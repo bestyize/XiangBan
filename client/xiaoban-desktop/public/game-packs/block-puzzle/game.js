@@ -1,6 +1,8 @@
 (() => {
   'use strict'
 
+  const runtime = globalThis.XiaobanBuiltinRuntime
+
   const rules = globalThis.XiabanBlockPuzzle
   const HOST_NONCE = new URLSearchParams(window.location.search).get('hostNonce')
   const boardNode = document.getElementById('board')
@@ -22,14 +24,12 @@
   let hostReady = false
 
   function postToHost(type, payload = {}) {
+    if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type, nonce: HOST_NONCE, ...payload }, '*')
   }
 
-  window.addEventListener('message', (event) => {
-    const message = event.data
-    if (!HOST_NONCE || event.source !== window.parent || !message || message.channel !== 'xiaban.game-host' ||
-      message.protocol !== 1 || message.type !== 'host.init' || message.nonce !== HOST_NONCE) return
+  function initialize() {
     if (hostReady) {
       postToHost('game.ready')
       return
@@ -40,6 +40,13 @@
     postToHost('game.start')
     postToHost('game.progress', { score: state.score, lines: state.lines })
     if (state.over) postToHost('game.result', { score: state.score, lines: state.lines })
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
+    const message = event.data
+    if (!HOST_NONCE || event.source !== window.parent || !message || message.channel !== 'xiaban.game-host' ||
+      message.protocol !== 1 || message.type !== 'host.init' || message.nonce !== HOST_NONCE) return
+    initialize()
   })
 
   function color(value) { return 'var(--color-' + value + ')' }
@@ -321,4 +328,6 @@
   window.addEventListener('resize', stopDrag)
   window.addEventListener('blur', () => { if (drag) stopDrag() })
   resetGame()
+  if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag() } })
+
 })()

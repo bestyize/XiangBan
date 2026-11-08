@@ -53,6 +53,7 @@
 # 界面约定
 
 - 修改小伴桌面控制台（`client/xiaoban-desktop/src/ui`）里的菜单、弹窗、卡片前，先读 [`client/xiaoban-desktop/docs/design-specs/ui-conventions.md`](client/xiaoban-desktop/docs/design-specs/ui-conventions.md)：菜单一项一行、说明放悬停提示、优先复用 `xb-menu` 共享类、颜色走 `--ui-*` 主题变量。
+- Android 协议 2 游戏使用宿主胶囊退出，运行页不另设左上角返回按钮。作品内层级接入浏览器历史，所有可交互控件按胶囊实际位置和大小避让。详见[运行时协议](docs/architecture/app-runtime/README.md)第 4 节和第 6 节。
 
 ---
 

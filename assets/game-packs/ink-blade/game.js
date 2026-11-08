@@ -14,6 +14,8 @@
   const canvas = $('scene'), ctx = canvas.getContext('2d', { alpha: false })
   const params = new URLSearchParams(location.search)
   const nonce = params.get('hostNonce')
+  const runtime = globalThis.XiaobanBuiltinRuntime
+  const hudActions = gameNode.querySelector('.hud-actions')
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const LV = globalThis.XiabanInkLevels
   const PROGRESS = globalThis.XiabanInkProgress
@@ -22,7 +24,7 @@
   const STEP = 1 / 60
   const CINNABAR = '#b8322a'
   const LOCAL_SAVE = 'xiaban.ink-blade.save'
-  const hosted = Boolean(nonce) && window.parent !== window
+  const hosted = Boolean(runtime || (nonce && window.parent !== window))
 
   // A shared result can open one 幅 as a duel ("切磋帖"), with the friend's score to beat.
   const duel = (() => {
@@ -55,7 +57,9 @@
   // ------------------------------------------------------------ host protocol
 
   function postToHost(type, payload = {}) {
-    if (!hostReady || !nonce || window.parent === window) return
+    if (!hostReady) return
+    if (runtime) { runtime.send(type, payload); return }
+    if (!nonce || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*')
   }
 
@@ -71,22 +75,30 @@
     if (phase === 'result') { resultPosted = true; postToHost('game.result', metrics()) }
   }
 
-  window.addEventListener('message', (event) => {
-    const data = event.data
-    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout'].includes(data.type)) return
-    if (data.safeArea && typeof data.safeArea === 'object') {
+  function updateHostLayout({ safeArea }) {
+    if (safeArea && typeof safeArea === 'object') {
       for (const side of ['top', 'right', 'bottom', 'left']) {
-        const value = data.safeArea[side]
+        const value = safeArea[side]
         if (Number.isFinite(value) && value >= 0 && value <= 160) hostSafeArea[side] = value
       }
       applySafeArea()
     }
+  }
+
+  function initialize(data) {
+    updateHostLayout(data)
     if (data.type === 'host.layout') return
     if (hostReady) { postToHost('game.ready'); return }
     hostReady = true
     if (Object.hasOwn(data, 'save')) applySave(data.save)
     postToHost('game.ready')
     syncRound()
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
+    const data = event.data
+    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout'].includes(data.type)) return
+    initialize(data)
   })
 
   // ------------------------------------------------------------ save
@@ -125,8 +137,16 @@
       const local = Math.max(0, Math.min(160, parseFloat(style.getPropertyValue('--viewport-safe-' + side)) || 0))
       physical[side] = Math.max(local, hostSafeArea[side])
     }
+    const capsule = (side) => parseFloat(style.getPropertyValue('--xb-capsule-' + side)) || 0
+    if (runtime && view.rotation && capsule('height') > 0) {
+      physical.top = Math.max(physical.top, capsule('top') + capsule('height') + 8)
+    }
     const logical = viewport.safeArea(view, physical)
     for (const side of ['top', 'right', 'bottom', 'left']) gameNode.style.setProperty('--safe-' + side, logical[side] + 'px')
+    if (runtime) {
+      const avoid = !view.rotation && capsule('width') > 0 ? capsule('right') + capsule('width') + 8 : 0
+      hudActions.style.marginRight = Math.max(0, avoid - Math.max(14, logical.right)) + 'px'
+    }
   }
 
   function buildAssets(key) {
@@ -370,6 +390,7 @@
   $('welcomeSound').addEventListener('click', toggleSound)
 
   async function requestImmersive(feedback = true) {
+    if (runtime) return
     const root = document.documentElement
     const request = root.requestFullscreen || root.webkitRequestFullscreen
     if (!request || document.fullscreenEnabled === false) { if (feedback) toast('当前浏览器暂不支持全屏，画面已自动适配横屏。', 3200); return }
@@ -379,13 +400,14 @@
     } catch { if (feedback) toast('全屏暂未开启，横持手机仍可继续。', 3000) }
   }
   async function leaveFullscreen() {
+    if (runtime) return
     try { screen.orientation?.unlock?.() } catch { /* Not every browser exposes orientation controls. */ }
     try {
       const exit = document.exitFullscreen || document.webkitExitFullscreen
       if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) await exit.call(document)
     } catch { /* Navigation also leaves fullscreen. */ }
   }
-  $('fullscreenButton').hidden = !(Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false)
+  $('fullscreenButton').hidden = Boolean(runtime) || !(Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false)
   function fullscreenChange() {
     const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement)
     $('fullscreenButton').setAttribute('aria-label', active ? '退出全屏' : '进入全屏')
@@ -412,6 +434,7 @@
   }
 
   function startRound(levelId = currentLevel, asDuel = false) {
+    if (runtime && history.state?.inkBladePicker) history.back()
     audio.resume()
     if (touchUI && !document.fullscreenElement) void requestImmersive(false)
     currentLevel = LV.level(levelId) ? levelId : selectedVolume + '-1'
@@ -456,6 +479,7 @@
   }
 
   function openSelect() {
+    if (runtime && !history.state?.inkBladePicker) history.pushState({ inkBladePicker: true }, '')
     phase = 'select'
     resetInput()
     setOverlays('select')
@@ -466,6 +490,10 @@
   }
 
   function backToWelcome() {
+    if (runtime && history.state?.inkBladePicker) {
+      history.back()
+      return
+    }
     phase = 'welcome'
     state = rules.createGame({ difficulty, level: currentLevel })
     camera.x = cameraTarget()
@@ -648,6 +676,10 @@
 
   $('startButton').addEventListener('click', () => { if (duel) startRound(duel.level, true); else openSelect() })
   $('selectBack').addEventListener('click', backToWelcome)
+  if (runtime) window.addEventListener('popstate', () => {
+    if (history.state?.inkBladePicker) openSelect()
+    else if (phase === 'select') backToWelcome()
+  })
   for (const tab of document.querySelectorAll('.volume-tab')) tab.addEventListener('click', () => selectVolume(Number(tab.dataset.vol)))
   $('restartButton').addEventListener('click', () => startRound(currentLevel, duelRound))
   $('nextButton').addEventListener('click', () => { const nextId = PROGRESS.next(currentLevel); if (nextId) startRound(nextId) })
@@ -1748,4 +1780,22 @@
   updateHUD(true)
   camera.x = cameraTarget()
   requestAnimationFrame(frame)
+  if (runtime) {
+    let restoreSound = false
+    runtime.connect(initialize, {
+      save: true,
+      layout: updateHostLayout,
+      hide() {
+        resetInput()
+        pause('离开页面时画卷已停住，回来可以接着走。')
+        restoreSound ||= audio.enabled
+        audio.setEnabled(false)
+      },
+      show() {
+        if (!restoreSound) return
+        restoreSound = false
+        audio.setEnabled(true)
+      },
+    })
+  }
 })()

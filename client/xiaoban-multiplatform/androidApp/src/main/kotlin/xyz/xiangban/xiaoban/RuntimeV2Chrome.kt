@@ -137,7 +137,7 @@ internal class RuntimeV2Chrome(
     }
 
     init {
-        root.addView(capsuleView, FrameLayout.LayoutParams(pixels(88.5f), pixels(32f), Gravity.TOP or Gravity.RIGHT))
+        root.addView(capsuleView, FrameLayout.LayoutParams(pixels(76f), pixels(32f), Gravity.TOP or Gravity.RIGHT))
         root.addView(overlayView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         updateInsets(0, 0, 0, 0, landscape = false)
         syncVisibility()
@@ -156,13 +156,9 @@ internal class RuntimeV2Chrome(
         val layout = capsuleView.layoutParams as FrameLayout.LayoutParams
         val topMargin = maxOf(pixels(if (landscape) 14f else 48f), top + pixels(4f))
         val rightMargin = right + pixels(if (landscape) 16f else 12f)
-        val width = pixels(88.5f)
-        val height = pixels(32f)
-        if (layout.topMargin != topMargin || layout.rightMargin != rightMargin || layout.width != width || layout.height != height) {
+        if (layout.topMargin != topMargin || layout.rightMargin != rightMargin) {
             layout.topMargin = topMargin
             layout.rightMargin = rightMargin
-            layout.width = width
-            layout.height = height
             capsuleView.layoutParams = layout
         }
         menuHorizontalInset = (maxOf(left, right) / displayMetrics.density).dp
@@ -241,7 +237,7 @@ internal class RuntimeV2Chrome(
         val ink = Color(0xFF222222)
         Row(
             Modifier.fillMaxSize().clip(CircleShape)
-                .background(Color.White.copy(alpha = .88f))
+                .background(Color.White.copy(alpha = .2f))
                 .border(.5.dp, Color.Black.copy(alpha = .12f), CircleShape),
             verticalAlignment = Alignment.CenterVertically,
         ) {

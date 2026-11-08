@@ -14,6 +14,7 @@ function script(saveEnabled = true) {
     .replaceAll('${JSONObject.quote(nonce)}', JSON.stringify('test-nonce'))
     .replaceAll('${JSONObject.quote(consoleToken)}', JSON.stringify('private-token:'))
     .replaceAll('${scriptJson(init.toString())}', JSON.stringify(init))
+    .replaceAll('${trial != null}', 'false')
     .replaceAll('${game.saveEnabled}', String(saveEnabled))
     .replaceAll('${JSONObject.quote(gameUrl(game.id))}', JSON.stringify('https://xiaoban-game.invalid/games/test/index.html?hostNonce=test-nonce'));
 }
@@ -98,7 +99,7 @@ count = game.logs.length;
 game.send({ type: 'game.save', data: {} });
 assert.equal(game.logs.length, count, 'reloading requires a fresh ready handshake');
 
-const bootstrap = source.split('val bootstrap = """<script>')[1].split('</script>""".trimIndent()')[0];
+const bootstrap = source.split('val bootstrap = """<script>')[1].split('</script>""".trimIndent()')[0].replaceAll('${trial != null}', 'false');
 const childListeners = {}, childMessages = [];
 vm.runInNewContext(bootstrap, {
   URLSearchParams, location: { search: '?hostNonce=test-nonce' },

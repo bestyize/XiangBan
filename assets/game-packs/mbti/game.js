@@ -1,6 +1,8 @@
 (() => {
   'use strict'
 
+  const runtime = globalThis.XiaobanBuiltinRuntime
+
   const rules = globalThis.XiaobanMbtiRules
   const profiles = globalThis.XiaobanMbtiProfiles
   const nonce = new URLSearchParams(location.search).get('hostNonce')
@@ -15,15 +17,13 @@
   let transitionTimer = null
 
   function post(type, payload = {}) {
+    if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !nonce || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*')
   }
 
   // Installed synchronously during script evaluation, before the iframe load event.
-  window.addEventListener('message', event => {
-    const message = event.data
-    if (!nonce || window.parent === window || event.source !== window.parent || !message ||
-      message.channel !== 'xiaban.game-host' || message.protocol !== 1 || message.nonce !== nonce || message.type !== 'host.init') return
+  function applyLayout(message) {
     if (message.safeArea && typeof message.safeArea === 'object') {
       for (const side of ['top', 'right', 'bottom', 'left']) {
         const value = message.safeArea[side]
@@ -32,6 +32,10 @@
         }
       }
     }
+  }
+
+  function initialize(message) {
+    applyLayout(message)
     if (hostReady) { post('game.ready'); return }
     const restored = rules.normalizeSave(message.save)
     // A late initialization must not replace answers already entered in this session.
@@ -41,6 +45,13 @@
     post('game.ready')
     if (dirty) post('game.save', { data: save })
     if (view === 'home') renderHome()
+  }
+
+  if (!runtime) window.addEventListener('message', event => {
+    const message = event.data
+    if (!nonce || window.parent === window || event.source !== window.parent || !message ||
+      message.channel !== 'xiaban.game-host' || message.protocol !== 1 || message.nonce !== nonce || message.type !== 'host.init') return
+    initialize(message)
   })
 
   function persist() {
@@ -270,4 +281,6 @@
   })
 
   renderHome()
+  if (runtime) runtime.connect(initialize, { save: true, layout: applyLayout })
+
 })()

@@ -1,6 +1,8 @@
 (() => {
   'use strict'
 
+  const runtime = globalThis.XiaobanBuiltinRuntime
+
   const COLS = 10
   const ROWS = 20
   const CELL = 25
@@ -45,6 +47,7 @@
   let hostReady = false
 
   function postToHost(type, payload = {}) {
+    if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({
       channel: PACK_CHANNEL,
@@ -55,7 +58,17 @@
     }, '*')
   }
 
-  window.addEventListener('message', (event) => {
+  function initialize() {
+    if (hostReady) { postToHost('game.ready'); return }
+    document.body.classList.add('hosted')
+    hostReady = true
+    postToHost('game.ready')
+    postToHost('game.start')
+    postToHost('game.progress', { score, lines })
+    if (finished) postToHost('game.result', { score, lines })
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
     const message = event.data
     if (
       event.source !== window.parent ||
@@ -65,13 +78,7 @@
       message.type !== 'host.init' ||
       message.nonce !== HOST_NONCE
     ) return
-    if (hostReady) { postToHost('game.ready'); return }
-    document.body.classList.add('hosted')
-    hostReady = true
-    postToHost('game.ready')
-    postToHost('game.start')
-    postToHost('game.progress', { score, lines })
-    if (finished) postToHost('game.result', { score, lines })
+    initialize()
   })
 
   function shuffle(items) {
@@ -399,4 +406,6 @@
     })
     resize.observe(boardCanvas)
   }
+  if (runtime) runtime.connect(initialize, { hide: () => { if (!paused && !finished) togglePause() } })
+
 })()

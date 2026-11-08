@@ -78,6 +78,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private var playing = false
     private var reportedOpen = false
     private var networkDisabled = true
+    private var legacySave: JSONObject? = null
     private var proxyReady = false
     private var info: JSONObject? = null
     private var safeInsets = Rect()
@@ -110,6 +111,7 @@ class RuntimeV2Activity : ComponentActivity() {
                     pack = if (root == null) AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
                     else assets.loadBundledRuntimeV2(id, root)
                     script = assets.open("runtime-v2/bridge.js").bufferedReader().use { it.readText() }
+                    if (root != null && id != RUNTIME_V2_FIXTURE) legacySave = MobileGameActivity.readBuiltinLegacySave(filesDir, id)
                     networkDisabled = if (BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE) {
                         val override = filesDir.resolve("runtime-v2/debug-network-disabled")
                         override.exists() && override.readText().trim() != "false"
@@ -133,9 +135,13 @@ class RuntimeV2Activity : ComponentActivity() {
                     layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
                 container = FrameLayout(this@RuntimeV2Activity)
+                val kindLabel = when {
+                    pack.manifest.kind == "game" -> "游戏"
+                    pack.manifest.category == "quiz" -> "测评"
+                    else -> "工具"
+                }
                 chrome = RuntimeV2Chrome(
-                    this@RuntimeV2Activity, container, pack.manifest.name,
-                    if (pack.manifest.kind == "game") "游戏" else "工具", icon,
+                    this@RuntimeV2Activity, container, pack.manifest.name, kindLabel, icon,
                     official = !community, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit, onMenuChanged = { updateVisibility() },
                     landscapeLaunch = pack.manifest.orientation == "landscape",
@@ -239,7 +245,7 @@ class RuntimeV2Activity : ComponentActivity() {
             .put("theme", if (dark) "dark" else "light")
             .put("locale", resources.configuration.locales[0].toLanguageTag())
             .put("safeArea", safeArea).put("capsule", capsuleArea)
-            .put("query", JSONObject()).put("legacySave", JSONObject.NULL)
+            .put("query", JSONObject()).put("legacySave", legacySave ?: JSONObject.NULL)
         val previous = info
         if (previous?.toString() == next.toString()) return
         info = next
@@ -256,8 +262,8 @@ class RuntimeV2Activity : ComponentActivity() {
     private fun inject(view: WebView) {
         injectedScript?.remove()
         injectedScript = WebViewCompat.addDocumentStartJavaScript(
-            view, script.replace("__XB_INITIAL_INFO__", checkNotNull(info).toString())
-                .replace("__XB_CAPABILITIES__", JSONArray(media.capabilities(pack)).toString()), setOf(pack.origin),
+            view, script.replace("__XB_CAPABILITIES__", JSONArray(media.capabilities(pack)).toString())
+                .replace("__XB_INITIAL_INFO__", checkNotNull(info).toString()), setOf(pack.origin),
         )
     }
 

@@ -9,6 +9,8 @@
   const map = $('map'), mapCtx = map.getContext('2d')
   const entryParams = new URLSearchParams(location.search)
   const nonce = entryParams.get('hostNonce')
+  const runtime = globalThis.XiaobanBuiltinRuntime
+  const hudActions = gameNode.querySelector('.hud-actions')
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const coarsePointer = matchMedia('(pointer: coarse)').matches
   const foodColors = ['#ff4e6a', '#ffc72c', '#a65cec', '#28b9f5', '#71ce36']
@@ -49,6 +51,7 @@
     wallet = value; refreshWalletUI()
   }
   function requestWallet(action) {
+    if (runtime) return Promise.reject(new Error('手机端暂不支持糖果币'))
     const requestId = Date.now().toString(36) + '_' + (++requestCounter).toString(36)
     if (window.parent === window) {
       return (action === 'read' ? memoryWallet.read().then(value => ({ wallet: value, coinsEarned: 0, protectionSeconds: 0 })) : memoryWallet.act(action, { requestId, sessionId: roundKey || undefined, score: state.snakes[0].score, finished: phase === 'result' })).then(response => { acceptWallet(response.wallet); return response })
@@ -82,7 +85,9 @@
   }
 
   function postToHost(type, payload = {}) {
-    if (!hostReady || !nonce || window.parent === window) return
+    if (!hostReady) return
+    if (runtime) { runtime.send(type, payload); return }
+    if (!nonce || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*')
   }
 
@@ -93,7 +98,32 @@
     if ((phase === 'result' || leaving) && !resultPosted) { resultPosted = true; postToHost('game.result', { score: state.snakes[0].score }) }
   }
 
-  window.addEventListener('message', (event) => {
+  function updateHostLayout({ safeArea }) {
+    if (safeArea && typeof safeArea === 'object') {
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        const value = safeArea[side]
+        if (Number.isFinite(value) && value >= 0 && value <= 160) hostSafeArea[side] = value
+      }
+      applySafeArea()
+    }
+  }
+
+  function initialize(data) {
+    updateHostLayout(data)
+    if (data.type === 'host.layout') return
+    if (hostReady) { postToHost('game.ready'); return }
+    hostReady = true
+    postToHost('game.ready')
+    syncRound()
+    if (runtime) return
+    void requestWallet('read').catch(() => { $('walletHint').textContent = '糖果币暂未连接，仍可正常玩' })
+    if (roundStarted && state.time === 0 && countdown > 0) {
+      const startingState = state
+      void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
+    }
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
     const data = event.data
     if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout', 'host.wallet'].includes(data.type)) return
     if (data.type === 'host.wallet') {
@@ -104,23 +134,7 @@
       else { acceptWallet(data.wallet); pending.resolve(data) }
       return
     }
-    if (data.safeArea && typeof data.safeArea === 'object') {
-      for (const side of ['top', 'right', 'bottom', 'left']) {
-        const value = data.safeArea[side]
-        if (Number.isFinite(value) && value >= 0 && value <= 160) hostSafeArea[side] = value
-      }
-      applySafeArea()
-    }
-    if (data.type === 'host.layout') return
-    if (hostReady) { postToHost('game.ready'); return }
-    hostReady = true
-    postToHost('game.ready')
-    syncRound()
-    void requestWallet('read').catch(() => { $('walletHint').textContent = '糖果币暂未连接，仍可正常玩' })
-    if (roundStarted && state.time === 0 && countdown > 0) {
-      const startingState = state
-      void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
-    }
+    initialize(data)
   })
 
   function tone(frequency, duration = 0.08, volume = 0.035, delay = 0) {
@@ -161,6 +175,7 @@
   }
 
   async function requestImmersive(feedback = true) {
+    if (runtime) return
     const root = document.documentElement
     const request = root.requestFullscreen || root.webkitRequestFullscreen
     if (!request || document.fullscreenEnabled === false) {
@@ -178,7 +193,7 @@
   }
 
   const fullscreenAvailable = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false
-  $('fullscreenButton').hidden = !fullscreenAvailable
+  $('fullscreenButton').hidden = Boolean(runtime) || !fullscreenAvailable
 
   function fullscreenChange() {
     const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement)
@@ -224,8 +239,16 @@
       const local = Math.max(0, Math.min(160, parseFloat(style.getPropertyValue('--viewport-safe-' + side)) || 0))
       physical[side] = Math.max(local, hostSafeArea[side])
     }
+    const capsule = (side) => parseFloat(style.getPropertyValue('--xb-capsule-' + side)) || 0
+    if (runtime && view.rotation && capsule('height') > 0) {
+      physical.top = Math.max(physical.top, capsule('top') + capsule('height') + 8)
+    }
     const logical = viewport.safeArea(view, physical)
     for (const side of ['top', 'right', 'bottom', 'left']) gameNode.style.setProperty('--safe-' + side, logical[side] + 'px')
+    if (runtime) {
+      const avoid = !view.rotation && capsule('width') > 0 ? capsule('right') + capsule('width') + 8 : 0
+      hudActions.style.marginRight = Math.max(0, avoid - Math.max(14, logical.right)) + 'px'
+    }
   }
 
   function resize() {
@@ -269,8 +292,10 @@
     $('tutorial').style.opacity = '1'
     $('startButton').blur(); $('restartButton').blur()
     syncRound(); updateHUD(); resize()
-    const startingState = state
-    void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
+    if (!runtime) {
+      const startingState = state
+      void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
+    }
     if (phase === 'playing') toast('3', 800)
   }
 
@@ -294,14 +319,14 @@
     syncRound(); updateHUD(); needsDraw = true
     tone(392, 0.13); tone(523, 0.15, 0.03, 0.12)
     $('restartButton').focus({ preventScroll: true })
-    if (!settled) {
+    if (!runtime && !settled) {
       settled = true; $('coinsEarned').disabled = true; $('coinsEarned').textContent = '正在结算糖果币…'
       const finishedKey = roundKey
       void requestWallet('settle').then(response => { if (roundKey === finishedKey) $('coinsEarned').textContent = `本局 +${response.coinsEarned} 糖果币 · 余额 ${response.wallet.coins}` }).catch(() => { if (roundKey === finishedKey) { settled = false; $('coinsEarned').disabled = false; $('coinsEarned').textContent = '糖果币暂未结算，点此重试' } })
     }
   }
   function eliminated() {
-    if (state.reason === 'timeout' || state.reviveUsed) { finishRound(); return }
+    if (runtime || state.reason === 'timeout' || state.reviveUsed) { finishRound(); return }
     phase = 'fallen'; resetInput(); accumulator = 0
     $('reviveScore').textContent = state.snakes[0].score
     $('reviveOverlay').hidden = false; $('controls').hidden = true; $('tutorial').hidden = true; $('toast').hidden = true
@@ -324,7 +349,7 @@
   }
 
   async function shareResult() {
-    if (phase !== 'result' || !lastResult) return
+    if (runtime || phase !== 'result' || !lastResult) return
     if (window.parent !== window && !hostReady) { toast('战绩页还在连接，请稍后再试。'); return }
     $('shareResultButton').disabled = true
     try {
@@ -346,7 +371,7 @@
     leaving = true
     resetInput()
     if (roundStarted) syncRound()
-    if (roundStarted && !settled) {
+    if (!runtime && roundStarted && !settled) {
       settled = true; phase = 'result'
       void requestWallet('settle').catch(() => {})
     }
@@ -777,7 +802,19 @@
 
   resize(); updateSoundButton(); updateHUD()
   refreshWalletUI()
-  if (window.parent === window) void requestWallet('read').catch(() => {})
+  if (!runtime && window.parent === window) void requestWallet('read').catch(() => {})
   camera.zoom = desiredZoom()
   requestAnimationFrame(frame)
+  if (runtime) {
+    for (const element of gameNode.querySelectorAll('.candy-wallet, .result-wallet, #shieldButton, #shareResultButton')) element.hidden = true
+    runtime.connect(initialize, {
+      layout: updateHostLayout,
+      hide() {
+        resetInput()
+        pause('离开页面时已经暂停，回来可以接着玩。')
+        if (audio?.state === 'running') void audio.suspend().catch(() => {})
+      },
+      show: unlockAudio,
+    })
+  }
 })()

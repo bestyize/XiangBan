@@ -97,7 +97,7 @@ class MobileGameActivity : Activity() {
         showMessage("正在检查游戏…")
         scope.launch {
             try {
-                val root = if (trial == null) bundledGameRoot(gameId) else null
+                val root = if (trial == null) bundledGameRoot(gameId, RuntimeV2Activity.supported(this@MobileGameActivity)) else null
                 val manifest = root?.let { withContext(Dispatchers.IO) { assets.bundledGameManifest(it) } }
                 if (isFinishing || isDestroyed) return@launch
                 if (manifest != null && readRuntimeProtocol(manifest) == 2) {
@@ -433,9 +433,7 @@ class MobileGameActivity : Activity() {
     }
 
     private fun readSave(): JSONObject? = runCatching {
-        val file = privateFile("saves/$gameId.json")
-        if (!file.isFile || file.length() > MAX_SAVE_BYTES) return@runCatching null
-        JSONObject(file.readText(Charsets.UTF_8))
+        readLegacySaveFile(privateFile("saves/$gameId.json"))
     }.getOrNull()
 
     /** A bounded 32 KiB atomic write runs serially on Main so finish/onPause can flush it reliably. */
@@ -626,6 +624,16 @@ class MobileGameActivity : Activity() {
         const val EXTRA_EXPORT = "mobile.game.export"
         private const val EXPORT_REQUEST = 4201
         private const val MAX_SAVE_BYTES = 32 * 1024
+
+        internal fun readBuiltinLegacySave(filesDir: File, id: String): JSONObject? = runCatching {
+            require(id in BuiltinMobileGames.ids)
+            readLegacySaveFile(filesDir.canonicalFile.resolve("workspace/saves/$id.json"))
+        }.getOrNull()
+
+        private fun readLegacySaveFile(file: File): JSONObject? {
+            if (file.canonicalFile != file.absoluteFile || !file.isFile || file.length() > MAX_SAVE_BYTES) return null
+            return JSONObject(file.readText(Charsets.UTF_8))
+        }
         private const val HOST_NAME = "xiaoban-game.invalid"
         private const val ORIGIN = "https://$HOST_NAME"
         private const val HOST_PATH = "/host.html"

@@ -7,6 +7,7 @@
   <script>
     /* Inlined desktop host adapter */
     (() => {
+      if (globalThis.XiaobanBuiltinRuntime) return;
       const nonce = new URLSearchParams(location.search).get('hostNonce');
       if (!nonce || window.parent === window) return;
       window.addEventListener('keydown', event => {
@@ -500,6 +501,12 @@
       .game-stats { padding: 6px 8px; }
     }
     .modal-card { max-height: calc(100% - 24px); overflow-y: auto; }
+    html.xb-builtin-runtime #game-container {
+      padding: var(--xb-safe-top, 0px) var(--xb-safe-right, 0px) var(--xb-safe-bottom, 0px) var(--xb-safe-left, 0px);
+    }
+    html.xb-builtin-runtime header.game-header {
+      padding-right: max(16px, calc(8px + var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) - var(--xb-safe-right, 0px)));
+    }
   </style>
 </head>
 <body>
@@ -591,6 +598,8 @@
   </div>
 
   <script>
+    const builtinRuntime = globalThis.XiaobanBuiltinRuntime;
+
     class AudioEngine {
       constructor() {
         this.ctx = null;
@@ -830,6 +839,8 @@
         this.winningLine = null;
         this.hoverCell = null;
         this.aiThinking = false;
+        this.paused = false;
+        this.pendingActions = [];
 
         this.ripples = [];
         this.particles = [];
@@ -894,7 +905,7 @@
 
       bindEvents() {
         const handlePoint = (clientX, clientY) => {
-          if (this.isGameOver || this.aiThinking) return;
+          if (this.paused || this.isGameOver || this.aiThinking) return;
           const rect = this.canvas.getBoundingClientRect();
           const x = clientX - rect.left;
           const y = clientY - rect.top;
@@ -989,6 +1000,10 @@
         });
 
         this.exitBtn.addEventListener('click', () => {
+          if (builtinRuntime) {
+            builtinRuntime.send('game.exit');
+            return;
+          }
           const nonce = new URLSearchParams(location.search).get('hostNonce');
           if (nonce && window.parent !== window) {
             window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type: 'game.exit', nonce }, '*');
@@ -1004,6 +1019,25 @@
         this.modalReviewBtn.addEventListener('click', () => {
           this.modal.classList.remove('show');
         });
+      }
+
+      delayAction(action, delay) {
+        setTimeout(() => {
+          if (this.paused) this.pendingActions.push(action);
+          else action();
+        }, delay);
+      }
+
+      pause() {
+        this.paused = true;
+        this.hoverCell = null;
+        this.audio.ctx?.suspend().catch(() => {});
+      }
+
+      resume() {
+        this.paused = false;
+        this.audio.ctx?.resume().catch(() => {});
+        for (const action of this.pendingActions.splice(0)) action();
       }
 
       makeMove(x, y) {
@@ -1039,7 +1073,7 @@
         if (this.gameMode === 'pve' && this.currentTurn !== this.playerRole && !this.isGameOver) {
           this.aiThinking = true;
           this.updateStatus();
-          setTimeout(() => {
+          this.delayAction(() => {
             if (this.isGameOver) return;
             const isMaster = this.aiDifficulty === 'master';
             const best = this.ai.getBestMove(this.board, this.currentTurn, isMaster);
@@ -1117,7 +1151,7 @@
           }
         }
 
-        setTimeout(() => {
+        this.delayAction(() => {
           this.modalBadge.textContent = badge;
           this.modalTitle.textContent = title;
           this.modalDesc.textContent = desc;
@@ -1182,7 +1216,7 @@
         if (this.gameMode === 'pve' && this.playerRole === 2) {
           this.aiThinking = true;
           this.updateStatus();
-          setTimeout(() => {
+          this.delayAction(() => {
             const best = this.ai.getBestMove(this.board, 1, this.aiDifficulty === 'master');
             this.aiThinking = false;
             this.makeMove(best.x, best.y);
@@ -1243,12 +1277,14 @@
       }
 
       render() {
-        this.ctx.clearRect(0, 0, this.canvasSize, this.canvasSize);
+        if (!this.paused) {
+          this.ctx.clearRect(0, 0, this.canvasSize, this.canvasSize);
 
-        this.drawBoardBackground();
-        this.drawGridAndLabels();
-        this.drawStones();
-        this.drawEffects();
+          this.drawBoardBackground();
+          this.drawGridAndLabels();
+          this.drawStones();
+          this.drawEffects();
+        }
 
         requestAnimationFrame(() => this.render());
       }
@@ -1550,7 +1586,12 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      new GomokuGame();
+      const game = new GomokuGame();
+      builtinRuntime?.connect(() => builtinRuntime.send('game.ready'), {
+        layout: () => game.resize(),
+        hide: () => game.pause(),
+        show: () => game.resume(),
+      });
     });
   </script>
 </body>

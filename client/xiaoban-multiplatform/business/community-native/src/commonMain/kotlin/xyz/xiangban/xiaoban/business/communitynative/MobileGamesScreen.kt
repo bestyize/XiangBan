@@ -95,6 +95,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     LaunchedEffect(overlay, allGames, allTools) { onOverlayChanged(overlay || allGames || allTools) }
     DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
     fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; remixSource = null; panel = "actions" } }
+    fun openOfficial(game: MobileGame) {
+        if (env.platform?.openGame(game.id) != true) message = "当前平台无法打开作品"
+    }
+    fun showOfficialDetails(game: MobileGame) {
+        detail = CreationItem(game.id, game.name, game.description, "游戏", game)
+        panel = "actions"
+    }
     BackHandler(enabled = overlay || allGames || allTools) {
         if (!overlay) { allGames = false; allTools = false }
         else if (!busy && detail != null && panel != "actions") panel = "actions" else close()
@@ -182,7 +189,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
             }
             if (!mine) AppPlazaScreen(env, official, games, covers, imageLoader, loading, errors, { reload++ },
-                onOfficial = { game -> detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions" },
+                onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
                 onAllGames = { allGames = true }, onAllTools = { allTools = true }, open = open)
             else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
@@ -219,12 +226,10 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 }
             }
         }
-        if (allTools && !mine) FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { allTools = false }) { tool ->
-            detail = CreationItem(tool.id, tool.name, tool.description, "游戏", tool); panel = "actions"
-        }
-        if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false }) { game ->
-            detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions"
-        }
+        if (allTools && !mine) FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { allTools = false },
+            onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
+        if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false },
+            onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
         detail?.let { entry ->
             if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, covers[entry.key], imageLoader,
                 dismiss = { close() }, remix = { detail = null; remixSource = entry.game })

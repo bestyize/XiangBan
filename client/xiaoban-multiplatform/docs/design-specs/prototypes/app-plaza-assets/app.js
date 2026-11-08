@@ -121,7 +121,7 @@ const BOARDS = [
   {id:'b4', title:'应用 · 广场', start:{screen:'plaza'}},
   {id:'b5', title:'应用 · 社区作品（帖子）', start:{screen:'post', post:'fish'}},
   {id:'b9', title:'做一个我的版本', start:{screen:'post', post:'fish', remix:'fish'}},
-  {id:'b6', title:'应用 · 官方应用详情', start:{screen:'plaza', sheet:'mbti'}},
+  {id:'b6', title:'应用 · 长按官方应用查看详情', start:{screen:'plaza', sheet:'mbti'}},
   {id:'b7', title:'全屏 · 竖屏', start:{screen:'run', app:'mbti'}},
   {id:'b8', title:'全屏 · 横屏', start:{screen:'run', app:'ink-blade'}}
 ];
@@ -191,7 +191,14 @@ function toast(id, text) {
   const t = document.querySelector(`#${id} .toast`); if (!t) return;
   t.textContent = text; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800);
 }
-function openItem(id, appId) { isPost(A[appId]) ? go(id, {screen:'post', post:appId}) : (phones[id].sheet = appId, phones[id].pop = false, render(id)); }
+function openItem(id, appId) {
+  if (isPost(A[appId])) go(id, {screen:'post', post:appId});
+  else launch(id, appId);
+}
+function showOfficialDetails(id, appId) {
+  Object.assign(phones[id], {sheet:appId, pop:false});
+  render(id);
+}
 
 function bind(el, id) {
   el.addEventListener('input', e => { if (e.target.matches('.idea')) phones[id].idea = e.target.value; });
@@ -241,10 +248,34 @@ function bind(el, id) {
       case 'toast': toast(id, t.dataset.msg); break;
     }
   });
-  let y0 = null;
-  el.addEventListener('pointerdown', e => { const sc = e.target.closest('.home-scroll'); if (sc && sc.scrollTop <= 0 && !phones[id].drawer) y0 = e.clientY; });
-  el.addEventListener('pointermove', e => { if (y0 !== null && e.clientY - y0 > 46) { y0 = null; phones[id].drawer = true; phones[id].hinted = true; render(id); } });
-  window.addEventListener('pointerup', () => { y0 = null; });
+  let y0 = null, press = null;
+  const officialId = target => {
+    const [act, appId] = (target.closest('[data-a]')?.dataset.a || '').split(':');
+    return act === 'open' && A[appId]?.src === 'official' ? appId : null;
+  };
+  el.addEventListener('pointerdown', e => {
+    const sc = e.target.closest('.home-scroll');
+    if (sc && sc.scrollTop <= 0 && !phones[id].drawer) y0 = e.clientY;
+    const appId = officialId(e.target);
+    if (appId && e.button === 0) press = {appId, x:e.clientX, y:e.clientY, at:e.timeStamp};
+  });
+  el.addEventListener('pointermove', e => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press = null;
+    if (y0 !== null && e.clientY - y0 > 46) { y0 = null; phones[id].drawer = true; phones[id].hinted = true; render(id); }
+  });
+  el.addEventListener('pointerup', e => {
+    if (press && e.timeStamp - press.at >= 500 && press.appId === officialId(e.target)) showOfficialDetails(id, press.appId);
+  });
+  el.addEventListener('contextmenu', e => {
+    const appId = officialId(e.target);
+    if (!appId) return;
+    e.preventDefault();
+    press = null;
+    showOfficialDetails(id, appId);
+  });
+  const clearPointer = () => { y0 = null; press = null; };
+  window.addEventListener('pointerup', clearPointer);
+  window.addEventListener('pointercancel', clearPointer);
 }
 
 /* ---------- 渲染 ---------- */
@@ -476,8 +507,8 @@ function run(s) {
     content = `<div class="generic-run">${a.cover ? cover(a) : cover(a)}<div class="label">演示画面</div></div>`;
   }
   const safe = L
-    ? `<div class="safe" style="left:0;top:0;bottom:0;width:52px"><em style="left:4px;bottom:8px">摄像头</em></div><div class="safe" style="right:8px;top:8px;width:104px;height:44px"><em style="right:0;top:48px">宿主胶囊</em></div>`
-    : `<div class="safe" style="left:0;right:0;top:0;height:44px"><em style="left:8px;top:48px">状态栏</em></div><div class="safe" style="right:6px;top:44px;width:104px;height:42px"><em style="right:0;top:46px">宿主胶囊</em></div>`;
+    ? `<div class="safe" style="left:0;top:0;bottom:0;width:52px"><em style="left:4px;bottom:8px">摄像头</em></div><div class="safe safe-capsule" style="right:8px;top:8px;height:44px"><em style="right:0;top:48px">宿主胶囊</em></div>`
+    : `<div class="safe" style="left:0;right:0;top:0;height:44px"><em style="left:8px;top:48px">状态栏</em></div><div class="safe safe-capsule" style="right:6px;top:44px;height:42px"><em style="right:0;top:46px">宿主胶囊</em></div>`;
   const fav = favs.has(a.id);
   const menu = s.menu ? `<div class="run-menu" data-a="closemenu"><div class="panel" data-stop>
     <div class="who">${ico(a, 'sm')}<span><b>${a.name.split(/[，：]/)[0]}</b><small>${a.src === 'official' ? '<span class="lbl">官方</span>' : a.author + ' ·'} ${a.kind}</small></span></div>

@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,8 +97,11 @@ internal fun rememberAppImageLoader(): ImageLoader {
 }
 
 @Composable
-internal fun AppShortcutTile(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+internal fun AppShortcutTile(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier,
+    onDetails: (() -> Unit)? = null, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(8.dp))
+        .combinedClickable(onLongClickLabel = "查看作品详情", onLongClick = onDetails, onClick = onClick)
+        .padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         AppShortcutIcon(env, item)
         Text(item.title, Modifier.padding(top = 8.dp), style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

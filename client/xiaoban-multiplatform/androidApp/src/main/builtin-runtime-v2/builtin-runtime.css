@@ -1,0 +1,45 @@
+html.xb-builtin-runtime {
+  --xb-builtin-top: max(var(--xb-safe-top, 0px), calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
+}
+
+/* The native capsule and system Back handle the top-left return actions. */
+html.xb-builtin-runtime body :is(#exitButton, #welcomeExit, #selectBack) {
+  display: none;
+}
+
+/* Keep the MBTI scrollport below the capsule, including after the result page scrolls. */
+html.xb-builtin-runtime body #app.app {
+  position: relative;
+  top: var(--xb-builtin-top);
+  height: calc(100% - var(--xb-builtin-top));
+  padding-top: 0;
+}
+
+/* Ink Blade's chapter picker has its own header, separate from the gameplay HUD. */
+html.xb-builtin-runtime #selectOverlay .select-head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+html.xb-builtin-runtime #selectOverlay .difficulty {
+  max-width: 100%;
+  margin-left: auto;
+}
+
+@media (orientation: landscape) {
+  html.xb-builtin-runtime #selectOverlay .select-head {
+    padding-right: max(0px, calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px - max(18px, var(--safe-right, 0px))));
+  }
+}
+
+/* Reserve the real status bar and capsule above the existing portrait HUD. */
+@media (orientation: portrait) {
+  html.xb-builtin-runtime body .game {
+    padding-top: var(--xb-builtin-top);
+    padding-bottom: max(10px, var(--xb-safe-bottom, 0px));
+  }
+
+  html.xb-builtin-runtime body.hosted .game .stats {
+    grid-column: 1 / 3;
+  }
+}

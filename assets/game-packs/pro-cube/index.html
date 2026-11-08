@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>3D全阶魔方 · Pro Cube Simulator</title>
   <link rel="stylesheet" href="game.css" />
+  <style>
+    html.xb-builtin-runtime .cube-hud-header {
+      padding: calc(0.625rem + var(--xb-builtin-top)) calc(1rem + var(--xb-safe-right, 0px))
+        0.625rem calc(1rem + var(--xb-safe-left, 0px));
+    }
+    html.xb-builtin-runtime .cube-hud-footer {
+      padding: 0.625rem calc(1rem + var(--xb-safe-right, 0px))
+        calc(0.625rem + var(--xb-safe-bottom, 0px)) calc(1rem + var(--xb-safe-left, 0px));
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      html.xb-builtin-runtime body {
+        padding: 8px calc(10px + var(--xb-safe-right, 0px))
+          calc(8px + var(--xb-safe-bottom, 0px)) calc(10px + var(--xb-safe-left, 0px));
+      }
+      html.xb-builtin-runtime .cube-hud-header { padding: var(--xb-builtin-top) 0 0; }
+      html.xb-builtin-runtime .cube-hud-footer { padding: 0; }
+      html.xb-builtin-runtime .hint-container {
+        left: calc(10px + var(--xb-safe-left, 0px));
+        right: calc(258px + var(--xb-safe-right, 0px));
+        bottom: calc(10px + var(--xb-safe-bottom, 0px));
+      }
+    }
+  </style>
 </head>
 <body>
 

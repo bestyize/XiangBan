@@ -1,6 +1,8 @@
 (() => {
   'use strict'
 
+  const runtime = globalThis.XiaobanBuiltinRuntime
+
   const rules = globalThis.Xiaban2048
   const HOST_NONCE = new URLSearchParams(window.location.search).get('hostNonce')
   const HOST_CHANNEL = 'xiaban.game-host'
@@ -33,17 +35,12 @@
   let hostReady = false
 
   function postToHost(type, payload = {}) {
+    if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({ channel: PACK_CHANNEL, protocol: PROTOCOL, type, nonce: HOST_NONCE, ...payload }, '*')
   }
 
-  window.addEventListener('message', (event) => {
-    const message = event.data
-    if (
-      !HOST_NONCE || event.source !== window.parent || !message ||
-      message.channel !== HOST_CHANNEL || message.protocol !== PROTOCOL ||
-      message.type !== 'host.init' || message.nonce !== HOST_NONCE
-    ) return
+  function initialize() {
     if (hostReady) { postToHost('game.ready'); return }
     document.body.classList.add('hosted')
     hostReady = true
@@ -52,6 +49,16 @@
     postToHost('game.progress', { score, maxTile: Math.max(...board.flat()) })
     if (overlayMode === 'lost') postToHost('game.result', { score, maxTile: Math.max(...board.flat()) })
     boardNode.focus({ preventScroll: true })
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
+    const message = event.data
+    if (
+      !HOST_NONCE || event.source !== window.parent || !message ||
+      message.channel !== HOST_CHANNEL || message.protocol !== PROTOCOL ||
+      message.type !== 'host.init' || message.nonce !== HOST_NONCE
+    ) return
+    initialize()
   })
 
   function render(spawned = null, merges = []) {
@@ -204,4 +211,6 @@
   })
 
   resetGame()
+  if (runtime) runtime.connect(initialize, {})
+
 })()

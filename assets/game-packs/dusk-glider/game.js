@@ -14,6 +14,8 @@
   const canvas = $('scene')
   const params = new URLSearchParams(location.search)
   const nonce = params.get('hostNonce')
+  const runtime = globalThis.XiaobanBuiltinRuntime
+  const hudActions = gameNode.querySelector('.hud-actions')
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const GAME_ID = 'dusk-glider'
   const MAX_STEP = 1 / 60
@@ -64,7 +66,9 @@
   // ------------------------------------------------------------ host protocol
 
   function postToHost(type, payload = {}) {
-    if (!hostReady || !nonce || window.parent === window) return
+    if (!hostReady) return
+    if (runtime) { runtime.send(type, payload); return }
+    if (!nonce || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*')
   }
 
@@ -77,21 +81,29 @@
     if (phase === 'result') { resultPosted = true; postToHost('game.result', metrics()) }
   }
 
-  window.addEventListener('message', (event) => {
-    const data = event.data
-    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout'].includes(data.type)) return
-    if (data.safeArea && typeof data.safeArea === 'object') {
+  function updateHostLayout({ safeArea }) {
+    if (safeArea && typeof safeArea === 'object') {
       for (const side of ['top', 'right', 'bottom', 'left']) {
-        const value = data.safeArea[side]
+        const value = safeArea[side]
         if (Number.isFinite(value) && value >= 0 && value <= 160) hostSafeArea[side] = value
       }
       applySafeArea()
     }
+  }
+
+  function initialize(data) {
+    updateHostLayout(data)
     if (data.type === 'host.layout') return
     if (hostReady) { postToHost('game.ready'); return }
     hostReady = true
     postToHost('game.ready')
     syncRound()
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
+    const data = event.data
+    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout'].includes(data.type)) return
+    initialize(data)
   })
 
   // ------------------------------------------------------------ layout
@@ -104,8 +116,16 @@
       const local = Math.max(0, Math.min(160, parseFloat(style.getPropertyValue('--viewport-safe-' + side)) || 0))
       physical[side] = Math.max(local, hostSafeArea[side])
     }
+    const capsule = (side) => parseFloat(style.getPropertyValue('--xb-capsule-' + side)) || 0
+    if (runtime && view.rotation && capsule('height') > 0) {
+      physical.top = Math.max(physical.top, capsule('top') + capsule('height') + 8)
+    }
     const logical = viewport.safeArea(view, physical)
     for (const side of ['top', 'right', 'bottom', 'left']) gameNode.style.setProperty('--safe-' + side, logical[side] + 'px')
+    if (runtime) {
+      const avoid = !view.rotation && capsule('width') > 0 ? capsule('right') + capsule('width') + 8 : 0
+      hudActions.style.marginRight = Math.max(0, avoid - Math.max(14, logical.right)) + 'px'
+    }
   }
 
   function pixelRatio() {
@@ -393,6 +413,7 @@
   }
 
   async function requestImmersive(feedback = true) {
+    if (runtime) return
     const root = document.documentElement
     const request = root.requestFullscreen || root.webkitRequestFullscreen
     if (!request || document.fullscreenEnabled === false) { if (feedback) toast('当前浏览器暂不支持全屏，画面已自动适配横屏。', 3200); return }
@@ -402,13 +423,14 @@
     } catch { if (feedback) toast('全屏暂未开启，横持手机仍可继续。', 3000) }
   }
   async function leaveFullscreen() {
+    if (runtime) return
     try { screen.orientation?.unlock?.() } catch { /* Not every browser exposes orientation controls. */ }
     try {
       const exit = document.exitFullscreen || document.webkitExitFullscreen
       if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) await exit.call(document)
     } catch { /* Navigation also leaves fullscreen. */ }
   }
-  $('fullscreenButton').hidden = !(Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false)
+  $('fullscreenButton').hidden = Boolean(runtime) || !(Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false)
   function fullscreenChange() {
     const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement)
     $('fullscreenButton').setAttribute('aria-label', active ? '退出全屏' : '进入全屏')
@@ -763,4 +785,21 @@
     if (reducedMotion) cam.dist = 70
   }
   requestAnimationFrame(frame)
+  if (runtime) {
+    let restoreSound = false
+    runtime.connect(initialize, {
+      layout: updateHostLayout,
+      hide() {
+        resetInput()
+        pause('离开页面时太阳替你停住了，回来可以接着飞。')
+        restoreSound ||= audio?.enabled === true
+        audio?.setEnabled(false)
+      },
+      show() {
+        if (!restoreSound) return
+        restoreSound = false
+        applySound()
+      },
+    })
+  }
 })()

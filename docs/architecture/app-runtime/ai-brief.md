@@ -34,14 +34,14 @@
 6. **布局。** 页面占满 100vw × 100vh。
    - 右上角有宿主的「··· | ✕」胶囊，四周有状态栏和挖孔。
    - 用 CSS 变量 --xb-safe-top、--xb-safe-right、--xb-safe-bottom、--xb-safe-left 留出边距。
-   - 可点的东西不要放在胶囊下面，胶囊的位置是 --xb-capsule-top、--xb-capsule-right、--xb-capsule-width、--xb-capsule-height。
+   - 用 --xb-capsule-top、--xb-capsule-right、--xb-capsule-width、--xb-capsule-height 计算胶囊区域。所有可交互控件都要避开它，包括选关、暂停、结算和滚动后的控件。
    - canvas 按 devicePixelRatio 绘制，监听 resize 后重新布局。
    - 按钮至少 44×44 像素。
 
 7. **SDK 和生命周期。** 宿主已经注入了全局对象 xb，不要自己打包它，也不要自己写 postMessage。
    - 第一屏画好后调用 xb.ready()。
    - xb.on('hide', fn)：暂停游戏、停掉声音。xb.on('show', fn)：恢复。
-   - 不要处理 Esc 和系统返回，退出由宿主负责。
+   - 退出由宿主负责。Android 游戏运行页不另设左上角返回按钮。不要拦截 Esc 和系统返回。
    - 作品里有多个界面时，用 history.pushState 记录，在 popstate 里切回上一个界面，手机的返回键就能一层层退回。
 
 8. **存数据。** 重要数据用 await xb.storage.set(key, value) 和 await xb.storage.get(key)。值是 JSON，单个作品合计最多 10 MB。数据一变就存，不要等到退出时才存，手机可能随时把作品挂起。localStorage 和 IndexedDB 可能被系统清掉，只适合放缓存。

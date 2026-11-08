@@ -1,6 +1,8 @@
 (() => {
   'use strict'
 
+  const runtime = globalThis.XiaobanBuiltinRuntime
+
   const rules = globalThis.XiabanWaterSort
   const HOST_NONCE = new URLSearchParams(window.location.search).get('hostNonce')
   const flavors = [
@@ -32,6 +34,7 @@
   function score() { return rules.completedTubes(board) * 100 }
 
   function postToHost(type, payload = {}) {
+    if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type, nonce: HOST_NONCE, ...payload }, '*')
   }
@@ -40,17 +43,21 @@
     postToHost('game.progress', { score: score(), lines: 0, maxTile: 0 })
   }
 
-  window.addEventListener('message', (event) => {
-    const message = event.data
-    if (hostReady || !HOST_NONCE || event.source !== window.parent || !message ||
-      message.channel !== 'xiaban.game-host' || message.protocol !== 1 ||
-      message.type !== 'host.init' || message.nonce !== HOST_NONCE) return
+  function initialize() {
     hostReady = true
     document.body.classList.add('hosted')
     postToHost('game.ready')
     postToHost('game.start')
     progress()
     if (won) postToHost('game.result', { score: score(), lines: 0, maxTile: 0 })
+  }
+
+  if (!runtime) window.addEventListener('message', (event) => {
+    const message = event.data
+    if (hostReady || !HOST_NONCE || event.source !== window.parent || !message ||
+      message.channel !== 'xiaban.game-host' || message.protocol !== 1 ||
+      message.type !== 'host.init' || message.nonce !== HOST_NONCE) return
+    initialize()
   })
 
   function status(message, warning = false) {
@@ -284,4 +291,6 @@
   startLevel(0, false)
   window.addEventListener('resize', updateTubeLayout)
   if (typeof ResizeObserver === 'function') new ResizeObserver(updateTubeLayout).observe(stageNode)
+  if (runtime) runtime.connect(initialize, {})
+
 })()

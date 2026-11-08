@@ -2,6 +2,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +35,8 @@ import xyz.xiangban.xiaoban.common.community.*
 @Composable
 internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local: List<MobileGame>, covers: Map<String, ByteArray>,
     imageLoader: ImageLoader, loading: Boolean, errors: List<String>, reload: () -> Unit,
-    onOfficial: (MobileGame) -> Unit, onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
+    onOfficial: (MobileGame) -> Unit, onOfficialDetails: (MobileGame) -> Unit,
+    onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
     val games = official.filterNot { BuiltinMobileGames.isTool(it.id) }
     val tools = official.filter { BuiltinMobileGames.isTool(it.id) }
     var filter by rememberSaveable { mutableStateOf("推荐") }
@@ -75,7 +77,8 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(games, key = { it.id }) { game ->
-                        FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.width(124.dp)) { onOfficial(game) }
+                        FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.width(124.dp),
+                            onDetails = { onOfficialDetails(game) }) { onOfficial(game) }
                     }
                 }
             }
@@ -84,7 +87,10 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 item { PlazaHeading("精选工具", "全部", onAllTools) }
                 item {
                     Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tools.take(4).forEach { tool -> AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f)) { onOfficial(tool) } }
+                        tools.take(4).forEach { tool ->
+                            AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f),
+                                onDetails = { onOfficialDetails(tool) }) { onOfficial(tool) }
+                        }
                         repeat(4 - tools.take(4).size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
@@ -141,8 +147,9 @@ private fun PlazaHeading(title: String, action: String? = null, onAction: (() ->
 
 /** Shared by the plaza row and the full list; only the cover is clipped so the two text lines never lose their corners. */
 @Composable
-internal fun FeaturedGameCard(game: MobileGame, cover: ByteArray?, imageLoader: ImageLoader, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(role = Role.Button, onClick = onClick).padding(bottom = 4.dp)) {
+internal fun FeaturedGameCard(game: MobileGame, cover: ByteArray?, imageLoader: ImageLoader, modifier: Modifier,
+    onDetails: () -> Unit, onClick: () -> Unit) {
+    Column(modifier.combinedClickable(role = Role.Button, onLongClickLabel = "查看作品详情", onLongClick = onDetails, onClick = onClick).padding(bottom = 4.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f).outlinedCard(16.dp), contentAlignment = Alignment.Center) {
             XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
             cover?.let { bytes -> AsyncImage(bytes, null, imageLoader = imageLoader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
@@ -181,13 +188,17 @@ private fun CreatorPickCard(env: CommunityEnv, pack: Pack, modifier: Modifier, o
 
 /** 精选工具「全部」：四列图标网格。 */
 @Composable
-internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back: () -> Unit, onOpen: (MobileGame) -> Unit) {
+internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back: () -> Unit,
+    onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenBar("精选工具", back)
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(tools.chunked(4)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { tool -> AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f)) { onOpen(tool) } }
+                    row.forEach { tool ->
+                        AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f),
+                            onDetails = { onDetails(tool) }) { onOpen(tool) }
+                    }
                     repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
@@ -197,7 +208,8 @@ internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back:
 
 /** 精选游戏「全部」：三列封面，按方向筛选。 */
 @Composable
-internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, ByteArray>, imageLoader: ImageLoader, back: () -> Unit, onOpen: (MobileGame) -> Unit) {
+internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, ByteArray>, imageLoader: ImageLoader, back: () -> Unit,
+    onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit) {
     var filter by rememberSaveable { mutableStateOf("全部") }
     val shown = games.filter { filter == "全部" || (filter == "横屏") == (it.orientation == "landscape") }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -207,7 +219,10 @@ internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, Byte
             if (shown.isEmpty()) item { Text("没有${filter}游戏", Modifier.padding(vertical = 24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3) }
             items(shown.chunked(3)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { game -> FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.weight(1f)) { onOpen(game) } }
+                    row.forEach { game ->
+                        FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.weight(1f),
+                            onDetails = { onDetails(game) }) { onOpen(game) }
+                    }
                     repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }

@@ -11,10 +11,12 @@ import xyz.xiangban.xiaoban.common.community.MobileGame
 import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 
 internal class AndroidGameLibrary(private val context: Context) {
+    private val runtimeV2 by lazy { RuntimeV2Activity.supported(context) }
+
     suspend fun games(): List<MobileGame> = withContext(Dispatchers.IO) {
         val ids = if (BuildConfig.DEBUG) BuiltinMobileGames.ids + RUNTIME_V2_FIXTURE else BuiltinMobileGames.ids
         ids.map { id ->
-            val root = checkNotNull(bundledGameRoot(id))
+            val root = checkNotNull(bundledGameRoot(id, runtimeV2))
             val manifest = context.assets.bundledGameManifest(root)
             when (readRuntimeProtocol(manifest)) {
                 1 -> BuiltinMobileGames.read(id, manifest)
@@ -25,20 +27,17 @@ internal class AndroidGameLibrary(private val context: Context) {
         }
     }
     suspend fun cover(id: String): ByteArray? = withContext(Dispatchers.IO) {
-        val root = bundledGameRoot(id) ?: return@withContext null
-        val assets = context.assets
-        if (readRuntimeProtocol(assets.bundledGameManifest(root)) == 2) {
-            val pack = assets.loadBundledRuntimeV2(id, root)
-            pack.open(pack.manifest.cover)?.use { it.readBytes() }
-        } else assets.open("$root/cover.svg").use { it.readBytes() }
+        // The plaza already has artwork sized for its portrait and landscape tiles.
+        val root = bundledGameRoot(id, runtimeV2 = false) ?: return@withContext null
+        context.assets.open("$root/cover.svg").use { it.readBytes() }
     }
 }
 
 internal const val RUNTIME_V2_FIXTURE = "runtime-v2-fixture"
 
-internal fun bundledGameRoot(id: String): String? = when {
+internal fun bundledGameRoot(id: String, runtimeV2: Boolean = true): String? = when {
     BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE -> RUNTIME_V2_FIXTURE
-    id in BuiltinMobileGames.ids -> "game-packs/$id"
+    id in BuiltinMobileGames.ids -> if (runtimeV2) "game-packs-v2/$id" else "game-packs/$id"
     else -> null
 }
 

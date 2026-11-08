@@ -2,24 +2,24 @@
   'use strict';
 
   // ==========================================
-  // 0. 小伴桌面宿主协议适配 (xiaban.game-pack protocol 1)
+  // 0. 小伴宿主协议适配
   // ==========================================
+  const builtinRuntime = globalThis.XiaobanBuiltinRuntime;
   const nonce = new URLSearchParams(location.search).get('hostNonce');
-  let hostReady = false;
 
   function postToHost(type, payload = {}) {
+    if (builtinRuntime) return builtinRuntime.send(type, payload);
     if (!nonce || window.parent === window) return;
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*');
   }
 
-  window.addEventListener('message', (event) => {
-    const data = event.data;
-    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce) return;
-    if (data.type === 'host.init') {
-      hostReady = true;
-      postToHost('game.ready');
-    }
-  });
+  if (!builtinRuntime) {
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce) return;
+      if (data.type === 'host.init') postToHost('game.ready');
+    });
+  }
 
   // ==========================================
   // 1. Web Audio 机械磁力魔方音效合成器
@@ -1343,8 +1343,11 @@
   // ==========================================
   // 9. 主渲染循环
   // ==========================================
+  let hiddenAt = null;
+
   function animate(now) {
     requestAnimationFrame(animate);
+    if (hiddenAt !== null) return;
 
     if (gameState === 'PLAYING') {
       elapsedTime = now - startTime;
@@ -1363,8 +1366,30 @@
 
   window.addEventListener('load', () => {
     updateStatusUI();
-    requestAnimationFrame(animate);
-    // If not framed or already initialized, send ready
-    postToHost('game.ready');
+    if (!builtinRuntime) {
+      requestAnimationFrame(animate);
+      postToHost('game.ready');
+      return;
+    }
+    requestAnimationFrame(now => {
+      animate(now);
+      builtinRuntime.connect(() => postToHost('game.ready'), {
+        layout: fitCameraToScreen,
+        hide() {
+          if (hiddenAt !== null) return;
+          hiddenAt = performance.now();
+          onPointerUp();
+          sound.ctx?.suspend().catch(() => {});
+        },
+        show() {
+          if (hiddenAt === null) return;
+          const hiddenDuration = performance.now() - hiddenAt;
+          if (gameState === 'PLAYING') startTime += hiddenDuration;
+          if (activeAnimation) activeAnimation.startTime += hiddenDuration;
+          hiddenAt = null;
+          sound.ctx?.resume().catch(() => {});
+        },
+      });
+    });
   });
 })();
