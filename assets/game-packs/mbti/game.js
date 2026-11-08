@@ -4,7 +4,6 @@
   const runtime = globalThis.XiaobanBuiltinRuntime
 
   const rules = globalThis.XiaobanMbtiRules
-  const profiles = globalThis.XiaobanMbtiProfiles
   const nonce = new URLSearchParams(location.search).get('hostNonce')
   const byId = id => document.getElementById(id)
   const app = byId('app')
@@ -63,6 +62,7 @@
     clearTimeout(transitionTimer)
     advancing = false
     view = next
+    document.body.classList.toggle('is-report', next === 'result')
     views.forEach(id => { byId(id).hidden = id !== next })
     byId('homeButton').hidden = next === 'home'
     app.scrollTop = 0
@@ -205,7 +205,7 @@
     if (!save.progress) return
     const result = rules.score(save.progress.answers)
     if (!result.type) return renderReview()
-    save.lastResult = { type: result.type, percentages: result.percentages, totals: result.totals, completedAt: new Date().toISOString() }
+    save.lastResult = { type: result.type, percentages: result.percentages, totals: result.totals, completedAt: new Date().toISOString(), answers: save.progress.answers.slice() }
     save.progress = null
     persist()
     renderResult()
@@ -214,46 +214,9 @@
   function renderResult() {
     const result = save.lastResult
     if (!result) return
-    const profile = profiles[result.type]
-    byId('resultType').textContent = result.type
-    const answered = result.totals.reduce((sum, count) => sum + count, 0)
-    byId('resultDate').textContent = formatDate(result.completedAt, true) + ' · 已答 ' + answered + ' / 48 题'
-    const rows = rules.dimensions.map((dimension, index) => {
-      const first = result.percentages[index]
-      const row = document.createElement('div')
-      const context = document.createElement('p')
-      context.className = 'dimension-context'
-      context.textContent = dimension.context + ' · 已答 ' + result.totals[index] + ' / 12' + (first === 50 ? ' · 两侧持平' : '')
-      const label = document.createElement('p')
-      label.className = 'dimension-label'
-      const left = document.createElement('span')
-      left.textContent = dimension.firstLabel + ' ' + first + '%'
-      const right = document.createElement('span')
-      right.textContent = dimension.secondLabel + ' ' + (100 - first) + '%'
-      label.append(left, right)
-      const bar = document.createElement('div')
-      bar.className = 'dimension-bar'
-      bar.setAttribute('role', 'img')
-      bar.setAttribute('aria-label', left.textContent + '，' + right.textContent)
-      const fill = document.createElement('span')
-      fill.style.width = first + '%'
-      bar.append(fill)
-      row.append(context, label, bar)
-      return row
-    })
-    byId('dimensions').replaceChildren(...rows)
-    const hasTie = result.percentages.includes(50)
-    byId('resultCaveat').textContent = '百分比是该侧选项占本维度已答题的比例，不是能力高低或诊断概率。' +
-      (hasTie ? '持平维度暂按 E / S / T / J 侧显示字母，仅供排版归类；请结合两侧理解下文。' : '接近一半的维度，可以结合两侧理解。') +
-      (answered < 48 ? '本次含未答题，解读仅作初步参考。' : '')
-    byId('interpretation').textContent = profile.description
-    for (const [id, items] of [['workList', profile.work], ['blindSpotsList', profile.blindSpots]]) {
-      byId(id).replaceChildren(...items.map(text => {
-        const item = document.createElement('li')
-        item.textContent = text
-        return item
-      }))
-    }
+    const report = globalThis.XiaobanMbtiReport.build(result)
+    if (!report) return goHome()
+    globalThis.XiaobanMbtiReportView.render(report, byId('reportBody'))
     show('result', 'resultType')
   }
 

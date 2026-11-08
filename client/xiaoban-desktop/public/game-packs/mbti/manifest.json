@@ -4,7 +4,7 @@
   "kind": "app",
   "id": "mbti",
   "name": "MBTI 性格测评",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "48 道原创情境题，观察四个维度的日常偏好。约 10 分钟，答案与结果只保存在本机；倾向不是标签。",
   "category": "quiz",
   "entry": "index.html",

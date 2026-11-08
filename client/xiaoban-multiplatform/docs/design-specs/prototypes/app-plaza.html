@@ -9,6 +9,9 @@ button:focus-visible{outline:2px solid #E3203C;outline-offset:2px}
 svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .review{max-width:1560px;margin:auto;padding:24px 26px 16px;display:flex;align-items:center;gap:12px}
 .review b{font-size:17px}
+.review-links{max-width:1560px;margin:0 auto 20px;padding:0 26px;display:flex;gap:10px;flex-wrap:wrap}
+.review-links a{font-size:12px;color:inherit;text-decoration:none;padding:7px 12px;border-radius:8px;background:#ffffffb0}
+.dark .review-links a{background:#ffffff14}
 .review .tools{margin-left:auto;display:flex;gap:8px}
 .tools button{background:#ffffffb0;padding:8px 13px;border-radius:9px;font-size:12px;white-space:nowrap}
 .dark .tools button{background:#ffffff14}
@@ -366,9 +369,6 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .mbti .opt{display:block;width:100%;text-align:left;background:#fffaf0;border:1px solid #e6dccb;border-radius:16px;padding:18px;font-size:15px;line-height:1.6;margin-bottom:12px;color:#3b352c}
 .mbti .opt.sel{background:#efe2c9;border-color:#9a7b4f}
 .mbti .foot{margin-top:auto;display:flex;justify-content:space-between;font-size:13px;color:#8c8270}
-.mbti .result{margin:auto 0;text-align:center}
-.mbti .result .type{font-family:'Songti SC',serif;font-size:56px;letter-spacing:6px;font-weight:600;margin:10px 0}
-.mbti .result p{font-size:14px;line-height:1.9;color:#6d6455}
 /* 演示内容：水墨剑客 */
 .ink-run{position:absolute;inset:0;background:#efe8da}
 .ink-run img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 70%}
@@ -405,10 +405,13 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 
 .narrow .phone:not(.landscape){width:360px;height:780px}
 .narrow .gallery.l>div{width:328px}
-</style></head><body>
+</style><link rel="stylesheet" href="app-plaza-assets/mbti-report.css?v=7"></head><body>
 <header class="review"><b>应用广场</b>
-<div class="tools"><button id="safeBtn">显示安全区</button><button id="sizeBtn">390 → 360</button><button id="themeBtn">深色预览</button></div></header>
+<div class="tools"><label class="review-type">人格 <select id="mbtiTypeSelect" aria-label="预览人格类型"></select></label><button id="safeBtn">显示安全区</button><button id="sizeBtn">390 → 360</button><button id="themeBtn">深色预览</button></div></header>
+<nav class="review-links" aria-label="设计稿画板导航"><a href="?board=b14">分析过渡</a><a href="?board=b10">完整报告 · 六个章节</a><a href="?board=b11">图片分享</a><a href="?board=b13">链接分享</a><a href="?board=b12">16 人格图鉴</a><a href="?">全部画板</a></nav>
 <main class="boards" id="boards"></main>
-<p class="footer-note">轻点官方游戏或工具直接打开，长按或右键查看详情。「系统返回」模拟手机返回手势。<br>颜色、字号、底栏、卡片按 docs/product/手机端设计规范.md；底栏第二项由「创造」改为「应用」。</p>
-<script src="app-plaza-assets/app.js?v=8"></script>
+<p class="footer-note">轻点官方游戏或工具直接打开，长按或右键查看详情。「系统返回」模拟手机返回手势。<br>MBTI 报告与日期为示例数据；报告可滚动、跳转章节、展开解读，分享卡可导出图片。人格插画为原创概念稿。</p>
+<script src="app-plaza-assets/mbti-type-data.js?v=1"></script>
+<script src="app-plaza-assets/mbti-report.js?v=7"></script>
+<script src="app-plaza-assets/app.js?v=12"></script>
 </body></html>

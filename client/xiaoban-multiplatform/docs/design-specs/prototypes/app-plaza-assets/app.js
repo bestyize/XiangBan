@@ -114,7 +114,7 @@ const canRemix = a => a.allowRemix !== false && a.author !== '我';
 const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
 
 /* ---------- 画板 ---------- */
-const BOARDS = [
+const ALL_BOARDS = [
   {id:'b1', title:'小伴AI · 首页', start:{screen:'home'}},
   {id:'b2', title:'小伴AI · 下拉打开我的应用', start:{screen:'home', drawer:true, hinted:true}},
   {id:'b3', title:'小伴AI · 对话里递上应用', start:{screen:'chat', chat:'mbti'}},
@@ -123,8 +123,19 @@ const BOARDS = [
   {id:'b9', title:'做一个我的版本', start:{screen:'post', post:'fish', remix:'fish'}},
   {id:'b6', title:'应用 · 长按官方应用查看详情', start:{screen:'plaza', sheet:'mbti'}},
   {id:'b7', title:'全屏 · 竖屏', start:{screen:'run', app:'mbti'}},
+  {id:'b14', title:'MBTI · 正在分析', start:{screen:'run', app:'mbti', q:4, mbtiView:'analysis', analysisStep:1}},
+  {id:'b10', title:'MBTI · 完整报告（示例）', start:{screen:'run', app:'mbti', q:4}},
+  {id:'b11', title:'MBTI · 图片分享到朋友圈', start:{screen:'run', app:'mbti', q:4, mbtiView:'share'}},
+  {id:'b13', title:'MBTI · 链接分享到朋友圈', start:{screen:'run', app:'mbti', q:4, mbtiView:'share', mbtiShareKind:'link'}},
+  {id:'b12', title:'MBTI · 16 人格角色图鉴', start:{screen:'run', app:'mbti', q:4, mbtiView:'atlas'}},
   {id:'b8', title:'全屏 · 横屏', start:{screen:'run', app:'ink-blade'}}
 ];
+const requestedBoard = new URLSearchParams(location.search).get('board');
+const boardIds = (requestedBoard || '').split(',');
+const BOARDS = ALL_BOARDS.some(b => boardIds.includes(b.id))
+  ? ALL_BOARDS.filter(b => boardIds.includes(b.id)) : ALL_BOARDS;
+let selectedMbtiType = new URLSearchParams(location.search).get('type') || 'INFJ';
+if (!globalThis.MbtiTypeData[selectedMbtiType]) selectedMbtiType = 'INFJ';
 const phones = {};
 const MBTI_Q = [
   ['在一场热闹的聚会上，你更常……', '找人聊天，越聊越有精神', '待一会儿就想找个安静角落'],
@@ -134,11 +145,16 @@ const MBTI_Q = [
 ];
 
 function init() {
+  const typeSelect=document.getElementById('mbtiTypeSelect');
+  typeSelect.innerHTML=Object.keys(globalThis.MbtiTypeData).map(type=>`<option value="${type}">${type} · ${globalThis.MbtiTypeData[type].profile.role}</option>`).join('');
+  typeSelect.value=selectedMbtiType;
+  typeSelect.onchange=()=>{selectedMbtiType=typeSelect.value;Object.keys(phones).forEach(id=>{phones[id].mbtiType=selectedMbtiType;render(id)});const url=new URL(location.href);url.searchParams.set('type',selectedMbtiType);history.replaceState(null,'',url)};
   const host = document.getElementById('boards');
   host.innerHTML = BOARDS.map(b => `<section class="board"><h2>${b.title}</h2><div class="phone" id="${b.id}"></div>
-    <div class="board-tools"><button data-sysback="${b.id}">${icon('left')}系统返回</button><button data-reset="${b.id}">${icon('refresh')}回到起点</button></div></section>`).join('');
+    <div class="board-tools">${b.id==='b14'?`<button data-preview-analysis="${b.id}">播放完整过渡</button>`:''}<button data-sysback="${b.id}">${icon('left')}系统返回</button><button data-reset="${b.id}">${icon('refresh')}回到起点</button></div></section>`).join('');
   BOARDS.forEach(b => reset(b.id));
   host.addEventListener('click', e => {
+    const preview = e.target.closest('[data-preview-analysis]'); if (preview) return beginMbtiAnalysis(preview.dataset.previewAnalysis);
     const sb = e.target.closest('[data-sysback]'); if (sb) return sysBack(sb.dataset.sysback);
     const rs = e.target.closest('[data-reset]'); if (rs) return reset(rs.dataset.reset);
   });
@@ -148,7 +164,7 @@ function init() {
 }
 function reset(id) {
   const b = BOARDS.find(x => x.id === id);
-  phones[id] = {screen:'plaza', sub:'广场', stack:[], sheet:null, drawer:false, chat:null, list:null, filter:'全部', wtab:'推荐', post:null, app:null, menu:false, armed:false, pop:false, q:0, sel:null, hinted:false, remix:null, remixSrc:null, idea:'', ...b.start};
+  phones[id] = {mbtiType:selectedMbtiType,screen:'plaza', sub:'广场', stack:[], sheet:null, drawer:false, chat:null, list:null, filter:'全部', wtab:'推荐', post:null, app:null, menu:false, armed:false, pop:false, q:0, sel:null, hinted:false, remix:null, remixSrc:null, idea:'', ...b.start};
   phones[id].home = b.start.screen === 'run' ? 'plaza' : b.start.screen;
   const el = document.getElementById(id);
   if (!el.dataset.bound) { bind(el, id); el.dataset.bound = '1'; }
@@ -164,6 +180,7 @@ function pop(id) {
 function sysBack(id) {
   const s = phones[id];
   if (s.screen === 'run') {
+    if (s.app === 'mbti' && ['share','atlas'].includes(s.mbtiView)) { s.mbtiView = 'report'; render(id); return; }
     if (s.menu) return exitRun(id);
     s.menu = true; s.armed = true; render(id); return;
   }
@@ -173,10 +190,21 @@ function sysBack(id) {
   if (!s.stack.length) return toast(id, '已在起点');
   pop(id);
 }
+function beginMbtiAnalysis(id) {
+  const s=phones[id], token=(s.analysisToken||0)+1;
+  Object.assign(s,{screen:'run',app:'mbti',q:MBTI_Q.length,sel:null,mbtiView:'analysis',analysisStep:0,analysisToken:token});
+  render(id);
+  const update=(step,finish=false)=>{
+    if(phones[id]!==s || s.analysisToken!==token || s.screen!=='run' || s.app!=='mbti' || s.mbtiView!=='analysis') return;
+    s.analysisStep=step;if(finish)s.mbtiView='report';render(id);
+  };
+  setTimeout(()=>update(1),800);setTimeout(()=>update(2),1600);
+  setTimeout(()=>update(3),2300);setTimeout(()=>update(3,true),2750);
+}
 function launch(id, appId) {
   const s = phones[id], a = A[appId];
   s.stack.push(snapshot(s));
-  Object.assign(s, {screen:'launch', app:appId, sheet:null, drawer:false, pop:false, menu:false, armed:false, q:0, sel:null});
+  Object.assign(s, {screen:'launch', app:appId, sheet:null, drawer:false, pop:false, menu:false, armed:false, q:0, sel:null, mbtiView:null});
   const i = recent.indexOf(appId); if (i >= 0) recent.splice(i, 1); recent.unshift(appId);
   render(id);
   setTimeout(() => { if (s.screen === 'launch' && s.app === appId) { s.screen = 'run'; render(id); } }, a.o === 'L' ? 1400 : 700);
@@ -201,6 +229,23 @@ function showOfficialDetails(id, appId) {
 }
 
 function bind(el, id) {
+  el.addEventListener('scroll', e => {
+    if (!e.target.matches?.('.mr-scroll')) return;
+    const sc=e.target, line=sc.getBoundingClientRect().top+105;
+    const sections=[...sc.querySelectorAll('[data-chapter]')];
+    const active=sections.filter(n=>n.getBoundingClientRect().top<=line).pop()?.dataset.chapter || 'traits';
+    sc.querySelectorAll('[data-a^="mbti-jump:"]').forEach(b=>b.classList.toggle('active',b.dataset.a==='mbti-jump:'+active));
+  }, true);
+  el.addEventListener('change', e => {
+    const s = phones[id];
+    if (e.target.matches('[data-mbti-scores]')) { s.mbtiScores = e.target.checked; render(id); }
+    if (e.target.matches('[data-mbti-check]')) {
+      const n = +e.target.dataset.mbtiCheck;
+      s.mbtiDone = (s.mbtiDone || []).filter(x => x !== n);
+      if (e.target.checked) s.mbtiDone.push(n);
+      el.querySelector('[data-mbti-count]').textContent = s.mbtiDone.length;
+    }
+  });
   el.addEventListener('input', e => { if (e.target.matches('.idea')) phones[id].idea = e.target.value; });
   el.addEventListener('click', e => {
     const idea = e.target.closest('[data-idea]');
@@ -234,8 +279,17 @@ function bind(el, id) {
       case 'menu': s.menu = true; render(id); break;
       case 'closemenu': s.menu = false; s.armed = false; render(id); break;
       case 'exit': exitRun(id); break;
-      case 'restart': s.menu = false; s.armed = false; s.q = 0; s.sel = null; render(id); toast(id, '已重新开始'); break;
-      case 'answer': s.sel = +arg; render(id); setTimeout(() => { s.q++; s.sel = null; render(id); }, 260); break;
+      case 'restart': s.menu = false; s.armed = false; s.q = 0; s.sel = null; s.mbtiView = null; render(id); toast(id, '已重新开始'); break;
+      case 'mbti-analyze': beginMbtiAnalysis(id); break;
+      case 'answer': {
+        if ((s.sel !== null && s.q < MBTI_Q.length-1) || s.screen !== 'run' || s.app !== 'mbti' || s.q >= MBTI_Q.length) break;
+        s.sel = +arg; const question = s.q; render(id);
+        if (question < MBTI_Q.length-1) setTimeout(() => {
+          if (phones[id] !== s || s.screen !== 'run' || s.app !== 'mbti' || s.q !== question) return;
+          s.q++; s.sel = null; render(id);
+        }, 260);
+        break;
+      }
       case 'remix':
         if (s.screen === 'run') exitRun(id);
         s.remix = arg; s.idea = ''; s.pop = false; s.sheet = null; render(id); break;
@@ -245,6 +299,24 @@ function bind(el, id) {
       case 'post': go(id, {screen:'post', post:arg}); break;
       case 'allow': A[arg].allowRemix = A[arg].allowRemix === false; render(id); toast(id, A[arg].allowRemix ? '已允许别人改编' : '已关闭，别人看不到「做一个我的版本」'); break;
       case 'make': toast(id, '描述想法，小伴帮你做出来'); break;
+      case 'mbti-share': s.mbtiView = 'share'; render(id); break;
+      case 'mbti-report': s.mbtiView = 'report'; render(id); break;
+      case 'mbti-atlas': s.mbtiView = 'atlas'; render(id); break;
+      case 'mbti-share-kind': s.mbtiShareKind = arg; render(id); el.querySelector('.ms-scroll')?.scrollTo(0,0); break;
+      case 'mbti-moments': toast(id, '设计演示：以' + (s.mbtiShareKind === 'link' ? '链接' : '图片') + '打开微信朋友圈发布页'); break;
+      case 'mbti-copy-link': toast(id, '设计预览：正式版将生成并复制公开结果链接'); break;
+      case 'mbti-paper': s.mbtiPaper = arg; render(id); break;
+      case 'mbti-lens': s.mbtiLens = arg; render(id); break;
+      case 'mbti-jump': {
+        const sc = el.querySelector('.mr-scroll'), target = el.querySelector('[data-chapter="' + arg + '"]');
+        if (sc && target) {
+          sc.querySelectorAll('[data-a^="mbti-jump:"]').forEach(b=>b.classList.toggle('active',b.dataset.a==='mbti-jump:'+arg));
+          sc.scrollTo({top: sc.scrollTop + target.getBoundingClientRect().top - sc.getBoundingClientRect().top - 48, behavior:'smooth'});
+        }
+        break;
+      }
+      case 'mbti-save': MbtiDesign.save(s).then(() => toast(id, '卡片已导出')).catch(() => toast(id, '导出失败，请重试')); break;
+      case 'mbti-copy': navigator.clipboard.writeText('我此刻的人格倾向是 INFJ。看见细微，也不忘照亮自己。\n测试日期：2026.11.08 · 小伴自我观察').then(() => toast(id, '分享文案已复制')).catch(() => toast(id, '当前浏览器无法复制')); break;
       case 'toast': toast(id, t.dataset.msg); break;
     }
   });
@@ -289,7 +361,7 @@ function nav(active) {
 function render(id) {
   const el = document.getElementById(id), s = phones[id];
   const keep = {};
-  ['.scroll', '.sheet .inner', '.gallery'].forEach(q => { const n = el.querySelector(q); if (n && el.dataset.key === s.screen + (s.post || '')) keep[q] = [n.scrollTop, n.scrollLeft]; });
+  ['.scroll', '.sheet .inner', '.gallery', '.mr-scroll', '.ms-scroll'].forEach(q => { const n = el.querySelector(q); if (n && el.dataset.key === s.screen + (s.post || '')) keep[q] = [n.scrollTop, n.scrollLeft]; });
   el.classList.toggle('landscape', s.screen === 'run' && A[s.app].o === 'L');
   let html = '<div class="island"></div>' + ({home, chat, plaza, list, post, remixes, launch:launchScreen, run}[s.screen])(s);
   if (s.sheet) html += sheet(s);
@@ -489,14 +561,14 @@ function run(s) {
   const a = A[s.app], L = a.o === 'L';
   let content;
   if (a.id === 'mbti') {
-    if (s.q < MBTI_Q.length) {
+    if (s.mbtiView === 'analysis') { content = MbtiDesign.analysis(s); }
+    else if (s.q < MBTI_Q.length) {
       const [q, x, y] = MBTI_Q[s.q];
-      content = `<div class="mbti"><div class="prog">${12 + s.q} / 48<div><i style="width:${(12 + s.q) / 48 * 100}%"></i></div></div><h2>${q}</h2>
+      content = `<div class="mbti"><div class="prog">${s.q === MBTI_Q.length-1 ? 48 : 12 + s.q} / 48<div><i style="width:${(s.q === MBTI_Q.length-1 ? 48 : 12 + s.q) / 48 * 100}%"></i></div></div><h2>${q}</h2>
         <button class="opt ${s.sel === 0 ? 'sel' : ''}" data-a="answer:0">${x}</button><button class="opt ${s.sel === 1 ? 'sel' : ''}" data-a="answer:1">${y}</button>
-        <div class="foot"><span>上一题</span><span>跳过</span></div></div>`;
+        ${s.q===MBTI_Q.length-1 && s.sel!==null ? '<button class="mbti-submit" data-a="mbti-analyze">提交结果</button>' : ''}<div class="foot"><span>上一题</span><span>跳过</span></div></div>`;
     } else {
-      content = `<div class="mbti"><div class="result"><small style="color:#8c8270">你的倾向</small><div class="type">INFJ</div><p>安静，但心里有很多想法。<br>你在意别人的感受，也需要独处的时间。<br>这只是倾向，不是标签。</p>
-        <button class="opt" style="margin-top:28px;text-align:center" data-a="toast" data-msg="回到对话，小伴陪你聊这个结果">和小伴聊聊这个结果</button><button class="opt" style="text-align:center" data-a="restart">再测一次</button></div></div>`;
+      content = s.mbtiView === 'share' ? MbtiDesign.share(s) : s.mbtiView === 'atlas' ? MbtiDesign.atlas(s) : MbtiDesign.report(s);
     }
   } else if (a.id === 'ink-blade') {
     content = `<div class="ink-run"><img src="${a.cover}" alt=""><div class="ink-hud">卷三 · 烽火<span>第四幅 · 铁骑将军</span></div>
@@ -517,3 +589,6 @@ function run(s) {
     <div class="capsule"><button data-a="menu" aria-label="更多">${icon('more')}</button><i></i><button data-a="exit" aria-label="退出">${icon('close')}</button></div>${menu}</div>`;
 }
 init();
+const focusLinkedBoard = () => document.getElementById(location.hash.slice(1))?.closest('.board')?.scrollIntoView({block:'start'});
+addEventListener('load', focusLinkedBoard);
+addEventListener('hashchange', focusLinkedBoard);

@@ -101,12 +101,12 @@
   }
 
   function emptySave() {
-    return { version: 1, progress: null, lastResult: null }
+    return { version: 2, progress: null, lastResult: null }
   }
 
   function normalizeSave(value) {
     const save = emptySave()
-    if (!value || value.version !== 1) return save
+    if (!value || ![1, 2].includes(value.version)) return save
     const progress = value.progress
     if (progress && Array.isArray(progress.answers)) {
       save.progress = {
@@ -125,6 +125,14 @@
       const expectedType = dimensions.map((dimension, index) => result.percentages[index] >= 50 ? dimension.first : dimension.second).join('')
       if (expectedType === result.type) save.lastResult = {
         type: result.type, percentages: result.percentages.slice(), totals: result.totals.slice(), completedAt: result.completedAt,
+      }
+      // New results carry the answers that produced them. Recompute their scores
+      // from that snapshot; aggregate-only legacy results remain readable.
+      if (Array.isArray(result.answers) && result.answers.length === questions.length &&
+        result.answers.every(answer => answer === null || answer === 0 || answer === 1)) {
+        const snapshot = normalizeAnswers(result.answers), computed = score(snapshot)
+        if (computed.type) save.lastResult = { type: computed.type, percentages: computed.percentages,
+          totals: computed.totals, completedAt: result.completedAt, answers: snapshot }
       }
     }
     return save

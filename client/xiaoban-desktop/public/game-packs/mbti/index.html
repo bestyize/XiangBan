@@ -7,8 +7,11 @@
     <title>MBTI 性格测评 · 小伴</title>
     <link rel="stylesheet" href="./game.css">
     <link rel="stylesheet" href="./theme.css">
+    <link rel="stylesheet" href="./report.css">
     <script src="./rules.js" defer></script>
     <script src="./profiles.js" defer></script>
+    <script src="./report.js" defer></script>
+    <script src="./report-view.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
   <body>
@@ -38,7 +41,7 @@
         </div>
         <div class="home-actions">
           <p class="session-meta">48 道情境题 <span aria-hidden="true">·</span> 约 10 分钟</p>
-          <p class="privacy-copy">结果只保存在这台设备上。<br>这只是倾向，不是标签；不用于心理诊断。</p>
+          <p class="privacy-copy">从日常选择，看看你的性格倾向。<br>完成后，阅读属于这次作答的分析报告。</p>
           <button id="startButton" class="primary-button full-width" type="button">开始</button>
           <button id="resumeButton" class="primary-button full-width" type="button" hidden>继续上次</button>
           <button id="resetButton" class="text-button full-width" type="button" hidden>重新开始</button>
@@ -78,17 +81,7 @@
       </section>
 
       <section id="result" class="view result" hidden aria-labelledby="resultType">
-        <div class="result-heading">
-          <p class="eyebrow">此刻的倾向，更接近</p>
-          <h2 id="resultType" class="result-type" tabindex="-1"></h2>
-          <p id="resultDate" class="result-date"></p>
-        </div>
-        <div id="dimensions" class="dimensions" aria-label="四个维度的倾向"></div>
-        <p id="resultCaveat" class="result-caveat"></p>
-        <div class="reflection"><h3>一份观察，留给自己</h3><p id="interpretation"></p></div>
-        <div class="reflection"><h3>适合的工作方式</h3><ul id="workList"></ul></div>
-        <div class="reflection"><h3>可能的盲点</h3><ul id="blindSpotsList"></ul></div>
-        <p class="result-footnote">这些建议可以试一试，也可以不适合你。情境与状态会改变选择，四个字母装不下一个完整的人。</p>
+        <div id="reportBody"></div>
         <button id="retryButton" class="primary-button full-width" type="button">再测一次</button>
       </section>
       <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
