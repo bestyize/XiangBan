@@ -3,16 +3,9 @@ package xyz.xiangban.xiaoban.common.community
 import kotlin.test.*
 
 class GameLibraryTest {
-    private val manifest = """{"id":"dusk-glider","entry":"index.html","runtimeProtocol":1,"name":"暮色滑翔","description":"滑翔游戏","orientation":"landscape","save":true}"""
-    @Test fun `bundled catalog preserves identity orientation and save support`() {
-        val game = BuiltinMobileGames.read("dusk-glider", manifest)
-        assertEquals("landscape", game.orientation)
-        assertTrue(game.save)
-        assertFails { BuiltinMobileGames.read("ink-blade", manifest) }
-        assertFails { BuiltinMobileGames.read("other-game", manifest) }
-        assertFails { BuiltinMobileGames.read("dusk-glider", manifest.replace("index.html", "../index.html")) }
-        assertFails { BuiltinMobileGames.read("dusk-glider", manifest.replace("\"runtimeProtocol\":1", "\"runtimeProtocol\":2")) }
-        assertFails { MobileGameFormat.id("dusk-glider") } // Bundled IDs must remain protected from user replacement.
+    @Test fun `bundled ids stay protected from user replacement`() {
+        assertFails { MobileGameFormat.id("dusk-glider") }
+        assertTrue("mbti" in BuiltinMobileGames.ids && BuiltinMobileGames.isTool("mbti"))
     }
     @Test fun `history is deduplicated ordered bounded and tolerant of corrupt preferences`() {
         val old = (1..15).map { "game-$it" }

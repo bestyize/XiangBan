@@ -41,20 +41,14 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
                     val chosen = version ?: pack.version
                     require(pack.kind in setOf("game", "app") && pack.status == "published") { "作品已不可用" }
                     val info = env.forum.gameDownload(id, chosen)
-                    val protocol = info.validate(pack, chosen)
-                    val launched = if (protocol == 2) {
-                        require(env.config.runtimeV2) { "当前设备暂不支持协议 2" }
-                        if (env.platform.needsRuntimeV2MobileConfirmation(info)) {
-                            val decision = CompletableDeferred<Boolean>()
-                            pendingDownload = info.size to decision
-                            if (!decision.await()) return@launch
-                        }
-                        env.platform.playCommunityRuntimeV2(info, pack)
-                    } else env.platform.playCommunityGame(info, pack.title, bookmark = { next ->
-                        if (!env.session.state.value.loggedIn) throw ApiException(401, "请先登录后收藏")
-                        if (next == null) env.contentSocial.state("pack", id).bookmarked
-                        else env.contentSocial.bookmark("pack", id, next).bookmarked.also { env.contentBookmarkRevision.value++ }
-                    }, login = { open?.invoke(Route.Login) })
+                    info.validate(pack, chosen)
+                    require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
+                    if (env.platform.needsRuntimeV2MobileConfirmation(info)) {
+                        val decision = CompletableDeferred<Boolean>()
+                        pendingDownload = info.size to decision
+                        if (!decision.await()) return@launch
+                    }
+                    val launched = env.platform.playCommunityRuntimeV2(info, pack)
                     check(launched) { "无法打开试玩，请重试" }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { error = messageOf(e) }

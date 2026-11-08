@@ -20,15 +20,9 @@ private val WORK_VERSION = Regex("[a-zA-Z0-9.-]{1,32}")
 private val PATH_SEGMENT = Regex("[a-zA-Z0-9_@-][a-zA-Z0-9._@-]*")
 private val ENCODED_SEPARATOR = Regex("%2f|%5c", RegexOption.IGNORE_CASE)
 
-internal fun readRuntimeProtocol(manifest: String): Int = Json.parseToJsonElement(manifest).jsonObject.runtimeProtocol()
-
-private fun JsonObject.runtimeProtocol(): Int {
-    if ("runtimeProtocol" !in this) return 1
-    return when (unquoted("runtimeProtocol")) {
-        "1" -> 1
-        "2" -> 2
-        else -> throw IllegalArgumentException("不支持的作品运行时协议")
-    }
+private fun JsonObject.runtimeProtocol(): Int = when (unquoted("runtimeProtocol")) {
+    "2" -> 2
+    else -> throw IllegalArgumentException("这是旧版作品，已不再支持")
 }
 
 private fun JsonObject.unquoted(key: String): String? =
@@ -63,6 +57,7 @@ internal data class RuntimeV2Manifest(
     val cover: String,
     val orientation: String,
     val capabilities: Set<String>,
+    val input: List<String> = listOf("touch"),
 ) {
     companion object {
         private val APP_CATEGORIES = setOf("tool", "quiz")
@@ -87,7 +82,8 @@ internal data class RuntimeV2Manifest(
             val orientation = json.optionalText("orientation") ?: "portrait"
             require(orientation in setOf("portrait", "landscape", "any")) { "作品方向无效" }
             require(json.optionalText("layer") == null) { "该作品仅支持桌面端" }
-            require(json.textSet("input", setOf("touch", "mouse", "keyboard")).isNotEmpty()) { "作品未声明操作方式" }
+            val input = json.textSet("input", setOf("touch", "mouse", "keyboard"))
+            require(input.isNotEmpty()) { "作品未声明操作方式" }
             val entry = json.optionalText("entry") ?: "index.html"
             val icon = json.requiredText("icon")
             val cover = json.requiredText("cover")
@@ -96,7 +92,7 @@ internal data class RuntimeV2Manifest(
                 "作品图标或封面无效"
             }
             val capabilities = json.textSet("capabilities", CAPABILITIES)
-            return RuntimeV2Manifest(id, name, description, version, kind, category, entry, icon, cover, orientation, capabilities)
+            return RuntimeV2Manifest(id, name, description, version, kind, category, entry, icon, cover, orientation, capabilities, input.toList())
         }
     }
 }
@@ -138,6 +134,18 @@ internal class RuntimeV2Package private constructor(
             val manifest = RuntimeV2Manifest.read(root.resolve("manifest.json").inputStream().use(::readRuntimeManifest))
             require(manifest.kind == kind) { "作品包类型不匹配" }
             return create(manifest, id.toString(), version.toString()) { path -> root.resolve(path).inputStream() }
+        }
+
+        /** 手机里自己做的作品，文件在私有工作区 games/<id>/。每次读取都拒绝符号链接和目录外的路径。 */
+        fun loadWorkspace(root: File, id: String): RuntimeV2Package {
+            val base = root.canonicalFile
+            val manifest = base.resolve("manifest.json").inputStream().use(::readRuntimeManifest).let(RuntimeV2Manifest::read)
+            require(manifest.id == id && base.name == id) { "作品清单与目录不一致" }
+            return create(manifest, "mine-$id", manifest.version) { path ->
+                val file = base.resolve(path)
+                require(file.canonicalFile.path.startsWith(base.path + File.separator) && file.canonicalFile == file.absoluteFile) { "路径无效" }
+                file.inputStream()
+            }
         }
 
         private fun create(manifest: RuntimeV2Manifest, host: String, version: String, open: (String) -> InputStream): RuntimeV2Package {

@@ -142,8 +142,7 @@ val mobileVoiceAssets = tasks.register<SyncMobileVoiceAssets>("syncMobileVoiceAs
     outputDirectory.set(layout.buildDirectory.dir("generated/mobile-voice"))
 }
 
-// Build self-contained Android v2 variants from the reviewed gameplay sources.
-// Keep the original packages available to devices with older WebViews.
+// Build self-contained protocol 2 packages from the reviewed gameplay sources.
 abstract class SyncMobileGameAssets : DefaultTask() {
     @get:InputDirectory abstract val sourceDirectory: org.gradle.api.file.DirectoryProperty
     @get:InputDirectory abstract val runtimeDirectory: org.gradle.api.file.DirectoryProperty
@@ -159,11 +158,6 @@ abstract class SyncMobileGameAssets : DefaultTask() {
         val reviewedIds = source.listFiles().orEmpty().filter { it.resolve("manifest.json").isFile }.map { it.name }.toSet()
         check(categories.keys == reviewedIds) { "Android 内置作品的协议 2 分类与资源目录不一致" }
         files.sync {
-            from(source) {
-                include("**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.svg")
-                exclude("**/*.test.*")
-                into("game-packs")
-            }
             for (id in categories.keys) {
                 val target = "game-packs-v2/$id"
                 from(source.resolve(id)) {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonPrimitive
 import xyz.xiangban.xiaoban.common.community.CommunityGameDownload
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.RecentCommunityGame
@@ -28,6 +29,7 @@ internal object AndroidRuntimeV2Community {
     const val DIGEST = "runtime.v2.pack.digest"
     const val KIND = "runtime.v2.pack.kind"
     const val AUTHOR = "runtime.v2.pack.author"
+    const val LEGACY_VERSIONS = "runtime.v2.pack.legacy.versions"
     private const val CACHE_BYTES = 1024L * 1024 * 1024
     private val shaPattern = Regex("[a-fA-F0-9]{64}")
     private val lock = Mutex()
@@ -49,12 +51,17 @@ internal object AndroidRuntimeV2Community {
             val intent = RuntimeV2Activity.launchIntent(activity) {
                 AndroidCommunityGames.opened(appContext, recent)
             }
+            val legacyVersions = pack.versions.asSequence()
+                .filter { it.version in 1 until info.version }
+                .filter { (it.manifest["runtimeProtocol"] ?: JsonPrimitive(1)) == JsonPrimitive(1) }
+                .map { it.version }.sortedDescending().toList().toIntArray()
             activity.startActivity(intent
                 .putExtra(PACK_ID, info.packId)
                 .putExtra(VERSION, info.version)
                 .putExtra(DIGEST, info.sha256)
                 .putExtra(KIND, info.kind)
                 .putExtra(AUTHOR, pack.author?.nickname?.take(80))
+                .putExtra(LEGACY_VERSIONS, legacyVersions)
                 .putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, pack.networkDisabled != false))
             true
         }

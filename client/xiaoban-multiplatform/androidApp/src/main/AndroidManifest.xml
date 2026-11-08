@@ -48,11 +48,6 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/community_poster_paths" />
         </provider>
         <activity
-            android:name=".MobileGameActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
             android:name=".RuntimeV2Activity"
             android:exported="false"
             android:process=":runtime_v2"

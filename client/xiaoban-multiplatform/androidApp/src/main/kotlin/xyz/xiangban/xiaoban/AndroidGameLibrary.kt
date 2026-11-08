@@ -11,38 +11,28 @@ import xyz.xiangban.xiaoban.common.community.MobileGame
 import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 
 internal class AndroidGameLibrary(private val context: Context) {
-    private val runtimeV2 by lazy { RuntimeV2Activity.supported(context) }
-
     suspend fun games(): List<MobileGame> = withContext(Dispatchers.IO) {
         val ids = if (BuildConfig.DEBUG) BuiltinMobileGames.ids + RUNTIME_V2_FIXTURE else BuiltinMobileGames.ids
         ids.map { id ->
-            val root = checkNotNull(bundledGameRoot(id, runtimeV2))
-            val manifest = context.assets.bundledGameManifest(root)
-            when (readRuntimeProtocol(manifest)) {
-                1 -> BuiltinMobileGames.read(id, manifest)
-                else -> context.assets.loadBundledRuntimeV2(id, root).manifest.let {
-                    MobileGame(it.id, it.name, it.description, orientation = it.orientation)
-                }
+            context.assets.loadBundledRuntimeV2(id, checkNotNull(bundledGameRoot(id))).manifest.let {
+                MobileGame(it.id, it.name, it.description, it.orientation, it.kind, it.category, it.input, it.capabilities.toList(), it.version)
             }
         }
     }
     suspend fun cover(id: String): ByteArray? = withContext(Dispatchers.IO) {
-        // The plaza already has artwork sized for its portrait and landscape tiles.
-        val root = bundledGameRoot(id, runtimeV2 = false) ?: return@withContext null
-        context.assets.open("$root/cover.svg").use { it.readBytes() }
+        val root = bundledGameRoot(id) ?: return@withContext null
+        val manifest = context.assets.loadBundledRuntimeV2(id, root).manifest
+        context.assets.open("$root/${manifest.cover}").use { it.readBytes() }
     }
 }
 
 internal const val RUNTIME_V2_FIXTURE = "runtime-v2-fixture"
 
-internal fun bundledGameRoot(id: String, runtimeV2: Boolean = true): String? = when {
+internal fun bundledGameRoot(id: String): String? = when {
     BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE -> RUNTIME_V2_FIXTURE
-    id in BuiltinMobileGames.ids -> if (runtimeV2) "game-packs-v2/$id" else "game-packs/$id"
+    id in BuiltinMobileGames.ids -> "game-packs-v2/$id"
     else -> null
 }
-
-internal fun AssetManager.bundledGameManifest(root: String): String =
-    readRuntimeManifest(this, root)
 
 internal fun AssetManager.loadBundledRuntimeV2(id: String, root: String): RuntimeV2Package {
     val host = if (id == RUNTIME_V2_FIXTURE) "local-$id" else "official-$id"

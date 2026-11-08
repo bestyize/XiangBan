@@ -6,13 +6,14 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class RuntimeV2PackageTest {
-    @Test fun routingUsesOnlyTheDeclaredRuntimeProtocol() {
-        assertEquals(1, readRuntimeProtocol("""{"schemaVersion":3}"""))
-        assertEquals(1, readRuntimeProtocol("""{"runtimeProtocol":1}"""))
-        assertEquals(2, readRuntimeProtocol("""{"runtimeProtocol":2}"""))
-        for (value in listOf("3", "null", "true", "\"2\"", "2.0")) {
-            assertThrows(IllegalArgumentException::class.java) { readRuntimeProtocol("""{"runtimeProtocol":$value}""") }
+    @Test fun onlyProtocol2ManifestsAreAccepted() {
+        val base = """{"schemaVersion":3,"runtimeProtocol":RUNTIME,"kind":"app","id":"demo-app","name":"测试作品",
+            "description":"测试说明","version":"1.0","category":"tool","icon":"icon.svg","cover":"cover.svg","input":["touch"]}"""
+        assertEquals("demo-app", RuntimeV2Manifest.read(base.replace("RUNTIME", "2")).id)
+        for (value in listOf("1", "3", "null", "true", "\"2\"", "2.0")) {
+            assertThrows(IllegalArgumentException::class.java) { RuntimeV2Manifest.read(base.replace("RUNTIME", value)) }
         }
+        assertThrows(IllegalArgumentException::class.java) { RuntimeV2Manifest.read(base.replace(""","runtimeProtocol":RUNTIME""", "")) }
     }
 
     @Test fun validatesTheProtocol2ManifestBeforeOpeningAssets() {

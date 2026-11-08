@@ -52,7 +52,7 @@ pub fn configure(settings: &Settings, permission: &Permission, trust: &Path, ses
 pub fn danger(tool: &str, args: &Value) -> Option<String> {
     match tool {
         "delete_file" => Some("删除手机工作区内容无法自动撤销，请确认目标路径".into()),
-        "game_create" if args["overwrite"] == true => Some("这会覆盖已有游戏，请确认作品和覆盖范围".into()),
+        "app_create" if args["overwrite"] == true => Some("这会覆盖已有作品，请确认作品和覆盖范围".into()),
         _ => None,
     }
 }

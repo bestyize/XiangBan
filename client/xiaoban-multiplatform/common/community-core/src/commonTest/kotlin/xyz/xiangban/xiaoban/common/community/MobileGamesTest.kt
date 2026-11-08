@@ -5,8 +5,10 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class MobileGamesTest {
-    private val game = MobileGame("touch-runner", "触控跑酷", "点按跳跃并挑战最高分", save = true)
-    private val files = listOf(MobileGameFile("index.html", "<!doctype html><script src='game.js'></script>"), MobileGameFile("game.js", "let score = 0;"), MobileGameFile("cover.svg", "<svg xmlns='http://www.w3.org/2000/svg'/>"))
+    private val game = MobileGame("touch-runner", "触控跑酷", "点按跳跃并挑战最高分", category = "action")
+    private val svg = "<svg xmlns='http://www.w3.org/2000/svg'/>"
+    private val files = listOf(MobileGameFile("index.html", "<!doctype html><script src='game.js'></script>"), MobileGameFile("game.js", "let score = 0;"),
+        MobileGameFile("icon.svg", svg), MobileGameFile("cover.svg", svg))
 
     @Test
     fun `delete removes only selected work progress and logs`() = runTest {
@@ -60,7 +62,7 @@ class MobileGamesTest {
     }
 
     @Test
-    fun `export has a desktop v1 resource manifest and excludes saves and runtime logs`() = runTest {
+    fun `export has a protocol 2 manifest and excludes saves and runtime logs`() = runTest {
         val workspace = MemoryMobileWorkspace()
         val store = MobileGameStore(workspace)
         store.create(game, files)
@@ -69,36 +71,48 @@ class MobileGamesTest {
         val exported = store.exportFiles(game.id)
         val manifest = Json.parseToJsonElement(exported.first().content).jsonObject
         assertEquals("manifest.json", exported.first().path)
-        assertEquals(1, manifest.getValue("schemaVersion").jsonPrimitive.int)
+        assertEquals(3, manifest.getValue("schemaVersion").jsonPrimitive.int)
+        assertEquals(2, manifest.getValue("runtimeProtocol").jsonPrimitive.int)
         assertEquals("game", manifest.getValue("kind").jsonPrimitive.content)
         assertEquals(game.id, manifest.getValue("id").jsonPrimitive.content)
-        assertTrue(manifest.getValue("save").jsonPrimitive.boolean)
-        assertEquals("space", manifest.getValue("layer").jsonPrimitive.content)
-        assertEquals(setOf("manifest.json", "index.html", "game.js", "cover.svg"), exported.map { it.path }.toSet())
+        assertEquals("action", manifest.getValue("category").jsonPrimitive.content)
+        assertEquals("icon.svg", manifest.getValue("icon").jsonPrimitive.content)
+        assertEquals(listOf("touch", "mouse", "keyboard"), manifest.getValue("input").jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(setOf("manifest.json", "index.html", "game.js", "icon.svg", "cover.svg"), exported.map { it.path }.toSet())
         assertEquals(game, store.validate(game.id))
         assertEquals(listOf(game), store.list())
     }
 
     @Test
-    fun `game validation matches desktop identifiers metadata paths and text limits`() {
-        for (id in listOf("a", "A-game", "-game", "a_game", "falling-blocks", "pro-cube", "jade-gomoku")) {
+    fun `validation covers identifiers metadata paths and text limits`() {
+        for (id in listOf("a", "A-game", "-game", "game-", "a_game", "falling-blocks", "pro-cube", "jade-gomoku", "mbti")) {
             assertFailsWith<IllegalArgumentException>(id) { MobileGameFormat.metadata(game.copy(id = id)) }
         }
-        for (path in listOf("../index.html", "/index.html", "a\\game.js", "a:b.js", "a/.hidden.js", "a/b/c/d/e.js", "assets/a.png", "a.exe", "__MACOSX/game.js", "manifest.json/game.js")) {
+        for (path in listOf("../index.html", "/index.html", "a\\game.js", "a:b.js", "a/.hidden.js", "a/b/c/d/e/f/g.js", "assets/a.png", "a.exe", "__MACOSX/game.js", "manifest.json/game.js")) {
             assertFailsWith<IllegalArgumentException>(path) { MobileGameFormat.files(files + MobileGameFile(path, "x")) }
         }
+        MobileGameFormat.files(files + MobileGameFile("lib/util.mjs", "export {}"))
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + MobileGameFile("GAME.JS", "x")) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + MobileGameFile("manifest.json", "{}")) }
-        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files.filterNot { it.path == "index.html" }) }
+        for (name in MobileGameFormat.required) {
+            assertFailsWith<IllegalArgumentException>(name) { MobileGameFormat.files(files.filterNot { it.path == name }) }
+        }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + MobileGameFile("big.js", "a".repeat(MobileGameFormat.FILE_BYTES + 1))) }
-        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files((1..41).map { MobileGameFile("file$it.js", "x") }) }
-        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(listOf(MobileGameFile("index.html", "a".repeat(1024 * 1024))) + (1..4).map { MobileGameFile("file$it.js", "a".repeat(1024 * 1024)) }) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + (1..MobileGameFormat.FILES).map { MobileGameFile("file$it.js", "x") }) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + (1..9).map { MobileGameFile("file$it.js", "a".repeat(1024 * 1024)) }) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + listOf(MobileGameFile("folder.js", "x"), MobileGameFile("folder.js/child.js", "x"))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(name = "字".repeat(25))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(description = "字".repeat(81))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(name = "\u0085")) }
-        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(layer = "desktop")) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(orientation = "diagonal")) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(category = "tool")) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(kind = "app", category = "action")) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(kind = "effect")) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(input = listOf("mouse"))) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(input = listOf("touch", "gamepad"))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(capabilities = listOf("pointer"))) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(version = "1.0 beta")) }
+        assertEquals("tool", MobileGameFormat.metadata(game.copy(kind = "app", category = "tool", capabilities = listOf("camera"))).category)
         assertEquals("😀".repeat(24), MobileGameFormat.metadata(game.copy(name = "😀".repeat(24))).name)
     }
 
@@ -107,8 +121,8 @@ class MobileGamesTest {
         val workspace = MemoryMobileWorkspace()
         val store = MobileGameStore(workspace)
         files.forEach { workspace.write("drafts/runner/${it.path}", it.content) }
-        val create = mobileGameTools(store).first { it.name == "game_create" }
-        val base = buildJsonObject { put("id", game.id); put("name", game.name); put("description", game.description); put("source_dir", "drafts/runner") }
+        val create = mobileGameTools(store).first { it.name == "app_create" }
+        val base = buildJsonObject { put("id", game.id); put("name", game.name); put("description", game.description); put("source_dir", "drafts/runner"); put("category", "action") }
         assertFalse(create.run(JsonObject(base - "source_dir")).ok)
         assertFalse(create.run(JsonObject(base + ("files" to JsonArray(emptyList())))).ok)
         assertFalse(create.run(JsonObject(base + ("source_dir" to JsonPrimitive("../outside")))).ok)
@@ -116,6 +130,10 @@ class MobileGamesTest {
         assertEquals(files.toSet(), store.exportFiles(game.id).filterNot { it.path == "manifest.json" }.toSet())
         assertFalse(create.run(base).ok)
         assertTrue(create.run(JsonObject(base + ("overwrite" to JsonPrimitive(true)))).ok)
+        val tool = JsonObject(base + mapOf("overwrite" to JsonPrimitive(true), "kind" to JsonPrimitive("app"), "category" to JsonPrimitive("tool")))
+        assertTrue(create.run(tool).ok)
+        assertEquals("app", store.validate(game.id).kind)
+        assertFalse(create.run(JsonObject(tool + ("category" to JsonPrimitive("puzzle")))).ok)
         workspace.write("drafts/runner/manifest.json", "{}")
         assertFalse(create.run(JsonObject(base + ("overwrite" to JsonPrimitive(true)))).ok)
     }
@@ -151,9 +169,9 @@ class MobileGamesTest {
         val original = workspace.read("games/${game.id}/manifest.json")
         val objectManifest = Json.parseToJsonElement(original).jsonObject
         fun withField(key: String, value: JsonElement) = JsonObject(objectManifest + (key to value)).toString()
-        val wrongTypes = listOf("kind", "id", "name", "description", "layer", "orientation").map { withField(it, JsonPrimitive(false)) } +
-            listOf(withField("capabilities", JsonPrimitive("pointer")), withField("capabilities", buildJsonArray { add(JsonPrimitive(1)) }), "[]")
-        for (corrupt in listOf(original.replace("\"schemaVersion\":1", "\"schemaVersion\":2"), original.replace("\"schemaVersion\":1", "\"schemaVersion\":\"1\""), original.replace("\"${game.id}\"", "\"other-game\""), original.replace("\"save\":true", "\"save\":\"true\""), original.replace("\"orientation\":\"portrait\"", "\"orientation\":false")) + wrongTypes) {
+        val wrongTypes = listOf("kind", "id", "name", "description", "category", "orientation").map { withField(it, JsonPrimitive(false)) } +
+            listOf(withField("input", JsonPrimitive("touch")), withField("capabilities", JsonPrimitive("pointer")), withField("capabilities", buildJsonArray { add(JsonPrimitive(1)) }), "[]")
+        for (corrupt in listOf(original.replace("\"schemaVersion\":3", "\"schemaVersion\":2"), original.replace("\"runtimeProtocol\":2", "\"runtimeProtocol\":1"), original.replace("\"schemaVersion\":3", "\"schemaVersion\":\"3\""), original.replace("\"${game.id}\"", "\"other-game\""), original.replace("\"icon\":\"icon.svg\"", "\"icon\":\"../icon.svg\""), original.replace("\"orientation\":\"portrait\"", "\"orientation\":false")) + wrongTypes) {
             workspace.write("games/${game.id}/manifest.json", corrupt)
             assertFailsWith<IllegalArgumentException> { store.validate(game.id) }
             assertEquals(emptyList(), store.list())

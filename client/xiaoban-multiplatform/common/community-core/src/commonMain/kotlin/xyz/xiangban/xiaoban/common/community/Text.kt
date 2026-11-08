@@ -2,7 +2,7 @@ package xyz.xiangban.xiaoban.common.community
 
 /** 内容类型的中文名，顺序就是信息流二级 Tab 的顺序。 */
 val PackKinds: List<Pair<String, String>> = listOf(
-    "effect" to "特效", "wallpaper" to "壁纸", "widget" to "组件", "game" to "游戏",
+    "effect" to "特效", "wallpaper" to "壁纸", "widget" to "组件", "game" to "游戏", "app" to "应用",
     "reminder" to "提醒", "routine" to "例行", "task" to "任务", "goal" to "目标",
     "skill" to "技能", "expert" to "专家", "workflow" to "工作流",
 )
@@ -10,7 +10,7 @@ val PackKinds: List<Pair<String, String>> = listOf(
 fun kindLabel(kind: String): String = PackKinds.firstOrNull { it.first == kind }?.second ?: kind
 
 /** 视觉类内容用双列封面卡片，文字为主的能力类用单列。 */
-val VisualKinds = setOf("effect", "wallpaper", "widget", "game")
+val VisualKinds = setOf("effect", "wallpaper", "widget", "game", "app")
 
 private val tag = Regex("<[^>]*>")
 private val blankLines = Regex("\n{3,}")

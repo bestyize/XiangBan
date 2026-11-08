@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.ResultReceiver
 import android.util.Log
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.PermissionRequest
@@ -79,6 +80,8 @@ class RuntimeV2Activity : ComponentActivity() {
     private var reportedOpen = false
     private var networkDisabled = true
     private var legacySave: JSONObject? = null
+    private var log: RuntimeV2Log? = null
+    private var startedAt = 0L
     private var proxyReady = false
     private var info: JSONObject? = null
     private var safeInsets = Rect()
@@ -87,9 +90,11 @@ class RuntimeV2Activity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val id = intent.getStringExtra(MobileGameActivity.EXTRA_GAME_ID).orEmpty()
+        val id = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
         val community = intent.hasExtra(AndroidRuntimeV2Community.PACK_ID)
-        val root = if (community) null else bundledGameRoot(id) ?: run { finish(); return }
+        val workspace = !community && intent.getBooleanExtra(EXTRA_WORKSPACE, false) && MOBILE_GAME_ID.matches(id)
+        val root = if (community || workspace) null else bundledGameRoot(id) ?: run { finish(); return }
+        if (workspace) log = RuntimeV2Log(filesDir.resolve("workspace/logs/$id.txt"))
         active?.let { previous ->
             previous.closing = true
             previous.destroyWebView()
@@ -108,10 +113,21 @@ class RuntimeV2Activity : ComponentActivity() {
         lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 runCatching {
-                    pack = if (root == null) AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
-                    else assets.loadBundledRuntimeV2(id, root)
+                    pack = when {
+                        workspace -> RuntimeV2Package.loadWorkspace(filesDir.resolve("workspace/games/$id"), id)
+                        root == null -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
+                        else -> assets.loadBundledRuntimeV2(id, root)
+                    }
                     script = assets.open("runtime-v2/bridge.js").bufferedReader().use { it.readText() }
-                    if (root != null && id != RUNTIME_V2_FIXTURE) legacySave = MobileGameActivity.readBuiltinLegacySave(filesDir, id)
+                    legacySave = when {
+                        workspace -> null
+                        community -> LegacySaves.community(
+                            filesDir, intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0),
+                            intent.getIntArrayExtra(AndroidRuntimeV2Community.LEGACY_VERSIONS) ?: intArrayOf(),
+                        )
+                        id != RUNTIME_V2_FIXTURE -> LegacySaves.builtin(filesDir, id)
+                        else -> null
+                    }
                     networkDisabled = if (BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE) {
                         val override = filesDir.resolve("runtime-v2/debug-network-disabled")
                         override.exists() && override.readText().trim() != "false"
@@ -142,7 +158,7 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
                 chrome = RuntimeV2Chrome(
                     this@RuntimeV2Activity, container, pack.manifest.name, kindLabel, icon,
-                    official = !community, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
+                    official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit, onMenuChanged = { updateVisibility() },
                     landscapeLaunch = pack.manifest.orientation == "landscape",
                 )
@@ -276,6 +292,9 @@ class RuntimeV2Activity : ComponentActivity() {
         playing = false
         acceptingStorage = true
         chrome.loading()
+        startedAt = System.currentTimeMillis()
+        log?.reset()
+        log?.add("host.open", "gameId" to pack.manifest.id, "version" to pack.manifest.version)
         val view = createWebView()
         webView = view
         container.addView(view, 0, FrameLayout.LayoutParams(-1, -1))
@@ -345,6 +364,12 @@ class RuntimeV2Activity : ComponentActivity() {
         webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) = media.request(request, pack)
             override fun onPermissionRequestCanceled(request: PermissionRequest) = media.cancel(request)
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                    log?.add("console.error", "message" to message.message().take(300), "source" to message.sourceId().substringAfterLast('/').take(100), "line" to message.lineNumber())
+                }
+                return true
+            }
             override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
                 result.cancel()
                 return true
@@ -394,6 +419,8 @@ class RuntimeV2Activity : ComponentActivity() {
                 updateVisibility()
             }
             "document.error" -> {
+                log?.add("runtime.error", "filename" to params.optString("filename").take(128), "name" to params.optString("type").take(64),
+                    "message" to params.optString("message").take(256), "line" to params.optInt("line"))
                 result()
                 if (!ready) fail("作品启动时出错")
             }
@@ -401,12 +428,13 @@ class RuntimeV2Activity : ComponentActivity() {
                 result()
                 if (!ready && !failed && !closing) {
                     ready = true
+                    log?.add("game.ready", "readyMs" to System.currentTimeMillis() - startedAt)
                     handler.removeCallbacks(timeout)
                     chrome.loaded()
                     reportOpen()
                 }
             }
-            "exit" -> { result(); exit() }
+            "exit" -> { result(); log?.add("game.exit"); exit() }
             "storage.get", "storage.set", "storage.remove", "storage.keys" -> {
                 if (!acceptingStorage) { error("busy"); return }
                 val file = filesDir.resolve("runtime-v2/storage/${pack.host}.json")
@@ -416,13 +444,13 @@ class RuntimeV2Activity : ComponentActivity() {
             }
             "game.start" -> {
                 if (!ready || pack.manifest.kind != "game") error("invalid")
-                else { playing = true; result() }
+                else { playing = true; log?.add("game.start"); result() }
             }
             "game.progress", "game.result" -> {
                 val score = params.opt("score")
                 if (!playing || score !is Number || !score.isNonNegativeInteger()) error("invalid")
                 else {
-                    if (method == "game.result") playing = false
+                    if (method == "game.result") { playing = false; log?.add("game.result", "score" to score.toLong()) }
                     result()
                 }
             }
@@ -462,6 +490,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private fun fail(message: String) {
         if (failed || closing || !::chrome.isInitialized) return
         failed = true
+        log?.add("host.fail", "message" to message.take(200))
         handler.removeCallbacks(timeout)
         updateVisibility()
         chrome.error(message) { leave(reopen = true) }
@@ -536,6 +565,7 @@ class RuntimeV2Activity : ComponentActivity() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         destroyWebView()
+        log?.close()
         media.close()
         if (active === this) {
             RuntimeV2Proxy.setNetworkEnabled(false)
@@ -563,6 +593,8 @@ class RuntimeV2Activity : ComponentActivity() {
 
     companion object {
         const val EXTRA_NETWORK_DISABLED = "runtime.v2.network.disabled"
+        const val EXTRA_GAME_ID = "runtime.v2.game.id"
+        const val EXTRA_WORKSPACE = "runtime.v2.workspace"
         private const val APPEARANCE = "runtime.v2.appearance"
         private const val ACCENT = "runtime.v2.accent"
         private const val OPENED = "runtime.v2.opened"

@@ -167,9 +167,6 @@ class AndroidPlatformActions(
     private val gameLibrary = AndroidGameLibrary(context.applicationContext)
     override val communityGamesSupported = true
     override val recentCommunityGames get() = AndroidCommunityGames.recent(context)
-    override suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
-        bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean =
-        (context as? android.app.Activity)?.let { AndroidCommunityGames.play(it, download, title, bookmark, login) } ?: false
     override suspend fun playCommunityRuntimeV2(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, pack: xyz.xiangban.xiaoban.common.community.Pack): Boolean =
         (context as? android.app.Activity)?.let { AndroidRuntimeV2Community.play(it, download, pack) } ?: false
     override suspend fun needsRuntimeV2MobileConfirmation(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload): Boolean =
@@ -179,10 +176,9 @@ class AndroidPlatformActions(
     override suspend fun builtinGames() = gameLibrary.games()
     override suspend fun builtinGameCover(id: String) = gameLibrary.cover(id)
     override fun openGame(id: String): Boolean =
-        (context as? android.app.Activity)?.let { AndroidMobileGameHost(it).openGame(id) } ?: false
+        (context as? android.app.Activity)?.let { AndroidGameLauncher.open(it, id) } ?: false
 
-    override suspend fun exportGame(id: String): Boolean =
-        (context as? android.app.Activity)?.let { AndroidMobileGameHost(it).exportGame(id) } ?: false
+    override suspend fun exportGame(id: String): Boolean = creationSharing.saveGame(id)
 
     override fun exitApp() {
         (context as? android.app.Activity)?.finish()

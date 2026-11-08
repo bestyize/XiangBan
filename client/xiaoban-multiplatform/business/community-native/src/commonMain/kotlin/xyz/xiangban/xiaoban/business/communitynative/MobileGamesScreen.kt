@@ -121,7 +121,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         scope.launch { env.remoteChat.refreshPeers() }
     }
     fun startCreation() {
-        if (createKind == "游戏") createLocal("帮我设计并制作一款支持手机触控和电脑键鼠的离线小游戏。我的想法：${idea.trim()}。先给出简短玩法方案让我确认，再按小伴游戏格式制作。")
+        if (createKind == "游戏") createLocal("帮我设计并制作一款支持手机触控和电脑键鼠的离线小游戏。我的想法：${idea.trim()}。先给出简短玩法方案让我确认，再先用 app_read_format 读取小伴应用规范，按规范制作。")
         else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
     }
     fun prepare(item: CreationItem? = null) {
@@ -172,7 +172,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             }
         } finally { errors = failures; loading = false }
     }
-    val myItems = games.map { CreationItem(it.id, it.name, it.description, "游戏", it, true) }
+    val myItems = games.map { CreationItem(it.id, it.name, it.description, if (it.kind == "app") "工具" else "游戏", it, true) }
     val visible = myItems.filter { category == "全部" || it.kind == category }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -255,7 +255,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                                     } else panel = "preview"
                                 }
                                 CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy, divider = true) {
-                                    if (entry.owned) createLocal("请先读取 games/${entry.id} 中的游戏源码和试玩记录，问我想怎样修改《${entry.name}》，然后在原游戏上迭代。") else prepare(entry)
+                                    if (entry.owned) createLocal("请先读取 games/${entry.id} 中的作品源码和试玩记录，问我想怎样修改《${entry.name}》，然后在原游戏上迭代。") else prepare(entry)
                                 }
                                 CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy, divider = true) {
                                     if (entry.game == null) createOnComputer("请在电脑上参考以下想法制作小伴桌面${entry.kind}：${entry.description} 先读取规范并给出方案让我确认。") else panel = "computer"

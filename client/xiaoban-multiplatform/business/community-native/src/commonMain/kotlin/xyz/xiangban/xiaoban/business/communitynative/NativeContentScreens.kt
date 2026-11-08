@@ -213,7 +213,7 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
             try {
                 val game = env.games?.read(localGameId) ?: error("本地作品不可用")
                 file = env.platform?.gamePackage(localGameId) ?: error("当前平台不支持作品打包")
-                if (!importedGame) { kind = "game"; title = game.name; summary = game.description; importedGame = true }
+                if (!importedGame) { kind = game.kind; title = game.name; summary = game.description; importedGame = true }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = e.message ?: "读取本地作品失败" }
             finally { busy = false; step = "" }
@@ -235,7 +235,7 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (packId == null) {
                 Text("资源类型", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                if (localGameId != null) Text("游戏 · 本机作品", style = XType.Body, fontWeight = FontWeight.Medium)
+                if (localGameId != null) Text("${kindLabel(actualKind)} · 本机作品", style = XType.Body, fontWeight = FontWeight.Medium)
                 else PageChipRow(ContentPackLimits.keys.map { it to kindLabel(it) }, actualKind, { if (!busy) { kind = it; fileKey = "" } })
             } else {
                 when (val state = existingState) {

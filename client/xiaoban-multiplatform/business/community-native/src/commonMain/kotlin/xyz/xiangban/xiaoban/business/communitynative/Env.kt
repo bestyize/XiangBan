@@ -74,15 +74,13 @@ interface PlatformActions : VoicePlatform {
     fun openGame(id: String): Boolean = false
     val communityGamesSupported: Boolean get() = false
     val recentCommunityGames: kotlinx.coroutines.flow.StateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>> get() = EmptyRecentCommunityGames
-    suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
-        bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean = false
     suspend fun playCommunityRuntimeV2(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, pack: xyz.xiangban.xiaoban.common.community.Pack): Boolean = false
     suspend fun needsRuntimeV2MobileConfirmation(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload): Boolean = false
     val gamesSupported: Boolean get() = false
     val recentGames: kotlinx.coroutines.flow.StateFlow<List<String>> get() = EmptyRecentGames
     suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()
     suspend fun builtinGameCover(id: String): ByteArray? = null
-    /** 导出兼容桌面的 ZIP，由用户在系统文件选择器中保存。 */
+    /** 把工作区作品导出为协议 2 的 ZIP 并保存到下载目录。 */
     suspend fun exportGame(id: String): Boolean = false
     /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */
     suspend fun gamePackage(id: String): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
@@ -212,11 +210,11 @@ class CommunityEnv(
 private const val AGENT_SYSTEM_PROMPT =
     "你是小伴，用户随身的温和、真诚、靠谱的 AI 伙伴。回答直接清晰、重点突出，默认使用简体中文。" +
         "你可以用工具帮用户做事；按当前对话权限执行，系统要求确认时等待用户。用户拒绝了就不要再试，直接告诉用户没有执行。" +
-        "手机工作区内可以读写、编辑和搜索文本文件。制作游戏前先用 game_read_format 读取规范，" +
+        "手机工作区内可以读写、编辑和搜索文本文件。制作游戏或工具前先用 app_read_format 读取规范，" +
         "用 todo 记录多步骤任务，用 ask_user 澄清影响结果的选择。逐步写草稿、校验后再安装；" +
-        "只有用户提出试玩或导出时才打开游戏或分享面板。用 game_runtime_read 查看试玩记录，" +
-        "没有实际试玩记录不能声称已测试通过。手机目前只创作独立窗口的离线文本小游戏，" +
-        "需要触控操作，也保留桌面键鼠操作。不要使用 CDN、ES module、localStorage 或系统权限。"
+        "只有用户提出试玩或导出时才打开作品或分享面板。用 app_runtime_read 查看试玩记录，" +
+        "没有实际试玩记录不能声称已测试通过。作品在手机上全屏独立运行，需要触控操作，" +
+        "也保留键鼠操作；手机上只能写文本文件，图形用 SVG 或 canvas 绘制，不要依赖 CDN。"
 
 private val EmptyRecentCommunityGames = kotlinx.coroutines.flow.MutableStateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>>(emptyList())
 private val EmptyRecentGames = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())

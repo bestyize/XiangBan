@@ -170,3 +170,12 @@
   - Android 协议 2 内置游戏隐藏自带的左上角返回按钮，竖屏游戏将空出的列用于分数面板。《水墨剑客》选关页使用浏览器历史，系统返回先回卷首，再打开宿主菜单。小米 14 上验证了这两次返回，浏览器验证了开局后选关历史已消耗、各内置包的重复按钮均隐藏。Android Debug 构建通过。
   - 宿主胶囊缩至 76 × 32 dp，白底不透明度为 20%。应用广场设计稿的竖屏、横屏画板与安全区标示已同步。小米 14 在《水墨剑客》验证了 SDK 和 CSS 注入的胶囊尺寸，以及「···」打开菜单和「✕」退出。胶囊避让和游戏内返回规则已写入开发规范及作者指引。
   - 应用广场和「全部」列表里的官方游戏与工具改为轻点直接启动，长按打开带收藏和改编入口的详情。社区卡片继续进入帖子。应用广场设计稿已同步，Android Debug 构建通过。小米 14 实测 MBTI 和《水墨剑客》一次点击即进入协议 2，《水墨剑客》长按可查看详情，退出后回到原列表。
+- 2026-11-08：Android 删除协议 1，手机上自己做的作品改走协议 2（未提交，由接手的会话完成；桌面端和论坛网页的协议 1 尚未处理）。
+  - 起因：用户要求"删除 V1 支持"。上一位接手方（Codex）在迁移《墨渡》《茶签归位》、论坛网页试玩时因用量上限中断；这一段在其基础上继续，先让手机工作区作品支持协议 2，再删协议 1 的宿主。
+  - 工作区作品：`MobileGameFormat` 改为协议 2 清单（schemaVersion 3、runtimeProtocol 2），必须有 `index.html`、`icon.svg`、`cover.svg`；kind 可以是 game 或 app，带 category、input、capabilities、version；文件上限 100 个、合计 8 MB，路径最多 6 层，允许 `.mjs`。id 不能以 `-` 结尾，因为它要做独立源的主机名。旧版（协议 1）作品在列表里提示"已不再支持，请让小伴按协议 2 重新生成"，仍可删除。
+  - Agent 工具：`game_*` 改为 `app_read_format`、`app_list`、`app_validate`、`app_create`、`app_open`、`app_runtime_read`、`app_export`，创作规范换成协议 2 手机版；`libs/agent-mobile` 的覆盖确认跟着改名。`app_snapshot`、`lib_add`、`asset_*`、`app_publish`、`app_check_read` 仍待实现（规范第 11.3 节）。
+  - 宿主：`RuntimeV2Activity` 直接打开 `games/<id>/`（独立源 `mine-<id>.app.xiangban.xyz`，联网默认开放，每次读取都拒绝符号链接），把加载、`xb.ready` 用时、脚本报错、控制台错误和成绩写进 `logs/<id>.txt`，供 `app_runtime_read` 读取。导出改为把协议 2 的 ZIP 存进下载目录的 Xiaoban 文件夹；发布页加入应用类型，游戏和应用上限均为 100 MB。
+  - 已删除：`MobileGameActivity`、`MobileGameHost`、社区协议 1 压缩包读取器、构建里的协议 1 内置包、社区试玩里的协议 1 分支（只提示"旧版运行协议，手机已不再支持"）。协议 1 存档读取单独留在 `LegacySaves`，作品第一次以协议 2 打开时继承旧档。
+  - 验证：community-core 的 MobileGames、GameLibrary、CommunityGameTrial、AppPlaza、ContentPublishing、CommunityCore 测试通过；`:androidApp:assembleDebug`、`:androidApp:compileReleaseKotlin`、`RuntimeV2*` 单元测试通过；agent-mobile 策略测试 4 项、server-forum 清单校验 5 项通过。小米 14 上用调试方式写入一件探针作品：从「我的作品」打开后进入 `RuntimeV2Activity`，日志依次记录 `host.open`、`game.ready`（55 ms）、`game.start`、`game.result`、`console.error` 和未捕获异常；胶囊 ✕ 正常退出；「保存作品包」在下载目录生成 ZIP，清单符合服务端协议 2 规则。内置作品回归：MBTI 仍显示已有答题进度，《水墨剑客》进入协议 2 且存储文件还在。
+  - 没有验证：真正让手机 Agent 用 `app_*` 工具从头做一件作品（测试里的 Agent 流程需要本地原生库，只在有库时才跑）；工作区作品的相机、麦克风授权；其余 8 款内置游戏本轮没有重新逐个打开；分享作品包到系统分享面板。
+  - 已知遗留：线上《墨渡》《茶签归位》仍是协议 1 包，手机端现在打不开，需要把本地已打好的协议 2 包发布成新版本（涉及生产论坛和资源机，需用户确认）；桌面端 `game_packs.rs`、`protocol.ts`、`check-game-assets.mjs` 和论坛 `game-sandbox` 仍是协议 1，桌面游戏空间与桌面层作品依赖它，要先确认桌面容器能给每个作品独立安全源才能删。

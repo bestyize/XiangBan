@@ -1,6 +1,6 @@
 小伴应用规范（给 AI 的创作规则，运行时协议 2）
 
-状态：草案。宿主实现协议 2 之前，创作工具仍然返回协议 1 的规则（桌面的 `GAME_FORMAT`、手机的 `MobileGameFormat.instructions`）。本文由 [README.md](README.md) 派生，两者冲突时以 README 为准；README 的上限、字段或接口改了以后，要同步改这里。这份规则要能独立使用，不能引用仓库里的其他文件，因为手机和网页上的模型读不到它们。
+状态：草案。手机的创作工具（`MobileGameFormat.instructions`，`app_read_format`）已经返回协议 2 的规则，手机版只允许文本文件、没有 `lib_add` 和 `asset_*`；桌面的 `GAME_FORMAT` 仍是协议 1。本文由 [README.md](README.md) 派生，两者冲突时以 README 为准；README 的上限、字段或接口改了以后，要同步改这里。这份规则要能独立使用，不能引用仓库里的其他文件，因为手机和网页上的模型读不到它们。
 
 以下是交给模型的正文：
 

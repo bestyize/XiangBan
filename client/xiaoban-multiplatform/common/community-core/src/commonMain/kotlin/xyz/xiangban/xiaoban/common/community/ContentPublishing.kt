@@ -30,7 +30,7 @@ import kotlinx.serialization.serializer
 val CapabilityPackKinds = setOf("routine", "reminder", "task", "goal", "skill", "expert", "workflow")
 val ContentPackLimits: Map<String, Long> = mapOf(
     "effect" to 1L, "reminder" to 1L, "routine" to 1L, "task" to 1L, "goal" to 1L, "expert" to 1L,
-    "widget" to 8L, "game" to 8L, "skill" to 8L, "workflow" to 8L, "wallpaper" to 32L,
+    "widget" to 8L, "game" to 100L, "app" to 100L, "skill" to 8L, "workflow" to 8L, "wallpaper" to 32L,
 ).mapValues { (_, mb) -> mb * 1024 * 1024 }
 
 @Serializable

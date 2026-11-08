@@ -34,6 +34,26 @@ internal class AndroidCreationSharing(private val context: Context) {
         ForumUploadFile("$id.zip", "application/zip", bytes)
     }
 
+    suspend fun saveGame(id: String): Boolean {
+        val file = gamePackage(id)
+        return withContext(Dispatchers.IO) {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val resolver = context.contentResolver
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, file.name)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Xiaoban")
+                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return@withContext false
+                try {
+                    requireNotNull(resolver.openOutputStream(uri)).use { it.write(file.bytes) }
+                    resolver.update(uri, android.content.ContentValues().apply { put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0) }, null, null) > 0
+                } catch (e: Exception) { runCatching { resolver.delete(uri, null, null) }; false }
+            } else false
+        }
+    }
+
     suspend fun shareGame(id: String): Boolean {
         val file = gamePackage(id)
         return shareFile(file.name, file.mime, file.bytes)

@@ -46,7 +46,7 @@ private val ToolLabels = mapOf(
     "wallpaper_list" to "查看壁纸", "wallpaper_apply" to "更换壁纸", "wallpaper_create" to "创作壁纸",
     "effect_list" to "查看特效", "effect_set" to "切换特效", "effect_create" to "创作特效",
     "widget_list" to "查看桌面组件", "widget_add" to "添加桌面组件", "widget_create" to "创作桌面组件",
-    "game_list" to "查看游戏列表", "game_open" to "打开游戏", "game_create" to "创作游戏", "game_close" to "退出游戏",
+    "app_list" to "查看作品列表", "app_open" to "打开作品", "app_create" to "创作作品", "app_close" to "退出作品",
     "process_start" to "启动后台命令", "process_read" to "查看后台输出", "process_stop" to "停止后台命令",
     "connector_search" to "查找连接器", "connector_request" to "连接服务", "connector_call" to "调用连接器工具",
     "research" to "调研子任务", "community_share" to "分享到论坛", "community_open" to "打开官网或论坛",

@@ -469,7 +469,7 @@ cover.png / .svg   16:9 封面，至少 640×360
 - 作品：`game_read_format`、`game_create`、`game_validate`、`game_list`、`game_open`、`game_close`、`game_runtime_read`、`game_export`
 - 联网：`web_search`、`web_fetch`
 
-这些工具现在都按协议 1 工作。要新增或升级的：
+手机上的 `game_*` 工具已经改为 `app_read_format`、`app_list`、`app_validate`、`app_create`、`app_open`、`app_runtime_read`、`app_export`，按协议 2 工作；协议 1 的作品手机不再支持。要新增或升级的：
 
 | 工具 | 作用 |
 | --- | --- |

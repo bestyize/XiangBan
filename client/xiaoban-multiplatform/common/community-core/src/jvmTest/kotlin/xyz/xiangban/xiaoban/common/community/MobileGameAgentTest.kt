@@ -19,14 +19,16 @@ class MobileGameAgentTest {
         val store = MobileGameStore(workspace)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val calls = listOf(
-            "game_read_format" to buildJsonObject {},
+            "app_read_format" to buildJsonObject {},
             "write_file" to buildJsonObject { put("path", "drafts/garden/index.html"); put("content", "<!doctype html><button>开始游戏</button>") },
-            "game_create" to buildJsonObject { put("id", "touch-garden"); put("name", "触控花园"); put("description", "点击种花"); put("source_dir", "drafts/garden"); put("orientation", "landscape") },
-            "game_validate" to buildJsonObject { put("id", "touch-garden") },
+            "write_file" to buildJsonObject { put("path", "drafts/garden/icon.svg"); put("content", "<svg xmlns='http://www.w3.org/2000/svg'/>") },
+            "write_file" to buildJsonObject { put("path", "drafts/garden/cover.svg"); put("content", "<svg xmlns='http://www.w3.org/2000/svg'/>") },
+            "app_create" to buildJsonObject { put("id", "touch-garden"); put("name", "触控花园"); put("description", "点击种花"); put("source_dir", "drafts/garden"); put("orientation", "landscape") },
+            "app_validate" to buildJsonObject { put("id", "touch-garden") },
         )
         var step = 0
         val model: suspend (String, suspend (String) -> Unit) -> ModelResult = { body, line ->
-            assertTrue(body.contains("game_create"), "actual tool schemas must reach the model")
+            assertTrue(body.contains("app_create"), "actual tool schemas must reach the model")
             val call = calls.getOrNull(step++)
             val delta = buildJsonObject {
                 if (call == null) put("content", "已制作游戏")
@@ -62,13 +64,14 @@ class MobileGameAgentTest {
             val result = withTimeout(10_000) { ended.await() }
             assertTrue(result.ok, result.error)
             assertTrue(errors.isEmpty(), errors.joinToString())
-            assertEquals(listOf("write_file", "game_create"), approvals)
+            assertEquals(listOf("write_file", "write_file", "write_file", "app_create"), approvals)
             val files = store.exportFiles("touch-garden")
             val manifest = Json.parseToJsonElement(files.single { it.path == "manifest.json" }.content).jsonObject
-            assertEquals(1, manifest.getValue("schemaVersion").jsonPrimitive.int)
+            assertEquals(3, manifest.getValue("schemaVersion").jsonPrimitive.int)
+            assertEquals(2, manifest.getValue("runtimeProtocol").jsonPrimitive.int)
             assertEquals("game", manifest.getValue("kind").jsonPrimitive.content)
             assertEquals("landscape", manifest.getValue("orientation").jsonPrimitive.content)
-            assertEquals(listOf("index.html", "manifest.json"), files.map { it.path }.sorted())
+            assertEquals(listOf("cover.svg", "icon.svg", "index.html", "manifest.json"), files.map { it.path }.sorted())
         } finally { runtime.stop(); scope.cancel(); directory.deleteRecursively() }
     }
 }

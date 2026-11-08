@@ -1,55 +1,38 @@
 package xyz.xiangban.xiaoban.common.community
 
-import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.*
 
 class CommunityGameTrialTest {
-    private val manifest = """{"schemaVersion":1,"kind":"game","id":"test-game","name":"测试游戏","description":"离线游戏","save":true,"layer":"space"}"""
-    private fun zip(files: List<Pair<String, ByteArray>>): ByteArray = ByteArrayOutputStream().use { output ->
-        ZipOutputStream(output).use { zip -> files.forEach { (path, bytes) -> zip.putNextEntry(ZipEntry(path)); zip.write(bytes); zip.closeEntry() } }
-        output.toByteArray()
-    }
-    private fun bytes(extra: List<Pair<String, ByteArray>> = emptyList(), manifestText: String = manifest) = zip(listOf("manifest.json" to manifestText.toByteArray(), "index.html" to "<h1>Play</h1>".toByteArray()) + extra)
-    private fun descriptor(bytes: ByteArray) = CommunityGameDownload(55, "game", 1,
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }, bytes.size.toLong(), "https://resource.example/game.zip")
-    private fun read(bytes: ByteArray) = CommunityGameArchive.read(bytes, descriptor(bytes))
+    private fun descriptor(kind: String = "app", size: Long = 1000, sha: String = "a".repeat(64)) = CommunityGameDownload(55, kind, 1, sha, size, "https://resource.example/game.zip")
+    private fun pack(manifest: kotlinx.serialization.json.JsonObject, info: CommunityGameDownload, kind: String = info.kind) =
+        Pack(info.packId, kind, title = "Work", versions = listOf(PackVersion(1, sha256 = info.sha256, size = info.size, manifest = manifest)))
+    private val protocol2 = buildJsonObject { put("runtimeProtocol", 2) }
 
-    @Test fun `valid archive remains in memory with save support`() {
-        val game = read(bytes(listOf("assets/style.css" to "body{}".toByteArray())))
-        assertEquals("test-game", game.game.id); assertTrue(game.game.save)
-        assertEquals(setOf("manifest.json", "index.html", "assets/style.css"), game.files.keys)
+    @Test fun `only protocol 2 packs of the exact published version can run`() {
+        val info = descriptor()
+        assertEquals(2, info.validate(pack(protocol2, info), 1))
+        assertEquals(2, descriptor(kind = "game").validate(pack(protocol2, descriptor(kind = "game")), 1))
+        assertFails { info.validate(pack(protocol2, info).copy(status = "removed"), 1) }
+        assertFails { info.validate(pack(protocol2, info), 2) }
+        assertFails { info.validate(pack(protocol2, info).copy(id = 56), 1) }
+        assertFails { info.validate(pack(protocol2, info, kind = "game"), 1) }
+        assertFails { info.validate(pack(protocol2, info.copy(sha256 = "b".repeat(64))), 1) }
+        assertFails { info.validate(pack(protocol2, info.copy(size = 1001)), 1) }
+        assertFails { info.validate(pack(buildJsonObject {}, info), 1) }
+        assertFails { info.validate(pack(buildJsonObject { put("runtimeProtocol", 1) }, info), 1) }
+        assertFails { info.validate(pack(buildJsonObject { put("runtimeProtocol", "2") }, info), 1) }
     }
-    @Test fun `integrity and exact published version are required`() {
-        val zip = bytes(); val info = descriptor(zip)
-        assertFails { CommunityGameArchive.read(zip, info.copy(sha256 = "0".repeat(64))) }
-        assertFails { CommunityGameArchive.read(zip, info.copy(size = zip.size + 1L)) }
-        val pack = Pack(55, "game", title = "Game", versions = listOf(PackVersion(1, sha256 = info.sha256, size = info.size)))
-        info.validate(pack, 1)
-        assertFails { info.validate(pack.copy(status = "removed"), 1) }
-        assertFails { info.validate(pack, 2) }
-        assertFails { info.validate(pack.copy(id = 56), 1) }
-    }
-    @Test fun `paths duplicate casing and binary data are rejected`() {
-        listOf("../escape.js", "/escape.js", "a/../../escape.js", "a\\escape.js", "a.png", "INDEX.html", "index.html/child.js").forEach { path ->
-            assertFails(path) { read(bytes(listOf(path to "bad".toByteArray()))) }
-        }
-        assertFails { read(bytes(listOf("bad.js" to byteArrayOf(0xC3.toByte(), 0x28)))) }
-        assertFails { read(bytes(listOf("bad.js" to byteArrayOf(0)))) }
-    }
-    @Test fun `protocol two permits an app and the larger signed archive limit`() {
-        val info = descriptor(bytes()).copy(kind = "app", size = CommunityGameDownload.MAX_RUNTIME_V2_BYTES.toLong())
-        val version = PackVersion(1, sha256 = info.sha256, size = info.size, manifest = buildJsonObject { put("runtimeProtocol", 2) })
-        val pack = Pack(info.packId, "app", title = "Tool", versions = listOf(version))
-        assertEquals(2, info.validate(pack, 1))
-        assertFails { info.validate(pack.copy(versions = listOf(version.copy(manifest = buildJsonObject { put("runtimeProtocol", "2") }))), 1) }
-        val oversized = info.copy(size = info.size + 1)
-        assertFails { oversized.validate(pack.copy(versions = listOf(version.copy(size = oversized.size))), 1) }
+    @Test fun `the signed archive limit is one hundred megabytes`() {
+        val limit = CommunityGameDownload.MAX_RUNTIME_V2_BYTES.toLong()
+        val ok = descriptor(size = limit)
+        assertEquals(2, ok.validate(pack(protocol2, ok), 1))
+        val big = descriptor(size = limit + 1)
+        assertFails { big.validate(pack(protocol2, big), 1) }
+        val bad = descriptor(sha = "xyz")
+        assertFails { bad.validate(pack(protocol2, bad), 1) }
     }
 
     @Test fun `runtime negotiation and network policy come from pack requests`() = runTest {
@@ -59,14 +42,6 @@ class CommunityGameTrialTest {
         assertEquals(true, api.pack(55).networkDisabled)
         assertEquals("1,2", server.requests.single().headers["X-Xiaoban-Runtime"])
         server.client.close()
-    }
-    @Test fun `expanded limits and unsupported formats fail before execution`() {
-        assertFails { read(bytes(listOf("large.js" to ByteArray(MobileGameFormat.FILE_BYTES + 1) { 65 }))) }
-        assertFails { read(bytes((1..41).map { "f$it.js" to byteArrayOf(65) })) }
-        assertFails { read(bytes(manifestText = manifest.replace("\"schemaVersion\":1", "\"schemaVersion\":2"))) }
-        assertFails { read(bytes(manifestText = manifest.replace("\"space\"", "\"desktop\""))) }
-        assertFails { read(bytes(manifestText = manifest.dropLast(1) + ",\"capabilities\":[\"network\"]}")) }
-        assertFails { read(zip(listOf("index.html" to "ok".toByteArray()))) }
     }
     @Test fun `history replaces revisions preserves order and is bounded`() {
         val old = (1L..15).map { RecentCommunityGame(it,1,"game$it") }
