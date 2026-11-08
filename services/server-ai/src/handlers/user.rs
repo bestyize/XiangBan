@@ -15,12 +15,13 @@ use serde_json::{json, Value};
 use sqlx::FromRow;
 
 // The deployed GPT chat models use New API's Responses-only Codex channel.
-fn web_chat_protocol(model: &str) -> &'static str {
+pub(crate) fn is_responses_only_model(model: &str) -> bool {
     let name = model.trim().rsplit('/').next().unwrap_or_default();
-    match name {
-        "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6-astra" | "gpt-6-luna" | "gpt-6-luna[1m]" => "responses",
-        _ => "chat_completions",
-    }
+    matches!(name, "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6.1-terra" | "gpt-6-astra" | "gpt-6-luna" | "gpt-6-luna[1m]")
+}
+
+fn web_chat_protocol(model: &str) -> &'static str {
+    if is_responses_only_model(model) { "responses" } else { "chat_completions" }
 }
 
 /// 当前产品的可用档位，以及开放了哪些媒体能力（语音的可选音色、图片的可选尺寸、实时语音的时长上限）。

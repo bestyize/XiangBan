@@ -8,6 +8,9 @@
 mod protocol_limits;
 use protocol_limits::output_limit_error;
 
+#[path = "responses_bridge.rs"]
+mod responses_bridge;
+
 use crate::{binding, error::AppError, extract::AuthUser, newapi::QuotaMode, products, quota, search, state::AppState};
 use axum::{
     body::Body,
@@ -143,7 +146,17 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
 
     fields.insert("model".into(), Value::String(tier.model.clone()));
     validate_reasoning(api, fields, &crate::reasoning::levels(&tier.model, tier.reasoning_efforts.as_deref()))?;
+    let bridged = if api == Api::ChatCompletions && crate::handlers::user::is_responses_only_model(&tier.model) {
+        Some(responses_bridge::chat_to_responses(&request)?)
+    } else {
+        None
+    };
     sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
+
+    if let Some((payload, want_stream)) = bridged {
+        let upstream = state.newapi.relay(Api::Responses.path(), &active.key, payload, &[]).await?;
+        return responses_bridge::respond_as_chat(upstream, &tier.tier, want_stream).await;
+    }
 
     let payload = serde_json::to_vec(&request).map_err(|e| AppError::Internal(e.to_string()))?;
     let upstream = state.newapi.relay(api.path(), &active.key, payload, &forwarded_headers(api, headers)).await?;

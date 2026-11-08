@@ -7,7 +7,7 @@ pub fn levels(model: &str, declared: Option<&[String]>) -> Vec<String> {
     if let Some(v) = declared { return if valid(v) { v.to_vec() } else { Vec::new() }; }
     let name = model.trim().rsplit('/').next().unwrap_or_default().to_ascii_lowercase();
     let levels: &[&str] = match name.as_str() {
-        "gpt-6-astra" | "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6-luna" => &["low", "medium", "high", "xhigh", "max"],
+        "gpt-6-astra" | "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6.1-terra" | "gpt-6-luna" => &["low", "medium", "high", "xhigh", "max"],
         "deepseek-flash" | "deepseek-v4-pro" | "kimi-k3" | "glm-5.2" | "glm-5.3" | "glm-5.3-flash" => &["low", "high", "max"],
         _ => &[],
     };
