@@ -2,4 +2,6 @@
 
 为社区创作者「一瞬流光」准备的两个离线游戏内容包：精选作品《墨渡》以蓄力跳舟渡江，社区作品《茶签归位》以茶签分罐解谜。供小伴手机 App 广场展示、试玩和后续发布使用；每个 `packs/` 下的作品目录即内容包根目录。
 
-每个作品含 `manifest.json`、`index.html`、`style.css`、`game.js`、`host.js`、`cover.svg`（3:4）、`cover-wide.svg`（16:9）和 `README.md`；《茶签归位》另有 `levels.js` 固定关卡数据。封面与源码均为原创，无外部资源。
+每个作品含 `manifest.json`、`index.html`、`style.css`、`game.js`、`icon.svg`（方形）、`cover.svg`（3:4）、`cover-wide.svg`（16:9）和 `README.md`。《茶签归位》另有 `levels.js` 固定关卡数据。封面与源码均为原创，无外部资源。
+
+源码包的 1.1.0 版使用运行时协议 2 和 `xb.storage`。首次运行可从 `xb.info.legacySave` 继承旧档。上线时在原作品《墨渡》（56）和《茶签归位》（57）下追加版本，保持原作者、帖子与收藏关系。现有的 `publish_remote.py` 用于首次登记和设置精选，已有作品应走版本更新。

@@ -7,18 +7,21 @@
   <out>/covers/<slug>-<version>.png         资源机上的文件键 covers/...
   <out>/register.json                       交给 publish_remote.py 的登记数据
 
-检查项对应手机端试玩的限制（MobileGameFormat 与 CommunityGameDownload）：
-只收文本文件、最多 40 个、单个不超过 1 MB、合计不超过 4 MB、ZIP 不超过 5 MB、清单在最外层。
+这两款离线作品使用协议 2，仍按小型文本包打包。清单和入口位于 ZIP 根目录。
 """
 import argparse
 import hashlib
+import html
 import json
 import re
+import shutil
 import sys
 import zipfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
+WEB_BRIDGE = ROOT.parent.parent / "web/runtime-v2/bridge.js"
 FIXED_TIME = (2026, 11, 8, 0, 0, 0)
 TEXT_EXT = {".html", ".js", ".css", ".json", ".svg", ".md", ".txt"}
 MAX_FILES, MAX_FILE, MAX_TOTAL, MAX_ZIP, MAX_COVER = 40, 1024 * 1024, 4 * 1024 * 1024, 5 * 1024 * 1024, 2 * 1024 * 1024
@@ -61,10 +64,38 @@ def build_zip(files: list[Path], dest: Path) -> None:
             archive.writestr(info, path.read_bytes())
 
 
+def stage_browser(files: list[Path], target: Path, parent_origin: str) -> None:
+    if target.exists():
+        fail(f"{target} 已存在，请使用新的浏览器预览输出目录")
+    target.mkdir(parents=True)
+    injection = f'<script src="./_xb_runtime.js" data-parent-origin="{html.escape(parent_origin, quote=True)}"></script>'
+    for path in files:
+        dest = target / path.name
+        if path.suffix == ".html":
+            source = path.read_text(encoding="utf-8")
+            head = re.search(r"<head\b[^>]*>", source, re.IGNORECASE)
+            if not head:
+                fail(f"{path.name} 缺少 head，无法在作品脚本前注入 SDK")
+            dest.write_text(source[:head.end()] + injection + source[head.end():], encoding="utf-8")
+        else:
+            shutil.copyfile(path, dest)
+    shutil.copyfile(WEB_BRIDGE, target / "_xb_runtime.js")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--browser-out", type=Path)
+    parser.add_argument("--browser-version", type=int)
+    parser.add_argument("--forum-origin", default="https://chat.xiangban.xyz")
     args = parser.parse_args()
+    origin = urlsplit(args.forum_origin)
+    if args.browser_out and (
+        not args.browser_version or args.browser_version <= 0 or not origin.hostname or origin.username or origin.password
+        or origin.path or origin.query or origin.fragment
+        or not (origin.scheme == "https" or (origin.scheme == "http" and origin.hostname in ("127.0.0.1", "localhost")))
+    ):
+        fail("浏览器预览需要有效的版本编号和论坛源")
     release = json.loads((ROOT / "release.json").read_text(encoding="utf-8"))
     entries = []
     for item in release["packs"]:
@@ -73,18 +104,25 @@ def main() -> None:
         manifest = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
         if manifest.get("id") != slug or not SLUG.match(slug):
             fail(f"{slug} 的清单 id 与目录名不一致或格式不对")
-        if manifest.get("kind") != "game" or manifest.get("schemaVersion") != 1:
-            fail(f"{slug} 的清单必须是 schemaVersion 1、kind game")
+        if manifest.get("kind") != "game" or manifest.get("schemaVersion") != 3 or manifest.get("runtimeProtocol") != 2:
+            fail(f"{slug} 的清单必须是协议 2、schemaVersion 3、kind game")
+        files = collect(src)
+        names = {p.name for p in files}
+        for field in ("entry", "icon", "cover"):
+            if manifest.get(field) not in names:
+                fail(f"{slug} 的清单字段 {field} 指向缺失文件")
         version = manifest["version"]
         zip_key, cover_key = f"packs/game/{slug}-{version}.zip", f"covers/{slug}-{version}.png"
         zip_path = args.out / zip_key
-        build_zip(collect(src), zip_path)
+        build_zip(files, zip_path)
         raw = zip_path.read_bytes()
         if len(raw) > MAX_ZIP:
-            fail(f"{slug} 的 ZIP {len(raw)} 字节超过 5 MB 的试玩上限")
+            fail(f"{slug} 的 ZIP {len(raw)} 字节超过本示例的 5 MB 打包上限")
         with zipfile.ZipFile(zip_path) as archive:
             if archive.testzip() is not None or "manifest.json" not in archive.namelist():
                 fail(f"{slug} 的 ZIP 校验失败")
+        if args.browser_out:
+            stage_browser(files, args.browser_out / str(item["pack_id"]) / f"v{args.browser_version}", args.forum_origin)
         cover_src = ROOT / item["cover_file"]
         cover = cover_src.read_bytes()
         if cover[:8] != b"\x89PNG\r\n\x1a\n" or len(cover) > MAX_COVER:

@@ -1,13 +1,17 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
   "kind": "game",
   "id": "tea-sort",
   "name": "茶签归位",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "将茶签分拣入罐，二十道茶席谜题等你慢慢解开。",
   "author": "一瞬流光",
   "license": "MIT",
-  "save": true,
+  "category": "puzzle",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "cover": "cover-wide.svg",
   "orientation": "portrait",
-  "layer": "space"
+  "input": ["touch", "mouse", "keyboard"]
 }
