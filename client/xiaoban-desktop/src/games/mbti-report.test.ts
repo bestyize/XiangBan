@@ -90,3 +90,43 @@ it('finishes a real quiz flow, saves its answers, and reopens the same personali
   expect(second.window.document.getElementById('resultType')!.textContent).toBe('INFJ')
   first.window.close();second.window.close()
 })
+
+describe('public result snapshots',()=>{
+  const {c}=load()
+  c.URLSearchParams=URLSearchParams
+  c.location={search:''}
+  runInNewContext(source('share.js'),c)
+  const share=c.XiaobanMbtiShare
+  it('round trips only type, four scores, answer counts and completion date',()=>{
+    const input=resultFor(answersFor('INFJ'))
+    const url=new URL(share.link(input))
+    expect(url.origin).toBe('https://chat.xiangban.xyz')
+    expect(url.pathname).toBe('/builtin-games/mbti/share.html')
+    expect([...url.searchParams.keys()]).toEqual(['t','p','n','d'])
+    expect(share.parse(url.search)).toEqual({type:input.type,percentages:input.percentages,totals:input.totals,completedAt:input.completedAt})
+    expect(url.href).not.toContain('answers')
+  })
+  it('rejects malformed, inconsistent, out-of-range and incomplete links',()=>{
+    for(const query of [
+      '?t=INFJ&p=0,0,0,0&n=12,12,12,12&d=2026-11-08T13%3A46%3A00.000Z',
+      '?t=INFJ&p=-1,0,0,100&n=12,12,12,12&d=2026-11-08T13%3A46%3A00.000Z',
+      '?t=INFJ&p=0,0,0,100&n=12,0,12,12&d=2026-11-08T13%3A46%3A00.000Z',
+      '?t=INFJ&p=0,0,0,100&n=12,12,12,12&d=invalid',
+      '?t=INFJ&p=0,0,0,100&n=12,12,12,12',
+      '?t=INFJ&p=0,0,0,100&n=12,12,12,12&d=2026-11-08T13%3A46%3A00.000Z&t=ESTJ',
+      '?t=INFJ&p=0,0,0,100&n=12,12,12,12&d=2026-11-08T13%3A46%3A00.000Z&answers=private',
+      '?t=INFJ&p=0,0,0,100&n=12,12,12,12&d=2026-02-31T13%3A46%3A00.000Z',
+    ]) expect(share.parse(query)).toBeNull()
+  })
+  it('renders a shared report with chapters while keeping individual answers out of the link',()=>{
+    const result=resultFor(answersFor('INFJ')),url=share.link(result),window=new Window({url})
+    window.document.body.innerHTML='<main id="publicResult"></main>'
+    const c:any={window,document:window.document,location:window.location,URLSearchParams,setTimeout,clearTimeout}
+    for(const file of ['rules.js','profiles.js','report.js','share.js','share-page.js'])runInNewContext(source(file),c)
+    const text=window.document.getElementById('publicResult')!.textContent!
+    for(const label of ['INFJ','四维性格倾向','你的力量与另一面','你的工作方式','你的人际关系','把洞察带进生活'])expect(text).toContain(label)
+    expect(url).not.toContain('answers')
+    expect(window.document.querySelectorAll('.public-section')).toHaveLength(5)
+    window.close()
+  })
+})

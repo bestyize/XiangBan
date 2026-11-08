@@ -53,6 +53,7 @@
     off(name, fn) { listeners.get(name)?.delete(fn); },
     can(name) { return capabilities.has(name); },
     exit() { return call('exit'); },
+    exportMbti(payload) { return call('builtin.mbti.export', payload); },
     storage: {
       get: key => call('storage.get', { key }),
       set: (key, value) => call('storage.set', { key, value }),

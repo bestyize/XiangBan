@@ -12,6 +12,7 @@
     <script src="./profiles.js" defer></script>
     <script src="./report.js" defer></script>
     <script src="./report-view.js" defer></script>
+    <script src="./share.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
   <body>
@@ -82,7 +83,17 @@
 
       <section id="result" class="view result" hidden aria-labelledby="resultType">
         <div id="reportBody"></div>
+        <button id="shareButton" class="primary-button full-width" type="button">分享我的结果</button>
         <button id="retryButton" class="primary-button full-width" type="button">再测一次</button>
+      </section>
+      <section id="share" class="view share-view" hidden aria-labelledby="shareTitle">
+        <button id="shareBack" class="text-button" type="button">← 返回报告</button>
+        <h2 id="shareTitle" tabindex="-1">分享我的结果</h2>
+        <p class="share-intro">保留此刻的画像，也邀请朋友一起测一测。</p>
+        <img id="posterPreview" class="poster-preview" alt="人格结果分享海报">
+        <p id="posterStatus" class="share-status" role="status">正在准备图片…</p>
+        <div class="share-actions"><button id="savePoster" type="button" class="primary-button" disabled>保存图片</button><button id="sharePoster" type="button" class="secondary-button" disabled>分享图片</button><button id="shareLink" type="button" class="secondary-button" disabled>分享结果链接</button></div>
+        <p class="share-intro share-link-note">链接展示类型、四维倾向和测试日期。原始答案留在本机。</p>
       </section>
       <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
     </main>

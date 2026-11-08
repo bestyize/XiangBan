@@ -78,7 +78,7 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
             continue;
         }
         let decoded = percent_decode(part)?;
-        if decoded == ".." || decoded == "." || decoded.starts_with('.') || decoded.contains('\\') || decoded.contains('\0') {
+        if decoded == ".." || decoded == "." || decoded.starts_with('.') || decoded.contains('/') || decoded.contains('\\') || decoded.contains('\0') {
             return None;
         }
         segments.push(decoded);
@@ -87,6 +87,7 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
 }
 
 fn parse_range(header: &str, length: u64) -> Option<(u64, u64)> {
+    if length == 0 { return None; }
     let range = header.trim();
     if !range.starts_with("bytes=") {
         return None;
@@ -267,13 +268,43 @@ pub fn serve_for(root: &Path, window_label: &str, raw_path: &str, range_header: 
     serve_from(root, raw_path, range_header)
 }
 
+// The installed desktop app embeds its frontend in the executable. Only fall
+// back to those assets for the official MBTI bundle and its own runtime window.
+fn serve_embedded_mbti<F>(window_label: &str, raw_path: &str, range_header: Option<&str>, fetch: F) -> Served
+where F: FnOnce(String) -> Option<Vec<u8>> {
+    if super::window::app_id_from_label(window_label) != Some("mbti") { return Served::status(403); }
+    let Some(mut segments) = safe_segments(raw_path) else { return Served::status(400); };
+    if segments.first().map(String::as_str) != Some("mbti") { return Served::status(403); }
+    if segments.len() == 1 { segments.push("index.html".into()); }
+    let Some(mime) = segments.last().and_then(|name| name.rsplit('.').next()).and_then(mime_for) else { return Served::status(404); };
+    let Some(bytes) = fetch(format!("game-packs/{}", segments.join("/"))) else { return Served::status(404); };
+    let length = bytes.len() as u64;
+    if length > MAX_SERVED_BYTES { return Served::status(413); }
+    if let Some(header) = range_header {
+        if let Some((start, end)) = parse_range(header, length) {
+            return Served { status: 206, mime, body: bytes[start as usize..=end as usize].to_vec(), range: Some(format!("bytes {start}-{end}/{length}")) };
+        }
+        return Served { range: Some(format!("bytes */{length}")), ..Served::status(416) };
+    }
+    Served { status: 200, mime, body: bytes, range: None }
+}
+
 pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
     let root = crate::storage::root(app);
     let range = request.headers().get("range").and_then(|v| v.to_str().ok());
-    let served = match root {
+    let mut served = match root {
         Ok(root) => serve_for(&root, window_label, request.uri().path(), range),
         Err(_) => Served::status(404),
     };
+    if served.status == 404 && window_label == "app-runtime-mbti" {
+        served = serve_embedded_mbti(window_label, request.uri().path(), range, |path| {
+            let assets = app.asset_resolver();
+            // AssetResolver::get falls back to the desktop index.html for unknown paths.
+            // Do not let that fallback masquerade as an MBTI package file.
+            if !cfg!(debug_assertions) && !assets.iter().any(|(key, _)| key.trim_start_matches('/') == path) { return None; }
+            assets.get(path).map(|asset| asset.bytes)
+        });
+    }
 
     let mut response = tauri::http::Response::builder()
         .status(served.status)
@@ -296,6 +327,16 @@ pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packaged_mbti_assets_are_scoped_and_support_ranges() {
+        let fetch = |path: String| (path == "game-packs/mbti/assets/test-qr.png").then(|| b"012345".to_vec());
+        let ok = serve_embedded_mbti("app-runtime-mbti", "/mbti/assets/test-qr.png", Some("bytes=1-3"), fetch);
+        assert_eq!((ok.status, ok.body.as_slice(), ok.range.as_deref()), (206, &b"123"[..], Some("bytes 1-3/6")));
+        assert_eq!(serve_embedded_mbti("app-runtime-other", "/mbti/assets/test-qr.png", None, fetch).status, 403);
+        assert_eq!(serve_embedded_mbti("app-runtime-mbti", "/mbti/%2e%2e%2fsecret.png", None, fetch).status, 400);
+        assert_eq!(serve_embedded_mbti("app-runtime-mbti", "/other/assets/test-qr.png", None, fetch).status, 403);
+    }
 
     #[test]
     fn test_base_url_format() {

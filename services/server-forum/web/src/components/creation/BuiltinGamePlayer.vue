@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
+import { checkedMbtiResultLink, decodeMbtiPng } from '@/lib/mbtiExport'
 const props = defineProps<{ gameId: string; autostart?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), dialog = ref<HTMLDialogElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
@@ -10,6 +11,58 @@ const stage=ref<HTMLElement>(), stageSize=ref({width:0,height:0})
 const desktopInput=window.matchMedia('(hover: hover) and (pointer: fine)'), desktop=ref(desktopInput.matches)
 const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value))
 const frameStyle=computed(() => stageSize.value.width && stageSize.value.height ? {width:`${frameSize.value.width}px`,height:`${frameSize.value.height}px`} : {width:'100%',height:'100%'})
+const exportRequest=ref<{ action:'save'|'image'|'link'; file?:File; url?:string } | null>(null)
+const exportError=ref('')
+let exportSequence=0
+let imageAssets = new Map<string, Promise<Blob>>()
+async function provideMbtiAsset(d:Record<string,unknown>, target:Window) {
+  if(props.gameId!=='mbti'||!connected.value||!started.value||!Number.isSafeInteger(d.id)||
+    (d.key!=='characters'&&d.key!=='observer'&&d.key!=='qr'))return
+  const key=d.key, activeNonce=nonce.value
+  let asset=imageAssets.get(key)
+  if(!asset){
+    const file=key==='characters'?'characters.png':key==='observer'?'observer-jade.png':'test-qr.png'
+    asset=fetch(`/builtin-games/mbti/assets/${file}`,{credentials:'omit',redirect:'error'}).then(async response=>{
+      if(!response.ok)throw new Error('素材不可用')
+      const blob=await response.blob();if(blob.type!=='image/png'||blob.size>3*1024*1024)throw new Error('素材无效')
+      return blob
+    })
+    imageAssets.set(key,asset)
+    asset.catch(()=>imageAssets.delete(key))
+  }
+  try{const blob=await asset;if(nonce.value===activeNonce&&frame.value?.contentWindow===target&&started.value)target.postMessage({channel:'xiaban.game-host',protocol:1,nonce:activeNonce,type:'mbti.asset',id:d.id,blob},'*')}catch{/* game shows a retry message */}
+}
+async function prepareExport(d:Record<string,unknown>) {
+  if(props.gameId!=='mbti'||!started.value||exportRequest.value)return
+  const current=++exportSequence; exportError.value=''
+  if(d.action==='link') {
+    const url=checkedMbtiResultLink(d.url);if(url)exportRequest.value={action:'link',url}
+    return
+  }
+  if(d.action!=='save'&&d.action!=='image')return
+  try {
+    const bytes=decodeMbtiPng(d.image);if(!bytes)return
+    const file=new File([bytes],'小伴人格画像.png',{type:'image/png'})
+    const valid=await validateImageDimensions(file)
+    if(valid&&current===exportSequence&&started.value)exportRequest.value={action:d.action,file}
+  }catch{if(current===exportSequence)exportError.value='图片准备失败，请重新打开分享页。'}
+}
+async function validateImageDimensions(file:File):Promise<boolean>{
+  if(typeof createImageBitmap==='function'){const bitmap=await createImageBitmap(file);const valid=bitmap.width===1080&&bitmap.height===1440;bitmap.close();return valid}
+  const url=URL.createObjectURL(file)
+  try{const image=new Image();image.src=url;await image.decode();return image.naturalWidth===1080&&image.naturalHeight===1440}finally{URL.revokeObjectURL(url)}
+}
+function closeExport(){exportSequence++;exportRequest.value=null;exportError.value=''}
+function downloadExport(){const file=exportRequest.value?.file;if(!file)return;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);closeExport()}
+async function shareExport(){
+  const request=exportRequest.value;if(!request)return
+  try {
+    const payload:ShareData=request.action==='link'?{title:'我的小伴人格画像',url:request.url}:{title:'我的小伴人格画像',files:[request.file!]}
+    if(!navigator.share || (request.action!=='link' && (!navigator.canShare || !navigator.canShare(payload)))){exportError.value=request.action==='link'?'当前浏览器无法直接分享，请复制链接。':'当前浏览器无法直接分享图片，请先保存图片。';return}
+    await navigator.share(payload);closeExport()
+  }catch(e){if(!(e instanceof DOMException&&e.name==='AbortError'))exportError.value='分享未完成，请重试。'}
+}
+async function copyResultLink(){if(!exportRequest.value?.url)return;try{await navigator.clipboard.writeText(exportRequest.value.url);closeExport()}catch{exportError.value='无法复制，请手动复制链接。'}}
 let stageObserver:ResizeObserver | undefined
 let previousOverflow='', disposed=false, orientationLocked=false
 const orientation=screen.orientation as ScreenOrientation & {lock?:(value:string)=>Promise<void>}
@@ -31,6 +84,7 @@ let handshakeTimer: ReturnType<typeof setTimeout> | undefined
 let previousFocus: HTMLElement | null = null
 let manifestController:AbortController | undefined
 async function restart() {
+  closeExport(); imageAssets = new Map()
   clearTimeout(handshakeTimer)
   manifestController?.abort()
   const controller=new AbortController()
@@ -80,9 +134,11 @@ function receive(event:MessageEvent) {
   const d = event.data
   if (d.type === 'game.ready') { connected.value = true; error.value = ''; clearTimeout(handshakeTimer) }
   if (d.type === 'game.exit') emit('close')
+  if (d.type === 'mbti.asset' && props.gameId === 'mbti' && frame.value?.contentWindow) void provideMbtiAsset(d,frame.value.contentWindow)
+  if (d.type === 'mbti.export' && props.gameId === 'mbti') void prepareExport(d)
 }
 window.addEventListener('message',receive)
-onBeforeUnmount(() => { disposed=true; document.removeEventListener('fullscreenchange',fullscreenChanged); if (orientationLocked) orientation?.unlock(); if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) void document.exitFullscreen().catch(() => {}); stageObserver?.disconnect(); desktopInput.removeEventListener('change',updateInput); if (started.value) document.documentElement.style.overflow=previousOverflow; sequence++; manifestController?.abort(); clearTimeout(handshakeTimer); window.removeEventListener('message',receive); dialog.value?.close(); previousFocus?.focus() })
+onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListener('fullscreenchange',fullscreenChanged); if (orientationLocked) orientation?.unlock(); if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) void document.exitFullscreen().catch(() => {}); stageObserver?.disconnect(); desktopInput.removeEventListener('change',updateInput); if (started.value) document.documentElement.style.overflow=previousOverflow; sequence++; manifestController?.abort(); clearTimeout(handshakeTimer); window.removeEventListener('message',receive); dialog.value?.close(); previousFocus?.focus() })
 </script>
 <template>
   <dialog ref="dialog" class="player" :aria-hidden="!started" :aria-label="game ? `${game.name}试玩` : '游戏试玩'" @cancel.prevent="emit('close')">
@@ -91,11 +147,20 @@ onBeforeUnmount(() => { disposed=true; document.removeEventListener('fullscreenc
     <button v-if="!connected || error" class="player-exit btn" type="button" @click="emit('close')">退出试玩</button>
     <button v-if="!desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
     <div ref="stage" class="game-stage"><iframe v-if="game && ready" :style="frameStyle" :key="generation" ref="frame" :src="url" :title="`${game.name}游戏区域`" sandbox="allow-scripts allow-orientation-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" @load="initialize" /></div>
+    <div v-if="exportRequest" class="export-overlay" role="dialog" aria-modal="true" aria-label="分享人格画像">
+      <div class="export-panel"><h2>{{ exportRequest.action === 'link' ? '分享结果链接' : '分享人格海报' }}</h2>
+        <p>{{ exportRequest.action === 'link' ? '朋友打开链接后可看到你选择分享的结果。' : '保存或分享这张图片，二维码可打开测评。' }}</p>
+        <input v-if="exportRequest.url" :value="exportRequest.url" readonly aria-label="结果链接" @focus="($event.target as HTMLInputElement).select()">
+        <p v-if="exportError" role="alert">{{ exportError }}</p>
+        <div class="export-actions"><button v-if="exportRequest.file" class="btn" type="button" @click="downloadExport">保存图片</button><button v-if="exportRequest.action !== 'save'" class="btn btn-primary" type="button" @click="shareExport">打开分享面板</button><button v-if="exportRequest.url" class="btn" type="button" @click="copyResultLink">复制链接</button><button class="btn" type="button" @click="closeExport">取消</button></div>
+      </div>
+    </div>
     </div>
   </dialog>
 </template>
 <style scoped>
 .player{position:fixed;inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0 0 env(safe-area-inset-bottom);border:0;background:var(--surface);color:var(--ink);overflow:hidden}
+.export-overlay{position:absolute;inset:0;z-index:9;display:grid;place-items:center;padding:20px;background:#0007}.export-panel{width:min(100%,440px);padding:20px;border-radius:16px;background:var(--surface);box-shadow:0 8px 32px #0003}.export-panel h2{font-size:18px;margin:0}.export-panel p{padding:10px 0;font-size:13px;line-height:1.7}.export-panel input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:12px}.export-actions{display:flex;flex-wrap:wrap;gap:8px}.export-actions button{min-height:44px}
 .player{display:flex;flex-direction:column;visibility:hidden;pointer-events:none}.player[open]{visibility:visible;pointer-events:auto}.player-surface{position:relative;display:flex;flex-direction:column;flex:1;min-height:0;width:100%;background:var(--surface);color:var(--ink)}.player-surface:fullscreen{width:100%;height:100%;padding:0}.player:has(.mobile){padding-bottom:0}.fullscreen-button,.player-exit{position:absolute;z-index:2;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);font-size:13px}.player-exit{top:auto;bottom:max(8px,env(safe-area-inset-bottom))}.player::backdrop{background:rgba(0,0,0,.5)}
 .player-status{position:absolute;inset:0;z-index:1;display:grid;place-items:center;background:var(--surface-2)}.player p{padding:12px;color:var(--ink-2)}
 .game-stage{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;background:var(--surface-2)}

@@ -161,6 +161,10 @@
   globalThis.XiaobanBuiltinRuntime = Object.freeze({
     connect(initialize, options) { connect(initialize, options).catch(reportError); },
     send,
+    async exportMbti(payload) {
+      if (!invoke || payload?.action !== 'save') throw failure('unsupported', '当前环境无法保存图片');
+      return invoke('app_runtime_save_mbti_poster', { image: payload.image });
+    }
   });
 
   document.addEventListener('DOMContentLoaded', () => {

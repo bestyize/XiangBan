@@ -14,7 +14,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
+import android.os.SystemClock
 import android.util.Log
+import android.view.MotionEvent
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JsPromptResult
@@ -85,8 +88,21 @@ class RuntimeV2Activity : ComponentActivity() {
     private var proxyReady = false
     private var info: JSONObject? = null
     private var safeInsets = Rect()
+    private var lastUserGesture = 0L
+    private var exportInFlight = false
+    private val mbtiShare = RuntimeV2MbtiShare(this)
     private val backCallback by lazy { OnBackInvokedCallback { handleBack() } }
     private val media = RuntimeV2Media(this, { chrome }, { ready && resumed && !closing && !failed && !chrome.menuOpen }, ::updateVisibility)
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_UP) lastUserGesture = SystemClock.elapsedRealtime()
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_UP && event.keyCode in setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_SPACE)) lastUserGesture = SystemClock.elapsedRealtime()
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -435,6 +451,24 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "exit" -> { result(); log?.add("game.exit"); exit() }
+            "builtin.mbti.export" -> {
+                if (pack.host != "official-mbti.app.xiangban.xyz" || pack.manifest.id != "mbti" ||
+                    intent.getBooleanExtra(EXTRA_WORKSPACE, false) || intent.hasExtra(AndroidRuntimeV2Community.PACK_ID)) { error("unsupported"); return }
+                if (!ready || !resumed || closing || failed || chrome.menuOpen || chrome.consentOpen ||
+                    SystemClock.elapsedRealtime() - lastUserGesture !in 0..3000 || lastUserGesture == 0L) { error("gesture"); return }
+                if (exportInFlight) { error("busy"); return }
+                lastUserGesture = 0L
+                exportInFlight = true
+                lifecycleScope.launch {
+                    try {
+                        mbtiShare.perform(params.optString("action"), params.optString("image"), params.optString("url")) { value, code ->
+                            exportInFlight = false
+                            if (code == null) result(value ?: "opened") else error(code)
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) { exportInFlight = false; throw e }
+                    catch (_: Exception) { exportInFlight = false; error("busy") }
+                }
+            }
             "storage.get", "storage.set", "storage.remove", "storage.keys" -> {
                 if (!acceptingStorage) { error("busy"); return }
                 val file = filesDir.resolve("runtime-v2/storage/${pack.host}.json")

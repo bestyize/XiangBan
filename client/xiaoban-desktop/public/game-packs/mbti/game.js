@@ -7,7 +7,7 @@
   const nonce = new URLSearchParams(location.search).get('hostNonce')
   const byId = id => document.getElementById(id)
   const app = byId('app')
-  const views = ['home', 'quiz', 'review', 'result']
+  const views = ['home', 'quiz', 'review', 'result', 'share']
   let save = rules.emptySave()
   let view = 'home'
   let hostReady = false
@@ -62,7 +62,7 @@
     clearTimeout(transitionTimer)
     advancing = false
     view = next
-    document.body.classList.toggle('is-report', next === 'result')
+    document.body.classList.toggle('is-report', next === 'result' || next === 'share')
     views.forEach(id => { byId(id).hidden = id !== next })
     byId('homeButton').hidden = next === 'home'
     app.scrollTop = 0
@@ -217,7 +217,49 @@
     const report = globalThis.XiaobanMbtiReport.build(result)
     if (!report) return goHome()
     globalThis.XiaobanMbtiReportView.render(report, byId('reportBody'))
+    byId('shareButton').textContent=globalThis.xb?.info?.platform==='desktop'?'保存人格海报':'分享我的结果'
     show('result', 'resultType')
+  }
+
+  let shareSequence = 0, preparedPoster = null, preparedLink = null
+  async function openShare() {
+    if (!save.lastResult) return
+    const sequence=++shareSequence
+    preparedPoster=null; preparedLink=null
+    for (const id of ['savePoster','sharePoster','shareLink']) byId(id).disabled=true
+    byId('posterPreview').removeAttribute('src')
+    byId('posterStatus').textContent='正在准备图片…'
+    const desktop=globalThis.xb?.info?.platform==='desktop'
+    byId('share').classList.toggle('desktop-share',desktop)
+    byId('shareTitle').textContent=desktop?'保存人格海报':'分享我的结果'
+    byId('sharePoster').hidden=desktop;byId('shareLink').hidden=desktop
+    show('share','shareTitle')
+    try {
+      preparedLink=globalThis.XiaobanMbtiShare.link(save.lastResult)
+      const image=await globalThis.XiaobanMbtiShare.poster(save.lastResult)
+      if(sequence!==shareSequence || view!=='share') return
+      preparedPoster=image;byId('posterPreview').src=image;byId('posterStatus').textContent=''
+      for (const id of ['savePoster','sharePoster','shareLink']) byId(id).disabled=false
+    } catch(error) { if(sequence===shareSequence) byId('posterStatus').textContent='图片准备失败，请返回报告后重试。' }
+  }
+  async function exportResult(action) {
+    if (!preparedPoster || !preparedLink) return
+    byId('posterStatus').textContent=''
+    try {
+      const payload={action,image:action==='link'?'':preparedPoster,url:action==='link'?preparedLink:''}
+      if (runtime?.exportMbti) {
+        const value=await runtime.exportMbti(payload)
+        if(value==='cancelled') byId('posterStatus').textContent='已取消保存。'
+        else if(value==='saved') byId('posterStatus').textContent='图片已保存。'
+      } else if (nonce && window.parent!==window) {
+        window.parent.postMessage({channel:'xiaban.game-pack',protocol:1,nonce,type:'mbti.export',...payload},'*')
+      } else if(action==='save') {
+        const a=document.createElement('a');a.href=preparedPoster;a.download='小伴人格画像-'+save.lastResult.type+'.png';document.body.append(a);a.click();a.remove()
+      } else if(navigator.share) {
+        const data=action==='link'?{title:'我的小伴人格画像',url:preparedLink}:{title:'我的小伴人格画像',files:[new File([await (await fetch(preparedPoster)).blob()],'小伴人格画像.png',{type:'image/png'})]}
+        await navigator.share(data)
+      } else byId('posterStatus').textContent='当前环境不支持分享，请保存图片后分享。'
+    } catch(error) { if(error?.name!=='AbortError') byId('posterStatus').textContent='操作未完成，请重试。' }
   }
 
   byId('startButton').addEventListener('click', start)
@@ -226,6 +268,11 @@
   byId('resumeButton').addEventListener('click', renderQuestion)
   byId('homeButton').addEventListener('click', goHome)
   byId('lastResultButton').addEventListener('click', renderResult)
+  byId('shareButton').addEventListener('click', openShare)
+  byId('shareBack').addEventListener('click', () => {shareSequence++;renderResult()})
+  byId('savePoster').addEventListener('click', () => exportResult('save'))
+  byId('sharePoster').addEventListener('click', () => exportResult('image'))
+  byId('shareLink').addEventListener('click', () => exportResult('link'))
   byId('previousButton').addEventListener('click', previous)
   byId('skipButton').addEventListener('click', advance)
   byId('fillButton').addEventListener('click', fillMissing)

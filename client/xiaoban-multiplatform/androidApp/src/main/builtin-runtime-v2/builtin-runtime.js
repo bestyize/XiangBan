@@ -56,5 +56,6 @@
   globalThis.XiaobanBuiltinRuntime = Object.freeze({
     connect(initialize, options) { connect(initialize, options).catch(reportError) },
     send,
+    exportMbti(payload) { return xb.exportMbti(payload) },
   })
 })()
