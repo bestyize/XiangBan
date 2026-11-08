@@ -5,6 +5,7 @@
   const palette=['#222824','#3c423a','#5c6256','#898b78','#bab8a0','#e4ddc7','#f1e9d5']
   const hash=(a,b)=>{const v=Math.sin(a*127.1+b*311.7)*43758.5453;return v-Math.floor(v)}
   function paint(g,kind,pose,x,y,facing,look={},time=0,seed=0){
+    if(F.KINDS[kind].summit)return globalThis.XiabanInkMountainFigures.paint(g,kind,pose,x,y,facing,look,time,seed)
     const spec=F.KINDS[kind],s=F.skeleton(spec,pose),entity=look.entity||{}
     const flat=look.color||null,C=i=>flat||palette[i],eye=look.mirror?C(5):'#b73c31'
     const [hx,hy]=s.head,[sx,sy]=s.shoulder,[bx,by]=s.hip

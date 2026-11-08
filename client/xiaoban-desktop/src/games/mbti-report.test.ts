@@ -75,7 +75,7 @@ function page(saved:any){
   const writes:any[]=[];const c:any={window,document:window.document,location:{search:''},URLSearchParams,setTimeout,clearTimeout,
     XiaobanBuiltinRuntime:{connect:(fn:any)=>fn({save:saved,safeArea:{top:88,right:0,bottom:16,left:0}}),send:(type:string,payload:any)=>{if(type==='game.save')writes.push(JSON.parse(JSON.stringify(payload.data)))}}}
   for(const file of ['rules.js','profiles.js','report.js','report-view.js','game.js'])runInNewContext(source(file),c)
-  return {window,writes,click:(id:string)=>window.document.getElementById(id)!.click()}
+  return {window,writes,click:(id:string)=>(window.document.getElementById(id)! as import('happy-dom').HTMLElement).click()}
 }
 it('finishes a real quiz flow, saves its answers, and reopens the same personalized report',()=>{
   const a=answersFor('INFJ'),partial=[...a];partial[47]=null

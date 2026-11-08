@@ -242,6 +242,23 @@
     copy:{boss:'沈照衡',bossSub:'执笔判官',win:'一剑出灯市',winLine:'判词化作白纸。天将明，桥上终于只剩一道影子。',loseLine:'灯火未熄。看清脚下的影，再迎着朱光出剑。',phase:'镜开见我 · 笔落成牢',place:'灯市'},
   }
 
+  const HANGING_MOUNTAIN = {
+    id:6,name:'悬山卷',length:6120,borrowStep:true,strictParry:true,
+    areas:['岩关','悬栈','风廊','松庭','钟楼','绝顶'].map((name,i)=>({x:[0,1440,2330,3290,4230,5230][i],name,sub:['第一幅','第二幅','第三幅','第四幅','第五幅','终幅'][i]})),
+    platforms:[{x:1990,y:238,w:130},{x:2860,y:245,w:140},{x:4690,y:226,w:150},{x:4920,y:252,w:120}],
+    wind:{zone:[2370,3160],cycle:[5.5,1,1.8],force:75},
+    prompts:[{x:0,key:'move'},{x:790,key:'borrow',local:true},{x:1460,key:'rope',local:true},{x:2400,key:'mountwind',local:true},{x:3300,key:'heavyguard',local:true},{x:4250,key:'elite',local:true}],
+    encounters:{
+      rockgate:{id:'rockgate',trigger:910,lock:[700,1440],waves:[[{type:'disciple',x:1150}],[{type:'umbrella',x:1140}],[{type:'umbrella',side:1},{type:'disciple',side:-1,delay:1}]]},
+      cliffwalk:{id:'cliffwalk',trigger:1640,lock:[1410,2160],waves:[[{type:'rope',x:1910}],[{type:'crossbow',x:2025,y:238}],[{type:'rope',side:1},{type:'crossbow',side:-1,delay:1},{type:'umbrella',side:1,delay:2}]]},
+      windhall:{id:'windhall',trigger:2690,lock:[2400,3150],waves:[[{type:'monk',x:2920}],[{type:'monk',side:1},{type:'disciple',side:-1,delay:.9}],[{type:'umbrella',side:-1},{type:'monk',side:1,delay:1}]]},
+      pinecourt:{id:'pinecourt',trigger:3640,lock:[3360,4110],waves:[[{type:'axeman',x:3920}],[{type:'umbrella',side:1},{type:'disciple',side:-1,delay:1}],[{type:'yanhui',x:3910,delay:1}]]},
+      belltower:{id:'belltower',trigger:4510,lock:[4300,5050],waves:[[{type:'crossbow',x:4760,y:226}],[{type:'crossbow',side:1},{type:'monk',side:-1,delay:1}],[{type:'shizhen',x:4820,delay:1}]]},
+      summit:{id:'summit',trigger:5530,lock:[5300,6050],waves:[[{type:'yue',x:5830}]]},
+    },
+    copy:{boss:'岳停云',bossSub:'守山剑师',win:'借一剑过万山',winLine:'守山人收剑侧身，远峰后的朱日已近云阙。',loseLine:'石台仍在。接住来势，再从侧后方出剑。',phase:'开山势 · 重剑横云',place:'悬山'},
+  }
+
   // Each 卷's boss and closing lines, read by the result screen and the boss bar.
   BAMBOO.copy = {
     boss: '无常', bossSub: '斗笠客', win: '一剑破无常', winLine: '斗笠客化作一池淡墨，竹林重归寂静。', loseLine: '无常仍立在月下。朱光一闪，便是出剑之时。',
@@ -334,6 +351,13 @@
     { id:'5-5', code:505, volume:5, name:'禁街', sub:'第五幅', range:[4200, 5230], start:4250, encounters:['street'], par:110, hurt:2, challenge:{stat:'writingDodges',goal:3,text:'避开 3 次落笔'}, grades:[4400, 5800, 7500] },
     { id:'5-6', code:506, volume:5, name:'问心', sub:'终幅', range:[5190, 6120], start:5240, encounters:['judge'], par:165, hurt:2, boss:true, challenge:{stat:'bossExecutions',goal:2,text:'破势处决判官 2 次'}, grades:[6500, 8500, 10500] },
     {id:'5-scroll',code:500,volume:5,name:'长卷',sub:'全卷连战',range:[0,6120],start:520,encounters:['market','alley','mirrors','theatre','street','judge'],par:560,hurt:5,scroll:true,challenge:{stat:'time',goal:460,at:'most',text:'7 分 40 秒内走出灯市'},grades:[21000,28500,35500]},
+    {id:'6-1',code:601,volume:6,name:'岩关',sub:'第一幅',range:[0, 1440],start:520,encounters:['rockgate'],par:85,hurt:2,challenge:{stat:'umbrellaExecutions',goal:2,text:'借势绕背处决铁伞客 2 次'},grades:[2600, 3500, 4500]},
+    {id:'6-2',code:602,volume:6,name:'悬栈',sub:'第二幅',range:[1340, 2330],start:1460,encounters:['cliffwalk'],par:115,hurt:2,challenge:{all:[{stat:'ropeParries',goal:1},{stat:'boltDeflects',goal:2}],text:'弹落索客 1 次、斩回弩箭 2 次'},grades:[3300, 4500, 5800]},
+    {id:'6-3',code:603,volume:6,name:'风廊',sub:'第三幅',range:[2290, 3290],start:2340,encounters:['windhall'],par:105,hurt:2,challenge:{stat:'windParries',goal:3,text:'风起期间弹反 3 次'},grades:[3200, 4300, 5500]},
+    {id:'6-4',code:604,volume:6,name:'松庭',sub:'第四幅',range:[3250, 4230],start:3300,encounters:['pinecourt'],par:140,hurt:3,challenge:{stat:'yanBackHits',goal:2,text:'借势背击燕回 2 次'},grades:[4300, 5900, 7500]},
+    {id:'6-5',code:605,volume:6,name:'钟楼',sub:'第五幅',range:[4200, 5230],start:4250,encounters:['belltower'],par:140,hurt:3,challenge:{all:[{stat:'boltDeflects',goal:2},{stat:'shizhenDefeated',goal:1}],text:'斩回弩箭 2 次、击败石震'},grades:[4500, 6200, 7900]},
+    {id:'6-6',code:606,volume:6,name:'绝顶',sub:'终幅',range:[5190, 6120],start:5240,encounters:['summit'],par:160,hurt:2,boss:true,challenge:{all:[{stat:'bossExecutions',goal:2},{stat:'yueBackHits',goal:3}],text:'处决 2 次、借势背击 3 次'},grades:[6800, 8800, 11000]},
+    {id:'6-scroll',code:600,volume:6,name:'长卷',sub:'全卷连战',range:[0,6120],start:520,encounters:['rockgate','cliffwalk','windhall','pinecourt','belltower','summit'],par:550,hurt:5,scroll:true,challenge:{stat:'time',goal:460,at:'most',text:'7 分 40 秒内踏上绝顶'},grades:[23500,31000,39000]},
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -341,7 +365,7 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA, LANTERN_CITY]
+  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA, LANTERN_CITY, HANGING_MOUNTAIN]
   function volume(id) { return VOLUMES.find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }

@@ -272,3 +272,5 @@ h1 { margin: 0; font-family: var(--brush); font-size: clamp(44px, 6.4vw, 78px); 
 .select-title { flex: 1 0 68px; min-width: 68px; white-space: nowrap; }
 .select-title span { white-space: nowrap; }
 .select-head .difficulty { flex: 0 0 260px; }
+
+.dash-button.borrow-ready { box-shadow: 0 0 0 2px #d1b68a, inset 0 0 0 2px #f4edd7; }

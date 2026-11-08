@@ -30,6 +30,15 @@
     mirror: {thigh:14,shin:14,torso:23,upper:12,fore:11,head:5.3,limbs:[4.8,4,3.6,3.2],blade:25,bladeW:2.3,color:'#242928',robe:'long',headStyle:'plain',city:true},
     watchman: {thigh:16,shin:16,torso:27,upper:13,fore:12,head:6.5,limbs:[7.7,6,6,5],blade:0,color:'#33382d',robe:'armor',spear:true,grip:{span:14},city:true},
     judge: {thigh:19,shin:18,torso:30,upper:15,fore:14,head:6.2,limbs:[6.7,5.6,5.4,4.7],blade:0,color:'#1b211b',robe:'long',headStyle:'plain',city:true},
+    umbrella:{thigh:14,shin:14,torso:22,upper:12,fore:11,head:5.5,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    monk:{thigh:16,shin:15,torso:24,upper:13,fore:12,head:5.8,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
+    disciple:{thigh:13,shin:13,torso:19,upper:11,fore:10,head:5.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    rope:{thigh:14,shin:13,torso:20,upper:11,fore:11,head:5.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    crossbow:{thigh:14,shin:14,torso:21,upper:12,fore:11,head:5.4,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    axeman:{thigh:16,shin:15,torso:26,upper:14,fore:13,head:6.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
+    yanhui:{thigh:16,shin:16,torso:24,upper:13,fore:12,head:5.8,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    shizhen:{thigh:18,shin:17,torso:28,upper:14,fore:13,head:6.5,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
+    yue:{thigh:18,shin:18,torso:27,upper:14,fore:13,head:6.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
   }
 
   const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist', 'one', 'flag', 'pot', 'sh', 'cast']
@@ -125,6 +134,7 @@
     anim.snap = false
     t.lean = 0.32; t.sw = 0.9; t.reach = 0.85; t.ou = 0.4; t.of = 0.1; t.crouch = 3
     const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
+    if (KINDS[e.type]?.summit) return globalThis.XiabanInkMountainFigures.pose(e,t,anim,time,progress,speed)
     if (KINDS[e.type]?.city) return cityPose(e,t,anim,time,progress,speed)
     if (e.type === 'archer') { t.lean = 0.08; t.ou = 1.5; t.of = 1.52; t.sw = 0 }
     if (e.type === 'shield') { t.ou = 0.95; t.of = 1.45; t.lean = 0.22 }
@@ -1229,7 +1239,7 @@
   // Draws a posed humanoid in world space. `look` = { color, alpha, flash, eyeGlow, halo }.
   function drawHumanoid(ctx, kind, pose, x, y, facing, look, time, seed = 0, extras = {}) {
     const spec = KINDS[kind]
-    if (spec.city && globalThis.XiabanInkLanternFigures) return globalThis.XiabanInkLanternFigures.draw(ctx,kind,pose,x,y,facing,look,time,seed)
+    if ((spec.city||spec.summit) && globalThis.XiabanInkLanternFigures) return globalThis.XiabanInkLanternFigures.draw(ctx,kind,pose,x,y,facing,look,time,seed)
     const s = skeleton(spec, pose)
     const out = { tip: null, head: [x + s.head[0] * facing, y + s.head[1]], hand: null }
     ctx.save()

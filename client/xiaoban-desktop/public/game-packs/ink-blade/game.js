@@ -347,7 +347,7 @@
     shield: ['盾傀正面难破：弹反破势，或闪身绕到背后', '盾傀正面难破：弹反破势，或闪身绕到背后'],
     ink: ['墨意已满，按「一笔」挥出满纸一击', '墨意已满，按 I 挥出满纸一击'],
     execute: ['敌人失衡，此刻出剑即可处决', '敌人失衡，此刻按 J 即可处决'],
-    broken: ['无常架势已破，速速出剑处决', '无常架势已破，速按 J 处决'],
+    broken: ['对手架势已破，速速出剑处决', '对手架势已破，速按 J 处决'],
     danger: ['「危」字为不可弹反之招，跳起或闪身躲开', '「危」字为不可弹反之招，跳起或闪身躲开'],
     icicle: ['出剑斩向悬冰，冰凌坠落可砸倒下方的敌人', '出剑斩向悬冰，冰凌坠落可砸倒下方的敌人'],
     thin: ['此处冰薄：在冰上久立不动，脚下便会开裂', '此处冰薄：在冰上久立不动，脚下便会开裂'],
@@ -366,6 +366,11 @@
     hookPull: ['钩镰朱光亮起时出剑弹反，海寇会被拽到身前；收剑后再斩可处决', '钩镰朱光亮起时按 J 弹反，海寇会被拽到身前；收剑后再斩可处决'],
     tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
     mirror: ['镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回', '镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回'],
+    borrow: ['弹反后「闪」亮起：朝对手闪身借势绕背，再斩处决；伞面始终挡正面', '弹反后按 L / Shift 借势绕背，再按 J 出剑；伞面始终挡正面'],
+    rope: ['索客亮刀后沿绳落斩，可迎刀弹反；连弩的两箭都能斩回', '索客亮刀后沿绳落斩，可迎刀弹反；连弩的两箭都能斩回'],
+    mountwind: ['布条展开后起风，注意站位；迎风弹反也能借势换边', '布条展开后起风，注意站位；迎风弹反也能借势换边'],
+    heavyguard: ['重兵举刃时不怕轻斩，先接招或让开，再打收招', '重兵举刃时不怕轻斩，先接招或让开，再打收招'],
+    elite: ['精英有独立架势条：多次弹反破势，出现「斩」再处决', '精英有独立架势条：多次弹反破势，出现「斩」再处决'],
     watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
     writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
     rigging: ['斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下', '斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下'],
@@ -741,6 +746,14 @@
     mirror: {a0:-2.3,a1:.7,r:35,width:8,color:'#20352a'},
     watchman: {a0:-.3,a1:.2,r:72,width:8,color:'#25382c'},
     judge: [{a0:-2.5,a1:.8}],
+    umbrella:{a0:-1.2,a1:.7,r:39,width:9,color:'#30372d'},
+    monk:{a0:-.4,a1:.4,r:72,width:8,color:'#30372d'},
+    disciple:{a0:-2,a1:.7,r:35,width:9,color:'#30372d'},
+    rope:{a0:-2,a1:.8,r:37,width:8,color:'#30372d'},
+    axeman:{a0:-2.5,a1:1.1,r:65,width:17,color:'#273025'},
+    yanhui:{a0:-2.3,a1:.8,r:49,width:12,color:'#273025'},
+    shizhen:{a0:-2.5,a1:1,r:65,width:17,color:'#273025'},
+    yue:[{a0:-2.5,a1:1}],
   }
 
   function snapshot(enemy) {
@@ -878,7 +891,7 @@
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
-          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge'
+          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge' || e.kind === 'yue'
           const spec = big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
           const lift = e.mounted ? 70 : big ? 50 : 36
@@ -986,6 +999,10 @@
           if (isSnowVolume()) audio.play('icecrack')
           audio.play('wave')
           break
+        case 'borrowStep':
+          audio.play('dash');FX.ring(fx,e.x,e.y-4,6,25,.25,'rgba(224,224,200,.7)',2);break
+        case 'backHit':
+          FX.sparks(fx,e.x,e.y,6,'#d2c9ad',{len:10,speed:130});audio.play('hit');break
         case 'mirrorSpawn':
           FX.ring(fx,e.x,e.y,10,55,.7,'rgba(207,224,198,0.65)',1);audio.play('mirror');break
         case 'mirrorTell':
@@ -1194,7 +1211,7 @@
     ctx.restore()
   }
 
-  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite'])
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite', 'mountTell', 'ropeTell', 'bowTell'])
   const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeWrite'])
 
   function teleProgress(enemy) {
@@ -1210,6 +1227,9 @@
 
   function drawEnemy(enemy, dt) {
     if (enemy.delay > 0 || !enemy.alive && enemy.state !== 'dying') return
+    if(enemy.type==='rope'&&(enemy.ropeMounted||enemy.state==='ropeClimb')){
+      ctx.save();ctx.strokeStyle='rgba(64,74,58,.65)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(enemy.aimX??enemy.x,rules.GROUND-205);ctx.lineTo(enemy.x,enemy.y-42);ctx.stroke();ctx.restore()
+    }
     const a = anim(enemy.id, enemy)
     const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
     const flash = enemy.flash > 0
@@ -1252,11 +1272,16 @@
       ctx.save();ctx.strokeStyle='rgba(207,224,216,0.85)';ctx.lineWidth=1.8
       ctx.beginPath();ctx.moveTo(state.player.x,state.player.y-36);ctx.lineTo(drawX,enemy.y-35);ctx.stroke();ctx.restore()
     }
+    if(rules.isElite(enemy)&&enemy.alive&&out.head){
+      const y=out.head[1]-25;ctx.save();ctx.fillStyle='rgba(241,232,209,.85)';ctx.fillRect(enemy.x-26,y-12,52,19)
+      ctx.fillStyle='#323a2c';ctx.font='10px KaiTi,serif';ctx.textAlign='center';ctx.fillText(enemy.type==='yanhui'?'燕回':'石震',enemy.x,y-3)
+      ctx.fillStyle='#a4ab92';ctx.fillRect(enemy.x-24,y+3,48,3);ctx.fillStyle=CINNABAR;ctx.fillRect(enemy.x-24,y+3,48*enemy.posture/enemy.postureMax,3);ctx.restore()
+    }
     const isBoss = rules.isBoss(enemy)
-    const glinting = progress >= 0 && out.tip && !DANGER_TELLS.has(enemy.state)
+    const glinting = progress >= 0 && out.tip && !enemy.sweep && !DANGER_TELLS.has(enemy.state)
     if (glinting) glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
     if (darkOn && out.head && enemy.type !== 'dummy') eyeMarks.push({ head: out.head, facing: enemy.facing, glow: look.eyeGlow, tip: glinting ? out.tip : null, progress, boss: isBoss })
-    if (enemy.state === 'stagger' || enemy.state === 'broken') {
+    if (enemy.state === 'stagger' || enemy.state === 'broken' || enemy.state === 'umbrellaOpen') {
       const pulse = 1 + Math.sin(clock * 10) * 0.08
       const top = out.head ? out.head[1] - (isBoss ? 30 : 22) : enemy.y - 70
       drawSeal('斩', enemy.x, top, 15 * pulse * (isBoss ? 1.3 : 1))
@@ -1286,6 +1311,7 @@
     footClock -= dt * Math.min(1.7, Math.abs(p.vx) / 200 + 0.4)
     if (footClock > 0) return
     footClock = 0.3
+    if(volume===6){audio.play('stonestep');return}
     if (volume === 3) {
       audio.play('sandstep')
       FX.puff(fx, p.x - p.facing * 5, rules.GROUND - 1, 1, { speed: 30, size: 4, alpha: 0.35, dust: true, angle: -Math.PI / 2 - p.facing * 0.7, spread: 1, life: 0.45 })
@@ -1305,7 +1331,7 @@
     const neckX = p.x + s.neck[0] * p.facing - p.facing * 2, neckY = p.y + s.neck[1] + 1
     fig.updateScarf(a, neckX, neckY, p.facing, p.vx, dt, clock, -p.vx * 0.9 - 30 * p.facing - 12)
     shadow(p.x, p.y, 15)
-    if (dashImage > 0) {
+    if (dashImage > 0 && currentVolume()!==6) {
       dashImage -= dt
       const copy = { ...pose }, x = p.x, y = p.y, facing = p.facing
       FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, 'player', copy, x, y, facing, { alpha: alpha * 0.32, color: '#2a2a2e' }, clock), 0.24, 0)
@@ -1754,10 +1780,11 @@
     if (state.enemies.some((en) => en.type === 'angler' && en.alive && en.phase2)) env.blizzard = Math.max(env.blizzard || 0, 0.65)
     const wind = state.world.wind
     if (wind && camera.x >= wind.zone[0] - 200 && camera.x <= wind.zone[1] + 200) {
-      env.blizzard = Math.max(env.blizzard || 0, state.wind.power)
+      if(currentVolume()===6)env.gust=state.wind.power
+      else env.blizzard = Math.max(env.blizzard || 0, state.wind.power)
       env.windDir = state.wind.dir
     }
-    const night = env.moon > 0.5 || (env.night || 0) > 0.5 || (currentVolume() === 4 && (env.top[0] < 100 || (camera.x > 2400 && camera.x < 3180)))
+    const night = fx.letterbox > 0.5 || env.moon > 0.5 || (env.night || 0) > 0.5 || (currentVolume() === 4 && (env.top[0] < 100 || (camera.x > 2400 && camera.x < 3180)))
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
     darkOn = darknessAt(camera.x) > 0.02
     eyeMarks.length = 0
@@ -1765,6 +1792,7 @@
     FX.update(fx, fxDt)
     phantomImage = Math.max(0, phantomImage - dt)
     scene.drawBase(ctx, assets, cam, env, clock, state.level)
+    if(currentVolume()===6)globalThis.XiabanInkMountain.moving(ctx,assets,cam,clock,env)
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     const burning = state.grass.length || state.fires.length ? drawGrassFire(cam) : 0
@@ -1816,6 +1844,7 @@
 
   function updateHUD(force = false) {
     const p = state.player
+    $('dashButton').classList.toggle('borrow-ready',state.world.borrowStep&&p.borrowUntil>state.clock)
     const goal = goalText()
     if (force || goal !== hud.goal) {
       $('goal').textContent = goal

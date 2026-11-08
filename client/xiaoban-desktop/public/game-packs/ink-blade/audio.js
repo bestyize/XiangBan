@@ -125,6 +125,7 @@
   }
 
   const SOUNDS = {
+    stonestep: () => {tone(140,{dur:.045,vol:.03,bend:.5});hiss({dur:.045,vol:.025,freq:450,to:120,type:'lowpass'})},
     mirror: () => { bell(784,0.025,1.1);bell(1174,0.018,0.8,0.06) },
     glass: () => { for(let i=0;i<6;i++)bell(1200+i*310,0.018,.35,i*.018);hiss({dur:.16,vol:.07,freq:4600,to:1800}) },
     paper: () => hiss({dur:.2,vol:.09,freq:2700,to:700,q:.6}),

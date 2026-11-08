@@ -337,7 +337,7 @@ describe('ink blade rules', () => {
     for (const level of levels.LEVELS) {
       const world = levels.volume(level.volume)
       const state = rules.createGame({ level: level.id })
-      if (level.challenge.stat !== 'time') expect(Object.keys(state.player)).toContain(level.challenge.stat)
+      for (const goal of level.challenge.all || [level.challenge]) if (goal.stat !== 'time') expect(Object.keys(state.player)).toContain(goal.stat)
       for (const id of level.encounters) {
         const encounter = world.encounters[id]
         expect(encounter.lock[1] - encounter.lock[0] - 80).toBeLessThanOrEqual(680)
