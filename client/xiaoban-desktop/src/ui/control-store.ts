@@ -82,11 +82,12 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
     },
     closeSettings() { store.settingsOpen = false; },
     async startCreation(kind) {
-      const prompts = {
+      const prompts: Record<string, string> = {
         wallpaper: '帮我创作一张动态壁纸：',
         effect: '帮我创作一个桌面特效：',
         widget: '帮我创作一个桌面小组件：',
         game: '帮我创作一款小游戏：',
+        app: '帮我创作一个轻量实用的桌面小应用：',
         pet: '帮我创作一个桌面宠物主题。先读取 pet_read_format：',
         skin: '帮我创作一套小伴界面皮肤。先读取 skin_read_format，再用 skin_create 制作并校验可导入的 ZIP，保存到皮肤页，保留当前皮肤。我的想法是：',
       };
@@ -231,6 +232,18 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
       const status = await invoke<ControlStore["game"]>("get_game_status").catch(() => null);
       if (status) store.game = status;
       else store.game.active = true;
+    },
+    async openApp(id: string, options?: import('./control-types.ts').AppOpenOptions) {
+      if (!desktop) {
+        window.open(`/?scene=games&game=${encodeURIComponent(id)}`, "_blank", "noopener");
+        return;
+      }
+      await invoke("app_runtime_open", {
+        id,
+        title: options?.title ?? null,
+        orientation: options?.orientation ?? null,
+        entry: options?.entry ?? null,
+      });
     },
     async stopDeskGame() {
       if (!desktop) return;

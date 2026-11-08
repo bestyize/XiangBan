@@ -11,13 +11,20 @@ import type { GameCatalog } from "../games/catalog.ts";
 export type { GameCatalog };
 
 /** The pages the shell shows (方案四). */
-export type MainPage = "new-task" | "chat" | "ai-store" | "library" | "studio" | "games" | "care" | "community" | "interactive";
+export type MainPage = "new-task" | "chat" | "ai-store" | "library" | "studio" | "apps" | "care" | "community" | "interactive";
 /**
  * Older ids that still work with `navigate`: the four studio kinds open 装扮 on that tab,
- * "settings" / "assistant" open the settings dialog instead of a page.
+ * "settings" / "assistant" open the settings dialog instead of a page,
+ * "games" redirects to "apps".
  */
-export type LegacyPage = "wallpapers" | "effects" | "widgets" | "companion" | "settings" | "assistant";
+export type LegacyPage = "wallpapers" | "effects" | "widgets" | "companion" | "settings" | "assistant" | "games";
 export type ControlPage = MainPage | LegacyPage;
+/** Options for launching a V2 application window. */
+export interface AppOpenOptions {
+  title?: string;
+  orientation?: "portrait" | "landscape";
+  entry?: string;
+}
 /** The tabs of 装扮. */
 export type StudioTab = "wallpapers" | "effects" | "widgets" | "pets" | "skins";
 /** The categories of the settings dialog. */
@@ -39,7 +46,7 @@ export interface ControlStore {
   goalTemplate: { outcome: string; verification: string; constraints: string; boundaries: string; stopWhen: string } | null;
   /** Files handed to the next message along with `creationDraft` (资料库 → 用这份资料提问). */
   creationAttachments: import('./chat/attachments.ts').PendingAttachment[] | null;
-  startCreation(kind: "wallpaper" | "effect" | "widget" | "game" | "pet" | "skin"): Promise<void>;
+  startCreation(kind: "wallpaper" | "effect" | "widget" | "game" | "app" | "pet" | "skin"): Promise<void>;
   /** The settings dialog's category; the chat sends people to "ai" when no model is set up. */
   settingsTab: SettingsTab;
   /** Whether the settings dialog is open. Use `openSettings` / `closeSettings`, or `navigate('settings')`. */
@@ -94,6 +101,8 @@ export interface ControlStore {
   setAutostart(enabled: boolean): Promise<void>;
   setDoubleClick(enabled: boolean): Promise<void>;
   openGames(gameId?: string): Promise<void>;
+  /** Opens a V2 container application window without affecting desktop wallpaper or pet. */
+  openApp(id: string, options?: AppOpenOptions): Promise<void>;
   /** Stops the desktop-layer game that is running. */
   stopDeskGame(): Promise<void>;
   /** Shipped games plus the user's own, and the user folders that could not be loaded. */

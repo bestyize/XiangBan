@@ -88,12 +88,12 @@ describe('ControlShell sidebar', () => {
     }
   });
 
-  it('lists 小伴 AI (new task, AI plugins, library) above 装扮, 游玩 and 提醒, and keeps the AI store tab', async () => {
+  it('lists 小伴 AI (new task, AI plugins, library) above 装扮, 应用 and 提醒, and keeps the AI store tab', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
       await flushPromises();
       expect(wrapper.findAll('#control-navigation .nav-item[data-testid^="nav-"]').map(b => b.attributes('data-testid')))
-        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-games', 'nav-care', 'nav-community']);
+        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-apps', 'nav-care', 'nav-community']);
       expect(wrapper.find('.control-statusbar').exists()).toBe(false);
       expect(wrapper.find('.sidebar-desktop-state').exists()).toBe(false);
       expect(wrapper.find('[data-testid="assistant-launcher"]').exists()).toBe(false);
@@ -111,14 +111,14 @@ describe('ControlShell sidebar', () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
       await flushPromises();
-      await wrapper.get('[data-testid="nav-games"]').trigger('click');
-      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="games-page"]').exists()).toBe(true); });
-      const first = wrapper.get('[data-testid="games-page"]').element;
+      await wrapper.get('[data-testid="nav-apps"]').trigger('click');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="apps-page"]').exists()).toBe(true); });
+      const first = wrapper.get('[data-testid="apps-page"]').element;
       await wrapper.get('[data-testid="nav-library"]').trigger('click');
       await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="library-page"]').exists()).toBe(true); });
-      await wrapper.get('[data-testid="nav-games"]').trigger('click');
-      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="games-page"]').exists()).toBe(true); });
-      expect(wrapper.get('[data-testid="games-page"]').element).toBe(first);
+      await wrapper.get('[data-testid="nav-apps"]').trigger('click');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="apps-page"]').exists()).toBe(true); });
+      expect(wrapper.get('[data-testid="apps-page"]').element).toBe(first);
     } finally { wrapper.unmount(); }
   });
 

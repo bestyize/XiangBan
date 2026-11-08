@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
-import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
+import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LayoutGrid, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, listen } from '../bridge.ts';
 import { accent, accents, followHost, followAccent, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
@@ -24,7 +24,8 @@ const pageLoaders = {
   library: () => import('./pages/LibraryPage.vue'),
   studio: () => import('./pages/StudioPage.vue'),
   interactive: () => import('./pages/InteractivePage.vue'),
-  games: () => import('./pages/GamesPage.vue'),
+  apps: () => import('./pages/AppsPage.vue'),
+  games: () => import('./pages/AppsPage.vue'),
   care: () => import('./pages/CarePage.vue'),
   community: () => import('./pages/CommunityPage.vue'),
 };
@@ -34,7 +35,7 @@ const AiStorePage = defineAsyncComponent(pageLoaders['ai-store']);
 const LibraryPage = defineAsyncComponent(pageLoaders.library);
 const StudioPage = defineAsyncComponent(pageLoaders.studio);
 const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
-const GamesPage = defineAsyncComponent(pageLoaders.games);
+const AppsPage = defineAsyncComponent(pageLoaders.apps);
 const CarePage = defineAsyncComponent(pageLoaders.care);
 const CommunityPage = defineAsyncComponent(pageLoaders.community);
 const AiGatewayCard = defineAsyncComponent(() => import('./components/AiGatewayCard.vue'));
@@ -60,7 +61,7 @@ function expandNavigation() { if (collapsed.value) { collapsed.value = false; ai
 const aiOpen = ref(true);
 const bottomItems = [
   { id: 'studio', label: '装扮', icon: Palette },
-  { id: 'games', label: '游玩', icon: Gamepad2 },
+  { id: 'apps', label: '应用', icon: LayoutGrid },
   { id: 'care', label: '提醒', icon: Bell },
   { id: 'community', label: '社区', icon: Globe },
 ] as const;
@@ -72,6 +73,7 @@ const aiItems = computed(() => [
 /** 新建任务 stays lit on the chat page while no conversation is open. */
 function isCurrent(id: string) {
   if (id === 'new-task') return store.page === 'new-task' || (store.page === 'chat' && !store.chat.currentId);
+  if (id === 'apps') return store.page === 'apps' || store.page === 'games';
   return store.page === id;
 }
 const attention = computed(() => store.chat.attention);
@@ -469,7 +471,8 @@ async function listenForAssistant() {
         else await store.chat.send(message);
       }catch(e){store.notify(e,'error');}
     }),
-    listen<unknown>('games-open', () => { navigate('games'); }),
+    listen<unknown>('games-open', () => { navigate('apps'); }),
+    listen<unknown>('apps-open', () => { navigate('apps'); }),
     listen<unknown>('application-skins-changed', () => { void refreshSkins().catch(error => store.notify(error, 'error')); }),
     listen<{ page: string; tab?: string | null }>('control-navigate', ({ page, tab }) => openPageFromAssistant(page, tab ?? undefined)),
   ]);
@@ -511,7 +514,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets);
   window.removeEventListener('keydown', onKeydown); document.removeEventListener('pointerdown', onPointerDown, true);
 });
-const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games', 'community'];
+const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps', 'games', 'community'];
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win, 'has-application-skin': !!activeSkin, 'skin-new-task': store.page === 'new-task' && !!activeSkin }">
@@ -656,7 +659,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
           <LibraryPage v-else-if="store.page === 'library'" :store="store" />
           <StudioPage v-else-if="store.page === 'studio'" :store="store" :widget-settings-request="widgetSettingsRequest" :pet-settings-request="petSettingsRequest" @widget-settings-opened="widgetSettingsRequest = null" @pet-settings-opened="petSettingsRequest = null" />
           <InteractivePage v-else-if="store.page === 'interactive'" :store="store" />
-          <GamesPage v-else-if="store.page === 'games'" :store="store" />
+          <AppsPage v-else-if="store.page === 'apps' || store.page === 'games'" :store="store" />
           <CarePage v-else-if="store.page === 'care'" :store="store" />
           <CommunityPage v-else-if="store.page === 'community'" :store="store" />
         </KeepAlive></template>
