@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "dusk-glider",
-  "version": "1.0.0",
   "name": "暮色滑翔",
+  "version": "1.0.0",
   "description": "横屏 3D 滑翔：按住俯冲，松开起飞，在日落之前飞过一座座岛。",
+  "category": "casual",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "orientation": "landscape"
+  "orientation": "landscape",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

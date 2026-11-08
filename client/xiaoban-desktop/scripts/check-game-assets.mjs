@@ -9,7 +9,7 @@ const errors = [];
 // Deliberate desktop-only adaptations. Every desktop pack is self-contained, so
 // the desktop index.html is derived from the reference pack by an exact, ordered rewrite
 // (shared files and the share button are dropped, theme/host become local).
-const desktopOnlyFiles = new Set(['desktop-host.js', 'theme.css']);
+const desktopOnlyFiles = new Set(['theme.css']);
 const freshThemePacks = new Set(['block-puzzle', 'merge-2048', 'water-sort']);
 const shareButtonRemovedPacks = new Set(['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort']);
 function desktopizeIndex(referenceText, id) {
@@ -19,9 +19,7 @@ function desktopizeIndex(referenceText, id) {
     if (line.includes('href="../fresh-theme.css"')) return [line.replace('../fresh-theme.css', './theme.css')];
     return [line];
   });
-  const text = lines.join('\n');
-  if (text.includes('<script src="./desktop-host.js"></script>')) return text;
-  return text.includes('<head>') ? text.replace('<head>', '<head><script src="./desktop-host.js"></script>') : null;
+  return lines.join('\n');
 }
 const desktopPackageAdaptations = {
   'falling-blocks/game.js': {
@@ -106,7 +104,7 @@ if (!errors.length) {
       if (!exists(manifestFile)) { errors.push(`${side}/${id}: 缺少 manifest.json`); continue; }
       let manifest;
       try { manifest = readJson(manifestFile); } catch { errors.push(`${side}/${id}: manifest.json 不是有效 JSON`); continue; }
-      if (manifest.id !== id || manifest.runtimeProtocol !== 1) errors.push(`${side}/${id}: manifest id 或 runtimeProtocol 不匹配`);
+      if (manifest.id !== id || manifest.schemaVersion !== 3 || manifest.runtimeProtocol !== 2) errors.push(`${side}/${id}: manifest id 或 schemaVersion/runtimeProtocol 不匹配`);
       for (const key of ['entry', 'cover']) {
         if (typeof manifest[key] !== 'string' || !exists(path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 不存在`);
         else if (!within(dir, path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 越出游戏目录`);
@@ -127,7 +125,7 @@ if (!errors.length) {
       if (!referenceFiles.includes(relative)) errors.push(`${id}/${relative}: 桌面与基准资源清单不一致`);
     }
     for (const relative of referenceFiles) if (!desktopFiles.includes(relative)) errors.push(`${id}/${relative}: 桌面与基准资源清单不一致`);
-    if (!desktopFiles.includes('desktop-host.js')) errors.push(`${id}: 缺少本地 desktop-host.js`);
+    if (desktopFiles.includes('desktop-host.js')) errors.push(`${id}: 协议 2 作品不应存在废弃的 desktop-host.js`);
     if (freshThemePacks.has(id) && !desktopFiles.includes('theme.css')) errors.push(`${id}: 缺少本地 theme.css`);
     for (const relative of referenceFiles) {
       const desktopFile = path.join(desktop, id, relative);
@@ -150,9 +148,7 @@ if (!errors.length) {
   const themeRules = [...freshThemePacks].flatMap(id => exists(path.join(desktop, id, 'theme.css')) ? cssRules(sourceText(path.join(desktop, id, 'theme.css'))) : []);
   for (const rule of referenceThemeRules) if (!themeRules.includes(rule)) errors.push(`theme.css 丢失基准 fresh-theme.css 规则：${rule.slice(0, 60)}`);
   for (const rule of themeRules) if (!referenceThemeRules.includes(rule) && !splitThemeRules.has(rule)) errors.push(`theme.css 含基准 fresh-theme.css 之外的规则：${rule.slice(0, 60)}`);
-  const hostSources = new Set(desktopCatalog.games.map(id => exists(path.join(desktop, id, 'desktop-host.js')) ? sourceText(path.join(desktop, id, 'desktop-host.js')) : ''));
-  if (hostSources.size !== 1) errors.push('各游戏包的 desktop-host.js 副本不一致');
   for (const shared of ['desktop-host.js', 'fresh-theme.css', 'result-share.css', 'result-share.js']) if (exists(path.join(desktop, shared))) errors.push(`桌面 game-packs 根目录不应再有共享文件：${shared}`);
 }
 if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
-else console.log('✓ 桌面十款游戏包、manifest、入口、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');
+else console.log('✓ 桌面十款 V2 游戏包、manifest (协议 2)、入口、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');

@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "jade-gomoku",
   "name": "雅韵五子棋",
+  "version": "1.0.0",
   "description": "水墨玉石质感五子棋，支持智能人机对弈与双人对局，沉浸式下子金石音效与连珠特效。",
+  "category": "board",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "save": false,
-  "orientation": "landscape"
+  "orientation": "landscape",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

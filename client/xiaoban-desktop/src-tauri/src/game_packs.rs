@@ -25,12 +25,9 @@ pub const MAX_ASSETS: usize = 60;
 pub const MAX_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ASSETS_TOTAL: usize = 16 * 1024 * 1024;
 const COVER_EXTENSIONS: [&str; 5] = ["svg", "png", "jpg", "jpeg", "webp"];
-pub const HOST_SCRIPT: &str = include_str!("../../public/game-packs/falling-blocks/desktop-host.js");
-const HOST_TAG: &str = "<script src=\"/__host/desktop-host.js\"></script>";
-/// Appended to the injected host script: answers host.init with game.ready so a user game that skips the
-/// handshake still loads. A second game.ready from the game itself is harmless.
-const AUTO_READY: &str = "\n(() => {\n  const nonce = new URLSearchParams(location.search).get('hostNonce')\n  if (!nonce || window.parent === window) return\n  window.addEventListener('message', event => {\n    const d = event.data\n    if (event.source !== window.parent || !d || d.channel !== 'xiaban.game-host' || d.protocol !== 1 || d.nonce !== nonce || d.type !== 'host.init') return\n    window.parent.postMessage({channel:'xiaban.game-pack',protocol:1,type:'game.ready',nonce}, '*')\n  })\n})()\n";
-fn injected_host_script() -> Vec<u8> { [HOST_SCRIPT, AUTO_READY].concat().into_bytes() }
+pub const HOST_SCRIPT: &str = "";
+const HOST_TAG: &str = "";
+fn injected_host_script() -> Vec<u8> { Vec::new() }
 
 /// Serialises create/delete so two tool calls never rename the same folder at once.
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
@@ -192,8 +189,9 @@ pub fn validate_manifest(dir: &Path, folder: &str, manifest: &Value) -> Result<V
     if text("entry")? != "index.html" {
         return Err("manifest 的 entry 必须是 index.html".into());
     }
-    if manifest.get("runtimeProtocol").and_then(Value::as_u64) != Some(1) {
-        return Err("manifest 的 runtimeProtocol 必须是 1".into());
+    let protocol = manifest.get("runtimeProtocol").and_then(Value::as_u64);
+    if protocol != Some(1) && protocol != Some(2) {
+        return Err("manifest 的 runtimeProtocol 必须是 1 或 2".into());
     }
     resolve_file(dir, &["index.html"]).map_err(|_| "缺少入口页 index.html".to_string())?;
     let layer = Layer::from_value(manifest)?;

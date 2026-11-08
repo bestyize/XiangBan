@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "block-puzzle",
-  "version": "1.0.0",
   "name": "消失高手",
+  "version": "1.0.0",
   "description": "拖动方块填满整行或整列，一次消得越多，分数越高。慢慢摆，轻松消。",
+  "category": "puzzle",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

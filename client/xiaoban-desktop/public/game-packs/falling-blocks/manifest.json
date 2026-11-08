@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "falling-blocks",
-  "version": "1.0.0",
   "name": "俄罗斯方块",
+  "version": "1.0.0",
   "description": "单人下落方块，移动和旋转，填满一行就能消除。",
+  "category": "puzzle",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

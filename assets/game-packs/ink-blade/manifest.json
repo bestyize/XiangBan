@@ -1,11 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "ink-blade",
-  "version": "1.3.0",
   "name": "水墨剑客",
+  "version": "1.3.0",
   "description": "横屏水墨动作：竹林、雪江、烽火三卷各六幅，逐幅解锁、集三印、求逸品。朱光一闪时出剑弹反，斩破月下无常、寒江钓叟与铁骑将军。",
+  "category": "action",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
   "orientation": "landscape",
-  "save": true
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

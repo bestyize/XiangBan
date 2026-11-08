@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "merge-2048",
-  "version": "1.0.0",
   "name": "2048",
+  "version": "1.0.0",
   "description": "滑动合并相同数字，慢慢合出 2048。手机和电脑都能玩。",
+  "category": "puzzle",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

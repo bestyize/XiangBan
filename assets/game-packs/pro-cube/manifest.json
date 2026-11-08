@@ -1,10 +1,19 @@
 {
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
   "id": "pro-cube",
-  "version": "1.0.0",
   "name": "3D全阶魔方",
+  "version": "1.0.0",
   "description": "3~9阶全系真实质感磁力魔方：支持手势划动切层、键盘旋转、多阶层深控制与智能还原。",
+  "category": "puzzle",
   "entry": "index.html",
+  "icon": "cover.svg",
   "cover": "cover.svg",
-  "runtimeProtocol": 1,
-  "orientation": "landscape"
+  "orientation": "landscape",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ]
 }

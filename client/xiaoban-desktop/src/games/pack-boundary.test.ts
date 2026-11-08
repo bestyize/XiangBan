@@ -15,7 +15,6 @@ describe('self-contained desktop game packs', () => {
   it.each(packs)('%s index.html only references files inside its own directory', id => {
     const text = html[`${prefix}${id}/index.html`];
     const refs = [...text.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]);
-    expect(refs.length).toBeGreaterThan(0);
     for (const ref of refs) {
       if (/^(#|data:|blob:|https?:|\/\/|javascript:|mailto:|tel:)/i.test(ref)) continue;
       expect(ref, `${id}: ${ref} must be relative to the pack`).not.toMatch(/^(\.\.\/|\/)/);
@@ -24,11 +23,8 @@ describe('self-contained desktop game packs', () => {
     }
   });
 
-  it('ships the same desktop-host.js in every pack', () => {
-    expect(Object.keys(hosts)).toHaveLength(packs.length);
-    const [first, ...rest] = Object.values(hosts);
-    expect(first.length).toBeGreaterThan(0);
-    for (const copy of rest) expect(copy).toBe(first);
+  it('does not ship legacy desktop-host.js in any pack', () => {
+    expect(Object.keys(hosts)).toHaveLength(0);
   });
 
   it('keeps no shared files at the game-packs root', () => {

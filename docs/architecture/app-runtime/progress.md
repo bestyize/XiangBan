@@ -199,4 +199,9 @@
   - **推进计划**：分三阶段实施：
     1. 第一阶段（容器基建）：在 `src-tauri` 中开发专有 V2 Webview 窗口与本地存储桥，实现 `bridge.js` 注入及胶囊控制栏；
     2. 第二阶段（界面重构）：控制台侧栏将原「游玩」升级为「应用」大厅，支持本地应用、精选测评与社区作品展示；
-    3. 第三阶段（生态迁移）：将内置 10 款游戏升级为协议 2，并无缝拉通《墨渡》《茶签归位》等社区最新案例。
+    3. 第三阶段（生态迁移与 V1 彻底清理）：将内置 10 款游戏全面升级为协议 2 规范（schemaVersion: 3, runtimeProtocol: 2），删除全量冗余的 `desktop-host.js` 与 HTML 注入逻辑，门禁脚本 `check-game-assets.mjs` 转正为纯 V2 规范强校验。
+- 2026-11-08：小伴桌面端完成第三阶段（生态迁移与 V1 彻底清理）。
+  - **包文件与规范升级**：`assets/game-packs/` 与 `public/game-packs/` 下 10 款游戏全面升级为协议 2（`schemaVersion: 3, runtimeProtocol: 2, kind, icon, input`）；彻底删除全部 11 份 `desktop-host.js` 遗留文件，从 `index.html` 移除脚本声明；
+  - **后端代码净化**：`game_packs.rs` 移除 `HOST_SCRIPT`、`AUTO_READY` 与 HTML 正则注入逻辑；`games.rs` 放宽协议 2 清单校验；
+  - **门禁与测试转正**：`check-game-assets.mjs` 反向门禁严禁 `desktop-host.js` 并强化协议 2 规范校验通过；`pack-boundary.test.ts` 13 项测试通过；前端 44 项测试与 Rust 15 项测试全部通过；
+  - **真机实测**：通过 CDP 与原生窗口截图实测，包括《俄罗斯方块》《2048》《MBTI 性格测评》在内的内置作品已全量通过 V2 独立原生窗口启动并渲染正常，三端实现完全同包共享。
