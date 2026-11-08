@@ -179,3 +179,10 @@
   - 验证：community-core 的 MobileGames、GameLibrary、CommunityGameTrial、AppPlaza、ContentPublishing、CommunityCore 测试通过；`:androidApp:assembleDebug`、`:androidApp:compileReleaseKotlin`、`RuntimeV2*` 单元测试通过；agent-mobile 策略测试 4 项、server-forum 清单校验 5 项通过。小米 14 上用调试方式写入一件探针作品：从「我的作品」打开后进入 `RuntimeV2Activity`，日志依次记录 `host.open`、`game.ready`（55 ms）、`game.start`、`game.result`、`console.error` 和未捕获异常；胶囊 ✕ 正常退出；「保存作品包」在下载目录生成 ZIP，清单符合服务端协议 2 规则。内置作品回归：MBTI 仍显示已有答题进度，《水墨剑客》进入协议 2 且存储文件还在。
   - 没有验证：真正让手机 Agent 用 `app_*` 工具从头做一件作品（测试里的 Agent 流程需要本地原生库，只在有库时才跑）；工作区作品的相机、麦克风授权；其余 8 款内置游戏本轮没有重新逐个打开；分享作品包到系统分享面板。
   - 已知遗留：线上《墨渡》《茶签归位》仍是协议 1 包，手机端现在打不开，需要把本地已打好的协议 2 包发布成新版本（涉及生产论坛和资源机，需用户确认）；桌面端 `game_packs.rs`、`protocol.ts`、`check-game-assets.mjs` 和论坛 `game-sandbox` 仍是协议 1，桌面游戏空间与桌面层作品依赖它，要先确认桌面容器能给每个作品独立安全源才能删。
+- 2026-11-08 23:36 CST：线上《墨渡》（56）和《茶签归位》（57）已原地替换为协议 2 的 1.1.0。
+  - 做法：论坛没有"管理员给已有作品追加版本"的接口，作者接口追加版本又会降回未审并重新入队，所以按用户要求**直接替换版本 1**，不新增版本、不动审核状态、精选和署名。两个新 ZIP 先放进资源机 `data/packs/game/` 的新文件键（`ink-ferry-1.1.0.zip`、`tea-sort-1.1.0.zip`，资源机不允许覆盖旧键），再在一个事务里把 `pack_versions` 里这两行的 `label`、`sha256`、`size`、`manifest`、`file_key`、`runtime_protocol` 改成新值（`UPDATE 1` 两次）。生成 SQL 的脚本是 `scripts/replace_version_sql.py`，它会先核对 ZIP 与 `register.json` 的哈希、大小和清单，只允许这两个作品编号。
+  - 回滚点：`/home/ubuntu/xiangban-forum/backups/v2-case-publish-20261108T073328Z/`（两行旧 `pack_versions`、`packs` 元数据、旧 ZIP）；旧 ZIP 在资源机原位仍在，回滚只需把两行改回旧值。服务端二进制和网页没有改动，`DEPLOYED_COMMIT` 仍是 `684b5cf7`，服务未重启。
+  - 线上核对：带 `X-Xiaoban-Runtime: 1,2` 时两个作品都是 200、`versions` 只有一项（1.1.0、协议 2）；不带协议头（旧客户端）返回 404，创作者精选列表对旧客户端为空；下载地址能取到文件，大小和 SHA-256 与登记一致。
+  - 小米 14：从广场点《墨渡》进入详情、"进入"，下载并缓存 `56-1-d79aab3c…` 后进入 `RuntimeV2Activity`；一局 12 分，结算页和"最高 12 分"正确，存储文件里 `{"best":12,"muted":false}` 说明旧最高分已继承。《茶签归位》同样下载缓存 `57-1-a9a8b599…`，选关页、第 1 关棋盘正常，"选关"按钮在胶囊下方；系统返回键一次后停在游戏内，没有退出。
+  - 没有验证：《茶签归位》通关后的红印和旧存档继承（这台手机上没有它的旧存档）、横屏、断网后的表现、联网被禁用后的表现。
+  - 代价：旧版 App（不带协议 2 能力）现在看不到这两个作品，也就是说线上只剩协议 2 的作品；网页版论坛试玩依赖作品域名，未配置前这两个作品在网页上不能试玩。
