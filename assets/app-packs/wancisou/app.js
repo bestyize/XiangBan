@@ -128,7 +128,7 @@
     const controller = new AbortController();
     state.search = controller;
     const request = ++state.request;
-    if (page === 1) { results.replaceChildren(); setBusy(true); }
+    if (page === 1) { results.replaceChildren(); results.scrollTop = 0; setBusy(true); }
     else { moreButton.disabled = true; moreButton.textContent = '加载中'; }
     const url = new URL('/api/search', API);
     url.searchParams.set('q', state.keyword);

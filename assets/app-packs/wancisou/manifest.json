@@ -5,7 +5,7 @@
   "id": "wancisou",
   "name": "万磁搜",
   "description": "跨站搜索公开资源，查看结果并复制磁力链接。",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "category": "tool",
   "entry": "index.html",
   "icon": "icon.svg",
