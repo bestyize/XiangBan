@@ -44,10 +44,19 @@
     { x: 4200, top: [42, 64, 82], low: [117, 139, 147], tint: [96, 124, 142, 0.38], sun: 0, moon: 0, rain: 0.8 },
     { x: 5200, top: [27, 42, 61], low: [130, 153, 163], tint: [104, 132, 147, 0.35], sun: 0, moon: 1, rain: 0.08 },
   ]
+  // 灯市 stays on paper and neutral ink; cool colour is confined to distant reflections.
+  const SKY_CITY = [
+    {x:0,top:[166,160,147],low:[238,232,216],tint:[225,220,204,.06],sun:0,moon:.3},
+    {x:1300,top:[145,143,133],low:[234,229,214],tint:[216,216,202,.06],sun:0,moon:.45},
+    {x:2300,top:[119,128,128],low:[228,231,220],tint:[181,198,191,.05],sun:0,moon:.6},
+    {x:3300,top:[137,133,125],low:[235,227,210],tint:[222,216,200,.06],sun:0,moon:.4},
+    {x:4200,top:[73,79,80],low:[198,205,199],tint:[171,188,184,.06],sun:0,moon:.55},
+    {x:5200,top:[161,157,147],low:[240,235,222],tint:[226,223,211,.04],sun:0,moon:.3},
+  ]
   const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
 
   function environment(x, volumeId = 1) {
-    const sky = volumeId === 4 ? SKY_SEA : volumeId === 3 ? SKY_BEACON : volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
+    const sky = volumeId === 5 ? SKY_CITY : volumeId === 4 ? SKY_SEA : volumeId === 3 ? SKY_BEACON : volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
     let a = sky[0], b = sky[0], t = 0
     for (let i = 0; i < sky.length - 1; i++) {
       const next = sky[i + 1]
@@ -138,7 +147,9 @@
     a.grain = art.paperGrain(256)
     a.vignette = art.vignette(o.width, o.height)
 
-    if (volumeId === 2) {
+    if (volumeId === 5) {
+      Object.assign(a, globalThis.XiabanInkLantern.build(r,span))
+    } else if (volumeId === 2) {
       a.far = art.mountains({ width: span(0.06), top: 25, height: 240, base: 250, res: r(0.3), seed: 101, peakW: [30, 75], peakH: [90, 195], gap: [0.4, 1], round: 1.2, detail: 16, detailAmp: 10, color: [75, 84, 102], alpha: 0.35, depth: 75, strokeCell: 4, strokeDensity: 0.5, strokeLen: 8, outline: 0.6, trees: 0.1, treeH: 3, fadeH: 80, snow: 0.9, snowFrom: 70, snowDepth: 50 })
       a.mid = art.mountains({ width: span(0.16), top: 85, height: 186, base: 265, res: r(0.4), seed: 107, peakW: [70, 160], peakH: [50, 130], gap: [0.5, 1.1], round: 1.5, detail: 22, detailAmp: 12, color: [52, 58, 72], alpha: 0.45, depth: 50, strokeCell: 4, strokeDensity: 0.55, strokeLen: 8, outline: 0.75, trees: 0.35, treeH: 6, fadeH: 65, snow: 0.9, snowFrom: 52, snowDepth: 36 })
       a.near = art.mountains({ width: span(0.32), top: 165, height: 130, base: 290, res: r(0.5), seed: 113, peakW: [120, 280], peakH: [30, 80], gap: [0.55, 0.95], round: 1.9, detail: 26, detailAmp: 10, color: [36, 40, 50], alpha: 0.58, depth: 36, strokeCell: 3, strokeDensity: 0.6, strokeLen: 7, outline: 0.9, trees: 0.5, treeH: 9, fadeH: 45, snow: 0.94, snowFrom: 30, snowDepth: 24 })
@@ -217,7 +228,9 @@
     }
     a.platforms = world.platforms.map((p, i) => volumeId === 2
       ? { p, s: art.snowRock(p.w, p.y, GROUND, 40 + i, r(1)) }
-      : volumeId === 4
+      : volumeId === 5
+        ? { p, s: globalThis.XiabanInkLantern.platform(p,r(1)) }
+        : volumeId === 4
         ? { p, s: art.bridge(p.w, p.y, GROUND, r(1), 70 + i) }
         : volumeId === 3
         ? { p, s: art.earthBlock(p.w, p.y, GROUND, 60 + i, r(1)) }
@@ -341,7 +354,9 @@
     layer(ctx, cam, 0.32); art.drawStrip(ctx, a.near, cam.left * 0.32, cam.viewW)
     mist(ctx, a, cam, 0.45, 287, 38, 0.55, clock * 11, 19)
 
-    if (a.volumeId === 2) {
+    if (a.volumeId === 5) {
+      globalThis.XiabanInkLantern.background(ctx,a,cam,clock)
+    } else if (a.volumeId === 2) {
       if (e.forest > 0.02) {
         const sway = Math.sin(clock * 0.5) * 0.006
         layer(ctx, cam, 0.55, sway, 292)
@@ -415,7 +430,9 @@
     layer(ctx, cam, 1)
     const left = cam.left - 60, right = cam.left + cam.viewW + 60
 
-    if (a.volumeId === 2) {
+    if (a.volumeId === 5) {
+      globalThis.XiabanInkLantern.ground(ctx,a,cam,clock)
+    } else if (a.volumeId === 2) {
       const field = ctx.createLinearGradient(0, GROUND, 0, GROUND + 130)
       field.addColorStop(0, 'rgba(250,251,255,1)'); field.addColorStop(1, 'rgba(214,223,238,1)')
       ctx.fillStyle = field
@@ -508,7 +525,10 @@
   }
 
   function drawForeground(ctx, a, cam, e, clock) {
-    if (a.volumeId === 2) {
+    if (a.volumeId === 5) {
+      layer(ctx,cam,1)
+      globalThis.XiabanInkLantern.foreground(ctx,a,cam,clock)
+    } else if (a.volumeId === 2) {
       const gale = e.blizzard || 0
       const sway = Math.sin(clock * 0.8 + 2) * (0.006 + gale * 0.01)
       layer(ctx, cam, 1.3, sway, 400)
@@ -712,5 +732,35 @@
     ctx.drawImage(a.vignette, 0, 0, cam.width, cam.height)
   }
 
-  globalThis.XiabanInkScene = { WATER, environment, build, layer, drawBackground, drawGround, drawCover, drawForeground, createWeather, updateWeather, drawWeather, drawPost }
+  // 灯市 architecture is static during a fight. Composite it once into bounded opaque
+  // tiles instead of replaying many translucent landmark/mist layers every frame.
+  function drawBase(ctx,a,cam,e,clock,level=null) {
+    if(a.volumeId!==5){drawBackground(ctx,a,cam,e,clock);drawGround(ctx,a,cam,e,clock);return}
+    const center=cam.left+cam.viewW/2
+    let area=0
+    for(let i=1;i<a.world.areas.length;i++)if(center>=a.world.areas[i].x)area=i
+    const range=level&&!level.scroll?level.range:[Math.max(0,a.world.areas[area].x-100),a.world.areas[area+1]?.x||a.world.length]
+    const left=range[0]-cam.viewW*.5,right=range[1]+cam.viewW*.5
+    const key=[level&&!level.scroll?level.id:area,cam.P,cam.top,cam.height,cam.viewW].join(':')
+    if(a.cityBase?.key!==key){
+      const fullWidth=Math.ceil((right-left)*cam.P),tiles=[]
+      const fixed={...cam,left,viewW:right-left,width:fullWidth,sx:0,sy:0}
+      const fixedEnv=environment((range[0]+range[1])*.5,5)
+      for(let offset=0;offset<fullWidth;offset+=1536){
+        const node=art.canvas(Math.min(1536,fullWidth-offset),cam.height),g=node.getContext('2d',{alpha:false})
+        const set=g.setTransform.bind(g)
+        g.setTransform=(aa,bb,cc,dd,ee,ff)=>set(aa,bb,cc,dd,ee-offset,ff)
+        drawBackground(g,a,fixed,fixedEnv,0);drawGround(g,a,fixed,fixedEnv,0)
+        g.setTransform=set
+        tiles.push({node,offset})
+      }
+      a.cityBase={key,left,tiles}
+    }
+    ctx.setTransform(1,0,0,1,0,0)
+    const shift=(a.cityBase.left-cam.left)*cam.P+cam.sx
+    for(const tile of a.cityBase.tiles){const x=shift+tile.offset;if(x+tile.node.width<0||x>cam.width)continue;ctx.drawImage(tile.node,x,cam.sy)}
+    layer(ctx,cam,1)
+  }
+
+  globalThis.XiabanInkScene = { WATER, environment, build, layer, drawBase, drawBackground, drawGround, drawCover, drawForeground, createWeather, updateWeather, drawWeather, drawPost }
 })()

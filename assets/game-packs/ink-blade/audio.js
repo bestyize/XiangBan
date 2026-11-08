@@ -125,6 +125,10 @@
   }
 
   const SOUNDS = {
+    mirror: () => { bell(784,0.025,1.1);bell(1174,0.018,0.8,0.06) },
+    glass: () => { for(let i=0;i<6;i++)bell(1200+i*310,0.018,.35,i*.018);hiss({dur:.16,vol:.07,freq:4600,to:1800}) },
+    paper: () => hiss({dur:.2,vol:.09,freq:2700,to:700,q:.6}),
+    brush: () => { hiss({dur:.3,vol:.12,freq:1000,to:130});tone(98,{dur:.15,vol:.06,bend:.6}) },
     chain: () => { for(let i=0;i<5;i++) bell(960+i*210,0.024,0.12,i*0.035); hiss({dur:0.2,vol:0.07,freq:2700,to:900}) },
     rigging: () => { tone(180,{type:'triangle',dur:0.22,vol:0.06,bend:0.4});hiss({dur:0.14,vol:0.09,freq:1400,to:300}) },
     slash: () => { hiss({ dur: 0.14, vol: 0.12, freq: 2600, to: 700, q: 0.9 }); tone(220, { dur: 0.08, vol: 0.02, bend: 0.6 }) },

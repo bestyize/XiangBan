@@ -26,6 +26,10 @@
     angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true, grip: { span: 12 } },
     pirate: { thigh: 13, shin: 13, torso: 20, upper: 11, fore: 10, head: 5.6, limbs: [5.8, 4.7, 4.8, 3.8], blade: 32, bladeW: 4, color: '#202a2d', robe: 'rags', hat: null, headStyle: 'plain', sabre: true, seaRaider: true },
     hooker: { thigh: 14, shin: 13, torso: 22, upper: 12, fore: 11, head: 5.8, limbs: [6.2, 5, 5.3, 4.2], blade: 0, color: '#16272b', robe: 'straw', hat: null, hook: true, seaRaider: true, grip: { span: 13 } },
+    lantern: {thigh:15,shin:14,torso:24,upper:12,fore:12,head:5.2,limbs:[5.3,4.4,4.1,3.6],blade:36,bladeW:3.5,color:'#242823',robe:'long',headStyle:'plain',city:true},
+    mirror: {thigh:14,shin:14,torso:23,upper:12,fore:11,head:5.3,limbs:[4.8,4,3.6,3.2],blade:25,bladeW:2.3,color:'#242928',robe:'long',headStyle:'plain',city:true},
+    watchman: {thigh:16,shin:16,torso:27,upper:13,fore:12,head:6.5,limbs:[7.7,6,6,5],blade:0,color:'#33382d',robe:'armor',spear:true,grip:{span:14},city:true},
+    judge: {thigh:19,shin:18,torso:30,upper:15,fore:14,head:6.2,limbs:[6.7,5.6,5.4,4.7],blade:0,color:'#1b211b',robe:'long',headStyle:'plain',city:true},
   }
 
   const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist', 'one', 'flag', 'pot', 'sh', 'cast']
@@ -121,6 +125,7 @@
     anim.snap = false
     t.lean = 0.32; t.sw = 0.9; t.reach = 0.85; t.ou = 0.4; t.of = 0.1; t.crouch = 3
     const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
+    if (KINDS[e.type]?.city) return cityPose(e,t,anim,time,progress,speed)
     if (e.type === 'archer') { t.lean = 0.08; t.ou = 1.5; t.of = 1.52; t.sw = 0 }
     if (e.type === 'shield') { t.ou = 0.95; t.of = 1.45; t.lean = 0.22 }
     if (e.type === 'spearman') { t.sw = -0.15; t.reach = 1.1; t.lean = 0.28 }
@@ -187,6 +192,21 @@
         t.air = 1; Object.assign(t, { l1: 0.7, b1: 1.3, l2: -0.1, b2: 0.9, lean: -0.1 })
         break
     }
+    return t
+  }
+
+  function cityPose(e,t,anim,time,q,speed) {
+    const judge=e.type==='judge',guard=e.type==='watchman'
+    t.lean=judge?0.02:guard?0.1:0.18;t.crouch=1;t.sw=judge?0.65:guard?-0.15:1.2;t.ou=-0.5;t.of=-0.7;t.reach=1
+    if(e.type==='mirror'){t.ou=-1.5;t.of=-.8;t.lean=.1}
+    if(e.state==='walk'||(e.state==='idle'&&speed>10))runLegs(t,anim.phase,Math.min(.65,speed/170))
+    if(e.state==='tele'||e.state==='judgeTell'){t.sw=judge?-2.55:guard?-.2:-2.2;t.lean=-.15;t.crouch=3+q*3;t.reach=guard?1.3:1;t.l1=.5;t.l2=-.4;t.ou=-.7;t.of=-1.1}
+    if(e.state==='attack'||e.state==='judgeAttack'){t.sw=guard?0:judge&&e.judgeStage<3?-.12:.75;t.lean=.63;t.crouch=5;t.reach=1.3;t.l1=.8;t.l2=-.65;anim.snap=true}
+    if(e.state==='judgeWrite'){t.sw=-1.7+q*2.2;t.lean=.05+q*.35;t.ou=-1.9;t.of=-2.2;t.l1=.45;t.l2=-.4;t.crouch=3;t.reach=1.25;anim.snap=true}
+    if(e.state==='judgeMirror'){t.sw=-1.1;t.ou=-2.2;t.of=-2.6;t.lean=-.1}
+    if(e.state==='recover'){t.sw=1.05;t.lean=.45;t.crouch=5;t.ou=.4;t.of=.9}
+    if(e.state==='hurt'||e.state==='stagger'||e.state==='broken'){t.lean=-.48;t.crouch=e.state==='broken'?14:8;t.sw=-2.5;t.head=-.4;t.ou=2;t.of=2.6;t.l1=.6;t.l2=-.3}
+    if(e.state==='roar'){t.sw=-2;t.ou=-2.4;t.of=-2.8;t.lean=-.15}
     return t
   }
 
@@ -1209,6 +1229,7 @@
   // Draws a posed humanoid in world space. `look` = { color, alpha, flash, eyeGlow, halo }.
   function drawHumanoid(ctx, kind, pose, x, y, facing, look, time, seed = 0, extras = {}) {
     const spec = KINDS[kind]
+    if (spec.city && globalThis.XiabanInkLanternFigures) return globalThis.XiabanInkLanternFigures.draw(ctx,kind,pose,x,y,facing,look,time,seed)
     const s = skeleton(spec, pose)
     const out = { tip: null, head: [x + s.head[0] * facing, y + s.head[1]], hand: null }
     ctx.save()
@@ -1345,6 +1366,10 @@
         fist(ctx, s.hand, af * 0.7, look, color)
       }
       if (!spec.broadsword && !spec.shortSpear) drawBlade(ctx, spec, s, look, out)
+    }
+    if (spec.city && globalThis.XiabanInkLantern) {
+      globalThis.XiabanInkLantern.costume(ctx,kind,s,pose,look,time,look.entity)
+      if(kind==='judge')out.tip=[s.hand[0]+Math.cos(pose.sw)*(look.entity?.judgeStage===3?49:78),s.hand[1]+Math.sin(pose.sw)*(look.entity?.judgeStage===3?49:78)]
     }
     ctx.restore()
     const map = (p) => p && [x + p[0] * facing, y + p[1]]

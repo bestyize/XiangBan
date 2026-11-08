@@ -20,7 +20,7 @@
       { x: 3880, y: 238, w: 142 },
       { x: 4560, y: 238, w: 152 },
     ],
-    prompts: [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'rigging', local: true }],
+    prompts: [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'dash' }],
     encounters: {
       gate: { id: 'gate', trigger: 900, lock: [640, 1400], waves: [
         [{ type: 'dummy', x: 1110 }, { type: 'dummy', x: 1220, delay: 0.2 }],
@@ -88,7 +88,7 @@
     // Gusts: calm, warning, push (seconds); force is px/s at full power.
     wind: { zone: [4230, 5230], cycle: [3.2, 1.0, 2.4], force: 150 },
     prompts: [
-      { x: 0, key: 'move' }, { x: 560, key: 'jump' }, { x: 880, key: 'icicle', local: true }, { x: 1410, key: 'rigging', local: true }, { x: 1530, key: 'thin', local: true },
+      { x: 0, key: 'move' }, { x: 560, key: 'jump' }, { x: 880, key: 'icicle', local: true }, { x: 1410, key: 'dash' }, { x: 1530, key: 'thin', local: true },
       { x: 2335, key: 'ice', local: true }, { x: 3400, key: 'reed', local: true },
     ],
     encounters: {
@@ -149,7 +149,7 @@
     // 夜袭: a night sandstorm. Light only reaches `radius` around the player and around the camp fires; archers see half as far.
     dark: { zone: [4230, 5230], radius: 165, lights: [4440, 4810, 5020] },
     prompts: [
-      { x: 0, key: 'move' }, { x: 300, key: 'strict' }, { x: 560, key: 'jump' }, { x: 1410, key: 'rigging', local: true }, { x: 1460, key: 'grass', local: true }, { x: 4250, key: 'dark', local: true },
+      { x: 0, key: 'move' }, { x: 300, key: 'strict' }, { x: 560, key: 'jump' }, { x: 1410, key: 'dash' }, { x: 1460, key: 'grass', local: true }, { x: 4250, key: 'dark', local: true },
     ],
     encounters: {
       beacon: { id: 'beacon', trigger: 940, lock: [700, 1440], waves: [
@@ -223,6 +223,23 @@
       ] },
       dragon: { id: 'dragon', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'dragon', x: 5880 }]] },
     },
+  }
+
+  const LANTERN_CITY = {
+    id: 5, name: '灯市卷', length: 6120, strictParry: true,
+    areas: ['入市','纸巷','镜桥','戏台','禁街','问心'].map((name,i)=>({x:[0,1440,2330,3290,4230,5230][i],name,sub:i===5?'终幅':['第一幅','第二幅','第三幅','第四幅','第五幅'][i]})),
+    platforms: [{x:1830,y:238,w:135},{x:2810,y:240,w:170},{x:3610,y:247,w:155},{x:4820,y:238,w:130}],
+    writing: { zone:[4300,5060], cycle:5.5 },
+    prompts: [{x:0,key:'move'},{x:780,key:'mirror',local:true},{x:1460,key:'watchman',local:true},{x:2430,key:'mirror',local:true},{x:4250,key:'writing',local:true}],
+    encounters: {
+      market:{id:'market',trigger:900,lock:[700,1440],waves:[[{type:'lantern',x:1140}],[{type:'mirror',x:1160}],[{type:'mirror',side:1},{type:'lantern',side:-1,delay:1.2}]]},
+      alley:{id:'alley',trigger:1630,lock:[1410,2160],waves:[[{type:'watchman',x:1880}],[{type:'watchman',side:1},{type:'lantern',side:-1,delay:0.8}],[{type:'mirror',side:1},{type:'watchman',side:-1,delay:1}]]},
+      mirrors:{id:'mirrors',trigger:2700,lock:[2400,3140],waves:[[{type:'mirror',x:2920}],[{type:'mirror',side:1},{type:'lantern',side:-1,delay:1.2}],[{type:'mirror',side:-1},{type:'watchman',side:1,delay:1}]]},
+      theatre:{id:'theatre',trigger:3650,lock:[3360,4110],waves:[[{type:'lantern',side:-1},{type:'mirror',side:1,delay:0.7}],[{type:'watchman',side:1},{type:'mirror',side:-1,delay:1}],[{type:'lantern',side:-1},{type:'watchman',side:1,delay:0.6},{type:'mirror',side:1,delay:1.5}]]},
+      street:{id:'street',trigger:4520,lock:[4300,5050],waves:[[{type:'lantern',x:4820,delay:3}],[{type:'watchman',side:1}],[{type:'lantern',side:-1},{type:'watchman',side:1,delay:1}]]},
+      judge:{id:'judge',trigger:5530,lock:[5300,6050],waves:[[{type:'judge',x:5830}]]},
+    },
+    copy:{boss:'沈照衡',bossSub:'执笔判官',win:'一剑出灯市',winLine:'判词化作白纸。天将明，桥上终于只剩一道影子。',loseLine:'灯火未熄。看清脚下的影，再迎着朱光出剑。',phase:'镜开见我 · 笔落成牢',place:'灯市'},
   }
 
   // Each 卷's boss and closing lines, read by the result screen and the boss bar.
@@ -310,6 +327,13 @@
     { id: '4-scroll', code: 400, volume: 4, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
       encounters: ['sea_gate', 'masts', 'cave', 'reef', 'storm', 'dragon'], par: 510, hurt: 4, scroll: true,
       challenge: { stat: 'time', goal: 450, at: 'most', text: '7 分 30 秒内踏浪通卷' }, grades: [20000, 27000, 34000] },
+    { id:'5-1', code:501, volume:5, name:'入市', sub:'第一幅', range:[0, 1440], start:520, encounters:['market'], par:85, hurt:2, challenge:{stat:'mirrorReturns',goal:2,text:'弹回返锋 2 次'}, grades:[2400, 3200, 4100] },
+    { id:'5-2', code:502, volume:5, name:'纸巷', sub:'第二幅', range:[1340, 2330], start:1460, encounters:['alley'], par:100, hurt:2, challenge:{stat:'guardBreaks',goal:2,text:'弹反破开甲卫枪架 2 次'}, grades:[2900, 3850, 4950] },
+    { id:'5-3', code:503, volume:5, name:'镜桥', sub:'第三幅', range:[2290, 3290], start:2340, encounters:['mirrors'], par:110, hurt:2, challenge:{stat:'mirrorReturns',goal:3,text:'弹回返锋 3 次'}, grades:[3400, 4500, 5800] },
+    { id:'5-4', code:504, volume:5, name:'戏台', sub:'第四幅', range:[3250, 4230], start:3300, encounters:['theatre'], par:125, hurt:2, challenge:{stat:'mirrorExecutions',goal:2,text:'破镜后处决 2 次'}, grades:[3900, 5150, 6650] },
+    { id:'5-5', code:505, volume:5, name:'禁街', sub:'第五幅', range:[4200, 5230], start:4250, encounters:['street'], par:110, hurt:2, challenge:{stat:'writingDodges',goal:3,text:'避开 3 次落笔'}, grades:[4400, 5800, 7500] },
+    { id:'5-6', code:506, volume:5, name:'问心', sub:'终幅', range:[5190, 6120], start:5240, encounters:['judge'], par:165, hurt:2, boss:true, challenge:{stat:'bossExecutions',goal:2,text:'破势处决判官 2 次'}, grades:[6500, 8500, 10500] },
+    {id:'5-scroll',code:500,volume:5,name:'长卷',sub:'全卷连战',range:[0,6120],start:520,encounters:['market','alley','mirrors','theatre','street','judge'],par:560,hurt:5,scroll:true,challenge:{stat:'time',goal:460,at:'most',text:'7 分 40 秒内走出灯市'},grades:[21000,28500,35500]},
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -317,7 +341,7 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA]
+  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA, LANTERN_CITY]
   function volume(id) { return VOLUMES.find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }

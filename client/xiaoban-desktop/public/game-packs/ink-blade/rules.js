@@ -42,8 +42,12 @@
     pirate: { hp: 4, w: 15, h: 54, score: 170, speed: 118, reach: 84, tele: 0.5, active: 0.13, recover: 0.54, lunge: 320, damage: 1 },
     hooker: { hp: 4, w: 18, h: 56, score: 260, speed: 78, reach: 170, tele: 0.72, active: 0.2, recover: 0.95, lunge: 90, damage: 1 },
     dragon: { hp: 62, w: 40, h: 90, score: 3600 },
+    lantern: {hp:3,w:16,h:62,score:180,speed:82,reach:110,tele:0.65,active:0.15,recover:0.7,lunge:150,damage:1},
+    mirror: {hp:4,w:16,h:60,score:280,speed:62,reach:86,tele:0.6,active:0.14,recover:0.85,lunge:210,damage:1},
+    watchman: {hp:5,w:23,h:73,score:300,speed:54,reach:135,tele:0.75,active:0.16,recover:0.95,lunge:120,damage:1},
+    judge: {hp:60,w:24,h:86,score:3800},
   }
-  const BOSSES = new Set(['boss', 'angler', 'general', 'dragon'])
+  const BOSSES = new Set(['boss', 'angler', 'general', 'dragon', 'judge'])
   // Damage a raised shield cannot stop: the ink stroke and the terrain (falling ice, cracks, arrow rain, fire).
   const UNBLOCKED = new Set(['strike', 'icicle', 'crack', 'volley', 'fire'])
   const isBoss = (enemy) => BOSSES.has(enemy.type)
@@ -83,6 +87,7 @@
       volleys: [], volleyClock: world.volley ? world.volley.cycle[0] + world.volley.cycle[1] - 1.8 : 0, fires: [], grass: grassCells(world),
       tide: { phase: 'calm', t: world.tide?.cycle[0] || 0, zone: null, dir: 1, x: 0, hits: [] },
       rigging: (world.rigging || []).map((r, id) => ({ ...r, id, state: 'hang', t: 0, y: GROUND - 155 })),
+      mirrors: [], reflection: null, writing: [], writingClock: 1.4, writingCount: 0,
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
@@ -93,7 +98,7 @@
         score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
         icicleKills: 0, crackKills: 0, slideKills: 0, ambushes: 0, standT: 0, coverT: 0, hideT: 0, spottedT: 0, hidden: false,
         volleyKills: 0, fireKills: 0, unhorses: 0, formationBreaks: 0,
-        hookPulls: 0, tideKills: 0, riggingKills: 0,
+        hookPulls: 0, tideKills: 0, riggingKills: 0, mirrorReturns: 0, mirrorExecutions: 0, guardBreaks: 0, writingDodges: 0,
       },
     }
     state.random = mulberry(state.seed)
@@ -229,6 +234,7 @@
   }
 
   function startStrike(state) {
+    state.mirrors.length=0; state.reflection=null
     const player = state.player
     player.ink = 0
     player.inkBuffer = 0
@@ -501,13 +507,15 @@
         attacker.state = 'recover'; attacker.t = 1.1; attacker.vx = -attacker.facing * 60
         emit(state, 'rear', { id: attacker.id, x: attacker.x, y: attacker.y, facing: attacker.facing })
       }
-      if (attacker.type === 'dragon') {
+      if (attacker.type === 'dragon' || attacker.type === 'judge') {
         attacker.state = 'recover'; attacker.t = 0.95; attacker.vx = -attacker.facing * 85
       }
       attacker.postureClock = state.clock
       if (attacker.posture >= attacker.postureMax) breakBoss(state, attacker)
       return
     }
+    if (attacker.type === 'mirror') attacker.mirrorOpened=false
+    if (attacker.type === 'watchman') { player.guardBreaks += 1; emit(state,'guardBreak',{id:attacker.id,x:attacker.x,y:attacker.y-40}) }
     if (attacker.type === 'cavalry') { unhorse(state, attacker); return }
     if (attacker.type === 'pavise') { breakFormation(state, attacker); return }
     if (attacker.type === 'hooker') {
@@ -524,7 +532,7 @@
     }
     attacker.state = 'stagger'
     attacker.openedAt = state.clock
-    attacker.t = attacker.type === 'shield' ? 1.8 : 1.3
+    attacker.t = attacker.type === 'shield' ? 1.8 : attacker.type === 'watchman' ? 1.6 : 1.3
     attacker.vx = sign(attacker.x - player.x) * 170
     emit(state, 'stagger', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h })
   }
@@ -553,17 +561,21 @@
   function hitEnemy(state, enemy, damage, source) {
     const player = state.player
     if (!enemy.alive || enemy.state === 'spawn' || enemy.state === 'dying') return
+    if (enemy.type === 'judge' && ['roar','intro'].includes(enemy.state)) return
     const fromFront = sign(player.x - enemy.x) === enemy.facing
-    if ((enemy.type === 'shield' || enemy.type === 'pavise') && enemy.state !== 'stagger' && fromFront && !UNBLOCKED.has(source)) {
+    if ((enemy.type === 'shield' || enemy.type === 'pavise' || enemy.type === 'watchman') && enemy.state !== 'stagger' && fromFront && !UNBLOCKED.has(source)) {
       state.hitstop = Math.max(state.hitstop, 0.05)
       if (source !== 'arrow') player.vx = -player.facing * 150
       emit(state, 'block', { x: enemy.x + enemy.facing * 18, y: enemy.y - 34 })
       return
     }
     const melee = source === 'slash' || source === 'heavy'
+    if (enemy.type==='mirror' && melee && fromFront && ['idle','walk'].includes(enemy.state) && startMirrorCounter(state,enemy)) {
+      emit(state,'block',{x:enemy.x+enemy.facing*18,y:enemy.y-36});return
+    }
     // Hook guard and dragon scales punish repeated frontal cuts; openings remain generous.
     const hookGuard = enemy.type === 'hooker' && fromFront && ['idle', 'walk', 'tele'].includes(enemy.state)
-    const scales = enemy.type === 'dragon' && !['recover', 'broken', 'roar'].includes(enemy.state)
+    const scales = (enemy.type === 'dragon' || (enemy.type === 'judge' && enemy.judgeStage < 3)) && !['recover', 'broken', 'roar'].includes(enemy.state)
     if (melee && (hookGuard || scales)) {
       emit(state, 'block', { x: enemy.x + enemy.facing * 20, y: enemy.y - 40 })
       state.hitstop = Math.max(state.hitstop, 0.035)
@@ -595,7 +607,8 @@
           if (enemy.pressure >= 2 && enemy.hp > damage) {
             enemy.pressure = 0
             enemy.facing = sign(player.x - enemy.x) || enemy.facing
-            if (enemy.type === 'dragon') startDragonHead(state, enemy)
+            if (enemy.type === 'judge') startJudgeStrike(state, enemy)
+            else if (enemy.type === 'dragon') startDragonHead(state, enemy)
             else startCombo(state, enemy)
             enemy.t *= 0.8; enemy.teleTotal = enemy.t
           }
@@ -608,11 +621,14 @@
         if (enemy.hp > 0 && enemy.posture >= enemy.postureMax && enemy.state !== 'broken') breakBoss(state, enemy)
       }
       if (enemy.hp <= 0) {
+        if(enemy.type==='judge'){state.mirrors.length=0;state.reflection=null;state.writing.length=0}
         enemy.hp = 0
         enemy.state = 'dying'; enemy.t = 2.6; enemy.vx = 0
         state.slow = 1.6; state.slowScale = 0.22
         killScore(state, enemy)
         emit(state, 'bossDown', { id: enemy.id, x: enemy.x, y: enemy.y - 40 })
+      } else if (enemy.type === 'judge') {
+        judgeTransition(state,enemy)
       } else if (!enemy.phase2 && enemy.hp <= enemy.maxHp * 0.5) {
         enemy.phase2 = true
         enemy.state = 'roar'; enemy.t = 1.25; enemy.vx = 0; enemy.combo = null
@@ -622,6 +638,7 @@
       return
     }
     if (enemy.state === 'stagger' && fresh) {
+      if (enemy.mirrorOpened) player.mirrorExecutions += 1
       player.executions += 1
       state.hitstop = Math.max(state.hitstop, 0.13); state.slow = 0.45; state.slowScale = 0.3
       addCombo(state); addScore(state, 150); addInk(state, 15)
@@ -692,7 +709,7 @@
       hitDone: false, side, seed: state.random() * 10, combo: null, move: null,
     }
     if (BOSSES.has(spec.type)) {
-      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
+      enemy.hp = enemy.maxHp = spec.type === 'judge' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
@@ -701,6 +718,9 @@
     if (spec.type === 'pavise') { enemy.group = spec.group || 'p' + enemy.id; prompt(state, 'pavise') }
     if (spec.type === 'general') enemy.mounted = true
     if (spec.type === 'hooker') prompt(state, 'hookPull')
+    if (spec.type === 'mirror') { enemy.mirrorCd=0; prompt(state,'mirror') }
+    if (spec.type === 'watchman') prompt(state,'watchman')
+    if (spec.type === 'judge') { enemy.judgeStage=1;enemy.mirrorCd=1;enemy.chain=0 }
     enemy.burnCd = 0
     state.enemies.push(enemy)
     if (!enemy.delay) emit(state, 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
@@ -716,7 +736,7 @@
   }
 
   /** Cover from 芦丛 stops new attacks, so ranged and waiting enemies lose the player until they are spotted. */
-  function mayAttack(state) { return attackers(state) < state.diff.tokens && !state.player.hidden }
+  function mayAttack(state) { return !state.reflection && !state.writing.length && attackers(state) < state.diff.tokens && !state.player.hidden }
 
   const WIND_MASS = { hammer: 0.15, spearman: 0.4, shield: 0.3 }
 
@@ -823,7 +843,7 @@
         break
       case 'stagger':
         enemy.vx *= Math.pow(0.01, dt)
-        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.5 }
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.5; enemy.mirrorOpened=false }
         break
     }
     moveGround(state, enemy, dt)
@@ -1825,6 +1845,120 @@
     boss.x = clamp(boss.x + boss.vx * dt, min + (boss.facing > 0 ? 220 : 65), max - (boss.facing < 0 ? 220 : 65))
   }
 
+  // ----------------------------------------------------------- 灯市 · mirrors and brush strokes
+  // The performer now counters with the physical mirror in her hand; no body doubles.
+  function startMirrorCounter(state,owner) {
+    if(state.reflection||state.writing.length||(owner.mirrorCd||0)>0)return false
+    const p=state.player,x=owner.x+owner.facing*15,y=owner.y-36
+    owner.mirrorCd=5
+    state.reflection={owner:owner.id,x,y,startX:x,startY:y,dir:sign(p.x-x)||-p.facing,state:'tell',t:state.difficulty==='easy'?0.8:0.6,total:state.difficulty==='easy'?0.8:0.6,life:2.5}
+    emit(state,'mirrorTell',{x,y})
+    return true
+  }
+
+  function shatterMirror(state,owner) {
+    state.mirrors=state.mirrors.filter(m=>m.owner!==owner.id)
+    owner.mirrorCd=5;owner.mirrorOpened=true;owner.openedAt=state.clock;owner.vx=0
+    if(isBoss(owner)) {
+      owner.posture=Math.min(owner.postureMax,owner.posture+24);owner.postureClock=state.clock
+      owner.state='recover';owner.t=1.3
+      if(owner.posture>=owner.postureMax)breakBoss(state,owner)
+    } else {owner.state='stagger';owner.t=1.5}
+    state.player.mirrorReturns+=1
+    emit(state,'mirrorBreak',{x:owner.x,y:owner.y-35,id:owner.id})
+  }
+
+  function makeWriting(state,kind,boss=null) {
+    if(state.writing.length||state.reflection)return
+    const p=state.player,[lo,hi]=state.lock||[p.x-300,p.x+300]
+    const x=clamp(p.x,lo+110,hi-110),g=GROUND
+    const tele=(kind==='box'?1.2:kind==='vertical'?0.9:0.95)*state.diff.tele
+    const segments=kind==='horizontal'?[{x0:lo+8,x1:hi-8,y0:g-32,y1:g+2}]:kind==='vertical'?[{x0:x-24,x1:x+24,y0:g-215,y1:g+3}]:[{x0:x-100,x1:x+100,y0:g-24,y1:g+2},{x0:x-100,x1:x+100,y0:g-115,y1:g-99},{x0:x+83,x1:x+101,y0:g-115,y1:g}]
+    state.writing.push({kind,x,segments,phase:'tell',t:tele,total:tele,hit:false,source:boss?.id||0})
+    emit(state,'writingTell',{kind,x,y:g-55});prompt(state,'writing')
+  }
+
+  function updateLanternWorld(state,dt) {
+    if(state.world.id!==5)return
+    const blade=state.reflection,p=state.player
+    if(blade) {
+      const owner=state.enemies.find(e=>e.id===blade.owner&&e.alive&&e.state!=='dying')
+      if(!owner || p.dead)state.reflection=null
+      else if(blade.state==='tell') {blade.t-=dt;if(blade.t<=0){blade.state='fly';emit(state,'mirrorFire',{x:blade.x,y:blade.y})}}
+      else if(blade.state==='return') {
+        blade.t-=dt;const q=clamp(1-blade.t/0.2,0,1);blade.x=blade.startX+(owner.x-blade.startX)*q;blade.y=blade.startY+(owner.y-35-blade.startY)*q
+        if(blade.t<=0){shatterMirror(state,owner);state.reflection=null}
+      } else {
+        const old=blade.x;blade.x+=blade.dir*400*dt;blade.life-=dt
+        if(overlaps({x0:Math.min(old,blade.x)-12,x1:Math.max(old,blade.x)+12,y0:blade.y-6,y1:blade.y+6},playerBox(p))) {
+          const facing=sign(blade.x-p.x)===p.facing || Math.abs(blade.x-p.x)<14
+          if(facing&&inParryWindow(state)) {
+            p.parries+=1;addCombo(state);addScore(state,50);addInk(state,20);p.iframes=Math.max(p.iframes,0.22)
+            state.hitstop=0.09;state.slow=0.25;state.slowScale=0.4
+            emit(state,'parry',{x:p.x+p.facing*14,y:blade.y,target:'mirror',id:owner.id})
+            blade.state='return';blade.t=0.2;blade.startX=blade.x;blade.startY=blade.y
+          } else {if(p.iframes<=0&&!state.strike)hurtPlayer(state,1,blade.x-blade.dir*30);state.reflection=null}
+        } else if(blade.life<=0)state.reflection=null
+      }
+    }
+    const hazard=state.world.writing
+    if(hazard&&state.lock&&state.lock[0]>=hazard.zone[0]&&state.lock[1]<=hazard.zone[1]) {
+      if(!state.reflection&&!state.writing.length)state.writingClock-=dt
+      if(state.writingClock<=0&&!state.enemies.some(e=>e.alive&&['tele','attack'].includes(e.state))){makeWriting(state,state.writingCount++%2?'vertical':'horizontal');state.writingClock=hazard.cycle}
+    }
+    for(const stroke of state.writing) {
+      stroke.t-=dt
+      if(stroke.phase==='tell'&&stroke.t<=0){stroke.phase='active';stroke.t=0.25;emit(state,'writingFall',{x:stroke.x,y:GROUND,kind:stroke.kind})}
+      if(stroke.phase==='active') {
+        if(!stroke.hit&&!p.dead&&stroke.segments.some(seg=>overlaps(seg,playerBox(p)))&&p.iframes<=0&&!state.strike){stroke.hit=true;hurtPlayer(state,1,stroke.x)}
+        if(stroke.t<=0){stroke.phase='fade';stroke.t=0.4;if(!stroke.hit&&!p.dead)p.writingDodges+=1}
+      }
+    }
+    state.writing=state.writing.filter(w=>w.phase!=='fade'||w.t>0)
+  }
+
+  function judgeTransition(state,boss) {
+    const next=boss.hp<=boss.maxHp*0.3?3:boss.hp<=boss.maxHp*0.65?2:1
+    if(next<=(boss.judgeStage||1))return
+    boss.judgeStage=next;boss.phase2=next>=2;boss.state='roar';boss.t=1.2;boss.vx=0;boss.chain=0
+    state.mirrors.length=0;state.reflection=null;state.writing.length=0
+    emit(state,'bossPhase',{id:boss.id,kind:boss.type,x:boss.x,y:boss.y-40,stage:next})
+  }
+
+  function startJudgeStrike(state,boss,second=false) {
+    boss.chain=second?1:0;boss.state='judgeTell';boss.t=(second?0.45:boss.judgeStage===3?0.55:0.65)*state.diff.tele;boss.teleTotal=boss.t;boss.vx=0
+    boss.facing=sign(state.player.x-boss.x)||boss.facing
+    emit(state,'tell',{id:boss.id,x:boss.x,y:boss.y-65,facing:boss.facing})
+  }
+
+  function updateJudge(state,boss,dt) {
+    const p=state.player,dx=p.x-boss.x
+    if(boss.state!=='broken'&&state.clock-boss.postureClock>2)boss.posture=Math.max(0,boss.posture-5*dt)
+    switch(boss.state) {
+      case 'intro':case 'roar':boss.vx=0;if(boss.t<=0){boss.state='idle';boss.t=0.6}break
+      case 'idle':
+        boss.facing=sign(dx)||boss.facing;boss.vx=Math.abs(dx)>130?boss.facing*90:0
+        if(boss.t<=0&&!p.dead&&!state.reflection&&!state.writing.length) {
+          boss.moves++
+          if(boss.judgeStage<3&&(boss.moves%3===0||Math.abs(dx)>240)) {
+            const kind=boss.judgeStage===2&&boss.moves%2===0?'box':boss.moves%2?'horizontal':'vertical'
+            makeWriting(state,kind,boss);boss.state='judgeWrite';boss.t=state.writing[0]?.total||1;boss.teleTotal=boss.t;boss.brushKind=kind;boss.vx=0
+          } else if(Math.abs(dx)<160)startJudgeStrike(state,boss)
+          else boss.t=0.2
+        }break
+      case 'judgeTell':
+        if(boss.t<=0){boss.state='judgeAttack';boss.t=0.16;boss.hitDone=false;boss.vx=boss.facing*(boss.judgeStage===3?340:210);emit(state,'enemySwing',{id:boss.id,kind:'judge',x:boss.x,y:boss.y,facing:boss.facing})}break
+      case 'judgeAttack':
+        if(!boss.hitDone&&overlaps(bossReachBox(boss,boss.judgeStage===3?98:135),playerBox(p))){boss.hitDone=true;enemyStrike(state,boss,1);if(boss.state!=='judgeAttack')break}
+        if(boss.t<=0){if(boss.judgeStage===3&&!boss.chain)startJudgeStrike(state,boss,true);else{boss.state='recover';boss.t=1;boss.vx=0}}break
+      case 'judgeWrite':boss.vx=0;if(boss.t<=0){boss.state='recover';boss.t=boss.brushKind==='box'?1.4:1.2}break
+      case 'judgeMirror':boss.vx=0;if(!state.reflection){boss.state='idle';boss.t=0.65}break
+      case 'recover':boss.vx*=Math.pow(0.01,dt);if(boss.t<=0){boss.state='idle';boss.t=0.5/state.diff.aggression}break
+      case 'broken':boss.vx=0;if(boss.t<=0){boss.state='recover';boss.t=0.6;boss.posture=35}break
+    }
+    const [lo,hi]=state.lock||[0,state.world.length];boss.x=clamp(boss.x+boss.vx*dt,lo+40,hi-40)
+  }
+
   // ------------------------------------------------------------------ boss
 
   function chooseBossMove(state, boss) {
@@ -2032,6 +2166,8 @@
         if (enemy.delay <= 0) { enemy.delay = 0; emit(state, 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y }) }
         continue
       }
+      if ((state.reflection || state.writing.length) && !isBoss(enemy) && ['idle','walk','tele','attack'].includes(enemy.state)) { enemy.vx=0; continue }
+      enemy.mirrorCd=Math.max(0,(enemy.mirrorCd||0)-dt)
       enemy.t -= dt
       enemy.cd -= dt
       enemy.flash = Math.max(0, enemy.flash - dt)
@@ -2052,6 +2188,8 @@
       else if (enemy.type === 'angler') updateAngler(state, enemy, dt)
       else if (enemy.type === 'general') updateGeneral(state, enemy, dt)
       else if (enemy.type === 'dragon') updateDragon(state, enemy, dt)
+      else if (enemy.type === 'judge') updateJudge(state, enemy, dt)
+      else if (enemy.type === 'mirror') updateMelee(state,enemy,dt)
       else if (enemy.type === 'cavalry') updateCavalry(state, enemy, dt)
       else if (enemy.type === 'pavise') updatePavise(state, enemy, dt)
       else if (enemy.type === 'bomber') updateBomber(state, enemy, dt)
@@ -2499,6 +2637,7 @@
     updateFire(state, sdt)
     updateTide(state, sdt)
     updateRigging(state, sdt)
+    updateLanternWorld(state, sdt)
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)

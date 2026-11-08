@@ -365,6 +365,9 @@
     dark: ['夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮', '夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮'],
     hookPull: ['钩镰朱光亮起时出剑弹反，海寇会被拽到身前；收剑后再斩可处决', '钩镰朱光亮起时按 J 弹反，海寇会被拽到身前；收剑后再斩可处决'],
     tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
+    mirror: ['镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回', '镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回'],
+    watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
+    writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
     rigging: ['斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下', '斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下'],
   }
 
@@ -734,6 +737,10 @@
     pirate: { a0: -2.35, a1: 0.9, r: 38, width: 12, color: '#202a2d' },
     hooker: { a0: -2.5, a1: 0.7, r: 55, width: 9, color: '#16272b' },
     dragon: [{ a0: -2.6, a1: 0.7 }],
+    lantern: {a0:-2.2,a1:.8,r:52,width:9,color:'#20352a'},
+    mirror: {a0:-2.3,a1:.7,r:35,width:8,color:'#20352a'},
+    watchman: {a0:-.3,a1:.2,r:72,width:8,color:'#25382c'},
+    judge: [{a0:-2.5,a1:.8}],
   }
 
   function snapshot(enemy) {
@@ -871,7 +878,7 @@
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
-          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon'
+          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge'
           const spec = big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
           const lift = e.mounted ? 70 : big ? 50 : 36
@@ -950,7 +957,7 @@
           FX.shake(fx, 9)
           FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
           FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-          toast(state.world.copy.phase, 2000)
+          toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
           audio.play('roar')
           break
         }
@@ -979,6 +986,18 @@
           if (isSnowVolume()) audio.play('icecrack')
           audio.play('wave')
           break
+        case 'mirrorSpawn':
+          FX.ring(fx,e.x,e.y,10,55,.7,'rgba(207,224,198,0.65)',1);audio.play('mirror');break
+        case 'mirrorTell':
+          FX.seal(fx,'返',e.x,e.y-35,16,.8);audio.play('tell');break
+        case 'mirrorFire':audio.play('slash');break
+        case 'mirrorBreak':
+          FX.seal(fx,'破',e.x,e.y-27,20);FX.sparks(fx,e.x,e.y,18,'#dce8cc',{len:13,speed:190});FX.shake(fx,3);audio.play('glass');break
+        case 'guardBreak':
+          FX.sparks(fx,e.x,e.y,10,'#c4beb0',{len:8,speed:130});audio.play('block');break
+        case 'writingTell':audio.play('danger');break
+        case 'writingFall':
+          FX.shake(fx,4);audio.play('brush');break
         case 'rigCut':
           FX.drops(fx,e.x,e.y,12,{speed:95,size:1.5});FX.seal(fx,'斩',e.x,e.y-15,17)
           audio.play('rigging');break
@@ -1175,8 +1194,8 @@
     ctx.restore()
   }
 
-  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell'])
-  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell'])
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite'])
+  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeWrite'])
 
   function teleProgress(enemy) {
     // A charging lance glints brighter as it closes in: the cue for the parry.
@@ -1195,7 +1214,7 @@
     const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
     const flash = enemy.flash > 0
     const progress = teleProgress(enemy)
-    const look = { color: flash ? '#f4eedf' : undefined, flash, eyeGlow: progress >= 0 ? progress : enemy.state === 'attack' || enemy.state === 'dive' ? 1 : 0.15, halo: 0.22 }
+    const look = { entity: enemy, color: flash ? '#f4eedf' : undefined, flash, eyeGlow: progress >= 0 ? progress : enemy.state === 'attack' || enemy.state === 'dive' ? 1 : 0.15, halo: 0.22 }
     if (enemy.state === 'spawn') look.alpha = Math.max(0, Math.min(1, 1 - enemy.t / (enemy.type === 'boss' ? 0.9 : 0.75)))
     if (enemy.state === 'dying') { look.alpha = Math.max(0.15, enemy.t / 2.6); if (Math.random() < 0.6) FX.smoke(fx, enemy.x, enemy.y - 36, { alpha: 0.3 }) }
     let out
@@ -1745,8 +1764,7 @@
     scene.updateWeather(weather, cam, env, dt, clock)
     FX.update(fx, fxDt)
     phantomImage = Math.max(0, phantomImage - dt)
-    scene.drawBackground(ctx, assets, cam, env, clock)
-    scene.drawGround(ctx, assets, cam, env, clock)
+    scene.drawBase(ctx, assets, cam, env, clock, state.level)
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     const burning = state.grass.length || state.fires.length ? drawGrassFire(cam) : 0
@@ -1760,6 +1778,7 @@
     drawHangingIcicles()
     drawBarrier()
     FX.drawGhosts(ctx, fx)
+    if (currentVolume()===5) globalThis.XiabanInkLantern.effects(ctx,state,clock)
     const simDt = phase === 'playing' && !state.strike && state.hitstop <= 0 ? fxDt : 0
     for (const enemy of state.enemies) drawEnemy(enemy, simDt)
     drawProjectiles()

@@ -262,3 +262,13 @@ h1 { margin: 0; font-family: var(--brush); font-size: clamp(44px, 6.4vw, 78px); 
   .move-track { width: 132px; height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Five scroll tabs stay usable alongside difficulty and the host capsule. */
+.select-head { flex-wrap: wrap; row-gap: 6px; }
+.volume-tabs { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.volume-tab { flex: 0 0 auto; white-space: nowrap; }
+
+.volume-tab { padding-inline: 10px; min-height: 44px; }
+.select-title { flex: 1 0 68px; min-width: 68px; white-space: nowrap; }
+.select-title span { white-space: nowrap; }
+.select-head .difficulty { flex: 0 0 260px; }
