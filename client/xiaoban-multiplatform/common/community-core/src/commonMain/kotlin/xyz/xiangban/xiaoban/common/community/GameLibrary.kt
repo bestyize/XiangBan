@@ -8,6 +8,11 @@ object BuiltinMobileGames {
     /** Builtins shown under 精选工具 instead of 精选游戏. */
     val tools = setOf("mbti")
     fun isTool(id: String): Boolean = id in tools
+    /** Tools draw a one-character serif mark instead of a cropped cover. */
+    fun glyph(id: String): String? = when (id) {
+        "mbti" -> "格"
+        else -> null
+    }
     fun genre(id: String): String = when (id) {
         "mbti" -> "测评"
         "water-sort", "snake-arena" -> "解压"

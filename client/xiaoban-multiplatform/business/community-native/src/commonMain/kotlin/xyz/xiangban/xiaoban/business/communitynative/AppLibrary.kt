@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -11,12 +12,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.ImageLoader
 import coil3.compose.LocalPlatformContext
@@ -51,6 +55,21 @@ internal fun AppActionButton(text: String, onClick: () -> Unit, modifier: Modifi
 
 @Composable
 internal fun AppShortcutIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier.size(56.dp)) {
+    val glyph = if (item.source == "builtin") BuiltinMobileGames.glyph(item.id) else null
+    if (glyph != null) AppGlyphIcon(glyph, modifier) else AppCoverIcon(env, item, modifier)
+}
+
+@Composable
+private fun AppGlyphIcon(glyph: String, modifier: Modifier) {
+    val tint = if (ThemeState.dark) Color(0xFFE0A274) else Color(0xFFB06A34)
+    val shape = RoundedCornerShape(16.dp)
+    BoxWithConstraints(modifier.clip(shape).background(tint.copy(alpha = if (ThemeState.dark) .18f else .12f)).border(0.5.dp, tint.copy(alpha = .3f), shape), contentAlignment = Alignment.Center) {
+        Text(glyph, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = (maxWidth.value * .46f).sp, color = tint)
+    }
+}
+
+@Composable
+private fun AppCoverIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier) {
     var bytes by remember(item.key) { mutableStateOf<ByteArray?>(null) }
     LaunchedEffect(env, item.key) {
         try {
