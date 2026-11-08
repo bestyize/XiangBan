@@ -10,7 +10,7 @@ await rm(destination, {recursive:true, force:true}); await mkdir(destination, {r
 for (const id of ids) {
   const src = path.join(source,id), dest = path.join(destination,id)
   const manifest = JSON.parse(await readFile(path.join(src,'manifest.json'),'utf8'))
-  if (manifest.id !== id || manifest.entry !== 'index.html' || manifest.runtimeProtocol !== 1) throw new Error(`Invalid built-in game manifest: ${id}`)
+  if (manifest.id !== id || manifest.entry !== 'index.html' || (manifest.runtimeProtocol !== 1 && manifest.runtimeProtocol !== 2)) throw new Error(`Invalid built-in game manifest: ${id}`)
   await cp(src,dest,{recursive:true})
   const entry = path.join(dest,'index.html'), html = await readFile(entry,'utf8')
   if (!/<head(?:\s[^>]*)?>/i.test(html)) throw new Error(`Missing head: ${id}`)
