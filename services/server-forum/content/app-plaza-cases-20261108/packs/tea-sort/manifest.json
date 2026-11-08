@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "tea-sort",
+  "name": "茶签归位",
+  "version": "1.0.0",
+  "description": "将茶签分拣入罐，二十道茶席谜题等你慢慢解开。",
+  "author": "一瞬流光",
+  "license": "MIT",
+  "save": true,
+  "orientation": "portrait",
+  "layer": "space"
+}
