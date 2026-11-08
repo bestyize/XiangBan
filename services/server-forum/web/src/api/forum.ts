@@ -65,8 +65,8 @@ function qs(params?: Query) {
   return s ? `?${s}` : ''
 }
 
-export async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
-  const headers: Record<string, string> = {}
+export async function request<T>(method: string, path: string, body?: unknown, auth = true, extraHeaders?: Record<string, string>): Promise<T> {
+  const headers: Record<string, string> = { ...extraHeaders }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (auth) {
     const token = await tokenProvider()

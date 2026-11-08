@@ -1,6 +1,10 @@
 // 社区内容层接口：内容包、方案、项目、周刊、分享信息。
 import { request } from './forum'
+import { appRuntimeBase } from '@/lib/appRuntime'
 import type { Page } from './types'
+
+export const runtimeBase = appRuntimeBase(import.meta.env?.VITE_APP_RUNTIME_BASE, import.meta.env?.DEV === true)
+const runtimeHeaders = runtimeBase ? { 'X-Xiaoban-Runtime': '1,2' } : undefined
 
 export interface PackAuthor {
   uid: string
@@ -141,8 +145,8 @@ export const contentApi = {
     request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }),
   removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
-  packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p, following:p.following ? "true" : undefined })}`, undefined, p.following === true),
-  pack: (id: number) => request<PackDetail>('GET', `/packs/${id}`),
+  packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p, following:p.following ? "true" : undefined })}`, undefined, p.following === true, runtimeHeaders),
+  pack: (id: number) => request<PackDetail>('GET', `/packs/${id}`, undefined, true, runtimeHeaders),
   download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
   schemes: (page = 1, following = false) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page, following:following ? "true" : undefined })}`, undefined, following),
   projects: () => request<{ items: ProjectItem[] }>('GET', '/projects', undefined, false),
