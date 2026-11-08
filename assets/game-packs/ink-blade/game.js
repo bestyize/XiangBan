@@ -108,7 +108,14 @@
     saveApplied = true
     save = PROGRESS.normalize(raw)
     if (!params.has('difficulty')) difficulty = save.difficulty
-    if (save.volume && !duel) selectedVolume = save.volume
+    if (save.volume && !duel) {
+      selectedVolume = save.volume
+      if (phase === 'welcome' && state.level.volume !== selectedVolume) {
+        currentLevel = selectedVolume + '-1'
+        state = rules.createGame({ difficulty, level: currentLevel })
+        resize(); camera.x = cameraTarget()
+      }
+    }
     syncDifficulty()
     refreshWelcome()
     if (phase === 'select') renderSelect()
@@ -356,6 +363,9 @@
     cavalry: ['骑兵冲锋：枪尖朱光到身前时出剑，可将其打落马下；也可跳过或闪身', '骑兵冲锋：枪尖朱光到身前时按 J，可将其打落马下；也可跳过或闪身'],
     pavise: ['盾阵正面刀枪不入：弹反领阵者的枪，整阵失衡；或闪身绕到背后', '盾阵正面刀枪不入：弹反领阵者的枪，整阵失衡；或闪身绕到背后'],
     dark: ['夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮', '夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮'],
+    hookPull: ['钩镰朱光亮起时出剑弹反，海寇会被拽到身前；收剑后再斩可处决', '钩镰朱光亮起时按 J 弹反，海寇会被拽到身前；收剑后再斩可处决'],
+    tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
+    rigging: ['斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下', '斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下'],
   }
 
   function showPrompt(key) {
@@ -721,6 +731,9 @@
     soldier: { a0: -2.35, a1: 0.85, r: 36, width: 11, color: '#26282d' },
     footman: { a0: -2.35, a1: 0.85, r: 36, width: 12, color: '#24262b' },
     general: [{ a0: -2.5, a1: 1 }, { a0: 2.7, a1: -1.2 }, { a0: -3, a1: 1.3 }],
+    pirate: { a0: -2.35, a1: 0.9, r: 38, width: 12, color: '#202a2d' },
+    hooker: { a0: -2.5, a1: 0.7, r: 55, width: 9, color: '#16272b' },
+    dragon: [{ a0: -2.6, a1: 0.7 }],
   }
 
   function snapshot(enemy) {
@@ -733,6 +746,7 @@
       const look = { alpha, color: '#1d1f23' }
       if (kind === 'crow') fig.drawCrow(c, copy, copy.x, copy.y, look, clock)
       else if (kind === 'dummy') fig.drawDummy(c, copy, copy.x, copy.y, look, a || { wobble: 0 }, clock)
+      else if (kind === 'dragon') fig.drawDragon(c, copy, copy.x, copy.y, copy.facing, look, clock)
       else if ((kind === 'cavalry' || (kind === 'general' && enemy.mounted)) && fig.drawRider) fig.drawRider(c, kind, { ...copy, mounted: true, vx: 0 }, ghostAnim, copy.x, copy.y, copy.facing, look, clock, 0)
       else if (!fig.KINDS[kind]) return
       else fig.drawHumanoid(c, kind, pose, copy.x, copy.y, copy.facing, look, clock, enemy.seed)
@@ -788,6 +802,11 @@
           FX.shake(fx, 4)
           anim('p', p).parry = 0.22
           audio.play('parry')
+          break
+        case 'hookPull':
+          FX.seal(fx, '拽', e.x, e.y - 20, 18, 0.9)
+          FX.ring(fx, e.x, e.y, 8, 48, 0.36, 'rgba(180,211,215,0.8)', 3)
+          audio.play('chain')
           break
         case 'deflect':
           FX.sparks(fx, e.x, e.y, 10, CINNABAR, { len: 14, speed: 300 })
@@ -852,7 +871,7 @@
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
-          const big = e.kind === 'boss' || e.kind === 'general'
+          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon'
           const spec = big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
           const lift = e.mounted ? 70 : big ? 50 : 36
@@ -958,6 +977,29 @@
           break
         case 'wave':
           if (isSnowVolume()) audio.play('icecrack')
+          audio.play('wave')
+          break
+        case 'rigCut':
+          FX.drops(fx,e.x,e.y,12,{speed:95,size:1.5});FX.seal(fx,'斩',e.x,e.y-15,17)
+          audio.play('rigging');break
+        case 'rigSlam':
+          FX.shake(fx,7);FX.puff(fx,e.x,e.y,24,{speed:180,size:7,alpha:0.4})
+          FX.ring(fx,e.x,e.y,8,105,0.45,'rgba(211,224,213,0.7)',3);audio.play('slam');break
+        case 'dragonDive':
+          FX.drops(fx,e.x,e.y,30,{speed:230,size:2,stain:false,color:'#bdd1cd'});audio.play('wave');break
+        case 'dragonEmerge':
+          FX.shake(fx,9);FX.drops(fx,e.x,e.y,42,{speed:340,size:3,stain:false,color:'#bdd1cd'})
+          FX.ring(fx,e.x,e.y-5,15,130,0.5,'rgba(211,228,217,0.85)',4);audio.play('slam');break
+        case 'seaWave':
+          FX.shake(fx, 4)
+          audio.play('wave')
+          break
+        case 'tideWarning':
+          toast((e.dir > 0 ? '左侧来潮 →' : '← 右侧来潮') + ' · 迎浪起跳 / 登高避浪', 1150)
+          audio.play('danger')
+          break
+        case 'tideSurge':
+          FX.shake(fx, 6)
           audio.play('wave')
           break
         case 'vanish':
@@ -1133,8 +1175,8 @@
     ctx.restore()
   }
 
-  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell'])
-  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell'])
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell'])
+  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell'])
 
   function teleProgress(enemy) {
     // A charging lance glints brighter as it closes in: the cue for the parry.
@@ -1150,6 +1192,7 @@
   function drawEnemy(enemy, dt) {
     if (enemy.delay > 0 || !enemy.alive && enemy.state !== 'dying') return
     const a = anim(enemy.id, enemy)
+    const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
     const flash = enemy.flash > 0
     const progress = teleProgress(enemy)
     const look = { color: flash ? '#f4eedf' : undefined, flash, eyeGlow: progress >= 0 ? progress : enemy.state === 'attack' || enemy.state === 'dive' ? 1 : 0.15, halo: 0.22 }
@@ -1162,6 +1205,9 @@
       fig.updateDummy(a, dt)
       shadow(enemy.x, enemy.y, 14)
       out = fig.drawDummy(ctx, enemy, enemy.x, enemy.y, look, a, clock)
+    } else if (enemy.type === 'dragon') {
+      shadow(enemy.x, enemy.y, 45)
+      out = fig.drawDragon(ctx, enemy, enemy.x, enemy.y, enemy.facing, look, clock)
     } else if ((enemy.type === 'cavalry' || (enemy.type === 'general' && enemy.mounted)) && fig.drawRider) {
       shadow(enemy.x, enemy.y, enemy.type === 'general' ? 40 : 34)
       if (enemy.state === 'attack' || enemy.state === 'charge') {
@@ -1180,8 +1226,12 @@
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
         FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
       }
-      out = fig.drawHumanoid(ctx, enemy.type, pose, enemy.x, enemy.y, enemy.facing, look, clock, enemy.seed)
+      out = fig.drawHumanoid(ctx, enemy.type, pose, drawX, enemy.y, enemy.facing, look, clock, enemy.seed)
       if (!isBoss && Math.random() < dt * 1.8) FX.drops(fx, enemy.x + (Math.random() - 0.5) * 16, enemy.y - 20 - Math.random() * 20, 1, { speed: 20, size: 1.1 })
+    }
+    if (enemy.pullT > 0) {
+      ctx.save();ctx.strokeStyle='rgba(207,224,216,0.85)';ctx.lineWidth=1.8
+      ctx.beginPath();ctx.moveTo(state.player.x,state.player.y-36);ctx.lineTo(drawX,enemy.y-35);ctx.stroke();ctx.restore()
     }
     const isBoss = rules.isBoss(enemy)
     const glinting = progress >= 0 && out.tip && !DANGER_TELLS.has(enemy.state)
@@ -1578,18 +1628,77 @@
         ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
         ctx.restore()
         if (Math.random() < 0.7) FX.drops(fx, shot.x - dir * 10, rules.GROUND - 24, 2, { speed: 160, size: 1.4, angle: dir > 0 ? -2.2 : -0.9, spread: 0.8, stain: false, color: '#b0c4de' })
-      } else if (shot.type === 'wave') {
+      } else if (shot.type === 'wave' || shot.type === 'seaWave') {
         const dir = Math.sign(shot.vx) || 1
         const s = assets.wave
         ctx.save(); ctx.translate(shot.x, rules.GROUND); ctx.scale(dir, 1 + Math.sin(clock * 30 + shot.id) * 0.06)
-        ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
+        if (shot.type === 'seaWave') {
+          ctx.fillStyle='rgba(35,76,91,0.86)';ctx.strokeStyle='rgba(224,239,219,0.9)';ctx.lineWidth=2
+          ctx.beginPath();ctx.moveTo(-43,0);ctx.bezierCurveTo(-26,-9,-30,-36,-7,-38);ctx.bezierCurveTo(15,-42,28,-23,10,-15);ctx.bezierCurveTo(19,-30,-5,-27,-8,-13);ctx.lineTo(22,0);ctx.closePath();ctx.fill();ctx.stroke()
+          ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(-42,5);ctx.bezierCurveTo(-26,-2,-19,-31,-6,-32);ctx.stroke()
+        } else ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
         ctx.restore()
         if (Math.random() < 0.7) FX.drops(fx, shot.x - dir * 10, rules.GROUND - 24, 2, { speed: 160, size: 1.4, angle: dir > 0 ? -2.2 : -0.9, spread: 0.8, stain: Math.random() < 0.3 })
       }
     }
   }
 
-  // Ink curtains mark the edges of a locked encounter.
+  function drawRigging() {
+    if(currentVolume()!==4) return
+    for(const r of state.rigging) {
+      if(r.x<camera.x-viewW/2-180||r.x>camera.x+viewW/2+180)continue
+      ctx.save();ctx.lineCap='round'
+      const top=rules.GROUND-205
+      ctx.strokeStyle='rgba(35,54,60,0.75)';ctx.lineWidth=4
+      ctx.beginPath();ctx.moveTo(r.x-24,rules.GROUND);ctx.lineTo(r.x-24,top-12);ctx.lineTo(r.target,top);ctx.stroke()
+      if(r.state==='hang') {
+        ctx.strokeStyle='rgba(225,230,210,0.85)';ctx.lineWidth=2
+        ctx.beginPath();ctx.moveTo(r.x,rules.GROUND-30);ctx.lineTo(r.x,top+5);ctx.lineTo(r.target,top);ctx.lineTo(r.target,r.y);ctx.stroke()
+        ctx.strokeStyle='#233d43';ctx.lineWidth=1
+        for(let j=0;j<5;j++){ctx.beginPath();ctx.ellipse(r.x,rules.GROUND-37+j*3,5,3,0,0,Math.PI*2);ctx.stroke()}
+        drawSeal('斩',r.x,rules.GROUND-72,12)
+      }
+      const yy=r.state==='spent'?rules.GROUND+8:r.y
+      ctx.strokeStyle=r.state==='spent'?'rgba(32,52,58,0.4)':'#273e44';ctx.lineWidth=11
+      ctx.beginPath();ctx.moveTo(r.target-90,yy-4);ctx.lineTo(r.target+90,yy+3);ctx.stroke()
+      ctx.strokeStyle='rgba(216,221,197,0.7)';ctx.lineWidth=1.3
+      ctx.beginPath();ctx.moveTo(r.target-88,yy-7);ctx.lineTo(r.target+86,yy);ctx.stroke()
+      for(const xx of [-62,62]){ctx.lineWidth=2;for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(r.target+xx+j*3,yy-7);ctx.lineTo(r.target+xx+j*3,yy+6);ctx.stroke()}}
+      ctx.restore()
+    }
+  }
+
+  function drawDragonLanding() {
+    const boss=state.enemies.find(e=>e.type==='dragon'&&e.alive&&e.state==='dragonDiveTell')
+    if(!boss)return
+    const x=boss.diveX, y=rules.GROUND, q=1-boss.t/boss.teleTotal
+    ctx.save();ctx.strokeStyle='rgba(211,231,217,0.8)';ctx.lineWidth=2
+    for(let i=0;i<3;i++){ctx.beginPath();ctx.ellipse(x,y-3,68+i*17-q*12,9+i*4,0,0,Math.PI*2);ctx.stroke()}
+    ctx.fillStyle='rgba(184,50,42,0.22)';ctx.fillRect(x-68,y-3,136,5)
+    drawSeal('危',x,y-55,19+q*4);ctx.restore()
+  }
+
+  function drawTide() {
+    const tide=state.tide
+    if(!tide?.zone||tide.phase==='calm')return
+    const [a,b]=tide.zone,y=rules.GROUND
+    ctx.save()
+    if(tide.phase==='warn') {
+      ctx.strokeStyle='rgba(190,213,207,0.8)';ctx.lineWidth=1.5
+      for(let j=0;j<3;j++){ctx.beginPath();for(let x=a;x<=b;x+=10){const yy=y+8+j*5+Math.sin(x*0.04+clock*8)*3;x===a?ctx.moveTo(x,yy):ctx.lineTo(x,yy)}ctx.stroke()}
+      const edge=tide.dir>0?a+35:b-35
+      drawSeal('危',edge,y-60,19)
+      ctx.fillStyle='rgba(184,50,42,0.8)';ctx.font='22px serif';ctx.textAlign='center';ctx.fillText(tide.dir>0?'→':'←',edge,y-24)
+    } else {
+      ctx.translate(tide.x,y);ctx.scale(tide.dir,1)
+      ctx.fillStyle='rgba(45,87,102,0.8)';ctx.beginPath();ctx.moveTo(-140,18);ctx.bezierCurveTo(-64,5,-57,-46,-15,-48);ctx.bezierCurveTo(20,-51,37,-26,14,-13);ctx.bezierCurveTo(22,-35,-8,-34,-14,-10);ctx.lineTo(25,14);ctx.lineTo(-140,18);ctx.fill()
+      ctx.strokeStyle='rgba(233,244,226,0.95)';ctx.lineWidth=2.4
+      for(let j=0;j<4;j++){ctx.beginPath();ctx.moveTo(-126,12+j*4);ctx.bezierCurveTo(-63,-3+j*5,-52,-45+j*5,-14,-46+j*3);ctx.bezierCurveTo(10,-48+j*3,28,-28,13,-15);ctx.stroke()}
+      for(let j=0;j<15;j++){const u=j/15;ctx.fillStyle='rgba(232,242,225,0.8)';ctx.beginPath();ctx.arc(-12+u*48,-47-Math.sin(u*Math.PI)*17+Math.sin(clock*14+j)*3,1+j%2,0,Math.PI*2);ctx.fill()}
+    }
+    ctx.restore()
+  }
+
   function drawBarrier() {
     if (!state.lock) return
     ctx.save()
@@ -1629,7 +1738,7 @@
       env.blizzard = Math.max(env.blizzard || 0, state.wind.power)
       env.windDir = state.wind.dir
     }
-    const night = env.moon > 0.5 || (env.night || 0) > 0.5
+    const night = env.moon > 0.5 || (env.night || 0) > 0.5 || (currentVolume() === 4 && (env.top[0] < 100 || (camera.x > 2400 && camera.x < 3180)))
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
     darkOn = darknessAt(camera.x) > 0.02
     eyeMarks.length = 0
@@ -1644,6 +1753,9 @@
     FX.drawDecals(ctx, fx)
     drawStuckArrows(phase === 'paused' ? 0 : fxDt)
     drawVolleys()
+    drawTide()
+    drawRigging()
+    drawDragonLanding()
     drawCracks()
     drawHangingIcicles()
     drawBarrier()
@@ -1670,7 +1782,7 @@
     const volume = currentVolume()
     audio.update({
       combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale,
-      fire: Math.min(1, burning / 6), sand: env.sand || 0, war: volume === 3, volume,
+      fire: Math.min(1, burning / 6), sand: env.sand || 0, sea: volume === 4 ? 0.55 + (env.rain || 0) * 0.35 : 0, war: volume === 3, volume,
     })
   }
 
@@ -1768,6 +1880,7 @@
     globalThis.__ink = {
       get state() { return state }, get phase() { return phase }, get save() { return save }, input,
       freeze: false,
+      diagnostics() { return { frameCost, quality, canvas: [canvas.width, canvas.height], enemies: state.enemies.length, particles: fx.parts.length } },
       advance(seconds, each) {
         debugClock = Math.max(debugClock, lastFrame)
         for (let t = 0; t < seconds; t += STEP) { debugClock += STEP * 1000; stepping = true; frame(debugClock); stepping = false; each?.() }

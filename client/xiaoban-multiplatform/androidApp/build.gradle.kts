@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import com.android.build.api.instrumentation.AsmClassVisitorFactory
 import com.android.build.api.instrumentation.ClassContext
@@ -84,6 +83,10 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // Keep locally signed builds beside an installed release or another machine's debug build.
+            applicationIdSuffix = ".debug"
+        }
         release {
             if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
@@ -125,7 +128,9 @@ val prepareVoiceRuntime = tasks.register<Exec>("prepareVoiceRuntime") {
     inputs.file(script)
     inputs.file(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
     outputs.dir(voiceRuntimeDirectory)
-    commandLine("python3", script.asFile.absolutePath, "--output", voiceRuntimeDirectory.get().asFile.absolutePath)
+    val python = System.getenv("PYTHON")?.takeIf { it.isNotBlank() }
+        ?: if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
+    commandLine(python, script.asFile.absolutePath, "--output", voiceRuntimeDirectory.get().asFile.absolutePath)
 }
 
 abstract class SyncMobileVoiceAssets : DefaultTask() {
@@ -142,7 +147,7 @@ val mobileVoiceAssets = tasks.register<SyncMobileVoiceAssets>("syncMobileVoiceAs
     outputDirectory.set(layout.buildDirectory.dir("generated/mobile-voice"))
 }
 
-// Build self-contained protocol 2 packages from the reviewed gameplay sources.
+// Copy the reviewed protocol 2 packages and add the Android host adapter before gameplay scripts.
 abstract class SyncMobileGameAssets : DefaultTask() {
     @get:InputDirectory abstract val sourceDirectory: org.gradle.api.file.DirectoryProperty
     @get:InputDirectory abstract val runtimeDirectory: org.gradle.api.file.DirectoryProperty
@@ -162,13 +167,10 @@ abstract class SyncMobileGameAssets : DefaultTask() {
                 val target = "game-packs-v2/$id"
                 from(source.resolve(id)) {
                     include("**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.svg")
-                    exclude("**/*.test.*", "manifest.json", "index.html", "desktop-host.js")
+                    exclude("**/*.test.*", "desktop-host.js")
                     into(target)
                 }
                 from(listOf(runtime.resolve("builtin-runtime.js"), runtime.resolve("builtin-runtime.css"))) { into(target) }
-                val icon = runtime.resolve("icons/$id.png")
-                check(icon.isFile) { "$id 缺少协议 2 图标" }
-                from(icon) { rename { "icon.png" }; into(target) }
             }
             into(output)
         }
@@ -176,28 +178,14 @@ abstract class SyncMobileGameAssets : DefaultTask() {
             val input = source.resolve(id)
             val target = output.resolve("game-packs-v2/$id")
             val manifest = JsonSlurper().parse(input.resolve("manifest.json")) as Map<*, *>
-            check(manifest["id"] == id && manifest["runtimeProtocol"] == 1 && manifest["entry"] == "index.html") { "$id 的原版清单无效" }
-            val kind = if (category == "quiz") "app" else "game"
-            val migrated = linkedMapOf(
-                "schemaVersion" to 3, "runtimeProtocol" to 2, "kind" to kind, "id" to id,
-                "name" to manifest["name"], "description" to manifest["description"],
-                "version" to (manifest["version"] ?: "1.0.0"), "category" to category,
-                "entry" to "index.html", "icon" to "icon.png", "cover" to "runtime-cover.svg",
-                "orientation" to manifest["orientation"], "input" to listOf("touch", "mouse", "keyboard"),
-            )
-            target.resolve("manifest.json").writeText(JsonOutput.prettyPrint(JsonOutput.toJson(migrated)))
+            check(manifest["schemaVersion"] == 3 && manifest["runtimeProtocol"] == 2 && manifest["id"] == id && manifest["entry"] == "index.html" && manifest["category"] == category) {
+                "$id 的协议 2 清单无效"
+            }
 
             val entry = input.resolve("index.html").readText()
-            val desktopScript = "<script src=\"./desktop-host.js\"></script>"
-            check(desktopScript in entry) { "$id 的入口缺少宿主脚本位置" }
-            target.resolve("index.html").writeText(entry.replaceFirst(desktopScript,
-                "<script src=\"./builtin-runtime.js\"></script><link rel=\"stylesheet\" href=\"./builtin-runtime.css\">"))
-
-            val cover = input.resolve(manifest["cover"] as String).readText()
-            val svg = checkNotNull(Regex("<svg\\b[^>]*>").find(cover)) { "$id 的封面不是 SVG" }
-            val attributes = svg.value.removePrefix("<svg").replace(Regex("""\s+(?:width|height|preserveAspectRatio)=(['"]).*?\1"""), "")
-            target.resolve("runtime-cover.svg").writeText(cover.replaceRange(svg.range,
-                "<svg width=\"640\" height=\"360\" preserveAspectRatio=\"xMidYMid slice\"$attributes"))
+            check("</head>" in entry && "<script" in entry) { "$id 的入口缺少脚本或 head 结束标签" }
+            val withStyle = entry.replaceFirst("</head>", "<link rel=\"stylesheet\" href=\"./builtin-runtime.css\"></head>")
+            target.resolve("index.html").writeText(withStyle.replaceFirst("<script", "<script src=\"./builtin-runtime.js\"></script><script"))
         }
     }
 }

@@ -8,7 +8,7 @@
   const FRONTIER = [110, 130.81, 146.83, 164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440]
   let fire = null, fireGain = null, sandSrc = null, sandGain = null, sandFilter = null
   let nextCrackle = 0, nextDrone = 0
-  let enabled = false, nextNote = 0, nextDrum = 0, nextChime = 0, lastNote = 5
+  let enabled = false, nextNote = 0, nextDrum = 0, nextChime = 0, nextSurf = 0, lastNote = 5
 
   function init() {
     if (ac) return true
@@ -125,6 +125,8 @@
   }
 
   const SOUNDS = {
+    chain: () => { for(let i=0;i<5;i++) bell(960+i*210,0.024,0.12,i*0.035); hiss({dur:0.2,vol:0.07,freq:2700,to:900}) },
+    rigging: () => { tone(180,{type:'triangle',dur:0.22,vol:0.06,bend:0.4});hiss({dur:0.14,vol:0.09,freq:1400,to:300}) },
     slash: () => { hiss({ dur: 0.14, vol: 0.12, freq: 2600, to: 700, q: 0.9 }); tone(220, { dur: 0.08, vol: 0.02, bend: 0.6 }) },
     heavy: () => { hiss({ dur: 0.2, vol: 0.16, freq: 1800, to: 380, q: 0.8 }); tone(130, { dur: 0.14, vol: 0.05, bend: 0.5 }) },
     hit: () => { hiss({ dur: 0.09, vol: 0.16, freq: 900, to: 300, type: 'lowpass' }); tone(150, { dur: 0.12, vol: 0.12, bend: 0.4 }) },
@@ -305,9 +307,13 @@
       windGain = ac.createGain(); windGain.gain.value = 0
       wind.connect(windFilter); windFilter.connect(windGain); windGain.connect(master); wind.start()
     }
-    const gale = mood.gale || 0, snow = mood.snow || 0
-    windGain.gain.setTargetAtTime(snow * 0.014 + gale * 0.06, now, 0.8)
-    windFilter.frequency.setTargetAtTime(380 + gale * 520 + Math.sin(now * 0.7) * 120 * (0.4 + gale), now, 0.4)
+    const gale = mood.gale || 0, snow = mood.snow || 0, sea = mood.sea || 0
+    windGain.gain.setTargetAtTime(snow * 0.014 + gale * 0.06 + sea * 0.025, now, 0.8)
+    windFilter.frequency.setTargetAtTime(380 + gale * 520 + sea * 130 + Math.sin(now * 0.7) * 120 * (0.4 + gale + sea), now, 0.4)
+    if (sea > 0 && now >= nextSurf) {
+      hiss({ dur: 1.3, vol: 0.018 + sea * 0.02, freq: 280, to: 1100, q: 0.5, send: 0.25 })
+      nextSurf = now + 3.2 + Math.random() * 1.7
+    }
     if (snow > 0.1 && now >= nextChime) {
       bell(SCALE[2 + Math.floor(Math.random() * 6)] * 2, 0.012 + 0.01 * snow, 2.2)
       nextChime = now + 5 + Math.random() * 8

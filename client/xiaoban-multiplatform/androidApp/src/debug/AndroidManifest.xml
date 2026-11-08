@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/community_debug_network">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application android:networkSecurityConfig="@xml/community_debug_network" android:label="小伴测试版" tools:replace="android:label">
         <activity android:name=".RuntimeV2SpikeActivity" android:exported="true" />
     </application>
 </manifest>

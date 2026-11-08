@@ -38,8 +38,12 @@
     footman: { hp: 3, w: 15, h: 54, score: 300, speed: 104, reach: 80, tele: 0.5, active: 0.12, recover: 0.55, lunge: 300, damage: 1 },
     pavise: { hp: 4, w: 18, h: 56, score: 200, speed: 46, reach: 86, tele: 0.62, active: 0.14, recover: 0.7, lunge: 170, damage: 1 },
     general: { hp: 56, w: 26, h: 82, score: 3000 },
+    // 怒涛卷
+    pirate: { hp: 4, w: 15, h: 54, score: 170, speed: 118, reach: 84, tele: 0.5, active: 0.13, recover: 0.54, lunge: 320, damage: 1 },
+    hooker: { hp: 4, w: 18, h: 56, score: 260, speed: 78, reach: 170, tele: 0.72, active: 0.2, recover: 0.95, lunge: 90, damage: 1 },
+    dragon: { hp: 62, w: 40, h: 90, score: 3600 },
   }
-  const BOSSES = new Set(['boss', 'angler', 'general'])
+  const BOSSES = new Set(['boss', 'angler', 'general', 'dragon'])
   // Damage a raised shield cannot stop: the ink stroke and the terrain (falling ice, cracks, arrow rain, fire).
   const UNBLOCKED = new Set(['strike', 'icicle', 'crack', 'volley', 'fire'])
   const isBoss = (enemy) => BOSSES.has(enemy.type)
@@ -77,6 +81,8 @@
       icicles: (world.icicles || []).map((spec, index) => ({ id: index, x: spec.x, top: spec.y, len: spec.len || 24, y: spec.y + (spec.len || 24), state: 'hang', vy: 0, hits: [], hitPlayer: false })),
       cracks: [], nextCrack: 0, wind: { phase: 'calm', dir: 0, power: 0, cycle: -1 },
       volleys: [], volleyClock: world.volley ? world.volley.cycle[0] + world.volley.cycle[1] - 1.8 : 0, fires: [], grass: grassCells(world),
+      tide: { phase: 'calm', t: world.tide?.cycle[0] || 0, zone: null, dir: 1, x: 0, hits: [] },
+      rigging: (world.rigging || []).map((r, id) => ({ ...r, id, state: 'hang', t: 0, y: GROUND - 155 })),
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
@@ -87,6 +93,7 @@
         score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
         icicleKills: 0, crackKills: 0, slideKills: 0, ambushes: 0, standT: 0, coverT: 0, hideT: 0, spottedT: 0, hidden: false,
         volleyKills: 0, fireKills: 0, unhorses: 0, formationBreaks: 0,
+        hookPulls: 0, tideKills: 0, riggingKills: 0,
       },
     }
     state.random = mulberry(state.seed)
@@ -379,19 +386,24 @@
         emit(state, 'ambush', { x: enemy.x, y: enemy.y - enemy.h / 2 })
       }
     }
+    for (const rig of state.rigging) {
+      if (rig.state !== 'hang' || !overlaps(box, { x0: rig.x - 9, x1: rig.x + 9, y0: GROUND - 65, y1: GROUND - 15 })) continue
+      rig.state = 'fall'; rig.t = 0.48
+      emit(state, 'rigCut', { x: rig.x, y: GROUND - 40 })
+    }
     for (const ice of state.icicles) {
       if (ice.state === 'hang' && overlaps(box, iceBox(ice))) dropIcicle(state, ice)
     }
     for (const shot of state.projectiles) {
       if (shot.owner !== 'enemy' || shot.dead || action.hits.includes('p' + shot.id)) continue
-      const shotBox = shot.type === 'wave'
+      const shotBox = shot.type === 'wave' || shot.type === 'seaWave'
         ? { x0: shot.x - 18, x1: shot.x + 18, y0: GROUND - 38, y1: GROUND }
         : shot.type === 'pot'
           ? { x0: shot.x - 12, x1: shot.x + 12, y0: shot.y - 10, y1: shot.y + 10 }
           : { x0: shot.x - 10, x1: shot.x + 10, y0: shot.y - 6, y1: shot.y + 6 }
       if (!overlaps(box, shotBox)) continue
       action.hits.push('p' + shot.id)
-      deflect(state, shot)
+      if (shot.type !== 'seaWave') deflect(state, shot)
     }
   }
 
@@ -489,12 +501,27 @@
         attacker.state = 'recover'; attacker.t = 1.1; attacker.vx = -attacker.facing * 60
         emit(state, 'rear', { id: attacker.id, x: attacker.x, y: attacker.y, facing: attacker.facing })
       }
+      if (attacker.type === 'dragon') {
+        attacker.state = 'recover'; attacker.t = 0.95; attacker.vx = -attacker.facing * 85
+      }
       attacker.postureClock = state.clock
       if (attacker.posture >= attacker.postureMax) breakBoss(state, attacker)
       return
     }
     if (attacker.type === 'cavalry') { unhorse(state, attacker); return }
     if (attacker.type === 'pavise') { breakFormation(state, attacker); return }
+    if (attacker.type === 'hooker') {
+      const [min, max] = state.lock || [0, state.world.length]
+      const fromX = attacker.x
+      attacker.pullFrom = fromX; attacker.pullT = 0.22
+      attacker.x = clamp(player.x + player.facing * (player.w + attacker.w + 15), min + attacker.w, max - attacker.w)
+      attacker.vx = 0
+      attacker.state = 'stagger'; attacker.openedAt = state.clock; attacker.t = 1.6
+      player.hookPulls += 1
+      addScore(state, 100)
+      emit(state, 'hookPull', { id: attacker.id, x: attacker.x, y: attacker.y - 36, fromX })
+      return
+    }
     attacker.state = 'stagger'
     attacker.openedAt = state.clock
     attacker.t = attacker.type === 'shield' ? 1.8 : 1.3
@@ -534,6 +561,16 @@
       return
     }
     const melee = source === 'slash' || source === 'heavy'
+    // Hook guard and dragon scales punish repeated frontal cuts; openings remain generous.
+    const hookGuard = enemy.type === 'hooker' && fromFront && ['idle', 'walk', 'tele'].includes(enemy.state)
+    const scales = enemy.type === 'dragon' && !['recover', 'broken', 'roar'].includes(enemy.state)
+    if (melee && (hookGuard || scales)) {
+      emit(state, 'block', { x: enemy.x + enemy.facing * 20, y: enemy.y - 40 })
+      state.hitstop = Math.max(state.hitstop, 0.035)
+      if (source === 'slash') return
+      damage = 1
+    }
+    if (enemy.type === 'dragon' && ['dragonDive', 'dragonDiveTell'].includes(enemy.state)) return
     // Only a swing begun after the opening can execute; the parrying swing itself never does.
     const fresh = melee && player.slashStartClock > (enemy.openedAt ?? Infinity)
     if (isBoss(enemy)) {
@@ -558,7 +595,8 @@
           if (enemy.pressure >= 2 && enemy.hp > damage) {
             enemy.pressure = 0
             enemy.facing = sign(player.x - enemy.x) || enemy.facing
-            startCombo(state, enemy)
+            if (enemy.type === 'dragon') startDragonHead(state, enemy)
+            else startCombo(state, enemy)
             enemy.t *= 0.8; enemy.teleTotal = enemy.t
           }
         }
@@ -627,6 +665,8 @@
     else if (how === 'icicle') player.icicleKills += 1
     else if (how === 'crack') player.crackKills += 1
     else if (how === 'volley') player.volleyKills += 1
+    else if (how === 'tide') player.tideKills += 1
+    else if (how === 'rigging') player.riggingKills += 1
     else if (how === 'fire' || how === 'pot') player.fireKills += 1
     else if (how !== 'strike') {
       if (!player.onGround) player.airKills += 1
@@ -652,7 +692,7 @@
       hitDone: false, side, seed: state.random() * 10, combo: null, move: null,
     }
     if (BOSSES.has(spec.type)) {
-      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : state.diff.bossHp
+      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
@@ -660,6 +700,7 @@
     if (spec.type === 'cavalry') prompt(state, 'cavalry')
     if (spec.type === 'pavise') { enemy.group = spec.group || 'p' + enemy.id; prompt(state, 'pavise') }
     if (spec.type === 'general') enemy.mounted = true
+    if (spec.type === 'hooker') prompt(state, 'hookPull')
     enemy.burnCd = 0
     state.enemies.push(enemy)
     if (!enemy.delay) emit(state, 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
@@ -736,6 +777,7 @@
           enemy.vx *= Math.pow(0.02, dt)
           if (distance < 34) enemy.vx = -enemy.facing * 60
           if (enemy.cd <= 0 && facingPlayer && mayAttack(state)) {
+            enemy.chain = 0
             telegraph(state, enemy, kind.tele)
             prompt(state, 'parry')
           }
@@ -762,7 +804,13 @@
           }
         }
         enemy.vx *= Math.pow(0.02, dt)
-        if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = kind.recover }
+        if (enemy.t <= 0) {
+          if (enemy.type === 'pirate' && !enemy.chain && !player.dead) {
+            enemy.chain = 1
+            enemy.facing = sign(player.x - enemy.x) || enemy.facing
+            telegraph(state, enemy, 0.48)
+          } else { enemy.state = 'recover'; enemy.t = enemy.type === 'pirate' ? 0.9 : kind.recover }
+        }
         break
       }
       case 'recover':
@@ -1668,6 +1716,115 @@
     }
   }
 
+  // ------------------------------------------------------------------ 怒涛卷 · 墨蛟
+
+  function startDragonHead(state, boss) {
+    boss.state = 'dragonTell'
+    boss.t = (boss.phase2 ? 0.52 : 0.66) * state.diff.tele
+    boss.teleTotal = boss.t
+    boss.vx = 0
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - 65, facing: boss.facing })
+  }
+
+  function startDragonWave(state, boss) {
+    boss.state = 'dragonWaveTell'
+    boss.t = (boss.phase2 ? 0.62 : 0.76) * state.diff.tele
+    boss.teleTotal = boss.t
+    boss.vx = 0
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - 70, facing: boss.facing })
+  }
+
+  function updateDragon(state, boss, dt) {
+    const player = state.player
+    const dx = player.x - boss.x
+    if (boss.state !== 'broken' && state.clock - boss.postureClock > 2) boss.posture = Math.max(0, boss.posture - 7 * dt)
+    switch (boss.state) {
+      case 'intro':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.4 }
+        break
+      case 'idle':
+        boss.vx *= Math.pow(0.01, dt)
+        boss.facing = sign(dx) || boss.facing
+        if (boss.t <= 0 && !player.dead) {
+          boss.moves += 1
+          if (boss.moves % (boss.phase2 ? 3 : 5) === 0) {
+            boss.state = 'dragonDive'; boss.t = 0.6; boss.vx = 0
+            emit(state, 'dragonDive', { x: boss.x, y: GROUND })
+          } else if (boss.moves % 4 === 0 || Math.abs(dx) > 210) startDragonWave(state, boss)
+          else startDragonHead(state, boss)
+        }
+        break
+      case 'dragonDive':
+        if (boss.t <= 0) {
+          const [lo, hi] = state.lock || [0, state.world.length]
+          boss.diveX = clamp(player.x, lo + 85, hi - 85)
+          boss.state = 'dragonDiveTell'; boss.t = boss.phase2 ? 0.85 : 1.05; boss.teleTotal = boss.t
+          emit(state, 'danger', { id: boss.id, x: boss.diveX, y: GROUND - 65, facing: boss.facing })
+        }
+        break
+      case 'dragonDiveTell':
+        if (boss.t <= 0) {
+          boss.x = boss.diveX
+          boss.facing = sign(player.x - boss.x) || boss.facing
+          boss.state = 'dragonEmerge'; boss.t = 0.22; boss.hitDone = false
+          emit(state, 'dragonEmerge', { x: boss.x, y: GROUND })
+        }
+        break
+      case 'dragonEmerge':
+        if (!boss.hitDone && overlaps({ x0: boss.x - 68, x1: boss.x + 68, y0: GROUND - 90, y1: GROUND }, playerBox(player))) {
+          boss.hitDone = true; enemyStrike(state, boss, 1, 'unblockable')
+        }
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 1.45 }
+        break
+      case 'dragonTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'dragonBite'; boss.t = 0.19; boss.hitDone = false
+          boss.vx = boss.facing * (boss.phase2 ? 420 : 340)
+          emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'dragon' })
+        }
+        break
+      case 'dragonBite':
+        if (!boss.hitDone && overlaps(bossReachBox(boss, 126), playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1)
+          if (boss.state !== 'dragonBite') break
+        }
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = boss.phase2 ? 0.62 : 0.78; boss.vx = 0 }
+        break
+      case 'dragonWaveTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'dragonWave'; boss.t = 0.2
+          const dirs = boss.phase2 ? [-1, 1] : [boss.facing]
+          for (const dir of dirs) state.projectiles.push({ id: state.nextId++, type: 'seaWave', owner: 'enemy', x: boss.x + dir * 52, y: GROUND, vx: dir * (boss.phase2 ? 420 : 360), vy: 0, life: 1.4, source: boss.id, dead: false })
+          emit(state, 'seaWave', { id: boss.id, x: boss.x, y: GROUND })
+        }
+        break
+      case 'dragonWave':
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.9 }
+        break
+      case 'recover':
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.34 + state.random() * 0.36) / state.diff.aggression }
+        break
+      case 'broken':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.35; boss.posture = 40 }
+        break
+      case 'roar':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.4 }
+        break
+      case 'dying':
+        boss.vx = 0
+        break
+    }
+    const [min, max] = state.lock || [0, state.world.length]
+    boss.x = clamp(boss.x + boss.vx * dt, min + (boss.facing > 0 ? 220 : 65), max - (boss.facing < 0 ? 220 : 65))
+  }
+
   // ------------------------------------------------------------------ boss
 
   function chooseBossMove(state, boss) {
@@ -1878,6 +2035,7 @@
       enemy.t -= dt
       enemy.cd -= dt
       enemy.flash = Math.max(0, enemy.flash - dt)
+      enemy.pullT = Math.max(0, (enemy.pullT || 0) - dt)
       if (enemy.state === 'spawn') {
         if (enemy.t <= 0) {
           if (isBoss(enemy)) { enemy.state = 'intro'; enemy.t = 2.2; emit(state, 'bossIntro', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y }) }
@@ -1893,6 +2051,7 @@
       if (enemy.type === 'boss') updateBoss(state, enemy, dt)
       else if (enemy.type === 'angler') updateAngler(state, enemy, dt)
       else if (enemy.type === 'general') updateGeneral(state, enemy, dt)
+      else if (enemy.type === 'dragon') updateDragon(state, enemy, dt)
       else if (enemy.type === 'cavalry') updateCavalry(state, enemy, dt)
       else if (enemy.type === 'pavise') updatePavise(state, enemy, dt)
       else if (enemy.type === 'bomber') updateBomber(state, enemy, dt)
@@ -1924,7 +2083,7 @@
         continue
       }
       if (shot.owner === 'enemy') {
-        const box = (shot.type === 'wave' || shot.type === 'iceWave')
+        const box = (shot.type === 'wave' || shot.type === 'iceWave' || shot.type === 'seaWave')
           ? { x0: shot.x - 18, x1: shot.x + 18, y0: GROUND - 36, y1: GROUND }
           : { x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }
         if (!player.dead && overlaps(box, playerBox(player))) {
@@ -1936,7 +2095,7 @@
               hurtPlayer(state, 1, shot.x)
               player.vx = -player.facing * 340
             }
-          } else if (facing && inParryWindow(state)) {
+          } else if (shot.type !== 'seaWave' && facing && inParryWindow(state)) {
             deflect(state, shot)
           } else if (player.iframes <= 0 && !state.strike) {
             shot.dead = true
@@ -2175,6 +2334,55 @@
     }
   }
 
+  function updateRigging(state, dt) {
+    for (const rig of state.rigging) {
+      if (rig.state !== 'fall') continue
+      rig.t -= dt
+      rig.y = GROUND - 155 + Math.pow(1 - Math.max(0, rig.t) / 0.48, 2) * 155
+      if (rig.t > 0) continue
+      rig.state = 'spent'; rig.y = GROUND
+      emit(state, 'rigSlam', { x: rig.target, y: GROUND })
+      for (const enemy of state.enemies) {
+        if (!enemy.alive || enemy.delay > 0 || Math.abs(enemy.x - rig.target) > 100 || enemy.y < GROUND - 100) continue
+        hitEnemy(state, enemy, 5, 'rigging')
+      }
+    }
+  }
+
+  function updateTide(state, dt) {
+    const tide = state.tide, config = state.world.tide
+    if (!config) return
+    const zone = state.lock && config.zones.find(([a,b]) => state.lock[0] >= a && state.lock[1] <= b)
+    if (!zone) { tide.zone = null; tide.phase = 'calm'; tide.t = config.cycle[0]; return }
+    if (tide.zone !== zone) { tide.zone = zone; tide.phase = 'calm'; tide.t = config.cycle[0] }
+    tide.t -= dt
+    if (tide.phase === 'surge') {
+      const q = clamp(1 - tide.t / config.cycle[2], 0, 1)
+      const oldX = tide.x
+      tide.x = tide.dir > 0 ? zone[0] + q*(zone[1]-zone[0]) : zone[1] - q*(zone[1]-zone[0])
+      const swept = (x) => x >= Math.min(oldX,tide.x)-30 && x <= Math.max(oldX,tide.x)+30
+      const p=state.player
+      if (!tide.hits.includes('player') && swept(p.x) && p.y > GROUND-38 && !p.dead) {
+        tide.hits.push('player')
+        if (p.iframes <= 0 && !state.strike) hurtPlayer(state,1,tide.x-tide.dir*50)
+      }
+      for (const enemy of state.enemies) {
+        if (!enemy.alive || enemy.delay>0 || enemy.state==='spawn' || enemy.state==='dying' || enemy.onPlatform || enemy.y<GROUND-4 || isBoss(enemy) || tide.hits.includes(enemy.id) || !swept(enemy.x)) continue
+        tide.hits.push(enemy.id); hitEnemy(state,enemy,4,'tide')
+      }
+    }
+    if (tide.t>0) return
+    if (tide.phase==='calm') {
+      tide.phase='warn';tide.t=config.cycle[1];tide.dir=-tide.dir
+      tide.x=tide.dir>0?zone[0]:zone[1]
+      prompt(state,'tide');emit(state,'tideWarning',{zone,dir:tide.dir})
+    } else if(tide.phase==='warn') {
+      tide.phase='surge';tide.t=config.cycle[2];tide.hits=[]
+      tide.x=tide.dir>0?zone[0]:zone[1]
+      emit(state,'tideSurge',{zone,dir:tide.dir})
+    } else { tide.phase='calm';tide.t=config.cycle[0] }
+  }
+
   function updateEncounters(state, dt) {
     const player = state.player
     if (!state.lock) {
@@ -2289,6 +2497,8 @@
     updateThinIce(state, sdt)
     updateVolleys(state, sdt)
     updateFire(state, sdt)
+    updateTide(state, sdt)
+    updateRigging(state, sdt)
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)

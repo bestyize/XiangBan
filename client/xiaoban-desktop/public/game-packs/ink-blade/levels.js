@@ -20,7 +20,7 @@
       { x: 3880, y: 238, w: 142 },
       { x: 4560, y: 238, w: 152 },
     ],
-    prompts: [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'dash' }],
+    prompts: [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'rigging', local: true }],
     encounters: {
       gate: { id: 'gate', trigger: 900, lock: [640, 1400], waves: [
         [{ type: 'dummy', x: 1110 }, { type: 'dummy', x: 1220, delay: 0.2 }],
@@ -88,7 +88,7 @@
     // Gusts: calm, warning, push (seconds); force is px/s at full power.
     wind: { zone: [4230, 5230], cycle: [3.2, 1.0, 2.4], force: 150 },
     prompts: [
-      { x: 0, key: 'move' }, { x: 560, key: 'jump' }, { x: 880, key: 'icicle', local: true }, { x: 1410, key: 'dash' }, { x: 1530, key: 'thin', local: true },
+      { x: 0, key: 'move' }, { x: 560, key: 'jump' }, { x: 880, key: 'icicle', local: true }, { x: 1410, key: 'rigging', local: true }, { x: 1530, key: 'thin', local: true },
       { x: 2335, key: 'ice', local: true }, { x: 3400, key: 'reed', local: true },
     ],
     encounters: {
@@ -149,7 +149,7 @@
     // 夜袭: a night sandstorm. Light only reaches `radius` around the player and around the camp fires; archers see half as far.
     dark: { zone: [4230, 5230], radius: 165, lights: [4440, 4810, 5020] },
     prompts: [
-      { x: 0, key: 'move' }, { x: 300, key: 'strict' }, { x: 560, key: 'jump' }, { x: 1410, key: 'dash' }, { x: 1460, key: 'grass', local: true }, { x: 4250, key: 'dark', local: true },
+      { x: 0, key: 'move' }, { x: 300, key: 'strict' }, { x: 560, key: 'jump' }, { x: 1410, key: 'rigging', local: true }, { x: 1460, key: 'grass', local: true }, { x: 4250, key: 'dark', local: true },
     ],
     encounters: {
       beacon: { id: 'beacon', trigger: 940, lock: [700, 1440], waves: [
@@ -178,6 +178,53 @@
     },
   }
 
+  // 怒涛卷: the parried hook brings a pirate into execution range; marked tide surges wash across three arenas.
+  const STORM_SEA = {
+    id: 4, name: '怒涛卷', length: 6120,
+    areas: [
+      { x: 0, name: '海门', sub: '第一幅' }, { x: 1440, name: '桅林', sub: '第二幅' },
+      { x: 2330, name: '潮洞', sub: '第三幅' }, { x: 3290, name: '礁城', sub: '第四幅' },
+      { x: 4230, name: '风眼', sub: '第五幅' }, { x: 5230, name: '墨蛟', sub: '终幅' },
+    ],
+    platforms: [
+      { x: 980, y: 242, w: 150 }, { x: 1710, y: 230, w: 150 }, { x: 2020, y: 246, w: 125 },
+      { x: 2640, y: 236, w: 170 }, { x: 2980, y: 218, w: 125 },
+      { x: 3540, y: 220, w: 170 }, { x: 3890, y: 240, w: 155 },
+      { x: 4590, y: 230, w: 155 }, { x: 4900, y: 246, w: 120 },
+    ],
+    tide: { zones: [[2400, 3140], [4300, 5060]], cycle: [4.2, 1.15, 1.25] },
+    rigging: [{ x: 1570, target: 1700 }, { x: 1910, target: 2020 }, { x: 3490, target: 3610 }, { x: 4430, target: 4570 }, { x: 4810, target: 4930 }],
+    prompts: [
+      { x: 0, key: 'move' }, { x: 520, key: 'jump' }, { x: 820, key: 'hookPull', local: true },
+      { x: 1410, key: 'rigging', local: true }, { x: 2430, key: 'tide', local: true },
+    ],
+    encounters: {
+      sea_gate: { id: 'sea_gate', trigger: 920, lock: [700, 1440], waves: [
+        [{ type: 'pirate', side: 1 }, { type: 'pirate', side: -1, delay: 0.4 }],
+        [{ type: 'hooker', side: 1 }, { type: 'pirate', side: -1, delay: 0.4 }, { type: 'pirate', side: 1, delay: 1.1 }],
+      ] },
+      masts: { id: 'masts', trigger: 1600, lock: [1380, 2100], waves: [
+        [{ type: 'hooker', side: 1 }, { type: 'pirate', side: -1, delay: 0.3 }, { type: 'archer', x: 1780, y: 230, delay: 0.6 }],
+        [{ type: 'hooker', side: -1 }, { type: 'hooker', side: 1, delay: 0.7 }, { type: 'pirate', side: 1 }, { type: 'archer', x: 2070, y: 246, delay: 0.5 }],
+      ] },
+      cave: { id: 'cave', trigger: 2720, lock: [2400, 3140], waves: [
+        [{ type: 'pirate', side: 1 }, { type: 'hooker', side: -1, delay: 0.5 }],
+        [{ type: 'hooker', side: 1 }, { type: 'pirate', side: -1 }, { type: 'pirate', side: 1, delay: 1.0 }],
+        [{ type: 'hooker', side: -1 }, { type: 'hooker', side: 1, delay: 0.9 }, { type: 'archer', x: 3020, y: 218, delay: 0.5 }],
+      ] },
+      reef: { id: 'reef', trigger: 3680, lock: [3360, 4120], waves: [
+        [{ type: 'hooker', side: 1 }, { type: 'hooker', side: -1, delay: 0.4 }, { type: 'archer', x: 3610, y: 220, delay: 0.7 }],
+        [{ type: 'pirate', side: 1 }, { type: 'hooker', side: -1 }, { type: 'hooker', side: 1, delay: 0.9 }, { type: 'archer', x: 3960, y: 240, delay: 0.5 }],
+      ] },
+      storm: { id: 'storm', trigger: 4580, lock: [4300, 5060], waves: [
+        [{ type: 'pirate', side: 1 }, { type: 'hooker', side: -1, delay: 0.3 }, { type: 'archer', x: 4660, y: 230, delay: 0.7 }],
+        [{ type: 'hooker', side: 1 }, { type: 'hooker', side: -1, delay: 0.5 }, { type: 'pirate', side: 1, delay: 1.2 }],
+        [{ type: 'hooker', side: -1 }, { type: 'pirate', side: 1 }, { type: 'hooker', side: 1, delay: 1.1 }, { type: 'archer', x: 4940, y: 246, delay: 0.5 }],
+      ] },
+      dragon: { id: 'dragon', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'dragon', x: 5880 }]] },
+    },
+  }
+
   // Each 卷's boss and closing lines, read by the result screen and the boss bar.
   BAMBOO.copy = {
     boss: '无常', bossSub: '斗笠客', win: '一剑破无常', winLine: '斗笠客化作一池淡墨，竹林重归寂静。', loseLine: '无常仍立在月下。朱光一闪，便是出剑之时。',
@@ -190,6 +237,10 @@
   BEACON.copy = {
     boss: '萧破虏', bossSub: '铁骑将军', win: '一剑落将旗', winLine: '将旗倒在烟里，烽燧的火一盏盏熄了。', loseLine: '将军仍勒马台前。枪尖朱光一闪，便是出剑之时。',
     phase: '弃马提刀 · 令旗招箭', place: '边关',
+  }
+  STORM_SEA.copy = {
+    boss: '墨蛟', bossSub: '沉舟之主', win: '一剑平怒涛', winLine: '墨蛟沉入海眼，潮声终于慢了下来。', loseLine: '墨蛟仍盘在孤礁。看准朱光，再迎浪出剑。',
+    phase: '逆鳞尽张 · 潜渊破浪', place: '沧海',
   }
 
   // Challenge stats: maxCombo, executions, airKills, deflectKills, parries, bossExecutions, icicleKills, crackKills, slideKills, ambushes,
@@ -243,6 +294,22 @@
     { id: '3-scroll', code: 300, volume: 3, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
       encounters: ['beacon', 'poplar', 'gobi', 'pass', 'raid', 'dais'], par: 480, hurt: 4, scroll: true,
       challenge: { stat: 'time', goal: 420, at: 'most', text: '7 分钟内踏破烽烟' }, grades: [18000, 24000, 30000] },
+    // 卷四 · 怒涛卷
+    { id: '4-1', code: 401, volume: 4, name: '海门', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['sea_gate'],
+      par: 70, hurt: 1, challenge: { stat: 'hookPulls', goal: 1, text: '弹反钩镰并拽近海寇 1 次' }, grades: [2200, 2900, 3600] },
+    { id: '4-2', code: 402, volume: 4, name: '桅林', sub: '第二幅', range: [1340, 2330], start: 1460, encounters: ['masts'],
+      par: 100, hurt: 2, challenge: { stat: 'riggingKills', goal: 2, text: '斩断帆索，落桅击败 2 人' }, grades: [3000, 4000, 5100] },
+    { id: '4-3', code: 403, volume: 4, name: '潮洞', sub: '第三幅', range: [2290, 3290], start: 2340, encounters: ['cave'],
+      par: 110, hurt: 2, challenge: { stat: 'tideKills', goal: 2, text: '借潮涌卷走 2 名敌人' }, grades: [3400, 4600, 5800] },
+    { id: '4-4', code: 404, volume: 4, name: '礁城', sub: '第四幅', range: [3250, 4230], start: 3300, encounters: ['reef'],
+      par: 110, hurt: 2, challenge: { stat: 'hookPulls', goal: 4, text: '拽近钩镰海寇 4 次' }, grades: [3600, 4800, 6200] },
+    { id: '4-5', code: 405, volume: 4, name: '风眼', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['storm'],
+      par: 125, hurt: 2, challenge: { stat: 'tideKills', goal: 3, text: '借潮涌卷走 3 名敌人' }, grades: [4300, 5800, 7400] },
+    { id: '4-6', code: 406, volume: 4, name: '墨蛟', sub: '终幅', range: [5190, 6120], start: 5240, encounters: ['dragon'],
+      par: 160, hurt: 2, boss: true, challenge: { stat: 'bossExecutions', goal: 2, text: '破势处决墨蛟 2 次' }, grades: [6500, 8500, 10500] },
+    { id: '4-scroll', code: 400, volume: 4, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
+      encounters: ['sea_gate', 'masts', 'cave', 'reef', 'storm', 'dragon'], par: 510, hurt: 4, scroll: true,
+      challenge: { stat: 'time', goal: 450, at: 'most', text: '7 分 30 秒内踏浪通卷' }, grades: [20000, 27000, 34000] },
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -250,7 +317,7 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON]
+  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA]
   function volume(id) { return VOLUMES.find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }

@@ -24,12 +24,14 @@
     pavise: { thigh: 14, shin: 13, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.4, 5.4, 5.6, 4.6], blade: 0, color: '#1e2024', robe: 'armor', hat: 'kettle', headStyle: 'plain', pavise: true, shortSpear: true },
     general: { thigh: 18, shin: 18, torso: 26, upper: 14, fore: 13, head: 6.6, limbs: [8.2, 6.8, 7.2, 5.8], blade: 0, color: '#0d0e10', robe: 'lamellar', hat: 'warhelm', headStyle: 'plain', broadsword: true, backFlags: true, cape: 28, grip: { span: 15 } },
     angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true, grip: { span: 12 } },
+    pirate: { thigh: 13, shin: 13, torso: 20, upper: 11, fore: 10, head: 5.6, limbs: [5.8, 4.7, 4.8, 3.8], blade: 32, bladeW: 4, color: '#202a2d', robe: 'rags', hat: null, headStyle: 'plain', sabre: true, seaRaider: true },
+    hooker: { thigh: 14, shin: 13, torso: 22, upper: 12, fore: 11, head: 5.8, limbs: [6.2, 5, 5.3, 4.2], blade: 0, color: '#16272b', robe: 'straw', hat: null, hook: true, seaRaider: true, grip: { span: 13 } },
   }
 
-  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist', 'one', 'flag', 'pot', 'sh']
+  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist', 'one', 'flag', 'pot', 'sh', 'cast']
 
   function basePose() {
-    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0, wrist: 0, one: 0, flag: 0, pot: 0, sh: 0 }
+    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0, wrist: 0, one: 0, flag: 0, pot: 0, sh: 0, cast: 0 }
   }
 
   function createAnim(entity) {
@@ -126,12 +128,15 @@
     if (e.type === 'ronin') { t.lean = 0.42; t.crouch = 3.5; t.sw = 1.2; t.wrist = -0.35 }
     if (e.type === 'puppet' || e.type === 'shield') t.wrist = -0.25
     if (e.type === 'soldier' || e.type === 'footman') { t.wrist = -0.3; t.lean = 0.3 }
+    if (e.type === 'pirate') { t.wrist = -0.45; t.lean = 0.4; t.sw = 1.1 }
+    if (e.type === 'hooker') { t.lean = 0.2; t.sw = -0.25; t.reach = 1.15; t.crouch = 4 }
     if (e.type === 'bomber') { t.lean = 0.22; t.sw = 0.9; t.reach = 0.85; t.ou = 1.2; t.of = 1.0; t.pot = 1 }
     if (e.type === 'pavise') {
       t.lean = 0.14; t.crouch = 5; t.sw = 0.6; t.reach = 0.75; t.wrist = -1.5
       Object.assign(t, { l1: 0.38, b1: 0.45, l2: -0.32, b2: 0.28 })
       return paviseState(e, t, anim, time, progress, speed)
     }
+    if (e.type === 'pirate' || e.type === 'hooker') return seaRaiderPose(e, t, anim, time, progress, speed)
     if (e.type === 'bomber') return bomberState(e, t, anim, time, progress, speed)
     switch (e.state) {
       case 'spawn':
@@ -182,6 +187,24 @@
         t.air = 1; Object.assign(t, { l1: 0.7, b1: 1.3, l2: -0.1, b2: 0.9, lean: -0.1 })
         break
     }
+    return t
+  }
+
+  function seaRaiderPose(e, t, anim, time, q, speed) {
+    const hook=e.type==='hooker'
+    t.sw=hook?-0.45:0.9;t.ou=-0.8;t.of=-1.4;t.lean=hook?0.12:0.3;t.crouch=hook?2:5
+    if(e.state==='walk') {runLegs(t,anim.phase,clamp(speed/160,0.3,0.8));t.ou=-Math.sin(anim.phase)*0.6;t.of=t.ou-0.9}
+    if(e.state==='tele') {
+      t.sw=hook?-1.3+q*0.3:e.chain?1.9:-2.5
+      t.ou=e.chain?-1.9:0.8;t.of=e.chain?-2.6:1.4;t.lean=-0.18;t.crouch=5+q*4
+      t.l1=0.6;t.l2=-0.5;t.b1=0.55;t.b2=0.2;t.reach=1
+      t.cast=hook?0.15+q*0.25:0
+    } else if(e.state==='attack') {
+      t.sw=hook?-0.03:e.chain?-0.65:1.3;t.lean=0.7;t.crouch=6;t.reach=1.25
+      t.l1=0.9;t.l2=-0.8;t.b1=0.55;t.b2=0.15;t.ou=-0.7;t.of=-1.3;t.cast=hook?1:0;anim.snap=true
+    } else if(e.state==='recover') {t.lean=0.65;t.sw=0.8;t.crouch=6;t.ou=0.8;t.of=1.7}
+    else if(e.state==='hurt'||e.state==='stagger') {t.lean=-0.6;t.crouch=7;t.sw=-2.2;t.ou=2.3;t.of=2.8;t.l1=0.5;t.l2=-0.4;t.head=-0.3}
+    else if(e.state==='spawn') {t.lean=0.65;t.crouch=12}
     return t
   }
 
@@ -998,6 +1021,27 @@
     ctx.restore()
   }
 
+  function drawHook(ctx, s, look, out, pose, time) {
+    const [hx, hy] = s.hand, [dx, dy] = s.axis
+    const nx = -dy, ny = dx
+    const cast=pose.cast||0, shaft=40+cast*105
+    const tx=hx+dx*shaft, ty=hy+dy*shaft
+    out.tip=[tx+8,ty-5]
+    ctx.save();ctx.strokeStyle=look.flash?look.color:'#1d3036';ctx.lineWidth=2.3
+    ctx.beginPath();ctx.moveTo(hx-dx*18,hy-dy*18);ctx.lineTo(hx+dx*27,hy+dy*27);ctx.stroke()
+    // Articulated chain, deliberately slack during preparation and taut on contact.
+    ctx.lineWidth=1.3
+    for(let i=0;i<15;i++) {
+      const q=i/14, sag=Math.sin(q*Math.PI)*(1-cast)*17
+      const px=hx+dx*(25+q*(shaft-25)), py=hy+dy*(25+q*(shaft-25))+sag
+      ctx.beginPath();ctx.ellipse(px,py,3,1.6,Math.atan2(dy,dx)+(i%2)*0.55,0,TAU);ctx.stroke()
+    }
+    ctx.fillStyle=look.flash?look.color:'#1c2b30';ctx.beginPath();ctx.moveTo(tx-5,ty-3)
+    ctx.lineTo(tx+12,ty-12);ctx.lineTo(tx+9,ty+2);ctx.lineTo(tx+2,ty+13);ctx.lineTo(tx-11,ty+15);ctx.lineTo(tx-6,ty+6);ctx.lineTo(tx+1,ty+5);ctx.closePath();ctx.fill()
+    ctx.strokeStyle=look.flash?look.color:'#c4d3cf';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(tx+12,ty-12);ctx.lineTo(tx+9,ty+2);ctx.lineTo(tx+2,ty+13);ctx.lineTo(tx-11,ty+15);ctx.stroke()
+    ctx.restore()
+  }
+
   // Clay fire-pot ~7 radius with a short fuse; returns the fuse tip (local).
   function drawPot(ctx, cx, cy, look, time) {
     ctx.save()
@@ -1135,6 +1179,33 @@
     void dy
   }
 
+  function drawSeaCostume(g,kind,s,pose,look,time) {
+    const hook=kind==='hooker', [hx,hy]=s.head, [sx,sy]=s.shoulder
+    g.save();g.fillStyle=look.color||'#17292e';g.strokeStyle=look.color||'#17292e'
+    if(hook) {
+      // Broad rope collar and a broken shell mask: a drowned salvage hunter.
+      g.lineWidth=5;g.beginPath();g.arc(sx-2,sy+2,12,2.8,6.6);g.stroke()
+      g.strokeStyle=look.flash?look.color:'rgba(204,217,207,0.6)';g.lineWidth=0.8
+      for(let i=0;i<12;i++){const a=2.8+i*0.32;g.beginPath();g.moveTo(sx-2+Math.cos(a)*9,sy+2+Math.sin(a)*9);g.lineTo(sx-2+Math.cos(a)*14,sy+2+Math.sin(a)*14);g.stroke()}
+      g.fillStyle=look.flash?look.color:'#b6c6bd';g.beginPath();g.moveTo(hx-3,hy-5);g.lineTo(hx+6,hy-7);g.lineTo(hx+9,hy+1);g.lineTo(hx+4,hy+7);g.lineTo(hx-1,hy+5);g.closePath();g.fill()
+      g.strokeStyle='#203339';g.lineWidth=1;g.beginPath();g.moveTo(hx+3,hy-5);g.lineTo(hx+1,hy);g.lineTo(hx+5,hy+3);g.stroke()
+      g.fillStyle=CINNABAR;g.fillRect(hx+4,hy-1,3,1.5)
+      g.strokeStyle=look.flash?look.color:'#17292e';g.lineWidth=1.8
+      for(let i=0;i<8;i++){const x=sx-8+i*2;g.beginPath();g.moveTo(x,sy+4);g.quadraticCurveTo(x-8,sy+20,x-12+Math.sin(time*5+i)*4,sy+34+i%3*4);g.stroke()}
+    } else {
+      // Top knot, split head wrap and crossed short blades distinguish the boarding duelist.
+      g.beginPath();g.ellipse(hx-3,hy-8,4.5,4,-0.3,0,TAU);g.fill()
+      g.strokeStyle=look.flash?look.color:'#91a8a5';g.lineWidth=2.4;g.beginPath();g.moveTo(hx-6,hy-3);g.lineTo(hx+5,hy-3);g.stroke()
+      g.strokeStyle=look.flash?look.color:'#20373c';g.lineWidth=2
+      for(let i=0;i<2;i++){g.beginPath();g.moveTo(hx-6,hy-2);g.quadraticCurveTo(hx-16,hy+5,hx-23+Math.sin(time*7+i)*3,hy+i*6);g.stroke()}
+      g.strokeStyle=look.flash?look.color:'rgba(207,218,206,0.55)';g.lineWidth=1.3;g.beginPath();g.moveTo(sx-6,sy+2);g.lineTo(s.hip[0]+4,s.hip[1]);g.stroke()
+      const [x,y]=s.offHand, a=pose.of-1.7, dx=Math.cos(a),dy=Math.sin(a)
+      g.fillStyle=look.flash?look.color:'#182b31';g.beginPath();g.moveTo(x,y);g.lineTo(x+dx*27-dy*4,y+dy*27+dx*4);g.quadraticCurveTo(x+dx*34-dy*9,y+dy*34+dx*9,x+dx*31,y+dy*31);g.lineTo(x+dy*2,y-dx*2);g.closePath();g.fill()
+      g.strokeStyle=look.flash?look.color:'#b9cac4';g.lineWidth=1;g.beginPath();g.moveTo(x-dy*3,y+dx*3);g.lineTo(x+dx*27-dy*4,y+dy*27+dx*4);g.stroke()
+    }
+    g.restore()
+  }
+
   // Draws a posed humanoid in world space. `look` = { color, alpha, flash, eyeGlow, halo }.
   function drawHumanoid(ctx, kind, pose, x, y, facing, look, time, seed = 0, extras = {}) {
     const spec = KINDS[kind]
@@ -1215,6 +1286,7 @@
     }
     drawHead(ctx, spec, s, look, time, seed)
     if (spec.hat) drawHat(ctx, spec, s, pose, time, look, seed)
+    if (spec.seaRaider) drawSeaCostume(ctx, kind, s, pose, look, time)
     if (spec.headStyle && !look.flash && LATE_HATS[spec.hat]) eyes(ctx, s.head[0] + spec.head * 0.42, s.head[1] - spec.head * 0.1, look.eyeGlow || 0, spec.head)
     if (spec.robe === 'lamellar') {
       ctx.fillStyle = look.flash ? look.color : '#191a1d'
@@ -1235,6 +1307,7 @@
       limb(ctx, [s.shoulder, [lerp(s.shoulder[0], pull[0], 0.5) - 2, lerp(s.shoulder[1], pull[1], 0.5) + 3], pull], af)
     } else if (gripOn) {
       if (spec.broadsword) drawBroadsword(ctx, spec, s, look, out, time)
+      else if (spec.hook) drawHook(ctx, s, look, out, pose, time)
       else if (spec.spear) drawSpear(ctx, spec, s, look, out)
       else if (spec.hammer) drawHammer(ctx, spec, s, look, out)
       else drawRod(ctx, spec, s, look, out)
@@ -1823,7 +1896,74 @@
     anim.wobble += anim.wobbleV * dt
   }
 
+  // A coiled sea dragon, with a continuous tapered spine and an articulated jaw.
+  // The head stays beside the simulation body; the large coil behind it is decorative.
+  function drawDragon(g,e,x,y,facing,look={},time=0) {
+    const tell=e.state==='dragonTell', bite=e.state==='dragonBite', wave=e.state==='dragonWaveTell'||e.state==='dragonWave'
+    const broken=e.state==='broken', recovering=e.state==='recover', diving=e.state==='dragonDive', hidden=e.state==='dragonDiveTell'
+    const q=e.teleTotal?clamp(1-e.t/e.teleTotal,0,1):0
+    const headX=bite?40:tell?-18*q:recovering?6:12
+    const headY=broken?-29:wave?-111:tell?-70-q*20:-66
+    const sink=diving?(1-clamp(e.t/0.6,0,1))*260:e.state==='intro'?Math.max(0,e.t/2.2)*150:e.state==='dying'?(1-clamp(e.t/2.6,0,1))*200:0
+    const out={head:[x+headX*facing,y+headY+sink],tip:[x+(headX+42)*facing,y+headY+12+sink]}
+    if(hidden) return {head:null,tip:null}
+    g.save();g.translate(x,y);g.scale(facing,1)
+    if(look.alpha!==undefined) g.globalAlpha*=look.alpha
+    g.beginPath();g.rect(-350,-340,510,345);g.clip();g.translate(0,sink)
+    const ink=look.color||'#142b34', paper=look.flash?look.color:'rgba(195,215,203,0.65)'
+    const collapse=broken?0.35:1
+    const control=[[headX,headY],[-44,-107*collapse],[-1,-198*collapse],[-93,-210*collapse],[-160,-155*collapse],[-128,-89*collapse],[-74,-61*collapse],[-167,-22],[-240,-13]]
+    const pts=[]
+    // Catmull-Rom centreline; independent scale rows follow its normal.
+    for(let k=0;k<control.length-1;k++) {
+      const a=control[Math.max(0,k-1)],b=control[k],c=control[k+1],d=control[Math.min(control.length-1,k+2)]
+      for(let j=0;j<7;j++) {const t=j/7;const calc=n=>0.5*((2*b[n])+(-a[n]+c[n])*t+(2*a[n]-5*b[n]+4*c[n]-d[n])*t*t+(-a[n]+3*b[n]-3*c[n]+d[n])*t*t*t)
+        const u=(k+t)/(control.length-1)
+        pts.push([calc(0)+Math.sin(time*2.8+u*10)*u*5,calc(1)+Math.sin(time*3+u*13)*u*5,25*(1-u)+3])
+      }
+    }
+    const side=(i,sign)=>{const p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)],len=Math.hypot(b[0]-a[0],b[1]-a[1])||1;return[p[0]-(b[1]-a[1])/len*p[2]*sign,p[1]+(b[0]-a[0])/len*p[2]*sign]}
+    g.fillStyle=ink;g.strokeStyle=paper;g.lineWidth=1
+    g.beginPath();pts.forEach((p,i)=>{const v=side(i,1);i?g.lineTo(...v):g.moveTo(...v)});for(let i=pts.length-1;i>=0;i--)g.lineTo(...side(i,-1));g.closePath();g.fill();g.stroke()
+    for(let i=3;i<pts.length-2;i+=2) {
+      const p=pts[i],a=pts[i-1],b=pts[i+1],angle=Math.atan2(b[1]-a[1],b[0]-a[0])
+      g.save();g.translate(p[0],p[1]);g.rotate(angle)
+      g.strokeStyle=look.flash?look.color:'rgba(171,199,188,0.4)';g.lineWidth=0.7
+      for(let row=-1;row<=1;row++){g.beginPath();g.arc(row%2?2:-1,row*p[2]*0.5,p[2]*0.32,0.2,2.9);g.stroke()}
+      // Dry-brush streaks interrupt the scales and keep the body from reading as flat vector art.
+      g.strokeStyle=look.flash?look.color:'rgba(143,173,162,0.16)';g.lineWidth=0.65
+      for(let n=0;n<4;n++){const yy=Math.sin(i*2.3+n*3.7)*p[2]*0.7;g.beginPath();g.moveTo(-5,yy);g.lineTo(2+n,yy+0.8);g.stroke()}
+      g.fillStyle=ink;g.beginPath();g.moveTo(-4,-p[2]+2);g.lineTo(-12,-p[2]-10*(1-i/pts.length));g.lineTo(4,-p[2]);g.closePath();g.fill()
+      g.strokeStyle=paper;g.beginPath();g.moveTo(-12,-p[2]-10*(1-i/pts.length));g.lineTo(4,-p[2]);g.stroke()
+      g.restore()
+    }
+    // Claws are jointed, gripping at the air rather than dangling as straight sticks.
+    g.strokeStyle=ink;g.lineWidth=7;g.lineCap='round'
+    for(const [cx,cy,sgn] of [[-42,-102*collapse,1],[-125,-114*collapse,-1]]) {
+      g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+sgn*22,cy+14);g.lineTo(cx+sgn*16,cy+33);g.stroke()
+      for(let i=0;i<3;i++){g.lineWidth=2.5;g.beginPath();g.moveTo(cx+sgn*16,cy+30);g.quadraticCurveTo(cx+sgn*(28+i*4),cy+30+i*4,cx+sgn*(27+i*4),cy+40+i*3);g.stroke()}
+    }
+    g.save();g.translate(headX,headY);g.rotate(tell?-0.14*q:bite?0.12:wave?-0.5:0)
+    // Mane, antler-like horns, brow, nostril and two unequal fangs.
+    g.fillStyle=ink;g.strokeStyle=ink
+    for(let i=0;i<12;i++){g.lineWidth=1.4+i%3;g.beginPath();g.moveTo(-12,-19+i*3);g.quadraticCurveTo(-40,-33+i*4,-44-i%3*5+Math.sin(time*5+i)*4,-23+i*4);g.stroke()}
+    g.lineWidth=5
+    for(let i=0;i<2;i++){const ox=-12+i*20;g.beginPath();g.moveTo(ox,-16);g.lineTo(ox-8,-39);g.lineTo(ox-1,-55);g.moveTo(ox-8,-39);g.lineTo(ox-22,-45);g.lineTo(ox-24,-55);g.stroke()}
+    g.beginPath();g.moveTo(-24,-10);g.quadraticCurveTo(-12,-36,12,-23);g.lineTo(26,-11);g.lineTo(43,-9);g.quadraticCurveTo(56,0,43,8);g.lineTo(16,8);g.lineTo(-8,16);g.lineTo(-26,5);g.closePath();g.fill()
+    g.strokeStyle=paper;g.lineWidth=1.1;g.beginPath();g.moveTo(-17,-17);g.quadraticCurveTo(5,-27,22,-7);g.lineTo(44,-3);g.stroke()
+    const jaw=tell?4+q*15:bite?5:wave?23:broken?15:5+Math.sin(time*1.6)*2
+    g.fillStyle=ink;g.beginPath();g.moveTo(-12,4);g.lineTo(37,7+jaw);g.lineTo(45,5+jaw);g.lineTo(36,19+jaw);g.lineTo(4,22+jaw);g.closePath();g.fill()
+    g.fillStyle=look.flash?look.color:'#d8dfca'
+    for(const [tx,ty,sz] of [[26,7,11],[39,7,7],[30,14+jaw,-7]]){g.beginPath();g.moveTo(tx-2,ty);g.lineTo(tx+2,ty);g.lineTo(tx-1,ty+sz);g.closePath();g.fill()}
+    g.strokeStyle=look.flash?look.color:'#0d1c24';g.lineWidth=4;g.beginPath();g.moveTo(5,-13);g.lineTo(18,-9);g.stroke()
+    g.strokeStyle=CINNABAR;g.lineWidth=2.5+(look.eyeGlow||0);g.beginPath();g.moveTo(7,-11);g.lineTo(15,-9);g.stroke()
+    g.fillStyle='#101e24';g.beginPath();g.ellipse(40,-5,3,2,0,0,TAU);g.fill()
+    g.strokeStyle=paper;g.lineWidth=1.2
+    for(let i=0;i<3;i++){g.beginPath();g.moveTo(35,5);g.bezierCurveTo(61,12+i*8,66+Math.sin(time*3+i)*6,-10-i*8,80,-2-i*10);g.stroke()}
+    g.restore();g.restore();return out
+  }
+
   globalThis.XiabanInkFigures = {
-    KINDS, CINNABAR, PAPER, createAnim, updatePose, drawHumanoid, drawRider, drawHorse, updateScarf, drawCrow, drawDummy, updateDummy, basePose, skeleton,
+    KINDS, CINNABAR, PAPER, createAnim, updatePose, drawHumanoid, drawDragon, drawRider, drawHorse, updateScarf, drawCrow, drawDummy, updateDummy, basePose, skeleton,
   }
 })()
