@@ -1,0 +1,273 @@
+(() => {
+  'use strict'
+
+  const rules = globalThis.XiaobanMbtiRules
+  const profiles = globalThis.XiaobanMbtiProfiles
+  const nonce = new URLSearchParams(location.search).get('hostNonce')
+  const byId = id => document.getElementById(id)
+  const app = byId('app')
+  const views = ['home', 'quiz', 'review', 'result']
+  let save = rules.emptySave()
+  let view = 'home'
+  let hostReady = false
+  let dirty = false
+  let advancing = false
+  let transitionTimer = null
+
+  function post(type, payload = {}) {
+    if (!hostReady || !nonce || window.parent === window) return
+    window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, nonce, type, ...payload }, '*')
+  }
+
+  // Installed synchronously during script evaluation, before the iframe load event.
+  window.addEventListener('message', event => {
+    const message = event.data
+    if (!nonce || window.parent === window || event.source !== window.parent || !message ||
+      message.channel !== 'xiaban.game-host' || message.protocol !== 1 || message.nonce !== nonce || message.type !== 'host.init') return
+    if (message.safeArea && typeof message.safeArea === 'object') {
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        const value = message.safeArea[side]
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+          document.documentElement.style.setProperty('--host-' + side, Math.min(value, 160) + 'px')
+        }
+      }
+    }
+    if (hostReady) { post('game.ready'); return }
+    const restored = rules.normalizeSave(message.save)
+    // A late initialization must not replace answers already entered in this session.
+    if (!dirty) save = restored
+    else if (!save.lastResult) save.lastResult = restored.lastResult
+    hostReady = true
+    post('game.ready')
+    if (dirty) post('game.save', { data: save })
+    if (view === 'home') renderHome()
+  })
+
+  function persist() {
+    dirty = true
+    post('game.save', { data: save })
+  }
+
+  function show(next, focusId) {
+    clearTimeout(transitionTimer)
+    advancing = false
+    view = next
+    views.forEach(id => { byId(id).hidden = id !== next })
+    byId('homeButton').hidden = next === 'home'
+    app.scrollTop = 0
+    if (focusId) byId(focusId).focus({ preventScroll: true })
+  }
+
+  function formatDate(value, includeYear = false) {
+    const date = new Date(value)
+    return (includeYear ? date.getFullYear() + ' 年 ' : '') + (date.getMonth() + 1) + ' 月 ' + date.getDate() + ' 日'
+  }
+
+  function renderHome() {
+    const progress = save.progress
+    byId('startButton').hidden = !!progress
+    byId('resumeButton').hidden = !progress
+    byId('resetButton').hidden = !progress
+    if (progress) byId('resumeButton').textContent = '继续上次（已答 ' + rules.score(progress.answers).answered + ' 题）'
+    const result = save.lastResult
+    byId('lastResultButton').hidden = !result
+    if (result) byId('lastResultButton').textContent = '上次结果：' + result.type + '（' + formatDate(result.completedAt) + '）'
+    byId('storageNote').textContent = hostReady ? '答案与结果仅保存在这台设备上。' : '独立预览：进度仅在本次打开期间保留。'
+  }
+
+  function goHome() {
+    // If home is activated while the selected card is briefly highlighted,
+    // preserve the answer and advance the saved cursor before leaving.
+    if (advancing) advance()
+    renderHome()
+    show('home', 'homeTitle')
+  }
+
+  function start() {
+    save.progress = { current: 0, answers: rules.normalizeAnswers([]), mode: 'all' }
+    persist()
+    renderQuestion()
+  }
+
+  function renderQuestion() {
+    const progress = save.progress
+    if (!progress) return goHome()
+    const question = rules.questions[progress.current]
+    const answered = rules.score(progress.answers).answered
+    byId('progressText').textContent = '已答 ' + answered + ' 题'
+    byId('questionNumber').textContent = (progress.current + 1) + ' / 48'
+    byId('progressBar').value = answered
+    byId('questionEyebrow').textContent = progress.mode === 'missing' ? '补答 · 也可以暂时留白' : '想一想平时的自己'
+    byId('questionTitle').textContent = question.prompt
+    for (let choice = 0; choice < 2; choice++) {
+      byId('optionText' + choice).textContent = question.options[choice].text
+      byId('option' + choice).setAttribute('aria-pressed', String(progress.answers[progress.current] === choice))
+      byId('option' + choice).disabled = false
+    }
+    byId('previousButton').disabled = progress.current === 0
+    byId('skipButton').textContent = progress.answers[progress.current] === null ? '跳过 →' : '下一题 →'
+    show('quiz', 'questionTitle')
+  }
+
+  function choose(choice) {
+    if (view !== 'quiz' || advancing) return
+    const progress = save.progress
+    const answeredIndex = progress.current
+    progress.answers[answeredIndex] = choice
+    // Commit completion before any visual delay, including if the host closes now.
+    const result = rules.score(progress.answers)
+    if (result.answered === 48) return finish()
+    // Save the next cursor immediately, so closing during the highlight loses no progress.
+    const next = nextIndex(answeredIndex)
+    progress.current = next < 48 ? next : answeredIndex
+    persist()
+    byId('progressText').textContent = '已答 ' + result.answered + ' 题'
+    byId('progressBar').value = result.answered
+    for (let index = 0; index < 2; index++) {
+      byId('option' + index).setAttribute('aria-pressed', String(index === choice))
+      byId('option' + index).disabled = true
+    }
+    advancing = true
+    transitionTimer = setTimeout(() => {
+      if (next >= 48) finishPass()
+      else renderQuestion()
+    }, 160)
+  }
+
+  function nextIndex(from) {
+    let next = from + 1
+    if (save.progress.mode === 'missing') {
+      while (next < 48 && save.progress.answers[next] !== null) next++
+    }
+    return next
+  }
+
+  function advance() {
+    if (view !== 'quiz') return
+    // A selection has already saved its next cursor; do not skip another question.
+    if (advancing) {
+      clearTimeout(transitionTimer)
+      const allAnswered = rules.score(save.progress.answers).answered === 48
+      if (allAnswered) return finishPass()
+      return renderQuestion()
+    }
+    const next = nextIndex(save.progress.current)
+    if (next >= 48) return finishPass()
+    save.progress.current = next
+    persist()
+    renderQuestion()
+  }
+
+  function previous() {
+    if (view !== 'quiz' || advancing || save.progress.current === 0) return
+    save.progress.current--
+    persist()
+    renderQuestion()
+  }
+
+  function finishPass() {
+    if (rules.score(save.progress.answers).answered === 48) return finish()
+    persist()
+    renderReview()
+  }
+
+  function renderReview() {
+    const result = rules.score(save.progress.answers)
+    const missing = 48 - result.answered
+    byId('reviewSummary').textContent = '已答 ' + result.answered + ' 题，还有 ' + missing + ' 题留白。可以补答，也可以只用已答题查看倾向。'
+    byId('reviewNotice').textContent = result.type
+      ? '未答题不计分；题目越少，结果越容易受单次选择影响。'
+      : '有维度尚未作答。四个维度各至少答 1 题后，才能形成完整结果；建议补完再看。'
+    byId('fillButton').textContent = '补答剩余 ' + missing + ' 题'
+    byId('finishButton').disabled = !result.type
+    show('review', 'reviewTitle')
+  }
+
+  function fillMissing() {
+    save.progress.current = save.progress.answers.indexOf(null)
+    save.progress.mode = 'missing'
+    persist()
+    renderQuestion()
+  }
+
+  function finish() {
+    if (!save.progress) return
+    const result = rules.score(save.progress.answers)
+    if (!result.type) return renderReview()
+    save.lastResult = { type: result.type, percentages: result.percentages, totals: result.totals, completedAt: new Date().toISOString() }
+    save.progress = null
+    persist()
+    renderResult()
+  }
+
+  function renderResult() {
+    const result = save.lastResult
+    if (!result) return
+    const profile = profiles[result.type]
+    byId('resultType').textContent = result.type
+    const answered = result.totals.reduce((sum, count) => sum + count, 0)
+    byId('resultDate').textContent = formatDate(result.completedAt, true) + ' · 已答 ' + answered + ' / 48 题'
+    const rows = rules.dimensions.map((dimension, index) => {
+      const first = result.percentages[index]
+      const row = document.createElement('div')
+      const context = document.createElement('p')
+      context.className = 'dimension-context'
+      context.textContent = dimension.context + ' · 已答 ' + result.totals[index] + ' / 12' + (first === 50 ? ' · 两侧持平' : '')
+      const label = document.createElement('p')
+      label.className = 'dimension-label'
+      const left = document.createElement('span')
+      left.textContent = dimension.firstLabel + ' ' + first + '%'
+      const right = document.createElement('span')
+      right.textContent = dimension.secondLabel + ' ' + (100 - first) + '%'
+      label.append(left, right)
+      const bar = document.createElement('div')
+      bar.className = 'dimension-bar'
+      bar.setAttribute('role', 'img')
+      bar.setAttribute('aria-label', left.textContent + '，' + right.textContent)
+      const fill = document.createElement('span')
+      fill.style.width = first + '%'
+      bar.append(fill)
+      row.append(context, label, bar)
+      return row
+    })
+    byId('dimensions').replaceChildren(...rows)
+    const hasTie = result.percentages.includes(50)
+    byId('resultCaveat').textContent = '百分比是该侧选项占本维度已答题的比例，不是能力高低或诊断概率。' +
+      (hasTie ? '持平维度暂按 E / S / T / J 侧显示字母，仅供排版归类；请结合两侧理解下文。' : '接近一半的维度，可以结合两侧理解。') +
+      (answered < 48 ? '本次含未答题，解读仅作初步参考。' : '')
+    byId('interpretation').textContent = profile.description
+    for (const [id, items] of [['workList', profile.work], ['blindSpotsList', profile.blindSpots]]) {
+      byId(id).replaceChildren(...items.map(text => {
+        const item = document.createElement('li')
+        item.textContent = text
+        return item
+      }))
+    }
+    show('result', 'resultType')
+  }
+
+  byId('startButton').addEventListener('click', start)
+  byId('resetButton').addEventListener('click', start)
+  byId('retryButton').addEventListener('click', start)
+  byId('resumeButton').addEventListener('click', renderQuestion)
+  byId('homeButton').addEventListener('click', goHome)
+  byId('lastResultButton').addEventListener('click', renderResult)
+  byId('previousButton').addEventListener('click', previous)
+  byId('skipButton').addEventListener('click', advance)
+  byId('fillButton').addEventListener('click', fillMissing)
+  byId('finishButton').addEventListener('click', finish)
+  byId('reviewPreviousButton').addEventListener('click', () => {
+    save.progress.current = 47
+    save.progress.mode = 'all'
+    persist()
+    renderQuestion()
+  })
+  for (let choice = 0; choice < 2; choice++) byId('option' + choice).addEventListener('click', () => choose(choice))
+  window.addEventListener('keydown', event => {
+    if (view !== 'quiz' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+    const actions = { '1': () => choose(0), '2': () => choose(1), ArrowLeft: previous, ArrowRight: advance }
+    if (actions[event.key]) { event.preventDefault(); actions[event.key]() }
+  })
+
+  renderHome()
+})()

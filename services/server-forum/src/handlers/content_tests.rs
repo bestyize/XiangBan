@@ -793,3 +793,223 @@ async fn app_plaza_kind_remix_protocol_filter_and_network_switch() -> Result<(),
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn app_plaza_featured_marker_filter_and_admin_switch() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("skipped: TEST_DATABASE_URL is not set");
+        return Ok(());
+    };
+    let schema = format!("content_test_{}", Uuid::new_v4().simple());
+    let admin_pool = crate::db::connect(&url, None).await?;
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin_pool).await?;
+    let pool = crate::db::connect(&url, Some(&schema)).await?;
+    crate::db::migrate(&pool).await?;
+    crate::db::seed(&pool).await?;
+
+    let mut config = AppConfig::from_env();
+    config.resource_base_url = Some("https://res.test".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    config.admin_user = Some("root".into());
+    config.admin_password = Some("correct-horse-battery".into());
+    config.daily_pack_publishes = 50;
+    crate::handlers::admin::seed_admin(&pool, &config).await?;
+    let secret = config.resource_secret.clone();
+
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let verifier = JwksVerifier::with_static_key("iss".into(), "aud".into(), DecodingKey::from_ed_components(&x).unwrap());
+    let enc = EncodingKey::from_ed_der(pkcs8.as_ref());
+    let user_token = |uid: Uuid| {
+        #[derive(serde::Serialize)]
+        struct C {
+            iss: String,
+            sub: String,
+            aud: String,
+            exp: i64,
+        }
+        let c = C { iss: "iss".into(), sub: uid.to_string(), aud: "aud".into(), exp: chrono::Utc::now().timestamp() + 600 };
+        encode(&Header::new(Algorithm::EdDSA), &c, &enc).unwrap()
+    };
+    let state = AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() };
+    let app = crate::build_router(state);
+    let (author, other) = (Uuid::new_v4(), Uuid::new_v4());
+    let (author_t, other_t) = (user_token(author), user_token(other));
+    let mb = 1024 * 1024;
+    // 未精选的已上架作品、被下架的作品，用来确认过滤和状态限制。
+    let (s, a) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "pick-a"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{a}");
+    let (s, b) = publish_pack(&app, &secret, &author_t, "game", manifest_v2("game", "pick-b"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, c) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "pick-c"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{c}");
+    let (a_id, b_id, c_id) = (a["id"].as_i64().unwrap(), b["id"].as_i64().unwrap(), c["id"].as_i64().unwrap());
+    let (_, detail) = call_with_runtime(&app, &format!("/api/packs/{a_id}"), Some("2")).await;
+    assert_eq!(detail["featured"], false);
+    assert_eq!(detail["featured_at"], Value::Null);
+
+    // 只有管理员能设置。
+    let path = |id: i64| format!("/api/admin/packs/{id}/featured");
+    let (s, _) = call(&app, "POST", &path(a_id), None, json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = call(&app, "POST", &path(a_id), Some(&author_t), json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED, "作者本人也不能自己精选");
+    let (s, login) = call(&app, "POST", "/api/admin/login", None, json!({"username":"root","password":"correct-horse-battery"})).await;
+    assert_eq!(s, StatusCode::OK, "{login}");
+    let admin_t = login["token"].as_str().unwrap().to_string();
+
+    // 没设置精选时，筛选为空，不带参数的列表不变。
+    let (_, none) = call_with_runtime(&app, "/api/packs?featured=true", Some("2")).await;
+    assert_eq!(none["total"], 0);
+    let (_, all) = call_with_runtime(&app, "/api/packs", Some("2")).await;
+    assert_eq!(all["total"], 3);
+
+    // 先精选 a，再精选 b：按精选时间倒序，b 在前；c 不出现。
+    let (s, r) = call(&app, "POST", &path(a_id), Some(&admin_t), json!({"featured": true, "note": "编辑推荐"})).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(r["featured"], true);
+    assert!(r["featured_at"].is_string());
+    let (s, _) = call(&app, "POST", &path(b_id), Some(&admin_t), json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, feat) = call_with_runtime(&app, "/api/packs?featured=true", Some("2")).await;
+    let ids: Vec<i64> = feat["items"].as_array().unwrap().iter().map(|i| i["id"].as_i64().unwrap()).collect();
+    assert_eq!(ids, vec![b_id, a_id]);
+    assert_eq!(feat["total"], 2);
+    assert_eq!(feat["items"][0]["featured"], true);
+    assert!(feat["items"][0]["featured_at"].is_string());
+    let (_, all) = call_with_runtime(&app, "/api/packs", Some("2")).await;
+    assert_eq!(all["total"], 3, "不带参数时不过滤");
+    let (_, fa) = call_with_runtime(&app, "/api/packs?featured=false", Some("2")).await;
+    assert_eq!(fa["total"], 3, "featured=false 不过滤");
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{a_id}"), Some("2")).await;
+    assert_eq!(d["featured"], true);
+    assert!(d["featured_at"].is_string());
+    assert_eq!(d["trust_level"], 2, "精选不改信任等级");
+
+    // 与其他筛选叠加：类型、运行时协议。
+    let (_, only_app) = call_with_runtime(&app, "/api/packs?featured=true&kind=app", Some("2")).await;
+    assert_eq!(only_app["total"], 1);
+    assert_eq!(only_app["items"][0]["id"], a_id);
+    let (_, old_client) = call_with_runtime(&app, "/api/packs?featured=true", None).await;
+    assert_eq!(old_client["total"], 0, "协议 2 的作品对旧客户端不可见");
+
+    // 再次精选会刷新时间：a 排到最前。
+    let (s, _) = call(&app, "POST", &path(a_id), Some(&admin_t), json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, feat) = call_with_runtime(&app, "/api/packs?featured=true", Some("2")).await;
+    assert_eq!(feat["items"][0]["id"], a_id);
+
+    // 取消精选后从列表消失。
+    let (s, r) = call(&app, "POST", &path(a_id), Some(&admin_t), json!({"featured": false})).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(r["featured"], false);
+    assert_eq!(r["featured_at"], Value::Null);
+    let (_, feat) = call_with_runtime(&app, "/api/packs?featured=true", Some("2")).await;
+    assert_eq!(feat["total"], 1);
+    assert_eq!(feat["items"][0]["id"], b_id);
+
+    // 未知作品 404；未上架的作品不能精选。
+    let (s, _) = call(&app, "POST", &path(987654), Some(&admin_t), json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    call(&app, "POST", &format!("/api/packs/{c_id}/remove"), Some(&author_t), Value::Null).await;
+    let (s, r) = call(&app, "POST", &path(c_id), Some(&admin_t), json!({"featured": true})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{r}");
+    // 下架的作品即使曾被精选，也不会出现在列表里。
+    call(&app, "POST", &format!("/api/packs/{b_id}/remove"), Some(&author_t), Value::Null).await;
+    let (_, feat) = call_with_runtime(&app, "/api/packs?featured=true", Some("2")).await;
+    assert_eq!(feat["total"], 0);
+
+    let (audits,): (i64,) = sqlx::query_as("SELECT count(*) FROM admin_audit WHERE action = 'pack.featured'").fetch_one(&pool).await?;
+    assert_eq!(audits, 4, "每次成功的设置都有审计记录");
+
+    drop(app);
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn admin_registered_pack_can_carry_an_author() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("skipped: TEST_DATABASE_URL is not set");
+        return Ok(());
+    };
+    let schema = format!("content_test_{}", Uuid::new_v4().simple());
+    let admin_pool = crate::db::connect(&url, None).await?;
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin_pool).await?;
+    let pool = crate::db::connect(&url, Some(&schema)).await?;
+    crate::db::migrate(&pool).await?;
+    crate::db::seed(&pool).await?;
+
+    let mut config = AppConfig::from_env();
+    config.resource_base_url = Some("https://res.test".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    config.admin_user = Some("root".into());
+    config.admin_password = Some("correct-horse-battery".into());
+    crate::handlers::admin::seed_admin(&pool, &config).await?;
+
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let verifier = JwksVerifier::with_static_key("iss".into(), "aud".into(), DecodingKey::from_ed_components(&x).unwrap());
+    let state = AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() };
+    let app = crate::build_router(state);
+
+    let (s, login) = call(&app, "POST", "/api/admin/login", None, json!({"username":"root","password":"correct-horse-battery"})).await;
+    assert_eq!(s, StatusCode::OK, "{login}");
+    let admin_t = login["token"].as_str().unwrap().to_string();
+
+    let (author, banned) = (Uuid::new_v4(), Uuid::new_v4());
+    sqlx::query("INSERT INTO users (uid, nickname) VALUES ($1, '一瞬流光')").bind(author).execute(&pool).await?;
+    sqlx::query("INSERT INTO users (uid, nickname, status) VALUES ($1, '封禁用户', 'banned')").bind(banned).execute(&pool).await?;
+
+    let body = |slug: &str, author_uid: Option<Uuid>| {
+        let mut body = json!({
+            "kind": "game", "title": "测试作品", "summary": "一个测试作品。",
+            "manifest": {"schemaVersion": 1, "kind": "game", "id": slug, "name": "测试作品", "version": "1.0.0"},
+            "file_key": format!("packs/game/{slug}-1.0.0.zip"),
+            "sha256": "a".repeat(64), "size": 4096,
+            "cover_key": format!("covers/{slug}-1.0.0.png"),
+        });
+        if let Some(uid) = author_uid {
+            body["author_uid"] = json!(uid);
+        }
+        body
+    };
+
+    // 只有管理员能登记。
+    let (s, _) = call(&app, "POST", "/api/admin/packs", None, body("anon-try", None)).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    // 不带作者：按官方作品登记，没有作者。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("official-one", None)).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{}", r["id"].as_i64().unwrap()), None).await;
+    assert_eq!(d["author"], Value::Null);
+    assert_eq!(d["trust_level"], 0);
+
+    // 带作者：详情里署名为该用户，并能按作者筛选。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("by-author", Some(author))).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let id = r["id"].as_i64().unwrap();
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{id}"), None).await;
+    assert_eq!(d["author"]["nickname"], "一瞬流光");
+    assert_eq!(d["author"]["uid"], author.to_string());
+    let (_, list) = call_with_runtime(&app, &format!("/api/packs?author={author}"), None).await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["id"], id);
+
+    // 作者不存在或已被封禁：拒绝，并且不留下半截数据。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("ghost-author", Some(Uuid::new_v4()))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{r}");
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("banned-author", Some(banned))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{r}");
+    let (left,): (i64,) = sqlx::query_as("SELECT count(*) FROM packs WHERE slug IN ('ghost-author', 'banned-author', 'anon-try')").fetch_one(&pool).await?;
+    assert_eq!(left, 0);
+
+    drop(app);
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
+    Ok(())
+}

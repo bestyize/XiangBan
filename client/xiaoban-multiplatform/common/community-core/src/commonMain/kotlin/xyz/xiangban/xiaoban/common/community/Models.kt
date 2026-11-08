@@ -52,6 +52,8 @@ data class Pack(
     @SerialName("updated_at") val updatedAt: String = "",
     val versions: List<PackVersion> = emptyList(),
     @SerialName("in_review") val inReview: Boolean = false,
+    /** 编辑选入「创作者精选」，和审核等级无关。 */
+    val featured: Boolean = false,
 ) {
     /** 手机上不能应用内容包，只能看、复制链接或下载，应用要回到电脑上的小伴。 */
     val trustLabel: String get() = when (trustLevel) { 0 -> "官方"; 1 -> "已审核"; else -> "未审核" }

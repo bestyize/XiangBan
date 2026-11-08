@@ -358,7 +358,7 @@ function plaza(s) {
       <div class="recent">${recent.slice(0, 6).map(i => `<button class="tile" data-a="launch:${i}">${ico(A[i])}<span>${A[i].name}</span></button>`).join('')}</div>
       <div class="sec"><h3>精选游戏</h3><button data-a="list:games">全部${icon('right')}</button></div>
       <div class="hscroll">${GAMES.map(gcard).join('')}</div>
-      <div class="sec"><h3>工具与测评</h3><button data-a="list:tools">全部${icon('right')}</button></div>
+      <div class="sec"><h3>精选工具</h3><button data-a="list:tools">全部${icon('right')}</button></div>
       <div class="tgrid">${TOOLS.slice(0, 4).map(ttile).join('')}</div>
       <div class="sec"><h3>创作者精选</h3><button data-a="list:picks">全部${icon('right')}</button></div>
       <div class="hscroll">${PICKS.map(pcard).join('')}</div>
@@ -377,12 +377,12 @@ function plaza(s) {
   return `<div class="screen">${statusBar()}${top}<div class="scroll"><div class="pad">${body}<div class="nav-space"></div></div></div>${nav('plaza')}</div>`;
 }
 function list(s) {
-  const map = {games:['精选游戏', GAMES], tools:['工具与测评', TOOLS], picks:['创作者精选', PICKS]};
+  const map = {games:['精选游戏', GAMES], tools:['精选工具', TOOLS], picks:['创作者精选', PICKS]};
   const [title, items] = map[s.list];
-  const shown = items.filter(a => s.filter === '全部' || (s.list === 'tools' ? a.kind === s.filter : (s.filter === '横屏') === (a.o === 'L')));
-  const chipSet = s.list === 'tools' ? ['全部', '测评', '工具'] : ['全部', '竖屏', '横屏'];
-  const chips = `<div class="chips">${chipSet.map(f => `<button class="chip ${s.filter === f ? 'on' : ''}" data-a="filter:${f}">${f}</button>`).join('')}</div>`;
-  const content = s.list === 'tools' ? `<div class="card rows">${shown.map(trow).join('')}</div><div class="endnote">更多工具陆续上架，也可以让小伴给你做一个</div>`
+  const shown = items.filter(a => s.filter === '全部' || (s.filter === '横屏') === (a.o === 'L'));
+  const chipSet = ['全部', '竖屏', '横屏'];
+  const chips = s.list === 'tools' ? '' : `<div class="chips">${chipSet.map(f => `<button class="chip ${s.filter === f ? 'on' : ''}" data-a="filter:${f}">${f}</button>`).join('')}</div>`;
+  const content = s.list === 'tools' ? `<div class="tgrid" style="row-gap:16px">${shown.map(ttile).join('')}</div>`
     : s.list === 'picks' ? waterfall(shown)
     : `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px">${shown.map(a => gcard(a).replace('class="gcard"', 'class="gcard" style="width:auto"')).join('')}</div>`;
   return `<div class="screen">${statusBar()}<div class="bar"><button class="ic" data-a="back" aria-label="返回">${icon('left')}</button><h1>${title}</h1><span class="ic"></span></div>

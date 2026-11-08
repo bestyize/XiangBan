@@ -25,7 +25,7 @@ object MobileGameFormat {
     const val FILE_BYTES = 1024 * 1024
     const val TOTAL_BYTES = 4 * 1024 * 1024
     const val GAMES = 40
-    private val builtin = setOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku")
+    private val builtin = setOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti")
     private val extensions = setOf("html", "js", "css", "json", "svg", "md", "txt")
 
     fun id(id: String) {

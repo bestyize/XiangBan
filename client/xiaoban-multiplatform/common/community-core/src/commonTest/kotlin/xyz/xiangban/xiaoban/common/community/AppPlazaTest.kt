@@ -33,6 +33,16 @@ class AppPlazaTest {
         assertEquals(listOf(listOf(0, 2), listOf(1, 3)), appWaterfallColumns((0..3).toList()) { Float.NaN })
     }
 
+    @Test fun `builtin tools are kept apart from games and carry their own mark`() {
+        assertTrue(BuiltinMobileGames.isTool("mbti"))
+        assertFalse(BuiltinMobileGames.isTool("ink-blade"))
+        assertEquals("格", BuiltinMobileGames.glyph("mbti"))
+        assertNull(BuiltinMobileGames.glyph("ink-blade"))
+        assertEquals("测评", BuiltinMobileGames.genre("mbti"))
+        assertTrue("mbti" in BuiltinMobileGames.ids)
+        assertTrue(AppShortcut("builtin", "mbti", "MBTI 性格测评").valid)
+    }
+
     @Test fun `orientation reads only the currently published version and remix preserves source`() {
         val pack = Pack(1, "game", title = "原作", version = 2, versions = listOf(PackVersion(1,
             manifest = Json.parseToJsonElement("""{"orientation":"landscape"}""").jsonObject)))

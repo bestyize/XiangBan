@@ -43,6 +43,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.svg.SvgDecoder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.MobileGame
 
@@ -75,6 +76,8 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     var panel by remember { mutableStateOf("actions") }
     var creating by remember { mutableStateOf(false) }
     var remixSource by remember { mutableStateOf<MobileGame?>(null) }
+    var allGames by rememberSaveable { mutableStateOf(false) }
+    var allTools by rememberSaveable { mutableStateOf(false) }
     var createKind by rememberSaveable { mutableStateOf("游戏") }
     var idea by rememberSaveable { mutableStateOf("") }
     var remotePrompt by remember { mutableStateOf<String?>(null) }
@@ -89,10 +92,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
     val covers = remember { mutableStateMapOf<String, ByteArray>() }
     val overlay = detail != null || creating || remotePrompt != null || remixSource != null
-    LaunchedEffect(overlay) { onOverlayChanged(overlay) }
+    LaunchedEffect(overlay, allGames, allTools) { onOverlayChanged(overlay || allGames || allTools) }
     DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
     fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; remixSource = null; panel = "actions" } }
-    BackHandler(enabled = overlay) { if (!busy && detail != null && panel != "actions") panel = "actions" else close() }
+    BackHandler(enabled = overlay || allGames || allTools) {
+        if (!overlay) { allGames = false; allTools = false }
+        else if (!busy && detail != null && panel != "actions") panel = "actions" else close()
+    }
     fun createLocal(prompt: String) {
         if (!session.loggedIn) { open(Route.Login); return }
         if (env.agent == null) { message = "当前安装包不支持手机本地创作，可连接电脑创作。"; return }
@@ -176,7 +182,8 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
             }
             if (!mine) AppPlazaScreen(env, official, games, covers, imageLoader, loading, errors, { reload++ },
-                onOfficial = { game -> detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions" }, open = open)
+                onOfficial = { game -> detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions" },
+                onAllGames = { allGames = true }, onAllTools = { allTools = true }, open = open)
             else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
                     Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { prepare() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -211,6 +218,12 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     }
                 }
             }
+        }
+        if (allTools && !mine) FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { allTools = false }) { tool ->
+            detail = CreationItem(tool.id, tool.name, tool.description, "游戏", tool); panel = "actions"
+        }
+        if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false }) { game ->
+            detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions"
         }
         detail?.let { entry ->
             if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, covers[entry.key], imageLoader,

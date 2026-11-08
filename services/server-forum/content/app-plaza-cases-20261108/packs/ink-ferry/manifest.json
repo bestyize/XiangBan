@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "ink-ferry",
+  "name": "墨渡",
+  "version": "1.0.0",
+  "description": "按住蓄力，松手渡过水墨江面，向下一片落脚处前行。",
+  "author": "一瞬流光",
+  "license": "MIT",
+  "save": true,
+  "orientation": "portrait",
+  "layer": "space"
+}

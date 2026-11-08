@@ -4,8 +4,17 @@ import kotlinx.serialization.json.*
 
 /** Bundled games are read-only assets, never user workspace entries. */
 object BuiltinMobileGames {
-    val ids = listOf("dusk-glider", "ink-blade", "jade-gomoku", "pro-cube", "snake-arena", "block-puzzle", "merge-2048", "water-sort", "falling-blocks")
+    val ids = listOf("dusk-glider", "ink-blade", "jade-gomoku", "pro-cube", "snake-arena", "block-puzzle", "merge-2048", "water-sort", "falling-blocks", "mbti")
+    /** Builtins shown under 精选工具 instead of 精选游戏. */
+    val tools = setOf("mbti")
+    fun isTool(id: String): Boolean = id in tools
+    /** Tools draw a one-character serif mark instead of a cropped cover. */
+    fun glyph(id: String): String? = when (id) {
+        "mbti" -> "格"
+        else -> null
+    }
     fun genre(id: String): String = when (id) {
+        "mbti" -> "测评"
         "water-sort", "snake-arena" -> "解压"
         "dusk-glider", "ink-blade" -> "冒险"
         else -> "益智"
