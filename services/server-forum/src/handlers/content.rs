@@ -1200,6 +1200,8 @@ pub struct AdminCreatePackInput {
     mirrors: Vec<Value>,
     /// 0 官方（默认）或 1 已审核的第三方作品。
     trust_level: Option<i16>,
+    /// 以某个已有用户的名义登记（社区作品的署名作者）；不传则没有作者，按官方作品展示。
+    author_uid: Option<Uuid>,
 }
 
 /// 官方直接登记内容包：文件已由运维放进资源机，这里只录入元数据，不经过上传凭证。
@@ -1237,15 +1239,25 @@ async fn admin_create_pack(
     let info = content::validate_manifest(&input.manifest, &input.kind).map_err(AppError::BadRequest)?;
 
     let mut tx = state.pool.begin().await?;
+    if let Some(author) = input.author_uid {
+        let usable: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE uid = $1 AND status <> 'banned')")
+            .bind(author)
+            .fetch_one(&mut *tx)
+            .await?;
+        if !usable {
+            return Err(AppError::BadRequest("作者账号不存在或已被封禁".into()));
+        }
+    }
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO packs (kind, slug, title, summary, tags, trust_level, status, cover_key)
-         VALUES ($1, $2, $3, $4, $5, $6, 'published', $7) RETURNING id",
+        "INSERT INTO packs (kind, slug, title, summary, tags, author_uid, trust_level, status, cover_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', $8) RETURNING id",
     )
     .bind(&input.kind)
     .bind(&info.slug)
     .bind(&title)
     .bind(&summary)
     .bind(&tags)
+    .bind(input.author_uid)
     .bind(trust)
     .bind(&input.cover_key)
     .fetch_one(&mut *tx)

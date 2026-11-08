@@ -928,3 +928,88 @@ async fn app_plaza_featured_marker_filter_and_admin_switch() -> Result<(), Box<d
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn admin_registered_pack_can_carry_an_author() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("skipped: TEST_DATABASE_URL is not set");
+        return Ok(());
+    };
+    let schema = format!("content_test_{}", Uuid::new_v4().simple());
+    let admin_pool = crate::db::connect(&url, None).await?;
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin_pool).await?;
+    let pool = crate::db::connect(&url, Some(&schema)).await?;
+    crate::db::migrate(&pool).await?;
+    crate::db::seed(&pool).await?;
+
+    let mut config = AppConfig::from_env();
+    config.resource_base_url = Some("https://res.test".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    config.admin_user = Some("root".into());
+    config.admin_password = Some("correct-horse-battery".into());
+    crate::handlers::admin::seed_admin(&pool, &config).await?;
+
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let verifier = JwksVerifier::with_static_key("iss".into(), "aud".into(), DecodingKey::from_ed_components(&x).unwrap());
+    let state = AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() };
+    let app = crate::build_router(state);
+
+    let (s, login) = call(&app, "POST", "/api/admin/login", None, json!({"username":"root","password":"correct-horse-battery"})).await;
+    assert_eq!(s, StatusCode::OK, "{login}");
+    let admin_t = login["token"].as_str().unwrap().to_string();
+
+    let (author, banned) = (Uuid::new_v4(), Uuid::new_v4());
+    sqlx::query("INSERT INTO users (uid, nickname) VALUES ($1, '一瞬流光')").bind(author).execute(&pool).await?;
+    sqlx::query("INSERT INTO users (uid, nickname, status) VALUES ($1, '封禁用户', 'banned')").bind(banned).execute(&pool).await?;
+
+    let body = |slug: &str, author_uid: Option<Uuid>| {
+        let mut body = json!({
+            "kind": "game", "title": "测试作品", "summary": "一个测试作品。",
+            "manifest": {"schemaVersion": 1, "kind": "game", "id": slug, "name": "测试作品", "version": "1.0.0"},
+            "file_key": format!("packs/game/{slug}-1.0.0.zip"),
+            "sha256": "a".repeat(64), "size": 4096,
+            "cover_key": format!("covers/{slug}-1.0.0.png"),
+        });
+        if let Some(uid) = author_uid {
+            body["author_uid"] = json!(uid);
+        }
+        body
+    };
+
+    // 只有管理员能登记。
+    let (s, _) = call(&app, "POST", "/api/admin/packs", None, body("anon-try", None)).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    // 不带作者：按官方作品登记，没有作者。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("official-one", None)).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{}", r["id"].as_i64().unwrap()), None).await;
+    assert_eq!(d["author"], Value::Null);
+    assert_eq!(d["trust_level"], 0);
+
+    // 带作者：详情里署名为该用户，并能按作者筛选。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("by-author", Some(author))).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let id = r["id"].as_i64().unwrap();
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{id}"), None).await;
+    assert_eq!(d["author"]["nickname"], "一瞬流光");
+    assert_eq!(d["author"]["uid"], author.to_string());
+    let (_, list) = call_with_runtime(&app, &format!("/api/packs?author={author}"), None).await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["id"], id);
+
+    // 作者不存在或已被封禁：拒绝，并且不留下半截数据。
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("ghost-author", Some(Uuid::new_v4()))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{r}");
+    let (s, r) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), body("banned-author", Some(banned))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{r}");
+    let (left,): (i64,) = sqlx::query_as("SELECT count(*) FROM packs WHERE slug IN ('ghost-author', 'banned-author', 'anon-try')").fetch_one(&pool).await?;
+    assert_eq!(left, 0);
+
+    drop(app);
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
+    Ok(())
+}
