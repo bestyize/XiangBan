@@ -170,10 +170,14 @@ pub fn resolve_app_file(root: &Path, segments: &[String]) -> Option<(PathBuf, &'
     // Check 2: Built-in packs in public/game-packs/<id>
     let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_else(|| PathBuf::from("."));
     let builtin_dirs = [
+        PathBuf::from("../public/game-packs").join(app_id),
         PathBuf::from("public/game-packs").join(app_id),
         PathBuf::from("client/xiaoban-desktop/public/game-packs").join(app_id),
-        exe_dir.join("public/game-packs").join(app_id),
+        exe_dir.join("../../../public/game-packs").join(app_id),
+        exe_dir.join("../../public/game-packs").join(app_id),
         exe_dir.join("../public/game-packs").join(app_id),
+        exe_dir.join("public/game-packs").join(app_id),
+        exe_dir.join("../Resources/public/game-packs").join(app_id),
     ];
     for b_dir in builtin_dirs {
         let mut b_candidate = b_dir.clone();
@@ -302,5 +306,16 @@ mod tests {
         assert_eq!(mime_for("mjs"), Some("text/javascript; charset=utf-8"));
         assert_eq!(mime_for("wasm"), Some("application/wasm"));
         assert_eq!(mime_for("exe"), None);
+    }
+
+    #[test]
+    fn test_resolve_builtin_mbti() {
+        let root = PathBuf::from("temp-fake-root");
+        let segments = vec!["mbti".to_string(), "index.html".to_string()];
+        let resolved = resolve_app_file(&root, &segments);
+        assert!(resolved.is_some(), "mbti index.html must be resolvable");
+        let (path, mime) = resolved.unwrap();
+        assert_eq!(mime, "text/html; charset=utf-8");
+        assert!(path.ends_with("index.html"));
     }
 }
