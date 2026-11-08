@@ -100,7 +100,7 @@ it('launches protocol 2 apps via store.openApp (V2 container) without affecting 
   }
 });
 
-it('launches legacy protocol 1 games via store.openGames', async () => {
+it('launches apps in App Plaza via store.openApp (V2 container)', async () => {
   const { wrapper, openApp, openGames } = setupApps();
   try {
     await flushPromises();
@@ -110,8 +110,12 @@ it('launches legacy protocol 1 games via store.openGames', async () => {
     await gameCard.trigger('click');
     await flushPromises();
 
-    expect(openGames).toHaveBeenCalledWith('merge-2048');
-    expect(openApp).not.toHaveBeenCalled();
+    expect(openApp).toHaveBeenCalledWith('merge-2048', {
+      title: '2048',
+      orientation: 'portrait',
+      entry: 'index.html',
+    });
+    expect(openGames).not.toHaveBeenCalled();
   } finally {
     wrapper.unmount();
   }

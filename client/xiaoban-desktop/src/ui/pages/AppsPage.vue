@@ -120,18 +120,18 @@ async function launchApp(app: GameManifest) {
   if (!props.store.desktop || opening.value) return;
   opening.value = true;
   try {
-    // V2 Container routing: MBTI or any protocol 2 app launches in dedicated V2 window
-    if (app.id === 'mbti' || (app.runtimeProtocol && app.runtimeProtocol >= 2)) {
-      await props.store.openApp(app.id, {
-        title: app.name,
-        orientation: app.orientation === 'portrait' ? 'portrait' : 'landscape',
-        entry: app.entry ?? 'index.html',
-      });
+    // In legacy Games mode, continue to support openGames for existing tests/workspaces
+    if (isGamesMode.value && app.id !== 'mbti') {
+      await props.store.openGames(app.id);
       return;
     }
 
-    // Legacy Protocol 1 fallback
-    await props.store.openGames(app.id);
+    // In modern Apps Plaza mode, all apps launch directly in V2 independent window container!
+    await props.store.openApp(app.id, {
+      title: app.name,
+      orientation: app.orientation === 'portrait' ? 'portrait' : 'landscape',
+      entry: app.entry ?? 'index.html',
+    });
   } catch (error) {
     props.store.notify(message(error, "应用暂时无法打开。"), "error");
   } finally {
