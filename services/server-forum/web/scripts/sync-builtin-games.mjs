@@ -5,7 +5,7 @@ import path from 'node:path'
 const root = fileURLToPath(new URL('../../../../', import.meta.url))
 const source = path.join(root, 'client/xiaoban-desktop/public/game-packs')
 const destination = fileURLToPath(new URL('../public/builtin-games', import.meta.url))
-const ids = ['dusk-glider','ink-blade','jade-gomoku','pro-cube','snake-arena','block-puzzle','merge-2048','water-sort','falling-blocks']
+const ids = ['dusk-glider','ink-blade','jade-gomoku','pro-cube','snake-arena','block-puzzle','merge-2048','water-sort','falling-blocks','mbti']
 await rm(destination, {recursive:true, force:true}); await mkdir(destination, {recursive:true})
 for (const id of ids) {
   const src = path.join(source,id), dest = path.join(destination,id)

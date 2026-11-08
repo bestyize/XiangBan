@@ -13,7 +13,7 @@ test('built-in games match mobile order and copied official manifests', async ()
   for (const game of BUILTIN_GAMES) {
     const dir = new URL(`${game.id}/`,publicDir)
     const manifest = JSON.parse(await readFile(new URL('manifest.json',dir),'utf8'))
-    assert.equal(manifest.id,game.id); assert.equal(manifest.name,game.name); assert.equal(manifest.runtimeProtocol,1); assert.equal(manifest.entry,'index.html')
+    assert.equal(manifest.id,game.id); assert.equal(manifest.name,game.name); assert.ok(manifest.runtimeProtocol === 1 || manifest.runtimeProtocol === 2); assert.equal(manifest.entry,'index.html')
     assert.equal(game.cover,`/builtin-games/${game.id}/cover.svg`); await access(fileURLToPath(new URL('cover.svg',dir)))
     const html = await readFile(new URL('index.html',dir),'utf8')
     assert.match(html,/Content-Security-Policy/); assert.match(html,/connect-src 'none'/)

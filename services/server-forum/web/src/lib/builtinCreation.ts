@@ -9,6 +9,7 @@ export const BUILTIN_GAMES = [
   { id:'merge-2048', name:'2048', genre:'益智', description:'滑动合并相同数字，慢慢合出 2048。', orientation:'portrait' },
   { id:'water-sort', name:'奶茶大师', genre:'解压', description:'把同色饮料倒在一起，慢慢调制。', orientation:'portrait' },
   { id:'falling-blocks', name:'俄罗斯方块', genre:'益智', description:'移动和旋转方块，填满一行就能消除。', orientation:'portrait' },
+  { id:'mbti', name:'MBTI 性格测评', genre:'测评', description:'48 道原创情境题，观察日常偏好。', orientation:'portrait' },
 ].map(game => ({ ...game, cover:`/builtin-games/${game.id}/cover.svg` }))
 export type BuiltinGame = typeof BUILTIN_GAMES[number]
 export function builtinGame(id:string): BuiltinGame | undefined { return BUILTIN_GAMES.find(game => game.id === id) }

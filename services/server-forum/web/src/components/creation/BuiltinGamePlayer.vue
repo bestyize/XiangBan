@@ -42,7 +42,7 @@ async function restart() {
     const response = await fetch(`/builtin-games/${game.value.id}/manifest.json`, {credentials:'omit',signal:controller.signal})
     if (!response.ok) throw new Error('游戏资源不可用')
     const manifest = await response.json()
-    if (manifest.id !== game.value.id || manifest.entry !== 'index.html' || manifest.runtimeProtocol !== 1) throw new Error('游戏资源不完整')
+    if (manifest.id !== game.value.id || manifest.entry !== 'index.html' || (manifest.runtimeProtocol !== 1 && manifest.runtimeProtocol !== 2)) throw new Error('游戏资源不完整')
     if (current !== sequence) return
     nonce.value = crypto.randomUUID(); generation.value++; ready.value = true
     handshakeTimer = setTimeout(() => { if (current === sequence && !connected.value) error.value = '游戏未响应，请重试' }, 15000)
