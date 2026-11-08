@@ -357,8 +357,7 @@ function chat(s) {
     <div class="dock"><div>继续说…</div><div class="tb">${icon('plus')}${icon('chip')}${icon('lock')}<span style="flex:1"></span>${icon('mic')}${icon('wave')}<span class="send sm">${icon('up')}</span></div></div></div>`;
 }
 function gcard(a) {
-  const badge = a.src === 'official' ? '<span class="offi">官方</span>' : '';
-  return `<button class="gcard" data-a="open:${a.id}"><div class="cv">${cover(a)}${badge}</div><b>${a.name}</b><small>${a.src === 'official' ? a.line : a.author}</small></button>`;
+  return `<button class="gcard" data-a="open:${a.id}"><div class="cv">${cover(a)}</div><b>${a.name}</b><small>${a.src === 'official' ? '官方' : a.author} · ${oriText(a)}</small></button>`;
 }
 function ttile(a) {
   return `<button class="tile ttile" data-a="open:${a.id}">${ico(a)}<span>${a.name.replace(' 性格测评', '')}</span></button>`;
@@ -367,7 +366,7 @@ function trow(a) {
   return `<div class="trow" data-a="open:${a.id}" role="button">${ico(a, 'sm')}<span style="min-width:0;flex:1"><b>${a.name}</b><small>${a.line}</small></span><button class="pill" data-a="launch:${a.id}">打开</button></div>`;
 }
 function pcard(a) {
-  return `<button class="card pcard" data-a="open:${a.id}"><div class="cv">${cover(a)}</div><div class="who">${ava(a.author)}${a.author}</div><b>${a.name}</b><p>${a.note}</p></button>`;
+  return `<button class="card pcard" data-a="open:${a.id}"><div class="cv">${cover(a)}</div><b>${a.name}</b><div class="who">${ava(a.author)}<span>${a.author}</span></div></button>`;
 }
 function wcard(a) {
   const liked = likes.has(a.id);
@@ -430,7 +429,7 @@ function post(s) {
     <div class="scroll">${gallery}
       <div class="post-body"><h2>${a.name}</h2>${a.remixOf ? `<button class="from" data-a="post:${a.remixOf}">改编自 @${A[a.remixOf].author}《${short(A[a.remixOf])}》${icon('right')}</button>` : ''}<p>${a.desc}</p><div class="tags">${a.tags}</div>
         <div class="when">${a.time}<span>·</span>${a.kind} · ${oriText(a)}<span>·</span>${a.plays} 人玩过</div>
-        <button class="big" style="margin-top:16px" data-a="launch:${a.id}">${icon(a.o === 'L' ? 'landscape' : 'play')}${a.o === 'L' ? '横屏进入' : '进入'}</button>
+        <button class="big enter" style="margin-top:16px" data-a="launch:${a.id}">${icon(a.o === 'L' ? 'landscape' : 'play')}${a.o === 'L' ? '横屏进入' : '进入'}</button>
         ${mine ? `<button class="big grey" data-a="toast" data-msg="打开创作对话，让小伴接着改">${icon('pen')}继续修改</button>` : canRemix(a) ? `<button class="big grey" data-a="remix:${a.id}">${icon('pen')}做一个我的版本</button>` : ''}
         ${a.pick && a.note ? `<div class="editor"><b>小伴选</b>${a.note}</div>` : ''}
         ${a.remixes ? `<div class="card remix-row" data-a="remixes:${a.id}" role="button"><span class="stackav">${a.remixes.map(i => ava(A[i].author, 'md')).join('')}</span><span><b>${a.remixes.length} 个改编版本</b><small>大家在这个作品上做的新玩法</small></span>${icon('right')}</div>` : ''}

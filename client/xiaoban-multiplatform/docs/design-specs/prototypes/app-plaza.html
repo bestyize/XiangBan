@@ -63,6 +63,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .chip.on{background:var(--soft);color:var(--brand-ink)}
 .big{height:48px;border-radius:24px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px;font-weight:600;background:var(--soft);color:var(--brand-ink)}
 .big svg{width:18px;height:18px}
+.big.enter{background:var(--surface);color:var(--ink);border:1px solid color-mix(in srgb,var(--ink) 24%,var(--surface))}
+.big.enter:focus-visible{outline-color:var(--ink)}
 
 /* bottom nav · Kit.kt FloatingNav */
 .nav{position:absolute;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:.5px solid var(--line);padding-bottom:22px;display:flex;height:78px}
@@ -172,9 +174,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .hscroll{display:flex;gap:12px;overflow:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}
 .hscroll::-webkit-scrollbar{display:none}
 .gcard{width:112px;flex-shrink:0;text-align:left}
-.gcard .cv{aspect-ratio:3/4;border-radius:12px;overflow:hidden;position:relative;background:var(--fill)}
-.gcard .cv img{width:100%;height:100%;object-fit:cover}
-.offi{position:absolute;right:6px;bottom:6px;font-size:10px;line-height:14px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.92);color:#222;font-weight:600}
+.gcard .cv{aspect-ratio:1;border-radius:12px;overflow:hidden;position:relative;background:var(--fill)}
+.gcard .cv img{width:100%;height:100%;object-fit:contain}
 .tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .ttile{padding:2px 0}
 .ttile span{font-size:12px;line-height:16px;color:var(--ink)}
@@ -184,11 +185,12 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .trow{display:flex;align-items:center;gap:12px;padding:12px 14px;width:100%;text-align:left}
 .trow+.trow{border-top:.5px solid var(--line)}
 .trow b{font-size:15px;line-height:22px;font-weight:600;display:block}.trow small{display:block;font-size:12px;line-height:16px;color:var(--ink3)}
-.pcard{width:250px;flex-shrink:0;text-align:left;overflow:hidden}
+.pcard{width:184px;flex-shrink:0;text-align:left;overflow:hidden}
 .pcard .cv{aspect-ratio:16/9;position:relative;overflow:hidden}
-.pcard .who{display:flex;align-items:center;gap:6px;padding:12px 12px 0;font-size:12px;color:var(--ink3)}
-.pcard b{display:block;font-size:15px;line-height:22px;font-weight:600;padding:4px 12px 0}
-.pcard p{margin:2px 12px 12px;font-size:13px;line-height:18px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcard b{display:block;font-size:13px;line-height:18px;font-weight:600;padding:8px 10px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .who{display:flex;align-items:center;gap:5px;padding:4px 10px 9px;font-size:12px;line-height:16px;color:var(--ink3)}
+.pcard .who .ava{width:16px;height:16px;font-size:9px}
+.pcard .who span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ava{width:18px;height:18px;border-radius:50%;flex:none;overflow:hidden;display:grid;place-items:center;color:#fff;font-size:10px;font-weight:600}
 .ava.md{width:28px;height:28px;font-size:12px}
 .ava.lg{width:32px;height:32px;font-size:13px}
@@ -226,8 +228,9 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 /* 社区作品详情 = 帖子页 */
 .post-bar{height:52px;display:flex;align-items:center;padding:0 8px 0 4px;gap:8px;flex-shrink:0}
 .post-bar .who{display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:15px;font-weight:600}
-.follow{height:32px;padding:0 14px;border-radius:16px;background:var(--soft);color:var(--brand-ink);font-size:13px;font-weight:600}
-.follow.done{background:var(--fill);color:var(--sub)}
+.follow{height:32px;padding:0 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);color:var(--ink2);font-size:13px;font-weight:400}
+.follow.done{background:var(--fill);color:var(--sub);border-color:transparent}
+.follow:focus-visible{outline-color:var(--ink)}
 .gallery{display:flex;overflow:auto;scroll-snap-type:x mandatory;scrollbar-width:none;gap:8px;padding:0 16px}
 .gallery::-webkit-scrollbar{display:none}
 .gallery>div{scroll-snap-align:center;flex-shrink:0;border-radius:12px;overflow:hidden;position:relative;background:var(--fill)}
@@ -257,6 +260,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .cmt .lk{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--ink3)}
 .cmt .lk svg{width:16px;height:16px}
 .post-page{background:var(--surface)}
+.post-page .big{font-weight:400}
+.post-page .big:focus-visible{outline-color:var(--ink)}
 .post-dock{position:absolute;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:.5px solid var(--line);padding:8px 12px 30px;display:flex;align-items:center;gap:12px}
 .post-dock .say{flex:1;min-width:0;height:36px;border-radius:18px;background:var(--fill);color:var(--ink3);font-size:13px;display:flex;align-items:center;padding:0 12px;white-space:nowrap}
 .post-dock .act{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--ink2)}
