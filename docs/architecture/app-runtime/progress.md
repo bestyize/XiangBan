@@ -205,3 +205,7 @@
   - **后端代码净化**：`game_packs.rs` 移除 `HOST_SCRIPT`、`AUTO_READY` 与 HTML 正则注入逻辑；`games.rs` 放宽协议 2 清单校验；
   - **门禁与测试转正**：`check-game-assets.mjs` 反向门禁严禁 `desktop-host.js` 并强化协议 2 规范校验通过；`pack-boundary.test.ts` 13 项测试通过；前端 44 项测试与 Rust 15 项测试全部通过；
   - **真机实测**：通过 CDP 与原生窗口截图实测，包括《俄罗斯方块》《2048》《MBTI 性格测评》在内的内置作品已全量通过 V2 独立原生窗口启动并渲染正常，三端实现完全同包共享。
+- 2026-11-08：论坛网页端（`server-forum/web`）生产部署完成（香港机 `43.155.99.113`）。
+  - **部署产物**：本地构建 `dist` 打包上传并解压至 `/home/ubuntu/xiangban-forum/releases/web-b4438ca5`，原子切换软链接至 `web/dist`，更新 `DEPLOYED_WEB_COMMIT` 为 `b4438ca5`；
+  - **服务平滑重启**：重启 `server-forum.service`，进程状态 active，日志无报错；
+  - **线上核验**：`https://chat.xiangban.xyz/` 成功加载最新生产主包（`assets/index-B_5bctWo.js`），线上确认已包含协议 2（V2）试玩容器、通信 bridge 与 IndexedDB 存储支持；HTTP 200 正常响应。
