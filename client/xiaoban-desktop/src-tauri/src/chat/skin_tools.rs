@@ -47,7 +47,7 @@ impl Tool for SkinTool {
 }
 
 pub(super) fn tools(desktop: Arc<dyn Desktop>, workspace: &Path) -> Vec<Arc<dyn Tool>> {
-    let empty = || json!({"type":"object","properties":{},"additionalProperties":false});
+    let empty = || json!({"type":"object","properties":{}});
     let specs = vec![
         ToolSpec::new("skin_list", "列出小伴界面皮肤（内置与已安装）及当前 activeId。换肤前先查名称和精确 id；这是应用背景场景，与桌面壁纸、桌宠外壳、主题色分别管理。", empty()).risk(Risk::Read).parallel(),
         ToolSpec::new("skin_read_format", "读取程序内置的完整应用皮肤格式、可用示例、限制与创作流程。创作皮肤 ZIP 前必读；无需用户提供模板，不要搜索源码文档。theme.json 配色暂不生效，不能承诺改按钮或文字颜色。", empty()).risk(Risk::Read).parallel(),

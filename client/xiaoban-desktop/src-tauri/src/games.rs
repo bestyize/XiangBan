@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{fs, io::Write, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-pub const IDS: [&str; 9] = ["falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku"];
+pub const IDS: [&str; 10] = ["falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
 #[derive(Default)]
 pub struct GameState {
     pub active: AtomicBool,
@@ -34,6 +34,7 @@ pub fn builtin_catalog() -> Result<Vec<Value>, String> {
         include_str!("../../public/game-packs/dusk-glider/manifest.json"),
         include_str!("../../public/game-packs/pro-cube/manifest.json"),
         include_str!("../../public/game-packs/jade-gomoku/manifest.json"),
+        include_str!("../../public/game-packs/mbti/manifest.json"),
     ];
     manifests.iter().zip(IDS).map(|(text, id)| {
         let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
@@ -316,7 +317,7 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 }
 #[cfg(test)] mod tests {
     use super::*;
-    #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),9); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),1); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
+    #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),10); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),2); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
     #[test] fn the_game_window_doubles_landscape_dimensions_and_preserves_pack_shape() {
         let (landscape_w, landscape_h) = game_window_size(1440.0, 900.0, true);
         let (portrait_w, portrait_h) = game_window_size(1440.0, 900.0, false);
@@ -338,16 +339,17 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
         let root=temp_root("merge"); user_game(&root,"my-game",false);
         fs::create_dir_all(crate::game_packs::packs_dir(&root).join("broken")).unwrap();
         let merged=catalog_in(Some(&root)).unwrap();
-        assert_eq!(merged.games.len(),10); assert_eq!(merged.ids()[..9],IDS); assert_eq!(merged.ids()[9],"my-game");
-        assert_eq!(merged.games[9]["source"],"user"); assert!(merged.games[9]["base"].as_str().unwrap().contains("game-pack")); assert!(merged.games[9]["base"].as_str().unwrap().ends_with("/my-game/"));
+        assert_eq!(merged.games.len(),11); assert_eq!(merged.ids()[..10],IDS); assert_eq!(merged.ids()[10],"my-game");
+        assert_eq!(merged.games[10]["source"],"user"); assert!(merged.games[10]["base"].as_str().unwrap().contains("game-pack")); assert!(merged.games[10]["base"].as_str().unwrap().ends_with("/my-game/"));
         assert_eq!(merged.errors.len(),1); assert!(merged.errors[0].contains("broken"));
-        assert_eq!(catalog_in(None).unwrap().games.len(),9);
+        assert_eq!(catalog_in(None).unwrap().games.len(),10);
         let _=fs::remove_dir_all(root);
     }
     #[test] fn save_files_follow_the_manifest_flag() {
         let root=temp_root("saves"); user_game(&root,"saves-yes",true); user_game(&root,"saves-no",false);
         let saves=root.join("games/saves");
         assert_eq!(save_file_in(&root,"ink-blade").unwrap(),saves.join("ink-blade.json"));
+        assert_eq!(save_file_in(&root,"mbti").unwrap(),saves.join("mbti.json"));
         for id in ["falling-blocks","snake-arena","dusk-glider"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }
         assert_eq!(save_file_in(&root,"saves-yes").unwrap(),saves.join("user-saves-yes.json"));
         assert!(save_file_in(&root,"saves-no").is_err()); assert!(save_file_in(&root,"missing-game").is_err());

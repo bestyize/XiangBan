@@ -158,14 +158,25 @@ pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, Accoun
             changed = Some(config.view(&ai_config::default_workspace(&app)?));
         }
     } else if is_active(&config) {
-        let levels = tiers.iter().find(|t| t.tier == config.gateway_tier).map(|t| t.reasoning_efforts.clone()).unwrap_or_default();
-        if config.gateway_reasoning_efforts != levels {
-            config.gateway_reasoning_efforts = levels;
-            if config.gateway_reply_preference.effort().is_some_and(|e| !config.gateway_reasoning_efforts.iter().any(|s| s == e)) {
+        let current_tier = tiers.iter().find(|t| t.tier == config.gateway_tier && t.available);
+        if current_tier.is_none() {
+            if let Some(tier) = tiers.iter().find(|tier| tier.is_default && tier.available) {
+                select(&mut config, &tier.tier, &format!("{}/v1", ai_base_url()));
+                config.gateway_reasoning_efforts = tier.reasoning_efforts.clone();
                 config.gateway_reply_preference = Default::default();
+                ai_config::save(&path, &config).map_err(|e| e.to_string())?;
+                changed = Some(config.view(&ai_config::default_workspace(&app)?));
             }
-            ai_config::save(&path, &config).map_err(|e| e.to_string())?;
-            changed = Some(config.view(&ai_config::default_workspace(&app)?));
+        } else {
+            let levels = current_tier.map(|t| t.reasoning_efforts.clone()).unwrap_or_default();
+            if config.gateway_reasoning_efforts != levels {
+                config.gateway_reasoning_efforts = levels;
+                if config.gateway_reply_preference.effort().is_some_and(|e| !config.gateway_reasoning_efforts.iter().any(|s| s == e)) {
+                    config.gateway_reply_preference = Default::default();
+                }
+                ai_config::save(&path, &config).map_err(|e| e.to_string())?;
+                changed = Some(config.view(&ai_config::default_workspace(&app)?));
+            }
         }
     }
     drop(io);

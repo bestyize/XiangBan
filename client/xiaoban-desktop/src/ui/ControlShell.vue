@@ -426,9 +426,14 @@ async function shareAppearance() {
 /** Once, after the floating assistant first exists, say how to call it: most people never open its settings. */
 async function introduceAssistant() {
   try {
-    const assistant = await invoke<{ enabled: boolean; hintSeen: boolean; shortcutLabel: string; ball: boolean }>('assistant_status');
+    const assistant = await invoke<{ enabled: boolean; hintSeen: boolean; shortcutLabel: string; ball: boolean; registered?: boolean; error?: string }>('assistant_status');
     if (assistant?.shortcutLabel) assistantShortcut.value = assistant.shortcutLabel;
-    if (!assistant || assistant.hintSeen || !assistant.enabled) return;
+    if (!assistant || !assistant.enabled) return;
+    if (assistant.registered === false && assistant.error) {
+      store.notify(`超级小伴快捷键未生效：${assistant.error}。可在设置中更换。`, 'error');
+      return;
+    }
+    if (assistant.hintSeen) return;
     store.notify(`新功能：按 ${assistant.shortcutLabel} 随时呼出超级小伴${assistant.ball ? '，也可以点屏幕边缘的小球' : ''}`, 'info');
     await invoke('assistant_configure', { patch: { hintSeen: true } });
   } catch { /* the hint is a courtesy; it can wait for the next start */ }
