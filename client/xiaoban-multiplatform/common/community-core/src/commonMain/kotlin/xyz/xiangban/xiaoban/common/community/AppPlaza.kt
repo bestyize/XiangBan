@@ -23,6 +23,18 @@ data class AppShortcut(
     }
 }
 
+/** The last public featured catalog, kept briefly to cover a slow refresh. */
+@Serializable
+data class FeaturedToolsCache(val fetchedAtMs: Long, val shortcuts: List<AppShortcut>) {
+    companion object {
+        private const val MaxAgeMs = 24 * 60 * 60 * 1000L
+
+        fun restore(raw: String?, nowMs: Long): List<AppShortcut> =
+            raw?.let { runCatching { CommunityJson.decodeFromString<FeaturedToolsCache>(it) }.getOrNull() }
+                ?.takeIf { nowMs - it.fetchedAtMs in 0..MaxAgeMs }?.shortcuts.orEmpty()
+    }
+}
+
 object AppFavorites {
     private val json = Json { ignoreUnknownKeys = true }
     fun decode(raw: String?): List<AppShortcut> = runCatching {

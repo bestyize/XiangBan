@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,10 +35,14 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import xyz.xiangban.xiaoban.common.community.ChatHistory
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 
@@ -46,6 +52,27 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
  */
 /** 页面进入、返回的转场时长。 */
 private const val PageMillis = 260
+private const val TabMillis = 180
+
+/** Keep visited pages in composition and leave hidden pages out of layout and hit testing. */
+@Composable
+internal fun RetainedTabPage(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    visible: () -> Boolean = { selected },
+    content: @Composable () -> Unit,
+) {
+    var visited by remember { mutableStateOf(false) }
+    if (!selected && !visited) return
+    if (!visited) SideEffect { visited = true }
+
+    Box(modifier.fillMaxSize().layout { measurable, constraints ->
+        val page = if (visible()) measurable.measure(constraints) else null
+        layout(constraints.maxWidth, constraints.maxHeight) { page?.placeRelative(0, 0) }
+    }) {
+        content()
+    }
+}
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -62,6 +89,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
+        var showMyWorks by rememberSaveable { mutableStateOf(false) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
         var appDrawerOpen by remember { mutableStateOf(false) }
         // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
@@ -82,21 +110,39 @@ fun CommunityNativeApp(env: CommunityEnv) {
             // 返回时再原样推回来，滚动位置和已加载的数据都在。
             val tabShift by animateFloatAsState(if (stack.any { it != Route.Login }) 1f else 0f, tween<Float>(PageMillis, easing = FastOutSlowInEasing), label = "一级页让位")
             Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }) {
-                AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
+                val selectedTab = Tab.valueOf(tab)
+                val gamesSelected = selectedTab == Tab.Games
+                val gamesAlpha = animateFloatAsState(if (gamesSelected) 1f else 0f, tween(TabMillis), label = "应用页淡入淡出")
+                RetainedTabPage(
+                    selected = gamesSelected,
+                    modifier = Modifier.zIndex(if (gamesSelected) 1f else 0f)
+                        .graphicsLayer { alpha = gamesAlpha.value }
+                        .semantics { if (!gamesSelected) hideFromAccessibility() },
+                    visible = { gamesSelected || gamesAlpha.value > 0f },
+                ) {
+                    GamesScreen(
+                        env, chat, ::push, mine = showMyWorks, onMineChanged = { showMyWorks = it }, active = gamesSelected,
+                        onOverlayChanged = { gameOverlayOpen = it },
+                        createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null },
+                    )
+                }
+                AnimatedContent(targetState = selectedTab, modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(TabMillis)) togetherWith fadeOut(tween(TabMillis)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
                         Tab.Ai -> AiHomeScreen(
                             env, chat, ::push, { aiDrawerOpen = true },
                             onCreateImage = { if (!chat.state.value.sending) chat.clearConversation(); pendingImageSheet = true; push(Route.AiChat) },
                             onCreateWork = { kind -> pendingCreation = kind; tab = Tab.Games.name },
-                            onGoPlaza = { tab = Tab.Games.name }, onAppDrawerChanged = { appDrawerOpen = it },
+                            onGoPlaza = { showMyWorks = false; tab = Tab.Games.name }, onAppDrawerChanged = { appDrawerOpen = it },
                         )
-                        Tab.Games -> GamesScreen(env, chat, ::push, onOverlayChanged = { gameOverlayOpen = it }, createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null })
+                        Tab.Games -> Spacer(Modifier.fillMaxSize()) // Keep the transition full size.
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
-                if ((!gameOverlayOpen || tab != Tab.Games.name) && (!appDrawerOpen || tab != Tab.Ai.name)) FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
-                AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
+                Box(Modifier.fillMaxSize().zIndex(2f)) {
+                    if ((!gameOverlayOpen || !gamesSelected) && (!appDrawerOpen || selectedTab != Tab.Ai)) FloatingNav(selectedTab, publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                    AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
+                }
             }
             val pages = stack.filter { it != Route.Login }
             AnimatedContent(

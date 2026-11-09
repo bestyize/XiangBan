@@ -41,6 +41,10 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1, tag: String? = null, following: Boolean = false, featured: Boolean = false): Page<Pack> =
         getPack("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it }, "featured" to featured.takeIf { it })}")
 
+    /** The public tool catalog can load while the account session is being restored. */
+    suspend fun featuredTools(): List<Pack> =
+        packHttp.send(HttpMethod.Get, "/api/packs?kind=app&page=1&featured=true", serializer<Page<Pack>>()).items
+
     suspend fun pack(id: Long, recordView: Boolean = false): Pack =
         getPack("/api/packs/$id${query("view" to recordView.takeIf { it })}")
     suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = getPack("/api/packs/$id/download?version=$version")

@@ -6,6 +6,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,7 @@ import xyz.xiangban.xiaoban.common.community.*
 @Composable
 internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local: List<MobileGame>, covers: Map<String, ByteArray>,
     imageLoader: ImageLoader, loading: Boolean, errors: List<String>, reload: () -> Unit,
+    featuredShortcuts: List<AppShortcut>, featuredTools: Load<Unit>, retryFeaturedTools: () -> Unit,
     onOfficial: (MobileGame) -> Unit, onOfficialDetails: (MobileGame) -> Unit,
     onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
     val games = official.filterNot { BuiltinMobileGames.isTool(it.id) }
@@ -54,9 +56,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
         )
     }
     val state by key(loader) { loader.state.collectAsState() }
-    val toolsLoader = rememberLoader(env, "app-plaza-tools-${session.accountId}") { env.forum.packs(kind = "app", featured = true) }
-    val toolsState by toolsLoader.state.collectAsState()
-    val featuredTools = (toolsState as? Load.Ready)?.value?.items.orEmpty()
+    val toolShortcuts = (tools.map { AppShortcut("builtin", it.id, it.name) } + featuredShortcuts).take(4)
     LaunchedEffect(loader, state) {
         (state as? Load.Ready)?.value?.let { result ->
             val items = if (featuredOnly) result.items.filter { it.featured && (it.kind == "game" || it.kind == "app") } else result.items
@@ -72,10 +72,13 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (recent.isNotEmpty()) {
                 item { LazyRow(Modifier.padding(top = 4.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(recent, key = { it.key }) { item -> AppShortcutTile(env, item, Modifier.width(64.dp)) {
-                        if (item.source == "community") open(Route.Pack(item.id.toLong()))
-                        else if (env.platform?.openGame(item.id) != true) message = "当前平台无法打开游戏"
-                    } }
+                    items(recent, key = { it.key }) { item ->
+                        if (item.source == "community") {
+                            CommunityShortcutTile(env, item, Modifier.width(64.dp), showGameDetails = true) { open(Route.Pack(item.id.toLong())) }
+                        } else AppShortcutTile(env, item, Modifier.width(64.dp)) {
+                            if (env.platform?.openGame(item.id) != true) message = "当前平台无法打开游戏"
+                        }
+                    }
                 } }
             }
             item { PlazaHeading("精选游戏", "全部", onAllGames.takeIf { games.isNotEmpty() }) }
@@ -90,18 +93,17 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
             }
             if (errors.isNotEmpty()) item { Banner(errors.joinToString("\n"), Modifier.padding(horizontal = 16.dp), warn = true, actionText = "重试", onAction = reload) }
-            if (tools.isNotEmpty() || featuredTools.isNotEmpty()) {
+            if (toolShortcuts.isNotEmpty() || featuredTools !is Load.Ready) {
                 item { PlazaHeading("精选工具", "全部", onAllTools) }
-                item {
-                    val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
-                        featuredTools.map { it.toToolShortcut() }
+                if (toolShortcuts.isNotEmpty()) item {
                     Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        shortcuts.take(4).forEach { shortcut ->
+                        toolShortcuts.forEach { shortcut ->
                             FeaturedToolTile(env, shortcut, tools, Modifier.weight(1f), onOfficialDetails, onOfficial, open)
                         }
-                        repeat(4 - shortcuts.take(4).size) { Spacer(Modifier.weight(1f)) }
+                        repeat(4 - toolShortcuts.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
+                featuredToolsStatus(featuredTools, featuredShortcuts.isNotEmpty(), retryFeaturedTools, Modifier.padding(horizontal = 16.dp))
             }
             item { PlazaHeading("社区作品") }
             item {
@@ -170,13 +172,9 @@ internal fun PlazaChip(label: String, active: Boolean, onClick: () -> Unit) {
 /** 精选工具「全部」：四列图标网格。 */
 @Composable
 internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back: () -> Unit,
+    featuredShortcuts: List<AppShortcut>, featuredTools: Load<Unit>, retryFeaturedTools: () -> Unit,
     onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit, open: (Route) -> Unit) {
-    val session by env.session.state.collectAsState()
-    val loader = rememberLoader(env, "featured-tools-${session.accountId}") { env.forum.packs(kind = "app", featured = true) }
-    val featured by loader.state.collectAsState()
-    val communityTools = (featured as? Load.Ready)?.value?.items.orEmpty()
-    val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
-        communityTools.map { it.toToolShortcut() }
+    val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } + featuredShortcuts
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenBar("精选工具", back)
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -188,8 +186,20 @@ internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back:
                     repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            if (featured is Load.Failed) item { Banner((featured as Load.Failed).message, Modifier.fillMaxWidth(), warn = true, actionText = "重试", onAction = loader::reload) }
+            featuredToolsStatus(featuredTools, featuredShortcuts.isNotEmpty(), retryFeaturedTools)
         }
+    }
+}
+
+private fun LazyListScope.featuredToolsStatus(state: Load<Unit>, hasTools: Boolean, retry: () -> Unit, modifier: Modifier = Modifier) {
+    when (state) {
+        Load.Loading -> if (!hasTools) item {
+            Text("正在加载社区精选工具…", modifier, style = XType.Caption, color = LocalExtraColors.current.ink3)
+        }
+        is Load.Failed -> item {
+            Banner("社区精选工具加载失败", modifier.fillMaxWidth(), desc = state.message, warn = true, actionText = "重试", onAction = retry)
+        }
+        is Load.Ready -> Unit
     }
 }
 
@@ -217,8 +227,6 @@ internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, Byte
     }
 }
 
-private fun Pack.toToolShortcut() = AppShortcut("community", id.toString(), title, coverUrl, slug)
-
 @Composable
 private fun FeaturedToolTile(env: CommunityEnv, shortcut: AppShortcut, tools: List<MobileGame>, modifier: Modifier,
     onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit, open: (Route) -> Unit) {
@@ -226,14 +234,7 @@ private fun FeaturedToolTile(env: CommunityEnv, shortcut: AppShortcut, tools: Li
         val tool = tools.first { it.id == shortcut.id }
         AppShortcutTile(env, shortcut, modifier, onDetails = { onDetails(tool) }) { onOpen(tool) }
     } else key(shortcut.key) {
-        val id = shortcut.id.toLong()
-        CommunityWorkLaunch(env, id) { loading, _, error, launch ->
-            Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-                AppShortcutTile(env, shortcut, Modifier.fillMaxWidth(), onDetails = { open(Route.Pack(id)) }, onClick = launch)
-                if (loading) Text("正在打开…", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                error?.let { Text(it, style = XType.Caption, color = Danger) }
-            }
-        }
+        CommunityShortcutTile(env, shortcut, modifier) { open(Route.Pack(shortcut.id.toLong())) }
     }
 }
 

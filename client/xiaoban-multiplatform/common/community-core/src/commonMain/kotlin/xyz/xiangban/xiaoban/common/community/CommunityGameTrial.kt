@@ -31,6 +31,19 @@ data class CommunityGameDownload(
 @Serializable
 data class RecentCommunityGame(val packId: Long, val version: Int, val title: String)
 
+/** Last server approval for a locally cached community tool. */
+@Serializable
+data class CommunityToolApproval(
+    val checkedAtMs: Long,
+    val forumBase: String,
+    val slug: String,
+    val title: String,
+    val author: String? = null,
+    val legacyVersions: List<Int> = emptyList(),
+) {
+    fun isFresh(nowMs: Long): Boolean = nowMs - checkedAtMs in 0..(24 * 60 * 60 * 1000L)
+}
+
 /** Device-local history, independent of collection and author workspace; only successful ready events count. */
 object CommunityGameHistory {
     fun decode(raw: String?): List<RecentCommunityGame> = runCatching {

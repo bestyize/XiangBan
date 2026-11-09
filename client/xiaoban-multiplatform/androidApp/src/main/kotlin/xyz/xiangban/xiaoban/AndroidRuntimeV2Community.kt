@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.util.AtomicFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -12,10 +13,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
+import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.CommunityGameDownload
+import xyz.xiangban.xiaoban.common.community.CommunityJson
+import xyz.xiangban.xiaoban.common.community.CommunityToolApproval
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.RecentCommunityGame
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -31,8 +36,19 @@ internal object AndroidRuntimeV2Community {
     const val AUTHOR = "runtime.v2.pack.author"
     const val LEGACY_VERSIONS = "runtime.v2.pack.legacy.versions"
     private const val CACHE_BYTES = 1024L * 1024 * 1024
+    private const val OFFLINE_APPROVAL = ".offline-approval"
+    private const val OFFLINE_READY = ".offline-ready"
     private val shaPattern = Regex("[a-fA-F0-9]{64}")
+    private val cacheName = Regex("([1-9][0-9]*)-([1-9][0-9]*)-([a-f0-9]{64})")
     private val lock = Mutex()
+
+    private data class CachedPackage(val root: File, val version: Int, val digest: String)
+
+    fun isOffline(context: Context): Boolean {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        return connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
+    }
 
     suspend fun needsMobileConfirmation(context: Context, info: CommunityGameDownload): Boolean = withContext(Dispatchers.IO) {
         if (info.size <= 20L * 1024 * 1024) return@withContext false
@@ -43,28 +59,120 @@ internal object AndroidRuntimeV2Community {
 
     suspend fun play(activity: Activity, info: CommunityGameDownload, pack: Pack): Boolean {
         require(info.validate(pack, info.version) == 2)
-        withContext(Dispatchers.IO) { lock.withLock { prepare(activity, info, pack.slug) } }
+        val legacyVersions = pack.versions.asSequence()
+            .filter { it.version in 1 until info.version }
+            .filter { (it.manifest["runtimeProtocol"] ?: JsonPrimitive(1)) == JsonPrimitive(1) }
+            .map { it.version }.sortedDescending().toList()
+        val approval = CommunityToolApproval(System.currentTimeMillis(), forumBase(activity), pack.slug, pack.title.take(200), pack.author?.nickname?.take(80), legacyVersions)
+        val target = directory(activity, info.packId, info.version, info.sha256)
+        withContext(Dispatchers.IO) {
+            lock.withLock {
+                prepare(activity, info, pack.slug)
+                if (info.kind == "app") {
+                    runCatching { writeApproval(target, CommunityJson.encodeToString(approval)) }
+                }
+            }
+        }
+        return launch(activity, info.packId, info.version, info.sha256, info.kind, approval,
+            networkDisabled = pack.networkDisabled != false, readyMarker = target.resolve(OFFLINE_READY).takeIf { info.kind == "app" })
+    }
+
+    suspend fun playCachedTool(activity: Activity, id: Long, version: Int?): Boolean {
+        val forumBase = forumBase(activity)
+        val (cached, approval) = withContext(Dispatchers.IO) {
+            lock.withLock {
+                val recent = AndroidCommunityGames.recent(activity).value.firstOrNull { it.packId == id }
+                val now = System.currentTimeMillis()
+                cachedPackages(activity, id, version).mapNotNull { cached ->
+                    readApproval(id, cached, recent, forumBase)?.takeIf { it.isFresh(now) }
+                        ?.let { cached to it }
+                }.maxByOrNull { (_, approval) -> approval.checkedAtMs }
+            }
+        } ?: return false
+        return launch(activity, id, cached.version, cached.digest, "app", approval, networkDisabled = true)
+    }
+
+    suspend fun invalidateOfflineTools(context: Context, id: Long, version: Int?) = withContext(Dispatchers.IO) {
+        lock.withLock {
+            cachedPackages(context, id, version).forEach { cached ->
+                val approval = runCatching { loadApproval(cached.root) }.getOrNull()
+                val source = approval?.forumBase ?: CommunityConfig().forumBase
+                // Keep a tombstone so a revoked package cannot fall back to the old history check.
+                if (source == forumBase(context) && runCatching { writeApproval(cached.root, "") }.isFailure) {
+                    cached.root.deleteRecursively()
+                }
+            }
+        }
+    }
+
+    private suspend fun launch(
+        activity: Activity, id: Long, version: Int, digest: String, kind: String,
+        approval: CommunityToolApproval, networkDisabled: Boolean, readyMarker: File? = null,
+    ): Boolean {
         return withContext(Dispatchers.Main) {
             if (activity.isFinishing || activity.isDestroyed) return@withContext false
             val appContext = activity.applicationContext
-            val recent = RecentCommunityGame(info.packId, info.version, pack.title.take(200))
+            val recent = RecentCommunityGame(id, version, approval.title)
             val intent = RuntimeV2Activity.launchIntent(activity) {
                 AndroidCommunityGames.opened(appContext, recent)
+                if (readyMarker != null) runCatching { readyMarker.createNewFile() }
             }
-            if (activity is MainActivity) RuntimeV2Favorites.attach(intent, activity, "community", info.packId.toString())
-            val legacyVersions = pack.versions.asSequence()
-                .filter { it.version in 1 until info.version }
-                .filter { (it.manifest["runtimeProtocol"] ?: JsonPrimitive(1)) == JsonPrimitive(1) }
-                .map { it.version }.sortedDescending().toList().toIntArray()
+            if (activity is MainActivity) RuntimeV2Favorites.attach(intent, activity, "community", id.toString())
             activity.startActivity(intent
-                .putExtra(PACK_ID, info.packId)
-                .putExtra(VERSION, info.version)
-                .putExtra(DIGEST, info.sha256)
-                .putExtra(KIND, info.kind)
-                .putExtra(AUTHOR, pack.author?.nickname?.take(80))
-                .putExtra(LEGACY_VERSIONS, legacyVersions)
-                .putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, pack.networkDisabled != false))
+                .putExtra(PACK_ID, id)
+                .putExtra(VERSION, version)
+                .putExtra(DIGEST, digest)
+                .putExtra(KIND, kind)
+                .putExtra(AUTHOR, approval.author)
+                .putExtra(LEGACY_VERSIONS, approval.legacyVersions.toIntArray())
+                .putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, networkDisabled))
             true
+        }
+    }
+
+    private fun cachedPackages(context: Context, id: Long, version: Int?): List<CachedPackage> =
+        context.cacheDir.resolve("runtime-v2-packs").listFiles().orEmpty().mapNotNull { root ->
+            val match = cacheName.matchEntire(root.name) ?: return@mapNotNull null
+            if (!root.isDirectory || match.groupValues[1] != id.toString()) return@mapNotNull null
+            val cachedVersion = match.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+            if (version != null && cachedVersion != version) return@mapNotNull null
+            CachedPackage(root, cachedVersion, match.groupValues[3])
+        }
+
+    private fun forumBase(context: Context): String =
+        ((context as? MainActivity)?.communityEnv?.config ?: CommunityConfig()).forumBase.trimEnd('/')
+
+    private fun readApproval(id: Long, cached: CachedPackage, recent: RecentCommunityGame?, forumBase: String): CommunityToolApproval? =
+        runCatching {
+            val approval = loadApproval(cached.root)
+            if (approval != null && approval.forumBase != forumBase) return null
+            if (recent?.version != cached.version && !cached.root.resolve(OFFLINE_READY).isFile) return null
+            // Older packages can use their last online cache timestamp if this exact version reached ready.
+            if (approval == null && (forumBase != CommunityConfig().forumBase || recent?.version != cached.version)) return null
+            val manifest = RuntimeV2Package.loadCommunity(cached.root, id, cached.version, "app").manifest
+            if (approval != null) approval.takeIf { it.slug == manifest.id }
+            else CommunityToolApproval(cached.root.lastModified(), forumBase, manifest.id, checkNotNull(recent).title)
+        }.getOrNull()
+
+    private fun loadApproval(root: File): CommunityToolApproval? {
+        val file = AtomicFile(root.resolve(OFFLINE_APPROVAL))
+        return try {
+            CommunityJson.decodeFromString(file.readFully().decodeToString())
+        } catch (e: FileNotFoundException) {
+            if (file.baseFile.exists()) throw e
+            null
+        }
+    }
+
+    private fun writeApproval(root: File, contents: String) {
+        val file = AtomicFile(root.resolve(OFFLINE_APPROVAL))
+        val output = file.startWrite()
+        try {
+            output.write(contents.encodeToByteArray())
+            file.finishWrite(output)
+        } catch (e: IOException) {
+            file.failWrite(output)
+            throw e
         }
     }
 

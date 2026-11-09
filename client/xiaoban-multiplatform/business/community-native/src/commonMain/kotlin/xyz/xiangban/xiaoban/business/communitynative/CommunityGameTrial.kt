@@ -39,6 +39,7 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
 
 @Composable
 internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = null,
+    openGameDetails: (() -> Unit)? = null,
     content: @Composable (loading: Boolean, busy: Boolean, error: String?, launch: () -> Unit) -> Unit) {
     val platform = env.platform
     val scope = rememberCoroutineScope()
@@ -51,20 +52,41 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
         scope.launch {
             if (env.communityGameBusy.value) return@launch
             if (platform?.communityGamesSupported != true) {
+                if (openGameDetails != null) {
+                    openGameDetails()
+                    return@launch
+                }
                 error = CommunityWorkUnsupported
                 return@launch
             }
             env.communityGameBusy.value = true
             loading = true
             error = null
+            var checkedVersion: Int? = null
             try {
-                // Recheck publication and exact version even on cache hits. Removed works cannot run from stale cards.
+                require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
+                if (platform.communityNetworkOffline()) {
+                    check(platform.playCachedCommunityTool(id, version)) { "没有可用的离线缓存，请联网打开一次" }
+                    return@launch
+                }
                 val pack = env.forum.pack(id)
                 val chosen = version ?: pack.version
-                require(pack.kind in setOf("game", "app") && pack.status == "published") { "作品已不可用" }
+                if (pack.kind !in setOf("game", "app") || pack.status != "published") {
+                    platform.invalidateCachedCommunityTools(id, null)
+                    error("作品已不可用")
+                }
+                if (pack.kind == "game" && openGameDetails != null) {
+                    openGameDetails()
+                    return@launch
+                }
+                checkedVersion = chosen
                 val info = env.forum.gameDownload(id, chosen)
-                info.validate(pack, chosen)
-                require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
+                try {
+                    info.validate(pack, chosen)
+                } catch (e: IllegalArgumentException) {
+                    platform.invalidateCachedCommunityTools(id, chosen)
+                    throw e
+                }
                 if (platform.needsRuntimeV2MobileConfirmation(info)) {
                     val decision = CompletableDeferred<Boolean>()
                     pendingDownload = info.size to decision
@@ -74,6 +96,10 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
                 check(launched) { "无法打开试玩，请重试" }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: ApiException) {
+                if (e.status == 0 && platform.playCachedCommunityTool(id, checkedVersion ?: version)) return@launch
+                if (e.status in listOf(403, 404, 410)) platform.invalidateCachedCommunityTools(id, checkedVersion)
+                error = messageOf(e)
             } catch (e: Exception) {
                 error = messageOf(e)
             } finally {

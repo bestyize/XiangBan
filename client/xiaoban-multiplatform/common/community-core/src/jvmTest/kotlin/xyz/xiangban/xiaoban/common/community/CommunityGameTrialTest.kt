@@ -43,6 +43,16 @@ class CommunityGameTrialTest {
         assertEquals("1,2", server.requests.single().headers["X-Xiaoban-Runtime"])
         server.client.close()
     }
+
+    @Test fun `offline approval expires after one day and rejects a backward clock`() {
+        val checkedAt = 1_800_000_000_000L
+        val approval = CommunityToolApproval(checkedAt, CommunityConfig().forumBase, "tool", "Tool")
+        val restored = CommunityJson.decodeFromString<CommunityToolApproval>(CommunityJson.encodeToString(approval))
+        assertTrue(restored.isFresh(checkedAt + 86_400_000))
+        assertFalse(restored.isFresh(checkedAt + 86_400_001))
+        assertFalse(restored.isFresh(checkedAt - 1))
+    }
+
     @Test fun `history replaces revisions preserves order and is bounded`() {
         val old = (1L..15).map { RecentCommunityGame(it,1,"game$it") }
         val next = CommunityGameHistory.opened(old, RecentCommunityGame(5,2,"updated"))

@@ -31,6 +31,8 @@ import kotlinx.coroutines.CancellationException
 import xiaoban.business.community_native.generated.resources.Res
 import xyz.xiangban.xiaoban.common.community.*
 
+private const val WancisouPackId = "58"
+
 /** Only official/local favorites live here; public works use the existing account bookmark API. */
 internal class AppLibraryState(private val prefs: AppPrefs) {
     var favorites by mutableStateOf(AppFavorites.decode(prefs.get("app-favorites")))
@@ -79,7 +81,14 @@ private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modif
             bytes = when (item.source) {
                 "builtin" -> env.platform?.builtinGameIcon(item.id)
                 "local" -> env.games?.let { store -> store.readFileBytes(item.id, store.read(item.id).icon) }
-                "community" -> if (item.slug == "wancisou") Res.readBytes("files/wancisou-icon.webp") else null
+                "community" -> {
+                    // Recent and bookmarked works can arrive with a pack ID and no slug.
+                    val isWancisou = item.slug == "wancisou" || (
+                        item.slug.isNullOrEmpty() && item.id == WancisouPackId &&
+                            env.config.forumBase.trimEnd('/') == CommunityConfig().forumBase
+                        )
+                    if (isWancisou) Res.readBytes("files/wancisou-icon.webp") else null
+                }
                 else -> null
             }
         } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }
@@ -108,5 +117,16 @@ internal fun AppShortcutTile(env: CommunityEnv, item: AppShortcut, modifier: Mod
         .padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         AppShortcutIcon(env, item)
         Text(item.title, Modifier.padding(top = 8.dp), style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+internal fun CommunityShortcutTile(env: CommunityEnv, item: AppShortcut, modifier: Modifier, showGameDetails: Boolean = false, onDetails: () -> Unit) {
+    CommunityWorkLaunch(env, item.id.toLong(), openGameDetails = onDetails.takeIf { showGameDetails }) { loading, _, error, launch ->
+        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+            AppShortcutTile(env, item, Modifier.fillMaxWidth(), onDetails = onDetails, onClick = launch)
+            if (loading) Text("正在打开…", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            error?.let { Text(it, style = XType.Caption, color = Danger) }
+        }
     }
 }

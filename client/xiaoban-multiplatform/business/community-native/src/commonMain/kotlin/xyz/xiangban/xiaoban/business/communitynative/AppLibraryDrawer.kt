@@ -80,10 +80,10 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
                 }
                 if (loading) Spinner(Modifier.fillMaxWidth().height(48.dp))
                 else if (recent.isEmpty()) Text("还没有使用记录", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                AppShortcutGrid(env, recent, ::choose)
+                AppShortcutGrid(env, recent, recentItems = true, choose = ::choose)
                 catalogError?.let { Banner(it, warn = true, actionText = "重试", onAction = { revision++ }) }
                 Text("我的收藏", Modifier.padding(top = 12.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
-                AppShortcutGrid(env, favorites, ::choose)
+                AppShortcutGrid(env, favorites, choose = ::choose)
                 when (val current = bookmarkState) {
                     is Load.Ready -> {
                         if (favorites.isEmpty()) Text("还没有收藏的应用", style = XType.Secondary, color = LocalExtraColors.current.ink3)
@@ -109,9 +109,13 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
 }
 
 @Composable
-private fun AppShortcutGrid(env: CommunityEnv, items: List<AppShortcut>, choose: (AppShortcut) -> Unit) {
+private fun AppShortcutGrid(env: CommunityEnv, items: List<AppShortcut>, recentItems: Boolean = false, choose: (AppShortcut) -> Unit) {
     items.chunked(4).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        row.forEach { item -> key(item.key) { AppShortcutTile(env, item, Modifier.weight(1f)) { choose(item) } } }
+        row.forEach { item -> key(item.key) {
+            if (recentItems && item.source == "community") {
+                CommunityShortcutTile(env, item, Modifier.weight(1f), showGameDetails = true) { choose(item) }
+            } else AppShortcutTile(env, item, Modifier.weight(1f)) { choose(item) }
+        } }
         repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
     } }
 }
