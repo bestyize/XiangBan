@@ -11,6 +11,7 @@
   const viewport = globalThis.XiabanInkViewport
   const $ = (id) => document.getElementById(id)
   const gameNode = $('game')
+  const volumeTabs = $('volumeTabs')
   const canvas = $('scene'), ctx = canvas.getContext('2d', { alpha: false })
   const params = new URLSearchParams(location.search)
   const nonce = params.get('hostNonce')
@@ -153,6 +154,7 @@
     if (runtime) {
       const avoid = !view.rotation && capsule('width') > 0 ? capsule('right') + capsule('width') + 8 : 0
       hudActions.style.marginRight = Math.max(0, avoid - Math.max(14, logical.right)) + 'px'
+      gameNode.style.setProperty('--capsule-clearance', avoid + 'px')
     }
   }
 
@@ -502,6 +504,7 @@
     resetInput()
     setOverlays('select')
     renderSelect()
+    showVolumeTab(volumeTabs.querySelector('.active'))
     const target = $('levelStrip').querySelector('[data-current="true"]') || $('levelStrip').querySelector('button:not(:disabled)')
     target?.scrollIntoView({ inline: 'center', block: 'nearest' })
     target?.focus({ preventScroll: true })
@@ -518,6 +521,21 @@
     setOverlays('welcome')
     refreshWelcome()
     $('startButton').focus({ preventScroll: true })
+  }
+
+  function syncVolumeFade() {
+    const { scrollLeft, clientWidth, scrollWidth } = volumeTabs
+    volumeTabs.classList.toggle('can-scroll-forward', scrollLeft + clientWidth < scrollWidth - 1)
+  }
+
+  function showVolumeTab(tab) {
+    if (!tab || !volumeTabs.clientWidth) return
+    const start = tab.offsetLeft
+    const end = start + tab.offsetWidth
+    const clearEnd = volumeTabs.scrollLeft + volumeTabs.clientWidth - tab.offsetWidth / 2
+    if (start < volumeTabs.scrollLeft) volumeTabs.scrollLeft = start
+    else if (end > clearEnd + 1) volumeTabs.scrollLeft += end - clearEnd
+    syncVolumeFade()
   }
 
   function selectVolume(vol) {
@@ -698,7 +716,15 @@
     if (history.state?.inkBladePicker) openSelect()
     else if (phase === 'select') backToWelcome()
   })
-  for (const tab of document.querySelectorAll('.volume-tab')) tab.addEventListener('click', () => selectVolume(Number(tab.dataset.vol)))
+  volumeTabs.addEventListener('scroll', syncVolumeFade, { passive: true })
+  new ResizeObserver(syncVolumeFade).observe(volumeTabs)
+  for (const tab of volumeTabs.querySelectorAll('.volume-tab')) {
+    tab.addEventListener('focus', () => showVolumeTab(tab))
+    tab.addEventListener('click', () => {
+      selectVolume(Number(tab.dataset.vol))
+      showVolumeTab(tab)
+    })
+  }
   $('restartButton').addEventListener('click', () => startRound(currentLevel, duelRound))
   $('nextButton').addEventListener('click', () => { const nextId = PROGRESS.next(currentLevel); if (nextId) startRound(nextId) })
   $('mapButton').addEventListener('click', openSelect)

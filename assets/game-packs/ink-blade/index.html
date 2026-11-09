@@ -65,10 +65,10 @@
       </div>
     </section>
 
-    <section id="selectOverlay" class="overlay select" role="dialog" aria-modal="true" aria-labelledby="selectTitle" hidden>
+    <section id="selectOverlay" class="overlay select" role="dialog" aria-modal="true" aria-label="选择卷轴与关卡" hidden>
       <header class="select-head">
         <button class="icon-button" id="selectBack" type="button" aria-label="返回卷首"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></svg></button>
-        <div class="volume-tabs" role="tablist" aria-label="选择卷轴">
+        <div class="volume-tabs can-scroll-forward" id="volumeTabs" role="tablist" aria-label="选择卷轴">
           <button type="button" class="volume-tab active" id="volTab1" data-vol="1" role="tab" aria-selected="true">竹林卷</button>
           <button type="button" class="volume-tab" id="volTab2" data-vol="2" role="tab" aria-selected="false">雪江卷</button>
           <button type="button" class="volume-tab" id="volTab3" data-vol="3" role="tab" aria-selected="false">烽火卷</button>
