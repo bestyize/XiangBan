@@ -7,7 +7,13 @@ import kotlinx.serialization.json.contentOrNull
 
 /** A device-local shortcut, never a cached download credential or executable. */
 @Serializable
-data class AppShortcut(val source: String, val id: String, val title: String, val coverUrl: String? = null) {
+data class AppShortcut(
+    val source: String,
+    val id: String,
+    val title: String,
+    val coverUrl: String? = null,
+    val slug: String? = null,
+) {
     val key: String get() = "$source:$id"
     val valid: Boolean get() = title.isNotBlank() && title.length <= 200 && when (source) {
         "builtin" -> id in BuiltinMobileGames.ids
@@ -35,18 +41,6 @@ fun recentAppShortcuts(localIds: List<String>, available: List<AppShortcut>, com
     (localIds.mapNotNull { id -> available.firstOrNull { it.id == id } } + community.map {
         AppShortcut("community", it.packId.toString(), it.title)
     }).filter { it.valid }.distinctBy { it.key }.take(12)
-
-/** Greedily fill the shorter column; retain source order within each column. */
-fun <T> appWaterfallColumns(items: List<T>, height: (T) -> Float): List<List<T>> {
-    val columns = listOf(mutableListOf<T>(), mutableListOf<T>())
-    val heights = floatArrayOf(0f, 0f)
-    items.forEach { item ->
-        val column = if (heights[0] <= heights[1]) 0 else 1
-        columns[column] += item
-        heights[column] += height(item).takeIf { it.isFinite() && it > 0 } ?: 1f
-    }
-    return columns
-}
 
 /** Unknown orientation stays unknown; never label an uninspected game as portrait. */
 fun appOrientation(pack: Pack): String? =

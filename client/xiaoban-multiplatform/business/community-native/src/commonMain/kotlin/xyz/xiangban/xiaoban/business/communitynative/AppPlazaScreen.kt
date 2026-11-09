@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -69,8 +68,6 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
     val available = official.map { AppShortcut("builtin", it.id, it.name) } + local.map { AppShortcut("local", it.id, it.name) }
     val recent = recentAppShortcuts(recentIds, available, recentCommunity)
     var message by remember { mutableStateOf<String?>(null) }
-    val ratios = remember(filter) { mutableStateMapOf<Long, Float>() }
-    val columns = appWaterfallColumns(entries) { pack -> 1f / (ratios[pack.id] ?: (4f / 3f)) + .6f }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (recent.isNotEmpty()) {
@@ -97,7 +94,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 item { PlazaHeading("精选工具", "全部", onAllTools) }
                 item {
                     val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
-                        featuredTools.map { AppShortcut("community", it.id.toString(), it.title, it.coverUrl) }
+                        featuredTools.map { it.toToolShortcut() }
                     Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         shortcuts.take(4).forEach { shortcut ->
                             val tool = tools.firstOrNull { it.id == shortcut.id && shortcut.source == "builtin" }
@@ -117,11 +114,10 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
             }
             run {
-                item {
-                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        columns.forEach { column -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            column.forEach { pack -> key(pack.id) { AppCommunityCard(env, pack, onRatio = { ratios[pack.id] = it }, open = open) } }
-                        } }
+                items(entries.chunked(2), key = { it.first().id }) { row ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { pack -> key(pack.id) { AppCommunityCard(env, pack, Modifier.weight(1f), open) } }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
                 when (val current = state) {
@@ -184,7 +180,7 @@ internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back:
     val featured by loader.state.collectAsState()
     val communityTools = (featured as? Load.Ready)?.value?.items.orEmpty()
     val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
-        communityTools.map { AppShortcut("community", it.id.toString(), it.title, it.coverUrl) }
+        communityTools.map { it.toToolShortcut() }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenBar("精选工具", back)
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -229,39 +225,39 @@ internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, Byte
     }
 }
 
+private fun Pack.toToolShortcut() = AppShortcut("community", id.toString(), title, coverUrl, slug)
+
 /** Same hierarchy as VisualTopicCard, with real pack and linked discussion counts. */
 @Composable
-private fun AppCommunityCard(env: CommunityEnv, pack: Pack, onRatio: (Float) -> Unit, open: (Route) -> Unit) {
+private fun AppCommunityCard(env: CommunityEnv, pack: Pack, modifier: Modifier, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
-    var liked by remember(pack.id, session.accountId) { mutableStateOf(false) }
-    var count by remember(pack.id, pack.likeCount, session.accountId) { mutableIntStateOf(pack.likeCount) }
+    var liked by rememberSaveable(pack.id, session.accountId) { mutableStateOf(false) }
+    var count by rememberSaveable(pack.id, pack.likeCount, session.accountId) { mutableStateOf(pack.likeCount) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var ratio by remember(pack.coverUrl) { mutableFloatStateOf(4f / 3f) }
-    Column(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { open(Route.Pack(pack.id)) }) {
-        Box(Modifier.fillMaxWidth().aspectRatio(ratio).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+    Column(modifier.outlinedCard(16.dp).clickable { open(Route.Pack(pack.id)) }) {
+        Box(Modifier.fillMaxWidth().aspectRatio(3f / 2f).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
             XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.ink3)
-            pack.coverUrl?.let { url -> AsyncImage(env.forum.imageUrl(url), null, imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), onSuccess = {
-                if (it.result.image.height > 0) {
-                    ratio = (it.result.image.width.toFloat() / it.result.image.height).coerceIn(.75f, 16f / 9f)
-                    onRatio(ratio)
+            pack.coverUrl?.let { url ->
+                AsyncImage(env.forum.imageUrl(url), null, imageLoader = rememberImageLoader(),
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+            CoverStats {
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val views = pack.viewCount?.let { compactCount(it.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) } ?: "—"
+                    CoverStat(XIcons.Eye, views, "浏览量", Modifier.weight(1f, fill = false))
+                    CoverStat(XIcons.Message, compactCount(pack.replyCount), "评论数", Modifier.weight(1f, fill = false))
                 }
-            }) }
-            Column(Modifier.align(Alignment.BottomEnd).fillMaxWidth()) {
                 if (pack.featured) {
-                    Text("精选", Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 6.dp).clip(CircleShape)
-                        .background(LocalExtraColors.current.brandSoft).padding(horizontal = 6.dp, vertical = 2.dp),
+                    Text("精选", Modifier.clip(CircleShape).background(LocalExtraColors.current.brandSoft)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
                         style = XType.Caption, color = LocalExtraColors.current.brandInk, maxLines = 1)
-                }
-                Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = .9f)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Stat(XIcons.Play, compactCount(pack.applyCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
-                    Stat(XIcons.Message, compactCount(pack.replyCount))
                 }
             }
         }
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(pack.title, style = XType.Secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(pack.title, style = XType.Secondary, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // PackAuthor has no avatar URL; use the shared circular initial avatar.
                 Avatar(pack.author?.nickname ?: "作者", 20.dp, showInitial = true)

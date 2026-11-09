@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -37,10 +40,30 @@ internal fun CommunityCover(url: String, modifier: Modifier = Modifier, natural:
 
 @Composable
 internal fun BoxScope.TopicCoverStats(topic: Topic) {
-    Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .72f)))).padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 7.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { XIcon(XIcons.Eye, tint = Color.White, size = 12.dp); Text(compactCount(topic.viewCount), style = XType.Caption, color = Color.White) }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { XIcon(XIcons.Message, tint = Color.White, size = 12.dp); Text(compactCount(topic.replyCount), style = XType.Caption, color = Color.White) }
+    CoverStats {
+        CoverStat(XIcons.Eye, compactCount(topic.viewCount), "浏览量")
+        CoverStat(XIcons.Message, compactCount(topic.replyCount), "评论数")
+    }
+}
+
+@Composable
+internal fun BoxScope.CoverStats(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.align(Alignment.BottomStart).fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .72f))))
+            .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        content = content,
+    )
+}
+
+@Composable
+internal fun CoverStat(icon: ImageVector, count: String, label: String, modifier: Modifier = Modifier) {
+    Row(modifier.clearAndSetSemantics { contentDescription = "$label $count" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        XIcon(icon, tint = Color.White, size = 12.dp)
+        Text(count, style = XType.Caption, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

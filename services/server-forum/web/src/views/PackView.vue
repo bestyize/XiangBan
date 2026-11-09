@@ -39,7 +39,7 @@ watch(
     missing.value = false
     loadError.value = ''
     try {
-      const result = await contentApi.pack(Number(id))
+      const result = await contentApi.pack(Number(id), true)
       if (current !== loadSequence) return
       pack.value = result
       track('view_pack', result.kind)

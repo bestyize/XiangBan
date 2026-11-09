@@ -677,6 +677,16 @@ async fn app_plaza_kind_remix_protocol_filter_and_network_switch() -> Result<(),
     assert_eq!(detail["network_disabled"], false);
     assert_eq!(detail["one_click"], false);
     assert_eq!(detail["versions"][0]["manifest"]["runtimeProtocol"], 2);
+    assert_eq!(detail["view_count"], 0);
+    let view_path = format!("/api/packs/{quiz_id}?view=true");
+    let (status, _) = call_with_runtime(&app, &view_path, Some("1")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    for expected in 1..=2 {
+        let (status, viewed) = call_with_runtime(&app, &view_path, Some("2")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(viewed["view_count"], expected);
+        assert_eq!(viewed["apply_count"], 0);
+    }
     let (s, _) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "quiz-one"), json!({})).await;
     assert_eq!(s, StatusCode::CONFLICT, "id 在所有类型里唯一");
 
@@ -687,6 +697,7 @@ async fn app_plaza_kind_remix_protocol_filter_and_network_switch() -> Result<(),
     let (_, list) = call_with_runtime(&app, "/api/packs?kind=app", Some("1,2")).await;
     assert_eq!(list["total"], 1);
     assert_eq!(list["items"][0]["trust_level"], 2);
+    assert_eq!(list["items"][0]["view_count"], 2);
     let (s, d) = call(&app, "GET", &format!("/api/packs/{game_id}/download"), None, Value::Null).await;
     assert_eq!(s, StatusCode::OK, "{d}");
     let (s, d) = call(&app, "GET", &format!("/api/packs/{quiz_id}/download"), None, Value::Null).await;

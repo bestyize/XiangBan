@@ -98,7 +98,7 @@ fn like_pattern(q: &str) -> String {
 }
 
 const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.author_uid, u.nickname AS author_name,
-    p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at,
+    p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.view_count, p.topic_id, p.created_at, p.updated_at,
     COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
     COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count,
     COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1)::smallint AS runtime_protocol,
@@ -122,6 +122,7 @@ struct PackRow {
     current_version: i32,
     cover_key: Option<String>,
     apply_count: i64,
+    view_count: i64,
     topic_id: Option<i64>,
     like_count: i32,
     reply_count: i32,
@@ -161,6 +162,7 @@ impl PackRow {
             "version": self.current_version,
             "cover_url": cover_url(state, self.cover_key.as_deref()),
             "apply_count": self.apply_count,
+            "view_count": self.view_count,
             "topic_id": self.topic_id,
             "like_count": self.like_count,
             "reply_count": self.reply_count,
@@ -277,8 +279,20 @@ async fn visible(state: &AppState, pack: &PackRow, viewer: Option<Uuid>) -> AppR
     Ok(visible)
 }
 
-async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, headers: HeaderMap, Path(id): Path<i64>) -> AppResult<Json<Value>> {
-    let pack = find_pack(&state, id).await?;
+#[derive(Deserialize)]
+struct PackDetailQuery {
+    #[serde(default)]
+    view: bool,
+}
+
+async fn get_pack(
+    State(state): State<AppState>,
+    MaybeUser(user): MaybeUser,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Query(query): Query<PackDetailQuery>,
+) -> AppResult<Json<Value>> {
+    let mut pack = find_pack(&state, id).await?;
     if !visible(&state, &pack, user.as_ref().map(|u| u.uid)).await? {
         return Err(AppError::not_found("内容包"));
     }
@@ -298,6 +312,16 @@ async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, hea
             json!({ "version": version, "label": label, "sha256": sha256, "size": size, "manifest": manifest, "changelog": changelog, "created_at": created_at })
         })
         .collect();
+    // Detail pages opt in. Trial and publishing lookups leave the count alone.
+    if query.view && pack.status == "published" && matches!(pack.kind.as_str(), "game" | "app") {
+        pack.view_count = sqlx::query_scalar::<_, i64>(
+            "UPDATE packs SET view_count = view_count + 1 WHERE id = $1 AND status = 'published' RETURNING view_count",
+        )
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .unwrap_or(pack.view_count);
+    }
     let mut body = pack.json(&state);
     body["versions"] = json!(versions);
     Ok(Json(body))

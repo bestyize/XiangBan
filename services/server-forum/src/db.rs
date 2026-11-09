@@ -807,6 +807,7 @@ CREATE TABLE IF NOT EXISTS packs (
     current_version INT NOT NULL DEFAULT 1,
     cover_key     TEXT,
     apply_count   BIGINT NOT NULL DEFAULT 0,
+    view_count    BIGINT NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -839,6 +840,7 @@ ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_author_uid UUID;
 ALTER TABLE packs ADD COLUMN IF NOT EXISTS network_disabled BOOLEAN NOT NULL DEFAULT FALSE;
 -- 应用广场「创作者精选」：编辑挑选的时间，空表示未精选。与信任等级无关，不影响可见性。
 ALTER TABLE packs ADD COLUMN IF NOT EXISTS featured_at TIMESTAMPTZ;
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS view_count BIGINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS packs_remix_idx ON packs (remix_of_pack_id) WHERE remix_of_pack_id IS NOT NULL;
 
 -- 直传凭证签发记录：资源机回调确认文件落盘并校验过哈希后才算 verified，发布内容包只认已确认的上传。

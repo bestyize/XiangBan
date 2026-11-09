@@ -7,7 +7,7 @@ import kotlin.test.*
 class AppPlazaTest {
     @Test fun `favorites survive restart and isolate local and public identities`() {
         val local = AppShortcut("local", "my-game", "我的作品")
-        val public = AppShortcut("community", "42", "社区作品")
+        val public = AppShortcut("community", "42", "万磁搜", slug = "wancisou")
         val items = AppFavorites.toggle(AppFavorites.toggle(emptyList(), local), public)
         assertEquals(listOf(public, local), AppFavorites.decode(AppFavorites.encode(items)))
         assertEquals(listOf(local), AppFavorites.toggle(items, public.copy(title = "新名字")))
@@ -26,11 +26,13 @@ class AppPlazaTest {
         assertEquals(12, recentAppShortcuts(emptyList(), emptyList(), (1L..20).map { RecentCommunityGame(it, 1, "游戏 $it") }).size)
     }
 
-    @Test fun `waterfall balances mixed heights with stable order and keeps every item`() {
-        val items = listOf(3f, 1f, 1.5f, 2f, 1f)
-        assertEquals(listOf(listOf(3f, 1f), listOf(1f, 1.5f, 2f)), appWaterfallColumns(items) { it })
-        assertEquals(listOf(emptyList(), emptyList()), appWaterfallColumns(emptyList<Int>()) { 1f })
-        assertEquals(listOf(listOf(0, 2), listOf(1, 3)), appWaterfallColumns((0..3).toList()) { Float.NaN })
+    @Test fun `pack views are distinct from applications and may be missing on older servers`() {
+        val old = Json.decodeFromString<Pack>("""{"id":42,"kind":"app","title":"万磁搜","apply_count":18,"reply_count":3}""")
+        val counted = Json.decodeFromString<Pack>("""{"id":42,"kind":"app","title":"万磁搜","view_count":12300,"apply_count":18,"reply_count":3}""")
+        assertNull(old.viewCount)
+        assertEquals(12300L, counted.viewCount)
+        assertEquals(18L, counted.applyCount)
+        assertEquals(3, counted.replyCount)
     }
 
     @Test fun `builtin tools are kept apart from games and carry their own mark`() {

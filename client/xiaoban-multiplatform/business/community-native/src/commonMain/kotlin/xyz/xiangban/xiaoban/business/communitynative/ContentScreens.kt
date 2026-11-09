@@ -181,7 +181,7 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
 /** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底栏与帖子一样提供评论、点赞、收藏和分享。 */
 @Composable
 fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null, chat: xyz.xiangban.xiaoban.common.community.CloudChatController? = null) {
-    val loader = rememberLoader(env, id) { env.forum.pack(id) }
+    val loader = rememberLoader(env, "pack-detail-$id") { env.forum.pack(id, recordView = true) }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }

@@ -8,7 +8,7 @@
   "version": "1.0.1",
   "category": "tool",
   "entry": "index.html",
-  "icon": "icon.svg",
+  "icon": "icon.webp",
   "cover": "cover.svg",
   "orientation": "portrait",
   "input": ["touch", "mouse", "keyboard"],

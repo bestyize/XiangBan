@@ -28,6 +28,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import kotlinx.coroutines.CancellationException
+import xiaoban.business.community_native.generated.resources.Res
 import xyz.xiangban.xiaoban.common.community.*
 
 /** Only official/local favorites live here; public works use the existing account bookmark API. */
@@ -72,12 +73,13 @@ private fun AppGlyphIcon(glyph: String, modifier: Modifier) {
 @Composable
 private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier, glyph: String?) {
     val revision = if (item.source == "local") env.games?.revision?.collectAsState()?.value else null
-    var bytes by remember(item.key, revision) { mutableStateOf<ByteArray?>(null) }
-    LaunchedEffect(env, item.key, revision) {
+    var bytes by remember(item.key, item.slug, revision) { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(env, item.key, item.slug, revision) {
         try {
             bytes = when (item.source) {
                 "builtin" -> env.platform?.builtinGameIcon(item.id)
                 "local" -> env.games?.let { store -> store.readFileBytes(item.id, store.read(item.id).icon) }
+                "community" -> if (item.slug == "wancisou") Res.readBytes("files/wancisou-icon.webp") else null
                 else -> null
             }
         } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }

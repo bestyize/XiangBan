@@ -146,7 +146,7 @@ export const contentApi = {
   removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
   packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p, following:p.following ? "true" : undefined })}`, undefined, p.following === true, runtimeHeaders),
-  pack: (id: number) => request<PackDetail>('GET', `/packs/${id}`, undefined, true, runtimeHeaders),
+  pack: (id: number, recordView = false) => request<PackDetail>('GET', `/packs/${id}${recordView ? '?view=true' : ''}`, undefined, true, runtimeHeaders),
   download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
   schemes: (page = 1, following = false) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page, following:following ? "true" : undefined })}`, undefined, following),
   projects: () => request<{ items: ProjectItem[] }>('GET', '/projects', undefined, false),
