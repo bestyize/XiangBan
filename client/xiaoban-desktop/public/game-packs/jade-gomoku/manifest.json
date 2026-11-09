@@ -9,7 +9,7 @@
   "category": "board",
   "entry": "index.html",
   "icon": "icon.png",
-  "cover": "cover.svg",
+  "cover": "icon.png",
   "orientation": "landscape",
   "input": [
     "touch",

@@ -51,7 +51,7 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
  * 打开子页面时一级页仍留在下面（只是被盖住），返回后滚动位置和已加载的数据都在。
  */
 /** 页面进入、返回的转场时长。 */
-private const val PageMillis = 260
+internal const val PageMillis = 260
 private const val TabMillis = 180
 
 /** Keep visited pages in composition and leave hidden pages out of layout and hit testing. */

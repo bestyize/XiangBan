@@ -706,10 +706,11 @@ class RuntimeV2Activity : ComponentActivity() {
     private fun handleBack() {
         if (closing) return
         if (::chrome.isInitialized && chrome.consentOpen) { media.cancel(); return }
-        if (!::chrome.isInitialized || !ready || failed || chrome.menuOpen) { exit(); return }
+        if (!::chrome.isInitialized || !ready || failed) { exit(); return }
+        if (chrome.menuOpen) { chrome.closeMenu(); return }
         val view = webView
         if (view != null && view.canGoBack()) view.goBack()
-        else chrome.openMenu(armed = true)
+        else exit()
     }
 
     private fun exit() = leave(reopen = false)

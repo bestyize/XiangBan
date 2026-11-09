@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
@@ -155,11 +157,23 @@ internal fun FeaturedGameCard(game: MobileGame, cover: ByteArray?, imageLoader: 
         Box(Modifier.fillMaxWidth().aspectRatio(1f).outlinedCard(16.dp), contentAlignment = Alignment.Center) {
             XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
             cover?.let { bytes -> AsyncImage(bytes, null, imageLoader = imageLoader, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-            Text("官方", Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption)
+            PlazaCoverBadge("官方", Modifier.align(Alignment.BottomEnd).padding(6.dp))
         }
         Text(game.name, Modifier.padding(top = 8.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(BuiltinMobileGames.genre(game.id), Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1)
     }
+}
+
+@Composable
+private fun PlazaCoverBadge(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.72f))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        style = XType.Caption.copy(fontSize = 10.sp, lineHeight = 12.sp),
+        color = Color.White,
+        maxLines = 1,
+    )
 }
 
 @Composable
@@ -260,11 +274,7 @@ private fun AppCommunityCard(env: CommunityEnv, pack: Pack, modifier: Modifier, 
                     CoverStat(XIcons.Eye, views, "浏览量", Modifier.weight(1f, fill = false))
                     CoverStat(XIcons.Message, compactCount(pack.replyCount), "评论数", Modifier.weight(1f, fill = false))
                 }
-                if (pack.featured) {
-                    Text("精选", Modifier.clip(CircleShape).background(LocalExtraColors.current.brandSoft)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = XType.Caption, color = LocalExtraColors.current.brandInk, maxLines = 1)
-                }
+                if (pack.featured) PlazaCoverBadge("精选")
             }
         }
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

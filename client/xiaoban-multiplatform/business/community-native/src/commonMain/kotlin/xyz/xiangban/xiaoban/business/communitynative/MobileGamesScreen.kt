@@ -1,5 +1,15 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -21,6 +31,7 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -32,12 +43,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
@@ -58,6 +71,7 @@ import kotlin.time.Clock
 
 private val LocalCreationTypes = listOf("游戏", "小程序")
 private val CreationTypes = listOf("全部") + LocalCreationTypes + listOf("壁纸", "小组件", "特效", "伙伴")
+private enum class FeaturedPage { Games, Tools }
 private data class CreationItem(val id: String, val name: String, val description: String, val kind: String,
     val game: MobileGame? = null, val owned: Boolean = false) {
     val key get() = (if (owned) "mine:" else "builtin:") + id
@@ -95,8 +109,7 @@ internal fun GamesScreen(
     var panel by remember { mutableStateOf("actions") }
     var creating by remember { mutableStateOf(false) }
     var remixSource by remember { mutableStateOf<MobileGame?>(null) }
-    var allGames by rememberSaveable { mutableStateOf(false) }
-    var allTools by rememberSaveable { mutableStateOf(false) }
+    var featuredPage by rememberSaveable { mutableStateOf<FeaturedPage?>(null) }
     var createKind by rememberSaveable { mutableStateOf("游戏") }
     var idea by rememberSaveable { mutableStateOf("") }
     var remotePrompt by remember { mutableStateOf<String?>(null) }
@@ -131,7 +144,13 @@ internal fun GamesScreen(
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
     val covers = remember { mutableStateMapOf<String, ByteArray>() }
     val overlay = detail != null || creating || remotePrompt != null || remixSource != null
-    LaunchedEffect(overlay, allGames, allTools) { onOverlayChanged(overlay || allGames || allTools) }
+    val featuredTransition = updateTransition(featuredPage.takeUnless { mine }, label = "精选列表切换")
+    val featuredVisible = featuredTransition.currentState != null || featuredTransition.targetState != null
+    val plazaShift by featuredTransition.animateFloat(
+        transitionSpec = { tween(PageMillis, easing = FastOutSlowInEasing) },
+        label = "广场让位",
+    ) { if (it == null) 0f else 1f }
+    LaunchedEffect(overlay, featuredVisible) { onOverlayChanged(overlay || featuredVisible) }
     DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
     fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; remixSource = null; panel = "actions" } }
     fun openOfficial(game: MobileGame) {
@@ -141,8 +160,8 @@ internal fun GamesScreen(
         detail = CreationItem(game.id, game.name, game.description, if (game.kind == "app") "小程序" else "游戏", game)
         panel = "actions"
     }
-    BackHandler(enabled = active && (overlay || allGames || allTools)) {
-        if (!overlay) { allGames = false; allTools = false }
+    BackHandler(enabled = active && (overlay || featuredVisible)) {
+        if (!overlay) featuredPage = null
         else if (!busy && detail != null && panel != "actions") panel = "actions" else close()
     }
     fun createLocal(prompt: String) {
@@ -211,14 +230,19 @@ internal fun GamesScreen(
     }
     val myItems = games.map { CreationItem(it.id, it.name, it.description, if (it.kind == "app") "小程序" else "游戏", it, true) }
     val visible = myItems.filter { category == "全部" || it.kind == category }
-    // Ignore touches while the outgoing page is still visible during its fade.
-    val blockTouches = if (active) Modifier else Modifier.pointerInput(Unit) {
+    // Ignore touches while a page is moving or leaving the active tab.
+    val blockTouches = if (active && !featuredTransition.isRunning) Modifier else Modifier.pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
         }
     }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(blockTouches)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(
+            Modifier.fillMaxSize()
+                .graphicsLayer { translationX = -size.width * plazaShift }
+                .semantics { if (featuredVisible) hideFromAccessibility() }
+                .statusBarsPadding(),
+        ) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     listOf(false to "广场", true to "我的作品").forEach { (value, label) ->
@@ -236,7 +260,8 @@ internal fun GamesScreen(
                     AppPlazaScreen(env, official, games, covers, imageLoader, loading, errors, { reload++ },
                         featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
                         onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
-                        onAllGames = { allGames = true }, onAllTools = { allTools = true }, open = open)
+                        onAllGames = { featuredPage = FeaturedPage.Games },
+                        onAllTools = { featuredPage = FeaturedPage.Tools }, open = open)
                 }
                 RetainedTabPage(selected = mine) {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -277,11 +302,23 @@ internal fun GamesScreen(
             }
         }
         if (!active) return@Box
-        if (allTools && !mine) FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { allTools = false },
-            featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
-            onDetails = ::showOfficialDetails, onOpen = ::openOfficial, open = open)
-        if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false },
-            onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
+        featuredTransition.AnimatedContent(
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                val spec = tween<IntOffset>(PageMillis, easing = FastOutSlowInEasing)
+                if (targetState != null) slideInHorizontally(spec) { it } togetherWith ExitTransition.None
+                else EnterTransition.None togetherWith slideOutHorizontally(spec) { it }
+            },
+        ) { page ->
+            when (page) {
+                FeaturedPage.Tools -> FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { featuredPage = null },
+                    featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
+                    onDetails = ::showOfficialDetails, onOpen = ::openOfficial, open = open)
+                FeaturedPage.Games -> FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { featuredPage = null },
+                    onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
+                null -> Spacer(Modifier.fillMaxSize())
+            }
+        }
         detail?.let { entry ->
             val artwork = if (entry.owned) rememberLocalCover(env.games, entry.game, workRevision) else covers[entry.key]
             if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, artwork, imageLoader,

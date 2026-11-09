@@ -109,7 +109,6 @@ internal class RuntimeV2Chrome(
     private var overlay by mutableStateOf<Overlay?>(Overlay.Loading)
     private var mediaConsent by mutableStateOf<MediaConsent?>(null)
     private var usingMedia by mutableStateOf(false)
-    private var armed by mutableStateOf(false)
     private var landscape by mutableStateOf(false)
     private var menuHorizontalInset by mutableStateOf(0.dp)
     private var menuBottomPadding by mutableStateOf(30.dp)
@@ -178,10 +177,8 @@ internal class RuntimeV2Chrome(
         menuBottomPadding = maxOf(30.dp, (bottom / displayMetrics.density + 6).dp)
     }
 
-    fun openMenu(armed: Boolean) {
-        if (overlay != null || consentOpen) return
-        this.armed = armed
-        if (menuOpen) return
+    private fun openMenu() {
+        if (overlay != null || consentOpen || menuOpen) return
         menuOpen = true
         syncVisibility()
         onMenuChanged(true)
@@ -189,7 +186,6 @@ internal class RuntimeV2Chrome(
 
     fun closeMenu() {
         if (!menuOpen) return
-        armed = false
         menuOpen = false
         syncVisibility()
         onMenuChanged(false)
@@ -249,7 +245,7 @@ internal class RuntimeV2Chrome(
         val ink = MaterialTheme.colorScheme.onSurface
         val shadow = if (ink.luminance() < .5f) Color.White else Color.Black
         Box(
-            Modifier.fillMaxSize().chromeClick { openMenu(armed = false) }
+            Modifier.fillMaxSize().chromeClick(onClick = ::openMenu)
                 .semantics { if (usingMedia) stateDescription = "正在使用摄像头或麦克风" },
             contentAlignment = Alignment.Center,
         ) {
@@ -288,7 +284,6 @@ internal class RuntimeV2Chrome(
     @Composable
     private fun RunMenu() {
         val scheme = MaterialTheme.colorScheme
-        val extra = LocalExtraColors.current
         val scrim = remember { Animatable(0f) }
         val panelProgress = remember { Animatable(0f) }
         LaunchedEffect(Unit) { scrim.animateTo(.45f, tween(200)) }
@@ -338,11 +333,6 @@ internal class RuntimeV2Chrome(
                         onPinShortcut?.let { MenuAction(XIcons.Pin, "添加到桌面", Modifier.weight(1f), it, enabled = !shortcutBusy) }
                     }
                     MenuPill("退出", onExit)
-                    if (armed) Text(
-                        "再返回一次也会退出",
-                        Modifier.fillMaxWidth().padding(top = 8.dp),
-                        style = XType.Caption, color = extra.ink3, textAlign = TextAlign.Center,
-                    )
                 }
             }
         }
