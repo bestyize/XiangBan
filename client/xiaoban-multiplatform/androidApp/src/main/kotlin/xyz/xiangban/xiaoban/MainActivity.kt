@@ -6,7 +6,11 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import android.Manifest
+import android.app.AlertDialog
+import android.content.Intent
 import android.os.Build
+import android.text.format.Formatter
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
@@ -15,8 +19,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
+import xyz.xiangban.xiaoban.business.communitynative.openCommunityWork
 import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.nativeAgentBridgeOrNull
 import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
@@ -26,10 +36,13 @@ class MainActivity : ComponentActivity() {
     internal lateinit var communityEnv: CommunityEnv
         private set
     private var sharingPlatform: CommunitySharingPlatform? = null
-    override fun onNewIntent(intent: android.content.Intent) {
+    private var shortcutJob: Job? = null
+
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         sharingPlatform?.accept(intent)
+        openWorkShortcut(intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -85,8 +98,41 @@ class MainActivity : ComponentActivity() {
             speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffset,
         )
         setContent { CommunityNativeApp(communityEnv) }
+        if (savedInstanceState == null) openWorkShortcut(intent)
         hideNavigationBar()
         (application as XiaobanApplication).prefetchSpeechResources()
+    }
+
+    private fun openWorkShortcut(intent: Intent) {
+        if (Build.VERSION.SDK_INT < 26 || intent.action != RuntimeWorkShortcut.ACTION_OPEN || shortcutJob?.isActive == true) return
+        shortcutJob = lifecycleScope.launch {
+            try {
+                val shortcut = withContext(Dispatchers.IO) { RuntimeWorkShortcut.fromPinnedIntent(this@MainActivity, intent) }
+                    ?: error("桌面快捷方式已失效")
+                val packId = shortcut.communityId
+                if (packId != null) {
+                    openCommunityWork(communityEnv, packId, confirmMobileDownload = ::confirmShortcutDownload)
+                } else {
+                    check(shortcut.matchesLocalSource() && AndroidGameLauncher.open(this@MainActivity, shortcut.id)) { "无法打开这个作品" }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, e.message ?: "无法打开作品，请重试", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private suspend fun confirmShortcutDownload(size: Long): Boolean = suspendCancellableCoroutine { continuation ->
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("使用移动网络下载？")
+            .setMessage("作品包大小为 ${Formatter.formatFileSize(this, size)}。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("下载") { _, _ -> if (continuation.isActive) continuation.resume(true) }
+            .setOnDismissListener { if (continuation.isActive) continuation.resume(false) }
+            .create()
+        continuation.invokeOnCancellation { runOnUiThread { dialog.dismiss() } }
+        dialog.show()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

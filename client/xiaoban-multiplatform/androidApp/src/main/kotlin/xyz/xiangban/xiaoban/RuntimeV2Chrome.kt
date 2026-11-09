@@ -93,6 +93,7 @@ internal class RuntimeV2Chrome(
     private val onExit: () -> Unit,
     private val onFavorite: (() -> Unit)?,
     private val onShare: (() -> Unit)?,
+    private val onPinShortcut: (() -> Unit)?,
     private val onMenuChanged: (Boolean) -> Unit = {},
     private val landscapeLaunch: Boolean = false,
 ) {
@@ -120,6 +121,7 @@ internal class RuntimeV2Chrome(
     var favorited by mutableStateOf(false)
     var favoriteBusy by mutableStateOf(false)
     var shareBusy by mutableStateOf(false)
+    var shortcutBusy by mutableStateOf(false)
 
     // Only the capsule's small view receives touches while the work is running.
     private val capsuleView = ComposeView(activity).apply {
@@ -337,6 +339,7 @@ internal class RuntimeV2Chrome(
                                 enabled = !favoriteBusy, selected = favorited)
                         }
                         onShare?.let { MenuAction(XIcons.Share, "分享", Modifier.weight(1f), it, enabled = !shareBusy) }
+                        onPinShortcut?.let { MenuAction(XIcons.Pin, "添加到桌面", Modifier.weight(1f), it, enabled = !shortcutBusy) }
                     }
                     MenuPill("退出", onExit)
                     if (armed) Text(

@@ -41,7 +41,6 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
 internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = null,
     openGameDetails: (() -> Unit)? = null,
     content: @Composable (loading: Boolean, busy: Boolean, error: String?, launch: () -> Unit) -> Unit) {
-    val platform = env.platform
     val scope = rememberCoroutineScope()
     val busy by env.communityGameBusy.collectAsState()
     var loading by remember(id, version) { mutableStateOf(false) }
@@ -51,61 +50,21 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
     content(loading, busy, error) {
         scope.launch {
             if (env.communityGameBusy.value) return@launch
-            if (platform?.communityGamesSupported != true) {
-                if (openGameDetails != null) {
-                    openGameDetails()
-                    return@launch
-                }
-                error = CommunityWorkUnsupported
-                return@launch
-            }
-            env.communityGameBusy.value = true
             loading = true
             error = null
-            var checkedVersion: Int? = null
             try {
-                require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
-                if (platform.communityNetworkOffline()) {
-                    check(platform.playCachedCommunityTool(id, version)) { "没有可用的离线缓存，请联网打开一次" }
-                    return@launch
-                }
-                val pack = env.forum.pack(id)
-                val chosen = version ?: pack.version
-                if (pack.kind !in setOf("game", "app") || pack.status != "published") {
-                    platform.invalidateCachedCommunityTools(id, null)
-                    error("作品已不可用")
-                }
-                if (pack.kind == "game" && openGameDetails != null) {
-                    openGameDetails()
-                    return@launch
-                }
-                checkedVersion = chosen
-                val info = env.forum.gameDownload(id, chosen)
-                try {
-                    info.validate(pack, chosen)
-                } catch (e: IllegalArgumentException) {
-                    platform.invalidateCachedCommunityTools(id, chosen)
-                    throw e
-                }
-                if (platform.needsRuntimeV2MobileConfirmation(info)) {
+                openCommunityWork(env, id, version, openGameDetails) { size ->
                     val decision = CompletableDeferred<Boolean>()
-                    pendingDownload = info.size to decision
-                    if (!decision.await()) return@launch
+                    pendingDownload = size to decision
+                    decision.await()
                 }
-                val launched = platform.playCommunityRuntimeV2(info, pack)
-                check(launched) { "无法打开试玩，请重试" }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: ApiException) {
-                if (e.status == 0 && platform.playCachedCommunityTool(id, checkedVersion ?: version)) return@launch
-                if (e.status in listOf(403, 404, 410)) platform.invalidateCachedCommunityTools(id, checkedVersion)
-                error = messageOf(e)
             } catch (e: Exception) {
                 error = messageOf(e)
             } finally {
                 pendingDownload = null
                 loading = false
-                env.communityGameBusy.value = false
             }
         }
     }
@@ -121,6 +80,53 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
                 }
             }
         }
+    }
+}
+
+/** Shared by the in-app launch buttons and Android desktop shortcuts. */
+suspend fun openCommunityWork(
+    env: CommunityEnv,
+    id: Long,
+    version: Int? = null,
+    openGameDetails: (() -> Unit)? = null,
+    confirmMobileDownload: suspend (Long) -> Boolean,
+) {
+    val platform = env.platform
+    if (platform?.communityGamesSupported != true) {
+        if (openGameDetails != null) return openGameDetails()
+        error(CommunityWorkUnsupported)
+    }
+    if (!env.communityGameBusy.compareAndSet(false, true)) return
+    var checkedVersion: Int? = null
+    try {
+        require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
+        if (platform.communityNetworkOffline()) {
+            check(platform.playCachedCommunityTool(id, version)) { "没有可用的离线缓存，请联网打开一次" }
+            return
+        }
+        val pack = env.forum.pack(id)
+        if (pack.kind !in setOf("game", "app") || pack.status != "published") {
+            platform.invalidateCachedCommunityTools(id, null)
+            error("作品已不可用")
+        }
+        if (pack.kind == "game" && openGameDetails != null) return openGameDetails()
+        val chosen = version ?: pack.version
+        checkedVersion = chosen
+        val info = env.forum.gameDownload(id, chosen)
+        try {
+            info.validate(pack, chosen)
+        } catch (e: IllegalArgumentException) {
+            platform.invalidateCachedCommunityTools(id, chosen)
+            throw e
+        }
+        if (platform.needsRuntimeV2MobileConfirmation(info) && !confirmMobileDownload(info.size)) return
+        check(platform.playCommunityRuntimeV2(info, pack)) { "无法打开作品，请重试" }
+    } catch (e: ApiException) {
+        if (e.status == 0 && platform.playCachedCommunityTool(id, checkedVersion ?: version)) return
+        if (e.status in listOf(403, 404, 410)) platform.invalidateCachedCommunityTools(id, checkedVersion)
+        throw e
+    } finally {
+        env.communityGameBusy.value = false
     }
 }
 

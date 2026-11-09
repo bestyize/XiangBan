@@ -55,6 +55,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize" />
         <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <receiver android:name=".RuntimeWorkShortcutResult" android:exported="false" />
     </application>
 
 </manifest>

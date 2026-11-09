@@ -2,12 +2,14 @@ package xyz.xiangban.xiaoban
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.graphics.Rect
+import android.net.Uri
 import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import android.view.MotionEvent
 import android.view.KeyEvent
@@ -37,6 +40,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -55,6 +59,9 @@ import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -97,6 +104,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private val favoriteReceiver by lazy { RuntimeV2Favorites.receiver(intent) }
     private var favorite: Boolean? = null
     private var shareJob: Job? = null
+    private val shortcutWindowFocused = MutableStateFlow(false)
     private val mbtiShare = RuntimeV2MbtiShare(this)
     private val backCallback by lazy { OnBackInvokedCallback { handleBack() } }
     private val media = RuntimeV2Media(this, { chrome }, { ready && resumed && !closing && !failed && !chrome.menuOpen }, ::updateVisibility)
@@ -109,6 +117,11 @@ class RuntimeV2Activity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_UP && event.keyCode in setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_SPACE)) lastUserGesture = SystemClock.elapsedRealtime()
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        shortcutWindowFocused.value = hasFocus
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -179,12 +192,14 @@ class RuntimeV2Activity : ComponentActivity() {
                     pack.manifest.category == "quiz" -> "测评"
                     else -> "工具"
                 }
+                val shortcut = RuntimeWorkShortcut.forWork(id, workspace, intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0))
                 chrome = RuntimeV2Chrome(
                     this@RuntimeV2Activity, container, pack.manifest.name, kindLabel, icon,
                     official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit,
                     onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
                     onShare = if (id != RUNTIME_V2_FIXTURE) ({ shareWork(id, workspace) }) else null,
+                    onPinShortcut = if (Build.VERSION.SDK_INT >= 26 && shortcut != null) ({ pinWork(shortcut, icon?.asAndroidBitmap()) }) else null,
                     onMenuChanged = { open ->
                         updateVisibility()
                         if (open) updateFavorite(toggle = false)
@@ -205,6 +220,62 @@ class RuntimeV2Activity : ComponentActivity() {
                 configureProxy()
             }.onFailure { showUnavailable("无法打开作品：${it.message.orEmpty().take(100)}") }
         }
+    }
+
+    @androidx.annotation.RequiresApi(26)
+    private fun pinWork(shortcut: RuntimeWorkShortcut, icon: android.graphics.Bitmap?) {
+        if (chrome.shortcutBusy || closing) return
+        chrome.shortcutBusy = true
+        lifecycleScope.launch {
+            try {
+                val xiaomi = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { shortcut.requestPin(this@RuntimeV2Activity, pack.manifest.name, icon) }
+                        .getOrDefault(RuntimeWorkShortcut.PinResult.Rejected)
+                }
+                if (result == RuntimeWorkShortcut.PinResult.AlreadyPinned) {
+                    Toast.makeText(this@RuntimeV2Activity, "快捷方式已在桌面", Toast.LENGTH_SHORT).show()
+                    chrome.closeMenu()
+                    return@launch
+                }
+
+                var offerSettings = xiaomi && result == RuntimeWorkShortcut.PinResult.Rejected
+                if (result == RuntimeWorkShortcut.PinResult.Requested) {
+                    // Wait for the launcher to finish its confirmation before reporting an unpinned request.
+                    delay(1_200)
+                    offerSettings = xiaomi && shortcutWindowFocused.value
+                    shortcutWindowFocused.first { it }
+                    delay(250)
+                    val pinned = withContext(Dispatchers.IO) {
+                        runCatching { shortcut.isPinned(this@RuntimeV2Activity) }.getOrDefault(false)
+                    }
+                    if (pinned) {
+                        chrome.closeMenu()
+                        return@launch
+                    }
+                }
+                if (!closing && !isFinishing) {
+                    Toast.makeText(this@RuntimeV2Activity, "未添加到桌面", Toast.LENGTH_SHORT).show()
+                    if (offerSettings) {
+                        AlertDialog.Builder(this@RuntimeV2Activity)
+                            .setTitle("尚未添加到桌面")
+                            .setMessage("请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。")
+                            .setNegativeButton("取消", null)
+                            .setPositiveButton("去设置") { _, _ -> openShortcutSettings() }
+                            .show()
+                    }
+                }
+            } finally {
+                chrome.shortcutBusy = false
+            }
+        }
+    }
+
+    private fun openShortcutSettings() {
+        val miui = Intent("miui.intent.action.APP_PERM_EDITOR")
+            .setPackage("com.miui.securitycenter").putExtra("extra_pkgname", packageName)
+        val appSettings = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        runCatching { startActivity(miui) }.recoverCatching { startActivity(appSettings) }
     }
 
     private fun updateFavorite(toggle: Boolean) {
