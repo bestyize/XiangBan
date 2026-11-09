@@ -33,6 +33,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
@@ -51,7 +52,9 @@ import androidx.webkit.ScriptHandler
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -59,6 +62,7 @@ import org.json.JSONObject
 import xyz.xiangban.xiaoban.business.communitynative.AppearanceMode
 import xyz.xiangban.xiaoban.business.communitynative.InMemoryPrefs
 import xyz.xiangban.xiaoban.business.communitynative.ThemeState
+import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import java.io.ByteArrayInputStream
 
 /** Protocol 2 pages run in a separate process with a filtering WebView proxy. */
@@ -90,6 +94,9 @@ class RuntimeV2Activity : ComponentActivity() {
     private var safeInsets = Rect()
     private var lastUserGesture = 0L
     private var exportInFlight = false
+    private val favoriteReceiver by lazy { RuntimeV2Favorites.receiver(intent) }
+    private var favorite: Boolean? = null
+    private var shareJob: Job? = null
     private val mbtiShare = RuntimeV2MbtiShare(this)
     private val backCallback by lazy { OnBackInvokedCallback { handleBack() } }
     private val media = RuntimeV2Media(this, { chrome }, { ready && resumed && !closing && !failed && !chrome.menuOpen }, ::updateVisibility)
@@ -175,7 +182,13 @@ class RuntimeV2Activity : ComponentActivity() {
                 chrome = RuntimeV2Chrome(
                     this@RuntimeV2Activity, container, pack.manifest.name, kindLabel, icon,
                     official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
-                    onRestart = { leave(reopen = true) }, onExit = ::exit, onMenuChanged = { updateVisibility() },
+                    onRestart = { leave(reopen = true) }, onExit = ::exit,
+                    onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
+                    onShare = if (id != RUNTIME_V2_FIXTURE) ({ shareWork(id, workspace) }) else null,
+                    onMenuChanged = { open ->
+                        updateVisibility()
+                        if (open) updateFavorite(toggle = false)
+                    },
                     landscapeLaunch = pack.manifest.orientation == "landscape",
                 )
                 setContentView(container)
@@ -191,6 +204,55 @@ class RuntimeV2Activity : ComponentActivity() {
                 ViewCompat.requestApplyInsets(container)
                 configureProxy()
             }.onFailure { showUnavailable("无法打开作品：${it.message.orEmpty().take(100)}") }
+        }
+    }
+
+    private fun updateFavorite(toggle: Boolean) {
+        val receiver = favoriteReceiver ?: return
+        if (chrome.favoriteBusy || closing) return
+        chrome.favoriteBusy = true
+        lifecycleScope.launch {
+            try {
+                favorite = if (toggle) {
+                    val current = favorite ?: RuntimeV2Favorites.request(receiver, pack.manifest.name)
+                    RuntimeV2Favorites.request(receiver, pack.manifest.name, saved = !current)
+                } else RuntimeV2Favorites.request(receiver, pack.manifest.name)
+                chrome.favorited = favorite == true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                favorite = null
+                chrome.favorited = false
+                if (toggle && !closing) {
+                    Toast.makeText(this@RuntimeV2Activity, e.message ?: "收藏操作失败，请稍后重试", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                chrome.favoriteBusy = false
+            }
+        }
+    }
+
+    private fun shareWork(id: String, workspace: Boolean) {
+        if (chrome.shareBusy || closing) return
+        chrome.shareBusy = true
+        shareJob = lifecycleScope.launch {
+            try {
+                if (workspace) {
+                    check(AndroidCreationSharing(this@RuntimeV2Activity).shareGame(id))
+                } else {
+                    val site = CommunityConfig().forumBase
+                    val packId = intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0)
+                    val url = if (packId > 0) "$site/packs/$packId" else "$site/create?game=$id"
+                    shareText(this@RuntimeV2Activity, pack.manifest.name, url)
+                }
+                chrome.closeMenu()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                if (!closing) Toast.makeText(this@RuntimeV2Activity, "分享失败，请稍后重试", Toast.LENGTH_SHORT).show()
+            } finally {
+                chrome.shareBusy = false
+            }
         }
     }
 
@@ -544,6 +606,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private fun leave(reopen: Boolean) {
         if (closing) return
         closing = true
+        shareJob?.cancel()
         media.cancel()
         if (webView == null) { finish(); return }
         updateVisibility()

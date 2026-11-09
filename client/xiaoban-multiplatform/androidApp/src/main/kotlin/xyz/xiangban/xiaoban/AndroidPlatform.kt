@@ -65,14 +65,7 @@ class AndroidPlatformActions(
         clipboard.setPrimaryClip(ClipData.newPlainText("链接", text))
     }
 
-    override fun share(title: String, url: String) {
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, title)
-            putExtra(Intent.EXTRA_TEXT, "$title $url")
-        }
-        context.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
+    override fun share(title: String, url: String) = shareText(context.applicationContext, title, url)
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -202,4 +195,15 @@ class AndroidPlatformActions(
         val settings = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(settings) }.isSuccess
     }
+}
+
+internal fun shareText(context: Context, title: String, url: String) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, title)
+        putExtra(Intent.EXTRA_TEXT, "$title $url")
+    }
+    val chooser = Intent.createChooser(send, title)
+    if (context !is android.app.Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(chooser)
 }

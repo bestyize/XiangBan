@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import xyz.xiangban.xiaoban.common.community.AccountApi
 import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.AgentRuntime
+import xyz.xiangban.xiaoban.common.community.AppShortcut
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
 import xyz.xiangban.xiaoban.common.community.LocalSpeech
 import xyz.xiangban.xiaoban.common.community.SpeechModels
@@ -162,6 +163,15 @@ class CommunityEnv(
     private var accountChanged: (String?, String?) -> Unit = { _, _ -> }
     val communityGameBusy = kotlinx.coroutines.flow.MutableStateFlow(false)
     internal val appLibrary = AppLibraryState(prefs)
+
+    fun isLocalAppFavorite(source: String, id: String): Boolean =
+        appLibrary.favorites.any { it.source == source && it.id == id }
+
+    fun setLocalAppFavorite(item: AppShortcut, saved: Boolean): Boolean {
+        if (isLocalAppFavorite(item.source, item.id) != saved) appLibrary.toggle(item)
+        return saved
+    }
+
     val contentBookmarkRevision = kotlinx.coroutines.flow.MutableStateFlow(0)
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }

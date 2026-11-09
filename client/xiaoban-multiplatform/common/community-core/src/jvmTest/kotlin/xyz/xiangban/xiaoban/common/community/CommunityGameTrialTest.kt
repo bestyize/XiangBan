@@ -61,4 +61,15 @@ class CommunityGameTrialTest {
         val page = api.bookmarks("game",2); assertTrue(page.hasMore); assertEquals("pack",page.items.single().kind)
         server.client.close()
     }
+
+    @Test fun `app collection accepts app packs and rejects games`() = runTest {
+        val server = FakeServer()
+        val api = ContentSocialApi(server.client, CommunityConfig()) { "access" }
+        val app = """{"items":[{"kind":"pack","id":55,"created_at":"now","content":{"id":55,"title":"Tool","kind":"app"}}]}"""
+        server.on("/api/me/content-bookmarks?kind=app&page=1", body = app)
+        server.on("/api/me/content-bookmarks?kind=app&page=2", body = app.replace("\"app\"", "\"game\""))
+        assertEquals(55L, api.bookmarks("app").items.single().id)
+        assertFailsWith<ApiException> { api.bookmarks("app", 2) }
+        server.client.close()
+    }
 }

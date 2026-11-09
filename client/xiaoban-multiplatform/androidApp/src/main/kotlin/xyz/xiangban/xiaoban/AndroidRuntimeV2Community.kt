@@ -51,6 +51,7 @@ internal object AndroidRuntimeV2Community {
             val intent = RuntimeV2Activity.launchIntent(activity) {
                 AndroidCommunityGames.opened(appContext, recent)
             }
+            if (activity is MainActivity) RuntimeV2Favorites.attach(intent, activity, "community", info.packId.toString())
             val legacyVersions = pack.versions.asSequence()
                 .filter { it.version in 1 until info.version }
                 .filter { (it.manifest["runtimeProtocol"] ?: JsonPrimitive(1)) == JsonPrimitive(1) }

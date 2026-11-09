@@ -12,12 +12,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
+import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.nativeAgentBridgeOrNull
 import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
 import xyz.xiangban.xiaoban.common.link.SqliteRemoteCache
 
 class MainActivity : ComponentActivity() {
+    internal lateinit var communityEnv: CommunityEnv
+        private set
     private var sharingPlatform: CommunitySharingPlatform? = null
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
@@ -70,9 +77,14 @@ class MainActivity : ComponentActivity() {
         val communityConfig = xyz.xiangban.xiaoban.common.community.CommunityConfig(runtimeV2 = RuntimeV2Activity.supported(this)).let { config ->
             if (previewBase == null) config else config.copy(forumBase = previewBase)
         }
-        setContent {
-            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset, communityConfig)
-        }
+        communityEnv = CommunityEnv(
+            config = communityConfig, storage = storage, platform = forumPlatform,
+            linkStorage = linkStorage, remoteCache = remoteCache,
+            scope = CoroutineScope(lifecycleScope.coroutineContext + Dispatchers.Default),
+            agentBridge = agentBridge, agentDir = agentDir, reminders = reminders,
+            speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffset,
+        )
+        setContent { CommunityNativeApp(communityEnv) }
         hideNavigationBar()
         (application as XiaobanApplication).prefetchSpeechResources()
     }

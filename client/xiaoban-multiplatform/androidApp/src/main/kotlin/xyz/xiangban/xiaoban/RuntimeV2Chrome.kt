@@ -91,6 +91,8 @@ internal class RuntimeV2Chrome(
     private val author: String?,
     private val onRestart: () -> Unit,
     private val onExit: () -> Unit,
+    private val onFavorite: (() -> Unit)?,
+    private val onShare: (() -> Unit)?,
     private val onMenuChanged: (Boolean) -> Unit = {},
     private val landscapeLaunch: Boolean = false,
 ) {
@@ -114,6 +116,10 @@ internal class RuntimeV2Chrome(
     var menuOpen by mutableStateOf(false)
         private set
     val consentOpen: Boolean get() = mediaConsent != null
+
+    var favorited by mutableStateOf(false)
+    var favoriteBusy by mutableStateOf(false)
+    var shareBusy by mutableStateOf(false)
 
     // Only the capsule's small view receives touches while the work is running.
     private val capsuleView = ComposeView(activity).apply {
@@ -326,9 +332,11 @@ internal class RuntimeV2Chrome(
                     Box(Modifier.fillMaxWidth().height(.5.dp).background(scheme.outline))
                     Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         MenuAction(XIcons.Refresh, "重新开始", Modifier.weight(1f), onRestart)
-                        MenuAction(XIcons.Star, "收藏", Modifier.weight(1f), null)
-                        MenuAction(XIcons.Share, "分享", Modifier.weight(1f), null)
-                        MenuAction(XIcons.Flag, if (official) "反馈" else "举报", Modifier.weight(1f), null)
+                        onFavorite?.let {
+                            MenuAction(XIcons.Star, if (favorited) "取消收藏" else "收藏", Modifier.weight(1f), it,
+                                enabled = !favoriteBusy, selected = favorited)
+                        }
+                        onShare?.let { MenuAction(XIcons.Share, "分享", Modifier.weight(1f), it, enabled = !shareBusy) }
                     }
                     MenuPill("退出", onExit)
                     if (armed) Text(
@@ -370,18 +378,19 @@ internal class RuntimeV2Chrome(
     }
 
     @Composable
-    private fun MenuAction(image: ImageVector, label: String, modifier: Modifier, action: (() -> Unit)?) {
-        val scheme = MaterialTheme.colorScheme
+    private fun MenuAction(image: ImageVector, label: String, modifier: Modifier, action: () -> Unit,
+        enabled: Boolean = true, selected: Boolean = false) {
+        val tint = if (selected) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface
         Column(
-            modifier.clickable(interactionSource = null, indication = null, enabled = action != null, role = Role.Button) { action?.invoke() },
+            modifier.clickable(interactionSource = null, indication = null, enabled = enabled, role = Role.Button, onClick = action),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
                 Modifier.size(48.dp).background(LocalExtraColors.current.fill, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center,
-            ) { XIcon(image, tint = scheme.onSurface, size = 22.dp) }
-            Text(label, style = XType.Caption, color = scheme.onSurface, textAlign = TextAlign.Center)
+            ) { XIcon(image, tint = tint, size = 22.dp) }
+            Text(label, style = XType.Caption, color = tint, textAlign = TextAlign.Center)
         }
     }
 

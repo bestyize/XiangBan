@@ -33,15 +33,18 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
     var loading by remember { mutableStateOf(true) }
     val session by env.session.state.collectAsState()
     val bookmarkRevision by env.contentBookmarkRevision.collectAsState()
-    var page by rememberSaveable(session.accountId) { mutableIntStateOf(1) }
+    var page by rememberSaveable(session.accountId, bookmarkRevision) { mutableIntStateOf(1) }
     var bookmarks by remember(session.accountId) { mutableStateOf(emptyList<AppShortcut>()) }
     val bookmarkLoader = rememberLoader(env, "app-drawer-favorites-${session.accountId}-$page-$bookmarkRevision") {
-        if (session.loggedIn) env.contentSocial.bookmarks("game", page) else Page<ContentBookmark>()
+        if (session.loggedIn) {
+            val games = env.contentSocial.bookmarks("game", page)
+            val apps = env.contentSocial.bookmarks("app", page)
+            (games.items + apps.items).sortedByDescending { it.createdAt } to (games.hasMore || apps.hasMore)
+        } else emptyList<ContentBookmark>() to false
     }
     val bookmarkState by bookmarkLoader.state.collectAsState()
-    LaunchedEffect(bookmarkRevision) { page = 1 }
     LaunchedEffect(bookmarkState) {
-        (bookmarkState as? Load.Ready)?.value?.let { result -> bookmarks = ((if (page == 1) emptyList() else bookmarks) + result.items.map {
+        (bookmarkState as? Load.Ready)?.value?.let { result -> bookmarks = ((if (page == 1) emptyList() else bookmarks) + result.first.map {
             AppShortcut("community", it.id.toString(), it.content.title, it.content.coverUrl)
         }).distinctBy { it.key } }
     }
@@ -84,7 +87,7 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
                 when (val current = bookmarkState) {
                     is Load.Ready -> {
                         if (favorites.isEmpty()) Text("还没有收藏的应用", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                        if (current.value.hasMore) AppActionButton("加载更多收藏", { page++ }, Modifier.fillMaxWidth())
+                        if (current.value.second) AppActionButton("加载更多收藏", { page++ }, Modifier.fillMaxWidth())
                     }
                     is Load.Failed -> Banner(current.message, warn = true, actionText = "重试", onAction = bookmarkLoader::reload)
                     else -> Spinner(Modifier.fillMaxWidth().height(48.dp))

@@ -12,6 +12,9 @@ internal object AndroidGameLauncher {
         return runCatching {
             activity.startActivity(RuntimeV2Activity.launchIntent(activity, opened).apply {
                 putExtra(RuntimeV2Activity.EXTRA_GAME_ID, id)
+                if (activity is MainActivity && id != RUNTIME_V2_FIXTURE) {
+                    RuntimeV2Favorites.attach(this, activity, if (builtin) "builtin" else "local", id)
+                }
                 if (!builtin) {
                     putExtra(RuntimeV2Activity.EXTRA_WORKSPACE, true)
                     putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, false)
