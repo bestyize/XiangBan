@@ -169,6 +169,7 @@ class AndroidPlatformActions(
     override suspend fun builtinGames() = gameLibrary.games()
     override suspend fun builtinGameCover(id: String) = gameLibrary.cover(id)
     override suspend fun builtinGameIcon(id: String) = gameLibrary.icon(id)
+    override suspend fun creationThreeLibrary() = gameLibrary.threeLibrary()
     override fun openGame(id: String): Boolean =
         (context as? android.app.Activity)?.let { AndroidGameLauncher.open(it, id) } ?: false
 

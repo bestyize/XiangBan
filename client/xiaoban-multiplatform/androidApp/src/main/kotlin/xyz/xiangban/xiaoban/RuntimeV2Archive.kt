@@ -7,8 +7,10 @@ import java.io.RandomAccessFile
 import java.util.Locale
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipFile
+import xyz.xiangban.xiaoban.common.community.MobileGameFile
 
 internal object RuntimeV2Archive {
     const val MAX_ZIP_BYTES = 100L * 1024 * 1024
@@ -17,6 +19,18 @@ internal object RuntimeV2Archive {
     private const val MAX_MANIFEST_BYTES = 64 * 1024
     private const val MAX_ENTRIES = 3000
     private const val MANIFEST = "manifest.json"
+
+    /** Encodes the validated snapshot returned by the local work store. */
+    fun encode(files: List<MobileGameFile>): ByteArray = ByteArrayOutputStream().use { output ->
+        ZipOutputStream(output).use { zip ->
+            for (file in files) {
+                zip.putNextEntry(ZipEntry(file.path))
+                zip.write(file.bytes)
+                zip.closeEntry()
+            }
+        }
+        output.toByteArray()
+    }
 
     /** Extracts into a fresh, private staging directory. The caller publishes it only after success. */
     fun extract(zip: File, destination: File, expectedKind: String): RuntimeV2Manifest {

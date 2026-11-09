@@ -2,20 +2,46 @@ package xyz.xiangban.xiaoban
 
 import java.io.File
 import java.io.RandomAccessFile
+import java.util.Base64
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.runBlocking
 import org.apache.commons.compress.archivers.zip.Zip64Mode
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import xyz.xiangban.xiaoban.common.community.MemoryMobileWorkspace
+import xyz.xiangban.xiaoban.common.community.MobileGame
+import xyz.xiangban.xiaoban.common.community.MobileGameFile
+import xyz.xiangban.xiaoban.common.community.MobileGameStore
 
 class RuntimeV2ArchiveTest {
     @get:Rule val temporary = TemporaryFolder()
+
+    @Test fun sharedMobileWorkKeepsArtAndLibraryInRuntimePackage() = runBlocking {
+        val store = MobileGameStore(MemoryMobileWorkspace())
+        val game = MobileGame("tool-demo", "测试工具", "验收用例", kind = "app", category = "tool", cover = "art/cover.png")
+        val artwork = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1sAAAAASUVORK5CYII=")
+        val library = "var THREE = { REVISION: '128' };".toByteArray()
+        store.create(game, listOf(
+            MobileGameFile("index.html", "<script src='lib/three.min.js'></script>"),
+            MobileGameFile("icon.svg", "<svg/>"),
+            MobileGameFile(game.cover, artwork),
+            MobileGameFile("lib/three.min.js", library),
+        ))
+        val archive = temporary.newFile().apply { writeBytes(RuntimeV2Archive.encode(store.exportFiles(game.id))) }
+        val destination = temporary.newFolder(game.id)
+        assertEquals(game.cover, RuntimeV2Archive.extract(archive, destination, "app").cover)
+        val runtime = RuntimeV2Package.loadWorkspace(destination, game.id)
+        assertArrayEquals(artwork, runtime.open(game.cover)!!.use { it.readBytes() })
+        assertArrayEquals(library, runtime.open("lib/three.min.js")!!.use { it.readBytes() })
+    }
 
     @Test fun extractsClassicAndZip64ArchivesWithExplicitAndImplicitDirectories() {
         for (mode in listOf(Zip64Mode.Never, Zip64Mode.Always)) {

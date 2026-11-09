@@ -36,7 +36,8 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                     return@suspendCancellableCoroutine
                 }
                 waiting = continuation
-                continuation.invokeOnCancellation { activity.runOnUiThread { if (waiting === continuation) waiting = null } }
+                // Keep the slot until this picker returns, even if its caller cancels.
+                // A subsequent request must not receive the previous selection.
                 try {
                     launcher.launch(if (image) arrayOf("image/png", "image/jpeg", "image/gif", "image/webp") else arrayOf("*/*"))
                 } catch (e: Exception) {
@@ -55,7 +56,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                     if (nameIndex >= 0 && !cursor.isNull(nameIndex)) name = cursor.getString(nameIndex)
                     val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                     if (sizeIndex >= 0 && !cursor.isNull(sizeIndex) && cursor.getLong(sizeIndex) > limit)
-                        throw ApiException(400, "文件超过上传上限（${limit / 1024 / 1024} MB）")
+                        throw ApiException(400, "文件超过大小上限（${limit / 1024 / 1024} MB）")
                 }
             }
             val mime = resolver.getType(uri) ?: "application/octet-stream"
@@ -67,7 +68,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                     val size = input.read(buffer, 0, minOf(buffer.size.toLong(), limit - total + 1).toInt())
                     if (size < 0) break
                     total += size
-                    if (total > limit) throw ApiException(400, "文件超过上传上限（${limit / 1024 / 1024} MB）")
+                    if (total > limit) throw ApiException(400, "文件超过大小上限（${limit / 1024 / 1024} MB）")
                     output.write(buffer, 0, size)
                 }
             } ?: throw ApiException(400, "无法读取这个文件，请重新选择")

@@ -108,7 +108,7 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
             }
         }
     }
-    OverlayTransition(remix) { panel -> AppRemixSheet(env, chat, pack.title, pack.summary, { remix = false }, open, panel) }
+    OverlayTransition(remix) { panel -> AppRemixSheet(env, chat, pack.title, pack.summary, { remix = false }, open, panel, kind = pack.kind) }
     OverlayTransition(share) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享作品", null, { share = false }, {}, panel) }
 }
 
@@ -140,7 +140,7 @@ private fun AppAuthorFollow(env: CommunityEnv, uid: String, open: ((Route) -> Un
 /** A descriptive reference is carried into the existing local creation chat; no source-copy/provenance claims. */
 @Composable
 internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: String, summary: String,
-    dismiss: () -> Unit, open: ((Route) -> Unit)?, panel: Modifier = Modifier) {
+    dismiss: () -> Unit, open: ((Route) -> Unit)?, panel: Modifier = Modifier, kind: String = "game") {
     var idea by rememberSaveable(title) { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     val session by env.session.state.collectAsState()
@@ -151,12 +151,14 @@ internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: 
             Text("参考《$title》", style = XType.Secondary, color = LocalExtraColors.current.ink3)
             if (summary.isNotBlank()) Text(summary, style = XType.Secondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(12.dp)) {
-                if (idea.isBlank()) Text("想怎么改？比如换一个主题，加一个新玩法", style = XType.Body, color = LocalExtraColors.current.ink3)
+                if (idea.isBlank()) Text(if (kind == "app") "想怎么改？比如换一个主题，加一个新功能" else "想怎么改？比如换一个主题，加一个新玩法", style = XType.Body, color = LocalExtraColors.current.ink3)
                 BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 104.dp).semantics { contentDescription = "改编想法" },
                     textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(MaterialTheme.colorScheme.primary))
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("换一个主题", "加一个新玩法", "改得简单一点", "加一个双人模式").forEach { hint -> AppActionButton(hint, { idea = hint }, height = 34.dp) }
+                val hints = if (kind == "app") listOf("换一个主题", "加一个新功能", "改得简单一点")
+                    else listOf("换一个主题", "加一个新玩法", "改得简单一点", "加一个双人模式")
+                hints.forEach { hint -> AppActionButton(hint, { idea = hint }, height = 34.dp) }
             }
             Text("小伴先给你看方案，确认后再制作。", style = XType.Caption, color = LocalExtraColors.current.ink3)
             AppActionButton("开始", {
@@ -168,7 +170,7 @@ internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: 
                         chat.clearConversation()
                         dismiss()
                         open?.invoke(Route.AiChat)
-                        chat.send(appRemixPrompt(title, summary, idea))
+                        chat.send(appRemixPrompt(title, summary, idea, kind))
                     }
                 }
             }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && open != null)

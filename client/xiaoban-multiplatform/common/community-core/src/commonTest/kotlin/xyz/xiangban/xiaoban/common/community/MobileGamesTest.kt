@@ -7,6 +7,7 @@ import kotlin.test.*
 class MobileGamesTest {
     private val game = MobileGame("touch-runner", "触控跑酷", "点按跳跃并挑战最高分", category = "action")
     private val svg = "<svg xmlns='http://www.w3.org/2000/svg'/>"
+    private val gif = "GIF89a".encodeToByteArray() + byteArrayOf(1, 0, 1, 0, -128, 0, 0)
     private val files = listOf(MobileGameFile("index.html", "<!doctype html><script src='game.js'></script>"), MobileGameFile("game.js", "let score = 0;"),
         MobileGameFile("icon.svg", svg), MobileGameFile("cover.svg", svg))
 
@@ -99,8 +100,11 @@ class MobileGamesTest {
         }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + MobileGameFile("big.js", "a".repeat(MobileGameFormat.FILE_BYTES + 1))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + (1..MobileGameFormat.FILES).map { MobileGameFile("file$it.js", "x") }) }
-        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + (1..9).map { MobileGameFile("file$it.js", "a".repeat(1024 * 1024)) }) }
+        val fullTextFile = ByteArray(MobileGameFormat.FILE_BYTES) { 'a'.code.toByte() }
+        val fullPack = (1..MobileGameFormat.TOTAL_BYTES / MobileGameFormat.FILE_BYTES).map { MobileGameFile("file$it.js", fullTextFile) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + fullPack) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + listOf(MobileGameFile("folder.js", "x"), MobileGameFile("folder.js/child.js", "x"))) }
+        assertFailsWith<IllegalArgumentException> { MobileGameFormat.files(files + listOf(MobileGameFile("Art/sprite.gif", gif), MobileGameFile("art/notes.txt", "x"))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(name = "字".repeat(25))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(description = "字".repeat(81))) }
         assertFailsWith<IllegalArgumentException> { MobileGameFormat.metadata(game.copy(name = "\u0085")) }
@@ -149,13 +153,84 @@ class MobileGamesTest {
             }
         }
         val store = MobileGameStore(workspace)
-        store.create(game, files)
+        store.create(game, files + MobileGameFile("assets/sprite.gif", gif))
         val before = store.exportFiles(game.id)
         assertFailsWith<IllegalArgumentException> { store.create(game.copy(name = "新版"), listOf(MobileGameFile("other.js", "x")), overwrite = true) }
         assertEquals(before, store.exportFiles(game.id))
         failPath = "games/${game.id}/manifest.json"
-        assertFailsWith<IllegalStateException> { store.create(game.copy(name = "新版"), files.map { it.copy(content = it.content + "updated") }, overwrite = true) }
+        assertFailsWith<IllegalStateException> { store.create(game.copy(name = "新版"), files.map { MobileGameFile(it.path, it.content + "updated") }, overwrite = true) }
         assertEquals(before, store.exportFiles(game.id))
+    }
+
+    @Test
+    fun `library and selected artwork survive small program installation and export`() = runTest {
+        val workspace = MemoryMobileWorkspace()
+        val store = MobileGameStore(workspace)
+        val directory = "drafts/clock"
+        val three = "var THREE = { REVISION: '128' };".encodeToByteArray()
+        val tools = mobileGameAssetTools(workspace, { three }) { image, maxBytes ->
+            assertTrue(image)
+            assertEquals(MobileWorkspaceLimits.ASSET_BYTES.toLong(), maxBytes)
+            ForumUploadFile("art.gif", "image/gif", gif)
+        }.associateBy { it.name }
+        val library = buildJsonObject { put("source_dir", directory); put("library", "three") }
+        val artwork = buildJsonObject { put("source_dir", directory); put("path", "assets/art.gif") }
+        assertTrue(tools.getValue("lib_add").run(library).ok)
+        assertTrue(tools.getValue("lib_add").run(library).ok)
+        assertTrue(tools.getValue("asset_import").run(artwork).ok)
+        workspace.write("$directory/index.html", "<script src='lib/three.min.js'></script>")
+        workspace.write("$directory/icon.svg", svg)
+        val result = mobileGameTools(store).single { it.name == "app_create" }.run(buildJsonObject {
+            put("source_dir", directory)
+            put("id", "my-clock")
+            put("name", "专注时钟")
+            put("description", "设置专注时间")
+            put("kind", "app")
+            put("cover", "assets/art.gif")
+        })
+        assertTrue(result.ok, result.output)
+        val work = store.validate("my-clock")
+        assertEquals("app", work.kind)
+        assertEquals("tool", work.category)
+        assertEquals("assets/art.gif", work.cover)
+        assertContentEquals(gif, store.readFileBytes(work.id, work.cover))
+        val exported = store.exportFiles(work.id).associateBy { it.path }
+        assertContentEquals(three, exported.getValue("lib/three.min.js").bytes)
+        assertContentEquals(gif, exported.getValue(work.cover).bytes)
+        assertEquals(work, readMobileGameManifest(exported.getValue("manifest.json").content))
+        val copyFile = mobileWorkspaceTools(workspace).single { it.name == "copy_file" }
+        val nextDraftCover = "drafts/clock-revision/${work.cover}"
+        assertTrue(copyFile.run(buildJsonObject {
+            put("source", "games/${work.id}/${work.cover}")
+            put("path", nextDraftCover)
+        }).ok)
+        assertContentEquals(gif, workspace.readBytes(nextDraftCover))
+    }
+
+    @Test
+    fun `asset picker validates target before opening and never overwrites another file`() = runTest {
+        val workspace = MemoryMobileWorkspace()
+        var selections = 0
+        var selected: ForumUploadFile? = null
+        val importer = mobileGameAssetTools(workspace, null) { _, _ -> selections++; selected }.single()
+        fun args(directory: String = "drafts/runner", path: String = "assets/sprite.gif") =
+            buildJsonObject { put("source_dir", directory); put("path", path) }
+        assertFalse(importer.run(args(directory = "games/runner")).ok)
+        assertFalse(importer.run(args(path = "../sprite.gif")).ok)
+        assertFalse(importer.run(args(path = "assets/script.js")).ok)
+        assertEquals(0, selections)
+        val cancelled = importer.run(args())
+        assertTrue(Json.parseToJsonElement(cancelled.output).jsonObject.getValue("cancelled").jsonPrimitive.boolean)
+        assertTrue(workspace.list().isEmpty())
+        selected = ForumUploadFile("fake.gif", "image/gif", "not a GIF".encodeToByteArray())
+        assertFalse(importer.run(args()).ok)
+        assertTrue(workspace.list().isEmpty())
+        selected = ForumUploadFile("sprite.gif", "image/gif", gif)
+        assertTrue(importer.run(args()).ok)
+        assertTrue(importer.run(args()).ok)
+        selected = ForumUploadFile("other.gif", "image/gif", gif + byteArrayOf(0))
+        assertFalse(importer.run(args()).ok)
+        assertContentEquals(gif, workspace.readBytes("drafts/runner/assets/sprite.gif"))
     }
 
     @Test

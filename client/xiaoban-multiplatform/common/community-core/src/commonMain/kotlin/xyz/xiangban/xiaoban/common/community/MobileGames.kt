@@ -2,6 +2,8 @@ package xyz.xiangban.xiaoban.common.community
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -18,19 +20,28 @@ data class MobileGame(
     val input: List<String> = listOf("touch", "mouse", "keyboard"),
     val capabilities: List<String> = emptyList(),
     val version: String = "1.0.0",
+    val icon: String = "icon.svg",
+    val cover: String = "cover.svg",
 )
 
-data class MobileGameFile(val path: String, val content: String)
+data class MobileGameFile(val path: String, val bytes: ByteArray) {
+    constructor(path: String, content: String) : this(path, content.encodeToByteArray())
+    val content: String get() = bytes.decodeToString(throwOnInvalidSequence = true)
+    override fun equals(other: Any?): Boolean = other is MobileGameFile && path == other.path && bytes.contentEquals(other.bytes)
+    override fun hashCode(): Int = 31 * path.hashCode() + bytes.contentHashCode()
+}
 data class MobileGameScan(val games: List<MobileGame>, val errors: List<String>)
 
 object MobileGameFormat {
     const val FILES = 100
-    const val FILE_BYTES = 1024 * 1024
-    const val TOTAL_BYTES = 8 * 1024 * 1024
+    const val FILE_BYTES = MobileWorkspaceLimits.FILE_BYTES
+    const val TOTAL_BYTES = 24 * 1024 * 1024
     const val GAMES = 40
     private const val MAX_DEPTH = 6
     private val builtin = setOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti")
-    private val extensions = setOf("html", "js", "mjs", "css", "json", "svg", "md", "txt")
+    private val textExtensions = setOf("html", "js", "mjs", "css", "json", "svg", "md", "txt", "gltf")
+    private val images = setOf("png", "jpg", "jpeg", "webp", "gif")
+    private val assets = images + setOf("mp3", "wav", "ogg", "m4a", "glb", "woff2")
     private val gameCategories = setOf("action", "puzzle", "board", "casual", "story")
     private val appCategories = setOf("tool", "quiz")
     private val inputs = setOf("touch", "mouse", "keyboard")
@@ -65,6 +76,10 @@ object MobileGameFormat {
         require(game.capabilities.all { it in allCapabilities } && game.capabilities.distinct().size == game.capabilities.size) {
             "capabilities 只能取 ${allCapabilities.joinToString("、")}"
         }
+        for (image in listOf(game.icon, game.cover)) {
+            path(image)
+            require(extension(image) == "svg" || isImageAsset(image)) { "图标和封面需要是 SVG、PNG、JPEG、WebP 或 GIF" }
+        }
         return normalized
     }
 
@@ -75,32 +90,72 @@ object MobileGameFormat {
         }) { "文件路径最多 $MAX_DEPTH 层，只能用字母、数字、._-，不能以 . 开头" }
         require(segments.first() != "__MACOSX") { "__MACOSX/ 是压缩包常见的垃圾目录，不能用于作品文件" }
         require(!segments.first().equals("manifest.json", ignoreCase = true) || segments.size == 1) { "manifest.json 保留给作品清单，不能作为目录" }
-        require(path.substringAfterLast('.', "").lowercase() in extensions) { "手机目前只能写 html/js/mjs/css/json/svg/md/txt 文本文件；图片请用 SVG 或 canvas 绘制" }
+        require(extension(path) in textExtensions || isAssetPath(path)) { "手机创作暂不支持这个文件类型：$path" }
     }
 
-    fun files(files: List<MobileGameFile>) {
-        require(files.size in 1..FILES) { "作品需要 1 到 $FILES 个文本文件" }
+    private fun extension(path: String) = path.substringAfterLast('/').substringAfterLast('.', "").lowercase()
+    fun isImageAsset(path: String) = extension(path) in images
+    fun isAssetPath(path: String) = extension(path) in assets
+
+    fun validateAsset(path: String, bytes: ByteArray) {
+        path(path)
+        require(isAssetPath(path) && bytes.size in 1..MobileWorkspaceLimits.ASSET_BYTES) {
+            "请选择支持的素材，单个文件不能超过 10 MB：$path"
+        }
+        fun matches(offset: Int, signature: String) = signature.withIndex().all { (index, char) ->
+            bytes.getOrNull(offset + index)?.toInt()?.and(255) == char.code
+        }
+        val valid = when (extension(path)) {
+            "png" -> matches(0, "\u0089PNG\r\n\u001a\n")
+            "jpg", "jpeg" -> matches(0, "\u00ff\u00d8\u00ff")
+            "webp" -> matches(0, "RIFF") && matches(8, "WEBP")
+            "gif" -> matches(0, "GIF87a") || matches(0, "GIF89a")
+            "wav" -> matches(0, "RIFF") && matches(8, "WAVE")
+            "ogg" -> matches(0, "OggS")
+            "mp3" -> matches(0, "ID3") || (bytes.size >= 4 && matches(0, "\u00ff") && (bytes[1].toInt() and 0xe0) == 0xe0)
+            "m4a" -> bytes.size >= 12 && matches(4, "ftyp")
+            "glb" -> bytes.size >= 12 && matches(0, "glTF")
+            "woff2" -> matches(0, "wOF2")
+            else -> false
+        }
+        require(valid) { "所选文件与素材路径的扩展名不匹配：$path" }
+    }
+
+    fun files(files: List<MobileGameFile>, requiredPaths: List<String> = required) {
+        require(files.size in 1..FILES) { "作品需要 1 到 $FILES 个文件" }
         val seen = mutableSetOf<String>()
+        val directories = mutableMapOf<String, String>()
         var total = 0L
         for (file in files) {
             path(file.path)
             require(!file.path.equals("manifest.json", ignoreCase = true)) { "manifest.json 由 app_create 自动生成，草稿或 files 不能包含它" }
             require(seen.add(file.path.lowercase())) { "文件路径不能重名（忽略大小写）：${file.path}" }
-            require('\u0000' !in file.content) { "作品文件必须是 UTF-8 文本" }
-            val size = file.content.encodeToByteArray().size
-            require(size <= FILE_BYTES) { "单个文件不能超过 1 MB：${file.path}" }
-            total += size
+            var directory = file.path.substringBeforeLast('/', "")
+            while (directory.isNotEmpty()) {
+                val previous = directories.put(directory.lowercase(), directory)
+                require(previous == null || previous == directory) { "目录大小写不一致：$directory" }
+                directory = directory.substringBeforeLast('/', "")
+            }
+            if (isAssetPath(file.path)) {
+                validateAsset(file.path, file.bytes)
+            } else {
+                require(file.bytes.size <= FILE_BYTES) { "单个文本文件不能超过 1 MB：${file.path}" }
+                require('\u0000' !in file.content) { "作品源码必须是 UTF-8 文本" }
+            }
+            total += file.bytes.size
         }
-        require(total <= TOTAL_BYTES) { "作品文本合计不能超过 8 MB" }
-        for (name in required) require(files.any { it.path == name }) { "作品必须有 $name（入口、1:1 图标、16:9 封面）" }
-        require(seen.none { parent -> seen.any { it.startsWith("$parent/") } }) { "文件路径冲突：同一名字不能既是文件又是目录" }
+        require(total <= TOTAL_BYTES) { "作品文件合计不能超过 24 MB" }
+        for (name in requiredPaths) require(files.any { it.path == name && it.bytes.isNotEmpty() }) {
+            "作品必须有 $name（入口、1:1 图标、16:9 封面）"
+        }
+        require(seen.none { it in directories }) { "文件路径冲突：同一名字不能既是文件又是目录" }
     }
 
     val instructions = """
         小伴应用规范（运行时协议 2，手机创作版）：
         1. 你在做一个作品：游戏（kind=game）或工具、测评（kind=app），在手机上全屏运行。先给用户一个简短方案，写明类型、竖屏还是横屏、玩法或功能，确认后再动手。
-        2. 免构建：写的源码就是最终运行的代码，没有 npm 和打包。用原生 JavaScript，可以用 <script type="module"> 和相对路径 import；不要依赖 CDN，手机上没有库可复制，需要的代码自己写。用 write_file 在专用草稿目录（例如 drafts/my-app）逐步写文件，再 app_create(source_dir=该目录) 安装；也可传 files=[{path,content}]，两者只能选一种。manifest.json 由工具生成，不要自己写。
-        3. 文件：必须有 index.html（入口）、icon.svg（1:1 图标，至少 192×192 的比例）、cover.svg（16:9 封面，640×360），风格与作品一致。其余文件只能是 html/js/mjs/css/json/svg/md/txt 文本，最多 100 个，单个不超过 1 MB，合计不超过 8 MB；路径最多 6 层，每段只用字母数字和 ._-，不能以 . 开头。手机目前不能写图片、音频等二进制，图形请用 SVG、canvas 绘制，音效用 WebAudio 合成。
+        2. 作品免构建，可用原生 JavaScript 和相对路径 import。在 drafts/<作品名> 内用 write_file 写源码。需要 3D 时，用 lib_add(library="three", source_dir=草稿目录) 加入 Three.js r128，再用 <script src="lib/three.min.js"></script> 加载全局 THREE。优先使用包内文件，确保没有 CDN 也能运行。
+        3. 入口是 index.html，图标默认用 1:1 的 icon.svg，封面默认用 16:9 的 cover.svg。使用 PNG、JPEG、WebP 或 GIF 时，在 app_create 的 icon、cover 参数里写包内相对路径。用 asset_import 请用户选择图片、音频、GLB 或 WOFF2，再用 source_dir 安装以保留素材。纯文本作品也可传 files，两个参数二选一。工具自动生成 manifest.json。最多 100 个文件，单个源码最多 1 MB、单个素材最多 10 MB、合计最多 24 MB。相对路径最多 6 层，每段只用字母数字和 ._-。
         4. 清单信息写在 app_create 的参数里：id（2 到 40 位小写字母、数字、-，不能与内置作品重名）、name（最多 24 字）、description（最多 80 字）、kind（game 或 app，默认 game）、category（游戏取 action、puzzle、board、casual、story，应用取 tool、quiz；默认游戏 casual、应用 tool）、orientation（portrait、landscape 或 any）、input（touch、mouse、keyboard，必须含 touch，默认三个都有）、capabilities（用到哪些系统能力，默认没有）、version（默认 1.0.0）。已有 id 需要 overwrite=true。
         5. 运行环境：作品是一个普通网站，有自己独立的 https 源。可以用 fetch、WebSocket、localStorage、IndexedDB、Worker、WebAssembly、Canvas、WebGL、WebAudio；只能访问 https/wss，不能访问 localhost 和局域网；不能用 alert、confirm、prompt、全屏 API、屏幕方向 API。联网只在确实需要实时数据时用，并处理断网：没网时给出可见提示，不要白屏。不要把密钥写进代码。
         6. 布局：页面占满 100vw × 100vh。右上角有宿主的“··· | ✕”胶囊，四周有状态栏和挖孔。用 CSS 变量 --xb-safe-top、--xb-safe-right、--xb-safe-bottom、--xb-safe-left 留出安全边距，用 --xb-capsule-top、--xb-capsule-right、--xb-capsule-width、--xb-capsule-height 计算胶囊区域，所有可点的控件（选关、暂停、结算、滚动后的控件）都要避开它。canvas 按 devicePixelRatio 绘制并监听 resize。按钮至少 44×44 像素。不要自己做左上角返回按钮，退出由宿主的胶囊负责。
@@ -111,7 +166,7 @@ object MobileGameFormat {
         11. 声音和操作：用户第一次点击时调用 AudioContext.resume()，收到 show 后再调用一次，并提供静音开关。同时支持触控和键鼠；游戏里的运动都乘以帧间隔 dt，dt 最多取 1/30 秒。
         12. 内容：不卖东西、不引导外部付款，不收集手机号等隐私，不做色情、赌博、血腥内容，不在后台偷偷上传用户数据。
         13. 质量：游戏要有开始、进行、暂停、结算和重开的完整流程，随机局面保证有解，难度先低后高；工具和测评打开就能用；主要操作都有动画或震动之类的反馈；配色 4 到 6 种，主角、目标、危险物一眼能分清。
-        14. 试用：安装后运行 app_validate，再请用户试玩（app_open），之后用 app_runtime_read 读加载、脚本报错和 xb.ready 的记录；没有实际试玩记录不能声称测试通过。作品安装在 games/<id>/，改完文件重新 app_validate。导出或分享给他人时，打包成的 ZIP 以 manifest.json 在最外层。
+        14. 安装后用 app_validate 校验，请用户用 app_open 试玩，再用 app_runtime_read 检查加载、脚本报错和 xb.ready 的记录。有实际试玩记录才能声称测试通过。修改已安装作品时，用 copy_file 将 games/<id>/ 的源码和素材复制进新草稿，保留路径并跳过 manifest.json。修改后用 app_create 安装新版。导出或分享的 ZIP 将 manifest.json 放在最外层。
     """.trimIndent()
 }
 
@@ -129,7 +184,7 @@ private fun JsonObject.gameInt(key: String): Int? = (this[key] as? JsonPrimitive
 
 private fun MobileGame.json(): JsonObject = buildJsonObject {
     put("schemaVersion", 3); put("runtimeProtocol", 2); put("kind", kind); put("id", id); put("name", name); put("description", description)
-    put("version", version); put("category", category); put("entry", "index.html"); put("icon", "icon.svg"); put("cover", "cover.svg")
+    put("version", version); put("category", category); put("entry", "index.html"); put("icon", icon); put("cover", cover)
     put("orientation", orientation); put("input", JsonArray(input.map(::JsonPrimitive)))
     if (capabilities.isNotEmpty()) put("capabilities", JsonArray(capabilities.map(::JsonPrimitive)))
 }
@@ -140,21 +195,25 @@ fun readMobileGameManifest(text: String): MobileGame {
     require(json.gameInt("runtimeProtocol") == 2 && json.gameInt("schemaVersion") == 3) {
         "这是旧版（协议 1）作品，现在已不再支持；请让小伴读取源码，按协议 2 规范重新生成（app_create，overwrite=true）"
     }
-    require(json.gameString("entry", "index.html") == "index.html" && json.gameString("icon") == "icon.svg" && json.gameString("cover") == "cover.svg") {
-        "手机作品的入口、图标、封面必须是 index.html、icon.svg、cover.svg"
-    }
+    require(json.gameString("entry", "index.html") == "index.html") { "手机作品的入口必须是 index.html" }
     require("layer" !in json) { "手机不支持桌面专用作品" }
     return MobileGameFormat.metadata(MobileGame(
         id = json.gameString("id"), name = json.gameString("name"), description = json.gameString("description"),
         orientation = json.gameString("orientation", "portrait"), kind = json.gameString("kind"), category = json.gameString("category"),
         input = json.gameStrings("input", emptyList()), capabilities = json.gameStrings("capabilities", emptyList()),
-        version = json.gameString("version"),
+        version = json.gameString("version"), icon = json.gameString("icon"), cover = json.gameString("cover"),
     ))
 }
 
 /** Keeps the pack manifest in games/<id>/; run logs and storage belong outside that folder. */
 class MobileGameStore(val workspace: MobileWorkspace) {
     private val lock = Mutex()
+    private val changes = MutableStateFlow(0)
+    val revision = changes.asStateFlow()
+
+    private suspend fun <T> access(action: suspend () -> T): T = lock.withLock {
+        workspace.gameTransaction(action)
+    }
 
     private suspend fun exists(id: String): Boolean = workspace.list().any { it.path == "games" && it.directory } &&
         workspace.list("games").any { it.path == "games/$id" }
@@ -182,22 +241,25 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         return game
     }
 
-    private suspend fun contentFiles(id: String): List<MobileGameFile> {
-        val entries = workspace.list("games/$id", recursive = true)
+    private suspend fun contentFiles(directory: String, installed: Boolean): List<MobileGameFile> {
+        val entries = workspace.list(directory, recursive = true)
         require(entries.size <= MobileGameFormat.FILES * 4 + 1) { "作品目录条目过多" }
-        val files = entries.filterNot { it.directory || it.path == "games/$id/manifest.json" }
+        val files = entries.filterNot { it.directory || (installed && it.path == "$directory/manifest.json") }
         require(files.size in 1..MobileGameFormat.FILES && files.sumOf { it.size } <= MobileGameFormat.TOTAL_BYTES) {
-            "作品需要 1 到 ${MobileGameFormat.FILES} 个文本文件，合计不超过 8 MB"
+            "作品需要 1 到 ${MobileGameFormat.FILES} 个文件，合计不超过 24 MB"
         }
-        return files.map { entry ->
-            MobileGameFile(entry.path.removePrefix("games/$id/"), workspace.read(entry.path))
+        return files.map { file ->
+            val path = file.path.removePrefix("$directory/")
+            MobileGameFormat.path(path)
+            if (MobileGameFormat.isAssetPath(path)) MobileGameFile(path, workspace.readBytes(file.path))
+            else MobileGameFile(path, workspace.read(file.path))
         }
     }
 
-    suspend fun validate(id: String): MobileGame {
+    suspend fun validate(id: String): MobileGame = access {
         val game = read(id)
-        MobileGameFormat.files(contentFiles(id))
-        return game
+        MobileGameFormat.files(contentFiles("games/$id", installed = true), listOf("index.html", game.icon, game.cover))
+        game
     }
 
     suspend fun readFile(id: String, path: String): String {
@@ -206,16 +268,22 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         return workspace.read("games/$id/$path")
     }
 
+    suspend fun readFileBytes(id: String, path: String): ByteArray {
+        MobileGameFormat.id(id)
+        MobileGameFormat.path(path)
+        return workspace.readBytes("games/$id/$path")
+    }
+
     /** Snapshot includes the normalized resource manifest, ready to write at the ZIP root. */
-    suspend fun exportFiles(id: String): List<MobileGameFile> {
+    suspend fun exportFiles(id: String): List<MobileGameFile> = access {
         val game = read(id)
-        val files = contentFiles(id)
-        MobileGameFormat.files(files)
-        return listOf(MobileGameFile("manifest.json", game.json().toString())) + files.sortedBy { it.path }
+        val files = contentFiles("games/$id", installed = true)
+        MobileGameFormat.files(files, listOf("index.html", game.icon, game.cover))
+        listOf(MobileGameFile("manifest.json", game.json().toString())) + files
     }
 
     /** Deletes only one user work and its run log. Old protocol-1 works can still be deleted. A failed deletion restores its files. */
-    suspend fun delete(id: String) = lock.withLock {
+    suspend fun delete(id: String) = access {
         MobileGameFormat.id(id) // Also refuses every reserved official id.
         val manifest = runCatching { MobileGameJson.parseToJsonElement(workspace.read("games/$id/manifest.json")) as? JsonObject }.getOrNull()
         require(manifest?.let { (it["id"] as? JsonPrimitive)?.contentOrNull } == id) { "找不到这件作品" }
@@ -225,60 +293,61 @@ class MobileGameStore(val workspace: MobileWorkspace) {
             parent in roots && workspace.list(parent).any { it.path == path && !it.directory }
         }
         val files = workspace.list("games/$id", recursive = true).filterNot { it.directory }.map { it.path } + auxiliary
-        val backup = files.map { it to workspace.read(it) }
+        val backup = files.map { it to workspace.readBytes(it) }
         withContext(NonCancellable) {
             try {
                 workspace.remove("games/$id", recursive = true)
                 auxiliary.forEach { workspace.remove(it) }
             } catch (failure: Exception) {
-                try { backup.forEach { (path, content) -> workspace.write(path, content) } }
+                try { backup.forEach { (path, bytes) -> workspace.writeBytes(path, bytes) } }
                 catch (rollback: Exception) { failure.addSuppressed(rollback) }
                 throw failure
             }
         }
+        changes.value++
     }
 
-    suspend fun createFromDirectory(game: MobileGame, sourceDir: String, overwrite: Boolean = false): MobileGame {
+    suspend fun createFromDirectory(game: MobileGame, sourceDir: String, overwrite: Boolean = false): MobileGame = access {
         MobileWorkspaceLimits.path(sourceDir)
-        val entries = workspace.list(sourceDir, recursive = true)
-        require(entries.size <= MobileGameFormat.FILES * 4) { "作品草稿目录条目过多" }
-        val sourceFiles = entries.filterNot { it.directory }
-        require(sourceFiles.size in 1..MobileGameFormat.FILES && sourceFiles.sumOf { it.size } <= MobileGameFormat.TOTAL_BYTES) {
-            "作品草稿需要 1 到 ${MobileGameFormat.FILES} 个文本文件，合计不超过 8 MB"
-        }
-        val files = sourceFiles.map {
-            MobileGameFile(it.path.removePrefix("$sourceDir/"), workspace.read(it.path))
-        }
-        return create(game, files, overwrite)
+        install(game, contentFiles(sourceDir, installed = false), overwrite)
     }
 
-    suspend fun create(game: MobileGame, files: List<MobileGameFile>, overwrite: Boolean = false): MobileGame = lock.withLock {
+    suspend fun create(game: MobileGame, files: List<MobileGameFile>, overwrite: Boolean = false): MobileGame =
+        access { install(game, files, overwrite) }
+
+    private suspend fun install(game: MobileGame, files: List<MobileGameFile>, overwrite: Boolean): MobileGame {
         val normalized = MobileGameFormat.metadata(game)
-        MobileGameFormat.files(files)
+        MobileGameFormat.files(files, listOf("index.html", normalized.icon, normalized.cover))
         val hadOld = exists(game.id)
         require(!hadOld || overwrite) { "作品 id 已存在；修改已有作品请显式设置 overwrite=true" }
         if (!hadOld) require(workspace.list().none { it.path == "games" } || workspace.list("games").count { it.directory } < MobileGameFormat.GAMES) {
             "最多保存 ${MobileGameFormat.GAMES} 件自创作品"
         }
         // Snapshot before any mutation, so invalid replacements and failed writes retain the original.
-        val previous = if (hadOld) workspace.list("games/${game.id}", true).filterNot { it.directory }.map {
-            MobileGameFile(it.path.removePrefix("games/${game.id}/"), workspace.read(it.path))
+        val directory = "games/${game.id}"
+        val previous = if (hadOld) workspace.list(directory, true).filterNot { it.directory }.map {
+            it.path to workspace.readBytes(it.path)
         } else emptyList()
         try {
-            if (hadOld) workspace.remove("games/${game.id}", recursive = true)
-            files.forEach { workspace.write("games/${game.id}/${it.path}", it.content) }
+            if (hadOld) workspace.remove(directory, recursive = true)
+            for (file in files) {
+                val path = "$directory/${file.path}"
+                if (MobileGameFormat.isAssetPath(file.path)) workspace.writeBytes(path, file.bytes)
+                else workspace.write(path, file.content)
+            }
             // A directory is only discoverable as a valid work when its final manifest is present.
-            workspace.write("games/${game.id}/manifest.json", normalized.json().toString())
+            workspace.write("$directory/manifest.json", normalized.json().toString())
         } catch (error: Exception) {
             withContext(NonCancellable) {
                 try {
-                    if (exists(game.id)) workspace.remove("games/${game.id}", recursive = true)
-                    previous.forEach { workspace.write("games/${game.id}/${it.path}", it.content) }
+                    if (exists(game.id)) workspace.remove(directory, recursive = true)
+                    previous.forEach { (path, bytes) -> workspace.writeBytes(path, bytes) }
                 } catch (rollback: Exception) { error.addSuppressed(rollback) }
             }
             throw error
         }
-        normalized
+        changes.value++
+        return normalized
     }
 }
 
@@ -287,6 +356,7 @@ private class MobileGameTool(
     override val description: String,
     override val parameters: JsonObject,
     override val risk: String = "read",
+    override val timeoutSeconds: Long = 60,
     private val action: suspend (JsonObject) -> JsonElement,
 ) : AgentTool {
     override suspend fun run(arguments: JsonObject): AgentToolResult = try {
@@ -321,9 +391,10 @@ fun mobileGameTools(store: MobileGameStore): List<AgentTool> = listOf(
     MobileGameTool("app_validate", "校验作品清单、入口、图标、封面、路径、文件类型与大小，试用或导出前使用。", gameParameters("id" to "string", required = listOf("id"))) {
         store.validate(it.gameString("id")).json()
     },
-    MobileGameTool("app_create", "按协议 2 安装一个作品（游戏或工具）。source_dir（工作区内专用草稿目录）或 files 数组必须二选一；manifest 自动生成。已有 id 需要 overwrite=true。", gameParameters(
+    MobileGameTool("app_create", "按协议 2 安装作品。source_dir（工作区内草稿目录，保留图片、音频等素材）和纯文本 files 数组二选一；icon 和 cover 是包内相对路径，清单自动生成。已有 id 需要 overwrite=true。", gameParameters(
         "id" to "string", "name" to "string", "description" to "string", "kind" to "string", "category" to "string", "orientation" to "string",
-        "input" to "array", "capabilities" to "array", "version" to "string", "source_dir" to "string", "files" to "array", "overwrite" to "boolean",
+        "input" to "array", "capabilities" to "array", "version" to "string", "icon" to "string", "cover" to "string",
+        "source_dir" to "string", "files" to "array", "overwrite" to "boolean",
         required = listOf("id", "name", "description"),
     ), "write") { args ->
         val kind = args.gameString("kind", "game")
@@ -332,16 +403,63 @@ fun mobileGameTools(store: MobileGameStore): List<AgentTool> = listOf(
             orientation = args.gameString("orientation", "portrait"), kind = kind,
             category = args.gameString("category", if (kind == "app") "tool" else "casual"),
             input = args.gameStrings("input", listOf("touch", "mouse", "keyboard")), capabilities = args.gameStrings("capabilities", emptyList()),
-            version = args.gameString("version", "1.0.0"),
+            version = args.gameString("version", "1.0.0"), icon = args.gameString("icon", "icon.svg"), cover = args.gameString("cover", "cover.svg"),
         )
         require(("source_dir" in args) != ("files" in args)) { "source_dir 和 files 必须二选一" }
         val created = if ("source_dir" in args) store.createFromDirectory(game, args.gameString("source_dir"), args.gameBoolean("overwrite")) else {
             val array = args["files"] as? JsonArray ?: throw IllegalArgumentException("files 必须是数组")
             store.create(game, array.map { value ->
                 val file = value as? JsonObject ?: throw IllegalArgumentException("files 的每项需要 path 与 content")
-                MobileGameFile(file.gameString("path"), file.gameString("content"))
+                val path = file.gameString("path")
+                require(!MobileGameFormat.isAssetPath(path)) { "素材需要用 asset_import 导入草稿，再使用 source_dir 安装" }
+                MobileGameFile(path, file.gameString("content"))
             }, args.gameBoolean("overwrite"))
         }
         created.json()
     },
 )
+
+/** Only registered on a host with a bundled library or a user-mediated system file picker. */
+fun mobileGameAssetTools(
+    workspace: MobileWorkspace,
+    loadThree: (suspend () -> ByteArray?)?,
+    pickAsset: (suspend (image: Boolean, maxBytes: Long) -> ForumUploadFile?)?,
+): List<AgentTool> = buildList {
+    if (loadThree != null) add(MobileGameTool(
+        "lib_add", "将内置 Three.js r128 复制进手机创作草稿。设 library=three，通过 lib/three.min.js 加载全局 THREE。",
+        gameParameters("library" to "string", "source_dir" to "string", required = listOf("library", "source_dir")), "write",
+    ) { args ->
+        val directory = args.draftDirectory()
+        require(args.gameString("library").lowercase() in setOf("three", "three.js")) { "当前手机内置库支持 three（Three.js r128）" }
+        val entry = "lib/three.min.js"
+        val bytes = checkNotNull(loadThree()) { "当前安装包中找不到 Three.js" }
+        check(bytes.size in 1..MobileGameFormat.FILE_BYTES) { "内置库文件大小无效" }
+        workspace.gameTransaction { workspace.writeBytes("$directory/$entry", bytes, overwrite = false) }
+        buildJsonObject { put("library", "three"); put("version", "0.128.0"); put("path", entry); put("global", "THREE") }
+    })
+    if (pickAsset != null) add(MobileGameTool(
+        "asset_import", "请用户通过系统选择器将一个本地素材复制进创作草稿。path 是相对草稿的目标文件名，例如 assets/hero.webp，扩展名必须与用户选择的文件一致。支持 PNG、JPEG、WebP、GIF、MP3、WAV、OGG、M4A、GLB 和 WOFF2，最多 10 MB。",
+        gameParameters("source_dir" to "string", "path" to "string", required = listOf("source_dir", "path")), "write",
+        timeoutSeconds = 300,
+    ) { args ->
+        val directory = args.draftDirectory()
+        val path = args.gameString("path")
+        MobileGameFormat.path(path)
+        require(MobileGameFormat.isAssetPath(path)) { "请选择受支持的图片、音频、GLB 或 WOFF2 素材路径" }
+        val target = MobileWorkspaceLimits.path("$directory/$path")
+        val file = pickAsset(MobileGameFormat.isImageAsset(path), MobileWorkspaceLimits.ASSET_BYTES.toLong())
+        if (file == null) {
+            buildJsonObject { put("imported", false); put("cancelled", true) }
+        } else {
+            MobileGameFormat.validateAsset(path, file.bytes)
+            workspace.gameTransaction { workspace.writeBytes(target, file.bytes, overwrite = false) }
+            buildJsonObject { put("imported", true); put("path", path); put("size", file.bytes.size) }
+        }
+    })
+}
+
+private fun JsonObject.draftDirectory(): String {
+    val path = MobileWorkspaceLimits.path(gameString("source_dir"))
+    require(path.startsWith("drafts/") && path.count { it == '/' } == 1) { "source_dir 需要是 drafts/<作品名> 的独立草稿目录" }
+    return path
+}

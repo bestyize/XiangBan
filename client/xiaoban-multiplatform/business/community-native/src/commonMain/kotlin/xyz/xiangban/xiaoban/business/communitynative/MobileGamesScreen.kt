@@ -46,12 +46,14 @@ import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.MobileGame
+import xyz.xiangban.xiaoban.common.community.MobileGameStore
 
-private val CreationTypes = listOf("全部", "游戏", "壁纸", "小组件", "特效", "伙伴")
+private val LocalCreationTypes = listOf("游戏", "小程序")
+private val CreationTypes = listOf("全部") + LocalCreationTypes + listOf("壁纸", "小组件", "特效", "伙伴")
 private data class CreationItem(val id: String, val name: String, val description: String, val kind: String,
     val game: MobileGame? = null, val owned: Boolean = false) {
     val key get() = (if (owned) "mine:" else "builtin:") + id
-    val device get() = if (game != null) "手机可玩" else "电脑创作灵感"
+    val device get() = when (game?.kind) { "game" -> "手机可玩"; "app" -> "手机可用"; else -> "电脑创作灵感" }
 }
 // These are reference ideas, not installed mobile desktop resources. Actual creation runs on the selected desktop.
 private val DesktopIdeas = listOf(
@@ -87,6 +89,8 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     val remote by env.remoteChat.state.collectAsState()
+    val workRevision = env.games?.revision?.collectAsState()?.value
+    val creationTypes = if (env.games != null) CreationTypes else CreationTypes.filterNot { it == "小程序" }
     val context = LocalPlatformContext.current
     val imageLoader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
@@ -99,7 +103,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         if (env.platform?.openGame(game.id) != true) message = "当前平台无法打开作品"
     }
     fun showOfficialDetails(game: MobileGame) {
-        detail = CreationItem(game.id, game.name, game.description, "游戏", game)
+        detail = CreationItem(game.id, game.name, game.description, if (game.kind == "app") "小程序" else "游戏", game)
         panel = "actions"
     }
     BackHandler(enabled = overlay || allGames || allTools) {
@@ -121,8 +125,10 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         scope.launch { env.remoteChat.refreshPeers() }
     }
     fun startCreation() {
-        if (createKind == "游戏") createLocal("帮我设计并制作一款支持手机触控和电脑键鼠的离线小游戏。我的想法：${idea.trim()}。先给出简短玩法方案让我确认，再先用 app_read_format 读取小伴应用规范，按规范制作。")
-        else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
+        if (createKind in LocalCreationTypes) {
+            val work = if (createKind == "小程序") "小程序（kind=app，category 取 tool 或 quiz）" else "离线小游戏（kind=game）"
+            createLocal("帮我设计并制作一个支持手机触控和电脑键鼠的$work。我的想法：${idea.trim()}。先用 app_read_format 读取小伴应用规范，给出简短方案让我确认，确认后按规范制作。")
+        } else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
     }
     fun prepare(item: CreationItem? = null) {
         detail = null
@@ -147,7 +153,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             finally { busy = false }
         }
     }
-    LaunchedEffect(env.games, reload) {
+    LaunchedEffect(env.games, workRevision, reload) {
         loading = true
         val failures = mutableListOf<String>()
         try {
@@ -162,17 +168,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 try { env.platform?.builtinGameCover(game.id)?.let { covers["builtin:${game.id}"] = it } }
                 catch (e: CancellationException) { throw e } catch (_: Exception) { }
             }
-            games.forEach { game ->
-                try { env.games?.readFile(game.id, "cover.svg")?.encodeToByteArray()?.takeIf { it.size <= 1024 * 1024 }?.let { covers["mine:${game.id}"] = it } }
-                catch (e: CancellationException) { throw e } catch (_: Exception) { }
-            }
             DesktopIdeas.forEach { item ->
                 try { env.platform?.creationCover(item.id)?.let { covers[item.key] = it } }
                 catch (e: CancellationException) { throw e } catch (_: Exception) { }
             }
         } finally { errors = failures; loading = false }
     }
-    val myItems = games.map { CreationItem(it.id, it.name, it.description, if (it.kind == "app") "工具" else "游戏", it, true) }
+    val myItems = games.map { CreationItem(it.id, it.name, it.description, if (it.kind == "app") "小程序" else "游戏", it, true) }
     val visible = myItems.filter { category == "全部" || it.kind == category }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -202,20 +204,20 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     }
                 }
                 item { Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                item { CreationChips(CreationTypes, category) { category = it } }
+                item { CreationChips(creationTypes, category) { category = it } }
                 if (errors.isNotEmpty()) item {
                     Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
                     LinkText("重新读取", { reload++ })
                 }
                 if (loading && visible.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(120.dp)) }
                 if (!loading && visible.isEmpty()) item {
-                    EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category !in listOf("全部", "游戏")) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
+                    EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category != "全部" && category !in LocalCreationTypes) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
                     AppActionButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth(), primary = true)
                 }
                 item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
                 items(visible, key = { it.key }) { entry ->
                     Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(68.dp))
+                        CreationCover(entry, rememberLocalCover(env.games, entry.game, workRevision), imageLoader, Modifier.size(68.dp))
                         Column(Modifier.weight(1f)) {
                             Text(entry.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -231,12 +233,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false },
             onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
         detail?.let { entry ->
-            if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, covers[entry.key], imageLoader,
+            val artwork = if (entry.owned) rememberLocalCover(env.games, entry.game, workRevision) else covers[entry.key]
+            if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, artwork, imageLoader,
                 dismiss = { close() }, remix = { detail = null; remixSource = entry.game })
             else CreationSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
                 Column(Modifier.fillMaxWidth().heightIn(max = 590.dp).verticalScroll(rememberScrollState())) {
                     if (panel in listOf("actions", "preview")) Row(Modifier.padding(bottom = 21.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp), cornerRadius = 11)
+                        CreationCover(entry, artwork, imageLoader, Modifier.size(52.dp), cornerRadius = 11)
                         Column(Modifier.weight(1f)) {
                             Text(entry.name, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text("${entry.kind} · ${if (entry.owned) "我的作品" else if (entry.game != null) "小伴官方" else "创作灵感"}", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -249,13 +252,14 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     when (panel) {
                         "actions" -> {
                             CreationActionGroup {
-                                CreationAction(if (entry.game != null) XIcons.Play else XIcons.Eye, if (entry.game != null) "开始游玩" else "预览灵感", if (entry.game != null) "手机可玩" else "电脑装扮", !busy) {
+                                val openLabel = when (entry.game?.kind) { "app" -> "打开小程序"; "game" -> "开始游玩"; else -> "预览灵感" }
+                                CreationAction(if (entry.game != null) XIcons.Play else XIcons.Eye, openLabel, if (entry.game != null) entry.device else "电脑装扮", !busy) {
                                     if (entry.game != null) {
-                                        if (env.platform?.openGame(entry.id) == true) close() else message = "当前平台无法打开游戏"
+                                        if (env.platform?.openGame(entry.id) == true) close() else message = "当前平台无法打开作品"
                                     } else panel = "preview"
                                 }
                                 CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy, divider = true) {
-                                    if (entry.owned) createLocal("请先读取 games/${entry.id} 中的作品源码和试玩记录，问我想怎样修改《${entry.name}》，然后在原游戏上迭代。") else prepare(entry)
+                                    if (entry.owned) createLocal("请先用 app_read_format 读取小伴应用规范，再读取 games/${entry.id} 的作品清单、源码和试玩记录。问我想怎样修改《${entry.name}》，确认后在草稿中修改，保留原有素材和作品类型，最后安装新版。") else prepare(entry)
                                 }
                                 CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy, divider = true) {
                                     if (entry.game == null) createOnComputer("请在电脑上参考以下想法制作小伴桌面${entry.kind}：${entry.description} 先读取规范并给出方案让我确认。") else panel = "computer"
@@ -285,18 +289,16 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                                         val store = env.games ?: error("本机作品不可用")
                                         store.delete(entry.id)
                                         games = games.filterNot { it.id == entry.id }
-                                        covers.remove(entry.key)
                                         detail = null
                                         panel = "actions"
                                         env.platform?.forgetGame(entry.id)
-                                        reload++
                                         message = "已删除《${entry.name}》"
                                     }
                                 }
                             }
                         }
                         "preview" -> {
-                            CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().height(220.dp))
+                            CreationCover(entry, artwork, imageLoader, Modifier.fillMaxWidth().height(220.dp))
                             Text(entry.description, Modifier.padding(vertical = 16.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("这是创作参考图。动画与互动效果需要在电脑上制作并预览。", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(14.dp))
@@ -316,7 +318,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             Text("选择分享形式，再选择接收应用", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(14.dp))
                             CreationActionGroup {
-                                CreationAction(XIcons.Image, "分享作品卡片", "图片", !busy) { runAction { if (env.platform?.shareCreationPreview(entry.name, entry.description, covers[entry.key]) != true) message = "当前平台不支持分享图片" } }
+                                CreationAction(XIcons.Image, "分享作品卡片", "图片", !busy) { runAction { if (env.platform?.shareCreationPreview(entry.name, entry.description, artwork) != true) message = "当前平台不支持分享图片" } }
                                 if (entry.owned) CreationAction(XIcons.Download, "分享作品包", "可导入使用", !busy, divider = true) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
                                 CreationAction(XIcons.Share, "分享文字介绍", enabled = !busy, divider = true) { env.platform?.share(entry.name, entry.description) }
                             }
@@ -334,21 +336,31 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
                 }
                 Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CreationChips(CreationTypes.drop(1), createKind) { createKind = it }
+                CreationChips(creationTypes.drop(1), createKind) { createKind = it }
+                val local = createKind in LocalCreationTypes
                 Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
-                    if (idea.isEmpty()) Text(if (createKind == "游戏") "例如：做一个小猫跳跃收集星星的游戏" else "描述你想要的${createKind}，小伴会在电脑上制作", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val placeholder = when (createKind) {
+                        "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
+                        "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
+                        else -> "描述你想要的${createKind}，小伴会在电脑上制作"
+                    }
+                    if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 110.dp).semantics { contentDescription = "创作想法" }, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
                 }
-                val hints = if (createKind == "游戏") listOf("星星跳跃游戏", "像素小冒险", "治愈系消除") else DesktopIdeas.filter { it.kind == createKind }.map { it.description }
+                val hints = when (createKind) {
+                    "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
+                    "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
+                    else -> DesktopIdeas.filter { it.kind == createKind }.map { it.description }
+                }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
                 }
-                Text(if (createKind == "游戏") "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AppActionButton(if (createKind == "游戏") "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank())
+                Text(if (local) "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank())
             }
         }
         remixSource?.let { source ->
-            AppRemixSheet(env, chat, source.name, source.description, { remixSource = null }, open)
+            AppRemixSheet(env, chat, source.name, source.description, { remixSource = null }, open, kind = source.kind)
         }
         remotePrompt?.let { prompt ->
             CreationSheet({ close() }) {
@@ -417,6 +429,18 @@ private fun CreationAction(icon: ImageVector, title: String, trailing: String = 
         if (trailing.isNotEmpty()) Text(trailing, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (arrow) XIcon(XIcons.ArrowRight, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+@Composable
+private fun rememberLocalCover(store: MobileGameStore?, game: MobileGame?, revision: Int?): ByteArray? {
+    if (store == null || game == null) return null
+    var bytes by remember(store, game.id, game.cover, revision) { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(store, game.id, game.cover, revision) {
+        try { bytes = store.readFileBytes(game.id, game.cover) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { /* The cover placeholder remains visible. */ }
+    }
+    return bytes
 }
 
 @Composable

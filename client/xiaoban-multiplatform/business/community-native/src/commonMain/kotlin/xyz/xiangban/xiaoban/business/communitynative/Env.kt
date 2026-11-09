@@ -82,6 +82,7 @@ interface PlatformActions : VoicePlatform {
     suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()
     suspend fun builtinGameCover(id: String): ByteArray? = null
     suspend fun builtinGameIcon(id: String): ByteArray? = builtinGameCover(id)
+    suspend fun creationThreeLibrary(): ByteArray? = null
     /** 把工作区作品导出为协议 2 的 ZIP 并保存到下载目录。 */
     suspend fun exportGame(id: String): Boolean = false
     /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */
@@ -225,7 +226,8 @@ private const val AGENT_SYSTEM_PROMPT =
         "用 todo 记录多步骤任务，用 ask_user 澄清影响结果的选择。逐步写草稿、校验后再安装；" +
         "只有用户提出试玩或导出时才打开作品或分享面板。用 app_runtime_read 查看试玩记录，" +
         "没有实际试玩记录不能声称已测试通过。作品在手机上全屏独立运行，需要触控操作，" +
-        "也保留键鼠操作；手机上只能写文本文件，图形用 SVG 或 canvas 绘制，不要依赖 CDN。"
+        "也保留键鼠操作。用 lib_add 加入内置 Three.js，用 asset_import 请用户选择本地素材；" +
+        "按规范从草稿目录安装并使用相对路径引用素材，避免依赖 CDN。"
 
 private val EmptyRecentCommunityGames = kotlinx.coroutines.flow.MutableStateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>>(emptyList())
 private val EmptyRecentGames = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())

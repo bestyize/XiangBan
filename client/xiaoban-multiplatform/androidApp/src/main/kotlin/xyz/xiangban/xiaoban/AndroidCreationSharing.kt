@@ -13,25 +13,12 @@ import xyz.xiangban.xiaoban.common.community.MobileGameStore
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Only a validated game snapshot or an explicitly rendered public preview can leave the app. */
 internal class AndroidCreationSharing(private val context: Context) {
     suspend fun gamePackage(id: String): ForumUploadFile = withContext(Dispatchers.IO) {
         val store = MobileGameStore(AndroidMobileWorkspace(File(context.filesDir, "workspace")))
-        val files = store.exportFiles(id)
-        val bytes = ByteArrayOutputStream().use { output ->
-            ZipOutputStream(output).use { zip ->
-                files.forEach { file ->
-                    zip.putNextEntry(ZipEntry(file.path))
-                    zip.write(file.content.toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-                }
-            }
-            output.toByteArray()
-        }
-        ForumUploadFile("$id.zip", "application/zip", bytes)
+        ForumUploadFile("$id.zip", "application/zip", RuntimeV2Archive.encode(store.exportFiles(id)))
     }
 
     suspend fun saveGame(id: String): Boolean {

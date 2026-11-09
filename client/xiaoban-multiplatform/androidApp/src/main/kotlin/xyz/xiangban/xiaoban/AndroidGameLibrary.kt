@@ -15,13 +15,20 @@ internal class AndroidGameLibrary(private val context: Context) {
         val ids = if (BuildConfig.DEBUG) BuiltinMobileGames.ids + RUNTIME_V2_FIXTURE else BuiltinMobileGames.ids
         ids.map { id ->
             context.assets.loadBundledRuntimeV2(id, checkNotNull(bundledGameRoot(id))).manifest.let {
-                MobileGame(it.id, it.name, it.description, it.orientation, it.kind, it.category, it.input, it.capabilities.toList(), it.version)
+                MobileGame(it.id, it.name, it.description, it.orientation, it.kind, it.category, it.input, it.capabilities.toList(), it.version,
+                    icon = it.icon, cover = it.cover)
             }
         }
     }
     suspend fun cover(id: String): ByteArray? = artwork(id) { it.cover }
 
     suspend fun icon(id: String): ByteArray? = artwork(id) { it.icon }
+
+    // Reuse the classic MIT-licensed Three.js r128 build already shipped for the cube.
+    suspend fun threeLibrary(): ByteArray = withContext(Dispatchers.IO) {
+        val root = checkNotNull(bundledGameRoot("pro-cube"))
+        context.assets.open("$root/vendor/three.min.js").use { it.readBytes() }
+    }
 
     private suspend fun artwork(id: String, path: (RuntimeV2Manifest) -> String): ByteArray? = withContext(Dispatchers.IO) {
         val root = bundledGameRoot(id) ?: return@withContext null

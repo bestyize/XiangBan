@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
 
-/** Persistent UTF-8 workspace confined to an app-private directory. Symlinks are never followed. */
+/** Persistent workspace confined to an app-private directory. Symlinks are never followed. */
 class JvmMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
     private val root = root.canonicalFile.also {
         require(!isSymbolic(root.absoluteFile)) { "工作区根目录不能是符号链接" }
@@ -46,24 +46,24 @@ class JvmMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         result
     }
 
-    override suspend fun readText(path: String): String = withContext(Dispatchers.IO) {
+    override suspend fun readData(path: String, limit: Int): ByteArray = withContext(Dispatchers.IO) {
         val file = checked(path)
         require(file.isFile) { "文件不存在：$path" }
-        require(file.length() <= MobileWorkspaceLimits.FILE_BYTES) { "单个文件不能超过 1 MB" }
+        require(file.length() <= limit) { "文件超过大小上限" }
         val bytes = ByteArrayOutputStream()
         file.inputStream().use { input ->
             val buffer = ByteArray(8192)
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
-                require(bytes.size() + count <= MobileWorkspaceLimits.FILE_BYTES) { "单个文件不能超过 1 MB" }
+                require(bytes.size() + count <= limit) { "文件超过大小上限" }
                 bytes.write(buffer, 0, count)
             }
         }
-        bytes.toByteArray().decodeToString(throwOnInvalidSequence = true)
+        bytes.toByteArray()
     }
 
-    override suspend fun writeText(path: String, content: String) = withContext(Dispatchers.IO) {
+    override suspend fun writeData(path: String, content: ByteArray) = withContext(Dispatchers.IO) {
         var file = checked(path)
         require(!file.isDirectory) { "目标是文件夹" }
         val parent = file.parentFile!!
@@ -71,7 +71,7 @@ class JvmMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         file = checked(path)
         val temporary = File.createTempFile("xb-write-", ".tmp", parent)
         try {
-            temporary.writeBytes(content.encodeToByteArray())
+            temporary.writeBytes(content)
             checked(path)
             require(temporary.renameTo(file)) { "无法保存文件" }
         } finally { temporary.delete() }

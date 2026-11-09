@@ -71,12 +71,13 @@ private fun AppGlyphIcon(glyph: String, modifier: Modifier) {
 
 @Composable
 private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier, glyph: String?) {
-    var bytes by remember(item.key) { mutableStateOf<ByteArray?>(null) }
-    LaunchedEffect(env, item.key) {
+    val revision = if (item.source == "local") env.games?.revision?.collectAsState()?.value else null
+    var bytes by remember(item.key, revision) { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(env, item.key, revision) {
         try {
             bytes = when (item.source) {
                 "builtin" -> env.platform?.builtinGameIcon(item.id)
-                "local" -> env.games?.readFile(item.id, "cover.svg")?.encodeToByteArray()
+                "local" -> env.games?.let { store -> store.readFileBytes(item.id, store.read(item.id).icon) }
                 else -> null
             }
         } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }

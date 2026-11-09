@@ -53,6 +53,8 @@ fun appOrientation(pack: Pack): String? =
     (pack.versions.firstOrNull { it.version == pack.version }?.manifest?.get("orientation") as? JsonPrimitive)
         ?.contentOrNull?.takeIf { it in listOf("portrait", "landscape") }
 
-fun appRemixPrompt(title: String, summary: String, idea: String): String =
-    "请参考《${title.trim()}》制作一个我的版本。原作简介：${summary.trim()}。我的想法：${idea.trim()}。" +
-        "先给出简短玩法方案让我确认，再按小伴游戏格式制作支持手机触控和电脑键鼠的离线小游戏。"
+fun appRemixPrompt(title: String, summary: String, idea: String, kind: String = "game"): String {
+    val work = if (kind == "app") "小程序（kind=app）" else "离线小游戏（kind=game）"
+    return "请参考《${title.trim()}》制作一个我的版本。原作简介：${summary.trim()}。我的想法：${idea.trim()}。" +
+        "先用 app_read_format 读取小伴应用规范，给出简短方案让我确认，再按规范制作支持手机触控和电脑键鼠的$work。"
+}

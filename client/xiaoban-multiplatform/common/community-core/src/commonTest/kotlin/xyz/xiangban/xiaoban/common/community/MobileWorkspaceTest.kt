@@ -40,8 +40,8 @@ class MobileWorkspaceTest {
         var writes = 0
         val workspace = object : ValidatedMobileWorkspace() {
             override suspend fun entries(path: String, recursive: Boolean) = listOf(WorkspaceEntry("full.txt", false, MobileWorkspaceLimits.TOTAL_BYTES))
-            override suspend fun readText(path: String) = ""
-            override suspend fun writeText(path: String, content: String) { writes += 1 }
+            override suspend fun readData(path: String, limit: Int) = byteArrayOf()
+            override suspend fun writeData(path: String, content: ByteArray) { writes += 1 }
             override suspend fun removeEntry(path: String, recursive: Boolean) = Unit
         }
         assertFailsWith<IllegalArgumentException> { workspace.write("new.txt", "x") }
@@ -55,6 +55,7 @@ class MobileWorkspaceTest {
         val workspace = MemoryMobileWorkspace()
         val tools = mobileWorkspaceTools(workspace).associateBy { it.name }
         workspace.write("draft/game.js", "score=0\nscore=0\nend")
+        workspace.writeBytes("draft/sprite.png", byteArrayOf(-119, 0, -1))
         assertFalse(tools.getValue("edit_file").run(args("path" to JsonPrimitive("draft/game.js"), "old_text" to JsonPrimitive("score=0"), "new_text" to JsonPrimitive("score=1"))).ok)
         assertEquals("score=0\nscore=0\nend", workspace.read("draft/game.js"))
         assertTrue(tools.getValue("edit_file").run(args("path" to JsonPrimitive("draft/game.js"), "old_text" to JsonPrimitive("score=0"), "new_text" to JsonPrimitive("score=1"), "replace_all" to JsonPrimitive(true))).ok)

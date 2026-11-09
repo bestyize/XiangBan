@@ -50,5 +50,7 @@ class AppPlazaTest {
         assertEquals("landscape", appOrientation(pack.copy(version = 1)))
         val prompt = appRemixPrompt("原作", "原简介", "换个主题")
         listOf("原作", "原简介", "换个主题", "方案让我确认").forEach { assertTrue(it in prompt) }
+        assertTrue("kind=game" in prompt)
+        assertTrue("kind=app" in appRemixPrompt("原作", "原简介", "加个功能", kind = "app"))
     }
 }

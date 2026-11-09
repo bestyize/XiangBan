@@ -452,7 +452,7 @@ cover.png / .svg   16:9 封面，至少 640×360
 
 免构建也要能用上界面框架和游戏引擎。小伴内置一批固定版本的库，Agent 用 `lib_add` 把需要的库复制进作品的 `lib/` 目录。这样作品不依赖外部 CDN：没网也能用，不受国外 CDN 在国内是否稳定的影响，库的版本也不会被人悄悄改掉。
 
-第一批：
+Android 已提供 Three.js r128 的经典脚本版本。`lib_add(library="three", source_dir="drafts/my-game")` 会把它复制为作品内的 `lib/three.min.js`，由普通 `<script src>` 加载全局 `THREE`。以下是库规划。
 
 | 用途 | 库 | 说明 |
 | --- | --- | --- |
@@ -461,22 +461,22 @@ cover.png / .svg   16:9 封面，至少 640×360
 | 2D 游戏 | PixiJS、Phaser | |
 | 3D | three.js | 暮色滑翔用的就是它 |
 
-每个库都提供一个可以直接 `import` 或 `<script src>` 的文件，不占手机工作区「单个文件 1 MB」的上限。以后按需要增加，加进来的库要固定版本、记录来源和许可证。
+计划中的库提供可以直接 `import` 或用 `<script src>` 加载的文件。每个库固定版本并保留来源和许可证。
 
 ### 11.3 手机 Agent 的工具
 
 现有的工具（`client/xiaoban-multiplatform` 的手机 Agent）：
 
-- 文件：`read_file`、`write_file`、`edit_file`、`delete_file`、`list_dir`、`grep`
-- 作品：`game_read_format`、`game_create`、`game_validate`、`game_list`、`game_open`、`game_close`、`game_runtime_read`、`game_export`
+- 文件：`read_file`、`write_file`、`copy_file`、`edit_file`、`delete_file`、`list_dir`、`grep`
+- 作品：`app_read_format`、`app_list`、`app_validate`、`app_create`、`app_open`、`app_runtime_read`、`app_export`
 - 联网：`web_search`、`web_fetch`
 
-手机上的 `game_*` 工具已经改为 `app_read_format`、`app_list`、`app_validate`、`app_create`、`app_open`、`app_runtime_read`、`app_export`，按协议 2 工作；协议 1 的作品手机不再支持。要新增或升级的：
+下表涵盖协议 2 的现有接口和后续规划。
 
 | 工具 | 作用 |
 | --- | --- |
-| `app_read_format` | 返回 [ai-brief.md](ai-brief.md)，替代 `game_read_format` |
-| `app_create`、`app_validate` | 按协议 2 安装和校验作品，`kind` 可以是 `game` 或 `app`；替代 `game_create`、`game_validate`，协议 1 的作品继续用旧工具 |
+| `app_read_format` | 返回当前平台支持的创作规范 |
+| `app_create`、`app_validate` | 按协议 2 安装和校验游戏或小程序 |
 | `app_open`、`app_close`、`app_runtime_read` | 在手机上打开作品试用；读运行错误、`xb.ready()` 用时和访问过的域名 |
 | `app_snapshot` | 给正在运行的作品截一张图交给模型，让 Agent 自己检查画面 |
 | `lib_add` | 把第 11.2 节的官方库复制进作品 |
@@ -486,7 +486,7 @@ cover.png / .svg   16:9 封面，至少 640×360
 | `app_publish` | 打包并上传，填好发布页：标题、简介、标签、封面、是否允许改编。**停在确认页，由用户点「发布」。** 发布是对外公开的动作，Agent 不能替用户点 |
 | `app_check_read` | 读服务端对这个版本的检查结果（第 10 节），没通过就改好后重新发布 |
 
-手机工作区现在的上限是单个文件 1 MB、合计 32 MB，并且只能放文本。要改成也能放二进制素材，合计上限提高到 100 MB，和第 3.2 节一致。
+Android 已接入 `lib_add` 和 `asset_import`。`app_create` 从草稿目录安装源码和素材，`icon` 与 `cover` 可指定包内图片。Android 本地创作的上限为单个源码 1 MB、单个素材 10 MB、作品文件合计 24 MB、工作区合计 64 MB。社区作品包使用第 3.2 节的上限。
 
 ### 11.4 在手机上的流程
 

@@ -2,15 +2,18 @@ package xyz.xiangban.xiaoban.common.community
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.RandomAccessFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 
-/** Persistent UTF-8 workspace confined to an app-private directory. Symlinks are never followed. */
+/** Persistent workspace confined to an app-private directory. Symlinks are never followed. */
 class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
     private val root = root.canonicalFile.also {
         require(!isSymbolic(root.absoluteFile)) { "工作区根目录不能是符号链接" }
@@ -27,6 +30,20 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
             require(!isSymbolic(file) && file.canonicalFile == file.absoluteFile) { "不允许符号链接或工作区外的路径" }
         }
         return file
+    }
+
+    override suspend fun <T> gameTransaction(action: suspend () -> T): T = gameGate.withLock {
+        withContext(Dispatchers.IO) {
+            // The runtime activity can share the same work from a separate Android process.
+            val workspace = checked("")
+            val lockFile = workspace.resolveSibling(".${workspace.name}-games.lock")
+            RandomAccessFile(lockFile, "rw").use { file ->
+                file.channel.lock().use {
+                    currentCoroutineContext().ensureActive()
+                    action()
+                }
+            }
+        }
     }
 
     override suspend fun entries(path: String, recursive: Boolean): List<WorkspaceEntry> = withContext(Dispatchers.IO) {
@@ -50,24 +67,24 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         result
     }
 
-    override suspend fun readText(path: String): String = withContext(Dispatchers.IO) {
+    override suspend fun readData(path: String, limit: Int): ByteArray = withContext(Dispatchers.IO) {
         val file = checked(path)
         require(file.isFile) { "文件不存在：$path" }
-        require(file.length() <= MobileWorkspaceLimits.FILE_BYTES) { "单个文件不能超过 1 MB" }
+        require(file.length() <= limit) { "文件超过大小上限" }
         val bytes = ByteArrayOutputStream()
         file.inputStream().use { input ->
             val buffer = ByteArray(8192)
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
-                require(bytes.size() + count <= MobileWorkspaceLimits.FILE_BYTES) { "单个文件不能超过 1 MB" }
+                require(bytes.size() + count <= limit) { "文件超过大小上限" }
                 bytes.write(buffer, 0, count)
             }
         }
-        bytes.toByteArray().decodeToString(throwOnInvalidSequence = true)
+        bytes.toByteArray()
     }
 
-    override suspend fun writeText(path: String, content: String) = withContext(Dispatchers.IO) {
+    override suspend fun writeData(path: String, content: ByteArray) = withContext(Dispatchers.IO) {
         var file = checked(path)
         require(!file.isDirectory) { "目标是文件夹" }
         val parent = file.parentFile!!
@@ -75,7 +92,7 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         file = checked(path)
         val temporary = File.createTempFile("xb-write-", ".tmp", parent)
         try {
-            temporary.writeBytes(content.encodeToByteArray())
+            temporary.writeBytes(content)
             checked(path)
             currentCoroutineContext().ensureActive()
             require(temporary.renameTo(file)) { "无法保存文件" }
@@ -99,6 +116,10 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
             removeTree(file)
         } else { currentCoroutineContext().ensureActive(); require(file.delete()) { "目录非空；删除整个目录需要 recursive=true" } }
         Unit
+    }
+
+    private companion object {
+        val gameGate = Mutex()
     }
 }
 

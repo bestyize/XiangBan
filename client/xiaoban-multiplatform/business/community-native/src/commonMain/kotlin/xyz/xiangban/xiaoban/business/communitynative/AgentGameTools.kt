@@ -31,6 +31,10 @@ internal fun mobileGameActionTools(store: MobileGameStore?, workspace: MobileWor
             if (logs) workspace.read("logs/$id.txt") else "还没有这件作品的试玩记录，请用户试玩后再检查。"
         })
         if (platform != null) {
+            if (platform.gamesSupported) addAll(mobileGameAssetTools(
+                workspace, platform::creationThreeLibrary,
+                if (platform.forumFilePickerSupported) platform::pickForumFile else null,
+            ))
             add(tool("app_open", "在手机运行宿主中全屏打开已校验的作品供用户试玩；这不代表自动测试通过。") { id ->
                 check(withContext(Dispatchers.Main) { platform.openGame(id) }) { "这个平台暂不支持作品试玩，或系统 WebView 版本过低" }
                 "已请求打开作品，请用户实际试玩，再用 app_runtime_read 检查运行记录。"

@@ -13,11 +13,18 @@ interface MobileWorkspace {
     suspend fun read(path: String): String
     suspend fun write(path: String, content: String)
     suspend fun remove(path: String, recursive: Boolean = false)
+    suspend fun readBytes(path: String): ByteArray = read(path).encodeToByteArray()
+    suspend fun writeBytes(path: String, content: ByteArray, overwrite: Boolean = true) {
+        require(overwrite) { "当前工作区无法添加素材" }
+        write(path, content.decodeToString(throwOnInvalidSequence = true))
+    }
+    suspend fun <T> gameTransaction(action: suspend () -> T): T = action()
 }
 
 object MobileWorkspaceLimits {
     const val FILE_BYTES = 1024 * 1024
-    const val TOTAL_BYTES = 32L * 1024 * 1024
+    const val ASSET_BYTES = 10 * 1024 * 1024
+    const val TOTAL_BYTES = 64L * 1024 * 1024
     const val ENTRIES = 2048
 
     fun path(path: String, allowRoot: Boolean = false): String {
@@ -32,7 +39,7 @@ object MobileWorkspaceLimits {
     }
 
     fun text(content: String): Int {
-        require('\u0000' !in content) { "工作区只支持 UTF-8 文本，不支持二进制文件" }
+        require('\u0000' !in content) { "文本工具只支持 UTF-8；图片和音频请用素材工具" }
         val bytes = content.encodeToByteArray().size
         require(bytes <= FILE_BYTES) { "单个工作区文件不能超过 1 MB" }
         return bytes
@@ -43,8 +50,8 @@ object MobileWorkspaceLimits {
 abstract class ValidatedMobileWorkspace : MobileWorkspace {
     private val lock = Mutex()
     protected abstract suspend fun entries(path: String, recursive: Boolean): List<WorkspaceEntry>
-    protected abstract suspend fun readText(path: String): String
-    protected abstract suspend fun writeText(path: String, content: String)
+    protected abstract suspend fun readData(path: String, limit: Int): ByteArray
+    protected abstract suspend fun writeData(path: String, content: ByteArray)
     protected abstract suspend fun removeEntry(path: String, recursive: Boolean)
 
     final override suspend fun list(path: String, recursive: Boolean): List<WorkspaceEntry> = lock.withLock {
@@ -52,21 +59,41 @@ abstract class ValidatedMobileWorkspace : MobileWorkspace {
     }
 
     final override suspend fun read(path: String): String = lock.withLock {
-        readText(MobileWorkspaceLimits.path(path)).also { MobileWorkspaceLimits.text(it) }
+        readData(MobileWorkspaceLimits.path(path), MobileWorkspaceLimits.FILE_BYTES)
+            .decodeToString(throwOnInvalidSequence = true).also { MobileWorkspaceLimits.text(it) }
     }
 
     final override suspend fun write(path: String, content: String) = lock.withLock {
+        MobileWorkspaceLimits.text(content)
+        writeValidated(path, content.encodeToByteArray(), overwrite = true)
+    }
+
+    final override suspend fun readBytes(path: String): ByteArray = lock.withLock {
+        readData(MobileWorkspaceLimits.path(path), MobileWorkspaceLimits.ASSET_BYTES)
+    }
+
+    final override suspend fun writeBytes(path: String, content: ByteArray, overwrite: Boolean) = lock.withLock {
+        require(content.size <= MobileWorkspaceLimits.ASSET_BYTES) { "单个素材不能超过 10 MB" }
+        writeValidated(path, content, overwrite)
+    }
+
+    private suspend fun writeValidated(path: String, content: ByteArray, overwrite: Boolean) {
         MobileWorkspaceLimits.path(path)
-        val bytes = MobileWorkspaceLimits.text(content)
         val current = entries("", true)
         val old = current.firstOrNull { it.path == path }
         require(old?.directory != true) { "目标是文件夹" }
-        require(current.sumOf { it.size } - (old?.size ?: 0) + bytes <= MobileWorkspaceLimits.TOTAL_BYTES) { "工作区总量不能超过 32 MB" }
+        if (old != null && !overwrite) {
+            require(old.size == content.size.toLong() && readData(path, MobileWorkspaceLimits.ASSET_BYTES).contentEquals(content)) {
+                "草稿已有不同的文件，请换一个路径"
+            }
+            return
+        }
+        require(current.sumOf { it.size } - (old?.size ?: 0) + content.size <= MobileWorkspaceLimits.TOTAL_BYTES) { "工作区总量不能超过 64 MB" }
         val ancestors = path.split('/').dropLast(1).runningReduce { a, b -> "$a/$b" }
         require(current.size + (if (old == null) 1 else 0) + ancestors.count { prefix -> current.none { it.path == prefix } } <= MobileWorkspaceLimits.ENTRIES) {
             "工作区文件和目录数量已达上限"
         }
-        writeText(path, content)
+        writeData(path, content)
     }
 
     final override suspend fun remove(path: String, recursive: Boolean) = lock.withLock {
@@ -76,20 +103,24 @@ abstract class ValidatedMobileWorkspace : MobileWorkspace {
 
 /** Useful for unsupported platforms and deterministic tests; not persistent. */
 class MemoryMobileWorkspace : ValidatedMobileWorkspace() {
-    private val files = linkedMapOf<String, String>()
+    private val files = linkedMapOf<String, ByteArray>()
     private val directories = linkedSetOf<String>()
     override suspend fun entries(path: String, recursive: Boolean): List<WorkspaceEntry> {
         require(path.isEmpty() || path in directories) { "目录不存在：$path" }
         val prefix = if (path.isEmpty()) "" else "$path/"
-        return (directories.map { WorkspaceEntry(it, true) } + files.map { (p, value) -> WorkspaceEntry(p, false, value.encodeToByteArray().size.toLong()) })
+        return (directories.map { WorkspaceEntry(it, true) } + files.map { (p, value) -> WorkspaceEntry(p, false, value.size.toLong()) })
             .filter { it.path.startsWith(prefix) && it.path != path && (recursive || '/' !in it.path.removePrefix(prefix)) }
     }
-    override suspend fun readText(path: String): String = files[path] ?: error("文件不存在：$path")
-    override suspend fun writeText(path: String, content: String) {
+    override suspend fun readData(path: String, limit: Int): ByteArray {
+        val content = files[path] ?: error("文件不存在：$path")
+        require(content.size <= limit) { "文件超过大小上限" }
+        return content.copyOf()
+    }
+    override suspend fun writeData(path: String, content: ByteArray) {
         val parents = path.split('/').dropLast(1).runningReduce { a, b -> "$a/$b" }
         require(parents.none { it in files }) { "路径的上级是文件" }
         directories.addAll(parents)
-        files[path] = content
+        files[path] = content.copyOf()
     }
     override suspend fun removeEntry(path: String, recursive: Boolean) {
         if (path in directories) {
@@ -157,10 +188,18 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
             if (offset + selected.size < lines.size) put("next_offset", offset + selected.size)
         }
     },
-    WorkspaceTool("write_file", "创建或覆盖工作区文本文件，自动创建目录。单文件最多 1 MB，工作区总量 32 MB。", "write",
+    WorkspaceTool("write_file", "创建或覆盖工作区文本文件，自动创建目录。文本单文件最多 1 MB。", "write",
         workspaceProperties("path" to "string", "content" to "string"), listOf("path", "content")) { args ->
         val path = args.workspaceString("path"); workspace.write(path, args.workspaceString("content"))
         buildJsonObject { put("path", path); put("saved", true) }
+    },
+    WorkspaceTool("copy_file", "按原始字节把工作区的一个文件复制到草稿。source 和 path 都相对工作区；同名内容不同时请另选目标路径。", "write",
+        workspaceProperties("source" to "string", "path" to "string"), listOf("source", "path")) { args ->
+        val source = MobileWorkspaceLimits.path(args.workspaceString("source"))
+        val path = MobileWorkspaceLimits.path(args.workspaceString("path"))
+        require(path.startsWith("drafts/") && path.count { it == '/' } >= 2) { "目标必须在 drafts/<作品名>/ 下" }
+        workspace.gameTransaction { workspace.writeBytes(path, workspace.readBytes(source), overwrite = false) }
+        buildJsonObject { put("path", path); put("copied", true) }
     },
     WorkspaceTool("edit_file", "精确替换工作区文件中的文本。默认要求 old_text 仅匹配一次；replace_all=true 时替换所有匹配。", "write",
         workspaceProperties("path" to "string", "old_text" to "string", "new_text" to "string", "replace_all" to "boolean"), listOf("path", "old_text", "new_text")) { args ->
@@ -185,6 +224,7 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
         val matches = mutableListOf<JsonElement>()
         var truncated = false
         for (entry in workspace.list(args.workspaceString("path", ""), true).filterNot { it.directory }) {
+            if (entry.size > MobileWorkspaceLimits.FILE_BYTES || MobileGameFormat.isAssetPath(entry.path)) continue
             workspace.read(entry.path).lineSequence().forEachIndexed { index, line ->
                 if (line.contains(query)) {
                     if (matches.size < 100) matches += buildJsonObject { put("path", entry.path); put("line", index + 1); put("text", line.take(500)) }

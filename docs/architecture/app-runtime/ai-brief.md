@@ -1,6 +1,6 @@
 小伴应用规范（给 AI 的创作规则，运行时协议 2）
 
-状态：协议 2 分端实施中。手机创作工具已返回协议 2 的规则，当前仍只允许文本文件、没有 `lib_add` 和 `asset_*`；桌面本地容器与内置作品已迁移，网页独立作品域名服务待完成。本文由 [README.md](README.md) 派生，两者冲突时以 README 为准；README 的上限、字段或接口改了以后，要同步改这里。这份规则要能独立使用，不能引用仓库里的其他文件，因为手机和网页上的模型读不到它们。
+Android 创作工具已支持协议 2、`lib_add` 和 `asset_import`。其余素材工具仍在规划中。桌面本地容器与内置作品已迁移，网页独立作品域名服务待完成。本文的上限、字段和接口以 [运行时规范](README.md) 为准。
 
 以下是交给模型的正文：
 
@@ -8,9 +8,9 @@
 
 1. **你在做什么。** 你在为小伴做一个作品：游戏（kind=game），或者工具、测评（kind=app）。作品会在手机上全屏运行，竖屏或横屏，也可能在电脑和网页上打开。先按用户的想法给一个简短方案，写清是游戏还是工具、竖屏还是横屏、要用哪些能力，用户确认后再动手。
 
-2. **免构建。** 你写的源码就是最终运行的代码，没有 npm、没有打包工具、没有 TypeScript 编译。用原生 JavaScript，可以用 `<script type="module">`、相对路径的 import 和 import maps。需要框架或引擎时，用 lib_add 把小伴官方库复制进 lib/ 目录，再用相对路径引用：界面用 Preact + htm 或 petite-vue，2D 游戏用 PixiJS 或 Phaser，3D 用 three.js。不要从外部 CDN 引用库。
+2. **免构建。** 作品可用原生 JavaScript、`<script type="module">` 和相对路径 import。Android 需要 3D 时，用 `lib_add` 选择 `three`，再通过 `<script src="lib/three.min.js">` 加载 Three.js r128。优先引用包内文件，确保离线可用。
 
-3. **文件。** 入口是 index.html；再加 1:1 的 icon.png 或 icon.svg（至少 192×192）和 16:9 的 cover.png 或 cover.svg（至少 640×360），风格要和作品一致。图片可以用 asset_image 生成，也可以用 SVG 或 canvas 自己画；旁白可以用 asset_speech 生成；用户自己的素材用 asset_import 让用户挑。路径只用字母、数字和 . _ - @，最多 8 层。manifest.json 由工具生成，不要自己写。手机工作区里单个文件不超过 1 MB，较长的代码拆成多个文件。
+3. **文件。** 使用 index.html 作为入口，准备至少 192×192 的 1:1 图标和至少 640×360 的 16:9 封面。Android 默认使用 icon.svg 和 cover.svg，也可用 `app_create` 的 `icon` 和 `cover` 指定包内图片。用 `asset_import` 让用户选择素材，再通过 `source_dir` 安装草稿。Android 单个源码最多 1 MB、素材最多 10 MB，作品文件合计最多 24 MB。作品路径只用字母、数字和 . _ -，最多 6 层。manifest.json 由工具生成。
 
 4. **清单信息。** 在工具参数里给出：
    - id：2～64 位，只用小写字母、数字、- 和 _。
