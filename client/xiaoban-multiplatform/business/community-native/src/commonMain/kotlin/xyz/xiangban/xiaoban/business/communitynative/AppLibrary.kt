@@ -57,7 +57,7 @@ internal fun AppActionButton(text: String, onClick: () -> Unit, modifier: Modifi
 @Composable
 internal fun AppShortcutIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier.size(56.dp)) {
     val glyph = if (item.source == "builtin") BuiltinMobileGames.glyph(item.id) else null
-    if (glyph != null) AppGlyphIcon(glyph, modifier) else AppCoverIcon(env, item, modifier)
+    AppArtworkIcon(env, item, modifier, glyph)
 }
 
 @Composable
@@ -70,19 +70,20 @@ private fun AppGlyphIcon(glyph: String, modifier: Modifier) {
 }
 
 @Composable
-private fun AppCoverIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier) {
+private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier, glyph: String?) {
     var bytes by remember(item.key) { mutableStateOf<ByteArray?>(null) }
     LaunchedEffect(env, item.key) {
         try {
             bytes = when (item.source) {
-                "builtin" -> env.platform?.builtinGameCover(item.id)
+                "builtin" -> env.platform?.builtinGameIcon(item.id)
                 "local" -> env.games?.readFile(item.id, "cover.svg")?.encodeToByteArray()
                 else -> null
             }
         } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }
     }
     Box(modifier.clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-        XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
+        if (glyph != null) AppGlyphIcon(glyph, Modifier.fillMaxSize())
+        else XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
         val model: Any? = bytes ?: item.coverUrl?.let(env.forum::imageUrl)
         if (model != null) AsyncImage(model, null, imageLoader = rememberAppImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     }

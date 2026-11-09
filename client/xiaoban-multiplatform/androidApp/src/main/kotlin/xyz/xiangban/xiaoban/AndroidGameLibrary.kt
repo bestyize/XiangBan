@@ -19,10 +19,14 @@ internal class AndroidGameLibrary(private val context: Context) {
             }
         }
     }
-    suspend fun cover(id: String): ByteArray? = withContext(Dispatchers.IO) {
+    suspend fun cover(id: String): ByteArray? = artwork(id) { it.cover }
+
+    suspend fun icon(id: String): ByteArray? = artwork(id) { it.icon }
+
+    private suspend fun artwork(id: String, path: (RuntimeV2Manifest) -> String): ByteArray? = withContext(Dispatchers.IO) {
         val root = bundledGameRoot(id) ?: return@withContext null
         val manifest = context.assets.loadBundledRuntimeV2(id, root).manifest
-        context.assets.open("$root/${manifest.cover}").use { it.readBytes() }
+        context.assets.open("$root/${path(manifest)}").use { it.readBytes() }
     }
 }
 

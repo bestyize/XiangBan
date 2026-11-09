@@ -168,6 +168,7 @@ class AndroidPlatformActions(
     override val recentGames get() = AndroidGameHistory.flow(context)
     override suspend fun builtinGames() = gameLibrary.games()
     override suspend fun builtinGameCover(id: String) = gameLibrary.cover(id)
+    override suspend fun builtinGameIcon(id: String) = gameLibrary.icon(id)
     override fun openGame(id: String): Boolean =
         (context as? android.app.Activity)?.let { AndroidGameLauncher.open(it, id) } ?: false
 

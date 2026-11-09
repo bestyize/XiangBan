@@ -166,7 +166,7 @@ abstract class SyncMobileGameAssets : DefaultTask() {
             for (id in categories.keys) {
                 val target = "game-packs-v2/$id"
                 from(source.resolve(id)) {
-                    include("**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.svg", "**/*.png")
+                    include("**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.svg", "**/*.png", "**/*.webp")
                     exclude("**/*.test.*", "desktop-host.js")
                     into(target)
                 }

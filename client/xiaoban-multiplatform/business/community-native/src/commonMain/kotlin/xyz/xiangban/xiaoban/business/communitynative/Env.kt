@@ -81,6 +81,7 @@ interface PlatformActions : VoicePlatform {
     val recentGames: kotlinx.coroutines.flow.StateFlow<List<String>> get() = EmptyRecentGames
     suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()
     suspend fun builtinGameCover(id: String): ByteArray? = null
+    suspend fun builtinGameIcon(id: String): ByteArray? = builtinGameCover(id)
     /** 把工作区作品导出为协议 2 的 ZIP 并保存到下载目录。 */
     suspend fun exportGame(id: String): Boolean = false
     /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */

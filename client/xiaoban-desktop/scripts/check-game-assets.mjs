@@ -105,7 +105,7 @@ if (!errors.length) {
       let manifest;
       try { manifest = readJson(manifestFile); } catch { errors.push(`${side}/${id}: manifest.json 不是有效 JSON`); continue; }
       if (manifest.id !== id || manifest.schemaVersion !== 3 || manifest.runtimeProtocol !== 2) errors.push(`${side}/${id}: manifest id 或 schemaVersion/runtimeProtocol 不匹配`);
-      for (const key of ['entry', 'cover']) {
+      for (const key of ['entry', 'icon', 'cover']) {
         if (typeof manifest[key] !== 'string' || !exists(path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 不存在`);
         else if (!within(dir, path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 越出游戏目录`);
       }
@@ -151,4 +151,4 @@ if (!errors.length) {
   for (const shared of ['desktop-host.js', 'fresh-theme.css', 'result-share.css', 'result-share.js']) if (exists(path.join(desktop, shared))) errors.push(`桌面 game-packs 根目录不应再有共享文件：${shared}`);
 }
 if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
-else console.log('✓ 桌面十款 V2 游戏包、manifest (协议 2)、入口、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');
+else console.log('✓ 桌面十款 V2 游戏包、manifest (协议 2)、入口、图标、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');
