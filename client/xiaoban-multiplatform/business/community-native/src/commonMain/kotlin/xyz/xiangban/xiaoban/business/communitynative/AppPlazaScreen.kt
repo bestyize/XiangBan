@@ -149,9 +149,9 @@ private fun PlazaHeading(title: String, action: String? = null, onAction: (() ->
 internal fun FeaturedGameCard(game: MobileGame, cover: ByteArray?, imageLoader: ImageLoader, modifier: Modifier,
     onDetails: () -> Unit, onClick: () -> Unit) {
     Column(modifier.combinedClickable(role = Role.Button, onLongClickLabel = "查看作品详情", onLongClick = onDetails, onClick = onClick).padding(bottom = 4.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f).outlinedCard(16.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).outlinedCard(16.dp), contentAlignment = Alignment.Center) {
             XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
-            cover?.let { bytes -> AsyncImage(bytes, null, imageLoader = imageLoader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+            cover?.let { bytes -> AsyncImage(bytes, null, imageLoader = imageLoader, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
             Text("官方", Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption)
         }
         Text(game.name, Modifier.padding(top = 8.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
