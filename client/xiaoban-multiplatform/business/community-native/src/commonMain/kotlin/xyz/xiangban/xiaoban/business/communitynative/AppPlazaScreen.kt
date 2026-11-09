@@ -39,21 +39,29 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
     onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
     val games = official.filterNot { BuiltinMobileGames.isTool(it.id) }
     val tools = official.filter { BuiltinMobileGames.isTool(it.id) }
-    var filter by rememberSaveable { mutableStateOf("推荐") }
-    var page by rememberSaveable(filter) { mutableStateOf(1) }
-    var entries by remember(filter) { mutableStateOf(emptyList<Pack>()) }
+    var selectedFilter by rememberSaveable { mutableStateOf("精选") }
+    val filter = if (selectedFilter == "推荐") "精选" else selectedFilter
+    val featuredOnly = filter == "精选"
     val session by env.session.state.collectAsState()
-    val loader = rememberLoader(env, "app-plaza-$filter-$page-${session.accountId}") {
-        env.forum.packs(kind = if (filter == "工具") "app" else "game", sort = if (filter == "最新") "latest" else "hot", page = page)
+    var page by remember(filter, session.accountId) { mutableStateOf(1) }
+    var entries by remember(filter, session.accountId) { mutableStateOf(emptyList<Pack>()) }
+    val requestedPage = page
+    val loader = rememberLoader(env, "app-plaza-$filter-$requestedPage-${session.accountId}") {
+        env.forum.packs(
+            kind = when (filter) { "精选" -> null; "工具" -> "app"; else -> "game" },
+            sort = when (filter) { "精选" -> null; "最新" -> "latest"; else -> "hot" },
+            page = requestedPage,
+            featured = featuredOnly,
+        )
     }
-    val state by loader.state.collectAsState()
-    val picksLoader = rememberLoader(env, "app-plaza-picks-${session.accountId}") { env.forum.packs(featured = true) }
-    val picks by picksLoader.state.collectAsState()
-    val pickItems = (picks as? Load.Ready)?.value?.items.orEmpty().filter { it.kind == "game" || it.kind == "app" }
-    val featuredTools = pickItems.filter { it.kind == "app" }
-    LaunchedEffect(state) {
+    val state by key(loader) { loader.state.collectAsState() }
+    val toolsLoader = rememberLoader(env, "app-plaza-tools-${session.accountId}") { env.forum.packs(kind = "app", featured = true) }
+    val toolsState by toolsLoader.state.collectAsState()
+    val featuredTools = (toolsState as? Load.Ready)?.value?.items.orEmpty()
+    LaunchedEffect(loader, state) {
         (state as? Load.Ready)?.value?.let { result ->
-            entries = ((if (page == 1) emptyList() else entries) + result.items).distinctBy { it.id }
+            val items = if (featuredOnly) result.items.filter { it.featured && (it.kind == "game" || it.kind == "app") } else result.items
+            entries = ((if (requestedPage == 1) emptyList() else entries) + items).distinctBy { it.id }
         }
     }
     val recentIds = env.platform?.recentGames?.collectAsState()?.value.orEmpty()
@@ -62,8 +70,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
     val recent = recentAppShortcuts(recentIds, available, recentCommunity)
     var message by remember { mutableStateOf<String?>(null) }
     val ratios = remember(filter) { mutableStateMapOf<Long, Float>() }
-    val communityPosts = if (filter == "推荐") (pickItems + entries).distinctBy { it.id } else entries
-    val columns = appWaterfallColumns(communityPosts) { pack -> 1f / (ratios[pack.id] ?: (4f / 3f)) + .6f }
+    val columns = appWaterfallColumns(entries) { pack -> 1f / (ratios[pack.id] ?: (4f / 3f)) + .6f }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (recent.isNotEmpty()) {
@@ -106,7 +113,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
             item { PlazaHeading("社区作品") }
             item {
                 Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("推荐", "最新", "游戏", "工具").forEach { label -> PlazaChip(label, label == filter) { filter = label } }
+                    listOf("精选", "最新", "游戏", "工具").forEach { label -> PlazaChip(label, label == filter) { selectedFilter = label } }
                 }
             }
             run {
@@ -119,9 +126,11 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
                 when (val current = state) {
                     is Load.Ready -> item {
-                        if (communityPosts.isEmpty()) Text(if (filter == "工具") "还没有社区工具" else "还没有社区作品", Modifier.padding(24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                        else if (current.value.hasMore) AppActionButton("加载更多", { page++ }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
-                        else Text("已看完所有作品", Modifier.padding(16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                        if (current.value.hasMore) AppActionButton("加载更多", { page = requestedPage + 1 }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+                        else if (entries.isEmpty()) {
+                            val emptyMessage = when (filter) { "精选" -> "暂无精选作品"; "工具" -> "还没有社区工具"; else -> "还没有社区作品" }
+                            Text(emptyMessage, Modifier.padding(24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        } else Text("已看完所有作品", Modifier.padding(16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     }
                     is Load.Failed -> item { Banner(current.message, Modifier.padding(horizontal = 16.dp), warn = true, actionText = "重试", onAction = loader::reload) }
                     else -> item { Spinner(Modifier.fillMaxWidth().height(64.dp)) }
@@ -239,9 +248,16 @@ private fun AppCommunityCard(env: CommunityEnv, pack: Pack, onRatio: (Float) -> 
                     onRatio(ratio)
                 }
             }) }
-            Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = .9f)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Stat(XIcons.Play, compactCount(pack.applyCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
-                Stat(XIcons.Message, compactCount(pack.replyCount))
+            Column(Modifier.align(Alignment.BottomEnd).fillMaxWidth()) {
+                if (pack.featured) {
+                    Text("精选", Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 6.dp).clip(CircleShape)
+                        .background(LocalExtraColors.current.brandSoft).padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = XType.Caption, color = LocalExtraColors.current.brandInk, maxLines = 1)
+                }
+                Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = .9f)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Stat(XIcons.Play, compactCount(pack.applyCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
+                    Stat(XIcons.Message, compactCount(pack.replyCount))
+                }
             }
         }
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
