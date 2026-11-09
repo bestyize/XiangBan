@@ -26,12 +26,6 @@ html.xb-builtin-runtime #selectOverlay .difficulty {
   margin-left: auto;
 }
 
-@media (orientation: landscape) {
-  html.xb-builtin-runtime #selectOverlay .select-head {
-    padding-right: max(0px, calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px - max(18px, var(--safe-right, 0px))));
-  }
-}
-
 /* Reserve the real status bar and capsule above the existing portrait HUD. */
 @media (orientation: portrait) {
   html.xb-builtin-runtime body .game {
