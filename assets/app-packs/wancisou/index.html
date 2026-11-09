@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <title>万磁搜</title>
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icon.webp" type="image/webp">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
@@ -18,7 +18,13 @@
       <button id="submit" type="submit">搜索</button>
     </form>
     <div class="source-row"><label class="source-select"><select id="source" aria-label="搜索来源"><option value="all">全部来源</option></select></label></div>
-    <main id="results" aria-live="polite"></main>
+    <main id="results" aria-live="polite">
+      <section class="search-intro" aria-labelledby="search-intro-title">
+        <svg class="search-intro-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.3 4.3"/></svg>
+        <h2 id="search-intro-title">跨站搜索公开资源</h2>
+        <p>电影、美剧、音乐、软件随心搜！</p>
+      </section>
+    </main>
   </div>
   <div class="modal" id="modal" hidden>
     <div class="backdrop" data-close></div>

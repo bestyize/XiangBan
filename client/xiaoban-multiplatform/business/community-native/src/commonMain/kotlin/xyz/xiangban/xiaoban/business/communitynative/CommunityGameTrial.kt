@@ -19,45 +19,69 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
+private const val CommunityWorkUnsupported = "当前平台暂不支持试玩，可在 Android 或电脑上打开"
+
 @Composable
 internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, open: ((Route) -> Unit)?, modifier: Modifier = Modifier, label: String = "试玩", appStyle: Boolean = false) {
+    Column(modifier) {
+        if (env.platform?.communityGamesSupported != true) {
+            Text(CommunityWorkUnsupported, style = XType.Caption, color = LocalExtraColors.current.ink3)
+            return@Column
+        }
+        CommunityWorkLaunch(env, id, version) { loading, busy, error, launchGame ->
+            val buttonLabel = if (loading) "正在准备试玩…" else label
+            if (appStyle) AppActionButton(buttonLabel, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
+            else PillButton(buttonLabel, launchGame, enabled = !busy)
+            error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
+        }
+    }
+}
+
+@Composable
+internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = null,
+    content: @Composable (loading: Boolean, busy: Boolean, error: String?, launch: () -> Unit) -> Unit) {
+    val platform = env.platform
     val scope = rememberCoroutineScope()
     val busy by env.communityGameBusy.collectAsState()
     var loading by remember(id, version) { mutableStateOf(false) }
     var error by remember(id, version) { mutableStateOf<String?>(null) }
     var pendingDownload by remember(id, version) { mutableStateOf<Pair<Long, CompletableDeferred<Boolean>>?>(null) }
-    Column(modifier) {
-        if (env.platform?.communityGamesSupported != true) {
-            Text("当前平台暂不支持试玩，可在 Android 或电脑上打开", style = XType.Caption, color = LocalExtraColors.current.ink3)
-            return@Column
-        }
-        val launchGame: () -> Unit = launchGame@{
-            if (busy) return@launchGame
-            env.communityGameBusy.value = true; loading = true; error = null
-            scope.launch {
-                try {
-                    // Recheck publication and exact version even on cache hits. Removed works cannot run from stale cards.
-                    val pack = env.forum.pack(id)
-                    val chosen = version ?: pack.version
-                    require(pack.kind in setOf("game", "app") && pack.status == "published") { "作品已不可用" }
-                    val info = env.forum.gameDownload(id, chosen)
-                    info.validate(pack, chosen)
-                    require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
-                    if (env.platform.needsRuntimeV2MobileConfirmation(info)) {
-                        val decision = CompletableDeferred<Boolean>()
-                        pendingDownload = info.size to decision
-                        if (!decision.await()) return@launch
-                    }
-                    val launched = env.platform.playCommunityRuntimeV2(info, pack)
-                    check(launched) { "无法打开试玩，请重试" }
-                } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = messageOf(e) }
-                finally { pendingDownload = null; loading = false; env.communityGameBusy.value = false }
+
+    content(loading, busy, error) {
+        scope.launch {
+            if (env.communityGameBusy.value) return@launch
+            if (platform?.communityGamesSupported != true) {
+                error = CommunityWorkUnsupported
+                return@launch
+            }
+            env.communityGameBusy.value = true
+            loading = true
+            error = null
+            try {
+                // Recheck publication and exact version even on cache hits. Removed works cannot run from stale cards.
+                val pack = env.forum.pack(id)
+                val chosen = version ?: pack.version
+                require(pack.kind in setOf("game", "app") && pack.status == "published") { "作品已不可用" }
+                val info = env.forum.gameDownload(id, chosen)
+                info.validate(pack, chosen)
+                require(env.config.runtimeV2) { "当前设备暂不支持这类作品，请更新系统 WebView 或 Chrome" }
+                if (platform.needsRuntimeV2MobileConfirmation(info)) {
+                    val decision = CompletableDeferred<Boolean>()
+                    pendingDownload = info.size to decision
+                    if (!decision.await()) return@launch
+                }
+                val launched = platform.playCommunityRuntimeV2(info, pack)
+                check(launched) { "无法打开试玩，请重试" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = messageOf(e)
+            } finally {
+                pendingDownload = null
+                loading = false
+                env.communityGameBusy.value = false
             }
         }
-        if (appStyle) AppActionButton(if (loading) "正在准备试玩…" else label, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
-        else PillButton(if (loading) "正在准备试玩…" else label, launchGame, enabled = !busy)
-        error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
     }
     pendingDownload?.let { (size, decision) ->
         val dismiss = { decision.complete(false); Unit }

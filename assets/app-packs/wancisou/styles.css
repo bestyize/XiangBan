@@ -20,6 +20,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.card:focus-visibl
 .source-select select{appearance:none;min-width:116px;height:36px;padding:0 30px 0 14px;border:1px solid #e7e7ea;border-radius:20px;background:#fff;color:#183042;font-size:13px;cursor:pointer}
 .source-select:after{content:"";position:absolute;right:13px;top:13px;width:6px;height:6px;border-right:1.7px solid #6e6872;border-bottom:1.7px solid #6e6872;transform:rotate(45deg);pointer-events:none}
 #results{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px 0 30px}
+.search-intro{margin-top:12px;padding:28px 18px;border:1px solid #1830420f;border-radius:22px;background:#ffffffba;text-align:center}
+.search-intro-icon{display:block;width:48px;height:48px;margin:0 auto 14px;padding:12px;border-radius:16px;background:#fff1ee;fill:none;stroke:#d75460;stroke-width:1.8;stroke-linecap:round}
+.search-intro h2{margin:0 0 8px;font-size:18px;line-height:26px}
+.search-intro p{max-width:320px;margin:0 auto;color:#6e6872;font-size:13px;line-height:21px}
+@media(prefers-color-scheme:dark){
+  .search-intro{border-color:#ffffff12;background:#161a21}
+  .search-intro-icon{background:#2a1f21;stroke:#fd7979}
+  .search-intro p{color:#9aa2ae}
+}
 .card{margin-bottom:12px;padding:16px;border:1px solid #1830420f;border-radius:22px;background:#fff;box-shadow:0 1px 2px #1830420a,0 8px 24px #1830420d;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .card:active{transform:scale(.992)}
 .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}

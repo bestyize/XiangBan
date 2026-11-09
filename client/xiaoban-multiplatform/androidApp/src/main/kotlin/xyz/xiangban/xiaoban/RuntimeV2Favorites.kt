@@ -28,6 +28,8 @@ internal object RuntimeV2Favorites {
         intent.putExtra(FAVORITES, object : ResultReceiver(Handler(Looper.getMainLooper())) {
             override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                 val request = resultData ?: return
+                // Binder gives this Bundle the system class loader, but the reply is an app-defined ResultReceiver.
+                request.classLoader = RuntimeV2Favorites::class.java.classLoader
                 val reply = BundleCompat.getParcelable(request, REPLY, ResultReceiver::class.java) ?: return
                 activity.lifecycleScope.launch {
                     val result = Bundle()

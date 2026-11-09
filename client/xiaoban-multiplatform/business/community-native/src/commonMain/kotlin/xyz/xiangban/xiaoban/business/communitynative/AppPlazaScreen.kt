@@ -97,11 +97,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                         featuredTools.map { it.toToolShortcut() }
                     Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         shortcuts.take(4).forEach { shortcut ->
-                            val tool = tools.firstOrNull { it.id == shortcut.id && shortcut.source == "builtin" }
-                            AppShortcutTile(env, shortcut, Modifier.weight(1f),
-                                onDetails = { if (tool != null) onOfficialDetails(tool) else open(Route.Pack(shortcut.id.toLong())) }) {
-                                if (tool != null) onOfficial(tool) else open(Route.Pack(shortcut.id.toLong()))
-                            }
+                            FeaturedToolTile(env, shortcut, tools, Modifier.weight(1f), onOfficialDetails, onOfficial, open)
                         }
                         repeat(4 - shortcuts.take(4).size) { Spacer(Modifier.weight(1f)) }
                     }
@@ -187,11 +183,7 @@ internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back:
             items(shortcuts.chunked(4)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { shortcut ->
-                        val tool = tools.firstOrNull { it.id == shortcut.id && shortcut.source == "builtin" }
-                        AppShortcutTile(env, shortcut, Modifier.weight(1f),
-                            onDetails = { if (tool != null) onDetails(tool) else open(Route.Pack(shortcut.id.toLong())) }) {
-                            if (tool != null) onOpen(tool) else open(Route.Pack(shortcut.id.toLong()))
-                        }
+                        FeaturedToolTile(env, shortcut, tools, Modifier.weight(1f), onDetails, onOpen, open)
                     }
                     repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -226,6 +218,24 @@ internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, Byte
 }
 
 private fun Pack.toToolShortcut() = AppShortcut("community", id.toString(), title, coverUrl, slug)
+
+@Composable
+private fun FeaturedToolTile(env: CommunityEnv, shortcut: AppShortcut, tools: List<MobileGame>, modifier: Modifier,
+    onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit, open: (Route) -> Unit) {
+    if (shortcut.source == "builtin") {
+        val tool = tools.first { it.id == shortcut.id }
+        AppShortcutTile(env, shortcut, modifier, onDetails = { onDetails(tool) }) { onOpen(tool) }
+    } else key(shortcut.key) {
+        val id = shortcut.id.toLong()
+        CommunityWorkLaunch(env, id) { loading, _, error, launch ->
+            Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+                AppShortcutTile(env, shortcut, Modifier.fillMaxWidth(), onDetails = { open(Route.Pack(id)) }, onClick = launch)
+                if (loading) Text("正在打开…", style = XType.Caption, color = LocalExtraColors.current.ink3)
+                error?.let { Text(it, style = XType.Caption, color = Danger) }
+            }
+        }
+    }
+}
 
 /** Same hierarchy as VisualTopicCard, with real pack and linked discussion counts. */
 @Composable
