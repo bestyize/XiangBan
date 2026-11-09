@@ -575,15 +575,16 @@ function run(s) {
     content = `<div class="generic-run">${a.cover ? cover(a) : cover(a)}<div class="label">演示画面</div></div>`;
   }
   const safe = L
-    ? `<div class="safe" style="left:0;top:0;bottom:0;width:52px"><em style="left:4px;bottom:8px">摄像头</em></div><div class="safe safe-capsule" style="right:8px;top:8px;height:44px"><em style="right:0;top:48px">宿主胶囊</em></div>`
-    : `<div class="safe" style="left:0;right:0;top:0;height:44px"><em style="left:8px;top:48px">状态栏</em></div><div class="safe safe-capsule" style="right:6px;top:44px;height:42px"><em style="right:0;top:46px">宿主胶囊</em></div>`;
+    ? `<div class="safe" style="left:0;top:0;bottom:0;width:52px"><em style="left:4px;bottom:8px">摄像头</em></div>`
+    : `<div class="safe" style="left:0;right:0;top:0;height:44px"><em style="left:8px;top:48px">状态栏</em></div>`;
+  const menuSafe = `<div class="safe safe-capsule"><em style="right:0;top:50px">宿主菜单触控区</em></div>`;
   const fav = favs.has(a.id);
   const menu = s.menu ? `<div class="run-menu" data-a="closemenu"><div class="panel" data-stop>
     <div class="who">${ico(a, 'sm')}<span><b>${a.name.split(/[，：]/)[0]}</b><small>${a.src === 'official' ? '<span class="lbl">官方</span>' : a.author + ' ·'} ${a.kind}</small></span></div>
     <div class="grid"><button data-a="restart"><span>${icon('refresh')}</span>重新开始</button><button data-a="fav:${a.id}" class="${fav ? 'on' : ''}"><span>${icon('star')}</span>${fav ? '已收藏' : '收藏'}</button><button data-a="toast" data-msg="分享：卡片、链接"><span>${icon('share')}</span>分享</button><button data-a="toast" data-msg="${a.src === 'official' ? '反馈已提交' : '举报已提交'}"><span>${icon('flag')}</span>${a.src === 'official' ? '反馈' : '举报'}</button></div>
     ${canRemix(a) ? `<button class="exit remixbtn" data-a="remix:${a.id}">${icon('pen')}做一个我的版本</button>` : ''}<button class="exit" data-a="exit">退出</button>${s.armed ? '<span class="hint">再返回一次也会退出</span>' : ''}</div></div>` : '';
-  return `<div class="screen run">${L ? '' : statusBar(a.id === 'mbti' ? 'color:#3b352c' : 'color:#fff')}<div class="app-frame">${content}</div>${safe}
-    <div class="capsule"><button data-a="menu" aria-label="更多">${icon('more')}</button><i></i><button data-a="exit" aria-label="退出">${icon('close')}</button></div>${menu}</div>`;
+  return `<div class="screen run">${L ? '' : statusBar(a.id === 'mbti' ? 'color:#3b352c' : 'color:#fff')}<div class="app-frame">${content}</div>${safe}${menuSafe}
+    <div class="capsule"><button data-a="menu" aria-label="应用菜单">${icon('more')}</button></div>${menu}</div>`;
 }
 init();
 const focusLinkedBoard = () => document.getElementById(location.hash.slice(1))?.closest('.board')?.scrollIntoView({block:'start'});

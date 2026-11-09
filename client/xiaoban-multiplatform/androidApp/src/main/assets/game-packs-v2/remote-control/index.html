@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>遥控器</title>
+  <link rel="stylesheet" href="remote.css">
+  <script defer src="remote.js"></script>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0">
+  <defs>
+    <linearGradient id="display" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#dbe9ff"/><stop offset=".58" stop-color="#b4caee"/><stop offset="1" stop-color="#829ecb"/>
+    </linearGradient>
+    <linearGradient id="casing" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fdfdff"/><stop offset="1" stop-color="#dfe4ec"/>
+    </linearGradient>
+  </defs>
+  <symbol id="tv-art" viewBox="0 0 96 64">
+    <ellipse cx="48" cy="56" rx="38" ry="3.5" fill="#536781" opacity=".12"/>
+    <path d="m22 49-6 6m58-6 6 6" stroke="#424d5d" stroke-width="2.5" stroke-linecap="round"/>
+    <rect x="10" y="7" width="76" height="44" rx="3" fill="#384656"/>
+    <rect x="12.5" y="9.5" width="71" height="38.5" rx="1.5" fill="url(#display)"/>
+    <path d="M13 42c18 3 29-25 49-20 7 2 13 6 21 8v17H13Z" fill="#edf4ff" opacity=".5"/>
+    <circle cx="76" cy="49.4" r=".8" fill="#cce2ff"/>
+  </symbol>
+  <symbol id="ac-art" viewBox="0 0 96 64">
+    <ellipse cx="48" cy="51" rx="38" ry="3.5" fill="#536781" opacity=".12"/>
+    <rect x="7" y="17" width="82" height="29" rx="6" fill="#637185"/>
+    <rect x="7" y="15" width="82" height="27" rx="6" fill="url(#casing)" stroke="#b6c1d1"/>
+    <path d="M11 35h74v5H11z" fill="#adb9c9"/>
+    <path d="M16 39h64" stroke="#4c596c" stroke-width="2" stroke-linecap="round"/>
+    <rect x="68" y="24" width="11" height="4" rx="2" fill="#8c9fb8"/>
+    <circle cx="75" cy="26" r="1" fill="#e0edff"/>
+  </symbol>
+</svg>
+  <div id="app" aria-busy="true"></div>
+  <div id="notice" role="status" hidden></div>
+  <dialog id="sheet"></dialog>
+</body>
+</html>

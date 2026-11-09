@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>遥控器 · 小伴手机设计稿</title>
+<style>
+  :root {
+    color-scheme: light;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #222;
+    background: #eeeff1;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  button, input { font: inherit; }
+  button { border: 0; cursor: pointer; color: inherit; background: transparent; }
+  button:disabled { cursor: default; opacity: .4; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #2f6fdb; outline-offset: -3px; }
+  h1, h2, h3, p, figure { margin: 0; }
+  svg { display: inline-block; width: 24px; height: 24px; vertical-align: middle; flex: none; }
+  .review { max-width: 1680px; margin: auto; padding: 32px 32px 18px; }
+  .review-brand { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: #535c6a; }
+  .review-brand svg { width: 16px; height: 16px; color: #2f6fdb; }
+  .review-line { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+  .review h1 { font-size: 32px; line-height: 1.25; font-weight: 680; }
+  .review p { margin-top: 6px; color: #626975; font-size: 13px; line-height: 18px; }
+  .review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .review-group { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: #f9fafb; }
+  .review-actions .review-group button { min-height: 32px; background: transparent; }
+  .review-actions button {
+    min-height: 36px; padding: 0 12px; border-radius: 999px; background: #f9fafb;
+    font-size: 12px; font-weight: 600;
+  }
+  .review-actions button[aria-pressed="true"] { background: #dce8fc; color: #1d53ae; }
+  .canvas {
+    max-width: 1680px; margin: auto; padding: 0 32px 28px;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;
+  }
+  figcaption { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px 4px; font-size: 13px; font-weight: 650; }
+  figcaption span { color: #667386; font: 600 11px ui-monospace, monospace; }
+  .phone {
+    --page: #fafafa; --panel: #eee; --surface: #fff; --line: #ededed; --control: #f2f2f2;
+    --ink: #222; --muted: #60656d; --blue: #1d53ae; --tint: #e6eefc;
+    --remote-power: #51ab7d; --remote-dot: #c5c5c5;
+    --xb-safe-top: 31px; --xb-safe-bottom: 18px;
+    --xb-capsule-top: 39px; --xb-capsule-right: 12px; --xb-capsule-width: 76px; --xb-capsule-height: 32px;
+    height: 698px; container-type: inline-size; position: relative; overflow: hidden; isolation: isolate;
+    border: 1px solid #d6d8dd; border-radius: 29px; background: var(--page); color: var(--ink);
+    box-shadow: 0 6px 20px #2431480d;
+  }
+  .dark .phone {
+    color-scheme: dark;
+    --page: #111; --panel: #18191b; --surface: #1c1c1e; --line: #303135; --control: #2c2c2e;
+    --ink: #ececec; --muted: #a6aab3; --blue: #8db6ff; --tint: #1e2a42;
+    --remote-power: #70c79a; --remote-dot: #929294;
+    border-color: #3e424a;
+  }
+  .dark { color: #ececec; background: #202225; }
+  .dark .review p, .dark .review-brand, .dark figcaption span { color: #b0b7c2; }
+  .dark .review-actions button { background: #303239; }
+  .dark .review-group { background: #303239; }
+  .dark .review-actions button[aria-pressed="true"] { color: #a7c5ff; background: #273b59; }
+  .status {
+    height: var(--xb-safe-top); position: absolute; inset: 0 0 auto; z-index: 3;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    font-size: 12px; font-weight: 650; pointer-events: none;
+  }
+  .status svg { width: 47px; height: 14px; }
+  .capsule {
+    position: absolute; top: var(--xb-capsule-top); right: var(--xb-capsule-right); z-index: 9;
+    width: var(--xb-capsule-width); height: var(--xb-capsule-height); display: flex; align-items: center;
+    border-radius: 999px; background: color-mix(in srgb, var(--surface) 78%, transparent);
+    border: 1px solid var(--line); backdrop-filter: blur(12px);
+  }
+  .capsule button { display: grid; place-items: center; flex: 1; height: 100%; padding: 0; border-radius: 999px; }
+  .capsule svg { width: 16px; height: 16px; }
+  .capsule i { height: 14px; border-left: 1px solid var(--line); }
+  .compact .phone {
+    --xb-capsule-top: var(--xb-safe-top);
+    --xb-capsule-right: 6px;
+    --xb-capsule-width: 48px;
+    --xb-capsule-height: 48px;
+  }
+  .compact .capsule { background: none; border: 0; backdrop-filter: none; }
+  .compact .capsule [data-action="exit"], .compact .capsule i { display: none; }
+  .compact .capsule [data-action="host"] svg {
+    translate: 0 -6px; rotate: 90deg; filter: drop-shadow(0 1px 1px #17253826);
+  }
+  .compact .title:not(.home-title) {
+    padding-inline: calc(var(--xb-capsule-right) + var(--xb-capsule-width) + 8px);
+    padding-bottom: 24px;
+    justify-content: center; text-align: center;
+  }
+  .compact .title:not(.home-title) h2 { font-size: 16px; line-height: 22px; }
+  .screen {
+    position: absolute; inset: var(--xb-safe-top) 0 0; overflow: auto; scrollbar-width: thin;
+    overscroll-behavior: contain; display: flex; flex-direction: column; padding-bottom: var(--xb-safe-bottom);
+    background: var(--page);
+  }
+  .screen.remote { background: var(--panel); }
+  .title {
+    position: relative;
+    min-height: calc(var(--xb-capsule-top) + var(--xb-capsule-height) - var(--xb-safe-top) + 8px);
+    display: flex; align-items: center;
+    padding: 4px calc(var(--xb-capsule-right) + var(--xb-capsule-width) + 12px) 4px 16px;
+  }
+  .page-back {
+    flex: none; display: grid; place-items: center; width: 48px; height: 48px;
+    margin-left: -8px; padding: 0;
+  }
+  .page-back svg { width: 20px; height: 20px; }
+  .compact .page-back {
+    position: absolute; left: var(--xb-capsule-right);
+    top: calc(var(--xb-capsule-top) - var(--xb-safe-top)); margin: 0;
+  }
+  .compact .page-back svg { translate: 0 -6px; }
+  .title h2 { font-size: 18px; line-height: 24px; font-weight: 670; overflow-wrap: anywhere; }
+  .home-title { padding: 48px 16px 0; justify-content: space-between; gap: 12px; }
+  .home-title h2 { font-size: 22px; line-height: 30px; font-weight: 680; }
+  .section { padding: 16px; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .section-head h3 { font-size: 16px; line-height: 22px; font-weight: 650; }
+  .pill {
+    display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px;
+    border-radius: 999px; padding: 0 16px; font-size: 14px; font-weight: 630;
+    background: var(--control); white-space: nowrap;
+  }
+  .pill.primary { background: var(--tint); color: var(--blue); }
+  .home-add { flex: none; min-height: 44px; display: grid; place-items: center; padding: 0; border-radius: 999px; }
+  .home-add span {
+    display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 8px;
+    border-radius: 999px; font-size: 12px; font-weight: 630; color: #222; background: #fff;
+    box-shadow: 0 0 8px #17253817, 0 2px 5px #17253812;
+  }
+  .home-add svg { width: 14px; height: 14px; }
+  .pill svg, .quiet svg, .notice svg { width: 16px; height: 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile {
+    min-height: 134px; width: 100%; display: flex; flex-direction: column; align-items: start; text-align: left;
+    padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
+  }
+  .tile .art { width: 75px; height: 56px; margin-bottom: 10px; }
+  .tile strong { margin-top: auto; font-size: 15px; line-height: 22px; overflow-wrap: anywhere; }
+  .tile small { color: var(--muted); font-size: 12px; line-height: 16px; margin-top: 2px; }
+  .device-card { position: relative; min-width: 0; }
+  .device-card .tile { height: 100%; }
+  .rename-key {
+    position: absolute; top: 4px; right: 4px; display: grid; place-items: center;
+    width: 44px; height: 44px; padding: 0; border-radius: 8px; color: var(--muted);
+  }
+  .rename-key svg { width: 16px; height: 16px; }
+  .tile.category { min-height: 122px; align-items: center; text-align: center; }
+  .tile.category .art { margin-bottom: 5px; }
+  .notice {
+    display: flex; gap: 8px; align-items: start; padding: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    font-size: 13px; line-height: 18px; color: var(--muted);
+  }
+  .notice svg { color: var(--blue); margin-top: 1px; }
+  .notice strong { color: var(--ink); display: block; margin-bottom: 2px; }
+  .empty { text-align: center; padding: 44px 12px; }
+  .empty > svg { width: 38px; height: 38px; margin-bottom: 12px; color: var(--muted); }
+  .empty h3, .pair h3 { font-size: 16px; line-height: 22px; }
+  .empty p, .pair p { margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 18px; }
+  .quiet {
+    min-height: 44px; display: flex; justify-content: center; align-items: center; gap: 6px;
+    color: var(--muted); font-size: 13px; padding: 0 8px;
+  }
+  .footer { margin-top: auto; padding: 12px 16px 0; display: grid; justify-items: center; }
+  .footer p { color: var(--muted); text-align: center; font-size: 12px; line-height: 16px; }
+  .steps { display: flex; gap: 6px; padding: 8px 16px 0; color: var(--muted); font-size: 12px; }
+  .steps span { padding: 6px 8px; border-radius: 999px; white-space: nowrap; }
+  .steps .current { background: var(--tint); color: var(--blue); font-weight: 650; }
+  .brand-search { display: flex; gap: 8px; align-items: center; padding: 0 12px; margin: 12px 16px; min-height: 44px; border-radius: 8px; background: var(--control); }
+  .brand-search svg { width: 20px; height: 20px; color: var(--muted); }
+  .brand-search input { width: 100%; min-width: 0; border: 0; background: none; color: var(--ink); outline: 0; font-size: 15px; }
+  .brand-search:focus-within { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .brand-list { background: var(--surface); }
+  .brand-group-title { padding: 10px 16px 6px; background: var(--page); color: var(--muted); font-size: 12px; font-weight: 600; }
+  .brand-row { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 0 16px; font-size: 15px; }
+  .brand-row + .brand-row { border-top: 1px solid var(--line); }
+  .brand-row svg { width: 16px; height: 16px; color: var(--muted); }
+  .pair { text-align: center; padding: 20px 16px 0; }
+  .pair .art { width: 110px; height: 74px; margin-bottom: 8px; }
+  .pair .pill { width: 100%; }
+  .pair .responses { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .pair .response { min-height: 22px; margin: 8px 0 0; color: var(--muted); }
+  .pair .test-key {
+    width: 72px; height: 72px; margin-top: 20px; border-radius: 50%;
+    color: var(--blue); background: var(--tint); display: inline-grid; place-items: center;
+  }
+  .test-key svg { width: 28px; height: 28px; }
+  .pair label, .rename-form label { display: block; text-align: left; margin-top: 18px; color: var(--muted); font-size: 13px; }
+  .pair input, .rename-form input { display: block; width: 100%; min-height: 48px; border: 1px solid var(--line); padding: 0 12px; border-radius: 8px; margin: 8px 0 12px; background: var(--surface); color: var(--ink); }
+  .tv {
+    min-height: 100%; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+    gap: 20px; padding: 0 0 clamp(22px, 12cqw, 64px);
+  }
+  .top-keys { width: 89%; display: flex; justify-content: space-around; }
+  .top-keys .round { width: clamp(48px, 14.2cqw, 72px); height: auto; aspect-ratio: 1; border: 0; }
+  .power { color: var(--remote-power); }
+  .pad {
+    width: min(61cqw, 300px); aspect-ratio: 1; border-radius: 50%;
+    display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+    background: var(--surface);
+  }
+  .pad button { border-radius: 50%; padding: 0; display: grid; place-items: center; color: var(--remote-dot); }
+  .pad button svg { width: 18px; height: 18px; }
+  .pad button:nth-child(1) { grid-area: 1 / 2; }
+  .pad button:nth-child(2) { grid-area: 2 / 1; }
+  .pad button:nth-child(3) {
+    grid-area: 2 / 2; place-self: center; width: 108%; height: 108%; z-index: 1;
+    background: var(--control); border: 1px solid var(--line); color: var(--ink); font-size: 18px;
+  }
+  .pad button:nth-child(4) { grid-area: 2 / 3; }
+  .pad button:nth-child(5) { grid-area: 3 / 2; }
+  .lower { width: 100%; display: grid; justify-items: center; gap: clamp(16px, 6.5cqw, 28px); }
+  .rocker { display: flex; width: min(65cqw, 320px); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .rocker button, .wide-key { min-height: clamp(44px, 13.8cqw, 68px); }
+  .rocker button { flex: 1; }
+  .rocker button + button { border-left: 1px solid var(--line); }
+  .wide-key { width: min(47.5cqw, 234px); border-radius: 999px; background: var(--surface); }
+  .ac { min-height: 100%; display: grid; grid-template-rows: minmax(175px, 2.6fr) repeat(4, minmax(48px, 1fr)); }
+  .readout { display: grid; grid-template-rows: 1fr auto; padding: 0 clamp(16px, 7.4cqw, 34px) 9%; }
+  .ac-display { display: grid; place-items: center; position: relative; }
+  .setpoint { position: relative; translate: -8px 0; font-size: clamp(70px, 28cqw, 124px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .setpoint output { letter-spacing: -.06em; }
+  .setpoint > span { position: absolute; top: .45em; left: calc(100% + .16em); font-size: .22em; white-space: nowrap; }
+  .ac-mode {
+    position: absolute; left: calc(50% + clamp(63px, 18cqw, 86px)); top: 59%;
+    display: flex; align-items: center; gap: 4px; font-size: 14px; white-space: nowrap;
+  }
+  .ac-mode svg { width: 24px; height: 24px; }
+  .ac-status { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+  .ac-status span { display: flex; align-items: center; gap: 4px; }
+  .ac-status svg { width: 16px; height: 16px; }
+  .key-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface); border-top: 1px solid var(--line); }
+  .key-row > * { display: grid; place-items: center; min-height: 48px; }
+  .key-row > * + * { border-left: 1px solid var(--line); }
+  .key-row.temperature > * { border-left: 0; }
+  .key-row.temperature svg { width: 26px; height: 26px; }
+  .key-row span { font-size: 14px; }
+  .command:not(:disabled):active { background: var(--tint); color: var(--blue); }
+  .tv, .ac { flex: 1 0 auto; min-height: 0; }
+  .round { display: grid; place-items: center; border-radius: 50%; background: var(--surface); padding: 0; }
+  .system-bar { position: absolute; z-index: 4; bottom: 5px; left: 50%; translate: -50% 0; width: 92px; height: 4px; border-radius: 4px; background: var(--ink); opacity: .2; pointer-events: none; }
+  .toast {
+    position: absolute; z-index: 8; bottom: 24px; left: 50%; translate: -50% 0;
+    border-radius: 999px; padding: 8px 14px; background: var(--tint); color: var(--blue);
+    border: 1px solid var(--line); font-size: 13px; font-weight: 630; max-width: 94%; width: max-content;
+    box-shadow: 0 4px 18px #0002; pointer-events: none;
+  }
+  dialog {
+    position: absolute; z-index: 7; inset: auto 0 0; margin: 0; width: 100%; max-width: none; border: 1px solid var(--line);
+    border-radius: 16px 16px 0 0; padding: 16px 16px 24px; background: var(--surface); color: var(--ink);
+  }
+  .shade { position: absolute; z-index: 6; inset: 0; background: #131b2850; }
+  dialog h3 { font-size: 18px; margin-bottom: 12px; }
+  .options { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .options button { white-space: normal; }
+  .options button[aria-pressed="true"] { background: var(--tint); color: var(--blue); }
+  .phone:has(.host-menu[open]) .shade { background: rgb(0 0 0 / 45%); }
+  .phone:has(.host-menu[open]) .capsule { z-index: 5; }
+  dialog.host-menu { border: 0; padding-bottom: max(30px, calc(var(--xb-safe-bottom) + 6px)); }
+  .host-header { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .host-icon, .host-actions button span:first-child { display: grid; place-items: center; background: var(--control); }
+  .host-icon { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
+  .host-header strong { font-size: 15px; font-weight: 650; }
+  .host-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 12px; }
+  .host-meta span { padding: 1px 6px; border-radius: 4px; background: var(--control); }
+  .host-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding-top: 14px; }
+  .host-actions button { display: grid; justify-items: center; gap: 6px; padding: 0; font-size: 12px; }
+  .host-actions button span:first-child { width: 48px; height: 48px; border-radius: 16px; }
+  .host-actions button[aria-pressed="true"] { color: var(--blue); }
+  .host-menu svg { width: 22px; height: 22px; }
+  .host-exit { width: 100%; margin-top: 16px; font-size: 15px; font-weight: 400; }
+  @media (max-width: 1110px) {
+    .canvas { max-width: 850px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .review { max-width: 850px; }
+  }
+  @media (max-width: 600px) {
+    .review, figure:nth-child(n+2), figcaption { display: none; }
+    .canvas { padding: 0; display: block; }
+    .phone {
+      --xb-safe-top: max(31px, env(safe-area-inset-top));
+      --xb-safe-bottom: max(18px, env(safe-area-inset-bottom));
+      --xb-capsule-top: calc(var(--xb-safe-top) + 8px);
+      height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .test-key:active { transform: scale(.97); }
+    .tile:active { background: var(--tint); }
+  }
+</style>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0">
+  <defs>
+    <linearGradient id="display" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#dbe9ff"/><stop offset=".58" stop-color="#b4caee"/><stop offset="1" stop-color="#829ecb"/>
+    </linearGradient>
+    <linearGradient id="casing" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fdfdff"/><stop offset="1" stop-color="#dfe4ec"/>
+    </linearGradient>
+  </defs>
+  <symbol id="tv-art" viewBox="0 0 96 64">
+    <ellipse cx="48" cy="56" rx="38" ry="3.5" fill="#536781" opacity=".12"/>
+    <path d="m22 49-6 6m58-6 6 6" stroke="#424d5d" stroke-width="2.5" stroke-linecap="round"/>
+    <rect x="10" y="7" width="76" height="44" rx="3" fill="#384656"/>
+    <rect x="12.5" y="9.5" width="71" height="38.5" rx="1.5" fill="url(#display)"/>
+    <path d="M13 42c18 3 29-25 49-20 7 2 13 6 21 8v17H13Z" fill="#edf4ff" opacity=".5"/>
+    <circle cx="76" cy="49.4" r=".8" fill="#cce2ff"/>
+  </symbol>
+  <symbol id="ac-art" viewBox="0 0 96 64">
+    <ellipse cx="48" cy="51" rx="38" ry="3.5" fill="#536781" opacity=".12"/>
+    <rect x="7" y="17" width="82" height="29" rx="6" fill="#637185"/>
+    <rect x="7" y="15" width="82" height="27" rx="6" fill="url(#casing)" stroke="#b6c1d1"/>
+    <path d="M11 35h74v5H11z" fill="#adb9c9"/>
+    <path d="M16 39h64" stroke="#4c596c" stroke-width="2" stroke-linecap="round"/>
+    <rect x="68" y="24" width="11" height="4" rx="2" fill="#8c9fb8"/>
+    <circle cx="75" cy="26" r="1" fill="#e0edff"/>
+  </symbol>
+</svg>
+<header class="review">
+  <div class="review-brand"><span id="review-icon"></span>小伴手机 · 小程序设计稿</div>
+  <div class="review-line">
+    <div><h1>遥控器</h1><p>电视与空调 · 可点按原型 · 红外操作为模拟</p></div>
+    <div class="review-actions" aria-label="预览设置">
+      <div class="review-group" role="group" aria-label="宿主控件">
+        <button data-chrome="compact" aria-pressed="true">竖三点</button>
+        <button data-chrome="standard" aria-pressed="false">旧版双按钮</button>
+      </div>
+      <button data-demo="normal" aria-pressed="true">默认</button>
+      <button data-demo="empty" aria-pressed="false">未添加</button>
+      <button data-demo="unsupported" aria-pressed="false">无红外</button>
+      <button id="theme" aria-pressed="false">深色</button>
+    </div>
+  </div>
+</header>
+<main class="canvas">
+  <figure><figcaption><span>01</span>我的遥控器</figcaption><div class="phone" data-start="home"></div></figure>
+  <figure><figcaption><span>02</span>添加遥控器</figcaption><div class="phone" data-start="types"></div></figure>
+  <figure><figcaption><span>03</span>电视遥控</figcaption><div class="phone" data-start="tv"></div></figure>
+  <figure><figcaption><span>04</span>空调遥控</figcaption><div class="phone" data-start="ac"></div></figure>
+</main>
+<script>
+  const glyphs = {
+    ir: '<circle cx="12" cy="12" r="1"/><path d="M8.5 8.5a5 5 0 0 0 0 7m7-7a5 5 0 0 1 0 7M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    dot: '<circle cx="12" cy="12" r="3.3" fill="currentColor" stroke="none"/>',
+    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>',
+    right: '<path d="m9 6 6 6-6 6"/>',
+    left: '<path d="m15 6-6 6 6 6"/>',
+    up: '<path d="m6 15 6-6 6 6"/>',
+    down: '<path d="m6 9 6 6 6-6"/>',
+    power: '<path d="M12 2.5v9m4.8-6.6a8 8 0 1 1-9.6 0"/>',
+    home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+    menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    back: '<path d="m8 4-5 5 5 5M3 9h12a5 5 0 1 1 0 10h-5"/>',
+    volumeDown: '<path d="M3 9v6h4l5 4V5L7 9zm13 3h6"/>',
+    volumeUp: '<path d="M3 9v6h4l5 4V5L7 9zm13 3h6m-3-3v6"/>',
+    cool: '<path d="M12 2v20M3.4 7l17.2 10M3.4 17 20.6 7M9 4l3 3 3-3M9 20l3-3 3 3"/>',
+    dry: '<path d="M12 3c4 5 7 8.8 7 12a7 7 0 0 1-14 0c0-3.2 3-7 7-12Z"/>',
+    heat: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>',
+    wind: '<path d="M3 8h12a2 2 0 1 0-2-2M2 12h17a2 2 0 1 1-2 2M4 16h8a2 2 0 1 1-2 2"/>',
+    swing: '<path d="M4 9a10 10 0 0 1 16 0M4 15a10 10 0 0 0 16 0m-12 3-4-3 1 5m11-2 4-3-1 5"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
+    edit: '<path d="m15 5 4 4M4 20l4-.8L20 7.2a1.7 1.7 0 0 0 0-2.4l-.8-.8a1.7 1.7 0 0 0-2.4 0L4.8 16Z"/>',
+    remote: '<rect x="7" y="2" width="10" height="20" rx="4"/><circle cx="12" cy="8" r="1.5"/><path d="M11 14h2m-2 3h2"/>',
+    restart: '<path d="M4 11a8 8 0 1 1 2 6M4 5v6h6"/>',
+    star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>',
+    share: '<path d="M12 15V3m-4 4 4-4 4 4M7 11H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-2"/>',
+  };
+  const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${glyphs[name]}</svg>`;
+  const art = type => `<svg class="art" viewBox="0 0 96 64" aria-hidden="true"><use href="#${type}-art"/></svg>`;
+  const typeLabel = { tv: '电视', ac: '空调' };
+  const brands = {
+    tv: {
+      rankingLabel: '2026 年 9 月 · 电视出货份额（含子品牌）',
+      ranked: ['海信', '创维', 'TCL', '小米', '长虹', '海尔', '康佳', '华为'],
+      others: ['红米', '雷鸟', '酷开', 'Vidda', '索尼', '三星', 'LG', '夏普', '东芝', '飞利浦', '松下'],
+    },
+    ac: {
+      rankingLabel: '2026 年 9 月 · 空调全渠道零售额份额',
+      ranked: ['格力', '美的', '小米', '海尔', '海信', '奥克斯'],
+      others: ['华凌', 'TCL', '科龙', '长虹', '统帅', '卡萨帝', 'COLMO', '志高', '大金', '松下',
+        '三菱电机', '三菱重工', '日立', '东芝', '富士通将军'],
+    },
+  };
+  const brandAliases = {
+    小米: 'xiaomi 米家 mijia', 红米: 'redmi', 华为: 'huawei 智慧屏', 雷鸟: 'ffalcon',
+    美的: 'midea', 格力: 'gree', 海尔: 'haier', 海信: 'hisense', 奥克斯: 'aux',
+    华凌: 'wahin', 科龙: 'kelon', 统帅: 'leader', 大金: 'daikin',
+  };
+  const defaultDevices = () => [
+    { id: 'living', type: 'tv', brand: '小米', name: '客厅电视' },
+    { id: 'bedroom', type: 'ac', brand: '美的', name: '卧室空调' },
+  ];
+  const modeIcons = { 制冷: 'cool', 制热: 'heat', 除湿: 'dry', 送风: 'wind', 自动: 'swing' };
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+  const status = `<div class="status" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 47 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M1 11V9m3 2V7m3 4V5m3 6V3m5 3a8 8 0 0 1 11 0m-9 2a5 5 0 0 1 7 0m-5 2a2 2 0 0 1 3 0"/><rect x="30" y="4" width="14" height="7" rx="2"/><path d="M46 6v3"/><rect x="32" y="6" width="10" height="3" rx=".7" fill="currentColor" stroke="none"/></svg></div>`;
+  const title = name => `<header class="title">
+    <button class="page-back" data-action="back" aria-label="返回上一页">${icon('left')}</button>
+    <h2>${escapeHtml(name)}</h2></header>`;
+  const noEmitter = `<div class="notice">${icon('info')}<div><strong>此手机无法发射红外</strong>请在支持红外遥控的安卓手机上使用。</div></div>`;
+  const homeLink = `<div class="footer"><button class="quiet" data-action="home">${icon('remote')}我的遥控器</button></div>`;
+
+  function mount(phone, main) {
+    const start = phone.dataset.start;
+    const initial = () => ({ page: start, type: start === 'ac' ? 'ac' : 'tv', id: start === 'ac' ? 'bedroom' : 'living' });
+    let route = initial();
+    let devices = defaultDevices();
+    let acStates = new Map();
+    let unsupported = false;
+    let tested = false;
+    let favorited = false;
+    let toastTimer;
+    const stack = [];
+    phone.innerHTML = status +
+      `<div class="capsule" aria-label="宿主胶囊预览"><button data-action="host" aria-label="宿主菜单">${icon('more')}</button><i></i><button data-action="exit" aria-label="退出小程序">${icon('close')}</button></div>
+      <div class="screen"></div><div class="system-bar"></div><div class="toast" role="status" hidden></div>
+      <div class="shade" aria-hidden="true" hidden></div><dialog></dialog>`;
+    const screen = phone.querySelector('.screen');
+    const capsule = phone.querySelector('.capsule');
+    const dialog = phone.querySelector('dialog');
+    const shade = phone.querySelector('.shade');
+    const toast = phone.querySelector('.toast');
+    const currentDevice = () => devices.find(item => item.id === route.id) || defaultDevices().find(item => item.type === route.type);
+    const ac = () => {
+      const id = route.id || 'bedroom';
+      if (!acStates.has(id)) acStates.set(id, { on: true, temp: 26, mode: '除湿', fan: '自动', direction: '自动', swing: false });
+      return acStates.get(id);
+    };
+
+    function notify(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.hidden = false;
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 1500);
+    }
+
+    function hideOptions() {
+      if (!dialog.open) return;
+      screen.inert = false;
+      capsule.inert = false;
+      shade.hidden = true;
+      dialog.close();
+    }
+
+    function dismissOptions() {
+      hideOptions();
+      if (main && history.state?.sheet) history.back();
+    }
+
+    function go(next, replace = false) {
+      hideOptions();
+      if (main) {
+        const method = replace || history.state?.sheet ? 'replaceState' : 'pushState';
+        history[method]({ remote: next }, '');
+      } else if (!replace) {
+        stack.push(route);
+      }
+      route = next;
+      tested = false;
+      render();
+      screen.scrollTop = 0;
+    }
+
+    function back() {
+      if (dialog.open) { dismissOptions(); return; }
+      if (main && route.page !== 'home') {
+        history.back();
+      } else if (stack.length) {
+        route = stack.pop();
+        tested = false;
+        render();
+        screen.scrollTop = 0;
+      } else {
+        go({ page: 'home' }, true);
+      }
+    }
+
+    function steps(step) {
+      const labels = ['选设备', '选品牌', '试码'];
+      return `<div class="steps" aria-label="添加进度">${labels.map((label, index) => index + 1 === step
+        ? `<span class="current" aria-current="step">${index + 1} ${label}</span>`
+        : `<span>${index + 1} ${label}</span>`).join('')}</div>`;
+    }
+
+    function renderHome() {
+      const cards = devices.map(item => `<div class="device-card">
+        <button class="tile" data-action="device" data-id="${item.id}">
+          ${art(item.type)}<strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.brand)} · 红外</small>
+        </button>
+        <button class="rename-key" data-action="rename" data-id="${item.id}" aria-label="修改「${escapeHtml(item.name)}」的备注名">${icon('edit')}</button>
+      </div>`).join('');
+      return `<header class="title home-title"><h2>遥控器</h2>
+        <button class="home-add" data-action="add" ${unsupported ? 'disabled' : ''}><span>${icon('plus')}添加</span></button>
+        </header><section class="section">
+        <div class="section-head"><h3>我的遥控器</h3></div>
+        ${unsupported ? noEmitter : ''}
+        ${cards ? `<div class="tiles" style="${unsupported ? 'margin-top:12px' : ''}">${cards}</div>`
+          : `<div class="empty">${icon('remote')}<h3>还没有遥控器</h3><p>添加一台电视或空调。</p></div>`}</section>`;
+    }
+
+    function renderTypes() {
+      if (unsupported) return `${title('添加遥控器')}<section class="section">${noEmitter}</section>${homeLink}`;
+      return `${title('添加遥控器')}${steps(1)}<section class="section">
+        <div class="section-head"><h3>选择设备类型</h3></div>
+        <div class="tiles">${Object.keys(typeLabel).map(type =>
+          `<button class="tile category" data-action="type" data-value="${type}">${art(type)}<strong>${typeLabel[type]}</strong></button>`).join('')}</div>
+        </section>${homeLink}`;
+    }
+
+    function brandRows(query = '') {
+      const { rankingLabel, ranked, others } = brands[route.type];
+      const row = brand => `<button class="brand-row" data-action="brand" data-value="${brand}">${brand}${icon('right')}</button>`;
+      const keyword = query.trim().toLowerCase();
+      if (!keyword) return `<h3 class="brand-group-title">${rankingLabel}</h3>${ranked.map(row).join('')}
+        <h3 class="brand-group-title">其他品牌</h3>${others.map(row).join('')}`;
+      const items = [...ranked, ...others].filter(brand =>
+        brand.toLowerCase().includes(keyword) || brandAliases[brand]?.includes(keyword));
+      return items.length ? items.map(row).join('')
+        : '<div class="empty"><h3>没有找到品牌</h3><p>换一个关键词试试。</p></div>';
+    }
+
+    function renderBrands() {
+      return `${title('选择' + typeLabel[route.type] + '品牌')}${steps(2)}
+        <label class="brand-search">${icon('search')}<input type="search" aria-label="搜索品牌" placeholder="搜索品牌" autocomplete="off"></label>
+        <div class="brand-list">${brandRows()}</div>
+        <div class="footer"><button class="quiet" data-action="back">更换设备类型</button></div>`;
+    }
+
+    function renderPair() {
+      const { type, brand, code, phase } = route;
+      const label = phase === 'volume' ? '音量 +' : '电源';
+      const key = phase === 'volume' ? 'volumeUp' : 'power';
+      return `${title('测试' + typeLabel[type])}${steps(3)}<section class="pair">
+        ${art(type)}<h3>${escapeHtml(brand)}${typeLabel[type]}</h3>
+        ${phase === 'failed' ? '<p>已试完 3 套示例遥控码。</p><p>确认手机顶部对准家电后，可以重新试码。</p><div class="responses"><button class="pill" data-action="back">换个品牌</button><button class="pill primary" data-action="retry">重新试码</button></div>'
+        : phase === 'save' ? `<p>匹配完成，可以给遥控器起个名字。</p>
+          <form><label>遥控器名称<input name="remote-name" value="${escapeHtml(brand + typeLabel[type])}" maxlength="14" required></label>
+          <button class="pill primary" type="submit">保存并打开</button></form>`
+        : `<p>将手机顶部对准设备，点按${label}键。</p>
+          <button class="test-key command" data-action="test" aria-label="测试${label}">${icon(key)}</button>
+          <p class="response" aria-live="polite">${tested ? '设备有反应吗？' : `第 ${code} / 3 套遥控码`}</p>
+          <div class="responses"><button class="pill" data-action="no" ${tested ? '' : 'disabled'}>没反应</button>
+          <button class="pill primary" data-action="yes" ${tested ? '' : 'disabled'}>有反应</button></div>`}
+        </section><div class="footer"><button class="quiet" data-action="home">我的遥控器</button></div>`;
+    }
+
+    function command(name, symbol, label = '', css = '') {
+      return `<button class="command ${css}" data-action="send" data-value="${name}" aria-label="${name}" ${unsupported ? 'disabled' : ''}>${symbol ? icon(symbol) : label}</button>`;
+    }
+
+    function renderTv() {
+      return `${title(currentDevice().name)}<section class="tv" aria-label="电视按键">
+        <div class="top-keys">
+          ${command('电源', 'power', '', 'round power')}
+          ${command('电视首页', 'home', '', 'round')}
+          ${command('菜单', 'menu', '', 'round')}
+        </div>
+        <div class="pad" aria-label="方向与确认">
+          ${command('向上', 'dot')}${command('向左', 'dot')}${command('确认', null, 'OK')}${command('向右', 'dot')}${command('向下', 'dot')}
+        </div>
+        <div class="lower">
+          <div class="rocker" role="group" aria-label="音量">${command('音量减', 'volumeDown')}${command('音量加', 'volumeUp')}</div>
+          ${command('电视返回', 'back', '', 'wide-key')}
+        </div>
+      </section>`;
+    }
+
+    function acButton(action, label, symbol, subtitle, disabled, css = '') {
+      return `<button class="ac-key command ${css}" data-action="${action}" aria-label="${label}" ${disabled ? 'disabled' : ''}>
+        ${symbol ? icon(symbol) : label}${subtitle ? `<small>${subtitle}</small>` : ''}</button>`;
+    }
+
+    function renderAc() {
+      const state = ac();
+      const locked = !state.on || unsupported;
+      return `${title(currentDevice().name)}
+        <section class="ac" aria-label="空调遥控">
+          <div class="readout" aria-label="遥控器设定">
+            <div class="ac-display">
+              <div class="setpoint"><output aria-label="设定温度">${state.on ? state.temp : '—'}</output><span>°C</span></div>
+              ${state.on ? `<span class="ac-mode">${icon(modeIcons[state.mode])}${state.mode}</span>` : ''}
+            </div>
+            <div class="ac-status"><span>${icon('wind')}风速 ${state.on ? state.fan : '—'}</span>
+              <span>${icon('swing')}${state.on ? (state.swing ? '扫风中' : state.direction + '风向') : '风向 —'}</span></div>
+          </div>
+          <div class="key-row">
+            ${acButton('ac-power', '电源', 'power', '', unsupported, 'power')}
+            ${acButton('mode', '模式', null, '', locked)}
+          </div>
+          <div class="key-row">
+            ${acButton('fan', '风速', null, '', locked || state.mode === '除湿')}
+            ${acButton('direction', '风向', null, '', locked)}
+            ${acButton('swing', '扫风', null, '', locked)}
+          </div>
+          <div class="key-row temperature">
+            ${acButton('temp-down', '降低温度', 'minus', '', locked || state.temp <= 16 || state.mode === '送风')}
+            <span>温度</span>
+            ${acButton('temp-up', '升高温度', 'plus', '', locked || state.temp >= 30 || state.mode === '送风')}
+          </div>
+          <div class="key-row">
+            <button disabled>定时</button><button disabled>睡眠</button>
+            ${acButton('ac-details', '更多空调信息', 'more', '', false)}
+          </div>
+        </section>`;
+    }
+
+    function render() {
+      const screens = { home: renderHome, types: renderTypes, brands: renderBrands, pair: renderPair, tv: renderTv, ac: renderAc };
+      screen.classList.toggle('remote', route.page === 'tv' || route.page === 'ac');
+      screen.innerHTML = screens[route.page]();
+      const input = screen.querySelector('input[type="search"]');
+      input?.addEventListener('input', () => { screen.querySelector('.brand-list').innerHTML = brandRows(input.value); });
+    }
+
+    function showSheet(heading, content, sheet, push) {
+      dialog.innerHTML = content;
+      dialog.classList.toggle('host-menu', sheet.host === true);
+      dialog.setAttribute('aria-label', heading);
+      if (main && push) history.pushState({ remote: route, sheet }, '');
+      shade.hidden = false;
+      dialog.show();
+      screen.inert = true;
+      capsule.inert = sheet.host === true;
+    }
+
+    function openOptions(heading, items, action, selected, push = true) {
+      const content = `<h3>${heading}</h3><div class="options">${items.map(item =>
+        `<button class="pill" data-action="${action}" data-value="${item}" aria-pressed="${item === selected}">${item}</button>`).join('')}</div>
+        <button class="quiet" data-action="dismiss">取消</button>`;
+      showSheet(heading, content, { heading, items, action, selected }, push);
+    }
+
+    function showHostMenu(push = true) {
+      const content = `<div class="host-header"><span class="host-icon">${icon('remote')}</span>
+        <div><strong>遥控器</strong><div class="host-meta"><span>官方</span>小程序</div></div>
+        </div><div class="host-actions">
+        <button data-action="restart"><span>${icon('restart')}</span><span>重新开始</span></button>
+        <button data-action="favorite" aria-pressed="${favorited}"><span>${icon('star')}</span><span>${favorited ? '取消收藏' : '收藏'}</span></button>
+        <button data-action="share"><span>${icon('share')}</span><span>分享</span></button>
+        </div><button class="pill host-exit" data-action="exit">退出</button>`;
+      showSheet('应用菜单', content, { host: true }, push);
+    }
+
+    function showRename(id, push = true) {
+      const item = devices.find(device => device.id === id);
+      if (!item) return;
+      const content = `<h3>修改备注名</h3>
+        <form class="rename-form" data-id="${item.id}">
+          <label>备注名<input name="remote-name" value="${escapeHtml(item.name)}" maxlength="14" required autofocus></label>
+          <div class="options">
+            <button class="pill" type="button" data-action="dismiss">取消</button>
+            <button class="pill primary" type="submit">保存</button>
+          </div>
+        </form>`;
+      showSheet('修改备注名', content, { rename: id }, push);
+    }
+
+    function showAcDetails(push = true) {
+      const content = '<h3>空调信息</h3><p>显示遥控器设定</p><button class="pill" data-action="dismiss">返回</button>';
+      showSheet('空调信息', content, { acDetails: true }, push);
+    }
+
+    function updateAc(action, value) {
+      const state = ac();
+      const changes = {
+        'ac-power': () => { state.on = !state.on; return state.on ? '开机' : '关机'; },
+        'temp-up': () => { state.temp += 1; return state.temp + '°C'; },
+        'temp-down': () => { state.temp -= 1; return state.temp + '°C'; },
+        'swing': () => { state.swing = !state.swing; return state.swing ? '开启扫风' : '关闭扫风'; },
+        'set-mode': () => { state.mode = value; if (value === '除湿') state.fan = '自动'; return value; },
+        'set-fan': () => { state.fan = value; return '风速' + value; },
+        'set-direction': () => { state.direction = value; state.swing = false; return value + '风向'; },
+      };
+      if (dialog.open) dismissOptions();
+      const label = changes[action]();
+      const scroll = screen.scrollTop;
+      render();
+      screen.scrollTop = scroll;
+      screen.querySelector(`[data-action="${action.replace('set-', '')}"]`)?.focus({ preventScroll: true });
+      notify('模拟发送 · ' + label);
+    }
+
+    phone.addEventListener('click', event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button || button.disabled) return;
+      const { action, value, id } = button.dataset;
+      switch (action) {
+        case 'home': go({ page: 'home' }); break;
+        case 'add': go({ page: 'types' }); break;
+        case 'back': back(); break;
+        case 'rename': showRename(id); break;
+        case 'type': go({ page: 'brands', type: value }); break;
+        case 'brand': go({ ...route, page: 'pair', brand: value, code: 1, phase: 'power' }); break;
+        case 'device': {
+          const item = devices.find(device => device.id === id);
+          go({ page: item.type, type: item.type, id });
+          break;
+        }
+        case 'test':
+          tested = true;
+          screen.querySelector('.response').textContent = '设备有反应吗？';
+          screen.querySelectorAll('.responses button').forEach(response => { response.disabled = false; });
+          notify('已模拟发射红外');
+          break;
+        case 'yes': go({ ...route, phase: route.type === 'tv' && route.phase === 'power' ? 'volume' : 'save' }, true); break;
+        case 'no': go({ ...route, code: Math.min(3, route.code + 1), phase: route.code === 3 ? 'failed' : 'power' }, true); break;
+        case 'retry': go({ ...route, code: 1, phase: 'power' }, true); break;
+        case 'send': notify('模拟发送 · ' + value); break;
+        case 'ac-details': showAcDetails(); break;
+        case 'mode': openOptions('模式', Object.keys(modeIcons), 'set-mode', ac().mode); break;
+        case 'fan': openOptions('风速', ['自动', '低', '中', '高'], 'set-fan', ac().fan); break;
+        case 'direction': openOptions('风向', ['自动', '向上', '居中', '向下'], 'set-direction', ac().direction); break;
+        case 'set-mode': case 'set-fan': case 'set-direction': case 'ac-power': case 'temp-up': case 'temp-down': case 'swing':
+          updateAc(action, value); break;
+        case 'host':
+          if (dialog.open) dismissOptions();
+          else showHostMenu();
+          break;
+        case 'restart':
+          acStates.clear();
+          go(initial(), true);
+          break;
+        case 'favorite':
+          favorited = !favorited;
+          button.setAttribute('aria-pressed', favorited);
+          button.lastElementChild.textContent = favorited ? '取消收藏' : '收藏';
+          break;
+        case 'share': notify('分享操作为演示'); break;
+        case 'dismiss': dismissOptions(); break;
+        case 'exit': go(initial(), true); notify('已退出本次预览'); break;
+      }
+    });
+    shade.addEventListener('click', dismissOptions);
+    dialog.addEventListener('keydown', event => {
+      if (event.key === 'Escape') dismissOptions();
+    });
+    dialog.addEventListener('submit', event => {
+      event.preventDefault();
+      const form = event.target;
+      const input = form.elements['remote-name'];
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      const item = devices.find(device => device.id === form.dataset.id);
+      if (!item) return;
+      item.name = name;
+      dismissOptions();
+      render();
+      notify('已保存备注名');
+    });
+
+    screen.addEventListener('submit', event => {
+      event.preventDefault();
+      const input = event.target.elements['remote-name'];
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      const item = { id: 'demo-' + Date.now(), type: route.type, brand: route.brand, name };
+      devices.push(item);
+      const remote = { page: item.type, type: item.type, id: item.id };
+      if (main) {
+        event.target.querySelector('button[type="submit"]').disabled = true;
+        // 选设备、选品牌和试码各占一条历史。保存后从列表打开新的遥控面板。
+        window.addEventListener('popstate', () => {
+          go(remote);
+          notify('已保存遥控器');
+        }, { once: true });
+        history.go(-3);
+      } else {
+        stack.splice(0, stack.length, { page: 'home' });
+        go(remote, true);
+        notify('已保存遥控器');
+      }
+    });
+
+    if (main) {
+      history.replaceState({ remote: route }, '');
+      window.addEventListener('popstate', event => {
+        hideOptions();
+        const next = event.state?.remote || initial();
+        if (JSON.stringify(next) !== JSON.stringify(route)) {
+          route = next;
+          tested = false;
+          render();
+          screen.scrollTop = 0;
+        }
+        const sheet = event.state?.sheet;
+        if (sheet?.host) showHostMenu(false);
+        else if (sheet?.rename) showRename(sheet.rename, false);
+        else if (sheet?.acDetails) showAcDetails(false);
+        else if (sheet) openOptions(sheet.heading, sheet.items, sheet.action, sheet.selected, false);
+      });
+    }
+    render();
+
+    return mode => {
+      unsupported = mode === 'unsupported';
+      devices = mode === 'empty' && main ? [] : defaultDevices();
+      acStates = new Map();
+      go(initial(), true);
+    };
+  }
+
+  document.querySelector('#review-icon').innerHTML = icon('ir');
+  const previews = [...document.querySelectorAll('.phone')].map((phone, index) => mount(phone, index === 0));
+  const chromeButtons = document.querySelectorAll('[data-chrome]');
+  function updateChrome() {
+    const compact = location.hash !== '#standard';
+    document.documentElement.classList.toggle('compact', compact);
+    chromeButtons.forEach(button => button.setAttribute('aria-pressed', (button.dataset.chrome === 'compact') === compact));
+  }
+  chromeButtons.forEach(button => button.addEventListener('click', () => {
+    history.replaceState(history.state, '', '#' + button.dataset.chrome);
+    updateChrome();
+  }));
+  window.addEventListener('hashchange', updateChrome);
+  updateChrome();
+  document.querySelectorAll('[data-demo]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-demo]').forEach(option => option.setAttribute('aria-pressed', option === button));
+    previews.forEach(preview => preview(button.dataset.demo));
+  }));
+  document.querySelector('#theme').addEventListener('click', event => {
+    const active = document.documentElement.classList.toggle('dark');
+    event.currentTarget.setAttribute('aria-pressed', active);
+    event.currentTarget.textContent = active ? '浅色' : '深色';
+  });
+</script>
+</body>
+</html>

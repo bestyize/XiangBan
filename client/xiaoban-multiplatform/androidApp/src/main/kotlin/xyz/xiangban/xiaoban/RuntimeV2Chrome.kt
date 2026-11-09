@@ -23,10 +23,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,12 +46,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
@@ -126,7 +128,7 @@ internal class RuntimeV2Chrome(
     // Only the capsule's small view receives touches while the work is running.
     private val capsuleView = ComposeView(activity).apply {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        setContent { Capsule() }
+        setContent { XiaobanTheme { Capsule() } }
     }
     private val overlayView = ComposeView(activity).apply {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -145,7 +147,9 @@ internal class RuntimeV2Chrome(
     }
 
     init {
-        root.addView(capsuleView, FrameLayout.LayoutParams(pixels(76f), pixels(32f), Gravity.TOP or Gravity.RIGHT))
+        root.addView(capsuleView, FrameLayout.LayoutParams(
+            pixels(48f), pixels(48f), Gravity.TOP or Gravity.RIGHT,
+        ))
         root.addView(overlayView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         updateInsets(0, 0, 0, 0, landscape = false)
         syncVisibility()
@@ -162,8 +166,8 @@ internal class RuntimeV2Chrome(
     fun updateInsets(left: Int, top: Int, right: Int, bottom: Int, landscape: Boolean) {
         this.landscape = landscape
         val layout = capsuleView.layoutParams as FrameLayout.LayoutParams
-        val topMargin = maxOf(pixels(if (landscape) 14f else 48f), top + pixels(4f))
-        val rightMargin = right + pixels(if (landscape) 16f else 12f)
+        val topMargin = top
+        val rightMargin = right + pixels(6f)
         if (layout.topMargin != topMargin || layout.rightMargin != rightMargin) {
             layout.topMargin = topMargin
             layout.rightMargin = rightMargin
@@ -242,29 +246,21 @@ internal class RuntimeV2Chrome(
 
     @Composable
     private fun Capsule() {
-        val ink = Color(0xFF222222)
-        Row(
-            Modifier.fillMaxSize().clip(CircleShape)
-                .background(Color.White.copy(alpha = .2f))
-                .border(.5.dp, Color.Black.copy(alpha = .12f), CircleShape),
-            verticalAlignment = Alignment.CenterVertically,
+        val ink = MaterialTheme.colorScheme.onSurface
+        val shadow = if (ink.luminance() < .5f) Color.White else Color.Black
+        Box(
+            Modifier.fillMaxSize().chromeClick { openMenu(armed = false) }
+                .semantics { if (usingMedia) stateDescription = "正在使用摄像头或麦克风" },
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier.weight(1f).fillMaxHeight().chromeClick { openMenu(armed = false) }
-                    .semantics { if (usingMedia) stateDescription = "正在使用摄像头或麦克风" },
-                contentAlignment = Alignment.Center,
-            ) {
-                XIcon(XIcons.More, tint = ink, size = 18.dp, description = "更多")
-                if (usingMedia) Box(
-                    Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 6.dp)
-                        .size(6.dp).background(Color(DesignTokens.Danger), CircleShape),
-                )
+            Box(Modifier.offset(y = (-6).dp)) {
+                XIcon(XIcons.More, Modifier.offset(y = 1.dp).rotate(90f), tint = shadow.copy(alpha = .32f), size = 16.dp)
+                XIcon(XIcons.More, Modifier.rotate(90f), tint = ink, size = 16.dp, description = "应用菜单")
             }
-            Box(Modifier.width(.5.dp).height(16.dp).background(Color.Black.copy(alpha = .18f)))
-            Box(
-                Modifier.weight(1f).fillMaxHeight().chromeClick(onClick = onExit),
-                contentAlignment = Alignment.Center,
-            ) { XIcon(XIcons.Close, tint = ink, size = 18.dp, description = "退出") }
+            if (usingMedia) Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 8.dp)
+                    .size(6.dp).background(Color(DesignTokens.Danger), CircleShape),
+            )
         }
     }
 

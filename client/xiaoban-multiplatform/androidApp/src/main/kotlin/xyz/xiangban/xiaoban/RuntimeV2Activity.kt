@@ -69,6 +69,7 @@ import org.json.JSONObject
 import xyz.xiangban.xiaoban.business.communitynative.AppearanceMode
 import xyz.xiangban.xiaoban.business.communitynative.InMemoryPrefs
 import xyz.xiangban.xiaoban.business.communitynative.ThemeState
+import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import java.io.ByteArrayInputStream
 
@@ -101,6 +102,9 @@ class RuntimeV2Activity : ComponentActivity() {
     private var safeInsets = Rect()
     private var lastUserGesture = 0L
     private var exportInFlight = false
+    private var remoteEnabled = false
+    private var remoteJob: Job? = null
+    private val remoteControl by lazy { RuntimeV2RemoteControl(this) }
     private val favoriteReceiver by lazy { RuntimeV2Favorites.receiver(intent) }
     private var favorite: Boolean? = null
     private var shareJob: Job? = null
@@ -130,6 +134,7 @@ class RuntimeV2Activity : ComponentActivity() {
         val community = intent.hasExtra(AndroidRuntimeV2Community.PACK_ID)
         val workspace = !community && intent.getBooleanExtra(EXTRA_WORKSPACE, false) && MOBILE_GAME_ID.matches(id)
         val root = if (community || workspace) null else bundledGameRoot(id) ?: run { finish(); return }
+        remoteEnabled = root != null && id == BuiltinMobileGames.REMOTE_CONTROL
         if (workspace) log = RuntimeV2Log(filesDir.resolve("workspace/logs/$id.txt"))
         active?.let { previous ->
             previous.closing = true
@@ -164,7 +169,7 @@ class RuntimeV2Activity : ComponentActivity() {
                         id != RUNTIME_V2_FIXTURE -> LegacySaves.builtin(filesDir, id)
                         else -> null
                     }
-                    networkDisabled = if (BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE) {
+                    networkDisabled = if (remoteEnabled) true else if (BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE) {
                         val override = filesDir.resolve("runtime-v2/debug-network-disabled")
                         override.exists() && override.readText().trim() != "false"
                     } else intent.getBooleanExtra(EXTRA_NETWORK_DISABLED, true)
@@ -198,7 +203,7 @@ class RuntimeV2Activity : ComponentActivity() {
                     official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit,
                     onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
-                    onShare = if (id != RUNTIME_V2_FIXTURE) ({ shareWork(id, workspace) }) else null,
+                    onShare = if (id != RUNTIME_V2_FIXTURE && !remoteEnabled) ({ shareWork(id, workspace) }) else null,
                     onPinShortcut = if (Build.VERSION.SDK_INT >= 26 && shortcut != null) ({ pinWork(shortcut, icon?.asAndroidBitmap()) }) else null,
                     onMenuChanged = { open ->
                         updateVisibility()
@@ -584,6 +589,41 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "exit" -> { result(); log?.add("game.exit"); exit() }
+            "builtin.remote.supported" -> {
+                if (remoteEnabled && reply === document) result(remoteControl.supported()) else error("unsupported")
+            }
+            "builtin.remote.catalog", "builtin.remote.send" -> {
+                if (!remoteEnabled || reply !== document) { error("unsupported"); return }
+                val send = method == "builtin.remote.send"
+                if (send) {
+                    if (!ready || !resumed || closing || failed || chrome.menuOpen || chrome.consentOpen ||
+                        lastUserGesture == 0L || SystemClock.elapsedRealtime() - lastUserGesture !in 0..1000) {
+                        error("gesture")
+                        return
+                    }
+                }
+                if (remoteJob?.isActive == true) { error("busy"); return }
+                if (send) lastUserGesture = 0L
+                remoteJob = lifecycleScope.launch {
+                    try {
+                        if (send) {
+                            val outcome = withContext(Dispatchers.IO) {
+                                remoteControl.send(params.optString("profile"), params.optString("key"), params.optJSONObject("state"))
+                            }
+                            if (outcome.error == null) result(outcome.state ?: true) else error(outcome.error)
+                        } else {
+                            val catalog = withContext(Dispatchers.IO) { remoteControl.catalog() }
+                            result(catalog)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: SecurityException) {
+                        error("denied")
+                    } catch (_: Exception) {
+                        error(if (send) "send-failed" else "catalog-failed")
+                    }
+                }
+            }
             "builtin.mbti.export" -> {
                 if (pack.host != "official-mbti.app.xiangban.xyz" || pack.manifest.id != "mbti" ||
                     intent.getBooleanExtra(EXTRA_WORKSPACE, false) || intent.hasExtra(AndroidRuntimeV2Community.PACK_ID)) { error("unsupported"); return }

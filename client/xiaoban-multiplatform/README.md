@@ -43,6 +43,14 @@ Android 在内置 `agent_mobile` 原生库时，可从「应用 → 我的作品
 
 创作时可用 `lib_add` 把内置的 Three.js r128 加入作品，用 `asset_import` 从系统文件选择器加入图片、音频、GLB 模型或 WOFF2 字体。图标和封面可引用包内图片。导出、分享或提交社区发布时，ZIP 会保留已安装作品的文件和目录结构。单个源码上限 1 MB，单个素材上限 10 MB，作品文件合计上限 24 MB。模块分工见 [手机 Agent 基础能力接入](docs/agent-foundation.md)。
 
+## Android 内置「遥控器」
+
+从「应用 → 广场 → 精选工具 → 遥控器」打开。码库随遥控器程序包分发，支持红外的手机首次打开即可离线按品牌试码、控制家电和修改备注名。
+
+内置码库由小米万能遥控公开快照的电视、固定码空调数据和 halifox 社区快照的电视数据组成，保留原有码集 ID。更新资源时，下载两份原始归档，安装 OpenSSL 并用 Python 3.11 或更新版本运行 `python3 tools/pack-remote-codes.py database_dump.tar.xz halifox.tar.gz`。脚本校验来源文件的 SHA-256，在打包时解密并验证按键波形，生成程序包内的 `codes.tar.xz`。 [小米 v2.1 发布包](https://github.com/ysard/mi_remote_database/releases/tag/v2.1) · [halifox 社区归档](https://codeload.github.com/halifox/android_xiaomi_ir_lab/tar.gz/35dcc787a2fc734a05fb684e923f0451009a20e8)
+
+电视和空调的固定码模式按码集显示可用按键和最近发出的指令。美的空调另外内置 SmartIR 的 14 套摄氏温度实录码，支持按码集开关机、切换模式、调温和调风速。更新美的资源时，用 `python3 tools/pack-smartir-midea.py /path/to/SmartIR` 从固定版本生成。红外接口只开放给 Android 随包内置的「遥控器」，发射前检查前台状态和用户操作。 [SmartIR 码库版本](https://github.com/smartHomeHub/SmartIR/tree/3dca407e3c475b57c02c08b97ae521a4ef0bbf43)
+
 ## 游戏中心 A 版（2026-10-31）
 
 手机版游戏页接入[轻量游戏库设计](docs/design-specs/prototypes/game-center.html)：双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 构建从桌面 `public/game-packs/` 打包 9 款只读官方游戏，仍使用离线沙箱与原有消息/存档协议；不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。官方排序优先暮色滑翔、水墨剑客、雅韵五子棋与 3D 全阶魔方。

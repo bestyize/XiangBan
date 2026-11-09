@@ -38,7 +38,7 @@ object MobileGameFormat {
     const val TOTAL_BYTES = 24 * 1024 * 1024
     const val GAMES = 40
     private const val MAX_DEPTH = 6
-    private val builtin = setOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti")
+    private val builtin = BuiltinMobileGames.ids.toSet()
     private val textExtensions = setOf("html", "js", "mjs", "css", "json", "svg", "md", "txt", "gltf")
     private val images = setOf("png", "jpg", "jpeg", "webp", "gif")
     private val assets = images + setOf("mp3", "wav", "ogg", "m4a", "glb", "woff2")

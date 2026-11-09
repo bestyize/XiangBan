@@ -54,6 +54,11 @@
     can(name) { return capabilities.has(name); },
     exit() { return call('exit'); },
     exportMbti(payload) { return call('builtin.mbti.export', payload); },
+    remote: {
+      supported: () => call('builtin.remote.supported'),
+      catalog: () => call('builtin.remote.catalog'),
+      send: (profile, key, state) => call('builtin.remote.send', { profile, key, state }),
+    },
     storage: {
       get: key => call('storage.get', { key }),
       set: (key, value) => call('storage.set', { key, value }),

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "app",
+  "id": "remote-control",
+  "name": "遥控器",
+  "version": "1.0.0",
+  "description": "内置电视和空调红外码库，支持离线试码、保存和控制。",
+  "category": "tool",
+  "entry": "index.html",
+  "icon": "icon.webp",
+  "cover": "cover.svg",
+  "orientation": "portrait",
+  "input": ["touch", "mouse", "keyboard"]
+}

@@ -333,18 +333,16 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 @keyframes blink{50%{opacity:1}}
 
 /* 全屏运行 */
-.run{--capsule-width:76px;background:#000}
+.run{--capsule-width:48px;--capsule-top:44px;background:#000}
+.landscape .run{--capsule-top:0px}
 .run .status{position:absolute;top:0;left:0;right:0}
 .app-frame{position:absolute;inset:0;overflow:hidden}
-.capsule{position:absolute;z-index:25;display:flex;align-items:center;width:var(--capsule-width);height:32px;border-radius:16px;background:rgba(255,255,255,.2);color:#222;border:.5px solid rgba(0,0,0,.12)}
-.capsule button{flex:1;height:100%;display:grid;place-items:center}
-.capsule button svg{width:18px;height:18px}
-.capsule i{width:.5px;height:16px;background:rgba(0,0,0,.18)}
-.phone:not(.landscape) .capsule{top:48px;right:12px}
-.landscape .capsule{top:14px;right:16px}
+.capsule{position:absolute;z-index:25;top:var(--capsule-top);right:6px;width:var(--capsule-width);height:48px;color:#222}
+.capsule button{width:100%;height:100%;display:grid;place-items:center}
+.capsule button svg{width:16px;height:16px;translate:0 -6px;rotate:90deg;filter:drop-shadow(1px 0 1px #fff8)}
 .safe-on .safe{display:block}
 .safe{display:none;position:absolute;z-index:24;pointer-events:none;border:1.5px dashed #2f7bff;background:#2f7bff14;border-radius:8px}
-.safe-capsule{width:calc(var(--capsule-width) + 16px)}
+.safe-capsule{width:var(--capsule-width);height:48px;right:6px;top:var(--capsule-top)}
 .safe em{position:absolute;font-style:normal;font-size:10px;color:#fff;background:#2f7bff;padding:1px 5px;border-radius:3px;white-space:nowrap}
 .run-menu{position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
 .landscape .run-menu{align-items:center}
@@ -413,5 +411,5 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 <p class="footer-note">轻点官方游戏或工具直接打开，长按或右键查看详情。「系统返回」模拟手机返回手势。<br>MBTI 报告与日期为示例数据；报告可滚动、跳转章节、展开解读，分享卡可导出图片。人格插画为原创概念稿。</p>
 <script src="app-plaza-assets/mbti-type-data.js?v=1"></script>
 <script src="app-plaza-assets/mbti-report.js?v=7"></script>
-<script src="app-plaza-assets/app.js?v=13"></script>
+<script src="app-plaza-assets/app.js?v=14"></script>
 </body></html>
