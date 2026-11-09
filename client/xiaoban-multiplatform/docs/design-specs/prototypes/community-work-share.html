@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>社区作品分享面板 · 小伴设计稿</title>
+  <style>
+    html { color-scheme: light dark; }
+    body {
+      margin: 0;
+      background: light-dark(#f3f3f5, #101012);
+      color: light-dark(#222, #f5f5f6);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .preview-toolbar {
+      max-width: 390px; margin: 0 auto; padding: 16px 16px 0;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .preview-toolbar span { color: light-dark(#666, #aaa); font-size: 12px; }
+    .preview-toolbar select { font: inherit; border: 1px solid light-dark(#ddd, #464649); border-radius: 8px; padding: 4px 6px; }
+  </style>
+</head>
+<body>
+<header class="preview-toolbar">
+  <span>小伴 App / 社区作品分享设计稿</span>
+  <select aria-label="预览外观" id="share-theme">
+    <option value="light dark">跟随系统</option>
+    <option value="light">浅色</option>
+    <option value="dark">深色</option>
+  </select>
+</header>
+<!-- mockup:start -->
+<div class="viz-dotted-background" id="xb-work-share">
+  <div class="ws-device" data-view="share" aria-label="小伴作品详情预览">
+    <div class="ws-page" inert>
+      <div class="ws-hero">
+        <img src="./game-center-assets/jade-gomoku.svg" alt="">
+        <div class="ws-status" aria-hidden="true">
+          <span>9:41</span>
+          <span><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></span>
+        </div>
+        <div class="ws-nav">
+          <span class="ws-hero-icon" aria-hidden="true"><i data-lucide="chevron-left"></i></span>
+          <button class="ws-hero-icon cursor-interaction" data-go="share" type="button" aria-label="分享作品"><i data-lucide="share-2" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="ws-detail">
+        <span class="ws-tag">游戏</span>
+        <h2>雅韵五子棋</h2>
+        <div class="ws-author"><span aria-hidden="true">伴</span><b>小伴精选</b></div>
+        <p>水墨玉石质感五子棋，支持人机对弈与双人对局。</p>
+        <h3>作品讨论</h3>
+      </div>
+    </div>
+    <button type="button" class="ws-scrim cursor-interaction" data-go="detail" aria-label="关闭面板" tabindex="-1"></button>
+
+    <section class="ws-sheet" data-panel="share" role="dialog" aria-modal="true" aria-labelledby="ws-title">
+      <header class="ws-sheet-header">
+        <h2 id="ws-title">分享作品</h2>
+        <button type="button" class="ws-close cursor-interaction" data-go="detail" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+      </header>
+      <div class="ws-preview">
+        <img src="./game-center-assets/jade-gomoku.svg" alt="">
+        <div>
+          <h3>雅韵五子棋</h3>
+          <p>游戏 <span>·</span> 小伴精选</p>
+        </div>
+      </div>
+      <div class="ws-actions" aria-label="分享方式">
+        <button type="button" class="ws-action ws-primary cursor-interaction" data-action="copy">
+          <span class="ws-action-icon"><i data-lucide="link-2" aria-hidden="true"></i></span>
+          <span data-copy-label>复制链接</span>
+        </button>
+        <button type="button" class="ws-action cursor-interaction" data-action="system">
+          <span class="ws-action-icon"><i data-lucide="share-2" aria-hidden="true"></i></span>
+          <span>系统分享</span>
+        </button>
+        <button type="button" class="ws-action cursor-interaction" data-go="poster">
+          <span class="ws-action-icon"><i data-lucide="image" aria-hidden="true"></i></span>
+          <span>生成海报</span>
+        </button>
+        <button type="button" class="ws-action cursor-interaction" data-action="web">
+          <span class="ws-action-icon"><i data-lucide="globe" aria-hidden="true"></i></span>
+          <span>浏览器打开</span>
+        </button>
+      </div>
+      <p class="ws-feedback" role="status">收到链接的人可以直接在浏览器查看。</p>
+    </section>
+
+    <section class="ws-sheet" data-panel="poster" role="dialog" aria-modal="true" aria-labelledby="ws-poster-title" hidden>
+      <header class="ws-sheet-header">
+        <button type="button" class="ws-close cursor-interaction" data-go="share" aria-label="返回分享方式"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+        <h2 id="ws-poster-title">分享海报</h2>
+        <button type="button" class="ws-close cursor-interaction" data-go="detail" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+      </header>
+      <figure class="ws-poster">
+        <img src="./game-center-assets/jade-gomoku.svg" alt="雅韵五子棋封面">
+        <figcaption>
+          <span>小伴社区</span>
+          <b>雅韵五子棋</b>
+          <small>游戏 · 小伴精选</small>
+        </figcaption>
+      </figure>
+      <div class="ws-poster-actions">
+        <button type="button" class="ws-pill cursor-interaction" data-action="save">保存海报</button>
+        <button type="button" class="ws-pill ws-pill-main cursor-interaction" data-action="send">分享海报</button>
+      </div>
+      <p class="ws-feedback" role="status">海报样式示意</p>
+    </section>
+    <div class="ws-safe" aria-hidden="true"><span></span></div>
+  </div>
+</div>
+<style>
+  #xb-work-share { padding: 16px 0; }
+  #xb-work-share *,
+  #xb-work-share *::before,
+  #xb-work-share *::after { box-sizing: border-box; }
+  #xb-work-share [hidden] { display: none; }
+  #xb-work-share .ws-device {
+    --ws-page: light-dark(#fafafa, #111111);
+    --ws-surface: light-dark(#fff, #1c1c1e);
+    --ws-fill: light-dark(#f2f2f2, #2b2b2e);
+    --ws-line: light-dark(#ededed, #343437);
+    --ws-text: light-dark(#222, #f2f2f2);
+    --ws-muted: light-dark(#666, #b4b4b9);
+    --ws-soft: light-dark(#e9e9ec, #3a3a3d);
+    --ws-accent: light-dark(#2b2b30, #e5e5ea);
+    --ws-brand: light-dark(#2b2b30, #636368);
+    position: relative; isolation: isolate;
+    width: min(100%, 390px); margin: 0 auto;
+    min-height: 592px; border: 1px solid var(--ws-line); border-radius: 28px;
+    overflow: clip; background: var(--ws-page); color: var(--ws-text);
+    font: 15px/22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  #xb-work-share h2, #xb-work-share h3, #xb-work-share p, #xb-work-share figure { margin: 0; }
+  #xb-work-share button { font: inherit; border: 0; background: none; color: inherit; padding: 0; }
+  #xb-work-share button:focus-visible { outline: 2px solid var(--ws-accent); outline-offset: -2px; }
+  #xb-work-share svg { display: block; width: 22px; height: 22px; }
+  #xb-work-share img { filter: grayscale(1); }
+  #xb-work-share .ws-hero { position: relative; background: #171717; color: #fff; height: 216px; }
+  #xb-work-share .ws-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #xb-work-share .ws-status, #xb-work-share .ws-nav {
+    position: absolute; inset-inline: 0; display: flex; justify-content: space-between; align-items: center;
+  }
+  #xb-work-share .ws-status { top: 10px; padding-inline: 22px; font-size: 13px; font-weight: 600; }
+  #xb-work-share .ws-status span:last-child { display: flex; gap: 6px; }
+  #xb-work-share .ws-status svg { width: 16px; height: 16px; }
+  #xb-work-share .ws-nav { top: 38px; padding-inline: 12px; }
+  #xb-work-share .ws-hero-icon {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #0007;
+  }
+  #xb-work-share .ws-detail { padding: 16px; }
+  #xb-work-share .ws-tag {
+    display: inline-block; background: var(--ws-fill); border-radius: 99px;
+    padding: 2px 10px; color: var(--ws-muted); font-size: 12px; line-height: 16px;
+  }
+  #xb-work-share .ws-detail h2 { font-size: 22px; line-height: 30px; font-weight: 600; margin-top: 6px; }
+  #xb-work-share .ws-author { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; }
+  #xb-work-share .ws-author span {
+    display: grid; place-items: center; width: 28px; height: 28px;
+    background: var(--ws-soft); color: var(--ws-accent); border-radius: 50%;
+  }
+  #xb-work-share .ws-detail p { color: var(--ws-muted); }
+  #xb-work-share .ws-detail h3 { margin-top: 32px; font-size: 16px; }
+  #xb-work-share .ws-scrim { position: absolute; inset: 0; width: 100%; background: #0006; }
+  #xb-work-share [data-view="detail"] .ws-scrim { display: none; }
+  #xb-work-share .ws-sheet {
+    position: absolute; inset: auto 0 0; z-index: 1;
+    border-radius: 16px 16px 0 0; background: var(--ws-surface);
+    box-shadow: 0 -4px 24px #0002; padding: 10px 16px 32px;
+  }
+  #xb-work-share .ws-sheet-header {
+    display: flex; justify-content: space-between; align-items: center; min-height: 44px; margin-bottom: 8px;
+  }
+  #xb-work-share .ws-sheet-header h2 { font-size: 18px; line-height: 24px; font-weight: 600; }
+  #xb-work-share .ws-close { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; }
+  #xb-work-share .ws-close svg {
+    width: 30px; height: 30px; padding: 7px; border-radius: 50%; background: var(--ws-fill); color: var(--ws-muted);
+  }
+  #xb-work-share .ws-preview {
+    display: flex; align-items: center; gap: 12px; padding: 10px;
+    border: 1px solid var(--ws-line); border-radius: 12px;
+  }
+  #xb-work-share .ws-preview img { width: 76px; height: 56px; object-fit: cover; border-radius: 8px; flex: none; }
+  #xb-work-share .ws-preview div { min-width: 0; }
+  #xb-work-share .ws-preview h3 {
+    font-size: 16px; line-height: 22px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #xb-work-share .ws-preview p { margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--ws-muted); }
+  #xb-work-share .ws-preview p span { margin-inline: 2px; }
+  #xb-work-share .ws-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+  #xb-work-share .ws-action {
+    display: grid; justify-items: center; align-content: start; gap: 7px;
+    padding: 0 0 6px; border-radius: 12px; min-height: 70px; text-align: center;
+    font-size: 12px; line-height: 16px;
+  }
+  #xb-work-share .ws-action-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--ws-fill); }
+  #xb-work-share .ws-primary .ws-action-icon { background: var(--ws-brand); color: #fff; }
+  #xb-work-share .ws-primary { font-weight: 600; }
+  #xb-work-share .ws-action:hover .ws-action-icon { filter: brightness(.95); }
+  #xb-work-share .ws-feedback {
+    margin-top: 8px; min-height: 18px; color: var(--ws-muted); font-size: 12px; line-height: 18px; text-align: center;
+  }
+  #xb-work-share .ws-feedback[data-success="true"] { color: light-dark(#14774b, #7ad6a6); }
+  #xb-work-share .ws-poster {
+    width: min(100%, 216px); margin-inline: auto;
+    overflow: hidden; border: 1px solid var(--ws-line); border-radius: 12px; background: var(--ws-page);
+  }
+  #xb-work-share .ws-poster img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  #xb-work-share .ws-poster figcaption { padding: 14px; display: grid; gap: 4px; }
+  #xb-work-share .ws-poster figcaption span { font-size: 12px; line-height: 16px; color: var(--ws-accent); }
+  #xb-work-share .ws-poster figcaption b { font-size: 18px; line-height: 24px; }
+  #xb-work-share .ws-poster figcaption small { font-size: 12px; line-height: 16px; color: var(--ws-muted); }
+  #xb-work-share .ws-poster-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  #xb-work-share .ws-pill { min-height: 44px; border-radius: 24px; background: var(--ws-fill); font-weight: 600; }
+  #xb-work-share .ws-pill-main { background: var(--ws-brand); color: #fff; }
+  #xb-work-share .ws-safe {
+    position: absolute; z-index: 2; bottom: 9px; inset-inline: 0; display: flex; justify-content: center; pointer-events: none;
+  }
+  #xb-work-share .ws-safe span { width: 108px; height: 4px; border-radius: 4px; background: var(--ws-text); opacity: .8; }
+</style>
+<script>
+  (() => {
+    const root = document.getElementById("xb-work-share");
+    const device = root.querySelector(".ws-device");
+    const detail = root.querySelector(".ws-page");
+    const share = root.querySelector('[data-panel="share"]');
+    const poster = root.querySelector('[data-panel="poster"]');
+    const copyLabel = root.querySelector("[data-copy-label]");
+    const shareStatus = share.querySelector(".ws-feedback");
+    const posterStatus = poster.querySelector(".ws-feedback");
+    const feedback = {
+      copy: "已复制链接（演示）",
+      system: "此处调起手机的系统分享菜单",
+      web: "此处在浏览器打开公开作品页",
+      save: "此处将海报保存到手机",
+      send: "此处通过系统菜单分享海报"
+    };
+
+    function show(view) {
+      device.dataset.view = view;
+      detail.inert = view !== "detail";
+      share.hidden = view !== "share";
+      poster.hidden = view !== "poster";
+      copyLabel.textContent = "复制链接";
+      shareStatus.textContent = "收到链接的人可以直接在浏览器查看。";
+      delete shareStatus.dataset.success;
+      posterStatus.textContent = "海报样式示意";
+      const activeView = { detail, share, poster }[view];
+      activeView.querySelector("button").focus();
+    }
+
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.go) {
+        show(button.dataset.go);
+        return;
+      }
+      const action = button.dataset.action;
+      if (!action) return;
+      const status = device.dataset.view === "poster" ? posterStatus : shareStatus;
+      status.textContent = feedback[action];
+      status.dataset.success = String(action === "copy");
+      copyLabel.textContent = action === "copy" ? "已复制" : "复制链接";
+    });
+
+    root.addEventListener("keydown", (event) => {
+      const view = device.dataset.view;
+      if (view === "detail") return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        show(view === "poster" ? "share" : "detail");
+      }
+      if (event.key === "Tab") {
+        const buttons = (view === "poster" ? poster : share).querySelectorAll("button");
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    if (globalThis.Tweak) {
+      const state = { appearance: "light dark" };
+      const tweak = new Tweak({
+        container: device,
+        onChange: () => { device.style.colorScheme = state.appearance; }
+      });
+      tweak.addSelect(state, "appearance", {
+        label: "外观",
+        options: [
+          { label: "跟随系统", value: "light dark" },
+          { label: "浅色", value: "light" },
+          { label: "深色", value: "dark" }
+        ]
+      });
+    }
+  })();
+</script>
+<!-- mockup:end -->
+<script>
+  document.getElementById("share-theme").addEventListener("change", (event) => {
+    document.documentElement.style.colorScheme = event.target.value;
+  });
+
+  // Offline equivalents of the icons supplied by the in-chat preview.
+  const paths = {
+    "battery-full": "M22 14v-4M6 14v-4m4 4v-4m4 4v-4 M4 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z",
+    "wifi": "M2 8.8a16 16 0 0 1 20 0M5 12.7a11 11 0 0 1 14 0m-11 3.9a6 6 0 0 1 8 0M12 20h.01",
+    "chevron-left": "m15 18-6-6 6-6",
+    "share-2": "M8.7 13.5l6.6 3.9m0-10.8-6.6 3.9 M21 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+    "x": "m18 6-12 12M6 6l12 12",
+    "link-2": "M10 13.5a3.5 3.5 0 0 0 5 .3l3-3a3.5 3.5 0 0 0-5-5l-1.7 1.7m1.4 3a3.5 3.5 0 0 0-5-.3l-3 3a3.5 3.5 0 0 0 5 5l1.7-1.7",
+    "image": "M3 17l4.5-4.5 4 4 3-3L21 20M9 9h.01 M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z",
+    "globe": "M2 12h20M12 2c5 5 5 15 0 20-5-5-5-15 0-20Zm10 10a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"
+  };
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  for (const icon of document.querySelectorAll("[data-lucide]")) {
+    const svg = document.createElementNS(svgNamespace, "svg");
+    const path = document.createElementNS(svgNamespace, "path");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    path.setAttribute("d", paths[icon.dataset.lucide]);
+    svg.append(path);
+    icon.replaceWith(svg);
+  }
+</script>
+</body>
+</html>

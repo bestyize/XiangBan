@@ -18,6 +18,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [社区作品分享面板](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/community-work-share.html) | 作品封面预览、四个分享入口、复制反馈及独立海报预览。支持浅色、深色和窄屏，分享操作为演示。[在线预览（本机）](http://127.0.0.1:1421/prototypes/community-work-share.html) |
 | [遥控器](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/universal-remote.html) | 电视与空调小程序的可点按设计稿。包含我的遥控器、添加与试码、电视圆形四点方向键、双段音量与独立返回键，以及空调大字温度、风速和风向状态与四行全宽按键。品牌选择列出 19 个电视品牌和 21 个空调品牌，按 2026 年 9 月中国市场的公开份额排序，电视按整机出货、空调按全渠道零售额，其余单列。首页「添加」与标题同行靠右，使用 28px 高的白底、黑字和轻阴影。已保存的遥控器可点卡片右上角的铅笔修改备注名。子页标题为 16px，与两侧的返回箭头、竖三点同高。使用海湾蓝，支持深浅色及无红外演示。默认使用贴近右上角的无圆底竖三点，点击打开与 Android 宿主布局对齐的底部菜单，可切回旧版双按钮对照。[在线预览（本机）](http://127.0.0.1:1421/prototypes/universal-remote.html)，启动方法见手机设计索引。 |
 | [万磁搜](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/torrent-search.html) | 小伴协议 2 的独立工具应用设计稿：跨站搜索、来源筛选、磁力获取及失败状态；视觉参考 search.xiangban.xyz，使用示例数据和模拟交互。手机画板使用通用竖三点宿主样式。[在线预览（本机）](http://127.0.0.1:1421/prototypes/torrent-search.html)，启动方法见手机设计索引。 |
 | [开源精选详情页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/open-source-detail.html) | 顶部项目卡片（含 Star 数与更新日期）、中文 / English README 语言切换、官方配图与可复制命令，支持手机 / 桌面、深浅色、图片放大、收藏、小红书风格评论 / 回复与贴边互动栏。[在线预览（本机）](http://127.0.0.1:1423/prototypes/open-source-detail.html)，启动方法见手机设计索引；未修改正式页面。 |
