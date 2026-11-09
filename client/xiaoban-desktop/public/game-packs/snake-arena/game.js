@@ -20,7 +20,7 @@
   let width = 0, height = 0, dpr = 1, camera = { x: 1200, y: 850, zoom: 1 }
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
   let best = 0, countdown = 0, lastFrame = 0, accumulator = 0, elapsedUI = 0, lastProgress = 0
-  let audio = null, sound = false, lastEatTone = 0, toastTimer = 0, wasFullscreen = false, leaving = false
+  let audio = null, sound = true, lastEatTone = 0, toastTimer = 0, wasFullscreen = false, leaving = false
   let joystickPointer = null, boostPointer = null, joystickBase = null
   let direction = null, boost = false, keyboardBoost = false, peakMass = 60
   let needsDraw = true

@@ -8,7 +8,7 @@
   const FRONTIER = [110, 130.81, 146.83, 164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440]
   let fire = null, fireGain = null, sandSrc = null, sandGain = null, sandFilter = null
   let nextCrackle = 0, nextDrone = 0
-  let enabled = false, nextNote = 0, nextDrum = 0, nextChime = 0, nextSurf = 0, lastNote = 5
+  let enabled = true, nextNote = 0, nextDrum = 0, nextChime = 0, nextSurf = 0, lastNote = 5
 
   function init() {
     if (ac) return true
@@ -349,14 +349,14 @@
 
   function setEnabled(value) {
     enabled = value
-    if (value && init() && ac.state === 'suspended') void ac.resume().catch(() => {})
+    if (value) resume()
     if (!value && rainGain) rainGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
     if (!value && windGain) windGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
     if (!value && fireGain) fireGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
     if (!value && sandGain) sandGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
   }
 
-  function resume() { if (enabled && ac?.state === 'suspended') void ac.resume().catch(() => {}) }
+  function resume() { if (enabled && init() && ac.state === 'suspended') void ac.resume().catch(() => {}) }
   function close() { if (ac) void ac.close().catch(() => {}) }
 
   globalThis.XiabanInkAudio = { play, update, setEnabled, resume, close, get enabled() { return enabled } }

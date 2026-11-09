@@ -312,11 +312,12 @@
   // Unlock the audio context on the first gesture, wherever it happens, when sound is still wanted.
   // The sound controls are skipped: their own handler decides the new state.
   function unlockSound(event) {
-    if (!soundWanted || audio?.enabled) return
+    if (!soundWanted || !audio) return
     if (event?.target instanceof Element && event.target.closest('#soundButton, #helpSound')) return
-    applySound()
+    if (audio.enabled) audio.resume()
+    else applySound()
   }
-  for (const type of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(type, unlockSound, { passive: true })
+  for (const type of ['pointerup', 'touchend', 'keydown']) window.addEventListener(type, unlockSound, { passive: true })
 
   // ------------------------------------------------------------ guidance
 
