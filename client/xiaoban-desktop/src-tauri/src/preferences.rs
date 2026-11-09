@@ -64,8 +64,8 @@ pub struct Settings {
     pub automatic_updates: bool,
     pub game_desktop_double_click: bool,
     pub companion_enabled: bool,
-    /// The small companion above the chat composer; independent of desktop companion visibility.
-    pub chat_composer_pet_enabled: bool,
+    /// Explicitly show the chat composer pet. The legacy enabled flag also stored the old on-by-default value.
+    pub chat_composer_pet_opt_in: bool,
     /// The companion reacts to the desktop effect (and later, to local presence) with expressions only.
     pub companion_links: bool,
     /// Official shell of the companion; an unknown name falls back to the pot.
@@ -112,7 +112,7 @@ impl Default for Settings {
             automatic_updates: true,
             game_desktop_double_click: false,
             companion_enabled: true,
-            chat_composer_pet_enabled: true,
+            chat_composer_pet_opt_in: false,
             companion_links: true,
             companion_skin: "pot".into(),
             assistant_enabled: true,
@@ -241,18 +241,23 @@ mod tests {
         assert!(value.settings.autostart);
         assert!(!value.settings.game_desktop_double_click);
         assert!(value.settings.companion_enabled);
-        assert!(value.settings.chat_composer_pet_enabled);
+        assert!(!value.settings.chat_composer_pet_opt_in);
         assert!(value.settings.companion_links);
         assert_eq!(value.settings.effects, Default::default());
     }
     #[test]
-    fn chat_composer_pet_can_stay_off_without_disabling_desktop_pets() {
-        let mut value: Preferences = serde_json::from_str(r#"{"settings":{"chatComposerPetEnabled":false}}"#).unwrap();
+    fn chat_composer_pet_requires_opt_in_and_remembers_the_choice() {
+        let mut value: Preferences =
+            serde_json::from_str(r#"{"settings":{"chatComposerPetEnabled":true}}"#).unwrap();
         value.settings.normalize();
-        let saved = serde_json::to_string(&value).unwrap();
-        let again: Preferences = serde_json::from_str(&saved).unwrap();
-        assert!(!again.settings.chat_composer_pet_enabled);
-        assert!(again.settings.companion_enabled);
+        assert!(!value.settings.chat_composer_pet_opt_in);
+        for enabled in [true, false] {
+            value.settings.chat_composer_pet_opt_in = enabled;
+            let saved = serde_json::to_string(&value).unwrap();
+            let again: Preferences = serde_json::from_str(&saved).unwrap();
+            assert_eq!(again.settings.chat_composer_pet_opt_in, enabled);
+            assert!(again.settings.companion_enabled);
+        }
     }
     #[test]
     fn companion_links_default_on_and_an_explicit_off_survives_reload() {

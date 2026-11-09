@@ -48,7 +48,7 @@ describe('small pet above the chat composer', () => {
     await flushPromises();
     expect(wrapper.get('[data-testid="composer-pet-reply"]').text()).toContain('收到这一点温柔');
     expect(wrapper.find('.composer-pet-live').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(87);
+    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(104);
     expect(actorPoke).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.pet-art').attributes('tabindex')).toBe('-1');
 
@@ -67,7 +67,7 @@ describe('small pet above the chat composer', () => {
     await flushPromises();
     await wrapper.get('[data-testid="composer-pet"]').trigger('click'); await flushPromises();
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(75);
+    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(90);
     await wrapper.setProps({ attention: true });
     expect(wrapper.get('.composer-pet').classes()).toContain('is-attention');
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);

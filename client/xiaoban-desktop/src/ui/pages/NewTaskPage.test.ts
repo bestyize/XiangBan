@@ -42,15 +42,18 @@ beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.useRealTimers(); });
 
 describe('新建任务', () => {
-  it('immediately hides and restores the shared composer pet when settings change', async () => {
+  it('keeps the shared composer pet hidden until enabled and responds to settings changes', async () => {
     const { store } = await open();
-    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(true);
-    store.settings = { ...defaults, chatComposerPetEnabled: false };
+    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(false);
+    store.settings = { ...defaults };
     await flushPromises();
     expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(false);
-    store.settings = { ...defaults, chatComposerPetEnabled: true };
+    store.settings = { ...defaults, chatComposerPetOptIn: true };
     await flushPromises();
     expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(true);
+    store.settings = { ...defaults };
+    await flushPromises();
+    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(false);
   });
   it('greets by the time of day', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });

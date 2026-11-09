@@ -89,15 +89,15 @@ describe('control state with native settings', () => {
   });
   it('persists chat pet visibility independently and keeps the saved value after a failure', async () => {
     const store = createControlStore(vi.fn());
-    expect(store.settings.chatComposerPetEnabled).toBe(true);
-    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), chatComposerPetEnabled: args?.enabled } as never));
-    await store.setChatComposerPet(false);
-    expect(ipc).toHaveBeenCalledWith('set_chat_composer_pet', { enabled: false });
-    expect(store.settings.chatComposerPetEnabled).toBe(false);
+    expect(store.settings.chatComposerPetOptIn).toBe(false);
+    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), chatComposerPetOptIn: args?.enabled } as never));
+    await store.setChatComposerPet(true);
+    expect(ipc).toHaveBeenCalledWith('set_chat_composer_pet', { enabled: true });
+    expect(store.settings.chatComposerPetOptIn).toBe(true);
     expect(store.settings.companionEnabled).toBe(true);
     ipc.mockRejectedValueOnce(new Error('保存失败'));
-    await expect(store.setChatComposerPet(true)).rejects.toThrow('保存失败');
-    expect(store.settings.chatComposerPetEnabled).toBe(false);
+    await expect(store.setChatComposerPet(false)).rejects.toThrow('保存失败');
+    expect(store.settings.chatComposerPetOptIn).toBe(true);
     store.dispose();
   });
   it('sends the companion links switch to the host and keeps the acknowledged value', async () => {

@@ -434,7 +434,7 @@ fn set_chat_composer_pet(app: tauri::AppHandle, enabled: bool) -> Result<Setting
     let state = app.state::<DesktopState>();
     let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = settings(&app);
-    next.chat_composer_pet_enabled = enabled;
+    next.chat_composer_pet_opt_in = enabled;
     persist(&app, &next)?;
     *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
     publish(&app);

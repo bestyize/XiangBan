@@ -44,9 +44,9 @@ async function setChatPet(enabled: boolean) {
     <div class="xb-group"><div class="xb-row"><div class="xb-row-text"><b>皮肤</b></div><button class="xb-btn" type="button" data-testid="settings-open-skins" @click="openSkins">管理皮肤</button></div></div>
     <div class="xb-group-title">对话界面</div>
     <div class="xb-group">
-      <div class="xb-row" title="显示输入框右上角的小伴，点击可互动" aria-description="显示输入框右上角的小伴，点击可互动">
+      <div class="xb-row" title="开启后在输入框右上角显示小伴，点击可互动" aria-description="开启后在输入框右上角显示小伴，点击可互动">
         <div class="xb-row-text"><b>对话框桌宠</b></div>
-        <NSwitch :value="store.settings.chatComposerPetEnabled !== false" aria-label="对话框桌宠" data-testid="settings-chat-composer-pet" :loading="savingPet" :disabled="savingPet" @update:value="setChatPet" />
+        <NSwitch :value="store.settings.chatComposerPetOptIn === true" aria-label="对话框桌宠" data-testid="settings-chat-composer-pet" :loading="savingPet" :disabled="savingPet" @update:value="setChatPet" />
       </div>
     </div>
   </div>

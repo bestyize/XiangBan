@@ -11,20 +11,20 @@ describe('chat pet appearance setting', () => {
   it('saves the switch and surfaces failures without changing the saved choice', async () => {
     const store = reactive({
       settings: { ...defaults }, notify: vi.fn(),
-      setChatComposerPet: vi.fn(async (enabled: boolean) => { store.settings.chatComposerPetEnabled = enabled; }),
+      setChatComposerPet: vi.fn(async (enabled: boolean) => { store.settings.chatComposerPetOptIn = enabled; }),
     });
     const wrapper = mount(AppearanceSettings, { props: { store: store as unknown as ControlStore } });
     const toggle = wrapper.getComponent(NSwitch);
-    expect(toggle.props('value')).toBe(true);
-    await toggle.vm.$emit('update:value', false);
-    await flushPromises();
-    expect(store.setChatComposerPet).toHaveBeenCalledWith(false);
     expect(toggle.props('value')).toBe(false);
-    store.setChatComposerPet.mockRejectedValueOnce(new Error('保存失败'));
     await toggle.vm.$emit('update:value', true);
     await flushPromises();
+    expect(store.setChatComposerPet).toHaveBeenCalledWith(true);
+    expect(toggle.props('value')).toBe(true);
+    store.setChatComposerPet.mockRejectedValueOnce(new Error('保存失败'));
+    await toggle.vm.$emit('update:value', false);
+    await flushPromises();
     expect(store.notify).toHaveBeenCalledWith(expect.objectContaining({ message: '保存失败' }), 'error');
-    expect(toggle.props('value')).toBe(false);
+    expect(toggle.props('value')).toBe(true);
     expect(toggle.props('disabled')).toBe(false);
     wrapper.unmount();
   });
