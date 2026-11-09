@@ -35,6 +35,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
@@ -71,6 +73,25 @@ internal fun RetainedTabPage(
         layout(constraints.maxWidth, constraints.maxHeight) { page?.placeRelative(0, 0) }
     }) {
         content()
+    }
+}
+
+@Composable
+private fun RetainedMainTab(selected: Boolean, content: @Composable () -> Unit) {
+    val tabAlpha = animateFloatAsState(if (selected) 1f else 0f, tween(TabMillis), label = "一级页淡入淡出")
+    val blockTouches = if (selected) Modifier else Modifier.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
+    }
+    RetainedTabPage(
+        selected = selected,
+        modifier = Modifier.zIndex(if (selected) 1f else 0f)
+            .graphicsLayer { alpha = tabAlpha.value }
+            .semantics { if (!selected) hideFromAccessibility() },
+        visible = { selected || tabAlpha.value > 0f },
+    ) {
+        Box(Modifier.fillMaxSize().then(blockTouches)) { content() }
     }
 }
 
@@ -112,19 +133,15 @@ fun CommunityNativeApp(env: CommunityEnv) {
             Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }) {
                 val selectedTab = Tab.valueOf(tab)
                 val gamesSelected = selectedTab == Tab.Games
-                val gamesAlpha = animateFloatAsState(if (gamesSelected) 1f else 0f, tween(TabMillis), label = "应用页淡入淡出")
-                RetainedTabPage(
-                    selected = gamesSelected,
-                    modifier = Modifier.zIndex(if (gamesSelected) 1f else 0f)
-                        .graphicsLayer { alpha = gamesAlpha.value }
-                        .semantics { if (!gamesSelected) hideFromAccessibility() },
-                    visible = { gamesSelected || gamesAlpha.value > 0f },
-                ) {
+                RetainedMainTab(selected = gamesSelected) {
                     GamesScreen(
                         env, chat, ::push, mine = showMyWorks, onMineChanged = { showMyWorks = it }, active = gamesSelected,
                         onOverlayChanged = { gameOverlayOpen = it },
                         createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null },
                     )
+                }
+                RetainedMainTab(selected = selectedTab == Tab.Community) {
+                    CommunityScreen(env, ::push)
                 }
                 AnimatedContent(targetState = selectedTab, modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(TabMillis)) togetherWith fadeOut(tween(TabMillis)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
@@ -134,8 +151,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                             onCreateWork = { kind -> pendingCreation = kind; tab = Tab.Games.name },
                             onGoPlaza = { showMyWorks = false; tab = Tab.Games.name }, onAppDrawerChanged = { appDrawerOpen = it },
                         )
-                        Tab.Games -> Spacer(Modifier.fillMaxSize()) // Keep the transition full size.
-                        Tab.Community -> CommunityScreen(env, ::push)
+                        Tab.Games, Tab.Community -> Spacer(Modifier.fillMaxSize()) // Keep the transition full size.
                         Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
