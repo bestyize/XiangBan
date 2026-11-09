@@ -19,7 +19,7 @@ async function remove(scheme: OwnScheme) {
 onMounted(load)
 </script>
 <template>
-  <section id="my-schemes" class="my-schemes"><div class="scheme-heading"><h2>我的方案</h2><RouterLink class="btn" to="/me/scheme-backups">账号方案备份</RouterLink><RouterLink class="btn btn-primary" to="/schemes/new">发布方案</RouterLink><button class="btn" :disabled="loading || removing !== null" @click="load">刷新</button></div>
+  <section id="my-schemes" class="my-schemes"><div class="scheme-heading"><h2>我的方案</h2><RouterLink class="btn btn-primary" to="/schemes/new">发布方案</RouterLink><button class="btn" :disabled="loading || removing !== null" @click="load">刷新</button></div>
     <p v-if="loading" class="scheme-state" role="status">正在读取方案…</p><p v-else-if="error" class="scheme-state" role="alert">{{ error }} <button class="btn" @click="load">重试</button></p><p v-else-if="!items.length" class="scheme-state">还没有发布过方案，可以用自己的已上架作品组装。</p>
     <ul v-else class="own-schemes"><li v-for="scheme in items" :key="scheme.id"><div><RouterLink v-if="scheme.status === 'published'" :to="`/schemes/${scheme.id}`"><strong>{{ scheme.title }}</strong></RouterLink><strong v-else>{{ scheme.title }}</strong><p>{{ scheme.status === 'published' ? '已发布' : '已下架' }} · {{ scheme.items.length }} 项作品 · {{ timeAgo(scheme.created_at) }}</p></div><button v-if="scheme.status === 'published'" class="btn btn-sm" :disabled="removing !== null" @click="remove(scheme)">{{ removing === scheme.id ? '正在下架…' : '下架' }}</button></li></ul>
   </section>
