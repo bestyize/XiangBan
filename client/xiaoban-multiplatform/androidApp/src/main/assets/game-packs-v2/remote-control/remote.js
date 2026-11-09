@@ -52,8 +52,10 @@ const art = type => `<svg class="art" viewBox="0 0 96 64" aria-hidden="true"><us
 const home = { page: 'home' };
 
 let route = home;
-let available = false;
-let initializing = true;
+let available = null;
+let readingDevices = true;
+let devicesReadFailed = false;
+let readingCatalog = true;
 let sending = false;
 let saving = false;
 let tested = false;
@@ -104,7 +106,7 @@ function steps(active) {
 
 function header(title, isHome = false) {
   if (isHome) return `<header class="top home"><h1>遥控器</h1>
-    <button class="add" data-action="add" ${!available || initializing ? 'disabled' : ''}><span>${icon('plus')}添加</span></button></header>`;
+    <button class="add" data-action="add" ${!available || readingDevices || devicesReadFailed ? 'disabled' : ''}><span>${icon('plus')}添加</span></button></header>`;
   return `<header class="top"><button class="back" data-action="back" aria-label="返回上一页">${icon('left')}</button>
     <h1>${escape(title)}</h1></header>`;
 }
@@ -117,8 +119,10 @@ function renderHome() {
     <button class="edit" data-action="rename" data-id="${escape(item.id)}" aria-label="修改「${escape(item.name)}」的备注名">${icon('edit')}</button>
     </div>`).join('');
   return `${header('遥控器', true)}<main class="content section"><h2>我的遥控器</h2>
-    ${initializing ? '<p>正在检查红外和本地码库…</p>' : !available ? '<div class="note"><strong>此手机无法发射红外</strong><p>请在支持红外遥控的安卓手机上使用。</p></div>' : ''}
-    ${cards ? `<div class="tiles">${cards}</div>` : !initializing ? `<div class="empty">${icon('remote')}<p>还没有遥控器</p></div>` : ''}
+    ${available === false ? '<div class="note"><strong>此手机无法发射红外</strong><p>请在支持红外遥控的安卓手机上使用。</p></div>' : ''}
+    ${devicesReadFailed ? '<p role="alert">已保存的遥控器读取失败，请重新打开遥控器。</p>' :
+      cards ? `<div class="tiles">${cards}</div>` :
+      !readingDevices ? `<div class="empty">${icon('remote')}<p>还没有遥控器</p></div>` : ''}
     </main>`;
 }
 
@@ -126,7 +130,8 @@ function renderTypes() {
   const selection = Object.entries(typeLabels).map(([type, label]) => `<button class="tile category" data-action="type" data-value="${type}" ${catalog?.[type]?.length ? '' : 'disabled'}>
     ${art(type)}<strong>${label}</strong></button>`).join('');
   return `${header('添加遥控器')}<main class="content">${steps(0)}<section class="section">
-    ${catalog ? `<h2>选择设备类型</h2><div class="tiles">${selection}</div>` :
+    ${readingCatalog ? '<p role="status">正在读取内置码库…</p>' :
+      catalog ? `<h2>选择设备类型</h2><div class="tiles">${selection}</div>` :
       '<p role="alert">内置码库读取失败，请重新打开遥控器。</p>'}
     </section></main>`;
 }
@@ -231,15 +236,18 @@ function renderRemote() {
   if (!item) return renderHome();
   const profile = profiles.get(item.profile);
   return `${header(item.name)}<main class="content">
-    ${!available ? '<div class="section"><p>此手机无法发射红外。</p></div>' :
-      !profile ? '<div class="section"><p>当前码库没有此遥控配置，请返回列表重新添加。</p></div>' : ''}
+    ${available === false ? '<div class="section"><p>此手机无法发射红外。</p></div>' :
+      !readingCatalog && !catalog ? '<div class="section"><p role="alert">内置码库读取失败，请重新打开遥控器。</p></div>' :
+      !readingCatalog && !profile ? '<div class="section"><p>当前码库没有此遥控配置，请返回列表重新添加。</p></div>' : ''}
     ${item.type === 'tv' ? renderTv(profile) : renderAc(item, profile)}</main>`;
 }
 
 function render() {
   const pages = { home: renderHome, types: renderTypes, brands: renderBrands, pair: renderPair, remote: renderRemote };
   app.classList.toggle('remote', route.page === 'remote');
-  app.setAttribute('aria-busy', initializing);
+  const busy = route.page === 'home' ? readingDevices :
+    readingCatalog && (route.page === 'types' || route.page === 'remote');
+  app.setAttribute('aria-busy', busy);
   app.innerHTML = pages[route.page]();
 }
 
@@ -441,17 +449,40 @@ async function initialize() {
   setTheme(host?.info?.theme || 'light');
   host?.on('theme', setTheme);
   render();
-  if (host) {
-    await host.ready().catch(() => {});
-    const [ir, saved, codes] = await Promise.allSettled([host.remote.supported(), host.storage.get('devices'), host.remote.catalog()]);
-    available = ir.status === 'fulfilled' && ir.value === true;
-    if (saved.status === 'fulfilled' && Array.isArray(saved.value)) {
-      devices = saved.value.filter(item => item && item.type in typeLabels && ['id', 'name', 'brand', 'profile'].every(key => typeof item[key] === 'string'));
-    }
-    if (codes.status === 'fulfilled') setCatalog(codes.value);
+  if (!host) {
+    available = false;
+    readingDevices = false;
+    readingCatalog = false;
+    render();
+    return;
   }
-  initializing = false;
-  render();
+
+  await host.ready().catch(() => {});
+  const loadDevices = host.storage.get('devices').then(saved => {
+    if (Array.isArray(saved)) {
+      devices = saved.filter(item => item && item.type in typeLabels && ['id', 'name', 'brand', 'profile'].every(key => typeof item[key] === 'string'));
+    }
+  }, () => {
+    devicesReadFailed = true;
+  }).finally(() => {
+    readingDevices = false;
+    render();
+  });
+  const checkInfrared = host.remote.supported().then(supported => {
+    available = supported === true;
+  }, () => {
+    available = false;
+  }).finally(render);
+  await Promise.all([loadDevices, checkInfrared]);
+
+  try {
+    if (available) setCatalog(await host.remote.catalog());
+  } catch (_) {
+    setCatalog(null);
+  } finally {
+    readingCatalog = false;
+    if (route.page === 'types' || route.page === 'remote') render();
+  }
 }
 
 void initialize();
