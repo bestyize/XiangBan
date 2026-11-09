@@ -8,7 +8,7 @@ export const DEFAULT_COVER = `data:image/svg+xml,${encodeURIComponent('<svg xmln
 
 export const builtinBase = (id: string) => `/game-packs/${id}/`;
 // Shipped games live under the app's own origin; user games are served by the native game-pack protocol.
-const BASE = /^(?:\/game-packs\/|game-pack:\/\/localhost\/|http:\/\/game-pack\.localhost\/)([a-z0-9][a-z0-9-]*)\/$/;
+const BASE = /^(?:\/game-packs\/|game-pack:\/\/localhost\/|http:\/\/game-pack\.localhost\/)([a-z0-9][a-z0-9_-]*)\/$/;
 
 /** True when `base` is a folder URL this app produces for exactly this game. */
 export function validBase(id: string, base: string): boolean {
@@ -28,8 +28,13 @@ export function readGames(raw: unknown): GameManifest[] {
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const g = item as Record<string, unknown>;
-    if (typeof g.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(g.id) || seen.has(g.id)) continue;
-    if (typeof g.name !== 'string' || !g.name || typeof g.description !== 'string' || g.entry !== 'index.html') continue;
+    const v2 = g.runtimeProtocol === 2;
+    const idPattern = v2 ? /^[a-z0-9][a-z0-9_-]{1,63}$/ : /^[a-z0-9][a-z0-9-]*$/;
+    if (typeof g.id !== 'string' || !idPattern.test(g.id) || seen.has(g.id)) continue;
+    if (typeof g.name !== 'string' || !g.name || typeof g.description !== 'string') continue;
+    if (v2) {
+      if (typeof g.entry !== 'string' || !/^(?:[a-z0-9_@-][a-z0-9._@-]*\/){0,7}[a-z0-9_@-][a-z0-9._@-]*\.html?$/i.test(g.entry)) continue;
+    } else if (g.entry !== 'index.html') continue;
     if (g.base !== undefined && (typeof g.base !== 'string' || !validBase(g.id, g.base))) continue;
     if (g.cover !== undefined && (typeof g.cover !== 'string' || !g.cover)) continue;
     seen.add(g.id);

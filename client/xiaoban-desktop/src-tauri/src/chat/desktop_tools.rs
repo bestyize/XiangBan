@@ -5,6 +5,7 @@
 //! The tools talk to a `Desktop`, so they can be tested without a running app.
 
 use super::community;
+use crate::app_runtime::{self, pack as app_pack};
 use crate::custom_widgets::widget_html_problems;
 use crate::preferences::{EXPRESSIONS, SKINS};
 use crate::reminders::Rule;
@@ -84,6 +85,9 @@ pub trait Desktop: Send + Sync {
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
     fn game_close(&self) -> Result<(), String>;
+    fn create_app(&self, _: &Value, _: &app_pack::Files, _: bool) -> Result<Value, String> { Err("当前宿主不支持 V2 作品创作".into()) }
+    fn validate_app(&self, _: &str) -> Result<Value, String> { Err("当前宿主不支持 V2 作品校验".into()) }
+    fn app_open(&self, _: &str) -> Result<(), String> { Err("当前宿主不支持 V2 作品试玩".into()) }
     /// Writes a user game folder from text files. Returns `{ id, name, directory, files, save, replaced }`.
     fn create_game(&self, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String>;
     /// Deletes a user game, closing the game space first when it is open.
@@ -383,6 +387,33 @@ impl Desktop for TauriDesktop {
         crate::game_packs::create_pack(&root, id, name, description, files, save, overwrite)
     }
 
+    fn create_app(&self, manifest: &Value, files: &app_pack::Files, overwrite: bool) -> Result<Value, String> {
+        let id = text_arg(manifest, "id")?;
+        let runtime = self.app.state::<app_runtime::AppRuntimeState>();
+        let _guard = runtime.lock.lock().map_err(|e| e.to_string())?;
+        if overwrite && self.app.get_webview_window(&app_runtime::window::window_label(id)).is_some() {
+            return Err("请先关闭正在运行的作品，再更新它".into());
+        }
+        crate::game_packs::create_v2_pack(&crate::storage::root(&self.app)?, manifest, files, overwrite)
+    }
+
+    fn validate_app(&self, id: &str) -> Result<Value, String> {
+        let (manifest, _) = crate::game_packs::read_v2_pack(&crate::storage::root(&self.app)?, id)?;
+        Ok(manifest)
+    }
+
+    fn app_open(&self, id: &str) -> Result<(), String> {
+        let builtin = if crate::game_packs::is_builtin(id) {
+            crate::games::builtin_catalog()?.into_iter().find(|item| item["id"] == id)
+        } else { None };
+        let work = builtin.unwrap_or(Value::Null);
+        tauri::async_runtime::block_on(app_runtime::window::open_app(
+            &self.app, id, work["name"].as_str().unwrap_or(""),
+            work["orientation"].as_str(), work["entry"].as_str(),
+        ))?;
+        Ok(())
+    }
+
     fn delete_game(&self, id: &str) -> Result<(), String> {
         let app = self.app.clone();
         tauri::async_runtime::block_on(crate::games::delete_user_game_by_id(&app, id))
@@ -417,7 +448,7 @@ impl Tool for DesktopTool {
         Ok(if self.spec.risk == Risk::Read { None }
         else if matches!(self.spec.name.as_str(), "computer_use_repair_permissions" | "request_accessibility_permission") {
             Some(agent_kernel::ToolResource::RunExclusive("computer".into()))
-        } else if matches!(self.spec.name.as_str(), "open_page" | "desktop_window_set" | "game_open" | "game_close") {
+        } else if matches!(self.spec.name.as_str(), "open_page" | "desktop_window_set" | "game_open" | "game_close" | "app_open") {
             // Focus/window changes must not interrupt another run's screen-control sequence.
             Some(agent_kernel::ToolResource::Named("computer".into()))
         } else { Some(agent_kernel::ToolResource::Named("app-state".into())) })
@@ -1010,19 +1041,20 @@ fn game_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let games = data["games"].as_array().cloned().unwrap_or_default();
     let line = |g: &Value| {
         let id = g["id"].as_str().unwrap_or("");
-        format!("- {} ({id}): {}", g["name"].as_str().unwrap_or(id), g["description"].as_str().unwrap_or(""))
+        let protocol = if g["runtimeProtocol"] == 2 { " [V2]" } else { "" };
+        format!("- {} ({id}): {}{protocol}", g["name"].as_str().unwrap_or(id), g["description"].as_str().unwrap_or(""))
     };
     let mut lines = vec![format!("小伴内置 10 款独立桌面小游戏（{state}）：")];
     lines.extend(games.iter().filter(|g| !is_user_game(g)).map(line));
     let mine: Vec<&Value> = games.iter().filter(|g| is_user_game(g)).collect();
     if !mine.is_empty() {
-        lines.push(format!("用户自创游戏（{} 款，来源：游戏文件夹，可用 game_delete 删除）：", mine.len()));
+        lines.push(format!("用户自创作品（{} 件，可用 game_delete 删除）：", mine.len()));
         lines.extend(mine.into_iter().map(|g| format!("{} {}", line(g), if g["layer"] == "desktop" { "[自创·桌面层：浮在桌面其他窗口上方运行]" } else { "[自创]" })));
     }
     for error in data["errors"].as_array().into_iter().flatten().filter_map(Value::as_str) {
         lines.push(format!("无法加载的自创游戏文件夹：{error}"));
     }
-    lines.push(r#"可用 game_open 启动（例如 game_open(id: "snake-arena") 打开贪吃蛇），game_close 退出游戏空间或停止桌面层游戏；game_create 可以为用户创作新游戏。"#.into());
+    lines.push(r#"V2 作品用 app_open 启动（例如 app_open(id: "snake-arena") 打开贪吃蛇）。旧版游戏用 game_open 和 game_close。新作先用 app_read_format 读规范，再用 app_create 安装。"#.into());
     Ok(lines.join("\n"))
 }
 
@@ -1069,14 +1101,7 @@ fn game_create(desktop: &dyn Desktop, args: &Value, workspace: &std::path::Path)
         if args.get("files").is_some() { return Err("files 和 source_dir 只能提供一个".into()); }
         super::game_draft::read(workspace, source)?
     } else {
-        let items = args.get("files").and_then(Value::as_array).ok_or("请提供 files 或 source_dir")?;
-        let mut files = Vec::with_capacity(items.len());
-        for item in items {
-            let path = item.get("path").and_then(Value::as_str).ok_or("each file needs a string `path`")?;
-            let content = item.get("content").and_then(Value::as_str).ok_or_else(|| format!("文件 {path} 缺少文本 `content`"))?;
-            files.push((path.to_string(), content.to_string()));
-        }
-        files
+        inline_game_files(args)?
     };
     files.sort_by(|a, b| a.0.cmp(&b.0));
     // Same checks the writer runs, so a bad request is refused before the desktop is involved.
@@ -1085,6 +1110,56 @@ fn game_create(desktop: &dyn Desktop, args: &Value, workspace: &std::path::Path)
     let replaced = if made["replaced"].as_bool().unwrap_or(false) { "（已覆盖同 id 的旧版本）" } else { "" };
     let saves = if save { "，已启用本机存档" } else { "" };
     Ok(format!("已保存游戏「{name}」（id: {id}）{replaced}{saves}，共 {} 个文件。请用 game_open(id: \"{id}\") 试玩一个代表性流程，再确认实际玩法。", files.len() + 1))
+}
+
+fn inline_game_files(args: &Value) -> Result<Vec<(String, String)>, String> {
+    let items = args.get("files").and_then(Value::as_array).ok_or("请提供 files 或 source_dir")?;
+    items.iter().map(|item| {
+        let path = item.get("path").and_then(Value::as_str).ok_or("每个文件需要文本 path")?;
+        let content = item.get("content").and_then(Value::as_str).ok_or_else(|| format!("文件 {path} 缺少文本 content"))?;
+        Ok((path.to_string(), content.to_string()))
+    }).collect()
+}
+
+const APP_FORMAT: &str = r#"小伴应用创作规范（桌面独立窗口，运行时协议 2）
+1. 先确定类型、功能或玩法、方向和输入方式。小游戏用 kind=game，工具或测评用 kind=app。用工作区的专用子目录（例如 app-drafts/<id>）分文件写入，用 edit_file 局部修正，再以 source_dir 交给 app_create。很短的文本作品也可以直接传 files。manifest.json 由工具生成。
+2. 草稿包含 HTML 入口（默认 index.html）、1:1 图标（至少 192×192）和 16:9 封面（至少 640×360）。图标和封面可用自包含 SVG，或使用草稿里的图片文件。资源用相对路径。包最多 3000 个文件（含清单）、单文件 50 MB、合计 100 MB，路径最多 8 层，每段只用字母、数字和 ._-@。
+3. 清单由 app_create 写为 schemaVersion=3、runtimeProtocol=2。id 为 2～64 位小写字母、数字、- 或 _，以字母或数字开头；要兼容手机本地创作，优先用 2～40 位且以字母或数字结尾的连字符命名。名称 1～24 字，简介 1～80 字。游戏 category 取 action、puzzle、board、casual、story，应用取 tool、quiz。orientation 取 portrait、landscape、any。input 声明实际可用的 mouse、keyboard、touch，桌面需鼠标或键盘，兼顾手机需触控。version 默认 1.0.0。
+4. 优先使用原生 HTML/CSS/JS 和本地 ES modules。依赖和素材放在包内，使用最终可直接运行的文件。联网仅用于必要的实时功能，提供断网提示，勿在包里保存密钥。按窗口尺寸排版，保持键盘焦点和操作反馈；支持移动端时使用 --xb-safe-* 和 --xb-capsule-* 变量避开系统边缘与宿主胶囊。退出由宿主管理，多页面用浏览器历史。
+5. 宿主注入全局 xb。首屏绘制后调用 xb.ready()；监听 xb.on('hide', ...) 暂停和停声，监听 show 恢复。重要数据用 await xb.storage.get(key) / set(key, value)，变化时保存。游戏可调用 xb.game.start()、progress({score})、result({score})，分数为非负整数。按需声明 capabilities，调用扩展能力前检查 xb.can 和对应方法是否存在，提供降级行为。
+6. 工具和测评首屏提供主要功能。小游戏说明目标和操作，提供合适的开始、暂停、结算和重开流程。动效按帧间隔更新，音频在用户交互后开启并提供静音。覆盖视觉、输入和存档的代表性流程。
+7. 用 app_create 安装到「应用 → 我的作品」，再用 app_validate 核对包。需要试用时用 app_open 打开 V2 独立窗口，实际操作后再判断功能是否通过。修改草稿后用同一个 id 和 overwrite=true 安装，先关闭正在运行的作品。可从作品卡片导出 V2 ZIP。
+"#;
+
+fn app_create(desktop: &dyn Desktop, args: &Value, workspace: &Path) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    let name = text_arg(args, "name")?;
+    let kind = text_arg(args, "kind")?;
+    let mut manifest = json!({
+        "schemaVersion": 3, "runtimeProtocol": 2, "id": id, "name": name.trim(),
+        "description": text_arg(args, "description")?.trim(), "kind": kind,
+        "category": if kind == "app" { "tool" } else { "casual" },
+        "version": "1.0.0", "orientation": "portrait", "input": ["mouse", "keyboard", "touch"],
+        "entry": "index.html", "icon": "icon.svg", "cover": "cover.svg",
+    });
+    for field in ["category", "version", "orientation", "input", "capabilities", "entry", "icon", "cover", "intents"] {
+        if let Some(value) = args.get(field) { manifest[field] = value.clone(); }
+    }
+    app_pack::check_manifest(&manifest)?;
+    if !manifest["input"].as_array().is_some_and(|inputs| inputs.iter().any(|value| matches!(value.as_str(), Some("mouse" | "keyboard")))) {
+        return Err("桌面创作的 input 至少需要 mouse 或 keyboard".into());
+    }
+    let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
+    let files = if let Some(source) = optional_text(args, "source_dir")? {
+        if args.get("files").is_some() { return Err("files 和 source_dir 只能提供一个".into()); }
+        let dir = super::game_draft::source_directory(workspace, source)?;
+        app_pack::read_files(&dir, false)?
+    } else {
+        inline_game_files(args)?.into_iter().map(|(path, content)| (path, content.into_bytes())).collect()
+    };
+    let made = desktop.create_app(&manifest, &files, overwrite)?;
+    let replaced = if made["replaced"] == true { "，已更新同 id 作品" } else { "" };
+    Ok(format!("已将 V2 作品「{name}」（{id}）保存到「应用 → 我的作品」{replaced}。可用 app_validate 核对包，用 app_open 打开试用。"))
 }
 
 fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -1096,17 +1171,17 @@ fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     Ok(format!("已删除自创游戏 {id}（游戏空间若正在运行已先关闭，它的本机存档也一并清除）。"))
 }
 
-const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（文件夹即游戏）。先调用 game_read_format 阅读游戏包规范（文件、脚本、运行环境、握手、成绩、存档）再写。\
+const GAME_CREATE_DESCRIPTION: &str = "按旧版协议 1 保存或更新一款离线小游戏。新作品使用 app_create。使用此工具前先调用 game_read_format 阅读旧版规范。\
 优先在工作目录的草稿子目录（如 game-drafts/<id>/）用 write_file 分文件写、edit_file 局部改，完成后用 source_dir 安装；files 仅适合简短作品，二者必须二选一。\
 创作时同时提供与游戏玩法、名称相匹配的 cover.svg 封面（640×360、16:9，纯 SVG，不引用外部资源）。安装失败不会改动已有游戏。保存后不会自动打开，试玩用 game_open(id)。";
 
 /// What `game_read_format` returns: the full game pack rules, read only when a game is being made.
-const GAME_FORMAT: &str = "游戏包规范（小伴程序内置，无需查找本地文件）：\n\
+const GAME_FORMAT: &str = "旧版游戏包规范（运行时协议 1，适用于维护现有作品；新作使用 app_read_format）：\n\
 0. 创作方式：在当前工作目录的专用子目录（如 game-drafts/<id>/）使用 write_file 逐个写入 index.html、style.css、game.js 等，较长脚本继续拆分；用 edit_file 局部修改，保留已完成文件。完成后调用 game_create，source_dir 指向该草稿目录，无需在参数中重传源码。安装失败不会改动已有游戏，修正草稿后再安装。不要通过缩减玩法或反复重写整包来应付输出超限。游戏保存在用户数据目录 games/packs/<id>/；可用 game_list 查看、game_delete 删除。\n\
 1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由 game_create 生成）。创作时同时写入 cover.svg：640×360、16:9，以游戏玩法插画与名称构图，纯 SVG，不引用外部资源；安装时自动登记为封面。旧游戏未提供封面时，客户端会按名称和类型生成默认插画。\n\
 2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
-3. 运行环境：游戏在沙盒 iframe 里运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
-4. 握手协议（宿主注入的 desktop-host.js 会在收到 host.init 时自动回复 game.ready，所以不读存档的游戏可以不写；需要存档或成绩时按下面实现）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\
+3. 运行环境：游戏在沙盒 iframe 里运行，没有网络、localStorage、cookie、IndexedDB 和系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。由作品实现握手，禁用已移除的 desktop-host.js。\n\
+4. 握手协议（所有旧版游戏必需）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\
 5. 可选成绩：开始一局发 type:'game.start'，之后可发 type:'game.progress' 和一次 type:'game.result'，都带非负整数 score（消息结构同上，channel 为 'xiaban.game-pack'，带 nonce）。\n\
 6. 存档（仅 save=true 时有效）：游戏在 game.ready 之后用 {channel:'xiaban.game-pack', protocol:1, nonce, type:'game.save', data:{…}} 提交存档，data 必须是普通 JSON 对象，序列化后不超过 32 KiB；宿主存在本机，下次启动时放进 host.init 的 save 字段。进度变化时就发送，不要依赖退出时才存。save=false 时不要发送 game.save，宿主会忽略。";
 
@@ -1173,13 +1248,14 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
 
 pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path) -> Vec<Arc<dyn Tool>> {
     let game_workspace = workspace.to_path_buf();
+    let app_workspace = workspace.to_path_buf();
     let wallpaper_workspace = workspace.to_path_buf();
     let import_workspace = workspace.to_path_buf();
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     let mut items = vec![
         tool(&desktop, ToolSpec::new("app_guide", "查小伴桌面的功能清单：每项功能能做什么、在控制台哪个页面、对应哪些工具、哪些要用户自己在页面里操作。用户问“能不能…”“在哪里…”“怎么设置…”，或你想说“不支持”之前先调用。topic 可填功能名、页面名、工具名或关键词（如 置顶、代理、提醒）；不填则返回完整目录。", object(json!({"topic":{"type":"string"}}), &[])).risk(Risk::Read).parallel(), |_, a| Ok(super::app_guide::describe(optional_text(a, "topic")?))),
-        tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、games 游玩、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴、skins 皮肤；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
+        tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、apps 应用、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴、skins 皮肤；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
             "page":{"type":"string","enum":super::app_guide::PAGES},
             "tab":{"type":"string","description":"studio 或 settings 的子页，其他页面不要填"}
         }), &["page"])).risk(Risk::Write).self_managed().serial(), |d, a| {
@@ -1446,7 +1522,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "game_open",
-                "在单独的窗口里直接玩一款游戏，必须指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔，pro-cube 为 3D全阶魔方，jade-gomoku 为雅韵五子棋，mbti 为 MBTI性格测评；用户自创游戏用 game_list 里的 id）。窗口默认不全屏，玩家可用系统标题栏切换全屏。不指定 id 只打开游戏空间页面，不会启动游戏。",
+                "打开旧版游戏或桌面层游戏，自创游戏用 game_list 里的精确 id。V2 游戏和小程序用 app_open。不指定 id 时打开应用页。",
                 object(
                     json!({
                         "id": {
@@ -1459,7 +1535,39 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ).risk(Risk::Write).self_managed().serial(),
             game_open,
         ),
-        tool(&desktop, ToolSpec::new("game_read_format", "读取游戏包规范（文件、脚本、运行环境、握手协议、成绩、存档）。用 game_create 创作前先调用；规范已内置在程序中。", none()).risk(Risk::Read).parallel(), game_read_format),
+        tool(&desktop, ToolSpec::new("app_read_format", "读取小伴应用 V2 创作规范。新建小游戏、小程序、工具或测评前使用。", none())
+            .risk(Risk::Read).parallel(), |_, _| Ok(APP_FORMAT.into())),
+        tool(&desktop, ToolSpec::new("app_create", "按 V2 规范安装小游戏或小程序到「应用 → 我的作品」。先用 app_read_format 读取规则，优先提供工作区草稿 source_dir。安装时校验文件并自动生成清单。", {
+            let mut schema = object(json!({
+                "id": {"type":"string","description":"作品 id，2～64 位小写字母、数字、- 或 _"},
+                "name": {"type":"string","maxLength":24},
+                "description": {"type":"string","maxLength":80},
+                "kind": {"type":"string","enum":["game","app"]},
+                "category": {"type":"string","description":"game 取 action、puzzle、board、casual、story，app 取 tool、quiz"},
+                "orientation": {"type":"string","enum":["portrait","landscape","any"]},
+                "version": {"type":"string","maxLength":32},
+                "input": {"type":"array","items":{"type":"string","enum":app_pack::INPUTS}},
+                "capabilities": {"type":"array","items":{"type":"string","enum":app_pack::CAPABILITIES}},
+                "intents": {"type":"array","maxItems":8,"items":{"type":"string","maxLength":12}},
+                "entry": {"type":"string","description":"入口相对路径，默认 index.html"},
+                "icon": {"type":"string","description":"图标相对路径，默认 icon.svg"},
+                "cover": {"type":"string","description":"封面相对路径，默认 cover.svg"},
+                "source_dir": {"type":"string","description":"工作区内专门存放本作品的草稿子目录，与 files 二选一"},
+                "files": {"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}},
+                "overwrite": {"type":"boolean","description":"更新同 id 的已有作品时才传 true"}
+            }), &["id", "name", "description", "kind"]);
+            schema["oneOf"] = json!([{"required":["source_dir"],"not":{"required":["files"]}}, {"required":["files"],"not":{"required":["source_dir"]}}]);
+            schema
+        }).risk(Risk::Write).serial(), move |d, a| app_create(d, a, &app_workspace)),
+        tool(&desktop, ToolSpec::new("app_validate", "校验已安装的 V2 自创作品的清单、入口、图标、封面、文件类型、路径和体积。", object(json!({"id":{"type":"string"}}), &["id"]))
+            .risk(Risk::Read).parallel(), |d, a| d.validate_app(text_arg(a, "id")?).map(|manifest| manifest.to_string())),
+        tool(&desktop, ToolSpec::new("app_open", "在 V2 独立窗口打开小游戏或小程序供试用，传作品的准确 id。", object(json!({"id":{"type":"string"}}), &["id"]))
+            .risk(Risk::Write).serial(), |d, a| {
+            let id = text_arg(a, "id")?;
+            d.app_open(id)?;
+            Ok(format!("已请求打开 V2 作品「{id}」，请完成实际试玩后确认功能表现。"))
+        }),
+        tool(&desktop, ToolSpec::new("game_read_format", "读取旧版协议 1 的游戏包规范，供维护已有游戏。新作品使用 app_read_format。", none()).risk(Risk::Read).parallel(), game_read_format),
         tool(
             &desktop,
             ToolSpec::new(
@@ -1721,6 +1829,14 @@ mod tests {
             self.log(format!("create-game {id} files={} save={save} overwrite={overwrite}", files.len()))?;
             Ok(json!({"id": id, "replaced": overwrite}))
         }
+        fn create_app(&self, manifest: &Value, files: &app_pack::Files, overwrite: bool) -> Result<Value, String> {
+            app_pack::validate(manifest, files)?;
+            self.log(format!("create-app {} {} v{}", manifest["id"], manifest["kind"], manifest["runtimeProtocol"]))?;
+            Ok(json!({"replaced":overwrite}))
+        }
+        fn app_open(&self, id: &str) -> Result<(), String> {
+            self.log(format!("app-open {id}"))
+        }
         fn delete_game(&self, id: &str) -> Result<(), String> {
             self.log(format!("delete-game {id}"))
         }
@@ -1773,7 +1889,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 52);
+        assert_eq!(names.len(), 56);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1783,7 +1899,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "skin_list", "skin_read_format", "wallpaper_list", "widget_list", "widget_preview", "widget_read", "widget_read_format"]);
+        assert_eq!(read, vec!["app_guide", "app_read_format", "app_validate", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "skin_list", "skin_read_format", "wallpaper_list", "widget_list", "widget_preview", "widget_read", "widget_read_format"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -2276,6 +2392,26 @@ mod tests {
         assert!(call(&fake, "game_open", json!({"id": "接星星"})).unwrap_err().contains("star-catcher"));
         assert!(call(&fake, "game_open", json!({"id": "STAR-CATCHER"})).is_err(), "user ids match exactly");
         assert_eq!(fake.calls(), vec!["game-open star-catcher"]);
+    }
+
+    #[test]
+    fn app_creation_reads_v2_rules_and_accepts_both_kinds_before_opening() {
+        let fake = Arc::new(Fake::default());
+        let format = call(&fake, "app_read_format", json!({})).unwrap();
+        assert!(format.contains("xb.ready()") && format.contains("schemaVersion=3"));
+        let mut args = json!({
+            "id":"draft-tool", "name":"草稿工具", "description":"读取列表", "kind":"app",
+            "files":[{"path":"index.html","content":"<script>xb.ready()</script>"},{"path":"icon.svg","content":"<svg/>"}],
+        });
+        assert!(call(&fake, "app_create", args.clone()).unwrap_err().contains("cover.svg"));
+        assert!(fake.calls().is_empty());
+        args["files"].as_array_mut().unwrap().push(json!({"path":"cover.svg","content":"<svg/>"}));
+        assert!(call(&fake, "app_create", args.clone()).unwrap().contains("我的作品"));
+        args["id"] = json!("draft-game");
+        args["kind"] = json!("game");
+        assert!(call(&fake, "app_create", args).unwrap().contains("app_open"));
+        call(&fake, "app_open", json!({"id":"draft-tool"})).unwrap();
+        assert_eq!(fake.calls(), vec!["create-app \"draft-tool\" \"app\" v2", "create-app \"draft-game\" \"game\" v2", "app-open draft-tool"]);
     }
 
     fn game_args() -> Value {

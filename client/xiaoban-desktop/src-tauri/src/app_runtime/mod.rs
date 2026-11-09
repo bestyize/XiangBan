@@ -2,6 +2,7 @@
 
 pub mod protocol;
 pub mod network;
+pub mod pack;
 pub mod storage;
 pub mod window;
 

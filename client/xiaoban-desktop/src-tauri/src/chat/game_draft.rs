@@ -2,7 +2,7 @@
 use crate::game_packs::{MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES};
 use std::{fs, io::Read, path::Path};
 
-pub fn read(workspace: &Path, source: &str) -> Result<Vec<(String, String)>, String> {
+pub(super) fn source_directory(workspace: &Path, source: &str) -> Result<std::path::PathBuf, String> {
     let workspace = workspace
         .canonicalize()
         .map_err(|e| format!("无法读取工作目录：{e}"))?;
@@ -11,8 +11,13 @@ pub fn read(workspace: &Path, source: &str) -> Result<Vec<(String, String)>, Str
         .canonicalize()
         .map_err(|e| format!("无法读取游戏草稿目录：{e}"))?;
     if source == workspace || !source.starts_with(&workspace) || !source.is_dir() {
-        return Err("source_dir 必须是当前工作目录内专门存放游戏文本文件的子目录".into());
+        return Err("source_dir 必须是当前工作目录内专门存放作品文件的子目录".into());
     }
+    Ok(source)
+}
+
+pub fn read(workspace: &Path, source: &str) -> Result<Vec<(String, String)>, String> {
+    let source = source_directory(workspace, source)?;
     let mut files = Vec::new();
     visit(&source, "", &mut files, &mut 0, &mut 0)?;
     Ok(files)

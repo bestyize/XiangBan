@@ -17,7 +17,7 @@ pub fn valid_app_id(id: &str) -> bool {
     !b.is_empty()
         && b.len() <= 64
         && (b[0].is_ascii_lowercase() || b[0].is_ascii_digit())
-        && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
+        && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'-' | b'_'))
 }
 
 pub fn validate_key(key: &str) -> Result<(), String> {
@@ -114,6 +114,12 @@ pub fn keys(root: &Path, app_id: &str) -> Result<Vec<String>, String> {
     let path = storage_path(root, app_id)?;
     let map = load_map_from_path(&path)?;
     Ok(map.keys().cloned().collect())
+}
+
+pub fn clear_pack(root: &Path, app_id: &str) {
+    if let Ok(path) = storage_path(root, app_id) {
+        let _ = fs::remove_file(path);
+    }
 }
 
 #[cfg(test)]

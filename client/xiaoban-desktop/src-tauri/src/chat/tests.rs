@@ -354,6 +354,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let deferred = [
         "connector_call", "image_generate", "effect_monitor_set",
         "skin_list", "skin_read_format", "skin_create", "skin_apply", "skin_export",
+        "app_read_format", "app_create", "app_validate", "app_open",
         "phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3", "phone_workflow_inspect", "phone_workflow_run",
         "app_guide", "open_page", "desktop_settings_set", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_preview", "widget_read", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",

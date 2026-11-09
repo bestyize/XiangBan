@@ -17,6 +17,7 @@ const TOOL_LABELS: Record<string, string> = {
   TeamCreate: '组建专家团', Agent: '调度团队成员', SendMessage: '与团队成员沟通', TeamDelete: '解散专家团',
   research: '调研子任务', process_start: '启动后台命令', process_read: '查看后台输出', process_write: '向后台命令输入', process_stop: '停止后台命令',
   game_list: '查看游戏列表', game_open: '打开游戏', game_close: '退出游戏', game_read_format: '读取游戏格式', game_create: '创作游戏', game_delete: '删除游戏',
+  app_read_format: '读取作品创作规范', app_create: '创作作品', app_validate: '校验作品包', app_open: '打开作品',
   community_share: '分享到论坛', community_open: '打开官网或论坛',
   request_accessibility_permission: '打开系统权限设置',
   computer_use_diagnose: '检查电脑控制权限',
@@ -81,6 +82,10 @@ export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'argumen
       return `${str(args.path)}\n\n${cut(str(args.content), 1500)}`;
     case 'game_open':
       return `进入游戏空间${args.id ? `并启动游戏：${str(args.id)}` : '页面'}`;
+    case 'app_open':
+      return `在独立窗口打开作品：${str(args.id)}`;
+    case 'app_create':
+      return `${args.overwrite ? '更新' : '安装'}作品：${str(args.name)}（${str(args.id)}）`;
     case 'game_close':
       return '退出游戏空间，返回桌面';
     case 'click':

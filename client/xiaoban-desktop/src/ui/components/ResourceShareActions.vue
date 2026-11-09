@@ -5,11 +5,11 @@ import { FileDown, Share2, Download } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 // `icons` drops the wording and keeps only the two marks, for the narrow strip at a card's lower right.
-const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean; /** `xb` is the console's secondary button, `menu` a row of a dropdown menu; both only for the import button. */ variant?: 'default' | 'xb' | 'menu' }>();
+const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'app' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean; /** `xb` is the console's secondary button, `menu` a row of a dropdown menu; both only for the import button. */ variant?: 'default' | 'xb' | 'menu' }>();
 const emit = defineEmits<{ imported: [result: { kind: string; id: string; name: string }] }>();
 const busy = ref(false);
 // Where each kind of pack lands, for the note shown when a pack is picked on another kind's page.
-const PLACES: Record<string, string> = { wallpaper: '壁纸页的“我的壁纸”', effect: '桌面特效页', widget: '桌面组件页', game: '游戏空间页', pet: '桌面宠物页的“自定义主题”' };
+const PLACES: Record<string, string> = { wallpaper: '壁纸页的“我的壁纸”', effect: '桌面特效页', widget: '桌面组件页', game: '应用页的“我的作品”', app: '应用页的“我的作品”', pet: '桌面宠物页的“自定义主题”' };
 async function run(share = false) {
   if (busy.value || props.disabled || !props.store.desktop) return;
   busy.value = true;
@@ -22,7 +22,7 @@ async function run(share = false) {
     } else {
       const result = await invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack');
       if (!result) return;
-      if (result.kind === props.kind) {
+      if (result.kind === props.kind || (props.kind === 'game' && result.kind === 'app')) {
         emit('imported', result);
         props.store.notify(`已导入「${result.name}」，可预览后再使用。`, 'success');
       } else {

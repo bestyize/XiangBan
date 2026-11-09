@@ -33,9 +33,9 @@ pub fn csp(windows: bool, network_allowed: bool) -> String {
     )
 }
 
-fn mime_for(ext: &str) -> Option<&'static str> {
+pub(crate) fn mime_for(ext: &str) -> Option<&'static str> {
     Some(match ext {
-        "html" => "text/html; charset=utf-8",
+        "html" | "htm" => "text/html; charset=utf-8",
         "js" | "mjs" => "text/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "json" => "application/json; charset=utf-8",
@@ -44,12 +44,27 @@ fn mime_for(ext: &str) -> Option<&'static str> {
         "jpg" | "jpeg" => "image/jpeg",
         "webp" => "image/webp",
         "gif" => "image/gif",
+        "avif" => "image/avif",
+        "ico" => "image/x-icon",
         "mp3" => "audio/mpeg",
         "ogg" => "audio/ogg",
         "wav" => "audio/wav",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "woff" => "font/woff",
         "woff2" => "font/woff2",
+        "ttf" => "font/ttf",
+        "otf" => "font/otf",
         "wasm" => "application/wasm",
-        "txt" => "text/plain; charset=utf-8",
+        "xml" => "application/xml",
+        "csv" => "text/csv; charset=utf-8",
+        "map" => "application/json; charset=utf-8",
+        "txt" | "md" | "atlas" | "glsl" => "text/plain; charset=utf-8",
+        "gltf" => "model/gltf+json",
+        "glb" => "model/gltf-binary",
+        "bin" | "data" | "ktx2" | "basis" => "application/octet-stream",
         _ => return None,
     })
 }
@@ -153,8 +168,8 @@ pub fn resolve_app_file(root: &Path, segments: &[String]) -> Option<(PathBuf, &'
     };
 
     let filename = rel_parts.last()?;
-    let ext = filename.rsplit('.').next()?;
-    let mime = mime_for(ext)?;
+    let (_, ext) = filename.rsplit_once('.')?;
+    let mime = mime_for(&ext.to_ascii_lowercase())?;
 
     // The desktop creator and the app plaza both list packs from games/packs.
     let user_pack_dir = crate::game_packs::packs_dir(root).join(app_id);
@@ -268,13 +283,14 @@ pub fn serve_for(root: &Path, window_label: &str, raw_path: &str, range_header: 
     serve_from(root, raw_path, range_header)
 }
 
-// The installed desktop app embeds its frontend in the executable. Only fall
-// back to those assets for the official MBTI bundle and its own runtime window.
-fn serve_embedded_mbti<F>(window_label: &str, raw_path: &str, range_header: Option<&str>, fetch: F) -> Served
+// The installed desktop app embeds the official packs in its frontend assets.
+fn serve_embedded_pack<F>(window_label: &str, raw_path: &str, range_header: Option<&str>, fetch: F) -> Served
 where F: FnOnce(String) -> Option<Vec<u8>> {
-    if super::window::app_id_from_label(window_label) != Some("mbti") { return Served::status(403); }
+    let Some(id) = super::window::app_id_from_label(window_label).filter(|id| crate::games::IDS.contains(id)) else {
+        return Served::status(403);
+    };
     let Some(mut segments) = safe_segments(raw_path) else { return Served::status(400); };
-    if segments.first().map(String::as_str) != Some("mbti") { return Served::status(403); }
+    if segments.first().map(String::as_str) != Some(id) { return Served::status(403); }
     if segments.len() == 1 { segments.push("index.html".into()); }
     let Some(mime) = segments.last().and_then(|name| name.rsplit('.').next()).and_then(mime_for) else { return Served::status(404); };
     let Some(bytes) = fetch(format!("game-packs/{}", segments.join("/"))) else { return Served::status(404); };
@@ -296,11 +312,11 @@ pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::R
         Ok(root) => serve_for(&root, window_label, request.uri().path(), range),
         Err(_) => Served::status(404),
     };
-    if served.status == 404 && window_label == "app-runtime-mbti" {
-        served = serve_embedded_mbti(window_label, request.uri().path(), range, |path| {
+    if served.status == 404 && super::window::app_id_from_label(window_label).is_some_and(|id| crate::games::IDS.contains(&id)) {
+        served = serve_embedded_pack(window_label, request.uri().path(), range, |path| {
             let assets = app.asset_resolver();
             // AssetResolver::get falls back to the desktop index.html for unknown paths.
-            // Do not let that fallback masquerade as an MBTI package file.
+            // Do not let that fallback masquerade as a package file.
             if !cfg!(debug_assertions) && !assets.iter().any(|(key, _)| key.trim_start_matches('/') == path) { return None; }
             assets.get(path).map(|asset| asset.bytes)
         });
@@ -329,13 +345,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn packaged_mbti_assets_are_scoped_and_support_ranges() {
+    fn packaged_assets_are_scoped_and_support_ranges() {
         let fetch = |path: String| (path == "game-packs/mbti/assets/test-qr.png").then(|| b"012345".to_vec());
-        let ok = serve_embedded_mbti("app-runtime-mbti", "/mbti/assets/test-qr.png", Some("bytes=1-3"), fetch);
+        let ok = serve_embedded_pack("app-runtime-mbti", "/mbti/assets/test-qr.png", Some("bytes=1-3"), fetch);
         assert_eq!((ok.status, ok.body.as_slice(), ok.range.as_deref()), (206, &b"123"[..], Some("bytes 1-3/6")));
-        assert_eq!(serve_embedded_mbti("app-runtime-other", "/mbti/assets/test-qr.png", None, fetch).status, 403);
-        assert_eq!(serve_embedded_mbti("app-runtime-mbti", "/mbti/%2e%2e%2fsecret.png", None, fetch).status, 400);
-        assert_eq!(serve_embedded_mbti("app-runtime-mbti", "/other/assets/test-qr.png", None, fetch).status, 403);
+        assert_eq!(serve_embedded_pack("app-runtime-other", "/mbti/assets/test-qr.png", None, fetch).status, 403);
+        assert_eq!(serve_embedded_pack("app-runtime-mbti", "/mbti/%2e%2e%2fsecret.png", None, fetch).status, 400);
+        assert_eq!(serve_embedded_pack("app-runtime-mbti", "/other/assets/test-qr.png", None, fetch).status, 403);
+        assert_eq!(serve_embedded_pack("app-runtime-snake-arena", "/snake-arena/index.html", None, |path| {
+            (path == "game-packs/snake-arena/index.html").then(|| b"<html></html>".to_vec())
+        }).status, 200);
     }
 
     #[test]

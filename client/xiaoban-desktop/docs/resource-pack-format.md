@@ -4,6 +4,12 @@
 
 小伴桌面里的“导出资源包”和“分享到论坛”生成的也是同样的 zip，反过来也能当作样例解压看看。
 
+## V2 小游戏和小程序
+
+在「应用」页导入或导出 V2 作品 ZIP。根目录的 `manifest.json` 使用 `schemaVersion: 3`、`runtimeProtocol: 2` 和 `kind: "game"` 或 `"app"`，并指定入口、图标和封面。包格式和体积限制见[小伴应用运行时协议](../../../docs/architecture/app-runtime/README.md#3-应用包)。导入后在「我的作品」中打开独立窗口。
+
+对话创作先读 `app_read_format`，再用 `app_create` 安装草稿，随后用 `app_validate` 核对资源包。需要试用时调用 `app_open`。下文的旧版资源包格式适用于既有作品。
+
 ## 能做什么
 
 | 类型 | `kind` | 是什么 | 内容 | 导入位置 |

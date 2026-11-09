@@ -1,6 +1,6 @@
 //! Portable authoring resources, shared as plain `.zip` files so any tool can make or open them.
 //! Packs contain templates, never runtime user data or saves. The layout is in docs/resource-pack-format.md.
-use crate::{custom_widgets, effect_packs, game_packs, local_media, pet_packs};
+use crate::{app_runtime::pack as app_pack, custom_widgets, effect_packs, game_packs, local_media, pet_packs};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -21,7 +21,7 @@ const MAX_ENTRY: u64 = 4 * 1024 * 1024;
 pub struct Pack {
     kind: String,
     data: Value,
-    /// Binary files under `assets/`; only games carry them for now.
+    /// Legacy binary assets, or all files beside the manifest in a V2 work.
     assets: Vec<(String, Vec<u8>)>,
 }
 
@@ -125,8 +125,13 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
             custom_widgets::validate(&pack)?;
             pack
         }
-        "game" => {
+        "game" | "app" => {
             let manifest = game_packs::find_user_game(root, id)?;
+            if manifest["runtimeProtocol"] == 2 && manifest["schemaVersion"] == 3 {
+                let (manifest, files) = game_packs::read_v2_pack(root, id)?;
+                return Ok(Pack { kind: text(&manifest, "kind")?.into(), data: manifest, assets: files });
+            }
+            if kind == "app" { return Err("请用对应类型导出旧版游戏".into()); }
             let mut found = GameFiles { text: Vec::new(), text_total: 0, assets: Vec::new(), assets_total: 0 };
             collect_game_files(&game_packs::packs_dir(root).join(id), "", &mut found)?;
             let name = text(&manifest, "name")?;
@@ -190,16 +195,29 @@ fn kind_label(kind: &str) -> &'static str {
 }
 
 fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
-    let (manifest, files) = zip_entries(pack)?;
+    let v2 = pack.data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app");
+    let legacy;
+    let (manifest, files) = if v2 {
+        (&pack.data, &pack.assets)
+    } else {
+        legacy = zip_entries(pack)?;
+        (&legacy.0, &legacy.1)
+    };
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     let mut add = |name: &str, bytes: &[u8]| -> Result<(), String> {
         writer.start_file(name, options).map_err(|e| e.to_string())?;
         writer.write_all(bytes).map_err(|e| e.to_string())
     };
-    add("manifest.json", &serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?)?;
-    for (name, bytes) in &files { add(name, bytes)?; }
-    Ok(writer.finish().map_err(|e| e.to_string())?.into_inner())
+    let manifest_bytes = if v2 { serde_json::to_vec(manifest) } else { serde_json::to_vec_pretty(manifest) }
+        .map_err(|e| e.to_string())?;
+    add("manifest.json", &manifest_bytes)?;
+    for (name, bytes) in files { add(name, bytes)?; }
+    let content = writer.finish().map_err(|e| e.to_string())?.into_inner();
+    if v2 && content.len() as u64 > app_pack::MAX_PACK_BYTES {
+        return Err("V2 作品 ZIP 不能超过 100 MB".into());
+    }
+    Ok(content)
 }
 
 fn clean_name(raw: &str) -> Result<String, String> {
@@ -209,9 +227,9 @@ fn clean_name(raw: &str) -> Result<String, String> {
 
 /// Reads a zip into a pack. Sizes are counted while unpacking, so a small archive cannot expand without limit.
 fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
-    if bytes.len() as u64 > MAX_PACK { return Err("资源包不能超过 32 MB".into()); }
+    if bytes.len() as u64 > app_pack::MAX_PACK_BYTES { return Err("资源包不能超过 100 MB".into()); }
     let mut archive = ZipArchive::new(Cursor::new(bytes)).map_err(|_| "不是有效的 zip 资源包".to_string())?;
-    if archive.len() > MAX_ENTRIES { return Err(format!("压缩包里的文件太多，最多 {MAX_ENTRIES} 个")); }
+    if archive.len() > app_pack::MAX_ENTRIES { return Err("压缩包里的条目太多".into()); }
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
     let mut total = 0u64;
     for index in 0..archive.len() {
@@ -223,10 +241,10 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
         if file.is_symlink() { return Err("压缩包不能包含符号链接".into()); }
         let name = clean_name(&name)?;
         let mut content = Vec::new();
-        (&mut file).take(MAX_ENTRY + 1).read_to_end(&mut content).map_err(|e| format!("无法解压「{name}」：{e}"))?;
-        if content.len() as u64 > MAX_ENTRY { return Err(format!("文件「{name}」超过 4 MB")); }
+        let limit = app_pack::MAX_FILE_BYTES.min(app_pack::MAX_PACK_BYTES - total);
+        (&mut file).take(limit + 1).read_to_end(&mut content).map_err(|e| format!("无法解压「{name}」：{e}"))?;
+        if content.len() as u64 > limit { return Err(format!("文件「{name}」超过单文件 50 MB 或解压合计 100 MB 的上限")); }
         total += content.len() as u64;
-        if total > MAX_PACK { return Err("资源包解压后超过 32 MB".into()); }
         entries.push((name, content));
     }
     // Zipping a folder wraps everything in that folder; step into it when manifest.json is not at the top.
@@ -244,8 +262,23 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     let file = |name: &str| entries.iter().find(|(entry, _)| entry == name).map(|(_, content)| content.as_slice());
     let utf8 = |name: &str, content: &[u8]| String::from_utf8(content.to_vec()).map_err(|_| format!("「{name}」必须使用 UTF-8 文本"));
     let page = || -> Result<String, String> { utf8("index.html", file("index.html").ok_or("压缩包里缺少 index.html")?) };
-    let manifest: Value = serde_json::from_slice(file("manifest.json").ok_or("压缩包里缺少 manifest.json，它要放在最外层")?)
+    let raw_manifest = file("manifest.json").ok_or("压缩包里缺少 manifest.json，它要放在最外层")?;
+    if raw_manifest.len() as u64 > MAX_ENTRY { return Err("manifest.json 超过 4 MB".into()); }
+    let manifest: Value = serde_json::from_slice(raw_manifest)
         .map_err(|_| "manifest.json 不是有效的 JSON".to_string())?;
+    if manifest["runtimeProtocol"] == 2 && matches!(manifest["kind"].as_str(), Some("game" | "app")) {
+        if raw_manifest.len() as u64 > app_pack::MAX_MANIFEST_BYTES {
+            return Err("manifest.json 超过 64 KB".into());
+        }
+        app_pack::check_manifest(&manifest)?;
+        let files = entries.into_iter().filter(|(name, _)| name != "manifest.json").collect();
+        return Ok(Pack { kind: text(&manifest, "kind")?.into(), data: manifest, assets: files });
+    }
+    if bytes.len() as u64 > MAX_PACK || total > MAX_PACK { return Err("旧版资源包不能超过 32 MB".into()); }
+    if archive.len() > MAX_ENTRIES { return Err(format!("压缩包里的文件太多，最多 {MAX_ENTRIES} 个")); }
+    if let Some((name, _)) = entries.iter().find(|(_, content)| content.len() as u64 > MAX_ENTRY) {
+        return Err(format!("文件「{name}」超过 4 MB"));
+    }
     let version = manifest.get("schemaVersion").and_then(Value::as_u64);
     if !matches!(version, Some(1 | 2)) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
     let kind = text(&manifest, "kind")?.to_string();
@@ -311,6 +344,10 @@ pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
 }
 fn import_pack(root: &Path, pack: Pack) -> Result<Value, String> {
     let data = &pack.data;
+    if data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app") {
+        let created = game_packs::create_v2_pack(root, data, &pack.assets, false)?;
+        return Ok(json!({"kind":pack.kind,"id":created["id"],"name":created["name"]}));
+    }
     let (id, name) = match pack.kind.as_str() {
         "pet" => {
             let theme: pet_packs::Theme = serde_json::from_value(data.clone()).map_err(|e|e.to_string())?;
@@ -350,7 +387,7 @@ pub fn export_with_dialog(app: &tauri::AppHandle, kind: &str, id: &str) -> Resul
     let pack = export(&crate::storage::root(app)?, kind, id)?;
     let content = to_zip(&pack)?;
     if content.len() as u64 > MAX_PACK { return Err("资源包不能超过 32 MB".into()); }
-    let filename = format!("{kind}-{id}.zip");
+    let filename = format!("{}-{id}.zip", pack.kind);
     let Some(file) = app.dialog().file().set_title("导出小伴资源包").add_filter("小伴资源包（zip）", &["zip"]).set_file_name(&filename).blocking_save_file() else { return Ok(None); };
     let path = file.into_path().map_err(|_| "请选择本机文件")?;
     fs::write(&path, &content).map_err(|e| format!("导出失败：{e}"))?;
@@ -372,7 +409,7 @@ pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option
     tauri::async_runtime::spawn_blocking(move || {
         let Some(file) = app.dialog().file().set_title("导入小伴资源包").add_filter("小伴资源包（zip）", &["zip"]).blocking_pick_file() else { return Ok(None); };
         let path = file.into_path().map_err(|_| "请选择本机文件")?;
-        let content = read_bytes(&path, MAX_PACK)?;
+        let content = read_bytes(&path, app_pack::MAX_PACK_BYTES)?;
         let pack = from_zip(&content)?;
         if pack.kind == "pet" {
             let theme: pet_packs::Theme = serde_json::from_value(pack.data).map_err(|e|e.to_string())?;
@@ -422,6 +459,56 @@ mod tests {
         let root = std::env::temp_dir().join(format!("xiaoban-resource-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         root
+    }
+
+    #[test]
+    fn v2_mobile_game_and_desktop_app_keep_their_manifest_and_runtime_files() {
+        let root = temp_root("v2-exchange");
+        for (id, kind, category, entry) in [
+            ("touch-game", "game", "puzzle", "index.html"),
+            ("my_tool", "app", "tool", "pages/tool.htm"),
+        ] {
+            let manifest = json!({
+                "schemaVersion":3, "runtimeProtocol":2, "kind":kind, "id":id, "name":"测试作品",
+                "description":"可在独立窗口运行", "version":"1.2.0", "category":category,
+                "entry":entry, "icon":"icon.svg", "cover":"cover.svg",
+                "orientation":"any", "input":["touch","mouse"], "capabilities":["clipboard"],
+            });
+            let page = "<!doctype html><script>window.xb.ready()</script>";
+            let icon = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"/>"#;
+            let cover = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"/>"#;
+            let zip = make_zip(&[
+                ("manifest.json", &manifest.to_string()),
+                (entry, page), ("icon.svg", icon), ("cover.svg", cover), ("README.md", "使用说明"),
+            ]);
+            let imported = import(&root, &zip).unwrap();
+            assert_eq!(imported["kind"], kind);
+            let catalog = game_packs::find_user_game(&root, id).unwrap();
+            assert_eq!(catalog["runtimeProtocol"], 2);
+            assert_eq!(catalog["kind"], kind);
+            assert_eq!(catalog["entry"], entry);
+            assert_eq!(catalog["orientation"], "any");
+            let served = crate::app_runtime::protocol::serve_for(
+                &root, &format!("app-runtime-{id}"), &format!("/{id}/{entry}"), None,
+            );
+            assert_eq!(served.status, 200);
+            assert_eq!(served.body, page.as_bytes());
+            let cover_response = game_packs::serve_from(&root, &format!("/{id}/cover.svg"), None);
+            assert_eq!(cover_response.body, cover.as_bytes());
+
+            let exported = to_zip(&export(&root, kind, id).unwrap()).unwrap();
+            import(&root.join("roundtrip"), &exported).unwrap();
+            let (restored, files) = game_packs::read_v2_pack(&root.join("roundtrip"), id).unwrap();
+            assert_eq!(restored, manifest);
+            assert!(files.iter().any(|(name, bytes)| name == entry && bytes == page.as_bytes()));
+
+            let mut malformed = manifest.clone();
+            malformed["cover"] = json!("../cover.svg");
+            assert!(game_packs::create_v2_pack(&root, &malformed, &files, true).is_err());
+            assert!(import(&root, &zip).is_err(), "manual imports never overwrite");
+            assert_eq!(game_packs::read_v2_pack(&root, id).unwrap().0, manifest);
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

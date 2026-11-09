@@ -46,6 +46,8 @@ const categoryFilters: { id: CategoryFilter; label: string; icon: any }[] = [
 ];
 
 function getAppKind(app: GameManifest): CategoryFilter {
+  if (app.kind === 'app') return app.category === 'quiz' ? 'assessment' : 'tool';
+  if (app.kind === 'game') return 'game';
   if (app.id === 'mbti') return 'assessment';
   if (app.id === 'pomodoro' || app.id.includes('tool') || app.id.includes('calc')) return 'tool';
   return 'game';
@@ -53,7 +55,9 @@ function getAppKind(app: GameManifest): CategoryFilter {
 
 function kindBadge(app: GameManifest): string {
   if (app.source === 'user') {
-    return app.layer === 'desktop' ? '桌面层' : '自定义';
+    if (app.layer === 'desktop') return '桌面层';
+    if (app.kind === 'app') return app.category === 'quiz' ? '自创测评' : '自创工具';
+    return '自定义';
   }
   if (app.id === 'mbti') return '测评 · 协议2';
   const kind = getAppKind(app);
@@ -129,7 +133,7 @@ async function launchApp(app: GameManifest) {
     // In modern Apps Plaza mode, all apps launch directly in V2 independent window container!
     await props.store.openApp(app.id, {
       title: app.name,
-      orientation: app.orientation === 'landscape' ? 'landscape' : 'portrait',
+      orientation: app.orientation === 'landscape' || app.orientation === 'any' ? app.orientation : 'portrait',
       entry: app.entry ?? 'index.html',
     });
   } catch (error) {
@@ -211,7 +215,7 @@ onActivated(() => {
           class="xb-btn-primary"
           :disabled="!store.desktop"
           data-testid="apps-create"
-          @click="store.startCreation('app')"
+          @click="store.startCreation(isGamesMode || (primaryTab === 'plaza' && activeFilter === 'game') ? 'game' : 'app')"
         >
           <Sparkles :size="14" />让小伴创作
         </button>
@@ -300,7 +304,7 @@ onActivated(() => {
               v-if="app.source === 'user'"
               class="app-share"
               :store="store"
-              kind="game"
+              :kind="app.kind ?? 'game'"
               :id="app.id"
               :disabled="opening"
             />

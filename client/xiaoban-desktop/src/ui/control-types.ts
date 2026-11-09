@@ -22,7 +22,7 @@ export type ControlPage = MainPage | LegacyPage;
 /** Options for launching a V2 application window. */
 export interface AppOpenOptions {
   title?: string;
-  orientation?: "portrait" | "landscape";
+  orientation?: "portrait" | "landscape" | "any";
   entry?: string;
 }
 /** The tabs of 装扮. */

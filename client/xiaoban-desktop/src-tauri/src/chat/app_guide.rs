@@ -15,7 +15,7 @@ pub(super) struct Feature {
     pub tools: &'static [&'static str],
 }
 
-pub(super) const PAGES: &[&str] = &["new-task", "ai-store", "library", "studio", "games", "care", "settings"];
+pub(super) const PAGES: &[&str] = &["new-task", "ai-store", "library", "studio", "apps", "games", "care", "settings"];
 pub(super) const STUDIO_TABS: &[&str] = &["wallpapers", "effects", "widgets", "pets", "skins"];
 pub(super) const SETTINGS_TABS: &[&str] = &["general", "appearance", "ai", "assistant", "voice", "network", "safety", "about"];
 
@@ -70,9 +70,10 @@ pub(super) const FEATURES: &[Feature] = &[
     Feature { id: "pet", name: "桌面伙伴（宠物）", path: "侧栏「装扮」→「伙伴」", page: Some(("studio", Some("pets"))),
         does: "添加多只桌面宠物，换形象、改表情、位置、大小、层级（置顶/贴桌面，会保存、重启后仍保持），创作新的宠物主题；盆栽小伴的显示、表情和外壳。",
         by_hand: "", tools: &["pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove", "companion_set"] },
-    Feature { id: "games", name: "游玩（小游戏）", path: "侧栏「游玩」，分官方游戏、我的游戏", page: Some(("games", None)),
-        does: "开始或关闭小游戏，创作和删除自己的游戏；桌面层游戏直接浮在桌面上。", by_hand: "",
-        tools: &["game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete"] },
+    Feature { id: "games", name: "应用（小游戏和小程序）", path: "侧栏「应用」→「我的作品」", page: Some(("apps", None)),
+        does: "按 V2 规范创作小游戏、工具和测评，校验后保存到「我的作品」，并可在独立窗口试用。旧版游戏及桌面层游戏沿用原有入口。",
+        by_hand: "在「应用」页点「让小伴创作」发起创作，也可以导入 V2 ZIP，或在作品卡片上导出。",
+        tools: &["app_read_format", "app_create", "app_validate", "app_open", "game_list", "game_open", "game_close", "game_delete"] },
     Feature { id: "care", name: "提醒与定时任务", path: "侧栏「提醒」", page: Some(("care", None)),
         does: "到点提醒：用户说“X点提醒我”“到时候叫我”“定个闹钟”“每天…提醒我”都用它。能管理关怀提醒（下班、休息、自定义；一次性、每天、每周几）和定时任务（到点由小伴在后台做事），小伴运行时到点会在桌面弹出提醒气泡。", by_hand: "天气来源等提醒设置在页面里改。",
         tools: &["care_list", "care_set", "care_delete"] },
@@ -153,7 +154,7 @@ const ALIASES: &[(&str, &str)] = &[
     ("effect", "特效 下雪 下雨 花瓣 粒子 飘雪 樱花"),
     ("widget", "组件 小组件 待办 纪念日 倒数日 今日日程 股票 时钟 天气组件 木鱼 月历 置顶 层级 最上面 贴桌面 贴在桌面 标记完成"),
     ("pet", "宠物 桌宠 伙伴 盆栽 换形象 表情"),
-    ("games", "游戏 贪吃蛇 俄罗斯方块 2048 消失高手 奶茶大师 水墨剑客 暮色滑翔 游玩"),
+    ("games", "游戏 小程序 小应用 作品包 贪吃蛇 俄罗斯方块 2048 消失高手 奶茶大师 水墨剑客 暮色滑翔 游玩 app_read_format app_create app_validate app_open"),
     ("care", "提醒 闹钟 到点 叫我 定时 下班提醒 休息提醒"),
     ("windows", "移动 挪到 左上角 右上角 左下角 右下角 居中 收起 悬浮条 悬浮球 显示器"),
     ("settings-general", "开机启动 开机自启 暂停动画 恢复动画 动画 帧率 数据目录"),

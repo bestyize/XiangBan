@@ -86,8 +86,8 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         wallpaper: '帮我创作一张动态壁纸：',
         effect: '帮我创作一个桌面特效：',
         widget: '帮我创作一个桌面小组件：',
-        game: '帮我创作一款小游戏：',
-        app: '帮我创作一个轻量实用的桌面小应用：',
+        game: '帮我按小伴应用 V2 规范创作一款小游戏。先用 app_read_format 读取创作规范。我的想法：',
+        app: '帮我按小伴应用 V2 规范创作一个作品，可以是小游戏、工具小程序或测评。先用 app_read_format 读取创作规范。我的想法：',
         pet: '帮我创作一个桌面宠物主题。先读取 pet_read_format：',
         skin: '帮我创作一套小伴界面皮肤。先读取 skin_read_format，再用 skin_create 制作并校验可导入的 ZIP，保存到皮肤页，保留当前皮肤。我的想法是：',
       };

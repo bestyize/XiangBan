@@ -38,7 +38,11 @@ describe('control state with native settings', () => {
     expect(store.page).toBe('new-task'); // nothing open any more: the draft goes to 新建任务
     expect(store.creationDraft).toBe('帮我创作一个桌面小组件：');
     await store.startCreation('game');
-    expect(store.creationDraft).toBe('帮我创作一款小游戏：');
+    expect(store.creationDraft).toContain('小游戏');
+    expect(store.creationDraft).toContain('app_read_format');
+    await store.startCreation('app');
+    expect(store.creationDraft).toContain('小程序');
+    expect(store.creationDraft).toContain('app_read_format');
     await store.startCreation('skin');
     expect(store.creationDraft).toContain('skin_read_format');
     expect(store.creationDraft).toContain('skin_create');

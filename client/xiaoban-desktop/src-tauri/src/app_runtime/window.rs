@@ -79,6 +79,14 @@ pub async fn open_app(
         return Ok(window);
     }
 
+    let installed;
+    let (title, orientation, entry) = if crate::game_packs::is_builtin(app_id) {
+        (title, orientation, entry)
+    } else {
+        installed = crate::game_packs::find_user_game(&crate::storage::root(app)?, app_id)?;
+        if installed["runtimeProtocol"] != 2 { return Err("这件作品需要在旧版游戏窗口中打开".into()); }
+        (installed["name"].as_str().unwrap_or(title), installed["orientation"].as_str(), installed["entry"].as_str())
+    };
     let (width, height) = default_dimensions(orientation);
     let entry_file = entry.unwrap_or("index.html");
 

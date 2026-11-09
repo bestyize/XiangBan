@@ -257,10 +257,13 @@ pub fn list_games(window: tauri::WebviewWindow) -> Result<Value, String> {
 /// Deletes a user game folder. A running game space is closed first so no frame keeps files that vanish.
 pub async fn delete_user_game_by_id(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let root = crate::storage::root(app)?;
-    if !crate::game_packs::valid_id(id) || crate::game_packs::is_builtin(id) { return Err("只能删除自创游戏".into()); }
+    if !crate::game_packs::valid_pack_id(id) || crate::game_packs::is_builtin(id) { return Err("只能删除自创作品".into()); }
     if fs::symlink_metadata(crate::game_packs::packs_dir(&root).join(id)).is_err() { return Err(format!("没有找到自创游戏「{id}」")); }
     if is_active(app) { close(app).await?; }
     if crate::desk_game::active_id(app).as_deref() == Some(id) { crate::desk_game::close(app).await?; }
+    let runtime = app.state::<crate::app_runtime::AppRuntimeState>();
+    let _runtime_guard = runtime.lock.lock().map_err(|e| e.to_string())?;
+    crate::app_runtime::window::close_app(app, id)?;
     let state = app.state::<GameState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     crate::game_packs::remove_pack(&root, id)
 }

@@ -50,6 +50,15 @@ describe('game catalog', () => {
     expect(catalog.directory).toBe('/data/games/packs');
     expect(readCatalog(null)).toEqual({ games: [], errors: [], directory: null });
   });
+
+  it('keeps V2 work metadata and accepts safe nested entry paths', () => {
+    const work = game({
+      id: 'my_tool', runtimeProtocol: 2, kind: 'app', category: 'tool',
+      entry: 'pages/main.htm', source: 'user', base: 'game-pack://localhost/my_tool/',
+    });
+    expect(readGames([work])).toEqual([work]);
+    expect(readGames([{ ...work, entry: '../main.html' }])).toEqual([]);
+  });
 });
 
 describe('browser preview catalog', () => {

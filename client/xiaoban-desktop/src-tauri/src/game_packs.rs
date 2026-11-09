@@ -3,9 +3,11 @@
 //! Everything here takes a plain `Path`, so the rules (manifest checks, folder scanning, the
 //! `game-pack` protocol's path guard, atomic creation) are testable with a temporary directory.
 //! Pack frames still get no IPC and no filesystem access; they only receive files through the protocol.
+use crate::app_runtime::pack as app_pack;
 use serde_json::{json, Value};
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -14,7 +16,7 @@ pub const MAX_USER_GAMES: usize = 40;
 pub const MAX_FILES: usize = 40;
 pub const MAX_FILE_BYTES: usize = 1024 * 1024;
 pub const MAX_TOTAL_BYTES: usize = 4 * 1024 * 1024;
-const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
+const MAX_MANIFEST_BYTES: u64 = app_pack::MAX_MANIFEST_BYTES;
 const MAX_SERVED_BYTES: u64 = 32 * 1024 * 1024;
 /// Text extensions the Agent may write.
 const WRITE_EXTENSIONS: [&str; 7] = ["html", "js", "css", "json", "svg", "md", "txt"];
@@ -100,6 +102,16 @@ fn check_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn valid_pack_id(id: &str) -> bool {
+    valid_id(id) || app_pack::valid_id(id)
+}
+
+fn check_pack_id(id: &str) -> Result<(), String> {
+    if !valid_pack_id(id) { return Err("作品 id 不合法".into()); }
+    if is_builtin(id) { return Err(format!("id「{id}」与内置作品重名，请换一个")); }
+    Ok(())
+}
+
 pub fn packs_dir(root: &Path) -> PathBuf {
     root.join("games").join("packs")
 }
@@ -176,10 +188,29 @@ fn resolve_file(dir: &Path, segments: &[&str]) -> Result<PathBuf, u16> {
 
 /// Checks a manifest read from `dir` and returns the normalized catalog entry.
 pub fn validate_manifest(dir: &Path, folder: &str, manifest: &Value) -> Result<Value, String> {
-    check_id(folder)?;
+    check_pack_id(folder)?;
     if manifest.get("id").and_then(Value::as_str) != Some(folder) {
         return Err(format!("manifest 的 id 必须与文件夹名「{folder}」一致"));
     }
+    if manifest["runtimeProtocol"] == 2 && manifest["schemaVersion"] == 3 {
+        let [entry, icon, cover] = app_pack::check_manifest(manifest)?;
+        if !fs::symlink_metadata(dir).is_ok_and(|meta| meta.is_dir()) {
+            return Err("作品需要保存在普通文件夹里".into());
+        }
+        for path in [entry, icon, cover] {
+            resolve_file(dir, &path.split('/').collect::<Vec<_>>())
+                .map_err(|_| format!("找不到作品文件 {path}"))?;
+        }
+        return Ok(json!({
+            "id": folder, "name": manifest["name"], "description": manifest["description"],
+            "schemaVersion": 3, "runtimeProtocol": 2, "kind": manifest["kind"], "category": manifest["category"],
+            "version": manifest["version"], "input": manifest["input"],
+            "entry": entry, "icon": icon, "cover": cover,
+            "orientation": manifest["orientation"].as_str().unwrap_or("portrait"),
+            "save": false, "layer": "space", "capabilities": manifest["capabilities"].as_array().cloned().unwrap_or_default(),
+        }));
+    }
+    check_id(folder)?;
     let text = |key: &str| manifest.get(key).and_then(Value::as_str).ok_or(format!("manifest 缺少 {key}"));
     let (name, description) = check_meta(text("name")?, text("description")?)?;
     if text("entry")? != "index.html" {
@@ -217,17 +248,24 @@ pub fn validate_manifest(dir: &Path, folder: &str, manifest: &Value) -> Result<V
     Ok(entry)
 }
 
-/// Reads and validates `<dir>/manifest.json`; the result carries `source` and `base` for the front end.
-pub fn load_manifest(dir: &Path, folder: &str) -> Result<Value, String> {
-    check_id(folder)?;
+fn read_manifest(dir: &Path) -> Result<Value, String> {
     let path = dir.join("manifest.json");
-    match fs::metadata(&path) {
+    match fs::symlink_metadata(&path) {
         Ok(m) if m.is_file() && m.len() <= MAX_MANIFEST_BYTES => {}
         Ok(m) if m.is_file() => return Err("manifest.json 超过 64 KB".into()),
         _ => return Err("缺少 manifest.json".into()),
     }
-    let text = fs::read_to_string(&path).map_err(|_| "manifest.json 需要是 UTF-8 文本".to_string())?;
-    let manifest: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| format!("manifest.json 格式错误：{e}"))?;
+    let mut text = String::new();
+    fs::File::open(path).and_then(|file| file.take(MAX_MANIFEST_BYTES + 1).read_to_string(&mut text))
+        .map_err(|_| "manifest.json 需要是 UTF-8 文本".to_string())?;
+    if text.len() as u64 > MAX_MANIFEST_BYTES { return Err("manifest.json 超过 64 KB".into()); }
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| format!("manifest.json 格式错误：{e}"))
+}
+
+/// Reads and validates `<dir>/manifest.json`; the result carries `source` and `base` for the front end.
+pub fn load_manifest(dir: &Path, folder: &str) -> Result<Value, String> {
+    check_pack_id(folder)?;
+    let manifest = read_manifest(dir)?;
     let mut entry = validate_manifest(dir, folder, &manifest)?;
     entry["source"] = json!("user");
     entry["base"] = json!(base_url(folder));
@@ -235,8 +273,23 @@ pub fn load_manifest(dir: &Path, folder: &str) -> Result<Value, String> {
 }
 
 pub fn find_user_game(root: &Path, id: &str) -> Result<Value, String> {
-    check_id(id)?;
+    check_pack_id(id)?;
     load_manifest(&packs_dir(root).join(id), id)
+}
+
+pub fn read_v2_pack(root: &Path, id: &str) -> Result<(Value, app_pack::Files), String> {
+    check_pack_id(id)?;
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = packs_dir(root).join(id);
+    if !fs::symlink_metadata(&dir).is_ok_and(|metadata| metadata.is_dir()) {
+        return Err(format!("未找到自创作品目录「{id}」"));
+    }
+    let manifest = read_manifest(&dir)?;
+    if manifest["id"] != id { return Err("作品清单 id 与目录不一致".into()); }
+    app_pack::check_manifest(&manifest)?;
+    let files = app_pack::read_files(&dir, true)?;
+    app_pack::validate(&manifest, &files)?;
+    Ok((manifest, files))
 }
 
 #[derive(Default, Debug)]
@@ -357,7 +410,7 @@ pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
     let segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     if segments[0] == "__host" { return Served::status(404); }
     let id = segments[0];
-    if check_id(id).is_err() {
+    if check_pack_id(id).is_err() {
         return Served::status(404);
     }
     let directory = packs_dir(root).join(id);
@@ -369,16 +422,17 @@ pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
     }
     let Some(file_name) = rest.last() else { return Served::status(404) };
     let ext = extension(file_name).unwrap_or_default();
-    let Some(mime) = mime_for(&ext) else { return Served::status(403) };
-    if load_manifest(&directory, id).is_err() {
-        return Served::status(404);
-    }
+    let Ok(manifest) = load_manifest(&directory, id) else { return Served::status(404) };
+    let v2 = manifest["runtimeProtocol"] == 2;
+    let mime = if v2 { crate::app_runtime::protocol::mime_for(&ext) } else { mime_for(&ext) };
+    let Some(mime) = mime else { return Served::status(403) };
     let file = match resolve_file(&directory, rest) {
         Ok(file) => file,
         Err(status) => return Served::status(status),
     };
+    let size_limit = if v2 { app_pack::MAX_FILE_BYTES } else { MAX_SERVED_BYTES };
     let length = match fs::metadata(&file) {
-        Ok(m) if m.len() <= MAX_SERVED_BYTES => m.len(),
+        Ok(m) if m.len() <= size_limit => m.len(),
         Ok(_) => return Served::status(413),
         Err(_) => return Served::status(404),
     };
@@ -595,13 +649,52 @@ pub fn create_oriented_pack_with_assets(
         return Err("文件路径冲突：同一个名字不能既是文件又是文件夹".into());
     }
     let (name, description) = check_meta(name, description)?;
+    let mut manifest = json!({
+        "id": id, "name": name, "description": description, "entry": "index.html",
+        "runtimeProtocol": 1, "save": save,
+    });
+    if let Some(orientation) = orientation {
+        manifest["orientation"] = json!(orientation);
+    }
+    if files.iter().any(|(p, _)| p == "cover.svg") {
+        manifest["cover"] = json!("cover.svg");
+    }
+    if layer.desktop {
+        manifest["layer"] = json!("desktop");
+        manifest["capabilities"] = json!(layer.capabilities);
+    }
+    let bodies = files.iter().map(|(path, content)| (path.as_str(), content.as_bytes()))
+        .chain(assets.iter().map(|(path, bytes)| (path.as_str(), bytes.as_slice())));
+    install_pack(root, id, &manifest, bodies, overwrite)
+}
+
+pub fn create_v2_pack(root: &Path, manifest: &Value, files: &app_pack::Files, overwrite: bool) -> Result<Value, String> {
+    app_pack::validate(manifest, files)?;
+    let id = manifest["id"].as_str().ok_or("作品缺少 id")?;
+    check_pack_id(id)?;
+    let bodies = files.iter().map(|(path, bytes)| (path.as_str(), bytes.as_slice()));
+    install_pack(root, id, manifest, bodies, overwrite)
+}
+
+fn install_pack<'a>(
+    root: &Path,
+    id: &str,
+    manifest: &Value,
+    bodies: impl Iterator<Item = (&'a str, &'a [u8])>,
+    overwrite: bool,
+) -> Result<Value, String> {
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let packs = packs_dir(root);
-    fs::create_dir_all(&packs).map_err(|e| format!("无法创建游戏文件夹：{e}"))?;
+    fs::create_dir_all(&packs).map_err(|e| format!("无法创建作品文件夹：{e}"))?;
     let target = packs.join(id);
     let exists = fs::symlink_metadata(&target).is_ok();
     if exists && !overwrite {
-        return Err(format!("游戏「{id}」已经存在，请换一个 id，或设置 overwrite=true 覆盖它"));
+        return Err(format!("作品「{id}」已经存在，请换一个 id，或设置 overwrite=true 覆盖它"));
+    }
+    if exists && manifest["runtimeProtocol"] == 1 &&
+        read_manifest(&target).is_ok_and(|old| old["runtimeProtocol"] == 2 && old["schemaVersion"] == 3)
+    {
+        return Err("这件作品使用 V2，请用 app_create 更新".into());
     }
     if !exists {
         let count = scan(root).games.len();
@@ -610,49 +703,36 @@ pub fn create_oriented_pack_with_assets(
         }
     }
     let temporary = packs.join(format!(".tmp-{id}-{}", random_tag()));
-    let build = || -> Result<(), String> {
+    let build = || -> Result<Value, String> {
         fs::create_dir_all(&temporary).map_err(|e| format!("无法创建临时文件夹：{e}"))?;
-        let bodies = files.iter().map(|(path, content)| (path, content.as_bytes())).chain(assets.iter().map(|(path, bytes)| (path, bytes.as_slice())));
+        let mut count = 1;
         for (path, content) in bodies {
             let destination = temporary.join(path);
             if let Some(parent) = destination.parent() {
                 fs::create_dir_all(parent).map_err(|e| format!("无法创建文件夹：{e}"))?;
             }
             fs::write(&destination, content).map_err(|e| format!("无法写入 {path}：{e}"))?;
+            count += 1;
         }
-        let mut manifest = json!({
-            "id": id, "name": name, "description": description, "entry": "index.html",
-            "runtimeProtocol": 1, "save": save,
-        });
-        if let Some(orientation) = orientation {
-            manifest["orientation"] = json!(orientation);
-        }
-        if files.iter().any(|(p, _)| p == "cover.svg") {
-            manifest["cover"] = json!("cover.svg");
-        }
-        if layer.desktop {
-            manifest["layer"] = json!("desktop");
-            manifest["capabilities"] = json!(layer.capabilities);
-        }
-        let text = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
+        let text = if manifest["runtimeProtocol"] == 2 { serde_json::to_string(manifest) } else { serde_json::to_string_pretty(manifest) }
+            .map_err(|e| e.to_string())?;
         fs::write(temporary.join("manifest.json"), text).map_err(|e| format!("无法写入 manifest.json：{e}"))?;
-        load_manifest(&temporary, id).map(|_| ())
+        let entry = load_manifest(&temporary, id)?;
+        Ok(json!({"id":id,"name":entry["name"],"directory":target,"files":count,
+            "save":entry["save"],"layer":entry["layer"],"replaced":exists}))
     };
-    if let Err(error) = build() {
-        let _ = fs::remove_dir_all(&temporary);
-        return Err(error);
-    }
+    let result = build().inspect_err(|_| { let _ = fs::remove_dir_all(&temporary); })?;
     let backup = packs.join(format!(".bak-{id}-{}", random_tag()));
     if let Err(error) = swap_in(&temporary, &target, &backup, exists) {
         let _ = fs::remove_dir_all(&temporary);
         return Err(error);
     }
-    Ok(json!({"id": id, "name": name, "directory": target, "files": files.len() + assets.len() + 1, "save": save, "layer": layer.name(), "replaced": exists}))
+    Ok(result)
 }
 
 /// Deletes a user game folder and its save file (so a game created later under the same id starts fresh).
 pub fn remove_pack(root: &Path, id: &str) -> Result<(), String> {
-    check_id(id)?;
+    check_pack_id(id)?;
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let target = packs_dir(root).join(id);
     if fs::symlink_metadata(&target).is_err() {
@@ -660,6 +740,7 @@ pub fn remove_pack(root: &Path, id: &str) -> Result<(), String> {
     }
     fs::remove_dir_all(&target).map_err(|e| format!("无法删除游戏：{e}"))?;
     let _ = fs::remove_file(save_dir(root).join(user_save_name(id)));
+    crate::app_runtime::storage::clear_pack(root, id);
     Ok(())
 }
 

@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { mount, flushPromises } from '@vue/test-utils';
 import { it, expect, vi } from 'vitest';
+import { invoke } from '../../bridge.ts';
 import AppsPage from './AppsPage.vue';
 import type { ControlStore } from '../control-types';
+
+vi.mock('../../bridge.ts', () => ({ invoke: vi.fn() }));
 
 const mbti = {
   id: 'mbti',
@@ -32,10 +35,13 @@ const userApp = {
   id: 'pomodoro-timer',
   name: '番茄时钟',
   description: '自创极简番茄钟',
-  entry: 'index.html',
+  entry: 'pages/timer.html',
   runtimeProtocol: 2,
+  kind: 'app' as const,
+  category: 'tool',
+  orientation: 'any',
   source: 'user' as const,
-  base: 'app-pack://localhost/pomodoro-timer/'
+  base: 'game-pack://localhost/pomodoro-timer/'
 };
 
 const stubs = {
@@ -66,13 +72,33 @@ function setupApps(appsList = [mbti, game2048, userApp]) {
 }
 
 it('renders App Plaza tabs, category filters and search bar when store.page is apps', async () => {
-  const { wrapper } = setupApps();
+  const { wrapper, store } = setupApps();
   try {
     await flushPromises();
     expect(wrapper.find('[data-testid="apps-page"]').exists()).toBe(true);
     expect(wrapper.findAll('.xb-tabs-lg [role=tab]').map(t => t.text())).toEqual(['精选应用', '我的作品']);
     expect(wrapper.findAll('.filter-chip').map(c => c.text())).toEqual(['全部', '精选游戏', '实用工具', '心理测评']);
     expect(wrapper.find('[data-testid="apps-search-input"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="apps-create"]').trigger('click');
+    expect(store.startCreation).toHaveBeenLastCalledWith('app');
+    await wrapper.get('[data-testid="apps-filter-game"]').trigger('click');
+    await wrapper.get('[data-testid="apps-create"]').trigger('click');
+    expect(store.startCreation).toHaveBeenLastCalledWith('game');
+  } finally {
+    wrapper.unmount();
+  }
+});
+
+it('switches to My Works after importing a V2 small app from the header', async () => {
+  const { wrapper, store } = setupApps();
+  try {
+    vi.mocked(invoke).mockResolvedValueOnce({ kind: 'app', id: userApp.id, name: userApp.name });
+    await flushPromises();
+    await wrapper.get('[data-testid="import-resource"]').trigger('click');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('import_resource_pack');
+    expect(store.listGames).toHaveBeenCalledTimes(2);
+    expect(wrapper.get('[data-testid="user-apps"]').text()).toContain(userApp.name);
   } finally {
     wrapper.unmount();
   }
@@ -164,13 +190,14 @@ it('switches to user apps tab and displays user creations', async () => {
     const section = wrapper.get('[data-testid="user-apps"]');
     expect(section.findAll('.app-card')).toHaveLength(1);
     expect(section.text()).toContain('番茄时钟');
+    expect(section.text()).toContain('自创工具');
 
     await section.get('.app-card').trigger('click');
     await flushPromises();
     expect(openApp).toHaveBeenCalledWith('pomodoro-timer', {
       title: '番茄时钟',
-      orientation: 'portrait',
-      entry: 'index.html',
+      orientation: 'any',
+      entry: 'pages/timer.html',
     });
   } finally {
     wrapper.unmount();
