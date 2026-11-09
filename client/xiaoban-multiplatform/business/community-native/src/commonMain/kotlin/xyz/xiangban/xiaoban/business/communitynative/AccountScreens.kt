@@ -231,7 +231,6 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                     else -> "${peers.size} 台设备 · 离线"
                 }
                 NavRow("我的收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
-                NavRow("资讯订阅与期刊") { env.platform?.openUrl("$site/me/subscriptions") }
                 NavRow("账号方案备份") { open(if (session.loggedIn) Route.SchemeBackups else Route.Login) }
                 NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
