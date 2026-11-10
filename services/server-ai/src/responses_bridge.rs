@@ -56,7 +56,7 @@ fn image_url_part(part: &Value) -> Option<Value> {
 
 /// Converts a Chat Completions JSON request (whose `model` has already been replaced with the upstream model)
 /// into a stateless streaming `/v1/responses` payload, returning `(payload_bytes, client_requested_stream)`.
-pub(crate) fn chat_to_responses(request: &Value) -> Result<(Vec<u8>, bool), AppError> {
+pub(crate) fn chat_to_responses(request: &Value, output_ceiling: Option<u32>) -> Result<(Vec<u8>, bool), AppError> {
     let want_stream = request.get("stream").and_then(Value::as_bool).unwrap_or(false);
     let messages = request
         .get("messages")
@@ -156,6 +156,13 @@ pub(crate) fn chat_to_responses(request: &Value) -> Result<(Vec<u8>, bool), AppE
         "stream": true,
         "store": false,
     });
+    if let (Some(ceiling), Some(requested)) = (output_ceiling, request["max_tokens"].as_u64()) {
+        let cap = requested.min(u64::from(ceiling));
+        if cap < 16 {
+            return Err(AppError::BadRequest("剩余模型输出预算不足".into()));
+        }
+        payload["max_output_tokens"] = json!(cap);
+    }
     if let Some(effort) = request.get("reasoning_effort").and_then(Value::as_str).filter(|s| !s.is_empty()) {
         payload["reasoning"] = json!({ "effort": effort, "summary": "auto" });
     }
@@ -769,6 +776,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn configured_responses_models_receive_the_output_budget() {
+        let input = json!({"model":"test","messages":[{"role":"user","content":"hi"}],"max_tokens":100});
+        let (body, _) = chat_to_responses(&input, Some(64)).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&body).unwrap()["max_output_tokens"], 64);
+    }
+
+    #[test]
     fn incomplete_responses_never_report_completed_tool_calls() {
         let mut converter = ResponsesToChat::new("test".into());
         let event = json!({
@@ -813,7 +827,7 @@ mod tests {
             "tool_choice": "auto",
             "parallel_tool_calls": false
         });
-        let (bytes, want_stream) = chat_to_responses(&chat).unwrap();
+        let (bytes, want_stream) = chat_to_responses(&chat, None).unwrap();
         assert!(want_stream);
         let out: Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(out["model"], "gpt-6.1-terra");

@@ -310,18 +310,22 @@ impl Agent {
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
             }
-            // Some gateways report usage with `output_tokens: 0` however much they streamed; counting that as zero
-            // leaves the budget and the usage line blind to the whole output. Charge an estimate instead.
-            if let Some(u) = reply.usage.as_mut().filter(|u| u.completion_tokens == 0) {
+            let mut metered = reply.usage.unwrap_or_default();
+            let strict_metering = self.provider.enforces_request_token_budget();
+            if strict_metering && metered.prompt_tokens == 0 {
+                let input = estimate_tokens(&turn.messages) + estimate_tool_tokens(&turn.tools);
+                metered.prompt_tokens = input.min(u32::MAX as usize) as u32;
+            }
+            if metered.completion_tokens == 0 {
                 let message = &reply.message;
                 let chars = message.text().chars().count()
                     + message.reasoning.iter().map(|r| r.text.chars().count()).sum::<usize>()
                     + message.tool_calls.iter().map(|c| c.name.chars().count() + c.arguments.chars().count()).sum::<usize>();
-                u.completion_tokens = chars.div_ceil(3).min(u32::MAX as usize) as u32;
+                metered.completion_tokens = chars.div_ceil(3).min(u32::MAX as usize) as u32;
             }
-            if let Some(u) = reply.usage {
+            if strict_metering || reply.usage.is_some() { control.record(metered); }
+            if let Some(u) = if strict_metering { reply.usage } else { reply.usage.map(|_| metered) } {
                 usage += u;
-                control.record(u);
                 on_event(Event::Usage { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens });
             }
 
@@ -357,7 +361,12 @@ impl Agent {
             self.store.append(session, std::slice::from_ref(&assistant))?;
             let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
             history.push(assistant);
-            control.check()?;
+            if let Err(error) = control.check() {
+                let results = self.reject_calls(session, &calls, "Not run: the run budget was exhausted.", on_event);
+                let messages: Vec<_> = calls.iter().zip(results).map(|(call, result)| result.message(&call.id)).collect();
+                self.store.append(session, &messages)?;
+                return Err(error);
+            }
             if matches!(finish, FinishReason::ContentFilter | FinishReason::Other) || invalid_ids
                 || (finish == FinishReason::ToolCalls && calls.is_empty()) {
                 let results = self.reject_calls(session, &calls, "Not run: abnormal model terminal state or duplicate/empty tool identity. The entire batch was rejected.", on_event);
@@ -510,6 +519,14 @@ impl Agent {
         if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
             control.check()?;
+            let input_estimate = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
+            let output_limit = match control.remaining_tokens().filter(|_| self.provider.enforces_request_token_budget()) {
+                Some(remaining) if remaining <= input_estimate as u64 => {
+                    return Err(HarnessError::BudgetExceeded("model tokens".into()));
+                }
+                Some(remaining) => Some((remaining - input_estimate as u64).min(u64::from(u32::MAX)) as u32),
+                None => None,
+            };
             let streamed_flag = std::cell::Cell::new(false);
             let text_flag = std::cell::Cell::new(false);
             let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
@@ -517,8 +534,9 @@ impl Agent {
             // Both provider callbacks share one observer without aliasing two &mut borrows.
             let result = {
                 let sink = std::cell::RefCell::new(&mut *on_event);
-                self.provider.chat_with_progress(
+                self.provider.chat_with_output_budget(
                     request,
+                    output_limit,
                     &mut |text| {
                         if text.is_empty() { return; }
                         visible_text.push_str(text);
@@ -546,8 +564,9 @@ impl Agent {
             let streamed = streamed_flag.get();
             // Failed streams often omit usage. Charge a conservative estimate to
             // the shared budget, without presenting it as provider-reported usage.
-            if result.is_err() && streamed {
-                let input = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
+            if result.is_err() && (streamed || output_limit.is_some() &&
+                matches!(&result, Err(HarnessError::Provider { retryable: true, .. }))) {
+                let input = input_estimate;
                 let output = visible_text.chars().count() + visible_reasoning.iter().map(|r| r.text.chars().count()).sum::<usize>();
                 control.record(Usage { prompt_tokens: input.min(u32::MAX as usize) as u32,
                     completion_tokens: output.div_ceil(3).min(u32::MAX as usize) as u32, ..Default::default() });

@@ -88,6 +88,21 @@ pub trait ModelProvider: Send + Sync {
         self.chat_with_reasoning(request, on_text, on_reasoning, cancel)
     }
 
+    /// Providers that can cap a single generation may use the run's remaining output allowance.
+    fn enforces_request_token_budget(&self) -> bool { false }
+
+    fn chat_with_output_budget(
+        &self,
+        request: &ChatRequest,
+        _max_output_tokens: Option<u32>,
+        on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+        on_tool: &mut dyn FnMut(&ToolProgress),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        self.chat_with_progress(request, on_text, on_reasoning, on_tool, cancel)
+    }
+
     /// A display-only reasoning channel. Older/custom providers may implement
     /// just `chat`; the default preserves binary-free source compatibility.
     fn chat_with_reasoning(

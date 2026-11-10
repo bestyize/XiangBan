@@ -201,6 +201,8 @@ fn http_error(status: u16, body: &str) -> HarnessError {
 }
 
 impl ModelProvider for HostModel {
+    fn enforces_request_token_budget(&self) -> bool { true }
+
     fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
         self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
     }
@@ -210,11 +212,19 @@ impl ModelProvider for HostModel {
     }
 
     fn chat_with_progress(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), on_tool: &mut dyn FnMut(&ToolProgress), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+        self.chat_with_output_budget(request, None, on_text, on_reasoning, on_tool, cancel)
+    }
+
+    fn chat_with_output_budget(&self, request: &ChatRequest, output_limit: Option<u32>, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), on_tool: &mut dyn FnMut(&ToolProgress), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
         let session = policy::MODEL_SESSION.with(|s| s.borrow().clone());
         let settings = lock(&self.settings).get(&session).cloned();
         let mut profile = ProviderProfile::new("host", "", settings.as_ref().map(|s| s.model.clone()).unwrap_or_else(|| lock(&self.model).clone()));
         profile.max_request_bytes = Some(8 * 1024 * 1024 - 4096);
         if let Some(settings) = &settings { profile.supports_tools = settings.supports_tools; profile.max_output_tokens = settings.max_output_tokens; }
+        if let Some(configured) = profile.max_output_tokens {
+            let limit = configured.min(output_limit.unwrap_or(configured));
+            profile.extra_body.insert("max_tokens".into(), json!(limit));
+        }
         let mut body: Value = serde_json::from_slice(&encode_request_body(&profile, request)?).map_err(|e|HarnessError::Config(e.to_string()))?;
         if profile.model.trim().is_empty() {
             // No model chosen: leave the field out so the server uses its default.

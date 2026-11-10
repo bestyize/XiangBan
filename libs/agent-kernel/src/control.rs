@@ -130,6 +130,10 @@ impl RunControl {
 
     pub fn reported_tokens(&self) -> u64 { self.0.tokens.load(Ordering::SeqCst) }
 
+    pub(crate) fn remaining_tokens(&self) -> Option<u64> {
+        (self.0.limit != u64::MAX).then(|| self.0.limit.saturating_sub(self.reported_tokens()))
+    }
+
     pub fn bounded(duration: Duration, tokens: u64) -> Self {
         Self::new(Inner {
             isolate: true,

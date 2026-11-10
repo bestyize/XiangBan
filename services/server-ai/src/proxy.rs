@@ -152,7 +152,7 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     fields.insert("model".into(), Value::String(tier.model.clone()));
     validate_reasoning(api, fields, &crate::reasoning::levels(&tier.model, tier.reasoning_efforts.as_deref()))?;
     let bridged = if api == Api::ChatCompletions && crate::handlers::user::is_responses_only_model(&tier.model) {
-        Some(responses_bridge::chat_to_responses(&request)?)
+        Some(responses_bridge::chat_to_responses(&request, tier.capabilities.as_ref().and_then(|cap| cap.0.max_output_tokens))?)
     } else {
         None
     };

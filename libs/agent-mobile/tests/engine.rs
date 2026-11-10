@@ -579,3 +579,38 @@ fn a_deleted_session_rejects_late_writes_and_cannot_be_reopened() {
     assert!(engine.send(&json!({"type":"run","id":"r2","session":"s1","input":"Open"}).to_string()).is_err());
     engine.stop();
 }
+
+#[test]
+fn budget_stops_unmetered_model_calls_and_prevents_tool_dispatch() {
+    let engine = Engine::start(&config(&temp_dir("unmetered-budget"))).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"hello","max_tokens":1}).to_string()).unwrap();
+    loop {
+        let event = next(&engine, Duration::from_secs(2));
+        assert_ne!(event["type"], "model_request");
+        if event["type"] == "run_end" {
+            assert_eq!(event["ok"], false);
+            break;
+        }
+    }
+    engine.send(&json!({"type":"configure_session","session":"s2","settings":{
+        "permission":"auto","max_output_tokens":2048
+    }}).to_string()).unwrap();
+    engine.send(&json!({"type":"run","id":"r2","session":"s2","input":"write","max_tokens":2048}).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+    assert!(body["max_tokens"].as_u64().is_some_and(|cap| cap < 2048));
+    let lines = data(json!({"choices":[{"delta":{"content":"x".repeat(6500),"tool_calls":[{
+        "index":0,"id":"c1","function":{"name":"set_reminder","arguments":"{\"title\":\"test\",\"minutes\":1}"}
+    }]},"finish_reason":"tool_calls"}]}));
+    reply_with(&engine, request["id"].as_str().unwrap(), &lines);
+    loop {
+        let event = next(&engine, Duration::from_secs(2));
+        assert_ne!(event["type"], "tool_request");
+        assert_ne!(event["type"], "model_request");
+        if event["type"] == "run_end" {
+            assert_eq!(event["ok"], false);
+            break;
+        }
+    }
+    engine.stop();
+}
