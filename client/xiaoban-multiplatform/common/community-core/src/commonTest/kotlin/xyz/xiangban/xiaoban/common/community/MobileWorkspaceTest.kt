@@ -9,6 +9,20 @@ class MobileWorkspaceTest {
     private fun args(vararg fields: Pair<String, JsonElement>) = JsonObject(fields.toMap())
 
     @Test
+    fun `generic tools cannot write installed games or their data`() = runTest {
+        val workspace = MemoryMobileWorkspace()
+        val tools = mobileWorkspaceTools(workspace).associateBy { it.name }
+        for (path in listOf("games/demo/index.html", "GAMES/demo/index.html", "saves/demo.json", "logs/demo.txt")) {
+            workspace.write(path, "old")
+            assertFalse(tools.getValue("write_file").run(args("path" to JsonPrimitive(path), "content" to JsonPrimitive("new"))).ok)
+            assertFalse(tools.getValue("edit_file").run(args("path" to JsonPrimitive(path), "old_text" to JsonPrimitive("old"), "new_text" to JsonPrimitive("new"))).ok)
+            assertFalse(tools.getValue("delete_file").run(args("path" to JsonPrimitive(path))).ok)
+            assertEquals("old", workspace.read(path))
+        }
+        assertTrue(tools.getValue("write_file").run(args("path" to JsonPrimitive("drafts/demo/index.html"), "content" to JsonPrimitive("new"))).ok)
+    }
+
+    @Test
     fun `relative paths cannot escape or address hidden and ambiguous files`() = runTest {
         val workspace = MemoryMobileWorkspace()
         for (path in listOf("", "/etc/passwd", "../secret", "a/../b", "a//b", "C:/data", "a\\b", ".secrets", "a/./b", "a/")) {

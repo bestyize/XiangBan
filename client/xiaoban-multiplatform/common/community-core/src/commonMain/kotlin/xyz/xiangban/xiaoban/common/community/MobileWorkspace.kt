@@ -155,6 +155,14 @@ private class WorkspaceTool(
 
 private fun JsonObject.workspaceString(key: String, default: String? = null): String =
     if (key !in this && default != null) default else (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: error("$key 必须是字符串")
+private fun JsonObject.workspaceWritablePath(): String {
+    val path = MobileWorkspaceLimits.path(workspaceString("path"))
+    require(path.substringBefore('/').lowercase() !in setOf("games", "saves", "logs")) {
+        "请通过作品管理工具修改已安装作品、存档或运行记录。"
+    }
+    return path
+}
+
 private fun JsonObject.workspaceBoolean(key: String, default: Boolean = false): Boolean =
     this[key]?.let { (it as? JsonPrimitive)?.takeIf { p -> !p.isString }?.booleanOrNull ?: error("$key 必须是布尔值") } ?: default
 private fun workspaceProperties(vararg fields: Pair<String, String>): JsonObject = buildJsonObject {
@@ -190,7 +198,7 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
     },
     WorkspaceTool("write_file", "创建或覆盖工作区文本文件，自动创建目录。文本单文件最多 1 MB。", "write",
         workspaceProperties("path" to "string", "content" to "string"), listOf("path", "content")) { args ->
-        val path = args.workspaceString("path"); workspace.write(path, args.workspaceString("content"))
+        val path = args.workspaceWritablePath(); workspace.write(path, args.workspaceString("content"))
         buildJsonObject { put("path", path); put("saved", true) }
     },
     WorkspaceTool("copy_file", "按原始字节把工作区的一个文件复制到草稿。source 和 path 都相对工作区；同名内容不同时请另选目标路径。", "write",
@@ -203,7 +211,7 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
     },
     WorkspaceTool("edit_file", "精确替换工作区文件中的文本。默认要求 old_text 仅匹配一次；replace_all=true 时替换所有匹配。", "write",
         workspaceProperties("path" to "string", "old_text" to "string", "new_text" to "string", "replace_all" to "boolean"), listOf("path", "old_text", "new_text")) { args ->
-        val path = args.workspaceString("path"); val old = args.workspaceString("old_text"); val replacement = args.workspaceString("new_text")
+        val path = args.workspaceWritablePath(); val old = args.workspaceString("old_text"); val replacement = args.workspaceString("new_text")
         require(old.isNotEmpty()) { "old_text 不能为空" }
         val content = workspace.read(path)
         var count = 0
@@ -237,7 +245,7 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
     },
     WorkspaceTool("delete_file", "删除工作区文件或空目录；递归删除目录必须显式传 recursive=true。", "write",
         workspaceProperties("path" to "string", "recursive" to "boolean"), listOf("path")) { args ->
-        val path = args.workspaceString("path"); workspace.remove(path, args.workspaceBoolean("recursive"))
+        val path = args.workspaceWritablePath(); workspace.remove(path, args.workspaceBoolean("recursive"))
         buildJsonObject { put("path", path); put("deleted", true) }
     },
 )
