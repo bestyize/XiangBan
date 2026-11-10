@@ -12,6 +12,7 @@ mod preferences;
 mod startup;
 mod library;
 mod website;
+mod desktop_update;
 mod content;
 mod account;
 mod ai_config;
@@ -841,8 +842,10 @@ fn main() {
     }
     #[cfg(target_os = "macos")]
     for window in &mut context.config_mut().app.windows { window.incognito = true; }
+    let updater_enabled = context.config().plugins.0.contains_key("updater");
     let builder = tauri::Builder::default()
         .manage(shutdown::ExitState::default())
+        .manage(desktop_update::State::default())
         .plugin(tauri::plugin::Builder::<tauri::Wry, ()>::new("app-context-menu")
             .js_init_script_on_all_frames(include_str!("webview_context_menu.js"))
             .build())
@@ -858,6 +861,7 @@ fn main() {
             }
             if !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
         }));
+    let builder = if updater_enabled { builder.plugin(tauri_plugin_updater::Builder::new().build()) } else { builder };
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
     let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![application_skins::skin_list, application_skins::skin_apply, application_skins::skin_delete, application_skins::skin_import, application_skins::skin_export, resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_chat_composer_pet, set_companion_links, set_companion_skin, poke,
@@ -882,6 +886,7 @@ fn main() {
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::set_automatic_updates, website::open_official_site, website::fetch_site_wallpapers, website::fetch_site_categories,
             website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message,
+            desktop_update::install_website_update,
             account::send_account_code, account::login_account_with_code, account::login_account_with_password,
             account::register_account, account::reset_account_password, account::check_account_username, account::get_signup_methods,
             account::get_account_session, account::logout_account,

@@ -53,8 +53,10 @@ android {
         applicationId = "xyz.xiangban.xiaoban"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 3
         versionName = "3.1.1"
+        val (major, minor, patch) = requireNotNull(versionName).split('.').map(String::toInt)
+        require(major in 0..2099 && minor in 0..999 && patch in 0..999)
+        versionCode = (major * 1_000_000 + minor * 1_000 + patch).also { require(it > 0) }
         // 手机只支持 64 位 ARM（arm64-v8a）：原生库只打这一种，其他 CPU 的包不装。
         ndk { abiFilters += "arm64-v8a" }
     }

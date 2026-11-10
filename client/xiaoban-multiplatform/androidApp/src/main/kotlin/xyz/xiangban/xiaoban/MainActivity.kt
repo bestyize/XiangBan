@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private var shortcutJob: Job? = null
     private lateinit var reminders: AndroidReminders
     private var voicePlatform: AndroidPlatformActions? = null
+    private var appUpdates: AndroidAppUpdates? = null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -60,9 +61,11 @@ class MainActivity : ComponentActivity() {
         }
         val app = application as XiaobanApplication
         val speech = app.speech
+        appUpdates = if (BuildConfig.DEBUG) null else AndroidAppUpdates(this)
         val platform = AndroidPlatformActions(
             this, gate = speech::newGate, attachments = AndroidChatAttachments(this),
             toolEnvironment = app.toolEnvironment,
+            appUpdates = appUpdates,
         ) {
             withContext(Dispatchers.Main.immediate) {
                 suspendCancellableCoroutine { continuation ->
@@ -137,6 +140,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        appUpdates?.checkOnStart()
         voicePlatform?.setVoiceForeground(true)
         if (::reminders.isInitialized) lifecycleScope.launch(Dispatchers.IO) { reminders.restore() }
     }

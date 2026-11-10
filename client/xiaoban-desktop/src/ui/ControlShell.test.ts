@@ -7,6 +7,8 @@ import LoginModal from './components/LoginModal.vue';
 import { activeSkin, builtinSkin } from './skins/store.ts';
 import { appearanceMode } from './appearance.ts';
 import SkinScene from './application-skins/SkinScene.vue';
+import AboutSettings from './components/settings/AboutSettings.vue';
+import { createControlStore } from './control-store.ts';
 
 vi.mock('naive-ui', async (importOriginal) => {
   const actual = await importOriginal<typeof import('naive-ui')>();
@@ -482,5 +484,32 @@ describe('ControlShell sidebar', () => {
     expect(quiet.find('[data-testid="nav-settings-new"]').exists()).toBe(false);
     expect(quiet.find('[data-testid="nav-notice-dot"]').exists()).toBe(true);
     quiet.unmount();
+    vi.mocked(invoke).mockImplementation(base);
+  });
+
+  it('installs signed releases by version and keeps the browser path for legacy releases', async () => {
+    const store = createControlStore(vi.fn());
+    const downloadUrl = 'https://example.com/releases/0.2.0';
+    store.website.update = { available: true, version: '0.2.0', notes: '', downloadUrl, inApp: true };
+    const wrapper = mount(AboutSettings, { props: { store } });
+    try {
+      await wrapper.get('[data-testid="about-download"]').trigger('click');
+      await flushPromises();
+      expect(invoke).toHaveBeenCalledWith('install_website_update', { version: '0.2.0' });
+      expect(invoke).not.toHaveBeenCalledWith('open_download_url', expect.anything());
+
+      store.website.installation = { busy: true, percent: 42, error: null };
+      await flushPromises();
+      expect(wrapper.get('[role="status"]').text()).toContain('42%');
+      expect(wrapper.get('[data-testid="about-download"]').attributes('disabled')).toBeDefined();
+      store.website.installation = undefined;
+      store.website.update.inApp = false;
+      await flushPromises();
+      await wrapper.get('[data-testid="about-download"]').trigger('click');
+      expect(invoke).toHaveBeenCalledWith('open_download_url', { url: downloadUrl });
+    } finally {
+      wrapper.unmount();
+      store.dispose();
+    }
   });
 });

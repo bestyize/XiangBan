@@ -33,6 +33,7 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
     const SETTINGS: &[&str] = &[
         "get_startup_status", "get_game_status", "update_settings", "set_autostart", "open_data_directory",
         "set_appearance", "set_accent", "set_chat_composer_pet", "open_application_skins", "set_automatic_updates", "check_website", "dismiss_website_message",
+        "install_website_update",
         "get_network_config", "save_network_config", "test_network_connection", "assistant_status", "assistant_configure",
         "assistant_try", "open_screen_capture_settings", "reset_screen_capture_permission",
         "chat_agent_settings", "chat_set_command_sandbox", "chat_set_sandbox_network", "chat_set_execution_limits",
@@ -85,6 +86,8 @@ pub fn store_identity(raw: &str) -> Result<String, String> {
         assert_eq!(kind("configuration-settings"), Some("settings"));
         assert!(command_allowed("settings", "open_application_skins"));
         assert!(!command_allowed("model", "open_application_skins"));
+        assert!(command_allowed("settings", "install_website_update"));
+        assert!(!command_allowed("model", "install_website_update"));
         assert_eq!(kind("configuration-model-012345678901234567890123"), Some("model"));
         for label in ["wallpaper", "configuration-model-../control", "configuration-settings-other"] { assert!(kind(label).is_none()); }
         for role in ["settings", "model"] {

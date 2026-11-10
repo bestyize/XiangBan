@@ -273,7 +273,13 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 NavRow("环境配置", tools.status.label, first = true) { open(Route.ToolEnvironment) }
             }
             GroupLabel("关于")
-            NavRow("用户协议", first = true) { env.platform?.openUrl("$site/terms") }
+            val updates = env.platform?.appUpdates
+            if (updates != null) {
+                val update by updates.state.collectAsState()
+                NavRow("检查更新", update.version?.let { "可更新至 v$it" } ?: "v${updates.currentVersion}", first = true, onClick = updates::check)
+                SwitchRow("自动检查更新", "打开小伴时检查新版本", update.automatic, updates::setAutomatic)
+            }
+            NavRow("用户协议", first = updates == null) { env.platform?.openUrl("$site/terms") }
             NavRow("隐私政策") { env.platform?.openUrl("$site/privacy") }
             NavRow("社区规则") { env.platform?.openUrl("$site/rules") }
             if (session.loggedIn) {

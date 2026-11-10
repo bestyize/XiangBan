@@ -60,6 +60,12 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 小伴三端安装包由 `.github/workflows/build-xiaoban-wallpaper.yml`（BuildXiaoBanWallpaper）打包：Windows x64 NSIS 一键安装包（当前用户目录、无管理员权限、不再发布便携版）、macOS aarch64 的 dmg 与 `.app`（GitHub Release 使用固定自签名证书，未公证；本地默认 ad-hoc）、小伴手机 App 的 Android APK。产物上传到 GitHub Release `xiaoban-wallpaper-v<版本号>`（没有就自动创建，重跑时替换同名文件），不占用 Actions artifact 存储额度。仅在 Actions 页手动运行；推送代码或 `xiaoban-wallpaper-v*` 标签不会触发构建。Android App 使用 `client/xiaoban-multiplatform`，签名读取仓库 secret `XIAOBAN_ANDROID_KEYSTORE_BASE64`、`XIAOBAN_ANDROID_KEYSTORE_PASSWORD`、`XIAOBAN_ANDROID_KEY_ALIAS`、`XIAOBAN_ANDROID_KEY_PASSWORD`，缺少时产出调试 APK。本地 Android release 需要 JDK 17+，GraalVM 在 jlink 步骤会失败，可改用 Android Studio 自带的 JBR。
 
+### 客户端更新发布
+
+- 在 `client/xiaoban-desktop` 中运行 `npx tauri signer generate -w <仓库外的私钥路径>`。把生成的公钥文件内容填入 GitHub Actions 仓库变量 `XIAOBAN_UPDATER_PUBLIC_KEY`，私钥文件内容存为 secret `TAURI_SIGNING_PRIVATE_KEY`。若设置了密码，将密码存为 secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。后续版本继续使用同一密钥。两项签名密钥都未配置时，桌面工作流只发布普通安装包。
+- Android 沿用上述正式 APK 签名配置。安装时检查 APK 的哈希、包名、版本号和签名证书，再由 Android 系统确认覆盖安装。Android `versionCode` 由 `versionName` 的三段数字生成，发布新版时递增版本号即可。
+- 在官方仓库 `main` 上手动运行 `BuildXiaoBanWallpaper`。每个平台先上传签名安装包，再更新 `client-updates` 分支中自己的清单。旧版本和同版本重跑不会覆盖已经发布的更新清单。用户需要先手动安装一次带更新功能的正式版，之后在桌面「设置 → 关于」或手机「我的 → 设置 → 关于」接收新版。
+
 正式壁纸网站位于 `services/server-xiaoban`，使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
 
 统一账号中心位于 `services/server-account`，使用独立 PostgreSQL 库，默认端口 55009，管理后台在 `/admin/`；集成测试使用 `TEST_DATABASE_URL`，未设置时跳过。设计见 [docs/architecture/account-center.md](docs/architecture/account-center.md)。 独立部署栈在 `infra/account`，当前没有账号中心专用工作流，本地打包与上传流程见 [docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md](docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md)。

@@ -115,7 +115,12 @@ fn save(app: &tauri::AppHandle, status: &Status) -> Result<(), String> {
 fn snapshot(app: &tauri::AppHandle) -> Value {
     let state = app.state::<WebsiteState>();
     let status = state.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    serde_json::to_value(status).unwrap()
+    let mut value = serde_json::to_value(status).unwrap();
+    value["installation"] = serde_json::to_value(crate::desktop_update::status(app)).unwrap();
+    value
+}
+pub(crate) fn publish_status(app: &tauri::AppHandle) {
+    let _ = app.emit("website-status", snapshot(app));
 }
 #[tauri::command]
 pub fn get_website_status(app: tauri::AppHandle) -> Value {
@@ -536,7 +541,11 @@ pub async fn check_website(app: tauri::AppHandle) -> Result<Value, String> {
             Err(e) => Err(e),
         }
     });
-    let update = content::check_updates(app.clone()).await;
+    let signed = crate::desktop_update::check(&app).await;
+    let update = match signed.as_ref() {
+        Ok(Some(update)) => Ok(update.clone()),
+        _ => content::check_updates(app.clone()).await,
+    };
     let notices = notices_task.await.map_err(|e| e.to_string())?;
     let desktop_state = app.state::<DesktopState>();
     let _update = desktop_state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
@@ -554,6 +563,9 @@ pub async fn check_website(app: tauri::AppHandle) -> Result<Value, String> {
         match update {
             Ok(value) => status.update = Some(value),
             Err(e) => status.errors.push(format!("更新: {e}")),
+        }
+        if let Err(error) = signed {
+            status.errors.push(format!("应用内更新: {error}"));
         }
         if status.errors.is_empty() {
             status.last_checked = Some(now_secs());
@@ -622,7 +634,15 @@ pub fn start(app: &tauri::AppHandle) {
     }
     if let Ok(root) = crate::storage::root(app) {
         if let Ok(text) = std::fs::read(root.join("config/website-messages.json")) {
-            if let Ok(status) = serde_json::from_slice::<Status>(&text) {
+            if let Ok(mut status) = serde_json::from_slice::<Status>(&text) {
+                if status.update.as_ref().is_some_and(|update| {
+                    update["available"] == true && update["version"].as_str()
+                        .and_then(|version| semver::Version::parse(version).ok())
+                        .is_some_and(|version| version <= app.package_info().version)
+                }) {
+                    status.update = None;
+                    status.last_checked = None;
+                }
                 *app.state::<WebsiteState>().status.lock().unwrap_or_else(|e| e.into_inner()) = status;
             }
         }

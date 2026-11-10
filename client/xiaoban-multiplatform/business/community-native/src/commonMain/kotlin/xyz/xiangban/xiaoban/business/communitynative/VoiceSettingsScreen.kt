@@ -143,7 +143,7 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
 
 /** 一行：左边标题和说明，右边开关；通栏、白底。 */
 @Composable
-private fun SwitchRow(title: String, desc: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, desc: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Hairline(Modifier.padding(start = 16.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -694,6 +694,7 @@ mod tests {
                 "open_official_site",
                 "fetch_site_wallpapers",
                 "check_website",
+                "install_website_update",
                 "dismiss_website_message",
                 "send_account_code",
                 "login_account_with_code",

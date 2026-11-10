@@ -138,7 +138,23 @@ jobs:
       - name: Verify Computer Use platform selection
         run: npm run test:computer-use
       - name: Build one-click user installer
-        run: npm run desktop:windows:build
+        shell: pwsh
+        env:
+          XIAOBAN_UPDATER_PUBLIC_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && vars.XIAOBAN_UPDATER_PUBLIC_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $config = Join-Path $env:RUNNER_TEMP "xiaoban-updater.json"
+          python ../../tools/publish-client-update.py configure-desktop windows-x86_64 $config
+          if ($LASTEXITCODE -ne 0) { throw "Failed to configure desktop signing." }
+          if (Test-Path $config) {
+            npm run desktop:windows:build -- --config $config
+            if ($LASTEXITCODE -ne 0) { throw "Failed to build signed update." }
+            "SIGNED_UPDATER=true" >> $env:GITHUB_ENV
+          } else {
+            npm run desktop:windows:build
+            if ($LASTEXITCODE -ne 0) { throw "Failed to build installer." }
+          }
       - name: Verify bundled Windows x64 engine
         run: node ../../libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --check --target x86_64-pc-windows-msvc --output src-tauri/resources/computer-use
       - name: Package one-click installer
@@ -167,6 +183,15 @@ jobs:
           }
           gh release upload $env:TAG (Get-ChildItem out).FullName --clobber
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload Windows installer." }
+      - name: Publish signed Windows update
+        if: ${{ env.SIGNED_UPDATER == 'true' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+          XIAOBAN_UPDATER_PUBLIC_KEY: ${{ vars.XIAOBAN_UPDATER_PUBLIC_KEY }}
+        run: python ../../tools/publish-client-update.py publish windows-x86_64 $env:TAG src-tauri/target/release/bundle/nsis "*-setup.exe"
 
   macos-aarch64:
     name: macOS aarch64
@@ -246,7 +271,19 @@ jobs:
 
       - name: Build app and dmg
         # tauri.macos.conf.json -> beforeBundleCommand runs the Swift AppKit renderer.
-        run: npx tauri build --target aarch64-apple-darwin --bundles app,dmg
+        env:
+          XIAOBAN_UPDATER_PUBLIC_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && vars.XIAOBAN_UPDATER_PUBLIC_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          config="$RUNNER_TEMP/xiaoban-updater.json"
+          python3 ../../tools/publish-client-update.py configure-desktop darwin-aarch64 "$config"
+          if [ -f "$config" ]; then
+            npx tauri build --target aarch64-apple-darwin --bundles app,dmg --config "$config"
+            echo "SIGNED_UPDATER=true" >> "$GITHUB_ENV"
+          else
+            npx tauri build --target aarch64-apple-darwin --bundles app,dmg
+          fi
 
       - name: Verify custom DMG guide and disk image
         shell: bash
@@ -293,6 +330,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release.outputs.tag }}
         run: gh release upload "$TAG" out/* --clobber
+      - name: Publish signed macOS update
+        if: ${{ env.SIGNED_UPDATER == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+          XIAOBAN_UPDATER_PUBLIC_KEY: ${{ vars.XIAOBAN_UPDATER_PUBLIC_KEY }}
+        run: python3 ../../tools/publish-client-update.py publish darwin-aarch64 "$TAG" src-tauri/target/aarch64-apple-darwin/release/bundle/macos "*.app.tar.gz"
 
   android:
     name: Android · 小伴手机 App
@@ -413,6 +458,13 @@ jobs:
           # Publish the content-addressed runtime before any APK that references it.
           gh release upload "$TAG" androidApp/build/tool-environment/downloads/* --clobber
           gh release upload "$TAG" out/* --clobber
+      - name: Publish signed Android update
+        if: ${{ env.SIGNED == 'true' && github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: python3 ../../tools/publish-client-update.py publish android-arm64-v8a "$TAG" out "*-Android.apk"
 
   # ───────────── 服务端镜像：单独的 Release，供服务器上拉取更新 ─────────────
 

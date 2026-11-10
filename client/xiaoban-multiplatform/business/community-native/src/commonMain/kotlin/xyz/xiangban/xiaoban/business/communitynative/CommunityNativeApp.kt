@@ -182,6 +182,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 }
             }
             CommunityLinkConfirmation(env, ::push)
+            env.platform?.appUpdates?.let { AppUpdateDialog(it) }
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     env,

@@ -827,6 +827,10 @@ pub(crate) fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_conn
     *slot=Some(manager.clone());
     Ok(manager)
 }
+pub(crate) fn has_active_runs(app: &tauri::AppHandle) -> bool {
+    !lock(&app.state::<ChatState>().leases).is_empty()
+}
+
 pub fn shutdown_connectors(app:&tauri::AppHandle){
     if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
     for (_, manager) in lock(&app.state::<ChatState>().processes).drain(){let _=manager.shutdown();}
