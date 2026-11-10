@@ -146,34 +146,38 @@ internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: 
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     BottomSheet(dismiss, panel, cornerRadius = 16.dp) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 540.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("做一个我的版本", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("参考《$title》", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-            if (summary.isNotBlank()) Text(summary, style = XType.Secondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(12.dp)) {
-                if (idea.isBlank()) Text(if (kind == "app") "想怎么改？比如换一个主题，加一个新功能" else "想怎么改？比如换一个主题，加一个新玩法", style = XType.Body, color = LocalExtraColors.current.ink3)
-                BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 104.dp).semantics { contentDescription = "改编想法" },
-                    textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(MaterialTheme.colorScheme.primary))
+        Column(Modifier.fillMaxWidth().heightIn(max = 540.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("做一个我的版本", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                Text("参考《$title》", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                if (summary.isNotBlank()) Text(summary, style = XType.Secondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(12.dp)) {
+                    if (idea.isBlank()) Text(if (kind == "app") "想怎么改？比如换一个主题，加一个新功能" else "想怎么改？比如换一个主题，加一个新玩法", style = XType.Body, color = LocalExtraColors.current.ink3)
+                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().semantics { contentDescription = "改编想法" },
+                        minLines = 4, maxLines = 8, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(MaterialTheme.colorScheme.primary))
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val hints = if (kind == "app") listOf("换一个主题", "加一个新功能", "改得简单一点")
+                        else listOf("换一个主题", "加一个新玩法", "改得简单一点", "加一个双人模式")
+                    hints.forEach { hint -> AppActionButton(hint, { idea = hint }, height = 34.dp) }
+                }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val hints = if (kind == "app") listOf("换一个主题", "加一个新功能", "改得简单一点")
-                    else listOf("换一个主题", "加一个新玩法", "改得简单一点", "加一个双人模式")
-                hints.forEach { hint -> AppActionButton(hint, { idea = hint }, height = 34.dp) }
-            }
-            Text("小伴先给你看方案，确认后再制作。", style = XType.Caption, color = LocalExtraColors.current.ink3)
-            AppActionButton("开始", {
+            val blocked = !chat.canLeaveForCreation()
+            Text(when {
+                blocked -> "当前还有创作任务正在执行。可以先编辑需求。"
+                cloud.sending -> "图片继续在原对话生成。确认方案后开始制作。"
+                else -> "小伴先给你看方案，确认后再制作。"
+            }, style = XType.Caption, color = LocalExtraColors.current.ink3)
+            AppActionButton("查看创作方案", {
                 when {
                     !session.loggedIn -> open?.invoke(Route.Login)
                     env.agent == null -> message = "当前安装包暂不支持手机本地创作"
-                    cloud.sending -> message = "先结束当前任务，再开始新作品"
-                    else -> {
-                        chat.clearConversation()
+                    chat.startCreation("改编《$title》", idea, appRemixPrompt(title, summary, idea, kind)) -> {
                         dismiss()
                         open?.invoke(Route.AiChat)
-                        chat.send(appRemixPrompt(title, summary, idea, kind))
                     }
                 }
-            }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && open != null)
+            }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && open != null && !blocked)
             message?.let { Text(it, style = XType.Caption, color = Danger) }
         }
     }

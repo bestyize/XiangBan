@@ -60,7 +60,8 @@ fun newChatId(nowMs: Long, random: Random = Random.Default): String =
     "c" + nowMs.toString(36) + random.nextLong(0, 36L * 36 * 36 * 36).toString(36).padStart(4, '0')
 
 /** 对话的标题：第一句提问，太长就截断。 */
-fun chatTitle(messages: List<ChatTurn>): String {
+fun chatTitle(messages: List<ChatTurn>, creation: CreationDraft? = null): String {
+    (creation?.title ?: legacyCreationTitle(messages))?.let { return it }
     val first = messages.firstOrNull { it.role == "user" }?.text?.trim().orEmpty()
     return if (first.isEmpty()) "新对话" else if (first.length > 14) first.take(14) + "…" else first
 }
@@ -193,6 +194,14 @@ class ChatHistory(
 
     fun list(): List<ChatSummary> = index
 
+    fun updateTitle(id: String, title: String): List<ChatSummary> {
+        if (index.any { it.id == id && it.title != title }) {
+            index = index.map { if (it.id == id) it.copy(title = title) else it }
+            enqueue(indexName(), CommunityJson.encodeToString(index))
+        }
+        return index
+    }
+
     /** Missing/corrupt/unreadable records must not silently remove the conversation index. */
     private fun readSnapshot(owner: String, id: String): StoredChat? = try {
         val name = "$owner/$id.json"
@@ -279,7 +288,7 @@ class ChatHistory(
         enqueue(Write(++revision, chatName(id), snapshot = StoredChat(id, kept, selected), media = mediaFor(id)))
         if (messages.none { it.streaming && !it.imageGeneration }) enqueue("$folder/$id.stream.json", null)
         if (kept.none { it.role == "user" }) return index
-        index = listOf(ChatSummary(id, chatTitle(kept), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
+        index = listOf(ChatSummary(id, chatTitle(kept, selected.creation), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         return index
     }

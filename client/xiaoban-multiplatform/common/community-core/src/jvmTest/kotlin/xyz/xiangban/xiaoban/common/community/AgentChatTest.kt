@@ -6,6 +6,10 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.http.content.TextContent
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.cancel
+import kotlin.test.assertFalse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -19,6 +23,57 @@ import kotlinx.coroutines.withTimeout
 
 /** 整条链：对话控制器 → 智能体运行时 → 真正的 Rust 内核（JNI）→ 假的 server-ai（MockEngine）和假的提醒调度。 */
 class AgentChatTest {
+    @Test
+    fun `creation retry and free text cannot start the native agent before confirmation`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val starts = AtomicInteger()
+        val plans = AtomicInteger()
+        val bridge = object : AgentBridge {
+            override fun start(config: String) = starts.incrementAndGet().toLong()
+            override fun send(handle: Long, line: String) = Unit
+            override fun poll(handle: Long, timeoutMs: Long): String? { Thread.sleep(20); return null }
+            override fun stop(handle: Long) = Unit
+        }
+        val client = HttpClient(MockEngine { request ->
+            if (request.url.encodedPath != "/v1/chat/completions") return@MockEngine respond("{}")
+            val body = (request.body as TextContent).text
+            assertFalse(body.contains("\"tools\""))
+            if (plans.incrementAndGet() == 1) return@MockEngine respond(
+                """{"error":{"message":"暂不可用"}}""", HttpStatusCode.BadGateway,
+            )
+            respond(sse("""{"choices":[{"delta":{"content":"先做地图，再测试。"},"finish_reason":"stop"}]}"""),
+                headers = headersOf(HttpHeaders.ContentType, "text/event-stream"))
+        })
+        val runtime = AgentRuntime(bridge, { _, _ -> ModelResult(200) }, emptyList(), "", "", scope)
+        val store = ChatHistory(InMemoryChatHistoryFiles(), scope)
+        val chat = CloudChatController(AiGatewayApi(client) { "token" }, scope, agent = runtime, history = store)
+        suspend fun idle() = withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        try {
+            assertTrue(chat.startCreation("潮汐灯塔", "制作潮汐灯塔", "三张地图"))
+            idle()
+            assertFalse(chat.state.value.creationPlanReady)
+            chat.retryLast()
+            idle()
+            assertTrue(chat.state.value.creationPlanReady)
+            val conversation = chat.state.value.conversationId
+            chat.clearConversation()
+            chat.openConversation(conversation)
+            assertTrue(chat.state.value.planningCreation)
+            chat.send("请接着上一次任务继续")
+            idle()
+            assertEquals(0, starts.get())
+            assertEquals(3, plans.get())
+            chat.confirmCreationPlan()
+            withTimeout(5_000) { while (starts.get() == 0) delay(10) }
+            assertTrue(chat.state.value.creation?.approved == true)
+        } finally {
+            chat.stop()
+            runtime.stop()
+            client.close()
+            scope.cancel()
+        }
+    }
+
     @Test
     fun `an unexpectedly closed engine ends the turn and can be restarted`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

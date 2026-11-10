@@ -10,7 +10,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
@@ -22,6 +25,48 @@ import kotlin.test.assertFailsWith
 
 class ImageGenerationTest {
     private val encoded = "R0lGODlhAQABAIAAAP8AAAAA/yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw=="
+
+    @Test fun `background image completion stays with its original conversation`() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        val png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lDsAAAAASUVORK5CYII="
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/images/jobs" -> {
+                    val id = CommunityJson.parseToJsonElement((request.body as TextContent).text).jsonObject["job_id"]!!.jsonPrimitive.content
+                    started.complete(Unit)
+                    finish.await()
+                    respond("""{"job_id":"$id","status":"succeeded","result":{"data":[{"b64_json":"$png"}]}}""")
+                }
+                else -> respond("{}")
+            }
+        })
+        val store = ChatHistory(InMemoryChatHistoryFiles(), this)
+        val chat = CloudChatController(AiGatewayApi(client) { "token" }, this, history = store)
+        try {
+            assertTrue(chat.generateImages("poster", 1, null))
+            withTimeout(5_000) { started.await() }
+            assertTrue(chat.canLeaveForCreation())
+            val imageChat = chat.state.value.conversationId
+            chat.clearConversation()
+            assertFalse(chat.state.value.sending)
+            assertEquals(1, chat.state.value.backgroundImageCount)
+            chat.openConversation(imageChat)
+            assertTrue(chat.state.value.sending)
+            chat.clearConversation()
+            val newChat = chat.state.value.conversationId
+            finish.complete(Unit)
+            withTimeout(5_000) { while (chat.state.value.backgroundImageCount > 0) delay(10) }
+            assertEquals(newChat, chat.state.value.conversationId)
+            assertTrue(chat.state.value.messages.isEmpty())
+            chat.openConversation(imageChat)
+            assertEquals(1, chat.state.value.messages.last().generatedImages.size)
+        } finally {
+            chat.reset()
+            client.close()
+            coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.cancel() }
+        }
+    }
 
     @Test fun `GIF capability is optional and animated results preserve original bytes`() = runBlocking {
         val old = CommunityJson.decodeFromString<AiTiersResponse>("""{"media":{"image":{"available":true,"sizes":["1024x1024"]}}}""")

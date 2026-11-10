@@ -250,8 +250,10 @@ impl ModelProvider for HostModel {
         self.rpc.emit(&json!({ "type": "model_request", "id": id, "session": session, "body": body }));
 
         let (mut sse, mut acc) = (SseParser::default(), StreamAccumulator::default());
-        let mut consume = |acc: &mut StreamAccumulator, payload: &str| -> Result<(), HarnessError> {
+        let mut received_done = false;
+        let mut consume = |acc: &mut StreamAccumulator, received_done: &mut bool, payload: &str| -> Result<(), HarnessError> {
             if payload.trim() == "[DONE]" {
+                *received_done = true;
                 acc.mark_done();
                 return Ok(());
             }
@@ -269,12 +271,12 @@ impl ModelProvider for HostModel {
             match rx.recv_timeout(POLL_STEP) {
                 Ok(ModelMsg::Line(line)) => {
                     if let Some(payload) = sse.push_line(&line) {
-                        if let Err(error) = consume(&mut acc, &payload) { break Err(error); }
+                        if let Err(error) = consume(&mut acc, &mut received_done, &payload) { break Err(error); }
                     }
                 }
                 Ok(ModelMsg::End { status, error, body, verified_tool_terminal }) => {
                     if let Some(payload) = sse.flush() {
-                        if let Err(error) = consume(&mut acc, &payload) { break Err(error); }
+                        if let Err(error) = consume(&mut acc, &mut received_done, &payload) { break Err(error); }
                     }
                     if let Some(message) = error {
                         break Err(HarnessError::provider(message, status == 0 || status == 429 || status >= 500));
@@ -295,7 +297,18 @@ impl ModelProvider for HostModel {
                         let Some(chunk) = result else {
                             break Err(HarnessError::provider("模型返回了无效的 JSON 回复", false));
                         };
-                        if let Err(error) = consume(&mut acc, &chunk.to_string()) { break Err(error); }
+                        if let Err(error) = consume(&mut acc, &mut received_done, &chunk.to_string()) { break Err(error); }
+                    }
+                    if verified_tool_terminal && received_done
+                        && matches!(acc.finish_reason(), Some("tool_calls" | "function_call")) {
+                        acc.fill_empty_tool_arguments(|name| request.tools.iter().any(|tool| {
+                            tool.name == name
+                                && tool.parameters["type"] == "object"
+                                && tool.parameters["additionalProperties"] == false
+                                && tool.parameters["properties"].as_object().is_some_and(|properties| properties.is_empty())
+                                && (tool.parameters["required"].is_null()
+                                    || tool.parameters["required"].as_array().is_some_and(|required| required.is_empty()))
+                        }));
                     }
                     let has_calls = acc.pending_tool_call().is_some();
                     if has_calls && (!profile.supports_tools || !verified_tool_terminal || !acc.tool_calls_complete()
@@ -428,7 +441,7 @@ impl Engine {
         let settings: policy::Settings = Arc::new(Mutex::new(HashMap::new()));
         let attachments = std::path::Path::new(&config.sessions_dir).join("attachments");
         let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone(), settings: settings.clone(), attachments: attachments.clone() });
-        let bridge = StdioBridge::new(LineWriter { tx: out_tx.clone(), buf: Vec::new() });
+        let bridge = StdioBridge::with_no_progress_limit(LineWriter { tx: out_tx.clone(), buf: Vec::new() }, Some(6));
         // Progress is independent of chat trimming and uses the same per-session isolation.
         let todo = Arc::new(Todo::new().persistent(std::path::Path::new(&config.sessions_dir).join("progress")));
 

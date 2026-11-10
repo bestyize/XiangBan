@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,7 +52,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
@@ -242,16 +240,17 @@ internal class RuntimeV2Chrome(
 
     @Composable
     private fun Capsule() {
-        val ink = MaterialTheme.colorScheme.onSurface
-        val shadow = if (ink.luminance() < .5f) Color.White else Color.Black
         Box(
             Modifier.fillMaxSize().chromeClick(onClick = ::openMenu)
                 .semantics { if (usingMedia) stateDescription = "正在使用摄像头或麦克风" },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.offset(y = (-6).dp)) {
-                XIcon(XIcons.More, Modifier.offset(y = 1.dp).rotate(90f), tint = shadow.copy(alpha = .32f), size = 16.dp)
-                XIcon(XIcons.More, Modifier.rotate(90f), tint = ink, size = 16.dp, description = "应用菜单")
+            Box(
+                Modifier.size(32.dp).background(Color(0xFF20232A), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = .35f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(XIcons.More, Modifier.rotate(90f), tint = Color.White, size = 20.dp, description = "应用菜单")
             }
             if (usingMedia) Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 8.dp)

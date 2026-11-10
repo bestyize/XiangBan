@@ -61,6 +61,18 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
                 entry["sizes"] = json!(setting.sizes);
                 entry["formats"] = json!(crate::media::image_formats(&setting.model));
                 entry["supports_jobs"] = json!(true);
+                // New API publishes its fixed USD price, independent of account/channel multipliers.
+                // A failed pricing lookup must not prevent the client from loading tiers.
+                if let Ok(Ok(prices)) = tokio::time::timeout(
+                    std::time::Duration::from_secs(1), state.newapi.list_models(),
+                ).await {
+                    if let Some(price) = prices.iter().find(|price| price.model_name == setting.model)
+                        .map(|price| price.model_price * 100.0)
+                        .filter(|price| price.is_finite() && *price > 0.0)
+                    {
+                        entry["base_points_per_image"] = json!(price);
+                    }
+                }
                 if crate::media::gif_image_model(&setting.model) {
                     entry["gif"] = json!({"max_frames":16,"default_frames":9,"min_frame_duration_ms":20,"max_frame_duration_ms":2000,"default_frame_duration_ms":200});
                 }

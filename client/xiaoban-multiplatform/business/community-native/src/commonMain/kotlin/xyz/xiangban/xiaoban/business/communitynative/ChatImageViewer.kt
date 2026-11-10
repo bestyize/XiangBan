@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import kotlin.io.encoding.Base64
+import kotlin.math.roundToLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,7 +49,7 @@ import com.multiplatform.webview.web.WebContent
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.WebViewState
 
-internal data class ChatImagePreview(val data: String, val label: String, val generated: Boolean = false)
+internal data class ChatImagePreview(val data: String, val label: String, val generated: Boolean = false, val prompt: String? = null)
 
 private data class ResolvedImage(val data: String? = null, val loading: Boolean = true)
 
@@ -113,6 +115,7 @@ internal fun ChatImageViewer(
     platform: PlatformActions?,
     resolve: suspend (String) -> String?,
     onReference: (() -> Unit)? = null,
+    onReview: (() -> Unit)? = null,
     referencing: Boolean = false,
     onClose: () -> Unit,
 ) {
@@ -181,9 +184,42 @@ internal fun ChatImageViewer(
                 }
                 IconTap(XIcons.Close, "关闭", onClose, tint = Color.White)
             }
+            if (image.generated && data != null && !failed) {
+                val dimensions = remember(bytes, data) { originalImageSize(bytes, data) }
+                Row(
+                    Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp)
+                        .clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.8f)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    dimensions?.let { Text(it, style = XType.Caption, color = Color.White) }
+                    if (onReview != null) GhostPillButton("检查画面和文字", onReview, enabled = !referencing, height = 36.dp)
+                }
+            }
             Toast(notice) { notice = null }
         }
     }
+}
+
+private fun originalImageSize(bytes: ByteArray?, data: String): String? {
+    if (bytes == null) return null
+    fun byte(offset: Int) = bytes[offset].toInt() and 255
+    fun int(offset: Int) = (byte(offset) shl 24) or (byte(offset + 1) shl 16) or (byte(offset + 2) shl 8) or byte(offset + 3)
+    val (width, height) = when {
+        data.startsWith("data:image/png;") && bytes.size >= 24 -> int(16) to int(20)
+        data.startsWith("data:image/gif;") && bytes.size >= 10 -> (byte(6) or (byte(7) shl 8)) to (byte(8) or (byte(9) shl 8))
+        else -> return null
+    }
+    return if (width > 0 && height > 0) "$width × $height" else null
+}
+
+private fun imageSizeLabel(size: String): String = when (size) {
+    "auto" -> "自动 · 由服务决定尺寸"
+    "1024x1024" -> "1:1 · 1024 × 1024"
+    "1024x1536" -> "2:3 · 1024 × 1536"
+    "1536x1024" -> "3:2 · 1536 × 1024"
+    "1024x1792" -> "4:7 · 1024 × 1792"
+    "1792x1024" -> "7:4 · 1792 × 1024"
+    else -> size.replace("x", " × ")
 }
 
 @Composable
@@ -191,6 +227,8 @@ internal fun ImageGenerationSheet(
     initialPrompt: String,
     sizes: List<String>,
     formats: List<String> = listOf("png"),
+    quota: String,
+    basePointsPerImage: Double?,
     onDismiss: () -> Unit,
     onGenerate: (String, Int, String?, String, Int, Int) -> Unit,
 ) {
@@ -222,10 +260,20 @@ internal fun ImageGenerationSheet(
             }
             if (sizes.size > 1) {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    sizes.forEach { option -> ChipPill(option, selected = size == option, onClick = { size = option }) }
+                    sizes.forEach { option -> ChipPill(imageSizeLabel(option), selected = size == option, onClick = { size = option }) }
                 }
+            } else {
+                Text("画幅 · ${imageSizeLabel(sizes.firstOrNull() ?: "auto")}", Modifier.padding(top = 10.dp), style = XType.Caption)
             }
-            Text("使用小伴 AI 额度，按张计费", Modifier.padding(top = 10.dp), style = XType.Caption)
+            val estimate = basePointsPerImage?.takeIf { !gif && it.isFinite() && it > 0 }?.let {
+                val cents = (it * count * 100).roundToLong()
+                if (cents == 0L) "不足 0.01" else "${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
+            }
+            Text(
+                if (estimate == null) "$quota · 按实际用量扣费，暂无点数预估"
+                else "$quota · 基础参考 $estimate 点，按实际用量扣费",
+                Modifier.padding(top = 10.dp), style = XType.Caption,
+            )
             GhostPillButton("生成", { onGenerate(prompt, if (gif) 1 else count, size, if (gif) "gif" else "png", frames.toIntOrNull() ?: 9, duration.toIntOrNull() ?: 200) }, Modifier.fillMaxWidth().padding(top = 10.dp),
                 enabled = prompt.trim().length in 1..4000 && (!gif || (frames.toIntOrNull() in 2..16 && duration.toIntOrNull() in 20..2000)))
         }

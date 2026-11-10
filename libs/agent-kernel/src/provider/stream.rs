@@ -220,6 +220,16 @@ impl StreamAccumulator {
         self.finish_reason.as_deref()
     }
 
+    /// Some gateways omit the empty object for tools that take no arguments.
+    /// Call this only after verifying the transport's tool-call terminator.
+    pub fn fill_empty_tool_arguments(&mut self, is_parameterless: impl Fn(&str) -> bool) {
+        for call in &mut self.calls {
+            if call.arguments.is_empty() && is_parameterless(&call.name) {
+                call.arguments.push_str("{}");
+            }
+        }
+    }
+
     pub fn tool_calls_complete(&self) -> bool {
         let mut ids = std::collections::HashSet::new();
         self.calls.iter().all(|call| {

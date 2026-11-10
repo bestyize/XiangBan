@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -65,6 +66,7 @@ import xyz.xiangban.xiaoban.common.community.SpokenCall
 import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.ChatAttachment
@@ -93,7 +95,7 @@ internal fun quotaText(balance: AiBalance?): String = when {
 
 internal fun CloudChatState.modelName(): String = activeTier?.displayName ?: tiers.firstOrNull()?.displayName ?: "小伴AI"
 
-private fun CloudChatState.title(): String = chatTitle(messages)
+private fun CloudChatState.title(): String = chatTitle(messages, creation)
 
 /** 没登录时的整页提示。 */
 @Composable
@@ -252,11 +254,15 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
                 }
             } else {
+                if (cloud.backgroundImageCount > 0) {
+                    LinkText("${cloud.backgroundImageCount} 个生图任务在其他对话中进行 · 查看对话", { drawer = true },
+                        Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
+                        key(conversation) { CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null) }
                     }
                 }
                 cloud.question?.let { question ->
@@ -272,6 +278,23 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                    if (cloud.planningCreation) {
+                        Text(
+                            when {
+                                cloud.sending -> "正在拟定方案 · 等你确认后才会制作"
+                                cloud.creationPlanReady -> "方案已就绪，可以继续补充需求"
+                                else -> "先生成方案并确认"
+                            },
+                            Modifier.padding(bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (!cloud.sending) {
+                            AppActionButton(
+                                if (cloud.creationPlanReady) "确认方案，开始制作" else "重新生成方案",
+                                if (cloud.creationPlanReady) chat::confirmCreationPlan else chat::requestCreationPlan,
+                                Modifier.fillMaxWidth().padding(bottom = 6.dp), primary = true,
+                            )
+                        }
+                    }
                     cloud.saveError?.let { message ->
                         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(message, Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.error)
@@ -285,10 +308,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                     cloud.inputError?.let { Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 4.dp)) }
                     ChatComposer(
-                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
+                        input, { input = it }, if (cloud.planningCreation) "补充需求或调整方案…" else "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
-                        onPermission = if (cloud.nativeAgentAvailable) ({ permissionSheet = true }) else null,
+                        onPermission = if (cloud.nativeAgentAvailable && !cloud.planningCreation) ({ permissionSheet = true }) else null,
                         fullTrust = cloud.permissionMode == "auto",
                         voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
                         onVoicePress = { if (cloud.sending) chat.stop() },
@@ -360,6 +383,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 initialPrompt = input,
                 sizes = cloud.imageCapability?.sizes.orEmpty(),
                 formats = cloud.imageCapability?.formats.orEmpty(),
+                quota = quotaText(cloud.balance),
+                basePointsPerImage = cloud.imageCapability?.basePointsPerImage,
                 onDismiss = { imageSheet = false },
                 onGenerate = { prompt, count, size, format, frames, duration ->
                     if (chat.generateImages(prompt, count, size, format, frames, duration)) {
@@ -371,29 +396,36 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         }
         preview?.let { image ->
             var referencing by remember(image) { mutableStateOf(false) }
-            ChatImageViewer(image, env.platform, resolveImage, referencing = referencing,
-                onReference = if (image.generated) ({
-                    if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
-                    else {
-                        referencing = true
-                        attachmentScope.launch {
-                            try {
-                                val item = chat.referenceGeneratedImage(conversation, image.data, image.label) { data ->
-                                    env.platform?.prepareGeneratedChatImage(data)
+            fun reference(review: Boolean) {
+                if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
+                else {
+                    referencing = true
+                    attachmentScope.launch {
+                        try {
+                            val item = chat.referenceGeneratedImage(conversation, image.data, image.label) { data ->
+                                env.platform?.prepareGeneratedChatImage(data)
+                            }
+                            if (stillInConversation() && preview == image) {
+                                val next = attachments + item
+                                chat.validateDraftAttachments(next)
+                                attachments = next
+                                if (review) {
+                                    val brief = image.prompt.orEmpty()
+                                    val reviewPrompt = "请按原需求检查这张图的文案、画幅和构图，逐字列出你能辨认的文字、偏差和看不清的部分。\n原需求：$brief"
+                                    input = listOf(input.trim(), reviewPrompt).filter { it.isNotEmpty() }.joinToString("\n\n")
                                 }
-                                if (stillInConversation() && preview == image) {
-                                    val next = attachments + item
-                                    chat.validateDraftAttachments(next)
-                                    attachments = next
-                                    preview = null
-                                    toast = "已添加到输入框"
-                                }
-                            } catch (e: CancellationException) { throw e }
-                            catch (e: Exception) { if (stillInConversation()) toast = e.message ?: "无法引用这张图片" }
-                            finally { referencing = false }
-                        }
+                                preview = null
+                                toast = if (review) "已填入检查要求，发送后开始检查" else "已添加到输入框"
+                            }
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) { if (stillInConversation()) toast = e.message ?: "无法引用这张图片" }
+                        finally { referencing = false }
                     }
-                }) else null,
+                }
+            }
+            ChatImageViewer(image, env.platform, resolveImage, referencing = referencing,
+                onReference = if (image.generated) ({ reference(false) }) else null,
+                onReview = if (image.generated) ({ reference(true) }) else null,
             ) { preview = null }
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
@@ -461,8 +493,23 @@ private fun ChatWelcome() {
 private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
-    val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
-    LaunchedEffect(messages.size, progressMark) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
+    var followLatest by remember { mutableStateOf(true) }
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect {
+            if (it is DragInteraction.Start) followLatest = false
+        }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { !listState.canScrollForward && !listState.isScrollInProgress }.collect {
+            if (it) followLatest = true
+        }
+    }
+    LaunchedEffect(listState, messages.size) {
+        // 图片解码后可能撑高消息，即使这时消息数据已经没有变化。
+        snapshotFlow { followLatest && listState.canScrollForward && !listState.isScrollInProgress }.collect {
+            if (it && messages.isNotEmpty()) listState.requestScrollToItem(messages.size)
+        }
+    }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(messages, key = { it.id }) { turn ->
             if (turn.role == "user") {
@@ -475,6 +522,12 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                 }
             } else {
                 AssistantRow {
+                    if (turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
+                        Text(turn.activity, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    turn.modelLabel?.let { model ->
+                        Text(model, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     AssistantTurnCards(
                         text = turn.text, streaming = turn.streaming, error = if (turn.cancelled) "已取消" else turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
                         waiting = if (turn.streaming) waiting else null, platform = platform, idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
@@ -483,8 +536,11 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                         extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), truncated = turn.truncated,
                             onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
-                    turn.generatedImages.forEachIndexed { index, data ->
-                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true), resolveImage, onPreview)
+                    if (turn.generatedImages.isNotEmpty()) {
+                        val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" && it.imageGeneration }?.text
+                        turn.generatedImages.forEachIndexed { index, data ->
+                            ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true, prompt = brief), resolveImage, onPreview)
+                        }
                     }
                     if (turn.imageJobRecoverable && !sending) LinkText("查回生图结果", { onRecoverImage(turn.id) })
                     if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
@@ -492,6 +548,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                 }
             }
         }
+        item(key = "latest-edge") { Spacer(Modifier.height(1.dp)) }
     }
 }
 

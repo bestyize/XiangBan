@@ -164,14 +164,12 @@ internal fun GamesScreen(
         if (!overlay) featuredPage = null
         else if (!busy && detail != null && panel != "actions") panel = "actions" else close()
     }
-    fun createLocal(prompt: String) {
+    fun createLocal(title: String, brief: String, request: String) {
         if (!session.loggedIn) { open(Route.Login); return }
         if (env.agent == null) { message = "当前安装包不支持手机本地创作，可连接电脑创作。"; return }
-        if (cloud.sending) { message = "先结束当前任务，再开始新作品"; return }
+        if (!chat.startCreation(title, brief, request)) return
         close()
-        chat.clearConversation()
         open(Route.AiChat)
-        chat.send(prompt)
     }
     fun createOnComputer(prompt: String) {
         if (!session.loggedIn) { open(Route.Login); return }
@@ -181,7 +179,9 @@ internal fun GamesScreen(
     fun startCreation() {
         if (createKind in LocalCreationTypes) {
             val work = if (createKind == "小程序") "小程序（kind=app，category 取 tool 或 quiz）" else "离线小游戏（kind=game）"
-            createLocal("帮我设计并制作一个支持手机触控和电脑键鼠的$work。我的想法：${idea.trim()}。先用 app_read_format 读取小伴应用规范，给出简短方案让我确认，确认后按规范制作。")
+            val brief = idea.trim()
+            createLocal(xyz.xiangban.xiaoban.common.community.creationTitle(brief, createKind), brief,
+                "制作支持手机触控和电脑键鼠的$work。需求：$brief")
         } else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
     }
     fun prepare(item: CreationItem? = null) {
@@ -346,7 +346,8 @@ internal fun GamesScreen(
                                     } else panel = "preview"
                                 }
                                 CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy, divider = true) {
-                                    if (entry.owned) createLocal("请先用 app_read_format 读取小伴应用规范，再读取 games/${entry.id} 的作品清单、源码和试玩记录。问我想怎样修改《${entry.name}》，确认后在草稿中修改，保留原有素材和作品类型，最后安装新版。") else prepare(entry)
+                                    if (entry.owned) createLocal("修改《${entry.name}》", "我想修改《${entry.name}》",
+                                        "先询问用户想修改什么，再读取 games/${entry.id} 的清单、源码和试玩记录。在草稿中修改，保留原有素材和作品类型。") else prepare(entry)
                                 }
                                 CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy, divider = true) {
                                     if (entry.game == null) createOnComputer("请在电脑上参考以下想法制作小伴桌面${entry.kind}：${entry.description} 先读取规范并给出方案让我确认。") else panel = "computer"
@@ -417,33 +418,43 @@ internal fun GamesScreen(
             }
         }
         if (creating) CreationSheet({ close() }, panelModifier = Modifier.imePadding()) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
-                }
-                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CreationChips(creationTypes.drop(1), createKind) { createKind = it }
-                val local = createKind in LocalCreationTypes
-                Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
-                    val placeholder = when (createKind) {
-                        "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
-                        "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
-                        else -> "描述你想要的${createKind}，小伴会在电脑上制作"
+            val local = createKind in LocalCreationTypes
+            val blocked = local && !chat.canLeaveForCreation()
+            Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
+                        IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
                     }
-                    if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 110.dp).semantics { contentDescription = "创作想法" }, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
+                    Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CreationChips(creationTypes.drop(1), createKind) { createKind = it }
+                    Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
+                        val placeholder = when (createKind) {
+                            "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
+                            "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
+                            else -> "描述你想要的${createKind}，小伴会在电脑上制作"
+                        }
+                        if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().semantics { contentDescription = "创作想法" }, minLines = 4, maxLines = 8, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
+                    }
+                    val hints = when (createKind) {
+                        "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
+                        "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
+                        else -> DesktopIdeas.filter { it.kind == createKind }.map { it.description }
+                    }
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
+                    }
+                    Text("${idea.length}/2000", Modifier.align(Alignment.End).padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                val hints = when (createKind) {
-                    "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
-                    "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
-                    else -> DesktopIdeas.filter { it.kind == createKind }.map { it.description }
+                val hint = when {
+                    blocked -> "当前还有创作任务正在执行。可以先编辑需求。"
+                    local && cloud.sending -> "图片继续在原对话生成，可以同时开始新作品。"
+                    local -> "先查看并确认方案，再在这台手机上制作。"
+                    else -> "选择已连接电脑后进入对话，作品保存在电脑上。"
                 }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
-                }
-                Text(if (local) "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank())
+                Text(hint, Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && !blocked)
             }
         }
         remixSource?.let { source ->

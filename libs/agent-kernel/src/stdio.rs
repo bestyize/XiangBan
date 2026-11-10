@@ -73,6 +73,7 @@ pub struct StdioBridge {
     next_id: AtomicU64,
     pending: Mutex<Pending>,
     runs: Mutex<HashMap<String, RunInfo>>,
+    max_no_progress_rounds: Option<usize>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -138,6 +139,10 @@ impl Approver for BridgeApprover {
 
 impl StdioBridge {
     pub fn new(out: impl Write + Send + 'static) -> Arc<Self> {
+        Self::with_no_progress_limit(out, None)
+    }
+
+    pub fn with_no_progress_limit(out: impl Write + Send + 'static, max_no_progress_rounds: Option<usize>) -> Arc<Self> {
         Arc::new(Self {
             out: Mutex::new(Box::new(out)),
             broken: AtomicBool::new(false),
@@ -145,6 +150,7 @@ impl StdioBridge {
             next_id: AtomicU64::new(0),
             pending: Mutex::new(Pending::default()),
             runs: Mutex::new(HashMap::new()),
+            max_no_progress_rounds,
         })
     }
 
@@ -356,7 +362,7 @@ impl StdioBridge {
         let thread_id = id.clone();
         let spawned = thread::Builder::new().name(format!("run-{id}")).spawn(move || {
             let mut kernel_run_id = None;
-            let options = crate::RunOptions { max_tool_calls, control: (isolate || max_millis.is_some() || max_tokens.is_some()).then(|| crate::RunControl::limits(max_millis.map(std::time::Duration::from_millis), max_tokens)), ..Default::default() };
+            let options = crate::RunOptions { max_tool_calls, max_no_progress_rounds: bridge.max_no_progress_rounds, control: (isolate || max_millis.is_some() || max_tokens.is_some()).then(|| crate::RunControl::limits(max_millis.map(std::time::Duration::from_millis), max_tokens)), ..Default::default() };
             let mut observe = |record: crate::RunEvent| {
                     kernel_run_id = Some(record.run_id.clone());
                     let sent = if observed { bridge.send(&json!({"type":"run_event", "run":thread_id, "record":record})) }
