@@ -130,7 +130,7 @@ class AgentChatTest {
             } else {
                 sse("""{"choices":[{"index":0,"delta":{"content":"好的，10 分钟后叫你。"},"finish_reason":"stop"}]}""")
             }
-            respond(text, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+            respond(text, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType to listOf("text/event-stream"), "x-xiaoban-stream-terminal-version" to listOf("1")))
         })
         val api = AiGatewayApi(client, CommunityConfig()) { "token" }
         val scheduled = mutableListOf<String>()
@@ -176,7 +176,7 @@ class AgentChatTest {
             } else {
                 sse("""{"choices":[{"index":0,"delta":{"content":"好的，没设。"},"finish_reason":"stop"}]}""")
             }
-            respond(text, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+            respond(text, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType to listOf("text/event-stream"), "x-xiaoban-stream-terminal-version" to listOf("1")))
         })
         val api = AiGatewayApi(client, CommunityConfig()) { "token" }
         val scheduled = mutableListOf<String>()

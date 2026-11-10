@@ -15,6 +15,15 @@ import kotlinx.serialization.json.JsonPrimitive
 interface ReminderScheduler {
     /** 在 [atEpochMs] 提醒用户；通知权限没开等原因设不了就返回 false。 */
     fun schedule(title: String, atEpochMs: Long): Boolean
+    fun scheduleResult(title: String, atEpochMs: Long): ReminderScheduleResult =
+        if (schedule(title, atEpochMs)) ReminderScheduleResult.Scheduled else ReminderScheduleResult.Failed
+}
+
+enum class ReminderScheduleResult(val message: String) {
+    Scheduled("已安排提醒，系统可能延后送达。"),
+    AwaitingPermission("提醒已保存，允许通知后会自动生效，无需重复设置。"),
+    NotificationsDisabled("提醒未设置，请在系统设置中开启小伴通知和提醒渠道。"),
+    Failed("提醒未设置，请检查时间或稍后重试。"),
 }
 
 private const val MAX_REMINDER_MINUTES = 7 * 24 * 60
@@ -41,7 +50,9 @@ class SetReminderTool(private val scheduler: ReminderScheduler, private val now:
         if (minutes == null || minutes < 1 || minutes > MAX_REMINDER_MINUTES) return AgentToolResult(false, "minutes 要在 1 到 $MAX_REMINDER_MINUTES 之间")
         val at = now() + minutes * 60_000
         currentCoroutineContext().ensureActive()
-        return if (scheduler.schedule(title.take(80), at)) AgentToolResult(true, "已设置：$minutes 分钟后提醒“${title.take(80)}”")
-        else AgentToolResult(false, "没能设置提醒，可能是没有开通知权限")
+        val result = scheduler.scheduleResult(title.take(80), at)
+        return if (result == ReminderScheduleResult.Scheduled) {
+            AgentToolResult(true, "已设置 $minutes 分钟后提醒“${title.take(80)}”。系统可能延后送达。")
+        } else AgentToolResult(false, result.message)
     }
 }

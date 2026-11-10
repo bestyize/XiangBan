@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
         private set
     private var sharingPlatform: CommunitySharingPlatform? = null
     private var shortcutJob: Job? = null
+    private lateinit var reminders: AndroidReminders
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -71,10 +73,28 @@ class MainActivity : ComponentActivity() {
         forumPlatform.accept(intent)
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
-        // 小伴要给你设提醒时才会弹出通知权限的请求；没有内核库（本地没编 Rust 库的调试包）就只有纯云端聊天。
-        val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-        val reminders = AndroidReminders(this) {
-            if (Build.VERSION.SDK_INT >= 33) runOnUiThread { notifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        var askingNotifications = false
+        val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            askingNotifications = false
+            lifecycleScope.launch {
+                val (scheduled, failed) = withContext(Dispatchers.IO) { reminders.permissionResult(granted) }
+                val message = when {
+                    scheduled > 0 && failed > 0 -> "已安排 $scheduled 条提醒，另有 $failed 条未能设置"
+                    scheduled > 0 -> "已安排 $scheduled 条提醒，系统可能延后送达"
+                    failed > 0 -> "提醒未设置，请检查小伴通知权限和提醒渠道"
+                    else -> null
+                }
+                message?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
+            }
+        }
+        reminders = AndroidReminders(this) {
+            if (Build.VERSION.SDK_INT >= 33) runOnUiThread {
+                if (!askingNotifications && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    askingNotifications = true
+                    try { notifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                    catch (_: IllegalStateException) { askingNotifications = false }
+                }
+            }
         }
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
@@ -101,6 +121,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) openWorkShortcut(intent)
         hideNavigationBar()
         (application as XiaobanApplication).prefetchSpeechResources()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::reminders.isInitialized) lifecycleScope.launch(Dispatchers.IO) { reminders.restore() }
     }
 
     private fun openWorkShortcut(intent: Intent) {

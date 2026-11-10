@@ -20,6 +20,22 @@ class MobileReliabilityTest {
     }), CommunityConfig()) { "token" }
 
     @Test
+    fun `reminder permission pending is described without claiming an alarm exists`() = runBlocking {
+        val scheduler = object : ReminderScheduler {
+            override fun schedule(title: String, atEpochMs: Long) = error("use the detailed schedule result")
+            override fun scheduleResult(title: String, atEpochMs: Long): ReminderScheduleResult {
+                assertEquals("喝水", title)
+                assertEquals(601_000L, atEpochMs)
+                return ReminderScheduleResult.AwaitingPermission
+            }
+        }
+        val tool = SetReminderTool(scheduler) { 1_000 }
+        val result = tool.run(buildJsonObject { put("title", "喝水"); put("minutes", 10) })
+        assertFalse(result.ok)
+        assertContains(result.output, "允许通知后会自动生效")
+    }
+
+    @Test
     fun `retired tiers and explicit text only capability block unsupported input`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val client = HttpClient(MockEngine { request ->

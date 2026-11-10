@@ -53,7 +53,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.common.community.HomeBanner
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Metric
@@ -61,6 +63,7 @@ import xyz.xiangban.xiaoban.common.community.ModelBoard
 import xyz.xiangban.xiaoban.common.community.NewsItem
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.QuotaInfo
+import xyz.xiangban.xiaoban.common.community.ReminderScheduleResult
 import xyz.xiangban.xiaoban.common.community.RepoIssue
 import xyz.xiangban.xiaoban.common.community.RepoRank
 import xyz.xiangban.xiaoban.common.community.shownDescription
@@ -447,8 +450,11 @@ private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
                     } else Row(
                         Modifier.padding(top = 10.dp).height(34.dp).clip(RoundedCornerShape(17.dp)).background(Brand).clickable {
                             scope.launch {
-                                val ok = env.reminders.schedule("Codex 额度已重置", at)
-                                if (ok) { setRemind(true); note = "重置时会通知你" } else note = "没能设置提醒，请允许小伴发送通知"
+                                val result = withContext(Dispatchers.Default) {
+                                    env.reminders.scheduleResult("Codex 额度已重置", at)
+                                }
+                                if (result == ReminderScheduleResult.Scheduled) setRemind(true)
+                                note = result.message
                             }
                         }.padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
