@@ -110,7 +110,7 @@ class AgentRuntime(
     private val mutationRequests = MutableStateFlow<Set<Pair<Long, String>>>(emptySet())
     private val requestRuns = MutableStateFlow<Map<Pair<Long, String>, String>>(emptyMap())
     private var nextRun = 0L
-    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions())
+    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions(), val account: AiAccountRequest? = null)
     private val activeRuns = MutableStateFlow<Map<String, ActiveRun>>(emptyMap())
 
     private fun line(block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit): String = buildJsonObject(block).toString()
@@ -160,11 +160,12 @@ class AgentRuntime(
     /** 在会话 [session] 里开始一轮；返回这一轮的编号，用来取消。 */
     fun nextRunId(): String = "r${++nextRun}"
 
-    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList(), options: ChatOptions? = null, tier: AiTier? = null, retry: Boolean = false): String {
+    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList(), options: ChatOptions? = null, tier: AiTier? = null, retry: Boolean = false, account: AiAccountRequest? = null): String {
         validateChatAttachments(attachments)
         check(!hasStoppingMutation()) { "上一项本机操作仍在停止，请稍后核对结果再继续" }
         val snapshot = options ?: ChatOptions(tier = currentModel, reasoningByTier = currentReasoning?.let { mapOf(currentModel to it) }.orEmpty())
-        val run = ActiveRun(id, generation, options = snapshot)
+        account?.checkCurrent()
+        val run = ActiveRun(id, generation, options = snapshot, account = account)
         activeRuns.update {
             check(session !in it) { "上一轮仍在停止，请稍后重试" }
             it + (session to run)
@@ -349,9 +350,14 @@ class AgentRuntime(
                 request(id, epoch, requestScope, running?.id) {
                     val result = try {
                         if (running == null || pendingRun(obj["session"].str().orEmpty(), epoch)?.id != running.id) throw CancellationException("run cancelled")
-                        model(body) { l -> sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) }) }
+                        withContext(running.account ?: kotlin.coroutines.EmptyCoroutineContext) {
+                            running.account?.checkCurrent()
+                            model(body) { l -> sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) }) }
+                        }
                     } catch (e: CancellationException) {
                         throw e
+                    } catch (e: ApiException) {
+                        ModelResult(e.status, error = e.message)
                     } catch (e: Exception) {
                         ModelResult(0, error = e.message ?: "请求失败")
                     }
@@ -382,8 +388,11 @@ class AgentRuntime(
                     val result = try {
                         currentCoroutineContext().ensureActive()
                         if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
-                        entered = true
-                        tool?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")
+                        withContext(running.account ?: kotlin.coroutines.EmptyCoroutineContext) {
+                            running.account?.checkCurrent()
+                            entered = true
+                            tool?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")
+                        }
                     } catch (e: CancellationException) {
                         withContext(NonCancellable) {
                             sendFor(h, epoch, line {

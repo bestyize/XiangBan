@@ -180,16 +180,39 @@ private const val MAX_REDEEM_CODE_LEN = 64
  * - `POST /api/ai/redeem`：兑换码充值
  * - `POST /v1/chat/completions`：流式对话（SSE），同时兼容非流式 JSON 响应
  */
+class AiAccountRequest internal constructor(
+    internal val identity: SessionIdentity?,
+    private val current: () -> Boolean,
+) : kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+    companion object Key : kotlin.coroutines.CoroutineContext.Key<AiAccountRequest>
+    fun isCurrent(): Boolean = current()
+    fun checkCurrent() {
+        if (!isCurrent()) throw ApiException(401, "账号已切换，请重新发起请求", "account_changed")
+    }
+}
+
 class AiGatewayApi(
     private val client: HttpClient,
     config: CommunityConfig = CommunityConfig(),
+    private val sessions: SessionManager? = null,
     private val tokenProvider: suspend () -> String?,
 ) {
     private val base = config.aiBase.trimEnd('/')
     private val http = JsonHttp(client, base)
 
-    private suspend fun requireToken(): String =
-        tokenProvider() ?: throw ApiException(401, "请先登录小伴账号", "unauthorized")
+    internal fun bindAccount(account: String?, current: () -> Boolean): AiAccountRequest {
+        val owner = sessions?.identity()?.takeIf { it.accountId == account }
+        return AiAccountRequest(owner) { current() && (sessions == null || owner != null && sessions.identity() == owner) }
+    }
+
+    private suspend fun requireToken(): String {
+        val request = kotlinx.coroutines.currentCoroutineContext()[AiAccountRequest]
+        request?.checkCurrent()
+        val owner = request?.identity ?: sessions?.identity()
+        val token = if (sessions != null && owner != null) sessions.accessToken(owner) else tokenProvider()
+        request?.checkCurrent()
+        return token ?: throw ApiException(401, "请先登录小伴账号", "unauthorized")
+    }
 
     suspend fun tiers(): List<AiTier> = capabilities().tiers
 
@@ -652,6 +675,16 @@ class CloudChatController(
     private var metaJob: Job? = null
     private var chatJob: Job? = null
     private var sendEpoch = 0L
+    @kotlin.concurrent.Volatile private var accountGeneration = 0L
+    private var accountId: String? = null
+    private var balanceJob: Job? = null
+    private var redeemJob: Job? = null
+    private var runAuthorization: AiAccountRequest? = null
+
+    private fun accountRequest(): AiAccountRequest {
+        val generation = accountGeneration
+        return api.bindAccount(accountId) { generation == accountGeneration }
+    }
     private var agentSession = newSessionId()
         set(value) { field = value; _state.value = _state.value.copy(conversationId = value) }
     private var agentRun: String? = null
@@ -666,12 +699,17 @@ class CloudChatController(
 
     /** 换到某个账号（登录后、换号后调用）：读出这个账号存下的对话列表，当前对话从头开始。 */
     fun useAccount(account: String?) {
+        ++accountGeneration
         metaJob?.cancel()
+        balanceJob?.cancel()
+        redeemJob?.cancel()
         // Stop and save under the OLD account before changing the storage namespace.
         clearConversation()
         stoppingRuns.clear()
+        accountId = account
+        runAuthorization = null
         val list = history?.useAccount(account) ?: emptyList()
-        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -752,13 +790,15 @@ class CloudChatController(
     fun loadMeta() {
         metaJob?.cancel()
         _state.value = _state.value.copy(loadingMeta = true, metaError = null)
-        metaJob = scope.launch {
+        val request = accountRequest()
+        metaJob = scope.launch(request) {
             try {
                 coroutineScope {
                     val balanceDeferred = async { runCatching { api.balance() } }
                     val tiersDeferred = async { runCatching { api.capabilities() } }
                     val balanceRes = balanceDeferred.await()
                     val tiersRes = tiersDeferred.await()
+                    if (!request.isCurrent()) return@coroutineScope
                     val current = _state.value
                     val nextTiers = tiersRes.getOrNull()?.tiers ?: current.tiers
                     val nextBalance = balanceRes.getOrNull() ?: current.balance
@@ -776,7 +816,7 @@ class CloudChatController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.value = _state.value.copy(loadingMeta = false, metaError = messageOf(e))
+                if (request.isCurrent()) _state.value = _state.value.copy(loadingMeta = false, metaError = messageOf(e))
             }
         }
     }
@@ -818,12 +858,13 @@ class CloudChatController(
         val reply = ChatTurn(replyId, "assistant", "", streaming = true, imageGeneration = true, activity = "正在生成图片…")
         val epoch = ++sendEpoch
         val ownerSession = agentSession
+        val request = accountRequest()
         _state.value = current.copy(messages = current.messages + userTurn + reply, sending = true)
         persist()
-        chatJob = scope.launch {
+        chatJob = scope.launch(request) {
             try {
                 val images = api.generateImages(prompt, count, size, format, frames, frameDurationMs)
-                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) {
                     val text = if (images.size == count) "已生成 ${images.size} 张图片"
                     else "已收到 ${images.size} / $count 张图片，请核对结果后再生成。"
@@ -832,7 +873,7 @@ class CloudChatController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
             }
             _state.value = _state.value.copy(sending = false)
@@ -862,6 +903,7 @@ class CloudChatController(
         }
         val epoch = ++sendEpoch
         val ownerSession = agentSession
+        val request = accountRequest()
         val tier = _state.value.selectedTier.ifEmpty { null }
         val reasoning = _state.value.reasoningByTier[tier]?.takeIf { it in _state.value.activeTier?.reasoningEfforts.orEmpty() }
         _state.value = _state.value.copy(
@@ -876,18 +918,20 @@ class CloudChatController(
             val tierSnapshot = _state.value.activeTier
             agentReplyId = replyId
             val session = agentSession
-            chatJob = scope.launch {
+            chatJob = scope.launch(request) {
                 try {
                     agent.ensureStarted(tier ?: "", reasoning)
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
+                    request.checkCurrent()
                     val runId = agent.nextRunId()
+                    runAuthorization = request
                     agentRun = runId
-                    agent.run(session, note + prompt, runId, attachments, snapshot, tierSnapshot, retry = nativeRetry)
+                    agent.run(session, note + prompt, runId, attachments, snapshot, tierSnapshot, retry = nativeRetry, account = request)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                    if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                     updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true) }
                     agentRun = null
                     _state.value = _state.value.copy(sending = false, approval = null, question = null)
@@ -896,23 +940,23 @@ class CloudChatController(
             }
             return
         }
-        chatJob = scope.launch {
+        chatJob = scope.launch(request) {
             try {
                 api.streamChat(history, tier, reasoning, _state.value.activeTier?.contextWindowTokens?.let { minOf(it, _state.value.contextTokens) } ?: _state.value.contextTokens) { delta ->
-                    if (epoch == sendEpoch && ownerSession == agentSession) updateTurn(replyId) { it.copy(text = it.text + delta) }
+                    if (request.isCurrent() && epoch == sendEpoch && ownerSession == agentSession) updateTurn(replyId) { it.copy(text = it.text + delta) }
                 }
-                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) { it.copy(streaming = false) }
                 _state.value = _state.value.copy(sending = false)
                 persist()
                 refreshBalanceQuietly()
             } catch (e: CancellationException) {
-                if (epoch != sendEpoch || ownerSession != agentSession) throw e
+                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) throw e
                 updateTurn(replyId) { it.copy(streaming = false) }
                 _state.value = _state.value.copy(sending = false)
                 throw e
             } catch (e: Exception) {
-                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
                 _state.value = _state.value.copy(sending = false)
                 persist()
@@ -1010,6 +1054,7 @@ class CloudChatController(
         tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (failed) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it }
 
     private fun onAgentEvent(event: AgentEvent) {
+        if (runAuthorization?.isCurrent() == false) return
         if (event is AgentEvent.ToolEnd && event.run != agentRun) {
             stoppingRuns[event.run]?.let { stopped ->
                 fun update(turn: ChatTurn) = turn.copy(tools = turn.tools.map { if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it })
@@ -1100,9 +1145,11 @@ class CloudChatController(
         val code = rawCode.trim()
         if (code.isEmpty() || _state.value.redeeming) return
         _state.value = _state.value.copy(redeeming = true, redeemError = null, redeemMessage = null)
-        scope.launch {
+        val request = accountRequest()
+        redeemJob = scope.launch(request) {
             try {
                 val done = api.redeem(code)
+                if (!request.isCurrent()) return@launch
                 val unit = _state.value.balance?.quotaPerUnit ?: 500_000
                 _state.value = _state.value.copy(
                     redeeming = false,
@@ -1112,13 +1159,16 @@ class CloudChatController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.value = _state.value.copy(redeeming = false, redeemError = messageOf(e))
+                if (request.isCurrent()) _state.value = _state.value.copy(redeeming = false, redeemError = messageOf(e))
             }
         }
     }
 
     fun reset() {
+        ++accountGeneration
         metaJob?.cancel()
+        balanceJob?.cancel()
+        redeemJob?.cancel()
         chatJob?.cancel()
         agentRun?.let { agent?.cancel(it) }
         agentRun = null
@@ -1133,9 +1183,11 @@ class CloudChatController(
     }
 
     private fun refreshBalanceQuietly() {
-        scope.launch {
+        balanceJob?.cancel()
+        val request = accountRequest()
+        balanceJob = scope.launch(request) {
             runCatching { api.balance() }.onSuccess { b ->
-                _state.value = _state.value.copy(balance = b)
+                if (request.isCurrent()) _state.value = _state.value.copy(balance = b)
             }
         }
     }

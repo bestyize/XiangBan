@@ -184,7 +184,7 @@ class CommunityEnv(
     val contentSocial = xyz.xiangban.xiaoban.common.community.ContentSocialApi(client, config) { session.accessToken() }
     val social = xyz.xiangban.xiaoban.common.community.SocialApi(client, config) { session.accessToken() }
     val challenges = xyz.xiangban.xiaoban.common.community.ChallengesApi(client, config) { session.accessToken() }
-    val ai = AiGatewayApi(client, config) { session.accessToken() }
+    val ai = AiGatewayApi(client, config, session) { session.accessToken() }
 
     val games: MobileGameStore? = workspace?.let(::MobileGameStore)
 

@@ -20,6 +20,47 @@ class MobileReliabilityTest {
     }), CommunityConfig()) { "token" }
 
     @Test
+    fun `a late quiet balance response cannot replace the new accounts balance`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var token = "A"
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/api/ai/balance" -> {
+                    if (request.headers[HttpHeaders.Authorization] == "Bearer A") {
+                        started.complete(Unit)
+                        withContext(NonCancellable) { release.await() }
+                        respond("""{"total":111}""")
+                    } else respond("""{"total":222}""")
+                }
+                "/api/ai/tiers" -> respond("""{"tiers":[]}""")
+                else -> respond(
+                    """data: {"choices":[{"delta":{"content":"ok"}}]}""" + "\n\ndata: [DONE]\n",
+                    headers = headersOf(HttpHeaders.ContentType, "text/event-stream"),
+                )
+            }
+        })
+        try {
+            val chat = CloudChatController(AiGatewayApi(client) { token }, scope)
+            chat.useAccount("A")
+            chat.send("balance")
+            withTimeout(5_000) { started.await() }
+            token = "B"
+            chat.useAccount("B")
+            chat.loadMeta()
+            await { chat.state.value.balance?.total == 222L }
+            release.complete(Unit)
+            delay(30)
+            assertEquals(222L, chat.state.value.balance?.total)
+        } finally {
+            release.complete(Unit)
+            scope.cancel()
+            client.close()
+        }
+    }
+
+    @Test
     fun `model permission reasoning and budgets belong to each saved conversation`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val files = InMemoryChatHistoryFiles()
