@@ -194,8 +194,9 @@ internal object QuickLaunchShortcut {
         // A verified home deep link can open the actual home tab rather than
         // restoring the app's last screen. It is always package-constrained.
         // If an update removes the route, the system launcher still works.
-        if (target.homepage != null && target.packages.isNotEmpty()) {
-            val home = Intent(Intent.ACTION_VIEW, Uri.parse(target.homepage))
+        val homepage = target.homepage
+        if (homepage != null && target.packages.isNotEmpty()) {
+            val home = Intent(Intent.ACTION_VIEW, Uri.parse(homepage))
                 .setPackage(target.packages.first())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val supported = runCatching { home.resolveActivity(activity.packageManager) != null }.getOrDefault(false)
