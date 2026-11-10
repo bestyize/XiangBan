@@ -196,10 +196,13 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     var imageSheet by remember(cloud.conversationId) { mutableStateOf(false) }
-    var preview by remember(cloud.conversationId, session.accountId) { mutableStateOf<ChatImagePreview?>(null) }
-    val resolveImage = remember(chat, cloud.conversationId, session.accountId) {
-        val conversation = cloud.conversationId
+    var preview by remember(conversation, accountGeneration) { mutableStateOf<ChatImagePreview?>(null) }
+    val resolveImage = remember(chat, conversation, accountGeneration) {
         val resolve: suspend (String) -> String? = { value -> chat.resolveImage(conversation, value) }
+        resolve
+    }
+    val resolveThumbnail = remember(chat, conversation, accountGeneration) {
+        val resolve: suspend (String) -> String? = { value -> chat.resolveImage(conversation, value, thumbnail = true) }
         resolve
     }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -253,7 +256,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform, resolveImage, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
                     }
                 }
                 cloud.question?.let { question ->

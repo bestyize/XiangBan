@@ -24,6 +24,7 @@ interface ChatHistoryFiles {
     fun delete(name: String)
     val backgroundReads: Boolean get() = false
     fun readMedia(name: String): ByteArray? = read(name)?.let(Base64::decode)
+    fun readMediaThumbnail(name: String): ByteArray? = null
     fun writeMedia(name: String, bytes: ByteArray) = write(name, Base64.encode(bytes))
     fun hasMedia(name: String): Boolean = read(name) != null
     fun deleteTree(name: String) = delete(name)
@@ -222,8 +223,14 @@ class ChatHistory(
         val saved = withContext(Dispatchers.Default) {
             io.withLock {
                 readSnapshot(owner, id)?.let { snapshot ->
-                    try { snapshot.copy(messages = snapshot.messages.map(media::compact)) }
-                    catch (_: Exception) { snapshot } // An old inline record remains readable if storage is full.
+                    try {
+                        val compacted = snapshot.copy(messages = snapshot.messages.map(media::compact))
+                        val name = "$owner/$id.json"
+                        if (compacted != snapshot && pending.value[name] == null && files.read(files.deletionMarker(owner, id)) == null) {
+                            files.write(name, CommunityJson.encodeToString(compacted))
+                        }
+                        compacted
+                    } catch (_: Exception) { snapshot } // An old inline record remains readable if storage is full.
                 }
             }
         }

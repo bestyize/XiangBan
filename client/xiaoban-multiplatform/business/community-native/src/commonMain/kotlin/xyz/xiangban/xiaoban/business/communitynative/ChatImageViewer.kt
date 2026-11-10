@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -48,11 +49,14 @@ import com.multiplatform.webview.web.WebViewState
 
 internal data class ChatImagePreview(val data: String, val label: String, val generated: Boolean = false)
 
+private data class ResolvedImage(val data: String? = null, val loading: Boolean = true)
+
 @Composable
-private fun resolvedChatImage(image: ChatImagePreview, resolve: suspend (String) -> String?): String? {
-    val source by produceState<String?>(null, image.data, resolve) { value = resolve(image.data) }
-    return source
-}
+private fun resolvedChatImage(image: ChatImagePreview, resolve: suspend (String) -> String?): ResolvedImage =
+    key(image, resolve) {
+        val source by produceState(ResolvedImage()) { value = ResolvedImage(resolve(image.data), loading = false) }
+        source
+    }
 
 /** The native WebView renders the original GIF on Android and iOS, without scripts or network access. */
 @Composable
@@ -72,18 +76,18 @@ private fun AnimatedChatImage(data: String, modifier: Modifier) {
 }
 
 @Composable
-private fun chatImageBytes(data: String?): ByteArray? {
-    val bytes by produceState<ByteArray?>(null, data) {
+private fun chatImageBytes(data: String?): ByteArray? = key(data) {
+    val bytes by produceState<ByteArray?>(null) {
         value = data?.let { encoded -> withContext(Dispatchers.Default) {
             runCatching { Base64.decode(encoded.substringAfter(";base64,")) }.getOrNull()
         } }
     }
-    return bytes
+    bytes
 }
 
 @Composable
 internal fun ChatImageThumbnail(image: ChatImagePreview, resolve: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit) {
-    val data = resolvedChatImage(image, resolve)
+    val data = resolvedChatImage(image, resolve).data
     if (data?.startsWith("data:image/gif;base64,") == true) {
         Box(Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 260.dp).clip(RoundedCornerShape(12.dp))) {
             AnimatedChatImage(data, Modifier.matchParentSize())
@@ -112,7 +116,8 @@ internal fun ChatImageViewer(
     referencing: Boolean = false,
     onClose: () -> Unit,
 ) {
-    val data = resolvedChatImage(image, resolve)
+    val sourceImage = resolvedChatImage(image, resolve)
+    val data = sourceImage.data
     val bytes = chatImageBytes(data)
     val scope = rememberCoroutineScope()
     var zoom by remember(image) { mutableStateOf(1f) }
@@ -149,7 +154,7 @@ internal fun ChatImageViewer(
                 contentScale = ContentScale.Fit, onError = { failed = bytes != null }, onSuccess = { failed = false },
                 modifier = imageModifier,
             )
-            if (failed) Text("无法读取图片", Modifier.align(Alignment.Center), color = Color.White)
+            if (failed || !sourceImage.loading && data == null) Text("无法读取图片", Modifier.align(Alignment.Center), color = Color.White)
             Row(
                 Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,

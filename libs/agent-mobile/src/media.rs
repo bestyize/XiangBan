@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const REF_PREFIX: &str = "xiaoban-attachment:";
 const MAX_IMAGE_BYTES: u64 = 2_800_000;
+const MAX_SESSION_MEDIA_BYTES: u64 = 128 * 1024 * 1024;
 static NEXT_IMAGE: AtomicU64 = AtomicU64::new(0);
 
 fn directory(root: &Path, session: &str) -> Result<PathBuf, HarnessError> {
@@ -24,14 +25,24 @@ fn storage_error(error: std::io::Error) -> HarnessError {
 }
 
 pub fn compact(root: &Path, session: &str, messages: &mut [Message]) -> Result<(), HarnessError> {
+    let directory = directory(root, session)?;
+    fs::create_dir_all(&directory).map_err(storage_error)?;
+    let stored = fs::read_dir(&directory).map_err(storage_error)?
+        .filter_map(Result::ok).filter_map(|entry| entry.metadata().ok())
+        .filter(|meta| meta.is_file()).map(|meta| meta.len()).sum::<u64>();
+    let additional = messages.iter().flat_map(|message| &message.parts).filter_map(|part| match part {
+        Part::Image { url } if url.starts_with("data:image/") => Some(url.len() as u64),
+        _ => None,
+    }).sum::<u64>();
+    if stored.saturating_add(additional) > MAX_SESSION_MEDIA_BYTES {
+        return Err(HarnessError::Store("此对话的图片存储已达上限，请使用新对话。".into()));
+    }
     for part in messages.iter_mut().flat_map(|message| &mut message.parts) {
         let Part::Image { url } = part else { continue };
         if !url.starts_with("data:image/") { continue; }
         if url.len() as u64 > MAX_IMAGE_BYTES {
             return Err(HarnessError::Store("对话图片超过大小上限".into()));
         }
-        let directory = directory(root, session)?;
-        fs::create_dir_all(&directory).map_err(storage_error)?;
         let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         let name = format!("{time:x}-{:x}-{:x}", std::process::id(), NEXT_IMAGE.fetch_add(1, Ordering::Relaxed));
         let temp = directory.join(format!("{name}.tmp"));

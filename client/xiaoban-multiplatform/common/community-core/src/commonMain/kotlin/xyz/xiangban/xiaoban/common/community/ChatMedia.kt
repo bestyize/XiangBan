@@ -8,7 +8,7 @@ import kotlin.io.encoding.Base64
 
 internal fun isChatMediaReference(value: String): Boolean = CHAT_MEDIA_REFERENCE.matches(value)
 
-private val CHAT_MEDIA_REFERENCE = Regex("media:[a-f0-9]{64}\\.(png|jpeg|webp|gif)")
+private val CHAT_MEDIA_REFERENCE = Regex("media:[a-f0-9]{64}\\.(png|jpeg|webp|gif)(:[1-9][0-9]{0,7})?")
 private const val MAX_CHAT_MEDIA_BYTES = 16 * 1024 * 1024
 
 /** A reference is relative to one account and conversation. Only data URLs leave this store. */
@@ -18,16 +18,17 @@ internal class ChatMedia(
     private val owner: String,
     private val id: String,
 ) {
-    private fun path(reference: String) = "$owner/media/$id/" + reference.removePrefix("media:")
+    private fun fileName(reference: String) = reference.removePrefix("media:").substringBefore(':')
+    private fun path(reference: String) = "$owner/media/$id/" + fileName(reference)
 
     private fun store(data: String): String {
         val mime = data.substringBefore(',').removePrefix("data:").removeSuffix(";base64")
         val format = mime.removePrefix("image/")
         if (format !in listOf("png", "jpeg", "webp", "gif") || !data.startsWith("data:$mime;base64,")) return data
         require(data.length <= 23_000_000) { "图片过大，无法保存" }
-        val bytes = Base64.decode(data.substringAfter(','))
+        val bytes = runCatching { Base64.decode(data.substringAfter(',')) }.getOrNull() ?: return data
         require(bytes.size in 1..MAX_CHAT_MEDIA_BYTES) { "图片过大或内容无效" }
-        val reference = "media:" + Sha256().apply { update(bytes) }.hex() + ".$format"
+        val reference = "media:" + Sha256().apply { update(bytes) }.hex() + ".$format:${bytes.size}"
         val name = path(reference)
         if (!files.hasMedia(name)) files.writeMedia(name, bytes)
         return reference
@@ -45,13 +46,17 @@ internal class ChatMedia(
         }
     }
 
-    suspend fun resolve(data: String): String? {
+    suspend fun resolve(data: String, thumbnail: Boolean = false): String? {
         if (!isChatMediaReference(data)) return data.takeIf { it.startsWith("data:image/") }
         return withContext(Dispatchers.Default) {
             io.withLock {
                 if (files.read(files.deletionMarker(owner, id)) != null) return@withLock null
-                val bytes = files.readMedia(path(data))?.takeIf { it.size in 1..MAX_CHAT_MEDIA_BYTES } ?: return@withLock null
-                "data:image/" + data.substringAfterLast('.') + ";base64," + Base64.encode(bytes)
+                val name = path(data)
+                if (thumbnail) files.readMediaThumbnail(name)?.let { return@withLock "data:image/jpeg;base64," + Base64.encode(it) }
+                val bytes = files.readMedia(name)?.takeIf { it.size in 1..MAX_CHAT_MEDIA_BYTES } ?: return@withLock null
+                val expected = data.substringAfterLast(':').toIntOrNull()
+                if (expected != null && expected != bytes.size) return@withLock null
+                "data:image/" + fileName(data).substringAfterLast('.') + ";base64," + Base64.encode(bytes)
             }
         }
     }

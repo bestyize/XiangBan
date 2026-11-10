@@ -829,11 +829,11 @@ class CloudChatController(
         _state.value = _state.value.copy(messages = saved.messages, approval = null, question = null, inputError = modelInputError(emptyList()))
     }
 
-    suspend fun resolveImage(conversation: String, value: String): String? {
+    suspend fun resolveImage(conversation: String, value: String, thumbnail: Boolean = false): String? {
         if (conversation != agentSession) return null
         val generation = accountGeneration
         val source = try {
-            if (isChatMediaReference(value)) history?.mediaFor(conversation)?.resolve(value)
+            if (isChatMediaReference(value)) history?.mediaFor(conversation)?.resolve(value, thumbnail)
             else value.takeIf { it.startsWith("data:image/") }
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { null }
