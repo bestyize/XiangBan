@@ -64,6 +64,7 @@ data class AiTier(
     @SerialName("reasoning_efforts") val reasoningEfforts: List<String> = emptyList(),
     @SerialName("context_window_tokens") val contextWindowTokens: Int? = null,
     @SerialName("supports_tools") val supportsTools: Boolean? = null,
+    @SerialName("supports_vision") val supportsVision: Boolean? = null,
     @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
 )
 
@@ -603,6 +604,7 @@ data class CloudChatState(
     val nativeAgentAvailable: Boolean = false,
     val loadingMeta: Boolean = false,
     val metaError: String? = null,
+    val inputError: String? = null,
     val messages: List<ChatTurn> = emptyList(),
     val sending: Boolean = false,
     val redeeming: Boolean = false,
@@ -725,7 +727,7 @@ class CloudChatController(
         agentRun = null
         nextId = (saved.messages.maxOfOrNull { it.id } ?: 0L) + 1
         applyOptions(saved.options)
-        _state.value = _state.value.copy(messages = saved.messages, approval = null, question = null)
+        _state.value = _state.value.copy(messages = saved.messages, approval = null, question = null, inputError = modelInputError(emptyList()))
     }
 
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
@@ -807,11 +809,13 @@ class CloudChatController(
                     _state.value = current.copy(
                         tiers = nextTiers,
                         media = tiersRes.getOrNull()?.media ?: current.media,
-                        selectedTier = pickAiTier(nextTiers, current.selectedTier),
+                        selectedTier = current.selectedTier.ifBlank { pickAiTier(nextTiers, "") },
                         balance = nextBalance,
                         loadingMeta = false,
                         metaError = if (balanceRes.isFailure && tiersRes.isFailure && err != null) messageOf(err) else null,
                     )
+                    val inputError = modelInputError(emptyList())
+                    if (inputError != null) _state.value = _state.value.copy(inputError = inputError)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -826,7 +830,7 @@ class CloudChatController(
         if (!found.available || _state.value.sending) return
         if (effort != null && effort !in found.reasoningEfforts) return
         val choices = _state.value.reasoningByTier - tier
-        _state.value = _state.value.copy(selectedTier = tier,
+        _state.value = _state.value.copy(selectedTier = tier, inputError = null,
             reasoningByTier = if (effort == null) choices else choices + (tier to effort))
         persist()
     }
@@ -835,11 +839,11 @@ class CloudChatController(
         if (_state.value.sending) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
-        _state.value = _state.value.copy(selectedTier = tier)
+        _state.value = _state.value.copy(selectedTier = tier, inputError = null)
         persist()
     }
 
-    fun send(rawPrompt: String) = sendPrompt(rawPrompt, "")
+    fun send(rawPrompt: String) { sendPrompt(rawPrompt, "") }
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
 
@@ -883,11 +887,27 @@ class CloudChatController(
         return true
     }
 
-    fun sendVoice(rawPrompt: String, note: String) = sendPrompt(rawPrompt, note)
+    fun sendVoice(rawPrompt: String, note: String) { sendPrompt(rawPrompt, note) }
 
-    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false) {
+    private fun modelInputError(attachments: List<ChatAttachment>): String? {
+        val state = _state.value
+        val tier = state.activeTier
+        return when {
+            state.selectedTier.isNotBlank() && state.tiers.isNotEmpty() && tier == null -> "历史模型已下架，请选择可用模型后发送。"
+            tier?.available == false -> "当前档位不可用，请检查点数或选择其他模型。"
+            tier?.supportsVision == false && attachments.any { it.imageDataUrl != null } ->
+                "当前模型不支持图片，请选择支持图片的模型。"
+            else -> null
+        }
+    }
+
+    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false): Boolean {
         val prompt = rawPrompt.trim().ifEmpty { if (attachments.isNotEmpty()) "请查看附件。" else "" }
-        if (prompt.isEmpty() || _state.value.sending) return
+        if (prompt.isEmpty() || _state.value.sending) return false
+        modelInputError(attachments)?.let { error ->
+            _state.value = _state.value.copy(inputError = error)
+            return false
+        }
         validateChatAttachments(attachments)
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments)
         val replyId = nextId++
@@ -896,7 +916,10 @@ class CloudChatController(
             if (systemPrompt.isNotBlank()) add(ChatMessage("system", systemPrompt))
             for (turn in _state.value.messages) {
                 if (turn.error == null && turn.text.isNotBlank()) {
-                    add(ChatMessage(turn.role, turn.text, turn.attachments))
+                    val pastAttachments = if (_state.value.activeTier?.supportsVision == false) {
+                        turn.attachments.filter { it.imageDataUrl == null }
+                    } else turn.attachments
+                    add(ChatMessage(turn.role, turn.text, pastAttachments))
                 }
             }
             add(ChatMessage("user", note + prompt, attachments))
@@ -909,12 +932,13 @@ class CloudChatController(
         _state.value = _state.value.copy(
             messages = _state.value.messages + (if (nativeRetry || reuseUser) emptyList() else listOf(userTurn)) + assistantTurn,
             sending = true,
+            inputError = null,
             approval = null,
             question = null,
         )
         persist()
         if (agent != null) {
-            val snapshot = options()
+            val snapshot = options().copy(reasoningByTier = reasoning?.let { mapOf(tier.orEmpty() to it) }.orEmpty())
             val tierSnapshot = _state.value.activeTier
             agentReplyId = replyId
             val session = agentSession
@@ -938,7 +962,7 @@ class CloudChatController(
                     persist()
                 }
             }
-            return
+            return true
         }
         chatJob = scope.launch(request) {
             try {
@@ -965,6 +989,7 @@ class CloudChatController(
                 }
             }
         }
+        return true
     }
 
     /** 上一条回复失败时，原样重试最后一条用户提问。 */
@@ -981,6 +1006,10 @@ class CloudChatController(
         val index = current.messages.indexOfLast { it.role == "user" }
         if (index < 0) return
         val turn = current.messages[index]
+        modelInputError(turn.attachments)?.let {
+            _state.value = current.copy(inputError = it)
+            return
+        }
         val last = current.messages.lastOrNull() ?: return
         if (turn.imageGeneration || last.imageGeneration) return
         if (agent != null) {
@@ -1022,7 +1051,7 @@ class CloudChatController(
         agentSession = newSessionId()
         agentRun = null
         applyOptions(ChatOptions(tier = pickAiTier(_state.value.tiers, "")))
-        _state.value = _state.value.copy(messages = emptyList(), approval = null, question = null)
+        _state.value = _state.value.copy(messages = emptyList(), approval = null, question = null, inputError = null)
     }
 
     /** 回答智能体的确认：`once` 允许这一次，`deny` 拒绝。 */

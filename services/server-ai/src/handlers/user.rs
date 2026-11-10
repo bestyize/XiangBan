@@ -35,6 +35,7 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
     let items: Vec<Value> = tiers
         .iter()
         .map(|t| {
+            let capabilities = t.capabilities.as_ref().map(|value| &value.0);
             json!({
                 "tier": t.tier,
                 "display_name": t.display_name,
@@ -44,6 +45,10 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
                 "chat_protocol": web_chat_protocol(&t.model),
                 "available": !t.requires_paid || paid,
                 "reasoning_efforts": crate::reasoning::levels(&t.model, t.reasoning_efforts.as_deref()),
+                "context_window_tokens": capabilities.and_then(|cap| cap.context_window_tokens),
+                "max_output_tokens": capabilities.and_then(|cap| cap.max_output_tokens),
+                "supports_tools": capabilities.and_then(|cap| cap.supports_tools),
+                "supports_vision": capabilities.and_then(|cap| cap.supports_vision),
             })
         })
         .collect();

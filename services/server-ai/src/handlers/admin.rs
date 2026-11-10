@@ -317,6 +317,7 @@ pub async fn list_tiers(State(state): State<AppState>, _admin: AuthAdmin, Path(p
 
 #[derive(Deserialize)]
 pub struct TierReq {
+    capabilities: Option<products::TierCapabilities>,
     #[serde(default)]
     reasoning_efforts: Option<Vec<String>>,
     display_name: String,
@@ -340,6 +341,9 @@ pub async fn upsert_tier(
     }
     if req.reasoning_efforts.as_ref().is_some_and(|v| !crate::reasoning::valid(v)) {
         return Err(AppError::BadRequest("思考等级必须是不重复的 low、medium、high、xhigh、max".into()));
+    }
+    if req.capabilities.as_ref().is_some_and(|capabilities| !capabilities.valid()) {
+        return Err(AppError::BadRequest("模型能力的上下文或输出上限无效".into()));
     }
     let display_name = req.display_name.trim().to_string();
     if display_name.is_empty() || display_name.chars().count() > 20 {
@@ -367,10 +371,12 @@ pub async fn upsert_tier(
             .await?;
     }
     sqlx::query(
-        "INSERT INTO product_tiers (product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "INSERT INTO product_tiers (product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts, capabilities)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (product_id, tier) DO UPDATE SET display_name = $3, description = $4, model = $5,
-             requires_paid = $6, is_default = $7, sort_order = $8, enabled = $9, reasoning_efforts = $10, updated_at = now()",
+             requires_paid = $6, is_default = $7, sort_order = $8, enabled = $9, reasoning_efforts = $10,
+             capabilities = CASE WHEN product_tiers.model = $5 THEN COALESCE($11, product_tiers.capabilities) ELSE $11 END,
+             updated_at = now()",
     )
     .bind(&product_id)
     .bind(&tier)
@@ -382,6 +388,7 @@ pub async fn upsert_tier(
     .bind(req.sort_order)
     .bind(req.enabled)
     .bind(&req.reasoning_efforts)
+    .bind(req.capabilities.map(sqlx::types::Json))
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;

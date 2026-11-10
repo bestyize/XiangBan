@@ -209,6 +209,7 @@ class AgentRuntime(
                 tier?.contextWindowTokens?.takeIf { it > 0 }?.let { put("model_window", it) }
                 tier?.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
                 put("supports_tools", tier?.supportsTools ?: true)
+                put("supports_vision", tier?.supportsVision ?: true)
                 options.budget.maxTurns?.let { put("max_turns", it) }
                 put("permission", options.permissionMode)
                 put("grants", JsonArray(options.grants.map(::JsonPrimitive)))

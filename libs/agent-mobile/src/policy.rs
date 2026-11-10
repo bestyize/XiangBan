@@ -13,6 +13,7 @@ pub struct SessionSettings {
     pub context_tokens: usize,
     pub model_window: Option<usize>,
     pub supports_tools: bool,
+    pub supports_vision: bool,
     pub max_output_tokens: Option<u32>,
     pub max_turns: Option<usize>,
     pub permission: String,
@@ -21,7 +22,7 @@ pub struct SessionSettings {
 impl Default for SessionSettings {
     fn default() -> Self {
         Self { model: String::new(), context_tokens: 256_000, model_window: None,
-            supports_tools: true, max_output_tokens: None, max_turns: None,
+            supports_tools: true, supports_vision: true, max_output_tokens: None, max_turns: None,
             permission: "ask".into(), grants: Vec::new() }
     }
 }
@@ -67,6 +68,16 @@ impl Middleware for MobileContext {
         let settings = self.settings.lock().unwrap_or_else(|e| e.into_inner()).get(&turn.session).cloned();
         let settings = settings.unwrap_or_else(|| SessionSettings { context_tokens: self.fallback_context, ..Default::default() });
         if let Some(limit) = settings.max_turns { if turn.index >= limit { return Err(HarnessError::MaxTurns(limit)); } }
+        if !settings.supports_tools { turn.tools.clear(); }
+        if !settings.supports_vision {
+            for message in &mut turn.messages {
+                for part in &mut message.parts {
+                    if matches!(part, agent_kernel::Part::Image { .. }) {
+                        *part = agent_kernel::Part::Text { text: "[历史图片已略去]".into() };
+                    }
+                }
+            }
+        }
         let budget = TokenBudget::resolve(settings.context_tokens, settings.model_window);
         summarize(turn, budget.input_budget());
         ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom).before_model(turn)

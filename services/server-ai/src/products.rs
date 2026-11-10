@@ -2,7 +2,7 @@
 
 use crate::error::AppError;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 
 #[derive(Debug, Clone, FromRow, Serialize)]
@@ -18,9 +18,27 @@ pub struct Product {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TierCapabilities {
+    pub context_window_tokens: Option<u32>,
+    pub max_output_tokens: Option<u32>,
+    pub supports_tools: Option<bool>,
+    pub supports_vision: Option<bool>,
+}
+
+impl TierCapabilities {
+    pub fn valid(&self) -> bool {
+        self.context_window_tokens.is_none_or(|v| (1..=10_000_000).contains(&v))
+            && self.max_output_tokens.is_none_or(|v| {
+                (1..=10_000_000).contains(&v) && self.context_window_tokens.is_none_or(|window| v <= window)
+            })
+    }
+}
+
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Tier {
     pub reasoning_efforts: Option<Vec<String>>,
+    pub capabilities: Option<sqlx::types::Json<TierCapabilities>>,
     pub product_id: String,
     pub tier: String,
     pub display_name: String,
@@ -33,7 +51,7 @@ pub struct Tier {
 }
 
 const PRODUCT_COLUMNS: &str = "product_id, name, credit_purchase_url, client_ids, trial_quota, trial_days, enabled, created_at, updated_at";
-const TIER_COLUMNS: &str = "product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts";
+const TIER_COLUMNS: &str = "product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts, capabilities";
 
 /// 令牌 `aud` 属于哪个已启用的产品；一个客户端只能属于一个产品。
 pub async fn for_client(pool: &PgPool, client_id: &str) -> Result<Option<Product>, AppError> {
@@ -187,6 +205,7 @@ mod tests {
     fn tier(name: &str, is_default: bool, enabled: bool) -> Tier {
         Tier {
             reasoning_efforts: None,
+            capabilities: None,
             product_id: "p".into(),
             tier: name.into(),
             display_name: name.into(),

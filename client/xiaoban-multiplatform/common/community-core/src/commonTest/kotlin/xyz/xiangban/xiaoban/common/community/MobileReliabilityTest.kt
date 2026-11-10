@@ -20,6 +20,36 @@ class MobileReliabilityTest {
     }), CommunityConfig()) { "token" }
 
     @Test
+    fun `retired tiers and explicit text only capability block unsupported input`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/api/ai/tiers" -> respond("""{"tiers":[{"tier":"text","display_name":"Text","supports_vision":false}]}""")
+                "/api/ai/balance" -> respond("""{"total":1}""")
+                else -> error("unsupported input reached the gateway")
+            }
+        })
+        try {
+            val store = ChatHistory(InMemoryChatHistoryFiles(), scope)
+            val chat = CloudChatController(AiGatewayApi(client) { "token" }, scope, history = store)
+            chat.useAccount("owner")
+            store.save("old", listOf(ChatTurn(1, "user", "hi")), 1, ChatOptions(tier = "retired"))
+            chat.loadMeta()
+            await { chat.state.value.tiers.isNotEmpty() }
+            chat.openConversation("old")
+            assertEquals("retired", chat.state.value.selectedTier)
+            assertFalse(chat.sendWithAttachments("hello", emptyList()))
+            assertTrue(chat.state.value.inputError.orEmpty().contains("下架"))
+            chat.selectTier("text")
+            assertFalse(chat.sendWithAttachments("view", listOf(ChatAttachment("pic.png", imageDataUrl = "data:image/png;base64,AAAA"))))
+            assertTrue(chat.state.value.inputError.orEmpty().contains("不支持图片"))
+        } finally {
+            scope.cancel()
+            client.close()
+        }
+    }
+
+    @Test
     fun `a late quiet balance response cannot replace the new accounts balance`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val started = CompletableDeferred<Unit>()

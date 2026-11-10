@@ -280,7 +280,7 @@ impl ModelProvider for HostModel {
                         if let Err(error) = consume(&mut acc, &chunk.to_string()) { break Err(error); }
                     }
                     let has_calls = acc.pending_tool_call().is_some();
-                    if has_calls && (!verified_tool_terminal || !acc.tool_calls_complete()
+                    if has_calls && (!profile.supports_tools || !verified_tool_terminal || !acc.tool_calls_complete()
                         || !matches!(acc.finish_reason(), Some("tool_calls" | "function_call" | "stop"))) {
                         break Err(HarnessError::provider("工具调用未完整结束或网关版本过旧，未执行操作", false));
                     }

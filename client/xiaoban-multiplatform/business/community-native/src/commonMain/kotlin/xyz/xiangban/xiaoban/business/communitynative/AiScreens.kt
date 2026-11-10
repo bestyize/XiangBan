@@ -275,6 +275,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (attachments.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         attachments.forEachIndexed { index, item -> ChipPill("${item.name} ×", onClick = { attachments = attachments.filterIndexed { i, _ -> i != index } }) }
                     }
+                    cloud.inputError?.let { Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 4.dp)) }
                     ChatComposer(
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
@@ -297,7 +298,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         },
                         onSend = {
                             if (!cloud.sending && (input.isNotBlank() || attachments.isNotEmpty())) {
-                                try { chat.sendWithAttachments(input, attachments); input = ""; attachments = emptyList() }
+                                try {
+                                    if (chat.sendWithAttachments(input, attachments)) { input = ""; attachments = emptyList() }
+                                }
                                 catch (e: Exception) { toast = e.message ?: "附件无法发送" }
                             }
                         },

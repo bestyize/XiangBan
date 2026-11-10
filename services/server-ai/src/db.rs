@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS product_tiers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS product_tiers_default_idx ON product_tiers (product_id) WHERE is_default;
 ALTER TABLE product_tiers ADD COLUMN IF NOT EXISTS reasoning_efforts TEXT[] DEFAULT NULL;
+ALTER TABLE product_tiers ADD COLUMN IF NOT EXISTS capabilities JSONB;
 
 -- 每个产品的语音、图片、识别、实时语音各用哪个模型；没有这一行就是没开放。客户端看不到模型名。
 -- voices 只用于语音、sizes 只用于图片（第一个为默认），max_secs 只用于实时语音。
