@@ -235,47 +235,63 @@ pub async fn image_generations(State(state): State<AppState>, auth: Result<AuthU
         let auth = auth?;
         let setting = setting(&state, &auth, Capability::Image).await?;
         let payload = image_payload(&setting.model, &setting.sizes, &body)?;
-        let gpt = native_gpt_image(&setting.model);
-        // Validate before any billable call. Native image tools produce one image per request.
-        let native_payload = if gpt { Some(responses_image_payload(&payload)?) }
-            else if native_gemini_image(&setting.model) { Some(gemini_image_payload(&payload)?) } else { None };
-        let active = caller(&state, auth, &setting).await?;
-        let images = if let Some(native_payload) = native_payload {
-            let path = if gpt { "/v1/responses".into() } else { format!("/v1beta/models/{}:generateContent", setting.model) };
-            let wanted = payload["n"].as_u64().unwrap_or(1) as usize;
-            let mut data = Vec::new();
-            let mut encoded_bytes = 0usize;
-            for _ in 0..wanted {
-                // No retries: each native request is charged by New API through this caller's own key.
-                let generated = if gpt {
-                    image_upstream_bytes(&state, &active.key, &path, &native_payload).await
-                        .and_then(|reply| responses_image_reply(&reply).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片，结果可能未知，请勿自动重试".into())))
-                } else {
-                    image_upstream(&state, &active.key, &path, &native_payload).await
-                        .and_then(|value| gemini_image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into())))
-                };
-                let generated = match generated {
-                    Ok(value) => value,
-                    Err(error) if data.is_empty() => return Err(error),
-                    Err(_) => break, // Keep images already generated; the desktop reports partial delivery.
-                };
-                for image in generated["data"].as_array().into_iter().flatten().take(wanted - data.len()) {
-                    encoded_bytes += image["b64_json"].as_str().map_or(0, str::len);
-                    if encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
-                    data.push(image.clone());
-                }
-                if data.len() >= wanted || encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
-            }
-            if data.is_empty() { return Err(AppError::BadGateway("生成的图片太大".into())); }
-            json!({"created":chrono::Utc::now().timestamp(),"data":data})
-        } else {
-            let value = image_upstream(&state, &active.key, "/v1/images/generations", &payload).await?;
-            image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))?
-        };
+        let images = generate_images(&state, auth, setting, payload, None).await?;
         Ok::<_, AppError>(Json(images).into_response())
     }
     .await;
     result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
+}
+
+pub(crate) fn validate_image_route(model: &str, payload: &Value) -> Result<(), AppError> {
+    if native_gpt_image(model) { responses_image_payload(payload)?; }
+    if native_gemini_image(model) { gemini_image_payload(payload)?; }
+    Ok(())
+}
+
+pub(crate) async fn generate_images(
+    state: &AppState, auth: AuthUser, setting: MediaSetting, payload: Value, job: Option<&crate::image_jobs::ImageJobKey>,
+) -> Result<Value, AppError> {
+    let gpt = native_gpt_image(&setting.model);
+    // Validate before any billable call. Native image tools produce one image per request.
+    let native_payload = if gpt { Some(responses_image_payload(&payload)?) }
+        else if native_gemini_image(&setting.model) { Some(gemini_image_payload(&payload)?) } else { None };
+    let active = caller(state, auth, &setting).await?;
+    let images = if let Some(native_payload) = native_payload {
+        let path = if gpt { "/v1/responses".into() } else { format!("/v1beta/models/{}:generateContent", setting.model) };
+        let wanted = payload["n"].as_u64().unwrap_or(1) as usize;
+        let mut data = Vec::new();
+        let mut encoded_bytes = 0usize;
+        for _ in 0..wanted {
+            // No retries: each native request is charged by New API through this caller's own key.
+            let generated = if gpt {
+                image_upstream_bytes(state, &active.key, &path, &native_payload).await
+                    .and_then(|reply| responses_image_reply(&reply).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片，结果可能未知，请勿自动重试".into())))
+            } else {
+                image_upstream(state, &active.key, &path, &native_payload).await
+                    .and_then(|value| gemini_image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into())))
+            };
+            let generated = match generated {
+                Ok(value) => value,
+                Err(error) if data.is_empty() => return Err(error),
+                Err(_) => break, // Keep images already generated; the desktop reports partial delivery.
+            };
+            for image in generated["data"].as_array().into_iter().flatten().take(wanted - data.len()) {
+                encoded_bytes += image["b64_json"].as_str().map_or(0, str::len);
+                if encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
+                data.push(image.clone());
+            }
+            if data.len() >= wanted || encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
+            if let Some(job) = job {
+                job.record_partial(&state.pool, json!({"created":chrono::Utc::now().timestamp(),"data":data})).await?;
+            }
+        }
+        if data.is_empty() { return Err(AppError::BadGateway("生成的图片太大".into())); }
+        json!({"created":chrono::Utc::now().timestamp(),"data":data})
+    } else {
+        let value = image_upstream(state, &active.key, "/v1/images/generations", &payload).await?;
+        image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))?
+    };
+    Ok(images)
 }
 
 // ---- 语音识别 ----

@@ -1857,7 +1857,7 @@ async fn web_search_goes_through_new_api_first_and_the_gateway_charges_only_what
 // ---- 图片、语音识别、实时语音 ----
 
 const REAL_SPEECH: &str = "gpt-4o-mini-tts";
-const REAL_IMAGE: &str = "gpt-image-2";
+const REAL_IMAGE: &str = "mock-images-api";
 const REAL_TRANSCRIBE: &str = "whisper-3";
 const REAL_REALTIME: &str = "qwen-omni-realtime";
 
@@ -1923,6 +1923,51 @@ async fn images_use_the_configured_model_and_return_images_only() {
     let binding_id = h.only_binding().await;
     sync::sync_binding(&h.state, binding_id).await.unwrap();
     assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id));
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn image_jobs_are_scoped_recoverable_and_dispatched_once() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    h.with_media().await;
+    let uid = Uuid::new_v4();
+    let token = h.token(uid, CLIENT);
+    let other = h.token(Uuid::new_v4(), CLIENT);
+    let id = Uuid::new_v4();
+    let request = json!({ "job_id": id, "parameters": { "prompt": "一只猫", "n": 2 } });
+    let (one, two) = tokio::join!(
+        h.call(Method::POST, "/v1/images/jobs", Some(&token), request.clone()),
+        h.call(Method::POST, "/v1/images/jobs", Some(&token), request.clone()),
+    );
+    assert_eq!(one.0, StatusCode::ACCEPTED, "{}", one.1);
+    assert_eq!(two.0, StatusCode::ACCEPTED, "{}", two.1);
+
+    let path = format!("/v1/images/jobs/{id}");
+    let terminal = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            let (status, body) = h.call(Method::GET, &path, Some(&token), Value::Null).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            if !matches!(body["status"].as_str(), Some("queued" | "running")) { break body; }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }).await.unwrap();
+    assert_eq!(terminal["status"], "partial");
+    assert_eq!(terminal["result"]["data"][0]["b64_json"], "iVBORw0K");
+    assert_eq!(h.call(Method::GET, &path, Some(&other), Value::Null).await.0, StatusCode::NOT_FOUND);
+    let changed = json!({ "job_id": id, "parameters": { "prompt": "另一只猫" } });
+    assert_eq!(h.call(Method::POST, "/v1/images/jobs", Some(&token), changed).await.0, StatusCode::CONFLICT);
+    assert_eq!(h.mock.relayed("/v1/images/generations").len(), 1);
+
+    // A claimed job with a lost worker is never sent to the upstream again.
+    let lost = Uuid::new_v4();
+    let parameters = json!({ "prompt": "一只狗" });
+    sqlx::query("INSERT INTO image_jobs (uid, product_id, job_id, request, status, updated_at)
+                 SELECT $1, product_id, $2, $3, 'running', now() - interval '27 minutes' FROM bindings WHERE uid = $1")
+        .bind(uid).bind(lost).bind(&parameters).execute(&h.state.pool).await.unwrap();
+    let (_, body) = h.call(Method::POST, "/v1/images/jobs", Some(&token), json!({"job_id":lost,"parameters":parameters})).await;
+    assert_eq!(body["status"], "unknown");
+    assert_eq!(h.mock.relayed("/v1/images/generations").len(), 1);
     h.cleanup().await;
 }
 

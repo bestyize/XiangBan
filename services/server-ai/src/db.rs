@@ -51,6 +51,20 @@ CREATE TABLE IF NOT EXISTS product_media (
     PRIMARY KEY (product_id, capability)
 );
 
+-- Images are keyed by the authenticated account, product and client operation ID.
+CREATE TABLE IF NOT EXISTS image_jobs (
+    uid           UUID NOT NULL,
+    product_id    TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    job_id        UUID NOT NULL,
+    request       JSONB NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'succeeded', 'partial', 'failed', 'unknown', 'expired')),
+    result        JSONB,
+    error         JSONB,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (uid, product_id, job_id)
+);
+CREATE INDEX IF NOT EXISTS image_jobs_expiry_idx ON image_jobs (updated_at) WHERE status <> 'expired';
+
 -- 每个 (账号, 产品) 对应 New API 里一个独立用户和一个无限额度的令牌，额度只由用户钱包决定。
 -- change_seq 在额度桶变化时自增，synced_seq 记录已推送到哪一版，二者不等说明还有变化没同步到 New API。
 CREATE TABLE IF NOT EXISTS bindings (

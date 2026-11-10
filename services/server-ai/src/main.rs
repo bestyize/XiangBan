@@ -1,4 +1,5 @@
 mod information_jobs;
+mod image_jobs;
 mod admin_auth;
 mod binding;
 mod codes;
@@ -89,6 +90,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/search", post(proxy::web_search))
         .route("/fetch", post(proxy::web_fetch))
         .route("/images/generations", post(media::image_generations))
+        .route("/images/jobs", post(image_jobs::submit))
+        .route("/images/jobs/{id}", get(image_jobs::status))
         .route("/realtime", get(media::realtime))
         .layer(DefaultBodyLimit::max(state.config.max_body_bytes))
         // A recording is bigger than any other request, so its route has its own limit.
@@ -163,6 +166,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dummy_password_hash: Arc::new(dummy_password_hash),
     };
     tokio::spawn(sync::run_loop(state.clone()));
+    tokio::spawn(image_jobs::maintain(state.pool.clone()));
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;

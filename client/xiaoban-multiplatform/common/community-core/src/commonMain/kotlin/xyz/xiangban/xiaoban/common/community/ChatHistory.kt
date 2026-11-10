@@ -242,8 +242,10 @@ class ChatHistory(
         enqueue(Write(++revision, "$folder/$id.stream.json", checkpoint = interrupted(turn)))
     }
 
-    internal suspend fun awaitSaved(id: String): Boolean =
-        pending.value[chatName(id)]?.result?.await() ?: true
+    internal suspend fun awaitSaved(id: String): Boolean {
+        val writes = pending.value
+        return writes[chatName(id)]?.result?.await() != false && writes[indexName()]?.result?.await() != false
+    }
 
     private fun interrupted(turn: ChatTurn): ChatTurn = turn.copy(
         streaming = false,
@@ -258,7 +260,8 @@ class ChatHistory(
         val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.streaming || it.imageGeneration || it.role == "user" }
             .map {
                 when {
-                    it.streaming && it.imageGeneration -> it.copy(streaming = false, error = UNKNOWN_IMAGE_RESULT)
+                    it.streaming && it.imageGeneration -> it.copy(streaming = false,
+                        error = if (it.imageJobRecoverable) RECOVER_IMAGE_RESULT else UNKNOWN_IMAGE_RESULT)
                     it.streaming -> interrupted(it)
                     else -> it
                 }

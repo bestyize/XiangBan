@@ -60,6 +60,7 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
             Some(products::Capability::Image) => {
                 entry["sizes"] = json!(setting.sizes);
                 entry["formats"] = json!(crate::media::image_formats(&setting.model));
+                entry["supports_jobs"] = json!(true);
                 if crate::media::gif_image_model(&setting.model) {
                     entry["gif"] = json!({"max_frames":16,"default_frames":9,"min_frame_duration_ms":20,"max_frame_duration_ms":2000,"default_frame_duration_ms":200});
                 }

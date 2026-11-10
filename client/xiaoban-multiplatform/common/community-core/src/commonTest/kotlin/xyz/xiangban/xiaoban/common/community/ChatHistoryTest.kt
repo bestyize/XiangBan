@@ -7,7 +7,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import io.ktor.http.encodedPath
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -183,6 +185,50 @@ class ChatHistoryTest {
         restarted.delete("one")
         eventually { files.read("chats/owner/one.stream.json") == null }
         assertNull(restarted.mediaFor("one").resolve(reference))
+    }
+
+    @Test
+    fun `image recovery after a lost response uses the original job and never posts again`() = runTest {
+        val files = InMemoryChatHistoryFiles()
+        val submitted = CompletableDeferred<String>()
+        var postCount = 0
+        val client = HttpClient(MockEngine { request ->
+            val path = request.url.encodedPath
+            val response = when {
+                path == "/v1/images/jobs" -> {
+                    postCount++
+                    val body = (request.body as TextContent).text
+                    val id = Regex("""["]job_id["]\s*:\s*["]([^"]+)["]""").find(body)!!.groupValues[1]
+                    assertTrue(files.read("chats/u1/index.json").orEmpty().contains("画一只猫"))
+                    submitted.complete(id)
+                    awaitCancellation()
+                }
+                path.startsWith("/v1/images/jobs/") -> """{"job_id":"${path.substringAfterLast('/')}","status":"succeeded","result":{"data":[{"b64_json":"iVBORw0KGgo="}]}}"""
+                else -> """{}"""
+            }
+            respond(response, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val store = ChatHistory(files, scope()).apply { useAccount("u1") }
+        val first = CloudChatController(api, scope(), history = store).apply { useAccount("u1") }
+        assertTrue(first.generateImages("画一只猫", 1, null))
+        val id = withContext(Dispatchers.Default) { withTimeout(5_000) { submitted.await() } }
+        val conversation = first.state.value.conversationId
+        first.stop()
+        eventually { files.read("chats/u1/$conversation.json").orEmpty().contains(id) }
+        val again = CloudChatController(api, scope(), history = ChatHistory(files, scope())).apply {
+            useAccount("u1")
+            openConversation(conversation)
+        }
+        val reply = again.state.value.messages.last()
+        assertEquals(id, reply.imageJob?.id)
+        again.recoverImageJob(reply.id)
+        val result = again.state.await { !it.sending && it.messages.lastOrNull()?.generatedImages?.size == 1 }
+        assertEquals(1, postCount)
+        assertEquals(id, result.messages.last().imageJob?.id)
+        assertTrue(!result.messages.last().imageJobRecoverable)
+        val image = result.messages.last().generatedImages.single()
+        assertEquals("data:image/png;base64,iVBORw0KGgo=", again.resolveImage(conversation, image))
     }
 
     @Test

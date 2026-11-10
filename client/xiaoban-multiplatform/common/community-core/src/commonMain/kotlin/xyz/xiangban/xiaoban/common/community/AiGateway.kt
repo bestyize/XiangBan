@@ -26,10 +26,13 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.uuid.Uuid
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -76,7 +79,32 @@ data class AiTiersResponse(
 )
 
 @Serializable
-data class AiMediaCapability(val available: Boolean = false, val sizes: List<String> = emptyList(), val formats: List<String> = listOf("png"))
+data class AiMediaCapability(
+    val available: Boolean = false,
+    val sizes: List<String> = emptyList(),
+    val formats: List<String> = listOf("png"),
+    @SerialName("supports_jobs") val supportsJobs: Boolean = false,
+)
+
+@Serializable
+data class ImageJobReceipt(val id: String, val count: Int, val format: String)
+
+@Serializable
+private data class ImageJobError(val code: String? = null, val message: String)
+
+@Serializable
+private data class ImageJobResponse(
+    @SerialName("job_id") val id: String,
+    val status: String,
+    val result: ImageGenerationResponse? = null,
+    val error: ImageJobError? = null,
+)
+
+internal data class ImageJobResult(
+    val images: List<String> = emptyList(),
+    val error: String? = null,
+    val canRecover: Boolean = false,
+)
 
 @Serializable
 private data class ImageGenerationResponse(val data: List<ImageGenerationItem> = emptyList())
@@ -89,6 +117,7 @@ private data class ImageGenerationItem(
 
 private const val MAX_GENERATED_IMAGE_BYTES = 16 * 1024 * 1024
 internal const val UNKNOWN_IMAGE_RESULT = "生图结果尚未确认，可能已扣除额度，请勿直接重复生成。"
+internal const val RECOVER_IMAGE_RESULT = "可查回原生图任务的结果。"
 
 private fun generatedImageMime(bytes: ByteArray): String? = when {
     bytes.size >= 8 && bytes.copyOf(8).contentEquals(byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)) -> "image/png"
@@ -221,16 +250,14 @@ class AiGatewayApi(
     suspend fun capabilities(): AiTiersResponse =
         http.send(HttpMethod.Get, "/api/ai/tiers", AiTiersResponse.serializer(), token = requireToken())
 
-    /** 生图与聊天档位独立。请求可能计费，连接中断后不自动重发。 */
-    suspend fun generateImages(prompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): List<String> {
+    internal fun imageParameters(prompt: String, count: Int, size: String?, format: String, frames: Int, frameDurationMs: Int): JsonObject {
         require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
         require(count in 1..4)
         require(format in listOf("png", "gif")) { "图片格式无效" }
         if (format == "gif") {
             require(count == 1 && frames in 2..16 && frameDurationMs in 20..2000) { "GIF 参数无效" }
         }
-        val token = requireToken()
-        val payload = buildJsonObject {
+        return buildJsonObject {
             put("prompt", prompt)
             put("n", count)
             size?.let { put("size", it) }
@@ -240,6 +267,12 @@ class AiGatewayApi(
                 put("frame_duration_ms", frameDurationMs)
             }
         }
+    }
+
+    /** 兼容旧网关的同步接口。连接中断后不重发付费请求。 */
+    suspend fun generateImages(prompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): List<String> {
+        val payload = imageParameters(prompt, count, size, format, frames, frameDurationMs)
+        val token = requireToken()
         try {
             val items = client.preparePost("$base/v1/images/generations") {
                 header(HttpHeaders.Authorization, "Bearer $token")
@@ -263,23 +296,7 @@ class AiGatewayApi(
                 val body = response.readBoundedBytes(48 * 1024 * 1024)
                 withContext(Dispatchers.Default) { CommunityJson.decodeFromString<ImageGenerationResponse>(body.decodeToString()).data }
             }
-            val images = mutableListOf<String>()
-            for (item in items.take(count)) {
-                try {
-                    val bytes = item.base64?.let { encoded ->
-                        check(encoded.length <= ((MAX_GENERATED_IMAGE_BYTES + 2) / 3) * 4)
-                        withContext(Dispatchers.Default) { Base64.decode(encoded) }
-                    } ?: downloadGeneratedImage(checkNotNull(item.url))
-                    check(bytes.size <= MAX_GENERATED_IMAGE_BYTES)
-                    val mime = checkNotNull(generatedImageMime(bytes))
-                    check(format != "gif" || mime == "image/gif")
-                    images += "data:$mime;base64," + (item.base64 ?: Base64.encode(bytes))
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    // Preserve usable images if a later result cannot be loaded.
-                }
-            }
+            val images = decodeImages(items, count, format)
             check(images.isNotEmpty())
             return images
         } catch (e: CancellationException) {
@@ -289,6 +306,72 @@ class AiGatewayApi(
         } catch (_: Exception) {
             throw ApiException(0, UNKNOWN_IMAGE_RESULT)
         }
+    }
+
+    internal suspend fun awaitImageJob(receipt: ImageJobReceipt, parameters: JsonObject? = null): ImageJobResult {
+        val job = withTimeoutOrNull(27 * 60_000L) {
+            var status = requestImageJob(receipt.id, parameters)
+            while (status.status == "queued" || status.status == "running") {
+                delay(2_000)
+                status = requestImageJob(receipt.id, null)
+            }
+            status
+        } ?: return ImageJobResult(error = "等待生图超时。$RECOVER_IMAGE_RESULT", canRecover = true)
+
+        val items = job.result?.data.orEmpty().take(receipt.count)
+        val images = decodeImages(items, receipt.count, receipt.format)
+        val missing = images.size != items.size
+        return when (job.status) {
+            "succeeded", "partial" -> ImageJobResult(images,
+                error = if (missing || images.isEmpty()) "部分生图结果未下载成功。$RECOVER_IMAGE_RESULT" else null,
+                canRecover = missing || images.isEmpty())
+            "failed" -> ImageJobResult(images, job.error?.message ?: "生图任务失败")
+            "unknown" -> ImageJobResult(images, job.error?.message ?: UNKNOWN_IMAGE_RESULT)
+            "expired" -> ImageJobResult(error = "生图结果已超过 7 天保留期")
+            else -> ImageJobResult(images, "无法识别生图任务状态。$RECOVER_IMAGE_RESULT", canRecover = true)
+        }
+    }
+
+    private suspend fun requestImageJob(id: String, parameters: JsonObject?): ImageJobResponse {
+        val token = requireToken()
+        val statement = if (parameters != null) client.preparePost("$base/v1/images/jobs") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject { put("job_id", id); put("parameters", parameters) }.toString())
+        } else client.prepareGet("$base/v1/images/jobs/$id") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            timeout { requestTimeoutMillis = 60_000; socketTimeoutMillis = 60_000 }
+        }
+        return statement.execute { response ->
+            if (!response.status.isSuccess()) throw parseApiError(response.status.value, response.readBoundedBytes(64 * 1024).decodeToString())
+            val body = response.readBoundedBytes(48 * 1024 * 1024 + 16 * 1024)
+            withContext(Dispatchers.Default) {
+                CommunityJson.decodeFromString<ImageJobResponse>(body.decodeToString()).also {
+                    check(it.id == id) { "生图任务编号不匹配" }
+                }
+            }
+        }
+    }
+
+    private suspend fun decodeImages(items: List<ImageGenerationItem>, count: Int, format: String): List<String> {
+        val images = mutableListOf<String>()
+        for (item in items.take(count)) {
+            try {
+                val bytes = item.base64?.let { encoded ->
+                    check(encoded.length <= ((MAX_GENERATED_IMAGE_BYTES + 2) / 3) * 4)
+                    withContext(Dispatchers.Default) { Base64.decode(encoded) }
+                } ?: downloadGeneratedImage(checkNotNull(item.url))
+                check(bytes.size <= MAX_GENERATED_IMAGE_BYTES)
+                val mime = checkNotNull(generatedImageMime(bytes))
+                check(format != "gif" || mime == "image/gif")
+                images += "data:$mime;base64," + (item.base64 ?: Base64.encode(bytes))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Preserve usable images if a later result cannot be loaded.
+            }
+        }
+        return images
     }
 
     private suspend fun downloadGeneratedImage(raw: String): ByteArray {
@@ -579,6 +662,8 @@ data class ChatTurn(
     val cancelled: Boolean = false,
     val imageGeneration: Boolean = false,
     val generatedImages: List<String> = emptyList(),
+    val imageJob: ImageJobReceipt? = null,
+    val imageJobRecoverable: Boolean = false,
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -872,47 +957,73 @@ class CloudChatController(
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
 
+    @OptIn(ExperimentalUuidApi::class)
     fun generateImages(rawPrompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): Boolean {
         val current = _state.value
         if (current.sending) return false
-        openJob?.cancel()
         val prompt = rawPrompt.trim()
-        require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
-        require(count in 1..4 && format in listOf("png", "gif"))
-        if (format == "gif") {
-            require(current.imageCapability?.formats?.contains("gif") == true) { "当前图片服务尚未开放 GIF" }
-            require(count == 1 && frames in 2..16 && frameDurationMs in 20..2000) { "GIF 参数无效" }
-        }
+        if (format == "gif") require(current.imageCapability?.formats?.contains("gif") == true) { "当前图片服务尚未开放 GIF" }
+        val parameters = api.imageParameters(prompt, count, size, format, frames, frameDurationMs)
+        val receipt = if (current.imageCapability?.supportsJobs != false) ImageJobReceipt(Uuid.random().toString(), count, format) else null
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, imageGeneration = true)
-        val replyId = nextId++
-        val reply = ChatTurn(replyId, "assistant", "", streaming = true, imageGeneration = true, activity = "正在生成图片…")
+        val reply = ChatTurn(nextId++, "assistant", "", streaming = true, imageGeneration = true,
+            activity = "正在生成图片…", imageJob = receipt, imageJobRecoverable = receipt != null)
+        val owner = agentSession
+        _state.value = current.copy(messages = current.messages + userTurn + reply)
+        runImageWork(reply.id, count, receipt) {
+            if (receipt == null) ImageJobResult(api.generateImages(prompt, count, size, format, frames, frameDurationMs))
+            else if (history?.awaitSaved(owner) == false) ImageJobResult(error = "未能保存生图任务编号，请重试保存后重新提交。")
+            else api.awaitImageJob(receipt, parameters)
+        }
+        return true
+    }
+
+    fun recoverImageJob(replyId: Long) {
+        if (_state.value.sending) return
+        val receipt = _state.value.messages.firstOrNull { it.id == replyId && it.imageJobRecoverable }?.imageJob ?: return
+        updateTurn(replyId) { it.copy(streaming = true, error = null, activity = "正在查回图片…") }
+        runImageWork(replyId, receipt.count, receipt) { api.awaitImageJob(receipt) }
+    }
+
+    private fun runImageWork(replyId: Long, count: Int, receipt: ImageJobReceipt?, work: suspend () -> ImageJobResult) {
+        openJob?.cancel()
         val epoch = ++sendEpoch
         val ownerSession = agentSession
         val media = history?.mediaFor(ownerSession)
         val request = accountRequest()
-        _state.value = current.copy(messages = current.messages + userTurn + reply, sending = true)
+        _state.value = _state.value.copy(sending = true)
         persist()
         chatJob = scope.launch(request) {
+            fun stillHere() = request.isCurrent() && epoch == sendEpoch && ownerSession == agentSession
             try {
-                val results = api.generateImages(prompt, count, size, format, frames, frameDurationMs)
-                val images = media?.save(results) ?: results
-                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
+                if (!stillHere()) return@launch
+                val result = work()
+                if (!stillHere()) return@launch
+                val images = media?.save(result.images) ?: result.images
+                if (!stillHere()) return@launch
                 updateTurn(replyId) {
-                    val text = if (images.size == count) "已生成 ${images.size} 张图片"
-                    else "已收到 ${images.size} / $count 张图片，请核对结果后再生成。"
-                    it.copy(text = text, streaming = false, generatedImages = images)
+                    val available = if (images.size >= it.generatedImages.size) images else it.generatedImages
+                    val text = when (available.size) {
+                        count -> "已生成 ${available.size} 张图片"
+                        0 -> it.text
+                        else -> "已收到 ${available.size} / $count 张图片。"
+                    }
+                    it.copy(text = text, streaming = false, generatedImages = available, error = result.error,
+                        imageJobRecoverable = result.canRecover)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
-                updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
+                if (!stillHere()) return@launch
+                val error = if (receipt == null) messageOf(e)
+                    else if (e is ApiException && e.code == "image_job_not_found") "暂未查到这次生图任务。$RECOVER_IMAGE_RESULT"
+                    else "${messageOf(e)} $RECOVER_IMAGE_RESULT"
+                updateTurn(replyId) { it.copy(streaming = false, error = error) }
             }
             _state.value = _state.value.copy(sending = false)
             persist()
             refreshBalanceQuietly()
         }
-        return true
     }
 
     fun sendVoice(rawPrompt: String, note: String) { sendPrompt(rawPrompt, note) }
@@ -1103,7 +1214,8 @@ class CloudChatController(
         run?.let { stoppingRuns[it] = agentSession to agentReplyId; agent?.cancel(it) }
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
-            else if (turn.imageGeneration) turn.copy(streaming = false, error = "已停止等待。$UNKNOWN_IMAGE_RESULT")
+            else if (turn.imageGeneration) turn.copy(streaming = false,
+                error = "已停止等待。" + if (turn.imageJobRecoverable) RECOVER_IMAGE_RESULT else UNKNOWN_IMAGE_RESULT)
             else if (turn.text.isEmpty() && turn.error == null && turn.tools.isEmpty() && turn.reasoning.isEmpty() && run == null) null
             else turn.copy(streaming = false, cancelled = true, activity = "已停止", tools = settleTools(turn.tools, true))
         }
