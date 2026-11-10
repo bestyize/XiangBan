@@ -2579,6 +2579,13 @@ pub(crate) fn remote_set_model(app: &tauri::AppHandle, session_id: &str, provide
     Ok(())
 }
 
+pub(crate) fn remote_approval_session(app: &tauri::AppHandle, approval_id: &str) -> Option<String> {
+    if approval_id.starts_with("del-") || approval_id.starts_with("req-") {
+        return approval_id.split(':').next().map(str::to_string);
+    }
+    app.state::<ChatState>().broker.pending_session(approval_id)
+}
+
 pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, choice: &str) -> Result<(), String> {
     if approval_id.starts_with("del-") || approval_id.starts_with("req-") {
         let task_id = approval_id.split(':').next().unwrap_or(approval_id);

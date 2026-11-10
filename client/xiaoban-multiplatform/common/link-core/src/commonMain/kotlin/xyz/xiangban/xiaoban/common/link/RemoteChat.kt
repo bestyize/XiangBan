@@ -9,6 +9,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -278,6 +279,20 @@ class RemoteChatController(
 
     private var nextMsgSeq = 1L
     private var eventConsumerJob: Job? = null
+    private var accountGeneration = 0L
+    private data class Outgoing(val peer: String, val session: String?, val clientId: String)
+    private var awaitingAck: Outgoing? = null
+    private var ackTimeout: Job? = null
+    private var approvalDecision: Pair<String, String>? = null
+    private var approvalTimeout: Job? = null
+
+    private fun clearPendingTransport() {
+        awaitingAck = null
+        ackTimeout?.cancel()
+        approvalDecision = null
+        approvalTimeout?.cancel()
+        pendingVoice.clear()
+    }
 
     /** 刚选中一台电脑时，第一页对话列表回来后自动打开最近的一个；用户自己点了新对话或别的对话以后就不再抢。 */
     private var openLatestWhenListed = true
@@ -288,6 +303,8 @@ class RemoteChatController(
 
     /** 账号切换时重置当前账号缓存上下文并加载对应缓存 */
     fun changeAccount(newAccountId: String?) {
+        accountGeneration++
+        clearPendingTransport()
         currentAccountId = newAccountId
         if (newAccountId == null) {
             _state.value = RemoteChatState()
@@ -354,6 +371,7 @@ class RemoteChatController(
             })
         }
         val cachedSessions = currentAccountId?.let { cache.sessions(it, peer.id) }.orEmpty()
+        clearPendingTransport()
         _state.value = _state.value.copy(
             selectedPeerId = peer.id,
             isPeerOnline = peer.online,
@@ -363,7 +381,12 @@ class RemoteChatController(
             newChatWorkspace = null,
             selectedSessionId = null,
             messages = emptyList(),
+            voicePhase = "idle",
+            voiceText = null,
+            voiceClip = null,
+            error = null,
             pendingApproval = null,
+            sending = false,
         )
         if (peer.online) {
             sendHello(peer.id)
@@ -388,11 +411,16 @@ class RemoteChatController(
             })
         }
         val cachedMsgs = currentAccountId?.let { cache.messages(it, peerId, sessionId) }.orEmpty()
+        clearPendingTransport()
         _state.value = _state.value.copy(
             selectedSessionId = sessionId,
             newChatWorkspace = null,
             permissionMode = "auto",
             messages = cachedMsgs,
+            voicePhase = "idle",
+            voiceText = null,
+            voiceClip = null,
+            error = null,
             pendingApproval = null,
             sending = false,
         )
@@ -418,11 +446,16 @@ class RemoteChatController(
                 put("session", oldSession)
             })
         }
+        clearPendingTransport()
         _state.value = _state.value.copy(
             selectedSessionId = null,
             newChatWorkspace = keep.ifBlank { null },
             permissionMode = "auto",
             messages = emptyList(),
+            voicePhase = "idle",
+            voiceText = null,
+            voiceClip = null,
+            error = null,
             pendingApproval = null,
             sending = false,
         )
@@ -468,6 +501,13 @@ class RemoteChatController(
         if (text.isEmpty() || _state.value.sending || !_state.value.isPeerOnline) return
 
         val clientId = "c-${nowMs()}-${nextMsgSeq++}"
+        val outgoing = Outgoing(peerId, _state.value.selectedSessionId, clientId)
+        awaitingAck = outgoing
+        ackTimeout?.cancel()
+        ackTimeout = scope.launch {
+            delay(15_000)
+            failOutgoing(outgoing, "电脑尚未确认收到消息，请刷新会话核对。")
+        }
         val userTurn = RemoteTurn(id = clientId, role = "user", text = text)
         val assistantTurn = RemoteTurn(id = "r-$clientId", role = "assistant", text = "", streaming = true)
         val updatedMessages = _state.value.messages + userTurn + assistantTurn
@@ -484,7 +524,7 @@ class RemoteChatController(
         sendJson(peerId, buildJsonObject {
             put("t", "message.send")
             put("id", nextId())
-            val sid = _state.value.selectedSessionId
+            val sid = outgoing.session
             if (!sid.isNullOrBlank()) put("session", sid)
             else {
                 _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
@@ -493,7 +533,15 @@ class RemoteChatController(
             put("text", note + text)
             put("client_id", clientId)
             if (speak) put("speak", true)
-        })
+        }, onFailure = { failOutgoing(outgoing, it.message ?: "消息未能发送") })
+    }
+
+    private fun failOutgoing(outgoing: Outgoing, error: String) {
+        if (awaitingAck != outgoing) return
+        awaitingAck = null
+        ackTimeout?.cancel()
+        finalizeAssistant(error)
+        _state.value = _state.value.copy(error = error)
     }
 
     /**
@@ -628,18 +676,32 @@ class RemoteChatController(
 
     fun answerApproval(approvalId: String, choice: String) {
         val peerId = _state.value.selectedPeerId ?: return
+        val pending = _state.value.pendingApproval ?: return
+        if (pending.approvalId != approvalId || pending.session != _state.value.selectedSessionId ||
+            approvalDecision?.first == approvalId) return
+        val decision = approvalId to choice
+        approvalDecision = decision
+        approvalTimeout?.cancel()
+        approvalTimeout = scope.launch {
+            delay(15_000)
+            if (approvalDecision == decision) {
+                approvalDecision = null
+                _state.value = _state.value.copy(error = "电脑尚未确认审批结果，请刷新会话核对。")
+            }
+        }
         sendJson(peerId, buildJsonObject {
             put("t", "approval.decision")
             put("id", nextId())
             put("approval_id", approvalId)
+            put("session", pending.session)
             put("choice", choice)
+        }, onFailure = { error ->
+            if (approvalDecision == decision) {
+                approvalDecision = null
+                approvalTimeout?.cancel()
+                _state.value = _state.value.copy(error = error.message ?: "审批未能发送")
+            }
         })
-        val pending = _state.value.pendingApproval
-        if (pending?.approvalId == approvalId) {
-            _state.value = _state.value.copy(pendingApproval = null)
-            val denied = choice == "deny" || choice == "__dismiss__" || choice.isBlank()
-            appendRecord(recordFor(pending, if (denied) null else choice, if (pending.isQuestion) null else "已允许"))
-        }
     }
 
     private fun recordFor(pending: RemoteApprovalRequest, answer: String?, approvedText: String?): ChatRecord =
@@ -663,10 +725,17 @@ class RemoteChatController(
 
     // ───────────── 协议收发处理 ─────────────
 
-    private fun sendJson(peer: String, obj: JsonObject, notify: Boolean = false) {
+    private fun sendJson(peer: String, obj: JsonObject, notify: Boolean = false, onFailure: (Exception) -> Unit = {}) {
+        val generation = accountGeneration
         scope.launch {
-            val bytes = obj.toString().encodeToByteArray()
-            runCatching { phoneLink.send(peer, bytes, notify) }
+            if (generation != accountGeneration) return@launch
+            try {
+                phoneLink.send(peer, obj.toString().encodeToByteArray(), notify)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (generation == accountGeneration) onFailure(e)
+            }
         }
     }
 
@@ -710,6 +779,8 @@ class RemoteChatController(
                 refreshPeers()
             }
             is LinkEvent.Disconnected -> {
+                awaitingAck?.let { failOutgoing(it, "连接中断，请刷新会话核对电脑是否已收到消息。") }
+                if (_state.value.sending) finalizeAssistant("连接中断，请重连查看电脑上的结果。")
                 _state.value = _state.value.copy(
                     isPeerOnline = false,
                     sending = false,
@@ -741,6 +812,11 @@ class RemoteChatController(
             }
             is LinkEvent.Message -> {
                 handleRemoteMessage(event.peer, event.data)
+            }
+            is LinkEvent.Undelivered -> {
+                awaitingAck?.takeIf { it.peer == event.peer }?.let {
+                    failOutgoing(it, "未收到送达确认，请刷新会话核对。")
+                }
             }
             else -> {}
         }
@@ -791,7 +867,8 @@ class RemoteChatController(
                 }
             }
             "voice.text" -> {
-                val speakReply = pendingVoice.remove(obj["voice_id"].asStr()) ?: false
+                if (peer != _state.value.selectedPeerId) return
+                val speakReply = pendingVoice.remove(obj["voice_id"].asStr()) ?: return
                 if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
                     val recognized = obj["text"].asStr().orEmpty().trim()
                     // 先把消息发出去再回到空闲：语音通话看到“空闲”时要能看到这条消息。
@@ -804,7 +881,8 @@ class RemoteChatController(
                     _state.value = _state.value.copy(voicePhase = "idle", error = obj["error"].asStr() ?: "语音识别失败")
                 }
             }
-            "voice.audio" -> handleVoiceAudio(obj)
+            "voice.audio" -> if (peer == _state.value.selectedPeerId &&
+                obj["session"].asStr()?.let { it == _state.value.selectedSessionId } != false) handleVoiceAudio(obj)
             "run.undo" -> {
                 val runId = obj["run_id"].asStr() ?: return
                 if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
@@ -902,21 +980,30 @@ class RemoteChatController(
                 }
             }
             "message.accepted" -> {
-                val sid = obj["session"].asStr()
-                if (sid != null && _state.value.selectedSessionId == null) {
+                val pending = awaitingAck ?: return
+                val sid = obj["session"].asStr()?.takeIf { it.isNotBlank() } ?: return
+                if (peer != pending.peer || peer != _state.value.selectedPeerId ||
+                    obj["client_id"].asStr() != pending.clientId || pending.session != _state.value.selectedSessionId ||
+                    pending.session?.let { it != sid } == true) return
+                awaitingAck = null
+                ackTimeout?.cancel()
+                if (pending.session == null) {
                     _state.value = _state.value.copy(selectedSessionId = sid)
                     fetchSessions(peer)
                 }
             }
             "event" -> {
-                val sid = obj["session"].asStr()
-                if (peer == _state.value.selectedPeerId && (sid.isNullOrBlank() || sid == _state.value.selectedSessionId)) {
-                    handleEventPayload(obj)
-                }
+                if (peer != _state.value.selectedPeerId) return
+                val sid = obj["session"].asStr()?.takeIf { it.isNotBlank() }
+                val clientId = (obj["data"] as? JsonObject)?.get("client_id").asStr()
+                if (clientId != null && clientId != awaitingAck?.clientId) return
+                if (sid == _state.value.selectedSessionId &&
+                    (sid != null || clientId != null)) handleEventPayload(obj)
             }
             "approval.request" -> {
                 val approvalId = obj["approval_id"].asStr() ?: return
-                val session = obj["session"].asStr().orEmpty()
+                val session = obj["session"].asStr()?.takeIf { it.isNotBlank() } ?: return
+                if (peer != _state.value.selectedPeerId || session != _state.value.selectedSessionId) return
                 val title = obj["title"].asStr() ?: "请确认"
                 val detail = (obj["detail"] as? JsonObject) ?: JsonObject(emptyMap())
                 val risk = obj["risk"].asStr() ?: "low"
@@ -945,12 +1032,20 @@ class RemoteChatController(
                 )
             }
             "approval.resolved" -> {
-                val approvalId = obj["approval_id"].asStr()
-                if (approvalId != null && _state.value.pendingApproval?.approvalId == approvalId) {
-                    val pending = _state.value.pendingApproval
-                    _state.value = _state.value.copy(pendingApproval = null)
-                    // 在电脑上处理的，对话里留一行“已在电脑上处理”；过期的不留。
-                    if (obj["by"].asStr() == "desktop" && pending != null) appendRecord(recordFor(pending, null, "已在电脑上处理"))
+                val pending = _state.value.pendingApproval ?: return
+                if (peer != _state.value.selectedPeerId || pending.session != _state.value.selectedSessionId ||
+                    obj["approval_id"].asStr() != pending.approvalId ||
+                    obj["session"].asStr()?.let { it != pending.session } == true) return
+                val choice = approvalDecision?.takeIf { it.first == pending.approvalId }?.second
+                approvalDecision = null
+                approvalTimeout?.cancel()
+                _state.value = _state.value.copy(pendingApproval = null, error = obj["reason"].asStr())
+                when (obj["by"].asStr()) {
+                    "desktop" -> appendRecord(recordFor(pending, null, "已在电脑上处理"))
+                    "phone" -> if (choice != null) {
+                        val denied = choice == "deny" || choice == "__dismiss__" || choice.isBlank()
+                        appendRecord(recordFor(pending, if (denied) null else choice, if (pending.isQuestion) null else "已允许"))
+                    }
                 }
             }
             else -> {}
@@ -1078,6 +1173,8 @@ class RemoteChatController(
     }
 
     private fun finalizeAssistant(error: String?) {
+        awaitingAck = null
+        ackTimeout?.cancel()
         val msgs = _state.value.messages.map { turn ->
             if (turn.role == "assistant" && turn.streaming) {
                 turn.copy(streaming = false, error = error, tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (error != null && error != TurnCancelled) ToolStatus.Error else ToolStatus.Done) else it })

@@ -133,6 +133,7 @@ struct RuntimeInner {
     subscriptions: HashMap<String, HashSet<String>>,
     /// 当前桌面等待用户确认的审批/问题：`approval_id -> session_id`，用于发现桌面已处理后向手机广播 `approval.resolved`。
     open_approvals: HashMap<String, String>,
+    accepted_messages: std::collections::VecDeque<(String, String, Value)>,
     /// 手机分片上传的录音，拼完交给语音识别。
     voice_in: phone_voice::Assembler,
     /// 要把回答念给手机听的对话：`会话编号 -> (手机, 这一轮最后一段回答的文字)`。
@@ -156,6 +157,7 @@ impl Default for RuntimeInner {
             last_error: None,
             subscriptions: HashMap::new(),
             open_approvals: HashMap::new(),
+            accepted_messages: std::collections::VecDeque::new(),
             voice_in: Default::default(),
             speak: HashMap::new(),
             speak_tx: None,
@@ -632,6 +634,14 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
             let session_id = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
             let text = msg.get("text").and_then(Value::as_str).unwrap_or("");
             let client_id = msg.get("client_id").and_then(Value::as_str).unwrap_or(&req_id);
+            if client_id.is_empty() || client_id.len() > 128 { return; }
+            let receipt = lock(&state.inner).accepted_messages.iter()
+                .find(|(owner, id, _)| owner == peer && id == client_id)
+                .map(|(_, _, reply)| reply.clone());
+            if let Some(receipt) = receipt {
+                let _ = send_json(link, peer, &receipt, false);
+                return;
+            }
             let workspace = msg.get("workspace").and_then(Value::as_str);
             let permission = msg.get("permission").and_then(Value::as_str);
             let speak = msg.get("speak").and_then(Value::as_bool).unwrap_or(false);
@@ -666,18 +676,19 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                             lock(&state.inner).speak.remove(sid);
                         }
                     }
-                    let _ = send_json(
-                        link,
-                        peer,
-                        &json!({
-                            "t": "message.accepted",
-                            "id": state.next_msg_id(),
-                            "client_id": client_id,
-                            "session": accepted["session"],
-                            "message_id": accepted["message_id"],
-                        }),
-                        false,
-                    );
+                    let receipt = json!({
+                        "t": "message.accepted",
+                        "id": state.next_msg_id(),
+                        "client_id": client_id,
+                        "session": accepted["session"],
+                        "message_id": accepted["message_id"],
+                    });
+                    {
+                        let mut inner = lock(&state.inner);
+                        if inner.accepted_messages.len() >= 512 { inner.accepted_messages.pop_front(); }
+                        inner.accepted_messages.push_back((peer.to_string(), client_id.to_string(), receipt.clone()));
+                    }
+                    let _ = send_json(link, peer, &receipt, false);
                 }
                 Err(error) => {
                     let _ = send_json(
@@ -697,6 +708,19 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
         }
         "approval.decision" => {
             let Some(approval_id) = msg.get("approval_id").and_then(Value::as_str) else { return };
+            let session = crate::chat::remote_approval_session(app, approval_id);
+            let claimed = msg.get("session").and_then(Value::as_str);
+            let allowed = session.as_deref().is_some_and(|session| {
+                claimed.is_none_or(|id| id == session) &&
+                    lock(&state.inner).subscriptions.get(peer).is_some_and(|sessions| sessions.contains(session))
+            });
+            if !allowed {
+                let _ = send_json(link, peer, &json!({
+                    "t": "approval.resolved", "id": state.next_msg_id(), "approval_id": approval_id,
+                    "session": claimed, "by": "expired", "reason": "审批不属于当前订阅的会话",
+                }), false);
+                return;
+            }
             let choice = msg.get("choice").and_then(Value::as_str).unwrap_or("deny");
             if let Ok(audit) = audit_path(app) {
                 append_remote_audit(
@@ -719,6 +743,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                             "t": "approval.resolved",
                             "id": state.next_msg_id(),
                             "approval_id": approval_id,
+                            "session": session,
                             "by": "phone",
                         }),
                         false,
@@ -734,6 +759,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                             "t": "approval.resolved",
                             "id": state.next_msg_id(),
                             "approval_id": approval_id,
+                            "session": session,
                             "by": "expired",
                             "reason": reason,
                         }),

@@ -161,7 +161,7 @@ class PhoneLink(
         if (data.size > MAX_LINK_MESSAGE_BYTES) throw LinkException("消息太大")
         if (lock.withLock { peer !in peerMap }) throw LinkException("没有这台电脑")
         sendObserverForTest?.invoke(peer, data)
-        val channel = out ?: throw LinkException("没有连上中转服务")
+        val channel = out ?: if (sendObserverForTest != null) return else throw LinkException("没有连上中转服务")
         val frame = buildJsonObject {
             put("op", "send"); put("to", peer); put("data", data.decodeToString()); put("notify", notify)
         }.toString()

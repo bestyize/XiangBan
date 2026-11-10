@@ -58,6 +58,11 @@ impl Broker {
  pub fn close_approval(&self,id:&str){let mut s=lock(&self.state);s.approvals.remove(id);s.revision+=1;}
  pub fn close_question(&self,id:&str){let _=self.clear_saved(id);let mut s=lock(&self.state);s.questions.remove(id);s.revision+=1;}
  pub fn drop_session(&self,id:&str){let mut s=lock(&self.state);s.approvals.retain(|_,(session,_,_)|session!=id);s.questions.retain(|key,(session,_,_)|{if session==id{let _=self.clear_saved(key);false}else{true}});s.revision+=1;}
+ pub fn pending_session(&self, id: &str) -> Option<String> {
+    let state = lock(&self.state);
+    state.approvals.get(id).map(|item| item.0.clone())
+        .or_else(|| state.questions.get(id).map(|item| item.0.clone()))
+ }
  pub fn snapshot(&self,id:&str)->Value{let s=lock(&self.state);json!({"revision":s.revision,"approvals":s.approvals.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>(),"questions":s.questions.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v.clone()).chain(lock(&self.recovered).values().filter(|v|v["session"]==id).cloned()).collect::<Vec<_>>()})}
  #[cfg(test)]pub fn pending(&self)->usize{let s=lock(&self.state);s.approvals.len()+s.questions.len()}
 }

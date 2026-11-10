@@ -29,7 +29,24 @@ class RemoteChatTest {
         val storage = InMemoryLinkStorage(LinkState(installId = "test-install-id-0123456789", device = DeviceIdentity("phn_1", "手机")))
         val link = PhoneLink(scope, mockClient, storage, { null }, "手机")
         link.seedPeersForTest(listOf(PeerSummary("dsk_1", "我的Mac电脑", false)))
+        link.sendObserverForTest = { _, _ -> }
         return link
+    }
+
+    @Test
+    fun `late approvals and undelivered requests cannot leave the selected chat stuck`() = runTest {
+        val link = createLink()
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        controller.selectSession("current")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"approval.request","session":"old","approval_id":"old-id"}""".encodeToByteArray()))
+        assertNull(controller.state.value.pendingApproval)
+        controller.send("hello")
+        assertTrue(controller.state.value.sending)
+        link.emitEventForTest(LinkEvent.Undelivered("dsk_1"))
+        assertFalse(controller.state.value.sending)
+        assertNotNull(controller.state.value.messages.last().error)
     }
 
     @Test
@@ -111,7 +128,7 @@ class RemoteChatTest {
 
         // 处理审批
         controller.answerApproval("a_1", "deny")
-        assertNull(controller.state.value.pendingApproval)
+        assertNotNull(controller.state.value.pendingApproval)
 
         // 审批广播已解决
         val resolved = """{"t":"approval.resolved","id":"8","approval_id":"a_1","by":"desktop"}"""
@@ -242,7 +259,8 @@ class RemoteChatTest {
         assertTrue(sent.single { it.contains("\"message.send\"") }.contains("\"permission\":\"ask\""))
 
         // 已有对话：让电脑切换，电脑确认后才算数；电脑也可以主动通知模式变了。
-        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"message.accepted","id":"1","client_id":"c","session":"s_9","message_id":"m"}""".encodeToByteArray()))
+        val clientId = Json.parseToJsonElement(sent.single { it.contains("\"message.send\"") }).jsonObject.getValue("client_id")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"message.accepted","id":"1","client_id":$clientId,"session":"s_9","message_id":"m"}""".encodeToByteArray()))
         sent.clear()
         controller.setPermission("auto")
         assertTrue(sent.single().contains("\"session.permission\"") && sent.single().contains("\"mode\":\"auto\""), sent.toString())
@@ -318,6 +336,7 @@ class RemoteChatTest {
 
         sent.clear()
         controller.answerApproval("q_1", "直接删除")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"approval.resolved","approval_id":"q_1","by":"phone"}""".encodeToByteArray()))
         assertTrue(sent.single().contains("\"choice\":\"直接删除\""))
         assertEquals(null, controller.state.value.pendingApproval)
         val record = controller.state.value.messages.last().records.single()
@@ -328,6 +347,7 @@ class RemoteChatTest {
         // 跳过：留下“已跳过”
         link.emitEventForTest(LinkEvent.Message("dsk_1", request.replace("q_1", "q_2").encodeToByteArray()))
         controller.answerApproval("q_2", "__dismiss__")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"approval.resolved","approval_id":"q_2","by":"phone"}""".encodeToByteArray()))
         assertEquals(null, controller.state.value.messages.last().records.last().result)
     }
 
@@ -481,8 +501,10 @@ class RemoteChatTest {
         assertEquals(null, controller.state.value.voiceClip)
 
         // 识别失败：回到空闲并说明原因
+        sent.clear()
         controller.sendVoice(ByteArray(40_000) { 1 }, speakReply = false)
-        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.text","id":"6","voice_id":"x","ok":false,"error":"电脑上还没有开启语音识别"}""".encodeToByteArray()))
+        val failedVoiceId = Json.parseToJsonElement(sent.single()).jsonObject.getValue("voice_id")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.text","id":"6","voice_id":$failedVoiceId,"ok":false,"error":"电脑上还没有开启语音识别"}""".encodeToByteArray()))
         assertEquals("idle", controller.state.value.voicePhase)
         assertEquals("电脑上还没有开启语音识别", controller.state.value.error)
     }
