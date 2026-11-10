@@ -24,6 +24,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 private const val PACK = """{"id":7,"kind":"effect","slug":"aurora","title":"极光光晕","summary":"流动的极光","tags":["官方"],"author":null,"trust_level":0,"status":"published","version":2,"cover_url":null,"apply_count":3,"topic_id":null,"one_click":true,"pure_data":true,"updated_at":"2026-10-28T00:00:00Z","unknown_future_field":1}"""
@@ -588,6 +589,19 @@ class AiGatewayAndCloudChatTest {
         assertEquals(402, err.status)
         assertEquals("insufficient_quota", err.code)
         assertEquals("额度已用完，请兑换额度后继续使用", err.message)
+    }
+
+    @Test
+    fun `voice call cannot submit to another conversation`() = runTest {
+        val server = FakeServer()
+        val chat = CloudChatController(AiGatewayApi(server.client, config) { "tok" }, scope())
+        val voice = CloudAssistant(chat)
+        chat.clearConversation()
+        voice.ask("late transcription")
+        voice.cancel()
+        assertNotNull(voice.unavailableReason())
+        assertTrue(chat.state.value.messages.isEmpty())
+        assertTrue(server.requests.isEmpty())
     }
 
     @Test

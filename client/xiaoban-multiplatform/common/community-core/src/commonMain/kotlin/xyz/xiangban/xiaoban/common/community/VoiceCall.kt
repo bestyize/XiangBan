@@ -440,20 +440,41 @@ class AssistantReply(val text: String, val busy: Boolean, val error: String? = n
 
 /** 云端小伴 AI 对话。 */
 class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
-    override fun unavailableReason(): String? = null
-    override fun ask(text: String) = chat.send(text)
-    override fun askWithNote(text: String, note: String) = chat.sendVoice(text, note)
-    override fun cancel() { if (chat.state.value.sending) chat.stop() }
+    private val conversation = chat.state.value.conversationId
+    private var replyId: Long? = null
+
+    override fun unavailableReason(): String? =
+        if (chat.state.value.conversationId == conversation) null else "原对话已切换，请重新开始通话"
+
+    override fun ask(text: String) = askWithNote(text, "")
+
+    override fun askWithNote(text: String, note: String) {
+        val before = chat.state.value
+        if (before.conversationId != conversation || before.sending || text.isBlank()) return
+        chat.sendVoice(text, note)
+        val after = chat.state.value
+        replyId = after.messages.lastOrNull()?.takeIf {
+            after.conversationId == conversation && it.role == "assistant" && it.id != before.messages.lastOrNull()?.id
+        }?.id
+    }
+
+    private fun ownsCurrentReply(): Boolean = chat.state.value.let {
+        replyId != null && it.conversationId == conversation && it.messages.lastOrNull()?.id == replyId
+    }
+
+    override fun cancel() {
+        if (ownsCurrentReply() && chat.state.value.sending) chat.stop()
+    }
+
     override fun reply(): AssistantReply {
         val state = chat.state.value
-        val turn = state.messages.lastOrNull { it.role == "assistant" }
-        return AssistantReply(
-            turn?.text.orEmpty(), busy = state.sending || turn?.streaming == true, error = turn?.error,
-            attention = null,
-        )
+        if (state.conversationId != conversation) return AssistantReply("", false, unavailableReason())
+        val turn = state.messages.lastOrNull { it.role == "assistant" && it.id == replyId }
+        return AssistantReply(turn?.text.orEmpty(), busy = turn?.streaming == true, error = turn?.error)
     }
 
     override fun prompt(): CallPrompt? {
+        if (!ownsCurrentReply()) return null
         chat.state.value.question?.let { question ->
             return CallPrompt(
                 title = question.question, detail = if (question.options.isEmpty()) "可在对话页输入回答，或先跳过这个问题。" else "", danger = null, question = true,
@@ -473,6 +494,7 @@ class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
     }
 
     override fun answerPrompt(id: String) {
+        if (!ownsCurrentReply()) return
         val question = chat.state.value.question
         if (question != null) {
             if (id == "dismiss:${question.id}") chat.answerQuestion(null)

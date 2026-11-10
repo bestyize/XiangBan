@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -182,9 +183,13 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
 fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, open: (Route) -> Unit, openImageSheet: Boolean = false, onImageSheetOpened: () -> Unit = {}) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
-    var attachments by remember(cloud.conversationId) { mutableStateOf(emptyList<ChatAttachment>()) }
-    val attachmentScope = rememberCoroutineScope()
-    var input by rememberSaveable { mutableStateOf("") }
+    val conversation = cloud.conversationId
+    val accountGeneration = session.generation
+    fun stillInConversation() = chat.state.value.conversationId == conversation &&
+        env.session.state.value.generation == accountGeneration
+    var attachments by remember(conversation, accountGeneration) { mutableStateOf(emptyList<ChatAttachment>()) }
+    val attachmentScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
+    var input by rememberSaveable(conversation, accountGeneration) { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
     var permissionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var executionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
@@ -194,17 +199,21 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var preview by remember(cloud.conversationId, session.accountId) { mutableStateOf<ChatImagePreview?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
     // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
-    val voiceInput = rememberVoiceInput(
-        env, { env.recognizers(CloudRecognizer(env.ai)) },
-        onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
-        onSend = { text -> chat.send(text) },
-        onMessage = { toast = it },
-    )
+    val voiceInput = key(conversation, accountGeneration) {
+        rememberVoiceInput(
+            env, { env.recognizers(CloudRecognizer(env.ai)) },
+            onText = { text ->
+                if (stillInConversation()) input = if (input.isBlank()) text else input.trimEnd() + " " + text
+            },
+            onSend = { text -> if (stillInConversation()) chat.send(text) },
+            onMessage = { if (stillInConversation()) toast = it },
+        )
+    }
     var voiceMode by rememberSaveable { mutableStateOf(false) }
-    val callHost = rememberVoiceCallHost(env)
-    val callScope = rememberCoroutineScope()
+    val callHost = key(conversation, accountGeneration) { rememberVoiceCallHost(env) }
+    val callScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
 
-    LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
+    LaunchedEffect(session.loggedIn, session.accountId, accountGeneration) { if (session.loggedIn) chat.loadMeta() }
     LaunchedEffect(openImageSheet) {
         if (openImageSheet) {
             onImageSheetOpened()
