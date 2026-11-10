@@ -15,6 +15,11 @@
     <!-- 朗读：Android 11 起要声明才能找到系统的语音合成服务 -->
     <queries>
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+        <!-- Discover only launchable apps for Quick Launch; no QUERY_ALL_PACKAGES permission. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.tencent.mm" />
         <package android:name="com.ss.android.ugc.aweme" />
         <package android:name="com.xunlei.downloadprovider" />
