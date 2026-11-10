@@ -3,6 +3,8 @@ package xyz.xiangban.xiaoban.common.community
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
+internal const val CHAT_IMAGE_DATA_URL_LIMIT = 2_800_000
+
 /** 仅包含用户通过系统选择器明确选择的内容，不读取手机上的任意路径。 */
 @Serializable
 data class ChatAttachment(val name: String, val text: String? = null, val imageDataUrl: String? = null)
@@ -17,7 +19,7 @@ internal fun validateChatAttachments(attachments: List<ChatAttachment>, allowSto
         require((a.text != null) != (a.imageDataUrl != null)) { "附件内容无效" }
         a.text?.let { require(it.encodeToByteArray().size <= 256 * 1024) { "文本附件不能超过 256 KiB" } }
         a.imageDataUrl?.takeUnless { allowStoredImages && isChatMediaReference(it) }?.let {
-            require(it.length <= 2_800_000) { "图片过大，请压缩后重新选择" }
+            require(it.length <= CHAT_IMAGE_DATA_URL_LIMIT) { "图片过大，请压缩后重新选择" }
             val prefix = it.substringBefore(',')
             val payload = it.substringAfter(',', "")
             val encoded = payload.trimEnd('=')
@@ -26,7 +28,7 @@ internal fun validateChatAttachments(attachments: List<ChatAttachment>, allowSto
                 encoded.all { c -> c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c == '+' || c == '/' }
             ) { "仅支持有效的本地 PNG、JPEG、WebP 图片" }
         }
-        bytes += (a.text ?: a.imageDataUrl.orEmpty()).encodeToByteArray().size
+        bytes += a.text?.encodeToByteArray()?.size ?: a.imageDataUrl.orEmpty().length
     }
     require(bytes <= 4 * 1024 * 1024) { "附件总量过大，请分开发送" }
 }

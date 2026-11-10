@@ -46,7 +46,7 @@ import com.multiplatform.webview.web.WebContent
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.WebViewState
 
-internal data class ChatImagePreview(val data: String, val label: String)
+internal data class ChatImagePreview(val data: String, val label: String, val generated: Boolean = false)
 
 @Composable
 private fun resolvedChatImage(image: ChatImagePreview, resolve: suspend (String) -> String?): String? {
@@ -104,7 +104,14 @@ internal fun ChatImageThumbnail(image: ChatImagePreview, resolve: suspend (Strin
 }
 
 @Composable
-internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?, resolve: suspend (String) -> String?, onClose: () -> Unit) {
+internal fun ChatImageViewer(
+    image: ChatImagePreview,
+    platform: PlatformActions?,
+    resolve: suspend (String) -> String?,
+    onReference: (() -> Unit)? = null,
+    referencing: Boolean = false,
+    onClose: () -> Unit,
+) {
     val data = resolvedChatImage(image, resolve)
     val bytes = chatImageBytes(data)
     val scope = rememberCoroutineScope()
@@ -147,6 +154,10 @@ internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?
                 Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (onReference != null) GhostPillButton(
+                    if (referencing) "正在准备图片…" else "引用此图继续聊",
+                    onReference, enabled = data != null && !failed && !referencing,
+                )
                 val source = bytes
                 if (platform != null && platform.supportsChatImageSave && source != null && data != null && !failed) {
                     GhostPillButton("保存图片", {

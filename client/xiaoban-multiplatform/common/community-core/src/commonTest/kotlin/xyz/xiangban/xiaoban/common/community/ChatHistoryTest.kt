@@ -232,6 +232,49 @@ class ChatHistoryTest {
     }
 
     @Test
+    fun `reference sends only the selected generated image and checks vision`() = runTest {
+        val files = InMemoryChatHistoryFiles()
+        val store = ChatHistory(files, scope()).apply { useAccount("u1") }
+        val images = listOf("data:image/png;base64,AA==", "data:image/png;base64,AQ==")
+        store.save("pictures", listOf(
+            ChatTurn(1, "user", "画两张图", imageGeneration = true),
+            ChatTurn(2, "assistant", "已生成 2 张图片", imageGeneration = true, generatedImages = images),
+        ), 1)
+        eventually { files.read("chats/u1/pictures.json").orEmpty().contains("media:") }
+
+        val sent = CompletableDeferred<String>()
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/api/ai/tiers" -> respond("""{"tiers":[{"tier":"text","display_name":"纯文字","supports_vision":false},{"tier":"vision","display_name":"视觉","supports_vision":true}]}""",
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                "/v1/chat/completions" -> {
+                    sent.complete((request.body as TextContent).text)
+                    respond("""{"choices":[{"message":{"content":"收到了"}}]}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+                else -> respond("{}", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+        })
+        val chat = CloudChatController(AiGatewayApi(client, CommunityConfig()) { "tok" }, scope(),
+            history = ChatHistory(files, scope())).apply {
+            useAccount("u1")
+            openConversation("pictures")
+            loadMeta()
+        }
+        chat.state.await { it.tiers.size == 2 }
+        val second = chat.state.value.messages.last().generatedImages[1]
+        chat.selectTier("text")
+        val error = runCatching { chat.referenceGeneratedImage("pictures", second, "第 2 张") }.exceptionOrNull()
+        assertTrue(error?.message.orEmpty().contains("不支持图片"))
+        chat.selectTier("vision")
+        val reference = chat.referenceGeneratedImage("pictures", second, "第 2 张")
+        assertEquals(second, reference.imageDataUrl)
+        assertTrue(chat.sendWithAttachments("这张图是什么颜色？", listOf(reference)))
+        val request = withContext(Dispatchers.Default) { withTimeout(5_000) { sent.await() } }
+        assertTrue(images[1] in request)
+        assertTrue(images[0] !in request && "media:" !in request)
+    }
+
+    @Test
     fun `an empty new conversation is not saved`() {
         val history = ChatHistory(InMemoryChatHistoryFiles(), scope())
         history.useAccount(null)

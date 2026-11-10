@@ -186,9 +186,20 @@ class AndroidChatAttachments(activity: ComponentActivity) : DefaultLifecycleObse
     private suspend fun readImage(uri: Uri): ChatAttachment {
         val name = displayName(uri, "图片.jpg")
         val bytes = readLimited(uri, 16 * 1024 * 1024, "原图不能超过 16 MiB，请先缩小图片")
+        return compressImage(name, bytes, allowGif = false)
+    }
+
+    suspend fun prepareGeneratedImage(data: String): String = withContext(Dispatchers.Default) {
+        require(data.startsWith("data:image/") && data.length <= 23_000_000) { "生成图内容无效或过大" }
+        val bytes = Base64.decode(data.substringAfter(',', ""), Base64.DEFAULT)
+        require(bytes.size in 1..16 * 1024 * 1024) { "生成图内容无效或过大" }
+        requireNotNull(compressImage("生成图片.jpg", bytes, allowGif = true).imageDataUrl)
+    }
+
+    private suspend fun compressImage(name: String, bytes: ByteArray, allowGif: Boolean): ChatAttachment {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outMimeType in ImageTypes) { "仅支持有效的 PNG、JPEG、WebP 图片" }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0 && (bounds.outMimeType in ImageTypes || allowGif && bounds.outMimeType == "image/gif")) { "无法识别图片格式" }
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MaxImageEdge) sample *= 2
         currentCoroutineContext().ensureActive()

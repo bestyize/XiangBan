@@ -527,7 +527,7 @@ class AiGatewayApi(
         onDelta: (String) -> Unit = {},
     ): String {
         val token = requireToken()
-        val payload = boundedChatBody(messages, tier, reasoningEffort, contextTokens)
+        val payload = withContext(Dispatchers.Default) { boundedChatBody(messages, tier, reasoningEffort, contextTokens) }
 
         val statement = try {
             client.preparePost("$base/v1/chat/completions") {
@@ -840,6 +840,36 @@ class CloudChatController(
         return source?.takeIf { conversation == agentSession && generation == accountGeneration }
     }
 
+    fun validateDraftAttachments(attachments: List<ChatAttachment>) {
+        validateChatAttachments(attachments, allowStoredImages = history != null)
+    }
+
+    suspend fun referenceGeneratedImage(
+        conversation: String,
+        value: String,
+        label: String,
+        prepare: suspend (String) -> String? = { null },
+    ): ChatAttachment {
+        val generation = accountGeneration
+        fun checkOwner() = check(conversation == agentSession && generation == accountGeneration) { "对话已切换，请重新选择图片。" }
+        checkOwner()
+        require(_state.value.messages.any { it.imageGeneration && value in it.generatedImages }) { "找不到这张生成图。" }
+        modelInputError(listOf(ChatAttachment(label, imageDataUrl = value)))?.let { throw IllegalStateException(it) }
+        val media = history?.mediaFor(conversation)
+        val original = resolveImage(conversation, value) ?: error("找不到这张生成图。")
+        val gif = original.startsWith("data:image/gif;base64,")
+        val image = if (gif || original.length > CHAT_IMAGE_DATA_URL_LIMIT) {
+            prepare(original) ?: error(if (gif) "请将 GIF 的一帧另存为图片后再引用。" else "请缩小图片后再引用。")
+        } else original
+        val attachment = ChatAttachment(if (gif) "$label（GIF 首帧）" else label, imageDataUrl = image)
+        withContext(Dispatchers.Default) { validateChatAttachments(listOf(attachment)) }
+        checkOwner()
+        modelInputError(listOf(attachment))?.let { throw IllegalStateException(it) }
+        val reference = if (image == original && isChatMediaReference(value)) value else media?.save(listOf(image))?.single() ?: image
+        checkOwner()
+        return attachment.copy(imageDataUrl = reference)
+    }
+
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
     fun addWorkspace(name: String) { history?.addWorkspace(name); refreshWorkspaces() }
     fun renameWorkspace(old: String, name: String) { history?.renameWorkspace(old, name); refreshWorkspaces() }
@@ -1047,7 +1077,7 @@ class CloudChatController(
             _state.value = _state.value.copy(inputError = error)
             return false
         }
-        validateChatAttachments(attachments, allowStoredImages = history != null)
+        validateDraftAttachments(attachments)
         openJob?.cancel()
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments)
         val replyId = nextId++

@@ -96,6 +96,7 @@ interface PlatformActions : VoicePlatform {
     suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?): Boolean = false
     /** 通过系统选择器读取用户明确选择的图片或文本文件。 */
     suspend fun pickChatAttachment(image: Boolean): ChatAttachment? = null
+    suspend fun prepareGeneratedChatImage(data: String): String? = null
     /** 横屏全屏的页面（散点图）进入时锁成横屏，离开时恢复；平台不支持就什么也不做。 */
     fun setLandscape(landscape: Boolean) {}
     /** 打开系统里这个应用的设置页（让用户去开麦克风权限）；平台不支持就返回 false。 */

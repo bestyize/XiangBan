@@ -150,6 +150,7 @@ class AndroidPlatformActions(
     override val supportsChatAttachments: Boolean get() = attachments != null
 
     override suspend fun pickChatAttachment(image: Boolean) = attachments?.pick(image)
+    override suspend fun prepareGeneratedChatImage(data: String) = attachments?.prepareGeneratedImage(data)
 
     private val creationSharing = AndroidCreationSharing(context)
     override suspend fun gamePackage(id: String) = creationSharing.gamePackage(id)

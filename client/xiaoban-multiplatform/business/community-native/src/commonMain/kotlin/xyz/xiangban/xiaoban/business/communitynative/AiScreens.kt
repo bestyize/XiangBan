@@ -342,7 +342,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                                 val item = env.platform?.pickChatAttachment(label == "相册")
                                 if (item != null && chat.state.value.conversationId == conversation) {
                                     val next = attachments + item
-                                    xyz.xiangban.xiaoban.common.community.validateChatAttachments(next)
+                                    chat.validateDraftAttachments(next)
                                     attachments = next
                                 }
                             } catch (e: CancellationException) { throw e }
@@ -366,7 +366,33 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 },
             )
         }
-        preview?.let { ChatImageViewer(it, env.platform, resolveImage) { preview = null } }
+        preview?.let { image ->
+            var referencing by remember(image) { mutableStateOf(false) }
+            ChatImageViewer(image, env.platform, resolveImage, referencing = referencing,
+                onReference = if (image.generated) ({
+                    if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
+                    else {
+                        referencing = true
+                        attachmentScope.launch {
+                            try {
+                                val item = chat.referenceGeneratedImage(conversation, image.data, image.label) { data ->
+                                    env.platform?.prepareGeneratedChatImage(data)
+                                }
+                                if (stillInConversation() && preview == image) {
+                                    val next = attachments + item
+                                    chat.validateDraftAttachments(next)
+                                    attachments = next
+                                    preview = null
+                                    toast = "已添加到输入框"
+                                }
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { if (stillInConversation()) toast = e.message ?: "无法引用这张图片" }
+                            finally { referencing = false }
+                        }
+                    }
+                }) else null,
+            ) { preview = null }
+        }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
         PressOverlay(voiceInput)
@@ -455,7 +481,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                             onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
                     turn.generatedImages.forEachIndexed { index, data ->
-                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}"), resolveImage, onPreview)
+                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true), resolveImage, onPreview)
                     }
                     if (turn.imageJobRecoverable && !sending) LinkText("查回生图结果", { onRecoverImage(turn.id) })
                     if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
