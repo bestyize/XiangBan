@@ -138,7 +138,7 @@ impl Tool for HistoryRead {
     }
 }
 
-fn session_component(session: &str) -> String {
+pub(crate) fn session_component(session: &str) -> String {
     session.bytes().map(|b| if b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b,b'-'|b'_') { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
 }
 

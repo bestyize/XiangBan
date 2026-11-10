@@ -8,15 +8,24 @@ import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
 class AndroidChatHistoryFiles(context: Context) : ChatHistoryFiles {
     private val root = context.applicationContext.filesDir
 
+    override val backgroundReads = true
+
     override fun read(name: String): String? = File(root, name).takeIf { it.isFile }?.readText()
 
-    override fun write(name: String, text: String) {
+    override fun readMedia(name: String): ByteArray? =
+        File(root, name).takeIf { it.isFile && it.length() in 1..16L * 1024 * 1024 }?.readBytes()
+
+    override fun hasMedia(name: String): Boolean = File(root, name).isFile
+
+    override fun write(name: String, text: String) = writeMedia(name, text.toByteArray(Charsets.UTF_8))
+
+    override fun writeMedia(name: String, bytes: ByteArray) {
         val file = File(root, name)
         val parent = requireNotNull(file.parentFile)
         check(parent.isDirectory || parent.mkdirs()) { "无法创建对话目录" }
         val temp = File(file.parentFile, file.name + ".tmp")
         try {
-            temp.outputStream().use { stream -> stream.write(text.toByteArray(Charsets.UTF_8)); stream.fd.sync() }
+            temp.outputStream().use { stream -> stream.write(bytes); stream.fd.sync() }
             // rename is atomic on Android; never delete the only good copy on failure.
             check(temp.renameTo(file)) { "无法保存对话，原记录已保留" }
         } finally { temp.delete() }
@@ -24,14 +33,18 @@ class AndroidChatHistoryFiles(context: Context) : ChatHistoryFiles {
 
     override fun delete(name: String) {
         val file = File(root, name)
-        check(!file.exists() || if (name.startsWith("agent/tool-output/")) file.deleteRecursively() else file.delete()) { "无法删除对话记录" }
+        check(!file.exists() || if (name.startsWith("agent/tool-output/") || name.startsWith("agent/attachments/")) file.deleteRecursively() else file.delete()) { "无法删除对话记录" }
+    }
+
+    override fun deleteTree(name: String) {
+        check(File(root, name).deleteRecursively()) { "无法删除对话图片" }
     }
 
     /** 智能体内核把对话存在 `files/agent/s-<编号>.jsonl`（见 MainActivity 里的 agentDir）。 */
     override fun agentCopy(id: String): String = "agent/s-${escapedId(id)}.jsonl"
     override fun agentProgressCopy(id: String): String = "agent/progress/s-${escapedId(id)}.jsonl"
     override fun agentSidecars(id: String): List<String> =
-        listOf(agentCopy(id), agentProgressCopy(id), "agent/tool-output/${escapedId(id)}", "agent/trust/$id")
+        listOf(agentCopy(id), agentProgressCopy(id), "agent/tool-output/${escapedId(id)}", "agent/attachments/${escapedId(id)}", "agent/trust/$id")
 
     override fun deletionMarker(folder: String, id: String): String = "agent/deleted/$id"
 

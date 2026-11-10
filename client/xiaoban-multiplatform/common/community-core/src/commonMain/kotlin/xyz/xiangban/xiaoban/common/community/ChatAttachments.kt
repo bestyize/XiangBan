@@ -7,14 +7,16 @@ import kotlinx.serialization.json.*
 @Serializable
 data class ChatAttachment(val name: String, val text: String? = null, val imageDataUrl: String? = null)
 
-fun validateChatAttachments(attachments: List<ChatAttachment>) {
+fun validateChatAttachments(attachments: List<ChatAttachment>) = validateChatAttachments(attachments, false)
+
+internal fun validateChatAttachments(attachments: List<ChatAttachment>, allowStoredImages: Boolean) {
     require(attachments.size <= 3) { "每条消息最多添加 3 个附件" }
     var bytes = 0
     for (a in attachments) {
         require(a.name.isNotBlank() && a.name.length <= 160) { "附件名称无效" }
         require((a.text != null) != (a.imageDataUrl != null)) { "附件内容无效" }
         a.text?.let { require(it.encodeToByteArray().size <= 256 * 1024) { "文本附件不能超过 256 KiB" } }
-        a.imageDataUrl?.let {
+        a.imageDataUrl?.takeUnless { allowStoredImages && isChatMediaReference(it) }?.let {
             require(it.length <= 2_800_000) { "图片过大，请压缩后重新选择" }
             val prefix = it.substringBefore(',')
             val payload = it.substringAfter(',', "")

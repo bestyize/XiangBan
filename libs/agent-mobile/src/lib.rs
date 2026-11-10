@@ -36,6 +36,7 @@ use std::time::{Duration, Instant};
 
 pub mod jni_api;
 mod policy;
+mod media;
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
@@ -189,6 +190,7 @@ struct HostModel {
     rpc: Arc<Rpc>,
     model: Arc<Mutex<String>>,
     settings: policy::Settings,
+    attachments: std::path::PathBuf,
 }
 
 fn http_error(status: u16, body: &str) -> HarnessError {
@@ -225,6 +227,12 @@ impl ModelProvider for HostModel {
             let limit = configured.min(output_limit.unwrap_or(configured));
             profile.extra_body.insert("max_tokens".into(), json!(limit));
         }
+        let mut hydrated;
+        let request = if media::has_references(&request.messages) {
+            hydrated = request.clone();
+            media::hydrate(&self.attachments, &session, &mut hydrated)?;
+            &hydrated
+        } else { request };
         let mut body: Value = serde_json::from_slice(&encode_request_body(&profile, request)?).map_err(|e|HarnessError::Config(e.to_string()))?;
         if profile.model.trim().is_empty() {
             // No model chosen: leave the field out so the server uses its default.
@@ -367,6 +375,7 @@ pub enum Polled {
 struct MobileSessionStore {
     history: JsonlStore,
     deleted: std::path::PathBuf,
+    attachments: std::path::PathBuf,
 }
 
 impl SessionStore for MobileSessionStore {
@@ -381,7 +390,13 @@ impl SessionStore for MobileSessionStore {
         if policy::valid_session(session) && self.deleted.join(session).is_file() {
             return Err(HarnessError::Store("会话已删除".into()));
         }
-        self.history.append(session, messages)
+        if messages.iter().flat_map(|message| &message.parts).any(|part| matches!(part, Part::Image { url } if url.starts_with("data:image/"))) {
+            let mut compact = messages.to_vec();
+            media::compact(&self.attachments, session, &mut compact)?;
+            self.history.append(session, &compact)
+        } else {
+            self.history.append(session, messages)
+        }
     }
 }
 
@@ -411,7 +426,8 @@ impl Engine {
         });
         let model = Arc::new(Mutex::new(config.model.clone()));
         let settings: policy::Settings = Arc::new(Mutex::new(HashMap::new()));
-        let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone(), settings: settings.clone() });
+        let attachments = std::path::Path::new(&config.sessions_dir).join("attachments");
+        let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone(), settings: settings.clone(), attachments: attachments.clone() });
         let bridge = StdioBridge::new(LineWriter { tx: out_tx.clone(), buf: Vec::new() });
         // Progress is independent of chat trimming and uses the same per-session isolation.
         let todo = Arc::new(Todo::new().persistent(std::path::Path::new(&config.sessions_dir).join("progress")));
@@ -422,7 +438,7 @@ impl Engine {
         }).check_reads().honor_grants_after_taint());
         let trust = std::path::Path::new(&config.sessions_dir).join("trust");
         let deleted = std::path::Path::new(&config.sessions_dir).join("deleted");
-        let store = Arc::new(MobileSessionStore { history: JsonlStore::new(&config.sessions_dir), deleted: deleted.clone() });
+        let store = Arc::new(MobileSessionStore { history: JsonlStore::new(&config.sessions_dir), deleted: deleted.clone(), attachments });
         let spill = std::path::Path::new(&config.sessions_dir).join("tool-output");
         let mut builder = Agent::builder(provider, store.clone())
             .system_prompt(config.system_prompt.clone())

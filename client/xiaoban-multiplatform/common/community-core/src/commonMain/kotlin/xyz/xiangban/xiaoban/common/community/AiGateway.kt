@@ -34,6 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -676,6 +677,8 @@ class CloudChatController(
     private var nextId = 1L
     private var metaJob: Job? = null
     private var chatJob: Job? = null
+    private var openJob: Job? = null
+    private var checkpointJob: Job? = null
     private var sendEpoch = 0L
     @kotlin.concurrent.Volatile private var accountGeneration = 0L
     private var accountId: String? = null
@@ -716,8 +719,19 @@ class CloudChatController(
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
     fun openConversation(id: String) {
+        openJob?.cancel()
         if (id == agentSession && _state.value.messages.isNotEmpty()) return
-        val saved = history?.loadSnapshot(id)
+        val store = history ?: return
+        if (store.backgroundReads) {
+            openJob = scope.launch {
+                val saved = store.loadInBackground(id)
+                openJob = null
+                showConversation(id, saved)
+            }
+        } else showConversation(id, store.loadSnapshot(id))
+    }
+
+    private fun showConversation(id: String, saved: StoredChat?) {
         if (saved == null) {
             _state.value = _state.value.copy(conversations = history?.list().orEmpty())
             return
@@ -728,6 +742,17 @@ class CloudChatController(
         nextId = (saved.messages.maxOfOrNull { it.id } ?: 0L) + 1
         applyOptions(saved.options)
         _state.value = _state.value.copy(messages = saved.messages, approval = null, question = null, inputError = modelInputError(emptyList()))
+    }
+
+    suspend fun resolveImage(conversation: String, value: String): String? {
+        if (conversation != agentSession) return null
+        val generation = accountGeneration
+        val source = try {
+            if (isChatMediaReference(value)) history?.mediaFor(conversation)?.resolve(value)
+            else value.takeIf { it.startsWith("data:image/") }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { null }
+        return source?.takeIf { conversation == agentSession && generation == accountGeneration }
     }
 
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
@@ -850,6 +875,7 @@ class CloudChatController(
     fun generateImages(rawPrompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): Boolean {
         val current = _state.value
         if (current.sending) return false
+        openJob?.cancel()
         val prompt = rawPrompt.trim()
         require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
         require(count in 1..4 && format in listOf("png", "gif"))
@@ -862,12 +888,14 @@ class CloudChatController(
         val reply = ChatTurn(replyId, "assistant", "", streaming = true, imageGeneration = true, activity = "正在生成图片…")
         val epoch = ++sendEpoch
         val ownerSession = agentSession
+        val media = history?.mediaFor(ownerSession)
         val request = accountRequest()
         _state.value = current.copy(messages = current.messages + userTurn + reply, sending = true)
         persist()
         chatJob = scope.launch(request) {
             try {
-                val images = api.generateImages(prompt, count, size, format, frames, frameDurationMs)
+                val results = api.generateImages(prompt, count, size, format, frames, frameDurationMs)
+                val images = media?.save(results) ?: results
                 if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) {
                     val text = if (images.size == count) "已生成 ${images.size} 张图片"
@@ -908,7 +936,8 @@ class CloudChatController(
             _state.value = _state.value.copy(inputError = error)
             return false
         }
-        validateChatAttachments(attachments)
+        validateChatAttachments(attachments, allowStoredImages = history != null)
+        openJob?.cancel()
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments)
         val replyId = nextId++
         val assistantTurn = ChatTurn(id = replyId, role = "assistant", text = "", streaming = true)
@@ -926,6 +955,7 @@ class CloudChatController(
         }
         val epoch = ++sendEpoch
         val ownerSession = agentSession
+        val media = this.history?.mediaFor(ownerSession)
         val request = accountRequest()
         val tier = _state.value.selectedTier.ifEmpty { null }
         val reasoning = _state.value.reasoningByTier[tier]?.takeIf { it in _state.value.activeTier?.reasoningEfforts.orEmpty() }
@@ -944,6 +974,7 @@ class CloudChatController(
             val session = agentSession
             chatJob = scope.launch(request) {
                 try {
+                    val resolved = resolveInput(attachments, media)
                     agent.ensureStarted(tier ?: "", reasoning)
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
@@ -951,7 +982,7 @@ class CloudChatController(
                     val runId = agent.nextRunId()
                     runAuthorization = request
                     agentRun = runId
-                    agent.run(session, note + prompt, runId, attachments, snapshot, tierSnapshot, retry = nativeRetry, account = request)
+                    agent.run(session, note + prompt, runId, resolved, snapshot, tierSnapshot, retry = nativeRetry, account = request)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -964,9 +995,12 @@ class CloudChatController(
             }
             return true
         }
+        val contextTokens = _state.value.contextTokens
+        val tierContext = _state.value.activeTier?.contextWindowTokens
         chatJob = scope.launch(request) {
             try {
-                api.streamChat(history, tier, reasoning, _state.value.activeTier?.contextWindowTokens?.let { minOf(it, _state.value.contextTokens) } ?: _state.value.contextTokens) { delta ->
+                val messages = resolveHistory(history, media)
+                api.streamChat(messages, tier, reasoning, tierContext?.let { minOf(it, contextTokens) } ?: contextTokens) { delta ->
                     if (request.isCurrent() && epoch == sendEpoch && ownerSession == agentSession) updateTurn(replyId) { it.copy(text = it.text + delta) }
                 }
                 if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
@@ -990,6 +1024,33 @@ class CloudChatController(
             }
         }
         return true
+    }
+
+    private suspend fun resolveInput(attachments: List<ChatAttachment>, media: ChatMedia?): List<ChatAttachment> {
+        val resolved = attachments.map { attachment ->
+            val reference = attachment.imageDataUrl?.takeIf(::isChatMediaReference) ?: return@map attachment
+            val image = media?.resolve(reference) ?: throw ApiException(0, "找不到引用的图片，请重新选择。")
+            attachment.copy(imageDataUrl = image)
+        }
+        if (resolved != attachments) withContext(Dispatchers.Default) { validateChatAttachments(resolved) }
+        return resolved
+    }
+
+    private suspend fun resolveHistory(messages: List<ChatMessage>, media: ChatMedia?): List<ChatMessage> {
+        val current = resolveInput(messages.last().attachments, media)
+        // Preserve the most recent old images without reading every large sidecar into memory.
+        var remaining = 4 * 1024 * 1024
+        val earlier = messages.dropLast(1).asReversed().map { message ->
+            message.copy(attachments = message.attachments.map images@{ attachment ->
+                val image = attachment.imageDataUrl ?: return@images attachment
+                val resolved = if (remaining > 0 && isChatMediaReference(image)) media?.resolve(image) else image
+                if (resolved != null && !isChatMediaReference(resolved) && resolved.length <= remaining) {
+                    remaining -= resolved.length
+                    attachment.copy(imageDataUrl = resolved)
+                } else ChatAttachment(attachment.name, text = "[历史图片 ${attachment.name} 已省略，可重新引用。]")
+            })
+        }.asReversed()
+        return earlier + messages.last().copy(attachments = current)
     }
 
     /** 上一条回复失败时，原样重试最后一条用户提问。 */
@@ -1029,6 +1090,10 @@ class CloudChatController(
 
     /** 停止正在生成的流式回复，保留已输出的部分文字。 */
     fun stop() {
+        openJob?.cancel()
+        openJob = null
+        checkpointJob?.cancel()
+        checkpointJob = null
         ++sendEpoch
         val wasSending = _state.value.sending
         chatJob?.cancel()
@@ -1194,6 +1259,8 @@ class CloudChatController(
     }
 
     fun reset() {
+        openJob?.cancel()
+        checkpointJob?.cancel()
         ++accountGeneration
         metaJob?.cancel()
         balanceJob?.cancel()
@@ -1206,9 +1273,19 @@ class CloudChatController(
     }
 
     private fun updateTurn(id: Long, transform: (ChatTurn) -> ChatTurn) {
-        _state.value = _state.value.copy(
-            messages = _state.value.messages.map { if (it.id == id) transform(it) else it },
-        )
+        val messages = _state.value.messages.map { if (it.id == id) transform(it) else it }
+        _state.value = _state.value.copy(messages = messages)
+        val store = history ?: return
+        val last = messages.lastOrNull()?.takeIf { it.id == id && it.streaming && !it.imageGeneration } ?: return
+        if (checkpointJob?.isActive == true) return
+        val owner = agentSession
+        val epoch = sendEpoch
+        checkpointJob = scope.launch {
+            delay(750)
+            if (epoch == sendEpoch && owner == agentSession) {
+                _state.value.messages.lastOrNull()?.takeIf { it.id == last.id }?.let { store.checkpoint(owner, it) }
+            }
+        }
     }
 
     private fun refreshBalanceQuietly() {

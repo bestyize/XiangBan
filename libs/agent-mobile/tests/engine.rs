@@ -378,6 +378,16 @@ fn text_and_image_parts_reach_the_host_model_request_without_changing_jni() {
     answer_text(&engine, &request, "参考图已收到。");
     assert_eq!(next_of(&engine, "run_end")["ok"], true);
     engine.stop();
+
+    let stored = std::fs::read_to_string(std::path::Path::new(&dir).join("s-s1.jsonl")).unwrap();
+    assert!(!stored.contains(image_url));
+    assert!(stored.contains("xiaoban-attachment:"));
+    let restarted = Engine::start(&config(&dir)).unwrap();
+    restarted.send(&json!({ "type": "run", "id": "r2", "session": "s1", "input": "继续" }).to_string()).unwrap();
+    let request = next_of(&restarted, "model_request");
+    assert!(request["body"].as_str().unwrap().contains(image_url));
+    assert!(!request["body"].as_str().unwrap().contains("xiaoban-attachment:"));
+    restarted.stop();
 }
 
 #[test]

@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.common.community
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -10,7 +11,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlin.io.encoding.Base64
 import kotlin.random.Random
 
 /** 对话历史放在手机的什么地方（各平台自己实现）：按名字存取一段文字，名字里的 `/` 是子文件夹。 */
@@ -18,6 +22,11 @@ interface ChatHistoryFiles {
     fun read(name: String): String?
     fun write(name: String, text: String)
     fun delete(name: String)
+    val backgroundReads: Boolean get() = false
+    fun readMedia(name: String): ByteArray? = read(name)?.let(Base64::decode)
+    fun writeMedia(name: String, bytes: ByteArray) = write(name, Base64.encode(bytes))
+    fun hasMedia(name: String): Boolean = read(name) != null
+    fun deleteTree(name: String) = delete(name)
     /** 智能体内核自己也存了一份对话，这里给出它的名字；删对话时一起删。没有就是 null。 */
     fun agentCopy(id: String): String? = null
     /** 内核持久任务清单，随会话一起删除。 */
@@ -33,6 +42,7 @@ class InMemoryChatHistoryFiles : ChatHistoryFiles {
     override fun read(name: String): String? = texts[name]
     override fun write(name: String, text: String) { texts[name] = text }
     override fun delete(name: String) { texts.remove(name) }
+    override fun deleteTree(name: String) { texts.keys.removeAll { it.startsWith("$name/") } }
     override fun deletedIds(folder: String): Set<String> =
         texts.keys.filter { it.startsWith("$folder/deleted/") }.map { it.substringAfterLast('/') }.toSet()
 }
@@ -68,9 +78,20 @@ class ChatHistory(
     private var groups: List<String> = emptyList()
     private var deleted = emptySet<String>()
     private val cleaning = mutableSetOf<String>()
-    private data class Write(val revision: Long, val name: String, val text: String?)
+    private data class Write(
+        val revision: Long,
+        val name: String,
+        val text: String? = null,
+        val snapshot: StoredChat? = null,
+        val checkpoint: ChatTurn? = null,
+        val media: ChatMedia? = null,
+        val deleteTree: String? = null,
+        val result: CompletableDeferred<Boolean> = CompletableDeferred(),
+    )
     private val pending = MutableStateFlow<Map<String, Write>>(emptyMap())
-    private val writes = Channel<Write>(Channel.UNLIMITED)
+    private val writes = Channel<Unit>(Channel.CONFLATED)
+    private val io = Mutex()
+    internal val backgroundReads get() = files.backgroundReads
     private var revision = 0L
     private val options = mutableMapOf<String, ChatOptions>()
     private val _saveError = MutableStateFlow<String?>(null)
@@ -79,29 +100,42 @@ class ChatHistory(
 
     init {
         scope.launch {
-            for (write in writes) {
-                if (pending.value[write.name] != write) continue
-                val result = try {
-                    withContext(Dispatchers.Default) {
-                        if (write.text == null) files.delete(write.name) else files.write(write.name, write.text)
+            for (signal in writes) {
+                for (write in pending.value.values.sortedBy { it.revision }) {
+                    if (pending.value[write.name] != write) continue
+                    val saved = try {
+                        withContext(Dispatchers.Default) {
+                            io.withLock {
+                                val text = when {
+                                    write.snapshot != null -> CommunityJson.encodeToString(
+                                        write.snapshot.copy(messages = write.snapshot.messages.map(requireNotNull(write.media)::compact)),
+                                    )
+                                    write.checkpoint != null -> CommunityJson.encodeToString(write.checkpoint)
+                                    else -> write.text
+                                }
+                                if (text == null) files.delete(write.name) else files.write(write.name, text)
+                                write.deleteTree?.let(files::deleteTree)
+                            }
+                        }
+                        true
+                    } catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { false }
+                    if (saved) {
+                        pending.update { if (it[write.name] == write) it - write.name else it }
+                        failed.update { it - write.name }
+                        if (failed.value.isEmpty()) _saveError.value = null
+                    } else {
+                        failed.update { it + write.name }
+                        _saveError.value = "对话尚未保存，请重试保存；退出应用可能丢失未保存内容。"
                     }
-                    Result.success(Unit)
-                } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { Result.failure(e) }
-                if (result.isSuccess) {
-                    pending.update { if (it[write.name] == write) it - write.name else it }
-                    failed.update { it - write.name }
-                    if (failed.value.isEmpty()) _saveError.value = null
-                } else {
-                    failed.update { it + write.name }
-                    _saveError.value = "对话尚未保存，请重试保存；退出应用可能丢失未保存内容。"
+                    write.result.complete(saved)
                 }
             }
         }
     }
 
     fun retryPending() {
-        pending.value.values.sortedBy { it.revision }.forEach { writes.trySend(it) }
+        writes.trySend(Unit)
         deleted.forEach { cleanDeleted(folder, it) }
     }
 
@@ -159,30 +193,81 @@ class ChatHistory(
     fun list(): List<ChatSummary> = index
 
     /** Missing/corrupt/unreadable records must not silently remove the conversation index. */
-    fun loadSnapshot(id: String): StoredChat? = try {
-        if (id in deleted) null else read(chatName(id))?.let { CommunityJson.decodeFromString<StoredChat>(it) }?.also { options[id] = it.options }
-    } catch (e: Exception) {
+    private fun readSnapshot(owner: String, id: String): StoredChat? = try {
+        val name = "$owner/$id.json"
+        val queuedSnapshot = pending.value[name]
+        val saved = if (queuedSnapshot != null) queuedSnapshot.snapshot
+            else read(name)?.let { CommunityJson.decodeFromString<StoredChat>(it) }
+        val last = saved?.messages?.lastOrNull()
+        if (saved != null && last?.error == INTERRUPTED_REPLY) {
+            val checkpointName = "$owner/$id.stream.json"
+            val queued = pending.value[checkpointName]
+            val checkpoint = if (queued != null) queued.checkpoint
+                else read(checkpointName)?.let { runCatching { CommunityJson.decodeFromString<ChatTurn>(it) }.getOrNull() }
+            if (checkpoint?.id == last.id) saved.copy(messages = saved.messages.dropLast(1) + checkpoint) else saved
+        } else saved
+    } catch (e: CancellationException) { throw e }
+    catch (_: Exception) {
         _saveError.value = "无法读取这段对话，原记录已保留，请稍后重试。"
         null
     }
 
+    fun loadSnapshot(id: String): StoredChat? =
+        if (!validChatId(id) || id in deleted) null else readSnapshot(folder, id)?.also { options[id] = it.options }
+
+    internal suspend fun loadInBackground(id: String): StoredChat? {
+        if (!validChatId(id) || id in deleted) return null
+        val owner = folder
+        val media = mediaFor(id)
+        val saved = withContext(Dispatchers.Default) {
+            io.withLock {
+                readSnapshot(owner, id)?.let { snapshot ->
+                    try { snapshot.copy(messages = snapshot.messages.map(media::compact)) }
+                    catch (_: Exception) { snapshot } // An old inline record remains readable if storage is full.
+                }
+            }
+        }
+        return saved?.takeIf { folder == owner && id !in deleted }?.also { options[id] = it.options }
+    }
+
     fun load(id: String): List<ChatTurn>? = loadSnapshot(id)?.messages
+
+    internal fun mediaFor(id: String): ChatMedia {
+        require(validChatId(id))
+        return ChatMedia(files, io, folder, id)
+    }
+
+    internal fun checkpoint(id: String, turn: ChatTurn) {
+        if (id in deleted || !turn.streaming || turn.imageGeneration) return
+        enqueue(Write(++revision, "$folder/$id.stream.json", checkpoint = interrupted(turn)))
+    }
+
+    internal suspend fun awaitSaved(id: String): Boolean =
+        pending.value[chatName(id)]?.result?.await() ?: true
+
+    private fun interrupted(turn: ChatTurn): ChatTurn = turn.copy(
+        streaming = false,
+        activity = "回复已中断",
+        error = INTERRUPTED_REPLY,
+        tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = ToolStatus.Error) else it },
+    )
 
     /** 存下一个对话（没有内容就不存），把它挪到列表最前面；返回新的列表。 */
     fun save(id: String, messages: List<ChatTurn>, nowMs: Long, settings: ChatOptions? = null): List<ChatSummary> {
         if (id in deleted) return index
-        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.imageGeneration || it.role == "user" }
+        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.streaming || it.imageGeneration || it.role == "user" }
             .map {
                 when {
                     it.streaming && it.imageGeneration -> it.copy(streaming = false, error = UNKNOWN_IMAGE_RESULT)
-                    it.streaming -> it.copy(streaming = false)
+                    it.streaming -> interrupted(it)
                     else -> it
                 }
             }
         val selected = settings ?: options[id] ?: ChatOptions()
         selected.validate()
         options[id] = selected
-        enqueue(chatName(id), CommunityJson.encodeToString(StoredChat(id, kept, selected)))
+        enqueue(Write(++revision, chatName(id), snapshot = StoredChat(id, kept, selected), media = mediaFor(id)))
+        if (messages.none { it.streaming && !it.imageGeneration }) enqueue("$folder/$id.stream.json", null)
         if (kept.none { it.role == "user" }) return index
         index = listOf(ChatSummary(id, chatTitle(kept), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
@@ -204,7 +289,8 @@ class ChatHistory(
             deleted = deleted + id
         }
         options.remove(id)
-        enqueue(chatName(id), null)
+        enqueue(Write(++revision, chatName(id), deleteTree = "$folder/media/$id"))
+        enqueue("$folder/$id.stream.json", null)
         index = index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         cleanDeleted(folder, id)
@@ -218,8 +304,12 @@ class ChatHistory(
             try {
                 withTimeout(10_000) { awaitAgentIdle(id) }
                 withContext(Dispatchers.Default) {
-                    files.delete("$owner/$id.json")
-                    files.agentSidecars(id).forEach(files::delete)
+                    io.withLock {
+                        files.delete("$owner/$id.json")
+                        files.delete("$owner/$id.stream.json")
+                        files.deleteTree("$owner/media/$id")
+                        files.agentSidecars(id).forEach(files::delete)
+                    }
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 _saveError.value = "对话正在停止，稍后可重试清理。"
@@ -246,8 +336,15 @@ class ChatHistory(
     }
 
     private fun enqueue(name: String, text: String?) {
-        val write = Write(++revision, name, text)
-        pending.update { it + (name to write) }
-        writes.trySend(write)
+        enqueue(Write(++revision, name, text))
+    }
+
+    private fun enqueue(write: Write) {
+        val previous = pending.value[write.name]
+        pending.update { it + (write.name to write) }
+        previous?.result?.complete(false)
+        writes.trySend(Unit)
     }
 }
+
+internal const val INTERRUPTED_REPLY = "回复已中断，已保留收到的内容。"

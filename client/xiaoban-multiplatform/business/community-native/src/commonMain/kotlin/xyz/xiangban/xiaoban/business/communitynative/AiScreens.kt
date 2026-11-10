@@ -197,6 +197,11 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var attach by rememberSaveable { mutableStateOf(false) }
     var imageSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var preview by remember(cloud.conversationId, session.accountId) { mutableStateOf<ChatImagePreview?>(null) }
+    val resolveImage = remember(chat, cloud.conversationId, session.accountId) {
+        val conversation = cloud.conversationId
+        val resolve: suspend (String) -> String? = { value -> chat.resolveImage(conversation, value) }
+        resolve
+    }
     var toast by remember { mutableStateOf<String?>(null) }
     // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
     val voiceInput = key(conversation, accountGeneration) {
@@ -248,7 +253,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, resolveImage, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
                     }
                 }
                 cloud.question?.let { question ->
@@ -361,7 +366,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 },
             )
         }
-        preview?.let { ChatImageViewer(it, env.platform) { preview = null } }
+        preview?.let { ChatImageViewer(it, env.platform, resolveImage) { preview = null } }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
         PressOverlay(voiceInput)
@@ -424,7 +429,7 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
@@ -436,7 +441,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                     turn.attachments.filter { it.imageDataUrl == null }.joinToString("") { "\n📎 ${it.name}" })
                 turn.attachments.forEach { attachment ->
                     attachment.imageDataUrl?.let { data ->
-                        ChatImageThumbnail(ChatImagePreview(data, attachment.name), onPreview)
+                        ChatImageThumbnail(ChatImagePreview(data, attachment.name), resolveImage, onPreview)
                     }
                 }
             } else {
@@ -450,7 +455,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                             onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
                     turn.generatedImages.forEachIndexed { index, data ->
-                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}"), onPreview)
+                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}"), resolveImage, onPreview)
                     }
                     if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
                     if (turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") }) LinkText("去兑换点数 ›", onQuota)

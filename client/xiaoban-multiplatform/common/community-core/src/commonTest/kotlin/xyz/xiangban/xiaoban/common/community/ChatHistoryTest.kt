@@ -160,6 +160,32 @@ class ChatHistoryTest {
     }
 
     @Test
+    fun `restart restores the interrupted response and scoped media`() = runTest {
+        val files = InMemoryChatHistoryFiles()
+        val history = ChatHistory(files, scope()).apply { useAccount("owner") }
+        val image = "data:image/png;base64,iVBORw0KGgo="
+        val user = ChatTurn(1, "user", "你好", attachments = listOf(ChatAttachment("画面.png", imageDataUrl = image)))
+        val reply = ChatTurn(2, "assistant", "", streaming = true)
+        history.save("one", listOf(user, reply), 1)
+        history.checkpoint("one", reply.copy(text = "已收到部分文字"))
+        eventually { files.read("chats/owner/one.stream.json") != null && files.read("chats/owner/one.json") != null }
+        val stored = checkNotNull(files.read("chats/owner/one.json"))
+        assertTrue("media:" in stored && image !in stored)
+        val restarted = ChatHistory(files, scope()).apply { useAccount("owner") }
+        val messages = checkNotNull(restarted.load("one"))
+        assertEquals("已收到部分文字", messages.last().text)
+        assertEquals(INTERRUPTED_REPLY, messages.last().error)
+        val reference = checkNotNull(messages.first().attachments.single().imageDataUrl)
+        assertEquals(image, restarted.mediaFor("one").resolve(reference))
+        restarted.useAccount("other")
+        assertNull(restarted.mediaFor("one").resolve(reference))
+        restarted.useAccount("owner")
+        restarted.delete("one")
+        eventually { files.read("chats/owner/one.stream.json") == null }
+        assertNull(restarted.mediaFor("one").resolve(reference))
+    }
+
+    @Test
     fun `an empty new conversation is not saved`() {
         val history = ChatHistory(InMemoryChatHistoryFiles(), scope())
         history.useAccount(null)

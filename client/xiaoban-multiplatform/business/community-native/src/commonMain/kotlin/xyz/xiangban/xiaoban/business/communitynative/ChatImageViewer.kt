@@ -48,6 +48,12 @@ import com.multiplatform.webview.web.WebViewState
 
 internal data class ChatImagePreview(val data: String, val label: String)
 
+@Composable
+private fun resolvedChatImage(image: ChatImagePreview, resolve: suspend (String) -> String?): String? {
+    val source by produceState<String?>(null, image.data, resolve) { value = resolve(image.data) }
+    return source
+}
+
 /** The native WebView renders the original GIF on Android and iOS, without scripts or network access. */
 @Composable
 private fun AnimatedChatImage(data: String, modifier: Modifier) {
@@ -66,25 +72,26 @@ private fun AnimatedChatImage(data: String, modifier: Modifier) {
 }
 
 @Composable
-private fun chatImageBytes(data: String): ByteArray? {
+private fun chatImageBytes(data: String?): ByteArray? {
     val bytes by produceState<ByteArray?>(null, data) {
-        value = withContext(Dispatchers.Default) {
-            runCatching { Base64.decode(data.substringAfter(";base64,")) }.getOrNull()
-        }
+        value = data?.let { encoded -> withContext(Dispatchers.Default) {
+            runCatching { Base64.decode(encoded.substringAfter(";base64,")) }.getOrNull()
+        } }
     }
     return bytes
 }
 
 @Composable
-internal fun ChatImageThumbnail(image: ChatImagePreview, onPreview: (ChatImagePreview) -> Unit) {
-    val bytes = chatImageBytes(image.data)
-    if (image.data.startsWith("data:image/gif;base64,")) {
+internal fun ChatImageThumbnail(image: ChatImagePreview, resolve: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit) {
+    val data = resolvedChatImage(image, resolve)
+    if (data?.startsWith("data:image/gif;base64,") == true) {
         Box(Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 260.dp).clip(RoundedCornerShape(12.dp))) {
-            AnimatedChatImage(image.data, Modifier.matchParentSize())
+            AnimatedChatImage(data, Modifier.matchParentSize())
             Box(Modifier.matchParentSize().clickable(onClickLabel = "查看 GIF 动图") { onPreview(image) })
         }
         return
     }
+    val bytes = chatImageBytes(data)
     AsyncImage(
         model = bytes,
         imageLoader = rememberImageLoader(),
@@ -97,8 +104,9 @@ internal fun ChatImageThumbnail(image: ChatImagePreview, onPreview: (ChatImagePr
 }
 
 @Composable
-internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?, onClose: () -> Unit) {
-    val bytes = chatImageBytes(image.data)
+internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?, resolve: suspend (String) -> String?, onClose: () -> Unit) {
+    val data = resolvedChatImage(image, resolve)
+    val bytes = chatImageBytes(data)
     val scope = rememberCoroutineScope()
     var zoom by remember(image) { mutableStateOf(1f) }
     var offset by remember(image) { mutableStateOf(Offset.Zero) }
@@ -128,7 +136,7 @@ internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?
                         translationX = offset.x
                         translationY = offset.y
                     }
-            if (image.data.startsWith("data:image/gif;base64,")) AnimatedChatImage(image.data, imageModifier)
+            if (data?.startsWith("data:image/gif;base64,") == true) AnimatedChatImage(data, imageModifier)
             else AsyncImage(
                 model = bytes, imageLoader = rememberImageLoader(), contentDescription = image.label,
                 contentScale = ContentScale.Fit, onError = { failed = bytes != null }, onSuccess = { failed = false },
@@ -140,12 +148,12 @@ internal fun ChatImageViewer(image: ChatImagePreview, platform: PlatformActions?
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 val source = bytes
-                if (platform != null && platform.supportsChatImageSave && source != null && !failed) {
+                if (platform != null && platform.supportsChatImageSave && source != null && data != null && !failed) {
                     GhostPillButton("保存图片", {
                         saving = true
                         scope.launch {
                             try {
-                                notice = when (platform.saveChatImage(source, image.data.substringAfter("data:").substringBefore(";"))) {
+                                notice = when (platform.saveChatImage(source, data.substringAfter("data:").substringBefore(";"))) {
                                     CommunityPosterResult.Saved -> "图片已保存"
                                     CommunityPosterResult.Cancelled -> null
                                     CommunityPosterResult.ChooserOpened -> "请选择保存位置"
