@@ -77,6 +77,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .game.night .score-block strong, .game.night .boss-name b, .game.night .combo { color: #f4eddc; text-shadow: 0 0 10px #1b1b1d; }
 .game.night .boss-hp { background: #efe7d42e; }
 .game.night .boss-hp span { background: linear-gradient(90deg, #e9e0c9, #f6f0e2); }
+.game.sea-night .area-title small { color: #e2d3b2; text-shadow: 0 1px 5px #1b2229; }
+.game.sea-night .area-title strong { color: #f3e6c8; text-shadow: 0 2px 14px #111824, 0 0 3px #151c22; }
 .game.boss-fight .prompt { top: calc(max(10px, var(--safe-top)) + 124px); }
 .toast { position: absolute; z-index: 5; top: 50%; left: 50%; transform: translateX(-50%); padding: 9px 18px; border-radius: 20px; background: #f4eddcf0; box-shadow: 0 5px 20px #3a2c1a1a; font-size: 12px; color: var(--ink-2); white-space: nowrap; pointer-events: none; }
 

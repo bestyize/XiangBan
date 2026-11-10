@@ -84,7 +84,7 @@ describe('竹林卷 · 架刀', () => {
     const events: Any[] = []
     let pressed = false
     for (let i = 0; i < 80; i++) {
-      const press = !pressed && puppet.state === 'tele' && puppet.t <= 0.08
+      const press: boolean = !pressed && puppet.state === 'tele' && puppet.t <= 0.08
       pressed = pressed || press
       events.push(...rules.step(state, { slashPressed: press }, DT))
     }

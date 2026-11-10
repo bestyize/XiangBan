@@ -1697,26 +1697,45 @@
   }
 
   function drawRigging() {
-    if(currentVolume()!==4) return
-    for(const r of state.rigging) {
-      if(r.x<camera.x-viewW/2-180||r.x>camera.x+viewW/2+180)continue
-      ctx.save();ctx.lineCap='round'
-      const top=rules.GROUND-205
-      ctx.strokeStyle='rgba(35,54,60,0.75)';ctx.lineWidth=4
-      ctx.beginPath();ctx.moveTo(r.x-24,rules.GROUND);ctx.lineTo(r.x-24,top-12);ctx.lineTo(r.target,top);ctx.stroke()
-      if(r.state==='hang') {
-        ctx.strokeStyle='rgba(225,230,210,0.85)';ctx.lineWidth=2
-        ctx.beginPath();ctx.moveTo(r.x,rules.GROUND-30);ctx.lineTo(r.x,top+5);ctx.lineTo(r.target,top);ctx.lineTo(r.target,r.y);ctx.stroke()
-        ctx.strokeStyle='#233d43';ctx.lineWidth=1
-        for(let j=0;j<5;j++){ctx.beginPath();ctx.ellipse(r.x,rules.GROUND-37+j*3,5,3,0,0,Math.PI*2);ctx.stroke()}
-        drawSeal('斩',r.x,rules.GROUND-72,12)
+    if (currentVolume() !== 4) return
+    const y = rules.GROUND
+    for (const r of state.rigging) {
+      if (r.x < camera.x-viewW/2-180 || r.x > camera.x+viewW/2+180) continue
+      ctx.save(); ctx.lineCap = 'round'
+      const mast = r.x - 27, top = y - 234, pulley = y - 213
+      ctx.fillStyle = 'rgba(67,56,43,.82)'
+      ctx.beginPath(); ctx.moveTo(mast-5,y); ctx.quadraticCurveTo(mast+2,y-112,mast-11,top)
+      ctx.lineTo(mast-5,top-1); ctx.quadraticCurveTo(mast+10,y-123,mast+5,y); ctx.closePath(); ctx.fill()
+      ctx.strokeStyle = 'rgba(203,174,125,.55)'; ctx.lineWidth = 1.1
+      ctx.beginPath();ctx.moveTo(mast-3,y-8);ctx.quadraticCurveTo(mast+3,y-116,mast-9,top+1);ctx.stroke()
+      ctx.strokeStyle = 'rgba(63,50,36,.79)'; ctx.lineWidth = 3.1
+      ctx.beginPath();ctx.moveTo(mast-18,pulley-8);ctx.quadraticCurveTo(mast+60,pulley-4,r.target+7,pulley+4);ctx.stroke()
+      ctx.strokeStyle = 'rgba(66,58,45,.47)';ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(mast-7,top+3);ctx.lineTo(mast-69,y-5)
+      ctx.moveTo(mast-4,top+8);ctx.quadraticCurveTo(r.target+10,pulley+20,r.target+60,y-9);ctx.stroke()
+      if (r.state === 'hang') {
+        ctx.strokeStyle = 'rgba(225,197,142,.92)'; ctx.lineWidth = 1.75
+        ctx.beginPath();ctx.moveTo(r.x,y-27);ctx.quadraticCurveTo(r.x-9,y-120,mast-5,pulley-5)
+        ctx.quadraticCurveTo(mast+45,pulley+15,r.target,pulley+4);ctx.lineTo(r.target,r.y);ctx.stroke()
+        ctx.fillStyle='#6a553b';ctx.fillRect(r.target-4,pulley+2,8,11)
+        ctx.strokeStyle='#b69a64';ctx.lineWidth=.9
+        for(let j=0;j<4;j++){ctx.beginPath();ctx.ellipse(r.x,y-37+j*3,5,2.7,-.13,0,Math.PI*2);ctx.stroke()}
+        drawSeal('斩',r.x,y-69,13)
       }
-      const yy=r.state==='spent'?rules.GROUND+8:r.y
-      ctx.strokeStyle=r.state==='spent'?'rgba(32,52,58,0.4)':'#273e44';ctx.lineWidth=11
-      ctx.beginPath();ctx.moveTo(r.target-90,yy-4);ctx.lineTo(r.target+90,yy+3);ctx.stroke()
-      ctx.strokeStyle='rgba(216,221,197,0.7)';ctx.lineWidth=1.3
-      ctx.beginPath();ctx.moveTo(r.target-88,yy-7);ctx.lineTo(r.target+86,yy);ctx.stroke()
-      for(const xx of [-62,62]){ctx.lineWidth=2;for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(r.target+xx+j*3,yy-7);ctx.lineTo(r.target+xx+j*3,yy+6);ctx.stroke()}}
+      const yy = r.state === 'spent' ? y+8 : r.y, x = r.target
+      if (r.state === 'spent') ctx.globalAlpha = .49
+      ctx.fillStyle = '#5e4b36'
+      ctx.beginPath();ctx.moveTo(x-92,yy-7);ctx.quadraticCurveTo(x-4,yy-9,x+90,yy+1)
+      ctx.lineTo(x+92,yy+6);ctx.quadraticCurveTo(x,yy+6,x-91,yy+1);ctx.closePath();ctx.fill()
+      ctx.strokeStyle='rgba(208,175,121,.72)';ctx.lineWidth=1
+      ctx.beginPath();ctx.moveTo(x-84,yy-5);ctx.quadraticCurveTo(x-11,yy-7,x+27,yy-2)
+      ctx.moveTo(x+44,yy-1);ctx.quadraticCurveTo(x+75,yy+.3,x+85,yy+2);ctx.stroke()
+      for (const dx of [-66,60]) {
+        ctx.lineWidth=1.25
+        for(let j=0;j<3;j++) {
+          ctx.beginPath();ctx.moveTo(x+dx+j*2.3,yy-6);ctx.lineTo(x+dx+j*2.3+2,yy+5);ctx.stroke()
+        }
+      }
       ctx.restore()
     }
   }
@@ -1732,22 +1751,47 @@
   }
 
   function drawTide() {
-    const tide=state.tide
-    if(!tide?.zone||tide.phase==='calm')return
-    const [a,b]=tide.zone,y=rules.GROUND
+    const tide = state.tide
+    if (!tide?.zone || tide.phase === 'calm') return
+    const [left, right] = tide.zone, y = rules.GROUND
     ctx.save()
-    if(tide.phase==='warn') {
-      ctx.strokeStyle='rgba(190,213,207,0.8)';ctx.lineWidth=1.5
-      for(let j=0;j<3;j++){ctx.beginPath();for(let x=a;x<=b;x+=10){const yy=y+8+j*5+Math.sin(x*0.04+clock*8)*3;x===a?ctx.moveTo(x,yy):ctx.lineTo(x,yy)}ctx.stroke()}
-      const edge=tide.dir>0?a+35:b-35
-      drawSeal('危',edge,y-60,19)
-      ctx.fillStyle='rgba(184,50,42,0.8)';ctx.font='22px serif';ctx.textAlign='center';ctx.fillText(tide.dir>0?'→':'←',edge,y-24)
+    if (tide.phase === 'warn') {
+      const edge = tide.dir > 0 ? left + 35 : right - 35
+      ctx.fillStyle = 'rgba(42,59,54,.65)'; ctx.fillRect(left, y + 4, right - left, 17)
+      ctx.strokeStyle = 'rgba(249,236,201,.85)'; ctx.lineWidth = 1.8
+      for (let x = left + 72; x < right - 50; x += 100) {
+        const pulse = 0.54 + 0.36 * Math.sin(clock * 9 - tide.dir * x * .026)
+        ctx.globalAlpha = pulse
+        ctx.beginPath(); ctx.moveTo(x - tide.dir * 4, y + 8); ctx.lineTo(x + tide.dir * 4, y + 12)
+        ctx.lineTo(x - tide.dir * 4, y + 16); ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      drawSeal('危', edge, y - 54, 21)
+      ctx.fillStyle = '#f8e8bf'; ctx.font = 'bold 23px serif'; ctx.textAlign = 'center'
+      ctx.fillText(tide.dir > 0 ? '→' : '←', edge, y - 21)
     } else {
-      ctx.translate(tide.x,y);ctx.scale(tide.dir,1)
-      ctx.fillStyle='rgba(45,87,102,0.8)';ctx.beginPath();ctx.moveTo(-140,18);ctx.bezierCurveTo(-64,5,-57,-46,-15,-48);ctx.bezierCurveTo(20,-51,37,-26,14,-13);ctx.bezierCurveTo(22,-35,-8,-34,-14,-10);ctx.lineTo(25,14);ctx.lineTo(-140,18);ctx.fill()
-      ctx.strokeStyle='rgba(233,244,226,0.95)';ctx.lineWidth=2.4
-      for(let j=0;j<4;j++){ctx.beginPath();ctx.moveTo(-126,12+j*4);ctx.bezierCurveTo(-63,-3+j*5,-52,-45+j*5,-14,-46+j*3);ctx.bezierCurveTo(10,-48+j*3,28,-28,13,-15);ctx.stroke()}
-      for(let j=0;j<15;j++){const u=j/15;ctx.fillStyle='rgba(232,242,225,0.8)';ctx.beginPath();ctx.arc(-12+u*48,-47-Math.sin(u*Math.PI)*17+Math.sin(clock*14+j)*3,1+j%2,0,Math.PI*2);ctx.fill()}
+      ctx.translate(tide.x, y); ctx.scale(tide.dir, 1)
+      const water = ctx.createLinearGradient(0, -44, 0, 29)
+      water.addColorStop(0, '#587b72'); water.addColorStop(.5, 'rgba(47,79,72,.91)')
+      water.addColorStop(1, 'rgba(47,79,72,0)')
+      ctx.fillStyle = water
+      ctx.beginPath(); ctx.moveTo(-149, 24)
+      ctx.bezierCurveTo(-73, 9, -49, -31, -18, -42)
+      ctx.bezierCurveTo(5, -51, 34, -41, 24, -18)
+      ctx.bezierCurveTo(20, -28, 9, -31, 2, -20)
+      ctx.quadraticCurveTo(1, -6, 29, 4); ctx.lineTo(28, 29); ctx.closePath(); ctx.fill()
+      for (let j = 0; j < 4; j++) {
+        ctx.strokeStyle = `rgba(249,238,208,${.94 - j * .19})`
+        ctx.lineWidth = j === 0 ? 2.8 : 1.05
+        ctx.beginPath(); ctx.moveTo(-123 + j * 12, 15 + j * 4)
+        ctx.bezierCurveTo(-62, 6 + j * 7, -47, -34 + j * 9, -17, -41 + j * 7)
+        ctx.bezierCurveTo(1, -48 + j * 7, 30, -43 + j * 6, 25, -20 + j * 6); ctx.stroke()
+      }
+      ctx.fillStyle = 'rgba(249,239,212,.69)'
+      for (let j = 0; j < 12; j++) {
+        const u = j / 11
+        ctx.beginPath(); ctx.ellipse(-20 + u * 49, -41 - Math.sin(u * Math.PI) * 11 + Math.sin(clock * 13 + j) * 3, 1.1 + j % 3 * .62, .9, -.35, 0, Math.PI * 2); ctx.fill()
+      }
     }
     ctx.restore()
   }
@@ -1794,6 +1838,7 @@
     }
     const night = fx.letterbox > 0.5 || env.moon > 0.5 || (env.night || 0) > 0.5 || (currentVolume() === 4 && (env.top[0] < 100 || (camera.x > 2400 && camera.x < 3180)))
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
+    gameNode.classList.toggle('sea-night', currentVolume() === 4 && night)
     darkOn = darknessAt(camera.x) > 0.02
     eyeMarks.length = 0
     scene.updateWeather(weather, cam, env, dt, clock)

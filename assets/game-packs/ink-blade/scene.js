@@ -37,12 +37,12 @@
     { x: 5200, top: [64, 60, 76], low: [228, 196, 158], tint: [236, 202, 162, 0.26], sun: 0.75, sand: 0.12, dust: 0.3 },
   ]
   const SKY_SEA = [
-    { x: 0, top: [155, 188, 194], low: [227, 236, 226], tint: [190, 218, 218, 0.12], sun: 0.8, moon: 0, rain: 0 },
-    { x: 1300, top: [159, 190, 197], low: [230, 235, 223], tint: [183, 213, 215, 0.16], sun: 0.7, moon: 0, rain: 0 },
-    { x: 2300, top: [112, 143, 157], low: [204, 215, 210], tint: [162, 192, 200, 0.24], sun: 0.22, moon: 0, rain: 0.15 },
-    { x: 3300, top: [115, 146, 153], low: [198, 214, 211], tint: [163, 190, 192, 0.3], sun: 0, moon: 0, rain: 0.2 },
-    { x: 4200, top: [42, 64, 82], low: [117, 139, 147], tint: [96, 124, 142, 0.38], sun: 0, moon: 0, rain: 0.8 },
-    { x: 5200, top: [27, 42, 61], low: [130, 153, 163], tint: [104, 132, 147, 0.35], sun: 0, moon: 1, rain: 0.08 },
+    { x: 0, top: [219,203,180], middle: [238,219,184], low: [249,232,192], glow: [255,218,150], sun: .88, wash: .22, foam: .27 },
+    { x: 1390, top: [179,162,139], middle: [216,191,148], low: [246,220,174], glow: [255,211,132], sun: .51, wash: .34, foam: .34 },
+    { x: 2330, blend: 420, top: [70,89,89], middle: [153,171,157], low: [222,226,203], glow: [223,235,207], wash: .66, foam: .56 },
+    { x: 3290, blend: 425, top: [158,144,142], middle: [205,180,153], low: [238,215,180], glow: [254,194,142], wash: .31, foam: .25 },
+    { x: 4230, top: [18,27,39], middle: [60,81,92], low: [174,187,174], glow: [169,201,207], rain: .94, wash: .91, foam: 1 },
+    { x: 5230, top: [27,33,55], middle: [71,87,113], low: [176,185,179], glow: [239,233,200], moon: 1, wash: .7, foam: .36 },
   ]
   // 灯市 stays on paper and neutral ink; cool colour is confined to distant reflections.
   const SKY_CITY = [
@@ -68,13 +68,21 @@
     let a = sky[0], b = sky[0], t = 0
     for (let i = 0; i < sky.length - 1; i++) {
       const next = sky[i + 1]
-      if (x < next.x - 280) { a = b = sky[i]; break }
-      if (x < next.x + 280) { a = sky[i]; b = next; t = smooth((x - next.x + 280) / 560); break }
+      const blend = next.blend ?? 280
+      if (x < next.x - blend) { a = b = sky[i]; break }
+      if (x < next.x + blend) { a = sky[i]; b = next; t = smooth((x - next.x + blend) / (2*blend)); break }
       a = b = next
     }
     const mix = (p, q) => p.map((v, j) => v + (q[j] - v) * t)
-    const out = { top: mix(a.top, b.top), low: mix(a.low, b.low), tint: mix(a.tint, b.tint) }
+    const out = { top: mix(a.top, b.top), low: mix(a.low, b.low), tint: volumeId === 4 ? [0,0,0,0] : mix(a.tint, b.tint) }
     for (const key of ENV_KEYS) out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * t
+    if (volumeId === 4) {
+      out.middle = mix(a.middle, b.middle)
+      out.glow = mix(a.glow, b.glow)
+      out.wash = a.wash + (b.wash - a.wash) * t
+      out.foam = a.foam + (b.foam - a.foam) * t
+      out.seaA = sky.indexOf(a); out.seaB = sky.indexOf(b); out.seaBlend = t
+    }
     return out
   }
 
@@ -97,12 +105,17 @@
     { s: 'banner1', x: 5420 }, { s: 'dais', x: 5960, alpha: 0.92 },
   ]
   const PROPS_SEA = [
-    { s: 'seaGate', x: 725, alpha: 0.68 }, { s: 'wreck', x: 1210, alpha: 0.4 },
-    { s: 'mast', x: 1510, alpha: 0.68 }, { s: 'wreck', x: 2060, alpha: 0.62 },
-    { s: 'cave', x: 2780, alpha: 0.74 },
-    { s: 'city', x: 3710, alpha: 0.68 }, { s: 'reef', x: 4100, alpha: 0.6 },
-    { s: 'wreck', x: 4490, alpha: 0.7 }, { s: 'mast', x: 4980, alpha: 0.65 },
-    { s: 'shrine', x: 5425, alpha: 0.58 }, { s: 'reef', x: 6100, alpha: 0.65 },
+    { s: 'seaGate', x: 935, y: 286, alpha: 0.9 }, { s: 'reef', x: 1250, y: 286, alpha: 0.55 },
+    { s: 'mast', x: 1680, y: 277, alpha: 0.87 }, { s: 'mast', x: 2110, y: 266, alpha: 0.49, scale: 0.66 },
+    { s: 'cave', x: 2755, y: 303, alpha: 0.96 },
+    { s: 'reef', x: 3430, y: 292, alpha: 0.53 }, { s: 'city', x: 3770, y: 287, alpha: 0.91 },
+    { s: 'wreck', x: 4730, y: 288, alpha: 0.83 }, { s: 'reef', x: 5050, y: 295, alpha: 0.63 },
+    { s: 'seaShrine', x: 5500, y: 291, alpha: 0.91 }, { s: 'reef', x: 6030, y: 281, alpha: 0.63 },
+  ]
+  const SEA_FLEET = [
+    { x: 450, y: 248, scale: 0.21 }, { x: 1135, y: 246, scale: 0.15 },
+    { x: 1480, y: 250, scale: 0.28 }, { x: 1840, y: 250, scale: 0.25 },
+    { x: 3540, y: 249, scale: 0.15 }, { x: 4110, y: 247, scale: 0.19 },
   ]
 
   function grass(res, color = INK, seed = 91) {
@@ -182,20 +195,22 @@
       a.reedBack = art.reeds({ period: 180, count: 9, height: 80, res: r(0.7), seed: 55, top: 190, bottom: GROUND + 10, alpha: 0.92 })
       a.reedFront = art.reeds({ period: 210, count: 5, height: 96, res: r(0.7), seed: 57, top: 180, bottom: GROUND + 14, alpha: 0.85 })
     } else if (volumeId === 4) {
-      a.far = art.mountains({ width: span(0.06), top: 45, height: 210, base: 255, res: r(0.3), seed: 301, peakW: [55, 120], peakH: [45, 110], gap: [0.65, 1.3], round: 2.5, detail: 15, detailAmp: 7, color: [69, 103, 115], alpha: 0.28, depth: 50, strokeCell: 4, strokeDensity: 0.35, strokeLen: 8, outline: 0.5, trees: 0, fadeH: 70 })
-      a.mid = art.mountains({ width: span(0.16), top: 120, height: 150, base: 276, res: r(0.4), seed: 311, peakW: [110, 230], peakH: [35, 83], gap: [0.7, 1.4], round: 2.7, detail: 20, detailAmp: 8, color: [52, 83, 94], alpha: 0.38, depth: 42, strokeCell: 4, strokeDensity: 0.4, strokeLen: 8, outline: 0.65, trees: 0, fadeH: 55 })
-      a.near = art.mountains({ width: span(0.32), top: 180, height: 105, base: 294, res: r(0.5), seed: 323, peakW: [150, 310], peakH: [18, 54], gap: [0.8, 1.4], round: 3, detail: 25, detailAmp: 8, color: [29, 53, 62], alpha: 0.5, depth: 32, strokeCell: 3, strokeDensity: 0.5, strokeLen: 7, outline: 0.8, trees: 0, fadeH: 38 })
-      a.horizon = art.water({ period: 640, line: 246, depth: 62, res: r(0.6), seed: 319 })
-      a.sea = art.water({ period: 640, line: 258, depth: 136, res: r(0.85), seed: 329 })
-      a.ground = art.ground({ period: 1024, line: GROUND, depth: 92, res: r(1), seed: 331 })
+      a.seaPaintings = new Map()
+      a.seaWater = art.seaWater(r(0.7))
+      a.seaFloors = ['pier', 'deck', 'rock', 'quay', 'storm', 'slate'].map((kind) => art.seaFloor(kind, r(0.85)))
+      a.seaJoins = world.areas.map((area, i) => {
+        if (i !== 2 && i !== 3) return null
+        const width = 340, x = area.x - 45 - width / 2
+        return { x, width, sprite: art.seaFloorJoin(a.seaFloors[i-1],a.seaFloors[i],x,width,3,r(.85)) }
+      })
       a.seaGate = art.seaProp('gate', r(1), 333)
       a.mast = art.seaProp('mast', r(1), 337)
       a.wreck = art.seaProp('wreck', r(1), 341)
       a.reef = art.seaProp('reef', r(1), 347)
       a.cave = art.seaProp('cave', r(0.8), 351)
       a.city = art.seaProp('city', r(0.9), 353)
-      a.shrine = art.seaProp('shrine', r(1), 359)
-      a.clouds = [art.inkCloud(11), art.inkCloud(17)]
+      a.seaShrine = art.seaProp('shrine', r(1), 359)
+      a.seaLamp = art.softDisc(64, [238,177,81], .75)
     } else if (volumeId === 3) {
       a.far = art.mountains({ width: span(0.06), top: 30, height: 236, base: 250, res: r(0.3), seed: 201, peakW: [40, 110], peakH: [60, 150], gap: [0.5, 1.1], round: 1.6, detail: 18, detailAmp: 9, color: [86, 92, 104], alpha: 0.3, depth: 70, strokeCell: 4, strokeDensity: 0.45, strokeLen: 9, outline: 0.5, trees: 0, treeH: 3, fadeH: 80, indigo: 0.22 })
       a.mid = art.mountains({ width: span(0.16), top: 90, height: 182, base: 266, res: r(0.4), seed: 211, peakW: [90, 200], peakH: [40, 110], gap: [0.5, 1], round: 2.2, detail: 22, detailAmp: 12, color: [72, 66, 60], alpha: 0.4, depth: 46, strokeCell: 4, strokeDensity: 0.55, strokeLen: 8, outline: 0.7, trees: 0.08, treeH: 4, fadeH: 60, ochre: 0.16, indigo: 0.1, wall: { from: 0, to: span(0.16), alpha: 0.5, towerEvery: 260 } })
@@ -243,7 +258,7 @@
         : volumeId === 5
         ? { p, s: globalThis.XiabanInkLantern.platform(p,r(1)) }
         : volumeId === 4
-        ? { p, s: art.bridge(p.w, p.y, GROUND, r(1), 70 + i) }
+        ? { p, s: art.seaPlatform(p, r(1), 70 + i) }
         : volumeId === 3
         ? { p, s: art.earthBlock(p.w, p.y, GROUND, 60 + i, r(1)) }
         : p.x >= WATER[0] && p.x < WATER[1]
@@ -328,7 +343,27 @@
     }
   }
 
+  function drawSeaBackground(ctx, a, cam, e, clock) {
+    const sea = globalThis.XiabanInkSeaAtmosphere
+    const lightX = sea.sky(ctx, a, cam, e, clock, layer)
+    sea.birds(ctx,cam,e,clock,layer)
+    const waterLeft = cam.left * 0.48
+    layer(ctx, cam, 0.48)
+    ctx.globalAlpha = 0.65 + e.wash * 0.35
+    art.drawStrip(ctx, a.seaWater, waterLeft - 40, cam.viewW + 80, a.seaWater.width)
+    ctx.globalAlpha = 1
+    art.seaRipples(ctx, waterLeft - 40, waterLeft + cam.viewW + 40, clock, e, waterLeft + lightX)
+    layer(ctx, cam, 0.73)
+    for (const sail of SEA_FLEET) {
+      const x = sail.x * 0.73
+      if (x < cam.left * 0.73 - 100 || x > cam.left * 0.73 + cam.viewW + 100) continue
+      seaSprite(ctx, a.mast, x, sail.y, sail.scale, 0.27 + e.sun * 0.11)
+    }
+    sea.shore(ctx, a, cam, e, clock, layer)
+  }
+
   function drawBackground(ctx, a, cam, e, clock) {
+    if (a.volumeId === 4) { drawSeaBackground(ctx, a, cam, e, clock); return }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     const sky = ctx.createLinearGradient(0, 0, 0, cam.height)
     sky.addColorStop(0, rgb(e.top)); sky.addColorStop(0.72, rgb(e.low)); sky.addColorStop(1, rgb(e.low))
@@ -349,7 +384,7 @@
       ctx.drawImage(a.moon, x - size / 2, y - size / 2, size, size)
     }
     ctx.globalAlpha = 1
-    if ((a.volumeId === 2 || a.volumeId === 4) && a.clouds) {
+    if (a.volumeId === 2 && a.clouds) {
       layer(ctx, cam, 0.025)
       const first = Math.floor((cam.left * 0.025 - 700) / 640)
       for (let n = first; n * 640 < cam.left * 0.025 + cam.viewW + 100; n++) {
@@ -390,20 +425,6 @@
         art.drawStrip(ctx, a.reeds, cam.left * 0.72 - 30, cam.viewW + 60, 900)
         ctx.globalAlpha = 1
       }
-    } else if (a.volumeId === 4) {
-      layer(ctx, cam, 0.52)
-      ctx.globalAlpha = 0.8
-      art.drawStrip(ctx, a.horizon, cam.left * 0.52 - clock * 5, cam.viewW + 50, 640)
-      ctx.globalAlpha = 1
-      layer(ctx, cam, 0.52)
-      art.drawSurf(ctx, cam.left * 0.52 - 150, cam.left * 0.52 + cam.viewW + 150, 269, clock * 0.6, 0.7 + e.rain)
-      // Far junks are scale cues against the open sea, kept lighter than the playable deck.
-      for (let i = 0; i < 4; i++) {
-        const x = 160 + i * 360
-        ctx.save(); ctx.translate(x, 254 + (i % 2) * 12); ctx.scale(0.34 + (i % 2) * 0.12, 0.34 + (i % 2) * 0.12)
-        art.drawSprite(ctx, a.wreck, 0, 0, 0.24); ctx.restore()
-      }
-      mist(ctx, a, cam, 0.7, 286, 24, 0.2, clock * 12, 37)
     } else if (a.volumeId === 3) {
       if (e.dust > 0.05) dustBand(ctx, a, cam, 0.4, 268, 70, e.dust * 0.5, clock * 9, 61)
       if (e.poplar > 0.02) {
@@ -440,6 +461,12 @@
     }
   }
 
+  function seaSprite(ctx, sprite, x, y, scale, alpha) {
+    ctx.globalAlpha = alpha
+    ctx.drawImage(sprite.node, x - sprite.ox * scale, y - sprite.oy * scale, sprite.width * scale, sprite.height * scale)
+    ctx.globalAlpha = 1
+  }
+
   function drawGround(ctx, a, cam, e, clock) {
     layer(ctx, cam, 1)
     const left = cam.left - 60, right = cam.left + cam.viewW + 60
@@ -468,14 +495,37 @@
       }
       drawReedBeds(ctx, a, a.reedBack, cam, e, clock, 1)
     } else if (a.volumeId === 4) {
-      art.drawStrip(ctx, a.sea, cam.left - clock * 8, cam.viewW + 40, 640)
-      art.drawSurf(ctx, left, right, 285, clock, 1 + e.rain * 1.2)
+      if (e.foam > .26) {
+        ctx.globalAlpha = smooth(Math.min(1,(e.foam-.26)/.22))
+        art.drawSurf(ctx, left, right, 283, clock, e.foam, false)
+        ctx.globalAlpha = 1
+      }
       for (const prop of PROPS_SEA) {
         const s = a[prop.s]
-        if (!s || prop.x + s.width < left || prop.x - s.width > right) continue
-        art.drawSprite(ctx, s, prop.x, GROUND + 14, prop.alpha ?? 1)
+        if (prop.x + s.width < left || prop.x - s.width > right) continue
+        seaSprite(ctx, s, prop.x, prop.y, prop.scale ?? 1, prop.alpha)
+        if (prop.s === 'cave') globalThis.XiabanInkSeaAtmosphere.drips(ctx, prop.x, prop.y, clock)
+        if (prop.s === 'seaShrine') {
+          ctx.globalAlpha = .22 + (Math.sin(clock*4.2) + Math.sin(clock*7.5))*.045
+          for (const side of [-1,1]) ctx.drawImage(a.seaLamp, prop.x+side*51-24, prop.y-106,48,48)
+          ctx.globalAlpha = 1
+        }
       }
-      art.drawSeaFloor(ctx, left, right, clock)
+      // The surface follows world coordinates, so the deck cannot turn into rock as the camera moves.
+      for (let i = 0; i < a.seaFloors.length; i++) {
+        const join = a.seaJoins[i], next = a.seaJoins[i + 1]
+        const lo = Math.max(left, join ? join.x+join.width : i === 0 ? left : a.world.areas[i].x-45)
+        const hi = Math.min(right, next ? next.x : i === a.seaFloors.length - 1 ? right : a.world.areas[i+1].x-45)
+        if (lo >= hi) continue
+        const floor = a.seaFloors[i]
+        ctx.save()
+        ctx.beginPath(); ctx.rect(lo, GROUND - 25, hi - lo, 150); ctx.clip()
+        art.drawStrip(ctx, floor, lo, hi - lo, floor.width)
+        ctx.restore()
+      }
+      for (const join of a.seaJoins) {
+        if (join && join.x < right && join.x + join.width > left) art.drawSprite(ctx,join.sprite,join.x,a.seaFloors[0].top)
+      }
     } else if (a.volumeId === 3) {
       art.drawStrip(ctx, a.ground, cam.left, cam.viewW, 1024)
       for (const prop of PROPS_BEACON) {
@@ -561,10 +611,11 @@
       }
       if (gale > 0.05) mist(ctx, a, cam, 1.12, GROUND - 2, 54, 0.62 * gale, clock * 70, 41)
     } else if (a.volumeId === 4) {
-      const storm = e.rain || 0
-      layer(ctx, cam, 1)
-      art.drawSurf(ctx, cam.left - 120, cam.left + cam.viewW + 120, GROUND + 94, clock * 1.2, 0.7 + storm, true)
-      if (storm > 0.1) mist(ctx, a, cam, 1.12, GROUND + 22, 23, 0.12 + storm * 0.12, clock * 45, 53)
+      const left = cam.left * 1.13
+      layer(ctx, cam, 1.13)
+      art.drawSurf(ctx, left - 100, left + cam.viewW + 100, GROUND + 73 - 24 * e.foam, clock * 1.2, e.foam, true)
+      if (e.rain > 0.1) mist(ctx, a, cam, 1.12, GROUND + 25, 20, 0.16 * e.rain, clock * 45, 53)
+      globalThis.XiabanInkSeaAtmosphere.foreground(ctx, a, cam, e, clock, layer)
     } else if (a.volumeId === 3) {
       const sway = Math.sin(clock * 0.9 + 2) * 0.014
       layer(ctx, cam, 1.18, sway, 394)

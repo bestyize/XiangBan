@@ -1215,9 +1215,9 @@
     if(hook) {
       // Broad rope collar and a broken shell mask: a drowned salvage hunter.
       g.lineWidth=5;g.beginPath();g.arc(sx-2,sy+2,12,2.8,6.6);g.stroke()
-      g.strokeStyle=look.flash?look.color:'rgba(204,217,207,0.6)';g.lineWidth=0.8
+      g.strokeStyle=look.flash?look.color:'rgba(209,188,144,0.72)';g.lineWidth=0.8
       for(let i=0;i<12;i++){const a=2.8+i*0.32;g.beginPath();g.moveTo(sx-2+Math.cos(a)*9,sy+2+Math.sin(a)*9);g.lineTo(sx-2+Math.cos(a)*14,sy+2+Math.sin(a)*14);g.stroke()}
-      g.fillStyle=look.flash?look.color:'#b6c6bd';g.beginPath();g.moveTo(hx-3,hy-5);g.lineTo(hx+6,hy-7);g.lineTo(hx+9,hy+1);g.lineTo(hx+4,hy+7);g.lineTo(hx-1,hy+5);g.closePath();g.fill()
+      g.fillStyle=look.flash?look.color:'#c8c5a7';g.beginPath();g.moveTo(hx-3,hy-5);g.lineTo(hx+6,hy-7);g.lineTo(hx+9,hy+1);g.lineTo(hx+4,hy+7);g.lineTo(hx-1,hy+5);g.closePath();g.fill()
       g.strokeStyle='#203339';g.lineWidth=1;g.beginPath();g.moveTo(hx+3,hy-5);g.lineTo(hx+1,hy);g.lineTo(hx+5,hy+3);g.stroke()
       g.fillStyle=CINNABAR;g.fillRect(hx+4,hy-1,3,1.5)
       g.strokeStyle=look.flash?look.color:'#17292e';g.lineWidth=1.8
@@ -1225,7 +1225,7 @@
     } else {
       // Top knot, split head wrap and crossed short blades distinguish the boarding duelist.
       g.beginPath();g.ellipse(hx-3,hy-8,4.5,4,-0.3,0,TAU);g.fill()
-      g.strokeStyle=look.flash?look.color:'#91a8a5';g.lineWidth=2.4;g.beginPath();g.moveTo(hx-6,hy-3);g.lineTo(hx+5,hy-3);g.stroke()
+      g.strokeStyle=look.flash?look.color:'#a78a66';g.lineWidth=2.4;g.beginPath();g.moveTo(hx-6,hy-3);g.lineTo(hx+5,hy-3);g.stroke()
       g.strokeStyle=look.flash?look.color:'#20373c';g.lineWidth=2
       for(let i=0;i<2;i++){g.beginPath();g.moveTo(hx-6,hy-2);g.quadraticCurveTo(hx-16,hy+5,hx-23+Math.sin(time*7+i)*3,hy+i*6);g.stroke()}
       g.strokeStyle=look.flash?look.color:'rgba(207,218,206,0.55)';g.lineWidth=1.3;g.beginPath();g.moveTo(sx-6,sy+2);g.lineTo(s.hip[0]+4,s.hip[1]);g.stroke()
@@ -1932,70 +1932,219 @@
   }
 
   // A coiled sea dragon, with a continuous tapered spine and an articulated jaw.
-  // The head stays beside the simulation body; the large coil behind it is decorative.
+  function dragonSpine(control, time) {
+    const pts = []
+    for (let k = 0; k < control.length-1; k++) {
+      const a=control[Math.max(0,k-1)], b=control[k], c=control[k+1], d=control[Math.min(control.length-1,k+2)]
+      for (let j=0; j<7; j++) {
+        const t=j/7, u=(k+t)/(control.length-1)
+        const curve = (n) => b[n]+.5*((c[n]-a[n])*t+(2*a[n]-5*b[n]+4*c[n]-d[n])*t*t+(-a[n]+3*b[n]-3*c[n]+d[n])*t*t*t)
+        pts.push({ x:curve(0)+Math.sin(time*2.3+u*9)*u*5, y:curve(1)+Math.sin(time*2.7+u*13)*u*6, w:curve(2) })
+      }
+    }
+    const [x,y,w]=control[control.length-1]
+    pts.push({x,y,w})
+    pts.forEach((p,i)=>{
+      const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)]
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1
+      p.nx=-dy/len; p.ny=dx/len; p.angle=Math.atan2(dy,dx)
+    })
+    return pts
+  }
+
+  function dragonRim(p, side) {
+    return [p.x+p.nx*p.w*side, p.y+p.ny*p.w*side]
+  }
+
+  function drawDragonBody(g, pts, ink, look, height, time) {
+    for (let i=10; i<pts.length-8; i+=5) {
+      const p=pts[i], [x,y]=dragonRim(p,1)
+      const size=(.54+Math.sin(i*.23)*.12)*p.w
+      g.save();g.translate(x,y);g.rotate(p.angle)
+      g.fillStyle=look.color||'#263735'
+      g.beginPath();g.moveTo(-9,-2)
+      g.bezierCurveTo(-1,3,4,size*.64,12,size)
+      g.quadraticCurveTo(8,size*.27,18,-3);g.closePath();g.fill()
+      if(!look.color) {
+        g.strokeStyle='rgba(163,179,155,.44)';g.lineWidth=.8
+        g.beginPath();g.moveTo(-6,0);g.quadraticCurveTo(4,size*.68,12,size);g.stroke()
+      }
+      g.restore()
+    }
+    let coat=ink
+    if (!look.color) {
+      const wash=g.createLinearGradient(0,-height-22,25,13)
+      wash.addColorStop(0,'#536564');wash.addColorStop(.31,'#354d4c')
+      wash.addColorStop(.68,'#233637');wash.addColorStop(1,'#1b2a2d')
+      coat=wash
+    }
+    g.fillStyle=coat;g.beginPath()
+    pts.forEach((p,i)=>{const edge=dragonRim(p,1);i?g.lineTo(...edge):g.moveTo(...edge)})
+    for(let i=pts.length-1;i>=0;i--)g.lineTo(...dragonRim(pts[i],-1))
+    g.closePath();g.fill()
+    if(look.color)return
+
+    g.save();g.clip()
+    const belly=g.createLinearGradient(0,-height,0,9)
+    belly.addColorStop(0,'rgba(178,183,145,.35)');belly.addColorStop(.65,'rgba(129,144,122,.30)')
+    belly.addColorStop(1,'rgba(94,120,112,.16)')
+    g.fillStyle=belly;g.beginPath()
+    pts.forEach((p,i)=>{const edge=dragonRim(p,-.44);i?g.lineTo(...edge):g.moveTo(...edge)})
+    for(let i=pts.length-1;i>=0;i--)g.lineTo(...dragonRim(pts[i],-1))
+    g.closePath();g.fill()
+
+    g.strokeStyle='rgba(216,220,181,.32)';g.lineWidth=1.05;g.beginPath()
+    for(let i=3;i<pts.length-4;i+=5) {
+      for(let j=i;j<i+4;j++) {
+        const edge=dragonRim(pts[j],.92+Math.sin(j*1.2)*.07)
+        j===i?g.moveTo(...edge):g.lineTo(...edge)
+      }
+    }
+    g.stroke()
+    for(let i=2;i<pts.length-2;i+=2) {
+      const p=pts[i], w=p.w
+      g.save();g.translate(p.x,p.y);g.rotate(p.angle)
+      const size=2.3+w*.21
+      g.strokeStyle='rgba(158,180,169,.30)';g.lineWidth=.7;g.beginPath()
+      for(const side of [-.1,.29,.64]) {
+        const dy=side*w, shift=side>.5?2:0
+        g.moveTo(-size+shift,dy-size*.52)
+        g.quadraticCurveTo(size*.7+shift,dy-size*.49,size+shift,dy)
+        g.quadraticCurveTo(size*.43+shift,dy+size*.69,-size+shift,dy+size*.4)
+      }
+      g.stroke()
+      g.strokeStyle='rgba(22,36,34,.41)';g.lineWidth=.85;g.beginPath()
+      g.moveTo(-2,-w*.42);g.quadraticCurveTo(3,-w*.64,4,-w*.97);g.stroke()
+      g.restore()
+    }
+    g.restore()
+
+    // Small breaks of white water trace the tail as it disappears below the surface.
+    const tail=pts[pts.length-2]
+    g.save();g.lineCap='round'
+    for (let i=0;i<3;i++) {
+      const x=tail.x+16+i*8, y=-7+i*4+Math.sin(time*3+i)*1.8
+      g.strokeStyle=`rgba(230,232,198,${.32-i*.065})`;g.lineWidth=1.3-i*.18
+      g.beginPath();g.moveTo(x-22,y);g.quadraticCurveTo(x,y-4,x+27,y);g.stroke()
+    }
+    g.restore()
+  }
+
+  function drawDragonFace(g, ink, look, jaw, time) {
+    const art=globalThis.XiabanInkArt
+    const ivory=look.color||'#cfcbb0', ridge=look.color||'#788981'
+    for(let i=0;i<8;i++) {
+      const y=-21+i*4, wake=Math.sin(time*3.4+i)*4
+      g.fillStyle=look.color||(i%2?'#304744':'#263837')
+      art.ribbon(g, [[-17,y],[-33,y-3],[-48,y+1+wake],[-64-i%3*5,y+6+wake]], t=>(8-i*.43)*Math.pow(1-t,.62))
+    }
+    for(const [x,y,size] of [[-18,-23,1.02],[-3,-27,.72]]) {
+      g.save();g.translate(x,y);g.scale(size,size)
+      g.fillStyle=look.color||'#626c5e';g.beginPath();g.moveTo(-4,5)
+      g.bezierCurveTo(-13,-6,-15,-15,-13,-25)
+      g.quadraticCurveTo(-9,-22,-7,-14)
+      g.quadraticCurveTo(-5,-24,-.7,-29)
+      g.quadraticCurveTo(-4,-11,3,3);g.closePath();g.fill()
+      if(!look.color) {
+        g.strokeStyle='rgba(216,209,165,.53)';g.lineWidth=.85;g.beginPath()
+        g.moveTo(-10,-19);g.quadraticCurveTo(-9,-9,-3,1);g.stroke()
+      }
+      g.restore()
+    }
+
+    g.fillStyle=look.color||'#192829';g.beginPath();g.moveTo(-23,-1)
+    g.quadraticCurveTo(9,1,47,-2);g.lineTo(46,7+jaw*42)
+    g.quadraticCurveTo(19,14+jaw*28,-18,13);g.closePath();g.fill()
+    g.save();g.translate(-19,5);g.rotate(jaw)
+    g.fillStyle=look.color||'#304441';g.beginPath();g.moveTo(-11,-4)
+    g.quadraticCurveTo(7,2,30,2);g.lineTo(62,-5)
+    g.quadraticCurveTo(64,-1,55,5);g.lineTo(20,12)
+    g.quadraticCurveTo(-7,11,-13,1);g.closePath();g.fill()
+    g.strokeStyle=ridge;g.lineWidth=.84;g.beginPath();g.moveTo(7,8)
+    g.quadraticCurveTo(29,10,48,4);g.stroke()
+    g.fillStyle=ivory;g.beginPath();g.moveTo(51,-2);g.quadraticCurveTo(55,-8,55,-10)
+    g.lineTo(57,-4);g.closePath();g.fill();g.restore()
+
+    let face=ink
+    if (!look.color) {
+      const wash=g.createLinearGradient(-2,-32,2,23)
+      wash.addColorStop(0,'#586c65');wash.addColorStop(.31,'#394f4f')
+      wash.addColorStop(.72,'#22363c');wash.addColorStop(1,'#202c2d');face=wash
+    }
+    g.fillStyle=face;g.beginPath();g.moveTo(-32,11)
+    g.bezierCurveTo(-40,-2,-29,-24,-14,-26)
+    g.quadraticCurveTo(-1,-34,9,-23);g.lineTo(19,-19)
+    g.quadraticCurveTo(32,-16,41,-20);g.quadraticCurveTo(54,-23,59,-13)
+    g.quadraticCurveTo(61,-5,51,-5);g.quadraticCurveTo(41,-6,34,-1)
+    g.lineTo(16,3);g.lineTo(7,11);g.quadraticCurveTo(-16,20,-32,11);g.closePath();g.fill()
+    if (!look.color) {
+      g.save();g.clip()
+      for (let i=0;i<13;i++) {
+        const x=-29+i*5.9,y=-18+Math.sin(i*2.4)*6
+        g.strokeStyle=i%3?'rgba(177,188,151,.18)':'rgba(23,36,37,.32)';g.lineWidth=i%4? .73:1.8
+        g.beginPath();g.moveTo(x,y);g.lineTo(x+6,y-2);g.lineTo(x+9,y-1.8);g.stroke()
+      }
+      g.restore()
+    }
+
+    g.fillStyle=ivory
+    for(const [x,y,size] of [[32,-1,9],[45,-4,6]]) {
+      g.beginPath();g.moveTo(x-2.8,y);g.quadraticCurveTo(x+2.7,y+size*.37,x-1.3,y+size)
+      g.quadraticCurveTo(x+.1,y+size*.45,x-5,y+1);g.closePath();g.fill()
+    }
+    if (!look.color) {
+      g.strokeStyle='rgba(184,196,162,.61)';g.lineWidth=1
+      g.beginPath();g.moveTo(-21,-15);g.quadraticCurveTo(-8,-30,4,-22)
+      g.moveTo(16,-16);g.quadraticCurveTo(31,-12,41,-17);g.stroke()
+      g.strokeStyle='rgba(156,177,159,.57)';g.lineWidth=1.2
+      for(let i=0;i<3;i++) {
+        g.beginPath();g.moveTo(-19+i*5,-3+i*2)
+        g.quadraticCurveTo(-15+i*4,5+i*2,-25+i*6,13+i);g.stroke()
+      }
+      g.fillStyle='#152326';g.beginPath();g.ellipse(49,-13,3.7,1.7,-.39,0,TAU);g.fill()
+      g.fillStyle='#101e24';g.beginPath();g.moveTo(-9,-18);g.lineTo(12,-13)
+      g.quadraticCurveTo(1,-9,-9,-18);g.fill()
+      g.strokeStyle='rgba(191,179,129,.7)';g.lineWidth=.92
+      g.beginPath();g.moveTo(-10,-20);g.quadraticCurveTo(3,-18,13,-14);g.stroke()
+      g.fillStyle=CINNABAR;g.beginPath();g.ellipse(2,-14.3,2.4+(look.eyeGlow||0)*.72,1.17,.21,0,TAU);g.fill()
+    }
+    for(let i=0;i<2;i++) {
+      const wave=Math.sin(time*3.7+i*2)*7
+      g.strokeStyle=i?ridge:ivory;g.lineWidth=i?1:1.4
+      g.beginPath();g.moveTo(39,-3);g.bezierCurveTo(57,2+i*4,64,-12+wave-i*4,80+i*13,-9+wave-i*13);g.stroke()
+    }
+  }
+
+  // Only the silhouette changes with the pose. The body behind the head remains scenery.
   function drawDragon(g,e,x,y,facing,look={},time=0) {
     const tell=e.state==='dragonTell', bite=e.state==='dragonBite', wave=e.state==='dragonWaveTell'||e.state==='dragonWave'
-    const broken=e.state==='broken', recovering=e.state==='recover', diving=e.state==='dragonDive', hidden=e.state==='dragonDiveTell'
+    const broken=e.state==='broken', recovering=e.state==='recover', diving=e.state==='dragonDive'
+    if(e.state==='dragonDiveTell')return {head:null,tip:null}
     const q=e.teleTotal?clamp(1-e.t/e.teleTotal,0,1):0
     const headX=bite?40:tell?-18*q:recovering?6:12
     const headY=broken?-29:wave?-111:tell?-70-q*20:-66
-    const sink=diving?(1-clamp(e.t/0.6,0,1))*260:e.state==='intro'?Math.max(0,e.t/2.2)*150:e.state==='dying'?(1-clamp(e.t/2.6,0,1))*200:0
-    const out={head:[x+headX*facing,y+headY+sink],tip:[x+(headX+42)*facing,y+headY+12+sink]}
-    if(hidden) return {head:null,tip:null}
+    const tilt=tell?-.13*q:bite?.14:wave?-.48:broken?.18:0
+    const sink=diving?(1-clamp(e.t/.6,0,1))*260:e.state==='intro'?Math.max(0,e.t/2.2)*150:e.state==='dying'?(1-clamp(e.t/2.6,0,1))*200:0
+    const tip=[x+(headX+50*Math.cos(tilt)+5*Math.sin(tilt))*facing,y+headY+50*Math.sin(tilt)-5*Math.cos(tilt)+sink]
+    const rise=broken?.37:wave?1.06:1
+    const pts=dragonSpine([[headX-10,headY+3,17],[-39,-84*rise,20],[-76,-124*rise,24],[-126,-153*rise,29],[-169,-132*rise,28],
+      [-190,-86*rise,24],[-217,-49*rise,18],[-253,-48*rise,13],[-289,-32*rise,8],[-323,8,2]],time)
+    const ink=look.color||'#263b3d'
     g.save();g.translate(x,y);g.scale(facing,1)
-    if(look.alpha!==undefined) g.globalAlpha*=look.alpha
-    g.beginPath();g.rect(-350,-340,510,345);g.clip();g.translate(0,sink)
-    const ink=look.color||'#142b34', paper=look.flash?look.color:'rgba(195,215,203,0.65)'
-    const collapse=broken?0.35:1
-    const control=[[headX,headY],[-44,-107*collapse],[-1,-198*collapse],[-93,-210*collapse],[-160,-155*collapse],[-128,-89*collapse],[-74,-61*collapse],[-167,-22],[-240,-13]]
-    const pts=[]
-    // Catmull-Rom centreline; independent scale rows follow its normal.
-    for(let k=0;k<control.length-1;k++) {
-      const a=control[Math.max(0,k-1)],b=control[k],c=control[k+1],d=control[Math.min(control.length-1,k+2)]
-      for(let j=0;j<7;j++) {const t=j/7;const calc=n=>0.5*((2*b[n])+(-a[n]+c[n])*t+(2*a[n]-5*b[n]+4*c[n]-d[n])*t*t+(-a[n]+3*b[n]-3*c[n]+d[n])*t*t*t)
-        const u=(k+t)/(control.length-1)
-        pts.push([calc(0)+Math.sin(time*2.8+u*10)*u*5,calc(1)+Math.sin(time*3+u*13)*u*5,25*(1-u)+3])
-      }
+    if(look.alpha!==undefined)g.globalAlpha*=look.alpha
+    g.beginPath();g.rect(-351,-340,522,345);g.clip();g.translate(0,sink)
+    drawDragonBody(g,pts,ink,look,153*rise,time)
+    const p=pts[11], stroke=globalThis.XiabanInkArt
+    g.fillStyle=ink
+    stroke.ribbon(g,[[p.x-5,p.y+9],[p.x+9,p.y+25],[p.x+3,p.y+43],[p.x+14,p.y+49]],t=>12*(1-t)+1)
+    for(let i=0;i<3;i++){
+      stroke.ribbon(g,[[p.x+2,p.y+41],[p.x+13+i*4,p.y+44+i*4],[p.x+15+i*4,p.y+52+i*2]],t=>4*(1-t))
     }
-    const side=(i,sign)=>{const p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)],len=Math.hypot(b[0]-a[0],b[1]-a[1])||1;return[p[0]-(b[1]-a[1])/len*p[2]*sign,p[1]+(b[0]-a[0])/len*p[2]*sign]}
-    g.fillStyle=ink;g.strokeStyle=paper;g.lineWidth=1
-    g.beginPath();pts.forEach((p,i)=>{const v=side(i,1);i?g.lineTo(...v):g.moveTo(...v)});for(let i=pts.length-1;i>=0;i--)g.lineTo(...side(i,-1));g.closePath();g.fill();g.stroke()
-    for(let i=3;i<pts.length-2;i+=2) {
-      const p=pts[i],a=pts[i-1],b=pts[i+1],angle=Math.atan2(b[1]-a[1],b[0]-a[0])
-      g.save();g.translate(p[0],p[1]);g.rotate(angle)
-      g.strokeStyle=look.flash?look.color:'rgba(171,199,188,0.4)';g.lineWidth=0.7
-      for(let row=-1;row<=1;row++){g.beginPath();g.arc(row%2?2:-1,row*p[2]*0.5,p[2]*0.32,0.2,2.9);g.stroke()}
-      // Dry-brush streaks interrupt the scales and keep the body from reading as flat vector art.
-      g.strokeStyle=look.flash?look.color:'rgba(143,173,162,0.16)';g.lineWidth=0.65
-      for(let n=0;n<4;n++){const yy=Math.sin(i*2.3+n*3.7)*p[2]*0.7;g.beginPath();g.moveTo(-5,yy);g.lineTo(2+n,yy+0.8);g.stroke()}
-      g.fillStyle=ink;g.beginPath();g.moveTo(-4,-p[2]+2);g.lineTo(-12,-p[2]-10*(1-i/pts.length));g.lineTo(4,-p[2]);g.closePath();g.fill()
-      g.strokeStyle=paper;g.beginPath();g.moveTo(-12,-p[2]-10*(1-i/pts.length));g.lineTo(4,-p[2]);g.stroke()
-      g.restore()
-    }
-    // Claws are jointed, gripping at the air rather than dangling as straight sticks.
-    g.strokeStyle=ink;g.lineWidth=7;g.lineCap='round'
-    for(const [cx,cy,sgn] of [[-42,-102*collapse,1],[-125,-114*collapse,-1]]) {
-      g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+sgn*22,cy+14);g.lineTo(cx+sgn*16,cy+33);g.stroke()
-      for(let i=0;i<3;i++){g.lineWidth=2.5;g.beginPath();g.moveTo(cx+sgn*16,cy+30);g.quadraticCurveTo(cx+sgn*(28+i*4),cy+30+i*4,cx+sgn*(27+i*4),cy+40+i*3);g.stroke()}
-    }
-    g.save();g.translate(headX,headY);g.rotate(tell?-0.14*q:bite?0.12:wave?-0.5:0)
-    // Mane, antler-like horns, brow, nostril and two unequal fangs.
-    g.fillStyle=ink;g.strokeStyle=ink
-    for(let i=0;i<12;i++){g.lineWidth=1.4+i%3;g.beginPath();g.moveTo(-12,-19+i*3);g.quadraticCurveTo(-40,-33+i*4,-44-i%3*5+Math.sin(time*5+i)*4,-23+i*4);g.stroke()}
-    g.lineWidth=5
-    for(let i=0;i<2;i++){const ox=-12+i*20;g.beginPath();g.moveTo(ox,-16);g.lineTo(ox-8,-39);g.lineTo(ox-1,-55);g.moveTo(ox-8,-39);g.lineTo(ox-22,-45);g.lineTo(ox-24,-55);g.stroke()}
-    g.beginPath();g.moveTo(-24,-10);g.quadraticCurveTo(-12,-36,12,-23);g.lineTo(26,-11);g.lineTo(43,-9);g.quadraticCurveTo(56,0,43,8);g.lineTo(16,8);g.lineTo(-8,16);g.lineTo(-26,5);g.closePath();g.fill()
-    g.strokeStyle=paper;g.lineWidth=1.1;g.beginPath();g.moveTo(-17,-17);g.quadraticCurveTo(5,-27,22,-7);g.lineTo(44,-3);g.stroke()
-    const jaw=tell?4+q*15:bite?5:wave?23:broken?15:5+Math.sin(time*1.6)*2
-    g.fillStyle=ink;g.beginPath();g.moveTo(-12,4);g.lineTo(37,7+jaw);g.lineTo(45,5+jaw);g.lineTo(36,19+jaw);g.lineTo(4,22+jaw);g.closePath();g.fill()
-    g.fillStyle=look.flash?look.color:'#d8dfca'
-    for(const [tx,ty,sz] of [[26,7,11],[39,7,7],[30,14+jaw,-7]]){g.beginPath();g.moveTo(tx-2,ty);g.lineTo(tx+2,ty);g.lineTo(tx-1,ty+sz);g.closePath();g.fill()}
-    g.strokeStyle=look.flash?look.color:'#0d1c24';g.lineWidth=4;g.beginPath();g.moveTo(5,-13);g.lineTo(18,-9);g.stroke()
-    g.strokeStyle=CINNABAR;g.lineWidth=2.5+(look.eyeGlow||0);g.beginPath();g.moveTo(7,-11);g.lineTo(15,-9);g.stroke()
-    g.fillStyle='#101e24';g.beginPath();g.ellipse(40,-5,3,2,0,0,TAU);g.fill()
-    g.strokeStyle=paper;g.lineWidth=1.2
-    for(let i=0;i<3;i++){g.beginPath();g.moveTo(35,5);g.bezierCurveTo(61,12+i*8,66+Math.sin(time*3+i)*6,-10-i*8,80,-2-i*10);g.stroke()}
-    g.restore();g.restore();return out
+    g.translate(headX,headY);g.rotate(tilt)
+    const jaw=tell?.12+q*.26:bite?.065:wave?.4:broken?.22:.035+Math.sin(time*1.8)*.019
+    drawDragonFace(g,ink,look,jaw,time)
+    g.restore()
+    return {head:[x+headX*facing,y+headY+sink],tip}
   }
 
   globalThis.XiabanInkFigures = {
