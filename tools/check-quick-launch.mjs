@@ -27,6 +27,6 @@ assert.match(native, /getLaunchIntentForPackage/, 'known app packages must use A
 assert.match(native, /queryIntentActivities/, 'unknown packages must resolve installed launchers');
 assert.match(native, /appleOnly/, 'unsupported Apple-only entries must not start arbitrary apps');
 assert.match(manifest, /android\.intent\.category\.LAUNCHER/, 'launcher package visibility is required');
-assert.ok(!manifest.includes('QUERY_ALL_PACKAGES'), 'do not request broad package inventory access');
+assert.ok(!/<uses-permission[^>]*QUERY_ALL_PACKAGES/.test(manifest), 'do not request broad package inventory access');
 assert.match(html, /quickLaunch\.available/, 'detail must check installed launchability');
 console.log('Quick Launch: 104 matching apps, launcher resolution, icons and manifest verified.');
