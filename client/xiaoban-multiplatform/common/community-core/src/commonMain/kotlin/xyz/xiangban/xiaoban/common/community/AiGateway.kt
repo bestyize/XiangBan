@@ -389,13 +389,17 @@ class AiGatewayApi(
             }.execute { response ->
                 val status = response.status.value
                 if (status !in 200..299) return@execute ModelResult(status, body = response.bodyAsText())
+                val verified = response.headers["x-xiaoban-stream-terminal-version"] == "1"
+                if (response.headers[HttpHeaders.ContentType]?.startsWith("application/json") == true) {
+                    return@execute ModelResult(status, body = response.readBoundedBytes(CHAT_BODY_BYTES).decodeToString(), verifiedToolTerminal = verified)
+                }
                 val channel = response.bodyAsChannel()
                 while (!channel.isClosedForRead) {
                     val line = channel.readUTF8Line() ?: break
                     onLine(line)
-                    if (line.removePrefix("data:").trim() == "[DONE]") break
+                    if (line.startsWith("data:") && line.removePrefix("data:").trim() == "[DONE]") break
                 }
-                ModelResult(status)
+                ModelResult(status, verifiedToolTerminal = verified)
             }
         } catch (e: CancellationException) {
             throw e
@@ -452,19 +456,13 @@ class AiGatewayApi(
                     }
                     return@execute
                 }
+                val stream = ChatTextStream { piece -> full.append(piece); onDelta(piece) }
                 val channel = response.bodyAsChannel()
                 while (!channel.isClosedForRead) {
                     val line = channel.readUTF8Line() ?: break
-                    if (!line.startsWith("data:")) continue
-                    val data = line.removePrefix("data:").trim()
-                    if (data.isEmpty()) continue
-                    if (data == "[DONE]") break
-                    val piece = parseSseData(data)
-                    if (piece.isNotEmpty()) {
-                        full.append(piece)
-                        onDelta(piece)
-                    }
+                    if (stream.line(line)) break
                 }
+                stream.finish()
             }
         } catch (e: CancellationException) {
             throw e
@@ -478,7 +476,7 @@ class AiGatewayApi(
 }
 
 /** 一次模型请求的结果：HTTP 状态，失败时的响应文本，或连接层面的错误。 */
-data class ModelResult(val status: Int, val body: String? = null, val error: String? = null)
+data class ModelResult(val status: Int, val body: String? = null, val error: String? = null, val verifiedToolTerminal: Boolean = true)
 
 /**
  * 把已经组好的 chat-completions 请求体（流式）发给 server-ai，响应的每一行原样交给 [onLine]。
@@ -489,30 +487,41 @@ suspend fun AiGatewayApi.postChatLines(body: String, onLine: suspend (String) ->
 private fun JsonElement?.asStr(): String? =
     this?.takeIf { it !is JsonNull }?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
 
-private fun parseSseData(data: String): String {
-    val obj = runCatching { CommunityJson.parseToJsonElement(data) as? JsonObject }.getOrNull() ?: return ""
-    if (obj["error"] is JsonObject) {
-        throw parseApiError(502, data)
+private class ChatTextStream(private val onText: (String) -> Unit) {
+    private var finishReason: String? = null
+    private var done = false
+
+    fun line(line: String): Boolean {
+        if (!line.startsWith("data:")) return false
+        val data = line.removePrefix("data:").trim()
+        if (data.isEmpty()) return false
+        if (data == "[DONE]") { done = true; return true }
+        val obj = runCatching { CommunityJson.parseToJsonElement(data) as? JsonObject }.getOrNull()
+            ?: throw ApiException(502, "模型返回了无法识别的流式内容", "invalid_stream")
+        if (obj["error"] is JsonObject) throw parseApiError(502, data)
+        val choice = (obj["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
+        choice?.get("finish_reason").asStr()?.let { finishReason = it }
+        val content = (choice?.get("delta") as? JsonObject)?.get("content").asStr()
+            ?: (choice?.get("message") as? JsonObject)?.get("content").asStr()
+            ?: obj["delta"].asStr()
+        if (!content.isNullOrEmpty()) onText(content)
+        return false
     }
-    val choice = (obj["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
-    val delta = choice?.get("delta") as? JsonObject
-    val content = delta?.get("content").asStr()
-        ?: (choice?.get("message") as? JsonObject)?.get("content").asStr()
-        ?: obj["delta"].asStr()
-    return content.orEmpty()
+
+    fun finish() {
+        if (finishReason != "stop" && !(finishReason == null && done)) {
+            throw ApiException(502, "模型回复未完整结束，可重试", "stream_interrupted")
+        }
+    }
 }
 
 private fun extractSingleReply(body: String): String {
-    // 若上游返回的是多行 data: 文本但未标 text/event-stream，也按 SSE 兜底解析。
     if (body.lineSequence().any { it.startsWith("data:") }) {
-        val sb = StringBuilder()
-        for (line in body.lineSequence()) {
-            if (!line.startsWith("data:")) continue
-            val data = line.removePrefix("data:").trim()
-            if (data.isEmpty() || data == "[DONE]") continue
-            sb.append(parseSseData(data))
-        }
-        return sb.toString()
+        val text = StringBuilder()
+        val stream = ChatTextStream { text.append(it) }
+        for (line in body.lineSequence()) if (stream.line(line)) break
+        stream.finish()
+        return text.toString()
     }
     val obj = runCatching { CommunityJson.parseToJsonElement(body) as? JsonObject }.getOrNull()
         ?: throw ApiException(200, "小伴 AI 服务返回了无法识别的内容")

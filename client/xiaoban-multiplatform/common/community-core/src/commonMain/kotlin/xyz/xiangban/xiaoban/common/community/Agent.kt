@@ -353,6 +353,7 @@ class AgentRuntime(
                             put("type", "model_end"); put("id", id); put("status", result.status)
                             result.error?.let { put("error", it) }
                             result.body?.let { put("body", it) }
+                            put("verified_tool_terminal", result.verifiedToolTerminal)
                         })
                     } catch (e: Exception) {
                         if (handle == h && generation == epoch) _events.emit(AgentEvent.Failure(e.message ?: "向智能体发送模型结果失败", affected))

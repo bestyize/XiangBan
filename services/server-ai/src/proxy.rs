@@ -115,7 +115,12 @@ async fn serve(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, hea
         Err(error) => return error_response(api, map_body_error(error.status())),
     };
     match handle(api, state, auth, headers, body).await {
-        Ok(response) => response,
+        Ok(mut response) => {
+            if api == Api::ChatCompletions {
+                response.headers_mut().insert("x-xiaoban-stream-terminal-version", axum::http::HeaderValue::from_static("1"));
+            }
+            response
+        }
         Err(err) => error_response(api, err),
     }
 }

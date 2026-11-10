@@ -575,6 +575,17 @@ class AiGatewayAndCloudChatTest {
     }
 
     @Test
+    fun `incomplete cloud stream preserves delivered text and reports interruption`() = runTest {
+        val server = FakeServer()
+        server.onSse("/v1/chat/completions", body = """data: {"choices":[{"delta":{"content":"半截"}}]}""" + "\n\n")
+        val api = AiGatewayApi(server.client, config) { "tok" }
+        val text = StringBuilder()
+        val failure = assertFailsWith<ApiException> { api.streamChat(listOf(ChatMessage("user", "你好"))) { text.append(it) } }
+        assertEquals("半截", text.toString())
+        assertEquals("stream_interrupted", failure.code)
+    }
+
+    @Test
     fun `cloud chat controller loads meta, streams replies, retries failures, and redeems codes`() = runTest {
         val server = FakeServer()
         server.on("/api/ai/tiers", body = tiersJson)

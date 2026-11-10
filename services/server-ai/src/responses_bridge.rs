@@ -431,14 +431,17 @@ impl ResponsesToChat {
             self.reconcile_item(idx, item, out);
         }
         self.usage = Self::parse_usage(response.get("usage"));
-        let reason = if !self.calls.is_empty() {
-            "tool_calls"
-        } else if incomplete {
+        let reason = if incomplete {
             match response.pointer("/incomplete_details/reason").and_then(Value::as_str) {
                 Some("max_output_tokens") => "length",
                 Some("content_filter") => "content_filter",
-                _ => "stop",
+                _ => {
+                    out.push_str(&self.interrupted());
+                    return;
+                }
             }
+        } else if !self.calls.is_empty() {
+            "tool_calls"
         } else {
             "stop"
         };
@@ -580,7 +583,12 @@ impl ResponsesToChat {
                 out.push_str(&format!("data: {err}\n\ndata: [DONE]\n\n"));
             }
             _ if event.get("object").and_then(Value::as_str) == Some("response") => {
-                self.finish_response(event, event.get("status").and_then(Value::as_str) == Some("incomplete"), &mut out);
+                match event["status"].as_str() {
+                    Some("completed") => self.finish_response(event, false, &mut out),
+                    Some("incomplete") => self.finish_response(event, true, &mut out),
+                    Some("failed" | "cancelled") => out.push_str(&self.interrupted()),
+                    _ => {}
+                }
             }
             _ => {}
         }
@@ -595,26 +603,29 @@ impl ResponsesToChat {
             return String::new();
         }
         if payload == "[DONE]" {
-            if !self.done {
-                self.done = true;
-                let reason = if !self.calls.is_empty() { "tool_calls" } else { "stop" };
-                self.finish_reason = Some(reason.into());
-                let mut out = String::new();
-                self.ensure_role(&mut out);
-                let usage = self.usage.clone();
-                out.push_str(&self.chunk(json!({}), Some(reason), usage));
-                out.push_str("data: [DONE]\n\n");
-                return out;
-            }
-            return String::new();
+            return self.interrupted();
         }
         let Ok(event) = serde_json::from_str::<Value>(payload) else { return String::new() };
         self.on_event(&event)
     }
 
+    fn interrupted(&mut self) -> String {
+        if self.done {
+            return String::new();
+        }
+        let message = "模型回复未完整结束，请重试";
+        self.done = true;
+        self.failed = Some(message.into());
+        let error = json!({"error":{"message":message,"type":"api_error","code":"stream_interrupted"}});
+        format!("data: {error}\n\ndata: [DONE]\n\n")
+    }
+
     fn into_non_streaming(mut self) -> Result<Value, AppError> {
         if let Some(msg) = self.failed.take() {
             return Err(AppError::BadGateway(msg));
+        }
+        if !self.done {
+            return Err(AppError::BadGateway("模型回复未完整结束，请重试".into()));
         }
         let tool_calls: Vec<Value> = self
             .calls
@@ -711,9 +722,7 @@ where
                                 out.push_str(&st.converter.feed_line(text));
                             }
                         }
-                        if !st.converter.done {
-                            out.push_str(&st.converter.feed_line("data: [DONE]"));
-                        }
+                        out.push_str(&st.converter.interrupted());
                         return if out.is_empty() { None } else { Some((Ok(Bytes::from(out)), st)) };
                     }
                 }
@@ -758,6 +767,26 @@ pub(crate) async fn respond_as_chat(upstream: reqwest::Response, tier: &str, wan
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incomplete_responses_never_report_completed_tool_calls() {
+        let mut converter = ResponsesToChat::new("test".into());
+        let event = json!({
+            "type": "response.incomplete",
+            "response": {
+                "incomplete_details": {"reason":"max_output_tokens"},
+                "output":[{"type":"function_call","call_id":"c1","name":"write_file","arguments":"{}"}]
+            }
+        });
+        let out = converter.on_event(&event);
+        assert!(out.contains("\"finish_reason\":\"length\""), "{out}");
+        assert!(!out.contains("\"finish_reason\":\"tool_calls\""), "{out}");
+
+        let mut converter = ResponsesToChat::new("test".into());
+        converter.on_event(&json!({"type":"response.output_text.delta","delta":"partial"}));
+        assert!(converter.feed_line("data: [DONE]").contains("stream_interrupted"));
+        assert!(converter.into_non_streaming().is_err());
+    }
 
     #[test]
     fn converts_chat_messages_tools_and_reasoning_into_responses_payload() {

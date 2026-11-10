@@ -216,6 +216,20 @@ impl StreamAccumulator {
         self.finished
     }
 
+    pub fn finish_reason(&self) -> Option<&str> {
+        self.finish_reason.as_deref()
+    }
+
+    pub fn tool_calls_complete(&self) -> bool {
+        let mut ids = std::collections::HashSet::new();
+        self.calls.iter().all(|call| {
+            !call.id.trim().is_empty()
+                && ids.insert(call.id.as_str())
+                && !call.name.trim().is_empty()
+                && serde_json::from_str::<Value>(&call.arguments).is_ok_and(|args| args.is_object())
+        })
+    }
+
     pub fn finish(mut self) -> Reply {
         let extras: serde_json::Map<String, Value> = self.calls.iter().enumerate().filter_map(|(i, call)| {
             call.extra_content.clone().map(|extra| (if call.id.is_empty() { format!("call_{i}") } else { call.id.clone() }, extra))

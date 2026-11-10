@@ -530,3 +530,36 @@ fn productive_continuations_are_not_stopped_after_eight_nudges() {
     assert_eq!(next_of(&engine,"run_end")["ok"],true);
     engine.stop();
 }
+
+#[test]
+fn incomplete_or_unverified_model_stream_never_dispatches_write_tools() {
+    for (index, (reason, marker, verified)) in [
+        (Value::Null, false, true),
+        (Value::Null, true, true),
+        (json!("length"), true, true),
+        (json!("tool_calls"), true, false),
+    ].into_iter().enumerate() {
+        let engine = Engine::start(&config(&temp_dir(&format!("unsafe-terminal-{index}")))).unwrap();
+        engine.send(&json!({"type":"configure_session","session":"s1","settings":{"permission":"auto"}}).to_string()).unwrap();
+        engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"Set a reminder"}).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let mut lines = data(json!({"choices":[{"delta":{"tool_calls":[{
+            "index":0,"id":"c1","function":{"name":"set_reminder","arguments":"{\"title\":\"x\",\"minutes\":1}"}
+        }]},"finish_reason":reason}]}));
+        if marker { lines.extend(["data: [DONE]".into(), String::new()]); }
+        for line in lines {
+            engine.send(&json!({"type":"model_line","id":request["id"],"line":line}).to_string()).unwrap();
+        }
+        engine.send(&json!({"type":"model_end","id":request["id"],"status":200,"verified_tool_terminal":verified}).to_string()).unwrap();
+        loop {
+            let event = next(&engine, Duration::from_secs(2));
+            assert_ne!(event["type"], "tool_request", "{event}");
+            assert_ne!(event["type"], "approval_request", "{event}");
+            if event["type"] == "run_end" {
+                assert_eq!(event["ok"], false, "{event}");
+                break;
+            }
+        }
+        engine.stop();
+    }
+}

@@ -104,7 +104,7 @@ fn parse_risk(name: &str) -> Result<Risk, String> {
 
 enum ModelMsg {
     Line(String),
-    End { status: u16, error: Option<String>, body: Option<String> },
+    End { status: u16, error: Option<String>, body: Option<String>, verified_tool_terminal: bool },
 }
 
 struct ToolMsg {
@@ -232,6 +232,17 @@ impl ModelProvider for HostModel {
         self.rpc.emit(&json!({ "type": "model_request", "id": id, "session": session, "body": body }));
 
         let (mut sse, mut acc) = (SseParser::default(), StreamAccumulator::default());
+        let mut consume = |acc: &mut StreamAccumulator, payload: &str| -> Result<(), HarnessError> {
+            if payload.trim() == "[DONE]" {
+                acc.mark_done();
+                return Ok(());
+            }
+            let chunk: Value = serde_json::from_str(payload)
+                .map_err(|e| HarnessError::provider(format!("bad stream chunk: {e}"), false))?;
+            acc.push_with_reasoning(&chunk, on_text, on_reasoning)?;
+            if let Some(progress) = acc.pending_tool_call() { on_tool(&progress); }
+            Ok(())
+        };
         let outcome = loop {
             if cancel.load(Ordering::SeqCst) || self.rpc.stopping.load(Ordering::SeqCst) {
                 self.rpc.emit(&json!({ "type": "model_cancel", "id": id }));
@@ -240,35 +251,42 @@ impl ModelProvider for HostModel {
             match rx.recv_timeout(POLL_STEP) {
                 Ok(ModelMsg::Line(line)) => {
                     if let Some(payload) = sse.push_line(&line) {
-                        if payload.trim() == "[DONE]" {
-                            acc.mark_done();
-                            break Ok(());
-                        }
-                        let chunk: Value = match serde_json::from_str(&payload) {
-                            Ok(v) => v,
-                            Err(e) => break Err(HarnessError::provider(format!("bad stream chunk: {e}"), false)),
-                        };
-                        if let Err(e) = acc.push_with_reasoning(&chunk, on_text, on_reasoning) {
-                            break Err(e);
-                        }
-                        if let Some(progress) = acc.pending_tool_call() { on_tool(&progress); }
+                        if let Err(error) = consume(&mut acc, &payload) { break Err(error); }
                     }
                 }
-                Ok(ModelMsg::End { status, error, body }) => {
+                Ok(ModelMsg::End { status, error, body, verified_tool_terminal }) => {
                     if let Some(payload) = sse.flush() {
-                        if payload.trim() != "[DONE]" {
-                            if let Ok(chunk) = serde_json::from_str::<Value>(&payload) {
-                                let _ = acc.push_with_reasoning(&chunk, on_text, on_reasoning);
-                            }
-                        }
+                        if let Err(error) = consume(&mut acc, &payload) { break Err(error); }
                     }
                     if let Some(message) = error {
-                        break Err(HarnessError::provider(message, true));
+                        break Err(HarnessError::provider(message, status == 0 || status == 429 || status >= 500));
                     }
                     if !(200..300).contains(&status) {
                         break Err(http_error(status, body.as_deref().unwrap_or("")));
                     }
-                    acc.mark_done();
+                    if let Some(body) = body {
+                        let result = serde_json::from_str::<Value>(&body).ok().and_then(|mut chunk| {
+                            let choice = chunk["choices"].get_mut(0)?.as_object_mut()?;
+                            let message = choice.remove("message")?;
+                            if choice.get("finish_reason").is_none_or(Value::is_null) && message["tool_calls"].is_null() {
+                                choice.insert("finish_reason".into(), json!("stop"));
+                            }
+                            choice.insert("delta".into(), message);
+                            Some(chunk)
+                        });
+                        let Some(chunk) = result else {
+                            break Err(HarnessError::provider("模型返回了无效的 JSON 回复", false));
+                        };
+                        if let Err(error) = consume(&mut acc, &chunk.to_string()) { break Err(error); }
+                    }
+                    let has_calls = acc.pending_tool_call().is_some();
+                    if has_calls && (!verified_tool_terminal || !acc.tool_calls_complete()
+                        || !matches!(acc.finish_reason(), Some("tool_calls" | "function_call" | "stop"))) {
+                        break Err(HarnessError::provider("工具调用未完整结束或网关版本过旧，未执行操作", false));
+                    }
+                    if !acc.is_finished() || matches!(acc.finish_reason(), Some("content_filter")) {
+                        break Err(HarnessError::provider("模型回复未完整结束，请重试", false));
+                    }
                     break Ok(());
                 }
                 Err(RecvTimeoutError::Timeout) => continue,
@@ -439,6 +457,7 @@ impl Engine {
                         status: value["status"].as_u64().unwrap_or(0) as u16,
                         error: value["error"].as_str().map(str::to_string),
                         body: value["body"].as_str().map(str::to_string),
+                        verified_tool_terminal: value["verified_tool_terminal"].as_bool().unwrap_or(true),
                     });
                 }
                 Ok(())
