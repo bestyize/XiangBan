@@ -266,6 +266,22 @@ class AccountAndSessionTest {
     }
 
     @Test
+    fun `temporary refresh failure preserves the credential and can recover`() = runTest {
+        val server = FakeServer()
+        val storage = InMemoryTokenStorage(Tokens("A1", "R1", 0, "u1"))
+        val manager = session(server, storage) { 1 }
+        val owner = manager.identity()!!
+        server.on("/api/auth/refresh", HttpStatusCode.ServiceUnavailable, """{"message":"outage"}""")
+        assertEquals(503, assertFailsWith<ApiException> { manager.accessToken(owner) }.status)
+        assertEquals("R1", storage.load()?.refreshToken)
+        assertEquals(owner, manager.identity())
+        server.on("/api/auth/refresh", body = """{"access_token":"A2","refresh_token":"R2","expires_in":900}""")
+        assertEquals("A2", manager.accessToken(owner))
+        manager.logout()
+        assertEquals("account_changed", assertFailsWith<ApiException> { manager.accessToken(owner) }.code)
+    }
+
+    @Test
     fun `logout clears the tokens even if the server cannot be reached`() = runTest {
         val server = FakeServer()
         server.onThrow("/api/auth/logout")
