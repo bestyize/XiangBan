@@ -103,6 +103,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private var lastUserGesture = 0L
     private var exportInFlight = false
     private var remoteEnabled = false
+    private var quickLaunchEnabled = false
     private var remoteJob: Job? = null
     private val remoteControl by lazy { RuntimeV2RemoteControl(this) }
     private val favoriteReceiver by lazy { RuntimeV2Favorites.receiver(intent) }
@@ -159,6 +160,11 @@ class RuntimeV2Activity : ComponentActivity() {
                         root == null -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
                         else -> assets.loadBundledRuntimeV2(id, root)
                     }
+                    quickLaunchEnabled = pack.manifest.id == "quick-launch" && runCatching {
+                        val expected = assets.open("game-packs-v2/quick-launch/index.html").use { it.readBytes() }
+                        val actual = requireNotNull(pack.open(pack.manifest.entry)).use { it.readBytes() }
+                        java.security.MessageDigest.isEqual(expected, actual)
+                    }.getOrDefault(false)
                     script = assets.open("runtime-v2/bridge.js").bufferedReader().use { it.readText() }
                     legacySave = when {
                         workspace -> null
@@ -589,6 +595,42 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "exit" -> { result(); log?.add("game.exit"); exit() }
+            "quickLaunch.available", "quickLaunch.open", "quickLaunch.pin" -> {
+                val name = params.optString("name")
+                if (!quickLaunchEnabled || reply !== document || !QuickLaunchShortcut.targets.containsKey(name)) { error("unsupported"); return }
+                if (method == "quickLaunch.available") { result(QuickLaunchShortcut.available(this, name)); return }
+                if (!ready || !resumed || closing || failed || chrome.menuOpen || chrome.consentOpen ||
+                    lastUserGesture == 0L || SystemClock.elapsedRealtime() - lastUserGesture !in 0..3000) { error("gesture"); return }
+                lastUserGesture = 0L
+                if (method == "quickLaunch.open") {
+                    if (QuickLaunchShortcut.open(this, name)) result(true) else error("unavailable")
+                    return
+                }
+                lifecycleScope.launch {
+                    val requested = withContext(Dispatchers.IO) {
+                        runCatching { QuickLaunchShortcut.pin(this@RuntimeV2Activity, name) }.getOrDefault(false)
+                    }
+                    if (!requested) { error("unavailable"); return@launch }
+                    delay(1_200)
+                    val focused = shortcutWindowFocused.value
+                    shortcutWindowFocused.first { it }
+                    delay(250)
+                    val pinned = withContext(Dispatchers.IO) {
+                        runCatching { QuickLaunchShortcut.isPinned(this@RuntimeV2Activity, name) }.getOrDefault(false)
+                    }
+                    if (pinned) result(true) else {
+                        error("unavailable")
+                        if (Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) && focused && !closing && !isFinishing) {
+                            AlertDialog.Builder(this@RuntimeV2Activity)
+                                .setTitle("尚未添加到桌面")
+                                .setMessage("请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。")
+                                .setNegativeButton("取消", null)
+                                .setPositiveButton("去设置") { _, _ -> openShortcutSettings() }
+                                .show()
+                        }
+                    }
+                }
+            }
             "builtin.remote.supported" -> {
                 if (remoteEnabled && reply === document) result(remoteControl.supported()) else error("unsupported")
             }

@@ -54,6 +54,11 @@
     can(name) { return capabilities.has(name); },
     exit() { return call('exit'); },
     exportMbti(payload) { return call('builtin.mbti.export', payload); },
+    quickLaunch: {
+      available: name => call("quickLaunch.available", { name }),
+      open: name => call("quickLaunch.open", { name }),
+      pin: name => call("quickLaunch.pin", { name }),
+    },
     remote: {
       supported: () => call('builtin.remote.supported'),
       catalog: () => call('builtin.remote.catalog'),

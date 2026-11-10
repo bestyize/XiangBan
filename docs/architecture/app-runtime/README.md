@@ -329,6 +329,10 @@ cover.png / .svg   16:9 封面，至少 640×360
 - 用户的同意按作品记录，可以在「小伴设置 → 应用权限」里撤销。
 - **所有限制都在宿主那一侧执行**，包括能力声明、次数、大小，以及「必须由用户点击触发」。作品可以绕过 SDK 直接给宿主发消息，所以不能指望 SDK 里的检查。判断是不是用户点击：原生宿主看最近一次触摸是不是在 1 秒以内；网页宿主看 `navigator.userActivation`。
 
+#### Android 轻启专用接口（开发中）
+
+Android 宿主为「轻启」提供 `xb.quickLaunch.available(name)`、`xb.quickLaunch.open(name)` 和 `xb.quickLaunch.pin(name)`。入口脚本必须与宿主内置的轻启入口逐字节一致；非该作品、未知目标、非前台或缺少近期用户手势时拒绝调用。宿主根据固定白名单选择目标包名与 URI，不接收作品提供的任意 Intent。创建桌面图标交给系统桌面确认，`pin` 成功返回表示宿主已确认该快捷方式处于固定状态。当前白名单包含 21 个常用应用的候选入口，实际首页和广告效果因应用版本而异；不属于通用协议 2 能力。
+
 ### 7.3 宿主怎么注入 SDK
 
 - **Android**：用 `WebViewCompat.addDocumentStartJavaScript` 注入 `xb` 和 CSS 变量，只对作品的源生效；用 `WebViewCompat.addWebMessageListener` 接收消息，只接受作品的源发来的消息。单条消息最少要能传 4 MB，二进制数据用 ArrayBuffer 传。现有实现会丢掉超过 40 KiB 的消息，要改。
