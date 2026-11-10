@@ -24,6 +24,7 @@ for (const [, name, image] of nativeEntries) {
     'missing icon for ' + name + ': ' + image);
 }
 assert.match(native, /getLaunchIntentForPackage/, 'known app packages must use Android launcher');
+assert.match(native, /bilibili:\/\/home/, 'Bilibili must use its home deep link with launcher fallback');
 assert.match(native, /queryIntentActivities/, 'unknown packages must resolve installed launchers');
 assert.match(native, /appleOnly/, 'unsupported Apple-only entries must not start arbitrary apps');
 assert.match(manifest, /android\.intent\.category\.LAUNCHER/, 'launcher package visibility is required');
