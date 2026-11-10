@@ -40,7 +40,7 @@ class SetReminderToolTest {
     fun `reports it when the platform cannot schedule`() = runTest {
         val result = SetReminderTool(Fake(accept = false)) { 0L }.run(args("""{"title":"x","minutes":5}"""))
         assertFalse(result.ok)
-        assertTrue(result.output.contains("通知"))
+        assertEquals(ReminderScheduleResult.Failed.message, result.output)
     }
 
     @Test

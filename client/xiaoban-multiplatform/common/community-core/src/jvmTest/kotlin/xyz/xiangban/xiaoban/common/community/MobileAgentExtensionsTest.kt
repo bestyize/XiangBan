@@ -91,7 +91,8 @@ class MobileAgentExtensionsTest {
             val oldSession = chat.state.value.conversationId
             val oldRun = bridge.run
             chat.clearConversation()
-            chat.send("另一会话")
+            val assistant = CloudAssistant(chat)
+            assistant.ask("另一会话")
             withTimeout(3_000) { while (chat.state.value.question == null) delay(10) }
             bridge.output.put("""{"type":"question","id":"old","session":"$oldSession","question":"过期问题","options":[]}""")
             bridge.output.put("""{"type":"approval_request","id":"old","session":"$oldSession","tool":"write_file","risk":"write","arguments":{}}""")
@@ -100,7 +101,7 @@ class MobileAgentExtensionsTest {
             assertEquals("用什么颜色？", chat.state.value.question?.question)
             assertNull(chat.state.value.approval)
             assertFalse(chat.state.value.messages.last().text.contains("过期"))
-            val assistant = CloudAssistant(chat)
+            assertNull(CloudAssistant(chat).prompt(), "a different voice call must not acquire an active prompt")
             val prompt = assertNotNull(assistant.prompt())
             assertTrue(prompt.question)
             assistant.answerPrompt(prompt.options.first { it.label == "绿色" }.id)
