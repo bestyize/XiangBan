@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
@@ -21,6 +22,9 @@ interface ChatHistoryFiles {
     fun agentCopy(id: String): String? = null
     /** 内核持久任务清单，随会话一起删除。 */
     fun agentProgressCopy(id: String): String? = null
+    fun agentSidecars(id: String): List<String> = listOfNotNull(agentCopy(id), agentProgressCopy(id))
+    fun deletionMarker(folder: String, id: String): String = "$folder/deleted/$id"
+    fun deletedIds(folder: String): Set<String> = emptySet()
 }
 
 /** 不提供存放处时用它：对话只在这次打开应用期间记着。 */
@@ -29,6 +33,8 @@ class InMemoryChatHistoryFiles : ChatHistoryFiles {
     override fun read(name: String): String? = texts[name]
     override fun write(name: String, text: String) { texts[name] = text }
     override fun delete(name: String) { texts.remove(name) }
+    override fun deletedIds(folder: String): Set<String> =
+        texts.keys.filter { it.startsWith("$folder/deleted/") }.map { it.substringAfterLast('/') }.toSet()
 }
 
 /** 对话列表里的一条。 */
@@ -52,10 +58,16 @@ fun chatTitle(messages: List<ChatTurn>): String {
  * 小伴AI 的对话历史：每个账号一份对话列表，每个对话一个文件。列表在内存里，写文件放到后台按顺序做，不卡界面。
  * 换账号只是换一份列表，不删别的账号的对话。和 [CloudChatController] 一样只在 [scope] 的线程上调用。
  */
-class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
+class ChatHistory(
+    private val files: ChatHistoryFiles,
+    private val scope: CoroutineScope,
+    private val awaitAgentIdle: suspend (String) -> Unit = {},
+) {
     private var folder = ""
     private var index: List<ChatSummary> = emptyList()
     private var groups: List<String> = emptyList()
+    private var deleted = emptySet<String>()
+    private val cleaning = mutableSetOf<String>()
     private data class Write(val revision: Long, val name: String, val text: String?)
     private val pending = MutableStateFlow<Map<String, Write>>(emptyMap())
     private val writes = Channel<Write>(Channel.UNLIMITED)
@@ -88,14 +100,22 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
         }
     }
 
-    fun retryPending() { pending.value.values.sortedBy { it.revision }.forEach { writes.trySend(it) } }
+    fun retryPending() {
+        pending.value.values.sortedBy { it.revision }.forEach { writes.trySend(it) }
+        deleted.forEach { cleanDeleted(folder, it) }
+    }
 
     /** 换到某个账号的对话；返回它的对话列表（最近的在前）。 */
     fun useAccount(account: String?): List<ChatSummary> {
         options.clear()
         folder = "chats/" + (account ?: "default").map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString("")
+        deleted = runCatching { files.deletedIds(folder) }.getOrElse {
+            _saveError.value = "无法读取待删除的对话，请重试。"
+            emptySet()
+        }.filter(::validChatId).toSet()
         index = read(indexName())?.let { runCatching { CommunityJson.decodeFromString<List<ChatSummary>>(it) }.getOrNull() }.orEmpty()
-            .sortedByDescending { it.updatedAtMs }
+            .filterNot { it.id in deleted }.sortedByDescending { it.updatedAtMs }
+        deleted.forEach { cleanDeleted(folder, it) }
         groups = read("$folder/workspaces.json")?.let {
             runCatching { CommunityJson.decodeFromString<List<String>>(it) }.getOrNull()
         }.orEmpty()
@@ -140,7 +160,7 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
 
     /** Missing/corrupt/unreadable records must not silently remove the conversation index. */
     fun loadSnapshot(id: String): StoredChat? = try {
-        read(chatName(id))?.let { CommunityJson.decodeFromString<StoredChat>(it) }?.also { options[id] = it.options }
+        if (id in deleted) null else read(chatName(id))?.let { CommunityJson.decodeFromString<StoredChat>(it) }?.also { options[id] = it.options }
     } catch (e: Exception) {
         _saveError.value = "无法读取这段对话，原记录已保留，请稍后重试。"
         null
@@ -150,6 +170,7 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
 
     /** 存下一个对话（没有内容就不存），把它挪到列表最前面；返回新的列表。 */
     fun save(id: String, messages: List<ChatTurn>, nowMs: Long, settings: ChatOptions? = null): List<ChatSummary> {
+        if (id in deleted) return index
         val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.imageGeneration || it.role == "user" }
             .map {
                 when {
@@ -168,14 +189,52 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
         return index
     }
 
+    fun isDeleted(id: String): Boolean = id in deleted
+
     fun delete(id: String): List<ChatSummary> {
+        require(validChatId(id))
+        if (id !in deleted) {
+            try {
+                // Record intent before asking the native run to stop. On restart this also hides an old index.
+                files.write(files.deletionMarker(folder, id), folder)
+            } catch (e: Exception) {
+                _saveError.value = "无法记录删除操作，请重试。"
+                return index
+            }
+            deleted = deleted + id
+        }
+        options.remove(id)
         enqueue(chatName(id), null)
-        files.agentCopy(id)?.let { enqueue(it, null) }
-        files.agentProgressCopy(id)?.let { enqueue(it, null) }
         index = index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
+        cleanDeleted(folder, id)
         return index
     }
+
+    private fun cleanDeleted(owner: String, id: String) {
+        val key = "$owner/$id"
+        if (!cleaning.add(key)) return
+        scope.launch {
+            try {
+                withTimeout(10_000) { awaitAgentIdle(id) }
+                withContext(Dispatchers.Default) {
+                    files.delete("$owner/$id.json")
+                    files.agentSidecars(id).forEach(files::delete)
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                _saveError.value = "对话正在停止，稍后可重试清理。"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _saveError.value = "对话文件尚未清理，请重试。"
+            } finally {
+                cleaning.remove(key)
+            }
+        }
+    }
+
+    private fun validChatId(id: String): Boolean =
+        id.length in 1..128 && id.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }
 
     private fun indexName() = "$folder/index.json"
     private fun chatName(id: String) = "$folder/$id.json"

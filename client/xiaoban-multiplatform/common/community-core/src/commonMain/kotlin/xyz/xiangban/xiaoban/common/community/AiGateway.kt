@@ -701,9 +701,9 @@ class CloudChatController(
 
     fun deleteConversation(id: String) {
         val store = history ?: return
-        // 先离开这个对话（会把没说完的存一下），再删，免得删完又被存回来。
-        if (id == agentSession) clearConversation()
-        _state.value = _state.value.copy(conversations = store.delete(id))
+        val remaining = store.delete(id)
+        _state.value = _state.value.copy(conversations = remaining)
+        if (store.isDeleted(id) && id == agentSession) clearConversation()
     }
 
     /** 把当前对话存一下（发出提问、回答结束、停止时）。 */

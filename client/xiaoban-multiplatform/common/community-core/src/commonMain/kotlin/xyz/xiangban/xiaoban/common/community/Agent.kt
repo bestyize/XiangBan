@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.currentCoroutineContext
@@ -189,6 +190,12 @@ class AgentRuntime(
         activeRuns.update { running -> running.mapValues { (_, value) -> if (value.id == run) value.copy(cancelled = true) else value } }
         runCatching { send(line { put("type", "cancel"); put("id", run) }) }
         requestRuns.value.filterValues { it == run }.keys.forEach { requests.value[it]?.cancel() }
+    }
+
+    suspend fun awaitSessionIdle(session: String) {
+        activeRuns.first { session !in it }
+        // A shutdown clears the map before the native thread has joined.
+        lock.withLock { }
     }
 
     fun configureSession(session: String, options: ChatOptions, tier: AiTier? = null) {

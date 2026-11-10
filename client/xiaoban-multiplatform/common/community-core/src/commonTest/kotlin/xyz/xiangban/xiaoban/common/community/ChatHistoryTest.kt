@@ -7,6 +7,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -120,6 +121,22 @@ class ChatHistoryTest {
         // 别的账号看不到这些对话。
         again.useAccount("u2")
         assertTrue(again.state.value.conversations.isEmpty())
+    }
+
+    @Test
+    fun `deletion waits for the agent and ignores late saves`() = runTest {
+        val files = AgentAwareFiles()
+        val stopped = CompletableDeferred<Unit>()
+        val history = ChatHistory(files, scope()) { stopped.await() }.apply { useAccount("owner") }
+        history.save("one", listOf(ChatTurn(1, "user", "hi")), 1)
+        files.texts["agent/s-one.jsonl"] = "active"
+        history.delete("one")
+        assertEquals("chats/owner", files.texts["chats/owner/deleted/one"])
+        assertEquals("active", files.texts["agent/s-one.jsonl"])
+        assertTrue(history.save("one", listOf(ChatTurn(2, "user", "late")), 2).isEmpty())
+        assertNull(history.load("one"))
+        stopped.complete(Unit)
+        eventually { "agent/s-one.jsonl" !in files.texts }
     }
 
     @Test

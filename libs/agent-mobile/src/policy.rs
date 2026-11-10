@@ -103,9 +103,9 @@ fn summarize(turn: &mut Turn, budget: usize) {
     turn.messages = messages;
 }
 
-pub struct HistoryRead { spec: ToolSpec, store: Arc<JsonlStore> }
+pub struct HistoryRead { spec: ToolSpec, store: Arc<dyn agent_kernel::SessionStore> }
 impl HistoryRead {
-    pub fn new(store: Arc<JsonlStore>) -> Self {
+    pub fn new(store: Arc<dyn agent_kernel::SessionStore>) -> Self {
         Self { store, spec: ToolSpec::new("history_read", "分页读取当前对话原始文本记录；摘要缺少细节时使用，不读取其他对话。", json!({"type":"object","properties":{"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":20}},"additionalProperties":false})).risk(Risk::Read) }
     }
 }

@@ -563,3 +563,19 @@ fn incomplete_or_unverified_model_stream_never_dispatches_write_tools() {
         engine.stop();
     }
 }
+
+#[test]
+fn a_deleted_session_rejects_late_writes_and_cannot_be_reopened() {
+    let dir = temp_dir("deleted");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"Hello"}).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    std::fs::create_dir(format!("{dir}/deleted")).unwrap();
+    std::fs::write(format!("{dir}/deleted/s1"), "owner").unwrap();
+    std::fs::remove_file(format!("{dir}/s-s1.jsonl")).unwrap();
+    answer_text(&engine, &request, "late");
+    assert_eq!(next_of(&engine, "run_end")["ok"], false);
+    assert!(!std::path::Path::new(&format!("{dir}/s-s1.jsonl")).exists());
+    assert!(engine.send(&json!({"type":"run","id":"r2","session":"s1","input":"Open"}).to_string()).is_err());
+    engine.stop();
+}

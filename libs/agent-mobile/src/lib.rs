@@ -354,6 +354,27 @@ pub enum Polled {
     Closed,
 }
 
+struct MobileSessionStore {
+    history: JsonlStore,
+    deleted: std::path::PathBuf,
+}
+
+impl SessionStore for MobileSessionStore {
+    fn load(&self, session: &str) -> Result<Vec<Message>, HarnessError> {
+        if policy::valid_session(session) && self.deleted.join(session).is_file() {
+            return Err(HarnessError::Store("会话已删除".into()));
+        }
+        self.history.load(session)
+    }
+
+    fn append(&self, session: &str, messages: &[Message]) -> Result<(), HarnessError> {
+        if policy::valid_session(session) && self.deleted.join(session).is_file() {
+            return Err(HarnessError::Store("会话已删除".into()));
+        }
+        self.history.append(session, messages)
+    }
+}
+
 pub struct Engine {
     input: Mutex<Option<Sender<Vec<u8>>>>,
     output: Mutex<Receiver<String>>,
@@ -364,6 +385,7 @@ pub struct Engine {
     permission: Arc<Permission>,
     settings: policy::Settings,
     trust: std::path::PathBuf,
+    deleted: std::path::PathBuf,
 }
 
 impl Engine {
@@ -389,7 +411,8 @@ impl Engine {
             if always_confirm.contains(tool) { Some("此工具每次执行都需要确认".into()) } else { policy::danger(tool,args) }
         }).check_reads().honor_grants_after_taint());
         let trust = std::path::Path::new(&config.sessions_dir).join("trust");
-        let store = Arc::new(JsonlStore::new(config.sessions_dir.clone()));
+        let deleted = std::path::Path::new(&config.sessions_dir).join("deleted");
+        let store = Arc::new(MobileSessionStore { history: JsonlStore::new(&config.sessions_dir), deleted: deleted.clone() });
         let spill = std::path::Path::new(&config.sessions_dir).join("tool-output");
         let mut builder = Agent::builder(provider, store.clone())
             .system_prompt(config.system_prompt.clone())
@@ -435,7 +458,7 @@ impl Engine {
             model,
             worker: Mutex::new(Some(worker)),
             closed_sent: AtomicBool::new(false),
-            permission, settings, trust,
+            permission, settings, trust, deleted,
         }))
     }
 
@@ -444,7 +467,13 @@ impl Engine {
     pub fn send(&self, line: &str) -> Result<(), String> {
         let value: Value = serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))?;
         let id = value["id"].as_str().unwrap_or("").to_string();
-        match value["type"].as_str().unwrap_or("") {
+        let kind = value["type"].as_str().unwrap_or("");
+        if matches!(kind, "run" | "configure_session" | "reviewed_session") {
+            if let Some(session) = value["session"].as_str().filter(|s| policy::valid_session(s)) {
+                if self.deleted.join(session).is_file() { return Err("会话已删除".into()); }
+            }
+        }
+        match kind {
             "model_line" => {
                 if let Some(tx) = lock(&self.rpc.models).get(&id) {
                     let _ = tx.send(ModelMsg::Line(value["line"].as_str().unwrap_or("").to_string()));
