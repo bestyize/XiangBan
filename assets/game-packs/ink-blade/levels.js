@@ -4,6 +4,12 @@
 
   const BAMBOO = {
     id: 1, name: '竹林卷', length: 6120,
+    // 架刀: after one cut lands these enemies guard their front and answer the next with a telegraphed strike.
+    guard: ['puppet'],
+    // 回墨: a cleared wave or a boss execution restores one 墨血.
+    respite: true,
+    // 收刀: a swing parries only if the one before it ended at least this long ago (seconds).
+    parryRest: 0.12,
     areas: [
       { x: 0, name: '山门', sub: '第一幅' },
       { x: 1440, name: '竹林', sub: '第二幅' },
@@ -284,15 +290,15 @@
     { id: '1-1', code: 101, volume: 1, name: '山门', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['gate'],
       par: 45, hurt: 0, challenge: { stat: 'maxCombo', goal: 6, text: '连击达到 6' }, grades: [1700, 1850, 2000] },
     { id: '1-2', code: 102, volume: 1, name: '竹林', sub: '第二幅', range: [1340, 2330], start: 1460, encounters: ['grove'],
-      par: 90, hurt: 1, challenge: { stat: 'executions', goal: 3, text: '处决 3 名敌人' }, grades: [2200, 2900, 3500] },
+      par: 90, hurt: 1, challenge: { stat: 'executions', goal: 3, text: '处决 3 名敌人' }, grades: [3000, 4300, 5300], parryEase: 0.06, finesse: 4 },
     { id: '1-3', code: 103, volume: 1, name: '鸦岭', sub: '第三幅', range: [2290, 3290], start: 2340, encounters: ['crows'],
-      par: 90, hurt: 1, challenge: { stat: 'airKills', goal: 3, text: '在空中击败 3 名敌人' }, grades: [2300, 2900, 3400] },
+      par: 90, hurt: 1, challenge: { stat: 'airKills', goal: 3, text: '在空中击败 3 名敌人' }, grades: [2300, 2900, 3400], parryEase: 0.04, finesse: 4 },
     { id: '1-4', code: 104, volume: 1, name: '断桥', sub: '第四幅', range: [3250, 4230], start: 3300, encounters: ['bridge'],
-      par: 100, hurt: 2, challenge: { stat: 'deflectKills', goal: 2, text: '以斩回的箭击败 2 名敌人' }, grades: [2600, 3500, 4300] },
+      par: 100, hurt: 2, challenge: { stat: 'deflectKills', goal: 2, text: '以斩回的箭击败 2 名敌人' }, grades: [3000, 4100, 5200], parryEase: 0.02, finesse: 5 },
     { id: '1-5', code: 105, volume: 1, name: '夜雨', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['rain'],
-      par: 110, hurt: 2, challenge: { stat: 'parries', goal: 8, text: '弹反 8 次' }, grades: [3800, 4800, 6000] },
+      par: 110, hurt: 2, challenge: { stat: 'parries', goal: 8, text: '弹反 8 次' }, grades: [3800, 4800, 6000], finesse: 6 },
     { id: '1-6', code: 106, volume: 1, name: '无常', sub: '终幅', range: [5190, 6120], start: 5240, encounters: ['boss'],
-      par: 120, hurt: 2, boss: true, challenge: { stat: 'bossExecutions', goal: 2, text: '破势处决无常 2 次' }, grades: [4800, 6000, 7400] },
+      par: 120, hurt: 2, boss: true, challenge: { stat: 'bossExecutions', goal: 2, text: '破势处决无常 2 次' }, grades: [4600, 5500, 6800], finesse: 5 },
     { id: '1-scroll', code: 100, volume: 1, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
       encounters: ['gate', 'grove', 'crows', 'bridge', 'rain', 'boss'], par: 420, hurt: 3, scroll: true,
       challenge: { stat: 'time', goal: 360, at: 'most', text: '6 分钟内一气呵成' }, grades: [14000, 18000, 22000] },

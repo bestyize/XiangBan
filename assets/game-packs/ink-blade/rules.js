@@ -104,10 +104,10 @@
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
         jumpBuffer: 0, slashBuffer: 0, dashBuffer: 0, inkBuffer: 0, jumpHeld: false, jumpCut: false,
-        action: null, slashStartClock: -9, slashEndClock: -9, nextStage: 0, dashCd: 0,
+        action: null, slashStartClock: -9, slashEndClock: -9, nextStage: 0, dashCd: 0, recoil: 0, freeUntil: -9, settleClock: -9,
         hp: diff.hp, maxHp: diff.hp, iframes: 0, hurt: 0, dead: false, deadT: 0,
         ink: 0, combo: 0, comboTimer: 0, maxCombo: 0, kills: 0, parries: 0, executions: 0,
-        score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
+        score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0, guardBlocks: 0, heals: 0,
         icicleKills: 0, crackKills: 0, slideKills: 0, ambushes: 0, standT: 0, coverT: 0, hideT: 0, spottedT: 0, hidden: false,
         volleyKills: 0, fireKills: 0, unhorses: 0, formationBreaks: 0,
         hookPulls: 0, tideKills: 0, riggingKills: 0, mirrorReturns: 0, mirrorExecutions: 0, guardBreaks: 0, writingDodges: 0,
@@ -233,13 +233,24 @@
     const current = player.action?.type === 'slash' ? player.action : null
     // A swing started while the previous one is still running continues the combo (and, in a strict 卷, cannot parry).
     const chained = Boolean(current)
+    // 收刀: where a 卷 asks for it, only a settled blade parries. The swing before must have ended a moment ago,
+    // unless that swing was itself a parry, so a string of parries still flows.
+    const rest = state.world.parryRest || 0
+    const settleFrom = Math.max(player.slashEndClock, player.settleClock)
+    const rested = state.clock <= player.freeUntil || (!chained && state.clock - settleFrom >= rest)
     let stage = current ? (current.stage + 1) % STAGES.length : state.clock - player.slashEndClock < 0.3 ? player.nextStage : 0
     if (air && stage === 2) stage = 0
-    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden, chained }
+    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden, chained, rested }
     player.slashStartClock = state.clock
     player.slashBuffer = 0
     if (air && player.vy > -80) player.vy = Math.min(player.vy, 40)
     emit(state, 'slash', { stage, air, x: player.x, y: player.y, facing: player.facing })
+  }
+
+  function interruptAction(state) {
+    const player = state.player
+    if (player.action?.type === 'slash') player.settleClock = Math.max(player.settleClock, state.clock)
+    player.action = null
   }
 
   function startDash(state, move) {
@@ -254,6 +265,7 @@
         if(Math.abs(destination-player.x)<=160 && destination>=lo+player.w && destination<=hi-player.w && supported(state.world.platforms,destination,player.w*2,player.y))borrowed={x:destination,id:target.id,dir:player.facing,from:player.x}
       }
     }
+    interruptAction(state)
     player.action = { type: 'dash', t: 0, dur: borrowed ? 0.2 : 0.19,borrow:borrowed }
     if(borrowed){player.borrowUntil=0;player.borrowSteps++;player.borrowMark={id:borrowed.id,until:state.clock+1.3,used:false};emit(state,'borrowStep',{x:player.x,y:player.y,targetX:borrowed.x})}
     player.dashBuffer = 0
@@ -269,7 +281,7 @@
     player.ink = 0
     player.inkBuffer = 0
     player.strikes += 1
-    player.action = null
+    interruptAction(state)
     player.iframes = Math.max(player.iframes, 1.4)
     state.strike = { t: 0, applied: false, x: player.x, facing: player.facing }
     emit(state, 'strike', { x: player.x, y: player.y, facing: player.facing })
@@ -297,6 +309,7 @@
     player.iframes = Math.max(0, player.iframes - dt)
     player.hurt = Math.max(0, player.hurt - dt)
     player.dashCd -= dt
+    player.recoil = Math.max(0, player.recoil - dt)
     if(player.borrowMark?.until<state.clock)player.borrowMark=null
     player.coyote -= dt
     player.comboTimer -= dt
@@ -335,11 +348,11 @@
     if (player.jumpBuffer > 0 && jumpAllowed) {
       if (player.onGround || player.coyote > 0) {
         player.vy = -660; player.onGround = false; player.coyote = 0; player.jumpBuffer = 0; player.jumpCut = false
-        player.action = null
+        interruptAction(state)
         emit(state, 'jump', { x: player.x, y: player.y, double: false })
       } else if (player.airJumps > 0) {
         player.vy = -585; player.airJumps -= 1; player.jumpBuffer = 0; player.jumpCut = false
-        player.action = null
+        interruptAction(state)
         emit(state, 'jump', { x: player.x, y: player.y, double: true })
       }
     }
@@ -479,7 +492,7 @@
     player.damageTaken += damage
     player.iframes = 1
     player.hurt = 0.3
-    player.action = null
+    interruptAction(state)
     player.combo = 0
     player.comboTimer = 0
     const away = sign(player.x - fromX) || -player.facing
@@ -499,7 +512,8 @@
   function inParryWindow(state) {
     const player = state.player
     const action = player.action
-    if (action?.type !== 'slash' || state.clock - player.slashStartClock > state.diff.parry) return false
+    if (action?.type !== 'slash' || state.clock - player.slashStartClock > state.diff.parry + (state.level.parryEase || 0)) return false
+    if (state.world.parryRest && !action.rested) return false
     return !(state.world.strictParry && action.chained)
   }
 
@@ -521,6 +535,9 @@
   function parry(state, attacker) {
     const player = state.player
     player.parries += 1
+    player.recoil = 0
+    player.freeUntil = state.clock + 0.6
+    attacker.guard = false
     if(state.world.borrowStep){player.borrowUntil=state.clock+.65;player.borrowTarget=attacker.id;prompt(state,'borrow');if(Math.abs(windSpeed(state,player.x))>5)player.windParries++}
     if(attacker.type==='rope'&&attacker.state==='ropeDive'){player.ropeParries++;attacker.y=attacker.homeY=GROUND;attacker.vy=0;attacker.ropeMounted=false;attacker.ropeCd=5}
     addCombo(state)
@@ -592,6 +609,33 @@
     emit(state, 'unhorse', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, boss: true })
   }
 
+  // A blocked blade is flung wide: presses are dropped for `recoil`, the blade cannot parry again until `settle`
+  // (plus the 卷's parryRest), and the guard's answering cut is telegraphed for at least `answer` seconds.
+  const GUARD = { recoil: 0.1, settle: 0.28, answer: 0.65 }
+  const GUARD_STATES = new Set(['idle', 'walk', 'hurt', 'tele', 'attack', 'combo'])
+
+  /** 架刀: a guarded enemy turns the blade aside, the swordsman recoils, and the enemy answers with a telegraphed cut. */
+  function guardBlock(state, enemy) {
+    const player = state.player
+    player.guardBlocks += 1
+    player.recoil = GUARD.recoil
+    player.settleClock = state.clock + GUARD.settle
+    player.slashBuffer = 0
+    player.vx = -player.facing * 150
+    state.hitstop = Math.max(state.hitstop, 0.05)
+    emit(state, 'block', { x: enemy.x + enemy.facing * 18, y: enemy.y - 36, guard: true })
+    if (player.dead) return
+    if (isBoss(enemy)) {
+      if (enemy.state === 'idle' || enemy.state === 'walk') { enemy.facing = sign(player.x - enemy.x) || enemy.facing; startCombo(state, enemy) }
+    } else if (['idle', 'walk', 'hurt'].includes(enemy.state) && mayAttack(state)) {
+      enemy.facing = sign(player.x - enemy.x) || enemy.facing
+      enemy.chain = 0
+      telegraph(state, enemy, Math.max(ENEMY[enemy.type].tele, GUARD.answer))
+    }
+    // Shown last so it is the hint on screen while the answering cut winds up.
+    prompt(state, 'guard')
+  }
+
   function hitEnemy(state, enemy, damage, source) {
     const player = state.player
     if (!enemy.alive || enemy.state === 'spawn' || enemy.state === 'dying') return
@@ -604,6 +648,7 @@
       return
     }
     const melee = source === 'slash' || source === 'heavy'
+    if (melee && fromFront && enemy.guard && GUARD_STATES.has(enemy.state)) { guardBlock(state, enemy); return }
     if(enemy.type==='umbrella'&&fromFront&&melee&&enemy.state!=='hurt'){
       emit(state,'block',{x:enemy.x+enemy.facing*22,y:enemy.y-38});state.hitstop=Math.max(state.hitstop,.035);return
     }
@@ -640,7 +685,7 @@
         enemy.state = 'recover'; enemy.t = 1
         enemy.vx = sign(enemy.x - player.x) * 260
         player.executions += 1
-        if(isBoss(enemy))player.bossExecutions += 1;else player.eliteExecutions++
+        if(isBoss(enemy)){player.bossExecutions += 1;respite(state)}else player.eliteExecutions++
         addCombo(state); addScore(state, 300); addInk(state, 15)
         state.hitstop = Math.max(state.hitstop, 0.16); state.slow = 0.7; state.slowScale = 0.25
         emit(state, 'execute', { id: enemy.id, x: enemy.x, y: enemy.y - 40, boss: true })
@@ -654,6 +699,7 @@
           enemy.pressure = (enemy.pressure || 0) + 1
           if (enemy.pressure >= 2 && enemy.hp > damage) {
             enemy.pressure = 0
+            if (state.world.guard) enemy.guard = true
             enemy.facing = sign(player.x - enemy.x) || enemy.facing
             if(SUMMIT.has(enemy.type))startSummitStrike(state,enemy,'thrust',.65)
             else if (enemy.type === 'judge') startJudgeStrike(state, enemy)
@@ -705,6 +751,7 @@
     state.hitstop = Math.max(state.hitstop, source === 'heavy' ? 0.085 : 0.05)
     emit(state, 'hit', { id: enemy.id, x: enemy.x, y: enemy.type === 'crow' ? enemy.y : enemy.y - enemy.h / 2, dir: source === 'arrow' ? sign(enemy.x - player.x) || 1 : player.facing, heavy: source === 'heavy' })
     if (enemy.hp <= 0) { kill(state, enemy, source); return }
+    if (melee && enemy.state !== 'recover' && state.world.guard?.includes(enemy.type)) enemy.guard = true
     // Late in a telegraph the strike is committed: hits land but do not interrupt, so a slightly early
     // press still meets the blade inside the parry window.
     const committed = (SUMMIT.has(enemy.type)&&['mountAttack','ropeDive','mountTell'].includes(enemy.state)) || enemy.state === 'attack' || (enemy.state === 'tele' && enemy.t < enemy.teleTotal * 0.55)
@@ -836,6 +883,7 @@
     const kind = ENEMY[enemy.type]
     const dx = player.x - enemy.x
     const distance = Math.abs(dx)
+    if (enemy.guard && (enemy.state === 'recover' || enemy.state === 'stagger')) enemy.guard = false
     switch (enemy.state) {
       case 'idle':
       case 'walk': {
@@ -2191,6 +2239,7 @@
 
   function updateBoss(state, boss, dt) {
     const player = state.player
+    if (boss.guard && !GUARD_STATES.has(boss.state)) boss.guard = false
     const dx = player.x - boss.x
     const faster = boss.phase2 ? 0.82 : 1
     if (boss.state !== 'broken' && state.clock - boss.postureClock > 2) boss.posture = Math.max(0, boss.posture - 7 * dt)
@@ -2706,6 +2755,7 @@
       for (const spec of encounter.waves[state.wave]) spawnEnemy(state, spec)
       return
     }
+    respite(state)
     if (state.wave + 1 < encounter.waves.length) {
       state.wave += 1
       state.waveDelay = 0.7
@@ -2717,6 +2767,15 @@
     addScore(state, 100 * state.encounter)
     emit(state, 'clear', { id: encounter.id })
     if (state.encounter >= state.plan.length) finish(state, 'clear')
+  }
+
+  /** 回墨: in a 卷 with respite, clearing a wave or executing its boss restores one 墨血. */
+  function respite(state) {
+    const player = state.player
+    if (!state.world.respite || player.dead || player.hp >= player.maxHp) return
+    player.hp += 1
+    player.heals += 1
+    emit(state, 'heal', { x: player.x, y: player.y - 40, hp: player.hp })
   }
 
   function finish(state, reason) {
@@ -2759,15 +2818,19 @@
     return { value, goal: goal.goal, met: goal.at === 'most' ? value <= goal.goal : value >= goal.goal, text: goal.text, stat: goal.stat }
   }
 
+  function finesse(state) { return state.player.parries + state.player.executions }
+
   /** Seals are a bitmask (1 过 通关, 2 全 少伤, 4 技 绝技); grade 0 means not cleared, 1–4 能 / 妙 / 神 / 逸品. */
   function evaluate(state) {
     const cleared = state.reason === 'clear'
-    if (!cleared) return { seals: 0, grade: 0 }
+    if (!cleared) return { seals: 0, grade: 0, capped: false }
     let seals = 1
     if (state.player.damageTaken <= state.level.hurt) seals |= 2
     if (challenge(state).met) seals |= 4
-    const grade = 1 + state.level.grades.filter((score) => state.player.score >= score).length
-    return { seals, grade }
+    const byScore = 1 + state.level.grades.filter((score) => state.player.score >= score).length
+    // 神品 and 逸品 are for reading the blade: a 幅 with `finesse` needs that many parries and executions together.
+    const capped = Boolean(state.level.finesse) && byScore > 2 && finesse(state) < state.level.finesse
+    return { seals, grade: capped ? 2 : byScore, capped }
   }
 
   function step(state, input = {}, dt = 1 / 60) {
@@ -2775,7 +2838,8 @@
     if (state.phase !== 'playing') return state.events
     const player = state.player
     if (input.jumpPressed) player.jumpBuffer = 0.13
-    if (input.slashPressed) player.slashBuffer = 0.17
+    // A blade knocked aside by a guard cannot swing again until the recoil ends; presses made meanwhile are dropped.
+    if (input.slashPressed && player.recoil <= 0) player.slashBuffer = 0.17
     if (input.dashPressed) player.dashBuffer = 0.13
     if (input.inkPressed) player.inkBuffer = 0.13
     player.jumpHeld = Boolean(input.jump)
@@ -2811,11 +2875,11 @@
 
   function result(state) {
     const player = state.player
-    const { seals, grade } = evaluate(state)
+    const { seals, grade, capped } = evaluate(state)
     return {
       level: state.level.id, code: state.level.code, score: player.score, kills: player.kills, maxCombo: player.maxCombo,
       parries: player.parries, cleared: state.reason === 'clear', seconds: Math.floor(state.time), executions: player.executions,
-      damageTaken: player.damageTaken, seals, grade,
+      damageTaken: player.damageTaken, seals, grade, capped, finesse: finesse(state), finesseGoal: state.level.finesse || 0,
     }
   }
 

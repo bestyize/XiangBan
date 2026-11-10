@@ -166,8 +166,9 @@ describe('烽火卷 · cavalry and the strict parry', () => {
     expect(jump.player.hp).toBe(jump.player.maxHp)
   })
 
-  it('still parries chained swings in the earlier 卷', () => {
-    const state = rules.createGame({ level: '1-2', seed: 3 })
+  it('still parries chained swings in a 卷 without a strict rule', () => {
+    // 雪江卷 has neither 军中不乱刀 nor 竹林卷's 收刀, so a chained swing still parries there.
+    const state = rules.createGame({ level: '2-1', seed: 3 })
     state.lock = [1000, 1800]; state.encounter = 99; state.player.x = 1400
     rules.step(state, { slashPressed: true }, DT)
     run(state, 9)

@@ -346,6 +346,7 @@
     parry: ['敌刃朱光一闪时出剑，即可弹反', '敌刃朱光一闪时按 J，即可弹反'],
     deflect: ['箭到身前时出剑，可将箭斩回', '箭到身前时按 J，可将箭斩回'],
     shield: ['盾傀正面难破：弹反破势，或闪身绕到背后', '盾傀正面难破：弹反破势，或闪身绕到背后'],
+    guard: ['敌人架刀，连斩会被格开：收住剑，等朱光一闪再斩', '敌人架刀，连按 J 会被格开：收住剑，等朱光一闪再按'],
     ink: ['墨意已满，按「一笔」挥出满纸一击', '墨意已满，按 I 挥出满纸一击'],
     execute: ['敌人失衡，此刻出剑即可处决', '敌人失衡，此刻按 J 即可处决'],
     broken: ['对手架势已破，速速出剑处决', '对手架势已破，速按 J 处决'],
@@ -650,6 +651,7 @@
       : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
     $('resultDescription').textContent = result.cleared
       ? (level.boss || level.scroll ? copy.winLine : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
+      : p.guardBlocks >= 3 && result.parries < 2 ? '连斩被架刀格开了。收住剑，等朱光一闪再斩。'
       : level.boss ? copy.loseLine : '提剑再入，' + (area ? area.name : copy.place) + '还在等你。'
     $('resultScore').textContent = result.score
     $('resultGrade').textContent = result.cleared ? LV.GRADES[result.grade] + (outcome.newGrade && !outcome.firstClear ? ' · 新品' : '') : '本局积分'
@@ -667,7 +669,7 @@
     $('resultParries').textContent = result.parries
     $('resultTime').textContent = formatTime(result.seconds)
     const bonus = state.bonus
-    $('resultBonus').textContent = bonus ? '用时 +' + bonus.time + ' · 余血 +' + bonus.hp + (bonus.flawless ? ' · 无伤 +' + bonus.flawless : '') : result.executions ? '处决 ' + result.executions + ' 次' : ''
+    $('resultBonus').textContent = bonus ? '用时 +' + bonus.time + ' · 余血 +' + bonus.hp + (bonus.flawless ? ' · 无伤 +' + bonus.flawless : '') + (result.capped ? ' · 弹反与处决共 ' + result.finesse + ' / ' + result.finesseGoal + ' 次，止于妙品' : '') : result.executions ? '处决 ' + result.executions + ' 次' : ''
     const entry = save.levels[level.id]
     const duelLine = duelRound && duel.target ? (result.score > duel.target ? '破帖！超过朋友 ' + (result.score - duel.target) + ' 分 · ' : '距破帖还差 ' + (duel.target - result.score + 1) + ' 分 · ') : ''
     $('bestLabel').textContent = duelLine + (!entry ? '' : outcome.newBest && !outcome.firstClear ? '刷新本幅最佳' : '本幅最佳 ' + LV.GRADES[entry.grade] + ' ' + entry.best + ' 分')
@@ -850,6 +852,9 @@
           FX.seal(fx, '格', e.x, e.y - 26, 14, 0.6, '#3a3835')
           FX.shake(fx, 2)
           audio.play('block')
+          break
+        case 'heal':
+          FX.seal(fx, '回', e.x, e.y - 34, 15, 0.9)
           break
         case 'stagger':
           FX.seal(fx, '乱', e.x, e.y - 14, 15, 0.7, '#3a3835')

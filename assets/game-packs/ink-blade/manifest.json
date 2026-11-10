@@ -4,7 +4,7 @@
   "kind": "game",
   "id": "ink-blade",
   "name": "水墨剑客",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "横屏水墨动作：竹林、雪江、烽火、怒涛、灯市、悬山六卷各六幅。看准朱光出剑弹反，弹反借势绕背、踏上悬山绝顶，逐幅解锁、集三印、求逸品。",
   "category": "action",
   "entry": "index.html",

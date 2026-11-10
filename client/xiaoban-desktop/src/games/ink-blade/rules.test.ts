@@ -123,15 +123,16 @@ describe('ink blade rules', () => {
 
   it('awards each seal only for its own condition and grades by score', () => {
     const state = rules.createGame({ level: '1-2' })
-    expect(rules.evaluate(state)).toEqual({ seals: 0, grade: 0 })
+    expect(rules.evaluate(state)).toMatchObject({ seals: 0, grade: 0 })
     state.reason = 'clear'
     state.player.damageTaken = 2
     state.player.score = 0
-    expect(rules.evaluate(state)).toEqual({ seals: 1, grade: 1 })
+    expect(rules.evaluate(state)).toMatchObject({ seals: 1, grade: 1 })
     state.player.damageTaken = 1
     state.player.executions = 3
+    state.player.parries = 3
     state.player.score = levels.level('1-2').grades[1]
-    expect(rules.evaluate(state)).toEqual({ seals: 7, grade: 3 })
+    expect(rules.evaluate(state)).toMatchObject({ seals: 7, grade: 3 })
     expect(rules.challenge(state)).toMatchObject({ value: 3, goal: 3, met: true })
     const scroll = rules.createGame({ level: '1-scroll' })
     scroll.reason = 'clear'; scroll.time = 400
