@@ -19,7 +19,9 @@ import android.os.ResultReceiver
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
@@ -81,6 +83,7 @@ class RuntimeV2Activity : ComponentActivity() {
     private lateinit var pack: RuntimeV2Package
     private lateinit var chrome: RuntimeV2Chrome
     private lateinit var container: FrameLayout
+    private lateinit var statusBarBackground: View
     private lateinit var script: String
     private var webView: WebView? = null
     private var injectedScript: ScriptHandler? = null
@@ -198,6 +201,10 @@ class RuntimeV2Activity : ComponentActivity() {
                     layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
                 container = FrameLayout(this@RuntimeV2Activity)
+                statusBarBackground = View(this@RuntimeV2Activity).apply {
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }
+                container.addView(statusBarBackground, FrameLayout.LayoutParams(-1, 0, Gravity.TOP))
                 val kindLabel = when {
                     pack.manifest.kind == "game" -> "游戏"
                     pack.manifest.category == "quiz" -> "测评"
@@ -223,6 +230,7 @@ class RuntimeV2Activity : ComponentActivity() {
                 ViewCompat.setOnApplyWindowInsetsListener(container) { _, insets ->
                     val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
                     safeInsets = Rect(safe.left, safe.top, safe.right, safe.bottom)
+                    updateStatusBarBackground()
                     updateInfo()
                     startWhenReady()
                     insets
@@ -391,7 +399,18 @@ class RuntimeV2Activity : ComponentActivity() {
         AppearanceMode.System -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
     }
 
+    private fun updateStatusBarBackground() {
+        val height = if (landscape) 0 else safeInsets.top
+        val layout = statusBarBackground.layoutParams
+        if (layout.height != height) {
+            layout.height = height
+            statusBarBackground.layoutParams = layout
+        }
+        statusBarBackground.setBackgroundColor(if (dark) 0xFF17191F.toInt() else 0xFFF7F8FA.toInt())
+    }
+
     private fun updateSystemBars() {
+        updateStatusBarBackground()
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             if (landscape) hide(WindowInsetsCompat.Type.systemBars())

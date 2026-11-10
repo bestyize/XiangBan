@@ -285,6 +285,37 @@ fn repeated_identical_host_calls_are_warned_about_and_then_blocked() {
 }
 
 #[test]
+fn alternating_unchanged_reads_pause_instead_of_looping() {
+    let dir = temp_dir("alternating-reads");
+    let mut settings: Value = serde_json::from_str(&config(&dir)).unwrap();
+    settings["tools"][0]["risk"] = json!("read");
+    let engine = Engine::start(&settings.to_string()).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"Check the same two files"}).to_string()).unwrap();
+    let mut reads = 0;
+    loop {
+        let event = next(&engine, Duration::from_secs(2));
+        match event["type"].as_str() {
+            Some("model_request") => {
+                assert!(reads < 12, "the run kept repeating reads");
+                let target = if reads % 2 == 0 { "first" } else { "second" };
+                ask_tool(&engine, &event, "set_reminder", json!({"title":target,"minutes":1}), &format!("read-{reads}"));
+                reads += 1;
+            }
+            Some("tool_request") => {
+                engine.send(&json!({"type":"tool_result","id":event["id"],"ok":true,"output":"unchanged"}).to_string()).unwrap();
+            }
+            Some("run_end") => {
+                assert_eq!(event["ok"], false, "{event}");
+                assert!(event["error"].as_str().unwrap().contains("no_progress_tool_rounds"), "{event}");
+                break;
+            }
+            _ => {}
+        }
+    }
+    engine.stop();
+}
+
+#[test]
 fn empty_answers_pause_after_three_continuations_instead_of_finishing_successfully() {
     let dir = temp_dir("no-progress");
     let engine = Engine::start(&config(&dir)).unwrap();
@@ -539,6 +570,48 @@ fn productive_continuations_are_not_stopped_after_eight_nudges() {
     let model=next_of(&engine,"model_request");answer_text(&engine,&model,"十个步骤已完成。");
     assert_eq!(next_of(&engine,"run_end")["ok"],true);
     engine.stop();
+}
+
+#[test]
+fn completed_parameterless_calls_accept_an_omitted_empty_object() {
+    for (name, done, dispatched) in [
+        ("app_read_format", true, true),
+        ("app_read_format", false, false),
+        ("set_reminder", true, false),
+    ] {
+        let dir = temp_dir(&format!("empty-arguments-{name}-{done}"));
+        let mut settings: Value = serde_json::from_str(&config(&dir)).unwrap();
+        settings["tools"].as_array_mut().unwrap().push(json!({
+            "name": "app_read_format", "description": "Read work format", "risk": "read",
+            "parameters": { "type": "object", "properties": {}, "additionalProperties": false },
+        }));
+        let engine = Engine::start(&settings.to_string()).unwrap();
+        engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"Inspect"}).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let mut sse = data(json!({"choices":[{"index":0,"delta":{"tool_calls":[
+            {"index":0,"id":"call_1","type":"function","function":{"name":name,"arguments":""}}
+        ]},"finish_reason":"tool_calls"}]}));
+        if done { sse.extend(["data: [DONE]".to_string(), String::new()]); }
+        reply_with(&engine, request["id"].as_str().unwrap(), &sse);
+        if dispatched {
+            let tool = next_of(&engine, "tool_request");
+            assert_eq!(tool["name"], name);
+            assert_eq!(tool["arguments"], json!({}));
+            engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":"Read"}).to_string()).unwrap();
+            let request = next_of(&engine, "model_request");
+            answer_text(&engine, &request, "Done.");
+        }
+        loop {
+            let event = next(&engine, Duration::from_secs(2));
+            assert_ne!(event["type"], "approval_request", "{event}");
+            assert_ne!(event["type"], "tool_request", "{event}");
+            if event["type"] == "run_end" {
+                assert_eq!(event["ok"], dispatched, "{event}");
+                break;
+            }
+        }
+        engine.stop();
+    }
 }
 
 #[test]

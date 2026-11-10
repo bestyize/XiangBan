@@ -409,7 +409,7 @@ internal fun AiDrawer(
                                     color = if (current) extra.brandInk else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
                                 )
-                                relativeTime(item.updatedAtMs).takeIf { it.isNotEmpty() }?.let {
+                                (if (item.id in cloud.imageSessions) "生图进行中" else relativeTime(item.updatedAtMs)).takeIf { it.isNotEmpty() }?.let {
                                     Text(it, Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
                                 }
                             }
