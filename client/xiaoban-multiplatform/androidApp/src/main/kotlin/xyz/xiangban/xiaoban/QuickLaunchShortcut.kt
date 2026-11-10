@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.Icon
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -26,6 +27,7 @@ internal object QuickLaunchShortcut {
         val image: String,
         val packages: List<String> = emptyList(),
         val labels: List<String> = emptyList(),
+        val homepage: String? = null,
     )
 
     val targets: Map<String, Target> = listOf(
@@ -35,7 +37,7 @@ internal object QuickLaunchShortcut {
         Target("京东", "jd.webp", packages = listOf("com.jingdong.app.mall")),
         Target("拼多多", "pdd.webp", packages = listOf("com.xunmeng.pinduoduo")),
         Target("美团", "meituan.webp", packages = listOf("com.sankuai.meituan")),
-        Target("哔哩哔哩", "bilibili.webp", packages = listOf("tv.danmaku.bili"), labels = listOf("bilibili")),
+        Target("哔哩哔哩", "bilibili.webp", packages = listOf("tv.danmaku.bili"), labels = listOf("bilibili"), homepage = "bilibili://home"),
         Target("微博", "weibo.webp", packages = listOf("com.sina.weibo")),
         Target("抖音", "douyin.webp", packages = listOf("com.ss.android.ugc.aweme")),
         Target("小红书", "xiaohongshu.webp", packages = listOf("com.xingin.xhs")),
@@ -187,9 +189,20 @@ internal object QuickLaunchShortcut {
 
     fun open(activity: Activity, name: String): Boolean {
         val target = targets[name] ?: return false
-        val intent = launcherIntent(activity, target) ?: return false
+        val fallback = launcherIntent(activity, target) ?: return false
+
+        // A verified home deep link can open the actual home tab rather than
+        // restoring the app's last screen. It is always package-constrained.
+        // If an update removes the route, the system launcher still works.
+        if (target.homepage != null && target.packages.isNotEmpty()) {
+            val home = Intent(Intent.ACTION_VIEW, Uri.parse(target.homepage))
+                .setPackage(target.packages.first())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val supported = runCatching { home.resolveActivity(activity.packageManager) != null }.getOrDefault(false)
+            if (supported && runCatching { activity.startActivity(home) }.isSuccess) return true
+        }
         return try {
-            activity.startActivity(intent)
+            activity.startActivity(fallback)
             true
         } catch (_: Exception) {
             false
