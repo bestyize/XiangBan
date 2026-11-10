@@ -5,11 +5,14 @@ import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,11 @@ import kotlin.time.TimeSource
 interface VoicePlatform {
     /** 开始流式录音：每 20ms 一帧（16kHz、单声道、16 位小端 PCM）调用 [onFrame]（在后台线程）。第一次会向用户要麦克风权限。返回停止录音的函数；不能录返回 null。 */
     suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = null
+    suspend fun streamRecording(onFrame: (ByteArray) -> Unit, onFailure: (String) -> Unit): (() -> Unit)? =
+        streamRecording(onFrame)
+
+    /** When present, a call owns its microphone only while the app is visible. */
+    val voiceForeground: StateFlow<Boolean>? get() = null
 
     /** 用手机自带的语音识别听一句话：[onPartial] 给中间结果，[onResult] 给（文字, 出错原因）；没人说话时文字是空串。返回取消函数；不支持返回 null。 */
     fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? = null
@@ -95,7 +103,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     // 默认就能开口打断；回声消除不可用的手机也一样，靠本地识别比对回声（confirmBarge）挡住小伴自己的声音。
     private val _state = MutableStateFlow(CallState(bargeIn = true))
     val state: StateFlow<CallState> = _state.asStateFlow()
-    private var job: Job? = null
+    @Volatile private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null
     protected var cachedRecognition: String? = null
     /** 停顿时就开始的识别（和判停同时跑，和电脑端一样）；说话人没再开口，这就是这句话的结果。 */
@@ -104,8 +112,9 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     @Volatile private var playedAt: TimeSource.Monotonic.ValueTimeMark? = null
     /** 刚听到的这句是在小伴说话时、或它刚说完半秒内开口的：里面可能混着它自己的声音。 */
     protected var heardOverPlayback = false
-    private val mic = Channel<ByteArray>(Channel.UNLIMITED)
+    private val mic = Channel<ByteArray>(64, BufferOverflow.DROP_OLDEST)
     private var stopMic: (() -> Unit)? = null
+    private var bargeWatcher: Job? = null
     @Volatile private var pendingBarge: ByteArray? = null
     @Volatile private var bargeTriggered = false
 
@@ -114,8 +123,16 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
 
     fun start() {
         if (job != null) return
-        job = scope.launch {
+        job = scope.launch(start = CoroutineStart.LAZY) {
+            val visibility = platform.voiceForeground
+            val monitor = visibility?.let { foreground ->
+                launch {
+                    foreground.first { !it }
+                    endWithNotice("小伴已退到后台，通话已结束。回到前台可重新开始。")
+                }
+            }
             try {
+                if (visibility?.value == false) throw CallError("请回到小伴前台再开始通话。")
                 run()
             } catch (e: CancellationException) {
                 throw e
@@ -124,14 +141,23 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
             } catch (e: Exception) {
                 update { it.copy(notice = e.message ?: "语音通话出错了") }
             } finally {
-                stopMic?.invoke()
+                monitor?.cancel()
+                bargeWatcher?.cancel()
+                runCatching { stopMic?.invoke() }
                 stopMic = null
-                mic.close()
-                platform.stopAudio()
-                platform.stopSpeaking()
-                update { it.copy(ended = true, level = 0f) }
+                mic.cancel()
+                runCatching { platform.stopAudio() }
+                runCatching { platform.stopSpeaking() }
+                update { it.copy(ended = true, level = 0f, prompt = null) }
             }
         }
+        job?.start()
+    }
+
+    private fun endWithNotice(message: String) {
+        val running = job?.takeIf { it.isActive } ?: return
+        update { if (it.ended) it else it.copy(notice = message) }
+        running.cancel()
     }
 
     /** 回答通话里的确认或选择（[CallPrompt] 的某个选项）。 */
@@ -183,7 +209,11 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     /** 麦克风在整通电话里一直开着（这样小伴说话时也能听见你开口）；第一次需要时才打开。 */
     private suspend fun openMic() {
         if (stopMic != null) return
-        stopMic = platform.streamRecording { if (!muted) mic.trySend(it) } ?: throw CallError("没有麦克风权限，没法通话")
+        stopMic = platform.streamRecording({ if (!muted) mic.trySend(it) }, ::endWithNotice)
+        if (stopMic == null) {
+            currentCoroutineContext().ensureActive()
+            throw CallError("无法启动麦克风，请检查权限或关闭占用麦克风的应用后重试。")
+        }
     }
 
     private fun drainMic() {
@@ -305,13 +335,14 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
             } finally {
                 detector.close()
             }
-        }
+        }.also { bargeWatcher = it }
     }
 
     /** 这一轮结束：已经被打断的就等用户把话说完，否则不用再听了。 */
     protected suspend fun finishBargeWatch(watcher: Job?) {
         if (watcher == null) return
         if (bargeTriggered) watcher.join() else watcher.cancel()
+        if (bargeWatcher == watcher) bargeWatcher = null
     }
 
     /** 用手机自带的识别听一句话。 */
@@ -575,6 +606,7 @@ class SpokenCall(
             }
         } finally {
             warm?.cancel()
+            assistant.cancel()
         }
     }
 

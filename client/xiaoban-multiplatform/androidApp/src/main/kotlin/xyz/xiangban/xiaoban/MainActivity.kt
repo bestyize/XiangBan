@@ -2,9 +2,7 @@ package xyz.xiangban.xiaoban
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
@@ -21,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -39,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var sharingPlatform: CommunitySharingPlatform? = null
     private var shortcutJob: Job? = null
     private lateinit var reminders: AndroidReminders
+    private var voicePlatform: AndroidPlatformActions? = null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -52,10 +52,11 @@ class MainActivity : ComponentActivity() {
 
         val storage = SharedPrefsTokenStorage(this)
         // 第一次录音时才弹麦克风权限；用户选完以后接着往下走。
-        var micWaiting: Continuation<Boolean>? = null
+        var micWaiting: CancellableContinuation<Boolean>? = null
         val micLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            micWaiting?.resume(granted)
+            val waiting = micWaiting
             micWaiting = null
+            waiting?.takeIf { it.isActive }?.resume(granted)
         }
         val app = application as XiaobanApplication
         val speech = app.speech
@@ -63,11 +64,22 @@ class MainActivity : ComponentActivity() {
             this, gate = speech::newGate, attachments = AndroidChatAttachments(this),
             toolEnvironment = app.toolEnvironment,
         ) {
-            suspendCoroutine { continuation ->
-                micWaiting = continuation
-                micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            withContext(Dispatchers.Main.immediate) {
+                suspendCancellableCoroutine { continuation ->
+                    if (micWaiting != null || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                        continuation.resume(false)
+                        return@suspendCancellableCoroutine
+                    }
+                    micWaiting = continuation
+                    try { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                    catch (_: IllegalStateException) {
+                        micWaiting = null
+                        continuation.resume(false)
+                    }
+                }
             }
         }
+        voicePlatform = platform
         val forumPlatform = CommunitySharingPlatform(ForumPickerPlatform(platform, AndroidForumPicker(this)), this)
         sharingPlatform = forumPlatform
         forumPlatform.accept(intent)
@@ -125,7 +137,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        voicePlatform?.setVoiceForeground(true)
         if (::reminders.isInitialized) lifecycleScope.launch(Dispatchers.IO) { reminders.restore() }
+    }
+
+    override fun onStop() {
+        voicePlatform?.setVoiceForeground(false)
+        if (::communityEnv.isInitialized) communityEnv.reader.stop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        voicePlatform?.releaseVoice()
+        voicePlatform = null
+        super.onDestroy()
     }
 
     private fun openWorkShortcut(intent: Intent) {

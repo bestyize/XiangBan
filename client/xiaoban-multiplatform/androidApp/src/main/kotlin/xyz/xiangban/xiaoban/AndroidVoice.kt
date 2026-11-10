@@ -6,11 +6,15 @@ import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioDeviceInfo
+import android.media.AudioDeviceCallback
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
 import android.media.AudioRecord
+import android.media.AudioRecordingConfiguration
+import android.media.AudioRouting
+import android.media.audiofx.AudioEffect
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.content.Intent
@@ -23,105 +27,237 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** 手机录音（16kHz 单声道 16 位 PCM，最长 20 秒）和播放电脑合成好的语音。 */
 class AndroidVoice(private val context: Context, private val requestMic: suspend () -> Boolean) {
-    @Volatile private var record: AudioRecord? = null
-    private var thread: Thread? = null
-    private var buffer: ByteArrayOutputStream? = null
+    private val captureLock = Any()
+    private val main = Handler(Looper.getMainLooper())
+    private val visibility = MutableStateFlow(false)
+    val foreground = visibility.asStateFlow()
+    private var pushToTalk: PushToTalk? = null
+    private var callCapture: CallCapture? = null
     private var player: MediaPlayer? = null
 
+    fun setForeground(active: Boolean) {
+        visibility.value = active
+        if (!active) {
+            stop()
+            synchronized(captureLock) { callCapture }?.halt("小伴已退到后台，通话已结束。回到前台可重新开始。")
+            stopPlayback()
+        }
+    }
+
+    private suspend fun canRecord(): Boolean =
+        visibility.value && (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED || requestMic())
+
+    private fun createRecord(source: Int, bufferSize: Int): AudioRecord? {
+        val rec = try {
+            AudioRecord(source, SampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+        } catch (_: RuntimeException) { return null }
+        if (rec.state == AudioRecord.STATE_INITIALIZED) return rec
+        rec.release()
+        return null
+    }
+
     suspend fun start(): Boolean {
-        if (record != null) return true
-        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED && !requestMic()) return false
+        if (!canRecord()) return false
         val minimum = AudioRecord.getMinBufferSize(SampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minimum <= 0) return false
-        val rec = try {
-            AudioRecord(MediaRecorder.AudioSource.MIC, SampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minimum * 4)
-        } catch (e: SecurityException) {
-            return false
-        }
-        if (rec.state != AudioRecord.STATE_INITIALIZED) { rec.release(); return false }
-        val out = ByteArrayOutputStream()
-        buffer = out
-        record = rec
-        rec.startRecording()
-        thread = Thread {
-            val chunk = ByteArray(minimum)
-            while (record === rec) {
-                val n = rec.read(chunk, 0, chunk.size)
-                if (n < 0) break
-                if (n > 0) synchronized(out) { if (out.size() < MaxBytes) out.write(chunk, 0, n) }
+        return synchronized(captureLock) {
+            if (!visibility.value || callCapture != null) return@synchronized false
+            if (pushToTalk != null) return@synchronized true
+            val rec = createRecord(MediaRecorder.AudioSource.MIC, minimum * 4) ?: return@synchronized false
+            val capture = PushToTalk(rec, minimum)
+            pushToTalk = capture
+            try {
+                capture.begin()
+                true
+            } catch (_: RuntimeException) {
+                capture.release()
+                false
             }
-        }.also { it.start() }
-        return true
+        }
     }
 
-    fun stop(): ByteArray? {
-        val rec = record ?: return null
-        record = null
-        runCatching { rec.stop() }
-        thread?.join(500)
-        thread = null
-        rec.release()
-        val out = buffer ?: return null
-        buffer = null
-        return synchronized(out) { out.toByteArray() }
+    fun stop(): ByteArray? = synchronized(captureLock) { pushToTalk }?.finish()
+
+    private inner class PushToTalk(private val record: AudioRecord, private val chunkSize: Int) {
+        private val running = AtomicBoolean(true)
+        private val bytes = ByteArrayOutputStream()
+
+        fun begin() {
+            record.startRecording()
+            check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+            Thread({
+                try {
+                    val chunk = ByteArray(chunkSize)
+                    while (running.get()) {
+                        val n = record.read(chunk, 0, chunk.size)
+                        if (n < 0) break
+                        if (n > 0) synchronized(bytes) {
+                            if (running.get()) bytes.write(chunk, 0, minOf(n, MaxBytes - bytes.size()))
+                        }
+                    }
+                } catch (_: RuntimeException) {
+                    // The caller sees an empty recording after a revoked or failed input.
+                } finally { release() }
+            }, "xiaoban-voice-input").start()
+        }
+
+        fun finish(): ByteArray? {
+            if (!running.compareAndSet(true, false)) return null
+            runCatching { record.stop() }
+            return synchronized(bytes) { bytes.toByteArray() }
+        }
+
+        fun release() {
+            running.set(false)
+            runCatching { record.stop() }
+            runCatching { record.release() }
+            synchronized(captureLock) { if (pushToTalk === this) pushToTalk = null }
+        }
     }
 
-    /**
-     * 流式录音：每 20ms（640 字节）一帧回调；返回停止函数，不能录返回 null。
-     * 按“通话”的方式录：麦克风用 VOICE_COMMUNICATION，打开系统的回声消除和降噪，音频走通话模式并外放（有耳机就不强制外放），
-     * 这样小伴说话时麦克风里它自己的声音会被大幅压掉，用户才能直接开口打断。
-     */
-    suspend fun stream(onFrame: (ByteArray) -> Unit): (() -> Unit)? {
-        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED && !requestMic()) return null
+    /** The stream owns its input, focus, and callbacks until it releases the device. */
+    suspend fun stream(onFrame: (ByteArray) -> Unit, onFailure: (String) -> Unit): (() -> Unit)? {
+        if (!canRecord()) return null
         val minimum = AudioRecord.getMinBufferSize(SampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minimum <= 0) return null
-        val rec = try {
-            AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, SampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, FrameBytes * 8))
-        } catch (e: SecurityException) {
-            return null
+        return synchronized(captureLock) {
+            if (!visibility.value || callCapture != null || pushToTalk != null) return@synchronized null
+            val rec = createRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, maxOf(minimum, FrameBytes * 8))
+                ?: return@synchronized null
+            val capture = CallCapture(rec, onFrame, onFailure)
+            callCapture = capture
+            try {
+                capture.begin()
+                val stop: () -> Unit = { capture.halt() }
+                stop
+            } catch (e: RuntimeException) {
+                capture.release()
+                onFailure(e.message?.takeIf { it == FocusUnavailable } ?: "无法启动麦克风，请检查权限后重试。")
+                null
+            }
         }
-        if (rec.state != AudioRecord.STATE_INITIALIZED) { rec.release(); return null }
-        val effects = ArrayList<android.media.audiofx.AudioEffect>()
-        if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(rec.audioSessionId)?.let { it.enabled = true; effects += it }
-        if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(rec.audioSessionId)?.let { it.enabled = true; effects += it }
-        val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val callAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
-        // 占用音频焦点：别的应用在放的音乐/视频会暂停，通话结束再恢复。
-        var focus: AudioFocusRequest? = null
-        if (Build.VERSION.SDK_INT >= 26) {
-            focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(callAttributes).setOnAudioFocusChangeListener { }.build()
-            audio.requestAudioFocus(focus)
-        } else {
-            @Suppress("DEPRECATION")
-            audio.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+    }
+
+    private inner class CallCapture(
+        private val record: AudioRecord,
+        private val onFrame: (ByteArray) -> Unit,
+        private val onFailure: (String) -> Unit,
+    ) {
+        private val running = AtomicBoolean(true)
+        private val audio = context.getSystemService(AudioManager::class.java)
+        private val effects = mutableListOf<AudioEffect>()
+        private val focusListener = AudioManager.OnAudioFocusChangeListener { focus ->
+            if (focus < 0) halt("音频焦点已被其他应用占用，通话已结束。")
         }
-        val running = java.util.concurrent.atomic.AtomicBoolean(true)
-        rec.startRecording()
-        val worker = Thread {
-            val frame = ByteArray(FrameBytes)
-            while (running.get()) {
-                var filled = 0
-                while (filled < FrameBytes && running.get()) {
-                    val n = rec.read(frame, filled, FrameBytes - filled)
-                    if (n < 0) { running.set(false); break }
-                    filled += n
+        private var focusRequest: AudioFocusRequest? = null
+        private var hasFocus = false
+        private var deviceId: Int? = null
+        private var headsetIds = emptySet<Int>()
+        private val routing = AudioRouting.OnRoutingChangedListener { route ->
+            val next = route.routedDevice?.id
+            if (deviceId != null && next != deviceId) halt(RouteChanged)
+            deviceId = next
+        }
+        private val devices = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = checkHeadsets()
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = checkHeadsets()
+        }
+        private val recording = object : AudioManager.AudioRecordingCallback() {
+            override fun onRecordingConfigChanged(configs: List<AudioRecordingConfiguration>) {
+                if (Build.VERSION.SDK_INT >= 29 && configs.any { it.clientAudioSessionId == record.audioSessionId && it.isClientSilenced }) {
+                    halt("系统暂停了麦克风输入，通话已结束。")
                 }
-                if (filled == FrameBytes && running.get()) onFrame(frame.copyOf())
-            }
-            runCatching { rec.stop() }
-            effects.forEach { runCatching { it.release() } }
-            rec.release()
-            if (Build.VERSION.SDK_INT >= 26) focus?.let { audio.abandonAudioFocusRequest(it) }
-            else {
-                @Suppress("DEPRECATION")
-                audio.abandonAudioFocus(null)
             }
         }
-        worker.start()
-        return { running.set(false) }
+
+        private fun currentHeadsets(): Set<Int> = audio.getDevices(AudioManager.GET_DEVICES_ALL)
+            .filter { it.type in HeadsetTypes }.map { it.id }.toSet()
+
+        private fun checkHeadsets() {
+            if (running.get() && currentHeadsets() != headsetIds) halt(RouteChanged)
+        }
+
+        @Suppress("DEPRECATION")
+        fun begin() {
+            val callAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+            val granted = if (Build.VERSION.SDK_INT >= 26) {
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(callAttributes).setOnAudioFocusChangeListener(focusListener, main).build()
+                focusRequest = request
+                audio.requestAudioFocus(request)
+            } else audio.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            check(granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { FocusUnavailable }
+            hasFocus = true
+            if (AcousticEchoCanceler.isAvailable()) enableEffect { AcousticEchoCanceler.create(record.audioSessionId) }
+            if (NoiseSuppressor.isAvailable()) enableEffect { NoiseSuppressor.create(record.audioSessionId) }
+            record.startRecording()
+            check(running.get() && record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+            deviceId = record.routedDevice?.id
+            headsetIds = currentHeadsets()
+            record.addOnRoutingChangedListener(routing, main)
+            audio.registerAudioDeviceCallback(devices, main)
+            if (Build.VERSION.SDK_INT >= 29) record.registerAudioRecordingCallback(context.mainExecutor, recording)
+            Thread(::read, "xiaoban-voice-call").start()
+        }
+
+        private fun enableEffect(create: () -> AudioEffect?) {
+            val effect = runCatching(create).getOrNull() ?: return
+            effects += effect
+            runCatching { effect.enabled = true }
+        }
+
+        private fun read() {
+            try {
+                val frame = ByteArray(FrameBytes)
+                var filled = 0
+                var emptyReads = 0
+                while (running.get()) {
+                    val n = record.read(frame, filled, frame.size - filled)
+                    if (n < 0 || n == 0 && ++emptyReads > 100) {
+                        halt("麦克风输入已中断，通话已结束。")
+                        break
+                    }
+                    if (n == 0) { Thread.sleep(10); continue }
+                    emptyReads = 0
+                    filled += n
+                    if (filled == frame.size && running.get()) {
+                        onFrame(frame.copyOf())
+                        filled = 0
+                    }
+                }
+            } catch (_: Exception) {
+                halt("麦克风输入已中断，通话已结束。")
+            } finally { release() }
+        }
+
+        fun halt(reason: String? = null) {
+            if (!running.compareAndSet(true, false)) return
+            runCatching { record.stop() } // Unblocks a pending read.
+            if (reason != null) onFailure(reason)
+        }
+
+        @Suppress("DEPRECATION")
+        fun release() {
+            running.set(false)
+            runCatching { record.stop() }
+            if (Build.VERSION.SDK_INT >= 29) runCatching { record.unregisterAudioRecordingCallback(recording) }
+            runCatching { record.removeOnRoutingChangedListener(routing) }
+            runCatching { audio.unregisterAudioDeviceCallback(devices) }
+            effects.forEach { runCatching { it.release() } }
+            runCatching { record.release() }
+            if (hasFocus) runCatching {
+                if (Build.VERSION.SDK_INT >= 26) focusRequest?.let { audio.abandonAudioFocusRequest(it) }
+                else audio.abandonAudioFocus(focusListener)
+            }
+            synchronized(captureLock) { if (callCapture === this) callCapture = null }
+        }
     }
 
     /** 系统的回声消除可用，或者戴着耳机：小伴自己的声音不会被当成用户开口。 */
@@ -133,12 +269,11 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
 
     /** 用系统自带的语音识别听一句话（本地识别和云端都用不了时的最后备选）。 */
     fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) return null
+        if (!visibility.value || !SpeechRecognizer.isRecognitionAvailable(context)) return null
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             onResult(null, "没有麦克风权限")
             return {}
         }
-        val main = Handler(Looper.getMainLooper())
         var recognizer: SpeechRecognizer? = null
         var finished = false
         fun finish(text: String?, error: String?) {
@@ -149,7 +284,12 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
             onResult(text, error)
         }
         main.post {
-            val r = SpeechRecognizer.createSpeechRecognizer(context)
+            if (finished) return@post
+            if (!visibility.value) { finish(null, "小伴已退到后台，通话已结束。"); return@post }
+            val r = try { SpeechRecognizer.createSpeechRecognizer(context) } catch (_: RuntimeException) {
+                finish(null, "无法启动手机语音识别")
+                return@post
+            }
             recognizer = r
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) = finish(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty(), null)
@@ -167,11 +307,13 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
                 override fun onEndOfSpeech() {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
-            r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            val request = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            })
+            }
+            try { r.startListening(request) }
+            catch (_: RuntimeException) { finish(null, "无法启动手机语音识别") }
         }
         return {
             main.post {
@@ -188,7 +330,9 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
     /** 正在播的这段播完要告诉谁；被别人停掉也要告诉，不然等它的通话会一直等下去。只说一次。 */
     private var finishCurrent: (() -> Unit)? = null
 
+    @Synchronized
     fun play(bytes: ByteArray, onDone: () -> Unit): Boolean {
+        if (!visibility.value) return false
         stopPlayback()
         var told = false
         val finish = { if (!told) { told = true; onDone() } }
@@ -196,6 +340,7 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
             val file = File(context.cacheDir, "reply-voice-${playSeq.incrementAndGet() % 4}.mp3")
             file.writeBytes(bytes)
             val mp = MediaPlayer()
+            player = mp
             // 使用媒体流属性播放，避免电话通道硬件降噪与窄带滤波导致的破音与沙沙声
             mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             mp.setDataSource(file.absolutePath)
@@ -203,7 +348,6 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
             mp.setOnErrorListener { _, _, _ -> if (player === mp) stopPlayback() else finish(); true }
             mp.prepare()
             mp.start()
-            player = mp
             finishCurrent = finish
             true
         } catch (e: Exception) {
@@ -212,6 +356,7 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
         }
     }
 
+    @Synchronized
     fun stopPlayback() {
         player?.let { runCatching { it.stop() }; it.release() }
         player = null
@@ -219,6 +364,8 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
     }
 
     private companion object {
+        const val FocusUnavailable = "无法取得音频焦点，请结束其他通话后重试。"
+        const val RouteChanged = "耳机或麦克风已切换，通话已结束。可以重新开始。"
         const val SampleRate = 16_000
         const val FrameBytes = 640
         val HeadsetTypes = setOf(

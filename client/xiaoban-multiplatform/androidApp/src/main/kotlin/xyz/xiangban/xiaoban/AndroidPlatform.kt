@@ -50,6 +50,18 @@ class AndroidPlatformActions(
     requestMic: suspend () -> Boolean = { false },
 ) : PlatformActions {
     private val voice = AndroidVoice(context, requestMic)
+    override val voiceForeground get() = voice.foreground
+
+    fun setVoiceForeground(active: Boolean) {
+        voice.setForeground(active)
+        if (!active) stopSpeaking()
+    }
+
+    fun releaseVoice() {
+        setVoiceForeground(false)
+        tts?.shutdown()
+        tts = null
+    }
 
     override suspend fun startRecording(): Boolean = voice.start()
     override fun stopRecording(): ByteArray? = voice.stop()
@@ -57,7 +69,9 @@ class AndroidPlatformActions(
     override fun stopAudio() = voice.stopPlayback()
     override fun speechGate() = gate()
     override fun bargeInSafe(): Boolean = voice.echoSafe()
-    override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = voice.stream(onFrame)
+    override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = voice.stream(onFrame) {}
+    override suspend fun streamRecording(onFrame: (ByteArray) -> Unit, onFailure: (String) -> Unit): (() -> Unit)? =
+        voice.stream(onFrame, onFailure)
     override fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? = voice.listenOnce(onPartial, onResult)
 
     override fun copy(text: String) {
@@ -74,7 +88,7 @@ class AndroidPlatformActions(
     private val ttsDone = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
     private fun speakWith(text: String, utteranceId: String, forCall: Boolean = false): Boolean {
-        if (ttsFailed) return false
+        if (ttsFailed || forCall && !voiceForeground.value) return false
         val engine = tts ?: TextToSpeech(context.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             ttsFailed = !ttsReady

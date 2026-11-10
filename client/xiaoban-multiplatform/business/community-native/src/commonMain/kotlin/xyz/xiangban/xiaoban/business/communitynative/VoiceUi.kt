@@ -143,6 +143,8 @@ class VoiceInputController(
     private var starting = false
     private var released = false
     private var ticker: Job? = null
+    private var startJob: Job? = null
+    private var recognitionJob: Job? = null
     private var startedAt: kotlin.time.TimeMark? = null
 
     val busy: Boolean get() = pressing || starting || recognizing
@@ -157,15 +159,16 @@ class VoiceInputController(
             else -> {
                 starting = true
                 released = false
-                scope.launch {
-                    platform.stopAudio()
-                    val ok = platform.startRecording()
-                    starting = false
-                    when {
-                        !ok -> micDenied = true
-                        released -> platform.stopRecording()
-                        else -> begin()
-                    }
+                startJob = scope.launch {
+                    try {
+                        platform.stopAudio()
+                        val ok = platform.startRecording()
+                        when {
+                            released || platform.voiceForeground?.value == false -> if (ok) platform.stopRecording() else Unit
+                            !ok -> micDenied = true
+                            else -> begin()
+                        }
+                    } finally { starting = false }
                 }
             }
         }
@@ -203,10 +206,11 @@ class VoiceInputController(
         ticker?.cancel()
         val elapsed = startedAt?.elapsedNow()?.inWholeMilliseconds ?: elapsedMs
         val pcm = env.platform?.stopRecording()
-        if (how == PttAction.Cancel || pcm == null) return
+        if (how == PttAction.Cancel) return
+        if (pcm == null) { onMessage("录音已中断，请重试"); return }
         if (Ptt.tooShort(elapsed)) { onMessage("说话时间太短"); return }
         recognizing = true
-        scope.launch {
+        recognitionJob = scope.launch {
             try {
                 val (text, reason) = recognizeWith(engines(), pcm)
                 when {
@@ -222,8 +226,13 @@ class VoiceInputController(
     }
 
     fun release() {
+        released = true
+        startJob?.cancel()
+        recognitionJob?.cancel()
         ticker?.cancel()
         if (pressing) { pressing = false; env.platform?.stopRecording() }
+        starting = false
+        recognizing = false
     }
 }
 
@@ -232,6 +241,7 @@ fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>,
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val controller = remember(env) { VoiceInputController(env, scope, engines, onText, onSend, onMessage) }
     DisposableEffect(controller) { onDispose { controller.release() } }
+    LaunchedEffect(controller) { env.platform?.voiceForeground?.collect { if (!it) controller.release() } }
     return controller
 }
 

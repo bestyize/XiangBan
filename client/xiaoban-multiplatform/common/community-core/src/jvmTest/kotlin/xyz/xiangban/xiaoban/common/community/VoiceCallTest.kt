@@ -12,10 +12,12 @@ import kotlin.math.sin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
@@ -477,13 +479,49 @@ class VoiceCallTest {
     }
 
     @Test
+    fun `backgrounding and a failed capture end the call and permit a fresh recording`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val foreground = MutableStateFlow(true)
+        val stopped = AtomicInteger()
+        var opened = CompletableDeferred<(String) -> Unit>()
+        val platform = object : VoicePlatform {
+            override val voiceForeground = foreground
+            override suspend fun streamRecording(onFrame: (ByteArray) -> Unit, onFailure: (String) -> Unit): () -> Unit {
+                opened.complete(onFailure)
+                return { stopped.incrementAndGet() }
+            }
+        }
+        fun startCall() = object : VoiceCall(scope, platform) {
+            override suspend fun run() { listenUtterance() }
+        }.also { it.start() }
+
+        try {
+            val first = startCall()
+            withTimeout(2_000) { opened.await() }
+            foreground.value = false
+            waitFor("ended in background") { first.state.value.ended }
+            assertTrue(first.state.value.notice.orEmpty().contains("后台"))
+            assertEquals(1, stopped.get())
+
+            foreground.value = true
+            opened = CompletableDeferred()
+            val second = startCall()
+            val fail = withTimeout(2_000) { opened.await() }
+            fail("麦克风输入已中断")
+            waitFor("ended after audio failure") { second.state.value.ended }
+            assertEquals("麦克风输入已中断", second.state.value.notice)
+            assertEquals(2, stopped.get())
+        } finally { scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
+
+    @Test
     fun `a call without microphone permission ends with the reason`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val api = AiGatewayApi(HttpClient(MockEngine { respond("{}", HttpStatusCode.OK) }), CommunityConfig()) { "tok" }
         val call = SpokenCall(scope, object : VoicePlatform {}, CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), listOf(CloudSynthesizer(api)))
         call.start()
         waitFor("ended") { call.state.value.ended }
-        assertEquals("没有麦克风权限，没法通话", call.state.value.notice)
+        assertTrue(call.state.value.notice.orEmpty().contains("检查权限"))
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
     }
