@@ -387,20 +387,61 @@ body.fresh-game[data-game="block-puzzle"][data-palette="sky"] {
   --palette-board:#416d91;--palette-empty:#5b83a2;
   --palette-highlight:#e1f6ff;--palette-mid:#65b8f5;--palette-shadow:#3387ca;
 }
+body.fresh-game[data-game="block-puzzle"][data-palette="mix"] {
+  --palette-top:#c5d6f7;--palette-middle:#a0b4e3;--palette-bottom:#7588bd;
+  --palette-board:#344365;--palette-empty:#4d5e85;
+  --palette-ink:#293963;--palette-board-shadow:#4d628c96;
+  --color-1:#ed628f;--color-2:#f9c54d;--color-3:#67ca89;
+  --color-4:#9d79ec;--color-5:#4bc5d6;--color-6:#f28c56;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mix-soda"] {
+  --palette-top:#ffe4b9;--palette-middle:#f6b789;--palette-bottom:#dd817b;
+  --palette-board:#633947;--palette-empty:#815061;
+  --palette-ink:#61313f;--palette-board-shadow:#974f6296;
+  --color-1:#ff6992;--color-2:#ffd34f;--color-3:#6fd6ac;
+  --color-4:#b28bf2;--color-5:#60b9fa;--color-6:#fd9559;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mix-reef"] {
+  --palette-top:#c6efe3;--palette-middle:#8ecfd0;--palette-bottom:#568db0;
+  --palette-board:#244e65;--palette-empty:#3a697e;
+  --palette-ink:#214c64;--palette-board-shadow:#3c6b8596;
+  --color-1:#f97c7f;--color-2:#f3d865;--color-3:#8dd576;
+  --color-4:#a78aeb;--color-5:#4dd8db;--color-6:#fa9d60;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mix-garden"] {
+  --palette-top:#ebefb9;--palette-middle:#b7d097;--palette-bottom:#7fa382;
+  --palette-board:#375b49;--palette-empty:#52705c;
+  --palette-ink:#304f40;--palette-board-shadow:#53775b96;
+  --color-1:#f477a4;--color-2:#f4d74d;--color-3:#9bd971;
+  --color-4:#c096e9;--color-5:#64bcef;--color-6:#f6a35c;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mix-orbit"] {
+  --palette-top:#c4bdf3;--palette-middle:#898ac4;--palette-bottom:#555584;
+  --palette-board:#2b3056;--palette-empty:#454b77;
+  --palette-ink:#2d315f;--palette-board-shadow:#40467996;
+  --color-1:#ff6fac;--color-2:#ffd860;--color-3:#8be89a;
+  --color-4:#ab89fa;--color-5:#52d9ee;--color-6:#ff9c68;
+}
 body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) {
   background:radial-gradient(ellipse at 52% 12%,var(--palette-top) 0%,var(--palette-middle) 45%,var(--palette-bottom) 100%);
 }
 body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .board {
   background:var(--palette-board);border-color:var(--palette-middle);
 }
+body.fresh-game[data-game="block-puzzle"][data-color-mode="mixed"] .board {
+  box-shadow:inset 0 2px 5px #18234255,0 5px 0 var(--palette-board-shadow);
+}
 body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .cell:not(.filled):not(.preview):not(.preview-invalid) {
   background:var(--palette-empty);
 }
-body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .cell.filled,
-body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .mini-cell {
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"],[data-color-mode="mixed"]) .cell.filled,
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"],[data-color-mode="mixed"]) .mini-cell {
   background:linear-gradient(140deg,var(--palette-highlight),var(--palette-mid) 45%,var(--palette-shadow));
   border-color:var(--palette-highlight);
   box-shadow:inset 3px 3px 0 #ffffff66,inset -4px -4px 0 #00000036,0 2px 3px #251c3240;
+}
+body.fresh-game[data-game="block-puzzle"][data-color-mode="mixed"] .cell.preview:not(.filled) {
+  background:var(--piece-color);
 }
 body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .best-score {
   text-shadow:0 3px 3px #46304788;
@@ -467,6 +508,10 @@ body.fresh-game[data-game="block-puzzle"][data-palette] .departing-tile::before 
 body.fresh-game[data-game="block-puzzle"][data-palette="sky"] .stats .stat strong,
 body.fresh-game[data-game="block-puzzle"][data-palette="sky"] .stats > div:nth-child(1) strong {
   color:#315fb5;text-shadow:0 3px 2px #ffffff8a;
+}
+body.fresh-game[data-game="block-puzzle"][data-color-mode="mixed"] .stats .stat strong,
+body.fresh-game[data-game="block-puzzle"][data-color-mode="mixed"] .stats > div:nth-child(1) strong {
+  color:var(--palette-ink);text-shadow:0 2px 2px #ffffff7a;
 }
 
 /* A cleared square gets a temporary 3D flight animation while its logical

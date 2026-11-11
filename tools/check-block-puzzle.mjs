@@ -157,6 +157,14 @@ const doubleFinisher = rules.generateHand(() => .15, adjacentLines, 8, 0, 0, 18)
 const square = doubleFinisher.find(shape => shape.id === 'square2')
 assert.equal(rules.placeShape(adjacentLines, square, 3, 6)?.perfect, true)
 
+const threeLines = rules.createBoard()
+for (const row of [4, 5, 6]) threeLines[row].fill(1, 0, 5)
+const deepFinisher = rules.generateHand(() => .15, threeLines, 85, 0, 0, 22)
+const largeSquare = deepFinisher.find(shape => shape.id === 'square3')
+const deepClear = rules.placeShape(threeLines, largeSquare, 4, 5)
+assert.equal(deepClear?.perfect, true)
+assert.equal(deepClear.clearedRows.length, 3)
+
 // Difficulty rises gradually across hundreds of deals, not sharply after 30.
 assert.equal(rules.dealGuidance(1), rules.dealGuidance(24))
 assert.ok(rules.dealGuidance(25) > .83)

@@ -94,6 +94,9 @@
     ...FULL_LINES,
     ...FULL_LINES.flatMap((line, i) => FULL_LINES.slice(i + 1).map((other) => line.map((bits, row) => bits | other[row]))),
   ]
+  const DEEP_FINISH_TARGETS = FULL_LINES.flatMap((first, i) =>
+    FULL_LINES.slice(i + 1).flatMap((second, j) => FULL_LINES.slice(i + j + 2)
+      .map((third) => first.map((bits, row) => bits | second[row] | third[row]))))
 
   function maskBoard(board) {
     return board.map((row) => row.reduce((bits, tile, col) => bits | (tile ? (1 << col) : 0), 0))
@@ -119,6 +122,26 @@
     }
     return value
   }
+  function tidyScore(rows) {
+    let packed = 0, tiles = 0
+    let fullestRow = 0, secondRow = 0, fullestCol = 0, secondCol = 0
+    for (const bits of rows) {
+      const count = BITS[bits]
+      tiles += count
+      packed += SPREAD[bits]
+      if (count > fullestRow) { secondRow = fullestRow; fullestRow = count }
+      else if (count > secondRow) secondRow = count
+    }
+    for (let col = 0; col < SIZE; col += 1) {
+      const count = (packed >>> (col * 4)) & 15
+      if (count > fullestCol) { secondCol = fullestCol; fullestCol = count }
+      else if (count > secondCol) secondCol = count
+    }
+    // Favor a small remainder that can be reached from a pair of lines on
+    // the next deal, instead of scattering blocks after a clear.
+    const covered = Math.max(fullestRow + secondRow, fullestCol + secondCol, fullestRow + fullestCol - 1)
+    return -6 * tiles - 12 * Math.max(0, tiles - covered)
+  }
   function tryMaskPlace(rows, position) {
     for (const [row, bits] of position) if (rows[row] & bits) return null
     const after = rows.slice()
@@ -133,7 +156,7 @@
     }
     return { rows: after, lines: BITS[fullRows] + BITS[fullColumns] }
   }
-  function handOpportunity(board, hand, beamWidth = BEAM_WIDTH) {
+  function handOpportunity(board, hand, beamWidth = BEAM_WIDTH, cleaning = false) {
     const initial = { rows: maskBoard(board), used: 0, lines: 0, perfect: false, firstClearStep: 0, depth: 0, rank: 0 }
     let beam = [initial], best = initial
     for (let depth = 1; depth <= 3; depth += 1) {
@@ -150,7 +173,8 @@
             expanded.push({
               rows: landed.rows, used: current.used | (1 << slot),
               lines, perfect, firstClearStep, depth,
-              rank: lines * 750 + (perfect ? 900 : 0) + nearLineScore(landed.rows) * 1.7
+              rank: lines * 750 + (perfect ? 900 : 0) +
+                (cleaning ? tidyScore(landed.rows) * 2 : nearLineScore(landed.rows) * 1.7)
                 + (firstClearStep ? (4 - firstClearStep) * 6 : 0),
             })
           }
@@ -170,7 +194,8 @@
       if (beam[0]) best = beam[0]
     }
     return { deepest: best.depth, canFinish: best.depth === 3,
-      clearedLines: best.lines, perfect: best.perfect, firstClearStep: best.firstClearStep }
+      clearedLines: best.lines, perfect: best.perfect, firstClearStep: best.firstClearStep,
+      tidy: cleaning ? tidyScore(best.rows) : 0 }
   }
 
   function shuffleHand(hand, random) {
@@ -181,10 +206,10 @@
     return hand
   }
 
-  // Fill one or two lines with up to three real pieces, then play the proposed
+  // Fill the targeted lines with up to three real pieces, then play the proposed
   // moves to check the order. In a cross, a premature clear can erase its intersection.
-  function perfectFinisher(rows, fitting, random) {
-    let checksLeft = 1800
+  function perfectFinisher(rows, fitting, random, deep) {
+    let checksLeft = deep ? 2400 : 1800
     function validate(field, moves, depth = 1, firstClearStep = 0, clearedLines = 0) {
       for (const [index, move] of moves.entries()) {
         const landed = tryMaskPlace(field, move.position)
@@ -216,7 +241,7 @@
       }
       return null
     }
-    for (const target of FINISH_TARGETS) {
+    for (const target of deep ? FINISH_TARGETS.concat(DEEP_FINISH_TARGETS) : FINISH_TARGETS) {
       if (checksLeft <= 0) break
       if (rows.some((bits, row) => bits & ~target[row])) continue
       const open = target.map((bits, row) => bits & ~rows[row])
@@ -231,7 +256,7 @@
     return null
   }
 
-  function reliefHand(rows, fitting, random) {
+  function reliefHand(rows, fitting, random, cleaning) {
     const columns = Array(SIZE).fill(0)
     rows.forEach((bits, row) => {
       for (let col = 0; col < SIZE; col += 1) if (bits & (1 << col)) columns[col] |= 1 << row
@@ -240,7 +265,7 @@
     for (const [axis, masks] of [rows, columns].entries()) {
       for (const bits of masks) {
         const count = BITS[bits]
-        if (count < 5 || count === SIZE) continue
+        if (count < (cleaning ? 4 : 5) || count === SIZE) continue
         const pieces = []
         let gap = 0
         for (let i = 0; i <= SIZE; i += 1) {
@@ -293,15 +318,20 @@
     const occupied = rows.reduce((total, bits) => total + BITS[bits], 0)
     const empty = SIZE * SIZE - occupied
     const guidedChance = Math.min(0.88, Math.max(0.18, 1 - empty / 70))
-    const wantOpportunity = random() < dealGuidance(deals, field, combo, drought)
-    // A fresh theme starts with ordinary deals. Later, a tidy board is more
-    // likely to get a proven finish, then all-clear starts the rhythm again.
-    const pressure = Math.min(1, Math.max(0, (cycleMoves - 6) / 10))
-    const preferPerfect = wantOpportunity && cycleMoves >= 6 && occupied > 0 && occupied <= 24 &&
-      random() < .38 + .56 * pressure
+    // Most openings favor building a board, with an occasional early finish.
+    const opening = cycleMoves < 6 && random() < .82
+    const pressure = Math.min(1, Math.max(0, (cycleMoves - 8) / 12))
+    // A long-running theme gets help even when the overall difficulty has
+    // risen. A crowded board gets a cleanup hand before an exact finish.
+    const cleaning = cycleMoves >= 8 && occupied > 0 && random() < .38 + .56 * pressure
+    const wantOpportunity = random() < dealGuidance(deals, field, combo, drought) || cleaning
     const recover = wantOpportunity && (empty < 36 || drought >= 2)
-    const finisher = preferPerfect && occupied <= 16 ? perfectFinisher(rows, fitting, random) : null
-    const relief = !finisher && recover ? reliefHand(rows, fitting, random) : null
+    const deep = cycleMoves >= 16
+    const compact = cleaning ? fitting.filter((shape) => shape.cells.length >= 2 && shape.cells.length <= 4) : []
+    const fillers = compact.length ? compact : fitting
+    const finisher = cleaning && occupied <= (deep ? 24 : 16) ? perfectFinisher(rows, fillers, random, deep) : null
+    const relief = !finisher && (recover || cleaning) ? reliefHand(rows, fillers, random, cleaning) : null
+    const alternateRelief = !finisher && cleaning && relief ? reliefHand(rows, fillers, random, true) : null
     let best = null, bestGrade = -Infinity
     for (let attempt = 0; attempt < DEAL_CANDIDATES; attempt += 1) {
       let hand
@@ -310,26 +340,30 @@
       const planned = attempt === 1 && finisher
       if (planned || (attempt === 1 && relief)) {
         hand = planned ? finisher.hand : relief
-      } else if (attempt % 5 === 0) {
+      } else if (attempt === 2 && alternateRelief) {
+        hand = alternateRelief
+      } else if (!opening && attempt % 5 === 0) {
         const recipe = LINE_RECIPES[Math.floor((attempt / 5 + random() * LINE_RECIPES.length) % LINE_RECIPES.length)]
         hand = shuffleHand(recipe.map((id) => BY_ID.get(id)), random)
       } else {
         hand = Array.from({ length: 3 }, () =>
-          pickShape(random() < guidedChance ? fitting : SHAPES, random))
+          pickShape(random() < guidedChance ? fillers : SHAPES, random))
       }
       if (!hand.some((shape) => hasSpace(field, shape))) {
         hand[Math.floor(random() * 3)] = pickShape(fitting, random)
       }
       const result = planned
-        ? { deepest: 3, canFinish: true, perfect: true, clearedLines: finisher.clearedLines, firstClearStep: finisher.firstClearStep }
-        : handOpportunity(field, hand)
+        ? { deepest: 3, canFinish: true, perfect: true, clearedLines: finisher.clearedLines, firstClearStep: finisher.firstClearStep, tidy: 0 }
+        : handOpportunity(field, hand, BEAM_WIDTH, cleaning)
       const opportunity = result.canFinish && result.clearedLines > 0
       // Every playable piece outranks the tie-breaks, even on unguided deals.
       const grade = result.deepest * 1000 +
         (wantOpportunity
           ? (opportunity ? 150 + (4 - result.firstClearStep) * 8 : 0) +
-            Math.min(3, result.clearedLines) * 20 + (preferPerfect && opportunity && result.perfect ? 160 : 0)
+            Math.min(3, result.clearedLines) * 20
           : Math.min(2, result.clearedLines) * 8) +
+        (cleaning ? result.tidy * .34 + (opportunity && result.perfect ? 220 : 0) : 0) -
+        (opening && result.perfect ? 92 : 0) +
         random() * (wantOpportunity ? 18 : 72)
       if (grade > bestGrade) { best = hand; bestGrade = grade }
     }

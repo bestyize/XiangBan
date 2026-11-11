@@ -75,7 +75,9 @@
   let boardImpact = null
   let paletteTimer = null
   let resultTimer = null
-  const PALETTES = ['rose', 'amber', 'mint', 'violet', 'sky']
+  const PALETTES = ['rose', 'amber', 'mint', 'violet', 'sky', 'mix', 'mix-soda', 'mix-reef', 'mix-garden', 'mix-orbit']
+  // Saved palette indices stay stable while solid and mixed themes alternate.
+  const PALETTE_ORDER = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9]
   const scoreNode = document.getElementById('score')
   const rewardDiamond = document.getElementById('rewardDiamond')
   let diamondTimer = null
@@ -110,7 +112,9 @@
     diamondTimer = setTimeout(() => { rewardDiamond.hidden = true }, isSetup ? 700 : 950)
   }
   function applyPalette() {
-    document.body.dataset.palette = PALETTES[paletteIndex] || 'rose'
+    const palette = PALETTES[paletteIndex] || 'rose'
+    document.body.dataset.palette = palette
+    document.body.dataset.colorMode = palette.startsWith('mix') ? 'mixed' : 'solid'
   }
   function clearVisualTimers() {
     clearTimeout(feedbackTimer)
@@ -562,7 +566,7 @@
     })
   }
   function celebratePerfect() {
-    paletteIndex = (paletteIndex + 1) % PALETTES.length
+    paletteIndex = PALETTE_ORDER[(PALETTE_ORDER.indexOf(paletteIndex) + 1) % PALETTE_ORDER.length]
     perfectCount += 1
     saveTheme()
     document.body.classList.add('palette-flash')
@@ -662,7 +666,7 @@
       if (y < 0 || y >= rules.SIZE || x < 0 || x >= rules.SIZE) return
       const index = y * rules.SIZE + x
       const cell = cells[index]
-      cell.style.setProperty('--piece-color', color(shape.color))
+      if (valid || !state.board[y][x]) cell.style.setProperty('--piece-color', color(shape.color))
       cell.classList.add(valid ? 'preview' : 'preview-invalid')
       previewCells.push(index)
     })
