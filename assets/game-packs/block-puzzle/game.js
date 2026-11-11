@@ -22,6 +22,106 @@
   let drag = null
   let suppressClickUntil = 0
   let hostReady = false
+  const storeKey = 'xiaoban.block-puzzle.classic.v2'
+  const hostStorage = globalThis.xb?.storage
+  const settingsOverlay = document.getElementById('settingsOverlay')
+  const settingsButton = document.getElementById('settingsButton')
+  const closeSettingsButton = document.getElementById('closeSettingsButton')
+  const soundButton = document.getElementById('soundButton')
+  const settingsRestart = document.getElementById('settingsRestart')
+  const comboBanner = document.getElementById('comboBanner')
+  const sparkLayer = document.getElementById('sparkLayer')
+  let soundEnabled = true
+  let audio = null
+  let turns = 0
+  let recovering = Boolean(hostStorage)
+  let hasLocalSave = false
+
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || 'null') } catch { return null }
+  }
+  function soundUI() {
+    soundButton.textContent = soundEnabled ? '声音：开启' : '声音：关闭'
+    soundButton.setAttribute('aria-pressed', String(soundEnabled))
+  }
+  function acceptSave(data) {
+    const loaded = data?.version === 2 ? rules.restoreGame(data.game) : null
+    if (!loaded) return false
+    state = loaded
+    best = Math.max(best, Number.isSafeInteger(data.best) && data.best >= 0 ? data.best : 0, loaded.score)
+    soundEnabled = data.soundEnabled !== false
+    soundUI()
+    return true
+  }
+  function persist() {
+    const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled }
+    try { localStorage.setItem(storeKey, JSON.stringify(data)) } catch { /* sandbox storage */ }
+    if (!recovering && hostStorage?.set) {
+      Promise.resolve(hostStorage.set(storeKey, data)).catch(() => {})
+    }
+  }
+  async function restoreFromHost() {
+    try {
+      const saved = await hostStorage.get(storeKey)
+      if (!hasLocalSave && turns === 0 && acceptSave(saved)) {
+        renderBoard()
+        renderHand()
+        if (state.over) showResult()
+        else postToHost('game.progress', { score: state.score, lines: state.lines })
+      }
+    } catch { /* optional platform storage */ }
+    finally { recovering = false; persist() }
+  }
+  function tone(hz, seconds = .09) {
+    if (!soundEnabled) return
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext
+      if (!Audio) return
+      audio ||= new Audio()
+      if (audio.state === 'suspended') void audio.resume()
+      const oscillator = audio.createOscillator(), volume = audio.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(hz, audio.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(hz * .72, audio.currentTime + seconds)
+      volume.gain.setValueAtTime(.055, audio.currentTime)
+      volume.gain.exponentialRampToValueAtTime(.001, audio.currentTime + seconds)
+      oscillator.connect(volume).connect(audio.destination)
+      oscillator.start()
+      oscillator.stop(audio.currentTime + seconds)
+    } catch { /* silent fallback */ }
+  }
+  function haptic(kind) {
+    try {
+      if (globalThis.xb?.can?.('haptics')) void Promise.resolve(globalThis.xb.haptics.impact(kind)).catch(() => {})
+      else if (kind !== 'light') navigator.vibrate?.(kind === 'heavy' ? 30 : 12)
+    } catch { /* optional feedback */ }
+  }
+  function showFeedback(result) {
+    sparkLayer.replaceChildren()
+    const lines = result.clearedRows.length + result.clearedCols.length
+    if (!lines) { comboBanner.hidden = true; return }
+    const word = result.perfect ? 'PERFECT!' : result.combo >= 5 ? 'AMAZING!' :
+      result.combo >= 3 ? 'GREAT!' : lines >= 2 ? 'EXCELLENT!' : 'GOOD!'
+    comboBanner.textContent = word + (result.combo >= 2 ? ' · COMBO ×' + result.combo : '') + '  +' + result.gained
+    comboBanner.hidden = false
+    comboBanner.classList.remove('pop')
+    void comboBanner.offsetWidth
+    comboBanner.classList.add('pop')
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const cell of result.clearedCells.slice(0, 32)) {
+        const spark = document.createElement('i')
+        spark.className = 'spark'
+        spark.style.left = (cell.col + .5) * 12.5 + '%'
+        spark.style.top = (cell.row + .5) * 12.5 + '%'
+        spark.style.setProperty('--dx', (Math.random() * 90 - 45) + 'px')
+        spark.style.setProperty('--dy', (Math.random() * 90 - 45) + 'px')
+        sparkLayer.append(spark)
+      }
+    }
+    clearTimeout(showFeedback.timer)
+    showFeedback.timer = setTimeout(() => { comboBanner.hidden = true; sparkLayer.replaceChildren() }, 780)
+  }
+
 
   function postToHost(type, payload = {}) {
     if (runtime) { if (hostReady) runtime.send(type, payload); return }
@@ -36,6 +136,7 @@
     }
     hostReady = true
     document.body.classList.add('hosted')
+    if (globalThis.xb?.info?.platform === 'android') document.body.classList.add('native-host')
     postToHost('game.ready')
     postToHost('game.start')
     postToHost('game.progress', { score: state.score, lines: state.lines })
@@ -68,7 +169,7 @@
 
   function clearPreview() {
     cells.forEach((cell, index) => {
-      cell.classList.remove('preview', 'preview-invalid')
+      cell.classList.remove('preview', 'preview-invalid', 'preview-line')
       const value = state.board[Math.floor(index / rules.SIZE)][index % rules.SIZE]
       if (value) cell.style.setProperty('--piece-color', color(value))
       else cell.style.removeProperty('--piece-color')
@@ -80,6 +181,14 @@
     const shape = selected === null ? null : state.hand[selected]
     if (!shape || state.over) return false
     const valid = rules.canPlace(state.board, shape, row, col)
+    const projected = valid ? rules.placeShape(state.board, shape, row, col) : null
+    if (projected) {
+      cells.forEach((cell, i) => {
+        if (projected.clearedRows.includes(Math.floor(i / 8)) || projected.clearedCols.includes(i % 8)) {
+          cell.classList.add('preview-line')
+        }
+      })
+    }
     shape.cells.forEach((offset) => {
       const y = row + offset.row
       const x = col + offset.col
@@ -127,6 +236,9 @@
     document.getElementById('score').textContent = state.score
     document.getElementById('best').textContent = best
     document.getElementById('lines').textContent = state.lines
+    const combo = document.getElementById('comboCount')
+    combo.textContent = state.combo >= 2 ? 'COMBO ×' + state.combo : ''
+    combo.hidden = state.combo < 2
   }
 
   function renderHand() {
@@ -165,7 +277,8 @@
     overlay.hidden = false
     restartButton.disabled = true
     exitButton.disabled = true
-    document.getElementById('resultScore').textContent = '本局 ' + state.score + ' 分 · 消除 ' + state.lines + ' 条行列'
+    document.getElementById('resultScore').textContent = state.score.toLocaleString('zh-CN')
+    document.getElementById('resultLines').textContent = '消除 ' + state.lines + ' 行列 · 最佳连消 ×' + Math.max(1, state.bestCombo)
     statusNode.textContent = '剩余方块都放不下啦。'
     postToHost('game.result', { score: state.score, lines: state.lines })
     restartOverlay.focus({ preventScroll: true })
@@ -185,10 +298,15 @@
     }
     state = result.state
     best = Math.max(best, state.score)
+    turns += 1
+    persist()
+    showFeedback(result)
+    const lineCount = result.clearedRows.length + result.clearedCols.length
+    tone(lineCount ? 520 + Math.min(600, result.combo * 95) : 280, lineCount ? .17 : .065)
+    haptic(lineCount >= 2 ? 'heavy' : lineCount ? 'medium' : 'light')
     selected = null
     renderBoard(result)
     renderHand()
-    const lineCount = result.clearedRows.length + result.clearedCols.length
     statusNode.textContent = lineCount
       ? '消掉 ' + lineCount + ' 条行列，+' + result.gained + ' 分！'
       : '+' + result.gained + ' 分。' + (result.replenished ? '三个新方块来啦。' : '继续摆，找机会消一整条。')
@@ -282,7 +400,11 @@
 
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return
-    if (event.key === 'Escape') { event.preventDefault(); stopDrag(); exitGame(); return }
+    if (event.key === 'Escape') {
+      if (!settingsOverlay.hidden) { event.preventDefault(); settingsOverlay.hidden = true; settingsButton.focus(); return }
+      if (!document.body.classList.contains('native-host')) { event.preventDefault(); stopDrag(); exitGame() }
+      return
+    }
     if (state.over) {
       if (event.key === 'Tab') {
         const shareButton = document.getElementById('shareResultButton')
@@ -307,27 +429,41 @@
     }
   })
 
-  function resetGame() {
+  function resetGame(fresh = true) {
     window.XiabanResultShare?.reset()
     if (state) stopDrag()
     state = rules.createGame()
+    if (!fresh) hasLocalSave = acceptSave(readLocal())
+    else turns += 1
     selected = null
     cursor = { row: 0, col: 0 }
     overlay.hidden = true
+    settingsOverlay.hidden = true
+    comboBanner.hidden = true
+    sparkLayer.replaceChildren()
     restartButton.disabled = false
     exitButton.disabled = false
     renderBoard()
     renderHand()
     statusNode.textContent = '拖方块到棋盘，或选方块后点空格。'
     postToHost('game.start')
+    if (fresh) persist()
+    if (state.over) showResult()
   }
 
-  restartButton.addEventListener('click', resetGame)
+  restartButton.addEventListener('click', () => resetGame())
   restartOverlay.addEventListener('click', () => { resetGame(); pieceButtons[0].focus({ preventScroll: true }) })
+  settingsButton.addEventListener('click', () => { stopDrag(); settingsOverlay.hidden = false; closeSettingsButton.focus() })
+  closeSettingsButton.addEventListener('click', () => { settingsOverlay.hidden = true; settingsButton.focus() })
+  soundButton.addEventListener('click', () => { soundEnabled = !soundEnabled; soundUI(); persist(); if (soundEnabled) tone(440) })
+  settingsRestart.addEventListener('click', () => { resetGame(); pieceButtons[0].focus() })
+  soundUI()
   exitButton.addEventListener('click', exitGame)
   window.addEventListener('resize', stopDrag)
   window.addEventListener('blur', () => { if (drag) stopDrag() })
-  resetGame()
-  if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag() } })
+  resetGame(false)
+  if (hostStorage?.get) void restoreFromHost()
+  else recovering = false
+  if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag(); persist() } })
 
 })()
