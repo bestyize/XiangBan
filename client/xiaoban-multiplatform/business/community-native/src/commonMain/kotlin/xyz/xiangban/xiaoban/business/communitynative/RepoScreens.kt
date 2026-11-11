@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -461,12 +460,21 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
         }
     }
     deleteTarget?.let { target ->
-        AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除评论？") }, text = { Text("删除后这条评论将不再显示。") }, confirmButton = {
-            TextButton(onClick = { deleteTarget = null; scope.launch {
-                try { env.forum.deleteRepoComment(owner, repo, target.id); loadComments(true) }
-                catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
-            } }) { Text("删除") }
-        }, dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } })
+        XiaobanConfirmDialog(
+            title = "删除评论？",
+            message = "删除后这条评论将不再显示。",
+            confirmLabel = "删除",
+            destructive = true,
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                deleteTarget = null
+                scope.launch {
+                    try { env.forum.deleteRepoComment(owner, repo, target.id); loadComments(true) }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { commentsError = messageOf(e) }
+                }
+            },
+        )
     }
 }
 
