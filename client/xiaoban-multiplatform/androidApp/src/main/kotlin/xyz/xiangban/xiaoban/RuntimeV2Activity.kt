@@ -406,7 +406,11 @@ class RuntimeV2Activity : ComponentActivity() {
             layout.height = height
             statusBarBackground.layoutParams = layout
         }
-        statusBarBackground.setBackgroundColor(if (dark) 0xFF17191F.toInt() else 0xFFF7F8FA.toInt())
+        statusBarBackground.setBackgroundColor(when {
+            pack.manifest.id == "block-puzzle" -> 0xFFEDA1B6.toInt()
+            dark -> 0xFF17191F.toInt()
+            else -> 0xFFF7F8FA.toInt()
+        })
     }
 
     private fun updateSystemBars() {
@@ -414,7 +418,12 @@ class RuntimeV2Activity : ComponentActivity() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             if (landscape) hide(WindowInsetsCompat.Type.systemBars())
-            else {
+            else if (pack.manifest.id == "block-puzzle") {
+                // Immersive only for this arcade game. Keep the host capsule and gesture navigation.
+                hide(WindowInsetsCompat.Type.statusBars())
+                show(WindowInsetsCompat.Type.navigationBars())
+                isAppearanceLightNavigationBars = true
+            } else {
                 show(WindowInsetsCompat.Type.systemBars())
                 isAppearanceLightStatusBars = !dark
                 isAppearanceLightNavigationBars = !dark

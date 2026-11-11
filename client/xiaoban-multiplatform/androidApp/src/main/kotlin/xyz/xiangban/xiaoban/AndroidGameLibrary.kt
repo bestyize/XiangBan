@@ -20,7 +20,9 @@ internal class AndroidGameLibrary(private val context: Context) {
             }
         }
     }
-    suspend fun cover(id: String): ByteArray? = artwork(id) { it.cover }
+    // This square plaza card uses its square icon rather than letterboxing a 16:9 banner.
+    suspend fun cover(id: String): ByteArray? =
+        artwork(id) { if (id == "block-puzzle") it.icon else it.cover }
 
     suspend fun icon(id: String): ByteArray? = artwork(id) { it.icon }
 

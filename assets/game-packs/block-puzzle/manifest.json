@@ -8,7 +8,7 @@
   "description": "经典8×8消除：拖放三块，填满横行或竖列，连消拿高分。支持存档、音效与挑战最高纪录。",
   "category": "puzzle",
   "entry": "index.html",
-  "icon": "icon.svg",
+  "icon": "icon.webp",
   "cover": "cover.svg",
   "orientation": "portrait",
   "input": [

@@ -218,3 +218,49 @@ body.fresh-game[data-game="block-puzzle"] {
 .fresh-game[data-game="block-puzzle"].native-host .game {
   padding-top:max(12px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
 }
+
+/* Full-bleed portrait screen. The native capsule owns the upper-right inset. */
+@media (orientation: portrait) and (max-width: 600px) {
+  .fresh-game[data-game="block-puzzle"] { min-height: 100dvh; }
+  .fresh-game[data-game="block-puzzle"] .game,
+  .fresh-game[data-game="block-puzzle"].hosted .game {
+    box-sizing:border-box;width:100%;max-width:none;height:100dvh;min-height:0;
+    gap:clamp(4px,1.2dvh,10px);
+    padding:max(8px,env(safe-area-inset-top,0px)) clamp(10px,3.2vw,18px)
+      max(8px,env(safe-area-inset-bottom,0px));
+  }
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .game,
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"].hosted .game {
+    padding-top:max(8px,var(--xb-builtin-top,8px));
+    padding-bottom:max(10px,var(--xb-safe-bottom,0px));
+  }
+  .fresh-game[data-game="block-puzzle"] .topbar,
+  .fresh-game[data-game="block-puzzle"].hosted .topbar { height:44px;flex:0 0 44px; }
+  .fresh-game[data-game="block-puzzle"] .stats,
+  .fresh-game[data-game="block-puzzle"].hosted .stats {
+    min-height:0;height:clamp(72px,12dvh,104px);flex:0 0 auto;
+  }
+  .fresh-game[data-game="block-puzzle"] .board-stage,
+  .fresh-game[data-game="block-puzzle"].hosted .board-stage {
+    flex:1 1 auto;min-height:0;width:100%;container-type:size;
+  }
+  .fresh-game[data-game="block-puzzle"] .board-shell,
+  .fresh-game[data-game="block-puzzle"].hosted .board-shell {
+    width:min(100cqw,100cqh,440px);max-width:100%;
+  }
+  .fresh-game[data-game="block-puzzle"] .tray,
+  .fresh-game[data-game="block-puzzle"].hosted .tray {
+    height:clamp(80px,13dvh,110px);flex:0 0 auto;
+  }
+  .fresh-game[data-game="block-puzzle"] .piece-button { height:100%; }
+  .fresh-game[data-game="block-puzzle"] .status,
+  .fresh-game[data-game="block-puzzle"].hosted .status { min-height:16px; }
+}
+
+/* Replace the shared green focus ring without suppressing keyboard focus. */
+.fresh-game[data-game="block-puzzle"] .piece-button:focus-visible {
+  outline:2px solid #fff1f7;outline-offset:-2px;
+}
+@media (pointer: coarse) {
+  .fresh-game[data-game="block-puzzle"] .piece-button:focus-visible { outline:none; }
+}

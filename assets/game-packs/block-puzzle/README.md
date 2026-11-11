@@ -17,3 +17,7 @@
 基准资源：`assets/game-packs/block-puzzle/`；桌面随包资源：`client/xiaoban-desktop/public/game-packs/block-puzzle/`。除 README、桌面私有 `theme.css` 与入口页去掉共享 CSS/脚本及分享按钮外，其余文件须逐字一致；`candy.css` 在共享主题之后加载，保证主题覆写一致。
 
 规则单元检查：`node tools/check-block-puzzle.mjs`。内置资源只读校验：`node client/xiaoban-desktop/scripts/check-game-assets.mjs`。Android 构建会按项目已有规则从桌面随包资源同步官方游戏，不需另开菜单 ID。
+
+## 手机全屏与游戏图标
+
+Android 对方块爆破单独隐藏状态栏，保留原生宿主胶囊退出与系统手势导航。顶部按 `--xb-builtin-top` 避让胶囊，底部按手势安全区自适应，棋盘始终为 8×8 正方形。触屏不出现通用绿色焦点框。独立 `icon.webp` 是 256×256 方形糖果方块图标，移动端精选游戏卡片直接使用该图标；横幅 `cover.svg` 继续用于横版场景。
