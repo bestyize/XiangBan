@@ -47,19 +47,148 @@
     return pool[Math.max(0, Math.min(pool.length - 1, Math.floor(random() * pool.length)))]
   }
 
-  // Partial board awareness prevents an avoidable instant loss from a randomly
-  // impossible hand. It does not guarantee every future hand can be finished.
-  function generateHand(random = Math.random, board = null) {
-    const fitting = board ? SHAPES.filter((shape) => hasSpace(board, shape)) : SHAPES
-    if (!fitting.length) return Array.from({ length: 3 }, () => pickShape(SHAPES, random))
-    const empty = board ? board.flat().filter((value) => value === 0).length : 64
-    const guidedChance = board ? Math.min(.88, Math.max(.18, 1 - empty / 70)) : 0
-    const hand = Array.from({ length: 3 }, () =>
-      pickShape(board && random() < guidedChance ? fitting : SHAPES, random))
-    if (board && !hand.some((shape) => hasSpace(board, shape))) {
-      hand[Math.floor(random() * 3)] = pickShape(fitting, random)
+  // The three-piece deal is the decision unit. Plan all three pieces together,
+  // including all play orders, with a tightly bounded search suitable for WebView.
+  // This is our own tuning model, not a claimed copy of any other game's RNG.
+  const BITS = Array.from({ length: 256 }, (_, value) => {
+    let count = 0
+    for (let n = value; n; n &= n - 1) count += 1
+    return count
+  })
+  const DEAL_CANDIDATES = 28
+  const BEAM_WIDTH = 8
+  const LINE_RECIPES = [
+    ['h5', 'h2', 'dot'], ['h4', 'h3', 'dot'],
+    ['h3', 'h3', 'h2'], ['h4', 'h2', 'h2'],
+    ['v5', 'v2', 'dot'], ['v4', 'v3', 'dot'],
+    ['v3', 'v3', 'v2'], ['v4', 'v2', 'v2'],
+  ]
+  const BY_ID = new Map(SHAPES.map((shape) => [shape.id, shape]))
+  const MOVES = new Map(SHAPES.map((shape) => {
+    const positions = []
+    for (let row = 0; row <= SIZE - shape.height; row += 1) {
+      for (let col = 0; col <= SIZE - shape.width; col += 1) {
+        const masks = new Array(SIZE).fill(0)
+        shape.cells.forEach((cell) => { masks[row + cell.row] |= 1 << (col + cell.col) })
+        positions.push(masks.map((bits, index) => bits ? [index, bits] : null).filter(Boolean))
+      }
     }
-    return hand
+    return [shape.id, positions]
+  }))
+
+  function maskBoard(board) {
+    return board.map((row) => row.reduce((bits, tile, col) => bits | (tile ? (1 << col) : 0), 0))
+  }
+  function nearLineScore(rows) {
+    const columns = new Array(SIZE).fill(0)
+    let value = 0
+    for (let row = 0; row < SIZE; row += 1) {
+      const bits = rows[row]
+      const length = BITS[bits]
+      value += length * length
+      for (let col = 0; col < SIZE; col += 1) if (bits & (1 << col)) columns[col] += 1
+    }
+    for (const length of columns) value += length * length
+    return value
+  }
+  function tryMaskPlace(rows, position) {
+    for (const [row, bits] of position) if (rows[row] & bits) return null
+    const after = rows.slice()
+    for (const [row, bits] of position) after[row] |= bits
+    let fullColumns = 255, fullRows = 0
+    for (let row = 0; row < SIZE; row += 1) {
+      fullColumns &= after[row]
+      if (after[row] === 255) fullRows |= 1 << row
+    }
+    for (let row = 0; row < SIZE; row += 1) {
+      after[row] = fullRows & (1 << row) ? 0 : after[row] & ~fullColumns
+    }
+    return { rows: after, lines: BITS[fullRows] + BITS[fullColumns] }
+  }
+  function handOpportunity(board, hand, beamWidth = BEAM_WIDTH) {
+    const initial = { rows: maskBoard(board), used: 0, lines: 0, firstClearStep: 0, depth: 0, rank: 0 }
+    let beam = [initial], best = initial
+    for (let depth = 1; depth <= 3; depth += 1) {
+      const expanded = []
+      for (const current of beam) {
+        for (let slot = 0; slot < 3; slot += 1) {
+          if (current.used & (1 << slot)) continue
+          for (const position of MOVES.get(hand[slot].id)) {
+            const landed = tryMaskPlace(current.rows, position)
+            if (!landed) continue
+            const lines = current.lines + landed.lines
+            const firstClearStep = current.firstClearStep || (landed.lines ? depth : 0)
+            expanded.push({
+              rows: landed.rows, used: current.used | (1 << slot),
+              lines, firstClearStep, depth,
+              rank: lines * 750 + nearLineScore(landed.rows) * 1.7
+                + (firstClearStep >= 2 ? 6 : 0),
+            })
+          }
+        }
+      }
+      if (!expanded.length) break
+      expanded.sort((a, b) => b.rank - a.rank)
+      const seen = new Set(), next = []
+      for (const candidate of expanded) {
+        const key = candidate.used + '/' + candidate.rows.join(',')
+        if (seen.has(key)) continue
+        seen.add(key)
+        next.push(candidate)
+        if (next.length >= beamWidth) break
+      }
+      beam = next
+      if (beam[0]) best = beam[0]
+    }
+    return { deepest: best.depth, canFinish: best.depth === 3,
+      clearedLines: best.lines, firstClearStep: best.firstClearStep }
+  }
+
+  // Opening, middle and late game aim for 75%, 60%, 45% guided deals.
+  // Those percentages are selection probabilities, NOT asserted player success
+  // rates: search checks that a route exists, not whether a human will find it.
+  function dealGuidance(deals) {
+    return deals <= 10 ? 0.75 : deals <= 30 ? 0.60 : 0.45
+  }
+  function generateHand(random = Math.random, board = null, deals = 1) {
+    const field = board || createBoard()
+    const fitting = SHAPES.filter((shape) => hasSpace(field, shape))
+    if (!fitting.length) return Array.from({ length: 3 }, () => pickShape(SHAPES, random))
+    const empty = field.flat().filter((value) => !value).length
+    const guidedChance = Math.min(0.88, Math.max(0.18, 1 - empty / 70))
+    const wantOpportunity = random() < dealGuidance(deals)
+    let best = null, bestGrade = -Infinity
+    for (let attempt = 0; attempt < DEAL_CANDIDATES; attempt += 1) {
+      let hand
+      // Seed a few natural straight-line combinations among ordinary draws.
+      // They still have to pass the actual board search to be preferred.
+      if (attempt % 5 === 0) {
+        hand = LINE_RECIPES[Math.floor((attempt / 5 + random() * LINE_RECIPES.length) % LINE_RECIPES.length)]
+          .map((id) => BY_ID.get(id))
+        hand = hand.slice()
+        for (let index = hand.length - 1; index > 0; index -= 1) {
+          const swap = Math.floor(random() * (index + 1))
+          ;[hand[swap], hand[index]] = [hand[index], hand[swap]]
+        }
+      } else {
+        hand = Array.from({ length: 3 }, () =>
+          pickShape(random() < guidedChance ? fitting : SHAPES, random))
+      }
+      if (!hand.some((shape) => hasSpace(field, shape))) {
+        hand[Math.floor(random() * 3)] = pickShape(fitting, random)
+      }
+      const result = handOpportunity(field, hand)
+      const opportunity = result.canFinish && result.clearedLines > 0
+      // A fully playable set wins over gratuitous impossible second/third moves.
+      // A natural puzzle can still be difficult: no hint is shown to the user.
+      const grade = result.deepest * 120 +
+        (wantOpportunity ? (opportunity ? 400 : 0) + Math.min(3, result.clearedLines) * 14
+          : (opportunity ? -100 : 100) - result.clearedLines * 12) +
+        (opportunity && result.firstClearStep >= 2 ? 12 : 0) +
+        random() * 16
+      if (grade > bestGrade) { best = hand; bestGrade = grade }
+    }
+    return best || Array.from({ length: 3 }, () => pickShape(fitting, random))
   }
 
   function canPlace(board, shape, row, col) {
@@ -113,7 +242,7 @@
   }
 
   function createGame(random = Math.random) {
-    return { board: createBoard(), hand: generateHand(random), score: 0, lines: 0,
+    return { board: createBoard(), hand: generateHand(random, createBoard(), 1), score: 0, lines: 0, deals: 1,
       combo: 0, drought: 0, bestCombo: 0, over: false }
   }
 
@@ -130,11 +259,12 @@
     let hand = state.hand.slice()
     hand[slot] = null
     const replenished = hand.every((piece) => piece === null)
-    if (replenished) hand = generateHand(random, result.board)
+    const deals = (state.deals || 1) + (replenished ? 1 : 0)
+    if (replenished) hand = generateHand(random, result.board, deals)
     const next = {
       board: result.board, hand,
       score: state.score + result.gained,
-      lines: state.lines + cleared,
+      lines: state.lines + cleared, deals,
       combo, drought,
       bestCombo: Math.max(state.bestCombo || 0, combo),
       over: !canPlay(result.board, hand),
@@ -145,7 +275,7 @@
   function serializeGame(state) {
     return {
       board: state.board, hand: state.hand.map((shape) => shape?.id || null),
-      score: state.score, lines: state.lines, combo: state.combo || 0,
+      score: state.score, lines: state.lines, deals: state.deals || 1, combo: state.combo || 0,
       drought: state.drought || 0, bestCombo: state.bestCombo || 0,
     }
   }
@@ -163,10 +293,12 @@
       if (!Number.isSafeInteger(data[key]) || data[key] < 0) return null
     }
     if (data.drought > 3 || data.combo > 100000 || data.bestCombo > 100000) return null
+    if (data.deals !== undefined && (!Number.isSafeInteger(data.deals) || data.deals < 1 || data.deals > 1000000)) return null
     const board = data.board.map((line) => line.slice())
     return { board, hand, score: data.score, lines: data.lines, combo: data.combo,
-      drought: data.drought, bestCombo: data.bestCombo, over: !canPlay(board, hand) }
+      drought: data.drought, bestCombo: data.bestCombo, deals: data.deals || 1,
+      over: !canPlay(board, hand) }
   }
 
-  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place, serializeGame, restoreGame })
+  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place, serializeGame, restoreGame, handOpportunity, dealGuidance })
 })()
