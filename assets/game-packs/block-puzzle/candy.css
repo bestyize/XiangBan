@@ -9,9 +9,11 @@ body.fresh-game[data-game="block-puzzle"] {
 }
 .fresh-game[data-game="block-puzzle"] .game,
 .fresh-game[data-game="block-puzzle"].hosted .game {
+  --bp-game-width:min(100vw,520px);
+  --bp-side-pad:clamp(12px,4vw,22px);
   position:relative;display:flex;flex-direction:column;align-items:stretch;
   width:min(100%,520px);height:100%;min-height:0;
-  padding:max(12px,env(safe-area-inset-top,0px)) clamp(12px,4vw,22px) max(12px,env(safe-area-inset-bottom,0px));
+  padding:max(12px,env(safe-area-inset-top,0px)) var(--bp-side-pad) max(12px,env(safe-area-inset-bottom,0px));
   gap:clamp(5px,1.5vh,14px);margin:auto;
 }
 .fresh-game[data-game="block-puzzle"] .topbar,
@@ -234,25 +236,38 @@ body.fresh-game[data-game="block-puzzle"] {
   .fresh-game[data-game="block-puzzle"] .combo-banner.pop{animation:none}
 }
 
-/* Native Android's capsule owns the upper-right gesture area. Move the game HUD below it. */
+/* Conservative fallback for hosts without the built-in Android adapter. */
 .fresh-game[data-game="block-puzzle"].native-host .game {
   padding-top:max(12px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
 }
 
-/* Full-bleed portrait screen. The native capsule owns the upper-right inset. */
+/* Keep the status bar safe, and move only the controls that share the capsule's row. */
+@media (orientation: portrait) {
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .game,
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"].hosted .game {
+    --bp-right-pad:max(var(--bp-side-pad),var(--xb-safe-right,0px));
+    padding-top:max(8px,var(--xb-safe-top,env(safe-area-inset-top,0px)));
+    padding-bottom:max(10px,var(--xb-safe-bottom,0px));
+    padding-inline-start:max(var(--bp-side-pad),var(--xb-safe-left,0px));
+    padding-inline-end:var(--bp-right-pad);
+  }
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .header-actions {
+    margin-inline-end:max(0px,calc(var(--xb-capsule-right,0px) + var(--xb-capsule-width,0px) + 8px
+      - (100vw - var(--bp-game-width)) / 2 - var(--bp-right-pad)));
+  }
+}
+
+/* Full-width board and thumb-height tray on portrait phones. */
 @media (orientation: portrait) and (max-width: 600px) {
   .fresh-game[data-game="block-puzzle"] { min-height: 100dvh; }
   .fresh-game[data-game="block-puzzle"] .game,
   .fresh-game[data-game="block-puzzle"].hosted .game {
+    --bp-game-width:100vw;
+    --bp-side-pad:clamp(10px,3.2vw,18px);
     box-sizing:border-box;width:100%;max-width:none;height:100dvh;min-height:0;
     gap:clamp(4px,1.2dvh,10px);
-    padding:max(8px,env(safe-area-inset-top,0px)) clamp(10px,3.2vw,18px)
+    padding:max(8px,env(safe-area-inset-top,0px)) var(--bp-side-pad)
       max(8px,env(safe-area-inset-bottom,0px));
-  }
-  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .game,
-  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"].hosted .game {
-    padding-top:max(8px,var(--xb-builtin-top,8px));
-    padding-bottom:max(10px,var(--xb-safe-bottom,0px));
   }
   .fresh-game[data-game="block-puzzle"] .topbar,
   .fresh-game[data-game="block-puzzle"].hosted .topbar { height:44px;flex:0 0 44px; }
