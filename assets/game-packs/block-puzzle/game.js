@@ -50,6 +50,7 @@
   const scoreNode = document.getElementById('score')
   const rewardDiamond = document.getElementById('rewardDiamond')
   let diamondTimer = null
+  const pendingNotes = new Set()
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   function acceptTheme(data) {
     if (!data || typeof data !== 'object') return false
@@ -95,6 +96,7 @@
     clearTimeout(diamondTimer)
     rewardDiamond.hidden = true
     cancelAnimationFrame(scoreAnimation)
+    cancelRewardNotes()
     feedbackTimer = paletteTimer = resultTimer = diamondTimer = null
   }
   function animateScore(from, to) {
@@ -167,7 +169,7 @@
     } catch { /* optional platform storage */ }
     finally { recovering = false; persist(); saveTheme() }
   }
-  function tone(hz, seconds = .09) {
+  function tone(hz, seconds = .09, level = .055) {
     if (!soundEnabled) return
     try {
       const Audio = window.AudioContext || window.webkitAudioContext
@@ -178,12 +180,25 @@
       oscillator.type = 'sine'
       oscillator.frequency.setValueAtTime(hz, audio.currentTime)
       oscillator.frequency.exponentialRampToValueAtTime(hz * .72, audio.currentTime + seconds)
-      volume.gain.setValueAtTime(.055, audio.currentTime)
+      volume.gain.setValueAtTime(Math.min(.065, Math.max(.005, level)), audio.currentTime)
       volume.gain.exponentialRampToValueAtTime(.001, audio.currentTime + seconds)
       oscillator.connect(volume).connect(audio.destination)
       oscillator.start()
       oscillator.stop(audio.currentTime + seconds)
     } catch { /* silent fallback */ }
+  }
+  function cancelRewardNotes() {
+    for (const pending of pendingNotes) clearTimeout(pending)
+    pendingNotes.clear()
+  }
+  function scheduleRewardNote(hz, duration, delay, volume = .047) {
+    // Never let the last combo's melody leak into the following move, restart
+    // or a temporarily hidden mobile WebView.
+    const pending = setTimeout(() => {
+      pendingNotes.delete(pending)
+      tone(hz, duration, volume)
+    }, delay)
+    pendingNotes.add(pending)
   }
   function haptic(kind) {
     try {
@@ -239,6 +254,18 @@
     showDiamond(result)
     const reduced = reducedMotion()
     if (!reduced) {
+      // One DOM insertion after constructing the FX scene keeps massive
+      // row/column clears from triggering repeated paint work on Android.
+      const effectNodes = []
+      const boardColors = typeof window.getComputedStyle === 'function'
+        ? window.getComputedStyle(document.body) : null
+      const colorSnapshot = new Map()
+      for (const cell of result.removedTiles || []) {
+        if (!colorSnapshot.has(cell.color)) {
+          const resolved = boardColors?.getPropertyValue('--color-' + cell.color)?.trim()
+          colorSnapshot.set(cell.color, resolved || color(cell.color))
+        }
+      }
       // Render the departing blocks using their ORIGINAL stored colors. Even
       // after the board state is cleared they visibly rise, slide or twist away.
       const boardBounds = boardNode.getBoundingClientRect()
@@ -252,29 +279,35 @@
         departing.style.top = (first.top - boardBounds.top + cell.row * verticalStep) + 'px'
         departing.style.width = first.width + 'px'
         departing.style.height = first.height + 'px'
-        departing.style.setProperty('--piece-color', color(cell.color))
+        departing.style.setProperty('--piece-color', colorSnapshot.get(cell.color) || color(cell.color))
         const rowClear = result.clearedRows.includes(cell.row)
         const colClear = result.clearedCols.includes(cell.col)
         departing.style.setProperty('--fly-x',
           (rowClear ? (cell.col < 4 ? -1 : 1) * (24 + cell.col * 4) : 0) + 'px')
         departing.style.setProperty('--fly-y',
           (colClear ? (cell.row < 4 ? -1 : 1) * (26 + cell.row * 4) : -10) + 'px')
-        departing.style.setProperty('--delay', (cell.row + cell.col) * 17 + 'ms')
-        sparkLayer.append(departing)
+        const rowIndex = result.clearedRows.indexOf(cell.row)
+        const colIndex = result.clearedCols.indexOf(cell.col)
+        // The same row (or column) departs as an ordered wave, rather than
+        // forming a diagonal checkerboard pattern.
+        const sweepOrder = rowIndex >= 0 ? rowIndex * 42 + cell.col * 12
+          : colIndex * 42 + cell.row * 12
+        departing.style.setProperty('--delay', (75 + sweepOrder) + 'ms')
+        effectNodes.push(departing)
       }
       result.clearedRows.forEach((row, index) => {
         const streak = document.createElement('span')
         streak.className = 'clear-beam horizontal'
         streak.style.top = (row * 12.5) + '%'
-        streak.style.setProperty('--delay', (index * 45) + 'ms')
-        sparkLayer.append(streak)
+        streak.style.setProperty('--delay', (20 + index * 42) + 'ms')
+        effectNodes.push(streak)
       })
       result.clearedCols.forEach((col, index) => {
         const streak = document.createElement('span')
         streak.className = 'clear-beam vertical'
         streak.style.left = (col * 12.5) + '%'
-        streak.style.setProperty('--delay', (index * 45) + 'ms')
-        sparkLayer.append(streak)
+        streak.style.setProperty('--delay', (20 + index * 42) + 'ms')
+        effectNodes.push(streak)
       })
       // Emit tiles in board order, not random places: one continuous sweep.
       for (const cell of result.clearedCells.slice(0, lines >= 3 ? 56 : 32)) {
@@ -284,13 +317,14 @@
         particle.style.top = ((cell.row + .5) * 12.5) + '%'
         particle.style.setProperty('--dx', ((cell.col - 3.5) * 9) + 'px')
         particle.style.setProperty('--dy', ((cell.row - 3.5) * 9) + 'px')
-        particle.style.setProperty('--delay', (25 + ((cell.row + cell.col) % 8) * 24) + 'ms')
-        sparkLayer.append(particle)
+        const alignedIndex = result.clearedRows.includes(cell.row) ? cell.col : cell.row
+        particle.style.setProperty('--delay', (95 + alignedIndex * 14) + 'ms')
+        effectNodes.push(particle)
       }
       if (lines >= 2 || result.combo >= 3) {
         const shockwave = document.createElement('span')
         shockwave.className = 'clear-shockwave'
-        sparkLayer.append(shockwave)
+        effectNodes.push(shockwave)
       }
       if (result.perfect) {
         for (let i = 0; i < 20; i += 1) {
@@ -299,9 +333,10 @@
           spark.style.left = ((i * 37) % 100) + '%'
           spark.style.top = ((i * 17) % 75) + '%'
           spark.style.setProperty('--dx', ((i * 19) % 120 - 60) + 'px')
-          sparkLayer.append(spark)
+          effectNodes.push(spark)
         }
       }
+      sparkLayer.append(...effectNodes)
     }
     feedbackTimer = setTimeout(() => {
       comboBanner.hidden = true
@@ -309,11 +344,12 @@
     }, result.perfect ? 1150 : 850)
   }
   function playReward(result) {
+    cancelRewardNotes()
     const lines = result.clearedRows.length + result.clearedCols.length
     if (!lines) {
       if (result.buildUpBonus > 0) {
-        tone(400, .11)
-        setTimeout(() => tone(610, .11), 80)
+        tone(400, .09, .035)
+        scheduleRewardNote(610, .10, 90, .035)
       } else tone(270, .06)
       haptic('light')
       return
@@ -321,10 +357,17 @@
     haptic(result.perfect || lines >= 3 ? 'heavy' : 'medium')
     const notes = Math.min(5, 1 + lines + Math.floor(result.combo / 3))
     const base = 470 + Math.min(340, result.combo * 38)
+    // First audible hit follows the visual row flash, then notes accelerate
+    // slightly on a larger multi-line clear without stacking harsh volume.
     for (let note = 0; note < notes; note += 1) {
-      setTimeout(() => tone(base * (1 + note * .20), .11 + note * .024), note * 75)
+      const duration = .095 + note * .014
+      scheduleRewardNote(base * (1 + note * .18), duration, 55 + note * 72,
+        Math.min(.053, .032 + note * .004))
     }
-    if (result.perfect) setTimeout(() => tone(1150, .26), 315)
+    if (result.perfect) {
+      scheduleRewardNote(1050, .18, 385, .05)
+      scheduleRewardNote(1340, .24, 490, .045)
+    }
   }
   function celebratePerfect() {
     paletteIndex = (paletteIndex + 1) % PALETTES.length
@@ -711,7 +754,15 @@
   else recovering = false
   if (globalThis.xb?.ready) {
     initialize()
-    globalThis.xb.on?.('hide', () => { if (drag) stopDrag(); persist() })
-  } else if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag(); persist() } })
+    globalThis.xb.on?.('hide', () => {
+      if (drag) stopDrag()
+      cancelRewardNotes()
+      persist()
+    })
+  } else if (runtime) runtime.connect(initialize, { hide: () => {
+    if (drag) stopDrag()
+    cancelRewardNotes()
+    persist()
+  } })
 
 })()
