@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+const root = new URL('../', import.meta.url)
+const read = path => readFileSync(new URL(path, root), 'utf8')
+const activity = read('client/xiaoban-multiplatform/androidApp/src/main/kotlin/xyz/xiangban/xiaoban/RuntimeV2Activity.kt')
+const chrome = read('client/xiaoban-multiplatform/androidApp/src/main/kotlin/xyz/xiangban/xiaoban/RuntimeV2Chrome.kt')
+const nativeTheme = read('client/xiaoban-multiplatform/androidApp/src/main/builtin-runtime-v2/builtin-runtime.css')
+const gameCss = read('assets/game-packs/block-puzzle/candy.css')
+const desktopCss = read('client/xiaoban-desktop/public/game-packs/block-puzzle/candy.css')
+const html = read('assets/game-packs/block-puzzle/index.html')
+const manifest = JSON.parse(read('assets/game-packs/block-puzzle/manifest.json'))
+
+assert.equal(manifest.id, 'block-puzzle')
+assert.equal(manifest.orientation, 'portrait')
+assert.match(html, /viewport-fit=cover/)
+assert.equal(gameCss, desktopCss, 'desktop and reference game styles must match')
+// Only the built-in game may change the system UI policy.
+assert.match(activity, /pack\.host == "official-block-puzzle\.app\.xiangban\.xyz"/)
+assert.match(activity, /if \(landscape \|\| blockPuzzleFullBleed\) 0 else safeInsets\.top/)
+assert.match(activity, /window\.statusBarColor = android\.graphics\.Color\.TRANSPARENT/)
+assert.match(activity, /show\(WindowInsetsCompat\.Type\.systemBars\(\)\)/)
+assert.match(activity, /isAppearanceLightStatusBars = !blockPuzzleShowingResult/)
+assert.match(activity, /isAppearanceLightNavigationBars = !blockPuzzleShowingResult/)
+assert.match(activity, /"game\.start"[\s\S]*?blockPuzzleShowingResult = false[\s\S]*?updateSystemBars\(\)/)
+assert.match(activity, /"game\.progress", "game\.result"[\s\S]*?blockPuzzleShowingResult = true[\s\S]*?updateSystemBars\(\)/)
+assert.match(activity, /blockPuzzleShowingResult = false[\s\S]*?chrome\.loading\(\)/)
+// Capsule margins must be based on the host's live insets, never fixed screen coordinates.
+assert.match(activity, /capsuleRightMarginDp = if \(blockPuzzleFullBleed\) 16f else 6f/)
+assert.match(activity, /capsuleTopGapDp = if \(blockPuzzleFullBleed\) 8f else 0f/)
+assert.match(chrome, /topMargin = top \+ \(if \(landscape\) 0 else pixels\(capsuleTopGapDp\)\)/)
+assert.match(chrome, /rightMargin = right \+ pixels\(capsuleRightMarginDp\)/)
+assert.match(nativeTheme, /--xb-builtin-top:/)
+assert.match(gameCss, /html\.xb-builtin-runtime body\.fresh-game\[data-game="block-puzzle"\] \.overlay\s*\{[^}]*position: fixed;[^}]*inset: 0;/)
+assert.match(gameCss, /padding-top: max\(24px, calc\(var\(--xb-safe-top, 0px\) \+ 16px\)\)/)
+assert.match(gameCss, /padding-bottom: max\(24px, calc\(var\(--xb-safe-bottom, 0px\) \+ 16px\)\)/)
+assert.match(gameCss, /html\.xb-builtin-runtime body\.fresh-game\[data-game="block-puzzle"\] \.settings-overlay/)
+console.log('PASS block-puzzle Android insets: full-bleed status bar, phase contrast, capsule and dialogs')

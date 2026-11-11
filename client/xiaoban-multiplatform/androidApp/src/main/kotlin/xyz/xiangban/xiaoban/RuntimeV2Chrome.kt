@@ -165,7 +165,7 @@ internal class RuntimeV2Chrome(
     fun updateInsets(left: Int, top: Int, right: Int, bottom: Int, landscape: Boolean) {
         this.landscape = landscape
         val layout = capsuleView.layoutParams as FrameLayout.LayoutParams
-        val topMargin = top + if (landscape) 0 else pixels(capsuleTopGapDp)
+        val topMargin = top + (if (landscape) 0 else pixels(capsuleTopGapDp))
         val rightMargin = right + pixels(capsuleRightMarginDp)
         if (layout.topMargin != topMargin || layout.rightMargin != rightMargin) {
             layout.topMargin = topMargin
