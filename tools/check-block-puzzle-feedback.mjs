@@ -52,16 +52,59 @@ class FakeElement {
   setPointerCapture() {}
 }
 
+class FakeMedia extends FakeElement {
+  paused = true
+  duration = .8
+  playCount = 0
+  play() {
+    this.paused = false
+    this.playCount += 1
+    return Promise.resolve()
+  }
+  pause() { this.paused = true }
+}
+
+class FakeAudioParam {
+  setValueAtTime(value) { this.value = value }
+  linearRampToValueAtTime(peak) { this.peak = peak }
+  exponentialRampToValueAtTime(end) { this.end = end }
+  setTargetAtTime(target) { this.target = target }
+}
+
+function fakeAudioContext(graph) {
+  const node = () => ({ connect(next) { return next }, disconnect() {}, start() {}, stop() {} })
+  return class {
+    state = 'running'
+    currentTime = 1
+    sampleRate = 44100
+    destination = node()
+    createGain() {
+      const gain = new FakeAudioParam()
+      graph.gains.push(gain)
+      return { ...node(), gain }
+    }
+    createOscillator() {
+      const frequency = new FakeAudioParam()
+      graph.pitches.push(frequency)
+      return { ...node(), frequency }
+    }
+    createBuffer(_channels, length) { return { getChannelData: () => new Float32Array(length) } }
+    createBufferSource() { return node() }
+    createBiquadFilter() { return { ...node(), Q: {}, frequency: new FakeAudioParam() } }
+  }
+}
+
 function scenario(board, combo = 0, drought = 0, options = {}) {
   const nodes = new Map()
   const buttons = [new FakeElement(), new FakeElement(), new FakeElement()]
   const timers = []
+  const audioGraph = { gains: [], pitches: [] }
   let computedColorReads = 0
   const save = {
     version: 2,
     game: { board, hand: ['dot', 'dot', 'dot'], score: 10,
       lines: 0, combo, drought, setupMoves: options.setupMoves || 0, bestCombo: combo, deals: 1 },
-    best: 20, soundEnabled: false, paletteIndex: 0, perfectCount: 0,
+    best: 20, soundEnabled: options.soundEnabled ?? false, paletteIndex: 0, perfectCount: 0,
   }
   const storage = new Map(options.hostSave ? [] : [['xiaoban.block-puzzle.classic.v2', JSON.stringify(save)]])
   let releaseHostSave = null
@@ -88,7 +131,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
     body: new FakeElement('body'),
     activeElement: null,
     getElementById(id) {
-      if (!nodes.has(id)) nodes.set(id, new FakeElement(id))
+      if (!nodes.has(id)) nodes.set(id, id === 'musicTrack' || id.startsWith('voice') ? new FakeMedia(id) : new FakeElement(id))
       return nodes.get(id)
     },
     querySelectorAll(selector) { return selector === '[data-slot]' ? buttons : [] },
@@ -96,6 +139,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
     addEventListener() {},
   }
   const window = {
+    AudioContext: fakeAudioContext(audioGraph),
     location: { search: '', assign() {} },
     matchMedia() { return { matches: false } },
     getComputedStyle() {
@@ -143,7 +187,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const savedTheme = () => JSON.parse(storage.get('xiaoban.block-puzzle.theme.v1'))
   const restart = () => nodes.get('restartOverlay').handlers.click()
   return {
-    nodes, document, timers, initial, placeAt, placeAtTopLeft, saved, savedTheme, restart,
+    nodes, document, timers, audioGraph, initial, placeAt, placeAtTopLeft, saved, savedTheme, restart,
     getComputedColorReads: () => computedColorReads,
     releaseHostSave: () => releaseHostSave?.(),
     getHosted: key => hostedStorage.get(key),
@@ -199,7 +243,10 @@ for (let index = 1; index < 8; index++) {
   crossBoard[index][0] = 1
 }
 crossBoard[5][5] = 1
-const cross = scenario(crossBoard, 2)
+const cross = scenario(crossBoard, 2, 0, { soundEnabled: true })
+const track = cross.nodes.get('musicTrack')
+const regularVolume = track.volume
+await track.play()
 cross.placeAtTopLeft()
 const fx = cross.nodes.get('sparkLayer').children.map(child => child.className)
 assert.ok(fx.includes('clear-beam horizontal'))
@@ -219,18 +266,39 @@ assert.match(cross.nodes.get('comboBanner').textContent, /COMBO ×3/)
 assert.equal(cross.saved().game.combo, 3)
 assert.equal(cross.saved().paletteIndex, 0)
 assert.ok(Number(cross.nodes.get('score').textContent) > 10)
-const pendingClearNotes = cross.timers.filter(timer => [55, 127, 199, 271].includes(timer.delay))
-assert.ok(pendingClearNotes.length >= 2)
+assert.equal(track.volume, regularVolume, 'clears and callouts should keep the music level steady')
+assert.equal(cross.nodes.get('voiceGood').playCount, 1)
+assert.ok(cross.audioGraph.pitches.length > 5, 'a cross and combo should schedule several pitches')
 cross.restart()
-assert.ok(pendingClearNotes.every(timer => timer.cancelled),
-  'restarted games must cancel the previous combo melody')
+assert.equal(cross.audioGraph.gains[0].target, 0, 'restart should fade the previous combo cue')
+assert.equal(cross.nodes.get('voiceGood').paused, true, 'restart should stop the previous callout')
+assert.equal(track.volume, regularVolume)
+
+// Single rows climb and single columns descend. A spoken cue is reserved for a reward.
+const soloRow = crossBoard.map((row, i) => row.map((value, j) => i > 0 && j === 0 ? 0 : value))
+const soloCol = crossBoard.map((row, i) => row.map((value, j) => i === 0 && j > 0 ? 0 : value))
+const rowClear = scenario(soloRow, 0, 0, { soundEnabled: true })
+const colClear = scenario(soloCol, 0, 0, { soundEnabled: true })
+rowClear.placeAtTopLeft()
+colClear.placeAtTopLeft()
+assert.ok(rowClear.audioGraph.pitches[1].value < rowClear.audioGraph.pitches[3].value)
+assert.ok(colClear.audioGraph.pitches[1].value > colClear.audioGraph.pitches[3].value)
+assert.equal(rowClear.nodes.get('voiceNice').playCount, 0)
+
+const nice = scenario(crossBoard, 0, 0, { soundEnabled: true })
+nice.placeAtTopLeft()
+assert.equal(nice.nodes.get('voiceNice').playCount, 1)
+const great = scenario(soloRow, 4, 0, { soundEnabled: true })
+great.placeAtTopLeft()
+assert.equal(great.nodes.get('voiceGreat').playCount, 1)
 
 // A true perfect clear switches the whole game's palette and persists the
 // unlock. It must not rotate the palette on a normal line clear.
 const perfectBoard = Array.from({ length: 8 }, () => Array(8).fill(0))
 for (let index = 1; index < 8; index++) perfectBoard[0][index] = 1
-const perfect = scenario(perfectBoard, 2)
+const perfect = scenario(perfectBoard, 2, 0, { soundEnabled: true })
 perfect.placeAtTopLeft()
+assert.equal(perfect.nodes.get('voiceWonderful').playCount, 1)
 assert.equal(perfect.saved().paletteIndex, 1)
 assert.equal(perfect.saved().perfectCount, 1)
 assert.match(perfect.nodes.get('comboBanner').textContent, /PERFECT!/)

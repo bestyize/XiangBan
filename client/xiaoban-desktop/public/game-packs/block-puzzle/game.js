@@ -30,12 +30,32 @@
   const settingsButton = document.getElementById('settingsButton')
   const closeSettingsButton = document.getElementById('closeSettingsButton')
   const soundButton = document.getElementById('soundButton')
+  const musicButton = document.getElementById('musicButton')
+  const musicTrack = document.getElementById('musicTrack')
+  const voiceNice = document.getElementById('voiceNice')
+  const voiceGood = document.getElementById('voiceGood')
+  const voiceGreat = document.getElementById('voiceGreat')
+  const voiceWonderful = document.getElementById('voiceWonderful')
+  // Each clear has its own pitch contour and sweep. Notes are MIDI pitches.
+  const CLEAR_SOUNDS = {
+    row:     { sweep: [3300, 1650], notes: [74, 78],         spacing: .055, tail: .13 },
+    column:  { sweep: [1800,  560], notes: [71, 66],         spacing: .078, tail: .16 },
+    cross:   { sweep: [3150,  730], notes: [66, 74, 81],     spacing: .065, tail: .19 },
+    multi:   { sweep: [2950, 1150], notes: [69, 74, 78, 81], spacing: .059, tail: .17 },
+    perfect: { sweep: [3650,  790], notes: [62, 69, 74, 78, 86], spacing: .085, tail: .26 },
+  }
   const settingsRestart = document.getElementById('settingsRestart')
   const continueButton = document.getElementById('continueButton')
   const comboBanner = document.getElementById('comboBanner')
   const sparkLayer = document.getElementById('sparkLayer')
   let soundEnabled = true
+  let musicEnabled = true
+  let musicUnlocked = false
+  let hostVisible = true
   let audio = null
+  let effectBus = null
+  let burstNoise = null
+  let activeCallout = null
   let turns = 0
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
@@ -53,7 +73,6 @@
   const scoreNode = document.getElementById('score')
   const rewardDiamond = document.getElementById('rewardDiamond')
   let diamondTimer = null
-  const pendingNotes = new Set()
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   function acceptTheme(data) {
     if (!data || typeof data !== 'object') return false
@@ -99,7 +118,8 @@
     clearTimeout(diamondTimer)
     rewardDiamond.hidden = true
     cancelAnimationFrame(scoreAnimation)
-    cancelRewardNotes()
+    stopEffects()
+    stopCallout()
     feedbackTimer = paletteTimer = resultTimer = diamondTimer = null
   }
   function animateScore(from, to) {
@@ -175,8 +195,37 @@
     postToHost('game.progress', { score: state.score, lines: state.lines })
   }
   function soundUI() {
-    soundButton.textContent = soundEnabled ? '声音：开启' : '声音：关闭'
+    soundButton.textContent = soundEnabled ? '音效：开启' : '音效：关闭'
     soundButton.setAttribute('aria-pressed', String(soundEnabled))
+    musicButton.textContent = musicEnabled ? '背景音乐：开启' : '背景音乐：关闭'
+    musicButton.setAttribute('aria-pressed', String(musicEnabled))
+    syncMusic()
+  }
+  function syncMusic() {
+    if (!musicEnabled || document.hidden || !hostVisible) {
+      if (musicTrack.paused === false) musicTrack.pause()
+      return
+    }
+    if (musicUnlocked && musicTrack.paused) {
+      void musicTrack.play().catch(() => { /* retry on the next gesture */ })
+    }
+  }
+  function unlockMusic(event) {
+    if (!event.isTrusted) return
+    musicUnlocked = true
+    syncMusic()
+  }
+  function onGameHide() {
+    hostVisible = false
+    syncMusic()
+    if (drag) stopDrag()
+    stopEffects()
+    stopCallout()
+    persist()
+  }
+  function onGameShow() {
+    hostVisible = true
+    syncMusic()
   }
   function acceptSave(data) {
     const loaded = data?.version === 2 ? rules.restoreGame(data.game) : null
@@ -185,6 +234,7 @@
     // Restoring the unfinished board is an explicit choice in Settings.
     best = Math.max(best, Number.isSafeInteger(data.best) && data.best >= 0 ? data.best : 0, loaded.score)
     soundEnabled = data.soundEnabled !== false
+    musicEnabled = typeof data.musicEnabled === 'boolean' ? data.musicEnabled : soundEnabled
     if (Number.isSafeInteger(data.paletteIndex) && data.paletteIndex >= 0) {
       paletteIndex = data.paletteIndex % PALETTES.length
     }
@@ -196,7 +246,7 @@
     return true
   }
   function persist() {
-    const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled, paletteIndex, perfectCount }
+    const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled, musicEnabled, paletteIndex, perfectCount }
     try { localStorage.setItem(storeKey, JSON.stringify(data)) } catch { /* sandbox storage */ }
     try { localStorage.setItem(themeStoreKey, JSON.stringify(themeSnapshot())) } catch { /* sandbox storage */ }
     if (!recovering && hostStorage?.set) {
@@ -229,36 +279,85 @@
       saveTheme()
     }
   }
-  function tone(hz, seconds = .09, level = .055) {
-    if (!soundEnabled) return
+  function stopEffects() {
+    if (!effectBus) return
+    const bus = effectBus
+    effectBus = null
+    bus.gain.setTargetAtTime(0, audio.currentTime, .004)
+    setTimeout(() => bus.disconnect(), 25)
+  }
+  function stopCallout() {
+    if (!activeCallout) return
+    activeCallout.pause()
+    activeCallout = null
+  }
+  function calloutFor(result, lines) {
+    if (result.perfect || result.combo === 8) return voiceWonderful
+    if (lines >= 4 || result.combo === 5) return voiceGreat
+    if (lines === 3 || result.combo === 3) return voiceGood
+    if (lines === 2 || result.combo === 2) return voiceNice
+    return null
+  }
+  function playCallout(track) {
+    if (document.hidden || !hostVisible || !soundEnabled) return
+    stopCallout()
+    activeCallout = track
+    track.volume = .52
+    track.currentTime = 0
+    void track.play().catch(() => {})
+  }
+  function playEffect(schedule) {
+    stopEffects()
+    if (!soundEnabled || document.hidden || !hostVisible) return
     try {
       const Audio = window.AudioContext || window.webkitAudioContext
       if (!Audio) return
       audio ||= new Audio()
-      if (audio.state === 'suspended') void audio.resume()
-      const oscillator = audio.createOscillator(), volume = audio.createGain()
-      oscillator.type = 'sine'
-      oscillator.frequency.setValueAtTime(hz, audio.currentTime)
-      oscillator.frequency.exponentialRampToValueAtTime(hz * .72, audio.currentTime + seconds)
-      volume.gain.setValueAtTime(Math.min(.065, Math.max(.005, level)), audio.currentTime)
-      volume.gain.exponentialRampToValueAtTime(.001, audio.currentTime + seconds)
-      oscillator.connect(volume).connect(audio.destination)
-      oscillator.start()
-      oscillator.stop(audio.currentTime + seconds)
+      if (audio.state === 'suspended') void audio.resume().catch(() => {})
+      effectBus = audio.createGain()
+      effectBus.connect(audio.destination)
+      schedule(effectBus, audio.currentTime + .005)
     } catch { /* silent fallback */ }
   }
-  function cancelRewardNotes() {
-    for (const pending of pendingNotes) clearTimeout(pending)
-    pendingNotes.clear()
+  function envelope(bus, at, seconds, peak) {
+    const volume = audio.createGain()
+    volume.gain.setValueAtTime(.001, at)
+    volume.gain.linearRampToValueAtTime(peak, at + .005)
+    volume.gain.exponentialRampToValueAtTime(.001, at + seconds)
+    volume.connect(bus)
+    return volume
   }
-  function scheduleRewardNote(hz, duration, delay, volume = .047) {
-    // Never let the last combo's melody leak into the following move, restart
-    // or a temporarily hidden mobile WebView.
-    const pending = setTimeout(() => {
-      pendingNotes.delete(pending)
-      tone(hz, duration, volume)
-    }, delay)
-    pendingNotes.add(pending)
+  function voice(bus, at, hz, seconds, peak, endHz = hz, wave = 'sine') {
+    const oscillator = audio.createOscillator()
+    oscillator.type = wave
+    oscillator.frequency.setValueAtTime(hz, at)
+    oscillator.frequency.exponentialRampToValueAtTime(endHz, at + seconds)
+    oscillator.connect(envelope(bus, at, seconds, peak))
+    oscillator.start(at)
+    oscillator.stop(at + seconds)
+  }
+  function chime(bus, at, note, seconds, peak) {
+    const hz = 440 * 2 ** ((note - 69) / 12)
+    voice(bus, at, hz, seconds, peak)
+    // A short, quiet overtone gives the hit a glassy attack.
+    voice(bus, at, hz * 2.01, .053, peak * .23)
+  }
+  function burst(bus, at, [from, to], seconds, peak) {
+    if (!burstNoise) {
+      burstNoise = audio.createBuffer(1, Math.ceil(audio.sampleRate * .20), audio.sampleRate)
+      const samples = burstNoise.getChannelData(0)
+      for (let i = 0; i < samples.length; i += 1) samples[i] = 2 * Math.random() - 1
+    }
+    const source = audio.createBufferSource()
+    source.buffer = burstNoise
+    const filter = audio.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.Q.value = .9
+    filter.frequency.setValueAtTime(from, at)
+    filter.frequency.exponentialRampToValueAtTime(to, at + seconds)
+    source.connect(filter).connect(envelope(bus, at, seconds, peak))
+    source.start(at)
+    source.stop(at + seconds)
   }
   function haptic(kind) {
     try {
@@ -404,30 +503,38 @@
     }, result.perfect ? 1150 : 850)
   }
   function playReward(result) {
-    cancelRewardNotes()
-    const lines = result.clearedRows.length + result.clearedCols.length
+    const rows = result.clearedRows.length
+    const cols = result.clearedCols.length
+    const lines = rows + cols
     if (!lines) {
-      if (result.buildUpBonus > 0) {
-        tone(400, .09, .035)
-        scheduleRewardNote(610, .10, 90, .035)
-      } else tone(270, .06)
       haptic('light')
+      playEffect((bus, at) => {
+        voice(bus, at, 330, .082, .165, 175, 'triangle')
+        if (result.buildUpBonus > 0) chime(bus, at + .065, 74, .13, .09)
+      })
       return
     }
     haptic(result.perfect || lines >= 3 ? 'heavy' : 'medium')
-    const notes = Math.min(5, 1 + lines + Math.floor(result.combo / 3))
-    const base = 470 + Math.min(340, result.combo * 38)
-    // First audible hit follows the visual row flash, then notes accelerate
-    // slightly on a larger multi-line clear without stacking harsh volume.
-    for (let note = 0; note < notes; note += 1) {
-      const duration = .095 + note * .014
-      scheduleRewardNote(base * (1 + note * .18), duration, 55 + note * 72,
-        Math.min(.053, .032 + note * .004))
-    }
-    if (result.perfect) {
-      scheduleRewardNote(1050, .18, 385, .05)
-      scheduleRewardNote(1340, .24, 490, .045)
-    }
+    const type = result.perfect ? 'perfect' : rows && cols ? 'cross' : lines > 1 ? 'multi' : rows ? 'row' : 'column'
+    const cue = CLEAR_SOUNDS[type]
+    const combo = !result.perfect && result.combo >= 2
+    const callout = soundEnabled ? calloutFor(result, lines) : null
+    playEffect((bus, at) => {
+      voice(bus, at, type === 'column' ? 285 : 390, .099, .17, 155, 'triangle')
+      burst(bus, at, cue.sweep, lines > 1 || result.perfect ? .17 : .11, lines > 1 ? .24 : .19)
+      cue.notes.forEach((note, i) => {
+        chime(bus, at + .033 + i * cue.spacing, note, cue.tail, .20 * .86 ** i)
+      })
+      const finish = at + .044 + cue.notes.length * cue.spacing
+      if (result.perfect) {
+        chime(bus, finish, 74, .22, .12)
+        chime(bus, finish + .018, 81, .22, .09)
+      } else if (combo) {
+        const accent = result.combo >= 8 ? 90 : result.combo >= 5 ? 88 : result.combo >= 3 ? 86 : 81
+        chime(bus, finish, accent, .145, .12)
+      }
+    })
+    if (callout) playCallout(callout)
   }
   function celebratePerfect() {
     paletteIndex = (paletteIndex + 1) % PALETTES.length
@@ -805,9 +912,33 @@
   restartOverlay.addEventListener('click', () => { resetGame(); pieceButtons[0].focus({ preventScroll: true }) })
   settingsButton.addEventListener('click', () => { stopDrag(); settingsOverlay.hidden = false; closeSettingsButton.focus() })
   closeSettingsButton.addEventListener('click', () => { settingsOverlay.hidden = true; settingsButton.focus() })
-  soundButton.addEventListener('click', () => { soundEnabled = !soundEnabled; soundUI(); persist(); if (soundEnabled) tone(440) })
+  soundButton.addEventListener('click', () => {
+    soundEnabled = !soundEnabled
+    if (soundEnabled) playEffect((bus, at) => chime(bus, at, 74, .14, .13))
+    else {
+      stopEffects()
+      stopCallout()
+    }
+    soundUI()
+    persist()
+  })
+  musicButton.addEventListener('click', () => {
+    musicEnabled = !musicEnabled
+    soundUI()
+    persist()
+  })
   settingsRestart.addEventListener('click', () => { resetGame(); pieceButtons[0].focus() })
   continueButton.addEventListener('click', continuePrevious)
+  musicTrack.volume = .23
+  document.addEventListener('pointerup', unlockMusic, { capture: true, passive: true })
+  document.addEventListener('keydown', unlockMusic)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopEffects()
+      stopCallout()
+    }
+    syncMusic()
+  })
   soundUI()
   exitButton.addEventListener('click', exitGame)
   window.addEventListener('resize', stopDrag)
@@ -817,15 +948,8 @@
   else { recovering = false; archiveContinue(); persist() }
   if (globalThis.xb?.ready) {
     initialize()
-    globalThis.xb.on?.('hide', () => {
-      if (drag) stopDrag()
-      cancelRewardNotes()
-      persist()
-    })
-  } else if (runtime) runtime.connect(initialize, { hide: () => {
-    if (drag) stopDrag()
-    cancelRewardNotes()
-    persist()
-  } })
+    globalThis.xb.on?.('hide', onGameHide)
+    globalThis.xb.on?.('show', onGameShow)
+  } else if (runtime) runtime.connect(initialize, { hide: onGameHide, show: onGameShow })
 
 })()

@@ -14,6 +14,8 @@
 
 ## 打包约定
 
+四句童声风格的报彩使用 [Kokoro-82M v1.0](https://huggingface.co/hexgrad/Kokoro-82M) 的 af_sky 音色离线生成，分别是 Nice、Good、Great 和 Wonderful。游戏包内置单声道 MP3。
+
 基准资源：`assets/game-packs/block-puzzle/`；桌面随包资源：`client/xiaoban-desktop/public/game-packs/block-puzzle/`。除 README、桌面私有 `theme.css` 与入口页去掉共享 CSS/脚本及分享按钮外，其余文件须逐字一致；`candy.css` 在共享主题之后加载，保证主题覆写一致。
 
 规则单元检查：`node tools/check-block-puzzle.mjs`。内置资源只读校验：`node client/xiaoban-desktop/scripts/check-game-assets.mjs`。Android 构建会按项目已有规则从桌面随包资源同步官方游戏，不需另开菜单 ID。
