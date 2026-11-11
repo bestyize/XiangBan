@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -178,11 +177,20 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
         }
     }
     deleteTarget?.let { target ->
-        AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除留言？") }, text = { Text("删除后这条留言将不再显示。") }, confirmButton = {
-            TextButton(onClick = { deleteTarget = null; scope.launch {
-                try { env.forum.deleteNewsComment(key, target.id, frontier); loadComments(true) }
-                catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
-            } }) { Text("删除") }
-        }, dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } })
+        XiaobanConfirmDialog(
+            title = "删除留言？",
+            message = "删除后这条留言将不再显示。",
+            confirmLabel = "删除",
+            destructive = true,
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                deleteTarget = null
+                scope.launch {
+                    try { env.forum.deleteNewsComment(key, target.id, frontier); loadComments(true) }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { commentsError = messageOf(e) }
+                }
+            },
+        )
     }
 }
