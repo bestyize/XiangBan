@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import kotlin.coroutines.resume
 import android.Manifest
-import android.app.AlertDialog
 import android.content.Intent
 import android.os.Build
 import android.text.format.Formatter
@@ -178,15 +177,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun confirmShortcutDownload(size: Long): Boolean = suspendCancellableCoroutine { continuation ->
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("使用移动网络下载？")
-            .setMessage("作品包大小为 ${Formatter.formatFileSize(this, size)}。")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("下载") { _, _ -> if (continuation.isActive) continuation.resume(true) }
-            .setOnDismissListener { if (continuation.isActive) continuation.resume(false) }
-            .create()
-        continuation.invokeOnCancellation { runOnUiThread { dialog.dismiss() } }
-        dialog.show()
+        val close = showXiaobanConfirmDialog(
+            title = "使用移动网络下载？",
+            message = "作品包大小为 ${Formatter.formatFileSize(this, size)}。",
+            confirmLabel = "下载",
+            onConfirm = { if (continuation.isActive) continuation.resume(true) },
+            onDismiss = { if (continuation.isActive) continuation.resume(false) },
+        )
+        continuation.invokeOnCancellation { runOnUiThread { close() } }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
