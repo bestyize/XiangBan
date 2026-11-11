@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -109,35 +108,53 @@ private fun ChallengeSubmissionDialog(env: CommunityEnv, challenge: CommunityCha
     var stale by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text("选择已上架的本人作品") },
-        text = { Column(Modifier.heightIn(max = 420.dp)) {
-            Text("每件作品只记录一次投稿；受限阅读、已下架或非本人作品不能投稿。", style = XType.Caption, color = LocalExtraColors.current.ink3)
-            when (val result = state) {
-                Load.Loading -> Spinner(Modifier.fillMaxWidth().height(100.dp))
-                is Load.Failed -> Banner(result.message, warn = true, actionText = "重试", onAction = loader::reload)
-                is Load.Ready -> if (owned.isEmpty()) Text("没有已上架的本人作品，请先从“我的作品”发布。", Modifier.padding(vertical = 16.dp), style = XType.Body)
-                else LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
-                    items(owned, key = { it.id }) { pack ->
-                        RadioRow(selected == pack.id, pack.title, desc = if (pack.id in submitted) "已提交当前挑战" else "${kindLabel(pack.kind)} · v${pack.version}", onClick = {
-                            if (!busy && pack.id !in submitted) { selected = pack.id; error = null }
-                        })
+    XiaobanDialog(
+        title = "选择已上架的本人作品",
+        onDismissRequest = { if (!busy) onDismiss() },
+        dismissEnabled = !busy,
+        primaryAction = XDialogAction(
+            label = if (busy) "投稿中…" else "提交作品",
+            enabled = !busy && !stale && session.loggedIn && challengeCanSubmit(challenge) &&
+                selected != null && selected !in submitted && owned.any { it.id == selected },
+            onClick = {
+                val pack = owned.firstOrNull { it.id == selected }
+                if (!busy && pack != null) {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        try { env.challenges.submit(challenge.key, pack.id); onSubmitted(pack.id) }
+                        catch (e: CancellationException) { throw e }
+                        catch (e: Exception) { error = messageOf(e); if ((e as? ApiException)?.status == 409) stale = true }
+                        finally { busy = false }
                     }
                 }
+            },
+        ),
+        secondaryAction = XDialogAction(
+            if (stale) "关闭并刷新" else "取消",
+            { if (stale) onRefresh() else onDismiss() },
+            enabled = !busy,
+        ),
+    ) {
+        Text("每件作品只记录一次投稿；受限阅读、已下架或非本人作品不能投稿。",
+            style = XType.Caption, color = LocalExtraColors.current.ink3)
+        when (val result = state) {
+            Load.Loading -> Spinner(Modifier.fillMaxWidth().height(100.dp))
+            is Load.Failed -> Banner(result.message, warn = true, actionText = "重试", onAction = loader::reload)
+            is Load.Ready -> if (owned.isEmpty()) Text("没有已上架的本人作品，请先从“我的作品”发布。",
+                Modifier.padding(vertical = 16.dp), style = XType.Body)
+            else LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
+                items(owned, key = { it.id }) { pack ->
+                    RadioRow(
+                        selected == pack.id, pack.title,
+                        desc = if (pack.id in submitted) "已提交当前挑战" else "${kindLabel(pack.kind)} · v${pack.version}",
+                        onClick = { if (!busy && pack.id !in submitted) { selected = pack.id; error = null } },
+                    )
+                }
             }
-            error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
-        } },
-        confirmButton = { PillButton(if (busy) "投稿中…" else "提交作品", {
-            if (busy) return@PillButton
-            val pack = owned.firstOrNull { it.id == selected } ?: return@PillButton
-            busy = true; error = null
-            scope.launch {
-                try { env.challenges.submit(challenge.key, pack.id); onSubmitted(pack.id) }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = messageOf(e); if ((e as? ApiException)?.status == 409) stale = true }
-                finally { busy = false }
-            }
-        }, enabled = !busy && !stale && session.loggedIn && challengeCanSubmit(challenge) && selected != null && selected !in submitted && owned.any { it.id == selected }) },
-        dismissButton = { GhostPillButton(if (stale) "关闭并刷新状态" else "取消", { if (stale) onRefresh() else onDismiss() }, enabled = !busy) })
+        }
+        error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
+    }
 }
 
 /** 点赞仅走作品真实帖子；每次操作后重新读计数和当前用户状态。 */
