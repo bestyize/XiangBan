@@ -246,23 +246,48 @@ internal fun NativeReportAction(env: CommunityEnv, targetType: String, id: Long,
     var submitted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Text(if (submitted) "已提交举报" else "举报", Modifier.clickable(enabled = !busy && !submitted) { show = true; error = null }, style = XType.Caption, color = LocalExtraColors.current.ink3)
-    if (show) AlertDialog(onDismissRequest = { if (!busy) show = false }, title = { Text(when (targetType) { "post" -> "举报回复"; "pack" -> "举报作品"; "scheme" -> "举报方案"; else -> "举报帖子" }) },
-        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    if (show) XiaobanDialog(
+        title = when (targetType) { "post" -> "举报回复"; "pack" -> "举报作品"; "scheme" -> "举报方案"; else -> "举报帖子" },
+        onDismissRequest = { if (!busy) show = false },
+        dismissEnabled = !busy,
+        primaryAction = if (!session.loggedIn) {
+            XDialogAction("登录", { show = false; open?.invoke(Route.Login) }, enabled = open != null)
+        } else {
+            XDialogAction(
+                if (busy) "提交中…" else "提交举报",
+                onClick = {
+                    if (!busy) {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            try {
+                                if (targetType in listOf("pack", "scheme")) env.contentSocial.report(targetType, id, reason, detail)
+                                else env.social.report(targetType, id, reason, detail)
+                                submitted = true
+                                show = false
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = messageOf(e) }
+                            finally { busy = false }
+                        }
+                    }
+                },
+                enabled = !busy && reason.isNotEmpty() && detail.length <= 500,
+            )
+        },
+        secondaryAction = XDialogAction("取消", { show = false }, enabled = !busy),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             if (!session.loggedIn) Text("请先登录小伴账号后举报。", style = XType.Body)
             else {
-                CommunityReportReasons.forEach { (key, title) -> RadioRow(reason == key, title, desc = null, onClick = { if (!busy) reason = key }) }
+                CommunityReportReasons.forEach { (key, title) ->
+                    RadioRow(reason == key, title, desc = null, onClick = { if (!busy) reason = key })
+                }
                 AreaBox(detail, { detail = it }, placeholder = "补充说明（最多 500 字，可选）", minHeight = 70.dp, enabled = !busy)
             }
             error?.let { Text(it, color = Danger, style = XType.Secondary) }
-        } },
-        confirmButton = {
-            if (!session.loggedIn) PillButton("登录", { show = false; open?.invoke(Route.Login) }, enabled = open != null)
-            else PillButton(if (busy) "提交中…" else "提交举报", {
-            if (busy) return@PillButton
-            busy = true; error = null
-            scope.launch { try { if (targetType in listOf("pack", "scheme")) env.contentSocial.report(targetType, id, reason, detail) else env.social.report(targetType, id, reason, detail); submitted = true; show = false }
-                catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
-                finally { busy = false } }
-        }, enabled = session.loggedIn && !busy && reason.isNotEmpty() && detail.length <= 500) },
-        dismissButton = { GhostPillButton("取消", { show = false }, enabled = !busy) })
+        }
+    }
 }
