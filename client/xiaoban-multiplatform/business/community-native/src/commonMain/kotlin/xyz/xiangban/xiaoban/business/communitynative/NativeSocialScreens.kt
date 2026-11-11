@@ -8,7 +8,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -161,11 +160,16 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
             }
         }
     }
-    if (blockConfirmation) AlertDialog(onDismissRequest = { if (!busy) blockConfirmation = false },
-        title = { Text("屏蔽该用户？") },
-        text = { Text("对方的帖子将从你的列表和搜索隐藏，回复会折叠，双方互相取消关注。对方不会收到屏蔽提示。") },
-        confirmButton = { PillButton("确认屏蔽", { blockConfirmation = false; action { env.social.block(uid, true) } }, enabled = !busy) },
-        dismissButton = { GhostPillButton("取消", { blockConfirmation = false }, enabled = !busy) })
+    if (blockConfirmation) XiaobanConfirmDialog(
+        title = "屏蔽该用户？",
+        message = "对方的帖子将从你的列表和搜索隐藏，回复会折叠，双方互相取消关注。对方不会收到屏蔽提示。",
+        confirmLabel = "确认屏蔽",
+        destructive = true,
+        onConfirm = { blockConfirmation = false; action { env.social.block(uid, true) } },
+        onDismiss = { if (!busy) blockConfirmation = false },
+        dismissEnabled = !busy,
+        confirmEnabled = !busy,
+    )
 }
 
 @Composable
