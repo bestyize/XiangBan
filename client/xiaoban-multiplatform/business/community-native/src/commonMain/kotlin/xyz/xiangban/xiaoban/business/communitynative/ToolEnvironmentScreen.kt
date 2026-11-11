@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -97,12 +95,13 @@ internal fun ToolEnvironmentScreen(controller: ToolEnvironmentController?, back:
         }
     }
     if (confirmRemove && controller != null) {
-        AlertDialog(
-            onDismissRequest = { confirmRemove = false },
-            title = { Text("移除工具环境？") },
-            text = { Text("已下载的运行时和其中安装的工具会被删除。") },
-            confirmButton = { TextButton(onClick = { confirmRemove = false; controller.remove() }) { Text("移除") } },
-            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("取消") } },
+        XiaobanConfirmDialog(
+            title = "移除工具环境？",
+            message = "已下载的运行时和其中安装的工具会被删除。",
+            confirmLabel = "移除",
+            destructive = true,
+            onConfirm = { confirmRemove = false; controller.remove() },
+            onDismiss = { confirmRemove = false },
         )
     }
 }
