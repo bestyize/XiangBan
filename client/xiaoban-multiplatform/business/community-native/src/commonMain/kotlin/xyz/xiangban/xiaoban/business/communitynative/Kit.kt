@@ -192,23 +192,6 @@ fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush
     }
 }
 
-/** 居中的小对话框（遮罩更淡）。 */
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    BackHandler(onBack = onDismiss)
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(indication = null, interactionSource = null) { onDismiss() }.statusBarsPadding().navigationBarsPadding().imePadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier.padding(horizontal = 32.dp).widthIn(max = 320.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface)
-                .clickable(indication = null, interactionSource = null) {}.padding(horizontal = 16.dp, vertical = 16.dp),
-            content = content,
-        )
-    }
-}
-
 /** 发布弹层里的一行：左图标方块，右标题与说明。 */
 @Composable
 fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> Unit) {
