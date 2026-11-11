@@ -63,7 +63,26 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
       lines: 0, combo, drought, setupMoves: options.setupMoves || 0, bestCombo: combo, deals: 1 },
     best: 20, soundEnabled: false, paletteIndex: 0, perfectCount: 0,
   }
-  const storage = new Map([['xiaoban.block-puzzle.classic.v2', JSON.stringify(save)]])
+  const storage = new Map(options.hostSave ? [] : [['xiaoban.block-puzzle.classic.v2', JSON.stringify(save)]])
+  let releaseHostSave = null
+  const hostedStorage = new Map(options.hostSave
+    ? [['xiaoban.block-puzzle.classic.v2', options.hostSave]] : [])
+  const xb = options.hostSave ? {
+    info: { platform: 'android' },
+    ready() { return Promise.resolve() },
+    on() {},
+    game: { start: async () => {}, progress: async () => {}, result: async () => {} },
+    storage: {
+      get(key) {
+        if (key === 'xiaoban.block-puzzle.classic.v2' && options.deferHost) {
+          return new Promise(resolve => { releaseHostSave = () => resolve(hostedStorage.get(key)) })
+        }
+        return Promise.resolve(hostedStorage.get(key) ?? null)
+      },
+      set(key, value) { hostedStorage.set(key, value); return Promise.resolve() },
+      remove(key) { hostedStorage.delete(key); return Promise.resolve() },
+    },
+  } : undefined
   if (options.theme) storage.set('xiaoban.block-puzzle.theme.v1', JSON.stringify(options.theme))
   const document = {
     body: new FakeElement('body'),
@@ -87,7 +106,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   }
   window.parent = window
   const sandbox = {
-    window, document, URLSearchParams,
+    window, document, URLSearchParams, xb,
     navigator: {},
     performance: { now: () => 100 },
     localStorage: {
@@ -126,6 +145,8 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   return {
     nodes, document, timers, initial, placeAt, placeAtTopLeft, saved, savedTheme, restart,
     getComputedColorReads: () => computedColorReads,
+    releaseHostSave: () => releaseHostSave?.(),
+    getHosted: key => hostedStorage.get(key),
   }
 }
 
@@ -146,6 +167,29 @@ assert.equal(freshStart.saved().game.score, 10)
 assert.equal(freshStart.saved().game.board[2][3], 1)
 assert.equal(freshStart.saved().game.board[2][4], 2)
 assert.equal(freshStart.nodes.get('continueButton').hidden, true)
+
+// Android may return the last round after the player has already made a move.
+// That delayed read may offer continuation, but must NEVER swap the live board.
+const remoteBoard = Array.from({ length: 8 }, () => Array(8).fill(0))
+remoteBoard[6][6] = 1
+const remoteSave = {
+  version: 2,
+  game: { board: remoteBoard, hand: ['dot', 'dot', 'dot'], score: 40,
+    lines: 0, combo: 0, drought: 0, bestCombo: 0, deals: 1 },
+  best: 60, soundEnabled: true, paletteIndex: 0, perfectCount: 0,
+}
+const asyncStart = scenario(remoteBoard, 0, 0,
+  { hostSave: remoteSave, deferHost: true, autoContinue: false })
+assert.equal(asyncStart.initial.score, 0)
+asyncStart.placeAt(0, 0)
+const scoreAfterMove = asyncStart.saved().game.score
+assert.ok(scoreAfterMove > 0)
+asyncStart.releaseHostSave()
+for (let i = 0; i < 18; i++) await Promise.resolve()
+assert.equal(asyncStart.saved().game.score, scoreAfterMove)
+assert.equal(asyncStart.saved().game.board[6][6], 0)
+assert.equal(asyncStart.saved().game.board[0][0] !== 0, true)
+assert.equal(asyncStart.nodes.get('overlay').hidden, true)
 
 // Cross clears must produce an orderly horizontal AND vertical beam, and
 // consecutive clears should use a louder reward tier rather than random sparks.
