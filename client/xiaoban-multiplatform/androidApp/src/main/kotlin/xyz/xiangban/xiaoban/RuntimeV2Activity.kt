@@ -2,7 +2,6 @@ package xyz.xiangban.xiaoban
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.Intent
@@ -276,12 +275,12 @@ class RuntimeV2Activity : ComponentActivity() {
                 if (!closing && !isFinishing) {
                     Toast.makeText(this@RuntimeV2Activity, "未添加到桌面", Toast.LENGTH_SHORT).show()
                     if (offerSettings) {
-                        AlertDialog.Builder(this@RuntimeV2Activity)
-                            .setTitle("尚未添加到桌面")
-                            .setMessage("请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。")
-                            .setNegativeButton("取消", null)
-                            .setPositiveButton("去设置") { _, _ -> openShortcutSettings() }
-                            .show()
+                        showXiaobanConfirmDialog(
+                                title = "尚未添加到桌面",
+                                message = "请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。",
+                                confirmLabel = "去设置",
+                                onConfirm = ::openShortcutSettings,
+                            )
                     }
                 }
             } finally {
@@ -640,12 +639,12 @@ class RuntimeV2Activity : ComponentActivity() {
                     if (pinned) result(true) else {
                         error("unavailable")
                         if (Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) && focused && !closing && !isFinishing) {
-                            AlertDialog.Builder(this@RuntimeV2Activity)
-                                .setTitle("尚未添加到桌面")
-                                .setMessage("请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。")
-                                .setNegativeButton("取消", null)
-                                .setPositiveButton("去设置") { _, _ -> openShortcutSettings() }
-                                .show()
+                            showXiaobanConfirmDialog(
+                                title = "尚未添加到桌面",
+                                message = "请在小伴的应用权限中检查「桌面快捷方式」是否已允许，然后再试。",
+                                confirmLabel = "去设置",
+                                onConfirm = ::openShortcutSettings,
+                            )
                         }
                     }
                 }
