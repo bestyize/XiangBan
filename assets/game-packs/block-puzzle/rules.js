@@ -253,10 +253,12 @@
       if (next.every((line) => line[i] !== 0)) clearedCols.push(i)
     }
     const clearedCells = []
+    const removedTiles = []
     for (let rowIndex = 0; rowIndex < SIZE; rowIndex += 1) {
       for (let colIndex = 0; colIndex < SIZE; colIndex += 1) {
         if (clearedRows.includes(rowIndex) || clearedCols.includes(colIndex)) {
           clearedCells.push({ row: rowIndex, col: colIndex })
+          removedTiles.push({ row: rowIndex, col: colIndex, color: next[rowIndex][colIndex] })
           next[rowIndex][colIndex] = 0
         }
       }
@@ -267,12 +269,23 @@
     const gained = shape.cells.length +
       (lines ? Math.round(base * (1 + Math.max(0, combo - 1) * .5)) : 0) +
       (perfect ? 300 : 0)
-    return { board: next, clearedRows, clearedCols, clearedCells, gained, perfect }
+    return { board: next, clearedRows, clearedCols, clearedCells, removedTiles, gained, perfect }
+  }
+
+  function nearCompleteLines(board) {
+    let count = 0
+    for (let line = 0; line < SIZE; line += 1) {
+      if (board[line].filter(Boolean).length === SIZE - 1) count += 1
+      let occupied = 0
+      for (let row = 0; row < SIZE; row += 1) if (board[row][line]) occupied += 1
+      if (occupied === SIZE - 1) count += 1
+    }
+    return count
   }
 
   function createGame(random = Math.random) {
     return { board: createBoard(), hand: generateHand(random, createBoard(), 1), score: 0, lines: 0, deals: 1,
-      combo: 0, drought: 0, bestCombo: 0, over: false }
+      combo: 0, drought: 0, setupMoves: 0, bestCombo: 0, over: false }
   }
 
   function place(state, slot, row, col, random = Math.random) {
@@ -284,7 +297,16 @@
     const drought = cleared ? 0 : Math.min(3, (state.drought || 0) + 1)
     const combo = cleared ? ((state.drought || 0) >= 3 ? 1 : (state.combo || 0) + 1)
       : (drought >= 3 ? 0 : (state.combo || 0))
-    const result = cleared ? placeShape(state.board, shape, row, col, combo) : placement
+    const scored = cleared ? placeShape(state.board, shape, row, col, combo) : placement
+    const setupMoves = cleared ? 0 : Math.min(9999, (state.setupMoves || 0) + 1)
+    // Deliberate, modest rewards for useful non-clearing moves. They never
+    // count as line clears or extend/reset the Combo counter.
+    const newReadyLines = cleared ? 0 :
+      Math.max(0, nearCompleteLines(scored.board) - nearCompleteLines(state.board))
+    const buildUpBonus = cleared ? 0 :
+      Math.min(16, newReadyLines * 8) + (setupMoves % 3 === 0 ? 5 : 0)
+    const result = { ...scored, gained: scored.gained + buildUpBonus,
+      buildUpBonus, newReadyLines, setupMoves }
     let hand = state.hand.slice()
     hand[slot] = null
     const replenished = hand.every((piece) => piece === null)
@@ -294,7 +316,7 @@
       board: result.board, hand,
       score: state.score + result.gained,
       lines: state.lines + cleared, deals,
-      combo, drought,
+      combo, drought, setupMoves,
       bestCombo: Math.max(state.bestCombo || 0, combo),
       over: !canPlay(result.board, hand),
     }
@@ -305,7 +327,8 @@
     return {
       board: state.board, hand: state.hand.map((shape) => shape?.id || null),
       score: state.score, lines: state.lines, deals: state.deals || 1, combo: state.combo || 0,
-      drought: state.drought || 0, bestCombo: state.bestCombo || 0,
+      drought: state.drought || 0, setupMoves: state.setupMoves || 0,
+      bestCombo: state.bestCombo || 0,
     }
   }
 
@@ -323,11 +346,14 @@
     }
     if (data.drought > 3 || data.combo > 100000 || data.bestCombo > 100000) return null
     if (data.deals !== undefined && (!Number.isSafeInteger(data.deals) || data.deals < 1 || data.deals > 1000000)) return null
+    if (data.setupMoves !== undefined &&
+      (!Number.isSafeInteger(data.setupMoves) || data.setupMoves < 0 || data.setupMoves > 9999)) return null
     const board = data.board.map((line) => line.slice())
     return { board, hand, score: data.score, lines: data.lines, combo: data.combo,
-      drought: data.drought, bestCombo: data.bestCombo, deals: data.deals || 1,
+      drought: data.drought, setupMoves: data.setupMoves || 0,
+      bestCombo: data.bestCombo, deals: data.deals || 1,
       over: !canPlay(board, hand) }
   }
 
-  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place, serializeGame, restoreGame, handOpportunity, dealGuidance })
+  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place, serializeGame, restoreGame, handOpportunity, dealGuidance, nearCompleteLines })
 })()
