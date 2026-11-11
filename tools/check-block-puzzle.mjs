@@ -33,6 +33,8 @@ const crossResult = rules.placeShape(crossing, dot, 0, 0, 1)
 assert.equal(crossResult.clearedRows.length, 1)
 assert.equal(crossResult.clearedCols.length, 1)
 assert.equal(crossResult.clearedCells.length, 15)
+assert.equal(crossResult.removedTiles.length, 15)
+assert.ok(crossResult.removedTiles.every(tile => tile.color >= 1 && tile.color <= 6))
 assert.equal(crossResult.gained, 21)
 assert.equal(crossResult.perfect, false)
 assert.equal(crossing[0][1], 1) // Pure rule must not mutate its input.
@@ -84,6 +86,31 @@ const resetCombo = rules.place(thirdGap, 0, 4, 4, () => 0)
 assert.equal(resetCombo.state.combo, 0)
 assert.equal(resetCombo.state.drought, 3)
 
+// A non-clearing placement can earn a modest, distinct setup reward.
+const readyBoard = rules.createBoard()
+for (let index = 0; index < 6; index++) readyBoard[0][index] = 1
+const readyState = {
+  board: readyBoard, hand: [dot, dot, dot],
+  score: 0, lines: 0, combo: 0, drought: 0, setupMoves: 0, bestCombo: 0, over: false,
+}
+const setup = rules.place(readyState, 0, 0, 6, () => 0)
+assert.equal(setup.placed, true)
+assert.equal(setup.newReadyLines, 1)
+assert.equal(setup.buildUpBonus, 8)
+assert.equal(setup.gained, 9)
+assert.equal(setup.state.lines, 0)
+assert.equal(setup.state.combo, 0)
+assert.equal(setup.state.setupMoves, 1)
+assert.equal(rules.restoreGame(rules.serializeGame(setup.state)).setupMoves, 1)
+const milestone = rules.place({ ...readyState, board: rules.createBoard(), setupMoves: 2 }, 0, 0, 0, () => 0)
+assert.equal(milestone.buildUpBonus, 5)
+assert.equal(milestone.gained, 6)
+assert.equal(milestone.state.lines, 0)
+assert.equal(milestone.state.setupMoves, 3)
+const oldSetupSave = rules.serializeGame(setup.state)
+delete oldSetupSave.setupMoves
+assert.equal(rules.restoreGame(oldSetupSave).setupMoves, 0)
+
 // Three-piece lookahead: five + two + one can complete a row in three moves
 // regardless of the presentation order. Search must not mutate the board.
 const h5 = rules.SHAPES.find(shape => shape.id === 'h5')
@@ -130,5 +157,5 @@ delete oldSave.deals
 assert.equal(rules.restoreGame(oldSave).deals, 1)
 assert.ok(rules.restoreGame(rules.serializeGame(turn.state)).deals >= 1)
 
-console.log('PASS block-puzzle: geometry, combo, 3-step lookahead, smooth pacing, recovery and persistence')
+console.log('PASS block-puzzle: geometry, combo, setup rewards, 3-step lookahead and saves')
 

@@ -19,7 +19,11 @@ class FakeElement {
     this.disabled = false
     this.className = ''
     this.offsetWidth = 40
-    this.style = { setProperty() {}, removeProperty() {} }
+    this.cssVars = {}
+    this.style = {
+      setProperty: (key, value) => { this.cssVars[key] = value },
+      removeProperty: key => { delete this.cssVars[key] },
+    }
     this.classes = new Set()
     this.classList = {
       add: (...names) => names.forEach(name => this.classes.add(name)),
@@ -48,17 +52,18 @@ class FakeElement {
   setPointerCapture() {}
 }
 
-function scenario(board, combo = 0, drought = 0) {
+function scenario(board, combo = 0, drought = 0, options = {}) {
   const nodes = new Map()
   const buttons = [new FakeElement(), new FakeElement(), new FakeElement()]
   const timers = []
   const save = {
     version: 2,
     game: { board, hand: ['dot', 'dot', 'dot'], score: 10,
-      lines: 0, combo, drought, bestCombo: combo, deals: 1 },
+      lines: 0, combo, drought, setupMoves: options.setupMoves || 0, bestCombo: combo, deals: 1 },
     best: 20, soundEnabled: false, paletteIndex: 0, perfectCount: 0,
   }
   const storage = new Map([['xiaoban.block-puzzle.classic.v2', JSON.stringify(save)]])
+  if (options.theme) storage.set('xiaoban.block-puzzle.theme.v1', JSON.stringify(options.theme))
   const document = {
     body: new FakeElement('body'),
     activeElement: null,
@@ -91,12 +96,15 @@ function scenario(board, combo = 0, drought = 0) {
   }
   runInNewContext(rulesText, sandbox, { filename: 'rules.js' })
   runInNewContext(gameText, sandbox, { filename: 'game.js' })
-  const placeAtTopLeft = () => {
-    buttons[0].handlers.click()
-    nodes.get('board').children[0].children[0].handlers.click()
+  const placeAt = (row, col, slot = 0) => {
+    buttons[slot].handlers.click()
+    nodes.get('board').children[row].children[col].handlers.click()
   }
+  const placeAtTopLeft = () => placeAt(0, 0)
   const saved = () => JSON.parse(storage.get('xiaoban.block-puzzle.classic.v2'))
-  return { nodes, document, timers, placeAtTopLeft, saved }
+  const savedTheme = () => JSON.parse(storage.get('xiaoban.block-puzzle.theme.v1'))
+  const restart = () => nodes.get('restartOverlay').handlers.click()
+  return { nodes, document, timers, placeAt, placeAtTopLeft, saved, savedTheme, restart }
 }
 
 // Cross clears must produce an orderly horizontal AND vertical beam, and
@@ -113,6 +121,11 @@ const fx = cross.nodes.get('sparkLayer').children.map(child => child.className)
 assert.ok(fx.includes('clear-beam horizontal'))
 assert.ok(fx.includes('clear-beam vertical'))
 assert.ok(fx.includes('clear-shockwave'))
+assert.equal(fx.filter(name => name === 'departing-tile').length, 15)
+assert.ok(cross.nodes.get('sparkLayer').children
+  .filter(tile => tile.className === 'departing-tile')
+  .every(tile => tile.cssVars['--piece-color'] === 'var(--color-1)'))
+assert.equal(cross.nodes.get('rewardDiamond').hidden, false)
 assert.match(cross.nodes.get('comboBanner').textContent, /COMBO ×3/)
 assert.equal(cross.saved().game.combo, 3)
 assert.equal(cross.saved().paletteIndex, 0)
@@ -132,10 +145,45 @@ const paletteChange = perfect.timers.find(timer => timer.delay === 330)
 assert.ok(paletteChange, 'theme rotation should be timed after the clear highlight')
 paletteChange.callback()
 assert.equal(perfect.document.body.dataset.palette, 'amber')
+assert.equal(perfect.savedTheme().paletteIndex, 1)
+perfect.restart()
+assert.equal(perfect.document.body.dataset.palette, 'amber')
+assert.equal(perfect.saved().paletteIndex, 1)
+// An independent theme save beats an older round snapshot.
+const reopened = scenario(Array.from({ length: 8 }, () => Array(8).fill(0)), 0, 0,
+  { theme: { paletteIndex: 1, perfectCount: 1 } })
+assert.equal(reopened.document.body.dataset.palette, 'amber')
+assert.equal(reopened.savedTheme().perfectCount, 1)
+// The same palette persists through a game-over screen and its restart.
+const finished = scenario(Array.from({ length: 8 }, () => Array(8).fill(1)), 0, 0,
+  { theme: { paletteIndex: 1, perfectCount: 1 } })
+assert.equal(finished.nodes.get('overlay').hidden, false)
+finished.restart()
+assert.equal(finished.document.body.dataset.palette, 'amber')
 
 const empty = Array.from({ length: 8 }, () => Array(8).fill(0))
 const buffer = scenario(empty, 2, 0)
 buffer.placeAtTopLeft()
 assert.match(buffer.nodes.get('status').textContent, /连击保留/)
 assert.equal(buffer.saved().game.combo, 2)
-console.log('PASS block-puzzle feedback: aligned beams, combo tiers, perfect palette and grace moves')
+// Non-clearing milestones are scored and animated separately from Combo.
+const setupBoard = Array.from({ length: 8 }, () => Array(8).fill(0))
+for (let i = 0; i < 6; i++) setupBoard[0][i] = 1
+const setup = scenario(setupBoard)
+setup.placeAt(0, 6)
+assert.equal(setup.saved().game.score, 19)
+assert.equal(setup.saved().game.combo, 0)
+assert.equal(setup.saved().game.lines, 0)
+assert.equal(setup.saved().game.setupMoves, 1)
+assert.match(setup.nodes.get('status').textContent, /布局奖励/)
+assert.match(setup.nodes.get('comboBanner').textContent, /NICE SETUP!/)
+assert.equal(setup.nodes.get('rewardDiamond').textContent, '+8')
+assert.equal(setup.nodes.get('rewardDiamond').hidden, false)
+assert.ok(setup.nodes.get('sparkLayer').children.every(tile => tile.className !== 'departing-tile'))
+const milestone = scenario(empty, 0, 3, { setupMoves: 2 })
+milestone.placeAtTopLeft()
+assert.equal(milestone.saved().game.score, 16)
+assert.match(milestone.nodes.get('comboBanner').textContent, /KEEP GOING!/)
+assert.equal(milestone.saved().game.lines, 0)
+
+console.log('PASS block-puzzle feedback: colored departures, quiet rewards, theme inheritance and combo')
