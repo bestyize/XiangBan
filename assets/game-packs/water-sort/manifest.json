@@ -3,17 +3,29 @@
   "runtimeProtocol": 2,
   "kind": "game",
   "id": "water-sort",
-  "name": "奶茶大师",
-  "version": "1.0.0",
-  "description": "把同色饮料倒在一起。8 关慢慢调，随时撤销，没有倒计时。",
+  "name": "倒杯快乐",
+  "version": "2.0.0",
+  "description": "36 关调饮解谜，解封签、接订单，收集风味手帐。每日特调，随时续玩。",
   "category": "puzzle",
   "entry": "index.html",
-  "icon": "cover.svg",
+  "icon": "icon.webp",
   "cover": "cover.svg",
-  "orientation": "portrait",
+  "orientation": "any",
   "input": [
     "touch",
     "mouse",
     "keyboard"
+  ],
+  "capabilities": [
+    "haptics",
+    "share",
+    "clipboard",
+    "files"
+  ],
+  "intents": [
+    "倒杯快乐",
+    "奶茶大师",
+    "倒水",
+    "饮料分类"
   ]
 }

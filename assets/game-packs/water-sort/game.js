@@ -1,296 +1,234 @@
 (() => {
-  'use strict'
-
-  const runtime = globalThis.XiaobanBuiltinRuntime
-
-  const rules = globalThis.XiabanWaterSort
-  const HOST_NONCE = new URLSearchParams(window.location.search).get('hostNonce')
-  const flavors = [
-    { symbol: 'A', short: '柠', name: '柠檬' }, { symbol: 'B', short: '莓', name: '莓莓' },
-    { symbol: 'C', short: '柚', name: '青柚' }, { symbol: 'D', short: '蓝', name: '蓝莓' },
-    { symbol: 'E', short: '葡', name: '葡萄' }, { symbol: 'F', short: '桃', name: '蜜桃' },
-    { symbol: 'G', short: '茶', name: '奶茶' }, { symbol: 'H', short: '汽', name: '苏打' },
-  ]
-  const boardNode = document.getElementById('board')
-  const statusNode = document.getElementById('status')
-  const levelSelect = document.getElementById('levelSelect')
-  const undoButton = document.getElementById('undoButton')
-  const resetButton = document.getElementById('resetButton')
-  const exitButton = document.getElementById('exitButton')
-  const overlay = document.getElementById('overlay')
-  const nextButton = document.getElementById('nextButton')
-  const replayButton = document.getElementById('replayButton')
-  const stageNode = document.querySelector('.stage')
-  const completed = new Set()
-  let hostReady = false
-  let levelIndex = 0
-  let highestUnlocked = 0
-  let board = []
-  let history = []
-  let steps = 0
-  let selected = null
-  let won = false
-
-  function score() { return rules.completedTubes(board) * 100 }
-
-  function postToHost(type, payload = {}) {
-    if (runtime) { if (hostReady) runtime.send(type, payload); return }
-    if (!hostReady || !HOST_NONCE || window.parent === window) return
-    window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type, nonce: HOST_NONCE, ...payload }, '*')
+  'use strict';
+  const R = globalThis.XiabanWaterSort, P = globalThis.PourJoyProgress, H = globalThis.PourJoyHost, A = globalThis.PourJoyArt, levels = globalThis.PourJoyLevels;
+  const $ = (s, root = document) => root.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const colors = [{ name:'草莓', symbol:'莓', color:'#ff527a' },{ name:'抹茶', symbol:'茶', color:'#73ca38' },{ name:'芒果', symbol:'芒', color:'#ffbe22' },{ name:'香芋', symbol:'芋', color:'#a66bf0' },{ name:'蓝莓', symbol:'蓝', color:'#43b8ed' },{ name:'蜜桃', symbol:'桃', color:'#ff8b45' }];
+  const chapters = [{name:'街角初遇',kind:'经典',tip:'同色相接，空杯中转。',color:'#ff9462'},{name:'果园来信',kind:'订单',tip:'带标签的杯子，最后要装满指定口味。',color:'#94cf55'},{name:'秘密配方',kind:'封签',tip:'先装满指定口味，解开封签杯。',color:'#b58aea'},{name:'金牌调饮',kind:'组合',tip:'解开封签，再按订单装杯。',color:'#ffbf47'}];
+  const screen = $('#screen'), dialog = $('#infoDialog');
+  let data = P.fresh(), session = null, level = levels[0], state = R.initial(level), undoStates = [], selected = -1;
+  let view = 'home', loading = true, readOnly = false, busy = false, pendingView = null, hints = null, hintToken = 0, witness = new Map();
+  let chapterTab = 0, journalTab = 0, lastResult = null, audio = null, hidden = false, toastTimer, reported = false, liveAnimations = [];
+  const toast = message => { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').classList.add('show'); toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 2500); };
+  const won = () => session && R.isWon(state, level);
+  const count = () => Object.keys(data.records).length;
+  const score = () => R.completed(state) * 100;
+  const starsText = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+  function save() { if (loading || readOnly) return; data.session = session; H.save(data); }
+  function storageStatus() { const b = $('#saveStatus'); b.hidden = !H.error && !readOnly; b.textContent = readOnly ? '○' : '!'; }
+  globalThis.addEventListener('joy-storage-error', storageStatus);
+  globalThis.addEventListener('joy-storage-restored', storageStatus);
+  $('#saveStatus').onclick = () => openDialog('存档状态', `<p>${readOnly ? '当前为不保存试玩。重新打开可恢复读取本机存档。' : '保存暂未成功，进度仍在当前页面。请重试后再退出。'}</p>${readOnly ? '' : '<button class="primary" id="retrySave">重试保存</button>'}`, () => { if ($('#retrySave')) $('#retrySave').onclick = async () => { await H.save(data); storageStatus(); if (!H.error) { closeDialog(); toast('已保存'); } }; });
+  let returnFocus;
+  function openDialog(title, html, bind) { returnFocus = document.activeElement; $('#dialogTitle').textContent = title; $('#dialogContent').innerHTML = html; dialog.showModal(); syncInsets(); bind?.(); }
+  function closeDialog() { dialog.close(); if (returnFocus?.isConnected) returnFocus.focus({ preventScroll:true }); }
+  $('.dialog-close').onclick = closeDialog;
+  dialog.addEventListener('click', e => { if (e.target === dialog) closeDialog(); });
+  function navigate(next, push = true) {
+    if (loading) return;
+    if (busy) { pendingView = [next, push]; return; }
+    hintToken++; hints = null; selected = -1;
+    if (dialog.open) closeDialog();
+    view = ['home','play','levels','journal','receipt','poster'].includes(next) ? next : 'home';
+    if (view === 'play' && !session) { start(levels[P.unlocked(data)].id, 'campaign', false); return; }
+    if (['receipt','poster'].includes(view) && !lastResult) view = 'home';
+    if (push && location.hash !== '#' + view) history.pushState({view}, '', '#' + view);
+    render(); screen.scrollTop = 0;
+    if (view === 'play' && session && !won() && !reported) { H.game('start'); H.game('progress', score()); reported = true; }
   }
-
-  function progress() {
-    postToHost('game.progress', { score: score(), lines: 0, maxTile: 0 })
+  document.addEventListener('click', e => { const button = e.target.closest('[data-view]'); if (button) navigate(button.dataset.view); });
+  globalThis.addEventListener('popstate', () => navigate(location.hash.slice(1) || 'home', false));
+  function prepareWitness() {
+    witness = new Map(); let s = R.initial(level);
+    for (const move of level.solution) { witness.set(R.key(s), move); s = R.pour(s, level, ...move); }
   }
-
-  function initialize() {
-    hostReady = true
-    document.body.classList.add('hosted')
-    postToHost('game.ready')
-    postToHost('game.start')
-    progress()
-    if (won) postToHost('game.result', { score: score(), lines: 0, maxTile: 0 })
+  function start(id, mode = 'campaign', confirm = true) {
+    if (busy) return;
+    const next = P.getLevel(id); if (!next) return toast('挑战码无效');
+    if (mode === 'campaign' && levels.indexOf(next) > P.unlocked(data)) return toast('先完成前一关');
+    if (confirm && session?.moves.length && !won()) {
+      openDialog('换一杯？', '<p>当前这杯会重新开始，已通关记录会保留。</p><button class="primary" id="switchRound">换一杯</button><button class="secondary" id="stayRound">继续当前关卡</button>', () => {
+        $('#switchRound').onclick = () => { closeDialog(); start(id, mode, false); };
+        $('#stayRound').onclick = closeDialog;
+      }); return;
+    }
+    hintToken++; level = next; chapterTab = level.chapter; session = { id, mode, moves:[], hints:0 }; state = R.initial(level); undoStates = []; selected = -1; hints = null; reported = false;
+    prepareWitness(); save(); navigate('play');
+    if (Object.keys(level.seals).length || Object.keys(level.orders).length) toast(chapters[level.chapter].tip);
   }
-
-  if (!runtime) window.addEventListener('message', (event) => {
-    const message = event.data
-    if (hostReady || !HOST_NONCE || event.source !== window.parent || !message ||
-      message.channel !== 'xiaban.game-host' || message.protocol !== 1 ||
-      message.type !== 'host.init' || message.nonce !== HOST_NONCE) return
-    initialize()
-  })
-
-  function status(message, warning = false) {
-    statusNode.textContent = message
-    statusNode.dataset.tone = warning ? 'warning' : 'normal'
+  function render() { ({home:renderHome,play:renderPlay,levels:renderLevels,journal:renderJournal,receipt:renderReceipt,poster:renderPoster})[view](); syncInsets(); }
+  function soundIcon() { return A.icon(data.sound ? 'sound' : 'mute'); }
+  function renderPlay() {
+    const focusTube = document.activeElement?.dataset?.tube, isWon = won();
+    const modeLabel = session.mode === 'campaign' ? `第 ${Number(level.id.slice(1))} 关` : session.mode === 'daily' ? '每日特调' : '好友挑战';
+    screen.innerHTML = `<section class="game-page ${state.board.length > 6 ? 'many-cups' : ''}"><div class="game-topline"><button class="chapter-tag" data-view="levels"><i></i>${chapters[level.chapter].name}⌄</button><button class="icon-button" id="soundButton" aria-label="${data.sound ? '关闭' : '开启'}音效">${soundIcon()}</button></div><div class="level-heading"><div><h2>${level.name}</h2><p>${modeLabel}${Object.keys(level.orders).length || Object.keys(level.seals).length ? ' · ' + chapters[level.chapter].kind : ''}</p></div><div class="step-count"><strong id="moveCount">${String(session.moves.length).padStart(2,'0')}</strong><span>步</span></div></div><div class="order-strip"><span class="completion-count">${R.completed(state)}<small> / ${level.colors}</small></span><div class="order-icons">${colors.slice(0,level.colors).map((c,i) => `<span class="order-dot ${state.board.some(t => R.full(t) && t[0] === i) ? 'done' : ''}" style="--flavor:${c.color}" title="${c.name}"><i></i>${c.symbol}</span>`).join('')}</div></div>${isWon ? winHTML() : '<div class="board-area"><div class="board" role="group" aria-label="调饮杯盘"></div></div><p class="game-tip" aria-live="polite">' + (selected >= 0 ? '选择接收杯' : session.moves.length ? '' : chapters[level.chapter].tip) + '</p>'}<div class="tools"><button class="tool" id="undo" ${!undoStates.length || isWon ? 'disabled' : ''}><span>${A.icon('undo')}</span>撤销</button><button class="tool" id="hint" ${isWon ? 'disabled' : ''}><span>${A.icon('hint')}</span>灵感</button><button class="tool" id="reset"><span>${A.icon('reset')}</span>重调</button></div><div class="game-bottom"><button data-view="home">小店</button><button id="starHelp" title="星级规则">${level.par} 步三星</button><button id="rules">玩法 ⓘ</button></div></section>`;
+    if (!isWon) renderBoard();
+    if (focusTube !== undefined) $(`[data-tube="${focusTube}"]`)?.focus({preventScroll:true});
+    $('#soundButton').onclick = () => { data.sound = !data.sound; save(); chime(true); renderPlay(); };
+    $('#undo').onclick = undo;
+    $('#hint').onclick = showHint;
+    $('#reset').onclick = () => start(level.id,session.mode);
+    $('#rules').onclick = showRules;
+    $('#starHelp').onclick = () => openDialog('星级挑战', `<p>★ 完成关卡<br>★★ 不超过 ${level.par + 5} 步<br>★★★ 不超过 ${level.par} 步，且未使用灵感</p><p>撤销不限次数，超出目标也能过关。目标是已验证的参考解，不一定是最少步数。</p>`);
+    if (isWon) $('#nextLevel').onclick = () => session.mode === 'campaign' && levels.indexOf(level) < 35 ? start(levels[levels.indexOf(level)+1].id,'campaign',false) : navigate('levels');
   }
-
-  function render(flashIndex = null, focusIndex = null) {
-    const buttons = board.map((tube, index) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = 'tube-button'
-      button.dataset.index = String(index)
-      button.disabled = won
-      button.setAttribute('aria-pressed', String(selected === index))
-      const contents = tube.map((color) => flavors[color].symbol + ' ' + flavors[color].name).join('、')
-      button.setAttribute('aria-label', '第 ' + (index + 1) + ' 杯，' +
-        (tube.length ? '由底至顶：' + contents + '。剩余 ' + (rules.CAPACITY - tube.length) + ' 格' : '空杯，可装 4 格'))
-      if (selected === index) button.classList.add('selected')
-      if (selected !== null && rules.getPour(board, selected, index).valid) button.classList.add('can-receive')
-      const sorted = tube.length === rules.CAPACITY && tube.every((color) => color === tube[0])
-      if (sorted) button.classList.add('sorted')
-      if (!tube.length) button.classList.add('empty')
-      if (index === flashIndex) button.classList.add('flash')
-      const glass = document.createElement('span')
-      glass.className = 'glass'
-      glass.setAttribute('aria-hidden', 'true')
-      tube.forEach((color) => {
-        const segment = document.createElement('span')
-        segment.className = 'segment'
-        segment.dataset.color = String(color)
-        const label = document.createElement('span')
-        label.className = 'flavor-label'
-        const short = document.createElement('span')
-        short.className = 'flavor-short'
-        short.textContent = '·' + flavors[color].short
-        label.append(document.createTextNode(flavors[color].symbol), short)
-        segment.append(label)
-        glass.append(segment)
-      })
-      if (!tube.length) {
-        const label = document.createElement('span')
-        label.className = 'empty-label'
-        label.textContent = '空杯'
-        glass.append(label)
+  function renderBoard() {
+    const board = $('.board');
+    board.dataset.count = state.board.length;
+    board.style.setProperty('--columns', state.board.length <= 4 ? 2 : state.board.length <= 6 ? 3 : 4);
+    board.innerHTML = state.board.map((tube,i) => {
+      const sealed = R.locked(state,level,i), order = level.orders[i], complete = R.full(tube) && (order === undefined || order === tube[0]);
+      const label = `${i+1}号杯，${sealed ? '封签，先完成'+colors[level.seals[i]].name : tube.length ? '从底到顶：'+tube.map(c=>colors[c].name).join('、') : '空杯'}${order !== undefined ? '，订单：'+colors[order].name : ''}`;
+      return `<button class="tube-button ${selected===i?'selected':''} ${selected>=0&&R.getPour(state,level,selected,i).valid?'target':''} ${hints?.includes(i)?'hint':''} ${complete?'complete':''} ${sealed?'sealed':''}" data-tube="${i}" aria-label="${label}" aria-pressed="${selected===i}"><span class="tube-shadow"></span><span class="glass"><span class="liquid-stack">${tube.map(c=>`<span class="liquid" style="--flavor:${colors[c].color}">${colors[c].symbol}</span>`).join('')}</span>${sealed?`<span class="seal-band" style="--flavor:${colors[level.seals[i]].color}">先调${colors[level.seals[i]].symbol}<b>⌑</b></span>`:complete?'<span class="complete-seal">✓</span>':''}</span><span class="cup-caption">${order!==undefined?`<span class="order-badge" style="--flavor:${colors[order].color}">${colors[order].symbol} · 订单</span>`:String(i+1).padStart(2,'0')}</span></button>`;
+    }).join('');
+    $$('[data-tube]').forEach(b=>b.onclick=()=>choose(+b.dataset.tube));
+  }
+  async function choose(i) {
+    if (busy || won()) return;
+    hintToken++; hints = null;
+    if (R.locked(state,level,i)) return toast('先装满一杯'+colors[level.seals[i]].name);
+    if (selected===i) { selected=-1; renderPlay(); return; }
+    if (selected<0) { if (!state.board[i].length) return toast('先选有饮料的杯子'); selected=i; renderPlay(); return; }
+    const from=selected, info=R.getPour(state,level,from,i);
+    if (!info.valid) { toast(info.reason==='full'?'这杯满啦':'顶层不同色'); $(`[data-tube="${i}"]`)?.classList.add('shake'); return; }
+    if (session.moves.length>=4096) return toast('步数已满，请撤销或重调');
+    busy=true; $$('button').forEach(b=>{ if (b.closest('.screen')) b.disabled=true; });
+    undoStates.push(state); const wasOpened=state.opened.length;
+    state=R.pour(state,level,from,i); session.moves.push([from,i]); selected=-1;
+    const finished=won(); if (finished) lastResult=P.finish(data,session);
+    // Commit and persist the move BEFORE animation: hiding/closing never saves a half-pour.
+    save(); H.game('progress',score()); if (finished) { H.game('result',score()); reported=false; }
+    H.haptic();
+    try { await animatePour(from,i,info.color); } finally { busy=false; }
+    if (pendingView) { const [next,push]=pendingView; pendingView=null; navigate(next,push); }
+    else renderPlay();
+    if (finished) { chime(true); toast('完美出杯！'); }
+    else if (state.opened.length>wasOpened) { chime(true); toast('封签已解开'); }
+    else if (R.full(state.board[i])) chime(true);
+  }
+  async function animatePour(from,to,color) {
+    if (hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) { chime(false); return; }
+    const source=$(`[data-tube="${from}"] .glass`), target=$(`[data-tube="${to}"] .glass`);
+    if (!source || !target) return;
+    const a=source.getBoundingClientRect(), b=target.getBoundingClientRect(), ghost=source.cloneNode(true);
+    ghost.classList.add('pour-ghost'); Object.assign(ghost.style,{left:a.left+'px',top:a.top+'px',width:a.width+'px',height:a.height+'px'}); document.body.append(ghost); source.style.opacity='.1';
+    const side=b.left>=a.left?1:-1, dx=b.left-a.left-side*38, dy=b.top-a.top-50;
+    const motion=ghost.animate([{transform:'none'},{transform:`translate(${dx}px,${dy}px) rotate(${side*55}deg)`,offset:.38},{transform:`translate(${dx}px,${dy}px) rotate(${side*55}deg)`,offset:.72},{transform:'none'}],{duration:580,easing:'ease-in-out'});
+    const stream=document.createElement('div'); stream.className='pour-stream'; Object.assign(stream.style,{left:b.left+b.width/2+'px',top:b.top-22+'px',height:'40px',background:colors[color].color});
+    liveAnimations=[motion]; const timer=setTimeout(()=>{ if(hidden)return; document.body.append(stream); chime(false); liveAnimations.push(stream.animate([{opacity:0,transform:'scaleY(0)'},{opacity:.9,transform:'scaleY(1)'},{opacity:0}],{duration:230})); },220);
+    try { await motion.finished; } catch (_) {} finally { clearTimeout(timer); ghost.remove(); stream.remove(); source.style.opacity=''; liveAnimations=[]; }
+  }
+  function undo() {
+    if (busy || won() || !undoStates.length) return;
+    hintToken++; state=undoStates.pop(); session.moves.pop(); selected=-1; hints=null; save(); H.game('progress',score()); renderPlay();
+  }
+  async function showHint() {
+    if (busy || won()) return;
+    const token=++hintToken, startKey=R.key(state); let move=witness.get(startKey);
+    if (!move) {
+      const search=R.createSearch(state,level,30000), started=performance.now();
+      $('#hint').disabled=true; $('.game-tip').textContent='找一点灵感…';
+      while (token===hintToken && view==='play') {
+        const result=search.step(100);
+        if (result.done) { move=result.path?.[0]; break; }
+        if (performance.now()-started>1800) break;
+        await new Promise(resolve=>setTimeout(resolve,0));
       }
-      const number = document.createElement('span')
-      number.className = 'tube-number'
-      number.textContent = (index + 1) + (sorted ? ' ✓' : '')
-      number.setAttribute('aria-hidden', 'true')
-      button.append(glass, number)
-      button.addEventListener('click', () => choose(index))
-      return button
-    })
-    boardNode.style.setProperty('--columns', String(Math.min(board.length, 5)))
-    boardNode.replaceChildren(...buttons)
-    updateTubeLayout()
-    document.getElementById('moves').textContent = String(steps)
-    document.getElementById('levelNumber').textContent = (levelIndex + 1) + '/' + rules.levelCount
-    document.getElementById('completed').textContent = completed.size + '/' + rules.levelCount
-    undoButton.disabled = won || history.length === 0
-    if (focusIndex !== null && !won) buttons[focusIndex].focus({ preventScroll: true })
+    }
+    if (token!==hintToken || view!=='play') return;
+    if (!move) { renderPlay(); toast('暂未找到解法，试试撤销或重调'); return; }
+    session.hints=Math.min(4096,session.hints+1); hints=move; selected=move[0]; save(); renderPlay(); $('.game-tip').textContent=`${move[0]+1} 号杯 → ${move[1]+1} 号杯`;
   }
-
-  function updateTubeLayout() {
-    if (!board.length) return
-    const style = getComputedStyle(stageNode)
-    const width = stageNode.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-    const height = document.body.classList.contains('hosted')
-      ? stageNode.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
-      : window.innerHeight - (document.querySelector('.game').getBoundingClientRect().height - stageNode.getBoundingClientRect().height) - 20
-    const minPanelHeight = board.length > 5 ? 320 : 220
-    const layout = globalThis.XiabanWaterSortLayout.getTubeLayout(board.length, width - 2, Math.max(minPanelHeight, height) - 2)
-    if (!layout) return
-    boardNode.style.setProperty('--columns', String(layout.columns))
-    boardNode.style.setProperty('--tracks', String(layout.columns * 2))
-    boardNode.classList.toggle('compact-labels', layout.tubeWidth < 46)
-    for (const name of ['tubeWidth', 'tubeHeight', 'gap', 'rowGap', 'paddingX', 'paddingTop', 'paddingBottom']) {
-      const property = '--' + name.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase())
-      boardNode.style.setProperty(property, layout[name] + 'px')
-    }
-    Array.from(boardNode.children).forEach((button, index) => {
-      button.style.gridColumn = layout.startColumns[index] + ' / span 2'
-      button.style.gridRow = String(Math.floor(index / layout.columns) + 1)
-    })
+  function winHTML() {
+    const result=lastResult || P.finish(data,session);
+    return `<div class="win-panel"><div class="win-badge">${starsText(result.stars)}</div><h3>完美出杯！</h3><p>${result.moves} 步${result.assisted?' · 灵感助调':''}</p><div class="win-drink">${A.drink(colors[(Number(level.id.slice(1))||0)%colors.length].color)}</div><button class="primary" data-view="receipt">收下快乐小票 ${A.icon('arrow')}</button><button class="secondary" id="nextLevel">${session.mode==='campaign'&&level.id!=='c36'?'下一杯 →':'回到菜单'}</button></div>`;
   }
-
-  function updateMenu() {
-    levelSelect.replaceChildren(...Array.from({ length: rules.levelCount }, (_, index) => {
-      const option = document.createElement('option')
-      option.value = String(index)
-      option.textContent = (index + 1) + '. ' + rules.getLevel(index).name +
-        (completed.has(index) ? ' ✓' : index > highestUnlocked ? ' · 待解锁' : '')
-      option.disabled = index > highestUnlocked
-      return option
-    }))
-    levelSelect.value = String(levelIndex)
+  function showRules() { openDialog('调饮规则','<ul><li>同色相接，空杯中转。连续同色一起倒，每杯最多四层。</li><li>所有非空杯装满单一口味即完成。</li><li>订单杯可暂存其他口味，通关时必须装满标签口味。</li><li>封签杯要先完成指定口味才能使用；撤销也会恢复封签。</li></ul><p>没有倒计时。数字 1–8 选杯，Esc 取消，Ctrl/Cmd+Z 撤销。</p>'); }
+  function bottom(active) { return `<nav class="bottom-nav"><button data-view="home" class="${active==='home'?'active':''}">${A.icon('home')}小店</button><button data-view="levels" class="${active==='levels'?'active':''}">${A.icon('cup')}菜单</button><button data-view="journal" class="${active==='journal'?'active':''}">${A.icon('book')}手帐</button></nav>`; }
+  function renderHome() {
+    const resumable=session&&!won(), next=levels[P.unlocked(data)], today=P.today(), dailyRecord=data.daily[today];
+    screen.innerHTML=`<section class="home-page"><div class="home-copy"><h2>来一杯<span>快乐！</span></h2></div><div class="shop-art">${A.shopSVG()}</div><div class="home-action"><button class="primary" id="continue">${resumable?'继续调饮':'开始调饮'} ${A.icon('arrow')}</button><div class="continue-info"><span>${count()} / 36 已完成</span><span>${resumable?level.name:next.name}</span></div></div><button class="daily-card" id="daily"><span class="daily-mark">✳</span><span><strong>每日特调</strong><small>${today.slice(5,7)} / ${today.slice(7,9)}${dailyRecord?' · '+starsText(dailyRecord.stars):' · 每天一杯'}</small></span><span class="arrow">↗</span></button><button class="challenge-entry" id="challenge">输入好友挑战码 ↗</button>${bottom('home')}</section>`;
+    $('#continue').onclick=()=>resumable?navigate('play'):start(next.id,'campaign',false);
+    $('#daily').onclick=()=>start(today,'daily'); $('#challenge').onclick=challengeDialog;
   }
-
-  function setDialog(open) {
-    overlay.hidden = !open
-    resetButton.disabled = open
-    exitButton.disabled = open
-    levelSelect.disabled = open
+  function challengeDialog() {
+    openDialog('好友同题','<label class="challenge-label" for="challengeCode">挑战码</label><input class="dialog-input" id="challengeCode" placeholder="PJ-C01 或 PJ-D20261112" maxlength="20" autocomplete="off" autocapitalize="characters"><p id="challengeError" role="status"></p><button class="primary" id="openChallenge">开始挑战</button>',()=>{
+      $('#openChallenge').onclick=()=>{ const code=$('#challengeCode').value.trim().toLowerCase().replace(/^pj-/,''); if(!/^(c\d{2}|d\d{8})$/.test(code)||!P.getLevel(code)){ $('#challengeError').textContent='挑战码无效，请检查后重试';return; } closeDialog();start(code,'challenge'); };
+      $('#challengeCode').onkeydown=e=>{if(e.key==='Enter')$('#openChallenge').click();}; $('#challengeCode').focus();
+    });
   }
-
-  function startLevel(index, focus = true) {
-    window.XiabanResultShare?.reset()
-    const level = rules.getLevel(index)
-    if (!level || index > highestUnlocked) return
-    levelIndex = index
-    board = level.board
-    history = []
-    selected = null
-    steps = 0
-    won = false
-    setDialog(false)
-    updateMenu()
-    render(null, focus ? 0 : null)
-    status('第 ' + (index + 1) + ' 关 · ' + level.name + '。点一杯，再点同色杯或空杯。')
-    postToHost('game.start')
-    progress()
+  function renderLevels() {
+    const unlocked=P.unlocked(data), chapter=chapters[chapterTab];
+    screen.innerHTML=`<section class="menu-page"><div class="page-title"><h2>调饮菜单</h2><span>${count()} / 36</span></div><nav class="chapter-tabs" aria-label="章节">${chapters.map((c,i)=>`<button data-chapter="${i}" aria-pressed="${i===chapterTab}" class="${i===chapterTab?'active':''}" style="--chapter:${c.color}">0${i+1}<small>${c.kind}</small></button>`).join('')}</nav><div class="chapter-intro"><h3>${chapter.name}</h3><p>${chapter.tip}</p></div><div class="level-grid">${levels.slice(chapterTab*9,chapterTab*9+9).map((l,i)=>{const locked=levels.indexOf(l)>unlocked,record=data.records[l.id];return `<button data-level="${l.id}" class="level-tile ${locked?'locked':''}" ${locked?'disabled':''}><strong>${locked?'⌑':String(chapterTab*9+i+1).padStart(2,'0')}</strong><span>${l.name}</span><small>${record?starsText(record.stars):locked?'待解锁':'☆ ☆ ☆'}</small></button>`;}).join('')}</div>${bottom('levels')}</section>`;
+    $$('[data-chapter]').forEach(b=>b.onclick=()=>{chapterTab=+b.dataset.chapter;renderLevels();}); $$('[data-level]').forEach(b=>b.onclick=()=>start(b.dataset.level));
   }
-
-  function showWin() {
-    window.XiabanResultShare?.finish({ gameId: 'water-sort', score: score(), level: levelIndex + 1, steps })
-    won = true
-    selected = null
-    completed.add(levelIndex)
-    highestUnlocked = Math.max(highestUnlocked, Math.min(levelIndex + 1, rules.levelCount - 1))
-    updateMenu()
-    render()
-    const finalLevel = levelIndex === rules.levelCount - 1
-    document.getElementById('resultTitle').textContent = finalLevel ? '今晚的饮料都调好啦！' : '第 ' + (levelIndex + 1) + ' 关完成！'
-    document.getElementById('resultText').textContent = steps + ' 步，调好 ' + rules.completedTubes(board) + ' 杯饮料。' +
-      (finalLevel ? '本次已完成 ' + completed.size + ' / ' + rules.levelCount + ' 关，菜单中可以重玩。' : '下一款口味，慢慢来。')
-    nextButton.textContent = finalLevel ? '回到菜单' : '下一关'
-    setDialog(true)
-    status('本关完成！共倒水 ' + steps + ' 步。')
-    postToHost('game.result', { score: score(), lines: 0, maxTile: 0 })
-    nextButton.focus({ preventScroll: true })
+  function renderJournal() {
+    const stickers=levels.filter((_,i)=>i%3===2), unlocked=stickers.filter(l=>data.records[l.id]).length;
+    screen.innerHTML=`<section class="journal-page"><div class="page-title"><h2>风味手帐</h2><span>${unlocked} / 12</span></div><div class="collection-progress"><div class="track"><span style="width:${unlocked/12*100}%"></span></div><span>${Object.values(data.records).reduce((sum,r)=>sum+r.stars,0)} ★</span></div><nav class="journal-tabs">${chapters.map((c,i)=>`<button data-journal="${i}" class="${journalTab===i?'active':''}">${c.name}</button>`).join('')}</nav><div class="sticker-grid">${stickers.slice(journalTab*3,journalTab*3+3).map((l,i)=>{const earned=data.records[l.id];return `<button class="sticker ${earned?'':'locked'}" data-sticker="${l.id}"><span class="tiny">NO. ${journalTab*3+i+1}</span><span class="sticker-art">${A.drink(colors[(journalTab*3+i)%6].color)}</span><h3>${l.name}</h3><p>${earned?starsText(earned.stars):'完成第 '+Number(l.id.slice(1))+' 关'}</p></button>`;}).join('')}</div>${bottom('journal')}</section>`;
+    $$('[data-journal]').forEach(b=>b.onclick=()=>{journalTab=+b.dataset.journal;renderJournal();});
+    $$('[data-sticker]').forEach(b=>b.onclick=()=>{const l=P.getLevel(b.dataset.sticker),record=data.records[l.id]; if(!record)return toast('完成第 '+Number(l.id.slice(1))+' 关收集'); openDialog(l.name,`<div class="win-drink">${A.drink(colors[Number(l.id.slice(1))%6].color)}</div><p class="center">${record.moves} 步 · ${starsText(record.stars)}</p><button class="primary" id="viewReceipt">查看小票</button>`,()=>{$('#viewReceipt').onclick=()=>{lastResult={...record,id:l.id,mode:'campaign'};closeDialog();navigate('receipt');};});});
   }
-
-  function choose(index) {
-    if (won) return
-    if (selected === null) {
-      if (!board[index].length) {
-        status('这是空杯。先选一杯有饮料的。', true)
-        return
-      }
-      selected = index
-      const flavor = flavors[board[index][board[index].length - 1]]
-      render(null, index)
-      status('已选第 ' + (index + 1) + ' 杯，顶层是 ' + flavor.symbol + ' ' + flavor.name + '。点同口味或空杯来接。')
-      return
-    }
-    if (selected === index) {
-      selected = null
-      render(null, index)
-      status('已取消选择，可以重新选杯。')
-      return
-    }
-    const result = rules.pour(board, selected, index)
-    if (!result.moved) {
-      const reasons = { full: '这杯已经满了，换一杯接。', color: '顶层口味不同，只能倒进同口味或空杯。', empty: '源杯是空的，请重新选择。', invalid: '这次无法倒水，请重新选杯。' }
-      status(reasons[result.reason] || '不能倒进这杯。再点源杯可取消选择。', true)
-      return
-    }
-    const from = selected
-    history.push(rules.cloneBoard(board))
-    board = result.board
-    steps += 1
-    selected = null
-    render(index, index)
-    progress()
-    if (rules.isWon(board)) {
-      showWin()
-    } else if (!rules.hasMove(board)) {
-      status('暂时没有能倒的杯子了。点“撤销”退一步，或重置本关。', true)
-    } else {
-      status('第 ' + (from + 1) + ' 杯 → 第 ' + (index + 1) + ' 杯，倒入 ' + result.amount + ' 格。继续慢慢调。')
-    }
+  function renderReceipt() {
+    const r=lastResult,l=P.getLevel(r.id);
+    screen.innerHTML=`<section class="share-page"><div class="share-heading"><h2>快乐小票</h2><span>${r.mode==='campaign'?'通关记录':r.mode==='daily'?'每日特调':'好友挑战'}</span></div><div class="receipt"><span class="eyebrow">POUR JOY</span><h3>今日快乐小票</h3><div class="receipt-art">${A.drink(colors[Number(l.id.slice(-2))%6].color)}<span class="stamp">快乐<br>已打包</span></div><h4 class="receipt-name">${l.name}</h4><div class="receipt-data"><div><strong>${r.moves}</strong><span>调饮步数</span></div><div><strong>${l.colors}</strong><span>风味归位</span></div><div><strong>${r.stars} ★</strong><span>本次星级</span></div></div><div class="receipt-line"><span>${r.assisted?'灵感助调':'自由调饮'}</span><span>PJ-${l.id.toUpperCase()}</span></div><div class="barcode" aria-hidden="true"></div><div class="receipt-footer">KEEP THIS LITTLE JOY.</div></div><div class="share-actions"><button class="primary" id="saveReceipt">${A.icon('download')}${H.native&&!H.canSave()?'查看分享图':'保存小票'}</button><button class="secondary" id="shareChallenge">${H.canShare()?'分享挑战':'复制挑战码'} ↗</button></div><button class="secondary" data-view="home">回小店</button></section>`;
+    $('#saveReceipt').onclick=saveReceipt;
+    $('#shareChallenge').onclick=shareChallenge;
   }
-
-  undoButton.addEventListener('click', () => {
-    if (won || !history.length) return
-    board = history.pop()
-    steps -= 1
-    selected = null
-    render(null, 0)
-    progress()
-    status('已撤销一步，试试换个顺序。')
-  })
-  resetButton.addEventListener('click', () => startLevel(levelIndex))
-  replayButton.addEventListener('click', () => startLevel(levelIndex))
-  nextButton.addEventListener('click', () => {
-    if (levelIndex < rules.levelCount - 1) startLevel(levelIndex + 1)
-    else {
-      setDialog(false)
-      levelSelect.focus({ preventScroll: true })
-      status('本次 8 关全部完成啦。菜单中可以挑一款饮料重玩。')
-    }
-  })
-  levelSelect.addEventListener('change', () => startLevel(Number(levelSelect.value)))
-  exitButton.addEventListener('click', () => {
-    if (hostReady) postToHost('game.exit')
-    else window.location.assign('/games')
-  })
-  document.addEventListener('keydown', (event) => {
-    if (event.ctrlKey || event.altKey || event.metaKey) return
-    if (!overlay.hidden) {
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        const buttons = [nextButton, replayButton]
-        const shareButton = document.getElementById('shareResultButton')
-        if (shareButton && !shareButton.hidden) buttons.unshift(shareButton)
-        const index = buttons.indexOf(document.activeElement)
-        buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus({ preventScroll: true })
-      }
-      return
-    }
-    if (event.key === 'Escape' && selected !== null) {
-      event.preventDefault()
-      const previous = selected
-      selected = null
-      render(null, previous)
-      status('已取消选择。')
-    }
-  })
-
-  startLevel(0, false)
-  window.addEventListener('resize', updateTubeLayout)
-  if (typeof ResizeObserver === 'function') new ResizeObserver(updateTubeLayout).observe(stageNode)
-  if (runtime) runtime.connect(initialize, {})
-
-})()
+  function poster() {
+    const r=lastResult,l=P.getLevel(r.id),canvas=document.createElement('canvas');canvas.width=900;canvas.height=1200;const c=canvas.getContext('2d');
+    const box=(x,y,w,h,r,color)=>{c.fillStyle=color;c.beginPath();c.roundRect(x,y,w,h,r);c.fill();};
+    const text=(s,y,size,color='#8f472e',weight=600)=>{c.fillStyle=color;c.font=`${weight} ${size}px "Microsoft YaHei",sans-serif`;c.textAlign='center';c.fillText(s,450,y);};
+    box(0,0,900,1200,0,'#ffd49a');box(65,60,770,1080,15,'#fffaf0');for(let x=65;x<835;x+=70)box(x,60,35,12,0,'#f36c47');
+    text('POUR JOY',142,23,'#e96442');text('今日快乐小票',220,51);text(l.name,283,29,'#d56e43');
+    c.save();c.translate(450,470);c.rotate(-.12);box(24,-115,13,100,5,'#f36b4f');box(-86,-62,172,220,33,colors[Number(l.id.slice(-2))%6].color);box(-86,-62,172,65,[20,20,0,0],'#fff0c9');box(-95,-72,190,22,12,'#fff7dc');box(-46,20,92,80,40,'#fff9e8');c.fillStyle='#ef6c45';c.font='bold 32px Georgia';c.textAlign='center';c.fillText('joy',0,72);c.restore();
+    text(starsText(r.stars),710,40,'#efa52a');text(`${r.moves} 步 · ${l.colors} 种风味`,786,32);text(r.assisted?'灵感助调':'自由调饮',833,21,'#b28a67');
+    c.setLineDash([7,7]);c.strokeStyle='#dabd91';c.beginPath();c.moveTo(125,875);c.lineTo(775,875);c.stroke();c.setLineDash([]);
+    text('同题挑战码',931,23,'#ab7b50');text('PJ-'+l.id.toUpperCase(),982,31,'#ea6b45');text('倒杯快乐 · 小店 → 输入好友挑战码',1054,21,'#a4805b');
+    return canvas;
+  }
+  function saveReceipt() {
+    if(H.native&&!H.canSave()){navigate('poster');return;}
+    const canvas=poster(),name='倒杯快乐-'+lastResult.id+'.png';
+    if(H.canSave()){H.saveImage(canvas.toDataURL('image/png'),name).then(()=>toast('已保存')).catch(()=>toast('未保存，可查看图片截图保存'));return;}
+    canvas.toBlob(blob=>{if(!blob)return toast('生成失败，请重试');const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);},'image/png');
+  }
+  function renderPoster() { screen.innerHTML='<section class="poster-page"><div class="page-title"><h2>分享图</h2><button class="secondary" data-view="receipt">返回</button></div><p>截图保存</p><img alt="通关小票与好友挑战码"></section>';$('.poster-page img').src=poster().toDataURL('image/png'); }
+  async function shareChallenge() {
+    const code='PJ-'+lastResult.id.toUpperCase(),text=`我用${lastResult.moves}步调好这杯！挑战码 ${code}。打开倒杯快乐，在小店输入挑战码。`;
+    try {
+      if(H.canShare())await H.share({title:'倒杯快乐',text:text.slice(0,60),image:poster().toDataURL('image/png'),query:{challenge:lastResult.id}});
+      else{await H.copy(text);toast('挑战码已复制');}
+    }catch(_){openDialog('好友挑战码',`<p>在小店输入下方挑战码，游玩同一题。</p><input class="dialog-input" id="copyCode" readonly value="${code}">`,()=>$('#copyCode').select());}
+  }
+  function chime(success) {
+    if(!data.sound||hidden)return;
+    try{audio ||= new (window.AudioContext||window.webkitAudioContext)();audio.resume();const now=audio.currentTime;
+      for(const [i,freq] of (success?[523,659,784]:[330,460]).entries()){const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.0001,now+i*.07);g.gain.exponentialRampToValueAtTime(.035,now+i*.07+.01);g.gain.exponentialRampToValueAtTime(.0001,now+i*.07+.2);o.connect(g).connect(audio.destination);o.start(now+i*.07);o.stop(now+i*.07+.23);}
+    }catch(_){}
+  }
+  function syncInsets(){
+    const root=document.documentElement,computed=getComputedStyle(root),num=k=>parseFloat(computed.getPropertyValue(k))||0;
+    const left=innerWidth-num('--xb-capsule-right')-num('--xb-capsule-width'),top=num('--xb-capsule-top'),bottom=top+num('--xb-capsule-height');
+    const header=$('.app-header'),rect=header.getBoundingClientRect();
+    const overlaps=num('--xb-capsule-width')&&rect.top<bottom+8&&rect.bottom>top&&rect.right>left;
+    header.classList.toggle('has-capsule',!!overlaps);
+    header.style.setProperty('--capsule-clearance',overlaps?Math.min(rect.width-130,Math.max(16,rect.right-left+8))+'px':'16px');
+    if(dialog.open){const r=dialog.getBoundingClientRect();dialog.classList.toggle('close-left',!!num('--xb-capsule-width')&&r.right-5>left-8&&r.right-49<innerWidth-num('--xb-capsule-right')+8&&r.top+3<bottom+8&&r.top+47>top-8);}
+    root.style.setProperty('--visible-height',(globalThis.visualViewport?.height||innerHeight)+'px');
+  }
+  function hide(){hidden=true;hintToken++;for(const a of liveAnimations)try{a.finish();}catch(_){}save();audio?.suspend();}
+  function show(){hidden=false;syncInsets();if(data.sound)audio?.resume().catch(()=>{});if(!loading&&!busy){if(view==='home')renderHome();else if(view==='play')renderPlay();}}
+  H.on('hide',hide);H.on('show',show);H.on('safearea',syncInsets);
+  document.addEventListener('visibilitychange',()=>document.hidden?hide():show());globalThis.addEventListener('pagehide',hide);globalThis.addEventListener('resize',syncInsets);globalThis.visualViewport?.addEventListener('resize',syncInsets);
+  document.addEventListener('keydown',e=>{if(loading||busy||dialog.open||view!=='play'||e.target.matches?.('input,textarea'))return;if(e.key==='Escape'){selected=-1;hints=null;hintToken++;renderPlay();}if(/^[1-8]$/.test(e.key)&&+e.key<=state.board.length){e.preventDefault();choose(+e.key-1);}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
+  async function boot(temporary=false){
+    loading=true;screen.innerHTML='<div class="loading" role="status">正在开店…</div>';
+    try{
+      let timer;const raw=temporary?null:await Promise.race([H.read(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),5000);})]).finally(()=>clearTimeout(timer));
+      readOnly=temporary;data=P.sanitize(raw);session=data.session;
+      if(session){level=P.getLevel(session.id);const restored=P.replay(level,session.moves);state=restored.state;undoStates=restored.history;prepareWitness();if(won())lastResult=P.finish(data,session);}
+      loading=false;H.ready();storageStatus();
+      const query=H.query();if(query&&P.getLevel(query)){navigate('home',false);start(query,'challenge');}else navigate(session&&location.hash==='#play'?'play':'home',false);
+    }catch(_){screen.innerHTML='<div class="loading"><h2>存档暂时读不到</h2><p>已保存的进度不会被覆盖。</p><button class="primary" id="retryLoad">重试</button><button class="secondary" id="temporaryPlay">不保存试玩</button></div>';H.ready();$('#retryLoad').onclick=()=>boot();$('#temporaryPlay').onclick=()=>boot(true);}
+  }
+  boot();
+})();

@@ -1,29 +1,57 @@
-# 奶茶大师
+# 倒杯快乐（原奶茶大师）
 
-`water-sort` is a dependency-free classic-script game pack for the version 1 Xiaban host. The directory is self-contained: `desktop-host.js` is the desktop adapter and `theme.css` holds the fresh theme. The desktop build has no result sharing. All artwork, rules, and styling are local; the sandbox only needs `allow-scripts`, with no storage or external services.
+`water-sort` 2.0.0，运行时协议 2。纯本地 HTML/CSS/JavaScript，无运行时第三方依赖。保持原 ID 和旧名称启动别名；显示名称、图标与封面已升级。
 
-The theme uses a neutral gray-white background, white panels, dark gray UI text, restrained borders and shadows, blue interaction accents, and vivid flavor colors. Empty glasses and unfilled space are white. Flavor identifiers are plain white text without a badge background; narrow cups retain the letter and expose the complete flavor name in the button's accessible label. Load `theme.css` after `game.css`; the body class `fresh-game` and `data-game="water-sort"` select the game's skin.
+## 内容与规则
 
-`layout.js` is loaded before `game.js` and exposes `XiabanWaterSortLayout.getTubeLayout`. Cup height and width adapt to both cup count and available screen area. Four or five cups use one tall row; six to ten cups use balanced rows, with a shorter last row centered. Wide screens may use one row. Very short areas scroll instead of compressing liquid layers into unreadable strips. Layout dimensions update when the stage resizes; tests use the same published script.
+36 道固定关卡，4 章各 9 关：街角初遇（经典分杯）、果园来信（指定终点口味的订单杯）、秘密配方（完成指定口味后解锁的封签杯）、金牌调饮（组合）。2–6 种风味，4–8 杯，每杯容量四层。
 
-## Play
+选来源杯、再选目标杯。只能倒进空杯或同色顶层；自动倒出顶端连续同色，直到倒完或接收杯装满。订单杯可暂存其他口味，通关时必须装满标签口味。封签一旦满足条件会保持开启；撤销恢复之前的完整局面，包括封签状态。所有非空杯装满单色、且订单匹配后通关。
 
-Select a filled glass, then another glass. Its top flavor must match the source flavor, or it must be empty. Each pour moves the entire contiguous top flavor, limited by the destination's four-unit capacity. A level ends only when every nonempty glass is full and has one flavor. Flavor letters A–H and Chinese labels supplement colors.
+没有倒计时；撤销不限次数。每关三星目标使用已验证参考解的步数，不宣称最优。超过目标五步以内为两星，再多为一星；使用灵感最高两星。每完成三关收集一枚风味贴纸，共 12 枚。
 
-There are eight fixed levels with 2, 3, 4, 5, 6, 6, 7, and 8 flavors. Undo restores the previous board and step count; reset restarts the current level. Finishing unlocks the next level. The menu can replay unlocked levels. There is no timer. Level unlocks and the completed-level count last for this loaded game session.
+## 每日与好友挑战
 
-Native buttons support Tab / Shift+Tab and Enter / Space. Escape cancels a selected source. The completion dialog traps focus until the player selects its next-level or replay action. Small portrait and short landscape layouts are supported, as is reduced motion.
+每日特调用本机日历日期生成 `dYYYYMMDD`：从固定的第 10–36 关取题，再确定性重排杯位和颜色，同时重排订单、封签和通关路径。不在游玩时随机生成未经验证的题。相同日期码跨设备得到相同布局；分享旧日期码仍可重玩。
 
-Every completed level shows a result dialog with Share results, Next level, and Replay actions. Sharing uses a version 1 `game.share` message when hosted; standalone play opens the public result share page. Keep the flavor letters and labels visible when adjusting the palette so players do not depend on color alone.
+好友输入 `PJ-C01`～`PJ-C36` 或 `PJ-D20261112`；浏览器也接受 `?challenge=c01`，宿主接受 `xb.info.query.challenge`。好友挑战不越级解锁主线；每日记录单独保留最近 30 天。第一版的 36 关与每日变换算法需保持稳定，后续新增章节不能改变已发出的挑战码。
 
-## Rules and verification
+## 进度与宿主
 
-`rules.js` exposes `globalThis.XiabanWaterSort`; boards list flavors from bottom to top and moves return a fresh board.
+- `xb.storage` 优先，键 `pour-joy-v2`；独立浏览器用同名 localStorage。仅本机保存，不宣称跨端云同步。
+- 保存已通关记录、最佳星级与对应步数、声音设置、当前关卡、操作序列和提示次数。恢复时从初始局面逐步重放并校验每一步，拒绝损坏、非法或通关后追加的操作；可继续撤销。
+- 每次倒入先提交规则状态并保存，再播放动画。前后台切换会完成可视动画、暂停声音；不会保存半杯状态。写入串行，旧写入不会覆盖新进度。
+- 读取失败时显示重试或不保存试玩，不自动覆盖原存档。写失败有状态入口，可重试。
+- 接入 `xb.ready` 与 `xb.game.start/progress/result`；分数为已装满的单色杯数 × 100。已完成局面的重新打开不重复报结算。
+- 音效默认关闭；可选震动按真实能力判断。完整保留原生按钮、数字 1–8 选杯、Esc 取消、Ctrl/Cmd+Z 撤销与减弱动效偏好。
 
-The fixed puzzles were constructed offline by reversing pours from fully sorted glasses with two spare glasses. Reverse moves never uncover a different flavor in the original source and never add to an already matching target top, so each reverse move has a legal forward inverse. Tests replay an explicit solution witness for all eight boards and independently search for solutions with a bounded solver. No solver or random generator runs during play.
+## 分享能力边界
 
-## Host protocol and scores
+生成真实成绩小票，包含星级、步数、风味数和挑战码，没有虚构排名。通用 `xb.share` / `xb.files.save` 存在且获声明能力时才调用；当前桌面和 Android 桥接尚未完整实现这些方法，因此原生端显示分享图供截图，挑战码可复制或手动选取。独立浏览器可下载 PNG。没有为本游戏扩展原生权限或伪报系统分享成功。
 
-The game accepts `xiaban.game-host / host.init` only from its parent, at protocol 1 with the URL `hostNonce`. It then sends `game.ready`, `game.start`, and current `game.progress`, echoing the nonce. Duplicate initialization does not start a second round. Valid pours and undo update progress. Score is the number of full, single-flavor glasses × 100; `lines` and `maxTile` are zero. Undo can reduce the score.
+## 双端布局
 
-Each level is one round. Completion sends `game.result`; next level, reset, and replay send a new `game.start`. The host may save the resulting scores as game records. The pack does not read accounts or call website APIs. The exit button sends `game.exit`; when opened directly it navigates to `/games`.
+使用新版设计稿的高饱和液体、玻璃高光、台面与立体工具键。固定顶栏局部避让宿主菜单，系统安全区只作用于内容；背景铺满。无自制退出胶囊或左上角退出按钮，页面切换接入浏览器历史。
+
+竖屏 4–8 杯分两行，5/7 杯末行居中。窄屏保留触控面积并允许内容滚动；横屏将关卡、杯盘和工具分列。桌面容器居中，适配可缩放窗口。Android 构建从桌面副本复制本包并注入现有 builtin-runtime；iOS 仓库尚无游戏宿主，本次未新增 iOS 运行能力。
+
+## 文件
+
+- `engine.js`：纯规则、有界增量求解、每日变换。
+- `levels.js`：离线关卡与显式解法，不在运行时生成。
+- `progress.js`：存档清洗、重放、星级与解锁。
+- `host.js`：薄 SDK / 浏览器适配、串行持久化。
+- `game.js`：小店、菜单、对局、手帐、小票和生命周期。
+- `art.js`、`game.css`、`arcade.css`、`runtime.css`：本地美术与布局。
+- 桌面历史 `theme.css` 保留用于仓库资源校验，入口不再加载。
+
+## 验证与维护
+
+仓库根运行 `node tools/generate-water-sort.mjs` 可重现当前 36 关；此脚本用于离线维护，已发布的关卡不能无版本地改题。修改后同步 `assets/game-packs/water-sort/` 与 `client/xiaoban-desktop/public/game-packs/water-sort/`。
+
+- 专项测试：`cd client/xiaoban-desktop` 后 `npx vitest run src/games/water-sort.test.ts src/games/pack-boundary.test.ts`。
+- 全量构建入口：`npm --prefix client/xiaoban-desktop run build`（当前工作区的其他游戏改动可能阻塞，以执行结果为准）。
+- Android 资源：在手机项目运行 `gradlew.bat :androidApp:syncMobileGameAssets`。
+- 浏览器验收：仓库根 `python tools/preview-water-sort.py`，打开 `http://127.0.0.1:1487/qa`。这是独立 QA 页，模拟 SDK、系统安全区与宿主菜单，不等同于真机验收；不随游戏打包。
+
+已验证全部 36 关解法、28 天同题复现、特殊杯规则、存档恢复/防覆盖、提示/撤销及成绩流程。实际浏览器走通第 36 关的订单+封签组合（12 步），检查 320px / 390px 竖屏、844px 横屏和 1200px 桌面布局。未安装新客户端或做 Android/iOS 真机验收。

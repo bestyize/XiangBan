@@ -211,3 +211,7 @@ Android 的社区游戏作品详情、帖子中的本站游戏链接卡片和回
 Android 缺原生库或 iOS 当前入口会明确显示纯云聊天；原生与宿主需配套更新。持久 todo 继续可用，系统终止后的后台目标恢复、手机通用 Shell 等仍按原阶段边界。
 
 针对性验证：`cargo test --locked --manifest-path libs/agent-mobile/Cargo.toml`（仓库根）；community-core 的 MobileReliabilityTest、MobileCancellationTest、ChatHistoryTest、AgentChatTest、AgentRuntimeTest 和 ReasoningTest；JNI 测试需设置 AGENT_MOBILE_LIB 指向本次编译的原生库，避免跳过。
+
+## 倒杯快乐（原奶茶大师）2.0
+
+内置 `water-sort` 升级为[倒杯快乐](../xiaoban-desktop/public/game-packs/water-sort/README.md)：36 关、4 章，包含订单杯、封签杯、每日同题、星级手帐和断点续玩。采用高饱和游戏界面，适配桌面窗口、手机竖横屏及宿主菜单安全区。Android 从桌面资源自动同步；iOS 暂无游戏宿主。协议 2 存档使用 `xb.storage`，仅本机保存；原生分享能力未就绪时提供小票截图与挑战码，不伪报分享成功。尚未重新打包安装。

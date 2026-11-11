@@ -8,6 +8,8 @@
 
 ## 小伴桌面
 
+[倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。
+
 | 设计稿 | 内容 |
 | --- | --- |
 | [对话资产](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.html) | 右上角单图标入口，包含设计稿、生成图片、交付文件 / 文件夹；轻量浮层与常驻侧栏两版，可搜索、预览图片、展开目录、定位消息与导入资产。支持明暗、主题色、空状态和文件失效预览，稿中系统操作均为模拟。正式聊天页已接入轻量浮层、固定侧栏与本机文件 / 文件夹 / 设计源文件导入，普通导入保留原件；尚未重新打包。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)，需在桌面项目运行 `npm run dev`；[可编辑源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.fragment.html) |

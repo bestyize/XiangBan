@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f1e6">
+  <title>倒杯快乐 · Pour Joy — 交互设计稿</title>
+  <meta name="description" content="把今天，倒成喜欢的颜色。倒杯快乐游戏设计提案，可试玩调饮、浏览风味手帐、保存快乐小票。">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="arcade.css">
+</head>
+<body>
+  <header class="review-header">
+    <a class="brand" href="#play" aria-label="倒杯快乐，回到调饮台"><span class="brand-mark">pj<span>●</span></span><span>倒杯快乐<small>POUR JOY CLUB</small></span></a>
+    <nav class="review-tabs" aria-label="设计页面">
+      <button data-view="home">小店</button><button data-view="play" class="active">调饮</button><button data-view="journal">手帐</button><button data-view="share">分享</button>
+    </nav>
+    <span class="edition"><i></i> V2 · 试玩稿</span>
+  </header>
+  <main class="design-stage">
+<section class="phone-wrap" aria-label="手机交互原型">
+      <div class="phone">
+        <div class="host-bar"><span class="host-brand">小伴 · 游戏</span><button id="hostMenu" aria-label="宿主菜单" title="宿主胶囊示意">••• <span></span> ◉</button></div>
+        <div id="screen" class="screen"></div>
+        <div id="toast" role="status" aria-live="polite"></div>
+        <div class="home-indicator"></div>
+      </div>
+
+    </section>
+</main>
+  <footer class="review-footer"><button id="aboutButton">设计说明 ↗</button></footer>
+  <dialog id="infoDialog"><button class="dialog-close" aria-label="关闭说明">×</button><span class="eyebrow">DESIGN NOTES</span><h2>小杯子，大一点的快乐。</h2><div id="dialogContent"></div></dialog>
+  <script src="app.js"></script>
+</body></html>

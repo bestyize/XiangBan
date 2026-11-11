@@ -1021,7 +1021,7 @@ pub fn resolve_game_id(input: &str) -> Option<&'static str> {
         "2048" | "merge" | "merge_2048" => Some("merge-2048"),
         "消失高手" | "消消乐" | "block_puzzle" => Some("block-puzzle"),
         "口袋精灵" | "三消" | "pocket_sprites" => Some("pocket-sprites"),
-        "奶茶大师" | "倒水" | "分杯" | "奶茶" | "water_sort" => Some("water-sort"),
+        "倒杯快乐" | "奶茶大师" | "倒水" | "分杯" | "奶茶" | "water_sort" => Some("water-sort"),
         "水墨剑客" | "剑客" | "水墨" | "ink_blade" => Some("ink-blade"),
         "暮色滑翔" | "滑翔" | "滑翔机" | "dusk_glider" => Some("dusk-glider"),
         "魔方" | "3d魔方" | "全阶魔方" | "魔方模拟器" | "pro-cube" | "pro_cube" | "cube" => Some("pro-cube"),
@@ -1073,7 +1073,7 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
                     Some(game) => game["id"].as_str().map(str::to_string),
                     None => {
                         let extra: String = mine.iter().filter_map(|g| g["id"].as_str().map(|id| format!("、{} ({id})", g["name"].as_str().unwrap_or(id)))).collect();
-                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、口袋精灵 (pocket-sprites)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
+                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、口袋精灵 (pocket-sprites)、倒杯快乐 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
                     }
                 }
             }
@@ -1518,7 +1518,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(),
             widget_remove,
         ),
-        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔、3D全阶魔方、雅韵五子棋，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
+        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、倒杯快乐、水墨剑客、暮色滑翔、3D全阶魔方、雅韵五子棋，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
         tool(
             &desktop,
             ToolSpec::new(

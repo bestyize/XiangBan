@@ -497,3 +497,7 @@ Agent 的 `computer_use_diagnose` 可检查开关、内置路径、真实权限�
 云端备份按账号默认关闭，开启只读取备份；点击备份才上传明确选择的公开作品编号/固定版本、方案名称和固定说明，本地布局、文件、聊天、私人资料库和密钥不上传。云端引用可带回本机供逐项查看，不能自动执行；同版本竞争返回冲突，不静默覆盖。本地最多100份，512KiB有界文件。
 
 针对性验证：`npx vue-tsc --noEmit`、`npx vitest run src/ui/community/CommunitySchemesWindow.test.ts`；原生 `cargo test --locked --manifest-path src-tauri/Cargo.toml community_schemes::tests` 和 `configuration_window::policy::tests`。本地模拟数据已检查960px日间/540px夜间布局；仍需打包应用验证原生窗口、账号与真实资源还原，不能以浏览器模拟替代。服务端契约见 [私有方案备份](../../services/server-forum/docs/scheme-backups.md)。
+
+## 倒杯快乐（原奶茶大师）2.0
+
+内置 `water-sort` 升级为[倒杯快乐](public/game-packs/water-sort/README.md)：36 关、4 章，包含订单杯、封签杯、每日同题、星级手帐和断点续玩。采用高饱和游戏界面，适配桌面窗口、手机竖横屏及宿主菜单安全区。Android 从桌面资源自动同步；iOS 暂无游戏宿主。协议 2 存档使用 `xb.storage`，仅本机保存；原生分享能力未就绪时提供小票截图与挑战码，不伪报分享成功。尚未重新打包安装。
