@@ -12,8 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -69,17 +67,13 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
         }
     }
     pendingDownload?.let { (size, decision) ->
-        val dismiss = { decision.complete(false); Unit }
-        Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            CenterDialog(dismiss) {
-                Text("使用移动网络下载？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                Text("作品包大小为 ${formatSize(size)}。", Modifier.padding(top = 8.dp), style = XType.Body)
-                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GhostPillButton("取消", dismiss, Modifier.weight(1f), height = 44.dp)
-                    AppActionButton("下载", { decision.complete(true) }, Modifier.weight(1f), primary = true, height = 44.dp)
-                }
-            }
-        }
+        XiaobanConfirmDialog(
+            title = "使用移动网络下载？",
+            message = "作品包大小为 ${formatSize(size)}。",
+            confirmLabel = "下载",
+            onConfirm = { decision.complete(true) },
+            onDismiss = { decision.complete(false) },
+        )
     }
 }
 
