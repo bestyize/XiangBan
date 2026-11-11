@@ -100,35 +100,35 @@ internal fun CommunityLinkConfirmation(env: CommunityEnv, open: (Route) -> Unit)
     val api = remember(env) { CommunitySharingApi(env.client, env.config) }
     val loader = rememberLoader(env, "incoming-$pending") { api.publicInfo(target ?: throw ApiException(400, "此链接不是可打开的公开社区内容")) }
     val state by loader.state.collectAsState()
-    AlertDialog(
+    val info = (state as? Load.Ready)?.value
+    val primary = when {
+        target != null && info != null -> XDialogAction("查看详情", {
+            platform.consumeCommunityLink()
+            open(when (target.kind) {
+                "pack" -> if (info.packKind in CapabilityPackKinds) Route.Ability(target.id.toLong()) else Route.Pack(target.id.toLong())
+                "topic" -> Route.Topic(target.id.toLong())
+                "scheme" -> Route.Scheme(target.id.toLong())
+                "project" -> Route.Project(target.id)
+                else -> Route.Weekly(target.id)
+            })
+        })
+        target != null && state is Load.Failed -> XDialogAction("重试", loader::reload)
+        else -> null
+    }
+    XiaobanDialog(
+        title = "打开社区内容",
         onDismissRequest = platform::consumeCommunityLink,
-        title = { Text("打开社区内容") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (val current = state) {
-                    is Load.Ready -> {
-                        Text(current.value.title)
-                        Text(if (target?.requestsApply == true) "此链接指向桌面内容。手机只查看详情，不会自动下载或应用。" else "确认后查看公开社区详情。")
-                    }
-                    is Load.Failed -> Text(if (current.notFound) "内容未公开或已下架。" else "无法读取此公开链接，可重试或取消。")
-                    else -> Text("正在检查公开内容…")
-                }
+        primaryAction = primary,
+        secondaryAction = XDialogAction("取消", platform::consumeCommunityLink),
+    ) {
+        when (val current = state) {
+            is Load.Ready -> {
+                Text(current.value.title, style = XType.Body)
+                Text(if (target?.requestsApply == true) "此链接指向桌面内容。手机只查看详情，不会自动下载或应用。" else "确认后查看公开社区详情。",
+                    style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-        confirmButton = {
-            val info = (state as? Load.Ready)?.value
-            if (target != null && info != null) TextButton(onClick = {
-                platform.consumeCommunityLink()
-                open(when (target.kind) {
-                    "pack" -> if (info.packKind in CapabilityPackKinds) Route.Ability(target.id.toLong()) else Route.Pack(target.id.toLong())
-                    "topic" -> Route.Topic(target.id.toLong())
-                    "scheme" -> Route.Scheme(target.id.toLong())
-                    "project" -> Route.Project(target.id)
-                    else -> Route.Weekly(target.id)
-                })
-            }) { Text("查看详情") }
-            else if (target != null && state is Load.Failed) TextButton(onClick = loader::reload) { Text("重试") }
-        },
-        dismissButton = { TextButton(onClick = platform::consumeCommunityLink) { Text("取消") } },
-    )
+            is Load.Failed -> Text(if (current.notFound) "内容未公开或已下架。" else "无法读取此公开链接，可重试或取消。")
+            else -> Text("正在检查公开内容…")
+        }
+    }
 }
