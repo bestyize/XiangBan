@@ -94,8 +94,11 @@
   }
   function haptic(kind) {
     try {
-      if (globalThis.xb?.can?.('haptics')) void Promise.resolve(globalThis.xb.haptics.impact(kind)).catch(() => {})
-      else if (kind !== 'light') navigator.vibrate?.(kind === 'heavy' ? 30 : 12)
+      if (globalThis.xb) {
+        if (globalThis.xb.can?.('haptics') && globalThis.xb.haptics?.impact) {
+          void Promise.resolve(globalThis.xb.haptics.impact(kind)).catch(() => {})
+        }
+      } else if (kind !== 'light') navigator.vibrate?.(kind === 'heavy' ? 30 : 12)
     } catch { /* optional feedback */ }
   }
   function showFeedback(result) {
