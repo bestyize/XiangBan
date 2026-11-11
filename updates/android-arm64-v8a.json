@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "3.1.2",
-  "versionCode": 3001002,
-  "notes": "小伴 3.1.2：Windows x64 一键安装版（NSIS，当前用户目录）、macOS aarch64 dmg（固定自签名证书，未公证）、Android APK（小伴手机 App）。",
-  "url": "https://github.com/bestyize/XiangBan/releases/download/xiaoban-wallpaper-v3.1.2/XiaoBan-Update-android-arm64-v8a-67c650f863962a4669d9ada6303dc5c780f4ab44eb681df17edf971c1d1e58d2.apk",
-  "sha256": "67c650f863962a4669d9ada6303dc5c780f4ab44eb681df17edf971c1d1e58d2",
-  "bytes": 24523906
+  "version": "3.1.4",
+  "versionCode": 3001004,
+  "notes": "小伴 3.1.4：Windows x64 一键安装版（NSIS，当前用户目录）、macOS aarch64 dmg（固定自签名证书，未公证）、Android APK（小伴手机 App）。",
+  "url": "https://github.com/bestyize/XiangBan/releases/download/xiaoban-wallpaper-v3.1.4/XiaoBan-Update-android-arm64-v8a-e801d6ba9df7fea10e2f2933193b76f1cf1d11900298698ee0eefa3186283fc8.apk",
+  "sha256": "e801d6ba9df7fea10e2f2933193b76f1cf1d11900298698ee0eefa3186283fc8",
+  "bytes": 24536947
 }
