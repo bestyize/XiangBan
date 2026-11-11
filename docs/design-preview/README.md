@@ -1,5 +1,7 @@
 # 设计资源与预览
 
+口袋精灵手机三消：[原始 A 稿、素材规范与规则](../../client/xiaoban-multiplatform/docs/design-specs/pocket-sprites/README.md)，375 × 800 dp；[可玩本机预览](http://127.0.0.1:1473/assets/game-packs/pocket-sprites/index.html)（仓库根运行 `python tools/preview-pocket-sprites.py`）。
+
 状态：设计参考，静态文件用于讨论外观交互，不是客户端运行入口，不参与生产 Docker 构建。
 
 实现设计时修改对应 client 工程并验证；不要直接用预览覆盖已有应用、鉴权或平台接入逻辑。

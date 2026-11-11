@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#112b25">
+    <title>口袋精灵</title>
+    <link rel="icon" href="./assets/icon.png" type="image/png">
+    <link rel="stylesheet" href="./game.css">
+    <link rel="preload" href="./assets/sprites.png" as="image">
+    <script type="module" src="./game.mjs"></script>
+  </head>
+  <body>
+    <main class="stage">
+      <section class="screen home-screen" id="home" aria-labelledby="home-title">
+        <div class="home-hero">
+          <div class="hero-spirits" aria-hidden="true">
+            <span class="sprite hero-star" data-color="1"></span>
+            <span class="sprite hero-bird" data-color="0"></span>
+            <span class="sprite hero-sprout" data-color="2"></span>
+          </div>
+          <h1 id="home-title" tabindex="-1">口袋精灵</h1>
+          <p>把三个相同的精灵连在一起。</p>
+        </div>
+        <div class="home-actions">
+          <button class="primary wide" type="button" data-action="start" disabled>开始游戏</button>
+          <button class="secondary wide" type="button" data-action="levels" disabled>选择关卡</button>
+        </div>
+      </section>
+      <section class="screen levels-screen" id="levels" hidden aria-labelledby="levels-title">
+        <header class="map-header">
+          <button class="icon-button back-button" type="button" data-action="back" aria-label="返回首页"><span class="icon icon-back" aria-hidden="true"></span></button>
+          <h1 id="levels-title" tabindex="-1">选择关卡</h1>
+          <p id="levels-progress"></p>
+        </header>
+        <div class="level-grid" id="level-grid"></div>
+      </section>
+      <section class="screen game-screen" id="game" hidden aria-labelledby="game-title">
+        <div class="playfield" id="playfield">
+          <header class="game-header">
+            <div>
+              <p class="level-kicker" id="level-number"></p>
+              <h1 id="game-title" tabindex="-1"></h1>
+            </div>
+          </header>
+          <div class="hud">
+            <section class="moves-card" aria-labelledby="moves-title">
+              <h2 id="moves-title">剩余步数</h2>
+              <strong id="moves"></strong>
+            </section>
+            <section class="goals-card" aria-labelledby="goals-title">
+              <h2 id="goals-title">目标</h2>
+              <ul class="goals" id="goals"></ul>
+            </section>
+          </div>
+          <div class="board-frame">
+            <div class="board" id="board" role="grid" tabindex="0" aria-label="三消棋盘"></div>
+          </div>
+          <div class="game-footer">
+            <p class="feedback" id="feedback" role="status"></p>
+            <button class="icon-button pause-button" type="button" data-action="pause" aria-label="暂停"><span class="icon icon-pause" aria-hidden="true"></span></button>
+            <button class="icon-button hint-button" type="button" data-action="hint" aria-label="提示一步"><span class="icon icon-hint" aria-hidden="true"></span></button>
+          </div>
+        </div>
+      </section>
+      <dialog class="dialog" id="dialog" aria-labelledby="dialog-title">
+        <div class="dialog-content">
+          <div class="dialog-art" id="dialog-art" aria-hidden="true"></div>
+          <h2 id="dialog-title"></h2>
+          <p id="dialog-text" class="dialog-text"></p>
+          <div class="dialog-actions" id="dialog-actions"></div>
+        </div>
+      </dialog>
+      <p class="save-note" id="save-note" role="status" hidden>暂时无法存档。</p>
+    </main>
+  </body>
+</html>

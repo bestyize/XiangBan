@@ -96,7 +96,7 @@ if (!errors.length) {
   const desktopCatalog = readJson(path.join(desktop, 'catalog.json'));
   const referenceCatalog = readJson(path.join(reference, 'catalog.json'));
   if (desktopCatalog.version !== referenceCatalog.version || JSON.stringify(desktopCatalog.games) !== JSON.stringify(referenceCatalog.games)) errors.push('桌面 catalog 与基准 catalog 不一致');
-  if (!Array.isArray(desktopCatalog.games) || desktopCatalog.games.length !== 10 || new Set(desktopCatalog.games).size !== 10) errors.push('catalog 必须列出十个唯一游戏包');
+  if (!Array.isArray(desktopCatalog.games) || desktopCatalog.games.length !== 11 || new Set(desktopCatalog.games).size !== 11) errors.push('catalog 必须列出十一个唯一游戏包');
   for (const id of desktopCatalog.games) {
     for (const [base, side] of [[desktop, '桌面'], [reference, '基准']]) {
       const dir = path.join(base, id);
@@ -151,4 +151,4 @@ if (!errors.length) {
   for (const shared of ['desktop-host.js', 'fresh-theme.css', 'result-share.css', 'result-share.js']) if (exists(path.join(desktop, shared))) errors.push(`桌面 game-packs 根目录不应再有共享文件：${shared}`);
 }
 if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
-else console.log('✓ 桌面十款 V2 游戏包、manifest (协议 2)、入口、图标、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');
+else console.log('✓ 桌面十一款 V2 游戏包、manifest (协议 2)、入口、图标、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');

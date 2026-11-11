@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
+  "id": "pocket-sprites",
+  "name": "口袋精灵",
+  "version": "1.4.1",
+  "description": "交换精灵凑成三连，收集伙伴、打破冰块、清理蜂蜜，在步数用完前完成关卡目标。",
+  "category": "puzzle",
+  "entry": "index.html",
+  "icon": "assets/icon.png",
+  "cover": "assets/cover.png",
+  "orientation": "portrait",
+  "input": ["touch", "mouse", "keyboard"],
+  "capabilities": ["haptics"],
+  "intents": ["口袋精灵", "三消", "交换消除"],
+  "save": true
+}

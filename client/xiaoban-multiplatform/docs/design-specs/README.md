@@ -1,5 +1,7 @@
 # 小伴手机 App 设计稿
 
+口袋精灵：375 × 800 dp 手机三消，采用软陶精灵与深青庭院；[设计源稿与规则](pocket-sprites/README.md)，[可玩本机预览](http://127.0.0.1:1473/assets/game-packs/pocket-sprites/index.html)。
+
 | 设计稿 | 内容与预览 |
 | --- | --- |
 | [轻启](prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |

@@ -1020,6 +1020,7 @@ pub fn resolve_game_id(input: &str) -> Option<&'static str> {
         "俄罗斯方块" | "方块" | "tetris" | "falling_blocks" => Some("falling-blocks"),
         "2048" | "merge" | "merge_2048" => Some("merge-2048"),
         "消失高手" | "消消乐" | "block_puzzle" => Some("block-puzzle"),
+        "口袋精灵" | "三消" | "pocket_sprites" => Some("pocket-sprites"),
         "奶茶大师" | "倒水" | "分杯" | "奶茶" | "water_sort" => Some("water-sort"),
         "水墨剑客" | "剑客" | "水墨" | "ink_blade" => Some("ink-blade"),
         "暮色滑翔" | "滑翔" | "滑翔机" | "dusk_glider" => Some("dusk-glider"),
@@ -1044,7 +1045,7 @@ fn game_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let protocol = if g["runtimeProtocol"] == 2 { " [V2]" } else { "" };
         format!("- {} ({id}): {}{protocol}", g["name"].as_str().unwrap_or(id), g["description"].as_str().unwrap_or(""))
     };
-    let mut lines = vec![format!("小伴内置 10 款独立桌面小游戏（{state}）：")];
+    let mut lines = vec![format!("小伴内置 {} 款独立桌面小游戏（{state}）：", crate::games::IDS.len())];
     lines.extend(games.iter().filter(|g| !is_user_game(g)).map(line));
     let mine: Vec<&Value> = games.iter().filter(|g| is_user_game(g)).collect();
     if !mine.is_empty() {
@@ -1072,7 +1073,7 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
                     Some(game) => game["id"].as_str().map(str::to_string),
                     None => {
                         let extra: String = mine.iter().filter_map(|g| g["id"].as_str().map(|id| format!("、{} ({id})", g["name"].as_str().unwrap_or(id)))).collect();
-                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
+                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、口袋精灵 (pocket-sprites)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
                     }
                 }
             }
@@ -2367,7 +2368,7 @@ mod tests {
 
         let fake = Arc::new(Fake::default());
         let list_out = call(&fake, "game_list", json!({})).unwrap();
-        assert!(list_out.contains("小伴内置 10 款独立桌面小游戏"));
+        assert!(list_out.contains(&format!("小伴内置 {} 款独立桌面小游戏", crate::games::IDS.len())));
         assert!(list_out.contains("小伴贪吃蛇 (snake-arena)"));
 
         let open_out = call(&fake, "game_open", json!({"id": "贪吃蛇"})).unwrap();

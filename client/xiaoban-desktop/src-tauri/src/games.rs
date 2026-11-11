@@ -3,7 +3,8 @@ use serde_json::{json, Value};
 use std::{fs, io::Write, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-pub const IDS: [&str; 10] = ["falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
+const POCKET_SPRITES: &str = "pocket-sprites";
+pub const IDS: [&str; 11] = ["falling-blocks", "merge-2048", "block-puzzle", POCKET_SPRITES, "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
 #[derive(Default)]
 pub struct GameState {
     pub active: AtomicBool,
@@ -22,12 +23,13 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
     if ["get_game_catalog", "load_game_save", "save_game_save", "game_smoke_report"].contains(&command) { return Some(false); }
     None
 }
-/// The nine shipped games, each tagged with where its files come from.
+/// The shipped games, each tagged with where its files come from.
 pub fn builtin_catalog() -> Result<Vec<Value>, String> {
     let manifests = [
         include_str!("../../public/game-packs/falling-blocks/manifest.json"),
         include_str!("../../public/game-packs/merge-2048/manifest.json"),
         include_str!("../../public/game-packs/block-puzzle/manifest.json"),
+        include_str!("../../public/game-packs/pocket-sprites/manifest.json"),
         include_str!("../../public/game-packs/water-sort/manifest.json"),
         include_str!("../../public/game-packs/snake-arena/manifest.json"),
         include_str!("../../public/game-packs/ink-blade/manifest.json"),
@@ -38,7 +40,8 @@ pub fn builtin_catalog() -> Result<Vec<Value>, String> {
     ];
     manifests.iter().zip(IDS).map(|(text, id)| {
         let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
-        if value["id"] != id || (value["runtimeProtocol"] != 1 && value["runtimeProtocol"] != 2) || value["entry"] != "index.html" || value["cover"] != "cover.svg" { return Err(format!("游戏 {id} 的资源协议无效")); }
+        let expected_cover = if id == POCKET_SPRITES { "assets/cover.png" } else { "cover.svg" };
+        if value["id"] != id || (value["runtimeProtocol"] != 1 && value["runtimeProtocol"] != 2) || value["entry"] != "index.html" || value["cover"] != expected_cover { return Err(format!("游戏 {id} 的资源协议无效")); }
         value["source"] = json!("builtin"); value["base"] = json!(format!("/game-packs/{id}/")); value["layer"] = json!("space"); value["capabilities"] = json!([]);
         Ok(value)
     }).collect()
@@ -59,8 +62,8 @@ pub fn catalog(app: &tauri::AppHandle) -> Result<Catalog, String> { catalog_in(c
 #[tauri::command]
 pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> {
     authorize(&app, &host_token)?;
-    // Games that live on the desktop layer cannot run full screen, so the game space never lists them.
-    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop").collect())
+    // The legacy iframe host only serves games that implement its message protocol.
+    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop" && game["id"] != POCKET_SPRITES).collect())
 }
 /// A fresh secret for the window that is about to host a game; commands that touch saves check it.
 pub(crate) fn issue_token(app: &tauri::AppHandle) -> Result<String, String> {
@@ -158,6 +161,10 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
         let known = catalog(app)?;
         let game = known.games.iter().find(|game| game["id"] == game_id.as_str()).ok_or("没有找到这款本地游戏")?;
         if game["layer"] == "desktop" { return crate::desk_game::open(app, &game_id).await; }
+        if game_id == POCKET_SPRITES {
+            crate::app_runtime::window::open_app(app, &game_id, game["name"].as_str().unwrap_or_default(), game["orientation"].as_str(), game["entry"].as_str()).await?;
+            return Ok(());
+        }
         game["orientation"] == "landscape"
     };
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
@@ -320,7 +327,7 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 }
 #[cfg(test)] mod tests {
     use super::*;
-    #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),10); assert!(items.iter().all(|v|v["runtimeProtocol"]==2)); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
+    #[test] fn all_builtin_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),IDS.len()); assert!(items.iter().all(|v|v["runtimeProtocol"]==2)); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
     #[test] fn the_game_window_doubles_landscape_dimensions_and_preserves_pack_shape() {
         let (landscape_w, landscape_h) = game_window_size(1440.0, 900.0, true);
         let (portrait_w, portrait_h) = game_window_size(1440.0, 900.0, false);
@@ -342,10 +349,10 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
         let root=temp_root("merge"); user_game(&root,"my-game",false);
         fs::create_dir_all(crate::game_packs::packs_dir(&root).join("broken")).unwrap();
         let merged=catalog_in(Some(&root)).unwrap();
-        assert_eq!(merged.games.len(),11); assert_eq!(merged.ids()[..10],IDS); assert_eq!(merged.ids()[10],"my-game");
-        assert_eq!(merged.games[10]["source"],"user"); assert!(merged.games[10]["base"].as_str().unwrap().contains("game-pack")); assert!(merged.games[10]["base"].as_str().unwrap().ends_with("/my-game/"));
+        assert_eq!(merged.games.len(),IDS.len()+1); assert_eq!(merged.ids()[..IDS.len()],IDS); assert_eq!(merged.ids()[IDS.len()],"my-game");
+        assert_eq!(merged.games[IDS.len()]["source"],"user"); assert!(merged.games[IDS.len()]["base"].as_str().unwrap().contains("game-pack")); assert!(merged.games[IDS.len()]["base"].as_str().unwrap().ends_with("/my-game/"));
         assert_eq!(merged.errors.len(),1); assert!(merged.errors[0].contains("broken"));
-        assert_eq!(catalog_in(None).unwrap().games.len(),10);
+        assert_eq!(catalog_in(None).unwrap().games.len(),IDS.len());
         let _=fs::remove_dir_all(root);
     }
     #[test] fn save_files_follow_the_manifest_flag() {

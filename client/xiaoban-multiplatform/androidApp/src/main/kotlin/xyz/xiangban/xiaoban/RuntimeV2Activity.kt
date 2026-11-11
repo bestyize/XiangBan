@@ -95,11 +95,16 @@ class RuntimeV2Activity : ComponentActivity() {
     private var ready = false
     private var failed = false
     private var playing = false
-    // Only the official block puzzle uses a transparent, full-bleed status bar.
-    // It switches icon contrast when the real game.result/game.start events arrive.
+    // Block puzzle switches icon contrast with its game and result palettes.
     private var blockPuzzleShowingResult = false
     private val blockPuzzleFullBleed: Boolean
         get() = ::pack.isInitialized && pack.host == "official-block-puzzle.app.xiangban.xyz"
+    private val pocketSprites: Boolean
+        get() = ::pack.isInitialized && pack.host == "official-pocket-sprites.app.xiangban.xyz"
+    private val pocketSpritesFullBleed: Boolean
+        get() = pocketSprites && ready && !failed
+    private val fullBleedStatusBar: Boolean
+        get() = blockPuzzleFullBleed || pocketSpritesFullBleed
     private var reportedOpen = false
     private var networkDisabled = true
     private var legacySave: JSONObject? = null
@@ -407,16 +412,14 @@ class RuntimeV2Activity : ComponentActivity() {
     }
 
     private fun updateStatusBarBackground() {
-        // The native tint view was obscuring the CSS result overlay above the
-        // WebView, leaving a pink strip at the top of the purple result screen.
-        val height = if (landscape || blockPuzzleFullBleed) 0 else safeInsets.top
+        val height = if (landscape || fullBleedStatusBar) 0 else safeInsets.top
         val layout = statusBarBackground.layoutParams
         if (layout.height != height) {
             layout.height = height
             statusBarBackground.layoutParams = layout
         }
         statusBarBackground.setBackgroundColor(when {
-            blockPuzzleFullBleed -> android.graphics.Color.TRANSPARENT
+            fullBleedStatusBar -> android.graphics.Color.TRANSPARENT
             dark -> 0xFF17191F.toInt()
             else -> 0xFFF7F8FA.toInt()
         })
@@ -425,26 +428,29 @@ class RuntimeV2Activity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun updateSystemBars() {
         updateStatusBarBackground()
-        if (blockPuzzleFullBleed) {
-            // setDecorFitsSystemWindows(false) draws the full-screen WebView
-            // behind the real status bar. Keep the bar transparent so the CSS
-            // game/result background (not the old pink native strip) shows through.
+        if (blockPuzzleFullBleed || pocketSprites) {
             window.statusBarColor = android.graphics.Color.TRANSPARENT
+        }
+        if (pocketSprites) {
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= 29) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
         }
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            if (landscape) hide(WindowInsetsCompat.Type.systemBars())
-            else if (blockPuzzleFullBleed) {
-                // Preserve system time/battery indicators and gesture navigation.
-                // Light game palettes need dark icons; the purple result screen
-                // needs light icons. Other works keep their existing behavior.
-                show(WindowInsetsCompat.Type.systemBars())
-                isAppearanceLightStatusBars = !blockPuzzleShowingResult
-                isAppearanceLightNavigationBars = !blockPuzzleShowingResult
+            if (landscape) {
+                hide(WindowInsetsCompat.Type.systemBars())
             } else {
                 show(WindowInsetsCompat.Type.systemBars())
-                isAppearanceLightStatusBars = !dark
-                isAppearanceLightNavigationBars = !dark
+                val useDarkIcons = when {
+                    pocketSpritesFullBleed -> false
+                    blockPuzzleFullBleed -> !blockPuzzleShowingResult
+                    else -> !dark
+                }
+                isAppearanceLightStatusBars = useDarkIcons
+                isAppearanceLightNavigationBars = useDarkIcons
             }
         }
     }
@@ -497,7 +503,7 @@ class RuntimeV2Activity : ComponentActivity() {
         failed = false
         playing = false
         blockPuzzleShowingResult = false
-        if (blockPuzzleFullBleed) updateSystemBars()
+        if (blockPuzzleFullBleed || pocketSprites) updateSystemBars()
         acceptingStorage = true
         chrome.loading()
         startedAt = System.currentTimeMillis()
@@ -639,6 +645,7 @@ class RuntimeV2Activity : ComponentActivity() {
                     log?.add("game.ready", "readyMs" to System.currentTimeMillis() - startedAt)
                     handler.removeCallbacks(timeout)
                     chrome.loaded()
+                    if (pocketSprites) updateSystemBars()
                     reportOpen()
                 }
             }
@@ -806,6 +813,7 @@ class RuntimeV2Activity : ComponentActivity() {
         handler.removeCallbacks(timeout)
         updateVisibility()
         chrome.error(message) { leave(reopen = true) }
+        if (pocketSprites) updateSystemBars()
     }
 
     private fun handleBack() {

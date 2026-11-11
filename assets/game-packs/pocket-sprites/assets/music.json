@@ -1,0 +1,19 @@
+{
+  "title": "Garden Skip / 花园小步舞",
+  "source": "Original procedural composition; no third-party samples",
+  "bpm": 110,
+  "bars": 32,
+  "duration": 69.81818594104308,
+  "loopStart": 0,
+  "loopEnd": 69.81818594104308,
+  "instrumentation": [
+    "nylon-style plucks",
+    "wooden mallet melody",
+    "soft bass",
+    "woodblock",
+    "shaker"
+  ],
+  "peak": 0.76,
+  "rms": 0.1308224185524668,
+  "loopSeamDelta": 0.0
+}
