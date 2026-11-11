@@ -28,6 +28,8 @@
     ['z2', '阶梯方块', [[0, 1], [0, 2], [1, 0], [1, 1]]],
     ['rectH', '横向六格', [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]],
     ['rectV', '竖向六格', [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1]]],
+    ['diagDown', '右下斜线', [[0, 0], [1, 1], [2, 2]]],
+    ['diagUp', '左下斜线', [[0, 2], [1, 1], [2, 0]]],
   ]
   const SHAPES = Object.freeze(patterns.map(([id, name, cells], index) => Object.freeze({
     id, name,
@@ -41,8 +43,23 @@
     return Array.from({ length: SIZE }, () => Array(SIZE).fill(0))
   }
 
-  function generateHand(random = Math.random) {
-    return Array.from({ length: 3 }, () => SHAPES[Math.min(SHAPES.length - 1, Math.max(0, Math.floor(random() * SHAPES.length)))])
+  function pickShape(pool, random) {
+    return pool[Math.max(0, Math.min(pool.length - 1, Math.floor(random() * pool.length)))]
+  }
+
+  // Partial board awareness prevents an avoidable instant loss from a randomly
+  // impossible hand. It does not guarantee every future hand can be finished.
+  function generateHand(random = Math.random, board = null) {
+    const fitting = board ? SHAPES.filter((shape) => hasSpace(board, shape)) : SHAPES
+    if (!fitting.length) return Array.from({ length: 3 }, () => pickShape(SHAPES, random))
+    const empty = board ? board.flat().filter((value) => value === 0).length : 64
+    const guidedChance = board ? Math.min(.88, Math.max(.18, 1 - empty / 70)) : 0
+    const hand = Array.from({ length: 3 }, () =>
+      pickShape(board && random() < guidedChance ? fitting : SHAPES, random))
+    if (board && !hand.some((shape) => hasSpace(board, shape))) {
+      hand[Math.floor(random() * 3)] = pickShape(fitting, random)
+    }
+    return hand
   }
 
   function canPlace(board, shape, row, col) {
@@ -68,51 +85,88 @@
     return hand.some((shape) => hasSpace(board, shape))
   }
 
-  function placeShape(board, shape, row, col) {
+  function placeShape(board, shape, row, col, combo = 0) {
     if (!canPlace(board, shape, row, col)) return null
     const next = board.map((line) => line.slice())
     shape.cells.forEach((cell) => { next[row + cell.row][col + cell.col] = shape.color })
-    // Detect every complete line before clearing; a crossing cell belongs to both.
-    const clearedRows = []
-    const clearedCols = []
-    for (let index = 0; index < SIZE; index += 1) {
-      if (next[index].every(Boolean)) clearedRows.push(index)
-      if (next.every((line) => line[index] !== 0)) clearedCols.push(index)
+    const clearedRows = [], clearedCols = []
+    for (let i = 0; i < SIZE; i += 1) {
+      if (next[i].every(Boolean)) clearedRows.push(i)
+      if (next.every((line) => line[i] !== 0)) clearedCols.push(i)
     }
     const clearedCells = []
-    for (let y = 0; y < SIZE; y += 1) {
-      for (let x = 0; x < SIZE; x += 1) {
-        if (clearedRows.includes(y) || clearedCols.includes(x)) {
-          clearedCells.push({ row: y, col: x })
-          next[y][x] = 0
+    for (let rowIndex = 0; rowIndex < SIZE; rowIndex += 1) {
+      for (let colIndex = 0; colIndex < SIZE; colIndex += 1) {
+        if (clearedRows.includes(rowIndex) || clearedCols.includes(colIndex)) {
+          clearedCells.push({ row: rowIndex, col: colIndex })
+          next[rowIndex][colIndex] = 0
         }
       }
     }
     const lines = clearedRows.length + clearedCols.length
-    const gained = shape.cells.length + lines * 10 + lines * (lines - 1) * 5
-    return { board: next, clearedRows, clearedCols, clearedCells, gained }
+    const base = lines <= 2 ? lines * 10 : 60 + (lines - 3) * 40
+    const perfect = lines > 0 && next.every((line) => line.every((value) => value === 0))
+    const gained = shape.cells.length +
+      (lines ? Math.round(base * (1 + Math.max(0, combo - 1) * .5)) : 0) +
+      (perfect ? 300 : 0)
+    return { board: next, clearedRows, clearedCols, clearedCells, gained, perfect }
   }
 
   function createGame(random = Math.random) {
-    return { board: createBoard(), hand: generateHand(random), score: 0, lines: 0, over: false }
+    return { board: createBoard(), hand: generateHand(random), score: 0, lines: 0,
+      combo: 0, drought: 0, bestCombo: 0, over: false }
   }
 
   function place(state, slot, row, col, random = Math.random) {
     if (state.over || !Number.isInteger(slot) || slot < 0 || slot > 2) return { state, placed: false }
-    const result = placeShape(state.board, state.hand[slot], row, col)
-    if (!result) return { state, placed: false }
+    const shape = state.hand[slot]
+    if (!canPlace(state.board, shape, row, col)) return { state, placed: false }
+    const placement = placeShape(state.board, shape, row, col)
+    const cleared = placement.clearedRows.length + placement.clearedCols.length
+    const drought = cleared ? 0 : Math.min(3, (state.drought || 0) + 1)
+    const combo = cleared ? ((state.drought || 0) >= 3 ? 1 : (state.combo || 0) + 1)
+      : (drought >= 3 ? 0 : (state.combo || 0))
+    const result = cleared ? placeShape(state.board, shape, row, col, combo) : placement
     let hand = state.hand.slice()
     hand[slot] = null
-    const replenished = hand.every((shape) => shape === null)
-    if (replenished) hand = generateHand(random)
+    const replenished = hand.every((piece) => piece === null)
+    if (replenished) hand = generateHand(random, result.board)
     const next = {
       board: result.board, hand,
       score: state.score + result.gained,
-      lines: state.lines + result.clearedRows.length + result.clearedCols.length,
+      lines: state.lines + cleared,
+      combo, drought,
+      bestCombo: Math.max(state.bestCombo || 0, combo),
       over: !canPlay(result.board, hand),
     }
-    return { ...result, state: next, placed: true, replenished }
+    return { ...result, combo, state: next, placed: true, replenished }
   }
 
-  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place })
+  function serializeGame(state) {
+    return {
+      board: state.board, hand: state.hand.map((shape) => shape?.id || null),
+      score: state.score, lines: state.lines, combo: state.combo || 0,
+      drought: state.drought || 0, bestCombo: state.bestCombo || 0,
+    }
+  }
+
+  function restoreGame(data) {
+    if (!data || typeof data !== 'object' ||
+      !Array.isArray(data.board) || data.board.length !== SIZE ||
+      !data.board.every((line) => Array.isArray(line) && line.length === SIZE &&
+        line.every((value) => Number.isInteger(value) && value >= 0 && value <= 6))) return null
+    if (!Array.isArray(data.hand) || data.hand.length !== 3) return null
+    const hand = data.hand.map((id) =>
+      id === null ? null : SHAPES.find((shape) => shape.id === id))
+    if (hand.some((shape) => shape === undefined) || hand.every((shape) => shape === null)) return null
+    for (const key of ['score', 'lines', 'combo', 'drought', 'bestCombo']) {
+      if (!Number.isSafeInteger(data[key]) || data[key] < 0) return null
+    }
+    if (data.drought > 3 || data.combo > 100000 || data.bestCombo > 100000) return null
+    const board = data.board.map((line) => line.slice())
+    return { board, hand, score: data.score, lines: data.lines, combo: data.combo,
+      drought: data.drought, bestCombo: data.bestCombo, over: !canPlay(board, hand) }
+  }
+
+  globalThis.XiabanBlockPuzzle = Object.freeze({ SIZE, SHAPES, createBoard, generateHand, canPlace, hasSpace, canPlay, placeShape, createGame, place, serializeGame, restoreGame })
 })()
