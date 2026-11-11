@@ -119,9 +119,43 @@ const horizontal = rules.handOpportunity(rules.createBoard(), [h5, h2, dot])
 assert.equal(horizontal.canFinish, true)
 assert.ok(horizontal.clearedLines >= 1)
 assert.equal(horizontal.firstClearStep, 3)
+assert.equal(horizontal.perfect, true)
 const boardBefore = JSON.stringify(crossing)
 rules.handOpportunity(crossing, [dot, h2, h5])
 assert.equal(JSON.stringify(crossing), boardBefore)
+
+// A tidy row with three separate gaps gets a real finish, even when no single
+// piece can clear the line on its own.
+const splitRow = rules.createBoard()
+for (const col of [0, 2, 5, 7]) splitRow[3][col] = 1
+const finishingHand = rules.generateHand(() => .15, splitRow, 8, 0, 0, 18)
+const finishingPlan = rules.handOpportunity(splitRow, finishingHand)
+assert.equal(finishingPlan.canFinish, true)
+assert.equal(finishingPlan.perfect, true)
+assert.equal(finishingPlan.firstClearStep, 3)
+
+// Recorded-style finish: two occupied cells divide a column into gaps of
+// two and four. The third piece stays in hand when the theme cycle resets.
+const splitColumn = rules.createBoard()
+splitColumn[2][5] = splitColumn[3][5] = 1
+const finish = rules.generateHand(() => .15, splitColumn, 8, 0, 0, 18)
+const two = finish.findIndex(shape => shape.id === 'v2')
+const four = finish.findIndex(shape => shape.id === 'v4')
+assert.ok(two >= 0 && four >= 0)
+const firstFill = rules.place({ ...rules.createGame(() => .15), board: splitColumn, hand: finish, cycleMoves: 18 }, two, 0, 5)
+assert.equal(firstFill.state.cycleMoves, 19)
+assert.equal(rules.restoreGame(rules.serializeGame(firstFill.state)).cycleMoves, 19)
+const finishTurn = rules.place(firstFill.state, four, 4, 5)
+assert.equal(finishTurn.perfect, true)
+assert.equal(finishTurn.state.cycleMoves, 0)
+assert.equal(finishTurn.state.hand.filter(Boolean).length, 1)
+
+const adjacentLines = rules.createBoard()
+adjacentLines[3].fill(1, 0, 6)
+adjacentLines[4].fill(1, 0, 6)
+const doubleFinisher = rules.generateHand(() => .15, adjacentLines, 8, 0, 0, 18)
+const square = doubleFinisher.find(shape => shape.id === 'square2')
+assert.equal(rules.placeShape(adjacentLines, square, 3, 6)?.perfect, true)
 
 // Difficulty rises gradually across hundreds of deals, not sharply after 30.
 assert.equal(rules.dealGuidance(1), rules.dealGuidance(24))
@@ -154,7 +188,9 @@ assert.ok(opportunities >= 8, 'expected frequent but not guaranteed 3-step clear
 // Older versions stored no deal counter; restoration must remain backward-compatible.
 const oldSave = rules.serializeGame(turn.state)
 delete oldSave.deals
+delete oldSave.cycleMoves
 assert.equal(rules.restoreGame(oldSave).deals, 1)
+assert.equal(rules.restoreGame(oldSave).cycleMoves, 0)
 assert.ok(rules.restoreGame(rules.serializeGame(turn.state)).deals >= 1)
 
 console.log('PASS block-puzzle: geometry, combo, setup rewards, 3-step lookahead and saves')

@@ -6,6 +6,7 @@
   const rules = globalThis.XiabanBlockPuzzle
   const HOST_NONCE = new URLSearchParams(window.location.search).get('hostNonce')
   const boardNode = document.getElementById('board')
+  const previewLayer = document.getElementById('previewLayer')
   const statusNode = document.getElementById('status')
   const overlay = document.getElementById('overlay')
   const ghost = document.getElementById('dragGhost')
@@ -14,6 +15,7 @@
   const exitButton = document.getElementById('exitButton')
   const pieceButtons = [...document.querySelectorAll('[data-slot]')]
   const cells = []
+  const previewCells = []
 
   let state
   let best = 0
@@ -32,10 +34,12 @@
   const soundButton = document.getElementById('soundButton')
   const musicButton = document.getElementById('musicButton')
   const musicTrack = document.getElementById('musicTrack')
-  const voiceNice = document.getElementById('voiceNice')
-  const voiceGood = document.getElementById('voiceGood')
-  const voiceGreat = document.getElementById('voiceGreat')
-  const voiceWonderful = document.getElementById('voiceWonderful')
+  const callouts = {
+    nice: { title: 'NICE!', track: document.getElementById('voiceNice') },
+    good: { title: 'GOOD!', track: document.getElementById('voiceGood') },
+    great: { title: 'GREAT!', track: document.getElementById('voiceGreat') },
+    wonderful: { title: 'WONDERFUL!', track: document.getElementById('voiceWonderful') },
+  }
   // Each clear has its own pitch contour and sweep. Notes are MIDI pitches.
   const CLEAR_SOUNDS = {
     row:     { sweep: [3300, 1650], notes: [74, 78],         spacing: .055, tail: .13 },
@@ -56,6 +60,7 @@
   let effectBus = null
   let burstNoise = null
   let activeCallout = null
+  let queuedCallout = null
   let turns = 0
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
@@ -67,6 +72,7 @@
   let perfectCount = 0
   let scoreAnimation = 0
   let feedbackTimer = null
+  let boardImpact = null
   let paletteTimer = null
   let resultTimer = null
   const PALETTES = ['rose', 'amber', 'mint', 'violet', 'sky']
@@ -95,14 +101,9 @@
     }
   }
   function showDiamond(result, isSetup = false) {
-    const lines = result.clearedRows.length + result.clearedCols.length
-    if (!isSetup && !result.perfect && lines < 2 && result.combo < 3) {
-      rewardDiamond.hidden = true
-      return
-    }
     clearTimeout(diamondTimer)
     rewardDiamond.textContent = '+' + (isSetup ? result.buildUpBonus : result.gained)
-    rewardDiamond.className = isSetup ? 'reward-diamond setup' : 'reward-diamond'
+    rewardDiamond.className = 'reward-diamond' + (isSetup ? ' setup' : result.perfect ? ' perfect' : '')
     rewardDiamond.hidden = false
     void rewardDiamond.offsetWidth
     rewardDiamond.classList.add('appearing')
@@ -118,6 +119,8 @@
     clearTimeout(diamondTimer)
     rewardDiamond.hidden = true
     cancelAnimationFrame(scoreAnimation)
+    boardImpact?.cancel()
+    boardImpact = null
     stopEffects()
     stopCallout()
     feedbackTimer = paletteTimer = resultTimer = diamondTimer = null
@@ -287,24 +290,41 @@
     setTimeout(() => bus.disconnect(), 25)
   }
   function stopCallout() {
-    if (!activeCallout) return
-    activeCallout.pause()
+    queuedCallout = null
+    activeCallout?.pause()
     activeCallout = null
   }
-  function calloutFor(result, lines) {
-    if (result.perfect || result.combo === 8) return voiceWonderful
-    if (lines >= 4 || result.combo === 5) return voiceGreat
-    if (lines === 3 || result.combo === 3) return voiceGood
-    if (lines === 2 || result.combo === 2) return voiceNice
-    return null
+  function feedbackFor(result, lines) {
+    if (!lines) {
+      if (result.newReadyLines > 0) return { ...callouts.nice, tier: 'setup' }
+      return result.buildUpBonus > 0 ? { title: 'KEEP GOING!', tier: 'setup' } : null
+    }
+    if (result.perfect) return { ...callouts.wonderful, tier: 'perfect' }
+    if (result.combo >= 8 || lines >= 4) return { ...callouts.wonderful, tier: 'legendary' }
+    if (result.combo >= 3 || lines >= 3) {
+      return { ...callouts.great, tier: result.combo >= 5 ? 'amazing' : 'great' }
+    }
+    if (result.combo === 2 || lines === 2) return { ...callouts.good, tier: 'normal' }
+    return { ...callouts.nice, tier: 'normal' }
+  }
+  function finishCallout(track) {
+    if (activeCallout !== track) return
+    activeCallout = null
+    const next = queuedCallout
+    queuedCallout = null
+    if (next) playCallout(next)
   }
   function playCallout(track) {
     if (document.hidden || !hostVisible || !soundEnabled) return
-    stopCallout()
+    if (activeCallout) {
+      // Keep the current word intact and avoid a backlog of old praise.
+      queuedCallout = track
+      return
+    }
     activeCallout = track
     track.volume = .52
     track.currentTime = 0
-    void track.play().catch(() => {})
+    void track.play().catch(() => finishCallout(track))
   }
   function playEffect(schedule) {
     stopEffects()
@@ -370,15 +390,15 @@
   }
   // The clear travels along complete rows or columns. Its intensity is tied
   // to line count and combo milestones; effect nodes never intercept touches.
-  function showFeedback(result) {
+  function showFeedback(result, lines, feedback) {
+    boardImpact?.cancel()
+    boardImpact = null
     sparkLayer.replaceChildren()
-    const lines = result.clearedRows.length + result.clearedCols.length
     clearTimeout(feedbackTimer)
     if (!lines) {
-      if (result.buildUpBonus > 0) {
-        const message = result.newReadyLines > 0 ? 'NICE SETUP!' : 'KEEP GOING!'
-        comboBanner.textContent = message + '  +' + result.buildUpBonus
-        comboBanner.className = 'combo-banner tier-setup'
+      if (feedback) {
+        comboBanner.textContent = feedback.title + '  +' + result.buildUpBonus
+        comboBanner.className = 'combo-banner tier-' + feedback.tier
         comboBanner.hidden = false
         void comboBanner.offsetWidth
         comboBanner.classList.add('pop')
@@ -398,15 +418,9 @@
       }
       return
     }
-    const tier = result.perfect ? 'perfect' : result.combo >= 8 ? 'legendary' :
-      result.combo >= 5 ? 'amazing' : result.combo >= 3 || lines >= 3 ? 'great' : 'normal'
-    const title = {
-      perfect: 'PERFECT!', legendary: 'LEGENDARY!', amazing: 'AMAZING!',
-      great: 'GREAT!', normal: lines >= 2 ? 'EXCELLENT!' : 'GOOD!',
-    }[tier]
-    comboBanner.textContent = title +
+    comboBanner.textContent = feedback.title +
       (result.combo >= 2 ? '  COMBO ×' + result.combo : '') + '  +' + result.gained
-    comboBanner.className = 'combo-banner tier-' + tier
+    comboBanner.className = 'combo-banner tier-' + feedback.tier
     comboBanner.hidden = false
     void comboBanner.offsetWidth
     comboBanner.classList.add('pop')
@@ -496,6 +510,19 @@
         }
       }
       sparkLayer.append(...effectNodes)
+      const shell = boardNode.parentElement
+      if (shell?.animate) {
+        const strength = result.perfect ? 4 : Math.min(3.4, 1.8 + .55 * (lines - 1) + .18 * (result.combo - 1))
+        const x = result.clearedRows.length ? strength : 0
+        const y = result.clearedCols.length ? strength : 0
+        boardImpact = shell.animate([
+          { transform: 'translate(0, 0)' },
+          { transform: `translate(${x}px, ${y}px)`, offset: .18 },
+          { transform: `translate(${-x * .55}px, ${-y * .55}px)`, offset: .43 },
+          { transform: `translate(${x * .2}px, ${y * .2}px)`, offset: .68 },
+          { transform: 'translate(0, 0)' },
+        ], { duration: result.perfect ? 185 : 145, easing: 'ease-out' })
+      }
     }
     feedbackTimer = setTimeout(() => {
       comboBanner.hidden = true
@@ -518,7 +545,6 @@
     const type = result.perfect ? 'perfect' : rows && cols ? 'cross' : lines > 1 ? 'multi' : rows ? 'row' : 'column'
     const cue = CLEAR_SOUNDS[type]
     const combo = !result.perfect && result.combo >= 2
-    const callout = soundEnabled ? calloutFor(result, lines) : null
     playEffect((bus, at) => {
       voice(bus, at, type === 'column' ? 285 : 390, .099, .17, 155, 'triangle')
       burst(bus, at, cue.sweep, lines > 1 || result.perfect ? .17 : .11, lines > 1 ? .24 : .19)
@@ -534,7 +560,6 @@
         chime(bus, finish, accent, .145, .12)
       }
     })
-    if (callout) playCallout(callout)
   }
   function celebratePerfect() {
     paletteIndex = (paletteIndex + 1) % PALETTES.length
@@ -604,12 +629,15 @@
   }
 
   function clearPreview() {
-    cells.forEach((cell, index) => {
-      cell.classList.remove('preview', 'preview-invalid', 'preview-line')
+    previewLayer.replaceChildren()
+    for (const index of previewCells) {
+      const cell = cells[index]
+      cell.classList.remove('preview', 'preview-invalid')
       const value = state.board[Math.floor(index / rules.SIZE)][index % rules.SIZE]
       if (value) cell.style.setProperty('--piece-color', color(value))
       else cell.style.removeProperty('--piece-color')
-    })
+    }
+    previewCells.length = 0
   }
 
   function showPreview(row, col) {
@@ -619,19 +647,24 @@
     const valid = rules.canPlace(state.board, shape, row, col)
     const projected = valid ? rules.placeShape(state.board, shape, row, col) : null
     if (projected) {
-      cells.forEach((cell, i) => {
-        if (projected.clearedRows.includes(Math.floor(i / 8)) || projected.clearedCols.includes(i % 8)) {
-          cell.classList.add('preview-line')
+      for (const [indices, axis] of [[projected.clearedRows, 'horizontal'], [projected.clearedCols, 'vertical']]) {
+        for (const index of indices) {
+          const line = document.createElement('span')
+          line.className = 'line-preview ' + axis
+          line.style.setProperty('--line', index + 1)
+          previewLayer.append(line)
         }
-      })
+      }
     }
     shape.cells.forEach((offset) => {
       const y = row + offset.row
       const x = col + offset.col
       if (y < 0 || y >= rules.SIZE || x < 0 || x >= rules.SIZE) return
-      const cell = cells[y * rules.SIZE + x]
+      const index = y * rules.SIZE + x
+      const cell = cells[index]
       cell.style.setProperty('--piece-color', color(shape.color))
       cell.classList.add(valid ? 'preview' : 'preview-invalid')
+      previewCells.push(index)
     })
     return valid
   }
@@ -652,7 +685,9 @@
     if (focusBoard) cells[cursor.row * rules.SIZE + cursor.col].focus({ preventScroll: true })
   }
 
-  function renderBoard(result = null) {
+  function renderBoard(result = null, landing = []) {
+    clearPreview()
+    const cleared = new Set(result?.clearedCells.map((entry) => entry.row * rules.SIZE + entry.col))
     cells.forEach((cell, index) => {
       const row = Math.floor(index / rules.SIZE)
       const col = index % rules.SIZE
@@ -663,12 +698,13 @@
       cell.setAttribute('aria-label', '第 ' + (row + 1) + ' 行第 ' + (col + 1) + ' 列，' + (value ? '已有方块' : '空格'))
       cell.disabled = state.over
       cell.tabIndex = !state.over && cursor.row === row && cursor.col === col ? 0 : -1
-      if (result?.clearedCells.some((entry) => entry.row === row && entry.col === col)) {
-        // Restart the short flash even if two consecutive moves clear this cell.
-        void cell.offsetWidth
-        cell.classList.add('clear-flash')
-      }
     })
+    if (cleared.size || landing.length) {
+      // Restart the animations together with one layout read.
+      void boardNode.offsetWidth
+      for (const index of cleared) cells[index].classList.add('clear-flash')
+      for (const index of landing) if (!cleared.has(index)) cells[index].classList.add('landed')
+    }
     document.getElementById('score').textContent = state.score
     document.getElementById('best').textContent = best
     document.getElementById('lines').textContent = state.lines
@@ -701,6 +737,7 @@
     drag = null
     ghost.hidden = true
     ghost.classList.remove('invalid')
+    if (previous) pieceButtons[previous.slot].classList.remove('dragging')
     if (previous && pieceButtons[previous.slot].hasPointerCapture(previous.id)) {
       pieceButtons[previous.slot].releasePointerCapture(previous.id)
     }
@@ -732,30 +769,33 @@
       statusNode.textContent = '这里放不下，换个空位试试。'
       return
     }
-    const previousScore = state.score
+    const previousScore = Number(scoreNode.textContent)
+    const landing = state.hand[selected].cells.map((cell) =>
+      (row + cell.row) * rules.SIZE + col + cell.col)
     state = result.state
     if (result.perfect) celebratePerfect()
     best = Math.max(best, state.score)
     turns += 1
     persist()
-    showFeedback(result)
     const lineCount = result.clearedRows.length + result.clearedCols.length
+    const feedback = feedbackFor(result, lineCount)
+    showFeedback(result, lineCount, feedback)
     playReward(result)
+    if (feedback?.track) playCallout(feedback.track)
     selected = null
-    renderBoard(result)
+    renderBoard(result, landing)
     animateScore(previousScore, state.score)
     renderHand()
     statusNode.textContent = result.perfect
-      ? '完美全清！奖励 300 分，棋盘换新主题！'
+      ? '全消！+300，进入新主题'
       : lineCount
         ? (result.combo >= 3 ? '连消 ×' + result.combo + '！ ' : '') +
-          '爆破 ' + lineCount + ' 条行列，+' + result.gained + ' 分！'
+          '消除 ' + lineCount + ' 行列'
         : result.buildUpBonus > 0
-          ? '布局奖励 +' + result.buildUpBonus + '！' +
-            (result.newReadyLines ? ' 距离下一次消除只差一格。' : ' 稳稳铺垫，也能积累奖励。')
+          ? (result.newReadyLines ? '布局奖励 · 差一格消除' : '布局奖励 +' + result.buildUpBonus)
         : state.combo > 0 && state.drought < 3
-          ? '连击保留！还有 ' + (3 - state.drought) + ' 步缓冲'
-          : '+' + result.gained + ' 分。' + (result.replenished ? '新的一组三块来了。' : '继续布局，寻找爆破机会。')
+          ? '连击保留 · ' + (3 - state.drought) + ' 步'
+          : (result.replenished ? '新的一组' : '')
     postToHost('game.progress', { score: state.score, lines: state.lines })
     if (state.over) {
       if (lineCount) resultTimer = setTimeout(showResult, result.perfect ? 900 : 610)
@@ -766,7 +806,10 @@
   function moveDrag(event) {
     if (!drag || event.pointerId !== drag.id) return
     if (!drag.moving && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 5) return
-    drag.moving = true
+    if (!drag.moving) {
+      drag.moving = true
+      pieceButtons[drag.slot].classList.add('dragging')
+    }
     const shape = state.hand[drag.slot]
     const first = cells[0].getBoundingClientRect()
     const second = cells[1].getBoundingClientRect()
@@ -775,17 +818,28 @@
     const height = shape.height * step - 3
     const left = event.clientX - width / 2
     // Lift the entire shape above a finger so the landing cells stay visible.
-    const top = drag.touch ? event.clientY - height - 42 : event.clientY - height / 2
-    drag.row = Math.round((top - first.top) / step)
-    drag.col = Math.round((left - first.left) / step)
-    ghost.style.left = left + 'px'
-    ghost.style.top = top + 'px'
+    const lift = Math.min(54, Math.max(16, window.innerHeight - boardNode.getBoundingClientRect().bottom - 24))
+    const top = drag.touch ? event.clientY - height - lift : event.clientY - height / 2
+    const rowFloat = (top - first.top) / step
+    const colFloat = (left - first.left) / step
+    // Retain the visible valid target just past a cell boundary to absorb
+    // small finger movements, without searching for a different legal cell.
+    const steady = drag.valid && Math.abs(rowFloat - drag.row) < .58 && Math.abs(colFloat - drag.col) < .58
+    const row = steady ? drag.row : Math.round(rowFloat)
+    const col = steady ? drag.col : Math.round(colFloat)
+    if (row !== drag.row || col !== drag.col) {
+      drag.row = row
+      drag.col = col
+      drag.valid = showPreview(row, col)
+      const lines = previewLayer.children.length
+      statusNode.textContent = drag.valid ? (lines ? '可消除 ' + lines + ' 行列' : '') : '这里放不下'
+    }
+    const snap = drag.valid ? .48 : 0
+    ghost.style.left = left + (first.left + col * step - left) * snap + 'px'
+    ghost.style.top = top + (first.top + row * step - top) * snap + 'px'
     ghost.style.setProperty('--ghost-cell', first.width + 'px')
     ghost.hidden = false
-    const valid = showPreview(drag.row, drag.col)
-    ghost.classList.toggle('invalid', !valid)
-    if (valid !== drag.valid) statusNode.textContent = valid ? '落点亮起啦，松手放置。' : '红色位置放不下，移到完整的空位。'
-    drag.valid = valid
+    ghost.classList.toggle('invalid', !drag.valid)
   }
 
   for (let row = 0; row < rules.SIZE; row += 1) {
@@ -821,6 +875,8 @@
     button.addEventListener('pointerdown', (event) => {
       if (!event.isPrimary || event.button !== 0 || state.over || !state.hand[slot]) return
       stopDrag()
+      boardImpact?.cancel()
+      boardImpact = null
       selectPiece(slot)
       drag = { id: event.pointerId, slot, x: event.clientX, y: event.clientY, touch: event.pointerType === 'touch', moving: false }
       drawShape(ghost, state.hand[slot])
@@ -902,7 +958,7 @@
     exitButton.disabled = false
     renderBoard()
     renderHand()
-    statusNode.textContent = '拖方块到棋盘，或选方块后点空格。'
+    statusNode.textContent = '拖动方块，填满一行或一列'
     postToHost('game.start')
     if (fresh) persist()
     if (state.over) showResult()
@@ -930,6 +986,9 @@
   settingsRestart.addEventListener('click', () => { resetGame(); pieceButtons[0].focus() })
   continueButton.addEventListener('click', continuePrevious)
   musicTrack.volume = .23
+  for (const { track } of Object.values(callouts)) {
+    track.addEventListener('ended', () => finishCallout(track))
+  }
   document.addEventListener('pointerup', unlockMusic, { capture: true, passive: true })
   document.addEventListener('keydown', unlockMusic)
   document.addEventListener('visibilitychange', () => {

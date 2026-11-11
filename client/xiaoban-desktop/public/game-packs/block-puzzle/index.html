@@ -28,13 +28,14 @@
     <section class="stats" aria-label="当前得分">
       <div class="stat"><span>当前分数</span><strong id="score">0</strong></div>
       <div class="stat statistics-only"><span>消除行列</span><strong id="lines">0</strong></div>
-      <div id="rewardDiamond" class="reward-diamond" aria-live="polite" hidden></div>
+      <output id="rewardDiamond" class="reward-diamond" aria-live="polite" hidden></output>
       <p id="comboCount" class="combo-counter" hidden></p>
     </section>
     <p class="intro">拖放方块，填满一整行或一整列即可消除</p>
     <section class="board-stage" aria-label="棋盘">
       <div class="board-shell">
         <div id="board" class="board" role="grid" aria-label="八行八列方块棋盘" aria-describedby="help"></div>
+        <div id="previewLayer" class="preview-layer" aria-hidden="true"></div>
         <div id="sparkLayer" class="spark-layer" aria-hidden="true"></div>
         <div id="comboBanner" class="combo-banner" aria-live="polite" hidden></div>
         <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
@@ -49,7 +50,7 @@
         </div>
       </div>
     </section>
-    <p id="trayHint" class="tray-hint">拖动下方方块放入棋盘</p>
+    <p id="trayHint" class="tray-hint">拖放方块，或选中后点棋盘</p>
     <section id="tray" class="tray" aria-label="三个待放置方块" aria-describedby="trayHint">
       <button class="piece-button" type="button" data-slot="0" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
       <button class="piece-button" type="button" data-slot="1" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>

@@ -29,15 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Velocity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -121,26 +112,8 @@ private fun greeting(hour: Int): Pair<String, String> = when (hour) {
 fun AiHomeScreen(
     env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOpenDrawer: () -> Unit,
     onCreateImage: () -> Unit, onCreateWork: (kind: String) -> Unit,
-    onGoPlaza: () -> Unit, onAppDrawerChanged: (Boolean) -> Unit = {},
 ) {
-    var appsOpen by rememberSaveable { mutableStateOf(false) }
     val homeScroll = rememberScrollState()
-    val pullThreshold = with(LocalDensity.current) { 56.dp.toPx() }
-    val pullConnection = remember(pullThreshold) {
-        object : NestedScrollConnection {
-            var pulled = 0f
-            override suspend fun onPreFling(available: Velocity): Velocity { pulled = 0f; return Velocity.Zero }
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && homeScroll.value == 0 && available.y > 0 && !appsOpen) {
-                    pulled += available.y
-                    if (pulled >= pullThreshold) { appsOpen = true; pulled = 0f }
-                } else pulled = 0f
-                return Offset.Zero
-            }
-        }
-    }
-    LaunchedEffect(appsOpen) { onAppDrawerChanged(appsOpen) }
-    DisposableEffect(Unit) { onDispose { onAppDrawerChanged(false) } }
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     val remote by env.remoteChat.state.collectAsState()
@@ -172,7 +145,7 @@ fun AiHomeScreen(
         HomeFeature(XIcons.Monitor, "遥控电脑", computerDesc, Indigo) { open(Route.Devices) },
     )
 
-    Box(Modifier.fillMaxSize().nestedScroll(pullConnection)) {
+    Box(Modifier.fillMaxSize()) {
         HomeBackdrop(Modifier.fillMaxWidth().height(320.dp))
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -181,9 +154,6 @@ fun AiHomeScreen(
                 IconTap(XIcons.NewChat, "新对话", { signedIn { chat.clearConversation(); open(Route.AiChat) } }, size = 22.dp)
             }
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(homeScroll).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
-                Box(Modifier.fillMaxWidth().height(32.dp).semantics { contentDescription = "打开我的应用" }.clickable { appsOpen = true }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
-                }
                 Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(hello, Modifier.padding(top = 6.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
                 Text(line, Modifier.padding(top = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -221,9 +191,6 @@ fun AiHomeScreen(
                 }
                 Spacer(Modifier.height(NavInset + 12.dp))
             }
-        }
-        OverlayTransition(appsOpen, direction = "top") { panel ->
-            AppLibraryDrawer(env, { appsOpen = false }, onGoPlaza, open, panel)
         }
     }
 }

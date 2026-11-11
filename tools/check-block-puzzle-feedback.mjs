@@ -188,6 +188,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const restart = () => nodes.get('restartOverlay').handlers.click()
   return {
     nodes, document, timers, audioGraph, initial, placeAt, placeAtTopLeft, saved, savedTheme, restart,
+    select: slot => buttons[slot].handlers.click(),
     getComputedColorReads: () => computedColorReads,
     releaseHostSave: () => releaseHostSave?.(),
     getHosted: key => hostedStorage.get(key),
@@ -226,13 +227,12 @@ const asyncStart = scenario(remoteBoard, 0, 0,
   { hostSave: remoteSave, deferHost: true, autoContinue: false })
 assert.equal(asyncStart.initial.score, 0)
 asyncStart.placeAt(0, 0)
-const scoreAfterMove = asyncStart.saved().game.score
-assert.ok(scoreAfterMove > 0)
+const gameAfterMove = asyncStart.saved().game
+assert.ok(gameAfterMove.score > 0)
 asyncStart.releaseHostSave()
 for (let i = 0; i < 18; i++) await Promise.resolve()
-assert.equal(asyncStart.saved().game.score, scoreAfterMove)
-assert.equal(asyncStart.saved().game.board[6][6], 0)
-assert.equal(asyncStart.saved().game.board[0][0] !== 0, true)
+assert.equal(asyncStart.saved().game.score, gameAfterMove.score)
+assert.deepEqual(asyncStart.saved().game.board, gameAfterMove.board)
 assert.equal(asyncStart.nodes.get('overlay').hidden, true)
 
 // Cross clears must produce an orderly horizontal AND vertical beam, and
@@ -247,7 +247,11 @@ const cross = scenario(crossBoard, 2, 0, { soundEnabled: true })
 const track = cross.nodes.get('musicTrack')
 const regularVolume = track.volume
 await track.play()
+cross.select(0)
+assert.deepEqual(cross.nodes.get('previewLayer').children.map(line => line.className),
+  ['line-preview horizontal', 'line-preview vertical'])
 cross.placeAtTopLeft()
+assert.equal(cross.nodes.get('previewLayer').children.length, 0)
 const fx = cross.nodes.get('sparkLayer').children.map(child => child.className)
 assert.ok(fx.includes('clear-beam horizontal'))
 assert.ok(fx.includes('clear-beam vertical'))
@@ -262,19 +266,19 @@ const rowTiles = cross.nodes.get('sparkLayer').children
 const rowDelays = rowTiles.map(tile => Number(tile.cssVars['--delay'].replace('ms', '')))
 assert.deepEqual(rowDelays.slice(0, 7), [75, 87, 99, 111, 123, 135, 147])
 assert.equal(cross.nodes.get('rewardDiamond').hidden, false)
-assert.match(cross.nodes.get('comboBanner').textContent, /COMBO ×3/)
+assert.match(cross.nodes.get('comboBanner').textContent, /GREAT!.*COMBO ×3/)
 assert.equal(cross.saved().game.combo, 3)
 assert.equal(cross.saved().paletteIndex, 0)
 assert.ok(Number(cross.nodes.get('score').textContent) > 10)
 assert.equal(track.volume, regularVolume, 'clears and callouts should keep the music level steady')
-assert.equal(cross.nodes.get('voiceGood').playCount, 1)
+assert.equal(cross.nodes.get('voiceGreat').playCount, 1)
 assert.ok(cross.audioGraph.pitches.length > 5, 'a cross and combo should schedule several pitches')
 cross.restart()
 assert.equal(cross.audioGraph.gains[0].target, 0, 'restart should fade the previous combo cue')
-assert.equal(cross.nodes.get('voiceGood').paused, true, 'restart should stop the previous callout')
+assert.equal(cross.nodes.get('voiceGreat').paused, true, 'restart should stop the previous callout')
 assert.equal(track.volume, regularVolume)
 
-// Single rows climb and single columns descend. A spoken cue is reserved for a reward.
+// Single rows climb and single columns descend; their praise is identical.
 const soloRow = crossBoard.map((row, i) => row.map((value, j) => i > 0 && j === 0 ? 0 : value))
 const soloCol = crossBoard.map((row, i) => row.map((value, j) => i === 0 && j > 0 ? 0 : value))
 const rowClear = scenario(soloRow, 0, 0, { soundEnabled: true })
@@ -283,14 +287,30 @@ rowClear.placeAtTopLeft()
 colClear.placeAtTopLeft()
 assert.ok(rowClear.audioGraph.pitches[1].value < rowClear.audioGraph.pitches[3].value)
 assert.ok(colClear.audioGraph.pitches[1].value > colClear.audioGraph.pitches[3].value)
-assert.equal(rowClear.nodes.get('voiceNice').playCount, 0)
+assert.equal(rowClear.nodes.get('voiceNice').playCount, 1)
+assert.match(rowClear.nodes.get('comboBanner').textContent, /^NICE!/)
 
-const nice = scenario(crossBoard, 0, 0, { soundEnabled: true })
-nice.placeAtTopLeft()
-assert.equal(nice.nodes.get('voiceNice').playCount, 1)
-const great = scenario(soloRow, 4, 0, { soundEnabled: true })
+const double = scenario(crossBoard, 0, 0, { soundEnabled: true })
+double.placeAtTopLeft()
+assert.equal(double.nodes.get('voiceGood').playCount, 1)
+assert.match(double.nodes.get('comboBanner').textContent, /^GOOD!/)
+const great = scenario(soloRow, 3, 0, { soundEnabled: true })
 great.placeAtTopLeft()
 assert.equal(great.nodes.get('voiceGreat').playCount, 1)
+assert.match(great.nodes.get('comboBanner').textContent, /^GREAT!.*COMBO ×4/)
+
+const rapidBoard = soloRow.map(row => row.slice())
+rapidBoard[1] = rapidBoard[0].slice()
+const rapid = scenario(rapidBoard, 0, 0, { soundEnabled: true })
+rapid.placeAt(0, 0, 0)
+rapid.placeAt(1, 0, 1)
+const firstCallout = rapid.nodes.get('voiceNice')
+const nextCallout = rapid.nodes.get('voiceGood')
+assert.equal(firstCallout.paused, false, 'a new clear should not interrupt the previous word')
+assert.equal(nextCallout.playCount, 0)
+firstCallout.paused = true
+firstCallout.handlers.ended()
+assert.equal(nextCallout.playCount, 1, 'the queued word should play once the first finishes')
 
 // A true perfect clear switches the whole game's palette and persists the
 // unlock. It must not rotate the palette on a normal line clear.
@@ -301,7 +321,7 @@ perfect.placeAtTopLeft()
 assert.equal(perfect.nodes.get('voiceWonderful').playCount, 1)
 assert.equal(perfect.saved().paletteIndex, 1)
 assert.equal(perfect.saved().perfectCount, 1)
-assert.match(perfect.nodes.get('comboBanner').textContent, /PERFECT!/)
+assert.match(perfect.nodes.get('comboBanner').textContent, /^WONDERFUL!/)
 assert.equal(perfect.document.body.dataset.palette, 'rose')
 const paletteChange = perfect.timers.find(timer => timer.delay === 330)
 assert.ok(paletteChange, 'theme rotation should be timed after the clear highlight')
@@ -332,14 +352,15 @@ assert.equal(buffer.saved().game.combo, 2)
 // Non-clearing milestones are scored and animated separately from Combo.
 const setupBoard = Array.from({ length: 8 }, () => Array(8).fill(0))
 for (let i = 0; i < 6; i++) setupBoard[0][i] = 1
-const setup = scenario(setupBoard)
+const setup = scenario(setupBoard, 0, 0, { soundEnabled: true })
 setup.placeAt(0, 6)
 assert.equal(setup.saved().game.score, 19)
 assert.equal(setup.saved().game.combo, 0)
 assert.equal(setup.saved().game.lines, 0)
 assert.equal(setup.saved().game.setupMoves, 1)
 assert.match(setup.nodes.get('status').textContent, /布局奖励/)
-assert.match(setup.nodes.get('comboBanner').textContent, /NICE SETUP!/)
+assert.match(setup.nodes.get('comboBanner').textContent, /^NICE!/)
+assert.equal(setup.nodes.get('voiceNice').playCount, 1)
 assert.equal(setup.nodes.get('rewardDiamond').textContent, '+8')
 assert.equal(setup.nodes.get('rewardDiamond').hidden, false)
 assert.ok(setup.nodes.get('sparkLayer').children.every(tile => tile.className !== 'departing-tile'))

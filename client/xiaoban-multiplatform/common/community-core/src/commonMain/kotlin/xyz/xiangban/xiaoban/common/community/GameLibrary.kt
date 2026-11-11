@@ -6,7 +6,7 @@ import kotlinx.serialization.json.*
 object BuiltinMobileGames {
     const val REMOTE_CONTROL = "remote-control"
     const val QUICK_LAUNCH = "quick-launch"
-    val ids = listOf("dusk-glider", "ink-blade", "jade-gomoku", "pro-cube", "snake-arena", "block-puzzle", "merge-2048", "water-sort", "falling-blocks", "mbti", REMOTE_CONTROL, QUICK_LAUNCH)
+    val ids = listOf("dusk-glider", "ink-blade", "block-puzzle", "pocket-sprites", "pro-cube", "snake-arena", "jade-gomoku", "merge-2048", "water-sort", "falling-blocks", "mbti", REMOTE_CONTROL, QUICK_LAUNCH)
     /** Builtins shown under 精选工具 instead of 精选游戏. */
     val tools = setOf("mbti", REMOTE_CONTROL, QUICK_LAUNCH)
     fun isTool(id: String): Boolean = id in tools

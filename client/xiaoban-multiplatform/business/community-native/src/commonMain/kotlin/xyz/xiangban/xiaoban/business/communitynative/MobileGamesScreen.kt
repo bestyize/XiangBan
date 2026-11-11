@@ -42,7 +42,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -110,6 +112,7 @@ internal fun GamesScreen(
     var creating by remember { mutableStateOf(false) }
     var remixSource by remember { mutableStateOf<MobileGame?>(null) }
     var featuredPage by rememberSaveable { mutableStateOf<FeaturedPage?>(null) }
+    var libraryVisible by remember { mutableStateOf(false) }
     var createKind by rememberSaveable { mutableStateOf("游戏") }
     var idea by rememberSaveable { mutableStateOf("") }
     var remotePrompt by remember { mutableStateOf<String?>(null) }
@@ -150,7 +153,7 @@ internal fun GamesScreen(
         transitionSpec = { tween(PageMillis, easing = FastOutSlowInEasing) },
         label = "广场让位",
     ) { if (it == null) 0f else 1f }
-    LaunchedEffect(overlay, featuredVisible) { onOverlayChanged(overlay || featuredVisible) }
+    LaunchedEffect(overlay, featuredVisible, libraryVisible) { onOverlayChanged(overlay || featuredVisible || libraryVisible) }
     DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
     fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; remixSource = null; panel = "actions" } }
     fun openOfficial(game: MobileGame) {
@@ -229,6 +232,9 @@ internal fun GamesScreen(
         } finally { errors = failures; loading = false }
     }
     val myItems = games.map { CreationItem(it.id, it.name, it.description, if (it.kind == "app") "小程序" else "游戏", it, true) }
+    val appCatalog = remember(official, games) {
+        official.map { AppShortcut("builtin", it.id, it.name) } + games.map { AppShortcut("local", it.id, it.name) }
+    }
     val visible = myItems.filter { category == "全部" || it.kind == category }
     // Ignore touches while a page is moving or leaving the active tab.
     val blockTouches = if (active && !featuredTransition.isRunning) Modifier else Modifier.pointerInput(Unit) {
@@ -237,69 +243,79 @@ internal fun GamesScreen(
         }
     }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(blockTouches)) {
-        Column(
-            Modifier.fillMaxSize()
-                .graphicsLayer { translationX = -size.width * plazaShift }
-                .semantics { if (featuredVisible) hideFromAccessibility() }
-                .statusBarsPadding(),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    listOf(false to "广场", true to "我的作品").forEach { (value, label) ->
-                        Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { onMineChanged(value) }.padding(vertical = 8.dp)) {
-                            Text(label, style = XType.Title, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
-                        }
-                    }
-                }
-                IconTap(XIcons.Search, "搜索应用", {}) // Search destination is reserved for a later version.
-                if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
+        AppLibraryPullDown(
+            enabled = active && !mine && !featuredVisible && !overlay,
+            onVisibilityChanged = { libraryVisible = it },
+            drawer = { dismiss -> AppLibraryDrawer(env, appCatalog, loading, errors, { reload++ }, dismiss, open) },
+        ) { showLibrary, dragHandle ->
+            val headerDrag = if (mine) Modifier else dragHandle.semantics {
+                customActions = listOf(CustomAccessibilityAction("打开最近用过") { showLibrary(); true })
             }
-            Box(Modifier.fillMaxSize()) {
-                RetainedTabPage(selected = !mine) {
-                    AppPlazaScreen(env, official, games, covers, imageLoader, loading, errors, { reload++ },
-                        featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
-                        onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
-                        onAllGames = { featuredPage = FeaturedPage.Games },
-                        onAllTools = { featuredPage = FeaturedPage.Tools }, open = open)
-                }
-                RetainedTabPage(selected = mine) {
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        item {
-                            Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { prepare() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 24.dp)
-                                Column(Modifier.weight(1f)) {
-                                    Text("你想做个什么？", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                    Text("和小伴一起，把想法变成作品", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                                }
-                            }
-                        }
-                        item { Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        item { CreationChips(creationTypes, category) { category = it } }
-                        if (errors.isNotEmpty()) item {
-                            Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
-                            LinkText("重新读取", { reload++ })
-                        }
-                        if (loading && visible.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(120.dp)) }
-                        if (!loading && visible.isEmpty()) item {
-                            EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category != "全部" && category !in LocalCreationTypes) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
-                            AppActionButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth(), primary = true)
-                        }
-                        item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
-                        items(visible, key = { it.key }) { entry ->
-                            Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                CreationCover(entry, rememberLocalCover(env.games, entry.game, workRevision), imageLoader, Modifier.size(68.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(entry.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("保存在这台手机上", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+            Column(
+                Modifier.fillMaxSize()
+                    .graphicsLayer { translationX = -size.width * plazaShift }
+                    .semantics { if (featuredVisible) hideFromAccessibility() }
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding(),
+            ) {
+                Row(Modifier.fillMaxWidth().then(headerDrag).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        listOf(false to "广场", true to "我的作品").forEach { (value, label) ->
+                            Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { onMineChanged(value) }.padding(vertical = 8.dp)) {
+                                Text(label, style = XType.Title, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
                             }
                         }
                     }
+                    IconTap(XIcons.Search, "搜索应用", {}) // Search destination is reserved for a later version.
+                    if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
                 }
-            }
+                Box(Modifier.fillMaxSize()) {
+                    RetainedTabPage(selected = !mine) {
+                        AppPlazaScreen(env, official, loading, errors, { reload++ },
+                            featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
+                            onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
+                            onAllGames = { featuredPage = FeaturedPage.Games },
+                            onAllTools = { featuredPage = FeaturedPage.Tools }, open = open)
+                    }
+                    RetainedTabPage(selected = mine) {
+                        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            item {
+                                Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { prepare() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 24.dp)
+                                    Column(Modifier.weight(1f)) {
+                                        Text("你想做个什么？", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                        Text("和小伴一起，把想法变成作品", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                                    }
+                                }
+                            }
+                            item { Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            item { CreationChips(creationTypes, category) { category = it } }
+                            if (errors.isNotEmpty()) item {
+                                Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
+                                LinkText("重新读取", { reload++ })
+                            }
+                            if (loading && visible.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(120.dp)) }
+                            if (!loading && visible.isEmpty()) item {
+                                EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category != "全部" && category !in LocalCreationTypes) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
+                                AppActionButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth(), primary = true)
+                            }
+                            item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
+                            items(visible, key = { it.key }) { entry ->
+                                Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    CreationCover(entry, rememberLocalCover(env.games, entry.game, workRevision), imageLoader, Modifier.size(68.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(entry.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("保存在这台手机上", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+                                }
+                            }
+                        }
+                    }
+                }
+        }
         }
         if (!active) return@Box
         featuredTransition.AnimatedContent(
@@ -314,7 +330,7 @@ internal fun GamesScreen(
                 FeaturedPage.Tools -> FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { featuredPage = null },
                     featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
                     onDetails = ::showOfficialDetails, onOpen = ::openOfficial, open = open)
-                FeaturedPage.Games -> FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { featuredPage = null },
+                FeaturedPage.Games -> FeaturedGamesPage(env, official.filterNot { BuiltinMobileGames.isTool(it.id) }, back = { featuredPage = null },
                     onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
                 null -> Spacer(Modifier.fillMaxSize())
             }

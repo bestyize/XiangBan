@@ -112,7 +112,6 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         var showMyWorks by rememberSaveable { mutableStateOf(false) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
-        var appDrawerOpen by remember { mutableStateOf(false) }
         // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
         var pendingImageSheet by remember { mutableStateOf(false) }
         var pendingCreation by remember { mutableStateOf<String?>(null) }
@@ -149,14 +148,13 @@ fun CommunityNativeApp(env: CommunityEnv) {
                             env, chat, ::push, { aiDrawerOpen = true },
                             onCreateImage = { if (!chat.state.value.sending) chat.clearConversation(); pendingImageSheet = true; push(Route.AiChat) },
                             onCreateWork = { kind -> pendingCreation = kind; tab = Tab.Games.name },
-                            onGoPlaza = { showMyWorks = false; tab = Tab.Games.name }, onAppDrawerChanged = { appDrawerOpen = it },
                         )
                         Tab.Games, Tab.Community -> Spacer(Modifier.fillMaxSize()) // Keep the transition full size.
                         Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
                 Box(Modifier.fillMaxSize().zIndex(2f)) {
-                    if ((!gameOverlayOpen || !gamesSelected) && (!appDrawerOpen || selectedTab != Tab.Ai)) FloatingNav(selectedTab, publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                    if (!gameOverlayOpen || !gamesSelected) FloatingNav(selectedTab, publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
                     AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
                 }
             }

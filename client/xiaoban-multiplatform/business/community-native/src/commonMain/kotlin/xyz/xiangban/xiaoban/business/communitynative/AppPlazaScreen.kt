@@ -2,7 +2,6 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,16 +26,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
+private const val FeaturedColumns = 4
+private val FeaturedInset = 16.dp
+private val FeaturedGap = 8.dp
+
 /** Plaza sections deliberately exclude desktop ideas and unsupported app kinds. */
 @Composable
-internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local: List<MobileGame>, covers: Map<String, ByteArray>,
-    imageLoader: ImageLoader, loading: Boolean, errors: List<String>, reload: () -> Unit,
+internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>,
+    loading: Boolean, errors: List<String>, reload: () -> Unit,
     featuredShortcuts: List<AppShortcut>, featuredTools: Load<Unit>, retryFeaturedTools: () -> Unit,
     onOfficial: (MobileGame) -> Unit, onOfficialDetails: (MobileGame) -> Unit,
     onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
@@ -58,39 +60,26 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
         )
     }
     val state by key(loader) { loader.state.collectAsState() }
-    val toolShortcuts = (tools.map { AppShortcut("builtin", it.id, it.name) } + featuredShortcuts).take(4)
+    val toolShortcuts = (tools.map { AppShortcut("builtin", it.id, it.name) } + featuredShortcuts).take(FeaturedColumns)
     LaunchedEffect(loader, state) {
         (state as? Load.Ready)?.value?.let { result ->
             val items = if (featuredOnly) result.items.filter { it.featured && (it.kind == "game" || it.kind == "app") } else result.items
             entries = ((if (requestedPage == 1) emptyList() else entries) + items).distinctBy { it.id }
         }
     }
-    val recentIds = env.platform?.recentGames?.collectAsState()?.value.orEmpty()
-    val recentCommunity = env.platform?.recentCommunityGames?.collectAsState()?.value.orEmpty()
-    val available = official.map { AppShortcut("builtin", it.id, it.name) } + local.map { AppShortcut("local", it.id, it.name) }
-    val recent = recentAppShortcuts(recentIds, available, recentCommunity)
-    var message by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (recent.isNotEmpty()) {
-                item { LazyRow(Modifier.padding(top = 4.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(recent, key = { it.key }) { item ->
-                        if (item.source == "community") {
-                            CommunityShortcutTile(env, item, Modifier.width(64.dp), showGameDetails = true) { open(Route.Pack(item.id.toLong())) }
-                        } else AppShortcutTile(env, item, Modifier.width(64.dp)) {
-                            if (env.platform?.openGame(item.id) != true) message = "当前平台无法打开游戏"
-                        }
-                    }
-                } }
-            }
             item { PlazaHeading("精选游戏", "全部", onAllGames.takeIf { games.isNotEmpty() }) }
             if (loading && games.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(80.dp)) }
             if (!loading && games.isEmpty()) item { Text("当前平台暂无官方游戏", Modifier.padding(horizontal = 16.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3) }
             item {
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(games, key = { it.id }) { game ->
-                        FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.width(124.dp),
-                            onDetails = { onOfficialDetails(game) }) { onOfficial(game) }
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val tileWidth = (maxWidth - FeaturedInset * 2 - FeaturedGap * (FeaturedColumns - 1)) / FeaturedColumns
+                    LazyRow(contentPadding = PaddingValues(horizontal = FeaturedInset), horizontalArrangement = Arrangement.spacedBy(FeaturedGap)) {
+                        items(games, key = { it.id }) { game ->
+                            FeaturedGameTile(env, game, Modifier.width(tileWidth),
+                                onDetails = { onOfficialDetails(game) }) { onOfficial(game) }
+                        }
                     }
                 }
             }
@@ -98,11 +87,11 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
             if (toolShortcuts.isNotEmpty() || featuredTools !is Load.Ready) {
                 item { PlazaHeading("精选工具", "全部", onAllTools) }
                 if (toolShortcuts.isNotEmpty()) item {
-                    Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.padding(horizontal = FeaturedInset).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FeaturedGap)) {
                         toolShortcuts.forEach { shortcut ->
                             FeaturedToolTile(env, shortcut, tools, Modifier.weight(1f), onOfficialDetails, onOfficial, open)
                         }
-                        repeat(4 - toolShortcuts.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(FeaturedColumns - toolShortcuts.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
                 featuredToolsStatus(featuredTools, featuredShortcuts.isNotEmpty(), retryFeaturedTools, Modifier.padding(horizontal = 16.dp))
@@ -133,7 +122,6 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
             }
         }
-        Toast(message) { message = null }
     }
 }
 
@@ -149,19 +137,11 @@ private fun PlazaHeading(title: String, action: String? = null, onAction: (() ->
     }
 }
 
-/** Shared by the plaza row and the full list; only the cover is clipped so the two text lines never lose their corners. */
 @Composable
-internal fun FeaturedGameCard(game: MobileGame, cover: ByteArray?, imageLoader: ImageLoader, modifier: Modifier,
+private fun FeaturedGameTile(env: CommunityEnv, game: MobileGame, modifier: Modifier,
     onDetails: () -> Unit, onClick: () -> Unit) {
-    Column(modifier.combinedClickable(role = Role.Button, onLongClickLabel = "查看作品详情", onLongClick = onDetails, onClick = onClick).padding(bottom = 4.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f).outlinedCard(16.dp), contentAlignment = Alignment.Center) {
-            XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
-            cover?.let { bytes -> AsyncImage(bytes, null, imageLoader = imageLoader, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-            PlazaCoverBadge("官方", Modifier.align(Alignment.BottomEnd).padding(6.dp))
-        }
-        Text(game.name, Modifier.padding(top = 8.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(BuiltinMobileGames.genre(game.id), Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1)
-    }
+    AppShortcutTile(env, AppShortcut("builtin", game.id, game.name), modifier,
+        onDetails = onDetails, subtitle = BuiltinMobileGames.genre(game.id), onClick = onClick)
 }
 
 @Composable
@@ -192,12 +172,12 @@ internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back:
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenBar("精选工具", back)
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(shortcuts.chunked(4)) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(shortcuts.chunked(FeaturedColumns)) { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FeaturedGap)) {
                     row.forEach { shortcut ->
                         FeaturedToolTile(env, shortcut, tools, Modifier.weight(1f), onDetails, onOpen, open)
                     }
-                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(FeaturedColumns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
             featuredToolsStatus(featuredTools, featuredShortcuts.isNotEmpty(), retryFeaturedTools)
@@ -217,9 +197,9 @@ private fun LazyListScope.featuredToolsStatus(state: Load<Unit>, hasTools: Boole
     }
 }
 
-/** 精选游戏「全部」：三列封面，按方向筛选。 */
+/** 精选游戏「全部」：四列图标，按方向筛选。 */
 @Composable
-internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, ByteArray>, imageLoader: ImageLoader, back: () -> Unit,
+internal fun FeaturedGamesPage(env: CommunityEnv, games: List<MobileGame>, back: () -> Unit,
     onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit) {
     var filter by rememberSaveable { mutableStateOf("全部") }
     val shown = games.filter { filter == "全部" || (filter == "横屏") == (it.orientation == "landscape") }
@@ -228,13 +208,13 @@ internal fun FeaturedGamesPage(games: List<MobileGame>, covers: Map<String, Byte
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("全部", "竖屏", "横屏").forEach { label -> PlazaChip(label, label == filter) { filter = label } } } }
             if (shown.isEmpty()) item { Text("没有${filter}游戏", Modifier.padding(vertical = 24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3) }
-            items(shown.chunked(3)) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(shown.chunked(FeaturedColumns)) { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FeaturedGap)) {
                     row.forEach { game ->
-                        FeaturedGameCard(game, covers["builtin:${game.id}"], imageLoader, Modifier.weight(1f),
+                        FeaturedGameTile(env, game, Modifier.weight(1f),
                             onDetails = { onDetails(game) }) { onOpen(game) }
                     }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(FeaturedColumns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
