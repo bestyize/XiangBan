@@ -36,6 +36,7 @@
   let turns = 0
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
+  let writeQueue = Promise.resolve()
 
   function readLocal() {
     try { return JSON.parse(localStorage.getItem(storeKey) || 'null') } catch { return null }
@@ -57,7 +58,8 @@
     const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled }
     try { localStorage.setItem(storeKey, JSON.stringify(data)) } catch { /* sandbox storage */ }
     if (!recovering && hostStorage?.set) {
-      Promise.resolve(hostStorage.set(storeKey, data)).catch(() => {})
+      // Serialize host writes so a slow old save cannot overtake the newest round.
+      writeQueue = writeQueue.catch(() => {}).then(() => hostStorage.set(storeKey, data))
     }
   }
   async function restoreFromHost() {
@@ -99,7 +101,7 @@
   function showFeedback(result) {
     sparkLayer.replaceChildren()
     const lines = result.clearedRows.length + result.clearedCols.length
-    if (!lines) { comboBanner.hidden = true; return }
+    if (!lines) { clearTimeout(showFeedback.timer); comboBanner.hidden = true; return }
     const word = result.perfect ? 'PERFECT!' : result.combo >= 5 ? 'AMAZING!' :
       result.combo >= 3 ? 'GREAT!' : lines >= 2 ? 'EXCELLENT!' : 'GOOD!'
     comboBanner.textContent = word + (result.combo >= 2 ? ' · COMBO ×' + result.combo : '') + '  +' + result.gained
@@ -124,16 +126,27 @@
 
 
   function postToHost(type, payload = {}) {
+    // Official Android/desktop protocol 2 uses the injected xb SDK, not hostNonce.
+    if (globalThis.xb?.game) {
+      if (!hostReady) return
+      try {
+        let operation
+        if (type === 'game.ready') operation = globalThis.xb.ready()
+        else if (type === 'game.start') operation = globalThis.xb.game.start()
+        else if (type === 'game.progress') operation = globalThis.xb.game.progress({ score: payload.score })
+        else if (type === 'game.result') operation = globalThis.xb.game.result({ score: payload.score })
+        else if (type === 'game.exit') operation = globalThis.xb.exit()
+        if (operation) void Promise.resolve(operation).catch(() => {})
+      } catch { /* Host can be unavailable during shutdown. */ }
+      return
+    }
     if (runtime) { if (hostReady) runtime.send(type, payload); return }
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type, nonce: HOST_NONCE, ...payload }, '*')
   }
 
   function initialize() {
-    if (hostReady) {
-      postToHost('game.ready')
-      return
-    }
+    if (hostReady) return
     hostReady = true
     document.body.classList.add('hosted')
     if (globalThis.xb?.info?.platform === 'android') document.body.classList.add('native-host')
@@ -464,6 +477,9 @@
   resetGame(false)
   if (hostStorage?.get) void restoreFromHost()
   else recovering = false
-  if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag(); persist() } })
+  if (globalThis.xb?.ready) {
+    initialize()
+    globalThis.xb.on?.('hide', () => { if (drag) stopDrag(); persist() })
+  } else if (runtime) runtime.connect(initialize, { hide: () => { if (drag) stopDrag(); persist() } })
 
 })()
