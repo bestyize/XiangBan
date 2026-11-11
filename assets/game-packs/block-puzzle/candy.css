@@ -264,3 +264,130 @@ body.fresh-game[data-game="block-puzzle"] {
 @media (pointer: coarse) {
   .fresh-game[data-game="block-puzzle"] .piece-button:focus-visible { outline:none; }
 }
+
+
+/* v2.1.0: staged, direction-aware line clears and progressive combo feedback. */
+.fresh-game[data-game="block-puzzle"] .cell.preview-line {
+  box-shadow: inset 0 0 0 2px #fff0b6, 0 0 7px #ffdf77;
+}
+.fresh-game[data-game="block-puzzle"] .clear-beam {
+  position:absolute;pointer-events:none;z-index:4;
+  border-radius:4px;mix-blend-mode:screen;opacity:0;
+  box-shadow:0 0 14px 3px #fff5b8b8,0 0 29px 7px #ffaaff77;
+  animation-delay:var(--delay,0ms);
+}
+.fresh-game[data-game="block-puzzle"] .clear-beam.horizontal {
+  left:0;width:100%;height:12.5%;
+  background:linear-gradient(90deg,transparent 0%,#ffdf91 20%,#fff 50%,#ffcf82 80%,transparent 100%);
+  transform-origin:left center;animation-name:clear-sweep-x;animation-duration:460ms;animation-timing-function:cubic-bezier(.23,.74,.21,1);animation-fill-mode:both;
+}
+.fresh-game[data-game="block-puzzle"] .clear-beam.vertical {
+  top:0;height:100%;width:12.5%;
+  background:linear-gradient(180deg,transparent 0%,#ffdf91 20%,#fff 50%,#ffcf82 80%,transparent 100%);
+  transform-origin:center top;animation-name:clear-sweep-y;animation-duration:460ms;animation-timing-function:cubic-bezier(.23,.74,.21,1);animation-fill-mode:both;
+}
+@keyframes clear-sweep-x {
+  0%{transform:scaleX(.02);opacity:0}
+  15%{opacity:1}
+  55%{transform:scaleX(1);opacity:1}
+  100%{transform:scaleX(1);opacity:0}
+}
+@keyframes clear-sweep-y {
+  0%{transform:scaleY(.02);opacity:0}
+  15%{opacity:1}
+  55%{transform:scaleY(1);opacity:1}
+  100%{transform:scaleY(1);opacity:0}
+}
+.fresh-game[data-game="block-puzzle"] .clear-fragment {
+  position:absolute;z-index:5;pointer-events:none;width:8px;height:8px;
+  margin:-4px 0 0 -4px;border-radius:2px;
+  background:linear-gradient(135deg,#fffdde,#f9bb61);box-shadow:0 0 6px #fff6b8;
+  animation:clear-fragment .58s cubic-bezier(.16,.65,.24,1) var(--delay,0ms) both;
+}
+@keyframes clear-fragment {
+  0%{transform:scale(.2);opacity:0}
+  20%{transform:scale(1.45);opacity:1}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(95deg) scale(0);opacity:0}
+}
+.fresh-game[data-game="block-puzzle"] .clear-shockwave {
+  position:absolute;top:50%;left:50%;z-index:4;pointer-events:none;
+  width:25%;height:25%;border-radius:50%;border:3px solid #fff7b0b8;
+  box-shadow:0 0 20px #fff4a3;
+  animation:clear-shockwave .53s ease-out both;
+}
+@keyframes clear-shockwave {
+  0%{transform:translate(-50%,-50%) scale(.25);opacity:.9}
+  100%{transform:translate(-50%,-50%) scale(5);opacity:0}
+}
+.fresh-game[data-game="block-puzzle"] .perfect-confetti {
+  position:absolute;z-index:6;width:11px;height:14px;
+  background:#ffd345;border-radius:2px;opacity:0;pointer-events:none;
+  animation:perfect-confetti 1.05s ease-out both;
+}
+.fresh-game[data-game="block-puzzle"] .perfect-confetti:nth-of-type(3n){background:#fff5f4}
+.fresh-game[data-game="block-puzzle"] .perfect-confetti:nth-of-type(4n){background:#ea62a3}
+@keyframes perfect-confetti {
+  0%{opacity:0;transform:translateY(15px) scale(.4)}
+  18%{opacity:1}
+  100%{opacity:0;transform:translate(var(--dx),-70px) rotate(270deg)}
+}
+.fresh-game[data-game="block-puzzle"] .combo-banner.tier-great { color:#fff0a0;font-size:clamp(20px,5.3vw,32px) }
+.fresh-game[data-game="block-puzzle"] .combo-banner.tier-amazing { color:#ffe24a;font-size:clamp(21px,5.7vw,36px);text-shadow:0 2px 2px #9a3a6b,0 0 15px #ffd135 }
+.fresh-game[data-game="block-puzzle"] .combo-banner.tier-legendary,
+.fresh-game[data-game="block-puzzle"] .combo-banner.tier-perfect {
+  color:#fff9d5;font-size:clamp(23px,6.1vw,39px);
+  text-shadow:0 4px 2px #ad5186,0 0 16px #ffdf57,0 0 24px #ffc158;
+}
+/* Palette rotates on a perfect board clear, including the board AND every tile.
+   The default stays rose, maintaining visual continuity with previous saves. */
+body.fresh-game[data-game="block-puzzle"][data-palette="amber"] {
+  --palette-top:#f5bb82;--palette-middle:#e6a172;--palette-bottom:#cb7d61;
+  --palette-board:#825340;--palette-empty:#9a6854;
+  --palette-highlight:#ffe9a9;--palette-mid:#f6a944;--palette-shadow:#bc631c;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mint"] {
+  --palette-top:#a0ddc7;--palette-middle:#76c3b6;--palette-bottom:#4f9d9e;
+  --palette-board:#3b7776;--palette-empty:#538c8b;
+  --palette-highlight:#d9ffef;--palette-mid:#62d8aa;--palette-shadow:#248c88;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="violet"] {
+  --palette-top:#c4a8f3;--palette-middle:#a88adf;--palette-bottom:#826ac3;
+  --palette-board:#644b87;--palette-empty:#7c6399;
+  --palette-highlight:#f2ddff;--palette-mid:#bb7eeb;--palette-shadow:#7444b8;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="sky"] {
+  --palette-top:#a9cfee;--palette-middle:#80b3db;--palette-bottom:#668fbf;
+  --palette-board:#416d91;--palette-empty:#5b83a2;
+  --palette-highlight:#e1f6ff;--palette-mid:#65b8f5;--palette-shadow:#3387ca;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) {
+  background:radial-gradient(ellipse at 52% 12%,var(--palette-top) 0%,var(--palette-middle) 45%,var(--palette-bottom) 100%);
+}
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .board {
+  background:var(--palette-board);border-color:var(--palette-middle);
+}
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .cell:not(.filled):not(.preview):not(.preview-invalid):not(.preview-line) {
+  background:var(--palette-empty);
+}
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .cell.filled,
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .mini-cell {
+  background:linear-gradient(140deg,var(--palette-highlight),var(--palette-mid) 45%,var(--palette-shadow));
+  border-color:var(--palette-highlight);
+  box-shadow:inset 3px 3px 0 #ffffff66,inset -4px -4px 0 #00000036,0 2px 3px #251c3240;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette]:not([data-palette="rose"]) .best-score {
+  text-shadow:0 3px 3px #46304788;
+}
+body.fresh-game[data-game="block-puzzle"].palette-flash::after {
+  content:"";position:fixed;inset:0;z-index:19;pointer-events:none;
+  background:radial-gradient(circle at 50% 45%,#fffcee 0%,#ffe9ac88 45%,transparent 80%);
+  animation:palette-bloom .52s ease-out both;
+}
+@keyframes palette-bloom { from{opacity:0} 45%{opacity:.95} to{opacity:0} }
+@media (prefers-reduced-motion:reduce){
+  .fresh-game[data-game="block-puzzle"] .clear-beam,
+  .fresh-game[data-game="block-puzzle"] .clear-fragment,
+  .fresh-game[data-game="block-puzzle"] .clear-shockwave,
+  .fresh-game[data-game="block-puzzle"] .perfect-confetti,
+  body.fresh-game[data-game="block-puzzle"].palette-flash::after { animation:none;display:none }
+}
