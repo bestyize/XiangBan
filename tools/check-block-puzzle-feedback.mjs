@@ -38,7 +38,7 @@ class FakeElement {
   addEventListener(name, callback) { this.handlers[name] = callback }
   setAttribute(name, value) { this.attributes[name] = value }
   replaceChildren(...children) { this.children = children }
-  append(child) { this.children.push(child) }
+  append(...children) { this.children.push(...children) }
   get childElementCount() { return this.children.length }
   getBoundingClientRect() { return { top: 200, left: 0, width: 40, height: 40 } }
   focus() {}
@@ -56,6 +56,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const nodes = new Map()
   const buttons = [new FakeElement(), new FakeElement(), new FakeElement()]
   const timers = []
+  let computedColorReads = 0
   const save = {
     version: 2,
     game: { board, hand: ['dot', 'dot', 'dot'], score: 10,
@@ -78,6 +79,10 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const window = {
     location: { search: '', assign() {} },
     matchMedia() { return { matches: false } },
+    getComputedStyle() {
+      computedColorReads += 1
+      return { getPropertyValue(name) { return name === '--color-1' ? '#f65b97' : '' } }
+    },
     addEventListener() {},
   }
   window.parent = window
@@ -92,7 +97,9 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
     requestAnimationFrame(callback) { callback(2000); return 1 },
     cancelAnimationFrame() {},
     setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length },
-    clearTimeout() {},
+    clearTimeout(handle) {
+      if (timers[handle - 1]) timers[handle - 1].cancelled = true
+    },
   }
   runInNewContext(rulesText, sandbox, { filename: 'rules.js' })
   runInNewContext(gameText, sandbox, { filename: 'game.js' })
@@ -104,7 +111,10 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const saved = () => JSON.parse(storage.get('xiaoban.block-puzzle.classic.v2'))
   const savedTheme = () => JSON.parse(storage.get('xiaoban.block-puzzle.theme.v1'))
   const restart = () => nodes.get('restartOverlay').handlers.click()
-  return { nodes, document, timers, placeAt, placeAtTopLeft, saved, savedTheme, restart }
+  return {
+    nodes, document, timers, placeAt, placeAtTopLeft, saved, savedTheme, restart,
+    getComputedColorReads: () => computedColorReads,
+  }
 }
 
 // Cross clears must produce an orderly horizontal AND vertical beam, and
@@ -124,12 +134,22 @@ assert.ok(fx.includes('clear-shockwave'))
 assert.equal(fx.filter(name => name === 'departing-tile').length, 15)
 assert.ok(cross.nodes.get('sparkLayer').children
   .filter(tile => tile.className === 'departing-tile')
-  .every(tile => tile.cssVars['--piece-color'] === 'var(--color-1)'))
+  .every(tile => tile.cssVars['--piece-color'] === '#f65b97'))
+assert.equal(cross.getComputedColorReads(), 1)
+const rowTiles = cross.nodes.get('sparkLayer').children
+  .filter(tile => tile.className === 'departing-tile').slice(0, 8)
+const rowDelays = rowTiles.map(tile => Number(tile.cssVars['--delay'].replace('ms', '')))
+assert.deepEqual(rowDelays.slice(0, 7), [75, 87, 99, 111, 123, 135, 147])
 assert.equal(cross.nodes.get('rewardDiamond').hidden, false)
 assert.match(cross.nodes.get('comboBanner').textContent, /COMBO ×3/)
 assert.equal(cross.saved().game.combo, 3)
 assert.equal(cross.saved().paletteIndex, 0)
 assert.ok(Number(cross.nodes.get('score').textContent) > 10)
+const pendingClearNotes = cross.timers.filter(timer => [55, 127, 199, 271].includes(timer.delay))
+assert.ok(pendingClearNotes.length >= 2)
+cross.restart()
+assert.ok(pendingClearNotes.every(timer => timer.cancelled),
+  'restarted games must cancel the previous combo melody')
 
 // A true perfect clear switches the whole game's palette and persists the
 // unlock. It must not rotate the palette on a normal line clear.
