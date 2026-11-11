@@ -37,6 +37,43 @@
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
   let writeQueue = Promise.resolve()
+  // Visual progression belongs to the saved run, not to a global theme setting.
+  let paletteIndex = 0
+  let perfectCount = 0
+  let scoreAnimation = 0
+  let feedbackTimer = null
+  let paletteTimer = null
+  let resultTimer = null
+  const PALETTES = ['rose', 'amber', 'mint', 'violet', 'sky']
+  const scoreNode = document.getElementById('score')
+  function applyPalette() {
+    document.body.dataset.palette = PALETTES[paletteIndex] || 'rose'
+  }
+  function clearVisualTimers() {
+    clearTimeout(feedbackTimer)
+    clearTimeout(paletteTimer)
+    clearTimeout(resultTimer)
+    cancelAnimationFrame(scoreAnimation)
+    feedbackTimer = paletteTimer = resultTimer = null
+  }
+  function animateScore(from, to) {
+    cancelAnimationFrame(scoreAnimation)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || to <= from) {
+      scoreNode.textContent = to
+      return
+    }
+    const duration = Math.min(470, 200 + (to - from) * 2)
+    const started = performance.now()
+    function frame(now) {
+      const t = Math.min(1, (now - started) / duration)
+      const eased = 1 - (1 - t) ** 3
+      scoreNode.textContent = Math.round(from + (to - from) * eased)
+      if (t < 1) scoreAnimation = requestAnimationFrame(frame)
+    }
+    scoreNode.textContent = from
+    scoreAnimation = requestAnimationFrame(frame)
+  }
+
 
   function readLocal() {
     try { return JSON.parse(localStorage.getItem(storeKey) || 'null') } catch { return null }
@@ -51,11 +88,15 @@
     state = loaded
     best = Math.max(best, Number.isSafeInteger(data.best) && data.best >= 0 ? data.best : 0, loaded.score)
     soundEnabled = data.soundEnabled !== false
+    paletteIndex = Number.isSafeInteger(data.paletteIndex) && data.paletteIndex >= 0
+      ? data.paletteIndex % PALETTES.length : 0
+    perfectCount = Number.isSafeInteger(data.perfectCount) && data.perfectCount >= 0 ? data.perfectCount : 0
+    applyPalette()
     soundUI()
     return true
   }
   function persist() {
-    const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled }
+    const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled, paletteIndex, perfectCount }
     try { localStorage.setItem(storeKey, JSON.stringify(data)) } catch { /* sandbox storage */ }
     if (!recovering && hostStorage?.set) {
       // Serialize host writes so a slow old save cannot overtake the newest round.
@@ -101,30 +142,95 @@
       } else if (kind !== 'light') navigator.vibrate?.(kind === 'heavy' ? 30 : 12)
     } catch { /* optional feedback */ }
   }
+  // The clear travels along complete rows or columns. Its intensity is tied
+  // to line count and combo milestones; effect nodes never intercept touches.
   function showFeedback(result) {
     sparkLayer.replaceChildren()
     const lines = result.clearedRows.length + result.clearedCols.length
-    if (!lines) { clearTimeout(showFeedback.timer); comboBanner.hidden = true; return }
-    const word = result.perfect ? 'PERFECT!' : result.combo >= 5 ? 'AMAZING!' :
-      result.combo >= 3 ? 'GREAT!' : lines >= 2 ? 'EXCELLENT!' : 'GOOD!'
-    comboBanner.textContent = word + (result.combo >= 2 ? ' · COMBO ×' + result.combo : '') + '  +' + result.gained
+    clearTimeout(feedbackTimer)
+    if (!lines) {
+      comboBanner.hidden = true
+      return
+    }
+    const tier = result.perfect ? 'perfect' : result.combo >= 8 ? 'legendary' :
+      result.combo >= 5 ? 'amazing' : result.combo >= 3 || lines >= 3 ? 'great' : 'normal'
+    const title = {
+      perfect: 'PERFECT!', legendary: 'LEGENDARY!', amazing: 'AMAZING!',
+      great: 'GREAT!', normal: lines >= 2 ? 'EXCELLENT!' : 'GOOD!',
+    }[tier]
+    comboBanner.textContent = title +
+      (result.combo >= 2 ? '  COMBO ×' + result.combo : '') + '  +' + result.gained
+    comboBanner.className = 'combo-banner tier-' + tier
     comboBanner.hidden = false
-    comboBanner.classList.remove('pop')
     void comboBanner.offsetWidth
     comboBanner.classList.add('pop')
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      for (const cell of result.clearedCells.slice(0, 32)) {
-        const spark = document.createElement('i')
-        spark.className = 'spark'
-        spark.style.left = (cell.col + .5) * 12.5 + '%'
-        spark.style.top = (cell.row + .5) * 12.5 + '%'
-        spark.style.setProperty('--dx', (Math.random() * 90 - 45) + 'px')
-        spark.style.setProperty('--dy', (Math.random() * 90 - 45) + 'px')
-        sparkLayer.append(spark)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!reduced) {
+      result.clearedRows.forEach((row, index) => {
+        const streak = document.createElement('span')
+        streak.className = 'clear-beam horizontal'
+        streak.style.top = (row * 12.5) + '%'
+        streak.style.setProperty('--delay', (index * 45) + 'ms')
+        sparkLayer.append(streak)
+      })
+      result.clearedCols.forEach((col, index) => {
+        const streak = document.createElement('span')
+        streak.className = 'clear-beam vertical'
+        streak.style.left = (col * 12.5) + '%'
+        streak.style.setProperty('--delay', (index * 45) + 'ms')
+        sparkLayer.append(streak)
+      })
+      // Emit tiles in board order, not random places: one continuous sweep.
+      for (const cell of result.clearedCells.slice(0, lines >= 3 ? 56 : 32)) {
+        const particle = document.createElement('i')
+        particle.className = 'clear-fragment'
+        particle.style.left = ((cell.col + .5) * 12.5) + '%'
+        particle.style.top = ((cell.row + .5) * 12.5) + '%'
+        particle.style.setProperty('--dx', ((cell.col - 3.5) * 9) + 'px')
+        particle.style.setProperty('--dy', ((cell.row - 3.5) * 9) + 'px')
+        particle.style.setProperty('--delay', (25 + ((cell.row + cell.col) % 8) * 24) + 'ms')
+        sparkLayer.append(particle)
+      }
+      if (lines >= 2 || result.combo >= 3) {
+        const shockwave = document.createElement('span')
+        shockwave.className = 'clear-shockwave'
+        sparkLayer.append(shockwave)
+      }
+      if (result.perfect) {
+        for (let i = 0; i < 20; i += 1) {
+          const spark = document.createElement('i')
+          spark.className = 'perfect-confetti'
+          spark.style.left = ((i * 37) % 100) + '%'
+          spark.style.top = ((i * 17) % 75) + '%'
+          spark.style.setProperty('--dx', ((i * 19) % 120 - 60) + 'px')
+          sparkLayer.append(spark)
+        }
       }
     }
-    clearTimeout(showFeedback.timer)
-    showFeedback.timer = setTimeout(() => { comboBanner.hidden = true; sparkLayer.replaceChildren() }, 780)
+    feedbackTimer = setTimeout(() => {
+      comboBanner.hidden = true
+      sparkLayer.replaceChildren()
+    }, result.perfect ? 1150 : 850)
+  }
+  function playReward(result) {
+    const lines = result.clearedRows.length + result.clearedCols.length
+    if (!lines) { tone(270, .06); haptic('light'); return }
+    haptic(result.perfect || lines >= 3 ? 'heavy' : 'medium')
+    const notes = Math.min(5, 1 + lines + Math.floor(result.combo / 3))
+    const base = 470 + Math.min(340, result.combo * 38)
+    for (let note = 0; note < notes; note += 1) {
+      setTimeout(() => tone(base * (1 + note * .20), .11 + note * .024), note * 75)
+    }
+    if (result.perfect) setTimeout(() => tone(1150, .26), 315)
+  }
+  function celebratePerfect() {
+    paletteIndex = (paletteIndex + 1) % PALETTES.length
+    perfectCount += 1
+    document.body.classList.add('palette-flash')
+    paletteTimer = setTimeout(() => {
+      applyPalette()
+      document.body.classList.remove('palette-flash')
+    }, 330)
   }
 
 
@@ -312,22 +418,32 @@
       statusNode.textContent = '这里放不下，换个空位试试。'
       return
     }
+    const previousScore = state.score
     state = result.state
+    if (result.perfect) celebratePerfect()
     best = Math.max(best, state.score)
     turns += 1
     persist()
     showFeedback(result)
     const lineCount = result.clearedRows.length + result.clearedCols.length
-    tone(lineCount ? 520 + Math.min(600, result.combo * 95) : 280, lineCount ? .17 : .065)
-    haptic(lineCount >= 2 ? 'heavy' : lineCount ? 'medium' : 'light')
+    playReward(result)
     selected = null
     renderBoard(result)
+    animateScore(previousScore, state.score)
     renderHand()
-    statusNode.textContent = lineCount
-      ? '消掉 ' + lineCount + ' 条行列，+' + result.gained + ' 分！'
-      : '+' + result.gained + ' 分。' + (result.replenished ? '三个新方块来啦。' : '继续摆，找机会消一整条。')
+    statusNode.textContent = result.perfect
+      ? '完美全清！奖励 300 分，棋盘换新主题！'
+      : lineCount
+        ? (result.combo >= 3 ? '连消 ×' + result.combo + '！ ' : '') +
+          '爆破 ' + lineCount + ' 条行列，+' + result.gained + ' 分！'
+        : state.combo > 0 && state.drought < 3
+          ? '连击保留！还有 ' + (3 - state.drought) + ' 步缓冲'
+          : '+' + result.gained + ' 分。' + (result.replenished ? '新的一组三块来了。' : '继续布局，寻找爆破机会。')
     postToHost('game.progress', { score: state.score, lines: state.lines })
-    if (state.over) showResult()
+    if (state.over) {
+      if (lineCount) resultTimer = setTimeout(showResult, result.perfect ? 900 : 610)
+      else showResult()
+    }
   }
 
   function moveDrag(event) {
@@ -447,6 +563,9 @@
 
   function resetGame(fresh = true) {
     window.XiabanResultShare?.reset()
+    clearVisualTimers()
+    document.body.classList.remove('palette-flash')
+    applyPalette()
     if (state) stopDrag()
     state = rules.createGame()
     if (!fresh) hasLocalSave = acceptSave(readLocal())
