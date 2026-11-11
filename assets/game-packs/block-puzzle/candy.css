@@ -391,3 +391,153 @@ body.fresh-game[data-game="block-puzzle"].palette-flash::after {
   .fresh-game[data-game="block-puzzle"] .perfect-confetti,
   body.fresh-game[data-game="block-puzzle"].palette-flash::after { animation:none;display:none }
 }
+
+
+/* 2.1.0 · Every theme colors each *individual* shape, not only the board.
+   Background and tile material change together; the stored numeric tile IDs
+   remain unchanged, so changing palettes never changes gameplay. */
+body.fresh-game[data-game="block-puzzle"][data-palette="rose"] {
+  --color-1:#f65b97;--color-2:#ef5c94;--color-3:#e9538e;
+  --color-4:#f66ea0;--color-5:#e84783;--color-6:#e95d91;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="amber"] {
+  --color-1:#ffc527;--color-2:#ff8733;--color-3:#e75d82;
+  --color-4:#87c968;--color-5:#f49c29;--color-6:#a87ce5;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mint"] {
+  --color-1:#5bd9b0;--color-2:#7fd89b;--color-3:#42bcd0;
+  --color-4:#c2d36a;--color-5:#72a9e4;--color-6:#67c8c7;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="violet"] {
+  --color-1:#ae68ef;--color-2:#e56db6;--color-3:#6789e9;
+  --color-4:#f2ba5d;--color-5:#a77ce1;--color-6:#84d5e5;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="sky"] {
+  --color-1:#ffcd18;--color-2:#2875f2;--color-3:#a041ee;
+  --color-4:#ff8126;--color-5:#65db36;--color-6:#2ccbe9;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette] .cell.filled,
+body.fresh-game[data-game="block-puzzle"][data-palette] .mini-cell,
+body.fresh-game[data-game="block-puzzle"][data-palette] .departing-tile {
+  /* Modern Android Chromium supports color-mix. Solid fill is the fallback. */
+  background:var(--piece-color);
+  background:linear-gradient(145deg,
+    color-mix(in srgb,var(--piece-color),white 24%) 0%,
+    var(--piece-color) 46%,
+    color-mix(in srgb,var(--piece-color),black 28%) 100%);
+  border:1px solid color-mix(in srgb,var(--piece-color),white 42%);
+  box-shadow:inset 2px 2px 0 #ffffff70,inset -3px -3px 0 #00000028,
+    0 3px 2px #32162c50;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette] .cell.filled::before,
+body.fresh-game[data-game="block-puzzle"][data-palette] .mini-cell::before,
+body.fresh-game[data-game="block-puzzle"][data-palette] .departing-tile::before {
+  content:"";position:absolute;top:3%;left:5%;height:32%;width:89%;
+  background:linear-gradient(#ffffff8e,#ffffff14);
+  clip-path:polygon(0 0,100% 0,84% 100%,15% 100%);
+  pointer-events:none;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="sky"] .stats .stat strong,
+body.fresh-game[data-game="block-puzzle"][data-palette="sky"] .stats > div:nth-child(1) strong {
+  color:#315fb5;text-shadow:0 3px 2px #ffffff8a;
+}
+
+/* A cleared square gets a temporary 3D flight animation while its logical
+   grid cell is already empty. Themes use different exits and highlights. */
+.fresh-game[data-game="block-puzzle"] .departing-tile {
+  position:absolute;pointer-events:none;z-index:6;border-radius:3px;
+  transform-origin:center center;will-change:transform,opacity;
+  animation:depart-slide .64s cubic-bezier(.16,.72,.22,1)
+    var(--delay,0ms) both;
+}
+@keyframes depart-slide {
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  32%{opacity:1;transform:translate(0,-12px) scale(1.08)}
+  100%{opacity:0;transform:translate(var(--fly-x),var(--fly-y)) rotate(22deg) scale(.35)}
+}
+@keyframes depart-flip {
+  0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}
+  35%{opacity:1;transform:translate(0,-25px) rotate(-10deg) scale(1.2)}
+  100%{opacity:0;transform:translate(var(--fly-x),-125px) rotate(75deg) scale(.18)}
+}
+@keyframes depart-burst {
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  30%{opacity:1;transform:translate(0,-6px) scale(1.22)}
+  100%{opacity:0;transform:translate(var(--fly-x),var(--fly-y)) rotate(75deg) scale(.05)}
+}
+@keyframes depart-float {
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  50%{opacity:.85;transform:translate(6px,-25px) scale(.95)}
+  100%{opacity:0;transform:translate(var(--fly-x),-90px) rotate(-25deg) scale(.3)}
+}
+@keyframes depart-twist {
+  0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}
+  35%{opacity:1;transform:translate(0,-12px) rotate(30deg) scale(1.05)}
+  100%{opacity:0;transform:translate(var(--fly-x),var(--fly-y)) rotate(180deg) scale(.1)}
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="sky"] .departing-tile {
+  animation-name:depart-flip;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="amber"] .departing-tile {
+  animation-name:depart-burst;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="mint"] .departing-tile {
+  animation-name:depart-float;
+}
+body.fresh-game[data-game="block-puzzle"][data-palette="violet"] .departing-tile {
+  animation-name:depart-twist;
+}
+.fresh-game[data-game="block-puzzle"] .setup-glimmer {
+  position:absolute;z-index:5;pointer-events:none;
+  top:50%;left:50%;width:22%;height:22%;border-radius:50%;
+  border:2px solid #ffefc4;
+  box-shadow:0 0 18px #fff9aa96;
+  animation:setup-pulse .55s ease-out both;
+}
+@keyframes setup-pulse {
+  0%{transform:translate(-50%,-50%) scale(.3);opacity:.8}
+  100%{transform:translate(-50%,-50%) scale(2.7);opacity:0}
+}
+.fresh-game[data-game="block-puzzle"] .combo-banner.tier-setup {
+  color:#fff8cb;font-size:clamp(17px,4.5vw,25px);
+  text-shadow:0 3px 2px #8f4979,0 0 10px #ffe07c;
+}
+
+/* Independent, non-blocking reward diamond for milestone points and
+   advanced clears. It decorates the HUD without replacing the actual score. */
+.fresh-game[data-game="block-puzzle"] .reward-diamond {
+  position:absolute;left:50%;top:-32px;z-index:9;pointer-events:none;
+  width:82px;height:82px;display:grid;place-items:center;
+  color:#fffcf6;font-size:24px;font-weight:900;letter-spacing:-.03em;
+  text-shadow:0 2px 2px #5d3a7d;
+  transform:translate(-50%,0);isolation:isolate;
+}
+.fresh-game[data-game="block-puzzle"] .reward-diamond::before {
+  content:"";position:absolute;inset:12%;z-index:-1;border-radius:14px;
+  transform:rotate(45deg);
+  border:3px solid #e6f9ff;
+  background:linear-gradient(135deg,#43d1f5,#5486ec);
+  box-shadow:0 0 16px #abf2ff96,0 3px 6px #4b5bb770;
+}
+.fresh-game[data-game="block-puzzle"] .reward-diamond.setup::before {
+  background:linear-gradient(135deg,#ffd76b,#f68c94);
+  border-color:#fff8d8;
+}
+.fresh-game[data-game="block-puzzle"] .reward-diamond.appearing {
+  animation:reward-gem .86s ease-out both;
+}
+@keyframes reward-gem {
+  0%{opacity:0;transform:translate(-50%,22px) scale(.45)}
+  25%{opacity:1;transform:translate(-50%,0) scale(1.08)}
+  72%{opacity:1;transform:translate(-50%,-4px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-20px) scale(.9)}
+}
+@media (prefers-reduced-motion:reduce) {
+  .fresh-game[data-game="block-puzzle"] .departing-tile,
+  .fresh-game[data-game="block-puzzle"] .setup-glimmer,
+  .fresh-game[data-game="block-puzzle"] .reward-diamond.appearing {
+    animation:none;
+  }
+  .fresh-game[data-game="block-puzzle"] .departing-tile,
+  .fresh-game[data-game="block-puzzle"] .setup-glimmer {display:none}
+}
