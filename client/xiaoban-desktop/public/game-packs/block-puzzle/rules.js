@@ -153,19 +153,28 @@
       clearedLines: best.lines, firstClearStep: best.firstClearStep }
   }
 
-  // Opening, middle and late game aim for 75%, 60%, 45% guided deals.
-  // Those percentages are selection probabilities, NOT asserted player success
-  // rates: search checks that a route exists, not whether a human will find it.
-  function dealGuidance(deals) {
-    return deals <= 10 ? 0.75 : deals <= 30 ? 0.60 : 0.45
+  // A long, gradual progression avoids the sharp difficulty spike formerly
+  // introduced at deal 30. Crowded boards and sustained combo streaks receive
+  // a small recovery bonus so difficult boards can still yield satisfying clears.
+  // These are selection probabilities, not observed player success rates.
+  function dealGuidance(deals, board = null, combo = 0, drought = 0) {
+    let base = deals <= 24 ? .84 : deals <= 80 ? .72 : deals <= 160 ? .61 : .52
+    if (board) {
+      const empty = board.flat().filter((value) => value === 0).length
+      if (empty < 32) base += .12
+      else if (empty < 42) base += .06
+    }
+    if (combo >= 2) base += .04
+    if (drought >= 2) base += .06
+    return Math.min(.94, base)
   }
-  function generateHand(random = Math.random, board = null, deals = 1) {
+  function generateHand(random = Math.random, board = null, deals = 1, combo = 0, drought = 0) {
     const field = board || createBoard()
     const fitting = SHAPES.filter((shape) => hasSpace(field, shape))
     if (!fitting.length) return Array.from({ length: 3 }, () => pickShape(SHAPES, random))
     const empty = field.flat().filter((value) => !value).length
     const guidedChance = Math.min(0.88, Math.max(0.18, 1 - empty / 70))
-    const wantOpportunity = random() < dealGuidance(deals)
+    const wantOpportunity = random() < dealGuidance(deals, field, combo, drought)
     let best = null, bestGrade = -Infinity
     for (let attempt = 0; attempt < DEAL_CANDIDATES; attempt += 1) {
       let hand
@@ -269,7 +278,7 @@
     hand[slot] = null
     const replenished = hand.every((piece) => piece === null)
     const deals = (state.deals || 1) + (replenished ? 1 : 0)
-    if (replenished) hand = generateHand(random, result.board, deals)
+    if (replenished) hand = generateHand(random, result.board, deals, combo, drought)
     const next = {
       board: result.board, hand,
       score: state.score + result.gained,
