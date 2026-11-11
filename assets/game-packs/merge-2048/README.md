@@ -1,21 +1,20 @@
-# 2048 游戏包
+# 2048 · 黑曜
 
-独立的单人数字合并游戏，使用 HTML、CSS 和 JavaScript，在游戏广场的受限 iframe 中运行。游戏资源和规则随包提供，清新主题复用上级目录的 `fresh-theme.css`，结算分享复用 `result-share.js` 和 `result-share.css`，部署时须同时保留这三个共享文件。无外部服务或运行时依赖。
+独立 HTML/CSS/JavaScript 游戏。黑曜石环境、石质凹槽棋盘、青灰到琥珀金的数字块、125ms 滑动、合并光粒和得分浮字；可选本地合成音效默认关闭。无网络、字体、渲染库或存储依赖，遵循减少动态效果设置，后台暂停声音。
 
-画面使用浅色背景和白色面板，正文统一为深色，边框和阴影克制。低数字方块颜色温和，高数字逐步鲜艳；低值方块统一深色数字，深色高值方块使用白字，保持数字清楚。`fresh-theme.css` 在 `game.css` 后、`result-share.css` 前加载，通过 body 的 `fresh-game` 类和 `data-game="merge-2048"` 属性启用对应皮肤。
+- 方向键 / WASD、棋盘滑动或四个方向按钮操作。每次有效移动随机增加 2（90%）或 4（10%），一次移动中每块最多合并一次。
+- 达到 2048 可继续；无法移动时结算。重新开始保留本次打开期间的最高分，刷新后清空。
+- 桌面和 Android 使用协议 2 注入的 `XiaobanBuiltinRuntime`，隐藏包内退出按钮，由宿主提供退出。安全区使用 `--xb-safe-*`，顶栏按 `--xb-capsule-*` 局部避让。兼容旧协议 1 握手。
+- `rules.js` 返回规则结果与每个源方块的移动轨迹。动画期间最多缓存一个后续方向，重新开始取消未完成动画，不延迟写回旧棋局。
+- 基准入口保留共享结算分享；桌面副本移除分享资源和按钮。旧 `theme.css` 仅保留供基准校验，不再加载。
+- 桌面实际资源位于 `client/xiaoban-desktop/public/game-packs/merge-2048/`；Android 构建从桌面目录打包。
 
-- 电脑：方向键或 WASD 移动，Esc 返回游戏广场。
-- 手机：在棋盘上滑动，或点按下方四个方向按钮。
-- 相同数字沿移动方向合并，每个方块在一次移动中最多合并一次，得分增加合并后的数字。
-- 每次有效移动后，在空格中随机生成一个 2（90%）或 4（10%）；无效移动不生成方块。
-- 合出 2048 后可以继续挑战；没有空格也没有相邻同值方块时结束。
-- 本局结束的结算弹窗同时提供“分享战绩”和“再来一局”。合出 2048 时保留“继续挑战”，直到没有有效移动才结算分享。
-- 重新开始会保留本次打开游戏期间的最高分，离开或刷新后清空。不读取账号、不访问本地存储，也不上传游戏记录。
+验证：`node --test client/xiaoban-desktop/scripts/merge-2048.test.mjs`；资源校验 `node client/xiaoban-desktop/scripts/check-game-assets.mjs`；桌面构建 `npm --prefix client/xiaoban-desktop run build`。浏览器检查桌面、手机竖屏 / 短横屏、减少动态效果、胜负结算和协议 2 胶囊避让。
 
-布局适配手机竖屏、短横屏和安全区域；方向按钮保留至少 44px 的触控高度。不同等级的方块同时显示数字，配色调整应保留数字对比度和大数字的缩小字号。
+## 材质来源
 
-`rules.js` 提供纯规则函数，`game.js` 处理界面、输入以及版本 1 的宿主握手和退出协议。两个脚本使用普通 `defer` 加载，可直接运行在仅允许脚本的 iframe 中。
+`obsidian.webp` 由内置 imagegen 生成原图后经 Sharp 压缩为 WebP（1536 × 1024），随包离线分发。`cover.svg` 为可编辑矢量封面。
 
-分享按钮通过版本 1 的 `game.share` 消息把本局结果交给宿主；独立打开时进入公开战绩分享页。宿主可保存游戏记录，游戏包自身不调用账户或记录 API。
+最终生成提示词（内置工具模式）：
 
-规则测试位于 `client/xiaban-web/src/games/merge-2048/rules.test.ts`，与网站测试一起通过 `npm test` 执行。
+> Create a production background asset for a cinematic premium 2048 puzzle game, landscape 1536x1024. Photorealistic macro photograph of a vast dark obsidian stone tabletop, very fine charcoal mineral grain and faint hairline bronze-gold veins. A soft warm amber shaft of light enters from upper right through atmospheric haze, subtle cold teal ambient reflection far left. Center 60 percent stays extremely dark, uncluttered and low contrast so a game board can be placed over it. Luxury architectural still life, restrained chiaroscuro, tactile fine stone detail, analog film grain, deep black shadows, physically plausible surface, cinematic color grading. Full bleed material environment only. NO objects, NO tiles, NO board, NO typography, NO letters, NO numbers, NO watermark. Save generated asset for local project use.

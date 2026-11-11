@@ -31,19 +31,22 @@
     if (!DIRECTIONS.includes(direction)) throw new Error('不支持的移动方向')
     const next = createBoard()
     const merges = []
+    const motions = []
     let score = 0
 
     for (let line = 0; line < SIZE; line += 1) {
       const values = []
       for (let index = 0; index < SIZE; index += 1) {
         const { row, col } = coordinate(direction, line, index)
-        if (board[row][col] !== 0) values.push(board[row][col])
+        if (board[row][col] !== 0) values.push({ value: board[row][col], row, col })
       }
       let target = 0
       for (let index = 0; index < values.length; index += 1) {
-        let value = values[index]
+        let value = values[index].value
         const cell = coordinate(direction, line, target)
-        if (values[index + 1] === value) {
+        motions.push({ from: { row: values[index].row, col: values[index].col }, to: cell })
+        if (values[index + 1]?.value === value) {
+          motions.push({ from: { row: values[index + 1].row, col: values[index + 1].col }, to: cell })
           value *= 2
           score += value
           merges.push(cell)
@@ -55,7 +58,7 @@
     }
 
     const moved = board.some((row, y) => row.some((value, x) => value !== next[y][x]))
-    return { board: next, score, moved, merges }
+    return { board: next, score, moved, merges, motions }
   }
 
   function canMove(board) {

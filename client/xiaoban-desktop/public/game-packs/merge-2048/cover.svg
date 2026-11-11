@@ -1,12 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
- <rect width="160" height="160" rx="28" fill="#f2f8f5"/>
- <rect x="18" y="18" width="124" height="124" rx="22" fill="#ffffff"/>
- <rect x="26" y="26" width="51" height="51" rx="12" fill="#f2eee1"/>
- <rect x="83" y="26" width="51" height="51" rx="12" fill="#ffd12b"/>
- <rect x="26" y="83" width="51" height="51" rx="12" fill="#ff607a"/>
- <rect x="83" y="83" width="51" height="51" rx="12" fill="#526bd5"/>
- <g font-family="system-ui,sans-serif" font-weight="800" text-anchor="middle" dominant-baseline="central">
- <text x="51.5" y="51.5" fill="#152019" font-size="28">2</text><text x="108.5" y="51.5" fill="#152019" font-size="28">8</text>
- <text x="51.5" y="108.5" fill="#152019" font-size="24">64</text><text x="108.5" y="108.5" fill="#ffffff" font-size="16">2048</text>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">
+<defs>
+<radialGradient id="bg" cx="85%" cy="0%" r="100%"><stop stop-color="#5b4930"/><stop offset=".5" stop-color="#1c2521"/><stop offset="1" stop-color="#0b1010"/></radialGradient>
+<linearGradient id="rim" x2="1" y2="1"><stop stop-color="#a48d61"/><stop offset=".3" stop-color="#343d30"/><stop offset="1" stop-color="#151d17"/></linearGradient>
+<linearGradient id="jade" x2=".8" y2="1"><stop stop-color="#63735c"/><stop offset="1" stop-color="#283b31"/></linearGradient>
+<linearGradient id="gold" x2="1" y2="1"><stop stop-color="#e5cb8b"/><stop offset="1" stop-color="#96713a"/></linearGradient>
+<filter id="shadow"><feDropShadow dy="18" stdDeviation="18" flood-opacity=".6"/></filter>
+</defs>
+<rect width="960" height="640" fill="url(#bg)"/>
+<path d="M0 508 186 470 282 488 400 450M690 0 655 110 710 180 680 269M790 640 862 560 850 470 960 425" fill="none" stroke="#c1a36a" stroke-opacity=".16"/>
+<text x="80" y="100" fill="#c4b28c" font-family="sans-serif" font-size="17" letter-spacing="7">OBSIDIAN</text>
+<text x="72" y="290" fill="#eee6d3" font-family="Georgia,serif" font-size="128" letter-spacing="-6">2048</text>
+<text x="82" y="358" fill="#c9c4b3" font-family="serif" font-size="28" letter-spacing="7">让数字，聚成光。</text>
+<path d="M82 403H302" stroke="#bda16a" stroke-opacity=".4"/>
+<text x="82" y="454" fill="#a69e89" font-family="sans-serif" font-size="14" letter-spacing="4">黑曜石 · 琥珀光</text>
+<g filter="url(#shadow)" transform="translate(526 148) rotate(-8 160 170)">
+<rect x="-15" y="-15" width="352" height="352" rx="22" fill="url(#rim)" stroke="#9a8558" stroke-opacity=".5"/>
+<rect width="150" height="150" rx="12" fill="url(#jade)" stroke="#a7ae86" stroke-opacity=".5"/>
+<rect x="172" width="150" height="150" rx="12" fill="url(#jade)" stroke="#a7ae86" stroke-opacity=".5"/>
+<rect y="172" width="150" height="150" rx="12" fill="#80623c" stroke="#c3a268"/>
+<rect x="172" y="172" width="150" height="150" rx="12" fill="url(#gold)" stroke="#f1dfad"/>
+<g font-family="Georgia,serif" text-anchor="middle" fill="#f6efd9"><text x="75" y="98" font-size="64">8</text><text x="247" y="98" font-size="64">16</text><text x="75" y="270" font-size="58">128</text><text x="247" y="265" font-size="45">2048</text></g>
+<g stroke="#f9e1a0" stroke-width="3" opacity=".5"><path d="M67 126H83M239 126H255M67 298H83M239 298H255"/></g>
+</g>
 </svg>
