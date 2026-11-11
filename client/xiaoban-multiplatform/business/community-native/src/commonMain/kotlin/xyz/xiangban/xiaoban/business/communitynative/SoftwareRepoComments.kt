@@ -1,10 +1,8 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -104,38 +102,40 @@ internal fun SoftwareRepoComments(
         if (!composing && deleting == null) error?.let { Text(it, color = Danger, style = XType.Caption) }
     }
 
-    if (composing) AlertDialog(
+    if (composing) XiaobanDialog(
+        title = replyTo?.let { "回复 ${it.author.nickname}" } ?: "写评论",
         onDismissRequest = { if (!busy) { composing = false; error = null } },
-        title = { Text(replyTo?.let { "回复 ${it.author.nickname}" } ?: "写评论") },
-        text = {
-            Column {
-                OutlinedTextField(draft, { if (it.length <= 2000) draft = it }, enabled = !busy,
-                    minLines = 2, maxLines = 5, placeholder = { Text("分享你的看法，2–2000 字") })
-                error?.let { Text(it, color = Danger, style = XType.Caption) }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = !busy && draft.trim().length >= 2, onClick = {
+        dismissEnabled = !busy,
+        primaryAction = XDialogAction(
+            if (busy) "发送中…" else "发送",
+            onClick = {
                 mutate(nextPage = 1, onDone = { draft = ""; composing = false; replyTo = null }) {
                     env.forum.commentRepo(owner, repo, draft.trim(), replyTo?.id)
                 }
-            }) { Text(if (busy) "发送中…" else "发送") }
-        },
-        dismissButton = { TextButton(enabled = !busy, onClick = { composing = false; error = null }) { Text("取消") } },
-    )
+            },
+            enabled = !busy && draft.trim().length >= 2,
+        ),
+        secondaryAction = XDialogAction("取消", { composing = false; error = null }, enabled = !busy),
+    ) {
+        OutlinedTextField(draft, { if (it.length <= 2000) draft = it }, enabled = !busy,
+            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5,
+            placeholder = { Text("分享你的看法，2–2000 字") })
+        error?.let { Text(it, color = Danger, style = XType.Caption) }
+    }
 
     deleting?.let { comment ->
-        AlertDialog(
-            onDismissRequest = { if (!busy) { deleting = null; error = null } },
-            title = { Text("删除评论？") },
-            text = { Text(error ?: "删除后这条评论将不再显示。") },
-            confirmButton = {
-                TextButton(enabled = !busy, onClick = {
-                    val nextPage = if (page > 1 && loaded?.items?.size == 1) page - 1 else page
-                    mutate(nextPage, onDone = { deleting = null }) { env.forum.deleteRepoComment(owner, repo, comment.id) }
-                }) { Text("删除") }
+        XiaobanConfirmDialog(
+            title = "删除评论？",
+            message = error ?: "删除后这条评论将不再显示。",
+            confirmLabel = if (busy) "删除中…" else "删除",
+            destructive = true,
+            onConfirm = {
+                val nextPage = if (page > 1 && loaded?.items?.size == 1) page - 1 else page
+                mutate(nextPage, onDone = { deleting = null }) { env.forum.deleteRepoComment(owner, repo, comment.id) }
             },
-            dismissButton = { TextButton(enabled = !busy, onClick = { deleting = null; error = null }) { Text("取消") } },
+            onDismiss = { if (!busy) { deleting = null; error = null } },
+            confirmEnabled = !busy,
+            dismissEnabled = !busy,
         )
     }
 }
