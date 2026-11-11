@@ -95,6 +95,11 @@ class RuntimeV2Activity : ComponentActivity() {
     private var ready = false
     private var failed = false
     private var playing = false
+    // Only the official block puzzle uses a transparent, full-bleed status bar.
+    // It switches icon contrast when the real game.result/game.start events arrive.
+    private var blockPuzzleShowingResult = false
+    private val blockPuzzleFullBleed: Boolean
+        get() = ::pack.isInitialized && pack.host == "official-block-puzzle.app.xiangban.xyz"
     private var reportedOpen = false
     private var networkDisabled = true
     private var legacySave: JSONObject? = null
@@ -223,6 +228,8 @@ class RuntimeV2Activity : ComponentActivity() {
                         if (open) updateFavorite(toggle = false)
                     },
                     landscapeLaunch = pack.manifest.orientation == "landscape",
+                    capsuleRightMarginDp = if (blockPuzzleFullBleed) 16f else 6f,
+                    capsuleTopGapDp = if (blockPuzzleFullBleed) 8f else 0f,
                 )
                 setContentView(container)
                 media.watch()
@@ -400,29 +407,40 @@ class RuntimeV2Activity : ComponentActivity() {
     }
 
     private fun updateStatusBarBackground() {
-        val height = if (landscape) 0 else safeInsets.top
+        // The native tint view was obscuring the CSS result overlay above the
+        // WebView, leaving a pink strip at the top of the purple result screen.
+        val height = if (landscape || blockPuzzleFullBleed) 0 else safeInsets.top
         val layout = statusBarBackground.layoutParams
         if (layout.height != height) {
             layout.height = height
             statusBarBackground.layoutParams = layout
         }
         statusBarBackground.setBackgroundColor(when {
-            pack.manifest.id == "block-puzzle" -> 0xFFEDA1B6.toInt()
+            blockPuzzleFullBleed -> android.graphics.Color.TRANSPARENT
             dark -> 0xFF17191F.toInt()
             else -> 0xFFF7F8FA.toInt()
         })
     }
 
+    @Suppress("DEPRECATION")
     private fun updateSystemBars() {
         updateStatusBarBackground()
+        if (blockPuzzleFullBleed) {
+            // setDecorFitsSystemWindows(false) draws the full-screen WebView
+            // behind the real status bar. Keep the bar transparent so the CSS
+            // game/result background (not the old pink native strip) shows through.
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+        }
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             if (landscape) hide(WindowInsetsCompat.Type.systemBars())
-            else if (pack.manifest.id == "block-puzzle") {
-                // Immersive only for this arcade game. Keep the host capsule and gesture navigation.
-                hide(WindowInsetsCompat.Type.statusBars())
-                show(WindowInsetsCompat.Type.navigationBars())
-                isAppearanceLightNavigationBars = true
+            else if (blockPuzzleFullBleed) {
+                // Preserve system time/battery indicators and gesture navigation.
+                // Light game palettes need dark icons; the purple result screen
+                // needs light icons. Other works keep their existing behavior.
+                show(WindowInsetsCompat.Type.systemBars())
+                isAppearanceLightStatusBars = !blockPuzzleShowingResult
+                isAppearanceLightNavigationBars = !blockPuzzleShowingResult
             } else {
                 show(WindowInsetsCompat.Type.systemBars())
                 isAppearanceLightStatusBars = !dark
@@ -478,6 +496,8 @@ class RuntimeV2Activity : ComponentActivity() {
         ready = false
         failed = false
         playing = false
+        blockPuzzleShowingResult = false
+        if (blockPuzzleFullBleed) updateSystemBars()
         acceptingStorage = true
         chrome.loading()
         startedAt = System.currentTimeMillis()
@@ -721,13 +741,28 @@ class RuntimeV2Activity : ComponentActivity() {
             }
             "game.start" -> {
                 if (!ready || pack.manifest.kind != "game") error("invalid")
-                else { playing = true; log?.add("game.start"); result() }
+                else {
+                    playing = true
+                    if (blockPuzzleFullBleed && blockPuzzleShowingResult) {
+                        blockPuzzleShowingResult = false
+                        updateSystemBars()
+                    }
+                    log?.add("game.start")
+                    result()
+                }
             }
             "game.progress", "game.result" -> {
                 val score = params.opt("score")
                 if (!playing || score !is Number || !score.isNonNegativeInteger()) error("invalid")
                 else {
-                    if (method == "game.result") { playing = false; log?.add("game.result", "score" to score.toLong()) }
+                    if (method == "game.result") {
+                        playing = false
+                        if (blockPuzzleFullBleed) {
+                            blockPuzzleShowingResult = true
+                            updateSystemBars()
+                        }
+                        log?.add("game.result", "score" to score.toLong())
+                    }
                     result()
                 }
             }

@@ -541,3 +541,26 @@ body.fresh-game[data-game="block-puzzle"][data-palette="violet"] .departing-tile
   .fresh-game[data-game="block-puzzle"] .departing-tile,
   .fresh-game[data-game="block-puzzle"] .setup-glimmer {display:none}
 }
+
+
+/* Android full-bleed contract: the WebView paints *behind* the transparent
+   native status bar. Content, rather than the background, avoids the insets.
+   The result screen is not allowed to inherit the old pink system-bar strip. */
+html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .overlay {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  min-height: 100dvh;
+  padding-top: max(24px, calc(var(--xb-safe-top, 0px) + 16px));
+  padding-right: max(18px, var(--xb-safe-right, 0px));
+  padding-bottom: max(24px, calc(var(--xb-safe-bottom, 0px) + 16px));
+  padding-left: max(18px, var(--xb-safe-left, 0px));
+}
+html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .settings-overlay {
+  box-sizing: border-box;
+  padding-top: max(24px, calc(var(--xb-safe-top, 0px) + 12px));
+  padding-right: max(18px, var(--xb-safe-right, 0px));
+  padding-bottom: max(24px, calc(var(--xb-safe-bottom, 0px) + 12px));
+  padding-left: max(18px, var(--xb-safe-left, 0px));
+}

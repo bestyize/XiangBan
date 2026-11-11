@@ -96,6 +96,8 @@ internal class RuntimeV2Chrome(
     private val onPinShortcut: (() -> Unit)?,
     private val onMenuChanged: (Boolean) -> Unit = {},
     private val landscapeLaunch: Boolean = false,
+    private val capsuleRightMarginDp: Float = 6f,
+    private val capsuleTopGapDp: Float = 0f,
 ) {
     private sealed interface Overlay {
         data object Loading : Overlay
@@ -163,8 +165,8 @@ internal class RuntimeV2Chrome(
     fun updateInsets(left: Int, top: Int, right: Int, bottom: Int, landscape: Boolean) {
         this.landscape = landscape
         val layout = capsuleView.layoutParams as FrameLayout.LayoutParams
-        val topMargin = top
-        val rightMargin = right + pixels(6f)
+        val topMargin = top + if (landscape) 0 else pixels(capsuleTopGapDp)
+        val rightMargin = right + pixels(capsuleRightMarginDp)
         if (layout.topMargin != topMargin || layout.rightMargin != rightMargin) {
             layout.topMargin = topMargin
             layout.rightMargin = rightMargin
