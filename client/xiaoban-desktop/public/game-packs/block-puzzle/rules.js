@@ -55,8 +55,8 @@
     for (let n = value; n; n &= n - 1) count += 1
     return count
   })
-  const DEAL_CANDIDATES = 28
-  const BEAM_WIDTH = 8
+  const DEAL_CANDIDATES = 18
+  const BEAM_WIDTH = 6
   const LINE_RECIPES = [
     ['h5', 'h2', 'dot'], ['h4', 'h3', 'dot'],
     ['h3', 'h3', 'h2'], ['h4', 'h2', 'h2'],
@@ -79,16 +79,25 @@
   function maskBoard(board) {
     return board.map((row) => row.reduce((bits, tile, col) => bits | (tile ? (1 << col) : 0), 0))
   }
+  // Pack 8 four-bit column counters into one number. No carry occurs because
+  // a column contains at most eight tiles; this avoids 64 inner-loop branches
+  // on every simulated move and improves slower Android WebViews.
+  const SPREAD = Array.from({ length: 256 }, (_, bits) => {
+    let packed = 0
+    for (let col = 0; col < SIZE; col += 1) if (bits & (1 << col)) packed += 2 ** (4 * col)
+    return packed
+  })
   function nearLineScore(rows) {
-    const columns = new Array(SIZE).fill(0)
-    let value = 0
-    for (let row = 0; row < SIZE; row += 1) {
-      const bits = rows[row]
-      const length = BITS[bits]
-      value += length * length
-      for (let col = 0; col < SIZE; col += 1) if (bits & (1 << col)) columns[col] += 1
+    let packed = 0, value = 0
+    for (const bits of rows) {
+      const count = BITS[bits]
+      packed += SPREAD[bits]
+      value += count * count
     }
-    for (const length of columns) value += length * length
+    for (let col = 0; col < SIZE; col += 1) {
+      const count = (packed >>> (col * 4)) & 15
+      value += count * count
+    }
     return value
   }
   function tryMaskPlace(rows, position) {
