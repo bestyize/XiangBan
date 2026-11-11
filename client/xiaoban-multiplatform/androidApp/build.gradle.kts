@@ -53,7 +53,7 @@ android {
         applicationId = "xyz.xiangban.xiaoban"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionName = "3.1.4"
+        versionName = "3.1.5"
         val (major, minor, patch) = requireNotNull(versionName).split('.').map(String::toInt)
         require(major in 0..2099 && minor in 0..999 && patch in 0..999)
         versionCode = (major * 1_000_000 + minor * 1_000 + patch).also { require(it > 0) }
