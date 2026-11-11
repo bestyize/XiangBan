@@ -32,7 +32,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -406,27 +405,25 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             if (topic.help?.status == "open" && topic.author.uid == session.accountId) {
                                 TextButton(onClick = { confirmClose = true }, enabled = !closingHelp) { Text("关闭求助") }
                             }
-                            if (confirmClose) AlertDialog(
-                                onDismissRequest = { if (!closingHelp) confirmClose = false },
-                                title = { Text("关闭求助？") },
-                                text = { Text("尚未发放的悬赏积分将退还。") },
-                                confirmButton = {
-                                    TextButton(enabled = !closingHelp, onClick = {
-                                        guarded {
-                                            closingHelp = true
-                                            try {
-                                                env.forum.closeHelp(topic.id)
-                                                confirmClose = false
-                                                loader.reload()
-                                            } finally {
-                                                closingHelp = false
-                                            }
+                            if (confirmClose) XiaobanConfirmDialog(
+                                title = "关闭求助？",
+                                message = "尚未发放的悬赏积分将退还。",
+                                confirmLabel = "关闭求助",
+                                onConfirm = {
+                                    guarded {
+                                        closingHelp = true
+                                        try {
+                                            env.forum.closeHelp(topic.id)
+                                            confirmClose = false
+                                            loader.reload()
+                                        } finally {
+                                            closingHelp = false
                                         }
-                                    }) { Text("关闭求助") }
+                                    }
                                 },
-                                dismissButton = {
-                                    TextButton(enabled = !closingHelp, onClick = { confirmClose = false }) { Text("取消") }
-                                },
+                                onDismiss = { if (!closingHelp) confirmClose = false },
+                                dismissEnabled = !closingHelp,
+                                confirmEnabled = !closingHelp,
                             )
                             RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             LinkedGameCards(env, topic.bodyHtml, open)
