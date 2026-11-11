@@ -55,8 +55,8 @@
     for (let n = value; n; n &= n - 1) count += 1
     return count
   })
-  const DEAL_CANDIDATES = 18
-  const BEAM_WIDTH = 6
+  const DEAL_CANDIDATES = 12
+  const BEAM_WIDTH = 4
   const LINE_RECIPES = [
     ['h5', 'h2', 'dot'], ['h4', 'h3', 'dot'],
     ['h3', 'h3', 'h2'], ['h4', 'h2', 'h2'],
@@ -158,7 +158,18 @@
   // a small recovery bonus so difficult boards can still yield satisfying clears.
   // These are selection probabilities, not observed player success rates.
   function dealGuidance(deals, board = null, combo = 0, drought = 0) {
-    let base = deals <= 24 ? .84 : deals <= 80 ? .72 : deals <= 160 ? .61 : .52
+    // Continuous interpolation avoids sudden difficulty changes at round 25/81.
+    const phases = [[1, .84], [24, .84], [80, .72], [160, .61], [320, .52]]
+    let base = phases[phases.length - 1][1]
+    for (let i = 1; i < phases.length; i += 1) {
+      if (deals <= phases[i][0]) {
+        const [fromDeal, fromChance] = phases[i - 1]
+        const [toDeal, toChance] = phases[i]
+        const progress = Math.max(0, (deals - fromDeal) / (toDeal - fromDeal))
+        base = fromChance + (toChance - fromChance) * progress
+        break
+      }
+    }
     if (board) {
       const empty = board.flat().filter((value) => value === 0).length
       if (empty < 32) base += .12
