@@ -82,4 +82,52 @@ const thirdGap = { ...turn.state, hand: [dot, dot, dot], board: rules.createBoar
 const resetCombo = rules.place(thirdGap, 0, 4, 4, () => 0)
 assert.equal(resetCombo.state.combo, 0)
 assert.equal(resetCombo.state.drought, 3)
-console.log('PASS block-puzzle: geometry, cross clear, perfect bonus, hand safety, combo, persistence')
+
+// Three-piece lookahead: five + two + one can complete a row in three moves
+// regardless of the presentation order. Search must not mutate the board.
+const h5 = rules.SHAPES.find(shape => shape.id === 'h5')
+const h2 = rules.SHAPES.find(shape => shape.id === 'h2')
+const horizontal = rules.handOpportunity(rules.createBoard(), [h5, h2, dot])
+assert.equal(horizontal.canFinish, true)
+assert.ok(horizontal.clearedLines >= 1)
+assert.equal(horizontal.firstClearStep, 3)
+const boardBefore = JSON.stringify(crossing)
+rules.handOpportunity(crossing, [dot, h2, h5])
+assert.equal(JSON.stringify(crossing), boardBefore)
+
+// Difficulty rises gradually across hundreds of deals, not sharply after 30.
+assert.equal(rules.dealGuidance(1), rules.dealGuidance(24))
+assert.ok(rules.dealGuidance(25) > .83)
+assert.ok(rules.dealGuidance(40) > rules.dealGuidance(80))
+assert.ok(rules.dealGuidance(80) > rules.dealGuidance(160))
+assert.ok(rules.dealGuidance(160) > rules.dealGuidance(320))
+assert.equal(rules.dealGuidance(320), rules.dealGuidance(500))
+assert.ok(rules.dealGuidance(90, almostFull, 3, 2) > rules.dealGuidance(90))
+assert.ok(rules.dealGuidance(90, almostFull, 3, 2) <= .94)
+
+// A compact seed sample checks that the generator creates playable short-term
+// opportunities and that every dealt shape refers to the shipped shape library.
+let seed = 61230
+const random = () => {
+  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+  return seed / 4294967296
+}
+let opportunities = 0
+for (let iteration = 0; iteration < 20; iteration += 1) {
+  const hand = rules.generateHand(random, rules.createBoard(), iteration * 16 + 1)
+  assert.equal(hand.length, 3)
+  for (const piece of hand) assert.ok(rules.SHAPES.includes(piece))
+  const evaluation = rules.handOpportunity(rules.createBoard(), hand)
+  assert.equal(evaluation.canFinish, true)
+  if (evaluation.clearedLines >= 1) opportunities += 1
+}
+assert.ok(opportunities >= 8, 'expected frequent but not guaranteed 3-step clears')
+
+// Older versions stored no deal counter; restoration must remain backward-compatible.
+const oldSave = rules.serializeGame(turn.state)
+delete oldSave.deals
+assert.equal(rules.restoreGame(oldSave).deals, 1)
+assert.ok(rules.restoreGame(rules.serializeGame(turn.state)).deals >= 1)
+
+console.log('PASS block-puzzle: geometry, combo, 3-step lookahead, smooth pacing, recovery and persistence')
+
