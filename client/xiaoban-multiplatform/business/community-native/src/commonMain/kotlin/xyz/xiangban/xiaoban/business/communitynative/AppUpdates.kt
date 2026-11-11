@@ -5,10 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,28 +39,21 @@ internal fun AppUpdateDialog(updates: AppUpdates) {
     val state by updates.state.collectAsState()
     if (!state.visible) return
     val version = state.version
-    AlertDialog(
+    XiaobanDialog(
+        title = if (version == null) "检查更新" else "发现新版本 v$version",
         onDismissRequest = updates::dismiss,
-        title = { Text(if (version == null) "检查更新" else "小伴 v$version") },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (state.notes.isNotBlank()) Text(state.notes)
-                if (state.message.isNotBlank()) Text(state.message)
-                state.percent?.let { percent ->
-                    LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
-                }
+        primaryAction = version?.let { XDialogAction(if (state.busy) "安装中…" else "安装更新", updates::install, enabled = !state.busy) },
+        secondaryAction = XDialogAction(if (version == null) "关闭" else "稍后", updates::dismiss),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (state.notes.isNotBlank()) Text(state.notes, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.message.isNotBlank()) Text(state.message, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.percent?.let { percent ->
+                LinearProgressIndicator(progress = { (percent.coerceIn(0, 100)) / 100f }, modifier = Modifier.fillMaxWidth())
             }
-        },
-        confirmButton = {
-            if (version != null) TextButton(onClick = updates::install, enabled = !state.busy) {
-                Text("安装更新")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = updates::dismiss) { Text(if (version == null) "关闭" else "稍后") }
-        },
-    )
+        }
+    }
 }
