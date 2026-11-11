@@ -12,8 +12,24 @@
   let view = 'home'
   let hostReady = false
   let dirty = false
-  let advancing = false
-  let transitionTimer = null
+  let restoringHistory = false
+  let reportChapter = 'traits'
+
+  function rememberPage(replace = false) {
+    const state = { mbti: true, page: view, chapter: reportChapter }
+    window.history[replace ? 'replaceState' : 'pushState'](state, '')
+  }
+  // One history entry per page/section, not one for every answer.
+  rememberPage(true)
+
+  const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)')
+  function applyTheme() {
+    const theme = globalThis.xb?.info?.theme
+    document.documentElement.dataset.theme = theme === 'dark' || (theme !== 'light' && systemTheme?.matches) ? 'dark' : 'light'
+  }
+  applyTheme()
+  systemTheme?.addEventListener?.('change', applyTheme)
+  globalThis.xb?.on?.('theme', applyTheme)
 
   function post(type, payload = {}) {
     if (runtime) { if (hostReady) runtime.send(type, payload); return }
@@ -28,6 +44,14 @@
         const value = message.safeArea[side]
         if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
           document.documentElement.style.setProperty('--host-' + side, Math.min(value, 160) + 'px')
+        }
+      }
+    }
+    if (message.capsule && typeof message.capsule === 'object') {
+      for (const key of ['top', 'right', 'width', 'height']) {
+        const value = message.capsule[key]
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+          document.documentElement.style.setProperty('--host-capsule-' + key, value + 'px')
         }
       }
     }
@@ -59,13 +83,14 @@
   }
 
   function show(next, focusId) {
-    clearTimeout(transitionTimer)
-    advancing = false
+    const changed = view !== next
     view = next
+    if (changed && !restoringHistory) rememberPage()
     document.body.classList.toggle('is-report', next === 'result' || next === 'share')
     views.forEach(id => { byId(id).hidden = id !== next })
     byId('homeButton').hidden = next === 'home'
-    app.scrollTop = 0
+    byId('pageLabel').textContent = {home:'向内看', quiz:'认识自己的旅程', review:'留一点时间给自己', result:'你的性格画像', share:'留住此刻的自己'}[next]
+    byId(next).scrollTop = 0
     if (focusId) byId(focusId).focus({ preventScroll: true })
   }
 
@@ -82,14 +107,12 @@
     if (progress) byId('resumeButton').textContent = '继续上次（已答 ' + rules.score(progress.answers).answered + ' 题）'
     const result = save.lastResult
     byId('lastResultButton').hidden = !result
-    if (result) byId('lastResultButton').textContent = '上次结果：' + result.type + '（' + formatDate(result.completedAt) + '）'
+    if (result) byId('lastResultMeta').textContent = result.type + ' · ' + globalThis.XiaobanMbtiProfiles[result.type].role + ' / ' + formatDate(result.completedAt)
     byId('storageNote').textContent = hostReady ? '答案与结果仅保存在这台设备上。' : '独立预览：进度仅在本次打开期间保留。'
+    byId('storageNote').hidden = hostReady
   }
 
   function goHome() {
-    // If home is activated while the selected card is briefly highlighted,
-    // preserve the answer and advance the saved cursor before leaving.
-    if (advancing) advance()
     renderHome()
     show('home', 'homeTitle')
   }
@@ -106,9 +129,9 @@
     const question = rules.questions[progress.current]
     const answered = rules.score(progress.answers).answered
     byId('progressText').textContent = '已答 ' + answered + ' 题'
-    byId('questionNumber').textContent = (progress.current + 1) + ' / 48'
+    byId('questionNumber').textContent = String(progress.current + 1).padStart(2, '0') + ' / 48'
     byId('progressBar').value = answered
-    byId('questionEyebrow').textContent = progress.mode === 'missing' ? '补答 · 也可以暂时留白' : '想一想平时的自己'
+    byId('questionEyebrow').textContent = progress.mode === 'missing' ? '补答 · 也可以暂时留白' : ['关于你的能量', '关于你的观察', '关于你的决定', '关于你的节奏'][question.dimension]
     byId('questionTitle').textContent = question.prompt
     for (let choice = 0; choice < 2; choice++) {
       byId('optionText' + choice).textContent = question.options[choice].text
@@ -116,33 +139,25 @@
       byId('option' + choice).disabled = false
     }
     byId('previousButton').disabled = progress.current === 0
-    byId('skipButton').textContent = progress.answers[progress.current] === null ? '跳过 →' : '下一题 →'
+    byId('nextButton').disabled = progress.answers[progress.current] === null
+    byId('nextButton').textContent = nextIndex(progress.current) >= 48 ? '查看结果 →' : '下一题 →'
     show('quiz', 'questionTitle')
   }
 
   function choose(choice) {
-    if (view !== 'quiz' || advancing) return
+    if (view !== 'quiz' || !save.progress) return
     const progress = save.progress
-    const answeredIndex = progress.current
-    progress.answers[answeredIndex] = choice
-    // Commit completion before any visual delay, including if the host closes now.
+    progress.answers[progress.current] = choice
+    // Persist the selected answer immediately; explicit Next keeps it editable.
     const result = rules.score(progress.answers)
-    if (result.answered === 48) return finish()
-    // Save the next cursor immediately, so closing during the highlight loses no progress.
-    const next = nextIndex(answeredIndex)
-    progress.current = next < 48 ? next : answeredIndex
     persist()
     byId('progressText').textContent = '已答 ' + result.answered + ' 题'
     byId('progressBar').value = result.answered
     for (let index = 0; index < 2; index++) {
       byId('option' + index).setAttribute('aria-pressed', String(index === choice))
-      byId('option' + index).disabled = true
     }
-    advancing = true
-    transitionTimer = setTimeout(() => {
-      if (next >= 48) finishPass()
-      else renderQuestion()
-    }, 160)
+    byId('nextButton').disabled = false
+    byId('announcement').textContent = '已选择：' + rules.questions[progress.current].options[choice].text
   }
 
   function nextIndex(from) {
@@ -155,13 +170,6 @@
 
   function advance() {
     if (view !== 'quiz') return
-    // A selection has already saved its next cursor; do not skip another question.
-    if (advancing) {
-      clearTimeout(transitionTimer)
-      const allAnswered = rules.score(save.progress.answers).answered === 48
-      if (allAnswered) return finishPass()
-      return renderQuestion()
-    }
     const next = nextIndex(save.progress.current)
     if (next >= 48) return finishPass()
     save.progress.current = next
@@ -170,7 +178,7 @@
   }
 
   function previous() {
-    if (view !== 'quiz' || advancing || save.progress.current === 0) return
+    if (view !== 'quiz' || save.progress.current === 0) return
     save.progress.current--
     persist()
     renderQuestion()
@@ -207,6 +215,7 @@
     if (!result.type) return renderReview()
     save.lastResult = { type: result.type, percentages: result.percentages, totals: result.totals, completedAt: new Date().toISOString(), answers: save.progress.answers.slice() }
     save.progress = null
+    reportChapter = 'traits'
     persist()
     renderResult()
   }
@@ -216,8 +225,15 @@
     if (!result) return
     const report = globalThis.XiaobanMbtiReport.build(result)
     if (!report) return goHome()
-    globalThis.XiaobanMbtiReportView.render(report, byId('reportBody'))
-    byId('shareButton').textContent=globalThis.xb?.info?.platform==='desktop'?'保存人格海报':'分享我的结果'
+    globalThis.XiaobanMbtiReportView.render(report, byId('reportBody'), {
+      chapter: reportChapter,
+      onChapterChange(chapter) {
+        if (reportChapter === chapter) return
+        reportChapter = chapter
+        if (!restoringHistory) rememberPage()
+      },
+    })
+    byId('shareButton').textContent=globalThis.xb?.info?.platform==='desktop'?'保存人格海报':'把这份认识，留成一张卡'
     show('result', 'resultType')
   }
 
@@ -269,12 +285,15 @@
   byId('homeButton').addEventListener('click', goHome)
   byId('lastResultButton').addEventListener('click', renderResult)
   byId('shareButton').addEventListener('click', openShare)
-  byId('shareBack').addEventListener('click', () => {shareSequence++;renderResult()})
+  byId('shareBack').addEventListener('click', () => {shareSequence++;window.history.back()})
   byId('savePoster').addEventListener('click', () => exportResult('save'))
   byId('sharePoster').addEventListener('click', () => exportResult('image'))
   byId('shareLink').addEventListener('click', () => exportResult('link'))
   byId('previousButton').addEventListener('click', previous)
   byId('skipButton').addEventListener('click', advance)
+  byId('nextButton').addEventListener('click', () => {
+    if (save.progress && save.progress.answers[save.progress.current] !== null) advance()
+  })
   byId('fillButton').addEventListener('click', fillMissing)
   byId('finishButton').addEventListener('click', finish)
   byId('reviewPreviousButton').addEventListener('click', () => {
@@ -286,8 +305,23 @@
   for (let choice = 0; choice < 2; choice++) byId('option' + choice).addEventListener('click', () => choose(choice))
   window.addEventListener('keydown', event => {
     if (view !== 'quiz' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return
     const actions = { '1': () => choose(0), '2': () => choose(1), ArrowLeft: previous, ArrowRight: advance }
     if (actions[event.key]) { event.preventDefault(); actions[event.key]() }
+  })
+
+  window.addEventListener('popstate', event => {
+    shareSequence++
+    restoringHistory = true
+    const state = event.state?.mbti ? event.state : {page:'home'}
+    reportChapter = state.chapter || 'traits'
+    if (state.page === 'quiz' && save.progress) renderQuestion()
+    else if (state.page === 'review' && save.progress) renderReview()
+    else if (state.page === 'result' && save.lastResult) renderResult()
+    else if (state.page === 'share' && save.lastResult) openShare()
+    else goHome()
+    rememberPage(true)
+    restoringHistory = false
   })
 
   renderHome()

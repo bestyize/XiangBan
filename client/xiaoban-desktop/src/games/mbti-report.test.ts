@@ -81,6 +81,8 @@ it('finishes a real quiz flow, saves its answers, and reopens the same personali
   const a=answersFor('INFJ'),partial=[...a];partial[47]=null
   const first=page({version:1,progress:{answers:partial,current:47,mode:'all'},lastResult:null})
   first.click('resumeButton');first.click('option'+a[47])
+  expect(first.writes.at(-1).progress.answers).toEqual(a)
+  first.click('nextButton')
   const saved=first.writes.at(-1)
   expect(saved.version).toBe(2);expect(saved.progress).toBeNull();expect(saved.lastResult.answers).toEqual(a)
   expect(first.window.document.querySelectorAll('.report-section')).toHaveLength(6)
@@ -89,6 +91,66 @@ it('finishes a real quiz flow, saves its answers, and reopens the same personali
   expect(second.window.document.getElementById('reportBody')!.textContent).toBe(text)
   expect(second.window.document.getElementById('resultType')!.textContent).toBe('INFJ')
   first.window.close();second.window.close()
+})
+
+describe('native-style MBTI interaction',()=>{
+  it('keeps selections editable and restores the current question before advancing',()=>{
+    const first=page(null)
+    first.click('startButton');first.click('option0');first.click('option1')
+    expect(first.writes.at(-1).progress.current).toBe(0)
+    expect(first.writes.at(-1).progress.answers[0]).toBe(1)
+    const restored=page(first.writes.at(-1));restored.click('resumeButton')
+    expect(restored.window.document.getElementById('option1')!.getAttribute('aria-pressed')).toBe('true')
+    restored.click('nextButton')
+    expect(restored.writes.at(-1).progress.current).toBe(1)
+    expect((restored.window.document.getElementById('nextButton') as any).disabled).toBe(true)
+    restored.click('previousButton')
+    expect(restored.window.document.getElementById('option1')!.getAttribute('aria-pressed')).toBe('true')
+    first.window.close();restored.window.close()
+  })
+
+  it('reviews missing answers, prevents empty results, and fills the original gaps',()=>{
+    const current=page(null);current.click('startButton')
+    for(let i=0;i<48;i++)current.click('skipButton')
+    expect(current.window.document.getElementById('review')!.hidden).toBe(false)
+    expect((current.window.document.getElementById('finishButton') as any).disabled).toBe(true)
+    current.click('fillButton')
+    for(let i=0;i<48;i++){current.click('option0');current.click('nextButton')}
+    expect(current.writes.at(-1).progress).toBeNull()
+    expect(current.writes.at(-1).lastResult.answers).toEqual(Array(48).fill(0))
+    expect(current.window.document.getElementById('result')!.hidden).toBe(false)
+    current.window.close()
+  })
+
+  it('switches chapters without losing answer evidence or session action marks',()=>{
+    const current=page({version:2,lastResult:resultFor(answersFor('INFJ'))})
+    current.click('lastResultButton')
+    const doc=current.window.document
+    expect(doc.querySelectorAll('.report-section:not([hidden])')).toHaveLength(1)
+    expect(doc.querySelectorAll('.report-dimension')).toHaveLength(4)
+    current.click('report-tab-work')
+    expect(doc.getElementById('report-work')!.hidden).toBe(false)
+    expect(doc.querySelectorAll('#report-work .report-evidence')).not.toHaveLength(0)
+    expect(current.window.history.state).toMatchObject({page:'result',chapter:'work'})
+    current.click('report-tab-growth')
+    const check=doc.querySelector('.report-step input') as any
+    check.click();expect(check.checked).toBe(true)
+    current.click('homeButton');current.click('lastResultButton')
+    expect((doc.querySelector('.report-step input') as any).checked).toBe(true)
+    expect(doc.getElementById('report-growth')!.hidden).toBe(false)
+    current.window.close()
+  })
+
+  it('restores report chapters and falls back safely from obsolete quiz history',()=>{
+    const current=page({version:2,lastResult:resultFor(answersFor('INTJ'))})
+    current.click('lastResultButton');current.click('report-tab-growth')
+    current.window.dispatchEvent(new current.window.PopStateEvent('popstate',{state:{mbti:true,page:'result',chapter:'traits'}}))
+    expect(current.window.document.getElementById('report-traits')!.hidden).toBe(false)
+    current.window.dispatchEvent(new current.window.PopStateEvent('popstate',{state:{mbti:true,page:'quiz'}}))
+    expect(current.window.document.getElementById('home')!.hidden).toBe(false)
+    expect(current.window.history.state).toMatchObject({page:'home'})
+    current.window.close()
+  })
 })
 
 describe('public result snapshots',()=>{

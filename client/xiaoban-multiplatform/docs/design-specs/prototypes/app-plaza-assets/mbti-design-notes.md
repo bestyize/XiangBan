@@ -1,5 +1,13 @@
 # MBTI 报告与分享卡 · 设计说明
 
+## 原生风格提案：暖色首页插画（2026-11-12）
+
+`mbti-observer-coral.png` 由内置 imagegen 编辑 `mbti-observer-jade.png` 生成，保留透明背景与原有构图。仅用于 [向内看设计稿首页](http://127.0.0.1:1424/prototypes/mbti-native.html#home)；报告、分享卡与其他设计稿继续使用原版角色素材。源 PNG 已保存到本目录，不覆盖绿色原稿。首页实际加载 `mbti-observer-coral.webp`：768 × 512、WebP quality 82，保留透明通道，体积 63 KiB；PNG 仅作源稿保留。
+
+最终生成提示词：
+
+> Use case: precise-object-edit. Edit target: the supplied original paper-craft illustration for the homepage of a refined MBTI self-exploration mobile app. Create a warm coral color variant, changing ONLY the palette. Preserve the same person, face, hairstyle, body, standing pose, open book in hand, hanging lantern, paper tree, winding path, rocks, and large open book forming the base. Preserve the full uncropped landscape composition and detailed dimensional folded-paper style. Replace all dominant emerald/lime green clothes, tree leaves and ground with an elegant balanced palette of coral orange #EB7558, deep coral #C64C35, soft apricot, muted peach, warm ivory #FAF8F5, with restrained warm charcoal shadows. Keep the face natural, scarf and pages warm ivory, lantern softly amber. Use distinct coral, peach and ivory tones across adjacent foliage facets so they remain dimensional. Warm, lively and sophisticated, not oversaturated, not brown/sepia, not neon. This asset sits on an almost-white app background beside dark gray text and a deep coral button. True transparent background, preserving clean alpha edges; no backdrop, no halo, no ground rectangle, no text or logos. Do not add or remove objects. Output just the edited standalone illustration.
+
 本轮为设计原型，不修改题库、计分和客户端。示例为 INFJ，测试日期 2026.11.08 21:46，48/48 题，用时 08:26；数字和解读用于展示排版。四维分数不表示能力、排名或类型匹配率，不额外添加 A/T 维度。
 
 - [完整报告与分享卡](http://127.0.0.1:1424/prototypes/app-plaza.html?board=b10,b11)

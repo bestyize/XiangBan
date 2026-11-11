@@ -152,6 +152,8 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 内置游戏的运行资源在 `public/game-packs/`，构建时会与仓库内独立的 `assets/game-packs/` 基准包核对；修改游戏时需同步相关文件及桌面适配。
 
+MBTI 1.3.0 已按确认的手机设计稿更新首页、答题和结果页：珊瑚橙红与暖白、轻量 WebP、选中后手动下一题、六章报告切换、四维解读展开及系统明暗主题。保留 48 题计分、旧存档与真实海报导出。验证：`npx vitest run src/games/mbti-report.test.ts src/games/pack-boundary.test.ts`、`node scripts/check-game-assets.mjs`，并完成浏览器 48 题流程；尚未重新打包或验收原生安装包。
+
 超级小伴已采用月白 / 夜银两套配色与品牌标志小球（主题色圆底 + 白色 Sparkles），收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。当前形态与品牌标志以 [超级小伴设计规范](docs/design-specs/super-assistant.md) 为准；[对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 提供配色与回复交互参考。
 
 工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。

@@ -1,101 +1,37 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#f6f1e7">
-    <title>MBTI 性格测评 · 小伴</title>
-    <link rel="stylesheet" href="./game.css">
-    <link rel="stylesheet" href="./theme.css">
-    <link rel="stylesheet" href="./report.css">
-    <script src="./rules.js" defer></script>
-    <script src="./profiles.js" defer></script>
-    <script src="./report.js" defer></script>
-    <script src="./report-view.js" defer></script>
-    <script src="./share.js" defer></script>
-    <script src="./game.js" defer></script>
-  </head>
-  <body>
-    <main id="app" class="app">
-      <header class="topbar">
-        <div class="brand"><span class="seal" aria-hidden="true">格</span><span>小伴 · 自我观察</span></div>
-        <button id="homeButton" class="text-button" type="button" hidden>返回首页</button>
-      </header>
-
-      <section id="home" class="view home">
-        <div class="home-intro">
-          <p class="eyebrow">MBTI 性格测评</p>
-          <h1 id="homeTitle" tabindex="-1">认识自己，<br>从日常的选择开始。</h1>
-          <p class="intro-copy">没有标准答案，选更像平时自己的那一项。</p>
-          <svg class="dimension-art" viewBox="0 0 352 120" aria-hidden="true">
-            <g fill="none" stroke="currentColor" stroke-width="1.4">
-              <circle cx="36" cy="43" r="20"/><circle cx="51" cy="43" r="20"/>
-              <path d="M112 23h36v40h-36zM112 43h36M130 23v40"/>
-              <path d="M198 63 218 23 238 63ZM198 63h40M208 43h20"/>
-              <path d="M282 32h43M282 44h43M282 56h43"/><circle cx="297" cy="32" r="3"/><circle cx="312" cy="56" r="3"/>
-            </g>
-            <g fill="currentColor" font-size="12" text-anchor="middle" font-family="serif">
-              <text x="44" y="98">E / I</text><text x="130" y="98">S / N</text>
-              <text x="218" y="98">T / F</text><text x="304" y="98">J / P</text>
-            </g>
-          </svg>
-        </div>
-        <div class="home-actions">
-          <p class="session-meta">48 道情境题 <span aria-hidden="true">·</span> 约 10 分钟</p>
-          <p class="privacy-copy">从日常选择，看看你的性格倾向。<br>完成后，阅读属于这次作答的分析报告。</p>
-          <button id="startButton" class="primary-button full-width" type="button">开始</button>
-          <button id="resumeButton" class="primary-button full-width" type="button" hidden>继续上次</button>
-          <button id="resetButton" class="text-button full-width" type="button" hidden>重新开始</button>
-          <button id="lastResultButton" class="last-result full-width" type="button" hidden></button>
-          <p id="storageNote" class="storage-note" role="status">独立预览：进度仅在本次打开期间保留。</p>
-        </div>
-      </section>
-
-      <section id="quiz" class="view quiz" hidden aria-labelledby="questionTitle">
-        <div class="progress-label"><span id="progressText">已答 0 题</span><span id="questionNumber">1 / 48</span></div>
-        <progress id="progressBar" max="48" value="0" aria-label="已答题数"></progress>
-        <div class="question-area">
-          <p id="questionEyebrow" class="eyebrow">想一想平时的自己</p>
-          <h2 id="questionTitle" class="question-title" tabindex="-1"></h2>
-          <div class="options" role="group" aria-labelledby="questionTitle">
-            <button class="option" id="option0" type="button" aria-pressed="false"><span class="option-key" aria-hidden="true">A</span><span id="optionText0"></span><span class="selected-mark" aria-hidden="true">✓</span></button>
-            <button class="option" id="option1" type="button" aria-pressed="false"><span class="option-key" aria-hidden="true">B</span><span id="optionText1"></span><span class="selected-mark" aria-hidden="true">✓</span></button>
-          </div>
-          <p class="question-hint">按最近一段时间的习惯选，不必追求理想中的自己。</p>
-        </div>
-        <footer class="question-footer">
-          <div class="question-nav"><button id="previousButton" class="text-button" type="button">← 上一题</button><button id="skipButton" class="text-button" type="button">跳过 →</button></div>
-          <p class="keyboard-hint">键盘 1 / 2 选择 · ← / → 翻题</p>
-        </footer>
-      </section>
-
-      <section id="review" class="view review" hidden aria-labelledby="reviewTitle">
-        <p class="eyebrow">给留白一点时间</p>
-        <h2 id="reviewTitle" tabindex="-1">还有几题，想再想想？</h2>
-        <p id="reviewSummary" class="review-copy"></p>
-        <p id="reviewNotice" class="review-copy"></p>
-        <div class="review-actions">
-          <button id="fillButton" class="primary-button full-width" type="button">补答剩余题目</button>
-          <button id="finishButton" class="secondary-button full-width" type="button">查看已答结果</button>
-          <button id="reviewPreviousButton" class="text-button full-width" type="button">返回最后一题</button>
-        </div>
-      </section>
-
-      <section id="result" class="view result" hidden aria-labelledby="resultType">
-        <div id="reportBody"></div>
-        <button id="shareButton" class="primary-button full-width" type="button">分享我的结果</button>
-        <button id="retryButton" class="primary-button full-width" type="button">再测一次</button>
-      </section>
-      <section id="share" class="view share-view" hidden aria-labelledby="shareTitle">
-        <button id="shareBack" class="text-button" type="button">← 返回报告</button>
-        <h2 id="shareTitle" tabindex="-1">分享我的结果</h2>
-        <p class="share-intro">保留此刻的画像，也邀请朋友一起测一测。</p>
-        <img id="posterPreview" class="poster-preview" alt="人格结果分享海报">
-        <p id="posterStatus" class="share-status" role="status">正在准备图片…</p>
-        <div class="share-actions"><button id="savePoster" type="button" class="primary-button" disabled>保存图片</button><button id="sharePoster" type="button" class="secondary-button" disabled>分享图片</button><button id="shareLink" type="button" class="secondary-button" disabled>分享结果链接</button></div>
-        <p class="share-intro share-link-note">链接展示类型、四维倾向和测试日期。原始答案留在本机。</p>
-      </section>
-      <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
-    </main>
-  </body>
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#faf8f5">
+<title>MBTI 性格测评 · 小伴</title>
+<link rel="stylesheet" href="./game.css"><link rel="stylesheet" href="./theme.css"><link rel="stylesheet" href="./report.css">
+<script src="./rules.js" defer></script><script src="./profiles.js" defer></script><script src="./report.js" defer></script><script src="./report-view.js" defer></script><script src="./share.js" defer></script><script src="./game.js" defer></script>
+</head>
+<body>
+<svg class="svg-defs" aria-hidden="true"><defs>
+<symbol id="mbti-leaf" viewBox="0 0 24 24"><path d="M19 4C8 2 3 8 6 15s14 3 13-11Z"/><path d="M5 21 15 9M9 16l-1-5M12 13h5"/></symbol>
+<symbol id="mbti-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+<symbol id="mbti-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></symbol>
+<symbol id="mbti-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="mbti-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></symbol>
+<symbol id="mbti-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v11h14V9M9 20v-7h6v7"/></symbol>
+</defs></svg>
+<main id="app" class="app">
+<header class="topbar"><div class="brand"><svg aria-hidden="true"><use href="#mbti-leaf"/></svg><span id="pageLabel">向内看</span></div><button id="homeButton" class="icon-button" type="button" aria-label="回到首页" title="回到首页" hidden><svg aria-hidden="true"><use href="#mbti-home"/></svg></button></header>
+<section id="home" class="view home" aria-labelledby="homeTitle">
+<div class="home-intro"><p class="eyebrow home-kicker">A LITTLE CLOSER TO YOURSELF</p><h1 id="homeTitle" tabindex="-1">你比四个字母，<br><span>更值得被了解。</span></h1><p class="intro-copy">从生活里的小小选择，<br>看见你的能量、偏好与独特之处。</p><div class="home-art"><img src="./assets/observer-coral.webp" width="768" height="512" alt="珊瑚橙色提灯者站在展开的书与杏色纸艺树林之间"></div></div>
+<div class="home-actions"><div class="session-meta"><span><svg aria-hidden="true"><use href="#mbti-grid"/></svg>48 道情境题</span><span><svg aria-hidden="true"><use href="#mbti-clock"/></svg>约 10 分钟</span></div>
+<button id="startButton" class="primary-button full-width" type="button">开始探索<svg aria-hidden="true"><use href="#mbti-arrow"/></svg></button><button id="resumeButton" class="primary-button full-width" type="button" hidden>继续上次</button>
+<p class="privacy-copy"><svg aria-hidden="true"><use href="#mbti-lock"/></svg>答案留在你的设备里</p><button id="resetButton" class="text-button full-width" type="button" hidden>重新开始</button>
+<button id="lastResultButton" class="last-result full-width" type="button" hidden><span class="history-icon" aria-hidden="true"><svg><use href="#mbti-leaf"/></svg></span><span><strong>上一次，认识了怎样的自己？</strong><small id="lastResultMeta"></small></span><svg class="history-arrow" aria-hidden="true"><use href="#mbti-arrow"/></svg></button><p id="storageNote" class="storage-note" role="status">独立预览：进度仅在本次打开期间保留。</p></div></section>
+<section id="quiz" class="view quiz" hidden aria-labelledby="questionTitle">
+<div class="progress-label"><strong id="questionNumber">01 / 48</strong><span id="progressText">已答 0 题</span></div><progress id="progressBar" max="48" value="0" aria-label="已答题数"></progress>
+<div class="question-area"><p class="question-category"><span aria-hidden="true"><svg><use href="#mbti-leaf"/></svg></span><span id="questionEyebrow">关于你的能量</span></p><h2 id="questionTitle" class="question-title" tabindex="-1"></h2><p class="question-sub">哪一种，更像平时的你？</p>
+<div class="options" role="group" aria-labelledby="questionTitle"><button class="option" id="option0" type="button" aria-pressed="false"><span id="optionText0"></span><span class="selected-mark" aria-hidden="true">✓</span></button><button class="option" id="option1" type="button" aria-pressed="false"><span id="optionText1"></span><span class="selected-mark" aria-hidden="true">✓</span></button></div></div>
+<footer class="question-footer"><p class="question-hint">没有更好的选项，真实就很好。</p><div class="question-nav"><button id="previousButton" class="text-button" type="button">← 上一题</button><button id="skipButton" class="text-button" type="button">暂时跳过</button><button id="nextButton" class="next-button" type="button" disabled>下一题 →</button></div><p class="keyboard-hint">键盘 1 / 2 选择 · ← / → 翻题</p></footer></section>
+<section id="review" class="view review" hidden aria-labelledby="reviewTitle"><p class="eyebrow">给留白一点时间</p><h2 id="reviewTitle" tabindex="-1">还有几题，想再想想？</h2><p id="reviewSummary" class="review-copy"></p><p id="reviewNotice" class="review-copy"></p><div class="review-actions"><button id="fillButton" class="primary-button full-width" type="button">补答剩余题目</button><button id="finishButton" class="secondary-button full-width" type="button">查看已答结果</button><button id="reviewPreviousButton" class="text-button full-width" type="button">返回最后一题</button></div></section>
+<section id="result" class="view result" hidden aria-labelledby="resultType"><div id="reportBody"></div><div class="result-actions"><button id="shareButton" class="primary-button full-width" type="button">把这份认识，留成一张卡</button><button id="retryButton" class="text-button full-width" type="button">重新认识自己 →</button></div></section>
+<section id="share" class="view share-view" hidden aria-labelledby="shareTitle"><button id="shareBack" class="text-button" type="button">← 返回报告</button><h2 id="shareTitle" tabindex="-1">留住此刻的自己</h2><p class="share-intro">保留此刻的画像，也邀请朋友一起测一测。</p><img id="posterPreview" class="poster-preview" alt="人格结果分享海报"><p id="posterStatus" class="share-status" role="status">正在准备图片…</p><div class="share-actions"><button id="savePoster" type="button" class="primary-button" disabled>保存图片</button><button id="sharePoster" type="button" class="secondary-button" disabled>分享图片</button><button id="shareLink" type="button" class="secondary-button" disabled>分享结果链接</button></div><p class="share-intro share-link-note">链接展示类型、四维倾向和测试日期。原始答案留在本机。</p></section>
+<p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+</main>
+</body>
 </html>

@@ -20,6 +20,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [MBTI · 向内看](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mbti-native.html) | 原生 iOS 质感的首页、答题、结果交互提案（第四版：珊瑚橙红＋暖白＋墨灰、暖色首页插画、紧凑间距、加大正文）；支持三页总览、单页预览、6 题演示、六章报告、16 型切换、深浅色和分享卡。结果与历史记录为示例，保存分享为模拟；源文件与素材在仓库内，已应用到内置 MBTI 1.3.0（正式版使用真实作答与存档）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，启动方法见手机设计索引，后续沿用同一地址。 |
 | [轻启](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |
 | [社区作品分享面板](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/community-work-share.html) | 作品封面预览、四个分享入口、复制反馈及独立海报预览。支持浅色、深色和窄屏，分享操作为演示。[在线预览（本机）](http://127.0.0.1:1421/prototypes/community-work-share.html) |
 | [遥控器](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/universal-remote.html) | 电视与空调小程序的可点按设计稿。包含我的遥控器、添加与试码、电视圆形四点方向键、双段音量与独立返回键，以及空调大字温度、风速和风向状态与四行全宽按键。品牌选择列出 19 个电视品牌和 21 个空调品牌，按 2026 年 9 月中国市场的公开份额排序，电视按整机出货、空调按全渠道零售额，其余单列。首页「添加」与标题同行靠右，使用 28px 高的白底、黑字和轻阴影。已保存的遥控器可点卡片右上角的铅笔修改备注名。子页标题为 16px，与两侧的返回箭头、竖三点同高。使用海湾蓝，支持深浅色及无红外演示。默认使用贴近右上角的无圆底竖三点，点击打开与 Android 宿主布局对齐的底部菜单，可切回旧版双按钮对照。[在线预览（本机）](http://127.0.0.1:1421/prototypes/universal-remote.html)，启动方法见手机设计索引。 |

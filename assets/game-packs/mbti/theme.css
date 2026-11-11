@@ -1,31 +1,24 @@
 :root {
   color-scheme: light;
-  --serif: "Songti SC", "STSong", "SimSun", serif;
-  --ink: #3b352c;
-  --muted: #756b5e;
-  --paper: #f6f1e7;
-  --card: #fffaf2;
-  --line: #e4dac9;
-  --art: #9a7b4f;
-  --accent: #168368;
-  --accent-soft: #eef8f2;
-  --bar-first: #9a7b4f;
-  --bar-second: #e4dac9;
-  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  color: var(--ink); background: var(--paper);
+  --paper: #faf8f5; --card: #ffffff; --ink: #292c33; --muted: #71747b;
+  --line: #e8e6e3; --accent: #c64c35; --accent-soft: #fff0e9;
+  --coral: #eb7558; --on-accent: #ffffff; --halo: #ffe9dd;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased;
 }
-body { background: radial-gradient(ellipse at 15% 0%, #fffcf5 0%, transparent 60%), linear-gradient(180deg, var(--paper), #efe8db); }
-.primary-button { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb,var(--accent) 25%,white); }
-.secondary-button { color: var(--ink); background: #eae4db; }
-.option[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-.option[aria-pressed="true"] .option-key { color: var(--accent); }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #202023; --card: #2b2b2f; --ink: #f4f2f0; --muted: #b3b0b0;
+  --line: #424044; --accent: #ffae97; --accent-soft: #45312d;
+  --coral: #f58b70; --on-accent: #3c2520; --halo: #493129;
+}
+body { background: var(--paper); }
+.primary-button { color: var(--on-accent); background: var(--accent); box-shadow: 0 4px 12px #c64c3514; }
+.secondary-button, .next-button { color: var(--accent); background: var(--accent-soft); }
+.option[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 6px 16px #a84a2810; }
+.option[aria-pressed="true"] .selected-mark { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
 @media (hover: hover) {
-  .primary-button:hover:enabled { background: color-mix(in srgb,var(--accent) 14%,white); }
-  .text-button:hover:enabled { background: #e8dfd166; color: var(--ink); }
-  .option:hover:enabled, .last-result:hover:enabled { border-color: var(--art); }
-  .secondary-button:hover:enabled { background: #e3dbcf; }
-}
-button:active:enabled { transform: translateY(1px); }
-@media (prefers-reduced-motion: no-preference) {
-  .option, .primary-button, .text-button { transition: background-color .15s, border-color .15s; }
+  .primary-button:hover:enabled { filter: brightness(.95); }
+  .text-button:hover:enabled, .icon-button:hover:enabled { color: var(--accent); background: var(--accent-soft); }
+  .option:hover:enabled, .last-result:hover:enabled { border-color: var(--coral); }
 }

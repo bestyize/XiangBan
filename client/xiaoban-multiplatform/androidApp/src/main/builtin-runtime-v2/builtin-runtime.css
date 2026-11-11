@@ -7,30 +7,7 @@ html.xb-builtin-runtime body :is(#exitButton, #welcomeExit, #selectBack) {
   display: none;
 }
 
-/* MBTI scrolls from the system inset. Only its upper-right corner is clipped. */
-html.xb-builtin-runtime body #app.app {
-  --mbti-edge: calc((100vw - min(100vw, 480px)) / 2);
-  --mbti-end: clamp(0px, calc(var(--xb-builtin-capsule-end) - var(--mbti-edge)), 100%);
-  --mbti-notch-top: clamp(0px, calc(var(--xb-capsule-top, 0px) - var(--xb-safe-top, 0px) - 8px), 100%);
-  --mbti-notch-bottom: clamp(0px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px - var(--xb-safe-top, 0px)), 100%);
-  --mbti-side: max(24px, var(--xb-safe-right, 0px));
-  position: relative;
-  top: var(--xb-safe-top, 0px);
-  height: calc(100% - var(--xb-safe-top, 0px));
-  padding-top: 0;
-  clip-path: polygon(0 0, 100% 0, 100% var(--mbti-notch-top),
-    calc(100% - var(--mbti-end)) var(--mbti-notch-top),
-    calc(100% - var(--mbti-end)) var(--mbti-notch-bottom),
-    100% var(--mbti-notch-bottom), 100% 100%, 0 100%);
-}
-
-html.xb-builtin-runtime body.is-report #app.app {
-  --mbti-side: max(20px, var(--xb-safe-right, 0px));
-}
-
-html.xb-builtin-runtime #app.app :is(.topbar, .report-nav) {
-  padding-inline-end: max(0px, calc(var(--xb-builtin-capsule-end) - var(--mbti-edge) - var(--mbti-side)));
-}
+/* MBTI owns its fixed header, local capsule clearance and scrolling views. */
 
 /* Ink Blade's chapter picker has its own header, separate from the gameplay HUD. */
 html.xb-builtin-runtime #selectOverlay .select-head {

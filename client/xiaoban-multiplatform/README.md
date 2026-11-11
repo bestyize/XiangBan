@@ -1,5 +1,11 @@
 # 小伴多端 App
 
+## 内置 MBTI 界面（1.3.0）
+
+首页、答题、结果页已应用确认的珊瑚橙红设计稿，使用暖色透明 WebP，保留真实 48 题、断点存档、六章个性化报告和系统分享。答题选中后点下一题，可改选、跳过、补答；页面和报告章节接入浏览器历史，固定顶栏局部避让宿主三点。布局由运行包自身负责，不再依赖通用适配器裁切整页。
+
+验证：桌面子项目 MBTI 测试与资源边界检查、`:androidApp:syncMobileGameAssets`，以及浏览器 320px 模拟 Android 安全区、明暗主题和真实海报生成。未重新打包 APK，未进行 Android/iOS 真机验收。
+
 ## 账号 ID 与 AI 额度入口
 
 「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），「AI 额度」直接进入现有模型与点数页面。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
