@@ -6,7 +6,7 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| [client/xiaoban-desktop](client/xiaoban-desktop/README.md) | 3.1.3 | 小伴桌面：Windows/macOS 桌宠、动态壁纸、十二个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
+| [client/xiaoban-desktop](client/xiaoban-desktop/README.md) | 3.1.4 | 小伴桌面：Windows/macOS 桌宠、动态壁纸、十二个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | Android/iOS 使用 KMP + Compose；包含社区、小伴 AI 与手机桌面互联，桌面壳使用 Rust + Tauri |
 | [services/server-xiaoban](services/server-xiaoban/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-market](services/server-xiaoban-market/README.md) | 已实现 | 小伴市场：专家、技能、连接器的自建目录服务，公开网页、下载 / 更新检测 API，以及 SkillHub、魔搭社区的采集工作台；Rust Axum + PostgreSQL + Vue 3 + Vite |
