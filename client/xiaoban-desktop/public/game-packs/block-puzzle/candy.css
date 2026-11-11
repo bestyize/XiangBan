@@ -1,0 +1,215 @@
+/* Original rose-candy art for the built-in classic block puzzle.
+   This file loads AFTER the shared fresh theme in both the desktop and reference packs. */
+body.fresh-game[data-game="block-puzzle"] {
+  --color-1:#ee6293;--color-2:#ed6193;--color-3:#e95b8c;--color-4:#f16799;
+  --color-5:#ec5a8d;--color-6:#f06c9d;
+  color:#fff; color-scheme:light;
+  background:radial-gradient(ellipse at 52% 12%,#f6b9c9 0%,#eda1b6 43%,#e68aa6 100%);
+  overscroll-behavior:none;
+}
+.fresh-game[data-game="block-puzzle"] .game,
+.fresh-game[data-game="block-puzzle"].hosted .game {
+  position:relative;display:flex;flex-direction:column;align-items:stretch;
+  width:min(100%,520px);height:100%;min-height:0;
+  padding:max(12px,env(safe-area-inset-top,0px)) clamp(12px,4vw,22px) max(12px,env(safe-area-inset-bottom,0px));
+  gap:clamp(5px,1.5vh,14px);margin:auto;
+}
+.fresh-game[data-game="block-puzzle"] .topbar,
+.fresh-game[data-game="block-puzzle"].hosted .topbar {
+  display:flex;align-items:center;justify-content:space-between;
+  flex:0 0 auto;height:50px;width:100%;gap:14px;
+}
+.fresh-game[data-game="block-puzzle"] .best-score {display:flex;align-items:center;gap:4px;color:#ffda25;text-shadow:0 3px 3px #a94e6b88;white-space:nowrap}
+.fresh-game[data-game="block-puzzle"] .best-score span {font-size:35px;filter:drop-shadow(0 3px 2px #a75c7388)}
+.fresh-game[data-game="block-puzzle"] .best-score strong {font-size:26px;font-weight:850;font-variant-numeric:tabular-nums}
+.fresh-game[data-game="block-puzzle"] .header-actions{display:flex;align-items:center;gap:4px}
+.fresh-game[data-game="block-puzzle"] .icon-button,
+.fresh-game[data-game="block-puzzle"].hosted #exitButton {
+  display:grid;place-items:center;width:44px;height:44px;min-height:44px;padding:0;
+  border:0;border-radius:13px;background:transparent;color:#fff9f9;
+  font-size:30px;text-shadow:0 3px 3px #b5678199;box-shadow:none;
+}
+.fresh-game[data-game="block-puzzle"] .icon-button:focus-visible{outline:3px solid #fff}
+.fresh-game[data-game="block-puzzle"].native-host #exitButton{display:none}
+.fresh-game[data-game="block-puzzle"] .exit-label{display:none}
+.fresh-game[data-game="block-puzzle"] .exit-arrow{display:block;font-size:39px}
+.fresh-game[data-game="block-puzzle"] .stats,
+.fresh-game[data-game="block-puzzle"].hosted .stats {
+  width:100%;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+  gap:0;min-height:92px;position:relative;justify-content:center;
+}
+.fresh-game[data-game="block-puzzle"] .stats .stat,
+.fresh-game[data-game="block-puzzle"] .stats > div:nth-child(1){
+  background:none;border:0;box-shadow:none;padding:0;min-height:0;
+}
+.fresh-game[data-game="block-puzzle"] .stats .stat span{display:none}
+.fresh-game[data-game="block-puzzle"] .stats .stat strong,
+.fresh-game[data-game="block-puzzle"] .stats > div:nth-child(1) strong {
+  font-size:clamp(56px,15vw,90px);line-height:1.02;
+  font-weight:850;color:#fff;text-shadow:0 4px 2px #8e607ca0,0 1px 0 #fff;
+  letter-spacing:.025em;font-variant-numeric:tabular-nums;
+}
+.fresh-game[data-game="block-puzzle"] .statistics-only{display:none}
+.fresh-game[data-game="block-puzzle"] .combo-counter{
+  position:absolute;bottom:-8px;margin:0;z-index:1;color:#fff3b0;
+  font-size:15px;letter-spacing:.12em;font-weight:900;text-shadow:0 2px 4px #b4527e;
+}
+.fresh-game[data-game="block-puzzle"] .intro {display:none}
+.fresh-game[data-game="block-puzzle"] .board-stage,
+.fresh-game[data-game="block-puzzle"].hosted .board-stage {
+  display:flex;flex:1 1 auto;justify-content:center;align-items:center;
+  width:100%;min-height:0;container-type:size;
+}
+.fresh-game[data-game="block-puzzle"] .board-shell,
+.fresh-game[data-game="block-puzzle"].hosted .board-shell{
+  width:min(100cqw,100cqh,460px);aspect-ratio:1;flex:0 0 auto;position:relative;
+}
+.fresh-game[data-game="block-puzzle"] .board {
+  display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));
+  width:100%;height:100%;padding:6px;gap:2px;
+  border:6px solid #c87e96;border-radius:13px;
+  background:#704050;box-shadow:inset 0 2px 5px #49253250,0 5px 0 #b26a82a6;
+  touch-action:none;
+}
+.fresh-game[data-game="block-puzzle"] .cell{
+  background:#83505f;border:0;border-radius:1px;box-shadow:inset 0 1px 2px #5d2e403a;
+  min-width:0;min-height:0;
+}
+.fresh-game[data-game="block-puzzle"] .cell.filled,
+.fresh-game[data-game="block-puzzle"] .mini-cell{
+  position:relative;display:block;
+  border:1px solid #ffb0cc;border-radius:2px;
+  background:linear-gradient(140deg,#ff94b8 0%,#f66e9e 19%,#ef508a 48%,#da3a76 82%,#bb2661 100%);
+  box-shadow:inset 3px 3px 0 #ffbfd7a8,inset -4px -4px 0 #a91e5870,0 2px 3px #56303e5e;
+}
+.fresh-game[data-game="block-puzzle"] .cell.filled::before,
+.fresh-game[data-game="block-puzzle"] .mini-cell::before{
+  content:"";position:absolute;top:3%;left:5%;width:88%;height:33%;
+  background:linear-gradient(#ffd3e2a8,#ff8bb45c);clip-path:polygon(0 0,100% 0,84% 100%,15% 100%);
+  pointer-events:none;
+}
+.fresh-game[data-game="block-puzzle"] .cell.preview {
+  opacity:.62;background:#ff9ec0;box-shadow:inset 0 0 0 2px #fff4;
+}
+.fresh-game[data-game="block-puzzle"] .cell.preview-invalid {
+  background:#fa6b66;opacity:.9;box-shadow:inset 0 0 0 2px #fff6;
+}
+.fresh-game[data-game="block-puzzle"] .cell.preview-line:not(.filled){background:#a46c82;box-shadow:inset 0 0 0 2px #ffc7dc}
+.fresh-game[data-game="block-puzzle"] .cell.clear-flash{animation:candy-clear .45s ease-out}
+@keyframes candy-clear{
+  0%,32%{background:#fff8d3;box-shadow:0 0 16px #fff4a7,0 0 5px #fff}
+  100%{background:#83505f;box-shadow:none}
+}
+.fresh-game[data-game="block-puzzle"] .tray-hint,
+.fresh-game[data-game="block-puzzle"].hosted .tray-hint{
+  color:#fff4f7;text-shadow:0 1px 3px #b7617d;margin:0;text-align:center;font-size:12px;
+}
+.fresh-game[data-game="block-puzzle"] .tray,
+.fresh-game[data-game="block-puzzle"].hosted .tray{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:center;gap:6px;width:100%;flex:0 0 auto;
+}
+.fresh-game[data-game="block-puzzle"] .piece-button,
+.fresh-game[data-game="block-puzzle"] .piece-button[aria-pressed="true"]{
+  background:transparent;border:0;border-radius:12px;box-shadow:none;
+  height:clamp(72px,12vh,112px);padding:4px;
+  display:flex;align-items:center;justify-content:center;touch-action:none;
+}
+.fresh-game[data-game="block-puzzle"] .piece-button[aria-pressed="true"]{background:#ffffff22}
+.fresh-game[data-game="block-puzzle"] .piece-button.used{opacity:.17}
+.fresh-game[data-game="block-puzzle"] .piece-button.blocked .piece-art{opacity:.44}
+.fresh-game[data-game="block-puzzle"] .piece-art{
+  --mini-step:clamp(12px,3.9vw,19px);
+  width:calc(var(--piece-width) * var(--mini-step));
+  height:calc(var(--piece-height) * var(--mini-step));
+  grid-template-columns:repeat(var(--piece-width),1fr);
+  grid-template-rows:repeat(var(--piece-height),1fr);gap:1px;
+}
+.fresh-game[data-game="block-puzzle"] .piece-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.fresh-game[data-game="block-puzzle"] .status,
+.fresh-game[data-game="block-puzzle"].hosted .status{
+  color:#fff4f7;min-height:18px;line-height:1.3;text-align:center;
+  font-size:11px;margin:0;flex:0 0 auto;
+}
+.fresh-game[data-game="block-puzzle"] .footer{display:none}
+.fresh-game[data-game="block-puzzle"] .drag-ghost{opacity:.94;filter:drop-shadow(0 8px 6px #70314b72)}
+.fresh-game[data-game="block-puzzle"] .drag-ghost.invalid .mini-cell{background:#f55d67}
+.fresh-game[data-game="block-puzzle"] .spark-layer{
+  position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3;
+}
+.fresh-game[data-game="block-puzzle"] .spark{
+  position:absolute;width:8px;height:8px;border-radius:2px;background:#fff4bb;
+  box-shadow:0 0 8px #ffe179;animation:spark-burst .72s ease-out forwards;
+}
+@keyframes spark-burst{to{transform:translate(var(--dx),var(--dy)) rotate(110deg) scale(0);opacity:0}}
+.fresh-game[data-game="block-puzzle"] .combo-banner{
+  position:absolute;z-index:5;top:41%;left:50%;transform:translate(-50%,-50%);
+  white-space:nowrap;pointer-events:none;color:#ffed69;font-size:clamp(17px,4.8vw,28px);
+  font-weight:900;text-shadow:0 3px 1px #963c78,0 6px 12px #7f28589a;
+}
+.fresh-game[data-game="block-puzzle"] .combo-banner.pop{animation:combo-pop .75s ease-out both}
+@keyframes combo-pop{
+  0%{opacity:0;transform:translate(-50%,-30%) scale(.55)}
+  24%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}
+  60%{opacity:1;transform:translate(-50%,-52%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-70%) scale(1)}
+}
+.fresh-game[data-game="block-puzzle"] .overlay{
+  position:fixed;inset:0;border-radius:0;z-index:30;display:grid;place-items:center;
+  background:radial-gradient(ellipse at 50% 84%,#8d42d7,#5413a4 65%,#39067f);
+  padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));
+}
+.fresh-game[data-game="block-puzzle"] .result-card{
+  width:min(100%,440px);padding:14px;background:transparent;border:0;box-shadow:none;
+  color:white;text-align:center;display:flex;flex-direction:column;align-items:center;
+  max-height:100%;overflow:auto;
+}
+.fresh-game[data-game="block-puzzle"] .result-crown{font-size:74px;filter:drop-shadow(0 6px 3px #29025d90);line-height:1.1}
+.fresh-game[data-game="block-puzzle"] .result-card h2{color:#ffc820;font-size:clamp(30px,7.6vw,46px);margin:10px 0 20px;text-shadow:0 4px 3px #2d0759c2;font-weight:900}
+.fresh-game[data-game="block-puzzle"] .result-card .result-caption{font-size:19px;color:#eec8ff;margin:0}
+.fresh-game[data-game="block-puzzle"] .result-card .result-score{font-size:clamp(62px,15vw,96px);font-weight:900;color:#fff;line-height:1.15;margin:12px 0;text-shadow:0 5px 2px #32105b}
+.fresh-game[data-game="block-puzzle"] .result-card .result-lines{font-size:13px;color:#e8c4ff}
+.fresh-game[data-game="block-puzzle"] .result-restart{
+  margin-top:52px;width:min(85%,350px);height:72px;border:0;border-radius:14px;
+  background:linear-gradient(#ffca36,#eda317);color:#fff;font-size:24px;font-weight:800;
+  box-shadow:0 6px 0 #b87510,0 9px 16px #23004e64;text-shadow:0 2px 2px #ad7510;
+}
+.fresh-game[data-game="block-puzzle"] .settings-overlay{
+  position:fixed;inset:0;z-index:40;background:#4c183fba;display:grid;place-items:center;
+  padding:24px;color:#4d3240;
+}
+.fresh-game[data-game="block-puzzle"] .settings-panel{
+  width:min(100%,350px);background:#fff8fa;border-radius:22px;box-shadow:0 20px 60px #4d173f77;
+  padding:22px;display:flex;flex-direction:column;gap:13px;
+}
+.fresh-game[data-game="block-puzzle"] .settings-head{display:flex;justify-content:space-between;align-items:center}
+.fresh-game[data-game="block-puzzle"] .settings-head h2{font-size:22px;margin:0;color:#642b4a}
+.fresh-game[data-game="block-puzzle"] .settings-head .close-settings{border:0;background:transparent;color:#8f5572;font-size:20px;min-height:40px;min-width:40px}
+.fresh-game[data-game="block-puzzle"] .settings-panel p{color:#825873;font-size:13px;margin:0}
+.fresh-game[data-game="block-puzzle"] .settings-action{
+  min-height:50px;background:#fbe5ec;color:#74334e;border:1px solid #f3b9ce;border-radius:14px;font-weight:750
+}
+.fresh-game[data-game="block-puzzle"] .settings-tip{line-height:1.7}
+@media (max-height:640px){
+  .fresh-game[data-game="block-puzzle"] .game{gap:5px;padding-top:6px;padding-bottom:6px}
+  .fresh-game[data-game="block-puzzle"] .topbar{height:40px}
+  .fresh-game[data-game="block-puzzle"] .stats{min-height:58px}
+  .fresh-game[data-game="block-puzzle"] .stats .stat strong{font-size:54px}
+  .fresh-game[data-game="block-puzzle"] .piece-button{height:64px}
+}
+@media (max-height:480px) and (min-width:650px){
+  .fresh-game[data-game="block-puzzle"] .game{width:min(100%,980px);display:grid;grid-template-columns:210px minmax(0,1fr) 200px;grid-template-rows:auto 1fr auto;gap:8px}
+  .fresh-game[data-game="block-puzzle"] .topbar{grid-column:1;grid-row:1}
+  .fresh-game[data-game="block-puzzle"] .stats{grid-column:1;grid-row:2}
+  .fresh-game[data-game="block-puzzle"] .board-stage{grid-column:2;grid-row:1/4;align-self:stretch}
+  .fresh-game[data-game="block-puzzle"] .tray-hint{grid-column:3;grid-row:1}
+  .fresh-game[data-game="block-puzzle"] .tray{grid-column:3;grid-row:2;align-self:center}
+  .fresh-game[data-game="block-puzzle"] .status{grid-column:3;grid-row:3}
+  .fresh-game[data-game="block-puzzle"] .piece-button{height:76px}
+  .fresh-game[data-game="block-puzzle"] .piece-art{--mini-step:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fresh-game[data-game="block-puzzle"] .cell.clear-flash,
+  .fresh-game[data-game="block-puzzle"] .spark,
+  .fresh-game[data-game="block-puzzle"] .combo-banner.pop{animation:none}
+}

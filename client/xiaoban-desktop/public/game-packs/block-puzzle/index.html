@@ -1,52 +1,69 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#f2f8f5">
-    <title>消失高手 · 下班啦</title>
-    <link rel="stylesheet" href="./game.css">
-    <link rel="stylesheet" href="./theme.css">
-    <script src="./rules.js" defer></script>
-    <script src="./game.js" defer></script>
-  </head>
-  <body class="fresh-game" data-game="block-puzzle">
-    <main class="game">
-      <header class="topbar">
-        <div><p class="eyebrow">单人 · 摆一摆，消一消</p><h1>消失高手</h1></div>
-        <button id="exitButton" class="quiet-button" type="button" aria-label="返回游戏广场"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">回游戏广场</span></button>
-      </header>
-      <section class="stats" aria-label="本局数据">
-        <div class="stat"><span>得分</span><strong id="score">0</strong></div>
-        <div class="stat"><span>最高分</span><strong id="best">0</strong></div>
-        <div class="stat"><span>消除行列</span><strong id="lines">0</strong></div>
-      </section>
-      <p class="intro">填满整行或整列就消除，一次消多条有加分。</p>
-      <section class="board-stage" aria-label="游戏区域">
-        <div class="board-shell">
-          <div id="board" class="board" role="grid" aria-label="八行八列棋盘。选方块后，方向键移动，回车放置。" aria-describedby="help"></div>
-          <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
-            <div class="result-card">
-              <p class="eyebrow">这一局结束啦</p>
-              <h2 id="resultTitle">歇一会，再来一局？</h2>
-              <p id="resultScore"></p>
-              <button id="restartOverlay" class="primary-button" type="button">再来一局</button>
-            </div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#ee9aaf">
+  <title>方块爆破 · 小伴游戏</title>
+  <link rel="stylesheet" href="./game.css">
+  <link rel="stylesheet" href="./theme.css">
+  <link rel="stylesheet" href="./candy.css">
+  <script src="./rules.js" defer></script>
+  <script src="./game.js" defer></script>
+</head>
+<body class="fresh-game" data-game="block-puzzle">
+  <main class="game">
+    <header class="topbar">
+      <div class="best-score" aria-label="历史最高分"><span aria-hidden="true">👑</span><strong id="best">0</strong></div>
+      <div class="header-actions">
+        <button id="settingsButton" class="icon-button" type="button" aria-label="游戏设置">⚙</button>
+        <button id="exitButton" class="icon-button exit-button" type="button" aria-label="退出游戏"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">退出</span></button>
+      </div>
+    </header>
+    <section class="stats" aria-label="当前得分">
+      <div class="stat"><span>当前分数</span><strong id="score">0</strong></div>
+      <div class="stat statistics-only"><span>消除行列</span><strong id="lines">0</strong></div>
+      <p id="comboCount" class="combo-counter" hidden></p>
+    </section>
+    <p class="intro">拖放方块，填满一整行或一整列即可消除</p>
+    <section class="board-stage" aria-label="棋盘">
+      <div class="board-shell">
+        <div id="board" class="board" role="grid" aria-label="八行八列方块棋盘" aria-describedby="help"></div>
+        <div id="sparkLayer" class="spark-layer" aria-hidden="true"></div>
+        <div id="comboBanner" class="combo-banner" aria-live="polite" hidden></div>
+        <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
+          <div class="result-card">
+            <div class="result-crown" aria-hidden="true">👑</div>
+            <h2 id="resultTitle">再破一次纪录！</h2>
+            <p class="result-caption">本局得分</p>
+            <p id="resultScore" class="result-score">0</p>
+            <p id="resultLines" class="result-lines"></p>
+            <button id="restartOverlay" class="primary-button result-restart" type="button" aria-label="再玩一局">▶ <span>再玩一局</span></button>
           </div>
         </div>
-      </section>
-      <p id="trayHint" class="tray-hint">拖动下面方块到方格</p>
-      <section id="tray" class="tray" aria-label="待放置方块" aria-describedby="trayHint">
-        <button class="piece-button" type="button" data-slot="0" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
-        <button class="piece-button" type="button" data-slot="1" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
-        <button class="piece-button" type="button" data-slot="2" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
-      </section>
-      <p id="status" class="status" role="status" aria-live="polite">拖方块到棋盘，或选方块后点空格。</p>
-      <footer class="footer">
-        <p id="help" class="help">拖动 / 选中后点棋盘<br>键盘 1–3 选块 · 方向键 · 回车</p>
-        <button id="restartButton" class="quiet-button" type="button">重新开始</button>
-      </footer>
-    </main>
-    <div id="dragGhost" class="drag-ghost" aria-hidden="true" hidden></div>
-  </body>
+      </div>
+    </section>
+    <p id="trayHint" class="tray-hint">拖动下方方块放入棋盘</p>
+    <section id="tray" class="tray" aria-label="三个待放置方块" aria-describedby="trayHint">
+      <button class="piece-button" type="button" data-slot="0" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+      <button class="piece-button" type="button" data-slot="1" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+      <button class="piece-button" type="button" data-slot="2" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+    </section>
+    <p id="status" class="status" role="status" aria-live="polite">任选一个方块，拖进棋盘吧。</p>
+    <footer class="footer">
+      <p id="help" class="help">键盘：1–3 选块，方向键移动，回车放置</p>
+      <button id="restartButton" class="quiet-button" type="button">重新开始</button>
+    </footer>
+  </main>
+  <div id="dragGhost" class="drag-ghost" aria-hidden="true" hidden></div>
+  <section id="settingsOverlay" class="settings-overlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="settings-panel">
+      <div class="settings-head"><h2 id="settingsTitle">游戏设置</h2><button id="closeSettingsButton" type="button" class="close-settings" aria-label="关闭设置">✕</button></div>
+      <p>方块爆破 · 经典模式</p>
+      <button id="soundButton" type="button" aria-pressed="true" class="settings-action">声音：开启</button>
+      <button id="settingsRestart" type="button" class="settings-action">重新开始</button>
+      <p class="settings-tip">填满横向或纵向八格即可消除，连续消除能获得更高分数。</p>
+    </div>
+  </section>
+</body>
 </html>
