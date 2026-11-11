@@ -24,12 +24,14 @@
   let hostReady = false
   const storeKey = 'xiaoban.block-puzzle.classic.v2'
   const themeStoreKey = 'xiaoban.block-puzzle.theme.v1'
+  const resumeStoreKey = 'xiaoban.block-puzzle.resume.v1'
   const hostStorage = globalThis.xb?.storage
   const settingsOverlay = document.getElementById('settingsOverlay')
   const settingsButton = document.getElementById('settingsButton')
   const closeSettingsButton = document.getElementById('closeSettingsButton')
   const soundButton = document.getElementById('soundButton')
   const settingsRestart = document.getElementById('settingsRestart')
+  const continueButton = document.getElementById('continueButton')
   const comboBanner = document.getElementById('comboBanner')
   const sparkLayer = document.getElementById('sparkLayer')
   let soundEnabled = true
@@ -38,6 +40,7 @@
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
   let hasLocalTheme = false
+  let resumeSnapshot = null
   let writeQueue = Promise.resolve()
   // Visual progression belongs to the saved run, not to a global theme setting.
   let paletteIndex = 0
@@ -121,6 +124,56 @@
   function readLocal() {
     try { return JSON.parse(localStorage.getItem(storeKey) || 'null') } catch { return null }
   }
+  function readArchived() {
+    try { return JSON.parse(localStorage.getItem(resumeStoreKey) || 'null') } catch { return null }
+  }
+  function offerContinue(snapshot) {
+    const loaded = snapshot?.version === 2 ? rules.restoreGame(snapshot.game) : null
+    if (!loaded || loaded.over ||
+        (!loaded.score && loaded.board.every((row) => row.every((tile) => !tile)))) return false
+    resumeSnapshot = snapshot
+    continueButton.hidden = false
+    return true
+  }
+  function archiveContinue() {
+    if (!resumeSnapshot) return
+    const snapshot = resumeSnapshot
+    try { localStorage.setItem(resumeStoreKey, JSON.stringify(snapshot)) } catch { /* opaque origin */ }
+    if (!recovering && hostStorage?.set) {
+      writeQueue = writeQueue.catch(() => {}).then(() => hostStorage.set(resumeStoreKey, snapshot))
+    }
+  }
+  function clearContinueArchive() {
+    resumeSnapshot = null
+    continueButton.hidden = true
+    try { localStorage.removeItem?.(resumeStoreKey) } catch { /* opaque origin */ }
+    if (!recovering && hostStorage?.remove) {
+      writeQueue = writeQueue.catch(() => {}).then(() => hostStorage.remove(resumeStoreKey))
+    }
+  }
+  function continuePrevious() {
+    const snapshot = resumeSnapshot
+    const loaded = snapshot?.version === 2 ? rules.restoreGame(snapshot.game) : null
+    if (!loaded || loaded.over) return
+    clearVisualTimers()
+    if (drag) stopDrag()
+    state = loaded
+    best = Math.max(best, Number.isSafeInteger(snapshot.best) ? snapshot.best : 0, loaded.score)
+    clearContinueArchive()
+    selected = null
+    cursor = { row: 0, col: 0 }
+    overlay.hidden = true
+    settingsOverlay.hidden = true
+    restartButton.disabled = false
+    exitButton.disabled = false
+    renderBoard()
+    renderHand()
+    statusNode.textContent = '已继续上局。当前主题和最高分仍然保留。'
+    turns += 1
+    persist()
+    postToHost('game.start')
+    postToHost('game.progress', { score: state.score, lines: state.lines })
+  }
   function soundUI() {
     soundButton.textContent = soundEnabled ? '声音：开启' : '声音：关闭'
     soundButton.setAttribute('aria-pressed', String(soundEnabled))
@@ -128,7 +181,8 @@
   function acceptSave(data) {
     const loaded = data?.version === 2 ? rules.restoreGame(data.game) : null
     if (!loaded) return false
-    state = loaded
+    // Enter with a new, empty board. Recover only preferences and records.
+    // Restoring the unfinished board is an explicit choice in Settings.
     best = Math.max(best, Number.isSafeInteger(data.best) && data.best >= 0 ? data.best : 0, loaded.score)
     soundEnabled = data.soundEnabled !== false
     if (Number.isSafeInteger(data.paletteIndex) && data.paletteIndex >= 0) {
@@ -153,21 +207,27 @@
   async function restoreFromHost() {
     try {
       const saved = await hostStorage.get(storeKey)
+      // Never swap the board behind someone already playing.
       if (!hasLocalSave && turns === 0 && acceptSave(saved)) {
         renderBoard()
         renderHand()
-        if (state.over) showResult()
-        else postToHost('game.progress', { score: state.score, lines: state.lines })
       }
-      // Theme has independent lifetime: it survives a finished game, restarts
-      // and even a cleared/corrupt in-progress game save.
+      if (!resumeSnapshot) offerContinue(saved)
+      const archived = await hostStorage.get(resumeStoreKey)
+      if (!resumeSnapshot) offerContinue(archived)
+      // Theme is independent of the round and survives restarts.
       const theme = await hostStorage.get(themeStoreKey)
       if (!hasLocalTheme && turns === 0 && acceptTheme(theme)) {
         renderBoard()
         renderHand()
       }
     } catch { /* optional platform storage */ }
-    finally { recovering = false; persist(); saveTheme() }
+    finally {
+      recovering = false
+      archiveContinue()
+      persist()
+      saveTheme()
+    }
   }
   function tone(hz, seconds = .09, level = .055) {
     if (!soundEnabled) return
@@ -719,9 +779,11 @@
     if (state) stopDrag()
     state = rules.createGame()
     if (!fresh) {
-      hasLocalSave = acceptSave(readLocal())
+      const previous = readLocal()
+      hasLocalSave = acceptSave(previous)
+      if (!offerContinue(previous)) offerContinue(readArchived())
       hasLocalTheme = acceptTheme(readLocalTheme())
-      // The independent theme takes priority over an older round snapshot.
+      // Preserve the old round in a separate archive before starting fresh.
     } else turns += 1
     selected = null
     cursor = { row: 0, col: 0 }
@@ -745,13 +807,14 @@
   closeSettingsButton.addEventListener('click', () => { settingsOverlay.hidden = true; settingsButton.focus() })
   soundButton.addEventListener('click', () => { soundEnabled = !soundEnabled; soundUI(); persist(); if (soundEnabled) tone(440) })
   settingsRestart.addEventListener('click', () => { resetGame(); pieceButtons[0].focus() })
+  continueButton.addEventListener('click', continuePrevious)
   soundUI()
   exitButton.addEventListener('click', exitGame)
   window.addEventListener('resize', stopDrag)
   window.addEventListener('blur', () => { if (drag) stopDrag() })
   resetGame(false)
   if (hostStorage?.get) void restoreFromHost()
-  else recovering = false
+  else { recovering = false; archiveContinue(); persist() }
   if (globalThis.xb?.ready) {
     initialize()
     globalThis.xb.on?.('hide', () => {
