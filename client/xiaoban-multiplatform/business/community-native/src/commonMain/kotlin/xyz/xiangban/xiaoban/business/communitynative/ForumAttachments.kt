@@ -1,9 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -77,14 +75,12 @@ internal fun ForumAttachments(env: CommunityEnv, attachments: List<ForumAttachme
         message?.let { Text(it, style = XType.Caption) }
     }
     pending?.let { file ->
-        AlertDialog(
-            onDismissRequest = { pending = null },
-            title = { Text("购买附件") },
-            text = { Text("购买「${file.name}」需要 ${file.price} 积分，重复下载免费。") },
-            confirmButton = {
-                TextButton(onClick = { pending = null; download(file, purchase = true) }) { Text("购买并下载") }
-            },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("取消") } },
+        XiaobanConfirmDialog(
+            title = "购买附件",
+            message = "购买「${file.name}」需要 ${file.price} 积分，重复下载免费。",
+            confirmLabel = "购买并下载",
+            onConfirm = { pending = null; download(file, purchase = true) },
+            onDismiss = { pending = null },
         )
     }
 }
