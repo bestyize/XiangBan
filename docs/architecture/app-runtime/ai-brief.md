@@ -31,10 +31,10 @@ Android 创作工具已支持协议 2、`lib_add` 和 `asset_import`。其余素
    - 只在作品确实需要实时数据时才联网，并且要处理断网：没网时给出可见的提示，不要白屏。小伴后台可能禁止某个作品联网，作品要能在断网时继续使用不依赖网络的部分。
    - 作品要用 AI，就调用作者自己的服务，把地址和密钥的来源告诉用户；不要把密钥写死在代码里，代码是公开的。
 
-6. **布局。** 页面占满 100vw × 100vh。
-   - 右上角有宿主的「··· | ✕」胶囊，四周有状态栏和挖孔。
-   - 用 CSS 变量 --xb-safe-top、--xb-safe-right、--xb-safe-bottom、--xb-safe-left 留出边距。
-   - 用 --xb-capsule-top、--xb-capsule-right、--xb-capsule-width、--xb-capsule-height 计算胶囊区域。所有可交互控件都要避开它，包括选关、暂停、结算和滚动后的控件。
+6. **布局。** 在 viewport meta 中写 `viewport-fit=cover`，页面使用 100vw × 100dvh（100vh 兜底）。背景铺满整个视口，包括状态栏、挖孔和手势条后方；只给内容和可操作控件加系统安全区边距，不给背景或整个视口加白边。
+   - Android 右上角由宿主画透明底竖三点，触控区是一个独立矩形。系统边距用 `--xb-safe-top/right/bottom/left`，不要把三点的高度加进这些边距或整页顶部 padding。
+   - 从 `--xb-capsule-top/right/width/height` 取得三点实际尺寸，左边坐标为「视口宽 − right − width」。只挪开与该矩形相交的控件，留至少 8 CSS 像素间隔；左侧标题、中间内容和背景可以正常使用同一行。靠右的同排控件可用 `max(0px, calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px - 已用右边距))` 计算额外避让；没有宿主菜单时额外避让为 0。
+   - 检查首页、选关、对局、暂停、结算、弹窗以及滚动和横竖屏切换后，所有操作都能点到。绘制或拖放前用 `xb.info.safeArea`、`xb.info.capsule` 取最新数据，并在 `xb.on('safearea', ...)` 和 resize 后更新布局与命中区域。
    - canvas 按 devicePixelRatio 绘制，监听 resize 后重新布局。
    - 按钮至少 44×44 像素。
 

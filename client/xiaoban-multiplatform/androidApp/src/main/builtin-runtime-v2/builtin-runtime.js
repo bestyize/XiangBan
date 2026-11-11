@@ -9,12 +9,7 @@
   const reportError = error => console.error('小伴内置作品：', error)
 
   function layout() {
-    const safeArea = { ...xb.info.safeArea }
-    const capsule = xb.info.capsule
-    if (xb.info.orientation === 'portrait') {
-      safeArea.top = Math.max(safeArea.top, capsule.top + capsule.height + 8)
-    }
-    return { safeArea, capsule }
+    return { safeArea: { ...xb.info.safeArea }, capsule: { ...xb.info.capsule } }
   }
 
   async function connect(initialize, options = {}) {

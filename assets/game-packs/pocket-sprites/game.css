@@ -10,7 +10,7 @@
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--xb-safe-bottom, 0px));
   --safe-left: max(env(safe-area-inset-left, 0px), var(--xb-safe-left, 0px));
   --safe-right: max(env(safe-area-inset-right, 0px), var(--xb-safe-right, 0px));
-  --stage-top: max(24px, calc(var(--safe-top) + 12px), calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 10px));
+  --stage-top: max(24px, calc(var(--safe-top) + 12px));
   --stage-bottom: max(18px, calc(var(--safe-bottom) + 10px));
   --cell-pitch: clamp(30px, calc((100vw - 26px) / 9), 43px);
   font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -63,6 +63,16 @@ h1:focus { outline: 0; }
   isolation: isolate;
 }
 .stage::-webkit-scrollbar { display: none; }
+/* Keep controls that scroll up from entering the native menu's corner. */
+.stage {
+  --stage-notch-end: clamp(0px, calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px), 100%);
+  --stage-notch-top: clamp(0px, calc(var(--xb-capsule-top, 0px) - var(--stage-top) - 8px), 100%);
+  --stage-notch-bottom: clamp(0px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px - var(--stage-top)), 100%);
+  clip-path: polygon(0 0, 100% 0, 100% var(--stage-notch-top),
+    calc(100% - var(--stage-notch-end)) var(--stage-notch-top),
+    calc(100% - var(--stage-notch-end)) var(--stage-notch-bottom),
+    100% var(--stage-notch-bottom), 100% 100%, 0 100%);
+}
 .screen {
   width: min(100%, 470px);
   min-height: 100%;

@@ -1,5 +1,5 @@
 html.xb-builtin-runtime {
-  --xb-builtin-top: max(var(--xb-safe-top, 0px), calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
+  --xb-builtin-capsule-end: calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px);
 }
 
 /* The native capsule and system Back handle the top-left return actions. */
@@ -7,12 +7,29 @@ html.xb-builtin-runtime body :is(#exitButton, #welcomeExit, #selectBack) {
   display: none;
 }
 
-/* Keep the MBTI scrollport below the capsule, including after the result page scrolls. */
+/* MBTI scrolls from the system inset. Only its upper-right corner is clipped. */
 html.xb-builtin-runtime body #app.app {
+  --mbti-edge: calc((100vw - min(100vw, 480px)) / 2);
+  --mbti-end: clamp(0px, calc(var(--xb-builtin-capsule-end) - var(--mbti-edge)), 100%);
+  --mbti-notch-top: clamp(0px, calc(var(--xb-capsule-top, 0px) - var(--xb-safe-top, 0px) - 8px), 100%);
+  --mbti-notch-bottom: clamp(0px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px - var(--xb-safe-top, 0px)), 100%);
+  --mbti-side: max(24px, var(--xb-safe-right, 0px));
   position: relative;
-  top: var(--xb-builtin-top);
-  height: calc(100% - var(--xb-builtin-top));
+  top: var(--xb-safe-top, 0px);
+  height: calc(100% - var(--xb-safe-top, 0px));
   padding-top: 0;
+  clip-path: polygon(0 0, 100% 0, 100% var(--mbti-notch-top),
+    calc(100% - var(--mbti-end)) var(--mbti-notch-top),
+    calc(100% - var(--mbti-end)) var(--mbti-notch-bottom),
+    100% var(--mbti-notch-bottom), 100% 100%, 0 100%);
+}
+
+html.xb-builtin-runtime body.is-report #app.app {
+  --mbti-side: max(20px, var(--xb-safe-right, 0px));
+}
+
+html.xb-builtin-runtime #app.app :is(.topbar, .report-nav) {
+  padding-inline-end: max(0px, calc(var(--xb-builtin-capsule-end) - var(--mbti-edge) - var(--mbti-side)));
 }
 
 /* Ink Blade's chapter picker has its own header, separate from the gameplay HUD. */
@@ -26,14 +43,27 @@ html.xb-builtin-runtime #selectOverlay .difficulty {
   margin-left: auto;
 }
 
-/* Reserve the real status bar and capsule above the existing portrait HUD. */
+/* The portrait HUD starts below the status bar, with only its top row inset locally. */
 @media (orientation: portrait) {
   html.xb-builtin-runtime body .game {
-    padding-top: var(--xb-builtin-top);
+    padding-top: var(--xb-safe-top, 0px);
     padding-bottom: max(10px, var(--xb-safe-bottom, 0px));
+  }
+
+  html.xb-builtin-runtime body:not([data-game="block-puzzle"]) .game > .topbar {
+    padding-inline-end: var(--xb-builtin-capsule-end);
   }
 
   html.xb-builtin-runtime body.hosted .game .stats {
     grid-column: 1 / 3;
   }
+
+  /* Falling Blocks puts its pause control directly in the first grid row. */
+  html.xb-builtin-runtime .game:has(> .dashboard #next) {
+    --falling-menu-space: max(0px, calc(var(--xb-builtin-capsule-end) - (100vw - min(100vw, 480px)) / 2 - 12px));
+    grid-template-columns: minmax(0, 1fr) 64px 44px var(--falling-menu-space);
+  }
+  html.xb-builtin-runtime .game:has(> .dashboard #next) .stats { grid-column: 1; }
+  html.xb-builtin-runtime .game:has(> .dashboard #next) .next { grid-column: 2; }
+  html.xb-builtin-runtime .game:has(> .dashboard #next) #pauseButton { grid-column: 3; }
 }

@@ -236,22 +236,19 @@ body.fresh-game[data-game="block-puzzle"] {
   .fresh-game[data-game="block-puzzle"] .combo-banner.pop{animation:none}
 }
 
-/* Conservative fallback for hosts without the built-in Android adapter. */
-.fresh-game[data-game="block-puzzle"].native-host .game {
-  padding-top:max(12px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
-}
-
 /* Keep the status bar safe, and move only the controls that share the capsule's row. */
 @media (orientation: portrait) {
   html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .game,
-  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"].hosted .game {
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"].hosted .game,
+  body.fresh-game[data-game="block-puzzle"].native-host .game {
     --bp-right-pad:max(var(--bp-side-pad),var(--xb-safe-right,0px));
     padding-top:max(8px,var(--xb-safe-top,env(safe-area-inset-top,0px)));
     padding-bottom:max(10px,var(--xb-safe-bottom,0px));
     padding-inline-start:max(var(--bp-side-pad),var(--xb-safe-left,0px));
     padding-inline-end:var(--bp-right-pad);
   }
-  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .header-actions {
+  html.xb-builtin-runtime body.fresh-game[data-game="block-puzzle"] .header-actions,
+  body.fresh-game[data-game="block-puzzle"].native-host .header-actions {
     margin-inline-end:max(0px,calc(var(--xb-capsule-right,0px) + var(--xb-capsule-width,0px) + 8px
       - (100vw - var(--bp-game-width)) / 2 - var(--bp-right-pad)));
   }

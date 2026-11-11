@@ -7,19 +7,29 @@
   <link rel="stylesheet" href="game.css" />
   <style>
     html.xb-builtin-runtime .cube-hud-header {
-      padding: calc(0.625rem + var(--xb-builtin-top)) calc(1rem + var(--xb-safe-right, 0px))
-        0.625rem calc(1rem + var(--xb-safe-left, 0px));
+      --cube-hud-top: calc(0.625rem + var(--xb-safe-top, 0px));
+      --cube-hud-right: calc(1rem + var(--xb-safe-right, 0px));
+      padding: var(--cube-hud-top) var(--cube-hud-right) 0.625rem calc(1rem + var(--xb-safe-left, 0px));
     }
+    html.xb-builtin-runtime .hud-top-row {
+      margin-inline-end: max(0px, calc(var(--xb-builtin-capsule-end) - var(--cube-hud-right)));
+      min-height: max(0px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px - var(--cube-hud-top)));
+    }
+    html.xb-builtin-runtime #btn-exit { display: none; }
     html.xb-builtin-runtime .cube-hud-footer {
       padding: 0.625rem calc(1rem + var(--xb-safe-right, 0px))
         calc(0.625rem + var(--xb-safe-bottom, 0px)) calc(1rem + var(--xb-safe-left, 0px));
     }
     @media (orientation: landscape) and (max-height: 600px) {
       html.xb-builtin-runtime body {
-        padding: 8px calc(10px + var(--xb-safe-right, 0px))
+        padding: max(8px, var(--xb-safe-top, 0px)) calc(10px + var(--xb-safe-right, 0px))
           calc(8px + var(--xb-safe-bottom, 0px)) calc(10px + var(--xb-safe-left, 0px));
       }
-      html.xb-builtin-runtime .cube-hud-header { padding: var(--xb-builtin-top) 0 0; }
+      html.xb-builtin-runtime .cube-hud-header {
+        --cube-hud-top: max(8px, var(--xb-safe-top, 0px));
+        --cube-hud-right: calc(10px + var(--xb-safe-right, 0px));
+        padding: 0;
+      }
       html.xb-builtin-runtime .cube-hud-footer { padding: 0; }
       html.xb-builtin-runtime .hint-container {
         left: calc(10px + var(--xb-safe-left, 0px));

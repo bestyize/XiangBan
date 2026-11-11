@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 
 const root = new URL('../', import.meta.url)
 const read = path => readFileSync(new URL(path, root), 'utf8')
@@ -7,6 +8,7 @@ const expect = (source, pattern, description) => assert.ok(pattern.test(source),
 const activity = read('client/xiaoban-multiplatform/androidApp/src/main/kotlin/xyz/xiangban/xiaoban/RuntimeV2Activity.kt')
 const chrome = read('client/xiaoban-multiplatform/androidApp/src/main/kotlin/xyz/xiangban/xiaoban/RuntimeV2Chrome.kt')
 const nativeTheme = read('client/xiaoban-multiplatform/androidApp/src/main/builtin-runtime-v2/builtin-runtime.css')
+const builtinAdapter = read('client/xiaoban-multiplatform/androidApp/src/main/builtin-runtime-v2/builtin-runtime.js')
 const gameCss = read('assets/game-packs/block-puzzle/candy.css')
 const desktopCss = read('client/xiaoban-desktop/public/game-packs/block-puzzle/candy.css')
 const html = read('assets/game-packs/block-puzzle/index.html')
@@ -20,10 +22,10 @@ assert.ok(gameCss === desktopCss, 'desktop and reference game styles must match'
 expect(activity, /blockPuzzleFullBleed: Boolean\s+get\(\) = ::pack\.isInitialized && pack\.host == "official-block-puzzle\.app\.xiangban\.xyz"/, 'block-puzzle system bars are scoped to the official game')
 expect(activity, /pocketSprites: Boolean\s+get\(\) = ::pack\.isInitialized && pack\.host == "official-pocket-sprites\.app\.xiangban\.xyz"/, 'pocket-sprites system bars are scoped to the official game')
 expect(activity, /pocketSpritesFullBleed: Boolean\s+get\(\) = pocketSprites && ready && !failed/, 'pocket-sprites uses the game palette only after its page is ready')
-expect(activity, /fullBleedStatusBar: Boolean\s+get\(\) = blockPuzzleFullBleed \|\| pocketSpritesFullBleed/, 'both games can draw behind the status bar')
-expect(activity, /if \(landscape \|\| fullBleedStatusBar\) 0 else safeInsets\.top/, 'full-bleed games have no native status-bar overlay height')
-expect(activity, /if \(blockPuzzleFullBleed \|\| pocketSprites\) \{\s*window\.statusBarColor = android\.graphics\.Color\.TRANSPARENT/, 'both games have transparent status bars')
-expect(activity, /if \(pocketSprites\) \{\s*window\.navigationBarColor = android\.graphics\.Color\.TRANSPARENT[\s\S]*?window\.isNavigationBarContrastEnforced = false/, 'pocket-sprites has a transparent navigation bar without a system scrim')
+assert.doesNotMatch(activity, /statusBarBackground/, 'no native layer may cover a work’s background')
+expect(activity, /setDecorFitsSystemWindows\(window, false\)/, 'all runtime works draw edge to edge')
+expect(activity, /fun updateSystemBars\(\) \{[^{}]*window\.statusBarColor = android\.graphics\.Color\.TRANSPARENT\s*window\.navigationBarColor = android\.graphics\.Color\.TRANSPARENT/, 'both system bars are transparent for every work')
+expect(activity, /if \(Build.VERSION.SDK_INT >= 29\) \{\s*window\.isStatusBarContrastEnforced = false\s*window\.isNavigationBarContrastEnforced = false/, 'the OS does not add a solid scrim')
 expect(activity, /show\(WindowInsetsCompat\.Type\.systemBars\(\)\)/, 'portrait games keep system bars visible')
 expect(activity, /val useDarkIcons = when \{\s*pocketSpritesFullBleed -> false\s*blockPuzzleFullBleed -> !blockPuzzleShowingResult\s*else -> !dark\s*\}\s*isAppearanceLightStatusBars = useDarkIcons\s*isAppearanceLightNavigationBars = useDarkIcons/, 'pocket-sprites uses light icons and block-puzzle keeps phase-based contrast')
 expect(activity, /"game\.start"[\s\S]*?blockPuzzleShowingResult = false[\s\S]*?updateSystemBars\(\)/, 'block-puzzle restores game contrast when play starts')
@@ -40,9 +42,32 @@ expect(activity, /capsuleRightMarginDp = if \(blockPuzzleFullBleed\) 16f else 6f
 expect(activity, /capsuleTopGapDp = if \(blockPuzzleFullBleed\) 8f else 0f/, 'block-puzzle retains its capsule top gap')
 expect(chrome, /topMargin = top \+ \(if \(landscape\) 0 else pixels\(capsuleTopGapDp\)\)/, 'capsule top margin includes the current top inset')
 expect(chrome, /rightMargin = right \+ pixels\(capsuleRightMarginDp\)/, 'capsule right margin includes the current right inset')
-expect(nativeTheme, /--xb-builtin-top:/, 'the built-in theme provides its top inset variable')
+expect(nativeTheme, /body \.game \{\s*padding-top: var\(--xb-safe-top, 0px\)/, 'the shared game layout uses the system inset alone')
+expect(nativeTheme, /\.game > \.topbar \{\s*padding-inline-end: var\(--xb-builtin-capsule-end\)/, 'the shared game header avoids the menu locally')
 expect(gameCss, /html\.xb-builtin-runtime body\.fresh-game\[data-game="block-puzzle"\] \.overlay\s*\{[^}]*position: fixed;[^}]*inset: 0;/, 'the block-puzzle result background covers the viewport')
 expect(gameCss, /padding-top: max\(24px, calc\(var\(--xb-safe-top, 0px\) \+ 16px\)\)/, 'block-puzzle content avoids the top safe area')
 expect(gameCss, /padding-bottom: max\(24px, calc\(var\(--xb-safe-bottom, 0px\) \+ 16px\)\)/, 'block-puzzle content avoids the bottom safe area')
 expect(gameCss, /html\.xb-builtin-runtime body\.fresh-game\[data-game="block-puzzle"\] \.settings-overlay/, 'block-puzzle retains its built-in settings overlay styling')
-console.log('PASS Android insets for block-puzzle and pocket-sprites')
+// The adapter must forward the real values both on startup and after resize.
+const handlers = new Map()
+const xb = {
+  info: {
+    orientation: 'portrait',
+    safeArea: { top: 28, right: 0, bottom: 16, left: 0 },
+    capsule: { top: 36, right: 6, width: 48, height: 48 },
+  },
+  on: (name, fn) => handlers.set(name, fn),
+}
+const sandbox = { xb, console, document: { documentElement: { classList: { add() {} } }, body: { classList: { add() {} } } } }
+runInNewContext(builtinAdapter, sandbox)
+let changed
+const initial = await new Promise(resolve => sandbox.XiaobanBuiltinRuntime.connect(resolve, { layout: value => { changed = value } }))
+assert.equal(initial.safeArea.top, 28)
+assert.equal(initial.capsule.top + initial.capsule.height, 84)
+xb.info.safeArea.top = 41
+xb.info.capsule.top = 49
+handlers.get('safearea')()
+assert.equal(changed.safeArea.top, 41)
+assert.equal(changed.capsule.top, 49)
+assert.equal(initial.safeArea.top, 28)
+console.log('PASS Android edge-to-edge, local capsule layout, and live inset forwarding')
