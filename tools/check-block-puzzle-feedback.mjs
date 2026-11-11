@@ -15,7 +15,7 @@ class FakeElement {
     this.handlers = {}
     this.attributes = {}
     this.dataset = {}
-    this.hidden = false
+    this.hidden = id === 'continueButton'
     this.disabled = false
     this.className = ''
     this.offsetWidth = 40
@@ -93,6 +93,7 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
     localStorage: {
       getItem(key) { return storage.get(key) ?? null },
       setItem(key, value) { storage.set(key, value) },
+      removeItem(key) { storage.delete(key) },
     },
     requestAnimationFrame(callback) { callback(2000); return 1 },
     cancelAnimationFrame() {},
@@ -103,6 +104,17 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   }
   runInNewContext(rulesText, sandbox, { filename: 'rules.js' })
   runInNewContext(gameText, sandbox, { filename: 'game.js' })
+  const initial = {
+    board: nodes.get('board').children.map(row => row.children.map(cell => cell.className)),
+    score: nodes.get('score').textContent,
+    best: nodes.get('best').textContent,
+    canResume: !nodes.get('continueButton').hidden,
+  }
+  // Existing clear/score tests resume an explicit saved scenario, whereas
+  // default-entry tests below verify the real player-facing blank board.
+  if (options.autoContinue !== false && !nodes.get('continueButton').hidden) {
+    nodes.get('continueButton').handlers.click()
+  }
   const placeAt = (row, col, slot = 0) => {
     buttons[slot].handlers.click()
     nodes.get('board').children[row].children[col].handlers.click()
@@ -112,10 +124,28 @@ function scenario(board, combo = 0, drought = 0, options = {}) {
   const savedTheme = () => JSON.parse(storage.get('xiaoban.block-puzzle.theme.v1'))
   const restart = () => nodes.get('restartOverlay').handlers.click()
   return {
-    nodes, document, timers, placeAt, placeAtTopLeft, saved, savedTheme, restart,
+    nodes, document, timers, initial, placeAt, placeAtTopLeft, saved, savedTheme, restart,
     getComputedColorReads: () => computedColorReads,
   }
 }
+
+// Opening the app must show a blank 8x8 board, even with a saved partial game.
+const previous = Array.from({ length: 8 }, () => Array(8).fill(0))
+previous[2][3] = 1
+previous[2][4] = 2
+const freshStart = scenario(previous, 0, 0, { autoContinue: false })
+assert.equal(freshStart.initial.score, 0)
+assert.equal(freshStart.initial.best, 20)
+assert.ok(freshStart.initial.board.flat().every(name => name === 'cell'))
+assert.equal(freshStart.initial.canResume, true)
+assert.equal(freshStart.nodes.get('overlay').hidden, true)
+assert.equal(freshStart.saved().game.score, 0)
+assert.ok(freshStart.nodes.get('continueButton').hidden === false)
+freshStart.nodes.get('continueButton').handlers.click()
+assert.equal(freshStart.saved().game.score, 10)
+assert.equal(freshStart.saved().game.board[2][3], 1)
+assert.equal(freshStart.saved().game.board[2][4], 2)
+assert.equal(freshStart.nodes.get('continueButton').hidden, true)
 
 // Cross clears must produce an orderly horizontal AND vertical beam, and
 // consecutive clears should use a louder reward tier rather than random sparks.
@@ -177,7 +207,8 @@ assert.equal(reopened.savedTheme().perfectCount, 1)
 // The same palette persists through a game-over screen and its restart.
 const finished = scenario(Array.from({ length: 8 }, () => Array(8).fill(1)), 0, 0,
   { theme: { paletteIndex: 1, perfectCount: 1 } })
-assert.equal(finished.nodes.get('overlay').hidden, false)
+assert.equal(finished.nodes.get('overlay').hidden, true)
+assert.equal(finished.initial.score, 0)
 finished.restart()
 assert.equal(finished.document.body.dataset.palette, 'amber')
 
@@ -206,4 +237,4 @@ assert.equal(milestone.saved().game.score, 16)
 assert.match(milestone.nodes.get('comboBanner').textContent, /KEEP GOING!/)
 assert.equal(milestone.saved().game.lines, 0)
 
-console.log('PASS block-puzzle feedback: colored departures, quiet rewards, theme inheritance and combo')
+console.log('PASS block-puzzle feedback: clean start, explicit continue, colored departures and combo')
