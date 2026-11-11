@@ -165,7 +165,7 @@
         renderHand()
       }
     } catch { /* optional platform storage */ }
-    finally { recovering = false; persist() }
+    finally { recovering = false; persist(); saveTheme() }
   }
   function tone(hz, seconds = .09) {
     if (!soundEnabled) return
@@ -242,15 +242,16 @@
       // Render the departing blocks using their ORIGINAL stored colors. Even
       // after the board state is cleared they visibly rise, slide or twist away.
       const boardBounds = boardNode.getBoundingClientRect()
+      const first = cells[0].getBoundingClientRect()
+      const horizontalStep = cells[1].getBoundingClientRect().left - first.left
+      const verticalStep = cells[rules.SIZE].getBoundingClientRect().top - first.top
       for (const cell of (result.removedTiles || []).slice(0, 64)) {
-        const index = cell.row * rules.SIZE + cell.col
-        const rect = cells[index].getBoundingClientRect()
         const departing = document.createElement('span')
         departing.className = 'departing-tile'
-        departing.style.left = (rect.left - boardBounds.left) + 'px'
-        departing.style.top = (rect.top - boardBounds.top) + 'px'
-        departing.style.width = rect.width + 'px'
-        departing.style.height = rect.height + 'px'
+        departing.style.left = (first.left - boardBounds.left + cell.col * horizontalStep) + 'px'
+        departing.style.top = (first.top - boardBounds.top + cell.row * verticalStep) + 'px'
+        departing.style.width = first.width + 'px'
+        departing.style.height = first.height + 'px'
         departing.style.setProperty('--piece-color', color(cell.color))
         const rowClear = result.clearedRows.includes(cell.row)
         const colClear = result.clearedCols.includes(cell.col)
