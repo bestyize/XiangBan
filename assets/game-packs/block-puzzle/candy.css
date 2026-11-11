@@ -213,3 +213,8 @@ body.fresh-game[data-game="block-puzzle"] {
   .fresh-game[data-game="block-puzzle"] .spark,
   .fresh-game[data-game="block-puzzle"] .combo-banner.pop{animation:none}
 }
+
+/* Native Android's capsule owns the upper-right gesture area. Move the game HUD below it. */
+.fresh-game[data-game="block-puzzle"].native-host .game {
+  padding-top:max(12px, calc(var(--xb-capsule-top, 0px) + var(--xb-capsule-height, 0px) + 8px));
+}
