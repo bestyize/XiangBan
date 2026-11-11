@@ -23,6 +23,7 @@
   let suppressClickUntil = 0
   let hostReady = false
   const storeKey = 'xiaoban.block-puzzle.classic.v2'
+  const themeStoreKey = 'xiaoban.block-puzzle.theme.v1'
   const hostStorage = globalThis.xb?.storage
   const settingsOverlay = document.getElementById('settingsOverlay')
   const settingsButton = document.getElementById('settingsButton')
@@ -36,6 +37,7 @@
   let turns = 0
   let recovering = Boolean(hostStorage)
   let hasLocalSave = false
+  let hasLocalTheme = false
   let writeQueue = Promise.resolve()
   // Visual progression belongs to the saved run, not to a global theme setting.
   let paletteIndex = 0
@@ -46,6 +48,43 @@
   let resultTimer = null
   const PALETTES = ['rose', 'amber', 'mint', 'violet', 'sky']
   const scoreNode = document.getElementById('score')
+  const rewardDiamond = document.getElementById('rewardDiamond')
+  let diamondTimer = null
+  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  function acceptTheme(data) {
+    if (!data || typeof data !== 'object') return false
+    if (!Number.isSafeInteger(data.paletteIndex) || data.paletteIndex < 0 ||
+        !Number.isSafeInteger(data.perfectCount) || data.perfectCount < 0) return false
+    paletteIndex = data.paletteIndex % PALETTES.length
+    perfectCount = data.perfectCount
+    applyPalette()
+    return true
+  }
+  function themeSnapshot() { return { paletteIndex, perfectCount } }
+  function readLocalTheme() {
+    try { return JSON.parse(localStorage.getItem(themeStoreKey) || 'null') } catch { return null }
+  }
+  function saveTheme() {
+    const snapshot = themeSnapshot()
+    try { localStorage.setItem(themeStoreKey, JSON.stringify(snapshot)) } catch { /* sandbox storage */ }
+    if (!recovering && hostStorage?.set) {
+      writeQueue = writeQueue.catch(() => {}).then(() => hostStorage.set(themeStoreKey, snapshot))
+    }
+  }
+  function showDiamond(result, isSetup = false) {
+    const lines = result.clearedRows.length + result.clearedCols.length
+    if (!isSetup && !result.perfect && lines < 2 && result.combo < 3) {
+      rewardDiamond.hidden = true
+      return
+    }
+    clearTimeout(diamondTimer)
+    rewardDiamond.textContent = '+' + (isSetup ? result.buildUpBonus : result.gained)
+    rewardDiamond.className = isSetup ? 'reward-diamond setup' : 'reward-diamond'
+    rewardDiamond.hidden = false
+    void rewardDiamond.offsetWidth
+    rewardDiamond.classList.add('appearing')
+    diamondTimer = setTimeout(() => { rewardDiamond.hidden = true }, isSetup ? 700 : 950)
+  }
   function applyPalette() {
     document.body.dataset.palette = PALETTES[paletteIndex] || 'rose'
   }
@@ -53,8 +92,10 @@
     clearTimeout(feedbackTimer)
     clearTimeout(paletteTimer)
     clearTimeout(resultTimer)
+    clearTimeout(diamondTimer)
+    rewardDiamond.hidden = true
     cancelAnimationFrame(scoreAnimation)
-    feedbackTimer = paletteTimer = resultTimer = null
+    feedbackTimer = paletteTimer = resultTimer = diamondTimer = null
   }
   function animateScore(from, to) {
     cancelAnimationFrame(scoreAnimation)
@@ -88,9 +129,12 @@
     state = loaded
     best = Math.max(best, Number.isSafeInteger(data.best) && data.best >= 0 ? data.best : 0, loaded.score)
     soundEnabled = data.soundEnabled !== false
-    paletteIndex = Number.isSafeInteger(data.paletteIndex) && data.paletteIndex >= 0
-      ? data.paletteIndex % PALETTES.length : 0
-    perfectCount = Number.isSafeInteger(data.perfectCount) && data.perfectCount >= 0 ? data.perfectCount : 0
+    if (Number.isSafeInteger(data.paletteIndex) && data.paletteIndex >= 0) {
+      paletteIndex = data.paletteIndex % PALETTES.length
+    }
+    if (Number.isSafeInteger(data.perfectCount) && data.perfectCount >= 0) {
+      perfectCount = data.perfectCount
+    }
     applyPalette()
     soundUI()
     return true
@@ -98,6 +142,7 @@
   function persist() {
     const data = { version: 2, game: rules.serializeGame(state), best, soundEnabled, paletteIndex, perfectCount }
     try { localStorage.setItem(storeKey, JSON.stringify(data)) } catch { /* sandbox storage */ }
+    try { localStorage.setItem(themeStoreKey, JSON.stringify(themeSnapshot())) } catch { /* sandbox storage */ }
     if (!recovering && hostStorage?.set) {
       // Serialize host writes so a slow old save cannot overtake the newest round.
       writeQueue = writeQueue.catch(() => {}).then(() => hostStorage.set(storeKey, data))
@@ -111,6 +156,13 @@
         renderHand()
         if (state.over) showResult()
         else postToHost('game.progress', { score: state.score, lines: state.lines })
+      }
+      // Theme has independent lifetime: it survives a finished game, restarts
+      // and even a cleared/corrupt in-progress game save.
+      const theme = await hostStorage.get(themeStoreKey)
+      if (!hasLocalTheme && turns === 0 && acceptTheme(theme)) {
+        renderBoard()
+        renderHand()
       }
     } catch { /* optional platform storage */ }
     finally { recovering = false; persist() }
@@ -149,7 +201,27 @@
     const lines = result.clearedRows.length + result.clearedCols.length
     clearTimeout(feedbackTimer)
     if (!lines) {
-      comboBanner.hidden = true
+      if (result.buildUpBonus > 0) {
+        const message = result.newReadyLines > 0 ? 'NICE SETUP!' : 'KEEP GOING!'
+        comboBanner.textContent = message + '  +' + result.buildUpBonus
+        comboBanner.className = 'combo-banner tier-setup'
+        comboBanner.hidden = false
+        void comboBanner.offsetWidth
+        comboBanner.classList.add('pop')
+        showDiamond(result, true)
+        if (!reducedMotion()) {
+          const flash = document.createElement('span')
+          flash.className = 'setup-glimmer'
+          sparkLayer.append(flash)
+        }
+        feedbackTimer = setTimeout(() => {
+          comboBanner.hidden = true
+          sparkLayer.replaceChildren()
+        }, 700)
+      } else {
+        comboBanner.hidden = true
+        rewardDiamond.hidden = true
+      }
       return
     }
     const tier = result.perfect ? 'perfect' : result.combo >= 8 ? 'legendary' :
@@ -164,8 +236,31 @@
     comboBanner.hidden = false
     void comboBanner.offsetWidth
     comboBanner.classList.add('pop')
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    showDiamond(result)
+    const reduced = reducedMotion()
     if (!reduced) {
+      // Render the departing blocks using their ORIGINAL stored colors. Even
+      // after the board state is cleared they visibly rise, slide or twist away.
+      const boardBounds = boardNode.getBoundingClientRect()
+      for (const cell of (result.removedTiles || []).slice(0, 64)) {
+        const index = cell.row * rules.SIZE + cell.col
+        const rect = cells[index].getBoundingClientRect()
+        const departing = document.createElement('span')
+        departing.className = 'departing-tile'
+        departing.style.left = (rect.left - boardBounds.left) + 'px'
+        departing.style.top = (rect.top - boardBounds.top) + 'px'
+        departing.style.width = rect.width + 'px'
+        departing.style.height = rect.height + 'px'
+        departing.style.setProperty('--piece-color', color(cell.color))
+        const rowClear = result.clearedRows.includes(cell.row)
+        const colClear = result.clearedCols.includes(cell.col)
+        departing.style.setProperty('--fly-x',
+          (rowClear ? (cell.col < 4 ? -1 : 1) * (24 + cell.col * 4) : 0) + 'px')
+        departing.style.setProperty('--fly-y',
+          (colClear ? (cell.row < 4 ? -1 : 1) * (26 + cell.row * 4) : -10) + 'px')
+        departing.style.setProperty('--delay', (cell.row + cell.col) * 17 + 'ms')
+        sparkLayer.append(departing)
+      }
       result.clearedRows.forEach((row, index) => {
         const streak = document.createElement('span')
         streak.className = 'clear-beam horizontal'
@@ -214,7 +309,14 @@
   }
   function playReward(result) {
     const lines = result.clearedRows.length + result.clearedCols.length
-    if (!lines) { tone(270, .06); haptic('light'); return }
+    if (!lines) {
+      if (result.buildUpBonus > 0) {
+        tone(400, .11)
+        setTimeout(() => tone(610, .11), 80)
+      } else tone(270, .06)
+      haptic('light')
+      return
+    }
     haptic(result.perfect || lines >= 3 ? 'heavy' : 'medium')
     const notes = Math.min(5, 1 + lines + Math.floor(result.combo / 3))
     const base = 470 + Math.min(340, result.combo * 38)
@@ -226,6 +328,7 @@
   function celebratePerfect() {
     paletteIndex = (paletteIndex + 1) % PALETTES.length
     perfectCount += 1
+    saveTheme()
     document.body.classList.add('palette-flash')
     paletteTimer = setTimeout(() => {
       applyPalette()
@@ -436,6 +539,9 @@
       : lineCount
         ? (result.combo >= 3 ? '连消 ×' + result.combo + '！ ' : '') +
           '爆破 ' + lineCount + ' 条行列，+' + result.gained + ' 分！'
+        : result.buildUpBonus > 0
+          ? '布局奖励 +' + result.buildUpBonus + '！' +
+            (result.newReadyLines ? ' 距离下一次消除只差一格。' : ' 稳稳铺垫，也能积累奖励。')
         : state.combo > 0 && state.drought < 3
           ? '连击保留！还有 ' + (3 - state.drought) + ' 步缓冲'
           : '+' + result.gained + ' 分。' + (result.replenished ? '新的一组三块来了。' : '继续布局，寻找爆破机会。')
@@ -568,8 +674,11 @@
     applyPalette()
     if (state) stopDrag()
     state = rules.createGame()
-    if (!fresh) hasLocalSave = acceptSave(readLocal())
-    else turns += 1
+    if (!fresh) {
+      hasLocalSave = acceptSave(readLocal())
+      hasLocalTheme = acceptTheme(readLocalTheme())
+      // The independent theme takes priority over an older round snapshot.
+    } else turns += 1
     selected = null
     cursor = { row: 0, col: 0 }
     overlay.hidden = true
