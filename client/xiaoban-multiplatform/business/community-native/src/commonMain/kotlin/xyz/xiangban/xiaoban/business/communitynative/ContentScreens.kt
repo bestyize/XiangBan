@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -355,7 +358,7 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
 
 /** 帖子详情：标题、作者、正文，下面是回复；底栏可以点赞、收藏、写回复（需要登录）。 */
 @Composable
-fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit) {
+fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit, showComments: Boolean = false) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val loader = rememberLoader(env, listOf(id, session.accountId)) { env.forum.topic(id) }
@@ -366,6 +369,15 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
     var closingHelp by remember(id) { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
+    val commentAnchor = remember(id) { BringIntoViewRequester() }
+    var jumpToComments by rememberSaveable(id, showComments) { mutableStateOf(showComments) }
+    var commentsPlaced by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(jumpToComments, commentsPlaced) {
+        if (jumpToComments && commentsPlaced) {
+            commentAnchor.bringIntoView()
+            jumpToComments = false
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             ScreenBar("帖子", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { share = true }) })
@@ -443,7 +455,11 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 onAccept = { post -> guarded { env.forum.acceptAnswer(topic.id, post.id); toast = "已采纳"; loader.reload() } },
                             )
                         }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open, topicForEditing = topic) }
+                        val anchor = if (jumpToComments) Modifier.bringIntoViewRequester(commentAnchor)
+                            .onGloballyPositioned { commentsPlaced = true } else Modifier
+                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).then(anchor)) {
+                            CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open, topicForEditing = topic)
+                        }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

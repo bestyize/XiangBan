@@ -18,7 +18,7 @@ sealed interface Route {
     data object Blocks : Route
     data class User(val uid: String, val tab: String = "topics") : Route
     data class PublishPack(val packId: Long? = null, val localGameId: String? = null) : Route
-    data class Topic(val id: Long) : Route
+    data class Topic(val id: Long, val showComments: Boolean = false) : Route
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
     /** AI 工具的详情页，[key] 是后台里的工具标识。 */
@@ -73,7 +73,7 @@ sealed interface Route {
         Blocks -> "blocks"
         is User -> "user:$uid:$tab"
         is PublishPack -> localGameId?.let { "publishgame:$it" } ?: packId?.let { "publishpack:$it" } ?: "publishpack"
-        is Topic -> "topic:$id"
+        is Topic -> if (showComments) "topic-comments:$id" else "topic:$id"
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
         is Tool -> "tool:$key"
@@ -122,7 +122,7 @@ sealed interface Route {
                 "blocks" -> Blocks
                 "user" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { User(it, value.substringAfter(':', "topics")) }
                 "publishpack" -> if (value.isEmpty()) PublishPack() else value.toLongOrNull()?.takeIf { it > 0 }?.let(::PublishPack)
-                "topic" -> value.toLongOrNull()?.let(::Topic)
+                "topic", "topic-comments" -> value.toLongOrNull()?.let { Topic(it, showComments = key == "topic-comments") }
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)

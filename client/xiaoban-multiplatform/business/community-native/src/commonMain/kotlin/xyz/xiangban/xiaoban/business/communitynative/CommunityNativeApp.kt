@@ -214,7 +214,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Blocks -> NativeBlocksScreen(env, pop, push)
         is Route.User -> NativeProfileScreen(env, route.uid, route.tab, pop, push)
         is Route.PublishPack -> PublishContentScreen(env, route.packId, pop, push, route.localGameId)
-        is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
+        is Route.Topic -> TopicDetailScreen(env, route.id, pop, push, showComments = route.showComments)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
         Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。

@@ -14,15 +14,22 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,14 +50,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.DiscussController
+import xyz.xiangban.xiaoban.common.community.LikeState
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.Poll
@@ -260,8 +275,10 @@ private fun learnChannel(filter: String): String = when (filter) {
     "claude-code" -> "learn-claude-code"; "codex" -> "learn-codex"; "提示词" -> "learn-prompts"; "工作流" -> "learn-workflows"; "本地部署" -> "learn-local"; "ai-硬件" -> "learn-hardware"; else -> "learn"
 }
 
-/** 学习和教程的话题标签（论坛里标签是小写、空格换成连字符）。 */
-private val LearnTags = listOf("" to "全部", "claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
+/** 教程的子话题沿用论坛分类，点「教程」回到该分类的全部帖子。 */
+private val LearnTags = listOf("claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
+private const val ActiveDiscussionTag = "active-tag"
+private val DiscussionGutter = 16.dp
 
 
 private const val IdeasTitle = "小伴桌面1.0.0发布，支持动态桌面，一句话生成特效！"
@@ -281,50 +298,222 @@ internal fun IdeasTab(env: CommunityEnv, open: (Route) -> Unit) {
 @Composable
 internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussSub) -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
+    val scope = rememberCoroutineScope()
     var filter by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf("") }
     var page by rememberSaveable { mutableIntStateOf(1) }
-    var following by rememberSaveable { mutableStateOf(false) }
-
-    Column(Modifier.fillMaxSize()) {
-        PageChipRow(DiscussSub.entries.map { it.key to it.label }, sub.key, {
-            selectSub(DiscussSub.byKey(it))
-            filter = ""; tag = ""; page = 1
-        })
-        if (sub == DiscussSub.Learn) PageChipRow(LearnTags, filter, { filter = it; page = 1 })
-        PageChipRow(listOf("all" to "新帖", "following" to "关注"), if (following) "following" else "all", {
-            following = it == "following"
-            page = 1
-        })
-        if (tag.isNotEmpty()) {
-            TextButton(onClick = { tag = ""; page = 1 }) { Text("# $tag ×") }
+    val likes = remember(session.accountId) { mutableStateMapOf<Long, LikeState>() }
+    val liking = remember(session.accountId) { mutableStateMapOf<Long, Unit>() }
+    var toast by remember(session.accountId) { mutableStateOf<String?>(null) }
+    val category = when (sub) {
+        DiscussSub.All -> "learn,casual"
+        DiscussSub.Learn -> learnChannel(filter)
+        else -> sub.key
+    }
+    val loader = rememberLoader(env, listOf(category, tag, page, session.accountId)) {
+        env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, activeOnly = true)
+    }
+    val state by loader.state.collectAsState()
+    val topics = buildList {
+        DiscussSub.entries.forEach {
+            add(it.key to it.label)
+            if (it == DiscussSub.All && tag.isNotBlank()) add(ActiveDiscussionTag to "# $tag ×")
+            if (it == DiscussSub.Learn && sub == DiscussSub.Learn) addAll(LearnTags)
         }
-        if (following && !session.loggedIn) {
-            CenterMessage("登录后查看关注动态", "登录", { open(Route.Login) })
+    }
+    val selected = when {
+        tag.isNotBlank() -> ActiveDiscussionTag
+        sub == DiscussSub.Learn && LearnTags.any { it.first == filter } -> filter
+        else -> sub.key
+    }
+
+    fun selectTopic(key: String) {
+        tag = ""
+        page = 1
+        if (key == ActiveDiscussionTag) return
+        if (LearnTags.any { it.first == key }) {
+            selectSub(DiscussSub.Learn)
+            filter = key
         } else {
-            val category = when (sub) {
-                DiscussSub.All -> "learn,casual"
-                DiscussSub.Learn -> learnChannel(filter)
-                else -> sub.key
+            filter = ""
+            selectSub(DiscussSub.byKey(key))
+        }
+    }
+
+    fun selectCategory(topic: Topic) {
+        val slug = topic.category.slug
+        val lesson = LearnTags.firstOrNull { learnChannel(it.first) == slug }
+        when {
+            lesson != null -> selectTopic(lesson.first)
+            DiscussSub.entries.any { it.key == slug } -> selectTopic(slug)
+            else -> open(Route.Articles(slug, topic.category.name))
+        }
+    }
+
+    fun refresh() {
+        likes.clear()
+        loader.reload()
+    }
+
+    fun toggleLike(topic: Topic) {
+        if (!env.session.state.value.loggedIn) {
+            open(Route.Login)
+            return
+        }
+        if (topic.id in liking) return
+        liking[topic.id] = Unit
+        val next = !(likes[topic.id]?.liked ?: topic.liked)
+        scope.launch {
+            try {
+                likes[topic.id] = env.forum.setTopicLiked(topic.id, next)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                toast = "点赞失败，请重试"
+            } finally {
+                liking.remove(topic.id)
             }
-            val loader = rememberLoader(env, listOf(category, tag, page, following, session.accountId)) {
-                if (following) env.forum.followingTopics(page, category, tag.ifBlank { null }, home = category != "casual-chat", activeOnly = true)
-                else env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, home = category != "casual-chat", activeOnly = true)
-            }
-            val state by loader.state.collectAsState()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            DiscussionTopics(topics, selected, ::selectTopic)
             PullToRefreshBox(
-                isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.weight(1f).fillMaxWidth(),
+                isRefreshing = state is Load.Loading, onRefresh = ::refresh, modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
-                LoadBox(state, loader::reload) { result ->
-                    NoteFeed(env, result.items, open, showCategory = true, onTag = {
-                        selectSub(DiscussSub.All)
-                        tag = it; filter = ""; page = 1
-                    }) {
-                        if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
+                LoadBox(state, ::refresh) { result ->
+                    LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = DiscussionGutter, end = DiscussionGutter, top = 10.dp, bottom = 24.dp + NavInset),
+                        verticalArrangement = Arrangement.spacedBy(Gap),
+                    ) {
+                        if (result.items.isEmpty()) item {
+                            DiscussionEmpty(
+                                allTopics = selected == DiscussSub.All.key,
+                                showAll = { selectTopic(DiscussSub.All.key) },
+                                modifier = Modifier.fillParentMaxHeight(0.9f),
+                            )
+                        }
+                        items(result.items.distinctBy { it.id }, key = { it.id }) { topic ->
+                            val like = likes[topic.id]
+                            DiscussionPostCard(
+                                env = env,
+                                topic = topic,
+                                liked = like?.liked ?: topic.liked,
+                                likeCount = like?.likeCount ?: topic.likeCount,
+                                liking = topic.id in liking,
+                                onOpen = { open(Route.Topic(topic.id)) },
+                                onComments = { open(Route.Topic(topic.id, showComments = true)) },
+                                onLike = { toggleLike(topic) },
+                                onCategory = { selectCategory(topic) },
+                                onTag = {
+                                    selectTopic(DiscussSub.All.key)
+                                    tag = it
+                                },
+                            )
+                        }
+                        if (page > 1 || result.hasMore) item {
+                            NotePager(page, result.hasMore) { page = it }
+                        }
                     }
                 }
             }
         }
+        Toast(toast) { toast = null }
+    }
+}
+
+@Composable
+private fun DiscussionTopics(topics: List<Pair<String, String>>, selected: String, select: (String) -> Unit) {
+    val surface = MaterialTheme.colorScheme.surface
+    val extra = LocalExtraColors.current
+    val scroll = rememberLazyListState()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    LaunchedEffect(selected, topics) {
+        val index = topics.indexOfFirst { it.first == selected }
+        val layout = scroll.layoutInfo
+        val fullyVisible = layout.visibleItemsInfo.any {
+            it.key == selected && it.offset >= 0 && it.offset + it.size <= layout.viewportEndOffset - layout.afterContentPadding
+        }
+        if (index >= 0 && !fullyVisible) scroll.animateScrollToItem(index)
+    }
+
+    Column(Modifier.fillMaxWidth().background(surface)) {
+        Box {
+            LazyRow(
+                Modifier.fillMaxWidth().selectableGroup(),
+                state = scroll,
+                contentPadding = PaddingValues(horizontal = DiscussionGutter),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(topics, key = { it.first }) { (key, label) ->
+                    val active = key == selected
+                    Box(
+                        Modifier.heightIn(min = 44.dp).clip(CircleShape)
+                            .selectable(active, role = Role.Tab, onClick = { select(key) }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            Modifier.widthIn(max = 180.dp)
+                                .background(if (active) extra.brandSoft else Color.Transparent, CircleShape)
+                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                            style = XType.Secondary,
+                            color = if (active) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            val clear = surface.copy(alpha = 0f)
+            Box(Modifier.matchParentSize()) {
+                if (scroll.canScrollBackward) Box(
+                    Modifier.align(Alignment.CenterStart).width(22.dp).fillMaxHeight()
+                        .background(Brush.horizontalGradient(if (rtl) listOf(clear, surface) else listOf(surface, clear))),
+                )
+                if (scroll.canScrollForward) Box(
+                    Modifier.align(Alignment.CenterEnd).width(22.dp).fillMaxHeight()
+                        .background(Brush.horizontalGradient(if (rtl) listOf(surface, clear) else listOf(clear, surface))),
+                )
+            }
+        }
+        Hairline()
+    }
+}
+
+@Composable
+private fun DiscussionEmpty(allTopics: Boolean, showAll: () -> Unit, modifier: Modifier = Modifier) {
+    val extra = LocalExtraColors.current
+    Column(
+        modifier.fillMaxWidth().padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            Modifier.size(64.dp).background(extra.brandSoft, RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            XIcon(XIcons.Message, tint = extra.brandInk, size = 32.dp)
+        }
+        Text(
+            if (allTopics) "暂时没有帖子" else "这个话题还没有帖子",
+            Modifier.padding(top = 14.dp),
+            style = XType.Section,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            "点底部「＋」，发起一条讨论。",
+            Modifier.padding(top = 4.dp),
+            style = XType.Secondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (!allTopics) TextButton(onClick = showAll) { Text("查看全部话题") }
     }
 }
 
@@ -342,7 +531,6 @@ internal fun NoteFeed(
     topics: List<Topic>,
     open: (Route) -> Unit,
     showCategory: Boolean,
-    onTag: ((String) -> Unit)? = null,
     footer: @Composable () -> Unit = {},
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -358,7 +546,7 @@ internal fun NoteFeed(
             staggeredItems(topics, key = { it.id }) { topic ->
                 VisualTopicCard(env, topic, noteCover = true,
                     onCategory = if (showCategory) ({ open(Route.Articles(topic.category.slug, topic.category.name)) }) else null,
-                    onTag = onTag, onLogin = { open(Route.Login) }) { open(Route.Topic(topic.id)) }
+                    onLogin = { open(Route.Login) }) { open(Route.Topic(topic.id)) }
             }
             if (topics.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
                 CenterMessage("暂时没有帖子", modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp))
