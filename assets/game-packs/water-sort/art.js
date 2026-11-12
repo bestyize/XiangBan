@@ -7,6 +7,7 @@
     hint: '<path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 2H9s0-1-1-2Z"/>',
     reset: '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
     cup: '<path d="M5 7h14l-2 14H7zM4 4h16M13 4l3-3"/>',
+    addCup: '<path d="M4 5h10l-1 15H5zM18 8v8m-4-4h8"/>',
     book: '<path d="M12 5v16M12 5C9 2 4 3 2 4v15c4-2 7-1 10 2 3-3 6-4 10-2V4c-2-1-7-2-10 1Z"/>',
     arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
     download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',

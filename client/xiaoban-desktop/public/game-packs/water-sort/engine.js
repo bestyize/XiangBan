@@ -45,8 +45,11 @@
     return counts.every(n => n === CAPACITY);
   }
   const key = s => s.board.map(t => t.join('')).join('|') + '/' + s.opened.slice().sort().join(',');
-  function createSearch(state, level, maxNodes = 40000) {
-    const queue = [{ state: copy(state), parent: -1, move: null }], seen = new Set([key(state)]);
+  function createSearch(state, level, maxNodes = 40000, interchangeable = false) {
+    const hasOrders = Object.keys(level.orders || {}).length > 0;
+    const sameCupRoles = interchangeable && !hasOrders && Object.keys(level.seals || {}).length === 0;
+    const searchKey = sameCupRoles ? s => s.board.map(t => t.join('')).sort().join('|') : key;
+    const queue = [{ state: copy(state), parent: -1, move: null }], seen = new Set([searchKey(state)]);
     let cursor = 0, result = null, done = false;
     const path = index => { const p = []; for (let i = index; queue[i].parent !== -1; i = queue[i].parent) p.push(queue[i].move); return p.reverse(); };
     return { step(batch = 250) {
@@ -56,15 +59,15 @@
         if (isWon(s, level)) { result = path(index); done = true; break; }
         for (let a = 0; a < s.board.length; a++) {
           if (!s.board[a].length) continue;
-          if (!Object.keys(level.orders || {}).length && full(s.board[a])) continue;
+          if (!hasOrders && full(s.board[a])) continue;
           let emptyTried = false;
           for (let b = 0; b < s.board.length; b++) {
-            if (!s.board[b].length && !Object.keys(level.orders || {}).length && !locked(s, level, b)) {
+            if (!s.board[b].length && !hasOrders && !locked(s, level, b)) {
               if (emptyTried || s.board[a].every(c => c === s.board[a][0])) continue;
               emptyTried = true;
             }
             const next = pour(s, level, a, b); if (!next) continue;
-            const k = key(next); if (seen.has(k)) continue;
+            const k = searchKey(next); if (seen.has(k)) continue;
             seen.add(k); queue.push({ state: next, parent: index, move: [a, b] });
             if (queue.length >= maxNodes) { done = true; break; }
           }
@@ -75,7 +78,7 @@
       return { done, path: result, visited: queue.length };
     } };
   }
-  function solve(state, level, limit) { const search = createSearch(state, level, limit); let r; do { r = search.step(2000); } while (!r.done); return r.path; }
+  function solve(state, level, limit, interchangeable) { const search = createSearch(state, level, limit, interchangeable); let r; do { r = search.step(2000); } while (!r.done); return r.path; }
   function rng(seed) { let n = seed >>> 0; return () => { n += 0x6d2b79f5; let v = n; v = Math.imul(v ^ v >>> 15, v | 1); v ^= v + Math.imul(v ^ v >>> 7, v | 61); return ((v ^ v >>> 14) >>> 0) / 4294967296; }; }
   function shuffle(a, random) { const out = a.slice(); for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; } return out; }
   function daily(code, levels) {

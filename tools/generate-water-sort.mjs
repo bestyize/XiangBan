@@ -45,5 +45,47 @@ for (let i = 0; i < 36; i++) {
   }
   if (levels.length !== i + 1) throw Error('Unable to author level ' + (i + 1));
 }
-writeFileSync(new URL('levels.js', root), '// Generated offline by tools/generate-water-sort.mjs.\n' + 'globalThis.PourJoyLevels = Object.freeze(' + JSON.stringify(levels, null, 2) + ');\n');
+
+// Append new rounds. Published campaign IDs and daily seeds depend on the first 36 boards.
+const classicNames = ['双杯余地', '果味列队', '六色碰杯', '茶汤回旋', '晴天配方', '彩虹中转', '晚茶配方', '晚班考验', '店长压轴'];
+const classic = [];
+for (const [stage, name] of classicNames.entries()) {
+  const colors = stage < 2 ? 5 : 6;
+  const id = `c${37 + stage}`;
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const random = R.rng(701117 + stage * 179 + attempt * 313);
+    const units = Array.from({ length: colors * 4 }, (_, i) => i % colors);
+    for (let i = units.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [units[i], units[j]] = [units[j], units[i]];
+    }
+    const board = Array.from({ length: colors + 2 }, (_, i) => units.slice(i * 4, i * 4 + 4));
+    const fingerprint = board.map(t => t.join('')).sort().join('|');
+    if (fingerprints.has(fingerprint) || board.slice(0, colors).some(R.full)) continue;
+    const level = { id, chapter: 4, name, colors, board, orders: {}, seals: {} };
+    const solution = R.solve(R.initial(level), level, 26000, true);
+    const min = stage < 2 ? 12 : 14 + Math.floor((stage - 2) / 2);
+    if (!solution || solution.length < min || solution.length > min + 3) continue;
+    fingerprints.add(fingerprint);
+    classic.push({ ...level, par: solution.length, solution });
+    break;
+  }
+  if (classic.at(-1).id !== id) throw Error('Unable to author level ' + id);
+}
+classic.sort((a, b) => a.par - b.par);
+levels.push(...classic.map((level, i) => ({ ...level, id: `c${37 + i}`, name: classicNames[i] })));
+
+const training = [
+  ['先倒进空杯', [[0,0,1,1], [1,1,0,0], [], []]],
+  ['同色可以合并', [[0,0,1,1], [1,1,2,2], [2,2,0,0], []]],
+  ['给自己留个空杯', [[0,0,1,0], [1,1,2,2], [2,2,1,0], []]],
+].map(([name, board], i) => {
+  const level = { id: `t0${i + 1}`, chapter: 0, name, colors: new Set(board.flat()).size, board, orders: {}, seals: {} };
+  const solution = R.solve(R.initial(level), level);
+  if (!solution) throw Error('Invalid training round ' + level.id);
+  return { ...level, par: solution.length, solution };
+});
+writeFileSync(new URL('levels.js', root), '// Generated offline by tools/generate-water-sort.mjs.\n' +
+  'globalThis.PourJoyLevels = Object.freeze(' + JSON.stringify(levels, null, 2) + ');\n' +
+  'globalThis.PourJoyTraining = Object.freeze(' + JSON.stringify(training, null, 2) + ');\n');
 console.log(`Baked ${levels.length} unique, witnessed puzzles; par ${levels.map(l => l.par).join('/')}`);

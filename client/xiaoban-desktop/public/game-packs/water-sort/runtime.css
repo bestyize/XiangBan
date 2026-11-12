@@ -60,8 +60,105 @@ dialog.close-left .dialog-close{left:5px;right:auto}dialog.close-left h2{padding
   margin-top: 8px;
 }
 
+.tube-button .glass {
+  transition: transform 105ms ease-out, box-shadow 120ms ease-out;
+}
+
+.tube-button, .game-page .tool { touch-action: manipulation; }
+
+.tube-button.selected .glass {
+  transform: translateY(-11px);
+  box-shadow: 0 0 0 2px #ff9e32, 0 0 0 5px #fff1d3, 0 8px 20px #bd71365c;
+}
+
+.tube-button.target .glass {
+  box-shadow: 0 0 0 2px #488c37, 0 0 0 5px #a7e67c8c;
+}
+
+.tube-button.training-cue .glass {
+  animation: training-ring 900ms ease-in-out infinite alternate;
+}
+
+@keyframes training-ring {
+  from { outline: 2px solid #ff9e32; outline-offset: 3px; }
+  to { outline: 2px solid #ff9e32; outline-offset: 8px; }
+}
+
+.tube-button.shake .glass {
+  animation: cup-reject 185ms ease-out;
+}
+
+@keyframes cup-reject {
+  20%, 65% { translate: -3px; box-shadow: 0 0 0 2px #e57551; }
+  40%, 80% { translate: 3px; }
+}
+
+.tube-button.just-completed .complete-seal {
+  animation: seal-pop 290ms cubic-bezier(.15, .75, .32, 1.25) both;
+}
+
+@keyframes seal-pop {
+  from { scale: .45; opacity: .25; }
+  to { scale: 1; opacity: 1; }
+}
+
+.pour-stream {
+  width: 5px;
+  background: linear-gradient(90deg, #fff8, transparent 52%), var(--flavor);
+  box-shadow: 0 0 3px #fff7;
+}
+
+.pour-ghost { transition: none; }
+.flowing-layer { min-height: 0; }
+
+.board[data-count="9"] { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 24px 4px; }
+.board[data-count="9"] > .tube-button { grid-column: span 2; }
+.board[data-count="9"] > .tube-button:nth-child(6) { grid-column: 2 / span 2; }
+.many-cups .board[data-count="9"] .glass { width: min(78px, calc(100% - 5px)); }
+
+.game-page .tools { gap: clamp(5px, 2.6vw, 22px); }
+#addCup > span {
+  background: linear-gradient(#a8f1ff, #6ac7e4);
+  box-shadow: 0 5px 0 #4899bc, 0 7px 9px #488cab30, inset 0 3px 2px #ffffff80;
+  border-color: #d6f8ff;
+  color: #326881;
+}
+#reset > span {
+  background: linear-gradient(#d7b5ff, #af7bea);
+  box-shadow: 0 5px 0 #8754be, 0 7px 9px #9870ab30, inset 0 3px 2px #ffffff80;
+  border-color: #f3e7ff;
+  color: #7243a2;
+}
+
+.sound-settings { display: grid; gap: 8px; }
+.sound-settings label {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 10px;
+}
+.sound-settings input { width: 20px; height: 20px; accent-color: #ac482d; }
+.journal-tabs { flex-wrap: wrap; column-gap: 10px; }
+
 @media (max-height: 480px) {
   .round-result .win-drink {
     display: none;
   }
+}
+
+@media (max-height: 480px) and (min-width: 650px) {
+  .game-page .tools { gap: 6px; }
+  .game-page .tool { min-height: 55px; gap: 4px; }
+  .game-page .tool > span { height: 33px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tube-button .glass, .tube-button.just-completed .complete-seal { transition: none; animation: none; }
+  .tube-button.training-cue .glass { outline: 2px solid #ff9e32; outline-offset: 4px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .round-result .win-badge { animation: seal-pop 290ms cubic-bezier(.15, .75, .32, 1.25) both; }
 }
