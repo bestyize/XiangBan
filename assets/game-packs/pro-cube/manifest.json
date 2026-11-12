@@ -8,7 +8,7 @@
   "description": "3~9阶全系真实质感磁力魔方：支持手势划动切层、键盘旋转、多阶层深控制与智能还原。",
   "category": "puzzle",
   "entry": "index.html",
-  "icon": "cover.svg",
+  "icon": "icon.webp",
   "cover": "cover.svg",
   "orientation": "landscape",
   "input": [

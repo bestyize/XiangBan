@@ -13,6 +13,12 @@
 
 ## 材质来源
 
+`icon.webp` 是用内置 imagegen 生成的 256 × 256 方形图标，供桌面与 Android 的游戏包共用。
+
+图标生成提示词：
+
+> Use case: logo-brand, premium square game app icon for 2048: Obsidian. A single bespoke black obsidian game tile with chunky polished bevels dominates a full-bleed square charcoal canvas. Camera straight above and nearly orthographic, almost perfectly face-on, no rotation or perspective distortion. Main tile silhouette centered and fills 83% of the image width; keep its silhouette inside a 9% safe margin on all sides for rounded app crops. Give the tile subtle black volcanic stone texture, a luminous warm honey-amber inlaid bevel catching a key light from upper right, a restrained dark jade reflection on the opposite bevel, and a soft contact shadow. Thin companion slab edges subtly offset beneath it suggest stacked puzzle pieces, without adding competing shapes. The only characters are exactly “2048”, on one line, boldly inlaid on the tile face. Make the digits large (together around 70% of the full canvas width and 25% of its height), ivory-gold, crisp, high contrast, with sturdy, nearly monoline Roman serif shapes suitable for reading at 40 pixels. Slight shallow inset around the digits to make them feel physically crafted, and no glow over their counters. Tight crop with a softly lit dark stone setting to the edges, quiet background, no border on the outside of the icon. Luxurious tactile video game prop, realistic stone and metallic light, controlled chiaroscuro. Prioritize a readable silhouette and the exact number 2048 over ornament. 1:1 square image, one asset. No other text, no labels, no watermark, no drop shadow beyond the canvas, no white backdrop, no mockup.
+
 `obsidian.webp` 由内置 imagegen 生成原图后经 Sharp 压缩为 WebP（1536 × 1024），随包离线分发。`cover.svg` 为可编辑矢量封面。
 
 最终生成提示词（内置工具模式）：

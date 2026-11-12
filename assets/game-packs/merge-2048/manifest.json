@@ -8,7 +8,7 @@
   "description": "黑曜石与琥珀光，滑动数字，在方寸之间合出 2048。",
   "category": "puzzle",
   "entry": "index.html",
-  "icon": "cover.svg",
+  "icon": "icon.webp",
   "cover": "cover.svg",
   "orientation": "portrait",
   "input": [
