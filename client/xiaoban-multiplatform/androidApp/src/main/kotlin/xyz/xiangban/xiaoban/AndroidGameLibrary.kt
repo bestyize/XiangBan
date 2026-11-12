@@ -12,8 +12,7 @@ import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 
 internal class AndroidGameLibrary(private val context: Context) {
     suspend fun games(): List<MobileGame> = withContext(Dispatchers.IO) {
-        val ids = if (BuildConfig.DEBUG) BuiltinMobileGames.ids + RUNTIME_V2_FIXTURE else BuiltinMobileGames.ids
-        ids.map { id ->
+        BuiltinMobileGames.ids.map { id ->
             context.assets.loadBundledRuntimeV2(id, checkNotNull(bundledGameRoot(id))).manifest.let {
                 MobileGame(it.id, it.name, it.description, it.orientation, it.kind, it.category, it.input, it.capabilities.toList(), it.version,
                     icon = it.icon, cover = it.cover)
@@ -39,17 +38,13 @@ internal class AndroidGameLibrary(private val context: Context) {
     }
 }
 
-internal const val RUNTIME_V2_FIXTURE = "runtime-v2-fixture"
-
-internal fun bundledGameRoot(id: String): String? = when {
-    BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE -> RUNTIME_V2_FIXTURE
-    id in BuiltinMobileGames.ids -> "game-packs-v2/$id"
-    else -> null
-}
+internal fun bundledGameRoot(id: String): String? =
+    if (id in BuiltinMobileGames.ids) "game-packs-v2/$id" else null
 
 internal fun AssetManager.loadBundledRuntimeV2(id: String, root: String): RuntimeV2Package {
-    val host = if (id == RUNTIME_V2_FIXTURE) "local-$id" else "official-$id"
-    return RuntimeV2Package.load(this, root, host).also { require(it.manifest.id == id) { "内置作品清单不匹配" } }
+    return RuntimeV2Package.load(this, root, "official-$id").also {
+        require(it.manifest.id == id) { "内置作品清单不匹配" }
+    }
 }
 
 /** Same process as the runner; the StateFlow refreshes the library when returning from play. */

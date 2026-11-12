@@ -180,13 +180,9 @@ class RuntimeV2Activity : ComponentActivity() {
                             filesDir, intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0),
                             intent.getIntArrayExtra(AndroidRuntimeV2Community.LEGACY_VERSIONS) ?: intArrayOf(),
                         )
-                        id != RUNTIME_V2_FIXTURE -> LegacySaves.builtin(filesDir, id)
-                        else -> null
+                        else -> LegacySaves.builtin(filesDir, id)
                     }
-                    networkDisabled = if (remoteEnabled) true else if (BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE) {
-                        val override = filesDir.resolve("runtime-v2/debug-network-disabled")
-                        override.exists() && override.readText().trim() != "false"
-                    } else intent.getBooleanExtra(EXTRA_NETWORK_DISABLED, true)
+                    networkDisabled = remoteEnabled || intent.getBooleanExtra(EXTRA_NETWORK_DISABLED, true)
                     decodeIcon()?.asImageBitmap()
                 }
             }
@@ -217,7 +213,7 @@ class RuntimeV2Activity : ComponentActivity() {
                     official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit,
                     onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
-                    onShare = if (id != RUNTIME_V2_FIXTURE && !remoteEnabled) ({ shareWork(id, workspace) }) else null,
+                    onShare = if (!remoteEnabled) ({ shareWork(id, workspace) }) else null,
                     onPinShortcut = if (Build.VERSION.SDK_INT >= 26 && shortcut != null) ({ pinWork(shortcut, icon?.asAndroidBitmap()) }) else null,
                     onMenuChanged = { open ->
                         updateVisibility()

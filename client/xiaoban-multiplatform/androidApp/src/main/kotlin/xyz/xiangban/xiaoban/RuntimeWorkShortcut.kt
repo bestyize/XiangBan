@@ -63,7 +63,7 @@ internal data class RuntimeWorkShortcut private constructor(val source: String, 
 
         fun forWork(gameId: String, workspace: Boolean, packId: Long): RuntimeWorkShortcut? = when {
             packId > 0 -> RuntimeWorkShortcut("community", packId.toString())
-            gameId != RUNTIME_V2_FIXTURE && MOBILE_GAME_ID.matches(gameId) ->
+            MOBILE_GAME_ID.matches(gameId) ->
                 RuntimeWorkShortcut(if (workspace) "local" else "builtin", gameId)
             else -> null
         }

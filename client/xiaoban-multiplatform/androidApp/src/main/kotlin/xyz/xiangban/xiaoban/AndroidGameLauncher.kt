@@ -8,11 +8,11 @@ internal object AndroidGameLauncher {
         if (!MOBILE_GAME_ID.matches(id) || activity.isFinishing || activity.isDestroyed || !RuntimeV2Activity.supported(activity)) return false
         val builtin = bundledGameRoot(id) != null
         val context = activity.applicationContext
-        val opened: (() -> Unit)? = if (id == RUNTIME_V2_FIXTURE) null else ({ AndroidGameHistory.opened(context, id) })
+        val opened = { AndroidGameHistory.opened(context, id) }
         return runCatching {
             activity.startActivity(RuntimeV2Activity.launchIntent(activity, opened).apply {
                 putExtra(RuntimeV2Activity.EXTRA_GAME_ID, id)
-                if (activity is MainActivity && id != RUNTIME_V2_FIXTURE) {
+                if (activity is MainActivity) {
                     RuntimeV2Favorites.attach(this, activity, if (builtin) "builtin" else "local", id)
                 }
                 if (!builtin) {
