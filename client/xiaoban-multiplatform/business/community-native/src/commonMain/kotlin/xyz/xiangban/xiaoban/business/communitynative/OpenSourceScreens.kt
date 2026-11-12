@@ -46,15 +46,19 @@ private fun OpenSourceImage(env: CommunityEnv, project: OpenSourceProject) {
 }
 
 @Composable
-internal fun OpenSourceTab(env: CommunityEnv, open: (Route) -> Unit, initialCategory: String = "recommend") {
-    var category by rememberSaveable(initialCategory) { mutableStateOf(initialCategory) }
+internal fun OpenSourceTab(env: CommunityEnv, open: (Route) -> Unit, hotRankingOpenCount: Int) {
+    var category by key(hotRankingOpenCount) {
+        rememberSaveable { mutableStateOf(if (hotRankingOpenCount == 0) "recommend" else "hot") }
+    }
     var tag by rememberSaveable { mutableStateOf("") }
     val loader = rememberLoader(env, "open-source") { env.forum.openSourceCatalog() }
     val state by loader.state.collectAsState()
     val categoryTabs = (state as? Load.Ready<OpenSourceCatalog>)?.value?.categories.orEmpty().map { it.key to it.label }
     Column(Modifier.fillMaxSize()) {
         TabStrip(listOf("recommend" to "推荐", "hot" to "热榜") + categoryTabs, category, centered = true) { category = it; tag = "" }
-        if (category == "hot") HotTab(env, open) else LoadBox(state, loader::reload) { catalog ->
+        if (category == "hot") {
+            key(hotRankingOpenCount) { HotTab(env, open) }
+        } else LoadBox(state, loader::reload) { catalog ->
         val projects = remember(catalog, category, tag) {
             catalog.filter(category, tag = tag)
         }

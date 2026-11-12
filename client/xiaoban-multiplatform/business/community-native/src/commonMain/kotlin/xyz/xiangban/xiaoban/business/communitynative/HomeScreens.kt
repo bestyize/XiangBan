@@ -83,7 +83,7 @@ import xyz.xiangban.xiaoban.common.community.rankModels
 
 /** 社区首页栏目。 */
 internal enum class HomeSub(val key: String, val label: String) {
-    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Hot("hot", "开源热榜"), Rank("rank", "排行榜"), Track("track", "追踪"), Nav("nav", "导航");
+    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Rank("rank", "排行榜"), Track("track", "追踪"), Nav("nav", "导航");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Recommend
@@ -136,7 +136,7 @@ internal fun LangLine(r: RepoRank) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (CommunitySection, String) -> Unit) {
+internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, openHotRanking: () -> Unit) {
     val loader = rememberLoader(env, "home") { env.forum.home() }
     val state by loader.state.collectAsState()
     val frontierLoader = rememberLoader(env, "frontier") { env.forum.frontier() }
@@ -173,7 +173,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                                         XIcon(XIcons.Star, size = 18.dp)
                                         Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.isTrending) "GitHub 开源热榜" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", style = XType.Section, fontWeight = FontWeight.SemiBold)
                                     }
-                                    Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Home, HomeSub.Hot.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = openHotRanking).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("完整榜单", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                                         XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                                     }

@@ -20,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -41,18 +43,17 @@ internal enum class CommunitySection(val label: String) { Home("首页"), Ideas(
 fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
     var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
+    // 旧版会把热榜存为独立的首页标签。
+    val legacyHotSelected = homeSub == "hot"
+    var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
     var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
     var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Software.key) }
     val current = CommunitySection.valueOf(section)
+    val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
 
-    fun switchTo(target: CommunitySection, sub: String) {
-        section = target.name
-        when (target) {
-            CommunitySection.Ideas -> Unit
-            CommunitySection.Home -> homeSub = sub
-            CommunitySection.Discuss -> discussSub = sub
-            CommunitySection.Resources -> resourceSub = sub
-        }
+    fun openHotRanking() {
+        hotRankingOpenCount++
+        homeSub = HomeSub.OpenSource.key
     }
 
     LaunchedEffect(Unit) {
@@ -72,20 +73,26 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
-                CommunitySection.Home -> TabStrip(HomeSub.entries.filter { it != HomeSub.Hot }.map { it.key to it.label }, if (homeSub == HomeSub.Hot.key) HomeSub.OpenSource.key else homeSub, centered = true) { homeSub = it }
+                CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, currentHome.key, centered = true) { homeSub = it }
                 CommunitySection.Ideas, CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (current) {
-                    CommunitySection.Home -> when (HomeSub.byKey(homeSub)) {
-                        HomeSub.Recommend -> RecommendTab(env, open, ::switchTo)
-                        HomeSub.OpenSource -> OpenSourceTab(env, open)
-                        HomeSub.Hot -> OpenSourceTab(env, open, initialCategory = "hot")
-                        HomeSub.Rank -> RankTab(env, open)
-                        HomeSub.Track -> TrackTab(env)
-                        HomeSub.Nav -> NavTab(env)
+                HomeSub.entries.forEach { page ->
+                    key(page.key) {
+                        RetainedTabPage(selected = current == CommunitySection.Home && page == currentHome) {
+                            when (page) {
+                                HomeSub.Recommend -> RecommendTab(env, open, ::openHotRanking)
+                                HomeSub.OpenSource -> OpenSourceTab(env, open, hotRankingOpenCount)
+                                HomeSub.Rank -> RankTab(env, open)
+                                HomeSub.Track -> TrackTab(env)
+                                HomeSub.Nav -> NavTab(env)
+                            }
+                        }
                     }
+                }
+                when (current) {
+                    CommunitySection.Home -> Unit
                     CommunitySection.Ideas -> IdeasTab(env, open)
                     CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
                     CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open)
