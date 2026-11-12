@@ -13,3 +13,55 @@ html,body{height:100%;width:100%;overflow:hidden}body{margin:0;padding:0;backgro
 @media(max-height:480px) and (min-width:650px){.order-icons{flex-wrap:wrap;gap:6px}.order-dot{font-size:9px}.order-dot i{width:13px;height:13px}}
 
 dialog.close-left .dialog-close{left:5px;right:auto}dialog.close-left h2{padding-left:30px;padding-right:0}
+
+.result-page {
+  display: grid;
+  align-items: center;
+  min-height: 100%;
+  padding: 16px;
+  background: radial-gradient(ellipse at 15% 44%, #ffffff94, transparent 55%), linear-gradient(#fff1dc, #ffe4b9);
+}
+
+.round-result {
+  width: min(100%, 400px);
+  margin-inline: auto;
+  padding: 16px 16px 8px;
+  border: 3px solid #fff;
+  border-radius: 25px;
+  background: radial-gradient(ellipse at center, #fffbb8, #ffe4a8);
+  box-shadow: 0 6px 0 #ecc58c;
+  text-align: center;
+}
+
+.round-result h2 {
+  margin: 8px 0 4px;
+  color: #ad4629;
+  font-size: 27px;
+}
+
+.round-result p {
+  margin: 0 0 12px;
+  color: #85532e;
+  font-size: 13px;
+}
+
+.round-result .win-drink {
+  height: 126px;
+  margin: 18px 0 12px;
+}
+
+.round-result .win-drink .drink {
+  transform: rotate(-8deg) scale(.8);
+}
+
+.result-secondary {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-height: 480px) {
+  .round-result .win-drink {
+    display: none;
+  }
+}

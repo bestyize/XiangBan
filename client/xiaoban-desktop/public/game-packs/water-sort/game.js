@@ -7,7 +7,7 @@
   const screen = $('#screen'), dialog = $('#infoDialog');
   let data = P.fresh(), session = null, level = levels[0], state = R.initial(level), undoStates = [], selected = -1;
   let view = 'home', loading = true, readOnly = false, busy = false, pendingView = null, hints = null, hintToken = 0, witness = new Map();
-  let chapterTab = 0, journalTab = 0, lastResult = null, audio = null, hidden = false, toastTimer, reported = false, liveAnimations = [];
+  let chapterTab = 0, journalTab = 0, roundResult = null, lastResult = null, audio = null, hidden = false, toastTimer, reported = false, liveAnimations = [];
   const toast = message => { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').classList.add('show'); toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 2500); };
   const won = () => session && R.isWon(state, level);
   const count = () => Object.keys(data.records).length;
@@ -52,16 +52,21 @@
       }); return;
     }
     hintToken++; level = next; chapterTab = level.chapter; session = { id, mode, moves:[], hints:0 }; state = R.initial(level); undoStates = []; selected = -1; hints = null; reported = false;
+    roundResult = null;
     prepareWitness(); save(); navigate('play');
     if (Object.keys(level.seals).length || Object.keys(level.orders).length) toast(chapters[level.chapter].tip);
   }
   function render() { ({home:renderHome,play:renderPlay,levels:renderLevels,journal:renderJournal,receipt:renderReceipt,poster:renderPoster})[view](); syncInsets(); }
   function soundIcon() { return A.icon(data.sound ? 'sound' : 'mute'); }
   function renderPlay() {
-    const focusTube = document.activeElement?.dataset?.tube, isWon = won();
+    if (won()) {
+      renderResult();
+      return;
+    }
+    const focusTube = document.activeElement?.dataset?.tube;
     const modeLabel = session.mode === 'campaign' ? `第 ${Number(level.id.slice(1))} 关` : session.mode === 'daily' ? '每日特调' : '好友挑战';
-    screen.innerHTML = `<section class="game-page ${state.board.length > 6 ? 'many-cups' : ''}"><div class="game-topline"><button class="chapter-tag" data-view="levels"><i></i>${chapters[level.chapter].name}⌄</button><button class="icon-button" id="soundButton" aria-label="${data.sound ? '关闭' : '开启'}音效">${soundIcon()}</button></div><div class="level-heading"><div><h2>${level.name}</h2><p>${modeLabel}${Object.keys(level.orders).length || Object.keys(level.seals).length ? ' · ' + chapters[level.chapter].kind : ''}</p></div><div class="step-count"><strong id="moveCount">${String(session.moves.length).padStart(2,'0')}</strong><span>步</span></div></div><div class="order-strip"><span class="completion-count">${R.completed(state)}<small> / ${level.colors}</small></span><div class="order-icons">${colors.slice(0,level.colors).map((c,i) => `<span class="order-dot ${state.board.some(t => R.full(t) && t[0] === i) ? 'done' : ''}" style="--flavor:${c.color}" title="${c.name}"><i></i>${c.symbol}</span>`).join('')}</div></div>${isWon ? winHTML() : '<div class="board-area"><div class="board" role="group" aria-label="调饮杯盘"></div></div><p class="game-tip" aria-live="polite">' + (selected >= 0 ? '选择接收杯' : session.moves.length ? '' : chapters[level.chapter].tip) + '</p>'}<div class="tools"><button class="tool" id="undo" ${!undoStates.length || isWon ? 'disabled' : ''}><span>${A.icon('undo')}</span>撤销</button><button class="tool" id="hint" ${isWon ? 'disabled' : ''}><span>${A.icon('hint')}</span>灵感</button><button class="tool" id="reset"><span>${A.icon('reset')}</span>重调</button></div><div class="game-bottom"><button data-view="home">小店</button><button id="starHelp" title="星级规则">${level.par} 步三星</button><button id="rules">玩法 ⓘ</button></div></section>`;
-    if (!isWon) renderBoard();
+    screen.innerHTML = `<section class="game-page ${state.board.length > 6 ? 'many-cups' : ''}"><div class="game-topline"><button class="chapter-tag" data-view="levels"><i></i>${chapters[level.chapter].name}⌄</button><button class="icon-button" id="soundButton" aria-label="${data.sound ? '关闭' : '开启'}音效">${soundIcon()}</button></div><div class="level-heading"><div><h2>${level.name}</h2><p>${modeLabel}${Object.keys(level.orders).length || Object.keys(level.seals).length ? ' · ' + chapters[level.chapter].kind : ''}</p></div><div class="step-count"><strong id="moveCount">${String(session.moves.length).padStart(2,'0')}</strong><span>步</span></div></div><div class="order-strip"><span class="completion-count">${R.completed(state)}<small> / ${level.colors}</small></span><div class="order-icons">${colors.slice(0,level.colors).map((c,i) => `<span class="order-dot ${state.board.some(t => R.full(t) && t[0] === i) ? 'done' : ''}" style="--flavor:${c.color}" title="${c.name}"><i></i>${c.symbol}</span>`).join('')}</div></div><div class="board-area"><div class="board" role="group" aria-label="调饮杯盘"></div></div><p class="game-tip" aria-live="polite">${selected >= 0 ? '选择接收杯' : session.moves.length ? '' : chapters[level.chapter].tip}</p><div class="tools"><button class="tool" id="undo" ${!undoStates.length ? 'disabled' : ''}><span>${A.icon('undo')}</span>撤销</button><button class="tool" id="hint"><span>${A.icon('hint')}</span>灵感</button><button class="tool" id="reset"><span>${A.icon('reset')}</span>重调</button></div><div class="game-bottom"><button data-view="home">小店</button><button id="starHelp" title="星级规则">${level.par} 步三星</button><button id="rules">玩法 ⓘ</button></div></section>`;
+    renderBoard();
     if (focusTube !== undefined) $(`[data-tube="${focusTube}"]`)?.focus({preventScroll:true});
     $('#soundButton').onclick = () => { data.sound = !data.sound; save(); chime(true); renderPlay(); };
     $('#undo').onclick = undo;
@@ -69,7 +74,6 @@
     $('#reset').onclick = () => start(level.id,session.mode);
     $('#rules').onclick = showRules;
     $('#starHelp').onclick = () => openDialog('星级挑战', `<p>★ 完成关卡<br>★★ 不超过 ${level.par + 5} 步<br>★★★ 不超过 ${level.par} 步，且未使用灵感</p><p>撤销不限次数，超出目标也能过关。目标是已验证的参考解，不一定是最少步数。</p>`);
-    if (isWon) $('#nextLevel').onclick = () => session.mode === 'campaign' && levels.indexOf(level) < 35 ? start(levels[levels.indexOf(level)+1].id,'campaign',false) : navigate('levels');
   }
   function renderBoard() {
     const board = $('.board');
@@ -94,14 +98,14 @@
     busy=true; $$('button').forEach(b=>{ if (b.closest('.screen')) b.disabled=true; });
     undoStates.push(state); const wasOpened=state.opened.length;
     state=R.pour(state,level,from,i); session.moves.push([from,i]); selected=-1;
-    const finished=won(); if (finished) lastResult=P.finish(data,session);
+    const finished=won(); if (finished) roundResult=P.finish(data,session);
     // Commit and persist the move BEFORE animation: hiding/closing never saves a half-pour.
     save(); H.game('progress',score()); if (finished) { H.game('result',score()); reported=false; }
     H.haptic();
     try { await animatePour(from,i,info.color); } finally { busy=false; }
     if (pendingView) { const [next,push]=pendingView; pendingView=null; navigate(next,push); }
     else renderPlay();
-    if (finished) { chime(true); toast('完美出杯！'); }
+    if (finished) { chime(true); }
     else if (state.opened.length>wasOpened) { chime(true); toast('封签已解开'); }
     else if (R.full(state.board[i])) chime(true);
   }
@@ -138,9 +142,34 @@
     if (!move) { renderPlay(); toast('暂未找到解法，试试撤销或重调'); return; }
     session.hints=Math.min(4096,session.hints+1); hints=move; selected=move[0]; save(); renderPlay(); $('.game-tip').textContent=`${move[0]+1} 号杯 → ${move[1]+1} 号杯`;
   }
-  function winHTML() {
-    const result=lastResult || P.finish(data,session);
-    return `<div class="win-panel"><div class="win-badge">${starsText(result.stars)}</div><h3>完美出杯！</h3><p>${result.moves} 步${result.assisted?' · 灵感助调':''}</p><div class="win-drink">${A.drink(colors[(Number(level.id.slice(1))||0)%colors.length].color)}</div><button class="primary" data-view="receipt">收下快乐小票 ${A.icon('arrow')}</button><button class="secondary" id="nextLevel">${session.mode==='campaign'&&level.id!=='c36'?'下一杯 →':'回到菜单'}</button></div>`;
+  function renderResult() {
+    const result = roundResult;
+    const index = levels.indexOf(level);
+    const campaign = session.mode === 'campaign';
+    const next = campaign ? levels[index + 1] : null;
+    const label = campaign ? `第 ${index + 1} 关完成` : `${session.mode === 'daily' ? '每日特调' : '好友挑战'}完成`;
+    const action = next ? `下一关 · 第 ${index + 2} 关` : '返回选关';
+    screen.innerHTML = `<section class="result-page" aria-labelledby="roundTitle">
+      <div class="round-result">
+        <div class="win-badge" aria-label="获得 ${result.stars} 星">${starsText(result.stars)}</div>
+        <h2 id="roundTitle">完美出杯！</h2>
+        <p>${label} · ${result.moves} 步${result.assisted ? ' · 灵感助调' : ''}</p>
+        <div class="win-drink" aria-hidden="true">${A.drink(colors[Number(level.id.slice(-2)) % colors.length].color)}</div>
+        <button class="primary" id="nextLevel">${action} ${A.icon('arrow')}</button>
+        <div class="result-secondary">
+          <button class="secondary" data-view="receipt" id="roundReceipt">查看小票</button>
+          <button class="secondary" id="replayLevel">重玩本关</button>
+        </div>
+      </div>
+    </section>`;
+    $('#nextLevel').onclick = () => {
+      if (next) start(next.id, 'campaign', false);
+      else navigate('levels');
+    };
+    $('#roundReceipt').onclick = () => { lastResult = result; };
+    $('#replayLevel').onclick = () => start(level.id, session.mode, false);
+    screen.scrollTop = 0;
+    $('#nextLevel').focus({ preventScroll: true });
   }
   function showRules() { openDialog('调饮规则','<ul><li>同色相接，空杯中转。连续同色一起倒，每杯最多四层。</li><li>所有非空杯装满单一口味即完成。</li><li>订单杯可暂存其他口味，通关时必须装满标签口味。</li><li>封签杯要先完成指定口味才能使用；撤销也会恢复封签。</li></ul><p>没有倒计时。数字 1–8 选杯，Esc 取消，Ctrl/Cmd+Z 撤销。</p>'); }
   function bottom(active) { return `<nav class="bottom-nav"><button data-view="home" class="${active==='home'?'active':''}">${A.icon('home')}小店</button><button data-view="levels" class="${active==='levels'?'active':''}">${A.icon('cup')}菜单</button><button data-view="journal" class="${active==='journal'?'active':''}">${A.icon('book')}手帐</button></nav>`; }
@@ -172,6 +201,11 @@
     screen.innerHTML=`<section class="share-page"><div class="share-heading"><h2>快乐小票</h2><span>${r.mode==='campaign'?'通关记录':r.mode==='daily'?'每日特调':'好友挑战'}</span></div><div class="receipt"><span class="eyebrow">POUR JOY</span><h3>今日快乐小票</h3><div class="receipt-art">${A.drink(colors[Number(l.id.slice(-2))%6].color)}<span class="stamp">快乐<br>已打包</span></div><h4 class="receipt-name">${l.name}</h4><div class="receipt-data"><div><strong>${r.moves}</strong><span>调饮步数</span></div><div><strong>${l.colors}</strong><span>风味归位</span></div><div><strong>${r.stars} ★</strong><span>本次星级</span></div></div><div class="receipt-line"><span>${r.assisted?'灵感助调':'自由调饮'}</span><span>PJ-${l.id.toUpperCase()}</span></div><div class="barcode" aria-hidden="true"></div><div class="receipt-footer">KEEP THIS LITTLE JOY.</div></div><div class="share-actions"><button class="primary" id="saveReceipt">${A.icon('download')}${H.native&&!H.canSave()?'查看分享图':'保存小票'}</button><button class="secondary" id="shareChallenge">${H.canShare()?'分享挑战':'复制挑战码'} ↗</button></div><button class="secondary" data-view="home">回小店</button></section>`;
     $('#saveReceipt').onclick=saveReceipt;
     $('#shareChallenge').onclick=shareChallenge;
+    if (r === roundResult && won()) {
+      const returnButton = $('[data-view="home"]', screen);
+      returnButton.dataset.view = 'play';
+      returnButton.textContent = '返回结算';
+    }
   }
   function poster() {
     const r=lastResult,l=P.getLevel(r.id),canvas=document.createElement('canvas');canvas.width=900;canvas.height=1200;const c=canvas.getContext('2d');
@@ -225,7 +259,7 @@
     try{
       let timer;const raw=temporary?null:await Promise.race([H.read(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),5000);})]).finally(()=>clearTimeout(timer));
       readOnly=temporary;data=P.sanitize(raw);session=data.session;
-      if(session){level=P.getLevel(session.id);const restored=P.replay(level,session.moves);state=restored.state;undoStates=restored.history;prepareWitness();if(won())lastResult=P.finish(data,session);}
+      if(session){level=P.getLevel(session.id);const restored=P.replay(level,session.moves);state=restored.state;undoStates=restored.history;prepareWitness();if(won())roundResult=P.finish(data,session);}
       loading=false;H.ready();storageStatus();
       const query=H.query();if(query&&P.getLevel(query)){navigate('home',false);start(query,'challenge');}else navigate(session&&location.hash==='#play'?'play':'home',false);
     }catch(_){screen.innerHTML='<div class="loading"><h2>存档暂时读不到</h2><p>已保存的进度不会被覆盖。</p><button class="primary" id="retryLoad">重试</button><button class="secondary" id="temporaryPlay">不保存试玩</button></div>';H.ready();$('#retryLoad').onclick=()=>boot();$('#temporaryPlay').onclick=()=>boot(true);}

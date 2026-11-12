@@ -119,7 +119,7 @@ async function fixture(saved: any = null, failRead = false) {
 }
 
 describe('Pour Joy game and host integration',()=>{
-  it('starts once, saves a committed pour, undoes, completes and persists rewards',async()=>{
+  it('saves and undoes pours, then opens level two from the primary action on the result page',async()=>{
     const f=await fixture();try{
       expect(f.sdk.ready).toHaveBeenCalledTimes(1)
       await f.click('#continue')
@@ -132,8 +132,20 @@ describe('Pour Joy game and host integration',()=>{
       expect(f.events.filter(e=>e==='result')).toHaveLength(1)
       expect(f.values.at(-1).records.c01.stars).toBe(3)
       expect(f.window.document.body.textContent).toContain('完美出杯')
+      const next = () => f.window.document.querySelector('#nextLevel')
+      expect(next()?.textContent).toContain('下一关 · 第 2 关')
+      expect(next()?.classList.contains('primary')).toBe(true)
+      expect(f.window.document.activeElement).toBe(next())
+      expect(f.window.document.querySelector('#undo')).toBeNull()
       await f.click('[data-view="receipt"]')
       expect(f.window.document.body.textContent).toContain('PJ-C01')
+      expect(f.window.document.querySelector('.share-page [data-view="play"]')?.textContent).toBe('返回结算')
+      await f.click('.share-page [data-view="play"]')
+      await f.click('#nextLevel')
+      expect(f.window.document.querySelector('.level-heading')?.textContent).toContain('第 2 关')
+      expect(f.values.at(-1).session).toMatchObject({id:'c02',mode:'campaign',moves:[]})
+      expect(f.events.filter(e=>e==='start')).toHaveLength(2)
+      expect(f.events.filter(e=>e==='result')).toHaveLength(1)
     }finally{await f.window.happyDOM.close()}
   })
   it('restores an unfinished round without losing hints or undo history',async()=>{
