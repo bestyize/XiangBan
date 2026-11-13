@@ -28,5 +28,31 @@
     return { ...physical }
   }
 
-  globalThis.XiabanInkViewport = { layout, transform, point, safeArea }
+  function combatFrame(player, opponents, width, left, right, marginLeft, marginRight) {
+    const half = width / 2
+    let min = player.right - half + marginRight
+    let max = player.left + half - marginLeft
+
+    for (const foe of opponents) {
+      const a = Math.max(min, foe.right - half + marginRight)
+      const b = Math.min(max, foe.left + half - marginLeft)
+      if (a <= b) { min = a; max = b }
+    }
+
+    let safeMin = Math.max(min, player.right - half + right)
+    let safeMax = Math.min(max, player.left + half - left)
+    // Keep the most immediate opponents clear of the controls when the view has enough space.
+    if (safeMin <= safeMax) {
+      for (const foe of opponents) {
+        const a = Math.max(safeMin, foe.right - half + right)
+        const b = Math.min(safeMax, foe.left + half - left)
+        if (a <= b) { safeMin = a; safeMax = b }
+      }
+    } else {
+      safeMin = min; safeMax = max
+    }
+    return { min, max, safeMin, safeMax }
+  }
+
+  globalThis.XiabanInkViewport = { layout, transform, point, safeArea, combatFrame }
 })()

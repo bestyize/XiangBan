@@ -104,6 +104,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .ink-button:not(:disabled) { opacity: 1; background: radial-gradient(circle at 38% 34%, #d14a3e, #8c1f18 72%); animation: ink-ready 1.4s ease-in-out infinite; }
 @keyframes ink-ready { 50% { box-shadow: 0 0 0 7px #b8322a33, 0 0 22px #b8322a88; } }
 
+.combat-clearance .fighter-overlap { opacity: .24; transition: transform .08s, opacity .1s; }
+.combat-clearance .ink-button.fighter-overlap { opacity: .24; animation: none; }
+.combat-clearance .move-track.fighter-overlap { opacity: .22; }
+
 .overlay { position: absolute; z-index: 10; inset: 0; }
 .welcome { display: flex; align-items: center; padding: max(20px, var(--safe-top)) max(30px, var(--safe-right)) max(20px, var(--safe-bottom)) max(56px, calc(var(--safe-left) + 30px)); background: linear-gradient(90deg, #efe7d4f2 0%, #efe7d4d6 30%, #efe7d433 58%, transparent 75%); }
 .welcome-exit { position: absolute; top: max(14px, var(--safe-top)); left: max(14px, var(--safe-left)); z-index: 2; }

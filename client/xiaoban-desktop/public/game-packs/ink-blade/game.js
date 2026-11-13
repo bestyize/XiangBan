@@ -16,6 +16,8 @@
   const nonce = params.get('hostNonce')
   const runtime = globalThis.XiaobanBuiltinRuntime
   const hudActions = gameNode.querySelector('.hud-actions')
+  const controls = $('controls'), moveTrack = $('moveTrack')
+  const actionButtons = ['slashButton', 'jumpButton', 'dashButton', 'inkButton'].map($)
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const LV = globalThis.XiabanInkLevels
   const PROGRESS = globalThis.XiabanInkProgress
@@ -49,6 +51,7 @@
   const shown = new Set()
   const stuck = [], horses = []
   const camera = { x: 400 }
+  let controlLayout = null, framedFighters = [], fadedControls = 0
   const fx = FX.create()
   const weather = scene.createWeather()
   const anims = new Map()
@@ -150,6 +153,7 @@
     }
     const logical = viewport.safeArea(view, physical)
     for (const side of ['top', 'right', 'bottom', 'left']) gameNode.style.setProperty('--safe-' + side, logical[side] + 'px')
+    controlLayout = null
     if (runtime) {
       const capsuleEdge = !view.rotation && capsule('width') > 0 ? capsule('right') + capsule('width') : 0
       hudActions.style.marginRight = Math.max(0, capsuleEdge + 8 - Math.max(14, logical.right)) + 'px'
@@ -215,7 +219,8 @@
     if (pad && $('movePad').hasPointerCapture(pad.id)) $('movePad').releasePointerCapture(pad.id)
     pad = null; input.pad = 0
     $('moveKnob').style.transform = ''
-    $('moveTrack').style.left = ''; $('moveTrack').style.top = ''; $('moveTrack').style.bottom = ''
+    moveTrack.style.left = ''; moveTrack.style.top = ''; moveTrack.style.bottom = ''
+    controlLayout = null
     $('movePad').classList.remove('active')
   }
 
@@ -231,6 +236,7 @@
     if (touchUI === value) return
     touchUI = value
     gameNode.classList.toggle('touch', value)
+    controlLayout = null
   }
 
   $('movePad').addEventListener('pointerdown', (event) => {
@@ -241,10 +247,10 @@
     pad = { id: event.pointerId, x0: point.x }
     $('movePad').setPointerCapture(event.pointerId)
     $('movePad').classList.add('active')
-    const track = $('moveTrack')
-    track.style.left = Math.max(8, point.x - track.offsetWidth / 2) + 'px'
-    track.style.top = Math.max(0, point.y - $('movePad').offsetTop - track.offsetHeight / 2) + 'px'
-    track.style.bottom = 'auto'
+    moveTrack.style.left = Math.max(8, point.x - moveTrack.offsetWidth / 2) + 'px'
+    moveTrack.style.top = Math.max(0, point.y - $('movePad').offsetTop - moveTrack.offsetHeight / 2) + 'px'
+    moveTrack.style.bottom = 'auto'
+    controlLayout = null
   })
   $('movePad').addEventListener('pointermove', (event) => {
     if (!pad || pad.id !== event.pointerId) return
@@ -451,7 +457,13 @@
     $('resultOverlay').hidden = name !== 'result'
     const playing = name === 'playing'
     $('hud').hidden = name === 'welcome' || name === 'select'
-    $('controls').hidden = !playing
+    controls.hidden = !playing
+    controls.classList.toggle('combat-clearance', state.level.volume < 6)
+    if (fadedControls) {
+      for (const node of [moveTrack, ...actionButtons]) node.classList.remove('fighter-overlap')
+      fadedControls = 0
+    }
+    controlLayout = null
     if (!playing) { $('prompt').hidden = true; $('toast').hidden = true }
   }
 
@@ -1232,6 +1244,93 @@
 
   // ------------------------------------------------------------ rendering
 
+  function readControlLayout() {
+    const move = $('movePad')
+    const track = { node: moveTrack, left: moveTrack.offsetLeft, top: move.offsetTop + moveTrack.offsetTop,
+      width: moveTrack.offsetWidth, height: moveTrack.offsetHeight }
+    const cluster = actionButtons[0].offsetParent
+    // The compact layout scales the cluster about its lower-right corner.
+    const scale = new DOMMatrixReadOnly(getComputedStyle(cluster).transform).a
+    const right = cluster.offsetLeft + cluster.offsetWidth, bottom = cluster.offsetTop + cluster.offsetHeight
+    const buttons = actionButtons.map(node => ({
+      node, left: right - (cluster.offsetWidth - node.offsetLeft) * scale,
+      top: bottom - (cluster.offsetHeight - node.offsetTop) * scale,
+      width: node.offsetWidth * scale, height: node.offsetHeight * scale,
+    }))
+    const [safeLeft, safeRight] = ['left', 'right'].map(side => parseFloat(gameNode.style.getPropertyValue('--safe-' + side)) || 0)
+    const fixedTrack = track.left <= Math.max(34, safeLeft) + 6
+    return { shapes: [track, ...buttons], left: Math.max(safeLeft + 8, fixedTrack ? track.left + track.width + 14 : 0),
+      right: Math.max(safeRight + 8, width - Math.min(...buttons.map(button => button.left)) + 14),
+      marginLeft: Math.max(12, safeLeft + 8), marginRight: Math.max(12, safeRight + 8) }
+  }
+
+  function fighterBounds(fighter) {
+    const mounted = fighter.type === 'cavalry' || (fighter.type === 'general' && fighter.mounted)
+    const half = mounted ? 55 : fighter.type === 'dragon' ? 68 : fighter.w + 8
+    const x = fighter.pullT > 0 ? fighter.x + (fighter.pullFrom - fighter.x) * (fighter.pullT / .22) ** 2 : fighter.x
+    const head = mounted ? fighter.h + 48 : fighter.h + 10
+    return { left: x - half, right: x + half, top: fighter.y - head, bottom: fighter.y + 6 }
+  }
+
+  function frameTouchCombat() {
+    controlLayout ||= readControlLayout()
+    const player = state.player
+    const enemies = state.enemies.filter(enemy => enemy.alive && enemy.delay <= 0 && enemy.state !== 'dragonDiveTell')
+    enemies.sort((a, b) => Number(rules.isBoss(b)) - Number(rules.isBoss(a)) || Math.abs(player.x - a.x) - Math.abs(player.x - b.x))
+    const body = fighterBounds(player), opponents = enemies.map(fighterBounds)
+    framedFighters = [body, ...opponents]
+    return viewport.combatFrame(body, opponents, viewW, controlLayout.left / k, controlLayout.right / k,
+      controlLayout.marginLeft / k, controlLayout.marginRight / k)
+  }
+
+  function clearControlsForFighters(cam) {
+    const { shapes } = controlLayout
+    let overlap = 0
+    const { left, top, sx, sy } = cam
+    for (const body of framedFighters) {
+      const x0 = (body.left - left) * k + sx / dpr, x1 = (body.right - left) * k + sx / dpr
+      const y0 = (body.top - top) * k + sy / dpr, y1 = (body.bottom - top) * k + sy / dpr
+      for (const [i, rect] of shapes.entries()) {
+        const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2
+        const dx = Math.max(x0 - x, 0, x - x1), dy = Math.max(y0 - y, 0, y - y1)
+        const radius = rect.height / 2
+        const end = Math.max(0, (rect.width - rect.height) / 2)
+        const padding = fadedControls & (1 << i) ? 10 : 5
+        if (Math.hypot(Math.max(0, dx - end), dy) < radius + padding) overlap |= 1 << i
+      }
+    }
+    if (overlap !== fadedControls) {
+      for (const [i, rect] of shapes.entries()) rect.node.classList.toggle('fighter-overlap', Boolean(overlap & (1 << i)))
+      fadedControls = overlap
+    }
+  }
+
+  function drawOffscreenEnemies(cam) {
+    const left = cam.left + controlLayout.marginLeft / k
+    const right = cam.left + cam.viewW - controlLayout.marginRight / k
+    let beyondLeft = false, beyondRight = false
+    for (let i = 1; i < framedFighters.length; i++) {
+      const body = framedFighters[i]
+      if (body.right < left) beyondLeft = true
+      if (body.left > right) beyondRight = true
+    }
+    if (!beyondLeft && !beyondRight) return
+
+    ctx.save()
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 2
+    ctx.fillStyle = '#f5ebd8e6'; ctx.strokeStyle = CINNABAR
+    const y = height * .38
+    for (const [visible, x, dir] of [[beyondLeft, controlLayout.marginLeft + 9, -1],
+      [beyondRight, width - controlLayout.marginRight - 9, 1]]) {
+      if (!visible) continue
+      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.moveTo(x - dir * 2, y - 5); ctx.lineTo(x + dir * 3, y)
+      ctx.lineTo(x - dir * 2, y + 5); ctx.stroke()
+    }
+    ctx.restore()
+  }
+
   function cameraTarget() {
     const half = viewW / 2
     if (phase === 'welcome' || phase === 'select') return Math.max(half, state.player.x - viewW * 0.24) + Math.sin(clock * 0.12) * 18
@@ -1894,13 +1993,19 @@
   function render(dt) {
     if (!assets) return
     const fxDt = phase === 'paused' ? 0 : state.slow > 0 && phase === 'playing' ? dt * Math.max(0.35, state.slowScale) : dt
-    camera.x += (cameraTarget() - camera.x) * (1 - Math.exp(-dt * (phase === 'welcome' ? 1.2 : 5.5)))
+    let target = cameraTarget()
+    const combatFrame = touchUI && !controls.hidden && state.level.volume < 6 ? frameTouchCombat() : null
+    if (combatFrame) target = Math.max(combatFrame.safeMin, Math.min(combatFrame.safeMax, target))
+    camera.x += (target - camera.x) * (1 - Math.exp(-dt * (phase === 'welcome' ? 1.2 : 5.5)))
+    // Smooth the camera within the interval that keeps the framed fighters on screen.
+    if (combatFrame) camera.x = Math.max(combatFrame.min, Math.min(combatFrame.max, camera.x))
     const P = k * dpr
     const amount = reducedMotion ? 0 : fx.shake
     const cam = {
       left: camera.x - viewW / 2, top: worldTop, viewW, viewH, P, width: canvas.width, height: canvas.height,
       sx: (Math.random() - 0.5) * amount * P, sy: (Math.random() - 0.5) * amount * P,
     }
+    if (combatFrame) clearControlsForFighters(cam)
     const env = scene.environment(camera.x, state.level ? state.level.volume : selectedVolume)
     if (state.enemies.some((en) => en.type === 'angler' && en.alive && en.phase2)) env.blizzard = Math.max(env.blizzard || 0, 0.65)
     const wind = state.world.wind
@@ -1961,6 +2066,7 @@
     scene.drawWeather(ctx, assets, cam, weather, env)
     scene.drawPost(ctx, assets, cam, env, quality)
     FX.drawScreen(ctx, fx, cam)
+    if (combatFrame && state.lock) drawOffscreenEnemies(cam)
     const volume = currentVolume()
     audio.update({
       combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale,
