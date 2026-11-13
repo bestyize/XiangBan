@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
-import { Window } from 'happy-dom'
+import { Window, type HTMLElement } from 'happy-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 const source = (file: string) => readFileSync(new URL(`../../public/game-packs/water-sort/${file}`, import.meta.url), 'utf8')
@@ -123,8 +123,8 @@ it('moves both liquid surfaces together and cleans up when the pour is interrupt
   try {
     const {document} = window
     document.body.innerHTML = '<div><div id="source"><span class="liquid-stack"><i></i><i></i><i></i></span></div></div><div id="target"><span class="liquid-stack"><i></i></span></div>'
-    const sourceCup = document.querySelector('#source') as HTMLElement
-    const targetCup = document.querySelector('#target') as HTMLElement
+    const sourceCup = document.querySelector<HTMLElement>('#source')!
+    const targetCup = document.querySelector<HTMLElement>('#target')!
     const area = (left: number, top: number) => ({left, top, width:60, height:100, bottom:top+100})
     Object.defineProperties(sourceCup, {
       offsetWidth:{value:60}, offsetHeight:{value:100}, offsetTop:{value:10},

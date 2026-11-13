@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
-import { Window } from 'happy-dom'
+import { Window, type HTMLElement } from 'happy-dom'
 import { describe, expect, it } from 'vitest'
 
 const source=(file:string)=>readFileSync(new URL(`../../public/game-packs/mbti/${file}`,import.meta.url),'utf8')
@@ -75,7 +75,7 @@ function page(saved:any){
   const writes:any[]=[];const c:any={window,document:window.document,location:{search:''},URLSearchParams,setTimeout,clearTimeout,
     XiaobanBuiltinRuntime:{connect:(fn:any)=>fn({save:saved,safeArea:{top:88,right:0,bottom:16,left:0}}),send:(type:string,payload:any)=>{if(type==='game.save')writes.push(JSON.parse(JSON.stringify(payload.data)))}}}
   for(const file of ['rules.js','profiles.js','report.js','report-view.js','game.js'])runInNewContext(source(file),c)
-  return {window,writes,click:(id:string)=>(window.document.getElementById(id)! as import('happy-dom').HTMLElement).click()}
+  return {window,writes,click:(id:string)=>(window.document.getElementById(id)! as HTMLElement).click()}
 }
 it('finishes a real quiz flow, saves its answers, and reopens the same personalized report',()=>{
   const a=answersFor('INFJ'),partial=[...a];partial[47]=null
@@ -112,13 +112,13 @@ describe('native-style MBTI interaction',()=>{
   it('reviews missing answers, prevents empty results, and fills the original gaps',()=>{
     const current=page(null);current.click('startButton')
     for(let i=0;i<48;i++)current.click('skipButton')
-    expect(current.window.document.getElementById('review')!.hidden).toBe(false)
+    expect(current.window.document.querySelector<HTMLElement>('#review')!.hidden).toBe(false)
     expect((current.window.document.getElementById('finishButton') as any).disabled).toBe(true)
     current.click('fillButton')
     for(let i=0;i<48;i++){current.click('option0');current.click('nextButton')}
     expect(current.writes.at(-1).progress).toBeNull()
     expect(current.writes.at(-1).lastResult.answers).toEqual(Array(48).fill(0))
-    expect(current.window.document.getElementById('result')!.hidden).toBe(false)
+    expect(current.window.document.querySelector<HTMLElement>('#result')!.hidden).toBe(false)
     current.window.close()
   })
 
@@ -129,7 +129,7 @@ describe('native-style MBTI interaction',()=>{
     expect(doc.querySelectorAll('.report-section:not([hidden])')).toHaveLength(1)
     expect(doc.querySelectorAll('.report-dimension')).toHaveLength(4)
     current.click('report-tab-work')
-    expect(doc.getElementById('report-work')!.hidden).toBe(false)
+    expect(doc.querySelector<HTMLElement>('#report-work')!.hidden).toBe(false)
     expect(doc.querySelectorAll('#report-work .report-evidence')).not.toHaveLength(0)
     expect(current.window.history.state).toMatchObject({page:'result',chapter:'work'})
     current.click('report-tab-growth')
@@ -137,7 +137,7 @@ describe('native-style MBTI interaction',()=>{
     check.click();expect(check.checked).toBe(true)
     current.click('homeButton');current.click('lastResultButton')
     expect((doc.querySelector('.report-step input') as any).checked).toBe(true)
-    expect(doc.getElementById('report-growth')!.hidden).toBe(false)
+    expect(doc.querySelector<HTMLElement>('#report-growth')!.hidden).toBe(false)
     current.window.close()
   })
 
@@ -145,9 +145,9 @@ describe('native-style MBTI interaction',()=>{
     const current=page({version:2,lastResult:resultFor(answersFor('INTJ'))})
     current.click('lastResultButton');current.click('report-tab-growth')
     current.window.dispatchEvent(new current.window.PopStateEvent('popstate',{state:{mbti:true,page:'result',chapter:'traits'}}))
-    expect(current.window.document.getElementById('report-traits')!.hidden).toBe(false)
+    expect(current.window.document.querySelector<HTMLElement>('#report-traits')!.hidden).toBe(false)
     current.window.dispatchEvent(new current.window.PopStateEvent('popstate',{state:{mbti:true,page:'quiz'}}))
-    expect(current.window.document.getElementById('home')!.hidden).toBe(false)
+    expect(current.window.document.querySelector<HTMLElement>('#home')!.hidden).toBe(false)
     expect(current.window.history.state).toMatchObject({page:'home'})
     current.window.close()
   })

@@ -436,8 +436,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
       </div>
       <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
       <ChatMentionMenu v-if="mentions.open.value" :items="mentions.items.value" :active="mentions.index.value" :loading="mentions.loading.value" @pick="mentions.pick" @hover="mentions.index.value = $event" />
-      <div class="composer-editor">
-        <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
+      <div class="composer-editor" :style="{ '--composer-min-rows': Math.max(1, minRows) }">
+        <NInput ref="input" v-model:value="draft" type="textarea" autosize :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
         <ChatWorkbenchTools :store="store" :summary="addSummary" :selected-connector-ids="mentions.selected.value.map(item => item.id)" :selected-skill-ids="skills.map(skill => skill.name)" :selected-expert="chat.currentExpert" :expert-locked="!!chat.currentId" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @clear-expert="chat.pendingExpert = null" @toggle-skill="toggleSkill" @toggle-connector="toggleConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
@@ -488,12 +488,19 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 .chip-x:disabled{opacity:.5;cursor:not-allowed}
 .chip-x:focus-visible{outline:2px solid var(--ui-btn);outline-offset:1px}
 .composer-ctx{display:flex;align-items:center;gap:2px;flex:none;min-width:0;margin-left:auto;max-width:70%}
-.composer-editor{display:flex;min-width:0;padding:0 2px 2px}
+.composer-editor{display:flex;min-width:0;padding:0 2px 2px;--composer-line-height:1.6em}
 .composer-editor :deep(.n-input){flex:1;min-width:0;width:100%;--n-border:none;--n-border-hover:none;--n-border-focus:none;--n-box-shadow-focus:none;--n-color:transparent;--n-color-focus:transparent;--n-color-disabled:transparent;background:transparent;font-size:14.5px}
 .page-new-task .composer-editor :deep(.n-input){font-size:15px}
 .composer-editor :deep(.n-input .n-input__border),.composer-editor :deep(.n-input .n-input__state-border){display:none}
 .composer-editor :deep(.n-input-wrapper){padding:0}
-.composer-editor :deep(.n-input__textarea-el),.composer-editor :deep(.n-input__placeholder){line-height:1.6;padding:0}
+.composer-editor :deep(.n-input__textarea-el),
+.composer-editor :deep(.n-input__textarea-mirror),
+.composer-editor :deep(.n-input__placeholder){line-height:var(--composer-line-height);padding:0}
+/* Set the mirror's row limits before layout to avoid resizing it in Naive UI's observer. */
+.composer-editor :deep(.n-input__textarea-mirror) {
+  min-height: calc(var(--composer-min-rows) * var(--composer-line-height));
+  max-height: calc(8 * var(--composer-line-height));
+}
 .composer-row{display:flex;gap:2px;align-items:center;min-width:0}
 .composer-spacer{flex:1;min-width:4px}
 .voice{color:var(--ui-text-secondary)}
