@@ -8,8 +8,8 @@
   "description": "水墨玉石质感五子棋，支持智能人机对弈与双人对局，沉浸式下子金石音效与连珠特效。",
   "category": "board",
   "entry": "index.html",
-  "icon": "icon.png",
-  "cover": "icon.png",
+  "icon": "icon.webp",
+  "cover": "icon.webp",
   "orientation": "landscape",
   "input": [
     "touch",

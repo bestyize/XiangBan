@@ -10,7 +10,7 @@ Android 创作工具已支持协议 2、`lib_add` 和 `asset_import`。其余素
 
 2. **免构建。** 作品可用原生 JavaScript、`<script type="module">` 和相对路径 import。Android 需要 3D 时，用 `lib_add` 选择 `three`，再通过 `<script src="lib/three.min.js">` 加载 Three.js r128。优先引用包内文件，确保离线可用。
 
-3. **文件。** 使用 index.html 作为入口，准备至少 192×192 的 1:1 图标和至少 640×360 的 16:9 封面。Android 默认使用 icon.svg 和 cover.svg，也可用 `app_create` 的 `icon` 和 `cover` 指定包内图片。用 `asset_import` 让用户选择素材，再通过 `source_dir` 安装草稿。Android 单个源码最多 1 MB、素材最多 10 MB，作品文件合计最多 24 MB。作品路径只用字母、数字和 . _ -，最多 6 层。manifest.json 由工具生成。
+3. **文件。** 使用 `index.html` 作为入口。准备至少 192×192 的 1:1 图标，桌面「精选应用」会把它与名称一起显示。为社区卡片和分享准备至少 640×360 的 16:9 封面。默认使用 `icon.svg` 和 `cover.svg`，也可用 `app_create` 的 `icon` 和 `cover` 指定 `icon.webp`、`cover.webp` 等包内图片。用 `asset_import` 让用户选择素材，再通过 `source_dir` 安装草稿。Android 单个源码最多 1 MB、素材最多 10 MB，作品文件合计最多 24 MB。作品路径只用字母、数字和 . _ -，最多 6 层。`manifest.json` 由工具生成。
 
 4. **清单信息。** 在工具参数里给出：
    - id：2～64 位，只用小写字母、数字、- 和 _。

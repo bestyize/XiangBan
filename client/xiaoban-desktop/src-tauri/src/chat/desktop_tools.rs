@@ -1124,7 +1124,7 @@ fn inline_game_files(args: &Value) -> Result<Vec<(String, String)>, String> {
 
 const APP_FORMAT: &str = r#"小伴应用创作规范（桌面独立窗口，运行时协议 2）
 1. 先确定类型、功能或玩法、方向和输入方式。小游戏用 kind=game，工具或测评用 kind=app。用工作区的专用子目录（例如 app-drafts/<id>）分文件写入，用 edit_file 局部修正，再以 source_dir 交给 app_create。很短的文本作品也可以直接传 files。manifest.json 由工具生成。
-2. 草稿包含 HTML 入口（默认 index.html）、1:1 图标（至少 192×192）和 16:9 封面（至少 640×360）。图标和封面可用自包含 SVG，或使用草稿里的图片文件。资源用相对路径。包最多 3000 个文件（含清单）、单文件 50 MB、合计 100 MB，路径最多 8 层，每段只用字母、数字和 ._-@。
+2. 草稿包含 HTML 入口（默认 index.html）、1:1 图标（至少 192×192）和 16:9 封面（至少 640×360）。桌面「精选应用」把方形图标和名称一起显示，社区卡片和分享使用宽屏封面。默认使用自包含的 icon.svg、cover.svg，也可在 app_create 的 icon、cover 参数里指定 icon.webp、cover.webp 等包内相对路径。位图通过 source_dir 随草稿安装。包最多 3000 个文件（含清单）、单文件 50 MB、合计 100 MB，路径最多 8 层，每段只用字母、数字和 ._-@。
 3. 清单由 app_create 写为 schemaVersion=3、runtimeProtocol=2。id 为 2～64 位小写字母、数字、- 或 _，以字母或数字开头；要兼容手机本地创作，优先用 2～40 位且以字母或数字结尾的连字符命名。名称 1～24 字，简介 1～80 字。游戏 category 取 action、puzzle、board、casual、story，应用取 tool、quiz。orientation 取 portrait、landscape、any。input 声明实际可用的 mouse、keyboard、touch，桌面需鼠标或键盘，兼顾手机需触控。version 默认 1.0.0。
 4. 优先使用原生 HTML/CSS/JS 和本地 ES modules。依赖和素材放在包内，使用最终可直接运行的文件。联网仅用于必要的实时功能，提供断网提示，勿在包里保存密钥。按窗口尺寸排版，保持键盘焦点和操作反馈。兼容 Android 时使用 viewport-fit=cover 和 100dvh，背景铺满状态栏与手势区后方，--xb-safe-* 只给内容留系统安全边距。右上角宿主竖三点按 --xb-capsule-* 的实际触控矩形局部避让，控件至少离它 8 CSS 像素，勿用胶囊底边增加整页顶部留白；滚动、弹窗、横竖屏与 safearea 变化后复核。退出由宿主管理，多页面用浏览器历史。
 5. 宿主注入全局 xb。首屏绘制后调用 xb.ready()；监听 xb.on('hide', ...) 暂停和停声，监听 show 恢复。重要数据用 await xb.storage.get(key) / set(key, value)，变化时保存。游戏可调用 xb.game.start()、progress({score})、result({score})，分数为非负整数。按需声明 capabilities，调用扩展能力前检查 xb.can 和对应方法是否存在，提供降级行为。

@@ -19,6 +19,7 @@ const encodePath = (path: string) => path.split('/').map(encodeURIComponent).joi
 export const entryUrl = (game: GameManifest) => `${gameBase(game)}${encodePath(game.entry)}`;
 export const fallbackCoverUrl = (game: GameManifest) => game.source === 'user' ? generatedCover(game) : DEFAULT_COVER;
 export const coverUrl = (game: GameManifest) => (game.cover ? `${gameBase(game)}${encodePath(game.cover)}` : fallbackCoverUrl(game));
+export const iconUrl = (game: GameManifest) => (typeof game.icon === 'string' && game.icon.trim() ? `${gameBase(game)}${encodePath(game.icon)}` : coverUrl(game));
 
 /** Keeps the entries that look like games; one bad entry never hides the rest. */
 export function readGames(raw: unknown): GameManifest[] {

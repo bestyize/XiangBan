@@ -4,7 +4,7 @@ import { computed, onActivated, onMounted, ref } from "vue";
 import { Compass, Gamepad2, LayoutGrid, Palette, Save, Search, Sparkles, Square, Trash2, Wrench } from "lucide-vue-next";
 import { NAlert, NPopconfirm, NSkeleton } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
-import { coverUrl, fallbackCoverUrl } from "../../games/catalog.ts";
+import { coverUrl, fallbackCoverUrl, iconUrl } from "../../games/catalog.ts";
 import type { GameManifest } from "../../games/protocol.ts";
 
 defineOptions({ name: 'AppsPage' });
@@ -17,6 +17,7 @@ type PrimaryTab = 'plaza' | 'builtin' | 'custom';
 type CategoryFilter = 'all' | 'game' | 'tool' | 'assessment';
 
 const primaryTab = ref<PrimaryTab>(isGamesMode.value ? 'builtin' : 'plaza');
+const showFeaturedApps = computed(() => !isGamesMode.value && primaryTab.value === 'plaza');
 const activeFilter = ref<CategoryFilter>('all');
 const searchQuery = ref('');
 const games = ref<GameManifest[]>([]);
@@ -76,7 +77,7 @@ const filteredApps = computed(() => {
 
   return list.filter(app => {
     // Category filter (Plaza only)
-    if (!isGamesMode.value && primaryTab.value === 'plaza' && activeFilter.value !== 'all') {
+    if (showFeaturedApps.value && activeFilter.value !== 'all') {
       const kind = getAppKind(app);
       if (kind !== activeFilter.value) return false;
     }
@@ -101,6 +102,14 @@ function onCoverError(event: Event, app: GameManifest) {
   const image = event.currentTarget as HTMLImageElement;
   const fallback = fallbackCoverUrl(app);
   if (image.getAttribute('src') !== fallback) image.src = fallback;
+}
+
+function onIconError(event: Event, app: GameManifest) {
+  const image = event.currentTarget as HTMLImageElement;
+  const icon = iconUrl(app);
+  const cover = coverUrl(app);
+  if (icon !== cover && image.getAttribute('src') === icon) image.src = cover;
+  else onCoverError(event, app);
 }
 
 const message = (error: unknown, fallback: string) =>
@@ -223,7 +232,7 @@ onActivated(() => {
     </header>
 
     <!-- Secondary Category Chips Filter (Plaza Only) -->
-    <nav v-if="!isGamesMode && primaryTab === 'plaza'" class="apps-filter-bar" aria-label="子分类筛选">
+    <nav v-if="showFeaturedApps" class="apps-filter-bar" aria-label="子分类筛选">
       <button
         v-for="filter in categoryFilters"
         :key="filter.id"
@@ -264,11 +273,36 @@ onActivated(() => {
           有 {{ folderErrors.length }} 个{{ isGamesMode ? '游戏' : '作品' }}文件夹无法使用：{{ folderErrors.join('；') }}
         </NAlert>
 
-        <div v-if="loading" class="app-grid" aria-label="正在读取应用资料">
+        <div v-if="loading && showFeaturedApps" class="featured-app-grid" aria-label="正在读取应用资料">
+          <div v-for="item in 6" :key="item" class="featured-app-skeleton">
+            <NSkeleton class="featured-app-icon" :sharp="false" />
+            <NSkeleton width="64px" height="12px" :sharp="false" />
+          </div>
+        </div>
+
+        <div v-else-if="loading" class="app-grid" aria-label="正在读取应用资料">
           <article v-for="item in 6" :key="item" class="app-card-skeleton">
             <NSkeleton height="142px" :sharp="false" />
             <NSkeleton text :repeat="2" />
           </article>
+        </div>
+
+        <div v-else-if="showFeaturedApps && filteredApps.length" class="featured-app-grid">
+          <button
+            v-for="app in filteredApps"
+            :key="app.id"
+            type="button"
+            class="featured-app"
+            :data-testid="`app-${app.id}`"
+            :title="descriptionFor(app)"
+            :aria-label="`启动${app.name}`"
+            :aria-description="descriptionFor(app)"
+            :aria-disabled="opening || !store.desktop"
+            @click="launchApp(app)"
+          >
+            <img class="featured-app-icon" :src="iconUrl(app)" alt="" loading="lazy" @error="onIconError($event, app)" />
+            <span class="featured-app-name">{{ app.name }}</span>
+          </button>
         </div>
 
         <div v-else-if="filteredApps.length" class="app-grid">
@@ -441,6 +475,50 @@ onActivated(() => {
 }
 .catalog-error {
   border-radius: 12px;
+}
+.featured-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 12px 14px;
+}
+.featured-app,
+.featured-app-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 6px 8px;
+}
+.featured-app {
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ui-text-primary);
+  cursor: pointer;
+}
+.featured-app[aria-disabled="true"] {
+  cursor: default;
+}
+.featured-app:not([aria-disabled="true"]):hover,
+.featured-app:focus-visible {
+  background: var(--ui-surface-hover);
+}
+.featured-app-grid .featured-app-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 18px;
+}
+img.featured-app-icon {
+  background: var(--ui-control);
+  object-fit: contain;
+}
+.featured-app-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .app-grid {
   display: grid;

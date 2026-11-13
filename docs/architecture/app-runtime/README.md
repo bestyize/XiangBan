@@ -88,12 +88,14 @@
 ```
 manifest.json      清单，必须放在最外层
 index.html         入口（可在清单里改名）
-icon.png / .svg    1:1 图标，至少 192×192
-cover.png / .svg   16:9 封面，至少 640×360
+icon.webp         1:1 图标，至少 192×192
+cover.webp        16:9 封面，至少 640×360
 其余文件           任意目录结构，用相对路径引用
 ```
 
 作品可以有多个 HTML 页面，见第 6.4 节。
+
+桌面「精选应用」显示 `icon` 指定的方形图标，下方显示 `name`。创作时还需为社区卡片和分享准备 16:9 封面。上面的文件名只是示例，图标和封面也可用 PNG、SVG 等格式，实际路径由清单的 `icon` 和 `cover` 指定。
 
 ### 3.2 体积、文件类型与路径
 
@@ -128,8 +130,8 @@ cover.png / .svg   16:9 封面，至少 640×360
 | `version` | 文本 | 是 | 最多 32 个字符，只含字母、数字、点和连字符，例如 `1.2.0` |
 | `category` | 文本 | 是 | 游戏取 `action`、`puzzle`、`board`、`casual`、`story`；应用取 `tool`、`quiz` |
 | `entry` | 文本 | 否 | 入口页面，默认 `index.html` |
-| `icon` | 文本 | 是 | 1:1 图标的路径 |
-| `cover` | 文本 | 是 | 16:9 封面的路径 |
+| `icon` | 文本 | 是 | 1:1 图标的包内相对路径，用于桌面「精选应用」等图标展示 |
+| `cover` | 文本 | 是 | 16:9 封面的包内相对路径，用于社区卡片和分享 |
 | `orientation` | 文本 | 否 | `portrait`（默认）、`landscape`，或 `any`（跟随手机方向，但遵守系统的方向锁定开关） |
 | `input` | 文本列表 | 是 | 支持的操作方式，取 `touch`、`mouse`、`keyboard` |
 | `capabilities` | 文本列表 | 否 | 需要的能力，见第 7.2 节 |
@@ -149,8 +151,8 @@ cover.png / .svg   16:9 封面，至少 640×360
   "description": "48 道情境题，约 10 分钟。",
   "version": "1.0.0",
   "category": "quiz",
-  "icon": "icon.png",
-  "cover": "cover.png",
+  "icon": "icon.webp",
+  "cover": "cover.webp",
   "orientation": "portrait",
   "input": ["touch", "mouse", "keyboard"],
   "capabilities": ["haptics", "share"],

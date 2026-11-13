@@ -39,9 +39,14 @@ pub fn builtin_catalog() -> Result<Vec<Value>, String> {
         include_str!("../../public/game-packs/mbti/manifest.json"),
     ];
     manifests.iter().zip(IDS).map(|(text, id)| {
-        let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
-        let expected_cover = if id == POCKET_SPRITES { "assets/cover.png" } else { "cover.svg" };
-        if value["id"] != id || (value["runtimeProtocol"] != 1 && value["runtimeProtocol"] != 2) || value["entry"] != "index.html" || value["cover"] != expected_cover { return Err(format!("游戏 {id} 的资源协议无效")); }
+        let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
+            .map_err(|e| format!("游戏 {id} 的清单无法读取：{e}"))?;
+        if value["id"] != id {
+            return Err(format!("游戏 {id} 的清单编号不匹配"));
+        }
+        let [entry, _, _] = crate::app_runtime::pack::check_manifest(&value)
+            .map_err(|error| format!("游戏 {id} 的资源协议无效：{error}"))?;
+        value["entry"] = json!(entry);
         value["source"] = json!("builtin"); value["base"] = json!(format!("/game-packs/{id}/")); value["layer"] = json!("space"); value["capabilities"] = json!([]);
         Ok(value)
     }).collect()

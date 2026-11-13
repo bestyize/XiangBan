@@ -12,6 +12,7 @@ const mbti = {
   name: 'MBTI 性格测评',
   description: '48 道原创情境题',
   entry: 'index.html',
+  icon: 'icon.webp',
   cover: 'cover.svg',
   runtimeProtocol: 2,
   orientation: 'portrait' as const,
@@ -104,13 +105,14 @@ it('switches to My Works after importing a V2 small app from the header', async 
   }
 });
 
-it('launches protocol 2 apps via store.openApp (V2 container) without affecting background', async () => {
+it('shows only the featured app name and icon, and launches it through the V2 host', async () => {
   const { wrapper, openApp, openGames } = setupApps();
   try {
     await flushPromises();
     const mbtiCard = wrapper.get('[data-testid="app-mbti"]');
-    expect(mbtiCard.text()).toContain('MBTI 性格测评');
-    expect(mbtiCard.text()).toContain('测评 · 协议2');
+    expect(mbtiCard.text()).toBe(mbti.name);
+    expect(mbtiCard.get('img').attributes('src')).toBe(`${mbti.base}${mbti.icon}`);
+    expect(mbtiCard.attributes('title')).toContain(mbti.description);
 
     await mbtiCard.trigger('click');
     await flushPromises();
@@ -121,6 +123,18 @@ it('launches protocol 2 apps via store.openApp (V2 container) without affecting 
       entry: 'index.html',
     });
     expect(openGames).not.toHaveBeenCalled();
+  } finally {
+    wrapper.unmount();
+  }
+});
+
+it('uses the featured app cover if its icon fails to load', async () => {
+  const { wrapper } = setupApps();
+  try {
+    await flushPromises();
+    const image = wrapper.get('[data-testid="app-mbti"] img');
+    await image.trigger('error');
+    expect(image.attributes('src')).toBe(`${mbti.base}${mbti.cover}`);
   } finally {
     wrapper.unmount();
   }
@@ -151,19 +165,19 @@ it('filters apps by category filter chips and search keyword', async () => {
   const { wrapper } = setupApps();
   try {
     await flushPromises();
-    expect(wrapper.findAll('.app-card')).toHaveLength(2); // mbti and merge-2048 in plaza
+    expect(wrapper.findAll('.featured-app')).toHaveLength(2); // mbti and merge-2048 in plaza
 
     // Filter by assessment
     await wrapper.get('[data-testid="apps-filter-assessment"]').trigger('click');
     await flushPromises();
-    expect(wrapper.findAll('.app-card')).toHaveLength(1);
-    expect(wrapper.get('.app-card').text()).toContain('MBTI');
+    expect(wrapper.findAll('.featured-app')).toHaveLength(1);
+    expect(wrapper.get('.featured-app').text()).toContain('MBTI');
 
     // Filter by game
     await wrapper.get('[data-testid="apps-filter-game"]').trigger('click');
     await flushPromises();
-    expect(wrapper.findAll('.app-card')).toHaveLength(1);
-    expect(wrapper.get('.app-card').text()).toContain('2048');
+    expect(wrapper.findAll('.featured-app')).toHaveLength(1);
+    expect(wrapper.get('.featured-app').text()).toContain('2048');
 
     // Reset filter
     await wrapper.get('[data-testid="apps-filter-all"]').trigger('click');
@@ -172,8 +186,8 @@ it('filters apps by category filter chips and search keyword', async () => {
     // Search query
     await wrapper.get('[data-testid="apps-search-input"]').setValue('MBTI');
     await flushPromises();
-    expect(wrapper.findAll('.app-card')).toHaveLength(1);
-    expect(wrapper.get('.app-card').text()).toContain('MBTI');
+    expect(wrapper.findAll('.featured-app')).toHaveLength(1);
+    expect(wrapper.get('.featured-app').text()).toContain('MBTI');
   } finally {
     wrapper.unmount();
   }
