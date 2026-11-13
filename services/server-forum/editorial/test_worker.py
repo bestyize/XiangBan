@@ -133,6 +133,28 @@ class EditorialTests(unittest.TestCase):
                 importer.assert_called_once_with(job['id'], dest, article, json.loads((dest / 'evidence.json').read_text()), (dest / 'cover.webp').read_bytes(), kind)
                 model.assert_not_called()
 
+    def test_frontier_import_uses_reviewed_body_and_structured_source(self):
+        worker = object.__new__(w.Worker)
+        worker.forum = 'https://forum.example'
+        key = 'ed-article'
+        article = {'title': '新模型的变化', 'summary': '发布摘要', 'body': '最后一段是具体报道。'}
+        evidence = {
+            'title': '官方发布说明',
+            'url': 'https://docs.example/release',
+            'retrieved_at': '2026-11-14T00:00:00+00:00',
+            'source_published_at': '2026-11-13T00:00:00+00:00',
+        }
+        w.atomic(self.root / 'frontier-asset.json', {'path': '/api/discover/frontier/ed-article/assets/cover'})
+        with patch.object(worker, 'frontier_token', return_value='private'), patch.object(worker, 'state'), patch.object(worker, 'publish_frontier') as publish, patch('worker.api') as api:
+            worker.import_frontier(key, self.root, article, evidence, b'')
+            payload = api.call_args.args[3]
+            self.assertEqual(payload['data']['body'], article['body'])
+            self.assertEqual(payload['data']['url'], evidence['url'])
+            self.assertEqual(payload['source_name'], evidence['title'])
+            self.assertEqual(payload['source_url'], evidence['url'])
+            self.assertEqual(payload['data']['source_published_at'], evidence['source_published_at'])
+            publish.assert_called_once_with(key, 'frontier')
+
     def test_source_scope_and_private_network_rejection(self):
         with self.assertRaises(w.Reject):
             w.source_url('https://evil.example/a', ['docs.example'])
