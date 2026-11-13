@@ -451,9 +451,9 @@ onActivated(() => {
   color: var(--ui-text-primary);
 }
 .filter-chip.active {
-  background: var(--ui-ink);
-  color: var(--ui-bg);
-  border-color: var(--ui-ink);
+  background: var(--ui-btn);
+  color: var(--ui-text-on-btn);
+  border-color: var(--ui-btn);
 }
 .apps-body {
   flex: 1;
