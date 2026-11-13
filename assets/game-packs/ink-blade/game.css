@@ -77,8 +77,11 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .game.night .score-block strong, .game.night .boss-name b, .game.night .combo { color: #f4eddc; text-shadow: 0 0 10px #1b1b1d; }
 .game.night .boss-hp { background: #efe7d42e; }
 .game.night .boss-hp span { background: linear-gradient(90deg, #e9e0c9, #f6f0e2); }
-.game.sea-night .area-title small { color: #e2d3b2; text-shadow: 0 1px 5px #1b2229; }
-.game.sea-night .area-title strong { color: #f3e6c8; text-shadow: 0 2px 14px #111824, 0 0 3px #151c22; }
+.game.ink-night-title .area-title small { color: #e2d3b2; text-shadow: 0 1px 5px #1b2229; }
+.game.ink-night-title .area-title strong { color: #f3e6c8; text-shadow: 0 2px 14px #111824, 0 0 3px #151c22; }
+.game.mountain .prompt { padding: 6px 12px; font-size: clamp(11px, 1.65vh, 14px); line-height: 1.45; white-space: normal; width: max-content; max-width: 62%; }
+.game.mountain:not(.night) .hp i:not(.empty) { filter: drop-shadow(0 0 2px #f1e2bb9c); }
+.game.mountain:not(.night) .ink-meter small { color: #333b36; text-shadow: 0 0 5px #eee5cd, 0 0 2px #eee5cd; }
 .game.boss-fight .prompt { top: calc(max(10px, var(--safe-top)) + 124px); }
 .toast { position: absolute; z-index: 5; top: 50%; left: 50%; transform: translateX(-50%); padding: 9px 18px; border-radius: 20px; background: #f4eddcf0; box-shadow: 0 5px 20px #3a2c1a1a; font-size: 12px; color: var(--ink-2); white-space: nowrap; pointer-events: none; }
 
@@ -279,4 +282,4 @@ h1 { margin: 0; font-family: var(--brush); font-size: clamp(44px, 6.4vw, 78px); 
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-.dash-button.borrow-ready { box-shadow: 0 0 0 2px #d1b68a, inset 0 0 0 2px #f4edd7; }
+.dash-button.borrow-ready { color: #f8e7ba; background: radial-gradient(circle at 38% 34%, #76563c, #302720 74%); box-shadow: 0 0 0 2px #e1c58f, inset 0 0 0 2px #f4edd7, 0 0 16px #f3d59692; }

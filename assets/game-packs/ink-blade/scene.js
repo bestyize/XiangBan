@@ -53,13 +53,13 @@
     {x:4200,top:[73,79,80],low:[198,205,199],tint:[171,188,184,.06],sun:0,moon:.55},
     {x:5200,top:[161,157,147],low:[240,235,222],tint:[226,223,211,.04],sun:0,moon:.3},
   ]
-  const SKY_SUMMIT=[
-    {x:0,top:[198,193,179],low:[240,234,219],tint:[225,221,203,.04],sun:.85,moon:0},
-    {x:1300,top:[179,185,176],low:[231,230,212],tint:[207,214,201,.04],sun:.35,moon:0},
-    {x:2300,top:[151,160,153],low:[223,225,209],tint:[193,206,193,.03],sun:.12,moon:0},
-    {x:3300,top:[185,180,162],low:[240,231,210],tint:[226,215,191,.04],sun:.55,moon:0},
-    {x:4200,top:[166,163,151],low:[231,224,204],tint:[211,211,189,.04],sun:.25,moon:0},
-    {x:5200,top:[195,178,157],low:[243,232,210],tint:[232,217,189,.04],sun:1,moon:0},
+  const SKY_SUMMIT = [
+    { x: 0, top: [208, 201, 177], middle: [229, 221, 193], low: [248, 241, 215], tint: [0, 0, 0, 0] },
+    { x: 1450, top: [181, 193, 181], middle: [208, 218, 201], low: [238, 236, 218], tint: [0, 0, 0, 0], blend: 360 },
+    { x: 2370, top: [175, 188, 188], middle: [209, 219, 211], low: [239, 238, 219], tint: [0, 0, 0, 0], blend: 385 },
+    { x: 3350, top: [211, 199, 171], middle: [232, 218, 192], low: [247, 234, 210], tint: [0, 0, 0, 0], blend: 475 },
+    { x: 4300, top: [117, 137, 146], middle: [172, 186, 186], low: [228, 234, 220], tint: [0, 0, 0, 0], blend: 475 },
+    { x: 5310, top: [167, 151, 155], middle: [228, 197, 178], low: [249, 234, 211], tint: [0, 0, 0, 0], blend: 535 },
   ]
   const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
 
@@ -76,6 +76,7 @@
     const mix = (p, q) => p.map((v, j) => v + (q[j] - v) * t)
     const out = { top: mix(a.top, b.top), low: mix(a.low, b.low), tint: volumeId === 4 ? [0,0,0,0] : mix(a.tint, b.tint) }
     for (const key of ENV_KEYS) out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * t
+    if (volumeId === 6) out.middle = mix(a.middle, b.middle)
     if (volumeId === 4) {
       out.middle = mix(a.middle, b.middle)
       out.glow = mix(a.glow, b.glow)
@@ -169,7 +170,7 @@
     a.vignette = art.vignette(o.width, o.height)
 
     if (volumeId === 6) {
-      Object.assign(a,globalThis.XiabanInkMountain.build(r,span))
+      a.mountain = globalThis.XiabanInkMountain.build(r, world)
     } else if (volumeId === 5) {
       Object.assign(a, globalThis.XiabanInkLantern.build(r,span))
     } else if (volumeId === 2) {
@@ -251,11 +252,9 @@
       a.snowTree0 = art.deadTree(r(0.9), 3, 1, { snow: true, wide: true }); a.snowTree1 = art.deadTree(r(0.9), 8, 0.8, { snow: true, wide: true }); a.snowTree2 = art.deadTree(r(0.9), 13, 1.15, { snow: true, wide: true })
       a.plumTree = art.deadTree(r(0.9), 17, 1.05, { snow: true, blossom: true, wide: true })
     }
-    a.platforms = world.platforms.map((p, i) => volumeId === 2
+    a.platforms = (volumeId === 6 ? [] : world.platforms).map((p, i) => volumeId === 2
       ? { p, s: art.snowRock(p.w, p.y, GROUND, 40 + i, r(1)) }
-      : volumeId === 6
-        ? { p, s: globalThis.XiabanInkMountain.platform(p,r(1)) }
-        : volumeId === 5
+      : volumeId === 5
         ? { p, s: globalThis.XiabanInkLantern.platform(p,r(1)) }
         : volumeId === 4
         ? { p, s: art.seaPlatform(p, r(1), 70 + i) }
@@ -364,6 +363,7 @@
 
   function drawBackground(ctx, a, cam, e, clock) {
     if (a.volumeId === 4) { drawSeaBackground(ctx, a, cam, e, clock); return }
+    if (a.volumeId === 6) { globalThis.XiabanInkMountain.background(ctx, a, cam, clock, e, layer); return }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     const sky = ctx.createLinearGradient(0, 0, 0, cam.height)
     sky.addColorStop(0, rgb(e.top)); sky.addColorStop(0.72, rgb(e.low)); sky.addColorStop(1, rgb(e.low))
@@ -401,9 +401,7 @@
     layer(ctx, cam, 0.32); art.drawStrip(ctx, a.near, cam.left * 0.32, cam.viewW)
     mist(ctx, a, cam, 0.45, 287, 38, 0.55, clock * 11, 19)
 
-    if (a.volumeId === 6) {
-      globalThis.XiabanInkMountain.background(ctx,a,cam,clock)
-    } else if (a.volumeId === 5) {
+    if (a.volumeId === 5) {
       globalThis.XiabanInkLantern.background(ctx,a,cam,clock)
     } else if (a.volumeId === 2) {
       if (e.forest > 0.02) {
@@ -472,7 +470,7 @@
     const left = cam.left - 60, right = cam.left + cam.viewW + 60
 
     if (a.volumeId === 6) {
-      globalThis.XiabanInkMountain.ground(ctx,a,cam,clock)
+      globalThis.XiabanInkMountain.ground(ctx, a, cam)
     } else if (a.volumeId === 5) {
       globalThis.XiabanInkLantern.ground(ctx,a,cam,clock)
     } else if (a.volumeId === 2) {
@@ -803,7 +801,7 @@
   // 灯市 architecture is static during a fight. Composite it once into bounded opaque
   // tiles instead of replaying many translucent landmark/mist layers every frame.
   function drawBase(ctx,a,cam,e,clock,level=null) {
-    if(a.volumeId!==5&&a.volumeId!==6){drawBackground(ctx,a,cam,e,clock);drawGround(ctx,a,cam,e,clock);return}
+    if (a.volumeId !== 5) { drawBackground(ctx, a, cam, e, clock); drawGround(ctx, a, cam, e, clock); return }
     const center=cam.left+cam.viewW/2
     let area=0
     for(let i=1;i<a.world.areas.length;i++)if(center>=a.world.areas[i].x)area=i

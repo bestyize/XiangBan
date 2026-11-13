@@ -368,10 +368,12 @@
     hookPull: ['钩镰朱光亮起时出剑弹反，海寇会被拽到身前；收剑后再斩可处决', '钩镰朱光亮起时按 J 弹反，海寇会被拽到身前；收剑后再斩可处决'],
     tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
     mirror: ['镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回', '镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回'],
-    borrow: ['弹反后「闪」亮起：朝对手闪身借势绕背，再斩处决；伞面始终挡正面', '弹反后按 L / Shift 借势绕背，再按 J 出剑；伞面始终挡正面'],
-    rope: ['索客亮刀后沿绳落斩，可迎刀弹反；连弩的两箭都能斩回', '索客亮刀后沿绳落斩，可迎刀弹反；连弩的两箭都能斩回'],
-    mountwind: ['布条展开后起风，注意站位；迎风弹反也能借势换边', '布条展开后起风，注意站位；迎风弹反也能借势换边'],
-    heavyguard: ['重兵举刃时不怕轻斩，先接招或让开，再打收招', '重兵举刃时不怕轻斩，先接招或让开，再打收招'],
+    borrow: ['迎着伞尖朱光出剑。「闪」亮时点按绕背，再斩处决。', '迎着伞尖朱光按 J。弹反后松方向键，按 L 借势绕背，再按 J。'],
+    rope: ['索客沿朱线落斩。刀到身前时出剑，弩箭也能斩回。', '索客沿朱线落斩。刀到身前时按 J，弩箭也能斩回。'],
+    mountwind: ['风幡扬起时可以迎风弹反。看见贴地朱线就跳，落地再斩。', '风幡扬起时可以迎风弹反。看见贴地朱线就跳，落地再斩。'],
+    heavyguard: ['看斧刃起手：高处见朱光可弹，贴地横扫要跳。', '看斧刃起手：高处见朱光可弹，贴地横扫要跳。'],
+    mountbell: ['跳起斩钟。石震在钟下时，钟声能震松架势。', '跳起按 J 斩钟。石震在钟下时，钟声能震松架势。'],
+    mountduel: ['弹反重剑后借势背击。架势满后，再出一剑决胜。', '弹反重剑后借势背击。架势满后，再出一剑决胜。'],
     elite: ['精英有独立架势条：多次弹反破势，出现「斩」再处决', '精英有独立架势条：多次弹反破势，出现「斩」再处决'],
     watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
     writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
@@ -579,7 +581,7 @@
       if (open) {
         card.append(sealRow(entry ? entry.seals : 0))
         card.append(el('span', 'level-best', entry ? LV.GRADES[entry.grade] + ' · ' + entry.best + ' 分' : '未曾入画'))
-        card.append(el('span', 'level-goal', '全 · ' + hurtText(level) + '　技 · ' + level.challenge.text))
+        card.append(el('span', 'level-goal', '全 · ' + hurtText(level) + '　技 · ' + challengeLabel(level)))
         const seals = entry ? LV.SEALS.filter((seal) => entry.seals & seal.bit).length : 0
         card.setAttribute('aria-label', level.sub + level.name + '，已得 ' + seals + ' 枚印' + (entry ? '，最佳' + LV.GRADES[entry.grade] + ' ' + entry.best + ' 分' : '，尚未通过'))
         card.addEventListener('click', () => startRound(level.id))
@@ -630,6 +632,11 @@
   }
 
   function formatTime(seconds) { return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') }
+  function challengeLabel(level) {
+    const spec = level.challenge
+    if (spec.text) return spec.text
+    return spec.all.map(goal => goal.text + (goal.goal > 1 ? ' ' + goal.goal + ' 次' : '')).join('、')
+  }
 
   function showResult() {
     phase = 'result'
@@ -658,7 +665,7 @@
     $('resultGrade').classList.toggle('graded', result.cleared)
     const seals = LV.SEALS.map((seal) => {
       const item = el('li', 'seal-slot' + (result.seals & seal.bit ? ' on' : '') + (outcome.gained & seal.bit ? ' fresh' : ''))
-      const caption = seal.bit === 1 ? '通关' : seal.bit === 2 ? hurtText(level) : level.challenge.text
+      const caption = seal.bit === 1 ? '通关' : seal.bit === 2 ? hurtText(level) : challengeLabel(level)
       item.append(el('i', 'mini-seal', seal.char), el('span', 'seal-caption', caption))
       if (outcome.gained & seal.bit) item.append(el('b', 'seal-new', '新'))
       return item
@@ -760,6 +767,15 @@
     shizhen:{a0:-2.5,a1:1,r:65,width:17,color:'#273025'},
     yue:[{a0:-2.5,a1:1}],
   }
+  const MOUNTAIN_SWINGS = {
+    cleave: { a0: -2.38, a1: 0.77, r: 79, width: 23 },
+    lift: { a0: 0.94, a1: -1.95, r: 70, width: 17 },
+    reverse: { a0: 1.08, a1: -1.61, r: 55, width: 13 },
+    rush: { a0: -0.47, a1: 0.24, r: 81, width: 15 },
+    shove: { a0: -0.45, a1: 0.58, r: 43, width: 11 },
+    sweep: { a0: 0.45, a1: 0.12, r: 103, width: 13, lift: 25 },
+    slam: { a0: -1.9, a1: 0.82, r: 75, width: 23, lift: 41 },
+  }
 
   function snapshot(enemy) {
     const a = anims.get(enemy.id)
@@ -804,7 +820,7 @@
         case 'dash':
           FX.puff(fx, e.x - e.facing * 8, e.y - 4, 8, { angle: e.facing > 0 ? Math.PI : 0, spread: 0.6, speed: 90, size: 5, alpha: 0.32, ...snowPuff() })
           dashImage = 0.21
-          audio.play('dash')
+          if (!p.action?.borrow) audio.play('dash')
           break
         case 'hit': {
           const target = byId(e.id)
@@ -858,7 +874,7 @@
           break
         case 'stagger':
           FX.seal(fx, '乱', e.x, e.y - 14, 15, 0.7, '#3a3835')
-          promptOnce('execute')
+          if (byId(e.id)?.type !== 'umbrella') promptOnce('execute')
           break
         case 'execute':
           FX.invert(fx, 1)
@@ -893,20 +909,23 @@
           audio.play('tell')
           break
         case 'danger':
-          FX.seal(fx, '危', e.x, e.y - 22, 22, 1.1)
-          promptOnce('danger')
+          if (!rules.SUMMIT.has(byId(e.id)?.type)) {
+            FX.seal(fx, '危', e.x, e.y - 22, 22, 1.1)
+            promptOnce('danger')
+          }
           audio.play('danger')
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
           const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge' || e.kind === 'yue'
-          const spec = big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
+          const mountain = MOUNTAIN_SWINGS[e.move]
+          const spec = mountain ? { color: '#242924', ...mountain } : big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
-          const lift = e.mounted ? 70 : big ? 50 : 36
+          const lift = spec.lift ?? (e.mounted ? 70 : big ? 50 : 36)
           FX.trail(fx, {
             x: enemy.x, y: enemy.y - lift, follow: () => [enemy.x, enemy.y - lift], followFor: 0.12,
             facing: e.facing, a0: spec.a0, a1: spec.a1, r: spec.r, width: spec.width, grow: 0.09, life: 0.3, color: spec.color,
-            edge: big ? CINNABAR : null, hairs: big ? 14 : 9,
+            edge: big || e.move === 'sweep' || e.move === 'slam' ? CINNABAR : null, hairs: big ? 14 : 9,
           })
           audio.play(big ? 'heavy' : 'slash')
           break
@@ -946,15 +965,21 @@
           for (const enemy of state.enemies) if (enemy.alive && Math.abs(enemy.x - p.x) < 470) FX.splat(fx, assets.splats, enemy.x, enemy.y - 26, 80, { life: 0.8 })
           break
         case 'lock':
-          if (e.id !== 'gate' && !inBossFight()) toast(state.level.volume === 3 ? '烽烟合围 · 斩尽方可前行' : '墨障合围 · 斩尽方可前行', 1800)
-          audio.play(state.level.volume === 3 ? 'horn' : 'gong')
+          if (currentVolume() === 6) { if (!inBossFight()) audio.play('mountGate') }
+          else {
+            if (e.id !== 'gate' && !inBossFight()) toast(state.level.volume === 3 ? '烽烟合围 · 斩尽方可前行' : '墨障合围 · 斩尽方可前行', 1800)
+            audio.play(state.level.volume === 3 ? 'horn' : 'gong')
+          }
           break
         case 'clear':
           if (!state.plan.find((encounter) => encounter.id === e.id)?.waves[0].some((spec) => rules.BOSSES.has(spec.type))) toast(state.level.volume === 3 ? '烽烟散去，前路已开' : '墨障散去，前路已开', 1800)
           audio.play('ui')
           break
         case 'area':
-          showArea(e.sub, e.name)
+          if (state.level.volume === 6 && state.level.scroll && e.index > 0) {
+            $('areaLabel').textContent = e.name
+            $('areaTitle').hidden = true
+          } else showArea(e.sub, e.name)
           if (e.name === '无常') audio.play('gong')
           break
         case 'prompt':
@@ -965,21 +990,28 @@
           audio.play('ink')
           break
         case 'bossIntro': {
-          FX.letterbox(fx, 2.2)
+          if (e.kind !== 'yue') FX.letterbox(fx, 2.2)
           $('bossBar').hidden = false
           $('bossTitle').textContent = state.world.copy.boss
           $('bossSub').textContent = state.world.copy.bossSub
-          audio.play('gong')
+          audio.play(e.kind === 'yue' ? 'mountBell' : 'gong')
           if (state.level.volume === 3) audio.play('horn')
           break
         }
         case 'bossPhase': {
-          FX.invert(fx, 0.7)
-          FX.shake(fx, 9)
-          FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
-          FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-          toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
-          audio.play('roar')
+          if (e.kind === 'yue') {
+            $('bossSub').textContent = '开山势'
+            FX.ring(fx, e.x, rules.GROUND - 2, 8, 84, .6, '#cda26f', 2)
+            FX.shake(fx, 3)
+            audio.play('mountBell')
+          } else {
+            FX.invert(fx, 0.7)
+            FX.shake(fx, 9)
+            FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
+            FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
+            toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
+            audio.play('roar')
+          }
           break
         }
         case 'broken':
@@ -1008,9 +1040,29 @@
           audio.play('wave')
           break
         case 'borrowStep':
-          audio.play('dash');FX.ring(fx,e.x,e.y-4,6,25,.25,'rgba(224,224,200,.7)',2);break
+          FX.puff(fx, e.x, e.y - 2, 8, { angle: e.facing > 0 ? Math.PI : 0, size: 4, speed: 110, alpha: .26 })
+          audio.play('borrowStep')
+          break
+        case 'borrowLand':
+          FX.ring(fx, e.x, e.y - 2, 4, 22, .24, 'rgba(230,217,182,.85)', 1.5)
+          break
         case 'backHit':
-          FX.sparks(fx,e.x,e.y,6,'#d2c9ad',{len:10,speed:130});audio.play('hit');break
+          FX.sparks(fx, e.x, e.y, 12, '#e8c792', { len: 15, speed: 220 })
+          FX.seal(fx, '背', e.x - e.facing * 16, e.y - 33, 17, .58)
+          audio.play('backHit')
+          break
+        case 'sweepCounter':
+          FX.seal(fx, '越', e.x, e.y - 42, 17, .65)
+          break
+        case 'mountainBell':
+          audio.play('mountBell')
+          FX.shake(fx, e.effective ? 3.8 : 2)
+          if (e.effective) FX.seal(fx, '震', e.x, e.y + 26, 20, .8)
+          break
+        case 'summitImpact':
+          FX.puff(fx, e.x + e.facing * 58, e.y - 3, e.move === 'slam' ? 14 : 7, { speed: 115, size: 5, alpha: .26 })
+          if (e.move === 'slam') { audio.play('slam'); FX.shake(fx, 5) }
+          break
         case 'mirrorSpawn':
           FX.ring(fx,e.x,e.y,10,55,.7,'rgba(207,224,198,0.65)',1);audio.play('mirror');break
         case 'mirrorTell':
@@ -1056,7 +1108,7 @@
           audio.play('dash')
           break
         case 'wave2':
-          toast('又有墨影聚来', 1400)
+          if (currentVolume() !== 6) toast('又有墨影聚来', 1400)
           break
         case 'icicleFall':
           FX.sparks(fx, e.x, e.y, 6, '#dfeaf8', { len: 8, speed: 170 })
@@ -1168,7 +1220,7 @@
           audio.play('horn')
           break
         case 'gust':
-          toast(e.dir > 0 ? '风起 · 自左向右 →' : '← 风起 · 自右向左', 1700)
+          if (currentVolume() !== 6) toast(e.dir > 0 ? '风起 · 自左向右 →' : '← 风起 · 自右向左', 1700)
           audio.play('gust')
           break
         case 'over':
@@ -1188,6 +1240,15 @@
     if (state.lock) {
       const [a, b] = state.lock
       x = b - a >= viewW ? Math.max(a + half, Math.min(b - half, x)) : (a + b) / 2
+    }
+    // Leave room for the touch buttons when a duel reaches the edge of its arena.
+    if (state.world.borrowStep && state.lock && touchUI) {
+      const clearLeft = Math.min(half * .34, 112 / k)
+      const clearRight = Math.min(half * .55, 190 / k)
+      const leftEdge = Math.min(half, state.lock[0] + clearLeft - half)
+      const rightEdge = Math.max(WORLD.length - half, state.lock[1] + clearRight - half)
+      x = Math.max(p.x - half + clearRight, Math.min(p.x + half - clearLeft, x))
+      return Math.max(leftEdge, Math.min(rightEdge, x))
     }
     return Math.max(half, Math.min(WORLD.length - half, x))
   }
@@ -1235,8 +1296,11 @@
 
   function drawEnemy(enemy, dt) {
     if (enemy.delay > 0 || !enemy.alive && enemy.state !== 'dying') return
-    if(enemy.type==='rope'&&(enemy.ropeMounted||enemy.state==='ropeClimb')){
-      ctx.save();ctx.strokeStyle='rgba(64,74,58,.65)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(enemy.aimX??enemy.x,rules.GROUND-205);ctx.lineTo(enemy.x,enemy.y-42);ctx.stroke();ctx.restore()
+    if (enemy.type === 'rope' && (enemy.ropeMounted || enemy.state === 'ropeClimb')) {
+      const anchor = enemy.ropeAnchorX ?? enemy.x
+      ctx.save(); ctx.strokeStyle = '#554438a8'; ctx.lineWidth = 1.7
+      ctx.beginPath(); ctx.moveTo(anchor, rules.GROUND - 205); ctx.quadraticCurveTo(anchor + (enemy.x - anchor) * .28, enemy.y - 52, enemy.x, enemy.y - 42); ctx.stroke()
+      ctx.restore()
     }
     const a = anim(enemy.id, enemy)
     const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
@@ -1268,7 +1332,7 @@
       const pose = fig.updatePose(enemy.type, enemy, a, dt, clock, rules)
       const isBoss = rules.isBoss(enemy)
       shadow(enemy.x, enemy.y, isBoss ? 26 : 16)
-      if (isBoss && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
+      if (isBoss && enemy.type !== 'yue' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
       if (isBoss && (enemy.state === 'phantom' || enemy.state === 'rush') && phantomImage > 0) {
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
         FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
@@ -1280,19 +1344,28 @@
       ctx.save();ctx.strokeStyle='rgba(207,224,216,0.85)';ctx.lineWidth=1.8
       ctx.beginPath();ctx.moveTo(state.player.x,state.player.y-36);ctx.lineTo(drawX,enemy.y-35);ctx.stroke();ctx.restore()
     }
-    if(rules.isElite(enemy)&&enemy.alive&&out.head){
-      const y=out.head[1]-25;ctx.save();ctx.fillStyle='rgba(241,232,209,.85)';ctx.fillRect(enemy.x-26,y-12,52,19)
-      ctx.fillStyle='#323a2c';ctx.font='10px KaiTi,serif';ctx.textAlign='center';ctx.fillText(enemy.type==='yanhui'?'燕回':'石震',enemy.x,y-3)
-      ctx.fillStyle='#a4ab92';ctx.fillRect(enemy.x-24,y+3,48,3);ctx.fillStyle=CINNABAR;ctx.fillRect(enemy.x-24,y+3,48*enemy.posture/enemy.postureMax,3);ctx.restore()
+    if (rules.isElite(enemy) && enemy.alive && enemy.state !== 'spawn' && out.head) {
+      const y = out.head[1] - (enemy.state === 'broken' ? 40 : 17)
+      ctx.save()
+      ctx.fillStyle = '#f4ead4e6'; ctx.beginPath(); ctx.roundRect(enemy.x - 25, y - 14, 50, 20, 3); ctx.fill()
+      ctx.fillStyle = '#313433'; ctx.font = '600 11px "Kaiti SC","Songti SC",serif'; ctx.textAlign = 'center'
+      ctx.fillText(enemy.type === 'yanhui' ? '燕回' : '石震', enemy.x, y - 3)
+      ctx.fillStyle = '#988d7a85'; ctx.fillRect(enemy.x - 20, y + 1, 40, 2.6)
+      ctx.fillStyle = CINNABAR; ctx.fillRect(enemy.x - 20, y + 1, 40 * enemy.posture / enemy.postureMax, 2.6)
+      ctx.restore()
     }
     const isBoss = rules.isBoss(enemy)
     const glinting = progress >= 0 && out.tip && !enemy.sweep && !DANGER_TELLS.has(enemy.state)
     if (glinting) glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
+    if (enemy.state === 'mountTell' && enemy.sweep && out.head) drawSeal('危', enemy.x, out.head[1] - 28, 16 + progress * 4)
     if (darkOn && out.head && enemy.type !== 'dummy') eyeMarks.push({ head: out.head, facing: enemy.facing, glow: look.eyeGlow, tip: glinting ? out.tip : null, progress, boss: isBoss })
     if (enemy.state === 'stagger' || enemy.state === 'broken' || enemy.state === 'umbrellaOpen') {
       const pulse = 1 + Math.sin(clock * 10) * 0.08
       const top = out.head ? out.head[1] - (isBoss ? 30 : 22) : enemy.y - 70
-      drawSeal('斩', enemy.x, top, 15 * pulse * (isBoss ? 1.3 : 1))
+      const landing = enemy.state === 'umbrellaOpen' ? rules.borrowLanding(state) : null
+      if (enemy.state !== 'umbrellaOpen' || (state.player.x - enemy.x) * enemy.facing < 0 || landing?.id === enemy.id) {
+        drawSeal(landing?.id === enemy.id ? '借' : '斩', enemy.x, top, 15 * pulse * (isBoss ? 1.3 : 1))
+      }
     }
   }
 
@@ -1838,16 +1911,17 @@
     }
     const night = fx.letterbox > 0.5 || env.moon > 0.5 || (env.night || 0) > 0.5 || (currentVolume() === 4 && (env.top[0] < 100 || (camera.x > 2400 && camera.x < 3180)))
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
-    gameNode.classList.toggle('sea-night', currentVolume() === 4 && night)
+    gameNode.classList.toggle('ink-night-title', (currentVolume() === 4 || currentVolume() === 6) && night)
+    gameNode.classList.toggle('mountain', currentVolume() === 6)
     darkOn = darknessAt(camera.x) > 0.02
     eyeMarks.length = 0
     scene.updateWeather(weather, cam, env, dt, clock)
     FX.update(fx, fxDt)
     phantomImage = Math.max(0, phantomImage - dt)
-    scene.drawBase(ctx, assets, cam, env, clock, state.level)
-    if(currentVolume()===6)globalThis.XiabanInkMountain.moving(ctx,assets,cam,clock,env)
+    scene.drawBase(ctx, assets, cam, env, currentVolume() === 6 && reducedMotion ? 0 : clock, state.level)
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    if (currentVolume() === 6) globalThis.XiabanInkMountain.moving(ctx, assets, cam, state, clock, reducedMotion)
     const burning = state.grass.length || state.fires.length ? drawGrassFire(cam) : 0
     FX.drawDecals(ctx, fx)
     drawStuckArrows(phase === 'paused' ? 0 : fxDt)
@@ -1860,6 +1934,14 @@
     drawBarrier()
     FX.drawGhosts(ctx, fx)
     if (currentVolume()===5) globalThis.XiabanInkLantern.effects(ctx,state,clock)
+    if (currentVolume() === 6) {
+      globalThis.XiabanInkMountain.attackGuides(ctx, state)
+      const landing = rules.borrowLanding(state)
+      if (landing) {
+        ctx.strokeStyle = '#dfc694'; ctx.lineWidth = 1.7
+        ctx.beginPath(); ctx.ellipse(landing.x, state.player.y - 1, 12, 3.6, 0, 0, Math.PI * 2); ctx.stroke()
+      }
+    }
     const simDt = phase === 'playing' && !state.strike && state.hitstop <= 0 ? fxDt : 0
     for (const enemy of state.enemies) drawEnemy(enemy, simDt)
     drawProjectiles()
@@ -1882,7 +1964,8 @@
     const volume = currentVolume()
     audio.update({
       combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale,
-      fire: Math.min(1, burning / 6), sand: env.sand || 0, sea: volume === 4 ? 0.55 + (env.rain || 0) * 0.35 : 0, war: volume === 3, volume,
+      fire: Math.min(1, burning / 6), sand: env.sand || 0, sea: volume === 4 ? 0.55 + (env.rain || 0) * 0.35 : 0,
+      mountain: volume === 6 ? 0.16 + (env.gust || 0) * 0.64 : 0, war: volume === 3, volume,
     })
   }
 
@@ -1891,13 +1974,22 @@
   const hud = { hp: -1, max: -1, ink: -1, score: -1, combo: -1, boss: -1, posture: -1 }
   function goalText() {
     const goal = rules.challenge(state)
+    const spec = state.level.challenge
+    if (state.world.borrowStep && spec.all) return '技 · ' + spec.all.map(g => g.text + ' ' + Math.min(state.player[g.stat], g.goal) + '/' + g.goal).join(' · ')
     if (goal.stat === 'time') return '技 · ' + formatTime(goal.value) + ' / ' + formatTime(goal.goal)
-    return '技 · ' + state.level.challenge.text + ' ' + Math.min(goal.value, goal.goal) + '/' + goal.goal
+    return '技 · ' + spec.text + ' ' + Math.min(goal.value, goal.goal) + '/' + goal.goal
   }
 
   function updateHUD(force = false) {
     const p = state.player
-    $('dashButton').classList.toggle('borrow-ready',state.world.borrowStep&&p.borrowUntil>state.clock)
+    const dash = $('dashButton')
+    const borrow = Boolean(rules.borrowLanding(state))
+    if (force || borrow !== hud.borrow) {
+      dash.classList.toggle('borrow-ready', borrow)
+      dash.querySelector('b').textContent = borrow ? '借' : '闪'
+      dash.setAttribute('aria-label', borrow ? '借势绕背' : '闪身冲刺')
+      hud.borrow = borrow
+    }
     const goal = goalText()
     if (force || goal !== hud.goal) {
       $('goal').textContent = goal

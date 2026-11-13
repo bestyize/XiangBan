@@ -6,6 +6,7 @@
   let ac = null, master = null, wet = null, noise = null, rain = null, rainGain = null, wind = null, windGain = null, windFilter = null
   // Volume 3 (烽火卷): desolate frontier mode, 羽调-flavoured minor pentatonic A C D E G over two octaves.
   const FRONTIER = [110, 130.81, 146.83, 164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440]
+  const MOUNTAIN = [98, 130.81, 146.83, 174.61, 196, 220, 261.63, 293.66, 349.23, 392, 440]
   let fire = null, fireGain = null, sandSrc = null, sandGain = null, sandFilter = null
   let nextCrackle = 0, nextDrone = 0
   let enabled = true, nextNote = 0, nextDrum = 0, nextChime = 0, nextSurf = 0, lastNote = 5
@@ -176,6 +177,19 @@
     hide: () => hiss({ dur: 0.28, vol: 0.035, freq: 2000, to: 900, q: 0.8 }),
     ambush: () => { hiss({ dur: 0.14, vol: 0.14, freq: 3000, to: 600, q: 0.9 }); drum(110, 0.18); bell(1500, 0.05, 0.7, 0.04) },
     gust: () => hiss({ dur: 1.7, vol: 0.085, freq: 300, to: 1400, q: 0.5, send: 0.5 }),
+    mountGate: () => { pluck(146.83, .07); pluck(196, .045, .18) },
+    mountBell: () => {
+      tone(91, { dur: 2.5, vol: .066, send: .52 })
+      for (const [freq, vol, dur] of [[183, .083, 2.8], [269, .039, 1.7], [485, .031, 1.1], [677, .018, .65]]) {
+        tone(freq, { dur, vol, send: .62 })
+      }
+      hiss({ dur: .13, vol: .032, freq: 1100, to: 520, q: 1.1 })
+    },
+    borrowStep: () => {
+      hiss({ dur: .24, vol: .095, freq: 780, to: 2700, q: .64, send: .31 })
+      tone(294, { dur: .21, vol: .031, bend: 1.5, delay: .05 })
+    },
+    backHit: () => { bell(660, .044, .54); hiss({ dur: .10, vol: .06, freq: 3100, to: 900, q: 1.2 }) },
     ui: () => pluck(440, 0.06),
     ink: () => bell(1760, 0.05, 0.8),
     hoof: () => hoofCluster(0, 0.1),
@@ -283,7 +297,7 @@
     if (!enabled || !ac || ac.state !== 'running') return
     const now = ac.currentTime
     if (now >= nextNote) {
-      const scale = mood.volume === 3 ? FRONTIER : SCALE
+      const scale = mood.volume === 3 ? FRONTIER : mood.volume === 6 ? MOUNTAIN : SCALE
       lastNote = Math.max(0, Math.min(scale.length - 1, lastNote + Math.round((Math.random() - 0.5) * 4)))
       pluck(scale[lastNote], mood.combat ? 0.035 : 0.045)
       if (Math.random() < 0.3) pluck(scale[Math.max(0, lastNote - 3)] / 2, 0.03, 0.02)
@@ -291,7 +305,7 @@
         pluck(Math.random() < 0.5 ? 55 : 82.41, 0.04, 0.05)
         nextDrone = now + 6 + Math.random() * 6
       }
-      nextNote = now + (mood.combat ? 0.55 + Math.random() * 0.7 : 1.3 + Math.random() * 1.8)
+      nextNote = now + (mood.combat ? 0.55 + Math.random() * 0.7 : 1.3 + Math.random() * 1.8) * (mood.volume === 6 ? 1.2 : 1)
     }
     if (mood.combat && mood.war && now >= nextDrum) {
       drum(mood.boss ? 56 : 64, mood.boss ? 0.17 : 0.1)
@@ -312,9 +326,9 @@
       windGain = ac.createGain(); windGain.gain.value = 0
       wind.connect(windFilter); windFilter.connect(windGain); windGain.connect(master); wind.start()
     }
-    const gale = mood.gale || 0, snow = mood.snow || 0, sea = mood.sea || 0
-    windGain.gain.setTargetAtTime(snow * 0.014 + gale * 0.06 + sea * 0.025, now, 0.8)
-    windFilter.frequency.setTargetAtTime(380 + gale * 520 + sea * 130 + Math.sin(now * 0.7) * 120 * (0.4 + gale + sea), now, 0.4)
+    const gale = mood.gale || 0, snow = mood.snow || 0, sea = mood.sea || 0, mountain = mood.mountain || 0
+    windGain.gain.setTargetAtTime(snow * 0.014 + gale * 0.06 + sea * 0.025 + mountain * 0.034, now, 0.8)
+    windFilter.frequency.setTargetAtTime(380 + gale * 520 + sea * 130 + mountain * 420 + Math.sin(now * 0.7) * 120 * (0.4 + gale + sea + mountain), now, 0.4)
     if (sea > 0 && now >= nextSurf) {
       hiss({ dur: 1.3, vol: 0.018 + sea * 0.02, freq: 280, to: 1100, q: 0.5, send: 0.25 })
       nextSurf = now + 3.2 + Math.random() * 1.7
