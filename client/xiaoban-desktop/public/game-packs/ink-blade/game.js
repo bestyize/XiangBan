@@ -1026,12 +1026,14 @@
           }
           break
         }
-        case 'broken':
+        case 'broken': {
+          const enemy = byId(e.id)
           FX.seal(fx, '破', e.x, e.y - 18, 26, 1.2)
           FX.sparks(fx, e.x, e.y + 20, 16, CINNABAR, { len: 20, speed: 320 })
-          promptOnce('broken')
+          if (enemy?.type !== 'yue' || enemy.hp !== 1) promptOnce('broken')
           audio.play('parry')
           break
+        }
         case 'bossDown':
           FX.invert(fx, 1); FX.letterbox(fx, 3.5); FX.shake(fx, 10)
           FX.splat(fx, assets.redSplats, e.x, e.y, 90, { life: 1.2, alpha: 0.85 })
@@ -2077,7 +2079,7 @@
 
   // ------------------------------------------------------------ HUD
 
-  const hud = { hp: -1, max: -1, ink: -1, score: -1, combo: -1, boss: -1, posture: -1 }
+  const hud = { hp: -1, max: -1, ink: -1, score: -1, combo: -1, boss: -1, posture: -1, bossHint: '' }
   function goalText() {
     const goal = rules.challenge(state)
     const spec = state.level.challenge
@@ -2138,6 +2140,18 @@
       if (hp !== hud.boss) { $('bossHp').style.width = hp / 10 + '%'; hud.boss = hp }
       if (posture !== hud.posture) { $('bossPosture').style.width = posture + '%'; hud.posture = posture }
     } else if (!$('bossBar').hidden && !inBossFight()) $('bossBar').hidden = true
+
+    let bossHint = ''
+    if (boss?.type === 'yue' && boss.hp === 1) {
+      const slashControl = touchUI ? '「斩」' : 'J'
+      bossHint = boss.state === 'broken' ? `架势已破，按 ${slashControl} 处决。` : '只剩 1 滴墨血，先破势，再出剑处决。'
+    }
+    if (bossHint !== hud.bossHint) {
+      const hint = $('bossHint')
+      hint.textContent = bossHint
+      hint.hidden = !bossHint
+      hud.bossHint = bossHint
+    }
     gameNode.classList.toggle('boss-fight', !$('bossBar').hidden)
   }
 
