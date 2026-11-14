@@ -4,24 +4,36 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,17 +63,30 @@ internal fun SoftwareDirectoryTab(env: CommunityEnv, open: (Route) -> Unit) {
     var category by rememberSaveable { mutableStateOf("all") }
     var sort by rememberSaveable { mutableStateOf("stars") }
     var limit by rememberSaveable { mutableIntStateOf(48) }
+    val listState = rememberLazyListState()
 
     Column(Modifier.fillMaxSize()) {
-        PageChipRow(SoftwareCategories, category, { category = it; limit = 48 })
-        PageChipRow(SoftwareSorts, sort, { sort = it; limit = 48 })
+        SoftwareDirectoryFilters(
+            category = category,
+            sort = sort,
+            onCategory = {
+                category = it
+                limit = 48
+                listState.requestScrollToItem(0)
+            },
+            onSort = {
+                sort = it
+                limit = 48
+                listState.requestScrollToItem(0)
+            },
+        )
         LoadBox(state, catalog::reload) { entries ->
             val snapshots = (summaryState as? Load.Ready)?.value.orEmpty()
             val visible = remember(entries, snapshots, category, sort) {
                 entries.filter { category == "all" || it.category == category }
                     .sortedWith(softwareDirectoryOrder(snapshots, sort))
             }
-            LazyColumn(contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(state = listState, contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (summaryState is Load.Failed) item {
                     Banner("同步数据暂不可用，正在显示收录资料", warn = true, actionText = "重试", onAction = summaries::reload)
                 }
@@ -72,6 +97,108 @@ internal fun SoftwareDirectoryTab(env: CommunityEnv, open: (Route) -> Unit) {
                     SoftwareCard(entry, snapshots[entry.project]) { open(Route.Software(entry.project)) }
                 }
                 if (visible.size > limit) item { GhostPillButton("加载更多", { limit += 48 }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SoftwareDirectoryFilters(
+    category: String,
+    sort: String,
+    onCategory: (String) -> Unit,
+    onSort: (String) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    val categoryScroll = rememberLazyListState()
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LazyRow(
+            Modifier.weight(1f).selectableGroup().drawWithContent {
+                drawContent()
+                val fadeWidth = 18.dp.toPx().coerceAtMost(size.width / 2)
+                val edgeSize = Size(fadeWidth, size.height)
+                val rtl = layoutDirection == LayoutDirection.Rtl
+                val fadeLeft = if (rtl) categoryScroll.canScrollForward else categoryScroll.canScrollBackward
+                val fadeRight = if (rtl) categoryScroll.canScrollBackward else categoryScroll.canScrollForward
+                if (fadeLeft) drawRect(
+                    Brush.horizontalGradient(listOf(colors.background, Color.Transparent), endX = fadeWidth),
+                    size = edgeSize,
+                )
+                if (fadeRight) drawRect(
+                    Brush.horizontalGradient(listOf(Color.Transparent, colors.background), startX = size.width - fadeWidth, endX = size.width),
+                    topLeft = Offset(size.width - fadeWidth, 0f),
+                    size = edgeSize,
+                )
+            },
+            state = categoryScroll,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            items(SoftwareCategories, key = { it.first }) { (key, label) ->
+                val active = key == category
+                Box(
+                    Modifier.defaultMinSize(minWidth = 44.dp, minHeight = 44.dp).clip(CircleShape)
+                        .selectable(selected = active, role = Role.Tab) { onCategory(key) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        Modifier.background(if (active) extra.brandSoft else Color.Transparent, CircleShape)
+                            .padding(horizontal = 9.dp, vertical = 6.dp),
+                        style = XType.Secondary,
+                        color = if (active) extra.brandInk else colors.onSurfaceVariant,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        SoftwareSortMenu(sort, onSort)
+    }
+}
+
+@Composable
+private fun SoftwareSortMenu(sort: String, onSort: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val label = SoftwareSorts.firstOrNull { it.first == sort }?.second ?: SoftwareSorts.first().second
+    Box {
+        Box(
+            Modifier.heightIn(min = 44.dp).clip(CircleShape)
+                .clickable(role = Role.Button, onClickLabel = "更改排序") { expanded = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                Modifier.outlinedCard(50.dp).widthIn(min = 90.dp).padding(horizontal = 9.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+            ) {
+                Text(label, style = XType.Secondary, fontWeight = FontWeight.Medium, maxLines = 1)
+                XIcon(if (expanded) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = colors.onSurfaceVariant)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(12.dp),
+            containerColor = colors.surface,
+        ) {
+            SoftwareSorts.forEach { (key, title) ->
+                val active = key == sort
+                DropdownMenuItem(
+                    modifier = Modifier.semantics { selected = active },
+                    text = { Text(title, style = XType.Body) },
+                    trailingIcon = { if (active) XIcon(XIcons.Check, size = 16.dp, tint = LocalExtraColors.current.brandInk) },
+                    onClick = {
+                        expanded = false
+                        if (!active) onSort(key)
+                    },
+                )
             }
         }
     }
