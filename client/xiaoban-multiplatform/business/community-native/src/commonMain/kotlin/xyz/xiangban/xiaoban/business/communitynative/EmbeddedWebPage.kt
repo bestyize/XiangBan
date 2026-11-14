@@ -27,11 +27,11 @@ import com.multiplatform.webview.request.WebRequest
 import com.multiplatform.webview.request.WebRequestInterceptResult
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebContent
-import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.WebViewNavigator
 import com.multiplatform.webview.web.WebViewState
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import io.ktor.http.Url
+import xyz.xiangban.xiaoban.common.webview.FullscreenWebView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +52,7 @@ internal fun EmbeddedWebPage(url: String, close: () -> Unit, platform: PlatformA
             if (platform != null) IconTap(XIcons.More, "网页菜单", { menuOpen = true })
         })
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            WebView(state = state, navigator = navigator, modifier = Modifier.fillMaxSize())
+            FullscreenWebView(state = state, navigator = navigator, modifier = Modifier.fillMaxSize())
             when (val loading = state.loadingState) {
                 is LoadingState.Loading -> LinearProgressIndicator(progress = { loading.progress }, modifier = Modifier.fillMaxWidth())
                 LoadingState.Initializing -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

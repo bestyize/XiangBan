@@ -37,10 +37,10 @@ import com.multiplatform.webview.request.WebRequest
 import com.multiplatform.webview.request.WebRequestInterceptResult
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebContent
-import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.WebViewNavigator
 import com.multiplatform.webview.web.WebViewState
 import com.multiplatform.webview.web.rememberWebViewNavigator
+import xyz.xiangban.xiaoban.common.webview.FullscreenWebView
 
 @Composable
 internal fun MicroGalleryTab(forumBase: String, open: (Route) -> Unit) {
@@ -201,7 +201,7 @@ private fun GalleryExhibitPlayer(
         cover(message)
     } else {
         Box(Modifier.fillMaxSize()) {
-            WebView(
+            FullscreenWebView(
                 state = state,
                 modifier = Modifier.fillMaxSize(),
                 captureBackPresses = false,
