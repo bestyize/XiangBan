@@ -1,7 +1,7 @@
 import { desktop, invoke } from "./bridge.ts";
 import { EffectsLayer } from "./effects/layer.ts";
 import { normalizeParams, parsePack } from "./effects/parse.ts";
-import type { EffectPack } from "./effects/types.ts";
+import { isArowana, type EffectPack } from "./effects/types.ts";
 
 interface Payload {
   /** The pack's data, exactly as read from its file; it is checked here before it is drawn. */
@@ -18,7 +18,7 @@ declare global {
 }
 
 /**
- * The desktop-wide particle layer. It is a transparent page in a click-through window that sits over the
+ * The desktop-wide effects layer. It is a transparent page in a click-through window that sits over the
  * desktop picture; the host sends it the chosen effect and the global pause and frame rate.
  */
 export async function mountEffects() {
@@ -38,16 +38,25 @@ export async function mountEffects() {
     }
     return pack;
   };
-  const layer = new EffectsLayer(host, resolve(), normalizeParams(state.params), { paused: state.paused, fps: state.fps });
   const lifecycle = new AbortController();
+  const initial = resolve();
+  const report: Record<string, unknown> = {};
+  const config = { paused: state.paused, fps: state.fps };
+  const reportError = (error: string) => {
+    report.error = error;
+    if (desktop) void invoke("scene_ready", { report: { kind: "effects", error } }).catch(() => {});
+  };
+  const layer = new EffectsLayer(host, initial, normalizeParams(state.params, isArowana(initial)), config, undefined, reportError);
   window.addEventListener("effects-config", (event) => {
     state = { ...state, ...(event as CustomEvent<Partial<Payload>>).detail };
-    layer.update(resolve(), normalizeParams(state.params), { paused: state.paused, fps: state.fps });
+    const next = resolve();
+    layer.update(next, normalizeParams(state.params, isArowana(next)), { paused: state.paused, fps: state.fps });
   }, { signal: lifecycle.signal });
   const dispose = () => { lifecycle.abort(); layer.destroy(); };
   window.addEventListener("pagehide", dispose, { once: true });
   window.addEventListener("beforeunload", dispose, { once: true });
-  const report: Record<string, unknown> = {};
+  if (isArowana(initial)) await layer.whenReady();
+  if (lifecycle.signal.aborted || report.error) return;
   if (state.test && desktop) {
     // In the isolated test profile, prove this page cannot reach commands that change the desktop.
     let blocked = false;

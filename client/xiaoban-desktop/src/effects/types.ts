@@ -1,3 +1,5 @@
+import type { AquariumSettings } from './arowana/settings.ts';
+
 /**
  * A particle effect is data: a few layers, each describing one kind of particle (how many, how big, how it
  * moves, what it looks like). The engine reads it and draws; nothing in a pack is code.
@@ -108,7 +110,13 @@ export interface EffectPack {
   source: "builtin" | "user";
 }
 
-export interface EffectParams { density: number; speed: number; size: number }
+/** This renderer is bundled with the app and cannot be selected by a user pack. */
+export const isArowana = (pack: Pick<EffectPack, "id" | "source"> | null) =>
+  pack?.id === "arowana" && pack.source === "builtin";
+
+export const arowanaCover = "/effects/arowana/cover.webp";
+
+export interface EffectParams { density: number; speed: number; size: number; aquarium?: AquariumSettings }
 export interface EffectsChoice { selected: string; params: Record<string, EffectParams>; monitor?: string }
 
 export const limits = {

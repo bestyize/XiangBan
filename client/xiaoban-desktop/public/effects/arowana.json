@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "arowana",
+  "name": "龙鱼巡游",
+  "description": "龙鱼和孔雀鱼可单独观赏，也可以同游。",
+  "sky": ["#142539", "#253d50"],
+  "source": "builtin"
+}

@@ -67,7 +67,13 @@ pub fn reconcile(app: &tauri::AppHandle) {
     let overlay: Vec<_> = selected.into_iter().filter(|area| !crate::content::composing_on(app, area)).collect();
     let signature = serde_json::to_string(&overlay).unwrap_or_default();
     let mut placement = PLACEMENT.lock().unwrap_or_else(|e| e.into_inner());
-    if *placement != signature || labels(app).len() != overlay.len() {
+    let windows = labels(app);
+    let failed = {
+        let state = app.state::<crate::content::ContentState>();
+        let reports = state.reports.lock().unwrap_or_else(|e| e.into_inner());
+        windows.iter().any(|label| reports.get(label).is_some_and(|report| report.get("error").is_some()))
+    };
+    if *placement != signature || windows.len() != overlay.len() || failed {
         if let Err(error) = close(app) { let _ = app.emit("desktop-error", error); return; }
         for (index, area) in overlay.iter().enumerate() {
             let label = if index == 0 { LABEL.to_string() } else { format!("effects-{index}") };
@@ -78,7 +84,7 @@ pub fn reconcile(app: &tauri::AppHandle) {
         }
         *placement = signature;
     } else {
-        for label in labels(app) { if let Some(window) = app.get_webview_window(&label) {
+        for label in windows { if let Some(window) = app.get_webview_window(&label) {
             let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('effects-config',{{detail:{}}}));", payload(app, &current, &pack)));
         } }
     }

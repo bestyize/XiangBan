@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadBuiltinPacks, readList } from "./catalog.ts";
 import { parsePack } from "./parse.ts";
-import type { EffectPack } from "./types.ts";
+import { isArowana, type EffectPack } from "./types.ts";
 
 // The files themselves, read by the bundler: the shipped effects and the example for people who write their own.
 const files = import.meta.glob<unknown>(["../../public/effects/*.json", "../../docs/effect-pack-example.json"], { eager: true, import: "default" });
@@ -17,12 +17,16 @@ describe("the effects shipped with the app", () => {
     for (const id of catalog) expect([...packs.get(id)!.name], id).toHaveLength(4);
     const onDisk = Object.keys(files).filter((path) => path.includes("/public/effects/") && !path.endsWith("/catalog.json")).map((path) => path.replace(/^.*\//, "").slice(0, -5)).sort();
     expect([...catalog].sort()).toEqual(onDisk);
-    expect(catalog).toEqual(["lanterns", "maple", "galaxy", "butterfly-dream", "fireworks", "snow", "rain", "fireflies", "petals", "meteors", "stars", "aurora"]);
+    expect(catalog).toEqual(["arowana", "lanterns", "maple", "galaxy", "butterfly-dream", "fireworks", "snow", "rain", "fireflies", "petals", "meteors", "stars", "aurora"]);
     for (const id of catalog) {
       const parsed = parsePack(read(`${id}.json`));
       expect(parsed.ok ? "" : parsed.error, id).toBe("");
       expect(packs.get(id)?.id).toBe(id);
     }
+  });
+  it("reserves the single-fish renderer for the built-in effect", () => {
+    expect(isArowana(packs.get("arowana")!)).toBe(true);
+    expect(parsePack({ ...read("arowana.json"), source: "user" }).ok).toBe(false);
   });
   it("show leaves as maple leaves and big enough to be seen", () => {
     expect(packs.has("leaves" as string)).toBe(false);

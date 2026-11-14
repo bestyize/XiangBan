@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { EffectsLayer } from '../../effects/layer.ts';
-import type { EffectPack } from '../../effects/types.ts';
+import { arowanaCover, isArowana, type EffectPack, type EffectParams } from '../../effects/types.ts';
 import { previewParams, subscribeEffectStill } from './effect-stills.ts';
 
-const props = defineProps<{ pack: EffectPack; playing?: boolean; paused?: boolean; fps?: 30 | 60 }>();
+const props = defineProps<{ pack: EffectPack; playing?: boolean; paused?: boolean; fps?: 30 | 60; tuning?: EffectParams }>();
 const host = ref<HTMLElement>();
 const stillUrl = ref('');
 let layer: EffectsLayer | undefined;
@@ -15,19 +15,22 @@ const sky = computed(() => `linear-gradient(${props.pack.sky.join(',')})`);
 
 function destroyLayer() { layer?.destroy(); layer = undefined; }
 function syncLayer() {
-  if (!mounted || !active || !props.playing || props.paused || !host.value) { destroyLayer(); return; }
-  const config = { paused: false, fps: props.fps ?? 60 };
-  if (layer) layer.update(props.pack, previewParams, config);
-  else layer = new EffectsLayer(host.value, props.pack, previewParams, config);
+  if (!mounted || !active || !props.playing || (props.paused && !props.tuning) || !host.value) { destroyLayer(); return; }
+  const config = { paused: props.paused ?? false, fps: props.fps ?? 60 };
+  const params = props.tuning ?? previewParams;
+  if (layer) layer.update(props.pack, params, config);
+  else layer = new EffectsLayer(host.value, props.pack, params, config);
 }
 function loadStill() {
   unsubscribe?.(); unsubscribe = undefined;
-  if (active) unsubscribe = subscribeEffectStill(props.pack, url => { stillUrl.value = url; });
+  if (!active) return;
+  if (isArowana(props.pack)) stillUrl.value = arowanaCover;
+  else unsubscribe = subscribeEffectStill(props.pack, url => { stillUrl.value = url; });
 }
 
 onMounted(() => { mounted = true; loadStill(); syncLayer(); });
 watch(() => props.pack, () => { stillUrl.value = ''; destroyLayer(); loadStill(); syncLayer(); }, { deep: true });
-watch(() => [props.playing, props.paused, props.fps], syncLayer);
+watch(() => [props.playing, props.paused, props.fps, props.tuning], syncLayer);
 onActivated(() => {
   // The first activation follows onMounted; don't create/update a layer twice.
   if (active) return;
@@ -48,5 +51,5 @@ onBeforeUnmount(() => {
 <style scoped>
 .effect-preview{position:relative;width:100%;height:100%}
 .effect-still{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
-.effects-host .effect-still{visibility:hidden}
+.effects-host:not(.effects-loading) .effect-still{visibility:hidden}
 </style>

@@ -58,6 +58,7 @@ const kindLabel=(card:Selection)=>{const kind=cardKind(card);return kind==='vide
 function inspect(card:Selection){if(!busy.value)select(card);}
 async function applyNow(card:Selection){if(busy.value)return;select(card);await applySelection();}
 const importMenu=ref(false);
+const importing=ref(false);
 const cardId=(card:Selection)=>card.source==='local'?card.item.definition.id:card.item.id;
 const cardTitle=(card:Selection)=>card.source==='local'?card.item.definition.title:card.item.title;
 const cardKind=(card:Selection)=>card.source==='local'?card.item.definition.kind:card.item.media_type;
@@ -76,7 +77,22 @@ const categoryOptions=computed(()=>[{label:'全部',value:''},...categories.valu
 watch(tab,value=>{if(value==='online'&&media.value==='canvas')media.value='';});
 const fits=[{label:'铺满屏幕',value:'cover'},{label:'完整显示',value:'contain'},{label:'拉伸适配',value:'fill'}];
 async function importedResource(result:{id:string}){await props.store.refreshLibrary();scope.value='mine';media.value='';const item=props.store.library.items.find(e=>e.definition.id===result.id);if(item)select({source:'local',item});}
-async function importMedia(){try {const id=await props.store.importMedia();if(id){scope.value='mine';importMenu.value=false;const item=props.store.library.items.find(e=>e.definition.id===id);if(item)select({source:'local',item});}}catch(e){props.store.notify(e,'error');}}
+async function importMedia() {
+  if (busy.value || importing.value) return;
+  importing.value = true;
+  try {
+    const id = await props.store.importMedia();
+    if (!id) return;
+    scope.value = 'mine';
+    media.value = '';
+    const item = props.store.library.items.find(entry => entry.definition.id === id);
+    if (item) select({ source: 'local', item });
+  } catch (error) {
+    props.store.notify(error, 'error');
+  } finally {
+    importing.value = false;
+  }
+}
 function setFit(value:string){if(busy.value)return;draft.value.fit=value as WallpaperOptions['fit'];}
 async function useNativeWallpaper(){
   if(busy.value)return;
@@ -135,8 +151,8 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 <template>
 <section class="wallpaper-workbench" data-testid="wallpapers-page">
 <StudioActions>
-<div class="import-wrap"><button type="button" class="xb-btn" aria-haspopup="menu" :aria-expanded="importMenu" :disabled="busy" data-testid="wallpapers-import" @click="importMenu=!importMenu"><Download :size="14"/>导入<ChevronDown :size="13"/></button>
-<template v-if="importMenu"><div class="menu-dismiss" @pointerdown="importMenu=false"></div><div class="xb-menu import-menu" role="menu" @click.capture="importMenu=false"><button type="button" role="menuitem" class="xb-menu-item" data-testid="import-media" :disabled="busy" @click="importMedia"><ImageIcon :size="15"/>导入图片 / 视频</button><ResourceShareActions :store="store" kind="wallpaper" variant="menu" import-label="导入资源包" :disabled="busy" @imported="importedResource"/></div></template></div>
+<div class="import-wrap"><button type="button" class="xb-btn" aria-haspopup="menu" :aria-expanded="importMenu" :disabled="busy || importing" data-testid="wallpapers-import" @click="importMenu=!importMenu"><Download :size="14"/>{{ importing ? '正在导入…' : '导入' }}<ChevronDown :size="13"/></button>
+<template v-if="importMenu"><div class="menu-dismiss" @pointerdown="importMenu=false"></div><div class="xb-menu import-menu" role="menu" @click.capture="importMenu=false"><button type="button" role="menuitem" class="xb-menu-item" data-testid="import-media" :disabled="busy" title="支持图片、视频和自包含 HTML" aria-description="支持图片、视频和自包含 HTML" @click="importMedia"><ImageIcon :size="15"/>导入本地壁纸</button><ResourceShareActions :store="store" kind="wallpaper" variant="menu" import-label="导入资源包" :disabled="busy" @imported="importedResource"/></div></template></div>
 <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="wallpapers-create" @click="store.startCreation('wallpaper')"><Sparkles :size="14"/>让小伴创作</button>
 </StudioActions>
 <div class="wp-toolbar" data-testid="wallpapers-toolbar">
@@ -158,7 +174,7 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 <div v-if="!active(card)" class="hover-actions"><button type="button" class="ha-btn" :disabled="busy" :data-testid="'wallpaper-preview-'+cardId(card)" @click.stop="inspect(card)">预览</button><button type="button" class="ha-btn primary" :disabled="busy" :data-testid="'wallpaper-use-'+cardId(card)" @click.stop="applyNow(card)">设为壁纸</button></div></div>
 <div class="nm"><b>{{cardTitle(card)}}</b><span class="wc-type">{{kindLabel(card)}}</span></div></article>
 </div>
-<div v-if="!cards.length&&!loading" class="xb-empty"><span class="xb-empty-icon"><ImageIcon :size="24"/></span><h3>{{tab==='online'?'暂无匹配的在线资源':scope==='mine'?'还没有自己的壁纸':'没有这一类壁纸'}}</h3><p>{{scope==='mine'?'点右上角“导入”添加图片或视频，也可以让小伴创作一个动画壁纸。':'换个类型或关键词试试。'}}</p></div></NSpin>
+<div v-if="!cards.length&&!loading" class="xb-empty"><span class="xb-empty-icon"><ImageIcon :size="24"/></span><h3>{{tab==='online'?'暂无匹配的在线资源':scope==='mine'?'还没有自己的壁纸':'没有这一类壁纸'}}</h3><p>{{scope==='mine'?'点右上角“导入”添加图片、视频或 HTML 动画壁纸。':'换个类型或关键词试试。'}}</p></div></NSpin>
 <div v-if="tab==='online'" class="pagination"><span class="muted">共 {{feed.total}} 张</span><NPagination :disabled="busy" :page="page" :page-count="page+(feed.has_more?1:0)" @update:page="page=$event"/></div>
 </div>
 <Transition name="drawer"><aside v-if="selection" class="inspector" data-testid="wallpaper-inspector"><div class="inspector-heading"><span class="muted">预览与设置</span><NButton text data-testid="cancel-selection" :disabled="busy" @click="cancel">取消选择</NButton></div><div class="inspector-scroll" data-testid="inspector-scroll"><div class="inspector-preview" :class="{viewable:canView && kind!=='video'}" data-testid="inspector-preview" :title="canView && kind!=='video' ? '点击全屏查看' : undefined" @click="kind!=='video' && openViewer()"><MediaPreview :key="selection.source+cardId(selection)" :kind="kind || ''" :source="preview.video" :poster="preview.poster" :title="title" controls :fit="draft.fit" :rate="draft.playbackRate"/><button v-if="canView" type="button" class="preview-expand" data-testid="open-fullscreen" aria-label="全屏查看" title="全屏查看" @click.stop="openViewer"><Maximize2 :size="16"/></button></div><h2>{{title}}</h2><p class="muted">{{selection.source==='local'?selection.item.definition.description:selection.item.description}}</p><div class="draft-note">修改后点击“应用到桌面”生效。</div>

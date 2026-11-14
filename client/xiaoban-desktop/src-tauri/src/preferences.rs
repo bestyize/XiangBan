@@ -181,6 +181,12 @@ impl Settings {
         if self.effects == Default::default() && !legacy.is_null() {
             self.effects = crate::effect_choice::EffectsChoice::from_value(&legacy);
         }
+        if self.wallpaper_id.starts_with("builtin-")
+            && !crate::library::builtins().iter().any(|wallpaper| wallpaper.id == self.wallpaper_id)
+        {
+            self.wallpaper_id = defaults.wallpaper_id;
+            self.wallpaper_options = defaults.wallpaper_options;
+        }
     }
 }
 
@@ -231,6 +237,20 @@ mod tests {
         let value = Preferences::default();
         assert!(value.settings.autostart);
         assert!(!value.autostart_initialized);
+    }
+    #[test]
+    fn retired_builtin_wallpaper_falls_back_to_the_system_wallpaper() {
+        let mut value: Preferences = serde_json::from_value(serde_json::json!({
+            "settings": {
+                "wallpaperId": "builtin-planet-garden",
+                "wallpaperOptions": {"fit": "contain"},
+                "effects": {"selected": "arowana"}
+            }
+        })).unwrap();
+        value.settings.normalize();
+        assert_eq!(value.settings.wallpaper_id, Settings::default().wallpaper_id);
+        assert_eq!(value.settings.wallpaper_options, Settings::default().wallpaper_options);
+        assert_eq!(value.settings.effects.selected, "arowana");
     }
     #[test]
     fn older_preferences_receive_new_defaults_without_resetting_scene() {

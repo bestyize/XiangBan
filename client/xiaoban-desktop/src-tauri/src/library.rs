@@ -189,13 +189,7 @@ fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
     Ok(())
 }
 
-pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
-    if !identifier(&item.id)
-        || item.id == "companion"
-        || (!builtin && (item.id.starts_with("builtin-") || item.id.starts_with("local-")))
-    {
-        return Err("壁纸 ID 不合法或使用了保留名称".into());
-    }
+pub(crate) fn validate_metadata(item: &Wallpaper) -> Result<(), String> {
     semver::Version::parse(&item.version).map_err(|_| "壁纸版本需使用 SemVer，如 1.0.0")?;
     if item.title.trim().is_empty()
         || item.title.len() > 160
@@ -204,6 +198,17 @@ pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
     {
         return Err("壁纸名称或介绍长度不合法".into());
     }
+    Ok(())
+}
+
+pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
+    if !identifier(&item.id)
+        || item.id == "companion"
+        || (!builtin && (item.id.starts_with("builtin-") || item.id.starts_with("local-")))
+    {
+        return Err("壁纸 ID 不合法或使用了保留名称".into());
+    }
+    validate_metadata(item)?;
     validate_resource(&item.resource, builtin)?;
     let mime = &item.resource.mime;
     if !match item.kind.as_str() {

@@ -9,7 +9,7 @@ import {
 import { PetView } from "./pet.ts";
 import { EffectsLayer } from "./effects/layer.ts";
 import { normalizeParams, parsePack } from "./effects/parse.ts";
-import type { EffectPack } from "./effects/types.ts";
+import { isArowana, type EffectPack } from "./effects/types.ts";
 import { isPresenceKind, presenceBeats } from "./companion/presence.ts";
 
 interface Payload {
@@ -106,7 +106,7 @@ export async function mountContent() {
       const parsed = parsePack(state.effects?.effect);
       effectPack = parsed.ok ? parsed.pack : null;
     }
-    effects.update(effectPack, normalizeParams(state.effects?.params), { paused: settings.paused, fps: settings.fps });
+    effects.update(effectPack, normalizeParams(state.effects?.params, isArowana(effectPack)), { paused: settings.paused, fps: settings.fps });
     if (state.config.overlay) {
       const petHost = document.querySelector<HTMLElement>(".content-pet")!;
       petHost.style.width = `${settings.size * 1.5}px`;

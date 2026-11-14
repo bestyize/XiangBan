@@ -5,7 +5,8 @@ use crate::effect_choice::valid_id;
 use serde_json::{json, Value};
 use std::{collections::HashSet, fs, path::{Path, PathBuf}};
 
-const BUILTIN: [(&str, &str); 12] = [
+const BUILTIN: [(&str, &str); 13] = [
+    ("arowana", include_str!("../../public/effects/arowana.json")),
     ("lanterns", include_str!("../../public/effects/lanterns.json")),
     ("maple", include_str!("../../public/effects/maple.json")),
     ("galaxy", include_str!("../../public/effects/galaxy.json")),
@@ -206,7 +207,9 @@ mod tests {
         assert_eq!(packs.len(), BUILTIN.len(), "every built-in file is valid JSON");
         for (pack, (id, _)) in packs.iter().zip(BUILTIN) {
             assert_eq!(pack["id"], id); assert_eq!(pack["schemaVersion"], 1); assert_eq!(pack["source"], "builtin");
-            assert!(pack["layers"].as_array().is_some_and(|layers| !layers.is_empty()), "{id}");
+            if id != "arowana" {
+                assert!(pack["layers"].as_array().is_some_and(|layers| !layers.is_empty()), "{id}");
+            }
         }
     }
     #[test]

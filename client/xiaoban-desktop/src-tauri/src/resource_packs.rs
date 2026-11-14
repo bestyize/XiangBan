@@ -108,9 +108,12 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
         "wallpaper" => {
             let item = local_media::read(&root.join("wallpapers"))?.items.into_iter()
                 .find(|item| item.id == id && item.kind == "web").ok_or("只能导出自己创作的动画壁纸")?;
+            if item.resource.bytes > MAX_ENTRY {
+                return Err("壁纸超过 ZIP 资源包的 4 MB 单文件限制，可以直接分享原始 HTML。".into());
+            }
             let path = local_media::resource_path(&root.join("wallpapers"), &item.resource);
             if !crate::library::verify_file(&path, &item.resource)? { return Err("壁纸文件校验失败".into()); }
-            json!({"title":item.title,"description":item.description,"html":read_text(&path, 4 * 1024 * 1024)?})
+            json!({"title":item.title,"description":item.description,"html":read_text(&path, MAX_ENTRY)?})
         }
         "effect" => {
             if effect_packs::is_builtin_id(id) { return Err("只能导出自创特效".into()); }

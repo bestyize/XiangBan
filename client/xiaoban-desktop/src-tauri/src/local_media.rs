@@ -1,4 +1,4 @@
-//! Native selection and streamed copying of user-owned images/videos.
+//! Native selection and streamed copying of user-owned wallpaper files.
 //! The renderer sees managed hashes, never the original filesystem path.
 use crate::library::{self, Catalog, Resource, Wallpaper};
 use sha2::{Digest, Sha256};
@@ -33,7 +33,6 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
     let r = &item.resource;
     if !library::hash_name(&r.sha256)
         || r.bytes == 0
-        || r.bytes > MAX_LOCAL_FILE
         || item.id != format!("local-{}", &r.sha256[..32])
         || r.url != format!("{PREFIX}{}", r.sha256)
         || item.cover.is_some()
@@ -51,28 +50,14 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
                     ]
                     .contains(&r.mime.as_str())
             }
-            "video" => ["video/mp4", "video/webm"].contains(&r.mime.as_str()),
-            "web" => r.bytes <= 4 * 1024 * 1024 && r.mime == "text/html",
+            "video" => r.bytes <= MAX_LOCAL_FILE && ["video/mp4", "video/webm"].contains(&r.mime.as_str()),
+            "web" => r.mime == "text/html",
             _ => false,
         }
     {
         return Err("本地壁纸元数据不合法".into());
     }
-    // Reuse general title/version validation without allowing local:// into the
-    // remote delivery protocol or raising its 256 MB resource limit.
-    let mut remote = item.clone();
-    remote.id = "validation".into();
-    remote.resource.url = "https://example.invalid/local-media".into();
-    remote.resource.bytes = r.bytes.min(library::MAX_FILE);
-    remote.resource.mime = if item.kind == "video" {
-        "video/mp4"
-    } else if item.kind == "web" {
-        "text/html"
-    } else {
-        "image/png"
-    }
-    .into();
-    library::validate_item(&remote, false)
+    library::validate_metadata(item)
 }
 
 pub(crate) fn media_type(data: &[u8]) -> Result<(&'static str, &'static str), String> {
@@ -113,7 +98,7 @@ pub(crate) fn media_type(data: &[u8]) -> Result<(&'static str, &'static str), St
     if data.starts_with(b"\x1a\x45\xdf\xa3") && data.windows(4).any(|b| b == b"webm") {
         return Ok(("video", "video/webm"));
     }
-    Err("不支持这个文件。请选择 PNG、JPG、WebP、GIF、BMP 图片，或 MP4、M4V、WebM 视频。视频建议使用 H.264 MP4。".into())
+    Err("不支持这个文件。请选择 PNG、JPG、WebP、GIF、BMP 图片，MP4、M4V、WebM 视频，或自包含 HTML。".into())
 }
 
 pub fn read(root: &Path) -> Result<Catalog, String> {
@@ -140,16 +125,24 @@ pub fn read(root: &Path) -> Result<Catalog, String> {
 }
 
 pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
+    let is_html = source.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
+        ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm")
+    });
     let mut input = fs::File::open(source).map_err(|e| format!("无法读取所选文件：{e}"))?;
     let metadata = input.metadata().map_err(|e| e.to_string())?;
-    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_LOCAL_FILE {
-        return Err("请选择非空的图片或视频，单个文件不能超过 1 GB。".into());
+    if !metadata.is_file() || metadata.len() == 0 {
+        return Err("请选择非空的壁纸文件。".into());
     }
     let mut buffer = [0u8; 65536];
     let first = input.read(&mut buffer).map_err(|e| e.to_string())?;
-    let (kind, mime) = media_type(&buffer[..first])?;
-    if kind == "image" && metadata.len() > MAX_LOCAL_IMAGE {
-        return Err("单张图片不能超过 64 MB。".into());
+    let (kind, mime) = if is_html { ("web", "text/html") } else { media_type(&buffer[..first])? };
+    let limit = match kind {
+        "image" => Some((MAX_LOCAL_IMAGE, "单张图片不能超过 64 MB。")),
+        "video" => Some((MAX_LOCAL_FILE, "单个视频不能超过 1 GB。")),
+        _ => None,
+    };
+    if let Some((max_bytes, error)) = limit {
+        if metadata.len() > max_bytes { return Err(error.into()); }
     }
     let directory = root.join("imports");
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -159,22 +152,30 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
         let mut digest = Sha256::new();
         let mut bytes = 0u64;
         let mut count = first;
-        loop {
-            if count == 0 {
-                break;
-            }
+        let mut utf8_tail = 0;
+        let mut has_text = false;
+        while count != 0 {
             bytes += count as u64;
-            if bytes > MAX_LOCAL_FILE {
-                return Err("文件超过 1 GB，已停止导入。".into());
+            if let Some((max_bytes, error)) = limit {
+                if bytes > max_bytes { return Err(error.into()); }
             }
-            digest.update(&buffer[..count]);
-            output
-                .write_all(&buffer[..count])
-                .map_err(|e| e.to_string())?;
-            count = input.read(&mut buffer).map_err(|e| e.to_string())?;
+            let end = utf8_tail + count;
+            let chunk = &buffer[utf8_tail..end];
+            digest.update(chunk);
+            output.write_all(chunk).map_err(|e| e.to_string())?;
+            if is_html {
+                utf8_tail = check_html_chunk(&mut buffer[..end], &mut has_text)?;
+            }
+            count = input.read(&mut buffer[utf8_tail..]).map_err(|e| e.to_string())?;
         }
         if bytes != metadata.len() {
             return Err("导入时源文件发生变化，请重试。".into());
+        }
+        if is_html && utf8_tail != 0 {
+            return Err("壁纸必须是 UTF-8 HTML 文件。".into());
+        }
+        if is_html && !has_text {
+            return Err("HTML 内容不能为空".into());
         }
         output.sync_all().map_err(|e| e.to_string())?;
         drop(output);
@@ -217,7 +218,8 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
             return Err("本地壁纸库最多保存 1000 张壁纸。".into());
         }
         let target = directory.join(&hash);
-        if library::verify_file(&target, &item.resource)? {
+        let cached = library::verify_file(&target, &item.resource)?;
+        if cached {
             fs::remove_file(&temporary).map_err(|e| e.to_string())?;
         } else {
             fs::rename(&temporary, &target).map_err(|e| e.to_string())?;
@@ -226,13 +228,32 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
             return Ok(existing.clone());
         }
         catalog.items.push(item.clone());
-        library::save_json(&root.join("local.json"), &catalog)?;
+        if let Err(error) = library::save_json(&root.join("local.json"), &catalog) {
+            if !cached { let _ = fs::remove_file(&target); }
+            return Err(error);
+        }
         Ok(item)
     })();
     if result.is_err() {
         let _ = fs::remove_file(temporary);
     }
     result
+}
+
+fn check_html_chunk(buffer: &mut [u8], has_text: &mut bool) -> Result<usize, String> {
+    let valid = match std::str::from_utf8(buffer) {
+        Ok(text) => text,
+        Err(error) if error.error_len().is_none() => {
+            std::str::from_utf8(&buffer[..error.valid_up_to()]).expect("validated UTF-8 prefix")
+        }
+        Err(_) => return Err("壁纸必须是 UTF-8 HTML 文件。".into()),
+    };
+    *has_text = *has_text || valid.chars().any(|c| c != '\u{feff}' && !c.is_whitespace());
+    let end = valid.len();
+    let tail = buffer.len() - end;
+    // A multibyte character can straddle two reads. Only keep its incomplete prefix.
+    buffer.copy_within(end.., 0);
+    Ok(tail)
 }
 
 pub(crate) const MAX_HTML_BYTES: u64 = 4 * 1024 * 1024;
@@ -355,8 +376,8 @@ pub async fn import_local_wallpaper(
     }
     let app = window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let chosen = app.dialog().file().set_parent(&window).set_title("选择图片或视频壁纸")
-            .add_filter("图片和视频", &["png","jpg","jpeg","webp","gif","bmp","mp4","m4v","webm"])
+        let chosen = app.dialog().file().set_parent(&window).set_title("选择本地壁纸文件")
+            .add_filter("壁纸文件", &["png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "m4v", "webm", "html", "htm"])
             .blocking_pick_file();
         let Some(chosen) = chosen else { return Ok(None); };
         let source = chosen.into_path().map_err(|e| e.to_string())?;
@@ -412,6 +433,50 @@ mod tests {
         invalid = one;
         invalid.resource.bytes = MAX_LOCAL_FILE + 1;
         assert!(validate(&invalid).is_err());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn imports_large_html_without_a_size_limit_and_keeps_verified_bytes() {
+        let base = std::env::temp_dir().join(format!("xiaoban-import-html-{}", std::process::id()));
+        let root = base.join("wallpapers");
+        fs::create_dir_all(&base).unwrap();
+        let source = base.join("龙鱼.HTM");
+        let mut html = String::from("<!doctype html><title>壁纸</title><!--");
+        html.extend(std::iter::repeat_n(' ', 65535 - html.len()));
+        html.push_str("龙鱼");
+        html.extend(std::iter::repeat_n('x', MAX_HTML_BYTES as usize));
+        html.push_str("-->");
+        fs::write(&source, &html).unwrap();
+
+        let item = import_file(&root, &source).unwrap();
+        assert_eq!(item.kind, "web");
+        assert_eq!(item.title, "龙鱼");
+        assert_eq!(item.resource.bytes, html.len() as u64);
+        assert_eq!(import_file(&root, &source).unwrap().id, item.id);
+        fs::remove_file(&source).unwrap();
+        assert_eq!(read(&root).unwrap().items.len(), 1);
+        assert!(library::verify_file(&resource_path(&root, &item.resource), &item.resource).unwrap());
+        assert_eq!(fs::read_to_string(resource_path(&root, &item.resource)).unwrap(), html);
+
+        let mut large = item;
+        large.resource.bytes = MAX_LOCAL_FILE + 1;
+        assert!(library::validate_stored(&large).is_ok());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn invalid_html_leaves_no_partial_import() {
+        let base = std::env::temp_dir().join(format!("xiaoban-invalid-html-{}", std::process::id()));
+        let root = base.join("wallpapers");
+        fs::create_dir_all(&base).unwrap();
+        let source = base.join("wallpaper.html");
+        for invalid in [b" \t\n".as_slice(), b"<!doctype html>\xff", b"<!doctype html>\xe9\xbe"] {
+            fs::write(&source, invalid).unwrap();
+            assert!(import_file(&root, &source).is_err());
+            assert!(read(&root).unwrap().items.is_empty());
+            assert!(fs::read_dir(root.join("imports")).unwrap().next().is_none());
+        }
         fs::remove_dir_all(base).unwrap();
     }
 

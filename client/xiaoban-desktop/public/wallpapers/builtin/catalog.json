@@ -1,24 +1,141 @@
 {
   "schemaVersion": 1,
-  "revision": "builtin-2",
+  "revision": "builtin-3",
   "items": [
     {
-      "id": "builtin-planet-garden",
+      "id": "builtin-aquarium-living-room",
       "version": "1.0.0",
-      "title": "桌面小星球",
-      "description": "会转动的绿色小星球：木屋、树林、云海与飘雪，拖动可以旋转、滚轮可以缩放。",
-      "author": "小伴创作",
-      "kind": "web",
+      "title": "山水客厅",
+      "description": "山水画映在深蓝水光里，水面和地板上的波纹缓缓流动。",
+      "author": "RealWorldBuilder",
+      "kind": "canvas",
       "resource": {
-        "url": "builtin://planet-garden.html",
-        "sha256": "0a590e7695fbcd3f3084592b484001281d2a38eb7fa50319718dda6bcfcc688e",
-        "bytes": 124155,
-        "mime": "text/html"
+        "url": "builtin://aquarium-water.js",
+        "sha256": "26d26d4f975f8213212c7313a707adacd071491a90678e9bebc4bb5e5a2e8277",
+        "bytes": 4993,
+        "mime": "application/javascript"
       },
       "cover": {
-        "url": "builtin://planet-garden-cover.webp",
-        "sha256": "ef52c90495fbbf998e539828e68d350cb6607b464f77c5c3fcfd91c0c6ac3a45",
-        "bytes": 29052,
+        "url": "builtin://aquarium-living-room-cover.webp",
+        "sha256": "ac7049ed94bc5bf8b7e70690fe02f1220a371dfedc6e312b5af40bf2ffacbc32",
+        "bytes": 21448,
+        "mime": "image/webp"
+      },
+      "assets": {
+        "background": {
+          "url": "builtin://aquarium-living-room.webp",
+          "sha256": "487dd6b27b11e216672388f5c250ee9a7f61d83282e130c28f75836d3e035cbf",
+          "bytes": 174816,
+          "mime": "image/webp"
+        }
+      },
+      "controls": [
+        {
+          "key": "strength",
+          "label": "水波强度",
+          "type": "range",
+          "default": 1,
+          "min": 0,
+          "max": 1.5,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "id": "builtin-aquarium-blackwater",
+      "version": "1.0.0",
+      "title": "雨林黑水",
+      "description": "琥珀色的水下光束穿过沉木，缸底泛起细微波纹。",
+      "author": "RealWorldBuilder",
+      "kind": "canvas",
+      "resource": {
+        "url": "builtin://aquarium-water.js",
+        "sha256": "26d26d4f975f8213212c7313a707adacd071491a90678e9bebc4bb5e5a2e8277",
+        "bytes": 4993,
+        "mime": "application/javascript"
+      },
+      "cover": {
+        "url": "builtin://aquarium-blackwater-cover.webp",
+        "sha256": "5d97f909fc1fba32b652982099cc600855a1af1dd76eb248bfa2bdc702744ee6",
+        "bytes": 23714,
+        "mime": "image/webp"
+      },
+      "assets": {
+        "background": {
+          "url": "builtin://aquarium-blackwater.webp",
+          "sha256": "ffd412dab6e9f7da37acebd8c8b6505421f100602acf51471790424f0fa34f24",
+          "bytes": 274720,
+          "mime": "image/webp"
+        }
+      },
+      "controls": [
+        {
+          "key": "strength",
+          "label": "水波强度",
+          "type": "range",
+          "default": 0.4,
+          "min": 0,
+          "max": 1.5,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "id": "builtin-aquarium-aquascape",
+      "version": "1.0.0",
+      "title": "清绿水草",
+      "description": "碧绿水草间留出一片开阔水域，水光轻轻摇曳。",
+      "author": "RealWorldBuilder",
+      "kind": "canvas",
+      "resource": {
+        "url": "builtin://aquarium-water.js",
+        "sha256": "26d26d4f975f8213212c7313a707adacd071491a90678e9bebc4bb5e5a2e8277",
+        "bytes": 4993,
+        "mime": "application/javascript"
+      },
+      "cover": {
+        "url": "builtin://aquarium-aquascape-cover.webp",
+        "sha256": "886a87b50d20b6c2cc53e19f5ec17abb021561b3c21621b5e95d83a103871386",
+        "bytes": 63986,
+        "mime": "image/webp"
+      },
+      "assets": {
+        "background": {
+          "url": "builtin://aquarium-aquascape.webp",
+          "sha256": "b0ffc00d2f1107a9567fe3ca0db62ff588346fe33d969b16bbbf58e7e6614f68",
+          "bytes": 517228,
+          "mime": "image/webp"
+        }
+      },
+      "controls": [
+        {
+          "key": "strength",
+          "label": "水波强度",
+          "type": "range",
+          "default": 0.45,
+          "min": 0,
+          "max": 1.5,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "id": "builtin-aquarium-moon-window",
+      "version": "1.0.0",
+      "title": "月下湖景",
+      "description": "夜色落在湖面和远山上，窗边留着一盏暖灯。",
+      "author": "RealWorldBuilder",
+      "kind": "image",
+      "resource": {
+        "url": "builtin://aquarium-moon-window.webp",
+        "sha256": "06d8bf78f904243f2aa26c165947074733cf8d48a59e26592f2536af7484dbc5",
+        "bytes": 222364,
+        "mime": "image/webp"
+      },
+      "cover": {
+        "url": "builtin://aquarium-moon-window-cover.webp",
+        "sha256": "78f1ef78eb4d5e1f0baba58edde125967d9f280bfcd70002bf6307341232f86e",
+        "bytes": 20524,
         "mime": "image/webp"
       }
     },

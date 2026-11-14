@@ -1,4 +1,5 @@
-import { defaultParams, limits, type Burst, type ColorPair, type EffectPack, type EffectParams, type EffectsChoice, type Layer, type Range, type Rgb, type Shape, type Vein, type Band, type Halo } from "./types.ts";
+import { defaultParams, isArowana, limits, type Burst, type ColorPair, type EffectPack, type EffectParams, type EffectsChoice, type Layer, type Range, type Rgb, type Shape, type Vein, type Band, type Halo } from "./types.ts";
+import { normalizeAquarium } from './arowana/settings.ts';
 
 type Obj = Record<string, unknown>;
 const isObj = (value: unknown): value is Obj => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -107,27 +108,39 @@ export function parsePack(raw: unknown): ParsedPack {
   if (raw.schemaVersion !== 1) return { ok: false, error: "不支持这个 schemaVersion（需要 1）" };
   if (typeof raw.id !== "string" || !limits.idPattern.test(raw.id)) return { ok: false, error: "id 只能用小写字母、数字、- 和 _，且不超过 48 个字符" };
   if (typeof raw.name !== "string" || !raw.name.trim()) return { ok: false, error: "缺少 name" };
+  const sky = Array.isArray(raw.sky) ? raw.sky.filter((c): c is string => hexToRgb(c) !== null).slice(0, 4) : [];
+  const pack: EffectPack = {
+    id: raw.id, name: raw.name.trim().slice(0, 24), description: typeof raw.description === "string" ? raw.description.slice(0, 80) : "",
+    sky: sky.length >= 2 ? sky : ["#10182f", "#2a3358"], layers: [], source: raw.source === "user" ? "user" : "builtin",
+  };
+  if (raw.id === "arowana") {
+    return raw.source === "builtin" && isArowana(pack)
+      ? { ok: true, pack }
+      : { ok: false, error: "arowana 是内置特效的名字" };
+  }
   if (!Array.isArray(raw.layers) || raw.layers.length === 0 || raw.layers.length > limits.layers) return { ok: false, error: `layers 需要 1 到 ${limits.layers} 层` };
-  const layers: Layer[] = [];
   for (const [index, item] of raw.layers.entries()) {
     const parsed = layer(item, index);
     if (typeof parsed === "string") return { ok: false, error: parsed };
-    layers.push(parsed);
+    pack.layers.push(parsed);
   }
-  if (layers.reduce((sum, item) => sum + item.count, 0) > limits.totalCount) return { ok: false, error: `所有层的 count 加起来不能超过 ${limits.totalCount}` };
-  const sky = Array.isArray(raw.sky) ? raw.sky.filter((c): c is string => hexToRgb(c) !== null).slice(0, 4) : [];
-  return { ok: true, pack: { id: raw.id, name: raw.name.trim().slice(0, 24), description: typeof raw.description === "string" ? raw.description.slice(0, 80) : "",
-    sky: sky.length >= 2 ? sky : ["#10182f", "#2a3358"], layers, source: raw.source === "user" ? "user" : "builtin" } };
+  if (pack.layers.reduce((sum, item) => sum + item.count, 0) > limits.totalCount) return { ok: false, error: `所有层的 count 加起来不能超过 ${limits.totalCount}` };
+  return { ok: true, pack };
 }
 
-export function normalizeParams(value: unknown): EffectParams {
+export function normalizeParams(value: unknown, aquarium = false): EffectParams {
   const raw = isObj(value) ? value : {};
-  return { density: num(raw.density, defaultParams.density, limits.density), speed: num(raw.speed, defaultParams.speed, limits.speed), size: num(raw.size, defaultParams.size, limits.size) };
+  return {
+    density: num(raw.density, defaultParams.density, limits.density),
+    speed: num(raw.speed, defaultParams.speed, limits.speed),
+    size: num(raw.size, defaultParams.size, limits.size),
+    ...(aquarium && isObj(raw.aquarium) ? { aquarium: normalizeAquarium(raw.aquarium) } : {}),
+  };
 }
 export function normalizeChoice(value: unknown): EffectsChoice {
   const raw = isObj(value) ? value : {};
   const params: EffectsChoice["params"] = {};
-  if (isObj(raw.params)) for (const [id, item] of Object.entries(raw.params).slice(0, 64)) if (limits.idPattern.test(id)) params[id] = normalizeParams(item);
+  if (isObj(raw.params)) for (const [id, item] of Object.entries(raw.params).slice(0, 64)) if (limits.idPattern.test(id)) params[id] = normalizeParams(item, id === 'arowana');
   return { selected: typeof raw.selected === "string" && limits.idPattern.test(raw.selected) ? raw.selected : "", params, ...(typeof raw.monitor === "string" && raw.monitor.length > 0 && raw.monitor.length <= 512 ? { monitor: raw.monitor } : {}) };
 }
 export const paramsOf = (choice: EffectsChoice, id: string): EffectParams => choice.params[id] ?? { ...defaultParams };

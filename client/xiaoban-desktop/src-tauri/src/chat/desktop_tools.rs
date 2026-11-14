@@ -1293,7 +1293,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
         tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()).risk(Risk::Read).parallel(), wallpaper_list),
         tool(
             &desktop,
-            ToolSpec::new("wallpaper_import", "直接把工作区中的图片或视频、或小伴刚生成的图片保存到壁纸库。只入库，返回可供 wallpaper_apply 使用的 id。自包含 HTML 请用 wallpaper_create。",
+            ToolSpec::new("wallpaper_import", "直接把工作区中的图片、视频、自包含 UTF-8 HTML 文件，或小伴刚生成的图片保存到壁纸库。直接导入 HTML 文件无文件大小上限。只入库，返回可供 wallpaper_apply 使用的 id。",
                 object(json!({"source_path":{"type":"string","description":"当前工作区内的相对文件路径，或 generated:<image_generate 返回的图片 id>"}}), &["source_path"]))
                 .risk(Risk::Write).serial(),
             move |desktop, args| {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import StudioActions from '../components/StudioActions.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
-import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue';
 import { NAlert, NPopconfirm, NSlider, NSwitch } from 'naive-ui';
 import { Ban, Sparkles, Trash2, Download } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
-import { defaultParams, limits, type EffectsChoice } from '../../effects/types.ts';
+import { defaultParams, isArowana, limits, type EffectsChoice, type EffectParams } from '../../effects/types.ts';
+import { aquariumLightControls, aquariumModes, defaultAquarium, lightValue, normalizeAquarium, type AquariumLight, type AquariumMode } from '../../effects/arowana/settings.ts';
 import type { ControlStore } from '../control-types.ts';
 import EffectPreview from '../components/EffectPreview.vue';
 import { createWidgetClient } from '../../widgets/client.ts';
@@ -14,11 +15,13 @@ const props = defineProps<{ store: ControlStore }>();
 const displays = createWidgetClient();
 const monitors = computed(() => displays.layout.value.monitors ?? []);
 const missingMonitor = computed(() => displays.ready.value && !!choice.value.monitor && choice.value.monitor !== "*" && !monitors.value.some(m => m.id === choice.value.monitor));
-const choice = computed(() => normalizeChoice(props.store.settings.effects));
+const pendingChoice = shallowRef<EffectsChoice>();
+const choice = computed(() => pendingChoice.value ?? normalizeChoice(props.store.settings.effects));
 const filter=ref<'all'|'desk'|'mine'>('all');
 const packs = computed(() => props.store.effectList.packs);
 const visiblePacks=computed(()=>packs.value.filter(pack=>filter.value==='mine'?pack.source==='user':filter.value==='desk'?pack.id===choice.value.selected:true));
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
+const aquariumSelected = computed(() => isArowana(chosen.value));
 // A saved desktop selection does not autoplay when this page opens.
 const previewId = ref('');
 const hoveredId = ref('');
@@ -28,29 +31,58 @@ watch(filter,()=>{hoveredId.value='';previewId.value='';});
 const missing = computed(() => choice.value.selected !== '' && packs.value.length > 0 && !chosen.value);
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 
-// The sliders follow the chosen effect; each effect keeps its own density, speed and size.
+// Preview the sliders immediately, then save them together after the drag settles.
 const density = ref(1), speed = ref(1), size = ref(1);
+const aquarium = ref(normalizeAquarium(undefined));
+const tuning = computed<EffectParams>(() => ({
+  density: density.value, speed: speed.value, size: size.value,
+  ...(aquariumSelected.value ? { aquarium: aquarium.value } : {}),
+}));
 let timer: ReturnType<typeof setTimeout> | null = null;
-watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.value, chosen.value.id)) : ''], () => {
-  if (timer || !chosen.value) return;
+watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.value, chosen.value.id)) : ''] as const, ([id], previous) => {
+  if ((timer && previous?.[0] === id) || !chosen.value) return;
+  if (timer) { clearTimeout(timer); timer = null; }
   const params = paramsOf(choice.value, chosen.value.id);
   density.value = params.density; speed.value = params.speed; size.value = params.size;
+  aquarium.value = normalizeAquarium(params.aquarium);
 }, { immediate: true });
 
 async function apply(next: EffectsChoice) {
-  try { await props.store.setEffects(next); } catch (error) { props.store.notify(message(error), 'error'); }
+  // Preserve a tuning change alongside a selection or display change that arrives before the debounce.
+  if (timer) {
+    clearTimeout(timer); timer = null;
+    next = withTuning(next);
+  }
+  pendingChoice.value = next;
+  try { await props.store.setEffects(next); }
+  catch (error) { props.store.notify(message(error), 'error'); }
+  finally { if (pendingChoice.value === next) pendingChoice.value = undefined; }
 }
 function choose(id: string) { previewId.value = id; void apply({ ...choice.value, selected: id }); }
-function commit() {
-  timer = null;
-  if (!chosen.value) return;
-  void apply({ ...choice.value, selected: chosen.value.id, params: { ...choice.value.params, [chosen.value.id]: { density: density.value, speed: speed.value, size: size.value } } });
+function withTuning(next: EffectsChoice): EffectsChoice {
+  return chosen.value ? { ...next, params: { ...next.params, [chosen.value.id]: tuning.value } } : next;
 }
-/** 恢复默认: this effect's density, speed and size go back to 1. */
+function commit() {
+  if (timer) clearTimeout(timer);
+  timer = null;
+  if (chosen.value) void apply(withTuning(choice.value));
+}
+function changeAquariumMode(mode: AquariumMode) {
+  aquarium.value = { ...aquarium.value, mode };
+  commit();
+}
+function changeLight(key: AquariumLight, value: number) {
+  aquarium.value = { ...aquarium.value, lighting: { ...aquarium.value.lighting, [key]: value } };
+  tune();
+}
+function resetLights() {
+  aquarium.value = { ...aquarium.value, lighting: { ...defaultAquarium.lighting } };
+  commit();
+}
 function restoreDefaults() {
   if (!chosen.value) return;
-  if (timer) { clearTimeout(timer); timer = null; }
   density.value = defaultParams.density; speed.value = defaultParams.speed; size.value = defaultParams.size;
+  aquarium.value = normalizeAquarium(undefined);
   commit();
 }
 /** 基于它创作: opens AI creation with this effect as the starting point. */
@@ -106,7 +138,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </button>
         <div v-for="pack in visiblePacks" :key="pack.id" class="effect-card-wrapper" :class="{ user: pack.source === 'user' }">
           <button class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" :title="pack.description" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
-            <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /><i v-if="chosen?.id === pack.id" class="lb">使用中</i></span>
+            <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id && !(aquariumSelected && chosen?.id === pack.id)" :paused="store.settings.paused" :fps="store.settings.fps" /><i v-if="chosen?.id === pack.id" class="lb">使用中</i></span>
             <span class="effect-name"><b>{{ pack.name }}</b></span>
           </button>
           <div v-if="pack.source === 'user'" class="card-tools">
@@ -125,7 +157,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
     </div>
     <aside class="fx-inspector" aria-label="特效设置" data-testid="effect-inspector">
       <div class="fx-preview" :class="{ none: !chosen }">
-        <EffectPreview v-if="chosen" :pack="chosen" :playing="true" :paused="store.settings.paused" :fps="store.settings.fps" />
+        <EffectPreview v-if="chosen" :pack="chosen" :playing="true" :paused="store.settings.paused" :fps="store.settings.fps" :tuning="aquariumSelected ? tuning : undefined" />
         <Ban v-else :size="30" :stroke-width="1.4" />
       </div>
       <div class="fx-title"><b>{{ chosen ? chosen.name : '无特效' }}</b><span>{{ chosen ? chosen.description : '桌面保持安静，不叠加任何特效。' }}</span></div>
@@ -137,12 +169,25 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </select>
       </label>
       <section v-if="chosen" class="fx-tuning" data-testid="effect-tuning">
-        <div class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
+        <label v-if="aquariumSelected" class="kv"><span>鱼类组合</span>
+          <select class="fx-display" :value="aquarium.mode" data-testid="aquarium-mode" @change="changeAquariumMode(($event.target as HTMLSelectElement).value as AquariumMode)">
+            <option v-for="mode in aquariumModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+          </select>
+        </label>
+        <div v-else class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
         <div class="kv"><div class="h"><span>速度</span><span data-testid="effect-speed-value">×{{ speed }}</span></div><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" :tooltip="false" @update:value="tune" /></div>
         <div class="kv"><div class="h"><span>大小</span><span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></div><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
+        <details v-if="aquariumSelected" class="fx-lighting">
+          <summary>灯光</summary>
+          <div v-for="light in aquariumLightControls" :key="light.key" class="kv" :data-testid="`aquarium-light-${light.key}`">
+            <div class="h"><span>{{ light.label }}</span><span>{{ lightValue(light.key, aquarium.lighting[light.key]) }}</span></div>
+            <NSlider :value="aquarium.lighting[light.key]" :min="light.min" :max="light.max" :step="light.step" :aria-label="light.label" :tooltip="false" @update:value="value => changeLight(light.key, value)" />
+          </div>
+          <button type="button" class="xb-link fx-light-reset" data-testid="aquarium-light-reset" @click="resetLights">恢复默认灯光</button>
+        </details>
       </section>
       <div class="kv row"><div class="grow"><span>伙伴跟着做表情</span><small>只换表情，不弹窗、不出声</small></div><NSwitch :value="store.settings.companionLinks" data-testid="effect-companion-links" @update:value="setLinks" /></div>
-      <div class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
+      <div class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
     </aside>
   </section>
 </template>
@@ -183,6 +228,9 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
 .kv .grow{flex:1;display:flex;flex-direction:column}
 .kv small{font-size:11.5px;color:var(--ui-text-secondary)}
 .fx-display{width:100%;height:34px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);padding:0 8px}
+.fx-lighting{margin-top:16px;border-top:1px solid var(--ui-border);border-bottom:1px solid var(--ui-border);padding:10px 0;font-size:13px}
+.fx-lighting summary{cursor:pointer;color:var(--ui-text-primary)}
+.fx-light-reset{margin-top:10px}
 .fx-buttons{margin-top:auto;padding-top:20px;display:flex;gap:8px}
 .fx-buttons .xb-btn{flex:1}
 @media(max-width:1000px){.effect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

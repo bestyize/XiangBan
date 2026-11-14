@@ -262,7 +262,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
       if (!preview) { store.settings = settings; await store.refreshLibrary(); }
     },
     async importMedia() {
-      if (!desktop) throw new Error("请在桌面应用中导入图片或视频");
+      if (!desktop) throw new Error("请在桌面应用中导入本地壁纸");
       const result = await invoke<{ id: string; library: WallpaperLibrary } | null>("import_local_wallpaper");
       if (!result) return null;
       store.library = result.library;

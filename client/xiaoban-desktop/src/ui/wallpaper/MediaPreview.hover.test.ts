@@ -9,7 +9,7 @@ describe('local HTML wallpaper card preview', () => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
     const view = mount(defineComponent({
       components: { MediaPreview },
-      template: '<button class="wallpaper-card"><MediaPreview kind="web" source="wallpaper-asset://localhost/hash" poster="" title="桌面小星球" /></button>',
+      template: '<button class="wallpaper-card"><MediaPreview kind="web" source="wallpaper-asset://localhost/hash" poster="" title="我的动画壁纸" /></button>',
     }));
     try {
       await flushPromises();

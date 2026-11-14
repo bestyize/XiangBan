@@ -533,9 +533,14 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     if content::media_label(window.label()) || effects::is_effect(window.label()) {
         if let Some(report) = report {
             if report.to_string().len() > 16384 { return Err("场景报告过大".into()); }
-            let failed = report.get("error").is_some();
+            let error = report.get("error").cloned();
             window.app_handle().state::<content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).insert(window.label().into(), report);
-            if failed { return Ok(()); }
+            if let Some(error) = error {
+                if let Some(message) = error.as_str().filter(|_| effects::is_effect(window.label())) {
+                    let _ = window.app_handle().emit("desktop-error", message);
+                }
+                return Ok(());
+            }
         }
     }
     if content::is_wallpaper(window.label()) {
