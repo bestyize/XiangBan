@@ -10,7 +10,7 @@ const maxFileBytes = 32 * 1024 * 1024
 
 const policy = [
   "default-src 'none'",
-  "script-src 'unsafe-inline'",
+  "script-src 'unsafe-inline' 'wasm-unsafe-eval'",
   "style-src 'unsafe-inline'",
   'img-src data: blob:',
   'media-src data: blob:',
@@ -31,6 +31,21 @@ function embedPlayer(html, source) {
     function openCommunityExhibit(action) {
       if (window.parent !== window) window.parent.postMessage(action, '*');
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const status = document.querySelector('#status, #preview-status');
+      if (!status) return;
+      const showFailure = () => {
+        if (!status.textContent.trim().startsWith('无法')) return;
+        status.textContent = '当前无法显示 3D 预览，可以查看展品图片。';
+        status.dataset.previewFailed = 'true';
+        observer.disconnect();
+        openCommunityExhibit('gallery:unavailable');
+      };
+      const observer = new MutationObserver(showFailure);
+      observer.observe(status, { childList: true, characterData: true, subtree: true });
+      showFailure();
+    });
   </script>`
   const linkStyle = `<style>
     button[onclick^="openCommunityExhibit"] { font: inherit; cursor: pointer; }

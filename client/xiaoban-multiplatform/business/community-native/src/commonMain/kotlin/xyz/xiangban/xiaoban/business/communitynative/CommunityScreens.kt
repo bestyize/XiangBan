@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 
 internal enum class CommunitySection(val label: String) { Home("首页"), Ideas("创意"), Discuss("讨论"), Resources("资源") }
 
+private enum class IdeasSub(val label: String) { All("全部"), Gallery("微观展厅") }
+
 /**
  * 社区：顶部是 首页 / 创意 / 讨论 / 资源 四个栏目，每个栏目下面有自己的二级栏目。
  * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
@@ -48,6 +50,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
     var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
     var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Software.key) }
+    var ideasSub by rememberSaveable { mutableStateOf(IdeasSub.All.name) }
     val current = CommunitySection.valueOf(section)
     val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
 
@@ -74,7 +77,8 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, currentHome.key, centered = true) { homeSub = it }
-                CommunitySection.Ideas, CommunitySection.Discuss -> Unit
+                CommunitySection.Ideas -> TabStrip(IdeasSub.entries.map { it.name to it.label }, ideasSub) { ideasSub = it }
+                CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -93,7 +97,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 }
                 when (current) {
                     CommunitySection.Home -> Unit
-                    CommunitySection.Ideas -> IdeasTab(env, open)
+                    CommunitySection.Ideas -> if (ideasSub == IdeasSub.Gallery.name) MicroGalleryTab(env.config.forumBase, open) else IdeasTab(env, open)
                     CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
                     CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open)
                 }

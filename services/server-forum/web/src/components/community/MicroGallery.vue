@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { galleryAssets, galleryExhibits, galleryTab } from '@/lib/microGallery'
@@ -8,12 +8,25 @@ const route = useRoute()
 const router = useRouter()
 const exhibit = computed(() => galleryExhibits.find(item => item.id === route.query.exhibit))
 const player = useTemplateRef<HTMLIFrameElement>('player')
+const photoMode = ref(false)
+const previewFailed = ref(false)
+
+function coverUrl(cover: string) {
+  return `${galleryAssets}assets/gallery/${cover}.webp`
+}
+
+function togglePhoto() {
+  photoMode.value = !photoMode.value
+  previewFailed.value = false
+}
 
 function exhibitLocation(id?: string) {
   return { name: 'ideas', query: { tab: galleryTab.key, exhibit: id } }
 }
 
 watch(exhibit, async (current, previous) => {
+  photoMode.value = false
+  previewFailed.value = false
   await nextTick()
   if (current) {
     document.getElementById('exhibit-title')?.focus({ preventScroll: true })
@@ -43,6 +56,9 @@ function onExhibitMessage(event: MessageEvent) {
     returnToGallery()
   } else if (event.data === 'gallery:aquarium') {
     void router.replace(exhibitLocation('aquarium'))
+  } else if (event.data === 'gallery:unavailable') {
+    previewFailed.value = true
+    photoMode.value = true
   }
 }
 
@@ -61,8 +77,14 @@ watch(exhibit, (current, _, onCleanup) => {
           <AppIcon name="back" :size="16" /> 返回展厅
         </a>
         <h2 id="exhibit-title" tabindex="-1">{{ exhibit.name }}</h2>
+        <button type="button" class="gallery-photo-toggle" @click="togglePhoto">{{ photoMode ? '试用 3D' : '看图片' }}</button>
       </div>
+      <figure v-if="photoMode" class="gallery-photo">
+        <img :src="coverUrl(exhibit.cover)" :alt="exhibit.name">
+        <figcaption v-if="previewFailed" role="status">当前无法显示 3D 预览，已切换为展品图片。</figcaption>
+      </figure>
       <iframe
+        v-else
         ref="player"
         :key="exhibit.id"
         :src="galleryAssets + exhibit.source + exhibit.query"
@@ -75,7 +97,7 @@ watch(exhibit, (current, _, onCleanup) => {
     <ul v-else class="gallery-grid">
       <li v-for="(item, index) in galleryExhibits" :key="item.id" :class="{ 'gallery-feature': index === 0 }">
         <RouterLink :id="`exhibit-${item.id}`" :to="exhibitLocation(item.id)" class="gallery-card">
-          <img :src="`${galleryAssets}assets/gallery/${item.cover}.webp`" alt="" :loading="index === 0 ? 'eager' : 'lazy'" decoding="async">
+          <img :src="coverUrl(item.cover)" alt="" :loading="index === 0 ? 'eager' : 'lazy'" decoding="async">
           <div class="gallery-copy">
             <h2>{{ item.name }}</h2>
             <p>{{ item.description }}</p>
@@ -172,6 +194,39 @@ watch(exhibit, (current, _, onCleanup) => {
   gap: 4px;
   min-height: 44px;
   color: var(--brand);
+  font-size: 13px;
+}
+
+.gallery-photo-toggle {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gallery-photo {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.gallery-photo img {
+  display: block;
+  width: 100%;
+  max-height: min(70dvh, 720px);
+  object-fit: contain;
+}
+
+.gallery-photo figcaption {
+  margin-top: 12px;
+  color: var(--ink-2);
   font-size: 13px;
 }
 

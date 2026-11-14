@@ -32,6 +32,7 @@ sealed interface Route {
     /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
     data class Repo(val owner: String, val repo: String) : Route
     data class WebPage(val url: String) : Route
+    data class GalleryExhibit(val id: String) : Route
     data class Software(val project: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
     data class OpenSourceCollection(val key: String) : Route
@@ -84,6 +85,7 @@ sealed interface Route {
         is Articles -> "articles:${category.encodeURLParameter()}:${title.encodeURLParameter()}"
         is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is WebPage -> "web:${url.encodeURLParameter()}"
+        is GalleryExhibit -> "gallery-exhibit:$id"
         is Software -> "software:${project.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
@@ -131,6 +133,7 @@ sealed interface Route {
                 "frontier" -> if (value.isEmpty()) Frontier else runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::FrontierArticle) }.getOrNull()
                 "articles" -> runCatching { Articles(value.substringBefore(':').decodeURLPart(), value.substringAfter(':').decodeURLPart()) }.getOrNull()
                 "web" -> runCatching { webPageRoute(value.decodeURLPart()) }.getOrNull()
+                "gallery-exhibit" -> MicroGalleryExhibit.byId(value)?.let { GalleryExhibit(it.id) }
                 "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
                 "software" -> runCatching { value.decodeURLPart().takeIf { it.matches(Regex("[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+")) }?.let(::Software) }.getOrNull()
                 "repo", "opensource" -> runCatching {
