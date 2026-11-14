@@ -19,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,27 +34,48 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.xiangban.xiaoban.common.community.ForumCategories
+import xyz.xiangban.xiaoban.common.community.ForumSection
+import xyz.xiangban.xiaoban.common.community.Load
 
 internal enum class CommunitySection(val label: String) { Home("首页"), Ideas("创意"), Discuss("讨论"), Resources("资源") }
 
-private enum class IdeasSub(val label: String) { All("全部"), Gallery("微观展厅") }
+private const val AllIdeas = ""
+private const val Gallery = "gallery:micro"
 
 /**
  * 社区：顶部是 首页 / 创意 / 讨论 / 资源 四个栏目，每个栏目下面有自己的二级栏目。
  * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
  */
 @Composable
-fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
+fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination: (Route.NewPost) -> Unit = {}) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
     var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
     // 旧版会把热榜存为独立的首页标签。
     val legacyHotSelected = homeSub == "hot"
     var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
-    var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
-    var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Software.key) }
-    var ideasSub by rememberSaveable { mutableStateOf(IdeasSub.All.name) }
+    var discussSub by rememberSaveable { mutableStateOf(AllDiscussions) }
+    var resourceSub by rememberSaveable { mutableStateOf(SoftwareResourceTab) }
+    var ideasSub by rememberSaveable { mutableStateOf(AllIdeas) }
+    var ideaBoard by rememberSaveable { mutableStateOf(AllIdeas) }
     val current = CommunitySection.valueOf(section)
     val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
+    val loader = rememberLoader(env, "forum-categories") { ForumCategories(env.forum.categories()) }
+    val categoryState by loader.state.collectAsState()
+    val catalog = (categoryState as? Load.Ready)?.value
+    val ideaBoards = catalog?.boardsIn(ForumSection.Ideas).orEmpty()
+    val resourceBoards = catalog?.boardsIn(ForumSection.Resources).orEmpty()
+    val ideaTab = ideaBoards.firstOrNull { it.slug == ideaBoard }?.slug ?: AllIdeas
+    val ideasGallery = ideasSub == Gallery
+    val resourceTab = resourceBoards.firstOrNull { it.slug == resourceSub }?.slug ?: SoftwareResourceTab
+    SideEffect {
+        onPostDestination(when (current) {
+            CommunitySection.Home -> Route.NewPost()
+            CommunitySection.Ideas -> Route.NewPost(ForumSection.Ideas, ideaTab.takeIf { it.isNotEmpty() && !ideasGallery })
+            CommunitySection.Discuss -> Route.NewPost(ForumSection.Discuss, catalog?.find(discussSub)?.slug)
+            CommunitySection.Resources -> Route.NewPost(ForumSection.Resources, catalog?.find(resourceTab)?.slug)
+        })
+    }
 
     fun openHotRanking() {
         hotRankingOpenCount++
@@ -60,16 +83,26 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        if (discussSub == "create") {
-            if (current == CommunitySection.Discuss) section = CommunitySection.Ideas.name
-            discussSub = DiscussSub.All.key
+        discussSub = when (discussSub) {
+            "create" -> {
+                if (current == CommunitySection.Discuss) section = CommunitySection.Ideas.name
+                AllDiscussions
+            }
+            "casual-media" -> {
+                if (current == CommunitySection.Discuss) section = CommunitySection.Resources.name
+                resourceSub = "resource-movies"
+                AllDiscussions
+            }
+            "design", "3d" -> "tag:$discussSub"
+            else -> discussSub
         }
-        if (discussSub == "casual-media") {
-            if (current == CommunitySection.Discuss) section = CommunitySection.Resources.name
-            resourceSub = ResourceSub.Media.key
-            discussSub = DiscussSub.All.key
+        resourceSub = when (resourceSub) {
+            "media" -> "resource-movies"
+            "help" -> "resource-help"
+            "open", "resource-open" -> SoftwareResourceTab
+            else -> resourceSub
         }
-        resourceSub = ResourceSub.byKey(resourceSub).key
+        if (ideasSub == "Gallery") ideasSub = Gallery
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -77,9 +110,15 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, currentHome.key, centered = true) { homeSub = it }
-                CommunitySection.Ideas -> TabStrip(IdeasSub.entries.map { it.name to it.label }, ideasSub, centered = true) { ideasSub = it }
+                CommunitySection.Ideas -> TabStrip(
+                    listOf(AllIdeas to "全部", Gallery to "微观展厅"),
+                    if (ideasGallery) Gallery else AllIdeas, centered = true,
+                ) { ideasSub = it }
                 CommunitySection.Discuss -> Unit
-                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
+                CommunitySection.Resources -> TabStrip(
+                    listOf(SoftwareResourceTab to "开源软件") + resourceBoards.map { it.slug to it.name },
+                    resourceTab, centered = true,
+                ) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 HomeSub.entries.forEach { page ->
@@ -97,9 +136,30 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 }
                 when (current) {
                     CommunitySection.Home -> Unit
-                    CommunitySection.Ideas -> if (ideasSub == IdeasSub.Gallery.name) MicroGalleryTab(env.config.forumBase, open) else IdeasTab(env, open)
-                    CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
-                    CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open)
+                    CommunitySection.Ideas -> if (ideasGallery) {
+                        MicroGalleryTab(env.config.forumBase, open)
+                    } else {
+                        LoadBox(categoryState, loader::reload) {
+                            val category = ideaTab.ifEmpty { ideaBoards.joinToString(",") { it.slug }.ifEmpty { NoActiveBoard } }
+                            Column(Modifier.fillMaxSize()) {
+                                if (ideaBoards.isNotEmpty()) {
+                                    PageChipRow(
+                                        listOf(AllIdeas to "全部板块") + ideaBoards.map { it.slug to it.name },
+                                        ideaTab, { ideaBoard = it }, Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    )
+                                }
+                                Box(Modifier.weight(1f)) { BoardNoteFeed(env, category, open) }
+                            }
+                        }
+                    }
+                    CommunitySection.Discuss -> LoadBox(categoryState, loader::reload) {
+                        DiscussTab(env, it, discussSub, { discussSub = it }, open)
+                    }
+                    CommunitySection.Resources -> Column(Modifier.fillMaxSize()) {
+                        val failure = categoryState as? Load.Failed
+                        if (failure != null) Banner(failure.message, warn = true, actionText = "重试", onAction = loader::reload)
+                        ResourceTab(env, resourceTab, open)
+                    }
                 }
             }
         }

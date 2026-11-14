@@ -64,6 +64,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.DiscussController
+import xyz.xiangban.xiaoban.common.community.ForumCategories
+import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.LikeState
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
@@ -75,20 +77,8 @@ import xyz.xiangban.xiaoban.common.community.compactCount
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
 
-internal enum class DiscussSub(val key: String, val label: String, val topicTag: String? = null) {
-    All("all", "全部"),
-    Design("design", "设计", topicTag = "设计"),
-    Games("casual-games", "游戏"),
-    ThreeD("3d", "3D", topicTag = "3d"),
-    Learn("learn", "教程"),
-    Travel("casual-travel", "旅行"), Books("casual-books", "读书"),
-    Screen("casual-screen", "影视动漫"), Feelings("casual-feelings", "情感心理"),
-    Food("casual-food", "美食"), Work("casual-work", "职场");
-
-    companion object {
-        fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: All
-    }
-}
+internal const val AllDiscussions = "all"
+internal const val NoActiveBoard = "__no_active_category__"
 
 /** 白底卡片之间留 8dp、两边留 12dp；底部让出悬浮导航的高度。 */
 internal val FeedPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp + NavInset)
@@ -273,86 +263,79 @@ internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
     }
 }
 
-// ───────────── 学习和教程 ─────────────
-
-private fun learnChannel(filter: String): String = when (filter) {
-    "claude-code" -> "learn-claude-code"; "codex" -> "learn-codex"; "提示词" -> "learn-prompts"; "工作流" -> "learn-workflows"; "本地部署" -> "learn-local"; "ai-硬件" -> "learn-hardware"; else -> "learn"
-}
-
-/** 教程的子话题沿用论坛分类，点「教程」回到该分类的全部帖子。 */
-private val LearnTags = listOf("claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
 private const val ActiveDiscussionTag = "active-tag"
 private val DiscussionGutter = 16.dp
 
-
-private const val IdeasTitle = "小伴桌面1.0.0发布，支持动态桌面，一句话生成特效！"
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun IdeasTab(env: CommunityEnv, open: (Route) -> Unit) {
-    val loader = rememberLoader(env, IdeasTitle) {
-        env.forum.searchTopics("小伴桌面1.0.0发布").items.firstOrNull { it.title == IdeasTitle }
+internal fun BoardNoteFeed(env: CommunityEnv, category: String, open: (Route) -> Unit) {
+    val session by env.session.state.collectAsState()
+    var page by rememberSaveable(category) { mutableIntStateOf(1) }
+    val loader = rememberLoader(env, Triple(category, page, session.accountId)) {
+        env.forum.topics(sort = "new", category = category, page = page, home = false, activeOnly = true)
     }
     val state by loader.state.collectAsState()
-    LoadBox(state, loader::reload) { topic ->
-        NoteFeed(env, listOfNotNull(topic), open, showCategory = true)
+    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
+        LoadBox(state, loader::reload) { result ->
+            NoteFeed(env, result.items, open, showCategory = true) {
+                if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
+            }
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussSub) -> Unit, open: (Route) -> Unit) {
+internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String, selectSub: (String) -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
     val scope = rememberCoroutineScope()
-    var filter by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf("") }
     var page by rememberSaveable { mutableIntStateOf(1) }
     val likes = remember(session.accountId) { mutableStateMapOf<Long, LikeState>() }
     val liking = remember(session.accountId) { mutableStateMapOf<Long, Unit>() }
     var toast by remember(session.accountId) { mutableStateOf<String?>(null) }
-    val category = when (sub) {
-        DiscussSub.All, DiscussSub.Design, DiscussSub.ThreeD -> "learn,casual"
-        DiscussSub.Learn -> learnChannel(filter)
-        else -> sub.key
+    val discussion = remember(catalog) { catalog.activeIn(ForumSection.Discuss) + catalog.activeIn(ForumSection.Site) }
+    val bySlug = remember(discussion) { discussion.associateBy { it.slug } }
+    val activeBoard = bySlug[sub]
+    val activeParent = activeBoard?.let(catalog::parent)
+    val activeGroup = activeParent?.takeUnless { it.slug == "casual" }?.slug ?: sub
+    val tagFilter = catalog.discussionTabs.firstOrNull { it.key == sub }?.topicTag
+    val selected = when {
+        tag.isNotBlank() -> ActiveDiscussionTag
+        activeBoard != null || tagFilter != null -> sub
+        else -> AllDiscussions
     }
-    val topicTag = sub.topicTag ?: tag.ifBlank { null }
+    val category = activeBoard?.slug ?: catalog.boardsIn(ForumSection.Discuss)
+        .joinToString(",") { it.slug }.ifBlank { NoActiveBoard }
+    val topicTag = tagFilter ?: tag.ifBlank { null }
     val loader = rememberLoader(env, listOf(category, topicTag, page, session.accountId)) {
-        env.forum.topics(sort = "new", category = category, page = page, tag = topicTag, activeOnly = true)
+        env.forum.topics(sort = "new", category = category, page = page, tag = topicTag,
+            home = activeBoard == null, activeOnly = true)
     }
     val state by loader.state.collectAsState()
     val topics = buildList {
-        DiscussSub.entries.forEach {
-            add(it.key to it.label)
-            if (it == DiscussSub.All && tag.isNotBlank()) add(ActiveDiscussionTag to "# $tag ×")
-            if (it == DiscussSub.Learn && sub == DiscussSub.Learn) addAll(LearnTags)
+        add(AllDiscussions to "全部")
+        if (tag.isNotBlank()) add(ActiveDiscussionTag to "# $tag ×")
+        for (tab in catalog.discussionTabs) {
+            add(tab.key to tab.label)
+            val board = tab.category
+            if (activeGroup == tab.key && board != null) {
+                catalog.children(board).forEach { add(it.slug to it.name) }
+            }
         }
-    }
-    val selected = when {
-        tag.isNotBlank() -> ActiveDiscussionTag
-        sub == DiscussSub.Learn && LearnTags.any { it.first == filter } -> filter
-        else -> sub.key
     }
 
     fun selectTopic(key: String) {
         tag = ""
         page = 1
         if (key == ActiveDiscussionTag) return
-        if (LearnTags.any { it.first == key }) {
-            selectSub(DiscussSub.Learn)
-            filter = key
-        } else {
-            filter = ""
-            selectSub(DiscussSub.byKey(key))
-        }
+        selectSub(key)
     }
 
     fun selectCategory(topic: Topic) {
         val slug = topic.category.slug
-        val lesson = LearnTags.firstOrNull { learnChannel(it.first) == slug }
-        when {
-            lesson != null -> selectTopic(lesson.first)
-            DiscussSub.entries.any { it.key == slug && it.topicTag == null } -> selectTopic(slug)
-            else -> open(Route.Articles(slug, topic.category.name))
-        }
+        if (slug in bySlug) selectTopic(slug)
+        else open(Route.Articles(slug, topic.category.name))
     }
 
     fun refresh() {
@@ -395,8 +378,8 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
                     ) {
                         if (result.items.isEmpty()) item {
                             DiscussionEmpty(
-                                allTopics = selected == DiscussSub.All.key,
-                                showAll = { selectTopic(DiscussSub.All.key) },
+                                allTopics = selected == AllDiscussions,
+                                showAll = { selectTopic(AllDiscussions) },
                                 modifier = Modifier.fillParentMaxHeight(0.9f),
                             )
                         }
@@ -413,7 +396,7 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
                                 onLike = { toggleLike(topic) },
                                 onCategory = { selectCategory(topic) },
                                 onTag = {
-                                    selectTopic(DiscussSub.All.key)
+                                    selectTopic(AllDiscussions)
                                     tag = it
                                 },
                             )

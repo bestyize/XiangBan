@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.decodeURLPart
+import xyz.xiangban.xiaoban.common.community.ForumSection
 
 /** 页面栈里的一页。编码成字符串，方便旋转屏幕后恢复。 */
 sealed interface Route {
@@ -44,7 +45,7 @@ sealed interface Route {
     data object Scatter : Route
     data object Login : Route
     data object Search : Route
-    data object NewPost : Route
+    data class NewPost(val section: ForumSection? = null, val boardSlug: String? = null) : Route
     data class CreationPost(val title: String, val body: String) : Route
     /** 发求助：和发帖同一页，一打开就选好「资源求助」并显示悬赏设置。 */
     data object NewHelp : Route
@@ -94,7 +95,8 @@ sealed interface Route {
         Scatter -> "scatter"
         Login -> "login"
         Search -> "search"
-        NewPost -> "newpost"
+        is NewPost -> if (section == null && boardSlug == null) "newpost"
+            else "newpost:${section?.name.orEmpty()}:${boardSlug.orEmpty().encodeURLParameter()}"
         is CreationPost -> "creationpost:${title.encodeURLParameter()}:${body.encodeURLParameter()}"
         NewHelp -> "newhelp"
         Settings -> "settings"
@@ -148,7 +150,12 @@ sealed interface Route {
                 "scatter" -> Scatter
                 "login" -> Login
                 "search" -> Search
-                "newpost" -> NewPost
+                "newpost" -> runCatching {
+                    NewPost(
+                        ForumSection.entries.firstOrNull { it.name == value.substringBefore(':') },
+                        value.substringAfter(':', "").decodeURLPart().ifEmpty { null },
+                    )
+                }.getOrNull()
                 "creationpost" -> runCatching { CreationPost(value.substringBefore(':').decodeURLPart(), value.substringAfter(':', "").decodeURLPart()) }.getOrNull()
                 "publishgame" -> value.takeIf { it.matches(Regex("[a-z0-9][a-z0-9-]{1,39}")) }?.let { PublishPack(localGameId = it) }
                 "newhelp" -> NewHelp

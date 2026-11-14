@@ -24,10 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,43 +55,14 @@ import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.remainText
 
-/** 资源的二级栏目；精选独立放在首页。 */
-internal enum class ResourceSub(val key: String, val label: String) {
-    Software("software", "开源软件"), Media("media", "影视"), Help("help", "求助悬赏");
-
-    companion object {
-        // 旧版本存下的 "open" / "resource-open"（已下线的开源讨论）不在列表里，会落到默认的开源软件。
-        fun byKey(key: String) = when (key) {
-            "resource-movies" -> Media
-            "resource-help" -> Help
-            else -> entries.firstOrNull { it.key == key } ?: Software
-        }
-    }
-}
+internal const val SoftwareResourceTab = "directory:software"
 
 @Composable
-internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit) {
+internal fun ResourceTab(env: CommunityEnv, sub: String, open: (Route) -> Unit) {
     when (sub) {
-        ResourceSub.Software -> SoftwareDirectoryTab(env, open)
-        ResourceSub.Media -> ResourceMediaTab(env, open)
-        ResourceSub.Help -> HelpTab(env, open)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ResourceMediaTab(env: CommunityEnv, open: (Route) -> Unit) {
-    var page by rememberSaveable { mutableIntStateOf(1) }
-    val loader = rememberLoader(env, page) {
-        env.forum.topics(sort = "new", category = "resource-movies", page = page, home = false, activeOnly = true)
-    }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { result ->
-            NoteFeed(env, result.items, open, showCategory = true) {
-                if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
-            }
-        }
+        SoftwareResourceTab -> SoftwareDirectoryTab(env, open)
+        "resource-help", "share-help" -> HelpTab(env, sub, open)
+        else -> BoardNoteFeed(env, sub, open)
     }
 }
 
@@ -140,9 +109,9 @@ internal fun helpRemain(help: HelpInfo): String = when {
 }
 
 @Composable
-private fun HelpTab(env: CommunityEnv, open: (Route) -> Unit) {
+private fun HelpTab(env: CommunityEnv, category: String, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-help", home = false, activeOnly = true) }
+    val controller = remember(env, category) { DiscussController(env.forum, scope, category = category, home = false, activeOnly = true) }
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
     TopicFeed(controller, "还没有人发求助", open, header = {

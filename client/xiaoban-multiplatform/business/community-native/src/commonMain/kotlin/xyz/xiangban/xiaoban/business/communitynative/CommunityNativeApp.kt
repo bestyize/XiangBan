@@ -111,6 +111,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         var showMyWorks by rememberSaveable { mutableStateOf(false) }
+        var communityPost by remember { mutableStateOf(Route.NewPost()) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
         // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
         var pendingImageSheet by remember { mutableStateOf(false) }
@@ -140,7 +141,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     )
                 }
                 RetainedMainTab(selected = selectedTab == Tab.Community) {
-                    CommunityScreen(env, ::push)
+                    CommunityScreen(env, ::push, onPostDestination = { communityPost = it })
                 }
                 AnimatedContent(targetState = selectedTab, modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(TabMillis)) togetherWith fadeOut(tween(TabMillis)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
@@ -186,7 +187,10 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     env,
                     onDismiss = { publishOpen = false },
                     onAiCreate = { publishOpen = false; chat.clearConversation(); push(Route.AiChat) },
-                    onNewPost = { publishOpen = false; push(Route.NewPost) },
+                    onNewPost = {
+                        publishOpen = false
+                        push(if (tab == Tab.Community.name) communityPost else Route.NewPost())
+                    },
                     onPublishPack = { publishOpen = false; push(Route.PublishPack()) },
                     panelModifier = panel,
                 )
@@ -219,7 +223,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
         Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。
         Route.Search -> SearchScreen(env, back = pop, open = push)
-        Route.NewPost -> NewPostScreen(env, back = pop, open = push)
+        is Route.NewPost -> NewPostScreen(env, back = pop, open = push, initialSection = route.section, initialBoardSlug = route.boardSlug)
         is Route.CreationPost -> NewPostScreen(env, back = pop, open = push, initialTitle = route.title, initialBody = route.body)
         Route.NewHelp -> NewPostScreen(env, back = pop, open = push, help = true)
         is Route.Tool -> ToolDetailScreen(env, route.key, pop)
@@ -258,7 +262,7 @@ private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: (
         Text("发布", style = XType.Title, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），发布到社区", onPublishPack)
-        SheetAction(XIcons.Pen, "发帖", "在讨论或资源里发一个帖子", onNewPost)
+        SheetAction(XIcons.Pen, "发帖", "发布到创意、讨论或资源板块", onNewPost)
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
     }
 }
