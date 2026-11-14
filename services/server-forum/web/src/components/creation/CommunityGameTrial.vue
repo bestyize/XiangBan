@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { contentApi, runtimeBase, type PackDetail } from '@/api/content'
 import { appRuntimeChannel, appRuntimeEntry, canTrialPack } from '@/lib/appRuntime'
 import { appRuntimeStorage } from '@/lib/appRuntimeStorage'
 import { readGameZip, sandboxUrl, validateDownload } from '@/lib/creationTrial'
-const props = defineProps<{ pack: PackDetail; version: number }>()
+const props = defineProps<{ pack: PackDetail; version: number; autostart?: boolean }>()
+const emit = defineEmits<{ exit: [] }>()
 const frame = ref<HTMLIFrameElement | null>(null), active = ref(false), loading = ref(false), error = ref(''), files = shallowRef<Record<string,string> | null>(null), nonce = ref(''), host = ref('')
 let sequence = 0
 let hostTimer: ReturnType<typeof setTimeout> | undefined
@@ -13,8 +14,9 @@ const usesV2 = computed(() => props.pack.versions.find(v => v.version === props.
 const configured = computed(() => usesV2.value ? Boolean(runtimeBase) : Boolean(import.meta.env.VITE_GAME_SANDBOX_URL))
 const eligible = computed(() => canTrialPack(props.pack.kind, props.pack.status, props.pack.trust_level,
   props.pack.versions.find(v => v.version === props.version)?.manifest.runtimeProtocol))
+const isApp = computed(() => props.pack.kind === 'app')
 async function start() {
-  if (loading.value || exitTimer) return
+  if (!eligible.value || !configured.value || loading.value || exitTimer) return
   const current = ++sequence; loading.value = true; error.value = ''; active.value = false; host.value = ''
   try {
     const pack = await contentApi.pack(props.pack.id)
@@ -90,19 +92,24 @@ function stop() {
   if (usesV2.value && frame.value?.contentWindow && host.value) {
     clearTimeout(hostTimer)
     frame.value.contentWindow.postMessage({ channel: appRuntimeChannel, type: 'hide' }, new URL(host.value).origin)
-    exitTimer = setTimeout(reset, 500)
+    exitTimer = setTimeout(finish, 500)
   } else {
-    reset()
+    finish()
   }
 }
+function finish() {
+  reset()
+  emit('exit')
+}
+onMounted(() => { if (props.autostart) void start() })
 onBeforeUnmount(() => { reset(); window.removeEventListener('message',receive) })
 </script>
 <template>
   <section v-if="eligible" class="trial">
-    <p v-if="!configured">网页试玩暂不可用，可在客户端体验。</p>
-    <div v-else-if="!active"><button class="btn btn-primary" :disabled="loading" type="button" @click="start">{{ loading ? '正在校验…' : '试玩游戏' }}</button></div>
-    <div v-if="active" class="bar"><strong>游戏试玩</strong><button class="btn" type="button" @click="start">重新开始</button><button class="btn" type="button" @click="stop">退出试玩</button></div>
-    <iframe v-if="active" :key="host" ref="frame" :src="host || undefined" title="隔离游戏试玩宿主" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+    <p v-if="!configured">请在小伴客户端打开{{ isApp ? '此应用' : '此游戏' }}。</p>
+    <div v-else-if="!active"><button class="btn btn-primary" :disabled="loading" type="button" @click="start">{{ loading ? '正在打开…' : isApp ? '打开应用' : '试玩游戏' }}</button></div>
+    <div v-if="active" class="bar"><strong>{{ isApp ? pack.title : '游戏试玩' }}</strong><button class="btn" type="button" @click="start">{{ isApp ? '重新打开' : '重新开始' }}</button><button class="btn" type="button" @click="stop">{{ isApp ? '关闭应用' : '退出试玩' }}</button></div>
+    <iframe v-if="active" :key="host" ref="frame" :src="host || undefined" :title="pack.title" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
     <p v-if="error" role="alert">{{ error }}</p>
   </section>
 </template>

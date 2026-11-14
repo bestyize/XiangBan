@@ -8,12 +8,11 @@ import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
-import { requiredPostLevel } from '@/lib/format'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 import { tagLabel } from '@/lib/format'
 import { articleLayout } from '@/lib/cardPresentation'
-import { canonicalCategory, categoryHref } from '@/lib/communityStructure'
+import { canonicalCategory, categoryHref, postableCategories } from '@/lib/communityStructure'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,13 +54,12 @@ function withQuery(patch: { sort?: string; tag?: string; help?: string }) {
   return { query: q }
 }
 
-/** 能发帖的分类：叶子分类且不是站务专用。一级分类发帖时让用户再选子分类。 */
+/** 一级分类有可发帖的子板块时可以进入发帖页。 */
 const composeTarget = computed(() => {
   const c = category.value
   if (!c || c.status !== 'active' || !c.posting_enabled) return null
-  // 已登录但等级不够发帖的板块（比如只有守护者能发的「小伴产品」和站务公告）不显示按钮；没登录的先让他登录。
-  const level = session.user?.trust_level
-  if (level !== undefined && level < requiredPostLevel(c)) return null
+  const level = session.user?.trust_level ?? 3
+  if (!postableCategories(meta.categories, level).some(board => board.id === c.id || board.parent_id === c.id)) return null
   return `/new?category=${c.slug}`
 })
 

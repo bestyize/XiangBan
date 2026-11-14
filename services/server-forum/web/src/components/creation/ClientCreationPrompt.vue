@@ -18,7 +18,7 @@ async function copy() {
       <textarea id="creation-idea" v-model="idea" class="input" rows="4" placeholder="写下你的创作想法" />
       <button v-if="idea" class="btn" type="button" @click="copy">复制想法</button><span role="status">{{ copied }}</span>
       <p>Windows / macOS 支持桌面创作；Android 目前支持游戏创作。iOS 暂不支持本地创作。</p>
-      <a class="btn btn-primary" href="https://wallpaper.xiangban.xyz/" target="_blank" rel="noopener noreferrer">前往小伴官网下载</a>
+      <RouterLink class="btn btn-primary" to="/ai" @click="emit('update:show', false)">下载小伴客户端</RouterLink>
     </div>
   </ModalDialog>
 </template>

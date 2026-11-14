@@ -9,7 +9,10 @@ export const SHOW_CHILD_THRESHOLD = 20
 
 export const useMeta = defineStore('meta', () => {
   const categories = ref<Category[]>([])
+  const categoriesLoading = ref(false)
+  const categoriesError = ref('')
   let loading: Promise<void> | null = null
+  let loaded = false
 
   const navigation = computed(()=>navigationSections(categories.value))
 
@@ -21,17 +24,26 @@ export const useMeta = defineStore('meta', () => {
   const byId = computed(() => new Map(categories.value.map(c => [c.id, c])))
 
   function load(force = false) {
-    if (loading && !force) return loading
+    if (loading) return loading
+    if (loaded && !force) return Promise.resolve()
+    categoriesLoading.value = true
+    categoriesError.value = ''
     loading = api
       .categories()
       .then(c => {
         categories.value = c
+        loaded = true
       })
-      .catch(() => {
+      .catch(error => {
+        loaded = false
+        categoriesError.value = error instanceof Error ? error.message : '板块加载失败'
+      })
+      .finally(() => {
+        categoriesLoading.value = false
         loading = null
       })
     return loading
   }
 
-  return { categories, navigation, bySlug, byId, load }
+  return { categories, categoriesLoading, categoriesError, navigation, bySlug, byId, load }
 })

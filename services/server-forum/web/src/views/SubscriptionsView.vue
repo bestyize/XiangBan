@@ -45,7 +45,7 @@ onMounted(()=>void act(load));onBeforeUnmount(()=>{disposed=true;++generation})
     <label>时区<input v-model="draft.timezone" required placeholder="Asia/Shanghai" @input="confirmed=false"></label>
    </div>
    <div class="grid"><label>单次额度上限<input v-model.number="draft.budget_per_run" type="number" min="1" max="1000000000000" step="1" required placeholder="自行设置，不预填价格" @input="confirmed=false"></label><label>每月额度上限（UTC 自然月）<input v-model.number="draft.budget_per_month" type="number" :min="draft.budget_per_run||1" max="1000000000000" step="1" required placeholder="含本月已用和预约额度" @input="confirmed=false"></label></div>
-   <p class="hint">与对话共用小伴额度。每期预约不超过单次上限，结算按已配置费率和实际用量；不会超预算追加扣款。每月上限含未结算预约，失败释放后可复用。降低预算不追回已开始任务的预约。<RouterLink to="/ai?panel=account">查看共同额度</RouterLink></p>
+   <p class="hint">与对话共用小伴额度。每期预约不超过单次上限，结算按已配置费率和实际用量；不会超预算追加扣款。每月上限含未结算预约，失败释放后可复用。降低预算不追回已开始任务的预约。<RouterLink to="/ai">下载客户端查看额度</RouterLink></p>
    <p class="hint">夏令时不存在的时刻跳过，重复时刻只发送一次。收件邮箱仅用于投递，不读取收件箱。使用平台服务，不上传你的 API Key。</p>
    <label class="check"><input v-model="confirmed" type="checkbox" required>我确认以上关注内容、收件邮箱、周期、时间和时区，并同意收到这些邮件及在上述预算内使用共同额度。</label>
    <div class="actions"><button class="btn btn-primary" :disabled="busy||!confirmed">确认保存</button><button type="button" class="btn" @click="editor=false">取消</button></div>

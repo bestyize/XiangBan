@@ -4,20 +4,20 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useNotifications } from '@/stores/notifications'
-import { areaOf, communitySections, sectionOf, type Section } from '@/lib/sections'
+import { areaOf, communitySections, isCommunityRoot, sectionOf, type Section } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
 import AppIcon from './AppIcon.vue'
 const route = useRoute(), router = useRouter(), session = useSession(), inbox = useNotifications()
 const { preference, resolved, openAppearance } = useTheme()
-const titles = { community: '社区', ai: '小伴 AI', create: '创造', me: '我的' }
+const titles = { community: '社区', ai: '小伴 AI', create: '应用', me: '我的' }
 const title = computed(() => titles[areaOf(route)])
-const communityRoot = computed(() => communitySections.some(item => item.key === route.name))
+const communityRoot = computed(() => isCommunityRoot(route))
 const meta = useMeta()
 const section = computed(() => sectionOf(route,meta.categories))
 const destinations = ref(Object.fromEntries(communitySections.map(item => [item.key, item.path])) as Record<Section, string>)
 watch(() => route.fullPath, path => { if (communityRoot.value) destinations.value[section.value] = path }, {immediate:true})
-const detail = computed(() => !communityRoot.value && !['ai', 'create', 'me'].includes(String(route.name)))
+const detail = computed(() => !communityRoot.value)
 const searchOpen = ref(false), query = ref(''), searchInput = ref<HTMLInputElement>()
 async function search() { searchOpen.value = !searchOpen.value; if (searchOpen.value) { await nextTick(); searchInput.value?.focus() } }
 function submit() { if (query.value.trim()) router.push({ name: 'search', query: { q: query.value.trim() } }) }

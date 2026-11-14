@@ -11,6 +11,7 @@ const paths: Record<string, string[]> = {
   bell: ['M6 17v-6a6 6 0 0 1 12 0v6l2 2H4Z', 'M10 22h4'],
   arrow: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'],
   bookmark: ['M6 3h12v18l-6-4-6 4Z'], folder: ['M3 6h6l2 3h10v11H3Z'],
+  monitor: ['M3 4h18v13H3Z', 'M12 17v4M8 21h8'],
   settings: ['M4 7h16M4 17h16', 'M8 4v6M16 14v6'],
   sun: ['M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z', 'M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5'],
   moon: ['M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z'],

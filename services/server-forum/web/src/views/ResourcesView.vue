@@ -18,7 +18,10 @@ import '@/components/community/community.css'
 const meta = useMeta()
 const route = useRoute(), router = useRouter()
 const tabs = computed(()=>resourceTabs(meta.categories))
-const tab = computed(() => tabs.value.some(t => t.key === resourceTopicCategory(String(route.query.tab))) ? resourceTopicCategory(String(route.query.tab)) : 'software')
+const requestedTab = computed(() => resourceTopicCategory(typeof route.query.tab === 'string' ? route.query.tab : ''))
+const tab = computed(() => {
+  return tabs.value.some(item => item.key === requestedTab.value) ? requestedTab.value : 'software'
+})
 const sectionTitle = computed(() => tabs.value.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 type ResourceData = { kind:'topics'; result:Page<TopicItem> }
@@ -36,7 +39,9 @@ useHead(() => ({ title:'资源' }))
   <main class="community-page resource-page" :class="{ 'resource-page--media': tab === 'resource-movies' }">
     <h1 class="sr-only">社区资源</h1>
     <CommunityTabs :class="{ 'resource-tabs--software': tab === 'software' }" :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
-    <OpenSourceSoftwareDirectory v-if="tab === 'software'" />
+    <RequestState v-if="requestedTab && requestedTab !== 'software' && !meta.categories.length && (meta.categoriesLoading || meta.categoriesError)"
+      :loading="meta.categoriesLoading" :error="meta.categoriesError" @retry="meta.load()" />
+    <OpenSourceSoftwareDirectory v-else-if="tab === 'software'" />
     <template v-else>
       <HelpStats v-if="tab === 'resource-help'" />
       <RequestState :loading="loading" :error="error" @retry="load" />

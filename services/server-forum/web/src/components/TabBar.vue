@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { discussionTabs, discussionCategory, resourceTopicCategory } from '@/lib/communityStructure'
+import { postingLocation } from '@/lib/postingStructure'
 import { useMeta } from '@/stores/meta'
-import { areaOf, sectionOf } from '@/lib/sections'
+import { areaOf, isCommunityRoot } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
 import AppIcon from './AppIcon.vue'
@@ -11,26 +11,24 @@ import ModalDialog from './ModalDialog.vue'
 const meta = useMeta()
 const route = useRoute(), router = useRouter(), { preference, openAppearance } = useTheme()
 const publishing = ref(false)
-const links = [{to:'/',key:'home',label:'首页',icon:'grid'}, {to:'/discuss',key:'discuss',label:'讨论',icon:'community'}, {to:'/resources',key:'resources',label:'资源',icon:'folder'}, {to:'/me',key:'me',label:'我的',icon:'me'}]
-// AI 和创造页不在主导航里：AI 从“我的”进入，创造页是首页“试玩”的延伸。创意没有对应入口，不高亮任何项。
-const current = computed(() => {
-  const area = areaOf(route)
-  if (area === 'me' || area === 'ai') return 'me'
-  if (area === 'create') return 'home'
-  const section = sectionOf(route, meta.categories)
-  return section === 'ideas' ? '' : section
-})
+const lastCommunity = ref('/')
+const lastApps = ref('/create')
+watch(() => route.fullPath, path => {
+  if (isCommunityRoot(route)) lastCommunity.value = path
+  if (route.name === 'app-works' || (route.name === 'create' && !route.query.game)) lastApps.value = path
+}, { immediate:true })
+const links = computed(() => [
+  {to:'/ai',key:'ai',label:'小伴AI',icon:'chat'},
+  {to:lastApps.value,key:'create',label:'应用',icon:'ai'},
+  {to:lastCommunity.value,key:'community',label:'社区',icon:'grid'},
+  {to:'/me',key:'me',label:'我的',icon:'me'},
+])
+const current = computed(() => areaOf(route))
 function publish(path: string) {
   publishing.value = false
-  const tab = String(route.query.tab ?? '')
-  const category = route.name === 'resources' && tab !== 'software' && Boolean(tab)
-    ? resourceTopicCategory(tab)
-    : route.name === 'ideas' ? String(route.query.category || 'create')
-    : route.name === 'discuss' && discussionTabs(meta.categories).some(item => item.key === tab && tab !== 'all')
-    ? discussionCategory(tab, String(route.query.filter ?? ''), meta.categories) : undefined
-  const selected = meta.bySlug.get(category || '')
-  if (path === '/new' && selected?.status === 'active' && selected.posting_enabled) void router.push({path,query:{category}})
-  else if (path === '/new') void router.push({path,query:{section:route.name === 'ideas' ? 'ideas' : route.name === 'resources' ? 'resources' : 'discuss'}})
+  if (path === '/new') void router.push({
+    path, query: postingLocation(route.name, route.query, meta.categories, route.params.slug),
+  })
   else void router.push(path)
 }
 </script>
@@ -45,7 +43,7 @@ function publish(path: string) {
     </div>
     <div class="nav-bottom">
       <button @click="openAppearance"><AppIcon name="sun" :size="18" />外观 · {{ THEME_LABEL[preference] }}</button>
-      <a href="https://wallpaper.xiangban.xyz" target="_blank" rel="noopener noreferrer"><AppIcon name="download" :size="18" />下载客户端</a>
+      <RouterLink to="/ai"><AppIcon name="download" :size="18" />下载客户端</RouterLink>
       <div><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink></div>
     </div>
   </nav>

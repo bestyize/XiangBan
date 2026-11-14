@@ -26,7 +26,7 @@
   .site-layout.community-layout .header-search { max-width: var(--page-w); padding: 4px 32px 16px; }
   .site-layout.community-layout .header-search input { height: 40px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--surface-2); }
 
-  /* Secondary tabs are visually distinct from the three primary community sections. */
+  /* Secondary tabs for the community's four sections. */
   .site-layout.community-layout .community-tabs { justify-content: flex-start; gap: 6px; background: none; padding: 0; margin-bottom: 20px; border-bottom: 0; }
   .site-layout.community-layout .community-tabs button { min-height: 36px; padding: 6px 14px; border-radius: 8px; font-size: 14px; transition: background .15s, color .15s; }
   .site-layout.community-layout .community-tabs button:hover { background: var(--surface); }
@@ -34,7 +34,8 @@
   .site-layout.community-layout .community-tabs button.on:after { display: none; }
   .site-layout.community-layout .community-tabs+.community-tabs { margin-top: -8px; }
   /* Center only the section tabs; filter/sort rows keep their content alignment. */
-  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); column-gap: 16px; overflow: visible; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type:not(.with-actions) { justify-content: safe center; overflow-x: auto; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type.with-actions { column-gap: 16px; }
   .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-items { grid-column: 2; grid-row: 1; }
   .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
 

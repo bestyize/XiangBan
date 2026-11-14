@@ -1,41 +1,101 @@
 import type { Category } from '../api/types'
-import { postableCategories } from './communityStructure.ts'
+import {
+  activeCategories, canonicalCategory, discussionDestinations, discussionRoute, discussionTopicTag, navigationSection, postableCategories,
+  resourceTopicCategory, SECTION_LABELS, type NavigationSectionKey,
+} from './communityStructure.ts'
+import { requiredPostLevel, TRUST_LABEL } from './format.ts'
 
-export type PostingSectionKey = 'ideas' | 'discuss' | 'resources'
-export interface PostingGroup { id: number; name: string; categories: Category[] }
+export type PostingSectionKey = NavigationSectionKey
+export interface PostingCategory extends Category { unavailableReason: string }
+export interface PostingGroup { id: number; name: string; categories: PostingCategory[]; expandable?: boolean }
 export interface PostingSection {
   key: PostingSectionKey
   name: string
-  description: string
   groups: PostingGroup[]
 }
-const sections: Omit<PostingSection, 'groups'>[] = [
-  { key: 'ideas', name: '创意', description: '分享创作思路、作品经验与使用技巧' },
-  { key: 'discuss', name: '讨论', description: '教程、生活话题与社区反馈' },
-  { key: 'resources', name: '资源', description: '开源讨论、影视与求助悬赏' },
-]
+const sections = ['ideas', 'discuss', 'resources'] as const
+
 export function postingSections(categories: Category[], level: number, editingCategoryId?: number): PostingSection[] {
-  const selectable = postableCategories(categories,level)
-  const edited = categories.find(c=>c.id===editingCategoryId)
-  if (edited && !selectable.some(c=>c.id===edited.id)) selectable.push(edited)
-  return sections.map(section => {
-    const groups: PostingGroup[] = []
-    for (const category of selectable) {
-      const key = category.section === 'site' ? 'discuss' : category.section
-      if (key !== section.key) continue
-      const parent = categories.find(c => c.id === category.parent_id) ?? category
-      let group = groups.find(g => g.id === parent.id)
-      if (!group) { group = { id: parent.id, name: parent.name, categories: [] }; groups.push(group) }
-      group.categories.push(category)
+  const parents = new Set(categories.map(category => category.parent_id))
+  const boards = activeCategories(categories).filter(category => !parents.has(category.id))
+  const eligibleIds = new Set(postableCategories(categories, level).map(category => category.id))
+  const edited = categories.find(category => category.id === editingCategoryId)
+  if (edited && !parents.has(edited.id) && !boards.includes(edited)) boards.push(edited)
+  if (edited) eligibleIds.add(edited.id)
+
+  const byId = new Map(categories.map(category => [category.id, category]))
+  const toOption = (board: Category): PostingCategory => {
+    const parent = board.parent_id === null ? undefined : byId.get(board.parent_id)
+    let unavailableReason = ''
+    if (!eligibleIds.has(board.id)) {
+      unavailableReason = board.posting_enabled && parent?.posting_enabled !== false
+        ? `需${TRUST_LABEL[requiredPostLevel(board)]}`
+        : '已关闭发帖'
     }
-    return { ...section, groups }
-  }).filter(section => section.groups.length > 0)
+    return { ...board, unavailableReason }
+  }
+  const discussion = discussionDestinations(categories).flatMap(({ category }) => {
+    if (!category) return []
+    const options = boards.filter(board => board.id === category.id || board.parent_id === category.id)
+    return options.length ? [{
+      id: category.id,
+      name: category.name,
+      categories: options.map(toOption),
+      expandable: !options.some(board => board.id === category.id),
+    }] : []
+  })
+  if (edited && navigationSection(edited) === 'discuss' && !discussion.some(group =>
+    group.categories.some(board => board.id === edited.id),
+  ) && boards.includes(edited)) {
+    discussion.push({ id: edited.id, name: edited.name, categories: [toOption(edited)], expandable: false })
+  }
+
+  return sections.flatMap<PostingSection>(key => {
+    if (key === 'discuss') return discussion.length ? [{ key, name: SECTION_LABELS[key], groups: discussion }] : []
+    const groups = new Map<number, PostingGroup>()
+    for (const board of boards) {
+      if (navigationSection(board) !== key) continue
+      const parent = (board.parent_id === null ? undefined : byId.get(board.parent_id)) ?? board
+      let group = groups.get(parent.id)
+      if (!group) {
+        group = { id: parent.id, name: parent.name, categories: [] }
+        groups.set(parent.id, group)
+      }
+      group.categories.push(toOption(board))
+    }
+    return groups.size ? [{ key, name: SECTION_LABELS[key], groups: [...groups.values()] }] : []
+  })
 }
 
-export function postingSelection(sections: PostingSection[], slug: string, categories: Category[], fallback: PostingSectionKey = 'discuss') {
-  const category = categories.find(c => c.slug === slug)
-  const section = sections.find(s => s.groups.some(g => g.categories.some(c => c.id === category?.id) || g.id === category?.id))
-    ?? sections.find(s => s.key === fallback) ?? sections[0]
-  const leaves = section?.groups.flatMap(g => g.categories) ?? []
-  return { sectionKey: section?.key ?? fallback, categoryId: leaves.find(c => c.id === category?.id)?.id ?? (leaves.length === 1 ? leaves[0]!.id : 0) }
+export function postingSelection(destinations: PostingSection[], slug: string, categories: Category[], fallback: PostingSectionKey = 'discuss') {
+  const canonical = canonicalCategory(slug)
+  const category = categories.find(c => c.slug === canonical || c.slug === slug)
+  const matchingSection = category && destinations.find(destination => destination.key === navigationSection(category))
+  const section = matchingSection ?? destinations.find(destination => destination.key === fallback) ?? destinations[0]
+  const available = section?.groups.flatMap(group => group.categories).filter(board => !board.unavailableReason) ?? []
+  const choices = slug ? available.filter(board => board.id === category?.id || board.parent_id === category?.id) : available
+  return { sectionKey: section?.key ?? fallback, categoryId: choices[0]?.id ?? 0 }
+}
+
+export function postingLocation(page: unknown, query: Record<string, unknown>, categories: Category[], categorySlug?: unknown) {
+  const read = (key: string) => typeof query[key] === 'string' ? query[key] : ''
+  let section: PostingSectionKey = 'discuss'
+  let slug = ''
+  if (page === 'ideas') {
+    section = 'ideas'
+    slug = read('category')
+  } else if (page === 'resources') {
+    section = 'resources'
+    const tab = resourceTopicCategory(read('tab'))
+    if (tab !== 'software') slug = tab
+  } else if (page === 'discuss') {
+    const { tab, board, filter } = discussionRoute(categories, read('tab'), read('filter'), read('board'))
+    const current = board || tab
+    if (board || (current !== 'all' && !discussionTopicTag(current))) slug = filter || current
+  } else if (page === 'category' && typeof categorySlug === 'string') {
+    slug = canonicalCategory(categorySlug)
+  }
+  const canonical = canonicalCategory(slug)
+  const category = activeCategories(categories).find(board => board.slug === canonical || board.slug === slug)
+  return category ? { section: navigationSection(category), category: category.slug } : { section }
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
-import { strictEqual } from 'node:assert'
-import { areaOf, communitySections, safeReturnPath, sectionOf } from '../src/lib/sections.ts'
+import { deepStrictEqual, strictEqual } from 'node:assert'
+import { areaOf, communitySections, isCommunityRoot, safeReturnPath, sectionOf } from '../src/lib/sections.ts'
 
 test('login destinations keep internal query/hash and reject external or control-character URLs', () => {
   strictEqual(safeReturnPath('/publish?pack=55#details'), true)
@@ -21,13 +21,12 @@ test('canonical resource category URLs belong to the resource section',()=>{
  for(const slug of ['resources','resource-movies','resource-help']) strictEqual(sectionOf({name:'category',params:{slug}},[{slug,section:'resources'}]),'resources')
 })
 
-test('contact is a primary community section labelled 站务', () => {
+test('community navigation matches the mobile sections and contact remains reachable from Mine', () => {
+  deepStrictEqual(communitySections.map(item => item.label), ['首页', '创意', '讨论', '资源'])
   const route = { name: 'contact', params: {} }
-  strictEqual(sectionOf(route), 'contact')
-  strictEqual(areaOf(route), 'community')
-  const tab = communitySections.find(item => item.key === 'contact')
-  strictEqual(tab?.path, '/contact')
-  strictEqual(tab?.label, '站务')
+  strictEqual(isCommunityRoot(route), false)
+  strictEqual(areaOf(route), 'me')
+  strictEqual(areaOf({ name: 'app-works', params: {} }), 'create')
 })
 
 test('custom category slugs follow metadata instead of historical prefixes',()=>{

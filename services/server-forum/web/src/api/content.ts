@@ -21,7 +21,9 @@ export interface PackItem {
   author: PackAuthor | null
   /** 0 官方，1 已审核，2 用户未审 */
   trust_level: number
+  featured?: boolean
   status: string
+  network_disabled?: boolean
   version: number
   cover_url: string | null
   apply_count: number
@@ -52,6 +54,7 @@ export interface PackListParams {
   tag?: string
   author?: string
   following?: boolean
+  featured?: boolean
   sort?: 'new' | 'hot'
   page?: number
   page_size?: number
@@ -145,7 +148,8 @@ export const contentApi = {
     request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }),
   removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
-  packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p, following:p.following ? "true" : undefined })}`, undefined, p.following === true, runtimeHeaders),
+  packs: ({ following, featured, ...params }: PackListParams) =>
+    request<Page<PackItem>>('GET', `/packs${qs({ ...params, following: following ? 'true' : undefined, featured: featured ? 'true' : undefined })}`, undefined, following === true, runtimeHeaders),
   pack: (id: number, recordView = false) => request<PackDetail>('GET', `/packs/${id}${recordView ? '?view=true' : ''}`, undefined, true, runtimeHeaders),
   download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
   schemes: (page = 1, following = false) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page, following:following ? "true" : undefined })}`, undefined, following),

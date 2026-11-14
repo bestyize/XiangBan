@@ -21,7 +21,7 @@ function togglePhoto() {
 }
 
 function exhibitLocation(id?: string) {
-  return { name: 'ideas', query: { tab: galleryTab.key, exhibit: id } }
+  return { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
 }
 
 watch(exhibit, async (current, previous) => {

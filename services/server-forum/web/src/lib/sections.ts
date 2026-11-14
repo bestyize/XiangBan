@@ -5,16 +5,17 @@ export const communitySections = [
   { key: 'ideas', label: '创意', path: '/ideas' },
   { key: 'discuss', label: '讨论', path: '/discuss' },
   { key: 'resources', label: '资源', path: '/resources' },
-  { key: 'contact', label: '站务', path: '/contact' },
 ] as const
 export type Section = (typeof communitySections)[number]['key']
 export type Area = 'community' | 'ai' | 'create' | 'me'
 type Route = { name?: unknown; params: Record<string, unknown> }
+export function isCommunityRoot(route: Route): boolean {
+  return communitySections.some(item => item.key === route.name)
+}
 export function sectionOf(route: Route, categories: Pick<Category,'slug'|'section'>[] = []): Section {
   if (['home', 'frontier', 'frontier-detail', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project', 'open-source', 'open-source-project', 'open-source-collection'].includes(String(route.name))) return 'home'
   if (route.name === 'ideas') return 'ideas'
   if (['resources', 'tool-detail'].includes(String(route.name))) return 'resources'
-  if (route.name === 'contact') return 'contact'
   if (route.name === 'category') {
     const slug = String(route.params.slug ?? '')
     const category = categories.find(c=>c.slug===canonicalCategory(slug))
@@ -25,8 +26,8 @@ export function sectionOf(route: Route, categories: Pick<Category,'slug'|'sectio
 export function areaOf(route: Route): Area {
   const name = String(route.name)
   if (name === 'ai') return 'ai'
-  if (['create', 'pack', 'schemes', 'scheme', 'scheme-publish', 'publish'].includes(name)) return 'create'
-  if (['me', 'works', 'content-bookmarks', 'scheme-backups', 'settings', 'notifications', 'points', 'user'].includes(name)) return 'me'
+  if (['create', 'app-works', 'pack', 'schemes', 'scheme', 'scheme-publish', 'publish'].includes(name)) return 'create'
+  if (['me', 'works', 'content-bookmarks', 'scheme-backups', 'subscriptions', 'settings', 'notifications', 'points', 'user', 'contact'].includes(name)) return 'me'
   return 'community'
 }
 export function safeReturnPath(path: string): boolean {

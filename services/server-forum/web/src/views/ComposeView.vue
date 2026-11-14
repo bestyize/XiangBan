@@ -10,7 +10,7 @@ import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 import { READ_LEVELS, TRUST_LABEL, tagLabel } from '@/lib/format'
 import { postingSections, postingSelection, type PostingSectionKey } from '@/lib/postingStructure'
-import { categoryLabel, canonicalCategory } from '@/lib/communityStructure'
+import { canonicalCategory, navigationSection } from '@/lib/communityStructure'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -36,7 +36,9 @@ const form = reactive({
 /** 编辑时帖子原来的阅读权限；发帖人后来被降级时，原值仍然可以保留。 */
 const originalReadLevel = ref<number | null>(null)
 const originalCategoryId = ref<number>()
+const originalReady = ref(false)
 const selectionTouched = ref(false)
+const activeGroupId = ref<number>()
 const attachments = ref<Attachment[]>([])
 const tagDraft = ref('')
 const busy = ref(false)
@@ -45,48 +47,104 @@ const error = ref('')
 /** 当前登录用户的信任等级；没登录按 0。 */
 const myLevel = computed(() => session.user?.trust_level ?? 0)
 
-/** 页面归属决定发布入口，数据库父分类只用于入口内分组与权限。 */
 const destinations = computed(() => postingSections(meta.categories, myLevel.value, originalCategoryId.value))
 const destination = computed(() => destinations.value.find(s => s.key === form.sectionKey))
 const leaves = computed(() => destination.value?.groups.flatMap(g => g.categories) ?? [])
-const leaf = computed(() => leaves.value.find(c => c.id === form.categoryId))
+const activeGroup = computed(() => destination.value?.groups.find(group => group.expandable && group.id === activeGroupId.value))
+const leaf = computed(() => leaves.value.find(c => c.id === form.categoryId && !c.unavailableReason))
+const noDestinations = computed(() => !destinations.value.some(section =>
+  section.groups.some(group => group.categories.some(category => !category.unavailableReason)),
+))
 const parent = computed(() => meta.byId.get(leaf.value?.parent_id ?? 0))
 const isCasual = computed(() => leaf.value?.slug === 'casual' || parent.value?.slug === 'casual')
-const isHelp = computed(() => leaf.value?.slug === 'resource-help')
+const isHelp = computed(() => canonicalCategory(leaf.value?.slug ?? '') === 'resource-help')
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
+const requestedSlug = computed(() => !editId.value && typeof route.query.category === 'string' ? route.query.category : '')
+const defaultBoard = computed(() => {
+  const boards = activeGroup.value?.categories ?? leaves.value
+  const requestedId = meta.bySlug.get(requestedSlug.value)?.id
+  return boards.find(board => !board.unavailableReason && board.id === requestedId)
+    ?? boards.find(board => !board.unavailableReason)
+})
+const selectionNote = computed(() => {
+  if (selectionTouched.value || !requestedSlug.value) return ''
+  const requested = meta.bySlug.get(requestedSlug.value)
+  if (!requested || requested.status !== 'active') return '原板块已不可用，请重新选择'
+  const board = leaves.value.find(candidate => candidate.id === requested.id)
+  return board?.unavailableReason ? `${board.name}（${board.unavailableReason}）` : ''
+})
+
+watch(editId, () => { void meta.load(true) }, { immediate: true })
 
 watch(
-  [() => meta.categories, () => route.query.category, () => route.query.section, () => myLevel.value],
-  ([categories, slug, section], previous) => {
-    if (editId.value || !categories.length) return
-    if (previous && (slug !== previous[1] || section !== previous[2])) selectionTouched.value = false
+  [() => meta.categories, requestedSlug, () => route.query.section, myLevel, editId],
+  ([categories, slug, section, , id], previous) => {
+    if (id) return
+    if (previous && (slug !== previous[1] || section !== previous[2] || previous[4])) selectionTouched.value = false
+    if (!categories.length) return
     if (selectionTouched.value) return
     const fallback = section === 'ideas' || section === 'resources' ? section : 'discuss'
-    Object.assign(form, postingSelection(destinations.value, typeof slug === 'string' ? canonicalCategory(slug) : '', categories, fallback))
+    Object.assign(form, postingSelection(destinations.value, slug, categories, fallback))
+    const targetId = meta.bySlug.get(slug)?.id
+    activeGroupId.value = destination.value?.groups.find(group => group.expandable && (
+      group.id === targetId || group.categories.some(board => board.id === targetId)
+    ))?.id
   },
   { immediate: true },
 )
-watch(leaves, available => {
-  if (!available.some(c => c.id === form.categoryId)) form.categoryId = available.length === 1 ? available[0]!.id : 0
+watch(leaf, (current, previous) => {
+  if (!current && previous && form.categoryId === previous.id) form.categoryId = 0
 })
+
+function selectSection(key: PostingSectionKey) {
+  selectionTouched.value = true
+  activeGroupId.value = undefined
+  Object.assign(form, postingSelection(destinations.value, '', meta.categories, key))
+}
+
+function selectDefault() {
+  if (!defaultBoard.value) return
+  const board = defaultBoard.value
+  form.categoryId = board.id
+  activeGroupId.value = destination.value?.groups.find(group =>
+    group.expandable && group.categories.some(category => category.id === board.id),
+  )?.id
+  selectionTouched.value = true
+}
 
 // 编辑：载入原帖。
 watch(
   editId,
-  async id => {
+  async (id, previousId, onCleanup) => {
+    originalReady.value = false
+    originalCategoryId.value = undefined
+    originalReadLevel.value = null
+    activeGroupId.value = undefined
+    if (previousId) {
+      Object.assign(form, { title: '', body: '', tags: [], readLevel: 0, bounty: 0, helpDays: 7 })
+      attachments.value = []
+      tagDraft.value = ''
+    }
     if (!id) return
+    let current = true
+    onCleanup(() => { current = false })
     try {
       const t = await api.topic(id)
+      if (!current) return
       if (!t.viewer.can_edit) {
         toast.show('这个帖子不能编辑', 'error')
         router.replace(`/t/${id}`)
         return
       }
       await meta.load()
+      if (!current) return
       const c = meta.byId.get(t.category.id)
       originalCategoryId.value = t.category.id
-      form.sectionKey = c?.section === 'ideas' || c?.section === 'resources' ? c.section : 'discuss'
+      form.sectionKey = c ? navigationSection(c) : 'discuss'
       form.categoryId = t.category.id
+      activeGroupId.value = destination.value?.groups.find(group =>
+        group.expandable && group.categories.some(board => board.id === t.category.id),
+      )?.id
       form.title = t.title
       form.body = t.body_md
       form.tags = [...t.tags]
@@ -94,8 +152,9 @@ watch(
       attachments.value = [...t.attachments]
       originalReadLevel.value = t.min_read_level
       if (t.help) form.bounty = t.help.bounty
+      originalReady.value = true
     } catch (e) {
-      toast.error(e)
+      if (current) toast.error(e)
     }
   },
   { immediate: true },
@@ -139,7 +198,7 @@ const titleHint = computed(() => isCasual.value ? '添加标题（可选）' : '
 
 async function submit() {
   error.value = ''
-  if (!leaf.value) return (error.value = '请选择分类')
+  if (!leaf.value || meta.categoriesLoading || meta.categoriesError || (editId.value && !originalReady.value)) return (error.value = '请选择可发帖的板块')
   if (!isCasual.value && titleLen.value < 4) return (error.value = '标题至少 4 个字')
   if (attachments.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) return (error.value = '附件下载积分必须为 0～10 的整数')
   if (isHelp.value && !editId.value && (!Number.isInteger(form.bounty) || form.bounty < 0 || form.bounty > 1000)) return (error.value = '悬赏积分必须为 0～1000 的整数')
@@ -194,26 +253,48 @@ const blocked = computed(() => {
 
     <form v-else class="form" novalidate @submit.prevent="submit">
       <section class="panel section">
-        <fieldset class="kinds">
+        <fieldset v-if="destinations.length" class="kinds" :disabled="meta.categoriesLoading || !!meta.categoriesError">
           <legend>发到哪里</legend>
           <div class="root-opts">
             <label v-for="r in destinations" :key="r.key" class="root" :class="{ on: form.sectionKey === r.key }">
-              <input v-model="form.sectionKey" type="radio" name="destination" :value="r.key" @change="selectionTouched = true" />
+              <input :checked="form.sectionKey === r.key" type="radio" name="destination" :value="r.key" @change="selectSection(r.key)" />
               <span class="rname">{{ r.name }}</span>
-              <span class="rdesc">{{ r.description }}</span>
             </label>
           </div>
         </fieldset>
-        <fieldset v-for="group in destination?.groups ?? []" :key="group.id" class="category-group">
-          <legend v-if="(destination?.groups.length ?? 0) > 1">{{ group.name }}</legend>
-          <div class="leaves" role="radiogroup" :aria-label="`${group.name}分类`">
-            <label v-for="l in group.categories" :key="l.id" class="leaf" :class="{ on: form.categoryId === l.id }">
-              <input v-model="form.categoryId" type="radio" name="leaf" :value="l.id" @change="selectionTouched = true" />
-              {{ categoryLabel(l) }}
-            </label>
+        <fieldset v-if="destination" class="category-group" :disabled="meta.categoriesLoading || !!meta.categoriesError">
+          <legend class="sr-only">{{ activeGroup?.name ?? destination.name }}板块</legend>
+          <button v-if="activeGroup" type="button" class="btn btn-sm group-back" @click="activeGroupId = undefined">
+            ‹ {{ activeGroup.name }}
+          </button>
+          <div class="leaves">
+            <button type="button" class="leaf" :disabled="!defaultBoard" @click="selectDefault">
+              默认 <small>{{ defaultBoard?.name ?? '暂无可发板块' }}</small>
+            </button>
+            <template v-for="group in activeGroup ? [activeGroup] : destination.groups" :key="group.id">
+              <button v-if="group.expandable && !activeGroup" type="button" class="leaf"
+                :class="{ on: group.categories.some(board => board.id === form.categoryId) }"
+                @click="activeGroupId = group.id; selectionTouched = true">
+                {{ group.name }} <span aria-hidden="true">›</span>
+              </button>
+              <template v-else>
+                <label v-for="board in group.categories" :key="board.id" class="leaf" :class="{ on: form.categoryId === board.id }">
+                  <input v-model="form.categoryId" type="radio" name="leaf" :value="board.id" :disabled="!!board.unavailableReason" @change="selectionTouched = true" />
+                  {{ board.name }}
+                  <small v-if="board.unavailableReason">{{ board.unavailableReason }}</small>
+                </label>
+              </template>
+            </template>
           </div>
         </fieldset>
-        <p v-if="leaf?.description" class="leaf-note">{{ leaf.description }}</p>
+        <p v-if="meta.categoriesLoading" class="leaf-note" role="status">正在加载板块</p>
+        <div v-else-if="meta.categoriesError" class="leaf-note" role="status">
+          {{ meta.categoriesError }}
+          <button type="button" class="btn btn-sm" @click="meta.load(true)">重试</button>
+        </div>
+        <p v-else-if="selectionNote" class="leaf-note" role="status">{{ selectionNote }}</p>
+        <p v-else-if="noDestinations" class="leaf-note" role="status">当前没有可发帖的板块</p>
+        <p v-else-if="leaf?.description" class="leaf-note">{{ leaf.description }}</p>
       </section>
 
       <section v-if="isHelp" class="panel section">
@@ -304,7 +385,7 @@ const blocked = computed(() => {
       <div class="submit">
         <p v-if="error" class="error-text" role="alert">{{ error }}</p>
         <RouterLink :to="editId ? `/t/${editId}` : '/'" class="btn btn-ghost">取消</RouterLink>
-        <button type="submit" class="btn btn-primary big" :disabled="busy">
+        <button type="submit" class="btn btn-primary big" :disabled="busy || !leaf || meta.categoriesLoading || !!meta.categoriesError || (!!editId && !originalReady)">
           {{ busy ? '正在提交' : editId ? '保存修改' : '发布' }}
         </button>
       </div>
@@ -420,14 +501,12 @@ legend {
   font-weight: 700;
   font-size: var(--fs-sm);
 }
-.rdesc {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  line-height: 1.4;
-}
 .category-group {
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+.group-back {
+  margin-bottom: 8px;
 }
 .leaves {
   display: flex;
@@ -436,11 +515,22 @@ legend {
 }
 .leaf {
   position: relative;
+  background: var(--surface);
+  color: inherit;
   padding: 4px 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
   font-size: var(--fs-sm);
   cursor: pointer;
+}
+.leaf:has(input:disabled),
+.leaf:disabled {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.leaf small {
+  margin-left: 4px;
+  font-size: var(--fs-xs);
 }
 .leaf-note {
   margin: 0;

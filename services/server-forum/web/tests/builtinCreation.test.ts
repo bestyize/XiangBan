@@ -1,24 +1,42 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
 import { readFile, access } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
-import { BUILTIN_GAMES, builtinGame } from '../src/lib/builtinCreation.ts'
+import { BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WANCISOU_ICON } from '../src/lib/builtinCreation.ts'
 const root = new URL('../../../../', import.meta.url)
 const publicDir = new URL('../public/builtin-games/', import.meta.url)
-test('built-in games match mobile order and copied official manifests', async () => {
+const desktopPacks = new URL('client/xiaoban-desktop/public/game-packs/', root)
+const mobile = new URL('client/xiaoban-multiplatform/', root)
+const mobilePacks = new URL('androidApp/src/main/assets/game-packs-v2/', mobile)
+const asset = (url: string) => new URL(url.replace('/builtin-games/', ''), publicDir)
+
+test('playable games match mobile order and use the manifest icons', async () => {
   const mobile = await readFile(new URL('client/xiaoban-multiplatform/common/community-core/src/commonMain/kotlin/xyz/xiangban/xiaoban/common/community/GameLibrary.kt',root),'utf8')
   const list = mobile.match(/val ids = listOf\(([^\n]+)\)/)?.[1]
   assert.ok(list)
-  assert.deepEqual(BUILTIN_GAMES.map(game => game.id), Array.from(list.matchAll(/"([^"]+)"/g), m => m[1]))
+  const androidGames = Array.from(list.matchAll(/"([^"]+)"/g), m => m[1]).filter(id => id !== MOBILE_ONLY_APPS.pocketSprites.id)
+  assert.deepEqual(BUILTIN_GAMES.map(game => game.id), androidGames)
   for (const game of BUILTIN_GAMES) {
     const dir = new URL(`${game.id}/`,publicDir)
     const manifest = JSON.parse(await readFile(new URL('manifest.json',dir),'utf8'))
-    assert.equal(manifest.id,game.id); assert.equal(manifest.name,game.name); assert.ok(manifest.runtimeProtocol === 1 || manifest.runtimeProtocol === 2); assert.equal(manifest.entry,'index.html')
-    assert.equal(game.cover,`/builtin-games/${game.id}/cover.svg`); await access(fileURLToPath(new URL('cover.svg',dir)))
+    assert.equal(manifest.id,game.id); assert.ok(manifest.runtimeProtocol === 1 || manifest.runtimeProtocol === 2); assert.equal(manifest.entry,'index.html')
+    assert.equal(game.icon,`/builtin-games/${game.id}/${manifest.icon}`)
+    await access(asset(game.icon))
     const html = await readFile(new URL('index.html',dir),'utf8')
     assert.match(html,/Content-Security-Policy/); assert.match(html,/connect-src 'none'/)
   }
   assert.equal(builtinGame('../game'),undefined)
+})
+
+test('the web plaza uses the exact phone artwork for mobile tools and games', async () => {
+  for (const app of Object.values(MOBILE_ONLY_APPS)) {
+    const dir = new URL(app.id + '/', app.id === 'pocket-sprites' ? desktopPacks : mobilePacks)
+    const manifest = JSON.parse(await readFile(new URL('manifest.json', dir), 'utf8'))
+    assert.deepEqual(await readFile(asset(app.icon)), await readFile(new URL(manifest.icon, dir)))
+  }
+  assert.deepEqual(
+    await readFile(asset(WANCISOU_ICON)),
+    await readFile(new URL('business/community-native/src/commonMain/composeResources/files/wancisou-icon.webp', mobile)),
+  )
 })
 
 test('game handshake accepts only the current opaque frame and nonce', async () => {

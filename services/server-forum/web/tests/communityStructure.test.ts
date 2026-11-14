@@ -1,14 +1,23 @@
 import { test } from 'node:test'
 import { strictEqual, deepStrictEqual } from 'node:assert'
-import { discussionTabs, learnFilters, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionFilter, postableCategories } from '../src/lib/communityStructure.ts'
+import { discussionTabs, learnFilters, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionFilter, discussionTopicTag, postableCategories } from '../src/lib/communityStructure.ts'
 import type { Category } from '../src/api/types.ts'
 function category(id:number, slug:string, section:Category['section'], parent_id:number|null=null, extra:Partial<Category>={}):Category {
   return {id,slug,name:slug,section,parent_id,status:'active',posting_enabled:true,description:'',kind:'normal',sort_order:id,min_post_level:1,on_home:true,award_points:false,admin_only:false,preset_tags:[],topic_count:0,...extra}
 }
 const rows=[category(1,'learn','discuss'),category(2,'learn-codex','discuss',1),category(3,'casual','discuss'),category(4,'casual-travel','discuss',3),category(5,'resources','resources'),category(6,'resource-movies','resources',5),category(7,'resource-help','resources',5)]
-test('navigation follows database names, additions and stop state',()=>{
- const changed=[...rows,category(9,'casual-new','discuss',3,{name:'新话题'}),category(10,'old','resources',5,{status:'archived'})]
- strictEqual(discussionTabs(changed).some(c=>c.label==='新话题'),true)
+test('mobile tabs keep their order and reflect the published boards and tags',()=>{
+ const added=category(9,'casual-new','discuss',3,{name:'新话题'})
+ const changed=[category(8,'casual-games','discuss',3,{name:'游戏'}),...rows,added,category(10,'old','resources',5,{status:'archived'})]
+ deepStrictEqual(discussionTabs(changed).map(c=>c.key),['all','design','casual-games','3d','learn','casual-travel','casual-new'])
+ deepStrictEqual(discussionTabs(changed).slice(0,4).map(c=>c.label),['全部','设计','游戏','3D'])
+ strictEqual(discussionCategory('design','',changed),sectionScope(changed,'discuss'))
+ strictEqual(discussionCategory('3d','',changed),sectionScope(changed,'discuss'))
+ strictEqual(discussionCategory('casual-games','',changed),'casual-games')
+ strictEqual(discussionTopicTag('design'),'设计')
+ strictEqual(discussionTopicTag('3d'),'3d')
+ strictEqual(discussionTopicTag('casual-games'),undefined)
+ strictEqual(categoryHref(added,changed),'/discuss?tab=casual-new')
  deepStrictEqual(learnFilters(changed).map(c=>c.key),['','learn-codex'])
  deepStrictEqual(resourceTabs(changed).map(c=>c.key),['software','resource-movies','resource-help'])
  strictEqual(sectionScope(changed,'discuss').includes('old'),false)

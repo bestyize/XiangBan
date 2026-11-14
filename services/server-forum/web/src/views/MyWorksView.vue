@@ -9,9 +9,11 @@ import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { useToast } from '@/stores/toast'
 
+const props = defineProps<{ embedded?: boolean }>()
 useHead(() => ({ title: '我的作品' }))
 const toast = useToast()
 const route = useRoute()
+const worksPath = computed(() => props.embedded ? '/create/works' : '/me/works')
 const schemeTab = computed(() => route.query.tab === 'schemes')
 const items = ref<MyPack[]>([])
 const loading = ref(true)
@@ -52,10 +54,10 @@ watch(schemeTab, value => { if (!value) load() }, { immediate: true })
 <template>
   <ContentShell>
     <div class="head">
-      <h1>我的作品</h1><RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
+      <component :is="embedded ? 'h2' : 'h1'">{{ embedded ? '已发布作品' : '我的作品' }}</component><RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
       <RouterLink class="btn btn-primary" :to="schemeTab ? '/schemes/new' : '/publish'">{{ schemeTab ? '发布方案' : '发布内容包' }}</RouterLink>
     </div>
-    <nav class="works-tabs" aria-label="我的社区内容"><RouterLink to="/me/works" :class="{ active: !schemeTab }">内容包</RouterLink><RouterLink :to="{ path: '/me/works', query: { tab: 'schemes' } }" :class="{ active: schemeTab }">方案</RouterLink></nav>
+    <nav class="works-tabs" aria-label="我的社区内容"><RouterLink :to="worksPath" :class="{ active: !schemeTab }">内容包</RouterLink><RouterLink :to="{ path: worksPath, query: { tab: 'schemes' } }" :class="{ active: schemeTab }">方案</RouterLink></nav>
     <template v-if="!schemeTab">
     <p v-if="loading" class="state">加载中</p>
     <p v-else-if="!items.length" class="state">还没有发布过内容。</p>
@@ -93,7 +95,7 @@ watch(schemeTab, value => { if (!value) load() }, { immediate: true })
   align-items: center;
   padding: 16px 16px 8px;
 }
-h1 {
+h1, .head > h2 {
   margin: 0;
   font-size: var(--fs-xl);
   font-weight: 600;

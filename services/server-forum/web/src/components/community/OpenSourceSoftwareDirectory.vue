@@ -7,8 +7,7 @@ import { openSourceCatalog, type OpenSourceProjectSummary } from '@/lib/openSour
 import { projectPath } from '@/lib/openSourcePaths'
 import { softwareCategories, softwareDirectoryPreview, findSoftwareProject, softwareDownload, softwareOwnerIcon, softwareProjects, type SoftwarePlatform } from '@/lib/openSourceSoftware'
 import { useCommunityResource } from './resource'
-import CommunityTabs from './CommunityTabs.vue'
-import DiscoverGlyph from './DiscoverGlyph.vue'
+import FilterChips from './FilterChips.vue'
 import RequestState from './RequestState.vue'
 
 const route = useRoute()
@@ -55,9 +54,9 @@ const activeCategory = computed(() =>
   softwareCategories.find(item => item.key === route.query.category)?.key ?? 'all',
 )
 const sortOptions = [
-  { key: 'stars', label: '收藏数', icon: 'star' },
-  { key: 'updated', label: '最近更新', icon: 'refresh' },
-  { key: 'hot', label: '近期热门', icon: 'clock' },
+  { key: 'stars', label: '收藏数' },
+  { key: 'updated', label: '最近更新' },
+  { key: 'hot', label: '近期热门' },
 ] as const
 const sort = computed(() => sortOptions.find(item => item.key === route.query.sort)?.key ?? 'stars')
 const pageSize = 48
@@ -86,8 +85,11 @@ const hasHotData = computed(() => categoryEntries.value.some(({ snapshot }) =>
   snapshot?.starGain != null,
 ))
 
-function selectSort(sort: typeof sortOptions[number]['key']) {
-  void router.replace({ query: { ...route.query, sort: sort === 'stars' ? undefined : sort } })
+function selectSort(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (sortOptions.some(item => item.key === value)) {
+    void router.replace({ query: { ...route.query, sort: value === 'stars' ? undefined : value } })
+  }
 }
 
 function selectCategory(category: string) {
@@ -130,19 +132,15 @@ function updateLabel(value?: string) {
 <template>
   <section class="software-directory" aria-label="开源软件">
     <div class="software-toolbar">
-      <CommunityTabs class="software-category-tabs" :items="softwareCategories" :active="activeCategory" label="软件分类" @change="selectCategory" />
-      <div class="software-sort-options" role="group" aria-label="软件排序">
-        <button v-for="item in sortOptions" :key="item.key" type="button"
-          :aria-pressed="sort === item.key" :title="item.key === 'stars' ? '按 GitHub Star 总数排序' : undefined"
-          @click="selectSort(item.key)">
-          <DiscoverGlyph :name="item.icon" :size="12" />{{ item.label }}
-        </button>
-      </div>
+      <FilterChips class="software-category-tabs" :items="softwareCategories" :active="activeCategory" label="软件分类" @change="selectCategory" />
+      <select class="software-sort" aria-label="软件排序" :value="sort" @change="selectSort">
+        <option v-for="item in sortOptions" :key="item.key" :value="item.key">{{ item.label }}</option>
+      </select>
     </div>
     <p v-if="sort === 'hot' && categoryEntries.length" class="software-sort-status" role="status">
       {{ hotLoading ? '正在读取近期星标数据…' : hotError ? '近期星标数据暂不可用，按最近更新展示。' : hasHotData ? '按近一周 GitHub 星标净增排序，暂无数据的软件排在后面。' : '暂无近一周星标数据，按最近更新展示。' }}
     </p>
-    <RequestState :loading="loading" :error="error" :empty="!!data && !visibleEntries.length" message="这个分类暂未收录软件。" @retry="load" />
+    <RequestState :loading="loading && !visibleEntries.length" :error="error" :empty="!!data && !visibleEntries.length" message="这个分类暂未收录软件。" @retry="load" />
     <ul v-if="visibleEntries.length" class="software-list">
       <li v-for="{ project, download, snapshot, version } in visibleEntries.slice(0, visibleLimit)" :key="project.full_name">
         <RouterLink :to="`${projectPath(project.full_name)}#official-download`" class="software-card">
@@ -201,58 +199,33 @@ function updateLabel(value?: string) {
 }
 .software-toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .software-toolbar .software-category-tabs {
-  flex: 1 1 max-content;
+  flex: 1;
   min-width: 0;
-  max-width: 100%;
-  justify-content: flex-start;
-  gap: 16px;
-  margin: 0;
-  padding-inline: 0;
-  border-bottom: 0;
-  background: none;
-}
-@media (max-width: 767px) {
-  .software-toolbar { row-gap: 2px; }
-}
-.software-sort-options {
-  display: inline-flex;
-  flex-wrap: wrap;
+  padding: 0;
   gap: 2px;
-  font-size: 12px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-2);
 }
-.software-sort-options button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 3px 7px;
-  border: 1px solid transparent;
-  border-radius: 7px;
+.software-category-tabs :deep(button) {
   background: transparent;
-  color: var(--ink-2);
-  font: inherit;
-  white-space: nowrap;
-  cursor: pointer;
+  min-height: 40px;
+  padding-inline: 10px;
 }
-.software-sort-options button:hover { color: var(--ink); background: var(--surface); }
-.software-sort-options button[aria-pressed="true"] {
-  border-color: var(--line);
+.software-category-tabs :deep(button.on) { background: var(--brand-soft); }
+.software-sort {
+  flex: none;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
   background: var(--surface);
-  color: var(--brand);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
 }
-.software-sort-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .software-sort-status { margin: 0 0 12px; color: var(--ink-3); font-size: 12px; }
 .software-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px;margin:0;padding:0;list-style:none}
 .software-list li{min-width:0}
