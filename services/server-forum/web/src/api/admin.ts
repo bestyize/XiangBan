@@ -59,9 +59,10 @@ function qs(params?: Query) {
   return s ? `?${s}` : ''
 }
 
-export async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, auth = true, response: 'json' | 'blob' = 'json'): Promise<T> {
   const headers: Record<string, string> = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const multipart = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   if (auth && adminAuth.token) headers.Authorization = `Bearer ${adminAuth.token}`
 
   let res: Response
@@ -69,12 +70,13 @@ export async function request<T>(method: string, path: string, body?: unknown, a
     res = await fetch(`/api/admin${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
     throw new AdminApiError(0, 'network', '网络连接失败，请检查网络后重试')
   }
 
+  if (res.ok && response === 'blob') return await res.blob() as T
   let data: unknown = null
   try {
     data = await res.json()

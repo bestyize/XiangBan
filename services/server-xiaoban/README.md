@@ -11,6 +11,8 @@
 
 ## 小伴桌面官网与客户端服务
 
+官网的「联系我们」和旧 `/contact` 地址均指向[社区站务](https://chat.xiangban.xyz/contact)。二维码在论坛后台维护。
+
 账户设置展示账号中心的数字字符串 `account_id`，内部 `uid` 不展示；「AI 额度」链接打开社区现有的 `/ai?panel=account` 额度页面，登录沿用网页自身会话。
 
 ### AI 插件市场（上游 API 模式）

@@ -30,7 +30,7 @@ const tabs: { id: SettingsTab; label: string; icon: Component; keywords: string 
   { id: 'voice', label: '声音', icon: Volume2, keywords: '语音 朗读 识别 麦克风 音色' },
   { id: 'network', label: '连接与网络', icon: Wifi, keywords: '代理 proxy 网络 连接 socks5 http https VPN 测试 手机 扫码 配对 遥控 互联' },
   { id: 'safety', label: '安全与权限', icon: ShieldCheck, keywords: '权限 沙箱 确认 命令 文件' },
-  { id: 'about', label: '关于与更新', icon: Info, keywords: '版本 更新 公告 官网' },
+  { id: 'about', label: '关于与更新', icon: Info, keywords: '版本 更新 公告 官网 联系我们 微信 QQ' },
 ];
 const query = ref('');
 const shown = computed(() => {

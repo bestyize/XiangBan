@@ -1,6 +1,0 @@
-{
-  "identifier": "community-chrome",
-  "description": "Local community titlebar; the remote content webview has no capability.",
-  "webviews": ["community-chrome"],
-  "permissions": []
-}

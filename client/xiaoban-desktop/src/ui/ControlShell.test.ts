@@ -95,7 +95,7 @@ describe('ControlShell sidebar', () => {
     try {
       await flushPromises();
       expect(wrapper.findAll('#control-navigation .nav-item[data-testid^="nav-"]').map(b => b.attributes('data-testid')))
-        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-apps', 'nav-care', 'nav-community']);
+        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-apps', 'nav-care', 'nav-community', 'nav-contact']);
       expect(wrapper.find('.control-statusbar').exists()).toBe(false);
       expect(wrapper.find('.sidebar-desktop-state').exists()).toBe(false);
       expect(wrapper.find('[data-testid="assistant-launcher"]').exists()).toBe(false);
@@ -121,6 +121,36 @@ describe('ControlShell sidebar', () => {
       await wrapper.get('[data-testid="nav-apps"]').trigger('click');
       await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="apps-page"]').exists()).toBe(true); });
       expect(wrapper.get('[data-testid="apps-page"]').element).toBe(first);
+    } finally { wrapper.unmount(); }
+  });
+
+  it('opens the forum and group contacts in the system browser without changing pages', async () => {
+    const wrapper = mount(ControlShell);
+    try {
+      await flushPromises();
+      const store = storeOf(wrapper);
+      const page = store.page;
+
+      const community = wrapper.get('[data-testid="nav-community"]');
+      const groups = wrapper.get('[data-testid="nav-contact"]');
+      expect(community.element.nextElementSibling).toBe(groups.element);
+      expect(groups.text()).toBe('交流群');
+      await community.trigger('click');
+      await groups.trigger('click');
+
+      expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://chat.xiangban.xyz/' });
+      expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://chat.xiangban.xyz/contact' });
+      expect(store.page).toBe(page);
+    } finally { wrapper.unmount(); }
+  });
+
+  it('opens saved desktop schemes directly from the account menu', async () => {
+    const wrapper = mount(ControlShell);
+    try {
+      await flushPromises();
+      await wrapper.get('[data-testid="account-entry"]').trigger('click');
+      await wrapper.get('[data-testid="nav-desktop-schemes"]').trigger('click');
+      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'community', tab: null, provider: null });
     } finally { wrapper.unmount(); }
   });
 
@@ -485,6 +515,21 @@ describe('ControlShell sidebar', () => {
     expect(quiet.find('[data-testid="nav-notice-dot"]').exists()).toBe(true);
     quiet.unmount();
     vi.mocked(invoke).mockImplementation(base);
+  });
+
+  it('opens the official contact page through the system browser from About', async () => {
+    const store = createControlStore(vi.fn());
+    const wrapper = mount(AboutSettings, { props: { store } });
+    try {
+      const url = 'https://chat.xiangban.xyz/contact';
+      const link = wrapper.get('[data-testid="about-contact"]');
+      expect(link.text()).toBe('联系我们');
+      await link.trigger('click');
+      expect(invoke).toHaveBeenCalledWith('open_download_url', { url });
+    } finally {
+      wrapper.unmount();
+      store.dispose();
+    }
   });
 
   it('installs signed releases by version and keeps the browser path for legacy releases', async () => {

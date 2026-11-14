@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { NAlert, NSwitch } from 'naive-ui';
 import { RefreshCw, Download, Sprout } from 'lucide-vue-next';
 import { invoke } from '../../../bridge.ts';
+import { CONTACT_URL, openInBrowser } from '../../community/links.ts';
 import type { ControlStore } from '../../control-types.ts';
 const props = defineProps<{ store: ControlStore }>();
 const emit = defineEmits<{ openSite: [] }>();
@@ -55,7 +56,10 @@ function startUpdate() {
         <button v-if="store.website.dismissed[notice.id] !== notice.revision" type="button" class="xb-btn is-sm" @click="act('dismiss', async () => { await invoke('dismiss_website_message', { id: notice.id, revision: notice.revision }); await store.checkWebsite(); })">标为已读</button>
       </div>
     </div>
-    <div class="about-links"><button type="button" class="xb-link" @click="emit('openSite')">小伴官网</button></div>
+    <div class="about-links">
+      <button type="button" class="xb-link" @click="emit('openSite')">小伴官网</button>
+      <button type="button" class="xb-link" data-testid="about-contact" @click="openInBrowser(CONTACT_URL, store.desktop).catch(error => store.notify(error, 'error'))">联系我们</button>
+    </div>
   </div>
 </template>
 <style scoped>

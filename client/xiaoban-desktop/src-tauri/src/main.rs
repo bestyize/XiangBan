@@ -619,8 +619,7 @@ fn show_control(app: tauri::AppHandle) -> Result<(), String> {
     present_control(&app)
 }
 
-/// Sends a `xiaoban://` link to the feature it names: `market` (the AI store) or `community` (packs and the community page).
-/// Each only asks the console to show something; the user confirms there.
+/// Route market requests and community pack links to the console. Community reading links open in the browser.
 fn route_link(app: &tauri::AppHandle, text: &str) {
     if text.starts_with("xiaoban://community") { community::receive_link(app, text); } else { chat::store_market::receive_link(app, text); }
 }
@@ -909,7 +908,7 @@ fn main() {
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             community_schemes::community_schemes_status, community_schemes::community_schemes_save, community_schemes::community_schemes_remove, community_schemes::community_schemes_restore, community_schemes::community_schemes_cloud_enabled, community_schemes::community_schemes_cloud,
-            community::community_web_open, community::community_tab_bounds, community::community_chat_context, community::community_media_page, community_media::community_media_action, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
+            community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,
@@ -940,13 +939,12 @@ fn main() {
                 invoke.resolver.reject("应用沙箱窗口没有此原生命令权限");
                 return true;
             }
-            if community::invocation_permission(label, command) == Some(false) { invoke.resolver.reject("社区视图没有此原生命令权限"); return true; }
             if command.starts_with("design_") && design_window::permitted(label,command)!=Some(true) { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
             if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=widget_preview::permitted(label,command).or_else(||community::invocation_permission(label,command)).or_else(||configuration_window::permitted(label,command)).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=widget_preview::permitted(label,command).or_else(||configuration_window::permitted(label,command)).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "get_network_config" | "save_network_config" | "test_network_connection") { return label=="control"; }
                 if matches!(command, "app_runtime_open" | "app_runtime_close") { return label=="control"; }
                 if command.starts_with("app_runtime_") { return label.starts_with("app-runtime-"); }

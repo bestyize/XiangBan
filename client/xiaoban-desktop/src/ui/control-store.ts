@@ -7,7 +7,6 @@ import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
 import type { ControlPage, ControlStore, StudioTab } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
-import type { CommunityContext } from "./chat/community-context.ts";
 import { loadTurnModels } from '../voice/turn/models.ts';
 import { createLiveTalk } from '../voice/live-talk.ts';
 import { createVoiceOwner } from '../voice/owner.ts';
@@ -60,11 +59,6 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
     account: null,
     showLoginModal: false,
     page: "new-task", creationDraft: null, goalTemplate: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
-      messageContext: async () => {
-        if (!desktop || store.page !== 'community') return undefined;
-        try { return (await invoke<CommunityContext | null>('community_chat_context')) ?? undefined; }
-        catch { return undefined; }
-      },
       onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (!store.chat.sentHere(session)) return; if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,

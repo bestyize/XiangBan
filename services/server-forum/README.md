@@ -91,6 +91,8 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 ## 页面与接口
 
+社区顶栏「站务」（`/contact`）公开展示微信公众号、QQ 群和微信群，桌面及手机的「交流群」按钮直达此页。访客可保存二维码及复制 QQ 群号。管理员可在「管理后台 → 联系方式」更新名称、群号、邀请链接、二维码和失效日期。保存时一起更新配置和选中的图片。微信群码从失效日零时（中国标准时间）起隐藏。单张二维码支持 5 MiB 以内的 PNG、JPG 和 WebP。
+
 「小伴前沿」提供 `/frontier` 列表和详情、首页已发布文章入口、发现页 `frontier` 草稿类型与隔离的评论表，沿用发现页人工审核发布。`POST /api/discover-editor/frontier/{key}/assets` 使用允许 `frontier` 的采集令牌接收 JSON `data_base64`，限制每图 5 MiB、每篇 20 张；存入数据库并审计，只有已发布文章引用的图片通过公开接口读取。Nginx 对该前缀需设置 `client_max_body_size 7m`。采集和图文生成可由 `tools/claude-skills/xiaoban-frontier` 使用 server-ai 完成，运行需运营账号和受限采集令牌；日报关联和 SEO 暂未实现。
 
 前台路由：`/` 社区发现（推荐、开源热榜、排行榜、追踪、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。

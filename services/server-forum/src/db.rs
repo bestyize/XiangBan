@@ -6,6 +6,16 @@ use sqlx::{
 use std::str::FromStr;
 
 const SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS contact_settings (
+    id     BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+    config JSONB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS contact_qr_images (
+    channel TEXT PRIMARY KEY CHECK (channel IN ('wechat-official', 'qq-group', 'wechat-group')),
+    mime    TEXT NOT NULL,
+    data    BYTEA NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS users (
     uid             UUID PRIMARY KEY,
     nickname        TEXT NOT NULL,

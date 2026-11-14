@@ -47,6 +47,7 @@ import xyz.xiangban.xiaoban.common.community.AccountSignupMethods
 import xyz.xiangban.xiaoban.common.community.messageOf
 
 private enum class LoginMode(val label: String) { Code("验证码登录"), Password("密码登录") }
+private const val CONTACT_URL = "https://chat.xiangban.xyz/contact"
 
 /** 登录与完成注册共用一个弹窗，成功后回到当前页面。 */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -236,6 +237,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 NavRow("AI 额度") { open(Route.Models) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/c/site-feedback") }
+                NavRow("交流群") { env.platform?.openInBrowser(CONTACT_URL) }
             }
             Spacer(Modifier.height(NavInset))
         }
@@ -282,6 +284,7 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             NavRow("用户协议", first = updates == null) { env.platform?.openUrl("$site/terms") }
             NavRow("隐私政策") { env.platform?.openUrl("$site/privacy") }
             NavRow("社区规则") { env.platform?.openUrl("$site/rules") }
+            NavRow("联系我们") { env.platform?.openInBrowser(CONTACT_URL) }
             if (session.loggedIn) {
                 GhostPillButton("退出登录", { scope.launch { env.session.logout(); back() } }, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).fillMaxWidth(), textColor = Danger, onPage = true)
             } else {

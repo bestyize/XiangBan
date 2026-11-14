@@ -45,7 +45,7 @@ watch(() => route.hash, jumpToHash)
     </section>
     <section class="closing wrap"><span class="kicker">A LITTLE MORE POSSIBLE</span><h2>下一件想做的事，<br>从这里开始。</h2><p>给想法一点空间，剩下的，一起探索。</p><RouterLink class="button primary" to="/download">下载小伴 <span>↗</span></RouterLink></section>
     <div class="wrap"><ProductDownloads /></div>
-    <footer class="footer wrap"><div><strong>小伴</strong><p>你的 AI 工作与创作助手</p></div><div><RouterLink to="/features">功能介绍</RouterLink><RouterLink to="/guide">使用指南</RouterLink><RouterLink to="/images">壁纸</RouterLink><a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">社区 ↗</a></div></footer>
+    <footer class="footer wrap"><div><strong>小伴</strong><p>你的 AI 工作与创作助手</p></div><div><RouterLink to="/features">功能介绍</RouterLink><RouterLink to="/guide">使用指南</RouterLink><RouterLink to="/images">壁纸</RouterLink><a href="https://chat.xiangban.xyz/contact">联系我们</a><a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">社区 ↗</a></div></footer>
   </main>
 </template>
 

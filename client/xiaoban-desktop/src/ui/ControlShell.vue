@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
-import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LayoutGrid, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
+import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LayoutGrid, LogIn, LogOut, MessagesSquare, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, listen } from '../bridge.ts';
 import { accent, accents, followHost, followAccent, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
@@ -10,6 +10,7 @@ import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
 import ChatNameDialog from './components/ChatNameDialog.vue';
 import CommunityApplyDialog from './community/CommunityApplyDialog.vue';
+import { CONTACT_URL, FORUM_URL, openInBrowser } from './community/links.ts';
 import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
 import { openModelWindow, serveConfigurationWindows } from './configuration/windows.ts';
@@ -27,7 +28,6 @@ const pageLoaders = {
   apps: () => import('./pages/AppsPage.vue'),
   games: () => import('./pages/AppsPage.vue'),
   care: () => import('./pages/CarePage.vue'),
-  community: () => import('./pages/CommunityPage.vue'),
 };
 const NewTaskPage = defineAsyncComponent(pageLoaders['new-task']);
 const ChatPage = defineAsyncComponent(pageLoaders.chat);
@@ -37,7 +37,6 @@ const StudioPage = defineAsyncComponent(pageLoaders.studio);
 const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
 const AppsPage = defineAsyncComponent(pageLoaders.apps);
 const CarePage = defineAsyncComponent(pageLoaders.care);
-const CommunityPage = defineAsyncComponent(pageLoaders.community);
 const AiGatewayCard = defineAsyncComponent(() => import('./components/AiGatewayCard.vue'));
 const quotaPreview = ref(false);
 const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vue'));
@@ -63,7 +62,10 @@ const bottomItems = [
   { id: 'studio', label: '装扮', icon: Palette },
   { id: 'apps', label: '应用', icon: LayoutGrid },
   { id: 'care', label: '提醒', icon: Bell },
-  { id: 'community', label: '社区', icon: Globe },
+] as const;
+const communityLinks = [
+  { id: 'community', label: '社区', icon: Globe, url: FORUM_URL },
+  { id: 'contact', label: '交流群', icon: MessagesSquare, url: CONTACT_URL },
 ] as const;
 const aiItems = computed(() => [
   { id: 'new-task', label: '新建任务', icon: SquarePen, hint: `${mod.value}N` },
@@ -398,6 +400,11 @@ async function openOfficialSite() {
   }
 }
 
+function openDesktopSchemes() {
+  closeMenu();
+  void invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(error => store.notify(error, 'error'));
+}
+
 /* ── Studio requests from desktop widgets and pets ───────────────────── */
 const petSettingsRequest = ref<{ id: string } | null>(null);
 function managePets(event: Event) { petSettingsRequest.value = (event as CustomEvent<{ id: string }>).detail; navigate('companion'); }
@@ -514,7 +521,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets);
   window.removeEventListener('keydown', onKeydown); document.removeEventListener('pointerdown', onPointerDown, true);
 });
-const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps', 'games', 'community'];
+const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps', 'games'];
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win, 'has-application-skin': !!activeSkin, 'skin-new-task': store.page === 'new-task' && !!activeSkin }">
@@ -574,6 +581,9 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps',
         <button v-for="item in bottomItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="navigate(item.id)">
           <component :is="item.icon" :size="17" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
         </button>
+        <button v-for="item in communityLinks" :key="item.id" type="button" class="nav-item" :data-testid="`nav-${item.id}`" :title="`${item.label}（在浏览器打开）`" :aria-label="item.label" @click="openInBrowser(item.url, store.desktop).catch(error => store.notify(error, 'error'))">
+          <component :is="item.icon" :size="17" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
+        </button>
       </nav>
 
       <div ref="menuRoot" class="sidebar-bottom">
@@ -596,6 +606,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps',
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-ai-quota" title="查看小伴 AI 额度、兑换点数和配置模型" aria-description="查看小伴 AI 额度、兑换点数和配置模型" @click="openAiQuota"><Sparkles :size="16" />AI 额度</button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-settings" @click="openSettings()"><SlidersHorizontal :size="16" />设置<span class="xb-menu-hint">{{ mod }},</span></button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-appearance" @click="openSettings('appearance')"><Palette :size="16" />外观<span class="xb-menu-hint">{{ modeLabel }}</span></button>
+          <button v-if="store.desktop" type="button" class="xb-menu-item" role="menuitem" data-testid="nav-desktop-schemes" @click="openDesktopSchemes"><LayoutGrid :size="16" />我的桌面方案</button>
           <div class="accent-row" role="radiogroup" aria-label="主题色">
             <button v-for="item in accents" :key="item.id" type="button" role="radio" class="accent-dot" :class="{ on: accent === item.id }" :aria-checked="accent === item.id" :aria-label="item.name" :title="item.name" :data-testid="`accent-${item.id}`" :style="{ background: (isDark ? item.dark : item.light).btn, '--ring': (isDark ? item.dark : item.light).btn }" @click="setAccent(item.id)"></button>
           </div>
@@ -661,7 +672,6 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps',
           <InteractivePage v-else-if="store.page === 'interactive'" :store="store" />
           <AppsPage v-else-if="store.page === 'apps' || store.page === 'games'" :store="store" />
           <CarePage v-else-if="store.page === 'care'" :store="store" />
-          <CommunityPage v-else-if="store.page === 'community'" :store="store" />
         </KeepAlive></template>
       </main>
     </div>

@@ -7,7 +7,7 @@ import { applyFlow, closeApply, confirmApply, KIND_LABEL, scheduleText, schemeFl
 
 const props = defineProps<{ store: ControlStore }>();
 
-interface CommunityLink { action: 'apply' | 'open'; packId?: number; version?: number | null; sha256?: string | null; target?: string; id?: string }
+interface CommunityLink { action: 'apply'; packId: number; version?: number | null; sha256?: string | null }
 
 const state = computed(() => applyFlow.state);
 const show = computed(() => state.value.phase !== 'idle');
@@ -15,14 +15,13 @@ const progress = computed(() => schemeProgress());
 const preview = computed(() => ('preview' in state.value ? state.value.preview : null));
 const taskLike = computed(() => preview.value?.kind === 'routine');
 
-/** A link that opened the app: apply links go straight into the check; open links just show the community page. */
+/** Apply links from the forum fetch and verify the pack before showing a confirmation. */
 async function takeLink() {
   if (!props.store.desktop) return;
   try {
     const link = await invoke<CommunityLink | null>('community_take_link');
     if (!link) return;
     if (link.action === 'apply' && link.packId) void startApply({ packId: link.packId, version: link.version, sha256: link.sha256 });
-    else props.store.navigate('community');
   } catch { /* 没有待处理的链接 */ }
 }
 

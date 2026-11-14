@@ -114,6 +114,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_headers(Any);
 
     let app = create_api_router(state.clone())
+        .route("/contact", axum::routing::get(|| async {
+            axum::response::Redirect::temporary("https://chat.xiangban.xyz/contact")
+        }))
         .nest_service("/uploads", ServeDir::new("uploads"))
         .fallback(static_handler)
         .layer(cors)

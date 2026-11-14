@@ -51,6 +51,7 @@ pub fn build_router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(meta::health))
         .route("/config", get(meta::site_config))
+        .merge(handlers::contact::routes())
         .route("/categories", get(meta::categories))
         .route("/tags", get(meta::popular_tags))
         .route("/session", post(me::session))

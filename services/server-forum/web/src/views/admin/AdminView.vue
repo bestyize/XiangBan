@@ -21,6 +21,7 @@ import ProjectsPanel from './ProjectsPanel.vue'
 import WeeklyPanel from './WeeklyPanel.vue'
 import DiscoverPanel from './DiscoverPanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
+import ContactPanel from './ContactPanel.vue'
 import ToolMirrorsPanel from './ToolMirrorsPanel.vue'
 import CommunityEditorialPanel from './CommunityEditorialPanel.vue'
 import CommunityOperationsPanel from './CommunityOperationsPanel.vue'
@@ -55,13 +56,14 @@ const SECTIONS = [
   { key: 'community-editorial', label: '精选与挑战', comp: CommunityEditorialPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
   { key: 'account', label: '账号', comp: AccountPanel },
+  { key: 'contact', label: '联系方式', comp: ContactPanel },
 ] as const
 
 const GROUPS = [
   { label: '工作台', keys: ['', 'metrics'] },
   { label: '内容运营', keys: ['discover', 'open-source', 'collection', 'community-operations', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
   { label: '社区治理', keys: ['reports', 'content-reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
-  { label: '系统', keys: ['audit', 'account'] },
+  { label: '系统', keys: ['contact', 'audit', 'account'] },
 ].map(group => ({...group, sections: group.keys.map(key => SECTIONS.find(section => section.key === key)!)}))
 const DESCRIPTIONS: Record<string,string> = {
   'community-operations': '核对栏目内容与来源新鲜度，检查维护链接',

@@ -23,6 +23,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/ideas', name: 'ideas', component: DiscussView },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
+  { path: '/contact', name: 'contact', component: () => import('@/views/ContactView.vue') },
   { path: '/challenges', name: 'challenges', component: () => import('@/views/ChallengesView.vue') },
   { path: '/challenges/:key', name: 'challenge', component: () => import('@/views/ChallengeView.vue') },
   { path: '/schemes', name: 'schemes', component: () => import('@/views/SchemesView.vue') },

@@ -1,24 +1,21 @@
-//! The community prototype runs one verified upstream binary with fixed arguments.
+//! Runs the user's previously saved yt-dlp tool with fixed arguments.
 use agent_kernel::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{Arc, Mutex, atomic::{AtomicU64, Ordering}},
+    sync::{Arc, atomic::{AtomicU64, Ordering}},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::Manager;
 
-const RELEASE: &str = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
 const TOOL_DIR: &str = "community-tools/yt-dlp";
 pub(crate) const DOWNLOAD_TOOL: &str = "community_download_video";
 pub(crate) const BILIBILI_HTTP_567: &str = "bilibili_http_567";
 
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
-static INSTALL: Mutex<()> = Mutex::new(());
 
 fn unique_id() -> String {
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -39,15 +36,6 @@ fn tool_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join(TOOL_DIR))
 }
 
-fn fetch(client: &reqwest::blocking::Client, name: &str, limit: u64) -> Result<Vec<u8>, String> {
-    let response = client.get(format!("{RELEASE}/{name}")).send().and_then(|r| r.error_for_status())
-        .map_err(|e| format!("GitHub 官方下载失败：{e}"))?;
-    let mut bytes = Vec::new();
-    response.take(limit + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > limit { return Err("官方安装文件超出大小限制".into()); }
-    Ok(bytes)
-}
-
 fn program(binary: &Path) -> Command {
     let mut command = Command::new(binary);
     command.env_clear();
@@ -60,45 +48,6 @@ fn program(binary: &Path) -> Command {
         }
     }
     command
-}
-
-fn install(app: &tauri::AppHandle) -> Result<Value, String> {
-    let _guard = INSTALL.lock().map_err(|e| e.to_string())?;
-    let dir = tool_dir(app)?;
-    let name = asset()?;
-    let binary = dir.join(name);
-    if binary.is_file() { return Ok(json!({"installed":true})); }
-    let client = crate::network::blocking_builder(reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(90)).user_agent("XiaobanDesktop"))?.build().map_err(|e| e.to_string())?;
-    let checksums = String::from_utf8(fetch(&client, "SHA2-256SUMS", 128 * 1024)?).map_err(|e| e.to_string())?;
-    let expected = checksums.lines().find_map(|line| {
-        let (hash, file) = line.split_once(char::is_whitespace)?;
-        (file.trim().trim_start_matches('*') == name).then_some(hash)
-    }).ok_or("官方校验清单缺少当前平台文件")?;
-    let bytes = fetch(&client, name, 128 * 1024 * 1024)?;
-    if format!("{:x}", Sha256::digest(&bytes)) != expected.to_ascii_lowercase() {
-        return Err("安装包 SHA-256 校验失败".into());
-    }
-
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let staging = dir.join(format!("stage-{}", unique_id()));
-    fs::create_dir(&staging).map_err(|e| e.to_string())?;
-    let candidate = staging.join(name);
-    let result = (|| {
-        fs::write(&candidate, bytes).map_err(|e| e.to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&candidate, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
-        }
-        let output = program(&candidate).args(["--ignore-config", "--no-plugin-dirs", "--version"])
-            .output().map_err(|e| format!("无法启动 yt-dlp：{e}"))?;
-        if !output.status.success() { return Err("yt-dlp 版本验证失败".into()); }
-        fs::rename(&candidate, &binary).map_err(|e| e.to_string())?;
-        Ok(json!({"installed":true,"version":String::from_utf8_lossy(&output.stdout).trim()}))
-    })();
-    let _ = fs::remove_dir_all(staging);
-    result
 }
 
 fn media_url(input: &str) -> Result<url::Url, String> {
@@ -179,7 +128,7 @@ fn download(app: &tauri::AppHandle, input: &str, range_retry: bool, cancelled: i
     }
     let root = tool_dir(app)?;
     let binary = root.join(asset()?);
-    if !binary.is_file() { return Err("请先在桌面社区安装 yt-dlp".into()); }
+    if !binary.is_file() { return Err("找不到此前保存的 yt-dlp 工具".into()); }
     let parent = app.path().download_dir().map_err(|e| e.to_string())?.join("小伴");
     fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
     let destination = parent.join(format!("视频-{}", unique_id()));
@@ -232,36 +181,11 @@ fn download(app: &tauri::AppHandle, input: &str, range_retry: bool, cancelled: i
         let path = output.path();
         let media_verified = ffmpeg.is_some_and(|ffmpeg| verify_streams(&path, ffmpeg, &cancelled));
         if cancelled() { return Err("下载已取消".into()); }
-        fs::write(root.join("verified"), []).map_err(|e| e.to_string())?;
         Ok(json!({"path":path,"mediaVerified":media_verified}))
     })();
     if result.is_err() { let _ = fs::remove_dir_all(&destination); }
     else { let _ = fs::remove_file(destination.join(".error.log")); }
     result
-}
-
-fn save(app: &tauri::AppHandle) -> Result<Value, String> {
-    let dir = tool_dir(app)?;
-    if !dir.join(asset()?).is_file() || !dir.join("verified").is_file() {
-        return Err("请先完成一次下载".into());
-    }
-    fs::write(dir.join("saved"), []).map_err(|e| e.to_string())?;
-    Ok(json!({"saved":true}))
-}
-
-#[tauri::command]
-pub async fn community_media_action(app: tauri::AppHandle, window: tauri::Webview, action: String, url: Option<String>) -> Result<Value, String> {
-    if window.label() != "control" { return Err("仅桌面控制台可操作社区工具".into()); }
-    tauri::async_runtime::spawn_blocking(move || match action.as_str() {
-        "status" => {
-            let dir = tool_dir(&app)?;
-            Ok(json!({"installed":dir.join(asset()?).is_file(),"verified":dir.join("verified").is_file(),"saved":dir.join("saved").is_file()}))
-        }
-        "install" => install(&app),
-        "download" => download(&app, url.as_deref().ok_or("缺少视频链接")?, false, || false),
-        "save" => save(&app),
-        _ => Err("未知社区工具操作".into()),
-    }).await.map_err(|e| e.to_string())?
 }
 
 struct MediaTool {

@@ -43,6 +43,7 @@ pub fn routes() -> Router<AppState> {
         .route("/categories", get(list_categories).post(create_category))
         .route("/categories/{id}", patch(update_category))
         .route("/audit", get(list_audit))
+        .merge(super::contact::admin_routes())
 }
 
 // ───────────────────────── 令牌与密码 ─────────────────────────

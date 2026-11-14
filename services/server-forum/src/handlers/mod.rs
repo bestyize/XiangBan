@@ -3,6 +3,7 @@ pub mod analytics;
 pub mod attachments;
 pub mod blocks;
 pub mod content;
+pub mod contact;
 pub mod discover;
 pub mod discover_news;
 pub mod discover_frontier;
