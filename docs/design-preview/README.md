@@ -22,6 +22,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 键盘、表情与相册三种状态。点笑脸打开表情面板，选图后可预览和移除。支持单字或单表情发布、回复和深浅色预览，图稿使用小伴示例壁纸。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
 | [MBTI · 向内看](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mbti-native.html) | 原生 iOS 质感的首页、答题、结果交互提案（第四版：珊瑚橙红＋暖白＋墨灰、暖色首页插画、紧凑间距、加大正文）；支持三页总览、单页预览、6 题演示、六章报告、16 型切换、深浅色和分享卡。结果与历史记录为示例，保存分享为模拟；源文件与素材在仓库内，已应用到内置 MBTI 1.3.0（正式版使用真实作答与存档）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，启动方法见手机设计索引，后续沿用同一地址。 |
 | [轻启](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |
 | [社区作品分享面板](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/community-work-share.html) | 作品封面预览、四个分享入口、复制反馈及独立海报预览。支持浅色、深色和窄屏，分享操作为演示。[在线预览（本机）](http://127.0.0.1:1421/prototypes/community-work-share.html) |

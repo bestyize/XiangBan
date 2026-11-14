@@ -2,15 +2,15 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
@@ -39,9 +39,16 @@ internal fun ReplyContentCards(env: CommunityEnv, refs: List<ResolvedWorkReferen
     }
 }
 
-/** New-reply uploads are the only pending assets this composer may delete. */
+/** New-reply attachments are the only pending assets this composer may delete. */
 @Composable
-internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier, editingPost: Post? = null, dismissRequest: Int = 0) {
+internal fun NativeReplyComposer(
+    env: CommunityEnv,
+    topicId: Long,
+    onDismiss: () -> Unit,
+    onSent: () -> Unit,
+    parent: Post? = null,
+    editingPost: Post? = null,
+) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val account = remember { session.accountId }
@@ -51,7 +58,7 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
     var sourceAttempt by remember { mutableStateOf(0) }
     val retainedIds = original?.attachments.orEmpty().map { it.id }.toSet()
     val loadingSource = editingPost != null && original == null
-    var text by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf(TextFieldValue()) }
     var busy by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var resolving by remember { mutableStateOf(false) }
@@ -59,15 +66,14 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
     var error by remember { mutableStateOf<String?>(null) }
     var attachments by remember { mutableStateOf<List<ForumAttachment>>(emptyList()) }
     var selected by remember { mutableStateOf<List<SelectedWorkReference>>(emptyList()) }
-    var link by remember { mutableStateOf("") }
-    var showMine by remember { mutableStateOf(false) }
+    var images by remember { mutableStateOf<List<CommentDraftImage>>(emptyList()) }
     LaunchedEffect(editingPost?.id, sourceAttempt) {
         if (editingPost == null) return@LaunchedEffect
         sourceError = null
         try {
             val source = env.forum.replySource(editingPost.id)
             if (currentAccount != account) throw ApiException(401, "账号已切换，请重新打开编辑")
-            text = source.body
+            text = TextFieldValue(source.body, TextRange(source.body.length))
             attachments = source.attachments
             selected = replyEditSelection(source, editingPost.workRefs)
             original = source
@@ -83,79 +89,129 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
         env.scope.launch { if (currentAccount == account) pending.forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } } }
         onDismiss()
     }
-    LaunchedEffect(dismissRequest) { if (dismissRequest > 0) dismiss() }
-    fun addLink(value: String) {
-        if (locked) return
-        if (selected.size >= 3) { error = "最多选择 3 个不同的作品或方案"; return }
-        resolving = true; error = null
+    val body = remember(text.text, images) { (text.text + images.joinToString("") { forumImageMarkdown(it.image, it.name) }).trim() }
+    val length = remember(body) { commentLength(body) }
+    fun submit() {
+        if (locked || !session.loggedIn || currentAccount != account || length !in 1..10_000) return
+        busy = true
+        error = null
         scope.launch {
             try {
-                val next = refsApi.fromUrl(value)
-                if (currentAccount != account) throw ApiException(401, "账号已切换，请重新撰写回复")
-                val all = selected + next
-                validateWorkReferences(all.map { it.reference })
-                selected = all; link = ""; showMine = false
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
-            finally { resolving = false }
+                val refs = selected.map { it.reference }
+                if (editingPost == null) env.forum.reply(topicId, body, replyTo = parent?.id, workRefs = refs, attachments = attachments)
+                else env.forum.editReply(editingPost.id, body, workRefs = refs, attachments = attachments)
+                onSent()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = messageOf(e) }
+            finally { busy = false }
         }
     }
-    BottomSheet(::dismiss, panelModifier) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (editingPost == null) "回复" else "编辑回复", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            if (loadingSource) {
-                Text(sourceError ?: "正在读取回复原文…", style = XType.Body, color = if (sourceError == null) MaterialTheme.colorScheme.onSurface else Danger)
-                if (sourceError != null) GhostPillButton("重试读取", { sourceAttempt++ }, Modifier.fillMaxWidth())
-                GhostPillButton("取消", ::dismiss, Modifier.fillMaxWidth())
-            } else {
-            AreaBox(text, { text = it }, placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !locked, filled = true)
-            ForumUploadControls(env, enabled = !busy && !resolving && !leaving, onImage = { text += it }, onBusy = { uploading = it }, attachments = attachments,
-                onAttachments = { next -> attachments = next.map { if (it.id in retainedIds) it else it.copy(price = 0) } }, retainedAttachmentIds = retainedIds)
-            Text("引用公开作品或方案（最多 3 个）", style = XType.Secondary, fontWeight = FontWeight.Medium)
-            AreaBox(link, { link = it }, placeholder = "粘贴社区作品或方案链接", minHeight = 55.dp, enabled = !locked)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostPillButton(if (resolving) "正在读取…" else "添加引用", { addLink(link) }, Modifier.weight(1f), enabled = !locked && link.isNotBlank() && selected.size < 3)
-                GhostPillButton("我的作品", { showMine = !showMine }, Modifier.weight(1f), enabled = !locked && selected.size < 3)
-            }
-            if (showMine) {
-                val loader = rememberLoader(env, "reply-my-packs-${session.accountId}") { env.content.myPacks() }
-                val state by loader.state.collectAsState()
-                when (val mine = state) {
-                    is Load.Ready -> {
-                        val packs = ownedChallengePacks(mine.value.items, session.accountId)
-                        if (packs.isEmpty()) Text("还没有可引用的已上架作品。方案可粘贴公开链接引用。", style = XType.Caption)
-                        Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            packs.forEach { pack -> GhostPillButton(pack.title, { addLink(env.forum.packUrl(pack.id)) }, Modifier.fillMaxWidth(), enabled = !locked) }
+    val editor: @Composable ((() -> Unit)?, (() -> Unit)?, @Composable () -> Unit) -> Unit = { pickImage, addAttachment, uploadDetails ->
+        CommentComposer(
+            text, { text = it; error = null }, ::dismiss, ::submit,
+            limit = 10_000, replyTo = parent?.author?.nickname,
+            title = if (editingPost == null) "写评论" else "编辑评论",
+            submitLabel = if (editingPost == null) "发布" else "保存",
+            busyLabel = when {
+                busy -> if (editingPost == null) "发布中…" else "保存中…"
+                uploading -> "上传中…"
+                else -> null
+            },
+            length = length, locked = locked || !session.loggedIn || currentAccount != account,
+            editorReady = !loadingSource, error = error, canMention = true, onPickImage = pickImage,
+            preview = {
+                CommentDraftImages(env, images, if (locked) null else { id -> images = images.filterNot { it.image.id == id } })
+                uploadDetails()
+                selected.forEach { chosen ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(chosen.card?.title ?: "引用内容 #${chosen.reference.id}", style = XType.Secondary, maxLines = 2)
+                            Text(if (chosen.reference.kind == "scheme") "方案" else chosen.reference.version?.let { "固定版本 v$it" } ?: "发表时固定为当前版本",
+                                style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (!locked) IconTap(XIcons.Close, "移除引用", { selected = selected.filterNot { it.reference == chosen.reference } }, size = 16.dp)
+                    }
+                }
+            },
+            more = {
+                if (addAttachment != null) GhostPillButton("添加附件", addAttachment, Modifier.fillMaxWidth(),
+                    enabled = !locked && attachments.size < 5, height = 44.dp)
+                ReplyReferenceOptions(env, session.accountId, selected, locked, resolving, resolve = { url ->
+                    if (!locked && selected.size < 3) {
+                        resolving = true
+                        error = null
+                        scope.launch {
+                            try {
+                                val next = refsApi.fromUrl(url)
+                                if (currentAccount != account) throw ApiException(401, "账号已切换，请重新撰写回复")
+                                val all = selected + next
+                                validateWorkReferences(all.map { it.reference })
+                                selected = all
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = messageOf(e) }
+                            finally { resolving = false }
                         }
                     }
-                    is Load.Failed -> Banner(mine.message, warn = true, actionText = "重试", onAction = loader::reload)
-                    else -> Text("正在读取我的作品…", style = XType.Caption)
-                }
+                })
+            },
+            loading = {
+                if (sourceError == null) Spinner(Modifier.fillMaxWidth().height(60.dp))
+                else Banner(sourceError.orEmpty(), warn = true, actionText = "重试读取", onAction = { sourceAttempt++ })
+            },
+        )
+    }
+    if (!loadingSource && (env.platform?.forumPhotoPickerSupported == true ||
+            env.platform?.forumFilePickerSupported == true || attachments.isNotEmpty())) {
+        ForumUploadControls(
+            env, enabled = !busy && !resolving && !leaving,
+            onImage = { image, name ->
+                if (images.none { it.image.id == image.id }) images += CommentDraftImage(image, name)
+                error = null
+            },
+            onBusy = { uploading = it },
+            attachments = attachments,
+            onAttachments = { next -> attachments = next.map { if (it.id in retainedIds) it else it.copy(price = 0) } },
+            retainedAttachmentIds = retainedIds,
+            commentLayout = editor,
+        )
+    } else editor(null, null) {}
+}
+
+@Composable
+private fun ReplyReferenceOptions(
+    env: CommunityEnv,
+    accountId: String?,
+    selected: List<SelectedWorkReference>,
+    locked: Boolean,
+    resolving: Boolean,
+    resolve: (String) -> Unit,
+) {
+    var link by remember { mutableStateOf("") }
+    var showMine by remember { mutableStateOf(false) }
+    LaunchedEffect(selected.size) {
+        link = ""
+        showMine = false
+    }
+    Text("引用作品或方案", style = XType.Secondary, fontWeight = FontWeight.Medium)
+    AreaBox(link, { link = it }, placeholder = "粘贴社区作品或方案链接", minHeight = 48.dp, enabled = !locked, filled = true)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        GhostPillButton(if (resolving) "正在读取…" else "添加引用", { resolve(link) }, Modifier.weight(1f),
+            enabled = !locked && link.isNotBlank() && selected.size < 3, height = 40.dp)
+        GhostPillButton("我的作品", { showMine = !showMine }, Modifier.weight(1f),
+            enabled = !locked && selected.size < 3, height = 40.dp)
+    }
+    if (showMine) {
+        val loader = rememberLoader(env, "reply-my-packs-$accountId") { env.content.myPacks() }
+        val state by loader.state.collectAsState()
+        when (val mine = state) {
+            is Load.Ready -> {
+                val packs = ownedChallengePacks(mine.value.items, accountId)
+                if (packs.isEmpty()) Text("还没有可引用的已上架作品。", style = XType.Caption)
+                packs.forEach { pack -> GhostPillButton(pack.title, { resolve(env.forum.packUrl(pack.id)) },
+                    Modifier.fillMaxWidth(), enabled = !locked, height = 40.dp) }
             }
-            selected.forEach { chosen -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(chosen.card?.title ?: "${if (chosen.reference.kind == "pack") "作品" else "方案"} #${chosen.reference.id}（当前不可用）", style = XType.Body, maxLines = 2)
-                    Text(if (chosen.reference.kind == "scheme") "方案" else chosen.reference.version?.let { "固定版本 v$it" } ?: "发表时固定为当前版本", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                }
-                GhostPillButton("移除", { selected = selected.filterNot { it.reference == chosen.reference } }, enabled = !locked)
-            } }
-            error?.let { Text(it, style = XType.Secondary, color = Danger) }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GhostPillButton("取消", ::dismiss, Modifier.weight(1f), enabled = !locked)
-                PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else if (editingPost == null) "发送" else "保存修改", {
-                    if (locked) return@PillButton
-                    busy = true; error = null
-                    scope.launch {
-                        try {
-                            if (currentAccount != account) throw ApiException(401, "账号已切换，请重新撰写回复")
-                            if (editingPost == null) env.forum.reply(topicId, text.trim(), workRefs = selected.map { it.reference }, attachments = attachments)
-                            else env.forum.editReply(editingPost.id, text.trim(), workRefs = selected.map { it.reference }, attachments = attachments)
-                            onSent()
-                        } catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
-                        finally { busy = false }
-                    }
-                }, Modifier.weight(1f), enabled = !locked && session.loggedIn && currentAccount == account && text.trim().length >= 2)
-            }
-            }
+            is Load.Failed -> Banner(mine.message, warn = true, actionText = "重试", onAction = loader::reload)
+            else -> Text("正在读取我的作品…", style = XType.Caption)
         }
     }
 }

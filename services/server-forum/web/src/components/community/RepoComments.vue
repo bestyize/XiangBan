@@ -7,7 +7,7 @@ import type { CommentAdapter } from '@/components/comments/types'
 const props = defineProps<{ owner: string; repo: string }>()
 const adapter = computed<CommentAdapter>(() => {
   const { owner, repo } = props
-  return { list: page => discoverApi.repoComments(owner, repo, page), post: (body, to) => discoverApi.repoComment(owner, repo, body, to), like: (id, on) => discoverApi.likeRepoComment(owner, repo, id, on), remove: id => discoverApi.deleteRepoComment(owner, repo, id) }
+  return { list: page => discoverApi.repoComments(owner, repo, page), post: (body, to, images) => discoverApi.repoComment(owner, repo, body, to, images), like: (id, on) => discoverApi.likeRepoComment(owner, repo, id, on), remove: id => discoverApi.deleteRepoComment(owner, repo, id) }
 })
 </script>
 

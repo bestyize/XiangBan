@@ -142,8 +142,11 @@ pub struct PostInput {
 fn clean_reply(raw: &str) -> AppResult<String> {
     let body = raw.trim().to_string();
     let len = body.chars().count();
-    if !(2..=10_000).contains(&len) {
-        return Err(AppError::BadRequest("回复需要 2-10000 个字".into()));
+    if len == 0 {
+        return Err(AppError::BadRequest("请输入回复内容".into()));
+    }
+    if len > 10_000 {
+        return Err(AppError::BadRequest("回复最多 10000 个字".into()));
     }
     Ok(body)
 }

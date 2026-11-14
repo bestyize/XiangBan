@@ -177,8 +177,15 @@ fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @
 /** 遮罩覆盖整页，面板统一避让键盘，避免聊天页的同级覆盖层落在 IME 后面。[flush] 为真时选项通栏接边。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush: Boolean = false, cornerRadius: Dp = 20.dp, content: @Composable ColumnScope.() -> Unit) {
-    BackHandler(onBack = onDismiss)
+fun BottomSheet(
+    onDismiss: () -> Unit,
+    panelModifier: Modifier = Modifier,
+    flush: Boolean = false,
+    cornerRadius: Dp = 20.dp,
+    onBack: () -> Unit = onDismiss,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BackHandler(onBack = onBack)
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
         contentAlignment = Alignment.BottomCenter,

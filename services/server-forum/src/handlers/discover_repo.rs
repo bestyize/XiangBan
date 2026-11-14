@@ -17,6 +17,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
+use super::images::{self, CommentImageTarget};
 
 const PUBLISHED: &str = "kind='repo_issue' AND status='published' AND published_at<=now()";
 const HAS_REPO: &str = "EXISTS (SELECT 1 FROM jsonb_array_elements(data->'ranks') r WHERE lower(r->>'full_name')=$1)";
@@ -87,10 +88,11 @@ pub async fn list(State(state): State<AppState>, MaybeUser(viewer): MaybeUser, P
     ensure_repo(&state.pool, &key).await?;
     let uid = viewer.map(|v| v.uid);
     let page = q.page.unwrap_or(1).clamp(1, 10_000);
-    let rows: Vec<(i64, Option<i64>, String, DateTime<Utc>, Uuid, String, Option<String>, i64, bool)> = sqlx::query_as(
+    let rows: Vec<(i64, Option<i64>, String, DateTime<Utc>, Uuid, String, Option<String>, i64, bool, Vec<Uuid>)> = sqlx::query_as(
         "SELECT c.id,c.reply_to,c.body,c.created_at,u.uid,u.nickname,u.avatar_url,
          (SELECT count(*) FROM repo_comment_likes l WHERE l.comment_id=c.id),
-         EXISTS(SELECT 1 FROM repo_comment_likes l WHERE l.comment_id=c.id AND l.uid=$2)
+         EXISTS(SELECT 1 FROM repo_comment_likes l WHERE l.comment_id=c.id AND l.uid=$2),
+         ARRAY(SELECT a.image_id FROM discover_comment_images a WHERE a.repo_comment_id=c.id ORDER BY a.position)
          FROM repo_comments c JOIN users u ON u.uid=c.author_uid
          WHERE c.repo_key=$1 AND c.status='normal' AND u.status<>'banned'
          AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$2 AND b.blocked=c.author_uid)
@@ -111,9 +113,9 @@ pub async fn list(State(state): State<AppState>, MaybeUser(viewer): MaybeUser, P
     .await?;
     let items: Vec<Value> = rows
         .into_iter()
-        .map(|(id, reply_to, body, created_at, author, nickname, avatar_url, likes, liked)| {
+        .map(|(id, reply_to, body, created_at, author, nickname, avatar_url, likes, liked, image_ids)| {
             json!({"id":id,"reply_to":reply_to,"body":body,"created_at":created_at,"author":{"uid":author,"nickname":nickname,"avatar_url":avatar_url},
-                "like_count":likes,"liked":liked,"mine":uid == Some(author)})
+                "like_count":likes,"liked":liked,"mine":uid == Some(author),"images":images::comment_urls(image_ids)})
         })
         .collect();
     Ok(Json(json!({"items":items,"page":page,"page_size":30,"total":total})))
@@ -123,6 +125,8 @@ pub async fn list(State(state): State<AppState>, MaybeUser(viewer): MaybeUser, P
 pub struct CommentInput {
     body: String,
     reply_to: Option<i64>,
+    #[serde(default)]
+    image_ids: Vec<Uuid>,
 }
 
 pub async fn create(State(state): State<AppState>, auth: AuthUser, Path((owner, repo)): Path<(String, String)>, Json(input): Json<CommentInput>) -> AppResult<Json<Value>> {
@@ -130,9 +134,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Path((owner, 
     let key = parse(&owner, &repo)?;
     ensure_repo(&state.pool, &key).await?;
     let body = input.body.trim();
-    if !(2..=2000).contains(&body.chars().count()) {
-        return Err(AppError::BadRequest("评论需要 2–2000 个字".into()));
-    }
+    images::validate_comment_content(body, &input.image_ids)?;
     if moderation::screen(&state.pool, &[body]).await?.is_some() {
         return Err(AppError::BadRequest("评论暂不能发布，请修改后重试".into()));
     }
@@ -161,19 +163,26 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Path((owner, 
         .bind(body)
         .fetch_one(&mut *tx)
         .await?;
+    images::attach_to_comment(&mut tx, CommentImageTarget::Repo(id), auth.user.uid, &input.image_ids).await?;
     tx.commit().await?;
     Ok(Json(json!({"id":id})))
 }
 
 pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path((owner, repo, id)): Path<(String, String, i64)>) -> AppResult<Json<Value>> {
     let key = parse(&owner, &repo)?;
-    let done = sqlx::query("UPDATE repo_comments SET status='deleted' WHERE repo_key=$1 AND id=$2 AND author_uid=$3 AND status='normal'")
+    let (deleted,): (bool,) = sqlx::query_as(
+        "WITH deleted AS (
+            UPDATE repo_comments SET status='deleted'
+            WHERE repo_key=$1 AND id=$2 AND author_uid=$3 AND status='normal' RETURNING id
+         ), removed_images AS (
+            DELETE FROM discover_comment_images WHERE repo_comment_id IN (SELECT id FROM deleted)
+         ) SELECT EXISTS(SELECT 1 FROM deleted)")
         .bind(&key)
         .bind(id)
         .bind(auth.user.uid)
-        .execute(&state.pool)
+        .fetch_one(&state.pool)
         .await?;
-    if done.rows_affected() == 0 {
+    if !deleted {
         return Err(AppError::not_found("评论"));
     }
     Ok(Json(json!({"ok":true})))

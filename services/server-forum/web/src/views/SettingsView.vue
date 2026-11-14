@@ -99,7 +99,7 @@ onMounted(loadBlocks)
         </p>
         <ol>
           <li :class="{ on: session.info.user.trust_level === 0 }">
-            <strong>新人</strong>：可以浏览所有人可见的帖子、点赞和少量回复，链接和图片显示为文字。只能在「小伴壁纸」「小伴游戏」板块发帖分享作品资源包，其他板块要升级为成员。
+            <strong>新人</strong>可以浏览公开帖子、点赞和回复，也可以上传图片。在「创意 → 壁纸／游戏」可以发帖，外链在升级为成员后可用。
           </li>
           <li :class="{ on: session.info.user.trust_level === 1 }">
             <strong>成员</strong>：注册满 {{ session.info.limits.tl1_days }} 天、读过 {{ session.info.limits.tl1_reads }} 个帖子后自动升级。可以发帖、发链接和图片，能看「成员以上」可见的帖子，发帖时也能设成「成员以上」可见。

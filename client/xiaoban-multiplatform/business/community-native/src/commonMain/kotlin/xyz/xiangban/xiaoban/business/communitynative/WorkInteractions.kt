@@ -3,6 +3,8 @@ package xyz.xiangban.xiaoban.business.communitynative
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -11,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
@@ -30,11 +31,18 @@ internal fun WorkInteractionLayout(
     val scope = rememberCoroutineScope()
     var busy by remember(kind, id, session.accountId) { mutableStateOf(false) }
     var replyTopic by remember(kind, id, session.accountId) { mutableStateOf<Long?>(null) }
+    var replyingTo by remember(kind, id, session.accountId) { mutableStateOf<Post?>(null) }
+    var editing by remember(kind, id, session.accountId) { mutableStateOf<Post?>(null) }
     var revision by remember(kind, id) { mutableStateOf(0) }
     var bookmarked by remember(kind, id, session.accountId) { mutableStateOf<Boolean?>(null) }
     var bookmarkError by remember(kind, id, session.accountId) { mutableStateOf(false) }
     var toast by remember(kind, id) { mutableStateOf<String?>(null) }
+    var lastDiscussion by remember(kind, id, session.accountId) { mutableStateOf<ContentDiscussion?>(null) }
     val discussion = (state as? Load.Ready)?.value
+    val shownDiscussion = discussion ?: lastDiscussion
+    LaunchedEffect(discussion) { if (discussion != null) lastDiscussion = discussion }
+    val commentAnchor = remember(kind, id) { BringIntoViewRequester() }
+    val canReply = discussion != null && !discussion.locked && (!session.loggedIn || discussion.canReply)
     val bookmarkRevision by env.contentBookmarkRevision.collectAsState()
     LaunchedEffect(kind, id, session.accountId, revision, bookmarkRevision) {
         if (session.loggedIn) {
@@ -54,49 +62,66 @@ internal fun WorkInteractionLayout(
             finally { busy = false }
         }
     }
+    fun beginReply(parent: Post? = null) {
+        if (!canReply) return
+        act {
+            val current = discussion ?: return@act
+            val target = if (current.topicId == null) env.contentSocial.discussion(kind, id, create = true) else current
+            if (target.canReply && target.topicId != null) {
+                replyingTo = parent
+                replyTopic = target.topicId
+                if (current.topicId == null) loader.reload()
+            } else toast = "当前无法评论"
+        }
+    }
+    fun dismissComposer() {
+        replyTopic = null
+        replyingTo = null
+        editing = null
+    }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 content {
-                    when (val current = state) {
-                        is Load.Ready -> {
-                            val topic = current.value.topicId
-                            if (topic != null) CommentsSection(env, topic, revision, hint = "", open = open)
-                            else Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                Text("评论 0", style = XType.Section)
-                                Text("还没有评论，聊聊你的体验吧", Modifier.padding(top = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                            }
+                    val topic = shownDiscussion?.topicId
+                    val anchor = Modifier.bringIntoViewRequester(commentAnchor)
+                    when {
+                        topic != null -> CommentsSection(
+                            env, topic, revision, open,
+                            onReply = if (canReply) ::beginReply else null,
+                            onEdit = { editing = it; replyTopic = topic },
+                            anchor = anchor,
+                        )
+                        state is Load.Failed -> Banner((state as Load.Failed).message, Modifier.padding(12.dp).then(anchor),
+                            warn = true, actionText = "重试", onAction = loader::reload)
+                        shownDiscussion != null -> Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            CommentSectionTitle(0, anchor)
+                            Text("还没有评论", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        is Load.Failed -> Banner(current.message, Modifier.padding(12.dp), warn = true, actionText = "重试", onAction = loader::reload)
-                        else -> Spinner(Modifier.fillMaxWidth().height(48.dp))
+                        else -> Spinner(Modifier.fillMaxWidth().height(48.dp).then(anchor))
                     }
                 }
             }
-            Hairline()
-            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).heightIn(min = 60.dp).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                val canReply = discussion != null && !discussion.locked && (!session.loggedIn || discussion.canReply)
-                Box(Modifier.weight(1f).height(40.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
-                    .clickable(enabled = canReply && !busy) { act {
-                        val current = env.contentSocial.discussion(kind, id, create = true)
-                        if (current.canReply) replyTopic = current.topicId else toast = "当前无法评论"
-                        loader.reload()
-                    } }.padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
-                    Text(when {
-                        discussion == null -> "评论"
-                        discussion.locked -> "评论已关闭"
-                        !session.loggedIn -> "登录后评论"
-                        !discussion.canReply -> "暂不能评论"
-                        else -> "写评论…"
-                    }, style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                }
+            CommentBar(
+                when {
+                    shownDiscussion == null -> "评论"
+                    shownDiscussion.locked -> "评论已关闭"
+                    !session.loggedIn -> "登录后评论"
+                    !shownDiscussion.canReply -> "暂不能评论"
+                    else -> "写评论…"
+                },
+                onWrite = { beginReply() },
+                enabled = canReply && !busy,
+            ) {
                 Row(Modifier.clip(CircleShape).clickable(enabled = discussion != null && !busy) { act {
                     val current = env.contentSocial.discussion(kind, id, create = true)
                     val topic = current.topicId ?: throw ApiException(503, "讨论暂不可用")
                     env.forum.setTopicLiked(topic, !current.liked)
                     loader.reload()
-                } }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    XIcon(XIcons.Heart, tint = if (discussion?.liked == true) Brand else MaterialTheme.colorScheme.onSurface, description = if (discussion?.liked == true) "取消点赞" else "点赞")
-                    Text(discussion?.likeCount?.toString() ?: "—", style = XType.Secondary)
+                } }.heightIn(min = 44.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    XIcon(XIcons.Heart, tint = if (shownDiscussion?.liked == true) Brand else MaterialTheme.colorScheme.onSurface, size = 20.dp,
+                        description = if (shownDiscussion?.liked == true) "取消点赞" else "点赞")
+                    Text(shownDiscussion?.likeCount?.let(::compactCount) ?: "—", style = XType.Secondary)
                 }
                 IconTap(XIcons.Bookmark, if (bookmarked == true) "取消收藏" else "收藏", { act {
                     val current = bookmarked ?: env.contentSocial.state(kind, id).bookmarked
@@ -104,42 +129,48 @@ internal fun WorkInteractionLayout(
                     env.contentBookmarkRevision.value++
                     bookmarkError = false
                 } }, tint = if (bookmarked == true) Brand else MaterialTheme.colorScheme.onSurface)
-                if (onComments != null) IconTap(XIcons.Message, "查看评论", onComments)
-                else IconTap(XIcons.Share, "分享作品", onShare)
+                CommentCountAction(shownDiscussion?.replyCount) {
+                    if (onComments != null) onComments()
+                    else scope.launch { commentAnchor.bringIntoView() }
+                }
+                if (onComments == null) IconTap(XIcons.Share, "分享作品", onShare)
             }
             if (bookmarkError) Text("收藏状态读取失败，点击收藏可重试", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
-        OverlayTransition(replyTopic != null) { panel ->
-            replyTopic?.let { topic -> NativeReplyComposer(env, topic, { replyTopic = null }, {
-                replyTopic = null; revision++; loader.reload(); toast = "评论已提交"
-            }, panel) }
+        replyTopic?.let { topic ->
+            NativeReplyComposer(env, topic, ::dismissComposer, onSent = {
+                toast = if (editing != null) "评论已保存" else "评论已发布"
+                if (editing == null) lastDiscussion = shownDiscussion?.copy(replyCount = shownDiscussion.replyCount + 1)
+                dismissComposer()
+                revision++
+                loader.reload()
+            }, parent = replyingTo, editingPost = editing)
         }
         Toast(toast) { toast = null }
     }
 }
 
 @Composable
-internal fun PostLikeAction(env: CommunityEnv, post: Post, open: ((Route) -> Unit)?) {
+internal fun PostLikeAction(env: CommunityEnv, post: Post, open: ((Route) -> Unit)?, onError: (String?) -> Unit) {
     val session by env.session.state.collectAsState()
     val scope = rememberCoroutineScope()
     var liked by remember(post.id, post.liked, session.accountId) { mutableStateOf(post.liked) }
     var count by remember(post.id, post.likeCount, session.accountId) { mutableStateOf(post.likeCount) }
     var busy by remember(post.id, session.accountId) { mutableStateOf(false) }
-    var error by remember(post.id) { mutableStateOf<String?>(null) }
-    Column {
-        Row(Modifier.clickable(enabled = !busy) {
-            if (!session.loggedIn) { open?.invoke(Route.Login); return@clickable }
-            busy = true; error = null
+    CommentLikeAction(liked, count, enabled = !busy, onLike = {
+        if (!session.loggedIn) open?.invoke(Route.Login)
+        else if (!busy) {
+            busy = true
+            onError(null)
             scope.launch {
-                try { val next = env.forum.setPostLiked(post.id, !liked); count = next.likeCount; liked = next.liked }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = messageOf(e) }
+                try {
+                    val next = env.forum.setPostLiked(post.id, !liked)
+                    count = next.likeCount
+                    liked = next.liked
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { onError(messageOf(e)) }
                 finally { busy = false }
             }
-        }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            XIcon(XIcons.Heart, tint = if (liked) Brand else LocalExtraColors.current.ink3, size = 14.dp, description = if (liked) "取消评论点赞" else "点赞评论")
-            Text(if (count > 0) "$count" else "赞", style = XType.Caption, color = if (liked) Brand else LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, style = XType.Caption, color = Danger) }
-    }
+    })
 }

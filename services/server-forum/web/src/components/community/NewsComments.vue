@@ -8,8 +8,8 @@ const props = defineProps<{ articleKey: string; frontier?: boolean }>()
 const adapter = computed<CommentAdapter>(() => {
   const key = props.articleKey
   return props.frontier
-    ? { list: page => discoverApi.frontierComments(key, page), post: (body, to) => discoverApi.frontierComment(key, body, to), like: (id, on) => discoverApi.likeFrontierComment(key, id, on), remove: id => discoverApi.deleteFrontierComment(key, id) }
-    : { list: page => discoverApi.comments(key, page), post: (body, to) => discoverApi.comment(key, body, to), like: (id, on) => discoverApi.likeComment(key, id, on), remove: id => discoverApi.deleteComment(key, id) }
+    ? { list: page => discoverApi.frontierComments(key, page), post: (body, to, images) => discoverApi.frontierComment(key, body, to, images), like: (id, on) => discoverApi.likeFrontierComment(key, id, on), remove: id => discoverApi.deleteFrontierComment(key, id) }
+    : { list: page => discoverApi.comments(key, page), post: (body, to, images) => discoverApi.comment(key, body, to, images), like: (id, on) => discoverApi.likeComment(key, id, on), remove: id => discoverApi.deleteComment(key, id) }
 })
 </script>
 

@@ -22,6 +22,10 @@ import xyz.xiangban.xiaoban.business.communitynative.CommunityPosterResult
 /** Link sharing and clipboard support. Community poster export is unavailable on iOS. */
 @OptIn(ExperimentalForeignApi::class)
 class IOSCommunitySharing : PlatformActions {
+    private val photoPicker = IOSForumPhotoPicker()
+    override val forumPhotoPickerSupported = true
+    override suspend fun pickForumPhoto(maxBytes: Long) = photoPicker.pick(maxBytes)
+
     override val communitySystemShareSupported = false
     override fun copy(text: String) { UIPasteboard.generalPasteboard.string = text }
     override fun openUrl(url: String) {

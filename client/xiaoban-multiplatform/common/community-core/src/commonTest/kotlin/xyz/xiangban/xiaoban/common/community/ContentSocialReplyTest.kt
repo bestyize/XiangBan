@@ -47,9 +47,10 @@ class ContentSocialReplyTest {
     @Test fun `reply sends typed references and free attachment association without local paths`() = runTest {
         val s = FakeServer(); val api = ForumApi(s.client, CommunityConfig()) { "access" }
         s.on("/api/topics/9/posts", body = """{"id":12,"floor":2}""")
-        api.reply(9, "我的作品", workRefs = listOf(WorkReference("pack", 7, 3), WorkReference("scheme", 8)), attachments = listOf(ForumAttachment(REPLY_ASSET, "说明.zip", 10)))
+        api.reply(9, "好", workRefs = listOf(WorkReference("pack", 7, 3), WorkReference("scheme", 8)), attachments = listOf(ForumAttachment(REPLY_ASSET, "说明.zip", 10)))
         val json = CommunityJson.parseToJsonElement((s.requests.single().body as TextContent).text).jsonObject
         assertEquals(setOf("body", "work_refs", "attachment_ids", "attachment_prices"), json.keys)
+        assertEquals("好", json["body"]!!.jsonPrimitive.content)
         assertEquals(3, json["work_refs"]!!.jsonArray[0].jsonObject["version"]!!.jsonPrimitive.int)
         assertFalse("version" in json["work_refs"]!!.jsonArray[1].jsonObject)
         assertEquals(0, json["attachment_prices"]!!.jsonArray.single().jsonObject["price"]!!.jsonPrimitive.int)
@@ -59,8 +60,10 @@ class ContentSocialReplyTest {
     @Test fun `edit omits unchanged fields and explicit empty lists clear associations`() = runTest {
         val s = FakeServer(); val api = ForumApi(s.client, CommunityConfig()) { "access" }
         s.on({ it.url.encodedPath == "/api/posts/12" }, body = """{"ok":true}""")
-        api.editReply(12, "只修改正文")
-        assertEquals(setOf("body"), CommunityJson.parseToJsonElement((s.requests.last().body as TextContent).text).jsonObject.keys)
+        api.editReply(12, "👍")
+        val edited = CommunityJson.parseToJsonElement((s.requests.last().body as TextContent).text).jsonObject
+        assertEquals(setOf("body"), edited.keys)
+        assertEquals("👍", edited["body"]!!.jsonPrimitive.content)
         api.editReply(12, "清除引用附件", workRefs = emptyList(), attachments = emptyList())
         val cleared = CommunityJson.parseToJsonElement((s.requests.last().body as TextContent).text).jsonObject
         assertEquals(emptyList(), cleared["work_refs"]!!.jsonArray.toList()); assertEquals(emptyList(), cleared["attachment_ids"]!!.jsonArray.toList())

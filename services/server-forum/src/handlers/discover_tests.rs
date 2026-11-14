@@ -147,6 +147,69 @@ impl Harness {
 }
 
 #[tokio::test]
+async fn newcomers_can_upload_and_publish_discover_comment_images() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let upload_dir = std::env::temp_dir().join(&h.schema);
+    let mut state = h.state.clone();
+    Arc::make_mut(&mut state.config).upload_dir = upload_dir.clone();
+    let app = crate::build_router(state.clone());
+
+    let uid = Uuid::new_v4();
+    sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'新人',0)").bind(uid).execute(&h.pool).await?;
+    let author = (h.make_token)(uid);
+    let other = h.member().await?;
+    let (_, session) = call(&app, "POST", "/api/session", Some(&author), json!({})).await;
+    assert_eq!(session["user"]["trust_level"], 0, "{session}");
+    assert_eq!(session["limits"]["image_max_bytes"], state.config.upload_limit_image);
+    assert_eq!(session["limits"]["comment_images"], true);
+
+    let mut upload = b"--check\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.gif\"\r\nContent-Type: image/gif\r\n\r\n".to_vec();
+    upload.extend(b"GIF89a\x01\x00\x01\x00");
+    upload.extend(b"\r\n--check--\r\n");
+    let response = app.clone().oneshot(Request::post("/api/images")
+        .header("authorization", format!("Bearer {author}"))
+        .header("content-type", "multipart/form-data; boundary=check")
+        .body(Body::from(upload))?).await?;
+    let status = response.status();
+    let image: Value = serde_json::from_slice(&to_bytes(response.into_body(), 65536).await?)?;
+    assert_eq!(status, StatusCode::OK, "{image}");
+    let id = Uuid::parse_str(image["id"].as_str().unwrap())?;
+    let image_url = image["url"].as_str().unwrap();
+
+    for (kind, key) in [("news", "comment-img"), ("frontier", "comment-img"), ("repo_issue", "comment-img")] {
+        let data = match kind {
+            "repo_issue" => json!({"ranks":[{"full_name":"demo/image-comments"}]}),
+            _ => json!({"title":"配图评论"}),
+        };
+        sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES($1,$2,$3,'published',now())")
+            .bind(kind).bind(key).bind(data).execute(&h.pool).await?;
+    }
+    let paths = ["/api/discover/daily/comment-img/comments", "/api/discover/frontier/comment-img/comments",
+        "/api/discover/repo/demo/image-comments/comments"];
+    let first = paths[0];
+    let (status, _) = call(&app, "POST", first, Some(&other), json!({"body":"别人上传的图","image_ids":[id]})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let mut posted = Vec::new();
+    for path in paths {
+        let (status, result) = call(&app, "POST", path, Some(&author), json!({"body":"","image_ids":[id]})).await;
+        assert_eq!(status, StatusCode::OK, "{path}: {result}");
+        posted.push((path, result["id"].as_i64().unwrap()));
+        let (status, listing) = call(&app, "GET", path, None, Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(listing["total"], 1);
+        assert_eq!(listing["items"][0]["images"], json!([image_url]));
+    }
+    sqlx::query("UPDATE images SET created_at=now()-interval '2 days' WHERE id=$1").bind(id).execute(&h.pool).await?;
+    assert_eq!(crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?, 0);
+    for (path, id) in posted {
+        assert_eq!(call(&app, "DELETE", &format!("{path}/{id}"), Some(&author), Value::Null).await.0, StatusCode::OK);
+    }
+    assert_eq!(crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?, 1);
+    tokio::fs::remove_dir(upload_dir).await?;
+    h.finish().await
+}
+
+#[tokio::test]
 async fn news_article_and_comments_are_published_scoped_and_moderated() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let payload = json!({"data":{"title":"站内文章","source":"官方","url":"https://example.com/news",
@@ -163,17 +226,20 @@ async fn news_article_and_comments_are_published_scoped_and_moderated() -> Resul
     assert_eq!(call(&h.app, "POST", path, None, json!({"body":"留言"})).await.0, StatusCode::UNAUTHORIZED);
     let author = h.member().await?;
     let other = h.member().await?;
-    let (status, created) = call(&h.app, "POST", path, Some(&author), json!({"body":"第一条留言"})).await;
+    assert_eq!(call(&h.app, "POST", path, Some(&author), json!({"body":" \n "})).await.0, StatusCode::BAD_REQUEST);
+    let (status, created) = call(&h.app, "POST", path, Some(&author), json!({"body":"好"})).await;
     assert_eq!(status, StatusCode::OK, "{created}");
     let id = created["id"].as_i64().unwrap();
     assert_eq!(call(&h.app, "POST", path, Some(&author), json!({"body":"太快了"})).await.0, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(call(&h.app, "POST", path, Some(&other), json!({"body":"回复留言","reply_to":id})).await.0, StatusCode::OK);
+    assert_eq!(call(&h.app, "POST", path, Some(&other), json!({"body":"👍","reply_to":id})).await.0, StatusCode::OK);
     assert_eq!(call(&h.app, "PUT", &format!("{path}/{id}/like"), Some(&other), json!({})).await.0, StatusCode::OK);
     let (_, comments) = call(&h.app, "GET", path, Some(&other), Value::Null).await;
     assert_eq!(comments["total"], 2);
     assert_eq!(comments["items"][1]["like_count"], 1);
     assert_eq!(comments["items"][1]["liked"], true);
     assert_eq!(comments["items"][0]["reply_to"], id);
+    assert_eq!(comments["items"][0]["body"], "👍");
+    assert_eq!(comments["items"][1]["body"], "好");
     assert_eq!(call(&h.app, "DELETE", &format!("{path}/{id}"), Some(&other), json!({})).await.0, StatusCode::NOT_FOUND);
     assert_eq!(call(&h.app, "DELETE", &format!("{path}/{id}"), Some(&author), json!({})).await.0, StatusCode::OK);
     sqlx::query("UPDATE discover_items SET status='draft' WHERE kind='news' AND key='article-test'").execute(&h.pool).await?;

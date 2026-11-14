@@ -27,6 +27,7 @@ data class ForumUploadSession(val user: ForumUser, val limits: ForumUploadLimits
 data class ForumUploadLimits(
     @SerialName("image_max_bytes") val imageMaxBytes: Long,
     @SerialName("upload_max_bytes") val uploadMaxBytes: Long,
+    @SerialName("comment_images") val commentImages: Boolean = false,
 )
 @Serializable
 data class ForumImage(val id: String, val url: String, val size: Long)
@@ -38,6 +39,9 @@ data class AttachmentPurchase(val purchased: Boolean, val charged: Int, val bala
 
 
 internal val ForumAssetId = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+fun forumImageId(path: String): String? =
+    path.removePrefix("/api/images/").takeIf { path.startsWith("/api/images/") && ForumAssetId.matches(it) }
 
 fun forumUploadName(raw: String): String = raw.substringAfterLast('/').substringAfterLast('\\')
     .filter { !it.isISOControl() && it != '"' && it != ';' }.trim().take(120).ifEmpty { "file" }
@@ -53,7 +57,7 @@ fun validateForumUpload(file: ForumUploadFile, maxBytes: Long, image: Boolean) {
 
 /** 服务端响应必须是同一条站内图片资源，拒绝 file://、content://、第三方链接及 Markdown 注入。 */
 fun forumImageMarkdown(image: ForumImage, filename: String): String {
-    if (!ForumAssetId.matches(image.id) || image.url != "/api/images/${image.id}" || image.size <= 0)
+    if (forumImageId(image.url) != image.id || image.size <= 0)
         throw ApiException(200, "图片上传结果无效，请重试")
     val clean = forumUploadName(filename)
     val alt = clean.substringBeforeLast('.', clean)

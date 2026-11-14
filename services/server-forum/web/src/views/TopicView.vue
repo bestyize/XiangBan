@@ -249,7 +249,7 @@ function report(target: { type: 'topic' | 'post'; id: number }) {
 }
 
 async function sendReply() {
-  if (!topic.value || draft.value.trim().length < 2 || sending.value || uploading.value) return
+  if (!topic.value || !draft.value.trim() || sending.value || uploading.value) return
   if (replyFiles.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
   sending.value = true
   try {
@@ -454,7 +454,7 @@ function breadcrumbDestination(slug: string) {
               <button type="button" class="tool" aria-label="插入图片" @click="editor?.pickImage()"><AppIcon name="image" :size="22" /></button>
             </div>
             <span v-else class="muted">{{ session.user?.trust_level === 0 ? `新人每天可以回复 ${session.info?.limits.daily_posts ?? 10} 次` : '' }}</span>
-            <button type="submit" class="btn btn-primary" :disabled="sending || uploading || draft.trim().length < 2">
+            <button type="submit" class="btn btn-primary" :disabled="sending || uploading || !draft.trim()">
               {{ sending ? '正在发送' : isMobile ? '发送' : '发表回复' }}
             </button>
           </div>

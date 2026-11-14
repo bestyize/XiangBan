@@ -4,6 +4,7 @@
 
 | 设计稿 | 内容与预览 |
 | --- | --- |
+| [评论组件](prototypes/comment-composer.html) | 小伴手机 App 的评论列表、吸底入口与输入面板。点笑脸展开表情面板，点图片图标从系统相册选图。输入一个字或表情即可发布。支持回复、展开编辑、图片预览和深浅色。Compose 已用于帖子、求助、作品与方案、AI 日报、小伴前沿、开源精选、仓库和软件详情，图片评论需配套论坛服务。设计稿的相册网格使用小伴壁纸图库素材。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
 | [MBTI · 向内看](prototypes/mbti-native.html) | 原生 iOS 质感提案（第四版：珊瑚橙红、暖白与墨灰，配套暖色首页插画、紧凑间距与更清晰字号）：首页、答题、结果三页总览与单页体验，6 题缩略流程、前后切题、揭晓过渡、六章报告、16 型角色切换、行动勾选、分享卡预览及深浅色。题目不参与正式计分，报告和历史记录为示例，保存分享为模拟。复用 `app-plaza-assets/` 原创角色与类型数据，已应用到内置 MBTI 1.3.0 运行包（正式版为真实 48 题和实际报告）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，沿用下方应用广场的 1424 端口启动方式，后续迭代保持此链接。 |
 | [轻启](prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |
 | [社区作品分享面板](prototypes/community-work-share.html) | 作品封面预览、四个分享入口、复制反馈及独立海报预览。支持浅色、深色和窄屏，分享操作为演示。[在线预览（本机）](http://127.0.0.1:1421/prototypes/community-work-share.html) |

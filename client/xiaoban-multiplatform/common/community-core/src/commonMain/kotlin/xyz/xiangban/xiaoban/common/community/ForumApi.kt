@@ -78,9 +78,10 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     private fun articlePath(key: String, frontier: Boolean) = "/api/discover/${if (frontier) "frontier" else "daily"}/${key.encodeURLParameter()}"
     suspend fun news(key: String, frontier: Boolean = false): NewsItem = get(articlePath(key, frontier))
     suspend fun newsComments(key: String, page: Int = 1, frontier: Boolean = false): Page<NewsComment> = get("${articlePath(key, frontier)}/comments${query("page" to page)}")
-    suspend fun commentNews(key: String, body: String, replyTo: Long? = null, frontier: Boolean = false) {
+    suspend fun commentNews(key: String, body: String, replyTo: Long? = null, frontier: Boolean = false, imageIds: List<String> = emptyList()) {
         write(HttpMethod.Post, "${articlePath(key, frontier)}/comments", buildJsonObject {
             put("body", body); if (replyTo != null) put("reply_to", replyTo)
+            if (imageIds.isNotEmpty()) put("image_ids", buildJsonArray { imageIds.forEach { add(JsonPrimitive(it)) } })
         })
     }
     suspend fun likeNewsComment(key: String, id: Long, liked: Boolean, frontier: Boolean = false) {
@@ -120,9 +121,10 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         return readme
     }
     suspend fun repoComments(owner: String, repo: String, page: Int = 1): Page<NewsComment> = get("${repoPath(owner, repo)}/comments${query("page" to page)}")
-    suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null) {
+    suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null, imageIds: List<String> = emptyList()) {
         write(HttpMethod.Post, "${repoPath(owner, repo)}/comments", buildJsonObject {
             put("body", body); if (replyTo != null) put("reply_to", replyTo)
+            if (imageIds.isNotEmpty()) put("image_ids", buildJsonArray { imageIds.forEach { add(JsonPrimitive(it)) } })
         })
     }
     suspend fun likeRepoComment(owner: String, repo: String, id: Long, liked: Boolean) {
@@ -193,7 +195,8 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
 
     /** 回复帖子；[replyTo] 是被回复的评论编号。 */
     suspend fun reply(topicId: Long, body: String, replyTo: Long? = null, workRefs: List<WorkReference>? = null, attachments: List<ForumAttachment>? = null) {
-        if (topicId <= 0 || body.trim().length < 2) throw ApiException(400, "请输入至少 2 个字的回复")
+        if (topicId <= 0) throw ApiException(400, "帖子编号无效")
+        if (body.isBlank()) throw ApiException(400, "请输入回复内容")
         write(HttpMethod.Post, "/api/topics/$topicId/posts", buildJsonObject {
             put("body", body); if (replyTo != null) put("reply_to", replyTo)
             replyAssociations(workRefs, attachments)
@@ -204,7 +207,8 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         return get("/api/posts/$postId/source")
     }
     suspend fun editReply(postId: Long, body: String, workRefs: List<WorkReference>? = null, attachments: List<ForumAttachment>? = null) {
-        if (postId <= 0 || body.trim().length < 2) throw ApiException(400, "请输入至少 2 个字的回复")
+        if (postId <= 0) throw ApiException(400, "回复编号无效")
+        if (body.isBlank()) throw ApiException(400, "请输入回复内容")
         write(HttpMethod.Patch, "/api/posts/$postId", buildJsonObject { put("body", body); replyAssociations(workRefs, attachments) })
     }
 

@@ -8,27 +8,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.Role
-import coil3.compose.AsyncImage
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,14 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import xyz.xiangban.xiaoban.common.community.NewsComment
 import xyz.xiangban.xiaoban.common.community.ReadmeBlock
 import xyz.xiangban.xiaoban.common.community.RepoDetail
 import xyz.xiangban.xiaoban.common.community.RepoRank
 import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.parseMarkdown
-import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.formatGain
 import xyz.xiangban.xiaoban.common.community.formatStars
 import xyz.xiangban.xiaoban.common.community.messageOf
@@ -124,18 +110,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
     var loadingDetail by remember(name) { mutableStateOf(false) }
     var zh by rememberSaveable(name) { mutableStateOf(true) }
     var expanded by rememberSaveable(name) { mutableStateOf(false) }
-    var comments by remember(name) { mutableStateOf<List<NewsComment>>(emptyList()) }
-    var commentsError by remember(name) { mutableStateOf<String?>(null) }
-    var commentsPage by remember(name) { mutableIntStateOf(0) }
-    var commentsMore by remember(name) { mutableStateOf(false) }
-    var commentsTotal by remember(name) { mutableIntStateOf(0) }
-    var loadingComments by remember(name) { mutableStateOf(false) }
-    var draft by remember(name) { mutableStateOf("") }
-    var replyTo by remember(name) { mutableStateOf<NewsComment?>(null) }
-    var sending by remember(name) { mutableStateOf(false) }
-    var composerOpen by rememberSaveable(name) { mutableStateOf(false) }
-    val commentFocus = remember { FocusRequester() }
-    var deleteTarget by remember(name) { mutableStateOf<NewsComment?>(null) }
+    val discussion = rememberRepoComments(env, owner, repo, open)
     val listState = rememberLazyListState()
 
     val readmeLoader = if (curated) rememberLoader(env, "project-readme:$name") { env.forum.projectReadme(name) } else null
@@ -164,51 +139,9 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
             finally { loadingDetail = false }
         }
     }
-    fun loadComments(reset: Boolean = false) {
-        if (loadingComments) return
-        loadingComments = true; commentsError = null
-        scope.launch {
-            try {
-                val result = env.forum.repoComments(owner, repo, if (reset) 1 else commentsPage + 1)
-                comments = if (reset) result.items else comments + result.items
-                commentsPage = result.page; commentsMore = result.hasMore; commentsTotal = result.total
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { commentsError = messageOf(e) }
-            finally { loadingComments = false }
-        }
-    }
-    fun beginComment(parent: NewsComment? = null) {
-        if (!session.loggedIn) {
-            open(Route.Login)
-            return
-        }
-        replyTo = parent
-        if (curated) composerOpen = true
-    }
+    LaunchedEffect(name, curated) { loadDetail() }
 
-    fun sendComment() {
-        if (sending || draft.trim().length < 2) return
-        if (!session.loggedIn) {
-            open(Route.Login)
-            return
-        }
-        sending = true
-        scope.launch {
-            try {
-                env.forum.commentRepo(owner, repo, if (curated) draft.trim() else draft, replyTo?.id)
-                draft = ""
-                replyTo = null
-                composerOpen = false
-                loadComments(true)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { commentsError = messageOf(e) }
-            finally { sending = false }
-        }
-    }
-
-    LaunchedEffect(name, curated) { loadDetail(); loadComments(true) }
-
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    CommentScaffold(env, discussion, Modifier.background(MaterialTheme.colorScheme.surface)) {
         ScreenBar(if (curated) "开源精选" else "仓库详情", onBack = back, trailing = {
             webPageRoute(curatedGithub)?.let { github ->
                 IconTap(XIcons.ExternalLink, "在 GitHub 查看项目", { open(github) })
@@ -235,7 +168,11 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
             }
             // 精选页在评论前有项目卡、README 栏、正文块和来源；缺省或失败时只显示一条状态。
             val commentsIndex = if (curated) {
-                if (curatedProject == null || curatedReadme == null) 0 else 3 + readmeBlocks.size
+                when {
+                    curatedProject == null || curatedReadme == null -> 0
+                    readme == null -> 3
+                    else -> 3 + readmeBlocks.size
+                }
             } else {
                 2 + if (hasReadme) (if (note != null) 1 else 0) + shown.size + (if (long) 1 else 0) else 1
             }
@@ -330,58 +267,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     }
                 }
                 }
-                item(key = "comments-head") {
-                    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        Hairline()
-                        Text("评论 · $commentsTotal", Modifier.padding(horizontal = 20.dp).padding(top = 20.dp, bottom = 8.dp), fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                if (comments.isEmpty() && !loadingComments && commentsError == null) item(key = "no-comments") {
-                    Text("还没有评论，来说说你怎么用它的。", Modifier.padding(horizontal = 20.dp, vertical = 14.dp), color = ink3, fontSize = 14.sp)
-                }
-                items(comments, key = { "c${it.id}" }) { comment ->
-                    val likeComment: () -> Unit = {
-                        if (!session.loggedIn) open(Route.Login) else scope.launch {
-                            try { env.forum.likeRepoComment(owner, repo, comment.id, !comment.liked); loadComments(true) }
-                            catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
-                        }
-                    }
-                    if (curated) {
-                        CuratedComment(
-                            env, comment,
-                            parentName = comments.firstOrNull { it.id == comment.replyTo }?.author?.nickname,
-                            onAuthor = { open(Route.User(comment.author.uid)) },
-                            onLike = likeComment,
-                            onReply = { beginComment(comment) },
-                            onDelete = { deleteTarget = comment },
-                        )
-                    } else {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Avatar(comment.author.nickname, 32.dp, showInitial = true)
-                                Column(Modifier.weight(1f)) {
-                                    Text(comment.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(agoText(comment.createdAt), fontSize = 12.sp, color = ink3)
-                                }
-                                Text("${if (comment.liked) "♥" else "♡"} ${comment.likeCount}", Modifier.clickable(onClick = likeComment).padding(5.dp), color = if (comment.liked) Brand else ink3, fontSize = 13.sp)
-                            }
-                            if (comment.replyTo != null) {
-                                val parent = comments.firstOrNull { it.id == comment.replyTo }
-                                Text("回复 ${parent?.author?.nickname ?: "评论 #${comment.replyTo}"}", Modifier.padding(start = 42.dp, top = 6.dp), fontSize = 12.sp, color = ink3)
-                            }
-                            Text(comment.body, Modifier.padding(start = 42.dp, top = 6.dp), fontSize = 15.sp, lineHeight = 24.sp)
-                            Row(Modifier.padding(start = 42.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                                Text("回复", Modifier.clickable { if (!session.loggedIn) open(Route.Login) else replyTo = comment }, color = ink3, fontSize = 12.sp)
-                                if (comment.mine) Text("删除", Modifier.clickable { deleteTarget = comment }, color = ink3, fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-                item(key = "comments-foot") {
-                    if (commentsError != null) Text("评论加载或操作失败：$commentsError · 重试", Modifier.clickable { loadComments(true) }.padding(20.dp), color = Danger, fontSize = 13.sp)
-                    else if (commentsMore) Text("加载更多评论", Modifier.clickable { loadComments() }.padding(20.dp), color = Brand, fontSize = 14.sp)
-                    if (loadingComments) Spinner(Modifier.fillMaxWidth().height(48.dp))
-                }
+                plainCommentItems(env, discussion, open)
                 val related = curatedCatalog?.related.orEmpty()
                 if (related.isNotEmpty()) item(key = "curated-related") {
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -397,121 +283,16 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).imePadding()) {
-                if (curated) Hairline()
-                if (curated && (!composerOpen || !session.loggedIn)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            "说点什么…",
-                            Modifier.weight(1f).clip(CircleShape).background(LocalExtraColors.current.fill)
-                                .clickable(role = Role.Button) { beginComment() }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            fontSize = 14.sp, color = ink3,
-                        )
-                        webPageRoute(curatedGithub)?.let { github ->
-                            IconTap(XIcons.ExternalLink, "在 GitHub 查看项目", { open(github) })
-                        }
-                        IconTap(XIcons.Star, if (fav) "取消收藏" else "收藏", { setFav(!fav) },
-                            tint = if (fav) Brand else MaterialTheme.colorScheme.onSurface)
-                        Row(
-                            Modifier.heightIn(min = 44.dp).semantics { contentDescription = "查看评论，共 $commentsTotal 条" }
-                                .clickable(role = Role.Button) { scope.launch { listState.animateScrollToItem(commentsIndex) } }
-                                .padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            XIcon(XIcons.Message, size = 24.dp)
-                            Text(commentsTotal.toString(), fontSize = 13.sp)
-                        }
+            CommentBar(if (session.loggedIn) "写评论…" else "登录后评论", onWrite = { discussion.begin() }) {
+                if (curated) {
+                    webPageRoute(curatedGithub)?.let { github ->
+                        IconTap(XIcons.ExternalLink, "在 GitHub 查看项目", { open(github) })
                     }
-                } else if (curated) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(replyTo?.let { "回复 ${it.author.nickname}" } ?: "写评论", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                            TextButton(onClick = { composerOpen = false; replyTo = null }) { Text("收起") }
-                        }
-                        OutlinedTextField(
-                            value = draft, onValueChange = { if (it.length <= 2000) draft = it },
-                            modifier = Modifier.fillMaxWidth().focusRequester(commentFocus),
-                            enabled = !sending, minLines = 2, maxLines = 3,
-                            placeholder = { Text("分享你的看法，2–2000 字") }, shape = RoundedCornerShape(12.dp),
-                        )
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${draft.trim().length} / 2000", Modifier.weight(1f), color = ink3, fontSize = 12.sp)
-                            Button(onClick = ::sendComment, enabled = !sending && draft.trim().length >= 2) {
-                                Text(if (sending) "提交中…" else "发送")
-                            }
-                        }
-                    }
-                    LaunchedEffect(commentFocus) { commentFocus.requestFocus() }
-                } else {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
-                        replyTo?.let { Text("回复 ${it.author.nickname} · 取消", Modifier.clickable { replyTo = null }.padding(bottom = 6.dp), color = Brand, fontSize = 12.sp) }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(value = draft, onValueChange = { if (it.length <= 2000) draft = it }, modifier = Modifier.weight(1f), placeholder = { Text(if (replyTo != null) "回复 ${replyTo?.author?.nickname}" else "写下你的看法…", fontSize = 14.sp) }, maxLines = 3, shape = RoundedCornerShape(12.dp))
-                            TextButton(enabled = !sending && draft.trim().length >= 2, onClick = ::sendComment) { Text(if (sending) "发送中" else "发送") }
-                        }
-                    }
+                    IconTap(XIcons.Star, if (fav) "取消收藏" else "收藏", { setFav(!fav) },
+                        tint = if (fav) Brand else MaterialTheme.colorScheme.onSurface)
                 }
+                CommentCountAction(discussion.total) { scope.launch { listState.animateScrollToItem(commentsIndex) } }
             }
-        }
-    }
-    deleteTarget?.let { target ->
-        AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除评论？") }, text = { Text("删除后这条评论将不再显示。") }, confirmButton = {
-            TextButton(onClick = { deleteTarget = null; scope.launch {
-                try { env.forum.deleteRepoComment(owner, repo, target.id); loadComments(true) }
-                catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
-            } }) { Text("删除") }
-        }, dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } })
-    }
-}
-
-@Composable
-internal fun CuratedComment(
-    env: CommunityEnv,
-    comment: NewsComment,
-    parentName: String?,
-    onAuthor: () -> Unit,
-    onLike: () -> Unit,
-    onReply: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val ink = LocalExtraColors.current.ink3
-    val name = comment.author.nickname
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(end = 44.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onAuthor)) {
-                Avatar(name, 36.dp, showInitial = true)
-                comment.author.avatarUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    AsyncImage(env.forum.imageUrl(url), contentDescription = null, imageLoader = rememberImageLoader(),
-                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                }
-            }
-            Column(Modifier.weight(1f)) {
-                Text(name, Modifier.clickable(onClick = onAuthor), color = ink, fontSize = 13.sp)
-                Text(comment.createdAt.substringBefore('T'), color = ink, fontSize = 11.sp)
-                comment.replyTo?.let { Text("回复 ${parentName ?: "评论 #$it"}", Modifier.padding(top = 6.dp), color = ink, fontSize = 12.sp) }
-                Text(comment.body, Modifier.padding(top = 6.dp), fontSize = 15.sp, lineHeight = 24.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("回复", Modifier.clickable(role = Role.Button, onClick = onReply).padding(vertical = 8.dp), color = ink, fontSize = 12.sp)
-                    if (comment.mine) Text("删除", Modifier.clickable(role = Role.Button, onClick = onDelete).padding(vertical = 8.dp), color = ink, fontSize = 12.sp)
-                }
-            }
-        }
-        val tint = if (comment.liked) Brand else ink
-        Column(
-            Modifier.align(Alignment.TopEnd).width(40.dp).heightIn(min = 44.dp)
-                .semantics { contentDescription = if (comment.liked) "取消赞" else "赞这条评论" }
-                .clickable(role = Role.Button, onClick = onLike),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            XIcon(XIcons.Heart, size = 18.dp, tint = tint)
-            Text(if (comment.likeCount > 0) comment.likeCount.toString() else "赞", color = tint, fontSize = 11.sp)
         }
     }
 }

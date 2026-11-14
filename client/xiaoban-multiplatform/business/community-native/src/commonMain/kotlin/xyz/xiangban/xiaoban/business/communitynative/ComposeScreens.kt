@@ -280,7 +280,8 @@ fun NewPostScreen(
                 Hairline()
                 Column(Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
                     ForumUploadControls(env, enabled = !busy && !uploading && !leaving, compact = true,
-                        onImage = { if (!leaving) body += it }, onBusy = { uploading = it }, attachments = attachments,
+                        onImage = { image, name -> if (!leaving) body += forumImageMarkdown(image, name) },
+                        onBusy = { uploading = it }, attachments = attachments,
                         onAttachments = { next ->
                             if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
                             else env.scope.launch { next.filterNot { file -> attachments.any { it.id == file.id } }.forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } } }

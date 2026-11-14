@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
@@ -20,13 +21,15 @@ import kotlin.coroutines.resumeWithException
 /** Storage Access Framework，只获得用户点选的单个 content URI，不申请存储权限。 */
 class AndroidForumPicker(private val activity: ComponentActivity) {
     private var waiting: CancellableContinuation<Uri?>? = null
-    private val launcher = activity.registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    private fun finish(uri: Uri?) {
         val continuation = waiting
         waiting = null
         if (continuation?.isActive == true) continuation.resume(uri)
     }
+    private val launcher = activity.registerForActivityResult(ActivityResultContracts.OpenDocument(), ::finish)
+    private val photoLauncher = activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia(), ::finish)
 
-    suspend fun pick(image: Boolean, maxBytes: Long): ForumUploadFile? {
+    suspend fun pick(image: Boolean, maxBytes: Long, fromPhotos: Boolean = false): ForumUploadFile? {
         val limit = minOf(maxBytes, FORUM_MEMORY_MAX_BYTES)
         if (limit <= 0) throw ApiException(400, "当前账号暂不能上传文件")
         val uri = withContext(Dispatchers.Main.immediate) {
@@ -39,7 +42,8 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                 // Keep the slot until this picker returns, even if its caller cancels.
                 // A subsequent request must not receive the previous selection.
                 try {
-                    launcher.launch(if (image) arrayOf("image/png", "image/jpeg", "image/gif", "image/webp") else arrayOf("*/*"))
+                    if (fromPhotos) photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    else launcher.launch(if (image) arrayOf("image/png", "image/jpeg", "image/gif", "image/webp") else arrayOf("*/*"))
                 } catch (e: Exception) {
                     waiting = null
                     if (continuation.isActive) continuation.resumeWithException(ApiException(400, "无法打开系统文件选择器"))
@@ -81,5 +85,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
 /** 通过委托接文件选择能力，不改既有 AndroidPlatform 的语音和遥控能力。 */
 class ForumPickerPlatform(private val delegate: PlatformActions, private val picker: AndroidForumPicker) : PlatformActions by delegate {
     override val forumFilePickerSupported = true
+    override val forumPhotoPickerSupported = true
     override suspend fun pickForumFile(image: Boolean, maxBytes: Long) = picker.pick(image, maxBytes)
+    override suspend fun pickForumPhoto(maxBytes: Long) = picker.pick(image = true, maxBytes = maxBytes, fromPhotos = true)
 }

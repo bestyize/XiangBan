@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>评论组件 · 小伴手机 App</title>
+<style>
+  :root {
+    color-scheme: light;
+    --canvas: #f4f3f0;
+    --paper: #fff;
+    --page: #fafafa;
+    --ink: #222;
+    --sub: #666;
+    --line: #e8e6e2;
+    --fill: #f2f2f2;
+    --brand: #e3203c;
+    --brand-ink: #bc1832;
+    --brand-soft: #fff0f2;
+    --keys: #e4e6eb;
+    --key: #fff;
+    --key-side: #cdd1da;
+    --shadow: 0 18px 52px #27221a13, 0 2px 8px #27221a0b;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --canvas: #151515;
+    --paper: #1c1c1e;
+    --page: #111;
+    --ink: #ececec;
+    --sub: #a9a9af;
+    --line: #343436;
+    --fill: #2c2c2e;
+    --brand: #ee4b5f;
+    --brand-ink: #ff8c91;
+    --brand-soft: #3a2225;
+    --keys: #26272a;
+    --key: #414247;
+    --key-side: #35363b;
+    --shadow: 0 18px 52px #0005, 0 2px 8px #0003;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; color: var(--ink); background: var(--canvas); }
+  button, textarea, input { font: inherit; color: inherit; }
+  button { border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: default; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  svg { display: block; width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; fill: none; flex: none; }
+  .workspace { max-width: 1216px; margin: auto; padding: 0 36px 32px; }
+  .workspace-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    height: 64px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 650; }
+  .brand svg { width: 17px; height: 17px; color: var(--brand); }
+  .workspace-action { display: flex; align-items: center; gap: 6px; }
+  .workspace-action button { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 18px; font-size: 12px; }
+  .workspace-action button:hover { background: var(--paper); }
+  .workspace-action svg { width: 16px; height: 16px; }
+  .intro { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 27px 0 24px; }
+  .intro h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.18; letter-spacing: -.04em; font-weight: 720; }
+  .intro p { margin: 0 0 2px; font-size: 13px; color: var(--sub); }
+  .board-nav { display: none; }
+  .boards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .board { min-width: 0; }
+  .board-title { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+  .phone {
+    height: 676px; position: relative; overflow: hidden; color: var(--ink); background: var(--page);
+    border: 1px solid var(--line); border-radius: 27px; box-shadow: var(--shadow); isolation: isolate;
+  }
+  .app { height: 100%; display: flex; flex-direction: column; background: var(--paper); }
+  .status-bar { height: 27px; padding: 6px 20px 0; display: flex; justify-content: space-between; align-items: center; font: 650 11px/1 Inter, sans-serif; }
+  .status-bar svg { width: 48px; height: 12px; }
+  .app-nav { height: 44px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; text-align: center; font-size: 15px; font-weight: 650; }
+  .app-nav button { margin: auto; }
+  .app-nav svg { width: 18px; height: 18px; }
+  .post-scroll { flex: 1; overflow: auto; scrollbar-width: none; }
+  .post { padding: 5px 16px 14px; }
+  .cover { width: 100%; height: 151px; display: block; object-fit: cover; border-radius: 9px; background: #344b63; }
+  .post h3 { margin: 13px 0 10px; font-size: 19px; line-height: 1.35; font-weight: 700; }
+  .author { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .avatar { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; font-size: 13px; font-weight: 650; background: #dcece4; color: #305d4b; }
+  .author .avatar { width: 23px; height: 23px; font-size: 11px; background: #e4e9f4; color: #40577e; }
+  .post-time { color: var(--sub); font-weight: 400; }
+  .comments { border-top: 1px solid var(--line); padding: 5px 16px 12px; }
+  .comments h3 { margin: 12px 0 0; font-size: 16px; }
+  .comment-total { margin-left: 6px; color: var(--sub); font-size: 13px; font-weight: 400; }
+  .comment { display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; gap: 10px; padding: 13px 0 0; }
+  .comment:nth-of-type(even) .avatar { color: #78513e; background: #f0dfd4; }
+  .comment h4 { margin: 0 0 4px; font-size: 13px; line-height: 18px; }
+  .comment p { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .comment-reply { display: inline-block; margin: 0 0 4px; border-radius: 8px; padding: 4px 8px; background: var(--fill); color: var(--sub); font-size: 12px; }
+  .row-meta { display: flex; align-items: center; gap: 12px; min-height: 34px; color: var(--sub); font-size: 12px; border-bottom: 1px solid var(--line); }
+  .row-meta button { min-height: 34px; padding: 0; }
+  .row-like { align-self: start; display: grid; justify-items: center; gap: 1px; min-height: 42px; color: var(--sub); font-size: 11px; }
+  .row-like svg { width: 17px; height: 17px; }
+  .row-like[aria-pressed="true"] { color: var(--brand-ink); }
+  .row-like[aria-pressed="true"] svg { fill: var(--brand-soft); }
+  .comment-pictures { display: flex; gap: 4px; margin-top: 6px; }
+  .comment-pictures img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+  .comment-bar { display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-top: 1px solid var(--line); }
+  .comment-bar .write { display: flex; align-items: center; justify-content: flex-start; gap: 7px; flex: 1; min-height: 44px; border-radius: 99px; padding: 0 12px; background: var(--fill); color: var(--sub); font-size: 13px; }
+  .comment-bar .write svg { width: 18px; height: 18px; }
+  .system-home { flex: none; height: 16px; display: grid; place-items: center; }
+  .system-home::after { content: ""; width: 94px; height: 4px; border-radius: 99px; background: var(--ink); opacity: .25; }
+  .overlay { pointer-events: none; position: absolute; z-index: 2; inset: 0; display: flex; align-items: end; }
+  .scrim { position: absolute; inset: 0; background: #0006; pointer-events: auto; }
+  .sheet {
+    position: relative; pointer-events: auto; width: 100%; max-height: calc(100% - 23px);
+    display: flex; flex-direction: column; overflow: hidden; border-radius: 16px 16px 0 0;
+    background: var(--paper); box-shadow: 0 -4px 24px #0002;
+  }
+  .handle { width: 30px; height: 4px; margin: 9px auto 1px; border-radius: 99px; background: var(--line); flex: none; }
+  .editor-title { display: flex; align-items: center; padding: 0 8px 0 16px; min-height: 42px; }
+  .editor-title h3 { flex: 1; margin: 0; font-size: 16px; line-height: 22px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border-radius: 50%; color: var(--sub); flex: none; }
+  .icon-button:hover { background: var(--fill); }
+  .icon-button[aria-pressed="true"] { color: var(--brand-ink); }
+  .editor-body { padding: 0 16px 4px; overflow: auto; min-height: 52px; }
+  .draft {
+    display: block; width: 100%; min-height: 64px; max-height: 106px; padding: 10px 12px; border: 0;
+    border-radius: 8px; background: var(--fill); outline: none; resize: none; font-size: 15px; line-height: 22px; caret-color: var(--brand);
+  }
+  .draft::placeholder { color: var(--sub); }
+  .draft:focus-visible { outline-offset: -1px; outline: 1px solid var(--brand); }
+  .sheet.expanded .draft { min-height: 172px; max-height: 232px; }
+  .counter { margin: 4px 0 0; text-align: right; color: var(--sub); font-size: 12px; }
+  .counter.invalid { color: var(--brand-ink); }
+  .selected-images { display: flex; gap: 8px; margin: 8px 0 0; overflow: auto; }
+  .selected-image { position: relative; width: 60px; height: 60px; border-radius: 8px; overflow: hidden; flex: none; }
+  .selected-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .selected-image button { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border-radius: 50%; color: #fff; background: #1a2029ba; }
+  .selected-image svg { width: 14px; height: 14px; }
+  .toolbar { display: flex; align-items: center; flex: none; padding: 2px 16px 6px 8px; }
+  .publish { min-width: 63px; min-height: 42px; margin-left: auto; padding: 0 12px; border-radius: 99px; background: var(--brand-soft); color: var(--brand-ink); font-size: 14px; font-weight: 650; }
+  .publish:disabled { color: var(--sub); background: var(--fill); }
+  .input-panels { flex: none; border-top: 1px solid var(--line); }
+  .emoji-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 1px 8px; }
+  .emoji-grid button { min-height: 42px; border-radius: 8px; padding: 0; text-align: center; font-size: 22px; line-height: 1; }
+  .emoji-grid button:hover { background: var(--fill); }
+  .emoji-panel { background: var(--page); }
+  .emoji-panel .emoji-grid { padding-top: 4px; }
+  .panel-label { margin: 0; padding: 10px 16px 4px; color: var(--sub); font-size: 12px; font-weight: 600; }
+  .keyboard { background: var(--keys); color: var(--ink); padding: 0 6px 4px; }
+  .suggestions { display: grid; grid-template-columns: repeat(3, 1fr); min-height: 32px; }
+  .suggestions button { font-size: 12px; }
+  .suggestions button + button { border-left: 1px solid var(--key-side); }
+  .keys { display: flex; justify-content: center; gap: 4px; margin: 4px 0; }
+  .keys button {
+    flex: 1; max-width: 11%; height: 31px; display: grid; place-items: center; padding: 0; border-radius: 5px;
+    box-shadow: 0 1px 0 #0003; background: var(--key); font: 450 15px/1 Inter, sans-serif;
+  }
+  .keys:nth-of-type(3) { padding-inline: 12px; }
+  .keys button.special { max-width: none; flex: 1.45; background: var(--key-side); }
+  .keys button.space { flex: 5; max-width: none; }
+  .keys button svg { width: 16px; height: 16px; }
+  .album { background: var(--page); }
+  .album-head { padding: 0 10px 0 16px; min-height: 42px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 650; }
+  .album-head button { min-height: 40px; padding: 0 8px; font-size: 13px; color: var(--brand-ink); font-weight: 650; }
+  .album-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; padding: 0 3px; }
+  .photo { isolation: isolate; position: relative; display: grid; place-items: center; aspect-ratio: 1; padding: 0; background: var(--fill); }
+  .photo img { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo .check {
+    position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 19px; height: 19px;
+    border: 1.5px solid #fff; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 650; background: #1115;
+  }
+  .photo[aria-pressed="true"] .check { background: var(--brand); }
+  .photo[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--brand); }
+  .more { padding: 1px 16px 12px; }
+  .more label { display: block; margin: 8px 0 4px; font-size: 12px; color: var(--sub); }
+  .more input { width: 100%; min-height: 40px; border: 0; border-radius: 8px; background: var(--fill); padding: 8px 10px; font-size: 13px; }
+  .more button { margin-top: 6px; min-height: 36px; border-radius: 99px; padding: 0 12px; color: var(--brand-ink); background: var(--brand-soft); font-size: 13px; }
+  .attachment-list { padding: 4px 0; }
+  .attachment { display: flex; align-items: center; justify-content: space-between; min-height: 35px; font-size: 12px; }
+  .attachment button { padding: 8px; color: var(--sub); font-size: 12px; }
+  .toast { position: absolute; z-index: 4; bottom: 79px; left: 50%; transform: translateX(-50%); border-radius: 99px; padding: 9px 14px; font-size: 12px; color: #fff; background: #242427e8; white-space: nowrap; }
+  .prototype-notes { margin: 22px 0 4px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--sub); font-size: 12px; line-height: 1.65; }
+  @media (max-width: 1060px) {
+    .workspace { max-width: 600px; padding-inline: 24px; }
+    .boards { display: block; }
+    .board { display: none; }
+    .board[data-visible] { display: block; }
+    .board-title { display: none; }
+    .board-nav { display: flex; gap: 6px; margin-bottom: 14px; }
+    .board-nav button { min-height: 36px; padding: 0 14px; border-radius: 20px; font-size: 13px; color: var(--sub); }
+    .board-nav button[aria-pressed="true"] { background: var(--paper); color: var(--brand-ink); font-weight: 650; }
+    .phone { width: min(100%, 390px); margin: 0 auto; }
+  }
+  @media (max-width: 520px) {
+    .workspace { padding: 0 12px 16px; }
+    .workspace-bar { height: 48px; }
+    .intro { margin: 17px 0 10px; }
+    .intro p { display: none; }
+    .phone { height: min(676px, calc(100svh - 140px)); min-height: 460px; border-radius: 18px; }
+    .keyboard .keys button { height: 27px; }
+    .album-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 158px; overflow: auto; }
+    .prototype-notes { margin-top: 12px; padding-top: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 24 24"><path d="M12 2.5 13.8 9l6.7 2-6.7 1.9-1.8 6.6-2-6.6L3.5 11 10 9zM19 15v5m-2.5-2.5h5M5 18h.01"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.7 8.7 0 0 1 9.5 3.3a9 9 0 1 0 11 11.2Z"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 5v5h5m-4.6 0a8 8 0 1 1 .8 7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M13 5v4c-5.2 0-8 2.5-9 9 2.2-2.9 5.5-4 9-4v4l7-6.5z"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M5 6h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7l-4 3v-3H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6-6 6M10 20H4v-6m0 6 6-6"/></symbol>
+    <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m20 4-6 6m0-6v6h6M4 20l6-6m0 6v-6H4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12m0-12L6 18"/></symbol>
+    <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 13.5c1.8 2.8 6.2 2.8 8 0M9 9.5h.01m6 0h.01"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><path d="M16 12v1a2 2 0 0 0 4 0v-1a8 8 0 1 0-3.5 6.6"/><circle cx="12" cy="12" r="4"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.3" cy="9" r="1.5"/><path d="m4 17 5-4 3 2.5 4-4 4 3.5"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01m4 0h.01m4 0h.01M7 14h10"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+    <symbol id="i-backspace" viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7 6-7zM11 9l6 6m0-6-6 6"/></symbol>
+    <symbol id="i-status" viewBox="0 0 48 12"><path d="M1 10V8m3 2V6m3 4V4m3 6V2m6 4c2-2 6-2 8 0m-6 2c1-1 3-1 4 0m-2 2h.01"/><rect x="30" y="2.5" width="14" height="7" rx="2"/><path d="M46 5v2"/><rect x="32" y="4.5" width="8" height="3" rx="1" fill="currentColor" stroke="none"/></symbol>
+  </defs>
+</svg>
+<main class="workspace">
+  <header class="workspace-bar">
+    <div class="brand"><svg aria-hidden="true"><use href="#i-mark"/></svg>小伴手机 App</div>
+    <div class="workspace-action">
+      <button id="reset" type="button"><svg aria-hidden="true"><use href="#i-reset"/></svg>重置</button>
+      <button id="theme" type="button" aria-pressed="false"><svg aria-hidden="true"><use href="#i-moon"/></svg><span>深色</span></button>
+    </div>
+  </header>
+  <div class="intro">
+    <h1>评论组件</h1>
+    <p>点按工具栏试写评论</p>
+  </div>
+  <nav class="board-nav" aria-label="示例状态">
+    <button type="button" data-board="keyboard" aria-pressed="true">键盘</button>
+    <button type="button" data-board="emoji" aria-pressed="false">表情</button>
+    <button type="button" data-board="album" aria-pressed="false">相册</button>
+  </nav>
+  <div class="boards" id="boards"></div>
+  <p class="prototype-notes">点击笑脸打开表情面板。相册使用小伴壁纸作为示例图片，发布只更新本页预览。</p>
+</main>
+<template id="board">
+  <section class="board">
+    <h2 class="board-title"></h2>
+    <div class="phone">
+      <div class="app">
+        <div class="status-bar" aria-hidden="true"><span>9:41</span><svg><use href="#i-status"/></svg></div>
+        <header class="app-nav">
+          <button class="icon-button" type="button" data-action="close" aria-label="返回"><svg><use href="#i-back"/></svg></button>
+          <span>作品详情</span>
+          <button class="icon-button" type="button" data-action="share" aria-label="分享作品"><svg><use href="#i-share"/></svg></button>
+        </header>
+        <div class="post-scroll">
+          <article class="post">
+            <img class="cover" src="comment-composer-assets/cloud-sea.jpg" alt="暮色下翻涌的云海">
+            <h3>把云海做成了动态壁纸</h3>
+            <div class="author"><span class="avatar">舟</span>小舟<span class="post-time">· 昨天</span></div>
+          </article>
+          <section class="comments">
+            <h3>评论<span class="comment-total"></span></h3>
+            <div class="comment-list"></div>
+          </section>
+        </div>
+        <footer class="comment-bar">
+          <button class="write" type="button" data-action="write"><svg aria-hidden="true"><use href="#i-message"/></svg>写评论…</button>
+          <button class="icon-button" type="button" data-action="jump" aria-label="查看评论"><svg><use href="#i-message"/></svg></button>
+        </footer>
+        <div class="system-home"></div>
+      </div>
+      <div class="overlay">
+        <div class="scrim" data-action="close"></div>
+        <section class="sheet" role="dialog" aria-label="评论编辑">
+          <div class="handle"></div>
+          <header class="editor-title">
+            <h3>写评论</h3>
+            <button class="icon-button" type="button" data-action="expand" aria-label="展开编辑区"><svg><use href="#i-expand"/></svg></button>
+            <button class="icon-button" type="button" data-action="close" aria-label="关闭评论编辑"><svg><use href="#i-close"/></svg></button>
+          </header>
+          <div class="editor-body">
+            <textarea class="draft" rows="2" aria-label="评论内容" placeholder="说点什么…" spellcheck="false"></textarea>
+            <div class="selected-images" hidden></div>
+            <div class="attachment-list" hidden></div>
+            <p class="counter" hidden></p>
+          </div>
+          <div class="toolbar">
+            <button class="icon-button" type="button" data-action="emoji" aria-label="打开表情"><svg><use href="#i-smile"/></svg></button>
+            <button class="icon-button" type="button" data-action="mention" aria-label="插入 @"><svg><use href="#i-at"/></svg></button>
+            <button class="icon-button" type="button" data-action="album" aria-label="打开相册"><svg><use href="#i-image"/></svg></button>
+            <button class="icon-button" type="button" data-action="more" aria-label="更多评论选项"><svg><use href="#i-plus"/></svg></button>
+            <button class="publish" type="button" data-action="publish" disabled>发布</button>
+          </div>
+          <div class="input-panels">
+            <div class="keyboard" hidden>
+              <div class="suggestions"><button type="button" data-insert="太好看了">太好看了</button><button type="button" data-insert="谢谢分享">谢谢分享</button><button type="button" data-insert="想试试">想试试</button></div>
+              <div class="key-rows"></div>
+              <div class="system-home"></div>
+            </div>
+            <div class="emoji-panel" hidden>
+              <h4 class="panel-label">常用表情</h4>
+              <div class="emoji-grid"></div>
+              <div class="system-home"></div>
+            </div>
+            <div class="album" hidden>
+              <div class="album-head"><span>最近照片</span><button type="button" data-action="album-done">完成</button></div>
+              <div class="album-grid"></div>
+              <div class="system-home"></div>
+            </div>
+            <div class="more" hidden>
+              <label>引用作品或方案<input type="text" placeholder="粘贴社区作品或方案链接"></label>
+              <button class="add-ref" type="button" data-action="add-ref">添加引用</button>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="toast" role="status" hidden></div>
+    </div>
+  </section>
+</template>
+<script>
+  const glyph = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
+  const emojis = [
+    ["😊", "微笑"], ["😂", "笑哭"], ["👍", "点赞"], ["❤️", "爱心"], ["🙌", "举手"], ["🤔", "思考"], ["🎉", "庆祝"],
+    ["😄", "大笑"], ["🥹", "感动"], ["🤣", "笑翻"], ["😍", "喜欢"], ["😅", "尴尬"], ["😭", "大哭"], ["😮", "惊讶"],
+    ["🤩", "星星眼"], ["😎", "墨镜"], ["🫡", "敬礼"], ["👏", "鼓掌"], ["🙏", "感谢"], ["💪", "加油"], ["🙈", "捂眼"],
+    ["🔥", "火"], ["✨", "闪光"], ["👀", "看看"], ["💡", "灵感"], ["🌿", "绿叶"], ["☕", "咖啡"], ["💯", "满分"],
+  ];
+  const photos = [
+    ["cloud-sea", "云海"], ["dusk-sea", "暮海"], ["aurora", "极光"], ["ink", "水墨山峦"],
+    ["maple", "枫叶"], ["frosted", "雪景"], ["cloud-sea", "远山"], ["aurora", "星夜"],
+    ["ink", "雾中山谷"], ["dusk-sea", "暮色"],
+  ];
+  const samples = [
+    { name: "阿禾", text: "最喜欢这版的蓝紫色，晚上看刚刚好。", time: "12 分钟前", likes: 12 },
+    { name: "山栗", text: "能做一个适合手机的竖屏版本吗？", time: "26 分钟前", likes: 4 },
+  ];
+  const configurations = [
+    { mode: "keyboard", label: "键盘输入", draft: "云层移动的速度刚刚好。" },
+    { mode: "emoji", label: "表情面板", parent: "阿禾" },
+    { mode: "album", label: "相册选图", draft: "试了一下，晚上看也很舒服。", picks: [1] },
+  ];
+  const boardTemplate = document.querySelector("#board");
+  const boards = document.querySelector("#boards");
+  const narrow = matchMedia("(max-width: 1060px)");
+  let visibleBoard = new URLSearchParams(location.search).get("view") || "keyboard";
+
+  function imageAt(index) {
+    const [slug, title] = photos[index];
+    const image = document.createElement("img");
+    image.src = `comment-composer-assets/${slug}.jpg`;
+    image.alt = title;
+    return image;
+  }
+
+  function buildBoard(config) {
+    const board = boardTemplate.content.firstElementChild.cloneNode(true);
+    const find = (selector) => board.querySelector(selector);
+    board.dataset.mode = config.mode;
+    find(".board-title").textContent = config.label;
+    const app = find(".app");
+    const sheet = find(".sheet");
+    const overlay = find(".overlay");
+    const draft = find(".draft");
+    const publish = find(".publish");
+    const selectedImages = find(".selected-images");
+    const attachmentList = find(".attachment-list");
+    const album = find(".album");
+    const albumGrid = find(".album-grid");
+    const counter = find(".counter");
+    const status = find(".toast");
+    const commentList = find(".comment-list");
+    let mode = config.mode;
+    let parent = config.parent;
+    let picks = new Set(config.picks);
+    let comments = samples.map((item) => ({...item}));
+    let reference = "";
+    let expanded = false;
+    let numbers = false;
+    let upper = false;
+    let toastTimer;
+
+    function notify(message) {
+      clearTimeout(toastTimer);
+      status.textContent = message;
+      status.hidden = false;
+      toastTimer = setTimeout(() => { status.hidden = true; }, 1800);
+    }
+
+    function sync() {
+      const length = Array.from(draft.value.trim()).length;
+      const eligible = length > 0 || picks.size > 0;
+      publish.disabled = !eligible || length > 10000;
+      draft.style.height = "";
+      draft.style.height = `${draft.scrollHeight}px`;
+      counter.textContent = `${length} / 10000`;
+      counter.hidden = !expanded && length <= 10000;
+      counter.classList.toggle("invalid", length > 10000);
+      find(".editor-title h3").textContent = parent ? `回复 ${parent}` : "写评论";
+      find("[data-action=expand]").innerHTML = glyph(expanded ? "collapse" : "expand");
+      find("[data-action=expand]").setAttribute("aria-label", expanded ? "收起编辑区" : "展开编辑区");
+      overlay.hidden = mode === "closed";
+      app.inert = !overlay.hidden;
+      sheet.classList.toggle("expanded", expanded);
+      find(".keyboard").hidden = mode !== "keyboard";
+      find(".emoji-panel").hidden = mode !== "emoji";
+      album.hidden = mode !== "album";
+      find(".more").hidden = mode !== "more";
+      for (const [action, icon, label] of [["emoji", "smile", "打开表情"], ["album", "image", "打开相册"], ["more", "plus", "更多评论选项"]]) {
+        const active = action === mode;
+        const button = find(`[data-action=${action}]`);
+        button.setAttribute("aria-pressed", active);
+        button.setAttribute("aria-label", active && action !== "more" ? "切换到键盘" : label);
+        button.innerHTML = glyph(active && action !== "more" ? "keyboard" : icon);
+      }
+    }
+
+    function renderPicks() {
+      selectedImages.hidden = picks.size === 0;
+      selectedImages.replaceChildren();
+      for (const index of picks) {
+        const tile = document.createElement("div");
+        tile.className = "selected-image";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.action = "remove-photo";
+        button.dataset.index = index;
+        button.setAttribute("aria-label", `移除${photos[index][1]}`);
+        button.innerHTML = glyph("close");
+        tile.append(imageAt(index), button);
+        selectedImages.append(tile);
+      }
+      Array.from(albumGrid.children).forEach((tile, index) => {
+        const order = Array.from(picks).indexOf(index) + 1;
+        tile.setAttribute("aria-pressed", order > 0);
+        tile.querySelector(".check").textContent = order || "";
+      });
+      find("[data-action=album-done]").textContent = picks.size ? `完成（${picks.size}）` : "完成";
+    }
+
+    function renderReference() {
+      attachmentList.replaceChildren();
+      attachmentList.hidden = reference.length === 0;
+      if (!reference) return;
+      const row = document.createElement("div");
+      row.className = "attachment";
+      const label = document.createElement("span");
+      label.textContent = "已引用社区作品";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "移除";
+      button.dataset.action = "remove-ref";
+      row.append(label, button);
+      attachmentList.append(row);
+    }
+
+    function renderComments() {
+      commentList.replaceChildren();
+      find(".comment-total").textContent = comments.length;
+      comments.forEach((item, index) => {
+        const row = document.createElement("article");
+        row.className = "comment";
+        row.innerHTML = `
+          <div class="avatar"></div><div><h4></h4><span class="comment-reply" hidden></span><p></p>
+          <div class="comment-pictures" hidden></div>
+          <div class="row-meta"><time></time><button type="button" data-action="reply">回复</button></div></div>
+          <button class="row-like" type="button" data-action="like" aria-label="点赞评论" aria-pressed="false">${glyph("heart")}<span></span></button>`;
+        row.querySelector(".avatar").textContent = item.name[0];
+        row.querySelector("h4").textContent = item.name;
+        row.querySelector("p").textContent = item.text;
+        row.querySelector("time").textContent = item.time;
+        if (item.parent) {
+          const reply = row.querySelector(".comment-reply");
+          reply.textContent = `回复 ${item.parent}`;
+          reply.hidden = false;
+        }
+        if (item.pictures?.length) {
+          const pictures = row.querySelector(".comment-pictures");
+          pictures.append(...item.pictures.map(imageAt));
+          pictures.hidden = false;
+        }
+        row.querySelectorAll("[data-action]").forEach((button) => { button.dataset.index = index; });
+        const like = row.querySelector(".row-like");
+        like.setAttribute("aria-pressed", !!item.liked);
+        like.querySelector("span").textContent = item.likes || "";
+        commentList.append(row);
+      });
+    }
+
+    function renderKeys() {
+      const keyRows = find(".key-rows");
+      keyRows.replaceChildren();
+      const layouts = numbers ? ["1234567890", "@#$%&-+()", ".,!?/:"] : ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+      const key = (label, action, special = false) => {
+        const node = document.createElement("button");
+        node.type = "button";
+        node.className = special ? "special" : "";
+        if (action === "insert") {
+          node.textContent = label;
+          node.dataset.insert = label;
+        } else {
+          node.dataset.action = action;
+          node.setAttribute("aria-label", { shift: "大小写", backspace: "删除", numeric: "切换数字键盘", space: "空格", newline: "换行" }[action]);
+          node.innerHTML = label;
+        }
+        return node;
+      };
+      layouts.forEach((layout, index) => {
+        const row = document.createElement("div");
+        row.className = "keys";
+        if (index === 2) row.append(key(glyph("arrow"), "shift", true));
+        for (const letter of layout) {
+          const button = key(upper ? letter.toUpperCase() : letter, "insert");
+          if (!upper && !numbers) button.style.textTransform = "uppercase";
+          row.append(button);
+        }
+        if (index === 2) row.append(key(glyph("backspace"), "backspace", true));
+        keyRows.append(row);
+      });
+      const row = document.createElement("div");
+      row.className = "keys";
+      const space = key("空格", "space", true);
+      space.classList.add("space");
+      row.append(key(numbers ? "ABC" : "123", "numeric", true), space, key("换行", "newline", true));
+      keyRows.append(row);
+    }
+
+    function insert(text) {
+      draft.setRangeText(text, draft.selectionStart, draft.selectionEnd, "end");
+      sync();
+    }
+
+    function jump() {
+      find(".comments").scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+
+    function switchMode(next, focus = false) {
+      mode = next;
+      if (next !== "keyboard") draft.blur();
+      sync();
+      if (focus) draft.focus({ preventScroll: true });
+    }
+
+    function reset() {
+      draft.value = config.draft || "";
+      draft.setSelectionRange(draft.value.length, draft.value.length);
+      picks = new Set(config.picks);
+      comments = samples.map((item) => ({...item}));
+      parent = config.parent;
+      reference = "";
+      expanded = false;
+      numbers = false;
+      upper = false;
+      status.hidden = true;
+      find(".post-scroll").scrollTop = 0;
+      renderKeys();
+      renderComments();
+      renderPicks();
+      renderReference();
+      switchMode(config.mode);
+    }
+
+    for (const [emoji, label] of emojis) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.insert = emoji;
+        button.setAttribute("aria-label", label);
+        button.textContent = emoji;
+        find(".emoji-panel .emoji-grid").append(button);
+    }
+    photos.forEach(([, label], index) => {
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "photo";
+      tile.dataset.action = "photo";
+      tile.dataset.index = index;
+      tile.setAttribute("aria-label", `选择${label}`);
+      tile.append(imageAt(index));
+      const check = document.createElement("span");
+      check.className = "check";
+      check.setAttribute("aria-hidden", "true");
+      tile.append(check);
+      albumGrid.append(tile);
+    });
+    draft.addEventListener("input", sync);
+    draft.addEventListener("focus", () => { if (mode !== "keyboard") switchMode("keyboard"); });
+    board.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || mode === "closed") return;
+      event.preventDefault();
+      switchMode(mode === "keyboard" ? "closed" : "keyboard");
+    });
+    board.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("[data-insert], .keys button")) event.preventDefault();
+    });
+    board.addEventListener("click", (event) => {
+      const control = event.target.closest("[data-insert], [data-action]");
+      if (!control || control.disabled) return;
+      if (control.dataset.insert) {
+        insert(control.dataset.insert);
+        if (upper) { upper = false; renderKeys(); }
+        return;
+      }
+      const index = Number(control.dataset.index);
+      switch (control.dataset.action) {
+        case "write": parent = null; switchMode("keyboard", true); break;
+        case "reply": parent = comments[index].name; switchMode("keyboard", true); break;
+        case "close": switchMode("closed"); break;
+        case "jump": jump(); break;
+        case "share": notify("作品链接 · 预览"); break;
+        case "expand": expanded = !expanded; sync(); break;
+        case "emoji": switchMode(mode === "emoji" ? "keyboard" : "emoji"); break;
+        case "album": switchMode(mode === "album" ? "keyboard" : "album"); break;
+        case "album-done": switchMode("keyboard"); break;
+        case "more": switchMode(mode === "more" ? "keyboard" : "more"); break;
+        case "mention": {
+          const prefix = draft.value.slice(0, draft.selectionStart).at(-1);
+          insert(prefix && /[\p{L}\p{N}_]/u.test(prefix) ? " @" : "@");
+          switchMode("keyboard", true);
+          break;
+        }
+        case "photo":
+        case "remove-photo":
+          if (picks.has(index)) picks.delete(index);
+          else picks.add(index);
+          renderPicks();
+          sync();
+          break;
+        case "add-ref": {
+          const input = find(".more input");
+          if (!input.value.trim()) { input.focus(); break; }
+          reference = input.value.trim();
+          input.value = "";
+          renderReference();
+          switchMode("keyboard");
+          break;
+        }
+        case "remove-ref": reference = ""; renderReference(); break;
+        case "like": {
+          const item = comments[index];
+          item.liked = !item.liked;
+          item.likes += item.liked ? 1 : -1;
+          renderComments();
+          break;
+        }
+        case "shift": upper = !upper; renderKeys(); break;
+        case "numeric": numbers = !numbers; renderKeys(); break;
+        case "space": insert(" "); break;
+        case "newline": insert("\n"); break;
+        case "backspace": {
+          const cursor = draft.selectionStart;
+          const char = Array.from(draft.value.slice(0, cursor)).at(-1);
+          const start = draft.selectionEnd > cursor ? cursor : Math.max(0, cursor - (char?.length || 0));
+          draft.setRangeText("", start, draft.selectionEnd, "end");
+          sync();
+          break;
+        }
+        case "publish":
+          comments.unshift({ name: "我", text: draft.value.trim(), time: "刚刚", parent, pictures: [...picks], likes: 0 });
+          draft.value = "";
+          picks.clear();
+          parent = null;
+          reference = "";
+          expanded = false;
+          renderPicks();
+          renderReference();
+          renderComments();
+          switchMode("closed");
+          jump();
+          notify("评论已发布 · 预览");
+          break;
+      }
+    });
+    reset();
+    return { board, reset };
+  }
+
+  const previews = configurations.map(buildBoard);
+  boards.append(...previews.map(({ board }) => board));
+
+  function selectBoard(mode) {
+    if (!configurations.some((config) => config.mode === mode)) mode = "keyboard";
+    visibleBoard = mode;
+    for (const { board } of previews) board.toggleAttribute("data-visible", board.dataset.mode === mode);
+    document.querySelectorAll("[data-board]").forEach((button) => button.setAttribute("aria-pressed", button.dataset.board === mode));
+  }
+  document.querySelectorAll("[data-board]").forEach((button) => {
+    button.addEventListener("click", () => selectBoard(button.dataset.board));
+  });
+  document.querySelector("#reset").addEventListener("click", () => previews.forEach(({ reset }) => reset()));
+  document.querySelector("#theme").addEventListener("click", (event) => {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    event.currentTarget.setAttribute("aria-pressed", dark);
+    event.currentTarget.innerHTML = `${glyph(dark ? "sun" : "moon")}<span>${dark ? "浅色" : "深色"}</span>`;
+  });
+  narrow.addEventListener("change", () => selectBoard(visibleBoard));
+  selectBoard(visibleBoard);
+</script>
+</body>
+</html>

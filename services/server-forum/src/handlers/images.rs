@@ -18,7 +18,8 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
+use std::collections::HashSet;
 use std::path::{Path as FsPath, PathBuf};
 use tokio::{fs::File, io::AsyncReadExt};
 use tokio_util::io::ReaderStream;
@@ -54,19 +55,17 @@ pub async fn upload(
 ) -> AppResult<Json<Value>> {
     let user = &auth.user;
     users::ensure_can_write(user)?;
-    if user.trust_level < 1 {
-        return Err(AppError::Forbidden("新人发的图片不会显示，升级为成员后就可以插图了".into()));
-    }
     let limit = state.config.upload_limit_image;
     let declared = headers.get(header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<u64>().ok());
     if declared.is_some_and(|n| n > limit + MULTIPART_OVERHEAD) {
         return Err(too_large(limit));
     }
-    let (today,): (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM images WHERE uploader_uid = $1 AND created_at > now() - interval '1 day'")
-            .bind(user.uid)
-            .fetch_one(&state.pool)
-            .await?;
+    let (today,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM images WHERE uploader_uid = $1 AND created_at > now() - interval '1 day'",
+    )
+    .bind(user.uid)
+    .fetch_one(&state.pool)
+    .await?;
     if today >= MAX_PER_DAY {
         return Err(AppError::TooManyRequests { message: format!("今天上传的图片已达上限（{MAX_PER_DAY} 张）"), retry_after: 3600 });
     }
@@ -143,7 +142,65 @@ pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppRes
     Ok(response)
 }
 
-/// 清掉上传超过一天、帖子和回复的 Markdown 里都没有引用的图片。
+pub enum CommentImageTarget {
+    Daily(i64),
+    Frontier(i64),
+    Repo(i64),
+}
+
+pub fn validate_comment_content(body: &str, image_ids: &[Uuid]) -> AppResult<()> {
+    let length = body.chars().count();
+    if length == 0 && image_ids.is_empty() {
+        return Err(AppError::BadRequest("请输入评论内容或添加图片".into()));
+    }
+    if length > 2000 {
+        return Err(AppError::BadRequest("评论最多 2000 个字".into()));
+    }
+    if image_ids.iter().collect::<HashSet<_>>().len() != image_ids.len() {
+        return Err(AppError::BadRequest("请移除重复图片".into()));
+    }
+    Ok(())
+}
+
+pub fn comment_urls(image_ids: Vec<Uuid>) -> Vec<String> {
+    image_ids.into_iter().map(|id| format!("/api/images/{id}")).collect()
+}
+
+pub async fn attach_to_comment(
+    tx: &mut Transaction<'_, Postgres>,
+    target: CommentImageTarget,
+    author: Uuid,
+    image_ids: &[Uuid],
+) -> AppResult<()> {
+    if image_ids.is_empty() {
+        return Ok(());
+    }
+    let (daily, frontier, repo) = match target {
+        CommentImageTarget::Daily(id) => (Some(id), None, None),
+        CommentImageTarget::Frontier(id) => (None, Some(id), None),
+        CommentImageTarget::Repo(id) => (None, None, Some(id)),
+    };
+    let attached = sqlx::query(
+        "INSERT INTO discover_comment_images(daily_comment_id,frontier_comment_id,repo_comment_id,image_id,position)
+         SELECT $1,$2,$3,i.id,selected.position
+         FROM unnest($4::uuid[]) WITH ORDINALITY AS selected(id,position)
+         JOIN images i ON i.id=selected.id AND i.uploader_uid=$5 AND NOT i.editor_pending
+         FOR KEY SHARE OF i",
+    )
+    .bind(daily)
+    .bind(frontier)
+    .bind(repo)
+    .bind(image_ids)
+    .bind(author)
+    .execute(&mut **tx)
+    .await?;
+    if attached.rows_affected() != image_ids.len() as u64 {
+        return Err(AppError::BadRequest("部分图片已失效，请重新选图".into()));
+    }
+    Ok(())
+}
+
+/// 清掉上传超过一天且未关联帖子、评论或待发布稿的图片。
 pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
     let rows: Vec<(Uuid,)> = sqlx::query_as(
         "DELETE FROM images i
@@ -151,6 +208,7 @@ pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
            AND NOT EXISTS (SELECT 1 FROM topics t WHERE position(i.id::text in t.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM posts p WHERE position(i.id::text in p.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM editor_draft_assets a WHERE a.image_id = i.id)
+           AND NOT EXISTS (SELECT 1 FROM discover_comment_images a WHERE a.image_id = i.id)
          RETURNING i.id",
     )
     .fetch_all(pool)

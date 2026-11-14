@@ -27,6 +27,7 @@ export interface SessionInfo {
     upload_max_bytes: number
     /** 正文插图的大小上限（字节），0 表示暂时不能插图 */
     image_max_bytes: number
+    comment_images?: boolean
   }
 }
 

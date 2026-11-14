@@ -15,7 +15,7 @@ export interface Group<T> { name: string; items: T[] }
 export interface ToolSummary { key: string; name: string; developer?: string; type_label?: string; license?: string; platforms?: string[]; icon_url?: string; latest_version?: string | null; latest_date?: string | null; sample?: boolean }
 export interface ToolArtifact { os: string; arch?: string; filename?: string; asset_id?: number | null; desc?: string; size?: number; sha256?: string; mirror_url?: string; github_url?: string; hash_source?: string }
 export interface ToolDetail extends ToolSummary { description?: string; homepage_url?: string; source?: string; as_of?: string; release_url?: string; license_spdx?: string | null; license_source_url?: string; collection_notes?: string[]; discussion_tag?: string; discussion_count: number; artifacts?: ToolArtifact[]; releases?: { version: string; date?: string; url?: string; items?: { kind: string; text: string }[] }[] }
-export interface NewsComment { id: number; reply_to?: number | null; body: string; created_at: string; author: { uid: string; nickname: string; avatar_url?: string | null }; liked: boolean; like_count: number; mine: boolean }
+export interface NewsComment { id: number; reply_to?: number | null; body: string; images?: string[]; created_at: string; author: { uid: string; nickname: string; avatar_url?: string | null }; liked: boolean; like_count: number; mine: boolean }
 export type ReadmeBlock =
   | { t: 'h'; l: number; x: string } | { t: 'p'; x: string } | { t: 'quote'; x: string } | { t: 'hr' }
   | { t: 'li'; x: string; d: number; n: number | null } | { t: 'code'; x: string; lang: string } | { t: 'table'; rows: string[][] }
@@ -33,14 +33,14 @@ export const discoverApi = {
   frontier: (page = 1) => get<Page<NewsItem>>(`/discover/frontier?page=${page}`),
   frontierArticle: (key: string) => get<NewsItem>(`/discover/frontier/${encodeURIComponent(key)}`),
   frontierComments: (key: string, page = 1) => get<Page<NewsComment>>(`/discover/frontier/${encodeURIComponent(key)}/comments?page=${page}`, true),
-  frontierComment: (key: string, body: string, reply_to?: number) => request<{ id: number }>('POST', `/discover/frontier/${encodeURIComponent(key)}/comments`, { body, reply_to }),
+  frontierComment: (key: string, body: string, reply_to?: number, image_ids?: string[]) => request<{ id: number }>('POST', `/discover/frontier/${encodeURIComponent(key)}/comments`, { body, reply_to, image_ids }),
   likeFrontierComment: (key: string, id: number, on: boolean) => request(on ? 'PUT' : 'DELETE', `/discover/frontier/${encodeURIComponent(key)}/comments/${id}/like`),
   deleteFrontierComment: (key: string, id: number) => request('DELETE', `/discover/frontier/${encodeURIComponent(key)}/comments/${id}`),
   daily: (page = 1) => get<Page<NewsItem>>(`${path.daily}?page=${page}`),
   article: (key: string) => get<NewsItem>(path.article(key)),
   repo: (owner: string, repo: string) => get<RepoDetail>(path.repo(owner, repo)),
   repoComments: (owner: string, repo: string, page = 1) => get<Page<NewsComment>>(`${path.repoComments(owner, repo)}?page=${page}`, true),
-  repoComment: (owner: string, repo: string, body: string, reply_to?: number) => request<{ id: number }>('POST', path.repoComments(owner, repo), { body, reply_to }),
+  repoComment: (owner: string, repo: string, body: string, reply_to?: number, image_ids?: string[]) => request<{ id: number }>('POST', path.repoComments(owner, repo), { body, reply_to, image_ids }),
   likeRepoComment: (owner: string, repo: string, id: number, on: boolean) => request(on ? 'PUT' : 'DELETE', `${path.repoComments(owner, repo)}/${id}/like`),
   deleteRepoComment: (owner: string, repo: string, id: number) => request('DELETE', `${path.repoComments(owner, repo)}/${id}`),
   repos: (issue = '') => get<RepoIssue>(`${path.repos}${issue ? `?issue=${encodeURIComponent(issue)}` : ''}`),
@@ -54,7 +54,7 @@ export const discoverApi = {
   models: () => get<ModelBoard>(path.models),
   usage: () => get<UsageBoard>(path.usage),
   comments: (key: string, page = 1) => get<Page<NewsComment>>(`${path.comments(key)}?page=${page}`, true),
-  comment: (key: string, body: string, reply_to?: number) => request<{ id: number }>('POST', path.comments(key), { body, reply_to }),
+  comment: (key: string, body: string, reply_to?: number, image_ids?: string[]) => request<{ id: number }>('POST', path.comments(key), { body, reply_to, image_ids }),
   likeComment: (key: string, id: number, on: boolean) => request(on ? 'PUT' : 'DELETE', `${path.comments(key)}/${id}/like`),
   deleteComment: (key: string, id: number) => request('DELETE', `${path.comments(key)}/${id}`),
 }

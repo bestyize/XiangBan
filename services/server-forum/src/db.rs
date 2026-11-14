@@ -204,7 +204,7 @@ CREATE INDEX IF NOT EXISTS attachments_topic_idx ON attachments (topic_id);
 CREATE INDEX IF NOT EXISTS attachments_pending_idx ON attachments (uploader_uid, created_at) WHERE topic_id IS NULL;
 
 -- 正文插图：文件在磁盘（FORUM_UPLOAD_DIR/img-{id}），公开按 id 访问。
--- 上传一天后正文里没有引用它的（帖子和回复的 Markdown 里搜不到 id）由定时任务清理。
+-- 定时任务清理上传满一天且未被帖子、评论或待发布稿引用的图片。
 CREATE TABLE IF NOT EXISTS images (
     id           UUID PRIMARY KEY,
     uploader_uid UUID NOT NULL REFERENCES users(uid),
@@ -1144,6 +1144,19 @@ CREATE TABLE IF NOT EXISTS repo_comment_likes (
     uid UUID NOT NULL REFERENCES users(uid),
     PRIMARY KEY (comment_id, uid)
 );
+
+CREATE TABLE IF NOT EXISTS discover_comment_images (
+    daily_comment_id BIGINT REFERENCES discover_news_comments(id) ON DELETE CASCADE,
+    frontier_comment_id BIGINT REFERENCES discover_frontier_comments(id) ON DELETE CASCADE,
+    repo_comment_id BIGINT REFERENCES repo_comments(id) ON DELETE CASCADE,
+    image_id UUID NOT NULL REFERENCES images(id),
+    position BIGINT NOT NULL,
+    CHECK (num_nonnulls(daily_comment_id, frontier_comment_id, repo_comment_id) = 1)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS discover_comment_images_daily_idx ON discover_comment_images (daily_comment_id, position) WHERE daily_comment_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS discover_comment_images_frontier_idx ON discover_comment_images (frontier_comment_id, position) WHERE frontier_comment_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS discover_comment_images_repo_idx ON discover_comment_images (repo_comment_id, position) WHERE repo_comment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS discover_comment_images_image_idx ON discover_comment_images (image_id);
 
 -- 编辑副本与线上条目分离；审核绑定 revision，修改会撤销定时发布。
 CREATE SEQUENCE IF NOT EXISTS discover_draft_revision_seq;

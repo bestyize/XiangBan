@@ -64,7 +64,7 @@ function insertAtCursor(text: string) {
 async function addImages(files: File[]) {
   if (!session.requireLogin()) return
   const max = imageLimit()
-  if (!max) return toast.show('新人暂时不能插图，升级为成员后就可以了', 'error')
+  if (!max) return toast.show('当前账号暂不能上传图片', 'error')
   for (const file of files) {
     if (!IMAGE_TYPES.includes(file.type)) {
       toast.show(`「${file.name}」不是 PNG、JPEG、GIF 或 WebP 图片`, 'error')
@@ -165,7 +165,7 @@ defineExpose({ focus, pickImage })
       <p v-else-if="!html" class="muted">还没有内容。</p>
       <div v-else v-html="html" />
     </div>
-    <p class="hint">支持 Markdown，图片可以点「插图」、粘贴或拖进来。新人发的链接和图片会显示为纯文字，升级到成员后恢复。</p>
+    <p class="hint">支持 Markdown，可以点「插图」、粘贴或拖入图片。</p>
   </div>
 </template>
 

@@ -57,9 +57,11 @@ interface PlatformActions : VoicePlatform {
     suspend fun saveCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     suspend fun shareCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     val supportsChatAttachments: Boolean get() = false
-    /** 未接系统文件选择器的平台（当前 iOS）明确降级到网页，不申请全盘访问权限。 */
+    /** 普通附件使用系统文件选择器。评论可单独支持系统相册。 */
     val forumFilePickerSupported: Boolean get() = false
     suspend fun pickForumFile(image: Boolean, maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
+    val forumPhotoPickerSupported: Boolean get() = false
+    suspend fun pickForumPhoto(maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = pickForumFile(true, maxBytes)
     fun enqueueSoftwareDownload(url: String, filename: String): Boolean = false
     val forumDownloadSupported: Boolean get() = false
     suspend fun saveForumDownload(filename: String, bytes: ByteArray): CommunityPosterResult = CommunityPosterResult.Unsupported

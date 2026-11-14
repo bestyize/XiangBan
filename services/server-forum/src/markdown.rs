@@ -3,7 +3,7 @@
 use pulldown_cmark::{html, Options, Parser};
 use std::collections::HashSet;
 
-/// 渲染并清洗。外链加 nofollow 并在新窗口打开；trusted 为 false（新人）时去掉图片和链接，只留文字。
+/// 渲染并清洗。新人可展示站内上传的图片，外链与外站图片需要成员等级。
 pub fn render(md: &str, trusted: bool) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -20,13 +20,23 @@ pub fn render(md: &str, trusted: bool) -> String {
         .url_schemes(HashSet::from(["http", "https", "mailto"]))
         .add_tags(["input"])
         .add_tag_attributes("input", ["type", "checked", "disabled"])
-        .add_tag_attributes("code", ["class"]);
-    if trusted {
-        builder.set_tag_attribute_value("img", "loading", "lazy");
-    } else {
-        builder.rm_tags(["img", "a"]);
+        .add_tag_attributes("code", ["class"])
+        .set_tag_attribute_value("img", "loading", "lazy");
+    if !trusted {
+        builder.rm_tags(["a"]).attribute_filter(|tag, attribute, value| {
+            if tag == "img" && attribute == "src" && !site_image_url(value) {
+                None
+            } else {
+                Some(std::borrow::Cow::Borrowed(value))
+            }
+        });
     }
     builder.clean(&raw).to_string()
+}
+
+fn site_image_url(value: &str) -> bool {
+    value.strip_prefix("/api/images/")
+        .is_some_and(|id| id.len() == 36 && uuid::Uuid::try_parse(id).is_ok())
 }
 
 /// 纯文本摘要，用于列表和 SEO description。
@@ -108,11 +118,17 @@ mod tests {
     }
 
     #[test]
-    fn untrusted_loses_images_and_links_but_keeps_text() {
-        assert!(render("![a](https://a.com/x.png)", true).contains("<img"));
-        let html = render("![a](https://a.com/x.png) [官网](https://a.com)", false);
-        assert!(!html.contains("<img") && !html.contains("<a"));
+    fn newcomers_can_render_uploaded_images() {
+        let local = format!("/api/images/{}", uuid::Uuid::new_v4());
+        let html = render(&format!("![配图]({local}) ![外站](https://a.com/x.png) [官网](https://a.com)"), false);
+        assert!(html.contains(&format!("src=\"{local}\"")), "{html}");
+        assert!(!html.contains("https://") && !html.contains("<a "));
         assert!(html.contains("官网"));
+    }
+
+    #[test]
+    fn members_can_render_external_images() {
+        assert!(render("![a](https://a.com/x.png)", true).contains("<img"));
     }
 
     #[test]
@@ -146,11 +162,10 @@ mod tests {
     }
 
     #[test]
-    fn site_images_keep_their_relative_url_for_members_only() {
+    fn site_images_keep_their_relative_url_at_all_levels() {
         let md = "![图](/api/images/6f1c2d3e-0000-4000-8000-000000000000)";
-        let html = render(md, true);
+        let html = render(md, false);
         assert!(html.contains(r#"src="/api/images/6f1c2d3e-0000-4000-8000-000000000000""#), "{html}");
         assert!(html.contains(r#"loading="lazy""#), "{html}");
-        assert!(!render(md, false).contains("<img"));
     }
 }

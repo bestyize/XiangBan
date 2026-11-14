@@ -48,7 +48,7 @@ fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fon
                 blocks.forEach { block ->
                     when (block) {
                         is BodyBlock.Text -> Text(block.text, fontSize = fontSize, lineHeight = lineHeight)
-                        is BodyBlock.Image -> BodyImage(env, block) { zoom = block.src }
+                        is BodyBlock.Image -> BodyImage(block) { zoom = block.src }
                     }
                 }
             }
@@ -59,11 +59,11 @@ fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fon
             style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    zoom?.let { ImageViewer(env, it) { zoom = null } }
+    zoom?.let { ImageViewer(it) { zoom = null } }
 }
 
 @Composable
-private fun BodyImage(env: CommunityEnv, image: BodyBlock.Image, onClick: () -> Unit) {
+internal fun BodyImage(image: BodyBlock.Image, onClick: () -> Unit) {
     AsyncImage(
         model = image.src, contentDescription = image.alt.ifEmpty { "图片" }, imageLoader = rememberImageLoader(), contentScale = ContentScale.FillWidth,
         modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 640.dp).clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onClick),
@@ -72,7 +72,7 @@ private fun BodyImage(env: CommunityEnv, image: BodyBlock.Image, onClick: () -> 
 
 /** 点图放大：黑底铺满，图片完整显示，点一下或按返回关闭。 */
 @Composable
-private fun ImageViewer(env: CommunityEnv, src: String, onClose: () -> Unit) {
+internal fun ImageViewer(src: String, onClose: () -> Unit) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
             AsyncImage(model = src, contentDescription = "放大的图片", imageLoader = rememberImageLoader(), contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())

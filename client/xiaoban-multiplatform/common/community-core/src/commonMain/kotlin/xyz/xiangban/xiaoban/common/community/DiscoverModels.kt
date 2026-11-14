@@ -39,6 +39,7 @@ data class NewsComment(
     @SerialName("like_count") val likeCount: Int = 0,
     val liked: Boolean = false,
     val mine: Boolean = false,
+    val images: List<String> = emptyList(),
 )
 
 @Serializable

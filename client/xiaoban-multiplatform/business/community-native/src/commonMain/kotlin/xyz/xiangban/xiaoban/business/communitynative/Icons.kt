@@ -35,6 +35,8 @@ object XIcons {
     val Eye: ImageVector by lazy { strokeIcon("Eye", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM9.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0z") }
     val ExternalLink: ImageVector by lazy { strokeIcon("ExternalLink", "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5") }
     val Fullscreen: ImageVector by lazy { strokeIcon("Fullscreen", "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5") }
+    val Expand: ImageVector by lazy { strokeIcon("Expand", "M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6") }
+    val Collapse: ImageVector by lazy { strokeIcon("Collapse", "M20 4l-6 6M14 4v6h6M4 20l6-6M10 20v-6H4") }
     val Info: ImageVector by lazy { strokeIcon("Info", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 11v5M12 7.8v.4") }
     val Coin: ImageVector by lazy { strokeIcon("Coin", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM14.5 9.5h-3.2a1.5 1.5 0 000 3h1.4a1.5 1.5 0 010 3H9.5M12 7.5v1.5M12 15.5V17") }
     val Pin: ImageVector by lazy { strokeIcon("Pin", "M9 4h6l-1 6 3 3H7l3-3zM12 13v7") }
@@ -53,6 +55,8 @@ object XIcons {
     val Heart: ImageVector by lazy { strokeIcon("Heart", "M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z") }
     val Image: ImageVector by lazy { strokeIcon("Image", "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM7.4 10a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM4 18l5-5 4 4 3-3 4 4") }
     val Keyboard: ImageVector by lazy { strokeIcon("Keyboard", "M5.5 6h13A2.5 2.5 0 0121 8.5v7a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 15.5v-7A2.5 2.5 0 015.5 6zM7 10h.01M11 10h.01M15 10h.01M7 14h10") }
+    val Smile: ImageVector by lazy { strokeIcon("Smile", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0zM8 13.5c1.8 2.8 6.2 2.8 8 0M9 9.5h.01M15 9.5h.01") }
+    val AtSign: ImageVector by lazy { strokeIcon("AtSign", "M16 12v1a2 2 0 0 0 4 0v-1a8 8 0 1 0-3.5 6.6M16 12a4 4 0 1 0-8 0a4 4 0 0 0 8 0z") }
     val Laptop: ImageVector by lazy { strokeIcon("Laptop", "M5 6h14a1 1 0 011 1v9H4V7a1 1 0 011-1zM2 19h20") }
     val Link: ImageVector by lazy { strokeIcon("Link", "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1") }
     val Lock: ImageVector by lazy { strokeIcon("Lock", "M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3") }

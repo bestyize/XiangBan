@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { timeAgo } from '@/lib/format'
+import { commentImageId } from './images'
 
-defineProps<{
+const props = defineProps<{
   author: { uid: string; nickname: string; avatar_url?: string | null }
   body: string
+  images?: string[]
   createdAt: string
   replyToName?: string
   likeCount: number
@@ -14,18 +17,23 @@ defineProps<{
   busy?: boolean
   nested?: boolean
 }>()
+const pictures = computed(() => props.images?.filter(commentImageId) ?? [])
 defineEmits<{ like: []; reply: []; remove: [] }>()
 </script>
 
 <template>
-  <!-- 纯文字评论的统一样式：头像、灰色昵称、正文、时间 · 回复，赞在右侧。 -->
   <article class="comment" :class="{ nested }">
     <RouterLink :to="`/u/${author.uid}`" class="avatar-link" :aria-label="`查看 ${author.nickname} 的主页`">
       <UserAvatar :name="author.nickname" :src="author.avatar_url" :size="nested ? 26 : 34" />
     </RouterLink>
     <div class="content">
       <RouterLink class="nickname" :to="`/u/${author.uid}`">{{ author.nickname }}</RouterLink>
-      <p class="body"><span v-if="replyToName" class="reply-to">回复 {{ replyToName }}：</span>{{ body }}</p>
+      <p v-if="body || replyToName" class="body"><span v-if="replyToName" class="reply-to">回复 {{ replyToName }}：</span>{{ body }}</p>
+      <div v-if="pictures.length" class="pictures">
+        <a v-for="src in pictures" :key="src" :href="src" target="_blank" rel="noopener noreferrer" aria-label="查看原图">
+          <img :src="src" loading="lazy" alt="评论图片">
+        </a>
+      </div>
       <div class="meta">
         <time :datetime="createdAt">{{ timeAgo(createdAt) }}</time>
         <button type="button" :disabled="busy" @click="$emit('reply')">回复</button>
@@ -52,6 +60,8 @@ defineEmits<{ like: []; reply: []; remove: [] }>()
 .nickname { color: var(--ink-3); font-size: 13px; overflow-wrap: anywhere; }
 .body { margin: 4px 0 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reply-to { color: var(--ink-3); }
+.pictures { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 8px; }
+.pictures img { display: block; width: 88px; max-width: 100%; height: 88px; object-fit: cover; border-radius: 8px; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; color: var(--ink-3); font-size: 12px; }
 .meta button { min-height: 30px; padding: 2px 0; border: 0; background: none; color: var(--ink-2); font-size: inherit; cursor: pointer; }
 .like {

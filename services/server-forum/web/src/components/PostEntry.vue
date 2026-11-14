@@ -44,7 +44,7 @@ async function startEdit() {
 }
 
 async function saveEdit() {
-  if (busy.value || uploading.value) return
+  if (busy.value || uploading.value || !draft.value.trim()) return
   if (files.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
   busy.value = true
   try {
@@ -100,7 +100,7 @@ async function remove() {
         <ReplyExtrasEditor v-if="session.info" v-model:work-refs="workRefs" v-model:attachments="files" :max-bytes="session.info.limits.upload_max_bytes" :disabled="busy" @uploading="uploading = $event" />
         <div class="edit-actions">
           <button type="button" class="btn btn-sm" :disabled="busy || uploading" @click="editing = false">取消</button>
-          <button type="button" class="btn btn-primary btn-sm" :disabled="busy || uploading || draft.trim().length < 2" @click="saveEdit">保存修改</button>
+          <button type="button" class="btn btn-primary btn-sm" :disabled="busy || uploading || !draft.trim()" @click="saveEdit">保存修改</button>
         </div>
       </template>
       <template v-else><div class="prose body" v-html="post.body_html" /><ReplyWorkCards :items="post.work_refs ?? []" /><AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted /></template>

@@ -204,7 +204,7 @@ async fn reply_content_ownership_atomicity_edit_compatibility_and_topic_isolatio
             StatusCode::BAD_REQUEST
         );
     }
-    let (status,data)=call(&h.app,"POST",&create,Some(&user),json!({"body":"分享作品","work_refs":[{"kind":"pack","id":pack}],"attachment_ids":[own],"attachment_prices":[{"id":own,"price":3}]})).await;
+    let (status,data)=call(&h.app,"POST",&create,Some(&user),json!({"body":"好","work_refs":[{"kind":"pack","id":pack}],"attachment_ids":[own],"attachment_prices":[{"id":own,"price":3}]})).await;
     assert_eq!(status, StatusCode::OK, "{data}");
     let post = data["id"].as_i64().unwrap();
     let (_, list) = call(&h.app, "GET", &create, Some(&user), Value::Null).await;
@@ -218,7 +218,7 @@ async fn reply_content_ownership_atomicity_edit_compatibility_and_topic_isolatio
         "PATCH",
         &format!("/api/posts/{post}"),
         Some(&user),
-        json!({"body":"旧客户端编辑"}),
+        json!({"body":"👍"}),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -232,6 +232,7 @@ async fn reply_content_ownership_atomicity_edit_compatibility_and_topic_isolatio
     .await;
     assert_eq!(source["work_refs"].as_array().unwrap().len(), 1);
     assert_eq!(source["attachments"].as_array().unwrap().len(), 1);
+    assert_eq!(source["body"], "👍");
     let header = h.attachment(uid).await;
     let mut tx = h.pool.begin().await?;
     crate::handlers::attachments::set_for_topic(&mut tx, topic, uid, &[header]).await?;

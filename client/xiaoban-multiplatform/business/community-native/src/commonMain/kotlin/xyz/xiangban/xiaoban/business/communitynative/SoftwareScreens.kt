@@ -28,7 +28,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -243,16 +242,18 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
     var platform by rememberSaveable(project) { mutableStateOf("all") }
     var selected by rememberSaveable(project) { mutableStateOf<String?>(null) }
     var limit by rememberSaveable(project) { mutableIntStateOf(15) }
+    val discussion = rememberRepoComments(env, project.substringBefore('/'), project.substringAfter('/'), open,
+        enabled = (state as? Load.Ready)?.value != null)
 
     fun scrollToComments() {
         scope.launch {
-            val index = listState.layoutInfo.totalItemsCount - 1
+            val index = listState.layoutInfo.totalItemsCount - discussion.itemCount
             if (index >= 0) listState.animateScrollToItem(index)
         }
     }
 
     var downloadNotice by remember(project) { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize()) {
+    CommentScaffold(env, discussion) {
         ScreenBar("软件详情", back, trailing = {
             if ((state as? Load.Ready)?.value != null) {
                 IconTap(XIcons.Message, "查看评论", ::scrollToComments)
@@ -265,13 +266,6 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                 return@LoadBox
             }
             val session by env.session.state.collectAsState()
-            var commentPage by rememberSaveable(project, session.accountId) { mutableIntStateOf(1) }
-            var openComposer by remember(project, session.accountId) { mutableStateOf(false) }
-            val comments = rememberLoader(env, listOf(project, commentPage, session.accountId)) {
-                env.forum.repoComments(project.substringBefore('/'), project.substringAfter('/'), commentPage)
-            }
-            val commentState by comments.state.collectAsState()
-            val commentCount = (commentState as? Load.Ready)?.value?.total
             val (saved, setSaved) = rememberPrefFlag(env, "fav_repo:$project")
             val data = (releases as? Load.Ready)?.value
             val history = data?.history.orEmpty()
@@ -345,31 +339,9 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                     }
                 }
                 if (history.size > limit) item { GhostPillButton("更多历史版本", { limit += 15 }) }
-                item(key = "software-comments") {
-                    SoftwareRepoComments(env, entry.project, comments, commentPage, { commentPage = it },
-                        openComposer, { openComposer = false }, open)
-                }
+                plainCommentItems(env, discussion, open, horizontalPadding = 0.dp)
             }
-            Hairline()
-            Row(
-                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    "说点什么…",
-                    Modifier.weight(1f).clip(CircleShape).background(LocalExtraColors.current.fill)
-                        .clickable(role = Role.Button) {
-                            if (!session.loggedIn) open(Route.Login)
-                            else {
-                                openComposer = true
-                                scrollToComments()
-                            }
-                        }.padding(horizontal = 14.dp, vertical = 11.dp),
-                    style = XType.Secondary,
-                    color = LocalExtraColors.current.ink3,
-                )
+            CommentBar(if (session.loggedIn) "写评论…" else "登录后评论", onWrite = { discussion.begin() }) {
                 if (env.platform != null) {
                     IconTap(XIcons.ExternalLink, "在 GitHub 查看项目", {
                         env.platform.openInBrowser("https://github.com/${entry.project}")
@@ -377,16 +349,7 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                 }
                 IconTap(XIcons.Star, if (saved) "取消收藏" else "收藏", { setSaved(!saved) },
                     tint = if (saved) Brand else MaterialTheme.colorScheme.onSurface)
-                Row(
-                    Modifier.heightIn(min = 44.dp).semantics {
-                        contentDescription = commentCount?.let { "查看评论，共 $it 条" } ?: "查看评论"
-                    }.clickable(role = Role.Button, onClick = ::scrollToComments).padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    XIcon(XIcons.Message, size = 22.dp)
-                    commentCount?.let { Text(it.toString(), style = XType.Caption) }
-                }
+                CommentCountAction(discussion.total, ::scrollToComments)
             }
         }
     }
