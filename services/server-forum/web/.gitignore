@@ -1,2 +1,5 @@
 # Generated from the checked-in desktop game packs by scripts/sync-builtin-games.mjs
 /public/builtin-games/
+# Generated from the pinned RealWorldBuilder revision.
+/public/gallery-exhibits/
+/scripts/.gallery-source-version
