@@ -75,11 +75,15 @@ import xyz.xiangban.xiaoban.common.community.compactCount
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
 
-internal enum class DiscussSub(val key: String, val label: String) {
-    All("all", "全部"), Learn("learn", "教程"),
+internal enum class DiscussSub(val key: String, val label: String, val topicTag: String? = null) {
+    All("all", "全部"),
+    Design("design", "设计", topicTag = "设计"),
+    Games("casual-games", "游戏"),
+    ThreeD("3d", "3D", topicTag = "3d"),
+    Learn("learn", "教程"),
     Travel("casual-travel", "旅行"), Books("casual-books", "读书"),
     Screen("casual-screen", "影视动漫"), Feelings("casual-feelings", "情感心理"),
-    Food("casual-food", "美食"), Work("casual-work", "职场"), Games("casual-games", "游戏");
+    Food("casual-food", "美食"), Work("casual-work", "职场");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: All
@@ -306,12 +310,13 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
     val liking = remember(session.accountId) { mutableStateMapOf<Long, Unit>() }
     var toast by remember(session.accountId) { mutableStateOf<String?>(null) }
     val category = when (sub) {
-        DiscussSub.All -> "learn,casual"
+        DiscussSub.All, DiscussSub.Design, DiscussSub.ThreeD -> "learn,casual"
         DiscussSub.Learn -> learnChannel(filter)
         else -> sub.key
     }
-    val loader = rememberLoader(env, listOf(category, tag, page, session.accountId)) {
-        env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, activeOnly = true)
+    val topicTag = sub.topicTag ?: tag.ifBlank { null }
+    val loader = rememberLoader(env, listOf(category, topicTag, page, session.accountId)) {
+        env.forum.topics(sort = "new", category = category, page = page, tag = topicTag, activeOnly = true)
     }
     val state by loader.state.collectAsState()
     val topics = buildList {
@@ -345,7 +350,7 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
         val lesson = LearnTags.firstOrNull { learnChannel(it.first) == slug }
         when {
             lesson != null -> selectTopic(lesson.first)
-            DiscussSub.entries.any { it.key == slug } -> selectTopic(slug)
+            DiscussSub.entries.any { it.key == slug && it.topicTag == null } -> selectTopic(slug)
             else -> open(Route.Articles(slug, topic.category.name))
         }
     }

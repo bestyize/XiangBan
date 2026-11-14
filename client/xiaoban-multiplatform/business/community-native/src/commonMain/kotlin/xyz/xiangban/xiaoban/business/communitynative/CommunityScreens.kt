@@ -77,7 +77,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, currentHome.key, centered = true) { homeSub = it }
-                CommunitySection.Ideas -> TabStrip(IdeasSub.entries.map { it.name to it.label }, ideasSub) { ideasSub = it }
+                CommunitySection.Ideas -> TabStrip(IdeasSub.entries.map { it.name to it.label }, ideasSub, centered = true) { ideasSub = it }
                 CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
