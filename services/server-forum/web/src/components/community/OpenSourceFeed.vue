@@ -6,6 +6,7 @@ import { previewOpenSourceCover } from '@/lib/openSourceCoverPreview'
 import RequestState from './RequestState.vue'
 import DiscoverGlyph from './DiscoverGlyph.vue'
 import RepoBoard from './RepoBoard.vue'
+import MasonryGrid from './MasonryGrid.vue'
 import OpenSourceProjectCard from './OpenSourceProjectCard.vue'
 import OpenSourceCollectionCard from './OpenSourceCollectionCard.vue'
 import './open-source.css'
@@ -97,9 +98,9 @@ function reset() { update({ tag: undefined, q: undefined, saved: undefined }) }
     <template v-else>
     <div v-if="category !== 'recommend' && tags.length" class="os-tag-filters" aria-label="细分标签"><button type="button" :aria-pressed="!tag" @click="update({tag: undefined})">全部</button><button v-for="item in tags" :key="item" type="button" :aria-pressed="tag === item" @click="update({tag: tag === item ? undefined : item})">{{ item }}</button></div>
     <div v-if="catalog" class="os-feed-heading"><h3 class="sr-only">{{ tabs.find(item => item.key === category)?.label ?? "精选" }}</h3><span>{{ catalog.total }} 个项目</span></div>
-    <div v-if="projects.length" class="os-project-grid">
+    <MasonryGrid v-if="projects.length" class="os-project-grid">
       <template v-for="(project, index) in projects" :key="project.full_name"><OpenSourceProjectCard :project="project" :cover-preview="coverPreview" /><OpenSourceCollectionCard v-if="showCollections && index === 3 && catalog?.collections[0]" :collection="catalog?.collections[0]" /><OpenSourceCollectionCard v-if="showCollections && index === 7 && catalog?.collections[1]" :collection="catalog?.collections[1]" /></template>
-    </div>
+    </MasonryGrid>
     <div v-else-if="catalog && !loading" class="os-empty" role="status"><DiscoverGlyph name="code" :size="24" /><h3>这个分类的项目正在整理中</h3><p>可以先看看其他分类。</p><button v-if="tag" type="button" class="os-button" @click="reset">清除标签筛选</button></div>
     <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <div v-if="catalog?.next_page && !error" ref="sentinel" class="os-feed-note">
