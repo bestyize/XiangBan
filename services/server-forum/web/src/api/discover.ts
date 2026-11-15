@@ -8,7 +8,6 @@ export interface HomeBundle { banners: { key: string; title: string; tag?: strin
 export interface RepoRank { rank: number; full_name: string; description?: string; description_zh?: string; language?: string; star_total: number; star_gain?: number | null; suspected_growth?: boolean; complete?: boolean; observed_days?: number | null }
 export interface RepoIssue { key: string; issue_no: number; week_start: string; week_end: string; source: string; metric: string; as_of?: string | null; total_gain?: number | null; wow_pct?: number | null; observed_days?: number | null; complete?: boolean; sample?: boolean; ranks: RepoRank[] }
 export interface RepoIssueRef { key: string; issue_no: number; week_start: string; week_end: string }
-export interface Tracker { now: string; sample?: boolean; quota?: { progress_pct: number; next_reset_at: string; published_at: string; sample?: boolean } | null; launches: { key: string; title: string; tags?: string[]; published_at?: string; summary?: string; source_url?: string | null; sample?: boolean }[]; promos: { key: string; text: string; eligibility?: string; ends_at?: string | null; days_left?: number | null; source_url?: string | null; sample?: boolean }[] }
 export interface NavItem { sample?: boolean; key: string; name: string; url: string; vendor?: string; category?: string; subtype?: string; region?: string; summary?: string; logo?: string }
 export interface DocItem { sample?: boolean; key: string; title: string; url: string; product?: string }
 export interface Group<T> { name: string; items: T[] }
@@ -45,7 +44,6 @@ export const discoverApi = {
   deleteRepoComment: (owner: string, repo: string, id: number) => request('DELETE', `${path.repoComments(owner, repo)}/${id}`),
   repos: (issue = '') => get<RepoIssue>(`${path.repos}${issue ? `?issue=${encodeURIComponent(issue)}` : ''}`),
   issues: () => get<{ items: RepoIssueRef[] }>(path.issues),
-  tracker: () => get<Tracker>(path.tracker),
   nav: () => get<{ groups: Group<NavItem>[]; catalog_version?: number }>(path.nav),
   docs: () => get<{ groups: Group<DocItem>[] }>(path.docs),
   tools: () => get<{ items: ToolSummary[] }>(path.tools),

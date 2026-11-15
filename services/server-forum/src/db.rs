@@ -277,6 +277,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     crate::subscriptions::init(pool).await?;
     crate::content_social::schema::init(pool).await?;
     crate::reply_content::schema::init(pool).await?;
+    remove_discover_tracker(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -285,6 +286,45 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
         .execute(pool)
         .await;
     }
+    Ok(())
+}
+
+/// 清理下线的追踪条目和草稿，并收回对应的采集权限。
+async fn remove_discover_tracker(pool: &PgPool) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    let inserted = sqlx::query(
+        "INSERT INTO data_migrations (name) VALUES ('remove-discover-tracker-v1') ON CONFLICT DO NOTHING",
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        return Ok(());
+    }
+
+    let retired = &["quota", "launch", "promo"][..];
+    sqlx::query("DELETE FROM discover_drafts WHERE kind = ANY($1)")
+        .bind(retired)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM discover_items WHERE kind = ANY($1)")
+        .bind(retired)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM discover_tokens WHERE kinds <@ $1")
+        .bind(retired)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE discover_tokens
+         SET kinds = ARRAY(SELECT scope FROM unnest(kinds) AS scope WHERE scope <> ALL($1)),
+             publish_kinds = ARRAY(SELECT scope FROM unnest(publish_kinds) AS scope WHERE scope <> ALL($1))
+         WHERE kinds && $1 OR publish_kinds && $1",
+    )
+    .bind(retired)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 /** Paths shared by the public discover views. Keys are always one URL segment. */
 export const discoverPaths = {
   home: '/discover/home/v2', daily: '/discover/daily', repos: '/discover/repos/v2',
-  issues: '/discover/repos/issues/v2', tracker: '/discover/tracker/v2',
+  issues: '/discover/repos/issues/v2',
   nav: '/discover/nav', docs: '/discover/docs', tools: '/tools',
   models: '/discover/models/v2', usage: '/discover/model-usage',
   article: (key: string) => `/discover/daily/${encodeURIComponent(key)}`,
@@ -25,13 +25,6 @@ export function webLink(raw: string | null | undefined): string | undefined {
     const u = new URL(raw)
     return (u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password ? u.href : undefined
   } catch { return undefined }
-}
-
-export function officialSource(raw: string | null | undefined): string | undefined {
-  const link = webLink(raw)
-  if (!link || !link.startsWith('https://')) return undefined
-  const u = new URL(link)
-  return !u.port || u.port === '443' ? link : undefined
 }
 
 export function repoMetric(issue: { source?: string; metric?: string; complete?: boolean }) {

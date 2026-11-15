@@ -7,7 +7,6 @@ import NewsRow from '@/components/community/NewsRow.vue'
 import FrontierBanner from '@/components/community/FrontierBanner.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import ModelPreview from '@/components/community/ModelPreview.vue'
-import TrackerPanel from '@/components/community/TrackerPanel.vue'
 import NavDirectory from '@/components/community/NavDirectory.vue'
 import OpenSourceFeed from '@/components/community/OpenSourceFeed.vue'
 import { useCommunityResource } from '@/components/community/resource'
@@ -19,7 +18,7 @@ import ProjectFeed from '@/components/ProjectFeed.vue'
 import { useHead } from '@/lib/head'
 import '@/components/community/community.css'
 const route = useRoute(), router = useRouter()
-const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'open-source', label: '精选' }, { key: 'rankings', label: '排行榜' }, { key: 'tracker', label: '追踪' }, { key: 'nav', label: '导航' }]
+const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'open-source', label: '精选' }, { key: 'rankings', label: '排行榜' }, { key: 'nav', label: '导航' }]
 const tab = computed(() => {
   const raw = String(route.query.tab || 'recommend')
   return tabs.some(t => t.key === raw) || raw === 'weekly' || raw === 'projects' ? raw : 'recommend'
@@ -55,7 +54,6 @@ useHead(() => ({ title: '社区' }))
   </template>
   <OpenSourceFeed v-else-if="tab === 'open-source'" />
   <ModelPreview v-else-if="tab === 'rankings'" />
-  <TrackerPanel v-else-if="tab === 'tracker'" />
   <NavDirectory v-else />
 </main></template>
 <style scoped>

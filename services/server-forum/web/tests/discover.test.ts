@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createRequestGate, discoverPaths, officialSource, repoGrowth, repoMetric, repoPage, webLink } from '../src/components/community/contract.ts'
+import { createRequestGate, discoverPaths, repoGrowth, repoMetric, repoPage, webLink } from '../src/components/community/contract.ts'
 
 test('repo detail paths escape each segment and only valid GitHub names get an in-site page', () => {
   assert.equal(discoverPaths.repo('own er', 'a/b'), '/discover/repo/own%20er/a%2Fb')
@@ -14,7 +14,6 @@ test('discover paths match the versioned mobile contract and escape keys once', 
   assert.equal(discoverPaths.home, '/discover/home/v2')
   assert.equal(discoverPaths.repos, '/discover/repos/v2')
   assert.equal(discoverPaths.issues, '/discover/repos/issues/v2')
-  assert.equal(discoverPaths.tracker, '/discover/tracker/v2')
   assert.equal(discoverPaths.article('a/b?c#d'), '/discover/daily/a%2Fb%3Fc%23d')
   assert.equal(discoverPaths.comments('a/b'), '/discover/daily/a%2Fb/comments')
   assert.equal(discoverPaths.tool('tool#1'), '/tools/tool%231')
@@ -24,10 +23,6 @@ test('editorial links reject scripts, credentials, cross-origin path tricks and 
   for (const raw of ['javascript:alert(1)', 'data:image/svg+xml,a', '//evil.test', '/\\evil.test', 'https://user:pass@example.com', 'https://example.com\n/path', 'file:///etc/passwd']) assert.equal(webLink(raw), undefined, raw)
   assert.equal(webLink('/api/images/1'), '/api/images/1')
   assert.equal(webLink('https://github.com/example/project'), 'https://github.com/example/project')
-  assert.equal(officialSource('http://example.com'), undefined)
-  assert.equal(officialSource('https://example.com:8443'), undefined)
-  assert.equal(officialSource('/api/tool'), undefined)
-  assert.equal(officialSource('https://example.com'), 'https://example.com/')
 })
 
 test('baseline and incomplete observations never invent weekly growth', () => {

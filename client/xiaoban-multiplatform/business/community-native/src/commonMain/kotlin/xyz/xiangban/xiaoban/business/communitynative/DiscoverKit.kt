@@ -177,16 +177,3 @@ internal fun ExpandableDescription(text: String) {
             style = XType.Caption, color = LocalExtraColors.current.brandInk)
     }
 }
-
-/** 没有站内详情的条目，把长说明收在明确的展开入口。 */
-@Composable
-internal fun DisclosureDescription(label: String, text: String) {
-    var expanded by remember(text) { mutableStateOf(false) }
-    Column {
-        Row(Modifier.clickable { expanded = !expanded }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (expanded) "收起$label" else label, style = XType.Caption, color = LocalExtraColors.current.ink3)
-            XIcon(if (expanded) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
-        }
-        if (expanded) Text(text, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}

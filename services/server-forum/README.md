@@ -95,7 +95,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 「小伴前沿」提供 `/frontier` 列表和详情、首页已发布文章入口、发现页 `frontier` 草稿类型与隔离的评论表，沿用发现页人工审核发布。`POST /api/discover-editor/frontier/{key}/assets` 使用允许 `frontier` 的采集令牌接收 JSON `data_base64`，限制每图 5 MiB、每篇 20 张；存入数据库并审计，只有已发布文章引用的图片通过公开接口读取。Nginx 对该前缀需设置 `client_max_body_size 7m`。采集和图文生成可由 `tools/claude-skills/xiaoban-frontier` 使用 server-ai 完成，运行需运营账号和受限采集令牌；日报关联和 SEO 暂未实现。
 
-前台路由：`/` 社区发现（推荐、开源热榜、排行榜、追踪、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。
+前台路由：`/` 社区发现（推荐、精选、排行榜、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。
 
 服务端对 `/`、`/t/{id}`、`/c/{slug}`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
 
@@ -165,7 +165,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 ### PC 网页布局（2026-11-02）
 
-公开社区页面在 1024px 起使用独立的 PC 样式：200px 导航栏、与正文对齐的顶部导航和搜索入口，内容区最大 1320px。社区首页的前沿图文、日报、精选作品分清主次，讨论和资源统一卡片与间距，正文保持阅读宽度。排行榜、开源榜、追踪和导航按实际内容宽度切换布局；原先内容容器最大 1000px，却使用 1100px 容器断点，导致宽屏布局无法生效，本轮将其改为 PC 范围内的 960px 内容断点。手机与后台不使用这套桌面样式。 网页窄屏底栏另与手机版对齐：通栏固定、56px 主体加安全区、四个等宽图标文字入口，选中项深色加粗，中间为 44×32px 的品牌色发布按钮；聊天输入区随新底栏高度避让。
+公开社区页面在 1024px 起使用独立的 PC 样式：200px 导航栏、与正文对齐的顶部导航和搜索入口，内容区最大 1320px。社区首页的前沿图文、日报、精选作品分清主次，讨论和资源统一卡片与间距，正文保持阅读宽度。排行榜、开源榜和导航按实际内容宽度切换布局；原先内容容器最大 1000px，却使用 1100px 容器断点，导致宽屏布局无法生效，本轮将其改为 PC 范围内的 960px 内容断点。手机与后台不使用这套桌面样式。 网页窄屏底栏另与手机版对齐：通栏固定、56px 主体加安全区、四个等宽图标文字入口，选中项深色加粗，中间为 44×32px 的品牌色发布按钮；聊天输入区随新底栏高度避让。
 
 验证：网页生产构建（含 Vue/TypeScript 检查）与 navigation/discover/appearance 9 项测试通过；云浏览器使用生产公开数据的只读快照检查首页、讨论、资源、排行榜和日夜主题。预览未连接登录、发布和其他写操作；本轮没有部署生产网站。
 
@@ -208,18 +208,19 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 针对性验证：`TEST_DATABASE_URL=… cargo test --locked --manifest-path services/server-forum/Cargo.toml content_social`；测试使用隔离 schema，覆盖游客读取不写入、首次互动并发、真实评论/点赞/通知、旧讨论复用、导入作品、方案、锁定/下架/禁言及原收藏举报。
 
-## 手机端社区的发现页
+## 社区发现页
 
-手机端社区（首页五个栏目、AI 工具、资料、求助悬赏）用的接口，实现在 `src/discover.rs`（内容校验与示例种子）、`src/handlers/discover.rs`（公开读取与兼容管理接口）、`src/handlers/discover_editor.rs`（编辑与审核）。公开内容存在 `discover_items`（`kind` + `key` + JSON `data`），编辑副本存在独立的 `discover_drafts`；保存副本不会改变线上内容。写入时按类型校验、只保留已知字段，草稿及内容日期未到的条目不对外。
+手机和网页的社区首页、AI 工具、资料与求助悬赏共用接口，实现在 `src/discover.rs`（内容校验与示例种子）、`src/handlers/discover.rs`（公开读取与兼容管理接口）、`src/handlers/discover_editor.rs`（编辑与审核）。公开内容存在 `discover_items`（`kind` + `key` + JSON `data`），编辑副本存在独立的 `discover_drafts`；保存副本不会改变线上内容。写入时按类型校验、只保留已知字段，草稿及内容日期未到的条目不对外。
 
-- 前台：`GET /discover/home`（头图、当天日报、精选创作、热榜前三，一次返回）、`/discover/daily`（往期日报，分页）、`/discover/repos[?issue=]` 与 `/discover/repos/issues`（开源热榜及往期）、`/discover/models`（模型榜，分档阈值 `tiers` 由后端给）、`/discover/tracker`（额度重置、模型上新、限时免费，进度和剩余天数服务端算）、`/discover/nav`、`/discover/docs`、`GET /tools[/{key}]`（AI 工具与按系统的安装包、更新记录）、`GET /help/stats`（进行中、本周已解决、悬赏积分合计，全站值）、`PUT /topics/{id}/poll/vote {option}`（每人一票）。
+- 前台：`GET /discover/home`（头图、当天日报、精选创作、热榜前三，一次返回）、`/discover/daily`（往期日报，分页）、`/discover/repos[?issue=]` 与 `/discover/repos/issues`（开源热榜及往期）、`/discover/models`（模型榜，分档阈值 `tiers` 由后端给）、`/discover/nav`、`/discover/docs`、`GET /tools[/{key}]`（AI 工具与按系统的安装包、更新记录）、`GET /help/stats`（进行中、本周已解决、悬赏积分合计，全站值）、`PUT /topics/{id}/poll/vote {option}`（每人一票）。
 - 帖子：发帖可带 `poll: {options: [2～6 项], days?}`；列表与详情返回 `images`（正文里前 3 张站内图）、`poll`（票数、总数、自己投的项）、`view_count`；`GET /topics?category=a,b` 可以同时指定几个分类。
-- 兼容后台接口：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`，仍允许管理员直接编辑线上内容。新管理台统一走下述草稿流程。类型：`banner news nav doc vendor model repo_issue quota launch promo tool hotword`，管理台已提供热门搜索编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后可删除示例。
+- 兼容后台接口：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`，仍允许管理员直接编辑线上内容。新管理台统一走下述草稿流程。类型：`banner news frontier nav doc vendor model model_board model_usage repo_issue tool hotword`，管理台已提供热门搜索编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后可删除示例。
 - 已实现服务端自动采集与管理台 `/admin/collection`：Artificial Analysis 能力榜、OpenRouter 每日 Token 用量榜、GitHub 候选仓库每日快照、官方 RSS 日报、GitHub Releases 工具版本。各来源独立开关，默认停用；第三方 key 在后台验证后用独立主密钥加密入库，只返回配置状态与尾号。`FORUM_COLLECTION_MASTER_KEY` 是部署用主密钥，不是第三方 API key。
 - 能力榜、调用量榜和开源热榜每天北京时间 12:00 采集，验证通过后原子自动发布，无需人工审核；公开接口始终读取数据库快照，页面刷新不会请求原厂。资讯与工具版本仍生成草稿，管理员核对后整批发布。失败保留上一版；人工编辑与定时稿不被覆盖。来源配置、运行、批次预览/审核接口在 `/api/admin/collection`；采集令牌不能进入该管理入口。
 - OpenRouter 每天北京时间 12:00 采集最近三个完整 UTC 日的 Token 用量快照，公开读接口 `/discover/model-usage[?date=]` 与 `/discover/model-usage/dates`，精确整数以字符串传输。能力榜 v2 为 `/discover/models/v2`，缺失指标为 null；旧模型接口兼容保留。
 - 开源热榜只记录明确配置的最多 30 个仓库；第一天是基线，满八个连续日边界才能形成完整七日净增，缺采样标明观测天数。日报仅采 OpenAI/DeepMind/Google Research 固定官方 RSS 标题、来源、链接和时间，北京时间每天最多十个新候选，不抓正文。
-- 工具来源最多十个 GitHub 仓库，只收正式版本与可识别主程序资产。官方摘要优先，缺摘要才在后台有界流式下载核验；128 MiB/文件、累计 256 MiB/次，不执行文件。未识别架构与超限资产提示人工维护。模型上新、限免、额度重置、导航与资料继续人工编辑，不推断全局实时额度。
+- 工具来源最多十个 GitHub 仓库，只收正式版本与可识别主程序资产。官方摘要优先，缺摘要才在后台有界流式下载核验；128 MiB/文件、累计 256 MiB/次，不执行文件。未识别架构与超限资产提示人工维护。导航与资料继续人工编辑。
+- 「追踪」已移除。新版服务首次启动会从发现表中永久删除追踪的线上条目与草稿，并移除采集令牌的对应权限。手机旧版需更新才能移除入口。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test --locked --manifest-path services/server-forum/Cargo.toml discover`。未设置 `TEST_DATABASE_URL` 会跳过数据库测试；测试使用独立 schema，覆盖原有接口、草稿隔离、批量事务、作用域与撤销、并发版本冲突、审核和定时发布。
 
 ### 发现页编辑与发布
@@ -378,7 +379,7 @@ API：
 
 ## 社区分类与发帖归属（2026-11-06）
 
-社区页面按首页、创意、讨论、资源组织。首页的精选、排行榜、追踪、导航属于独立目录或数据模块。创意和讨论（含站务）直接包含可发帖的板块，数据库禁止这些板块再挂父分类。分类的 `section`、`status` 和 `posting_enabled` 由浏览、发帖及自动采编共用。资源栏目支持父子分类，停用父分类时子分类一同停用。
+社区页面按首页、创意、讨论、资源组织。首页的精选、排行榜、导航属于独立目录或数据模块。创意和讨论（含站务）直接包含可发帖的板块，数据库禁止这些板块再挂父分类。分类的 `section`、`status` 和 `posting_enabled` 由浏览、发帖及自动采编共用。资源栏目支持父子分类，停用父分类时子分类一同停用。
 
 创意板块及讨论页原有直达板块保留 ID。原教程、站务子板块的帖子和稿件归到对应板块，原创意分组下未细分的内容归到创意的「默认」。迁移删除旧分组和子板块记录，旧地址跳转到现有板块或栏目。创意、讨论、资源各有一个独立的「默认」板块，收纳未分类帖子。
 

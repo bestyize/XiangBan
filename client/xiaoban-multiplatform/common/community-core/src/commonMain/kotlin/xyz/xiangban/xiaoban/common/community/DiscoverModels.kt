@@ -193,42 +193,6 @@ data class ModelBoard(
     fun vendor(key: String): ModelVendor? = vendors.firstOrNull { it.key == key }
 }
 
-// ───────────── 追踪 ─────────────
-
-@Serializable
-data class QuotaInfo(
-    @SerialName("progress_pct") val progressPct: Int = 0,
-    @SerialName("next_reset_at") val nextResetAt: String = "",
-    @SerialName("published_at") val updatedAt: String = "",
-    @SerialName("recent_intervals") val recentIntervals: List<Double> = emptyList(),
-    val sample: Boolean = false,
-)
-
-@Serializable
-data class LaunchItem(val key: String, val title: String, val tags: List<String> = emptyList(), @SerialName("published_at") val publishedAt: String = "", val sample: Boolean = false,
-    val summary: String = "", @SerialName("source_url") val sourceUrl: String? = null)
-
-@Serializable
-data class PromoItem(
-    val key: String,
-    val text: String,
-    @SerialName("ends_at") val endsAt: String? = null,
-    val pct: Int? = null,
-    @SerialName("days_left") val daysLeft: Int? = null,
-    val sample: Boolean = false,
-    @SerialName("source_url") val sourceUrl: String? = null,
-    val eligibility: String = "",
-)
-
-@Serializable
-data class Tracker(
-    val quota: QuotaInfo? = null,
-    val launches: List<LaunchItem> = emptyList(),
-    val promos: List<PromoItem> = emptyList(),
-    val now: String = "",
-    val sample: Boolean = false,
-)
-
 // ───────────── 搜索 ─────────────
 
 @Serializable
@@ -381,10 +345,3 @@ data class Poll(
 
 @Serializable
 data class VoteResult(val poll: Poll)
-
-/** Source links are optional for older timed items; malformed links never reach platform openUrl. */
-fun trackerOfficialSource(raw: String?): String? {
-    if (raw.isNullOrBlank() || raw.length > 2048 || raw.any { it.isISOControl() }) return null
-    val url = runCatching { io.ktor.http.Url(raw) }.getOrNull() ?: return null
-    return raw.takeIf { url.protocol.name == "https" && url.host.isNotEmpty() && url.user.isNullOrEmpty() && url.password.isNullOrEmpty() && url.port == 443 }
-}

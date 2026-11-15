@@ -139,7 +139,6 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun liveModelBoard(): LiveModelBoard = get("/api/discover/models/v2")
     suspend fun modelUsage(date: String? = null): ModelUsageBoard = get("/api/discover/model-usage${query("date" to date)}")
     suspend fun modelUsageDates(): ModelUsageDates = get("/api/discover/model-usage/dates")
-    suspend fun tracker(): Tracker = get("/api/discover/tracker/v2")
     suspend fun navLinks(): NavGroups = get("/api/discover/nav")
     suspend fun hotSearch(): HotWords = get("/api/discover/hot-search")
     suspend fun docs(): DocGroups = get("/api/discover/docs")

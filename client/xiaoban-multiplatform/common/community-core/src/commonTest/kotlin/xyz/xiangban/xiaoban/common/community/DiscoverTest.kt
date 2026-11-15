@@ -170,7 +170,7 @@ class DiscoverApiTest {
     }
 
     @Test
-    fun `model board, tracker, nav and docs map to their endpoints`() = runTest {
+    fun `model board, nav and docs map to their endpoints`() = runTest {
         val server = FakeServer()
         server.on(
             "/api/discover/models",
@@ -178,12 +178,6 @@ class DiscoverApiTest {
               "models":[{"key":"m","name":"模型","vendor":"v","iq":72.5,"price":3.4,"speed":90,"reasoning":true,"tier":"S"}],
               "tiers":[{"id":"S","label":"第一梯队","min":70.0},{"id":"C","label":"第四梯队","min":null}],
               "source":"Artificial Analysis","updated_at":"2026-10-31T00:00:00Z","sample":true}""",
-        )
-        server.on(
-            "/api/discover/tracker/v2",
-            body = """{"quota":{"key":"codex","progress_pct":68,"next_reset_at":"2026-11-01T10:00:00Z","recent_intervals":[5,5.5],"published_at":"2026-10-31T09:55:00Z"},
-              "launches":[{"key":"l","title":"上新","tags":["API"],"published_at":"2026-10-31T00:00:00Z"}],
-              "promos":[{"key":"p","text":"免费","ends_at":"2026-11-03T00:00:00Z","pct":57,"days_left":3}],"now":"2026-10-31T10:00:00Z","sample":false}""",
         )
         server.on("/api/discover/nav", body = """{"groups":[{"name":"海外","items":[{"key":"claude","group":"海外","name":"Claude","vendor":"Anthropic","url":"https://claude.ai/"}]}]}""")
         server.on("/api/discover/docs", body = """{"groups":[{"name":"Claude","items":[{"key":"d","title":"文档","label":"index","url":"https://docs.test"}]}]}""")
@@ -194,11 +188,6 @@ class DiscoverApiTest {
         assertEquals(72.5, board.models.single().iq)
         assertNull(board.tiers.last().min)
         assertEquals(70.0, board.tiers.first().min)
-
-        val tracker = api.tracker()
-        assertEquals(68, tracker.quota?.progressPct)
-        assertEquals(listOf(5.0, 5.5), tracker.quota?.recentIntervals)
-        assertEquals(3, tracker.promos.single().daysLeft)
 
         assertEquals("Claude", api.navLinks().groups.single().items.single().name)
         assertEquals("索引", api.docs().groups.single().items.single().labelText)

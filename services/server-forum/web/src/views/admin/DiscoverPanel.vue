@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 手机端社区的发现页内容：头图、日报、开源热榜、模型榜、追踪、导航、资料导读和 AI 工具。
+// 社区的发现页内容：头图、日报、开源热榜、模型榜、导航、资料导读和 AI 工具。
 // 内容形状在服务端校验，这里用 JSON 编辑；草稿不对外，标成示例的条目手机端会显示「示例数据」。
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { adminApi, AdminApiError, type DiscoverRow, type DiscoverDraft, type DiscoverToken, type DiscoverDraftInput } from '@/api/admin'
@@ -13,9 +13,6 @@ const KINDS = [
   { key: 'repo_issue', label: '开源热榜（按期）', sample: '{"issue_no":1,"week_start":"10.23","week_end":"10.29","total_gain":86420,"wow_pct":12,"daily_gain":[1,2,3,4,5,6,7],"ranks":[{"full_name":"owner/repo","description":"简介","language":"Python","language_color":"#3572A5","star_total":12400,"star_gain":3214,"spark":[1,2,3,4,5,6,7]}]}' },
   { key: 'vendor', label: '模型厂商', sample: '{"name":"厂商名","brand_color":"#E3203C","tint":"#FFE4E8"}' },
   { key: 'model', label: '模型榜', sample: '{"name":"模型名","vendor":"厂商 key","iq":70,"code":68,"math":66,"agent":69,"price":3.4,"speed":90,"latency":0.9,"context":"200K","open":false,"reasoning":true,"cn":false}' },
-  { key: 'quota', label: 'Codex 额度重置', sample: '{"progress_pct":68,"next_reset_at":"2026-11-01T10:00:00Z","recent_intervals":[5,5,4.5,5,5.5,5,5]}' },
-  { key: 'launch', label: '发布记录', sample: '{"title":"标题","tags":["API","编程"]}' },
-  { key: 'promo', label: '优惠与试用', sample: '{"text":"说明","started_at":"2026-10-28T00:00:00Z","ends_at":"2026-11-04T00:00:00Z"}' },
   { key: 'nav', label: '导航', sample: '{"category":"models","group":"大模型","region":"cn","summary":"一句话用途","name":"名称","vendor":"厂商","url":"https://example.com","brand_color":"#D97757","tint":"#FBE9E1"}' },
   { key: 'doc', label: '资料导读', sample: '{"product":"Claude","title":"标题","subtitle":"说明","label":"guide","url":"https://example.com"}' },
   { key: 'tool', label: 'AI 工具', sample: '{"name":"名称","developer":"开发者","type_label":"桌面应用","license":"open","platforms":["Windows","macOS"],"description":"简介","homepage_url":"https://github.com/owner/repo","discussion_tag":"tag","releases":[{"version":"v1.0.0","date":"10-20","items":[{"kind":"new","text":"内容"}]}],"artifacts":[{"os":"windows","desc":".msi 安装包","size":12582912,"sha256":"","mirror_url":"","github_url":"https://github.com/owner/repo/releases"}]}' },
@@ -47,7 +44,7 @@ const tokens = ref<DiscoverToken[]>([])
 const issuedToken = ref('')
 const tokenForm = reactive({ name: '', days: 30, kinds: ['news'] as string[], publish_kinds: [] as string[] })
 const visibleRows = computed(() => view.value === 'live' ? rows.value : drafts.value)
-const structuredKind = computed(() => ["banner","news","nav","doc","launch","promo","hotword","vendor","quota"].includes(kind.value))
+const structuredKind = computed(() => ["banner","news","nav","doc","hotword","vendor"].includes(kind.value))
 const snapshotKind = computed(() => kind.value === 'model_board' || kind.value === 'model_usage')
 let loadSeq = 0
 

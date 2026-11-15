@@ -120,7 +120,6 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                                 HomeSub.Recommend -> RecommendTab(env, open, ::openHotRanking)
                                 HomeSub.OpenSource -> OpenSourceTab(env, open, hotRankingOpenCount)
                                 HomeSub.Rank -> RankTab(env, open)
-                                HomeSub.Track -> TrackTab(env)
                                 HomeSub.Nav -> NavTab(env)
                             }
                         }

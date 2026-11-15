@@ -150,7 +150,7 @@ class CommunityEnv(
     agentBridge: AgentBridge? = null,
     /** 智能体保存对话的文件夹。 */
     agentDir: String? = null,
-    /** 系统闹钟提醒；智能体的“设提醒”和追踪页的“提醒我”都用它。没有就不提供提醒。 */
+    /** 系统闹钟提醒；智能体的“设提醒”使用它。没有就不提供提醒。 */
     val reminders: ReminderScheduler? = null,
     /** 手机本地语音识别（安卓上是 sherpa-onnx 的 SenseVoice）；没有就只用云端和电脑上的识别。 */
     val speech: LocalSpeech? = null,

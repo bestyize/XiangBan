@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,37 +51,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.common.community.HomeBanner
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Metric
 import xyz.xiangban.xiaoban.common.community.ModelBoard
 import xyz.xiangban.xiaoban.common.community.NewsItem
 import xyz.xiangban.xiaoban.common.community.Pack
-import xyz.xiangban.xiaoban.common.community.QuotaInfo
-import xyz.xiangban.xiaoban.common.community.ReminderScheduleResult
 import xyz.xiangban.xiaoban.common.community.RepoIssue
 import xyz.xiangban.xiaoban.common.community.RepoRank
 import xyz.xiangban.xiaoban.common.community.shownDescription
 import xyz.xiangban.xiaoban.common.community.repoObservationLabel
-import xyz.xiangban.xiaoban.common.community.trackerOfficialSource
 import xyz.xiangban.xiaoban.common.community.agoText
-import xyz.xiangban.xiaoban.common.community.clockText
 import xyz.xiangban.xiaoban.common.community.compactCount
-import xyz.xiangban.xiaoban.common.community.countdownText
 import xyz.xiangban.xiaoban.common.community.dayLabel
 import xyz.xiangban.xiaoban.common.community.formatGain
 import xyz.xiangban.xiaoban.common.community.formatScore
 import xyz.xiangban.xiaoban.common.community.formatStars
 import xyz.xiangban.xiaoban.common.community.kindLabel
-import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.rankModels
 
 /** 社区首页栏目。 */
 internal enum class HomeSub(val key: String, val label: String) {
-    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Rank("rank", "排行榜"), Track("track", "追踪"), Nav("nav", "导航");
+    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Rank("rank", "排行榜"), Nav("nav", "导航");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Recommend
@@ -100,14 +90,6 @@ internal fun dayText(date: String?): String {
     val m = parts.getOrNull(1)?.toIntOrNull() ?: return ""
     val d = parts.getOrNull(2)?.toIntOrNull() ?: return ""
     return "$m 月 $d 日"
-}
-
-@Composable
-private fun CardTitleRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (icon != null) XIcon(icon, size = 18.dp)
-        Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold)
-    }
 }
 
 /** 榜单行里的小图标：热榜仓库用，认不出的用仓库名首字。 */
@@ -348,130 +330,6 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
 @Composable
 internal fun RankTab(env: CommunityEnv, open: (Route) -> Unit) {
     LiveRankingsContent(env, open, preview = true)
-}
-
-// ───────────── 追踪 ─────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun TrackTab(env: CommunityEnv) {
-    var section by rememberSaveable { mutableStateOf("launches") }
-    val loader = rememberLoader(env, "tracker") { env.forum.tracker() }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { tracker ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                item { PageChipRow(listOf("launches" to "发布记录", "promos" to "优惠与试用"), section, { section = it }) }
-                tracker.quota?.let { q -> item { QuotaCard(env, q) } }
-                if (section == "launches") item {
-                    WhiteCard(padding = 14.dp) {
-                        CardTitleRow("发布记录", XIcons.Bolt)
-                        if (tracker.launches.isEmpty()) Text("暂无已核实的发布记录", Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Column(Modifier.padding(top = 10.dp)) {
-                            tracker.launches.forEachIndexed { i, l ->
-                                val source = trackerOfficialSource(l.sourceUrl)
-                                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Column(Modifier.width(12.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Dot(if (i == 0) DataBlue else DataBlueSoft, 10.dp, Modifier.padding(top = 5.dp))
-                                        if (i < tracker.launches.lastIndex) Box(Modifier.padding(top = 2.dp).width(2.dp).weight(1f).background(LocalExtraColors.current.hairline))
-                                    }
-                                    Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
-                                        Text(l.publishedAt.take(10).ifBlank { "日期未提供" }, style = XType.Caption, color = LocalExtraColors.current.ink3)
-                                        Text(l.title, Modifier.padding(top = 2.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                        if (l.summary.isNotBlank()) DisclosureDescription("发布说明", l.summary)
-                                        if (source != null) Row(Modifier.clickable { env.platform?.openUrl(source) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Text("官方原文", style = XType.Caption, color = LocalExtraColors.current.brandInk)
-                                            XIcon(XIcons.ExternalLink, size = 13.dp, tint = LocalExtraColors.current.brandInk)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (section == "promos") item {
-                    WhiteCard(padding = 14.dp) {
-                        CardTitleRow("优惠与试用", XIcons.Clock)
-                        if (tracker.promos.isEmpty()) Text("暂无已核实的优惠与试用", Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        tracker.promos.forEachIndexed { i, p ->
-                            if (i > 0) Hairline(Modifier.padding(top = 10.dp))
-                            Column(Modifier.padding(top = 10.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(p.text, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.Medium)
-                                    if (!p.endsAt.isNullOrBlank()) p.daysLeft?.let { Text("剩 $it 天", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                }
-                                if (p.endsAt.isNullOrBlank()) Text("长期提供，以官方条件为准", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                                else p.pct?.let { HBar(it / 100f, DataBlue, Modifier.padding(top = 8.dp), height = 4.dp, track = LocalExtraColors.current.fill) }
-                                if (p.eligibility.isNotBlank()) Text(p.eligibility, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                trackerOfficialSource(p.sourceUrl)?.let { source -> LinkText("查看官方条件与申请入口 ›", { env.platform?.openUrl(source) }) }
-                            }
-                        }
-                    }
-                }
-                if (tracker.sample) item { FootNote("追踪页里带「示例」字样的内容为示例数据。") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
-    val scope = rememberCoroutineScope()
-    val (remind, setRemind) = rememberPrefFlag(env, "quota_remind")
-    var note by remember { mutableStateOf<String?>(null) }
-    WhiteCard(padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                XIcon(XIcons.Refresh, size = 18.dp)
-                Text("Codex 额度重置", style = XType.Section, fontWeight = FontWeight.SemiBold)
-            }
-            if (q.updatedAt.isNotEmpty()) Text("${agoText(q.updatedAt)}更新", style = XType.Caption, color = LocalExtraColors.current.ink3)
-        }
-        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                ProgressRing(q.progressPct, DataBlue, size = 96.dp, stroke = 8.dp)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${q.progressPct}%", style = XType.Headline, fontWeight = FontWeight.Bold)
-                    Text("本轮已过", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                }
-            }
-            Column(Modifier.weight(1f)) {
-                Text("距离下次重置", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                Text(countdownText(q.nextResetAt), Modifier.padding(top = 2.dp), style = XType.Headline, fontWeight = FontWeight.Bold)
-                Text("预计${clockText(q.nextResetAt)}", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val at = parseIsoMillis(q.nextResetAt)
-                if (env.reminders != null && at != null) {
-                    if (remind) Row(
-                        Modifier.padding(top = 10.dp).height(34.dp).clip(RoundedCornerShape(17.dp)).background(LocalExtraColors.current.fill).clickable { setRemind(false) }.padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        XIcon(XIcons.Check, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-                        Text("已开启提醒", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else Row(
-                        Modifier.padding(top = 10.dp).height(34.dp).clip(RoundedCornerShape(17.dp)).background(Brand).clickable {
-                            scope.launch {
-                                val result = withContext(Dispatchers.Default) {
-                                    env.reminders.scheduleResult("Codex 额度已重置", at)
-                                }
-                                if (result == ReminderScheduleResult.Scheduled) setRemind(true)
-                                note = result.message
-                            }
-                        }.padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        XIcon(XIcons.Bell, tint = Color.White, size = 16.dp)
-                        Text("提醒我", style = XType.Body, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    }
-                }
-            }
-        }
-        note?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3) }
-        if (q.recentIntervals.isNotEmpty()) {
-            Hairline(Modifier.padding(top = 14.dp))
-            Text("最近 ${q.recentIntervals.size} 次重置间隔（小时）", Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-            IntervalBars(q.recentIntervals, Modifier.padding(top = 8.dp))
-        }
-    }
 }
 
 // ───────────── 往期日报 ─────────────

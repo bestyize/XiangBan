@@ -1,4 +1,4 @@
-//! 手机端社区的发现页接口：首页推荐、日报、开源热榜、模型榜、追踪、导航、资料导读、AI 工具、求助统计和投票。
+//! 社区的发现页接口：首页推荐、日报、开源热榜、模型榜、导航、资料导读、AI 工具、求助统计和投票。
 //!
 //! 条目都是后台手录的（见 `crate::discover`），这里只读取和组装；公开接口只返回已发布的条目。
 
@@ -54,8 +54,6 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/repo/{owner}/{repo}/comments/{id}", axum::routing::delete(super::discover_repo::delete))
         .route("/discover/repo/{owner}/{repo}/comments/{id}/like", put(super::discover_repo::like).delete(super::discover_repo::unlike))
         .route("/discover/models", get(models_board))
-        .route("/discover/tracker", get(tracker))
-        .route("/discover/tracker/v2", get(tracker_v2))
         .route("/discover/nav", get(nav))
         .route("/discover/docs", get(docs))
         .route("/discover/hot-search", get(hot_search))
@@ -270,36 +268,6 @@ async fn models_board(State(state): State<AppState>) -> AppResult<Json<Value>> {
     })))
 }
 
-async fn tracker(State(state): State<AppState>) -> AppResult<Json<Value>> { tracker_response(state, true).await }
-async fn tracker_v2(State(state): State<AppState>) -> AppResult<Json<Value>> { tracker_response(state, false).await }
-async fn tracker_response(state: AppState, legacy: bool) -> AppResult<Json<Value>> {
-    let quota = fetch(&state.pool, "quota", BY_ORDER, 1, 0).await?.into_iter().next();
-    let launches = fetch(&state.pool, "launch", NEWEST, 10, 0).await?;
-    let now = Utc::now();
-    // Filter before LIMIT so expired/future campaigns cannot crowd out current ongoing benefits.
-    let rows:Vec<Row>=sqlx::query_as("SELECT key,sort_order,published_at,data FROM discover_items WHERE kind='promo' AND status='published' AND published_at<=$1 AND (NOT $2 OR ((data->>'ends_at') IS NOT NULL AND (data->>'started_at') IS NOT NULL)) AND ((data->>'started_at') IS NULL OR (data->>'started_at')::timestamptz<=$1) AND ((data->>'ends_at') IS NULL OR (data->>'ends_at')::timestamptz>$1) ORDER BY (data->>'ends_at')::timestamptz ASC NULLS LAST,sort_order,published_at DESC,key LIMIT 50")
-        .bind(now).bind(legacy).fetch_all(&state.pool).await?;
-    let mut promos = Vec::new();
-    for mut p in rows.into_iter().map(item_json) {
-        if discover::validate("promo", p.clone()).is_err() { continue; }
-        match (parse_time(&p["started_at"]), parse_time(&p["ends_at"])) {
-            (Some(start), Some(end)) => {
-                p["pct"] = json!(discover::promo_progress(start, end, now));
-                p["days_left"] = json!(((end - now).num_seconds() + 86_399) / 86_400);
-            },
-            (_, None) => { p["pct"] = Value::Null; p["days_left"] = Value::Null; },
-            _ => continue,
-        }
-        promos.push(p);
-    }
-    let sample = quota.as_ref().is_some_and(|q| q["sample"].as_bool().unwrap_or(false)) || any_sample(&launches) || any_sample(&promos);
-    Ok(Json(json!({ "quota": quota, "launches": launches, "promos": promos, "now": now, "sample": sample })))
-}
-
-fn parse_time(v: &Value) -> Option<DateTime<Utc>> {
-    v.as_str()?.parse().ok()
-}
-
 /// 把条目按 `field` 的值分组，保持首次出现的顺序。
 fn group_by(items: Vec<Value>, field: &str) -> Vec<Value> {
     let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
@@ -464,7 +432,7 @@ pub struct PutInput {
     #[serde(default)]
     sort_order: i32,
     status: Option<String>,
-    /// 日报、上新这类按时间排序的条目可以指定发布时间，不传按当前时间（改已有条目时保持原样）。
+    /// 日报这类按时间排序的条目可以指定发布时间，不传按当前时间（改已有条目时保持原样）。
     published_at: Option<DateTime<Utc>>,
     /// 标记为示例内容，客户端会显示「示例数据」。
     #[serde(default)]

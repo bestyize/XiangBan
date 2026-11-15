@@ -1,4 +1,4 @@
-//! 手机端社区的发现页内容：日报、头图、开源热榜、模型榜、追踪、导航、资料导读和 AI 工具。
+//! 手机端社区的发现页内容：日报、头图、开源热榜、模型榜、导航、资料导读和 AI 工具。
 //!
 //! 这些条目都由后台手录（`/api/admin/discover/{kind}/{key}`），统一存在 `discover_items` 里，
 //! `data` 的形状按 `kind` 在写入时校验；读取接口再按页面需要组装。
@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
 
-pub const KINDS: &[&str] = &["banner", "news", "frontier", "nav", "doc", "vendor", "model", "model_board", "model_usage", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
+pub const KINDS: &[&str] = &["banner", "news", "frontier", "nav", "doc", "vendor", "model", "model_board", "model_usage", "repo_issue", "tool", "hotword"];
 
 /// 模型榜分档：(档位, 名称, 下限)。阈值由后端给出，客户端只负责显示。
 pub const TIERS: &[(&str, &str, f64)] =
@@ -21,16 +21,6 @@ pub fn tier_for(score: f64) -> &'static str {
 
 pub fn is_kind(kind: &str) -> bool {
     KINDS.contains(&kind)
-}
-
-/// 限时免费的进度：开始到结束之间走了多少（0～100）。
-pub fn promo_progress(start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> u8 {
-    let total = (end - start).num_seconds();
-    if total <= 0 {
-        return 100;
-    }
-    let done = (now - start).num_seconds().clamp(0, total);
-    (done * 100 / total) as u8
 }
 
 fn clean(raw: &str, what: &str, max: usize, required: bool) -> AppResult<String> {
@@ -344,87 +334,6 @@ impl Check for RepoIssue {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Quota {
-    /// 本轮额度已过去的比例，0～100。
-    progress_pct: u8,
-    next_reset_at: DateTime<Utc>,
-    #[serde(default)]
-    recent_intervals: Vec<f64>,
-}
-
-impl Check for Quota {
-    fn check(&mut self) -> AppResult<()> {
-        if self.progress_pct > 100 {
-            return Err(AppError::BadRequest("进度要在 0～100 之间".into()));
-        }
-        check_len(&self.recent_intervals, "重置间隔", 14)
-    }
-}
-
-/// Optional editorial source must be a public HTTPS link, never a credential-bearing URL.
-fn official_source(raw: &Option<String>) -> AppResult<Option<String>> {
-    let Some(raw) = raw.as_deref().map(str::trim).filter(|v| !v.is_empty()) else { return Ok(None); };
-    let url = reqwest::Url::parse(raw).map_err(|_| AppError::BadRequest("官方来源链接无效".into()))?;
-    if raw.len() > 2048 || raw.chars().any(char::is_control) || url.scheme() != "https" || url.host_str().is_none()
-        || !url.username().is_empty() || url.password().is_some() || url.port().is_some_and(|p| p != 443) {
-        return Err(AppError::BadRequest("官方来源必须是无凭据的 https 链接".into()));
-    }
-    Ok(Some(raw.to_owned()))
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Launch {
-    title: String,
-    #[serde(default)]
-    tags: Vec<String>,
-    #[serde(default)]
-    summary: String,
-    #[serde(default)]
-    source_url: Option<String>,
-}
-
-impl Check for Launch {
-    fn check(&mut self) -> AppResult<()> {
-        self.title = clean(&self.title, "标题", 80, true)?;
-        self.summary = clean(&self.summary, "摘要", 500, false)?;
-        self.source_url = official_source(&self.source_url)?;
-        check_len(&self.tags, "标签", 5)?;
-        for t in &mut self.tags {
-            *t = clean(t, "标签", 12, true)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Promo {
-    text: String,
-    #[serde(default)]
-    started_at: Option<DateTime<Utc>>,
-    #[serde(default)]
-    ends_at: Option<DateTime<Utc>>,
-    #[serde(default)]
-    source_url: Option<String>,
-    #[serde(default)]
-    eligibility: String,
-}
-
-impl Check for Promo {
-    fn check(&mut self) -> AppResult<()> {
-        self.text = clean(&self.text, "说明", 80, true)?;
-        self.source_url = official_source(&self.source_url)?;
-        self.eligibility = clean(&self.eligibility, "适用资格", 500, false)?;
-        match (self.started_at, self.ends_at) {
-            (Some(start), Some(end)) if end > start => {},
-            (_, None) if self.source_url.is_some() && !self.eligibility.is_empty() => {},
-            (_, None) => return Err(AppError::BadRequest("长期权益必须填写官方来源与适用资格，不能承诺所有人适用".into())),
-            _ => return Err(AppError::BadRequest("限时活动须填写真实开始时间，结束时间要晚于开始时间".into())),
-        }
-        Ok(())
-    }
-}
-
-#[derive(Deserialize, Serialize)]
 pub struct Hotword {
     text: String,
     /// 右侧的小红字，如「热」「新」，可空。
@@ -562,9 +471,6 @@ pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
         "model" => go::<Model>(data),
         "repo_issue" if data["source"] == "GitHub" => crate::collectors::repo_sources::validate_issue(data),
         "repo_issue" => go::<RepoIssue>(data),
-        "quota" => go::<Quota>(data),
-        "launch" => go::<Launch>(data),
-        "promo" => go::<Promo>(data),
         "tool" if data.get("github_repo_id").is_some() => crate::collectors::tool_sources::validate_tool(data),
         "tool" => go::<Tool>(data),
         "hotword" => go::<Hotword>(data),
@@ -658,16 +564,9 @@ type SeedItem = (&'static str, &'static str, i32, i32, Value);
 
 fn seed_items() -> Vec<SeedItem> {
     use serde_json::json;
-    let now = Utc::now();
     let site = "https://chat.xiangban.xyz/";
     let mut v: Vec<SeedItem> = vec![
         ("banner", "weekly-1", 0, 0, json!({ "tag": "本周原创", "title": "一周用下来，三款编程助手各适合谁", "byline": "小伴编辑部 · 8 分钟读完" })),
-        ("quota", "codex", 0, 5, json!({ "progress_pct": 68, "next_reset_at": now + chrono::Duration::minutes(192), "recent_intervals": [5.0, 5.5, 4.0, 5.0, 6.0, 5.0, 4.5] })),
-        ("launch", "demo-1", 0, 15, json!({ "title": "示例模型 G 发布", "tags": ["API", "编程"] })),
-        ("launch", "demo-2", 1, 28 * 60, json!({ "title": "示例模型 H 开源", "tags": ["开源", "7B"] })),
-        ("launch", "demo-3", 2, 96 * 60, json!({ "title": "示例模型 I 上线网页版", "tags": ["免费试用"] })),
-        ("promo", "demo-1", 0, 0, json!({ "text": "示例工具：免费额度翻倍", "started_at": now - chrono::Duration::days(4), "ends_at": now + chrono::Duration::days(3) })),
-        ("promo", "demo-2", 1, 0, json!({ "text": "示例模型：开放免费试用", "started_at": now - chrono::Duration::days(3), "ends_at": now + chrono::Duration::days(12) })),
     ];
     for (i, (title, source, accent, age)) in [
         ("示例：某厂商发布新一代编程模型，长任务更稳定", "示例媒体", "#3E5C8A", 120),
@@ -855,16 +754,6 @@ mod tests {
     }
 
     #[test]
-    fn promo_progress_is_clamped() {
-        let start = Utc::now() - chrono::Duration::days(1);
-        let end = start + chrono::Duration::days(4);
-        assert_eq!(promo_progress(start, end, start - chrono::Duration::days(1)), 0);
-        assert_eq!(promo_progress(start, end, start + chrono::Duration::days(1)), 25);
-        assert_eq!(promo_progress(start, end, end + chrono::Duration::days(9)), 100);
-        assert_eq!(promo_progress(end, start, start), 100);
-    }
-
-    #[test]
     fn every_seed_item_is_valid() {
         for (kind, key, _, _, data) in seed_items() {
             assert!(valid_key(key), "{kind}/{key}");
@@ -902,28 +791,4 @@ mod tests {
         assert!(out.get("evil").is_none());
         assert_eq!(out["brand_color"], "#ABCDEF");
     }
-    #[test]
-    fn promo_and_launch_sources_accept_truthful_ongoing_benefits_without_invented_dates() {
-        let ongoing=json!({"text":"学生优惠","started_at":null,"ends_at":null,"source_url":"https://education.github.com/pack","eligibility":"须通过学生资格验证，地区与领取资格以官方条件为准"});
-        let out=validate("promo",ongoing.clone()).unwrap();
-        assert!(out["started_at"].is_null() && out["ends_at"].is_null());
-        assert_eq!(out["source_url"],"https://education.github.com/pack");
-        for key in ["source_url","eligibility"] {
-            let mut bad=ongoing.clone();bad.as_object_mut().unwrap().remove(key);
-            assert!(validate("promo",bad).is_err());
-        }
-        for url in ["http://official.example", "javascript:alert(1)", "https://user:secret@official.example", "https://official.example:8443/path"] {
-            let mut bad=ongoing.clone();bad["source_url"]=json!(url);
-            assert!(validate("promo",bad).is_err());
-            assert!(validate("launch",json!({"title":"历史发布","source_url":url})).is_err());
-        }
-        assert!(validate("promo",json!({"text":"限时","ends_at":"2026-12-01T00:00:00Z"})).is_err());
-        assert!(validate("promo",json!({"text":"限时","started_at":"2026-12-01T00:00:00Z","ends_at":"2026-11-01T00:00:00Z"})).is_err());
-        assert!(validate("promo",json!({"text":"旧协议限时","started_at":"2025-01-01T00:00:00Z","ends_at":"2025-02-01T00:00:00Z"})).is_ok());
-        let launch=validate("launch",json!({"title":"历史回顾｜模型发布","summary":"官方原始发布记录","source_url":"https://www.anthropic.com/news/claude-sonnet-4-5"})).unwrap();
-        assert_eq!(launch["summary"],"官方原始发布记录");
-        assert!(launch["source_url"].as_str().unwrap().starts_with("https://"));
-        assert!(validate("launch",json!({"title":"旧条目","tags":[]})).is_ok());
-    }
-
 }

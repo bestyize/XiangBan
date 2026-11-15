@@ -9,7 +9,7 @@
 @container card-feed (min-width:1120px) {
   .adaptive-card-grid { --card-columns:4; }
 }
-.site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.track-card,.scheme-card) h3,
+.site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.scheme-card) h3,
 .site-layout.community-layout .community-page .scheme-card>strong,
 .site-layout.community-layout .community-page .tool-card .tool-body>strong,
 .site-layout.community-layout .community-page .nav-grid .name {
@@ -25,7 +25,6 @@
 }
 .site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.scheme-card) :is(.meta,.counts,.tag,.flag,.author,.author-name,.kind,.cover-kind,.news-meta,.repo-meta,time,small),
 .site-layout.community-layout .community-page .tool-card :is(.tool-meta,.license,.sample),
-.site-layout.community-layout .community-page .track-card :is(.tags,.launch-top,.deadline,.days,.sample),
 .site-layout.community-layout .community-page .nav-grid small {
   font-size:12px;
   font-weight:400;

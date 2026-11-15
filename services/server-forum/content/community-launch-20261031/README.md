@@ -16,7 +16,7 @@
 - `posts/`：论坛 Markdown 原稿，按稳定 external id 去重。每个批次由负责的作者流程单独导入、发布。
 - `packs/`：55 个作品源目录；`PACKS_README.md` 与 `scripts/README-resources.md` 说明包格式、构建和浏览器验证。
 - `pack-catalog.json`：版本、对象键、字节数、SHA-256、封面与使用说明。
-- `curated-discover.json`、`projects.json`、`weekly.json`、`tracker.json`：经核实的公开内容及管理接口请求体。
+- `curated-discover.json`、`projects.json`、`weekly.json`：经核实的公开内容及管理接口请求体。
 - `packs-register.json`、`schemes-register.json`：本批次发布请求。**POST 不是通用重放脚本**；重试先核对正式 ID 与已有版本，不能重复建方案。
 - `featured.json`：带预期 revision 的精选清单，不能盲目覆盖后续运营修改。
 - `research/`：公开来源、原事件日期、采集时间和历史口径说明。
@@ -46,8 +46,8 @@ python3 services/server-forum/content/community-launch-20261031/scripts/verify-d
   --output /tmp/community-download-audit.json
 ```
 
-计数按真实客户端筛选：27 个论坛叶分类、11 个作品类型、6 个学习标签、资料与导航分组，以及方案、工具、项目、周刊、榜单各指标。个人收藏、通知、账号额度不生成虚构数据。
+当前审计脚本跳过已下线的追踪栏目；上表与发布报告是 2026-11-01 的历史结果。计数按真实客户端筛选：27 个论坛叶分类、11 个作品类型、6 个学习标签、资料与导航分组，以及方案、工具、项目、周刊、榜单各指标。个人收藏、通知、账号额度不生成虚构数据。
 
-首日榜单与无统一截止日期的权益使用 `home/v2`、`repos/v2`、`repos/issues/v2`、`tracker/v2`。旧接口保留数值字段约定，过滤无法准确表示的新条目，不用补零冒充测量结果。
+首日榜单使用 `home/v2`、`repos/v2`、`repos/issues/v2`。旧接口保留数值字段约定，过滤无法准确表示的新条目，不用补零冒充测量结果。
 
 资源服务部署见 `infra/resource/README.md`。上线前已备份数据库及配置，二进制和网页均在本地构建后上传；55 个作品通过公开入口逐包检查下载 SHA、封面 SHA/MIME、Range 和未签名请求拒绝。

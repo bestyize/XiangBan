@@ -84,29 +84,6 @@ fun dayLabel(iso: String, now: Long = nowMillis()): String {
     }
 }
 
-/** 「3 小时 12 分」，不到一小时只写分钟，已经过了写「0 分」。 */
-fun countdownText(targetIso: String, now: Long = nowMillis()): String {
-    val t = parseIsoMillis(targetIso) ?: return ""
-    val left = (t - now).coerceAtLeast(0)
-    val h = left / Hour
-    val min = left % Hour / Minute
-    return if (h > 0) "$h 小时 $min 分" else "$min 分"
-}
-
-/** 目标时刻在东八区的「今天 18:40」「明天 09:00」「10 月 20 日 09:00」。 */
-fun clockText(targetIso: String, now: Long = nowMillis()): String {
-    val t = parseIsoMillis(targetIso) ?: return ""
-    val local = t + ChinaOffset
-    val hh = (local % Day / Hour).toString().padStart(2, '0')
-    val mm = (local % Hour / Minute).toString().padStart(2, '0')
-    val diffDays = Math2.floorDiv(local, Day) - Math2.floorDiv(now + ChinaOffset, Day)
-    return when (diffDays) {
-        0L -> "今天 $hh:$mm"
-        1L -> "明天 $hh:$mm"
-        else -> civilFromDays(Math2.floorDiv(local, Day)).let { (_, m, d) -> "$m 月 $d 日 $hh:$mm" }
-    }
-}
-
 /** 求助帖的剩余时间：「剩 5 天」，不到一天写「剩 3 小时」，已结束写「已结束」。 */
 fun remainText(expiresIso: String, now: Long = nowMillis()): String {
     val t = parseIsoMillis(expiresIso) ?: return ""

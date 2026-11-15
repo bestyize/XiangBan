@@ -27,7 +27,7 @@ rows=list(concurrent.futures.ThreadPoolExecutor(max_workers=4).map(countcheck,ch
 for path,label in [('discover/nav','导航'),('discover/docs','资料')]:
  for group in get(path)['groups']:
   n=len(group['items']);rows.append(dict(name=label+'/'+group['name'],count=n,minimum=5,pass_=n>=5,path=path))
-for path,label,key in [('discover/repos/v2','首页/开源热榜','ranks'),('discover/tracker/v2','追踪/发布记录','launches'),('discover/tracker/v2','追踪/优惠与试用','promos'),('discover/home/v2','首页/推荐新闻','news'),('discover/home/v2','首页/精选作品','featured')]:
+for path,label,key in [('discover/repos/v2','首页/开源热榜','ranks'),('discover/home/v2','首页/推荐新闻','news'),('discover/home/v2','首页/精选作品','featured')]:
  try:
   d=get(path);value=d.get(key,[]);n=len(value.get('items',[])) if isinstance(value,dict) else len(value);rows.append(dict(name=label,count=n,minimum=5,pass_=n>=5,path=path))
  except Exception as e:rows.append(dict(name=label,count=None,pass_=False,path=path,error=str(e)))

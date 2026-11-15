@@ -52,10 +52,9 @@ class RepoBaselineTest {
         s.on({it.url.encodedPath=="/api/discover/home/v2"},body="""{"repos":null}""")
         s.on({it.url.encodedPath=="/api/discover/repos/v2"},body="""{"source":"GitHub","metric":"star total baseline","total_gain":null,"wow_pct":null,"ranks":[]}""")
         s.on({it.url.encodedPath=="/api/discover/repos/issues/v2"},body="""{"items":[]}""")
-        s.on({it.url.encodedPath=="/api/discover/tracker/v2"},body="""{"promos":[]}""")
         val api=ForumApi(s.client,CommunityConfig()){null}
-        api.home();api.repoIssue("baseline");api.repoIssues();api.tracker()
-        assertEquals(listOf("/api/discover/home/v2","/api/discover/repos/v2","/api/discover/repos/issues/v2","/api/discover/tracker/v2"),s.requests.map{it.url.encodedPath})
+        api.home();api.repoIssue("baseline");api.repoIssues()
+        assertEquals(listOf("/api/discover/home/v2","/api/discover/repos/v2","/api/discover/repos/issues/v2"),s.requests.map{it.url.encodedPath})
         assertEquals("baseline",s.requests[1].url.parameters["issue"])
         s.client.close()
     }

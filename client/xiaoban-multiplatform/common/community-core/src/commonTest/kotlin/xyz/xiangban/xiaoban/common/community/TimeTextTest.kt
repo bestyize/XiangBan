@@ -31,13 +31,7 @@ class TimeTextTest {
     }
 
     @Test
-    fun `countdown, clock and remaining text`() {
-        assertEquals("3 小时 12 分", countdownText("2026-10-31T13:12:00Z", now))
-        assertEquals("45 分", countdownText("2026-10-31T10:45:00Z", now))
-        assertEquals("0 分", countdownText("2026-10-31T09:00:00Z", now))
-        assertEquals("今天 21:12", clockText("2026-10-31T13:12:00Z", now))
-        assertEquals("明天 09:00", clockText("2026-11-01T01:00:00Z", now))
-        assertEquals("11 月 5 日 09:00", clockText("2026-11-05T01:00:00Z", now))
+    fun `remaining text uses days and hours`() {
         assertEquals("剩 5 天", remainText("2026-11-05T10:00:00Z", now))
         assertEquals("剩 5 天", remainText("2026-11-04T12:00:00Z", now))
         assertEquals("剩 3 小时", remainText("2026-10-31T13:00:00Z", now))

@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Text
 import androidx.compose.ui.unit.sp
-import xyz.xiangban.xiaoban.common.community.formatScore
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -61,7 +60,7 @@ fun HBar(fraction: Float, color: Color, modifier: Modifier = Modifier, height: D
     }
 }
 
-/** 竖向小柱图（每日新增、重置间隔）。最后一根用 [highlight] 色。 */
+/** 竖向小柱图（每日新增）。最后一根用 [highlight] 色。 */
 @Composable
 fun MiniBars(values: List<Double>, modifier: Modifier = Modifier, color: Color = DataBlueSoft, highlight: Color = DataBlue, gap: Dp = 6.dp) {
     Canvas(modifier) {
@@ -98,17 +97,6 @@ fun Sparkline(values: List<Long>, color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-/** 圆环进度。[pct] 为 0～100。 */
-@Composable
-fun ProgressRing(pct: Int, color: Color, modifier: Modifier = Modifier, size: Dp = 84.dp, stroke: Dp = 8.dp, track: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)) {
-    Canvas(modifier.size(size)) {
-        val s = stroke.toPx()
-        val inner = Size(this.size.width - s, this.size.height - s)
-        drawArc(track, 0f, 360f, false, Offset(s / 2, s / 2), inner, style = Stroke(s))
-        drawArc(color, -90f, 360f * pct.coerceIn(0, 100) / 100f, false, Offset(s / 2, s / 2), inner, style = Stroke(s, cap = StrokeCap.Round))
-    }
-}
-
 /** 圆点（语言色、状态点）。 */
 @Composable
 fun Dot(color: Color, size: Dp = 8.dp, modifier: Modifier = Modifier) {
@@ -134,19 +122,6 @@ fun DayBars(values: List<Long>, labels: List<String>, modifier: Modifier = Modif
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.width(14.dp).height((height * (v.toFloat() / peak)).coerceAtLeast(3.dp)).clip(RoundedCornerShape(3.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
                 Text(labels.getOrElse(i) { "" }, style = XType.Caption, color = LocalExtraColors.current.ink3)
-            }
-        }
-    }
-}
-
-/** 额度重置间隔：每根柱上面写数值，柱宽 24、圆角 8，高度按 6 小时为满。 */
-@Composable
-fun IntervalBars(values: List<Double>, modifier: Modifier = Modifier, full: Double = 6.0, height: Dp = 30.dp) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-        values.forEachIndexed { i, v ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(formatScore(v), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Box(Modifier.width(24.dp).height((height * (v / full).toFloat()).coerceIn(4.dp, height)).clip(RoundedCornerShape(8.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
             }
         }
     }
