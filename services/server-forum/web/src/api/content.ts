@@ -151,8 +151,8 @@ export const contentApi = {
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
   packs: ({ following, featured, ...params }: PackListParams) =>
     request<Page<PackItem>>('GET', `/packs${qs({ ...params, following: following ? 'true' : undefined, featured: featured ? 'true' : undefined })}`, undefined, following === true, runtimeHeaders),
-  pack: (id: number, recordView = false) => request<PackDetail>('GET', `/packs/${id}${recordView ? '?view=true' : ''}`, undefined, true, runtimeHeaders),
-  download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
+  pack: (id: number, recordView = false, signal?: AbortSignal) => request<PackDetail>('GET', `/packs/${id}${recordView ? '?view=true' : ''}`, undefined, true, runtimeHeaders, signal),
+  download: (id: number, version?: number, signal?: AbortSignal) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false, undefined, signal),
   schemes: (page = 1, following = false) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page, following:following ? "true" : undefined })}`, undefined, following),
   projects: () => request<{ items: ProjectItem[] }>('GET', '/projects', undefined, false),
   project: (slug: string) => request<ProjectDetail>('GET', `/projects/${encodeURIComponent(slug)}`, undefined, false),

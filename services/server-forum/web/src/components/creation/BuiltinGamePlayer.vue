@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import AppRuntimeStatus from '@/components/creation/AppRuntimeStatus.vue'
 import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
 import { checkedMbtiResultLink, decodeMbtiPng } from '@/lib/mbtiExport'
 const props = defineProps<{ gameId: string }>()
 const emit = defineEmits<{ close: [] }>()
-const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
+const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), ready = ref(false), connected = ref(false)
+const message = ref('正在读取作品信息…')
 const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false)
 const stage=ref<HTMLElement>(), stageSize=ref({width:0,height:0})
 const desktopInput=window.matchMedia('(hover: hover) and (pointer: fine)'), desktop=ref(desktopInput.matches)
@@ -80,16 +82,17 @@ async function enterFullscreen() {
 }
 function updateInput() { desktop.value=desktopInput.matches }
 let sequence = 0
-let handshakeTimer: ReturnType<typeof setTimeout> | undefined
 let manifestController:AbortController | undefined
 async function restart() {
   closeExport(); imageAssets = new Map()
-  clearTimeout(handshakeTimer)
   manifestController?.abort()
   const controller=new AbortController()
   manifestController=controller
-  const manifestTimeout=setTimeout(() => controller.abort(),15000)
-  const current = ++sequence; ready.value = false; connected.value = false; error.value = ''; loading.value = true
+  const current = ++sequence
+  ready.value = false
+  connected.value = false
+  error.value = ''
+  message.value = '正在读取作品信息…'
   try {
     if (!game.value) throw new Error('找不到这个内置游戏')
     const response = await fetch(`/builtin-games/${game.value.id}/manifest.json`, {credentials:'omit',signal:controller.signal})
@@ -98,9 +101,10 @@ async function restart() {
     if (manifest.id !== game.value.id || manifest.entry !== 'index.html' || (manifest.runtimeProtocol !== 1 && manifest.runtimeProtocol !== 2)) throw new Error('游戏资源不完整')
     if (current !== sequence) return
     nonce.value = crypto.randomUUID(); generation.value++; ready.value = true
-    handshakeTimer = setTimeout(() => { if (current === sequence && !connected.value) error.value = '游戏未响应，请重试' }, 15000)
-  } catch (e) { if (current === sequence) error.value = controller.signal.aborted ? '游戏加载超时，请重试' : e instanceof Error ? e.message : '游戏加载失败' }
-  finally { clearTimeout(manifestTimeout); if (current === sequence) loading.value = false }
+    message.value = '正在加载作品资源…'
+  } catch (e) {
+    if (current === sequence) error.value = e instanceof TypeError ? '游戏资源请求失败，请检查网络。' : e instanceof Error ? e.message : '游戏加载失败'
+  }
 }
 watch(() => props.gameId, restart, { immediate:true })
 onMounted(() => {
@@ -111,11 +115,14 @@ onMounted(() => {
   if (stage.value) stageObserver.observe(stage.value)
 })
 const url = computed(() => game.value && ready.value ? `/builtin-games/${game.value.id}/index.html?hostNonce=${encodeURIComponent(nonce.value)}` : '')
-function initialize() { frame.value?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.init',nonce:nonce.value,save:null,safeArea:{top:0,right:0,bottom:0,left:0}}, '*') }
+function initialize() {
+  if (!connected.value) message.value = '正在启动作品…'
+  frame.value?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.init',nonce:nonce.value,save:null,safeArea:{top:0,right:0,bottom:0,left:0}}, '*')
+}
 function receive(event:MessageEvent) {
   if (!isBuiltinGameMessage(event.data, event.origin, event.source, frame.value?.contentWindow, nonce.value)) return
   const d = event.data
-  if (d.type === 'game.ready') { connected.value = true; error.value = ''; clearTimeout(handshakeTimer) }
+  if (d.type === 'game.ready') { connected.value = true; error.value = '' }
   if (d.type === 'game.exit') emit('close')
   if (d.type === 'mbti.asset' && props.gameId === 'mbti' && frame.value?.contentWindow) void provideMbtiAsset(d,frame.value.contentWindow)
   if (d.type === 'mbti.export' && props.gameId === 'mbti') void prepareExport(d)
@@ -133,13 +140,12 @@ onBeforeUnmount(() => {
   desktopInput.removeEventListener('change', updateInput)
   sequence++
   manifestController?.abort()
-  clearTimeout(handshakeTimer)
   window.removeEventListener('message', receive)
 })
 </script>
 <template>
   <section ref="surface" class="player" :aria-label="game?.name || '游戏试玩'">
-    <div v-if="loading || !connected || error" class="player-status"><p v-if="error" role="alert">{{ error }} <button class="btn" type="button" @click="restart">重试</button></p><p v-else role="status">{{ gameId === 'mbti' ? '正在加载应用…' : '游戏加载中…' }}</p></div>
+    <AppRuntimeStatus v-if="!connected || error" class="player-status" :message="message" :error="error" @retry="restart" />
     <button v-if="gameId !== 'mbti' && !desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
     <div ref="stage" class="game-stage"><iframe v-if="game && ready" :style="frameStyle" :key="generation" ref="frame" :src="url" :title="`${game.name}游戏区域`" sandbox="allow-scripts allow-orientation-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" @load="initialize" /></div>
     <div v-if="exportRequest" class="export-overlay" role="dialog" aria-modal="true" aria-label="分享人格画像">
@@ -156,7 +162,7 @@ onBeforeUnmount(() => {
 .player{position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:var(--surface);color:var(--ink)}
 .export-overlay{position:absolute;inset:0;z-index:9;display:grid;place-items:center;padding:20px;background:#0007}.export-panel{width:min(100%,440px);padding:20px;border-radius:16px;background:var(--surface);box-shadow:0 8px 32px #0003}.export-panel h2{font-size:18px;margin:0}.export-panel p{padding:10px 0;font-size:13px;line-height:1.7}.export-panel input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:12px}.export-actions{display:flex;flex-wrap:wrap;gap:8px}.export-actions button{min-height:44px}
 .fullscreen-button{position:absolute;z-index:2;top:8px;right:max(8px,env(safe-area-inset-right));min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);font-size:13px}
-.player-status{position:absolute;inset:0;z-index:1;display:grid;place-items:center;background:var(--surface-2)}.player p{padding:12px;color:var(--ink-2)}
+.player p{padding:12px;color:var(--ink-2)}
 .game-stage{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;background:var(--surface-2)}
 .player iframe{display:block;flex:none;border:0;background:var(--surface-2)}
 </style>

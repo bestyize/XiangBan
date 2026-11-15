@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 // 开发端口和后端地址可用环境变量覆盖，便于同时跑多套本地服务。
 const port = Number(process.env.FORUM_WEB_PORT ?? 5185)
 const api = process.env.FORUM_API ?? 'http://127.0.0.1:55010'
+const ideaPlayers = process.env.FORUM_IDEA_PLAYERS_ORIGIN
 
 export default defineConfig({
   plugins: [vue()],
@@ -12,7 +13,11 @@ export default defineConfig({
   server: {
     port,
     strictPort: true,
-    proxy: { '/api': { target: api, changeOrigin: true }, '/files': { target: api, changeOrigin: true } },
+    proxy: {
+      '/api': { target: api, changeOrigin: true },
+      '/files': { target: api, changeOrigin: true },
+      ...(ideaPlayers ? { '/idea-players': { target: ideaPlayers, changeOrigin: true } } : {}),
+    },
   },
   build: { chunkSizeWarningLimit: 600 },
 })

@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { galleryRunLocation } from '@/lib/ideaPlayers'
 import { galleryAssets, galleryExhibits, galleryTab } from '@/lib/microGallery'
 
 const route = useRoute()
@@ -21,7 +22,7 @@ function togglePhoto() {
 }
 
 function exhibitLocation(id?: string) {
-  return { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
+  return galleryRunLocation(id) ?? { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
 }
 
 watch(exhibit, async (current, previous) => {

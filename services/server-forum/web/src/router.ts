@@ -10,6 +10,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/ai', name: 'ai', component: () => import('@/views/AiDownloadView.vue') },
   { path: '/create', name: 'create', component: () => import('@/views/CreateView.vue') },
   { path: '/create/works', name: 'app-works', component: () => import('@/views/CreateView.vue') },
+  { path: '/create/run/ideas/:slug', name: 'idea-run', component: () => import('@/views/RunAppView.vue'), meta: { bare: true } },
   { path: '/create/run/:id(\\d+)/:version(\\d+)', name: 'app-run', component: () => import('@/views/RunAppView.vue'), meta: { bare: true } },
   { path: '/create/run/:gameId([a-z0-9-]+)', name: 'builtin-run', component: () => import('@/views/RunAppView.vue'), meta: { bare: true } },
   { path: '/me', name: 'me', component: () => import('@/views/MeView.vue') },

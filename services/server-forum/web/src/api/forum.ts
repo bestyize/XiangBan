@@ -65,7 +65,7 @@ function qs(params?: Query) {
   return s ? `?${s}` : ''
 }
 
-export async function request<T>(method: string, path: string, body?: unknown, auth = true, extraHeaders?: Record<string, string>): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, auth = true, extraHeaders?: Record<string, string>, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { ...extraHeaders }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (auth) {
@@ -74,7 +74,7 @@ export async function request<T>(method: string, path: string, body?: unknown, a
   }
   let res: Response
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    res = await fetch(`/api${path}`, { method, headers, signal, body: body === undefined ? undefined : JSON.stringify(body) })
   } catch {
     throw new ApiError(0, '网络连接失败，请稍后再试')
   }

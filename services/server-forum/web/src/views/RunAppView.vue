@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { contentApi, gameSandboxUrl, runtimeBase } from '@/api/content'
+import AppRuntimeStatus from '@/components/creation/AppRuntimeStatus.vue'
 import AppRuntimeWindow from '@/components/creation/AppRuntimeWindow.vue'
 import BuiltinGamePlayer from '@/components/creation/BuiltinGamePlayer.vue'
 import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
@@ -10,19 +11,26 @@ import { useCommunityResource } from '@/components/community/resource'
 import { canTrialPack } from '@/lib/appRuntime'
 import { builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY } from '@/lib/builtinCreation'
 import { useHead } from '@/lib/head'
+import { ideaPlayerId, ideaPlayers, ideaReturnLocation } from '@/lib/ideaPlayers'
 
 const route = useRoute(), router = useRouter()
 const isBuiltin = computed(() => route.name === 'builtin-run')
+const isIdea = computed(() => route.name === 'idea-run')
+const ideaId = computed(() => isIdea.value ? ideaPlayerId(route.params.slug) : undefined)
 const builtin = computed(() => typeof route.params.gameId === 'string' ? builtinGame(route.params.gameId) : undefined)
 const packId = computed(() => Number(route.params.id))
 const version = computed(() => Number(route.params.version))
+let launchController: AbortController | undefined
 const launch = useCommunityResource(async () => {
-  if (isBuiltin.value) return null
+  launchController?.abort()
+  if (isBuiltin.value || isIdea.value) return null
   const id = packId.value, requestedVersion = version.value
   if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(requestedVersion) || requestedVersion < 1) {
     throw new Error('作品地址无效')
   }
-  const pack = await contentApi.pack(id)
+  const controller = new AbortController()
+  launchController = controller
+  const pack = await contentApi.pack(id, false, controller.signal)
   const manifest = pack.versions.find(item => item.version === requestedVersion)?.manifest
   if (pack.id !== id || !manifest ||
       !canTrialPack(pack.kind, pack.status, pack.trust_level, manifest.runtimeProtocol)) {
@@ -30,16 +38,20 @@ const launch = useCommunityResource(async () => {
   }
   if (pack.kind === 'app' && pack.slug === 'wancisou' && pack.network_disabled === false && pack.version === requestedVersion) {
     try {
-      const response = await fetch('/builtin-games/wancisou/version.json', { signal: AbortSignal.timeout(5000) })
+      const response = await fetch('/builtin-games/wancisou/version.json', { signal: controller.signal })
       if (response.ok && canOpenBundledWancisou(pack, (await response.json())?.version)) {
         return { pack, mode: 'bundled' as const }
       }
-    } catch { /* The published version may still run on the configured app host. */ }
+    } catch (error) {
+      if (controller.signal.aborted) throw error
+      if (!runtimeBase && error instanceof TypeError) throw new Error('应用版本请求失败，请检查网络。')
+    }
   }
   const hasHost = manifest.runtimeProtocol === 2 ? runtimeBase : gameSandboxUrl
   return { pack, mode: hasHost ? 'runtime' as const : 'client' as const }
 })
-const title = computed(() => builtin.value?.name || launch.data.value?.pack.title || '小伴应用')
+const title = computed(() => ideaId.value ? ideaPlayers[ideaId.value].title :
+  builtin.value?.name || launch.data.value?.pack.title || '小伴应用')
 const icon = computed(() => builtin.value?.icon ||
   (launch.data.value?.pack.slug === 'wancisou' ? WANCISOU_ICON : webLink(launch.data.value?.pack.cover_url)))
 useHead(() => ({ title: title.value }))
@@ -47,21 +59,10 @@ useHead(() => ({ title: title.value }))
 const player = ref<InstanceType<typeof CommunityGameTrial> | null>(null)
 const revision = ref(0)
 const reloading = ref(false), closing = ref(false)
-const bundledReady = ref(false), bundledTimedOut = ref(false)
-let bundledTimer: ReturnType<typeof setTimeout> | undefined
+const bundledReady = ref(false)
 let disposed = false
-watch([isBuiltin, packId, version], () => void launch.load(), { immediate: true })
-watch(() => launch.data.value?.mode, mode => {
-  clearTimeout(bundledTimer)
-  bundledReady.value = false
-  bundledTimedOut.value = false
-  if (mode === 'bundled') bundledTimer = setTimeout(() => { bundledTimedOut.value = true }, 10000)
-})
-function bundledLoaded() {
-  clearTimeout(bundledTimer)
-  bundledTimedOut.value = false
-  bundledReady.value = true
-}
+watch([isBuiltin, isIdea, packId, version], () => void launch.load(), { immediate: true })
+watch(() => launch.data.value?.mode, () => { bundledReady.value = false })
 onBeforeRouteLeave(() => player.value?.prepareExit())
 onBeforeRouteUpdate((to, from) => {
   if (to.path !== from.path) return player.value?.prepareExit()
@@ -71,7 +72,7 @@ const removeNavigationHook = router.afterEach((_to, from, failure) => {
 })
 onBeforeUnmount(() => {
   disposed = true
-  clearTimeout(bundledTimer)
+  launchController?.abort()
   removeNavigationHook()
 })
 
@@ -83,13 +84,14 @@ async function reload() {
     await player.value?.prepareExit()
     if (disposed || closing.value || route.fullPath !== currentPath) return
     revision.value++
-    if (!isBuiltin.value) await launch.load()
+    if (!isBuiltin.value && !isIdea.value) void launch.load()
   } finally {
     reloading.value = false
   }
 }
 
 function returnPage() {
+  if (isIdea.value) return router.resolve(ideaReturnLocation(ideaId.value, router.hasRoute('idea-work'))).fullPath
   const previous = router.options.history.state.back
   if (typeof previous === 'string' && /^\/(?!\/)/.test(previous)) {
     const entry = router.resolve(previous)
@@ -117,21 +119,18 @@ async function close() {
 
 <template>
   <AppRuntimeWindow :title="title" :icon="icon" :compact="builtin?.id === 'mbti'"
-    :busy="reloading || launch.loading.value" :closing="closing" @reload="reload" @close="close">
+    :busy="reloading" :closing="closing" @reload="reload" @close="close">
     <BuiltinGamePlayer v-if="builtin" :key="revision" :game-id="builtin.id" @close="close" />
     <div v-else-if="isBuiltin" class="state" role="alert">找不到这个内置作品</div>
-    <div v-else-if="launch.loading.value" class="state" role="status">正在加载应用…</div>
-    <div v-else-if="launch.error.value" class="state" role="alert">
-      <p>{{ launch.error.value }}</p>
-      <button class="btn" type="button" @click="reload">重试</button>
-    </div>
+    <CommunityGameTrial v-else-if="ideaId" ref="player" :key="`${ideaId}:${revision}`" :idea-id="ideaId"
+      @retry="reload" @exit="close" />
+    <div v-else-if="isIdea" class="state" role="alert">找不到这个创意作品</div>
+    <AppRuntimeStatus v-else-if="launch.loading.value || launch.error.value" :key="revision"
+      message="正在读取作品信息…" :error="launch.error.value" @retry="reload" />
     <div v-else-if="launch.data.value?.mode === 'bundled'" class="bundled">
       <iframe :key="revision" :src="WANCISOU_WEB_ENTRY" :title="title" sandbox="allow-scripts allow-forms"
-        allow="clipboard-write" referrerpolicy="no-referrer" @load="bundledLoaded" />
-      <div v-if="!bundledReady" class="state bundled-status">
-        <p v-if="bundledTimedOut" role="alert">应用未响应 <button class="btn" type="button" @click="reload">重试</button></p>
-        <span v-else role="status">正在加载应用…</span>
-      </div>
+        allow="clipboard-write" referrerpolicy="no-referrer" @load="bundledReady = true" />
+      <AppRuntimeStatus v-if="!bundledReady" class="bundled-status" message="正在加载作品资源…" @retry="reload" />
     </div>
     <CommunityGameTrial v-else-if="launch.data.value?.mode === 'runtime'" ref="player"
       :key="`${packId}:${version}:${revision}`" :pack="launch.data.value.pack" :version="version"
@@ -148,6 +147,4 @@ async function close() {
 .bundled iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--surface-2); }
 .state { display: grid; align-content: center; justify-items: center; gap: 12px; height: 100%; padding: 20px; text-align: center; color: var(--ink-2); }
 .state p { margin: 0; overflow-wrap: anywhere; }
-.bundled-status { position: absolute; inset: 0; background: var(--surface); }
-.bundled-status .btn { margin-inline-start: 8px; }
 </style>
