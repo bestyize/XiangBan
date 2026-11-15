@@ -73,6 +73,7 @@ function publish(path: string) {
   .nav-item>.mobile-label{display:block;white-space:nowrap}
   .nav-item>svg{flex:none;width:23px;height:23px}
   .nav-publish>.publish-icon{display:grid;place-items:center;width:44px;height:32px;border-radius:10px;background:var(--brand-fill);color:#fff}
+  :global(html[data-accent="green"] .primary-nav .nav-publish > .publish-icon) { color: var(--brand-ink); }
   .publish-icon>svg{width:20px;height:20px}
   .nav-publish:hover>.publish-icon{background:var(--brand-hover)}
 

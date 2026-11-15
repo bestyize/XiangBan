@@ -1,10 +1,9 @@
 import type { Category } from '../api/types'
 import {
-  activeCategories, canonicalCategory, discussionDestinations, discussionTab, discussionTopicTag, ideaBoard,
+  activeCategories, canonicalCategory, discussionDestinations, discussionTab, discussionTopicTag,
   navigationSection, postableCategories, resourceTopicCategory, sectionBoards, SECTION_LABELS, type NavigationSectionKey,
 } from './communityStructure.ts'
 import { requiredPostLevel, TRUST_LABEL } from './format.ts'
-import { galleryTab } from './microGallery.ts'
 
 export type PostingSectionKey = NavigationSectionKey
 export interface PostingCategory extends Category { unavailableReason: string }
@@ -62,7 +61,6 @@ export function postingLocation(page: unknown, query: Record<string, unknown>, c
   let slug = ''
   if (page === 'ideas') {
     section = 'ideas'
-    slug = read('tab') === galleryTab.key ? '' : ideaBoard(categories, read('category'))
   } else if (page === 'resources') {
     section = 'resources'
     const tab = resourceTopicCategory(read('tab'))

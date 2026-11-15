@@ -31,7 +31,7 @@ test('closed destinations and permission changes prevent selection and allow exi
  deepStrictEqual(edited.map(c=>c.id),[3])
  strictEqual(postingSections(rows,3).flatMap(s=>s.boards).find(c=>c.id===10)?.unavailableReason,'')
 })
-test('the publish shortcut uses the board that the current page is displaying', () => {
+test('the publish shortcut follows the current page and its active board', () => {
   deepStrictEqual(postingLocation('discuss', { tab: 'learn', filter: 'codex' }, rows), { section: 'discuss', category: 'learn' })
   deepStrictEqual(postingLocation('discuss', { tab: 'all', board: 'learn', filter: 'learn-codex' }, rows), { section: 'discuss', category: 'learn' })
   deepStrictEqual(postingLocation('discuss', { tab: 'casual', filter: 'casual-travel' }, rows), { section: 'discuss', category: 'casual-travel' })
@@ -39,7 +39,7 @@ test('the publish shortcut uses the board that the current page is displaying', 
   deepStrictEqual(postingLocation('resources', { tab: 'software' }, rows), { section: 'resources' })
   deepStrictEqual(postingLocation('resources', { tab: 'help' }, rows), { section: 'resources', category: 'resource-help' })
   deepStrictEqual(postingLocation('category', {}, rows, 'site-feedback'), { section: 'discuss', category: 'site' })
-  deepStrictEqual(postingLocation('ideas', { category: 'xiaoban-game' }, rows), { section: 'ideas', category: 'create-game' })
+  deepStrictEqual(postingLocation('ideas', { category: 'xiaoban-game' }, rows), { section: 'ideas' })
   deepStrictEqual(postingLocation('ideas', { tab: 'gallery' }, rows), { section: 'ideas' })
 })
 test('no eligible board is substituted for a specific unavailable board', () => {

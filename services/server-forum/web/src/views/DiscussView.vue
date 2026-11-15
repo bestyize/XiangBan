@@ -9,7 +9,7 @@ import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
-import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, ideaBoard, sectionScope, sectionBoards } from '@/lib/communityStructure'
+import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import FilterChips from '@/components/community/FilterChips.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
@@ -21,11 +21,7 @@ import '@/components/community/community.css'
 
 const route = useRoute(), router = useRouter(), session = useSession()
 const meta = useMeta()
-const ideaCategories = computed(() => sectionBoards(meta.categories,'ideas'))
-const ideaTabs = computed(() => [{key:'',label:'全部'}, galleryTab, ...ideaCategories.value.map(c => ({key:c.slug,label:c.name}))])
-const ideaFilter = computed(() => ideaBoard(meta.categories, query('category')))
-const ideaKind = computed(()=>ideaFilter.value.replace(/^create-/,''))
-const packKinds = new Set(['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'])
+const ideaTabs = [{ key: '', label: '全部' }, galleryTab] as const
 const ideas = computed(() => route.name === 'ideas')
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
 const showGallery = computed(() => ideas.value && query('tab') === galleryTab.key)
@@ -34,7 +30,7 @@ const discussionOptions = computed(() => discussionTabs(meta.categories))
 const tag = computed(() => query('tag'))
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
-const category = computed(() => ideas.value ? ideaFilter.value || sectionScope(meta.categories,'ideas') : discussionCategory(tab.value, meta.categories))
+const category = computed(() => ideas.value ? sectionScope(meta.categories, 'ideas') : discussionCategory(tab.value, meta.categories))
 const scope = computed(() => ({
   category:category.value,
   tag:(!ideas.value ? discussionTopicTag(tab.value) : undefined) || tag.value || undefined,
@@ -51,8 +47,8 @@ const { data, loading, error, load } = useCommunityResource(async () => {
   if (showGallery.value || (following.value && !session.loggedIn) || !meta.categories.length) return null
   const [topics, packs, schemes] = await Promise.all([
     following.value ? api.followingTopics(current, scope.value) : api.topics({...scope.value, sort:'new', page:current}),
-    ideas.value && (!ideaKind.value || packKinds.has(ideaKind.value)) ? contentApi.packs({ kind:ideaKind.value || undefined, tag:tag.value || undefined, sort:'new', page:current, following:following.value}) : null,
-    ideas.value && !tag.value && (!ideaFilter.value || ideaFilter.value === 'create-schemes') ? contentApi.schemes(current, following.value) : null,
+    ideas.value ? contentApi.packs({ tag:tag.value || undefined, sort:'new', page:current, following:following.value}) : null,
+    ideas.value && !tag.value ? contentApi.schemes(current, following.value) : null,
   ])
   const packTopics = new Set(packs?.items.map(item => item.topic_id))
   const entries:Entry[] = [
@@ -62,18 +58,16 @@ const { data, loading, error, load } = useCommunityResource(async () => {
   ]
   return { entries:entries.sort((a,b) => date(b)-date(a)), hasMore:[topics,packs,schemes].some(result => result && result.page * result.page_size < result.total) }
 })
-watch([() => meta.categories,ideas,ideaFilter,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
+watch([() => meta.categories,ideas,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 
 function navigate(values:Record<string,string|undefined>) {
   void router.replace({query:{
     tab: ideas.value ? (showGallery.value ? galleryTab.key : undefined) : tab.value,
-    category: ideas.value ? ideaFilter.value || undefined : undefined,
     tag: tag.value || undefined, mode: following.value ? 'following' : undefined, ...values,
   }})
 }
 function changeIdeaTab(key:string) {
-  const gallery = key === galleryTab.key
-  navigate({tab:gallery ? galleryTab.key : undefined, category:!gallery && key ? key : undefined, tag:undefined, page:undefined})
+  navigate({ tab: key === galleryTab.key ? galleryTab.key : undefined, tag: undefined, page: undefined })
 }
 function changeDiscussionTab(key:string) {
   navigate({ tab:key, tag:undefined, page:undefined })
@@ -88,7 +82,7 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
     <h1 class="sr-only">{{ ideas ? '社区创意' : '社区讨论' }}</h1>
     <FilterChips v-if="!ideas" class="discussion-tabs" :items="discussionOptions" :active="tab" label="讨论板块"
       @change="changeDiscussionTab" />
-    <FilterChips v-else class="discussion-tabs" :items="ideaTabs" :active="showGallery ? galleryTab.key : ideaFilter" label="创意板块"
+    <FilterChips v-else class="discussion-tabs" :items="ideaTabs" :active="showGallery ? galleryTab.key : ''" label="创意板块"
       @change="changeIdeaTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>

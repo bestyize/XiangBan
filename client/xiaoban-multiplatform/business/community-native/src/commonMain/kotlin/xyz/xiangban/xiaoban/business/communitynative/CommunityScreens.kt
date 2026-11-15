@@ -56,21 +56,19 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
     var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
     var discussSub by rememberSaveable { mutableStateOf(AllDiscussions) }
     var resourceSub by rememberSaveable { mutableStateOf(SoftwareResourceTab) }
-    var ideaSelection by rememberSaveable { mutableStateOf(AllIdeas) }
+    var ideaTab by rememberSaveable { mutableStateOf(AllIdeas) }
     val current = CommunitySection.valueOf(section)
     val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
     val loader = rememberLoader(env, "forum-categories") { ForumCategories(env.forum.categories()) }
     val categoryState by loader.state.collectAsState()
     val catalog = (categoryState as? Load.Ready)?.value
-    val ideaBoards = catalog?.boardsIn(ForumSection.Ideas).orEmpty()
     val resourceBoards = catalog?.boardsIn(ForumSection.Resources).orEmpty()
-    val ideasGallery = ideaSelection == Gallery
-    val ideaBoard = ideaBoards.firstOrNull { it.slug == ideaSelection }
+    val ideasGallery = ideaTab == Gallery
     val resourceTab = resourceBoards.firstOrNull { it.slug == resourceSub }?.slug ?: SoftwareResourceTab
     SideEffect {
         onPostDestination(when (current) {
             CommunitySection.Home -> Route.NewPost()
-            CommunitySection.Ideas -> Route.NewPost(ForumSection.Ideas, ideaBoard?.slug)
+            CommunitySection.Ideas -> Route.NewPost(ForumSection.Ideas)
             CommunitySection.Discuss -> Route.NewPost(ForumSection.Discuss, catalog?.discussionTab(discussSub)?.category?.slug)
             CommunitySection.Resources -> Route.NewPost(ForumSection.Resources, catalog?.find(resourceTab)?.slug)
         })
@@ -132,17 +130,17 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                     CommunitySection.Home -> Unit
                     CommunitySection.Ideas -> Column(Modifier.fillMaxSize()) {
                         PageChipRow(
-                            listOf(AllIdeas to "全部", Gallery to "微观展厅") + ideaBoards.map { it.slug to it.name },
-                            if (ideasGallery) Gallery else ideaBoard?.slug ?: AllIdeas,
-                            { ideaSelection = it }, Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            listOf(AllIdeas to "全部", Gallery to "微观展厅"),
+                            if (ideasGallery) Gallery else AllIdeas,
+                            { ideaTab = it }, Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         )
                         Box(Modifier.weight(1f)) {
                             if (ideasGallery) {
                                 MicroGalleryTab(env.config.forumBase, open)
                             } else {
-                                LoadBox(categoryState, loader::reload) {
-                                    val category = ideaBoard?.slug
-                                        ?: ideaBoards.joinToString(",") { it.slug }.ifEmpty { NoActiveBoard }
+                                LoadBox(categoryState, loader::reload) { categories ->
+                                    val category = categories.boardsIn(ForumSection.Ideas)
+                                        .joinToString(",") { it.slug }.ifEmpty { NoActiveBoard }
                                     BoardNoteFeed(env, category, open)
                                 }
                             }

@@ -65,10 +65,6 @@ export function discussionTab(categories: Category[], rawTab: string, rawFilter 
   }
   return 'all'
 }
-export function ideaBoard(categories: Category[], raw: string) {
-  const slug = canonicalCategory(raw)
-  return sectionBoards(categories, 'ideas').find(category => category.slug === slug)?.slug ?? ''
-}
 export function resourceTopicCategory(tab:string) {
   return ({media:'resource-movies',help:'resource-help'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
@@ -78,9 +74,9 @@ export function resourceTabs(categories:Category[]) {
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
   if (!activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
+  if (category.section === 'ideas') return '/ideas'
   const leaf=!categories.some(child=>child.parent_id===category.id)
   if(category.section==='resources') return leaf ? '/resources?tab=' + category.slug : '/resources'
-  if(category.section==='ideas') return leaf ? `/ideas?category=${category.slug}` : '/ideas'
   const tab = discussionTab(categories, category.slug)
   return tab === 'all' ? '/discuss' : `/discuss?tab=${tab}`
 }
@@ -95,7 +91,7 @@ export function navigationSections(categories:Category[]) {
     const rows = active.filter(c=>navigationSection(c)===key)
     const children = key === 'discuss'
       ? discussionDestinations(categories).flatMap(({ category }) => category ? [category] : [])
-      : sectionBoards(categories, key)
+      : key === 'resources' ? sectionBoards(categories, key) : []
     return {key,name:SECTION_LABELS[key],href:key==='ideas'?'/ideas':key==='resources'?'/resources':'/discuss',
       children,
       topic_count:rows.reduce((total,c)=>total+c.topic_count,0)}

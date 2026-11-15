@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import { strictEqual, deepStrictEqual } from 'node:assert'
-import { discussionTabs, discussionTab, ideaBoard, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionTopicTag, postableCategories } from '../src/lib/communityStructure.ts'
+import { discussionTabs, discussionTab, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionTopicTag, postableCategories } from '../src/lib/communityStructure.ts'
 import type { Category } from '../src/api/types.ts'
 function category(id:number, slug:string, section:Category['section'], parent_id:number|null=null, extra:Partial<Category>={}):Category {
   return {id,slug,name:slug,section,parent_id,status:'active',posting_enabled:true,description:'',kind:'normal',sort_order:id,min_post_level:1,on_home:true,award_points:false,admin_only:false,preset_tags:[],topic_count:0,...extra}
@@ -33,24 +33,25 @@ test('a stopped parent hides descendants and legacy routes do not reopen them',(
  deepStrictEqual(resourceTabs(changed),[{key:'software',label:'开源软件'}])
 })
 
-test('detail navigation uses the same independent boards and routes as the community',()=>{
+test('detail navigation links to the available community tabs',()=>{
  const idea = category(10,'create-effect','ideas')
  const all=[...rows,idea,category(11,'site','site')]
  const sections=navigationSections(all)
  deepStrictEqual(sections.map(s=>s.name),['创意','讨论','资源'])
  deepStrictEqual(sections.find(s=>s.key==='discuss')!.children.map(c=>c.slug),['learn','casual-travel','site'])
- deepStrictEqual(sections.find(s=>s.key==='ideas')!.children,[idea])
+ deepStrictEqual(sections.find(s=>s.key==='ideas')!.children,[])
+ strictEqual(categoryHref(idea,all),'/ideas')
+ strictEqual(sectionScope(all,'ideas'),'create-effect')
  strictEqual(categoryHref({id:7,slug:'resource-help'},all),'/resources?tab=resource-help')
  strictEqual(categoryHref({id:2,slug:'learn-codex'},all),'/discuss?tab=learn')
  strictEqual(categoryHref({id:12,slug:'site-feedback'},all),'/discuss?tab=site')
 })
-test('old discussion and creative URLs select their current board',()=>{
- const all=[...rows,category(9,'site','site'),category(10,'create-game','ideas')]
+test('old discussion URLs select their current board',()=>{
+ const all=[...rows,category(9,'site','site')]
  strictEqual(discussionTab(all,'learn','codex'),'learn')
  strictEqual(discussionTab(all,'learn-codex'),'learn')
  strictEqual(discussionTab(all,'all','','site-feedback'),'site')
  strictEqual(discussionTab(all,'casual','casual-travel'),'casual-travel')
- strictEqual(ideaBoard(all,'xiaoban-game'),'create-game')
  strictEqual(categoryLabel({...help,name:'自定义求助板块'}),'自定义求助板块')
 })
 test('administrative posting and move selectors exclude stopped categories and descendants',()=>{

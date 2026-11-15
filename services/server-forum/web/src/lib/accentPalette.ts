@@ -1,4 +1,4 @@
-// Official colour schemes copied from client/xiaoban-desktop/src/ui/appearance.ts.
+// The website uses the desktop presets with its own green palette.
 export type AccentId = 'red' | 'green' | 'blue' | 'purple' | 'amber' | 'graphite';
 /**
  * The six roles of a theme colour.
@@ -13,8 +13,8 @@ export const accents: readonly AccentOption[] = [
     light: { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
     dark: { btn: '#E5484D', btnHi: '#F06A6F', soft: '#3A2225', ink: '#FF8C91', tint: '#1E1C1D', dot: '#FF6369' } },
   { id: 'green', name: '薄荷绿',
-    light: { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
-    dark: { btn: '#34A36D', btnHi: '#48B981', soft: '#1D3328', ink: '#72D6A2', tint: '#1B1E1C', dot: '#3FB87A' } },
+    light: { btn: '#07C160', btnHi: '#06AE56', soft: '#E4F8ED', ink: '#007A3E', tint: '#EFF7F2', dot: '#07C160' },
+    dark: { btn: '#07C160', btnHi: '#06AE56', soft: '#143625', ink: '#8FE6B3', tint: '#1A231E', dot: '#07C160' } },
   { id: 'blue', name: '海湾蓝',
     light: { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
     dark: { btn: '#3B7BE8', btnHi: '#5A92F0', soft: '#1E2A42', ink: '#8DB6FF', tint: '#1B1D21', dot: '#4C8DF6' } },

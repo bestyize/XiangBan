@@ -8,11 +8,15 @@ function luminance(hex: string) {
   return c[0]*.2126+c[1]*.7152+c[2]*.0722
 }
 function contrast(a:string,b:string){const l=[luminance(a),luminance(b)].sort((a,b)=>b-a);return (l[0]+.05)/(l[1]+.05)}
-test('all six web palettes retain the official client names and colours',()=>{
+test('the web presets match the desktop presets except for the green palette',()=>{
   const source=readFileSync(new URL('../../../../client/xiaoban-desktop/src/ui/appearance.ts',import.meta.url),'utf8')
   const web=readFileSync(new URL('../src/lib/accentPalette.ts',import.meta.url),'utf8')
-  const palette=(s:string)=>s.slice(s.indexOf('export const accents:'),s.indexOf('export const DEFAULT_ACCENT'))
-  assert.equal(palette(web),palette(source))
+  const sharedPalette = (text:string) => text
+    .slice(text.indexOf('export const accents:'),text.indexOf('export const DEFAULT_ACCENT'))
+    .replace(/(id: 'green', name: '薄荷绿',)\n    light: [^\n]+\n    dark: [^\n]+/, '$1')
+  assert.equal(sharedPalette(web),sharedPalette(source))
+  assert.equal(paletteFor('green').btn,'#07C160')
+  assert.equal(paletteFor('green',true).btn,'#07C160')
   assert.equal(accents.length,6)
   assert.equal(validAccent('invalid'),false)
   assert.deepEqual(paletteFor('invalid'),accents[0].light)
