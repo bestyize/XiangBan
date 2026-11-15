@@ -93,7 +93,10 @@ function communityIdeaCard(entry: Entry): IdeaCardItem {
 
 const ideaCards = computed(() => {
   if (!ideas.value || showGallery.value) return []
-  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({ ...item, to: item.href }))
+  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({
+    ...item,
+    to: item.kind === 'gallery' ? item.href : { name: 'idea-work', params: { slug: item.id } },
+  }))
   const featuredPacks = new Set(featuredIdeas.value.flatMap(item => item.pack_slug ? [item.pack_slug] : []))
   const entries = data.value?.entries ?? []
   const community = entries
