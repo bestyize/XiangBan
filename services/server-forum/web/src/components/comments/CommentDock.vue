@@ -1,51 +1,69 @@
 <script setup lang="ts">
 import AppIcon from '@/components/AppIcon.vue'
+import { compactCount } from '@/lib/format'
+import { useNarrow } from '@/lib/viewport'
 import DockButton from './DockButton.vue'
 
-withDefaults(defineProps<{ count?: number | null; disabled?: boolean; label?: string; hidden?: boolean }>(), { label: '说点什么…' })
-defineEmits<{ compose: []; jump: [] }>()
+withDefaults(defineProps<{ count?: number | null; disabled?: boolean; label?: string }>(), { label: '写评论…' })
+defineEmits<{ compose: []; discuss: [] }>()
+const narrow = useNarrow()
 </script>
 
 <template>
-  <!-- 手机详情页统一的底部互动栏：左边评论入口，右边是页面自己的按钮（slot）和评论数。 -->
-  <Teleport to="body">
-    <div v-show="!hidden" class="comment-dock" role="group" aria-label="评论与互动">
-      <button type="button" class="dock-capsule" :disabled="disabled" @click="$emit('compose')">{{ label }}</button>
-      <slot />
-      <DockButton :label="`查看评论，共 ${count ?? 0} 条`" :text="count || '评论'" @click="$emit('jump')"><AppIcon name="chat" :size="24" /></DockButton>
+  <Teleport to="body" :disabled="!narrow">
+    <div class="comment-dock" role="group" aria-label="评论与互动">
+      <button type="button" class="dock-capsule" aria-haspopup="dialog" :disabled="disabled" @click="$emit('compose')">
+        <AppIcon name="message" :size="16" /><span>{{ label }}</span>
+      </button>
+      <slot :narrow="narrow" />
+      <DockButton
+        :label="count == null ? '查看评论' : `查看评论，共 ${count} 条`"
+        :text="count == null ? '评论' : compactCount(count)"
+        @click="$emit('discuss')"
+      ><AppIcon name="message" :size="20" /></DockButton>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
 .comment-dock {
-  position: fixed;
-  z-index: 38;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
-  box-sizing: border-box;
-  height: calc(56px + env(safe-area-inset-bottom));
-  padding: 0 8px 0 12px;
-  padding-bottom: env(safe-area-inset-bottom);
+  gap: 4px;
+  margin-block: 16px 8px;
+  padding: 6px 12px;
   background: var(--surface);
-  border-top: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
 .dock-capsule {
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  height: 38px;
-  margin-right: 6px;
-  padding: 0 14px;
+  min-height: 44px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 19px;
+  border-radius: 22px;
   background: var(--surface-2);
   color: var(--ink-3);
-  font-size: 14px;
   text-align: left;
 }
-.dock-capsule:disabled { opacity: 0.6; }
+.dock-capsule svg { flex: none; }
+.dock-capsule span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-capsule:disabled { opacity: 0.65; }
+@media (max-width: 767px) {
+  .comment-dock {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 38;
+    margin: 0;
+    min-height: calc(56px + env(safe-area-inset-bottom));
+    padding: 5px 8px calc(6px + env(safe-area-inset-bottom)) 12px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+  }
+}
 </style>

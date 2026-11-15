@@ -1,24 +1,16 @@
 <script setup lang="ts">
 import { categoryDestination } from '@/lib/communityStructure'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
-import ReplyExtrasEditor from '@/components/ReplyExtrasEditor.vue'
-import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
-import type { Attachment } from '@/api/types'
-import PostEntry from '@/components/PostEntry.vue'
 import AttachmentList from '@/components/AttachmentList.vue'
 import PosterDialog from '@/components/PosterDialog.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
-import PagerNav from '@/components/PagerNav.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ActionSheet from '@/components/ActionSheet.vue'
-import CommentDock from '@/components/comments/CommentDock.vue'
-import CommentSheet from '@/components/comments/CommentSheet.vue'
-import CommentEmpty from '@/components/comments/CommentEmpty.vue'
+import ThreadComments from '@/components/comments/ThreadComments.vue'
 import DockButton from '@/components/comments/DockButton.vue'
 import { useNarrow } from '@/lib/viewport'
 import { api, ApiError } from '@/api/forum'
@@ -40,6 +32,10 @@ const toast = useToast()
 
 const id = computed(() => Number(route.params.id))
 const topic = ref<TopicDetail | null>(null)
+const commentRestriction = computed(() => {
+  if (topic.value?.locked) return '帖子已锁定，不能再回复。'
+  if (topic.value && session.user && !topic.value.viewer.can_reply) return '当前账号暂不能参与评论。'
+})
 const posterOpen = ref(false)
 const posterInput = computed(() =>
   topic.value
@@ -56,33 +52,16 @@ const missing = ref(false)
 const loadError = ref('')
 /** 没有阅读权限时服务端返回的说明，比如「这个帖子仅「老用户」及以上等级可见」。 */
 const forbidden = ref('')
-const posts = ref<PostItem[]>([])
-const postPage = ref(1)
-const postTotal = ref(0)
-const POST_PAGE = 50
-
-const replyRefs = ref<ReplyWorkRef[]>([]), replyFiles = ref<Attachment[]>([]), uploading = ref(false)
-const draft = ref('')
-const replyTo = ref<PostItem | null>(null)
-const sending = ref(false)
-const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
-const reportTarget = ref<{ type: 'topic' | 'post'; id: number } | null>(null)
-
-// 手机上（<768px）评论改成「底部栏 + 弹出的输入面板」，桌面端保持原来的页内回复框。
+const comments = ref<InstanceType<typeof ThreadComments> | null>(null)
+const reportTarget = ref<{ type: 'topic'; id: number } | null>(null)
 const isMobile = useNarrow()
-const composerOpen = ref(false), moreOpen = ref(false)
-// 菜单里的操作先收起菜单再执行，避免遮罩留在对话框或跳转后的页面上。
+const moreOpen = ref(false)
 function fromMore(action: () => unknown) { moreOpen.value = false; void action() }
 function openPoster() { posterOpen.value = true }
-function reportTopic() { if (topic.value) report({ type: 'topic', id: topic.value.id }) }
-const postNames = computed(() => new Map(posts.value.map(p => [p.id, p.author.nickname])))
-const repliesTitle = computed(() => {
-  const count = topic.value?.reply_count ?? 0
-  if (isMobile.value) return count ? `共 ${count} 条评论` : '评论'
-  return count ? `${count} 条回复` : '还没有回复'
-})
-function closeComposer() { composerOpen.value = false }
-watch(isMobile, mobile => { if (!mobile) { composerOpen.value = false; moreOpen.value = false } })
+function reportTopic() {
+  if (topic.value && session.requireLogin()) reportTarget.value = { type: 'topic', id: topic.value.id }
+}
+watch(isMobile, mobile => { if (!mobile) moreOpen.value = false })
 const helpBusy = ref(false)
 const helpOwner = computed(() => session.user?.uid === topic.value?.author.uid)
 const helpExpired = ref(false)
@@ -110,32 +89,21 @@ const parentCategory = computed(() => {
   return c?.parent_id ? meta.byId.get(c.parent_id) : undefined
 })
 
+let topicRequest = 0
 async function loadTopic() {
+  const current = ++topicRequest, topicId = id.value
   missing.value = false
   forbidden.value = ''
   loadError.value = ''
   try {
-    topic.value = await api.topic(id.value)
+    const result = await api.topic(topicId)
+    if (current === topicRequest && topicId === id.value) topic.value = result
   } catch (e) {
+    if (current !== topicRequest || topicId !== id.value) return
+    topic.value = null
     if (e instanceof ApiError && e.status === 404) missing.value = true
-    else if (e instanceof ApiError && e.status === 403) {
-      // 例如退出登录后再看一个需要登录的帖子：把已经载入的内容也清掉。
-      forbidden.value = e.message
-      topic.value = null
-      posts.value = []
-    } else { topic.value = null; loadError.value = e instanceof Error ? e.message : '加载失败' }
-  }
-}
-
-async function loadPosts(page = 1) {
-  try {
-    const res = await api.posts(id.value, page)
-    posts.value = res.items
-    postPage.value = res.page
-    postTotal.value = res.total
-  } catch (e) {
-    // 没有阅读权限的提示由帖子本身的请求负责展示，这里不重复弹。
-    if (!(e instanceof ApiError && e.status === 403)) toast.error(e)
+    else if (e instanceof ApiError && e.status === 403) forbidden.value = e.message
+    else loadError.value = e instanceof Error ? e.message : '加载失败'
   }
 }
 
@@ -149,40 +117,29 @@ watch(() => topicComposer.saved, saved => {
   if (saved?.id === id.value) void loadTopic()
 })
 
-watch(
-  id,
-  async () => {
-    topic.value = null
-    posts.value = []
-    draft.value = ''
-    replyRefs.value = []; replyFiles.value = []; uploading.value = false
-    replyTo.value = null
-    composerOpen.value = false; moreOpen.value = false
-    // 链接带了楼层锚点时，先翻到那一页。
-    const floor = Number(String(route.hash).replace('#floor-', ''))
-    const page = floor > 0 ? Math.ceil(floor / POST_PAGE) : 1
-    await Promise.all([loadTopic(), loadPosts(page)])
-    // 从作品、方案页的「说点什么」进来时，直接打开回复框。
-    // 回调开头把 topic 置成了 null，TypeScript 会一直当它是 null，这里按真实类型取一次。
-    const loaded = topic.value as TopicDetail | null
-    if (route.query.compose && loaded && !loaded.locked) {
-      const { compose: _compose, ...rest } = route.query
-      void router.replace({ query: rest, hash: route.hash })
-      await nextTick()
-      void startReply(null)
-    } else if (route.hash) {
-      await nextTick()
-      document.querySelector(route.hash)?.scrollIntoView({ block: 'start' })
-    }
-  },
-  { immediate: true },
-)
+watch(id, () => {
+  topic.value = null
+  moreOpen.value = false
+  reportTarget.value = null
+  void loadTopic()
+}, { immediate: true })
 
-// 登录状态变化后重新取一次：刷新"是否点过赞、能否编辑"，以及登录后能读到原来没权限的帖子。
-watch(
-  () => session.user?.uid,
-  () => Promise.all([loadTopic(), loadPosts(1)]),
-)
+// 评论入口与通知中的楼层链接定位到详情页内的评论。
+watch([() => topic.value?.id, () => route.hash, () => route.query.compose], ([topicId, hash, compose], previous) => {
+  if (!topicId || topicId !== id.value || !comments.value) return
+  if (!compose && previous[2] && topicId === previous[0] && hash === previous[1]) return
+  const floorNumber = Number(/^#floor-([1-9]\d*)$/.exec(hash)?.[1])
+  const floor = Number.isSafeInteger(floorNumber) ? floorNumber : undefined
+  if (floor) void comments.value.goToFloor(floor)
+  else if (hash === '#replies') comments.value.jumpToComments()
+  if (compose) {
+    void comments.value.startReply()
+    const { compose: _compose, ...query } = route.query
+    void router.replace({ query, hash })
+  }
+}, { flush: 'post' })
+
+watch(() => session.user?.uid, loadTopic)
 
 async function toggleLike() {
   if (!topic.value || !session.requireLogin()) return
@@ -243,53 +200,8 @@ async function removeTopic() {
   }
 }
 
-async function startReply(post: PostItem | null) {
-  if (!session.requireLogin()) return
-  replyTo.value = post
-  if (isMobile.value) {
-    composerOpen.value = true
-    await nextTick()
-    editor.value?.focus()
-    return
-  }
-  document.getElementById('reply-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  editor.value?.focus()
-}
-
-function report(target: { type: 'topic' | 'post'; id: number }) {
-  if (!session.requireLogin()) return
-  reportTarget.value = target
-}
-
-async function sendReply() {
-  if (!topic.value || !draft.value.trim() || sending.value || uploading.value) return
-  if (replyFiles.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
-  sending.value = true
-  try {
-    const res = await api.reply(topic.value.id, draft.value, replyTo.value?.id, replyExtras(replyRefs.value, replyFiles.value))
-    draft.value = ''
-    replyRefs.value = []; replyFiles.value = []; uploading.value = false
-    replyTo.value = null
-    composerOpen.value = false
-    topic.value.reply_count += 1
-    const lastPage = Math.ceil(res.floor / POST_PAGE)
-    await loadPosts(lastPage)
-    await nextTick()
-    document.getElementById(`floor-${res.floor}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  } catch (e) {
-    toast.error(e)
-  } finally {
-    sending.value = false
-  }
-}
-
-function scrollToReplies() {
-  document.getElementById('replies')?.scrollIntoView({ behavior: 'smooth' })
-}
-
-function goPosts(page: number) {
-  loadPosts(page)
-  document.getElementById('replies')?.scrollIntoView({ behavior: 'smooth' })
+function changeReplyCount(delta: number) {
+  if (topic.value) topic.value.reply_count = Math.max(0, topic.value.reply_count + delta)
 }
 
 async function acceptAnswer(post: PostItem) {
@@ -411,68 +323,37 @@ function breadcrumbDestination(slug: string) {
           v-else-if="session.user?.uid !== topic.author.uid"
           type="button"
           class="btn btn-ghost"
-          @click="report({ type: 'topic', id: topic.id })"
+          @click="reportTopic"
         >
           举报
         </button>
       </div>
 
-      <section id="replies" class="replies" aria-labelledby="replies-title">
-        <h2 id="replies-title">{{ repliesTitle }}</h2>
-        <CommentEmpty v-if="isMobile && !posts.length" />
-        <div v-if="posts.length" class="list">
-          <div v-for="p in posts" :key="p.id" class="answer">
-          <div v-if="topic.help?.accepted_post_id === p.id" class="accepted">✓ 已采纳的回答</div>
-          <PostEntry
-            :post="p"
-            :topic-author="topic.author.uid"
-            :can-reply="!topic.locked"
-            :accepted="topic.help?.accepted_post_id === p.id"
-            :reply-to-name="p.reply_to ? postNames.get(p.reply_to) : undefined"
-            @reply="startReply"
-            @report="post => report({ type: 'post', id: post.id })"
-            @removed="topic.reply_count = Math.max(0, topic.reply_count - 1)"
-          />
-          <div v-if="helpOwner && helpOpen && p.status === 'normal' && p.author.uid !== topic.author.uid" class="accept-control">
-            <button class="btn btn-sm" type="button" :disabled="helpBusy" @click="acceptAnswer(p)">采纳回答{{ topic.help?.bounty ? ` · 发放 ${topic.help.bounty} 积分` : '' }}</button>
+      <ThreadComments
+        ref="comments"
+        :key="topic.id"
+        :topic-id="topic.id"
+        :count="topic.reply_count"
+        :topic-author="topic.author.uid"
+        :accepted-id="topic.help?.accepted_post_id"
+        :locked-reason="commentRestriction"
+        @count-change="changeReplyCount"
+      >
+        <template #actions="{ narrow }">
+          <template v-if="narrow">
+            <DockButton label="赞" :text="topic.like_count || '赞'" :active="topic.viewer.liked" @click="toggleLike"><AppIcon name="heart" :size="24" /></DockButton>
+            <DockButton label="收藏" :text="topic.viewer.bookmarked ? '已收藏' : '收藏'" :active="topic.viewer.bookmarked" @click="toggleBookmark"><AppIcon name="bookmark" :size="24" /></DockButton>
+          </template>
+        </template>
+        <template #before-post="{ post }">
+          <div v-if="topic.help?.accepted_post_id === post.id" class="accepted">✓ 已采纳的回答</div>
+        </template>
+        <template #after-post="{ post }">
+          <div v-if="helpOwner && helpOpen && !post.blocked && post.status === 'normal' && post.author.uid !== topic.author.uid" class="accept-control">
+            <button class="btn btn-sm" type="button" :disabled="helpBusy" @click="acceptAnswer(post)">采纳回答{{ topic.help?.bounty ? ` · 发放 ${topic.help.bounty} 积分` : '' }}</button>
           </div>
-          </div>
-        </div>
-        <PagerNav :page="postPage" :page-size="POST_PAGE" :total="postTotal" @go="goPosts" />
-      </section>
-
-      <CommentSheet id="reply-box" class="reply-box" :open="composerOpen" :inline="!isMobile" :title="replyTo ? `回复 ${replyTo.author.nickname}` : '写评论'" @close="closeComposer">
-        <p v-if="topic.locked" class="panel note">帖子已锁定，不能再回复。</p>
-        <div v-else-if="!session.loggedIn" class="panel note">
-          <span>登录后参与讨论，或者告诉大家你的看法。</span>
-          <button type="button" class="btn btn-primary btn-sm" @click="session.loginOpen = true">登录</button>
-        </div>
-        <form v-else class="compose" @submit.prevent="sendReply">
-          <div v-if="!isMobile && replyTo" class="replying">
-            回复 #{{ replyTo.floor }} {{ replyTo.author.nickname }}
-            <button type="button" class="btn btn-ghost btn-sm" @click="replyTo = null">取消</button>
-          </div>
-          <MarkdownEditor
-            id="reply-editor"
-            ref="editor"
-            v-model="draft"
-            label="回复内容"
-            :rows="isMobile ? 3 : 5"
-            :compact="isMobile"
-            :placeholder="isMobile ? '说点什么…' : '说点有用的：你领到了吗？用的什么方法？'"
-          />
-          <ReplyExtrasEditor v-if="session.info" :key="topic.id" v-model:work-refs="replyRefs" v-model:attachments="replyFiles" :max-bytes="session.info.limits.upload_max_bytes" :disabled="sending" @uploading="uploading = $event" />
-          <div class="send">
-            <div v-if="isMobile" class="sheet-tools">
-              <button type="button" class="tool" aria-label="插入图片" @click="editor?.pickImage()"><AppIcon name="image" :size="22" /></button>
-            </div>
-            <span v-else class="muted">{{ session.user?.trust_level === 0 ? `新人每天可以回复 ${session.info?.limits.daily_posts ?? 10} 次` : '' }}</span>
-            <button type="submit" class="btn btn-primary" :disabled="sending || uploading || !draft.trim()">
-              {{ sending ? '正在发送' : isMobile ? '发送' : '发表回复' }}
-            </button>
-          </div>
-        </form>
-      </CommentSheet>
+        </template>
+      </ThreadComments>
 
       <ActionSheet :open="isMobile && moreOpen" label="更多操作" @close="moreOpen = false">
         <button type="button" class="more-row" @click="fromMore(share)">分享</button>
@@ -496,10 +377,6 @@ function breadcrumbDestination(slug: string) {
         <button type="button" class="more-cancel" @click="moreOpen = false">取消</button>
       </ActionSheet>
 
-      <CommentDock v-if="isMobile" :count="topic.reply_count" :disabled="topic.locked" :label="topic.locked ? '帖子已锁定' : '说点什么…'" :hidden="composerOpen || moreOpen" @compose="startReply(null)" @jump="scrollToReplies">
-        <DockButton label="赞" :text="topic.like_count || '赞'" :active="topic.viewer.liked" @click="toggleLike"><AppIcon name="heart" :size="24" /></DockButton>
-        <DockButton label="收藏" :text="topic.viewer.bookmarked ? '已收藏' : '收藏'" :active="topic.viewer.bookmarked" @click="toggleBookmark"><AppIcon name="bookmark" :size="24" /></DockButton>
-      </CommentDock>
     </article>
 
     <ReportDialog :target="reportTarget" @close="reportTarget = null" />
@@ -654,48 +531,6 @@ function breadcrumbDestination(slug: string) {
 .more-btn {
   display: none;
 }
-.replies h2 {
-  font-size: var(--fs-md);
-  margin: 0 0 10px;
-}
-.list {
-  border-top: 1px solid var(--line);
-}
-.list > :deep(*) {
-  border-bottom: 1px solid var(--line);
-}
-.reply-box {
-  margin-top: 18px;
-  scroll-margin-top: 90px;
-}
-.note {
-  padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-  margin: 0;
-}
-.compose {
-  display: grid;
-  gap: 10px;
-}
-.replying {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.send {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-xs);
-}
 .missing {
   padding: 48px 24px;
   text-align: center;
@@ -724,7 +559,7 @@ function breadcrumbDestination(slug: string) {
   width: 40%;
 }
 @media (max-width: 767px) {
-  /* 内容栏铺满屏幕宽度并去掉卡片圆角；左右 8px、底部 20px 是 App.vue 里手机社区页 app-main 的留白，抵消后白底一直铺到底部栏。 */
+  /* 内容栏铺满屏幕宽度并去掉卡片圆角；左右 8px、底部 20px 是 App.vue 里手机社区页 app-main 的留白，抵消后移除正文容器的圆角。 */
   .topic-shell :deep(.center) { margin:0 -8px -20px; border-radius:0; }
   .byline-top { display:flex; align-items:center; justify-content:space-between; width:100%; }
   .more-btn { display:grid; place-items:center; width:44px; height:44px; margin:-8px -12px -8px 0; border:0; background:none; color:var(--ink-2); }
@@ -732,28 +567,8 @@ function breadcrumbDestination(slug: string) {
   /* 分享、海报、举报、编辑等收进“更多”菜单；赞和收藏在底部栏。 */
   .actions { display:none; }
   .tags { margin-bottom:4px; }
-  .replies { scroll-margin-top:60px; }
-  .replies h2 { font-size:15px; font-weight:600; }
-  .list, .list > :deep(*) { border:0; }
   .topic-shell :deep(.center) { padding:16px 16px 24px; }
   .title { font-size:20px; line-height:1.4; font-weight:600; }
-  .actions .btn, .note .btn { min-height:44px; }
-  .replies { padding-top:14px; padding-bottom:24px; margin-top:16px; border-top:1px solid var(--line); }
-  .note {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .sheet-tools { display: flex; gap: 4px; }
-  .sheet-tools .tool {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    background: none;
-    color: var(--ink-2);
-  }
-  .reply-box .send .btn, .send .btn { min-width: 84px; min-height: 40px; border-radius: 20px; }
   .more-row {
     display: flex;
     align-items: center;

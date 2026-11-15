@@ -1,6 +1,6 @@
 import { onBeforeUnmount, ref } from 'vue'
 
-/** 手机宽度（<768px）：评论改用底部栏 + 弹出面板，桌面保持页内输入框。 */
+/** 与 CSS 的窄屏断点保持一致。 */
 export function useNarrow(query = '(max-width: 767px)') {
   const media = window.matchMedia(query)
   const narrow = ref(media.matches)

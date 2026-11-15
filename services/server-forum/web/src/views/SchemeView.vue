@@ -49,10 +49,10 @@ watch(() => route.params.id, load, { immediate: true })
       <h2>方案中的作品</h2><SchemeReferences :items="scheme.items" />
       <p class="hint">版本由作者发布方案时选定。当前不可用的作品会保留占位。</p>
       <ContentSocialActions kind="scheme" :id="scheme.id" />
-      <WorkDiscussion kind="scheme" :id="scheme.id" />
       <div class="scheme-actions"><button class="btn" type="button" @click="copy">{{ copied ? '链接已复制' : '复制方案链接' }}</button><button v-if="owner" class="btn" :disabled="busy" @click="remove">{{ busy ? '正在下架…' : '下架自己的方案' }}</button></div>
       <p v-if="error" role="alert">{{ error }} <button class="btn" :disabled="busy" @click="load">重新读取</button></p>
       <label v-if="copyError" class="field"><span>请手动复制方案链接</span><input class="input" readonly :value="link" @focus="($event.target as HTMLInputElement).select()"></label>
+      <WorkDiscussion kind="scheme" :id="scheme.id" />
     </article>
   </ContentShell>
 </template>

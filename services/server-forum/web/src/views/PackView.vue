@@ -137,14 +137,13 @@ async function copyLink() {
           {{ pack.trust_level === 2 && pack.kind !== 'game' && pack.kind !== 'app' ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <ContentSocialActions v-if="pack.status === 'published'" kind="pack" :id="pack.id" />
-        <WorkDiscussion v-if="pack.status === 'published'" :id="pack.id" />
         <div class="actions">
           <button class="btn" type="button" @click="creationOpen = true">在客户端创作或修改</button>
           <a v-if="!manualOnly && !desktopResource" class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
           <button class="btn" :class="{ 'btn-primary': desktopResource }" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <button class="btn" type="button" @click="posterOpen = true">生成海报</button>
-          <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
+          <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">查看关联帖子</RouterLink>
           <button v-if="isAuthor" type="button" class="btn" aria-haspopup="dialog" @click="publisher.open(pack.id)">发布新版本</button>
         </div>
         <p v-if="!manualOnly && !desktopResource && pack.kind !== 'app'" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
@@ -161,6 +160,9 @@ async function copyLink() {
           </li>
         </ul>
       </section>
+      <div v-if="pack.status === 'published'" class="work-comments">
+        <WorkDiscussion :id="pack.id" />
+      </div>
     </article>
   </ContentShell>
   <ClientCreationPrompt v-model:show="creationOpen" :kind="pack ? kindLabel(pack.kind) : undefined" />
@@ -185,6 +187,7 @@ async function copyLink() {
 .head {
   padding: 14px 16px 0;
 }
+.work-comments { padding-inline: 16px; }
 .web-app-launch { margin: 16px 0; }
 h1 {
   margin: 0;

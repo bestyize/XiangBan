@@ -70,6 +70,10 @@ export const router = createRouter({
   routes,
   scrollBehavior(to, from, saved) {
     if (saved) return saved
+    // 帖子页负责定位异步加载的评论和楼层。
+    if (to.name === 'topic' && (to.hash === '#replies' || /^#floor-[1-9]\d*$/.test(to.hash))) {
+      return to.path === from.path ? undefined : { top: 0 }
+    }
     if (to.hash) return { el: to.hash, top: 80 }
     if (to.path === from.path) {
       if (['/', '/discuss', '/ideas', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import AppIcon from '@/components/AppIcon.vue'
+
+defineProps<{ readOnly?: boolean }>()
 </script>
 
 <template>
   <div class="comment-empty">
-    <AppIcon name="chat" :size="40" />
+    <AppIcon name="message" :size="40" />
     <strong>还没有评论</strong>
-    <span>说点什么，做第一个留言的人</span>
+    <span v-if="!readOnly">说点什么，做第一个留言的人</span>
   </div>
 </template>
 

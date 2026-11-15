@@ -1,315 +1,148 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { PostItem } from '@/api/types'
+import { computed, ref } from 'vue'
+import type { Attachment, PostItem } from '@/api/types'
 import ReplyWorkCards from './ReplyWorkCards.vue'
 import ReplyExtrasEditor from './ReplyExtrasEditor.vue'
 import AttachmentList from './AttachmentList.vue'
+import CommentRow from './comments/CommentRow.vue'
 import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
-import type { Attachment } from '@/api/types'
-import UserAvatar from './UserAvatar.vue'
 import { api } from '@/api/forum'
 import { useSession } from '@/stores/session'
-import { useToast } from '@/stores/toast'
-import { TRUST_LABEL, formatDateTime, timeAgo } from '@/lib/format'
 
-const props = defineProps<{ post: PostItem; topicAuthor: string; canReply: boolean; accepted?: boolean; replyToName?: string }>()
-const emit = defineEmits<{ reply: [post: PostItem]; report: [post: PostItem]; removed: [] }>()
+const props = defineProps<{ post: PostItem; topicId: number; topicAuthor?: string; canReply: boolean; accepted?: boolean; replyToName?: string }>()
+const emit = defineEmits<{ reply: [post: PostItem]; report: [post: PostItem]; go: [floor: number]; removed: [] }>()
 const session = useSession()
-const toast = useToast()
 
 const editing = ref(false)
 const draft = ref('')
-const workRefs = ref<ReplyWorkRef[]>([]), files = ref<Attachment[]>([]), uploading = ref(false)
+const workRefs = ref<ReplyWorkRef[]>([])
+const files = ref<Attachment[]>([])
+const uploading = ref(false)
 const busy = ref(false)
+const error = ref('')
+const actions = computed(() => props.post.status === 'normal' && !editing.value)
+const floorLink = (floor: number) => `/t/${props.topicId}#floor-${floor}`
 
-async function like() {
-  if (!session.requireLogin()) return
-  try {
+async function run(action: () => Promise<void>) {
+  if (busy.value || !session.requireLogin()) return
+  busy.value = true
+  error.value = ''
+  try { await action() }
+  catch (e) { error.value = e instanceof Error ? e.message : '操作失败，请重试' }
+  finally { busy.value = false }
+}
+
+function like() {
+  return run(async () => {
     const res = await api.likePost(props.post.id, !props.post.liked)
     props.post.liked = res.liked
     props.post.like_count = res.like_count
-  } catch (e) {
-    toast.error(e)
-  }
+  })
 }
 
-async function startEdit() {
-  try {
+function startEdit() {
+  return run(async () => {
     const source = await api.postSource(props.post.id)
-    draft.value = source.body; workRefs.value = source.work_refs; files.value = source.attachments
+    draft.value = source.body
+    workRefs.value = source.work_refs
+    files.value = source.attachments
     editing.value = true
-  } catch (e) {
-    toast.error(e)
-  }
+  })
 }
 
-async function saveEdit() {
-  if (busy.value || uploading.value || !draft.value.trim()) return
-  if (files.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
-  busy.value = true
-  try {
+function saveEdit() {
+  if (uploading.value || !draft.value.trim()) return
+  if (files.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) {
+    error.value = '附件价格须为 0～10 的整数'
+    return
+  }
+  return run(async () => {
     const res = await api.updatePost(props.post.id, draft.value, replyExtras(workRefs.value, files.value))
     props.post.body_html = res.body_html
-    props.post.work_refs = res.work_refs; props.post.attachments = res.attachments
+    props.post.work_refs = res.work_refs
+    props.post.attachments = res.attachments
     props.post.edited_at = new Date().toISOString()
     editing.value = false
-  } catch (e) {
-    toast.error(e)
-  } finally {
-    busy.value = false
-  }
+  })
 }
 
-async function remove() {
+function remove() {
   if (!confirm('删除这条回复？删除后不能恢复。')) return
-  try {
+  return run(async () => {
     await api.deletePost(props.post.id)
     props.post.status = 'deleted'
     props.post.body_html = ''
     emit('removed')
-  } catch (e) {
-    toast.error(e)
-  }
+  })
 }
 </script>
 
 <template>
-  <article v-if="post.blocked" :id="`floor-${post.floor}`" class="post blocked-row">
-    <span class="muted">你已屏蔽 {{ post.author.nickname }}，这条回复已折叠。</span>
-    <RouterLink :to="`/u/${post.author.uid}`" class="muted-link">去取消屏蔽</RouterLink>
+  <article v-if="post.blocked" :id="`floor-${post.floor}`" class="blocked-row">
+    <span>你已屏蔽 {{ post.author.nickname }}，这条回复已折叠。</span>
+    <RouterLink :to="`/u/${post.author.uid}`">去取消屏蔽</RouterLink>
   </article>
-  <article v-else :id="`floor-${post.floor}`" class="post">
-    <RouterLink :to="`/u/${post.author.uid}`" class="avatar" :aria-label="post.author.nickname">
-      <UserAvatar :name="post.author.nickname" :src="post.author.avatar_url" :size="34" />
-    </RouterLink>
-    <div class="main">
-      <header class="head">
-        <RouterLink :to="`/u/${post.author.uid}`" class="name">{{ post.author.nickname }}</RouterLink>
-        <span v-if="post.author.uid === topicAuthor" class="op">楼主</span>
-        <span v-if="post.author.trust_level >= 2" class="tl">{{ TRUST_LABEL[post.author.trust_level] }}</span>
-        <a v-if="post.reply_to_floor" :href="`#floor-${post.reply_to_floor}`" class="replyto"><span class="only-wide">回复 #{{ post.reply_to_floor }}</span><span class="only-narrow">回复 {{ replyToName || `#${post.reply_to_floor}` }}</span></a>
-        <time :datetime="post.created_at" :title="formatDateTime(post.created_at)" class="time">{{ timeAgo(post.created_at) }}</time>
-        <a :href="`#floor-${post.floor}`" class="floor">#{{ post.floor }}</a>
-      </header>
-
-      <p v-if="post.status !== 'normal'" class="gone">
-        {{ post.status === 'deleted' ? '这条回复已被作者删除' : '这条回复因违反社区规则已被隐藏' }}
-      </p>
-      <template v-else-if="editing">
-        <textarea v-model="draft" class="textarea" rows="5" :aria-label="`编辑 #${post.floor} 楼`" />
-        <ReplyExtrasEditor v-if="session.info" v-model:work-refs="workRefs" v-model:attachments="files" :max-bytes="session.info.limits.upload_max_bytes" :disabled="busy" @uploading="uploading = $event" />
-        <div class="edit-actions">
-          <button type="button" class="btn btn-sm" :disabled="busy || uploading" @click="editing = false">取消</button>
-          <button type="button" class="btn btn-primary btn-sm" :disabled="busy || uploading || !draft.trim()" @click="saveEdit">保存修改</button>
-        </div>
-      </template>
-      <template v-else><div class="prose body" v-html="post.body_html" /><ReplyWorkCards :items="post.work_refs ?? []" /><AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted /></template>
-
-      <footer v-if="post.status === 'normal' && !editing" class="actions">
-        <time :datetime="post.created_at" class="time-m">{{ timeAgo(post.created_at) }}</time>
-        <button type="button" class="act act-like" :class="{ on: post.liked }" :aria-pressed="post.liked" @click="like">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5s-5-3-5-7a2.8 2.8 0 0 1 5-1.7A2.8 2.8 0 0 1 13 6.5c0 4-5 7-5 7z" /></svg>
-          {{ post.like_count || '赞' }}
-        </button>
-        <button v-if="canReply" type="button" class="act" @click="emit('reply', post)">回复</button>
+  <CommentRow
+    v-else
+    :id="`floor-${post.floor}`"
+    :author="post.author"
+    :created-at="post.created_at"
+    :can-reply="actions && canReply"
+    :can-like="actions"
+    :like-count="post.like_count"
+    :liked="post.liked"
+    :busy="busy"
+    @like="like"
+    @reply="emit('reply', post)"
+  >
+    <template v-if="post.author.uid === topicAuthor" #byline><span class="op">楼主</span></template>
+    <template v-if="post.reply_to_floor" #parent>
+      <a :href="floorLink(post.reply_to_floor)" @click.exact.prevent="emit('go', post.reply_to_floor)">回复 {{ replyToName || `#${post.reply_to_floor}` }}</a>
+    </template>
+    <p v-if="post.status !== 'normal'" class="gone">
+      {{ post.status === 'deleted' ? '这条回复已被作者删除' : '这条回复因违反社区规则已被隐藏' }}
+    </p>
+    <template v-else-if="editing">
+      <textarea v-model="draft" class="textarea" rows="5" :aria-label="`编辑 #${post.floor} 楼`" />
+      <ReplyExtrasEditor v-if="session.info" v-model:work-refs="workRefs" v-model:attachments="files" :max-bytes="session.info.limits.upload_max_bytes" :disabled="busy" @uploading="uploading = $event" />
+      <div class="edit-actions">
+        <button type="button" class="btn btn-sm" :disabled="busy || uploading" @click="editing = false; error = ''">取消</button>
+        <button type="button" class="btn btn-primary btn-sm" :disabled="busy || uploading || !draft.trim()" @click="saveEdit">保存修改</button>
+      </div>
+    </template>
+    <template v-else>
+      <div class="prose post-body" v-html="post.body_html" />
+      <ReplyWorkCards :items="post.work_refs ?? []" />
+      <AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted />
+    </template>
+    <p v-if="error" class="post-error" role="alert">{{ error }}</p>
+    <template #actions>
+      <template v-if="actions">
         <template v-if="post.mine && !accepted">
-          <button type="button" class="act" @click="startEdit">编辑</button>
-          <button type="button" class="act" @click="remove">删除</button>
+          <button type="button" :disabled="busy" @click="startEdit">编辑</button>
+          <button type="button" :disabled="busy" @click="remove">删除</button>
         </template>
-        <button v-else-if="session.loggedIn" type="button" class="act quiet" @click="emit('report', post)">举报</button>
-        <span v-if="post.edited_at" class="edited">已编辑</span>
-      </footer>
-    </div>
-  </article>
+        <button v-else-if="session.loggedIn" type="button" @click="emit('report', post)">举报</button>
+        <span v-if="post.edited_at">已编辑</span>
+      </template>
+      <a class="floor" :href="floorLink(post.floor)" @click.exact.prevent="emit('go', post.floor)">#{{ post.floor }}</a>
+    </template>
+  </CommentRow>
 </template>
 
 <style scoped>
-.post {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px 4px;
-  scroll-margin-top: calc(var(--header-h) + 12px);
-}
-.post:target {
-  background: color-mix(in srgb, var(--brand) 8%, transparent);
-}
-.main {
-  min-width: 0;
-}
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-  margin-bottom: 6px;
-}
-.name {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--ink);
-}
-.op,
-.tl {
-  padding: 0 6px;
-  border-radius: 4px;
-  font-weight: 700;
-  font-size: 11px;
-  line-height: 18px;
-}
-.op {
-  background: var(--ink);
-  color: var(--paper);
-}
-.tl {
-  border: 1px solid var(--line-strong);
-  color: var(--ink-2);
-}
-.replyto {
-  color: var(--ink-2);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.floor {
-  margin-left: auto;
-  font-family: var(--font-display);
-  font-variant-numeric: tabular-nums;
-}
-.floor:hover,
-.replyto:hover {
-  color: var(--ink);
-}
-.body {
-  font-size: 15px;
-  line-height: 1.75;
-}
-.gone {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
-  font-style: italic;
-}
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin: 8px 0 0 -8px;
-}
-.act {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  background: none;
-  padding: 3px 8px;
-  border-radius: 5px;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--ink-3);
-}
-.act:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
-.act svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-.act.on {
-  color: var(--danger);
-}
-.act.on svg {
-  fill: currentColor;
-}
-.quiet {
-  opacity: 0.8;
-}
-.edited {
-  margin-left: 8px;
-  font-size: 11px;
-  color: var(--ink-3);
-}
-.edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-}
-.only-narrow,
-.time-m {
-  display: none;
-}
-@media (max-width: 767px) {
-  .post {
-    padding: 12px 0;
-    gap: 10px;
-  }
-  /* 手机上去掉楼层号、等级标签和头部时间，时间挪到正文下面，赞靠右。 */
-  .tl,
-  .floor,
-  .head .time,
-  .only-wide {
-    display: none;
-  }
-  .only-narrow {
-    display: inline;
-  }
-  .head {
-    margin-bottom: 2px;
-  }
-  .name {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink-3);
-  }
-  .replyto {
-    text-decoration: none;
-  }
-  .body {
-    line-height: 1.6;
-  }
-  .actions {
-    gap: 14px;
-    margin: 4px 0 0;
-  }
-  .time-m {
-    display: inline;
-    font-size: var(--fs-xs);
-    color: var(--ink-3);
-  }
-  .act {
-    min-height: 32px;
-    padding: 4px 0;
-    font-weight: 500;
-  }
-  .act:hover {
-    background: none;
-  }
-  .act-like {
-    order: 99;
-    margin-left: auto;
-    gap: 5px;
-  }
-  .act-like svg {
-    width: 18px;
-    height: 18px;
-  }
-}
-.blocked-row {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  padding: 10px 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
-}
-.muted-link {
-  color: var(--ink-2);
-  text-decoration: underline;
-}
+.op { flex: none; padding: 0 6px; border-radius: 4px; background: var(--surface-2); color: var(--ink-3); font-size: 11px; }
+.post-body { margin-top: 4px; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.post-body :deep(> :first-child) { margin-top: 0; }
+.post-body :deep(> :last-child) { margin-bottom: 0; }
+.post-body :deep(pre), .post-body :deep(table) { max-width: 100%; overflow: auto; }
+.post-body :deep(table) { display: block; }
+.gone, .post-error { margin: 4px 0 0; color: var(--ink-3); font-size: var(--fs-sm); }
+.post-error { color: var(--danger); }
+.floor { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.floor:hover { color: var(--ink); }
+.edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.blocked-row { padding: 12px 0; color: var(--ink-3); font-size: var(--fs-sm); }
+.blocked-row a { margin-inline-start: 8px; text-decoration: underline; }
+@media (max-width: 767px) { .floor { display: none; } }
 </style>

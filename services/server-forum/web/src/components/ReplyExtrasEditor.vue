@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { ReplyWorkRef } from '@/api/replyContent'
 import type { Attachment } from '@/api/types'
 import AttachmentUploader from './AttachmentUploader.vue'
-const props = defineProps<{ workRefs: ReplyWorkRef[]; attachments: Attachment[]; maxBytes: number; disabled?: boolean }>()
+const props = defineProps<{ workRefs: ReplyWorkRef[]; attachments: Attachment[]; maxBytes: number; disabled?: boolean; embedded?: boolean }>()
 const emit = defineEmits<{ 'update:workRefs':[ReplyWorkRef[]]; 'update:attachments':[Attachment[]]; uploading:[boolean] }>()
 const link = ref(''), version = ref(''), error = ref('')
 function add() {
@@ -25,14 +25,16 @@ function add() {
 function remove(index: number) { emit('update:workRefs', props.workRefs.filter((_, i) => i !== index)) }
 </script>
 <template>
-  <details class="extras"><summary>引用作品、方案或添加附件</summary><div class="extra-fields">
+  <component :is="embedded ? 'div' : 'details'" class="extras" :class="{ embedded }"><summary v-if="!embedded">引用作品、方案或添加附件</summary><div class="extra-fields">
     <p class="hint">公开内容最多引用 3 项。内容包不填版本时固定为发表当时的版本；下架内容自动变为占位。</p>
     <ul v-if="workRefs.length" class="references"><li v-for="(item, i) in workRefs" :key="`${item.kind}:${item.id}`"><span>{{ item.kind === 'pack' ? '内容包' : '方案' }} #{{ item.id }} <template v-if="item.version">· v{{ item.version }}</template></span><button class="btn btn-sm" type="button" :disabled="disabled" @click="remove(i)">移除</button></li></ul>
     <div class="add-reference"><label class="field"><span>本站作品或方案链接</span><input v-model="link" class="input" :disabled="disabled || workRefs.length >= 3" placeholder="/packs/123 或 /schemes/123" @keydown.enter.prevent="add" /></label><label class="field version"><span>版本（可选）</span><input v-model="version" class="input" type="number" min="1" step="1" :disabled="disabled || workRefs.length >= 3" @keydown.enter.prevent="add" /></label><button class="btn" type="button" :disabled="disabled || !link.trim() || workRefs.length >= 3" @click="add">加入引用</button></div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <AttachmentUploader :model-value="attachments" :max-bytes="maxBytes" :disabled="disabled" @update:model-value="emit('update:attachments', $event)" @uploading="emit('uploading', $event)" />
-  </div></details>
+  </div></component>
 </template>
 <style scoped>
 .extras { margin:12px 0; }.extras summary { cursor:pointer; font-size:var(--fs-sm); }.extra-fields { display:grid; gap:12px; padding:12px 0; }.hint { margin:0; color:var(--ink-3); font-size:var(--fs-sm); }.references { margin:0; padding:0; list-style:none; display:grid; gap:6px; }.references li { display:flex; align-items:center; justify-content:space-between; gap:10px; }.add-reference { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; }.add-reference .field { flex:1 1 200px; }.add-reference .version { flex:0 1 110px; }.error { color:var(--danger); margin:0; }
+.extras.embedded { margin: 0; }
+.embedded .extra-fields { padding: 0; }
 </style>
