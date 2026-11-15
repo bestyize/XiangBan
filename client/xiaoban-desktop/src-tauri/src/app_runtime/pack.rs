@@ -7,6 +7,7 @@ use std::{
     path::Path,
 };
 
+pub const SCHEMA_VERSION: u64 = 3;
 pub const MAX_FILES: usize = 3_000;
 pub const MAX_ENTRIES: usize = MAX_FILES * 8;
 pub const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
@@ -69,7 +70,7 @@ fn extension(path: &str) -> String {
         .unwrap_or_default()
 }
 
-fn check_file_path(path: &str) -> Result<String, String> {
+pub(crate) fn check_file_path(path: &str) -> Result<String, String> {
     let ext = extension(path);
     if !valid_path(path)
         || path
@@ -117,7 +118,7 @@ fn check_list(manifest: &Value, key: &str, allowed: &[&str], required: bool) -> 
 
 /// Returns the exact entry, icon and cover paths that the package must contain.
 pub fn check_manifest(manifest: &Value) -> Result<[&str; 3], String> {
-    if manifest["schemaVersion"] != 3 || manifest["runtimeProtocol"] != 2 {
+    if manifest["schemaVersion"] != SCHEMA_VERSION || manifest["runtimeProtocol"] != 2 {
         return Err("V2 作品需要 schemaVersion=3、runtimeProtocol=2".into());
     }
     if !valid_id(string(manifest, "id")?) {

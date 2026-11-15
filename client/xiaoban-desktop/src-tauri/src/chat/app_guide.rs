@@ -98,7 +98,7 @@ pub(super) const FEATURES: &[Feature] = &[
     Feature { id: "settings-about", name: "设置·关于与更新", path: "设置 →「关于与更新」，或侧栏铃铛", page: Some(("settings", Some("about"))),
         does: "版本、检查更新、公告、官网。", by_hand: "检查更新由用户点击。", tools: NONE },
     Feature { id: "community", name: "官网与论坛", path: "系统浏览器", page: None,
-        does: "导出自创的壁纸/特效/组件/宠物/游戏为资源包，并打开论坛对应板块；打开官网或论坛页面。", by_hand: "发帖需要用户自己登录论坛。",
+        does: "导出自创的动态壁纸、特效、小组件和伙伴主题为 V2 ZIP，也可导出自创游戏。支持打开官网或论坛对应板块。", by_hand: "桌面资源可在「应用 → 导入作品」导入。发帖需要用户自己登录论坛。",
         tools: &["community_share", "community_open"] },
     Feature { id: "guide", name: "功能导览", path: "对话里", page: None,
         does: "app_guide 查功能清单和位置，open_page 打开控制台页面。", by_hand: "", tools: &["app_guide", "open_page"] },

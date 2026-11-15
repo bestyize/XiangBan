@@ -6,7 +6,19 @@
 
 「龙鱼巡游」使用内置 WebGL 2 渲染器，可在透明桌面层显示单条龙鱼、单条孔雀鱼、六条孔雀鱼群，或龙鱼与孔雀鱼群。鱼类组合与灯光保存在本机特效设置，可与任意壁纸搭配。模型、鱼鳍动画、花色和群游路线来自 [RealWorldBuilder](https://github.com/bestyize/RealWorldBuilder/tree/6b9d23da4c554be8ec1c134633776c1722706aa3)，资源随客户端安装，离线可播放。
 
-也可以不用手动放文件：在“桌面特效”页点“导入特效”选一个 JSON 文件，应用会先按下面的规则检查它（另外要求各层 `count` 加起来大于 0，否则这个特效什么也画不出来），通过后按它自己的 `id` 存成 `<id>.json` 并自动刷新列表。如果文件夹里已经有一个特效包用了同一个 `id`，会先问你要不要替换那个文件，选“取消”就什么都不写。或者直接在聊天里让小伴写一个（它会用 `effect_create` 工具，走同一套检查）。
+「装扮 → 特效 → 导入」可以选择单个 JSON 或 V2 ZIP。两种入口都会校验粒子数据并刷新列表。导入同 ID 的单个 JSON 时，应用会先询问是否替换。同 ID 的 ZIP 导入会被拒绝。
+
+对话创作先调用 `effect_read_format`，再把符合下文规则的粒子 JSON 交给 `effect_create` 的 `pack` 参数。各层 `count` 合计须大于 0。
+
+## 交付 V2 ZIP
+
+从自定义特效卡片导出资源包，小伴会生成外层清单。手工打包时，将粒子数据保存为 `effect.json`，并在 ZIP 根目录放置 `manifest.json`。
+
+```json
+{ "schemaVersion": 3, "kind": "effect", "entry": "effect.json" }
+```
+
+下文的 `schemaVersion: 1` 是 `effect.json` 的数据版本。ZIP 通用限制见 [桌面资源包格式](resource-pack-format.md#v2-桌面资源)。
 
 加载规则：
 

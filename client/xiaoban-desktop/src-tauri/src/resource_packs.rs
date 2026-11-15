@@ -9,7 +9,7 @@ use std::{
     io::{Cursor, Read, Write},
     path::Path,
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
@@ -22,7 +22,7 @@ const MAX_ENTRY: u64 = 4 * 1024 * 1024;
 pub struct Pack {
     kind: String,
     data: Value,
-    /// Legacy binary assets, or all files beside the manifest in a V2 work.
+    /// Resource assets, or all files beside the manifest in a V2 app or game.
     assets: Vec<(String, Vec<u8>)>,
 }
 
@@ -131,7 +131,7 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
         }
         "game" | "app" => {
             let manifest = game_packs::find_user_game(root, id)?;
-            if manifest["runtimeProtocol"] == 2 && manifest["schemaVersion"] == 3 {
+            if manifest["runtimeProtocol"] == 2 && manifest["schemaVersion"] == app_pack::SCHEMA_VERSION {
                 let (manifest, files) = game_packs::read_v2_pack(root, id)?;
                 return Ok(Pack { kind: text(&manifest, "kind")?.into(), data: manifest, assets: files });
             }
@@ -153,44 +153,72 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
     Ok(Pack { kind: kind.into(), data, assets })
 }
 
-/// The manifest and the files a pack is written as. Wallpapers and widgets keep their page in `index.html`,
-/// an effect is its own `effect.json`, and a game keeps its folder as it is.
+fn resource_entry(kind: &str) -> Option<&'static str> {
+    match kind {
+        "wallpaper" | "widget" => Some("index.html"),
+        "effect" => Some("effect.json"),
+        "pet" => Some("pet.json"),
+        _ => None,
+    }
+}
+
+fn widget_metadata(data: &Value) -> serde_json::Map<String, Value> {
+    ["id", "name", "description", "width", "height", "theme"]
+        .into_iter()
+        .filter_map(|key| data.get(key).map(|value| (key.to_string(), value.clone())))
+        .collect()
+}
+
+fn resource_manifest(kind: &str, entry: &str, data: &Value) -> Result<Value, String> {
+    let mut manifest = match kind {
+        "wallpaper" => json!({
+            "name": text(data, "title")?,
+            "description": data["description"].as_str().unwrap_or("")
+        }),
+        "widget" => Value::Object(widget_metadata(data)),
+        _ => json!({}),
+    };
+    manifest["schemaVersion"] = json!(app_pack::SCHEMA_VERSION);
+    manifest["kind"] = json!(kind);
+    manifest["entry"] = json!(entry);
+    Ok(manifest)
+}
+
 fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
     let data = &pack.data;
-    // Text-only packs stay at version 1 so older apps still open them; pictures and sound need version 2.
-    let desktop = pack.kind == "game" && game_packs::Layer::from_value(data)?.desktop;
-    let version = if pack.assets.is_empty() && !desktop && pack.kind != "pet" { 1 } else { 2 };
-    let mut manifest = json!({"schemaVersion": version, "kind": pack.kind});
-    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
-    match pack.kind.as_str() {
-        "pet" => {
-            files.push(("pet.json".into(), serde_json::to_vec_pretty(data).map_err(|e|e.to_string())?));
+    if let Some(entry) = resource_entry(&pack.kind) {
+        let manifest = resource_manifest(&pack.kind, entry, data)?;
+        let payload = if matches!(pack.kind.as_str(), "effect" | "pet") {
+            serde_json::to_vec(data).map_err(|e| e.to_string())?
+        } else {
+            text(data, "html")?.as_bytes().to_vec()
+        };
+        let mut files = vec![(entry.into(), payload)];
+        if pack.kind == "pet" {
             files.extend(pack.assets.iter().cloned());
+        } else if !pack.assets.is_empty() {
+            return Err("只有游戏和桌宠包可以带资源文件".into());
         }
-        "wallpaper" => {
-            manifest["title"] = json!(text(data, "title")?);
-            manifest["description"] = json!(data["description"].as_str().unwrap_or(""));
-            files.push(("index.html".into(), text(data, "html")?.as_bytes().to_vec()));
-        }
-        "effect" => files.push(("effect.json".into(), serde_json::to_vec_pretty(data).map_err(|e| e.to_string())?)),
-        "widget" => {
-            for (key, value) in data.as_object().ok_or("组件内容不合法")? {
-                if key != "html" && key != "schemaVersion" { manifest[key] = value.clone(); }
-            }
-            files.push(("index.html".into(), text(data, "html")?.as_bytes().to_vec()));
-        }
-        "game" => {
-            for key in ["id", "name", "description"] { manifest[key] = json!(text(data, key)?); }
-            manifest["save"] = json!(data["save"].as_bool().unwrap_or(false));
-            if let Some(orientation) = game_orientation(data)? { manifest["orientation"] = json!(orientation); }
-            if desktop { manifest["layer"] = json!("desktop"); manifest["capabilities"] = data["capabilities"].clone(); }
-            let list: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
-            files.extend(list.into_iter().map(|(path, content)| (path, content.into_bytes())));
-            files.extend(pack.assets.iter().cloned());
-        }
-        _ => return Err("不支持的资源类型".into()),
+        return Ok((manifest, files));
     }
-    if !pack.assets.is_empty() && !["game", "pet"].contains(&pack.kind.as_str()) { return Err("只有游戏和桌宠包可以带资源文件".into()); }
+    if pack.kind != "game" { return Err("不支持的资源类型".into()); }
+
+    // Old games still use the manifest understood by their game host.
+    let layer = game_packs::Layer::from_value(data)?;
+    let version = if pack.assets.is_empty() && !layer.desktop { 1 } else { 2 };
+    let mut manifest = json!({
+        "schemaVersion": version,
+        "kind": "game",
+        "id": text(data, "id")?,
+        "name": text(data, "name")?,
+        "description": text(data, "description")?,
+        "save": data["save"].as_bool().unwrap_or(false)
+    });
+    if let Some(orientation) = game_orientation(data)? { manifest["orientation"] = json!(orientation); }
+    if layer.desktop { manifest["layer"] = json!("desktop"); manifest["capabilities"] = data["capabilities"].clone(); }
+    let list: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
+    let mut files: Vec<_> = list.into_iter().map(|(path, content)| (path, content.into_bytes())).collect();
+    files.extend(pack.assets.iter().cloned());
     Ok((manifest, files))
 }
 
@@ -199,28 +227,37 @@ fn kind_label(kind: &str) -> &'static str {
 }
 
 fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
-    let v2 = pack.data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app");
-    let legacy;
-    let (manifest, files) = if v2 {
+    let app_v2 = pack.data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app");
+    let entries;
+    let (manifest, files) = if app_v2 {
         (&pack.data, &pack.assets)
     } else {
-        legacy = zip_entries(pack)?;
-        (&legacy.0, &legacy.1)
+        entries = zip_entries(pack)?;
+        (&entries.0, &entries.1)
     };
+    let manifest_bytes = if app_v2 { serde_json::to_vec(manifest) } else { serde_json::to_vec_pretty(manifest) }
+        .map_err(|e| e.to_string())?;
+    if !app_v2 {
+        if let Some((name, _)) = files.iter().find(|(_, content)| content.len() as u64 > MAX_ENTRY) {
+            return Err(format!("文件「{name}」超过 4 MB"));
+        }
+        let total = files.iter().map(|(_, content)| content.len() as u64).sum::<u64>();
+        if total + manifest_bytes.len() as u64 > MAX_PACK {
+            return Err("资源包解压后不能超过 32 MB".into());
+        }
+    }
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     let mut add = |name: &str, bytes: &[u8]| -> Result<(), String> {
         writer.start_file(name, options).map_err(|e| e.to_string())?;
         writer.write_all(bytes).map_err(|e| e.to_string())
     };
-    let manifest_bytes = if v2 { serde_json::to_vec(manifest) } else { serde_json::to_vec_pretty(manifest) }
-        .map_err(|e| e.to_string())?;
     add("manifest.json", &manifest_bytes)?;
     for (name, bytes) in files { add(name, bytes)?; }
     let content = writer.finish().map_err(|e| e.to_string())?.into_inner();
-    let limit = if v2 { app_pack::MAX_PACK_BYTES } else { MAX_PACK };
+    let limit = if app_v2 { app_pack::MAX_PACK_BYTES } else { MAX_PACK };
     if content.len() as u64 > limit {
-        return Err(if v2 { "V2 作品 ZIP 不能超过 100 MB" } else { "资源包不能超过 32 MB" }.into());
+        return Err(if app_v2 { "V2 作品 ZIP 不能超过 100 MB" } else { "资源包不能超过 32 MB" }.into());
     }
     Ok(content)
 }
@@ -266,7 +303,6 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     }
     let file = |name: &str| entries.iter().find(|(entry, _)| entry == name).map(|(_, content)| content.as_slice());
     let utf8 = |name: &str, content: &[u8]| String::from_utf8(content.to_vec()).map_err(|_| format!("「{name}」必须使用 UTF-8 文本"));
-    let page = || -> Result<String, String> { utf8("index.html", file("index.html").ok_or("压缩包里缺少 index.html")?) };
     let raw_manifest = file("manifest.json").ok_or("压缩包里缺少 manifest.json，它要放在最外层")?;
     if raw_manifest.len() as u64 > MAX_ENTRY { return Err("manifest.json 超过 4 MB".into()); }
     let manifest: Value = serde_json::from_slice(raw_manifest)
@@ -279,21 +315,39 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
         let files = entries.into_iter().filter(|(name, _)| name != "manifest.json").collect();
         return Ok(Pack { kind: text(&manifest, "kind")?.into(), data: manifest, assets: files });
     }
-    if bytes.len() as u64 > MAX_PACK || total > MAX_PACK { return Err("旧版资源包不能超过 32 MB".into()); }
+    if bytes.len() as u64 > MAX_PACK || total > MAX_PACK { return Err("桌面资源包不能超过 32 MB".into()); }
     if archive.len() > MAX_ENTRIES { return Err(format!("压缩包里的文件太多，最多 {MAX_ENTRIES} 个")); }
     if let Some((name, _)) = entries.iter().find(|(_, content)| content.len() as u64 > MAX_ENTRY) {
         return Err(format!("文件「{name}」超过 4 MB"));
     }
-    let version = manifest.get("schemaVersion").and_then(Value::as_u64);
-    if !matches!(version, Some(1 | 2)) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
     let kind = text(&manifest, "kind")?.to_string();
-    // Only the listed files are read. Anything else would be dropped without a word, so it is refused instead.
-    let allowed: &[&str] = match kind.as_str() {
-        "wallpaper" | "widget" => &["manifest.json", "index.html"],
-        "effect" => &["manifest.json", "effect.json"],
-        _ => &[],
+    let version = manifest.get("schemaVersion").and_then(Value::as_u64);
+    let entry = if resource_entry(&kind).is_some() {
+        if version != Some(app_pack::SCHEMA_VERSION) {
+            return Err("桌面资源包需要 V2 格式（schemaVersion=3）".into());
+        }
+        if raw_manifest.len() as u64 > app_pack::MAX_MANIFEST_BYTES {
+            return Err("manifest.json 超过 64 KB".into());
+        }
+        if manifest.get("runtimeProtocol").is_some() {
+            return Err("runtimeProtocol 只用于游戏和小程序".into());
+        }
+        let entry = text(&manifest, "entry")?;
+        let ext = app_pack::check_file_path(entry)?;
+        if matches!(kind.as_str(), "wallpaper" | "widget") {
+            if !matches!(ext.as_str(), "html" | "htm") { return Err("entry 需要指向 HTML 文件".into()); }
+        } else if ext != "json" {
+            return Err("entry 需要指向 JSON 文件".into());
+        }
+        entry
+    } else {
+        if !matches!(version, Some(1 | 2)) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
+        "index.html"
     };
-    if !allowed.is_empty() {
+    let payload = || file(entry).ok_or_else(|| format!("压缩包里缺少 {entry}"));
+    // Only the listed files are read. Anything else would be dropped without a word, so it is refused instead.
+    let allowed = ["manifest.json", entry];
+    if matches!(kind.as_str(), "wallpaper" | "widget" | "effect") {
         let extra: Vec<&str> = entries.iter().map(|(name, _)| name.as_str()).filter(|name| !allowed.contains(name)).collect();
         if !extra.is_empty() {
             let hint = if extra.iter().any(|name| name.starts_with(game_packs::ASSET_DIR)) {
@@ -307,20 +361,19 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
     let data = match kind.as_str() {
         "pet" => {
-            if version != Some(2) { return Err("桌宠资源包需要 schemaVersion=2".into()); }
-            let mut theme: pet_packs::Theme = serde_json::from_slice(file("pet.json").ok_or("压缩包里缺少 pet.json")?).map_err(|e|format!("pet.json 格式无效：{e}"))?;
-            for (name, content) in entries.iter().filter(|(name, _)| !["manifest.json", "pet.json"].contains(&name.as_str())) {
+            let mut theme: pet_packs::Theme = serde_json::from_slice(payload()?).map_err(|e| format!("{entry} 格式无效：{e}"))?;
+            for (name, content) in entries.iter().filter(|(name, _)| !allowed.contains(&name.as_str())) {
                 assets.push((name.clone(), content.clone()));
             }
             pet_packs::import_assets(&mut theme, &assets)?;
             serde_json::to_value(theme).map_err(|e|e.to_string())?
         }
-        "wallpaper" => json!({"title": text(&manifest, "title")?, "description": manifest["description"].as_str().unwrap_or(""), "html": page()?}),
-        "effect" => serde_json::from_slice(file("effect.json").ok_or("压缩包里缺少 effect.json")?).map_err(|_| "effect.json 不是有效的 JSON".to_string())?,
+        "wallpaper" => json!({"title": text(&manifest, "name")?, "description": manifest["description"].as_str().unwrap_or(""), "html": utf8(entry, payload()?)?}),
+        "effect" => serde_json::from_slice(payload()?).map_err(|_| format!("{entry} 不是有效的 JSON"))?,
         "widget" => {
-            let mut data = manifest.as_object().cloned().ok_or("manifest.json 不合法")?;
-            data.remove("kind");
-            data.insert("html".into(), json!(page()?));
+            let mut data = widget_metadata(&manifest);
+            data.insert("schemaVersion".into(), json!(1));
+            data.insert("html".into(), json!(utf8(entry, payload()?)?));
             Value::Object(data)
         }
         "game" => {
@@ -347,6 +400,15 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
 pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
     import_pack(root, from_zip(content)?)
 }
+
+pub(crate) fn import_effect_zip(root: &Path, path: &Path) -> Result<Value, String> {
+    let pack = from_zip(&read_bytes(path, MAX_PACK)?)?;
+    if pack.kind != "effect" {
+        return Err("请选择特效 ZIP，其他资源包可在「应用 → 导入作品」导入".into());
+    }
+    import_pack(root, pack)
+}
+
 fn import_pack(root: &Path, pack: Pack) -> Result<Value, String> {
     let data = &pack.data;
     if data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app") {
@@ -432,9 +494,15 @@ pub async fn import_resource_pack(
         }
         let root = crate::storage::root(&app)?;
         // Wallpaper creation and downloads share the same catalog lock.
-        let state = app.state::<crate::content::ContentState>();
-        let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
-        import_pack(&root, pack).map(Some)
+        let result = {
+            let state = app.state::<crate::content::ContentState>();
+            let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
+            import_pack(&root, pack)?
+        };
+        if result["kind"] == "wallpaper" {
+            let _ = app.emit_to("control", "wallpaper-library-changed", ());
+        }
+        Ok(Some(result))
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -455,12 +523,14 @@ mod tests {
 
     #[test]
     fn pet_zip_preserves_images_and_never_imports_instance_layout() {
-        let root=temp_root("pet-roundtrip");
-        let mut theme=pet_packs::builtin().remove(0);theme.id="shared-garden".into();
-        pet_packs::save(&root.join("a/pets/themes"),&theme,false).unwrap();
+        let root = temp_root("pet-roundtrip");
+        let mut theme = pet_packs::builtin().remove(0);
+        theme.id = "shared-garden".into();
+        pet_packs::save(&root.join("a/pets/themes"), &theme, false).unwrap();
         let pack=export(&root.join("a"),"pet",&theme.id).unwrap();
         assert_eq!(pack.assets.len(),2);
         let zip=to_zip(&pack).unwrap();
+        assert_eq!(zip_manifest(&zip), json!({"schemaVersion":3, "kind":"pet", "entry":"pet.json"}));
         assert_eq!(import(&root.join("b"),&zip).unwrap()["kind"],"pet");
         let restored=pet_packs::load(&root.join("b/pets/themes")).unwrap();
         assert_eq!(serde_json::to_value(&restored[0]).unwrap(),serde_json::to_value(&theme).unwrap());
@@ -477,6 +547,11 @@ mod tests {
             writer.write_all(content.as_bytes()).unwrap();
         }
         writer.finish().unwrap().into_inner()
+    }
+
+    fn zip_manifest(zip: &[u8]) -> Value {
+        let mut archive = ZipArchive::new(Cursor::new(zip)).unwrap();
+        serde_json::from_reader(archive.by_name("manifest.json").unwrap()).unwrap()
     }
 
     fn temp_root(name: &str) -> std::path::PathBuf {
@@ -612,7 +687,7 @@ mod tests {
         let root = temp_root("handmade");
         // A folder zipped by the Finder: everything sits inside one folder and macOS adds junk next to it.
         let widget = make_zip(&[
-            ("tiny-clock/manifest.json", r#"{"schemaVersion":1,"kind":"widget","id":"tiny-clock","name":"小时钟","width":200,"height":120}"#),
+            ("tiny-clock/manifest.json", r#"{"schemaVersion":3,"kind":"widget","entry":"index.html","id":"tiny-clock","name":"小时钟","width":200,"height":120}"#),
             ("tiny-clock/index.html", "<div>12:00</div>"),
             ("__MACOSX/tiny-clock/._index.html", "junk"),
             ("tiny-clock/.DS_Store", "junk"),
@@ -622,7 +697,7 @@ mod tests {
         assert_eq!(done["id"], "tiny-clock");
         assert!(custom_widgets::find(&root.join("custom_widgets"), "tiny-clock").is_some());
 
-        let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE)]);
+        let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":3,"kind":"effect","entry":"effect.json"}"#), ("effect.json", effect_packs::EXAMPLE)]);
         assert!(import(&root, &effect).is_ok());
 
         let game = make_zip(&[
@@ -632,9 +707,72 @@ mod tests {
         ]);
         assert_eq!(import(&root, &game).unwrap()["id"], "star-catcher");
 
-        let wallpaper = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"wallpaper","title":"手作"}"#), ("index.html", "<html><body>hi</body></html>")]);
-        assert_eq!(import(&root, &wallpaper).unwrap()["name"], "手作");
+        let wallpaper = make_zip(&[("manifest.json", r#"{"schemaVersion":3,"kind":"wallpaper","entry":"index.html","name":"手作"}"#), ("index.html", "<html><body>hi</body></html>")]);
+        let wallpaper = import(&root, &wallpaper).unwrap();
+        assert_eq!(wallpaper["name"], "手作");
+
+        for (kind, id, entry) in [
+            ("widget", "tiny-clock", "index.html"),
+            ("effect", "glitter", "effect.json"),
+            ("wallpaper", wallpaper["id"].as_str().unwrap(), "index.html"),
+        ] {
+            let zip = to_zip(&export(&root, kind, id).unwrap()).unwrap();
+            let manifest = zip_manifest(&zip);
+            assert_eq!(manifest["schemaVersion"], 3);
+            assert_eq!(manifest["kind"], kind);
+            assert_eq!(manifest["entry"], entry);
+            assert!(manifest.get("runtimeProtocol").is_none());
+            let imported = import(&root.join("reimported"), &zip).unwrap();
+            assert_eq!(imported["kind"], kind);
+            assert_eq!(imported["id"], id);
+        }
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn effect_file_picker_imports_v2_zip_at_its_declared_entry() {
+        let root = temp_root("effect-zip-picker");
+        fs::create_dir_all(&root).unwrap();
+        let zip = root.join("effect.zip");
+        fs::write(&zip, make_zip(&[
+            ("manifest.json", r#"{"schemaVersion":3,"kind":"effect","entry":"theme/particles.json"}"#),
+            ("theme/particles.json", effect_packs::EXAMPLE),
+        ])).unwrap();
+        assert_eq!(import_effect_zip(&root, &zip).unwrap()["id"], "glitter");
+        assert!(import_effect_zip(&root, &zip).is_err());
+        assert_eq!(effect_packs::find(&root.join("effects"), "glitter").unwrap()["schemaVersion"], 1);
+
+        fs::write(&zip, make_zip(&[
+            ("manifest.json", r#"{"schemaVersion":3,"kind":"wallpaper","entry":"index.html","name":"星空"}"#),
+            ("index.html", "<!doctype html><canvas></canvas>"),
+        ])).unwrap();
+        assert!(import_effect_zip(&root, &zip).unwrap_err().contains("请选择特效 ZIP"));
+        assert!(!root.join("wallpapers").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn desktop_v2_checks_entry_type_and_does_not_discard_files() {
+        let root = temp_root("desktop-v2-invalid");
+        let manifest = json!({"schemaVersion":3, "kind":"widget", "entry":"card.html", "id":"tiny-clock", "name":"小时钟"});
+        for (key, value, expected) in [
+            ("entry", json!("style.css"), "HTML 文件"),
+            ("entry", json!("../card.html"), "路径或类型"),
+            ("entry", json!("missing.html"), "缺少 missing.html"),
+            ("runtimeProtocol", json!(2), "runtimeProtocol"),
+        ] {
+            let mut invalid = manifest.clone();
+            invalid[key] = value;
+            let error = import(&root, &make_zip(&[("manifest.json", &invalid.to_string())])).unwrap_err();
+            assert!(error.contains(expected), "{error}");
+        }
+        let zip = make_zip(&[
+            ("manifest.json", &manifest.to_string()),
+            ("card.html", "<p>12:00</p>"),
+            ("style.css", "p{}"),
+        ]);
+        assert!(import(&root, &zip).unwrap_err().contains("style.css"));
+        assert!(!root.exists());
     }
 
     // 1x1 pixel images and short headers: enough bytes to pass the type check.
@@ -808,13 +946,13 @@ mod tests {
     #[test]
     fn kinds_that_cannot_carry_files_say_so_instead_of_dropping_them() {
         let root = temp_root("extra-files");
-        let widget = r#"{"schemaVersion":1,"kind":"widget","id":"tiny-clock","name":"小时钟"}"#;
+        let widget = r#"{"schemaVersion":3,"kind":"widget","entry":"index.html","id":"tiny-clock","name":"小时钟"}"#;
         let with_picture = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<p>x</p>"), ("assets/a.png", PNG)]);
         let error = import(&root, &with_picture).unwrap_err();
         assert!(error.contains("assets/") && error.contains("data:"), "{error}");
         let with_style = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<p>x</p>"), ("style.css", b"p{}")]);
         assert!(import(&root, &with_style).unwrap_err().contains("style.css"));
-        let effect = make_zip_bytes(&[("manifest.json", br#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE.as_bytes()), ("note.md", b"hi")]);
+        let effect = make_zip_bytes(&[("manifest.json", br#"{"schemaVersion":3,"kind":"effect","entry":"effect.json"}"#), ("effect.json", effect_packs::EXAMPLE.as_bytes()), ("note.md", b"hi")]);
         assert!(import(&root, &effect).unwrap_err().contains("note.md"));
         assert!(!root.exists());
         fs::remove_dir_all(&root).ok();
@@ -826,13 +964,16 @@ mod tests {
     }
 
     #[test]
-    fn a_pack_imports_from_any_page_because_the_manifest_names_its_kind() {
-        let root = temp_root("any-page");
-        let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE)]);
-        assert_eq!(import(&root, &effect).unwrap()["kind"], "effect");
-        let wallpaper = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"wallpaper","title":"手作"}"#), ("index.html", "<html><body>hi</body></html>")]);
-        assert_eq!(import(&root, &wallpaper).unwrap()["kind"], "wallpaper");
-        fs::remove_dir_all(root).unwrap();
+    fn desktop_resource_zips_require_v2_manifest() {
+        let root = temp_root("legacy-resource-rejected");
+        for kind in ["wallpaper", "effect", "widget", "pet"] {
+            for old_version in [1, 2] {
+                let manifest = json!({"schemaVersion": old_version, "kind": kind});
+                let zip = make_zip(&[("manifest.json", &manifest.to_string())]);
+                assert!(import(&root, &zip).unwrap_err().contains("需要 V2 格式"), "{manifest}");
+            }
+        }
+        assert!(!root.exists());
     }
 
     #[test]

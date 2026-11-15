@@ -99,7 +99,8 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 用户要创作小伴小游戏、工具小程序或测评时，先发现并调用 app_read_format 读取内置 V2 规范。给出简短方案，写清作品类型、玩法或核心功能、方向、操作方式和视觉风格。按下方规则确认后，在工作区分文件制作入口、图标、封面和代码，再用 app_create 安装（小游戏 kind=game，小程序 kind=app），用 app_validate 校验。用户要试用时用 app_open 打开独立窗口；实际操作后才可确认玩法、交互或存档已通过。作品在「应用 → 我的作品」，可从卡片导出 V2 ZIP。game_read_format、game_create 用于维护旧 V1 游戏。\n\
          - 确认小游戏、小程序或宠物主题的创作方案时，用 ask_user 提供“就按这个做”“我想改改”。宠物先读 pet_read_format，方案写清形象、主配色、角色和动作。用户提出修改时更新方案再确认，最多两轮。用户明确要求直接做、已经给出完整设定，或只修改刚做好的作品时，可以直接执行。\n\
          - 用户想要一个现有的特效里没有的桌面动效时，用 effect_create 直接为他写一个特效包：先用一句话说清楚你打算做成什么样，再用 effect_read_format 读取程序内置的完整格式和示例，按规范写出完整的 JSON 保存；不要到工作目录查找 docs/effects.md 等源码文档。写完告诉他可以在“桌面特效”页选用，也可以顺手用 effect_set 切过去看看。\n\
-         - 用户问起小伴桌面官网或超级小伴论坛，或想把自己创作的壁纸、特效、组件、游戏分享到论坛时，先用 load_skill 加载 xiaoban-community，再用 community_share 导出作品并打开论坛板块，用 community_open 打开官网或论坛页面。发帖要用户自己登录论坛完成，你不能代发，导出后把接下来要做的事告诉他。\n\
+         - 交付可导入的动态壁纸、特效、小组件或伙伴主题时，先用对应创作工具保存作品，再用 community_share 导出。只要 ZIP 时传 open_forum=false。小伴为这四类桌面资源自动生成 schemaVersion=3、kind、entry，资源内容按各自的创作规范提交。runtimeProtocol 用于游戏和小程序。\n\
+         - 用户问起小伴桌面官网或超级小伴论坛，或想把自己创作的壁纸、特效、组件、伙伴、游戏分享到论坛时，先用 load_skill 加载 xiaoban-community，再用 community_share 导出作品并打开论坛板块，用 community_open 打开官网或论坛页面。发帖要用户自己登录论坛完成，你不能代发，导出后把接下来要做的事告诉他。\n\
          - 用户要求用外部编程 Agent（Claude Code 或 Codex）写代码、排查较复杂的 Bug、修复测试、重构项目或执行长程工程任务时，使用 agent_delegate 把任务委派给本机已安装的 Agent 后台独立执行。委派后向用户汇报已启动并给出任务编号，在后续轮次中可用 agent_status 查看进展或 agent_approve 提交审批。\n\
          - 需要当前日期和时间时，用 time_now，不要猜。\n\
          - 专家角色只改变专业方法与交付标准，不能增加本轮没有的工具、权限或记忆；相关技能与连接器是否可用，以实际安装、授权和工具列表为准。{ocu_section}",

@@ -467,11 +467,13 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ### 自创资源导出与分享
 
-自创 HTML 动画壁纸、桌面特效、HTML 小组件和通过小伴创作的文本文件游戏支持导出 zip 资源包。各页提供“导入资源包”，作品卡片或详情面板提供“导出资源包”“分享到论坛”。分享先选择保存位置，再打开超级小伴论坛，由用户填写图文说明、上传预览图或视频和资源包附件。
+自创 HTML 动画壁纸、桌面特效、HTML 小组件、伙伴主题和应用作品支持导出 ZIP 资源包。各页提供导入入口，作品卡片或详情面板提供“导出资源包”“分享到论坛”。分享先选择保存位置，再打开超级小伴论坛，由用户填写图文说明并上传预览和资源包附件。
 
-资源包是普通 zip：最外层有 `manifest.json`（`schemaVersion: 1`、`kind`）加作品文件，任何工具都能打开和制作，完整格式见 [docs/resource-pack-format.md](docs/resource-pack-format.md)。单包最多 32 MB，包含作品模板和源文件，不包含聊天、账号、桌面布局、便签内容或游戏存档。自包含作品可离线使用；代码自行引用的外部网址不会自动下载。游戏的文本文件沿用现有创作协议的类型和大小限制；图片、音频和字体放在 `assets/` 下，一并导出和导入（带资源的包 `schemaVersion` 为 2，最多 60 个、单个 4 MB、合计 16 MB，并核对文件头）。壁纸、组件和特效暂不支持带资源文件，包里出现多余文件会被明确拒绝。各页的“导入资源包”都按包里的 `kind` 放到对应位置。
+桌面资源导入和导出使用 V2 ZIP，清单包含 `schemaVersion: 3`、`kind` 和 `entry`。「应用 → 导入作品」按 `kind` 把 ZIP 放到对应资源库，特效页也可直接选择特效 ZIP 或 JSON。壁纸和小组件使用自包含 HTML，特效使用 JSON，伙伴主题可携带 `assets/` 图片。桌面资源单包最多 32 MB。字段和文件布局见[资源包格式](docs/resource-pack-format.md)。
 
-游戏有两个运行层：独立游戏窗口（默认，可全屏）和桌面层。桌面层游戏在 manifest 里写 `layer: "desktop"`，由小伴在主显示器上放一个透明窗口、浮在其他应用窗口上方运行，窗口默认点击穿透，游戏用 `game.regions` 声明需要鼠标的矩形；按 `capabilities` 申请才会收到其他窗口的位置和大小（`windows`）或鼠标位置（`pointer`），不含窗口标题。托盘菜单的“停止桌面游戏”随时结束它。只支持 Windows 和 macOS；macOS 的窗口读取已在真机验证，Windows 部分尚未在真机运行。协议见 [docs/resource-pack-format.md](docs/resource-pack-format.md)，示例见 `docs/examples/desk-pal`。导入复用各资源原有的验证与存储流程，不自动应用壁纸、启用特效、放置组件或启动游戏；同名特效、组件与游戏拒绝覆盖，内容相同的壁纸去重。官网和论坛页面本轮未改动。
+旧版游戏有两个运行层，分别是独立游戏窗口（默认，可全屏）和桌面层。桌面层游戏在清单里写 `layer: "desktop"`，由小伴在主显示器上放一个透明窗口、浮在其他应用窗口上方运行。窗口默认点击穿透，游戏用 `game.regions` 声明需要鼠标的矩形，按 `capabilities` 申请其他窗口的位置和大小（`windows`）或鼠标位置（`pointer`）。托盘菜单的“停止桌面游戏”随时结束它。macOS 的窗口读取已在真机验证，Windows 部分尚未在真机运行。协议见 [资源包格式](docs/resource-pack-format.md)，示例见 `docs/examples/desk-pal`。V2 游戏和小程序使用独立窗口，清单另有 `runtimeProtocol: 2`。
+
+导入资源 ZIP 后可从对应资源库查看并选用。同 ID 的特效、组件、伙伴主题和游戏拒绝覆盖，内容相同的壁纸去重。ZIP 只包含作品模板和源文件。
 
 聊天里的小伴也能代办分享：内置技能 `xiaoban-community`（`src-tauri/skills/xiaoban-community/SKILL.md`，随程序更新）讲解官网与论坛的页面、板块和发帖规则；`community_share` 弹出保存对话框导出 zip 资源包，再打开论坛对应板块（壁纸、特效、组件到 `/c/xiaoban-wallpaper`，游戏到 `/c/xiaoban-game`），`community_open` 只能打开固定清单里的官网和论坛页面。登录和发帖仍由用户在论坛完成。
 

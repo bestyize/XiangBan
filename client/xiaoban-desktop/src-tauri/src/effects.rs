@@ -174,10 +174,21 @@ pub async fn import_effect_pack(window: tauri::WebviewWindow) -> Result<Value, S
     control_only(&window)?;
     let app = window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let chosen = app.dialog().file().set_parent(&window).set_title("选择特效包（JSON 文件）")
-            .add_filter("特效包", &["json"]).blocking_pick_file();
+        let chosen = app.dialog().file().set_parent(&window).set_title("选择特效包（ZIP 或 JSON）")
+            .add_filter("特效包", &["zip", "json"]).blocking_pick_file();
         let Some(chosen) = chosen else { return Ok(json!({ "status": "cancelled" })); };
         let source = chosen.into_path().map_err(|e| e.to_string())?;
+        if source.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
+            let root = storage::root(&app)?;
+            let state = app.state::<crate::content::ContentState>();
+            let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
+            let imported = crate::resource_packs::import_effect_zip(&root, &source)?;
+            sync(&app);
+            return Ok(json!({
+                "status": "imported", "id": imported["id"], "name": imported["name"],
+                "file": format!("{}.json", imported["id"].as_str().unwrap_or_default()),
+            }));
+        }
         let text = std::fs::read_to_string(&source).map_err(|_| "无法读取这个文件（需要 UTF-8 文本的 JSON）".to_string())?;
         if text.len() as u64 > 64 * 1024 { return Err("特效包超过 64 KB".into()); }
         let pack: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| format!("JSON 格式错误：{e}"))?;

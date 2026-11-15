@@ -8,7 +8,19 @@
 
 在「应用」页导入或导出 V2 作品 ZIP。根目录的 `manifest.json` 使用 `schemaVersion: 3`、`runtimeProtocol: 2` 和 `kind: "game"` 或 `"app"`，并指定入口、图标和封面。包格式和体积限制见[小伴应用运行时协议](../../../docs/architecture/app-runtime/README.md#3-应用包)。导入后在「我的作品」中打开独立窗口。
 
-对话创作先读 `app_read_format`，再用 `app_create` 安装草稿，随后用 `app_validate` 核对资源包。需要试用时调用 `app_open`。下文的旧版资源包格式适用于既有作品。
+对话创作先读 `app_read_format`，再用 `app_create` 安装草稿，随后用 `app_validate` 核对资源包。需要试用时调用 `app_open`。
+
+## V2 桌面资源
+
+壁纸、特效、小组件和伙伴使用 V2 ZIP 导入和导出。`manifest.json` 包含 `schemaVersion: 3`、`kind` 和指向包内文件的 `entry`。导入按 `kind` 找到对应的桌面资源库。桌面资源清单请省略 `runtimeProtocol`，此字段用于选择游戏和小程序的运行时。
+
+```json
+{ "schemaVersion": 3, "kind": "effect", "entry": "effect.json" }
+```
+
+`entry` 使用[应用包的相对路径规则](../../../docs/architecture/app-runtime/README.md#32-体积文件类型与路径)，最多八层。壁纸和小组件的入口是 `.html` 或 `.htm`。特效和伙伴的入口是 `.json`，其数据版本见各类型说明。导出使用下表列出的入口文件名。
+
+通过对话创作时，`wallpaper_create` 和 `widget_create` 接收完整 HTML，`effect_create` 接收粒子 JSON，`pet_theme_save` 接收主题 JSON。作品保存后，在对应资源页导出 ZIP，或调用 `community_share` 并传 `open_forum=false`。小伴会生成 V2 清单。
 
 ## 能做什么
 
@@ -17,7 +29,7 @@
 | 动态壁纸 | `wallpaper` | 铺满桌面的 HTML 动画或互动页面 | 一个自包含的 `index.html` | 壁纸页，“我的壁纸” |
 | 桌面特效 | `effect` | 铺在桌面上的粒子层（雨、雪、花瓣、烟花等） | 一个 JSON 描述，不含代码 | 桌面特效页 |
 | 桌面组件 | `widget` | 摆在桌面一角的小卡片（时钟、番茄钟、诗词等） | 一个自包含的 `index.html` | 桌面组件页 |
-| 小游戏 | `game` | 离线小游戏（独立窗口，可全屏） | 一个文件夹的文本文件，入口 `index.html` | 游戏空间页 |
+| 旧版小游戏 | `game` | 离线小游戏（独立窗口，可全屏） | 一个文件夹的文本文件，入口 `index.html` | 应用页，“我的作品” |
 | 桌面伙伴 | `pet` | 可自创形象的伙伴主题 | `pet.json`，可带 `assets/` | 桌面伙伴页 |
 
 官方内置组件和关怀提醒不是自创资源包；桌面伙伴主题可导入、导出和自创，详细结构与限制见 [桌面宠物主题](pets.md)。
@@ -26,38 +38,30 @@
 
 ### 各类型能带什么
 
-| 类型 | 包里的文件 | 图片、音频、字体 |
+| 类型 | 包里的文件（使用默认入口名） | 图片、音频、字体 |
 | --- | --- | --- |
 | 动态壁纸 | `manifest.json`、`index.html` | 不支持放文件，请用 `data:` 地址写进页面 |
 | 桌面特效 | `manifest.json`、`effect.json` | 不适用 |
 | 桌面组件 | `manifest.json`、`index.html` | 不支持放文件，请用 `data:` 地址写进页面 |
-| 小游戏 | `manifest.json` 加任意多个文本文件 | 支持，放在 `assets/` 下 |
+| 旧版小游戏 | `manifest.json` 加任意多个文本文件 | 支持，放在 `assets/` 下 |
 | 桌面伙伴 | `manifest.json`、`pet.json` | 支持图片素材，放在 `assets/` 下 |
 
-不支持的类型里出现多余的文件时，导入会直接拒绝并列出是哪些文件，不会悄悄丢掉。壁纸和组件以后会支持 `assets/`，到时候同一套写法可以直接用。
+壁纸、特效和小组件的 ZIP 只含清单和入口。有多余文件时，导入会拒绝并列出文件名。特效页的「导入」可选择特效 ZIP 或单个 JSON。
 
-## zip 的通用规则
+## 桌面资源与旧版游戏的 ZIP 规则
 
 - 标准 zip，压缩或仅存储都行，文件名以 `.zip` 结尾。
 - 最外层必须有 `manifest.json`。把整个文件夹压缩（访达“压缩”、`zip -r 名字.zip 文件夹`）也可以：只要最外层没有 `manifest.json` 且所有文件都在同一个文件夹里，就会自动进入那个文件夹。
 - 文件夹条目、`__MACOSX/`、`.DS_Store` 和以 `._` 开头的文件会被忽略。
 - 以下会被拒绝：符号链接、加密、绝对路径、含 `..` 的路径、含 `\` 或 `:` 的路径、重名文件（不分大小写）。
-- 数量和大小：最多 110 个文件，单个文件不超过 4 MB，zip 本身和解压后的总量都不超过 32 MB。各类型另有更严的限制，见下文。
+- 数量和大小：最多 110 个条目，单个文件不超过 4 MB，ZIP 本身和解压后的总量都不超过 32 MB。V2 的 `manifest.json` 上限为 64 KB。各类型另有更严的限制，见下文。
 - 除游戏和伙伴主题的 `assets/` 外，所有文件必须是 UTF-8 文本。
 
-### manifest.json
+### 从旧 ZIP 迁移
 
-必填两项，其余字段看类型，不认识的字段会被忽略：
+如果手里有旧的壁纸、特效、小组件或伙伴 ZIP，先在同时支持读取旧清单和导出 V2 的转换版中导入，再从对应资源页重新导出。新版请选择导出的 V2 ZIP。
 
-```json
-{ "schemaVersion": 1, "kind": "widget" }
-```
-
-`kind` 是上表所列值之一。`schemaVersion` 是 `1` 或 `2`：
-
-- 只有文本文件的包用 `1`，旧版本的小伴桌面也能导入。
-- 带 `assets/` 资源文件的包必须写 `2`。旧版本遇到 `2` 会提示“请更新小伴桌面”，不会出现看不懂的报错。写 `1` 却放了资源文件会被拒绝。
-- 小伴桌面导出时会按内容自动选择版本。
+旧版游戏的清单使用 `schemaVersion: 1`，包含 `assets/` 的旧包和桌面层游戏使用 `2`。小伴桌面导出旧版游戏时会按内容选择版本。
 
 ## 动态壁纸 `wallpaper`
 
@@ -72,7 +76,7 @@ manifest 字段：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `title` | 是 | 壁纸名称，最多 48 个字 |
+| `name` | 是 | 壁纸名称，最多 48 个字 |
 | `description` | 否 | 简短介绍，不超过 2 KB |
 
 `index.html` 不超过 4 MB，写成单个自包含页面：样式和脚本都内联，用 CSS 动画、canvas 或 WebGL 画，铺满 `100vw × 100vh` 并随窗口自适应。不要引用外部 CDN、字体或图片，不要依赖联网。
@@ -92,7 +96,7 @@ manifest.json
 effect.json
 ```
 
-manifest 只需要 `schemaVersion` 和 `kind`。`effect.json` 就是特效包本身，它的 `id`、`name` 写在里面。特效包是纯数据（几层粒子、每层多少个、多大、怎么运动、什么形状），不含代码。
+V2 清单通过 `entry` 指向 `effect.json`。特效数据的 `schemaVersion` 为 `1`，`id`、`name` 和粒子层参数也写在这个文件里。
 
 字段、形状、爆发、带状分布的完整规则见 [effects.md](effects.md)，可直接运行的样例见 [effect-pack-example.json](effect-pack-example.json)。要点：
 
@@ -113,7 +117,7 @@ manifest 字段：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `id` | 是 | 1 到 48 个字符，小写字母或数字开头，其余用小写字母、数字、`-`、`_`。不能与内置组件重名：`fortune`、`calendar`、`weather`、`notes`、`countdown` |
+| `id` | 是 | 1 到 48 个字符，小写字母或数字开头，其余用小写字母、数字、`-`、`_`。避开内置标识 `clock`、`weather`、`notes`、`reminders`、`stocks`、`woodfish`、`calendar`、`countdown`、`custom` 和 `pelican-bike` |
 | `name` | 是 | 显示名，最多 24 个字 |
 | `description` | 否 | 一句话介绍，最多 80 个字 |
 | `width` | 否 | 默认宽度，100 到 800 像素，默认 280 |
@@ -130,7 +134,7 @@ manifest 字段：
 
 已有同 `id` 的自创组件时拒绝导入，最多加载 40 个自创组件。
 
-## 小游戏 `game`
+## 旧版小游戏 `game`
 
 文件：
 
@@ -266,7 +270,7 @@ cd docs/examples/desk-pal && zip -r ../desk-pal.zip .
 `manifest.json`
 
 ```json
-{ "schemaVersion": 1, "kind": "widget", "id": "hello-card", "name": "问候卡片", "width": 240, "height": 120, "theme": "glass" }
+{ "schemaVersion": 3, "kind": "widget", "entry": "index.html", "id": "hello-card", "name": "问候卡片", "width": 240, "height": 120, "theme": "glass" }
 ```
 
 `index.html`
@@ -289,21 +293,21 @@ cd docs/examples/desk-pal && zip -r ../desk-pal.zip .
 cd hello-card && zip -r ../hello-card.zip .
 ```
 
-壁纸包同理，`manifest.json` 写 `{ "schemaVersion": 1, "kind": "wallpaper", "title": "水墨涟漪" }`，再放 `index.html`。特效包放 `manifest.json` 和 `effect.json`。游戏包放 `manifest.json`、`index.html` 和其他游戏文件。
+壁纸包同理，`manifest.json` 写 `{ "schemaVersion": 3, "kind": "wallpaper", "entry": "index.html", "name": "水墨涟漪" }`，再放 `index.html`。
 
 ## 给 AI 工具的检查清单
 
 做完一个包，逐项确认：
 
-- [ ] zip 最外层（或唯一的外层文件夹下）有 `manifest.json`，`schemaVersion` 是 `1`，`kind` 正确。
-- [ ] 所需文件齐全：壁纸和组件有 `index.html`，特效有 `effect.json`，游戏有 `index.html`。
-- [ ] 除游戏 `assets/` 下的图片、音频、字体外，全是 UTF-8 文本；带 `assets/` 的包 `schemaVersion` 是 `2`。
+- [ ] ZIP 最外层（或唯一的外层文件夹下）有 `manifest.json`。V2 桌面资源的 `schemaVersion` 为 `3`，`kind` 与资源类型一致，`entry` 指向实际文件。
+- [ ] 各类型的必填字段和文件齐全。HTML 和 JSON 文件使用 UTF-8。
+- [ ] 伙伴图片放在 `assets/`，带图片的 `pet.json` 的 `schemaVersion` 为 `2`。旧版游戏按其文件类型和清单版本规则打包。
 - [ ] 壁纸和组件里的图片已经用 `data:` 地址写进页面，没有额外的图片文件。
 - [ ] `id` 符合该类型的格式，且不与内置项重名。
 - [ ] 名称、简介没超过字数，页面和文件没超过大小。
 - [ ] 没有外部链接、CDN 和联网请求；没有 `localStorage`、cookie；资源引用都是相对路径。
 - [ ] 组件和壁纸在 `100vw × 100vh` 或指定的宽高里自适应；游戏用经典脚本，不用 ES modules。
-- [ ] 组件的交互不依赖内联脚本，或已在应用里确认能运行。
+- [ ] 已在组件沙箱里检查首屏和主要操作。
 - [ ] 桌面层游戏：`schemaVersion` 是 `2`，`layer` 是 `desktop`，只申请真正用到的 `capabilities`；用 `game.regions` 声明要鼠标的区域；自己提供退出方式，不依赖键盘。
 
 ## 实现位置
@@ -321,4 +325,4 @@ cd hello-card && zip -r ../hello-card.zip .
 
 ## 桌宠资源包
 
-桌宠沿用 ZIP 导入导出入口，最外层 `manifest.json` 为 `{"schemaVersion":2,"kind":"pet"}`，作品写在 `pet.json`，图片放在 `assets/`。主题与图片格式、限制及完整示例见 [桌宠格式](pets.md)。ZIP 只含创作素材，导入后在桌宠页自定义主题中选择并添加，不包含桌面实例与位置，也不会自动运行。
+桌宠使用 V2 `manifest.json`，例如 `{"schemaVersion":3,"kind":"pet","entry":"pet.json"}`。图片放在 `assets/`。主题与图片格式、限制及完整示例见 [桌宠格式](pets.md)。导入后在桌宠页的自定义主题中选择并添加实例。

@@ -1226,7 +1226,7 @@ fn tool(desktop: &Arc<dyn Desktop>, spec: ToolSpec, run: impl Fn(&dyn Desktop, &
 
 fn effect_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
     Ok(format!(
-        "以下是小伴程序内置的完整特效包格式和示例，可离线读取，无需查找本地文件。文档中的源码路径仅供开发参考，示例已附在末尾。\n\n{}\n\n## 完整可用示例\n\n```json\n{}\n```",
+        "以下是小伴内置的特效创作规范。末尾的 effect.json 示例可直接传给 effect_create 的 pack 参数。\n\n{}\n\n## effect.json 示例\n\n```json\n{}\n```",
         crate::effect_packs::FORMAT_GUIDE,
         crate::effect_packs::EXAMPLE,
     ))
@@ -1313,7 +1313,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "wallpaper_create",
-                "创作并保存自包含的单文件 HTML 动态或交互壁纸（最多 4 MiB）。从零创作直接传 html；已有工作区草稿时传 source_path，无需再读出和重发源码。两者只传一个。可用 Canvas、WebGL、内联 CSS/JS。壁纸运行于隔离 iframe，不能用本地存储、Cookie、IndexedDB、弹窗或外层导航。作品应离线可用，不依赖外链或同目录资源。用 100vw × 100vh 并处理 resize，主体避开桌面图标密集区，考虑不同屏幕比例，暂停不可见的动画。默认保存到壁纸库供预览；用户明确要求立即换上时传 apply_now=true。",
+                "创作并保存自包含的单文件 HTML 动态或交互壁纸（最多 4 MiB）。从零创作直接传 html；已有工作区草稿时传 source_path，无需再读出和重发源码。两者只传一个。可用 Canvas、WebGL、内联 CSS/JS。壁纸运行于隔离 iframe，不能用本地存储、Cookie、IndexedDB、弹窗或外层导航。作品应离线可用，不依赖外链或同目录资源。用 100vw × 100vh 并处理 resize，主体避开桌面图标密集区，考虑不同屏幕比例，暂停不可见的动画。默认保存到壁纸库供预览；用户明确要求立即换上时传 apply_now=true。交付可导入的 V2 ZIP 时用 community_share(kind=wallpaper, id=返回的 id, open_forum=false)。导出器生成清单 schemaVersion=3，entry 为 index.html，name 取壁纸的 title。",
                 object(
                     json!({
                         "title": { "type": "string", "description": "动态壁纸标题（最多 48 字，如 水墨涟漪交互壁纸）" },
@@ -1342,7 +1342,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
         }),
         tool(
             &desktop,
-            ToolSpec::new("effect_read_format", "读取程序内置的完整桌面特效包格式与可用 JSON 示例。创作特效前先调用本工具；无需搜索工作目录、安装目录或联网查找文档。", none()).risk(Risk::Read),
+            ToolSpec::new("effect_read_format", "读取程序内置的粒子 JSON 创作规范、示例和 V2 ZIP 打包规则。创作特效前先调用。", none()).risk(Risk::Read),
             effect_read_format,
         ),
         tool(
@@ -1354,7 +1354,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "effect_create",
-                "为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先调用 effect_read_format 阅读内置的完整格式和示例，再写一份完整的 JSON 放进 pack（对象或 JSON 字符串），必须包含 schemaVersion、id、name、layers。",
+                "创作并保存可在桌面上选用的粒子特效。先调用 effect_read_format，再把 effect.json 的完整数据放进 pack（对象或 JSON 字符串），包含 schemaVersion=1、id、name、layers。导出资源包时应用另行生成 V2 ZIP 清单。",
                 object(
                     json!({
                         "pack": {
@@ -1617,7 +1617,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "community_share",
-                "把用户自己创作的壁纸、特效、桌面组件、桌宠或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 zip 资源包，再在浏览器打开对应板块（壁纸、特效、组件、桌宠去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、pet_catalog、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
+                "弹出保存对话框，导出用户自创的作品。动态壁纸、特效、小组件和伙伴主题导出为 V2 ZIP，清单由小伴生成。id 来自 wallpaper_list、effect_list、widget_list、pet_catalog、game_list，只能导出自创作品。需要分享到论坛时，导出后打开对应板块，四类桌面资源去「小伴壁纸」，游戏去「小伴游戏」。发帖由用户完成。只交付文件时传 open_forum=false。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": community::KINDS, "description": "作品类型"},
@@ -1930,6 +1930,7 @@ mod tests {
     fn pet_tools_preserve_the_pot_and_create_pets_with_compact_results() {
         let fake=Arc::new(Fake::default());
         let format:Value=serde_json::from_str(&call(&fake,"pet_read_format",json!({})).unwrap()).unwrap();
+        assert!(format["format"].as_str().unwrap().contains(r#"{"schemaVersion":3,"kind":"pet","entry":"pet.json"}"#));
         let theme:crate::pet_packs::Theme=serde_json::from_value(format["example"].clone()).unwrap();
         crate::pet_packs::validate(&theme).unwrap();
         assert!(theme.pets.iter().all(|p|p.kind=="plant"));
@@ -1973,6 +1974,7 @@ mod tests {
         assert!(out.contains(crate::effect_packs::FORMAT_GUIDE));
         assert!(out.contains(crate::effect_packs::EXAMPLE));
         assert!(out.contains("## 粒子层") && out.contains("## 形状"));
+        assert!(out.contains(r#""schemaVersion": 3, "kind": "effect", "entry": "effect.json""#));
         let example: Value = serde_json::from_str(crate::effect_packs::EXAMPLE).unwrap();
         crate::effect_packs::validate(&example).unwrap();
         assert!(fake.calls().is_empty(), "reading documentation never touches desktop state");
@@ -2457,6 +2459,7 @@ mod tests {
         assert!(format.contains("游戏创作手册") && format.contains("安装前自查"), "the craft guide follows the rules");
         let widget = call(&fake, "widget_read_format", json!({})).unwrap();
         assert!(widget.starts_with("自定义小组件规范") && widget.contains("小组件创作手册") && widget.contains("保存前自查"), "{widget}");
+        assert!(widget.contains(r#""schemaVersion": 3, "kind": "widget", "entry": "index.html""#));
         let spec_text = tools(fake.clone()).iter().find(|t| t.spec().name == "game_create").unwrap().spec().description.clone();
         assert!(spec_text.contains("game_read_format") && !spec_text.contains("host.init"), "the long rules are read on demand");
     }
@@ -2474,6 +2477,9 @@ mod tests {
     #[test]
     fn wallpaper_create_validates_and_calls_desktop() {
         let fake = Arc::new(Fake::default());
+        let specs = tools(fake.clone());
+        let description = &specs.iter().find(|tool| tool.spec().name == "wallpaper_create").unwrap().spec().description;
+        assert!(description.contains("schemaVersion=3") && description.contains("name 取壁纸的 title"));
         let res = call(
             &fake,
             "wallpaper_create",

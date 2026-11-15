@@ -78,3 +78,13 @@
 在小伴的组件预览或实际桌面组件里检查首次打开时能看到什么，并操作一次主要按钮。发现报错时，按实际原因修正并复查。已放置的组件用同一个 id 覆盖模板，并设 `place_now: false`，避免多放一份。
 
 无法查看实际画面或操作组件时，向用户说明已完成哪些检查，以及首屏或交互中哪些还待核验。组件列表只提供启用、位置和层级状态。用户反馈空白时，优先核查实际渲染和初始化逻辑。
+
+### 11. 交付 V2 ZIP
+
+`widget_create` 接收自包含 HTML 和组件元数据。保存后可在自定义组件卡片上导出，也可用 `community_share` 传 `kind=widget` 和 `open_forum=false` 打开保存窗口。导出时小伴会生成 V2 清单。
+
+手工打包时把页面保存为 `index.html`，并在 ZIP 根目录放置 `manifest.json`。`id` 和 `name` 必填，`width` 和 `height` 按预览尺寸填写。
+
+```json
+{ "schemaVersion": 3, "kind": "widget", "entry": "index.html", "id": "focus-card", "name": "专注卡片", "width": 280, "height": 240 }
+```
