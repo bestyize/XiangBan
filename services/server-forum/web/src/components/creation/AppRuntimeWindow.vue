@@ -4,13 +4,60 @@ import AppIcon from '@/components/AppIcon.vue'
 
 defineProps<{ title: string; icon?: string | null; compact?: boolean; busy?: boolean; closing?: boolean }>()
 const emit = defineEmits<{ reload: []; close: [] }>()
+const workspace = ref<HTMLElement | null>(null)
 const maximized = ref(false)
+const fullscreen = ref(false)
+const changingSize = ref(false)
 const failedIcon = ref('')
-const windowSizeAction = computed(() => maximized.value ? '还原窗口' : '最大化窗口')
+const canFullscreen = computed(() => Boolean(workspace.value?.requestFullscreen && document.fullscreenEnabled))
+const expanded = computed(() => maximized.value || fullscreen.value)
+const windowSizeAction = computed(() => {
+  if (fullscreen.value) return '退出全屏'
+  if (maximized.value) return '还原窗口'
+  return canFullscreen.value ? '进入全屏' : '最大化窗口'
+})
+
+function syncFullscreen() {
+  fullscreen.value = !!workspace.value && document.fullscreenElement === workspace.value
+}
+
+async function toggleSize() {
+  const element = workspace.value
+  if (!element || changingSize.value) return
+  const exiting = document.fullscreenElement === element
+  if (!exiting && (maximized.value || !canFullscreen.value)) {
+    maximized.value = !maximized.value
+    return
+  }
+
+  changingSize.value = true
+  try {
+    if (exiting) await document.exitFullscreen()
+    else await element.requestFullscreen({ navigationUI: 'hide' })
+  } catch {
+    if (!exiting) maximized.value = true
+  } finally {
+    syncFullscreen()
+    changingSize.value = false
+  }
+}
+
+function handleEscape(event: KeyboardEvent) {
+  if (event.defaultPrevented || event.repeat || changingSize.value) return
+  if (document.fullscreenElement) {
+    if (document.fullscreenElement === workspace.value) void toggleSize()
+    return
+  }
+  if (fullscreen.value) return
+  event.preventDefault()
+  if (maximized.value) maximized.value = false
+  else emit('close')
+}
 </script>
 
 <template>
-  <main class="workspace" :class="{ maximized, compact }" @keydown.esc.prevent="emit('close')">
+  <main ref="workspace" class="workspace" :class="{ maximized: expanded, compact }"
+    @fullscreenchange="syncFullscreen" @keydown.esc="handleEscape">
     <section class="app-window" :aria-label="title">
       <header class="titlebar">
         <img v-if="icon && failedIcon !== icon" :src="icon" alt="" class="app-icon"
@@ -22,8 +69,8 @@ const windowSizeAction = computed(() => maximized.value ? '还原窗口' : '最�
             <AppIcon name="refresh" :size="18" />
           </button>
           <button type="button" class="size-action" :aria-label="windowSizeAction" :title="windowSizeAction"
-            @click="maximized = !maximized">
-            <AppIcon :name="maximized ? 'restore' : 'expand'" :size="17" />
+            :disabled="closing" @click="toggleSize">
+            <AppIcon :name="expanded ? 'restore' : 'expand'" :size="17" />
           </button>
           <button type="button" class="close-action" aria-label="关闭应用" title="关闭应用"
             :disabled="closing" @click="emit('close')">
@@ -116,6 +163,7 @@ h1 {
   }
   .window-actions button { width: 44px; height: 44px; }
   .window-actions .size-action { display: none; }
+  .workspace:fullscreen .window-actions .size-action { display: grid; }
   .window-content { padding-bottom: env(safe-area-inset-bottom); }
 }
 </style>
