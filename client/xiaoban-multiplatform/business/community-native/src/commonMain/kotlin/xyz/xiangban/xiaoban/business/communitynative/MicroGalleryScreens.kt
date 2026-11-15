@@ -43,7 +43,15 @@ import com.multiplatform.webview.web.rememberWebViewNavigator
 import xyz.xiangban.xiaoban.common.webview.FullscreenWebView
 
 @Composable
-internal fun MicroGalleryTab(forumBase: String, open: (Route) -> Unit) {
+internal fun MicroGalleryScreen(forumBase: String, back: () -> Unit, open: (Route) -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        ScreenBar("微观展厅", onBack = back)
+        MicroGalleryList(forumBase, open)
+    }
+}
+
+@Composable
+private fun MicroGalleryList(forumBase: String, open: (Route) -> Unit) {
     LazyVerticalGrid(
         GridCells.Fixed(2),
         Modifier.fillMaxSize(),

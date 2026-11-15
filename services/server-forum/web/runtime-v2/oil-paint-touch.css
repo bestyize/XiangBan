@@ -1,0 +1,32 @@
+.xb-oil-touch #view { touch-action: none; }
+.xb-oil-touch #hint { display: none; }
+.xb-oil-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  --bottom: max(12px, calc(var(--xb-safe-bottom, 0px) + 8px));
+  --pad-bottom: calc(var(--bottom) + 44px);
+  --left: max(12px, calc(var(--xb-safe-left, 0px) + 8px));
+  --right: max(12px, calc(var(--xb-safe-right, 0px) + 8px));
+}
+.xb-oil-controls button {
+  position: absolute;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  color: #fff8eb;
+  background: #211a16cc;
+  border: 1px solid #fff8eb77;
+  border-radius: 12px;
+  font: 600 18px system-ui;
+}
+.xb-oil-controls button:active { background: #654e37; }
+.xb-oil-controls [data-key="KeyW"] { left: calc(var(--left) + 48px); bottom: calc(var(--pad-bottom) + 48px); }
+.xb-oil-controls [data-key="KeyA"] { left: var(--left); bottom: var(--pad-bottom); }
+.xb-oil-controls [data-key="KeyS"] { left: calc(var(--left) + 48px); bottom: var(--pad-bottom); }
+.xb-oil-controls [data-key="KeyD"] { left: calc(var(--left) + 96px); bottom: var(--pad-bottom); }
+.xb-oil-controls [data-key="Space"] { right: var(--right); bottom: var(--bottom); }

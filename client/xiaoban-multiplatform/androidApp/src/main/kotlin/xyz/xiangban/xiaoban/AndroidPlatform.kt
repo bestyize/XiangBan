@@ -178,6 +178,10 @@ class AndroidPlatformActions(
     override val recentCommunityGames get() = AndroidCommunityGames.recent(context)
     override suspend fun playCommunityRuntimeV2(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, pack: xyz.xiangban.xiaoban.common.community.Pack): Boolean =
         (context as? android.app.Activity)?.let { AndroidRuntimeV2Community.play(it, download, pack) } ?: false
+    override suspend fun playIdeaRuntime(download: xyz.xiangban.xiaoban.common.community.IdeaRuntimeDownload): Boolean =
+        (context as? android.app.Activity)?.let { AndroidRuntimeV2Community.playIdea(it, download) } ?: false
+    override suspend fun needsIdeaRuntimeMobileConfirmation(download: xyz.xiangban.xiaoban.common.community.IdeaRuntimeDownload): Boolean =
+        AndroidRuntimeV2Community.needsIdeaMobileConfirmation(context, download)
     override fun communityNetworkOffline(): Boolean = AndroidRuntimeV2Community.isOffline(context)
     override suspend fun playCachedCommunityTool(id: Long, version: Int?): Boolean =
         (context as? android.app.Activity)?.let { AndroidRuntimeV2Community.playCachedTool(it, id, version) } ?: false

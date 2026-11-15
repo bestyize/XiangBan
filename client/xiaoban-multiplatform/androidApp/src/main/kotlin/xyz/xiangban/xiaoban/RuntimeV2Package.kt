@@ -136,6 +136,14 @@ internal class RuntimeV2Package private constructor(
             return create(manifest, id.toString(), version.toString()) { path -> root.resolve(path).inputStream() }
         }
 
+        fun loadIdea(root: File, id: String, version: String, kind: String): RuntimeV2Package {
+            val manifest = root.resolve("manifest.json").inputStream().use(::readRuntimeManifest).let(RuntimeV2Manifest::read)
+            require(manifest.id == id && manifest.kind == kind && manifest.version == version && manifest.capabilities.isEmpty()) {
+                "精选作品清单不匹配"
+            }
+            return create(manifest, "idea-$id", version) { path -> root.resolve(path).inputStream() }
+        }
+
         /** 手机里自己做的作品，文件在私有工作区 games/<id>/。每次读取都拒绝符号链接和目录外的路径。 */
         fun loadWorkspace(root: File, id: String): RuntimeV2Package {
             val base = root.canonicalFile

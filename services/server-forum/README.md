@@ -36,9 +36,19 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 创意页 `/ideas` 直接展示 16:9 作品卡片。首张卡通往微观展厅，紧接着是标注「3D模型」的碎花垂耳兔卡片，之后依次展示《星夜骑士》《小王子》、Saltline、Oil Paint 和社区内容。《星夜骑士》《小王子》和 Oil Paint 的详情页通往各自官网，Oil Paint 的详情页也提供源码链接。《星夜骑士》、Saltline、Oil Paint、展厅水族箱和碎花垂耳兔使用 `/create/run/ideas/:slug` 共用运行容器。兔子卡片直接打开作品，关闭后返回进入时的创意页。关闭从展厅打开的展品会返回展厅，关闭从作品详情打开的游戏会返回各自的详情。
 
-网页版读取公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署为 `/ideas-catalog.json`。目录顺序就是「全部」首屏的精选顺序，手机客户端也可以读取这个入口。更新精选时发布新版网页产物即可。作品包、方案和帖子仍从现有论坛接口读取。
+网页和手机版实时读取同一份公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署为 `/ideas-catalog.json`。目录顺序就是创意首页的精选顺序。更新精选时只需发布新版网页产物，手机无需重新打包。作品包、方案和帖子仍从现有论坛接口读取。
 
-站内作品由 Nginx 从论坛 Web 根目录之外提供。先在 `web/` 执行 `npm run build`，再用原始的 Saltline 单文件和已同步的展品生成三个 HTML：
+目录中的 `player` 标记站内可运行的精选。Android 从 `/idea-players/v1/packages/{id}.json` 读取版本、大小和 SHA-256，校验同目录下的 `{id}-{sha256}.zip` 后进入 V2 小程序容器。水族箱从微观展厅进入同一运行容器。将下文产出的五个通用 V2 ZIP 暂存为网站下载文件：
+
+```sh
+node scripts/stage-idea-runtime-packs.mjs --out /path/to/idea-players-v1/packages \
+  /path/to/saltline.zip /path/to/aquarium.zip /path/to/plush-rabbit.zip \
+  /path/to/Starry-Nightrider-v2.zip /path/to/Oil-Paint-v2.zip
+```
+
+该脚本逐字节复用已有 ZIP，只生成下载名和描述文件。先部署带哈希的 ZIP，再更新描述文件。网页的播放器文件与 ZIP 从同一次构建生成，桌面可以直接导入同一个 ZIP。
+
+站内作品由 Nginx 从论坛 Web 根目录之外提供。先在 `web/` 执行 `npm run build`，再用原始的 Saltline 单文件和已同步的展品生成三个 HTML 及对应的通用 V2 ZIP：
 
 ```sh
 node --experimental-strip-types scripts/build-idea-players.mjs --saltline /path/to/Saltline.html --out /path/to/idea-players-v1
@@ -52,7 +62,7 @@ Oil Paint 使用 [作者仓库](https://patch.gg/blendi/oil-paint/files) 的 `80
 node scripts/build-oil-paint-pack.mjs --dist /path/to/oil-paint/dist --cover public/ideas-covers/oil-paint.webp --icon /path/to/icon.webp --out /path/to/release
 ```
 
-将输出的 `oil-paint/` 放入上述作品部署目录，保留作者许可证。试玩使用 WebGL2、浏览器内的 Rapier WASM 和键鼠。作品沙箱仅可请求自己目录内的模块与模型。
+将输出的 `oil-paint/` 放入上述作品部署目录，保留作者许可证。试玩使用 WebGL2 和浏览器内的 Rapier WASM，支持键鼠及触控。触控设备可用方向按钮移动、拖动画面转动视角。作品沙箱仅可请求自己目录内的模块与模型。
 
 《星夜骑士》使用 [ByteRax 中文复刻](https://github.com/ByteRax/Starrynightrider/tree/0c5714aa67059d1ae804db2d5cfc868cf27c1b6a)。从固定提交的 `site/` 生成内嵌两套分辨率贴图的单 HTML 和 V2 ZIP。站内试玩使用本机排行榜，作品署名和官网链接随页面保留。
 

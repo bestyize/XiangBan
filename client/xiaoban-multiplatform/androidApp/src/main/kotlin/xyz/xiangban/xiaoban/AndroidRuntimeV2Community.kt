@@ -17,8 +17,10 @@ import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.CommunityGameDownload
 import xyz.xiangban.xiaoban.common.community.CommunityJson
 import xyz.xiangban.xiaoban.common.community.CommunityToolApproval
+import xyz.xiangban.xiaoban.common.community.IdeaRuntimeDownload
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.RecentCommunityGame
+import xyz.xiangban.xiaoban.common.community.isIdeaPlayerId
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
@@ -35,6 +37,8 @@ internal object AndroidRuntimeV2Community {
     const val KIND = "runtime.v2.pack.kind"
     const val AUTHOR = "runtime.v2.pack.author"
     const val LEGACY_VERSIONS = "runtime.v2.pack.legacy.versions"
+    const val IDEA_ID = "runtime.v2.idea.id"
+    private const val IDEA_VERSION = "runtime.v2.idea.version"
     private const val CACHE_BYTES = 1024L * 1024 * 1024
     private const val OFFLINE_APPROVAL = ".offline-approval"
     private const val OFFLINE_READY = ".offline-ready"
@@ -50,11 +54,17 @@ internal object AndroidRuntimeV2Community {
             ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
     }
 
-    suspend fun needsMobileConfirmation(context: Context, info: CommunityGameDownload): Boolean = withContext(Dispatchers.IO) {
-        if (info.size <= 20L * 1024 * 1024) return@withContext false
+    suspend fun needsMobileConfirmation(context: Context, info: CommunityGameDownload): Boolean =
+        needsMobileConfirmation(context, info.size, directory(context, info.packId, info.version, info.sha256))
+
+    suspend fun needsIdeaMobileConfirmation(context: Context, info: IdeaRuntimeDownload): Boolean =
+        needsMobileConfirmation(context, info.size, ideaDirectory(context, info.id, info.sha256))
+
+    private suspend fun needsMobileConfirmation(context: Context, size: Long, cache: File): Boolean = withContext(Dispatchers.IO) {
+        if (size <= 20L * 1024 * 1024) return@withContext false
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
         val mobile = connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
-        mobile && !directory(context, info.packId, info.version, info.sha256).isDirectory
+        mobile && !cache.isDirectory
     }
 
     suspend fun play(activity: Activity, info: CommunityGameDownload, pack: Pack): Boolean {
@@ -67,7 +77,9 @@ internal object AndroidRuntimeV2Community {
         val target = directory(activity, info.packId, info.version, info.sha256)
         withContext(Dispatchers.IO) {
             lock.withLock {
-                prepare(activity, info, pack.slug)
+                prepare(target, info.url, info.size, info.sha256, info.kind, pack.slug,
+                    load = { RuntimeV2Package.loadCommunity(it, info.packId, info.version, info.kind) },
+                )
                 if (info.kind == "app") {
                     runCatching { writeApproval(target, CommunityJson.encodeToString(approval)) }
                 }
@@ -75,6 +87,27 @@ internal object AndroidRuntimeV2Community {
         }
         return launch(activity, info.packId, info.version, info.sha256, info.kind, approval,
             networkDisabled = pack.networkDisabled != false, readyMarker = target.resolve(OFFLINE_READY).takeIf { info.kind == "app" })
+    }
+
+    suspend fun playIdea(activity: Activity, info: IdeaRuntimeDownload): Boolean {
+        val target = ideaDirectory(activity, info.id, info.sha256)
+        withContext(Dispatchers.IO) {
+            lock.withLock {
+                prepare(target, info.url, info.size, info.sha256, info.kind, info.id,
+                    load = { RuntimeV2Package.loadIdea(it, info.id, info.version, info.kind) },
+                )
+            }
+        }
+        return withContext(Dispatchers.Main) {
+            if (activity.isFinishing || activity.isDestroyed) return@withContext false
+            activity.startActivity(RuntimeV2Activity.launchIntent(activity)
+                .putExtra(IDEA_ID, info.id)
+                .putExtra(IDEA_VERSION, info.version)
+                .putExtra(DIGEST, info.sha256)
+                .putExtra(KIND, info.kind)
+                .putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, true))
+            true
+        }
     }
 
     suspend fun playCachedTool(activity: Activity, id: Long, version: Int?): Boolean {
@@ -184,15 +217,31 @@ internal object AndroidRuntimeV2Community {
         return RuntimeV2Package.loadCommunity(directory(context, id, version, digest), id, version, kind)
     }
 
+    fun loadIdea(context: Context, intent: Intent): RuntimeV2Package {
+        val id = intent.getStringExtra(IDEA_ID).orEmpty()
+        val version = intent.getStringExtra(IDEA_VERSION).orEmpty()
+        val digest = intent.getStringExtra(DIGEST).orEmpty()
+        val kind = intent.getStringExtra(KIND).orEmpty()
+        return RuntimeV2Package.loadIdea(ideaDirectory(context, id, digest), id, version, kind)
+    }
+
     private fun directory(context: Context, id: Long, version: Int, digest: String): File {
         require(id > 0 && version > 0 && shaPattern.matches(digest)) { "作品包信息无效" }
         return context.cacheDir.resolve("runtime-v2-packs/$id-$version-${digest.lowercase()}")
     }
 
-    private suspend fun prepare(context: Context, info: CommunityGameDownload, slug: String) {
-        val target = directory(context, info.packId, info.version, info.sha256)
+    private fun ideaDirectory(context: Context, id: String, digest: String): File {
+        require(isIdeaPlayerId(id) && shaPattern.matches(digest)) { "精选作品包信息无效" }
+        return context.cacheDir.resolve("runtime-v2-ideas/$id-${digest.lowercase()}")
+    }
+
+    private suspend fun prepare(
+        target: File, url: String, size: Long, digest: String, kind: String, slug: String,
+        load: (File) -> RuntimeV2Package,
+    ) {
+        require(size in 1..RuntimeV2Archive.MAX_ZIP_BYTES) { "作品包大小无效" }
         if (target.isDirectory) {
-            val cached = runCatching { RuntimeV2Package.loadCommunity(target, info.packId, info.version, info.kind).manifest }
+            val cached = runCatching { load(target).manifest }
             if (cached.getOrNull()?.id == slug) {
                 target.setLastModified(System.currentTimeMillis())
                 return
@@ -203,17 +252,18 @@ internal object AndroidRuntimeV2Community {
         check(root.isDirectory || root.mkdirs()) { "无法创建作品缓存" }
         root.listFiles().orEmpty().filter { it.name.startsWith("unpack-") }.forEach { it.deleteRecursively() }
         val partial = root.resolve("${target.name}.part")
-        trimCache(root, partial, info.size * 2)
-        download(info, partial)
+        trimCache(root, partial, size * 2)
+        download(url, size, partial)
         val verified = sha256(partial)
-        if (!verified.equals(info.sha256, true)) {
+        if (!verified.equals(digest, true)) {
             partial.delete()
             error("作品包校验失败，请重新下载")
         }
         val staging = Files.createTempDirectory(root.toPath(), "unpack-").toFile()
         try {
-            val manifest = RuntimeV2Archive.extract(partial, staging, info.kind)
+            val manifest = RuntimeV2Archive.extract(partial, staging, kind)
             require(manifest.id == slug) { "作品包标识不匹配" }
+            load(staging)
             currentCoroutineContext().ensureActive()
             check(staging.renameTo(target)) { "无法保存作品缓存" }
         } finally {
@@ -223,11 +273,11 @@ internal object AndroidRuntimeV2Community {
         trimCache(root, target, 0)
     }
 
-    private suspend fun download(info: CommunityGameDownload, file: File) {
-        if (file.length() > info.size) file.delete()
+    private suspend fun download(url: String, size: Long, file: File) {
+        if (file.length() > size) file.delete()
         val offset = file.length()
-        if (offset == info.size) return
-        val uri = runCatching { URI(info.url) }.getOrElse { error("下载地址不受支持") }
+        if (offset == size) return
+        val uri = runCatching { URI(url) }.getOrElse { error("下载地址不受支持") }
         val debugLoopback = BuildConfig.DEBUG && uri.scheme == "http" && uri.host == "127.0.0.1" && uri.port in 1024..65535
         require(uri.userInfo == null && uri.fragment == null && uri.host != null &&
             (debugLoopback || uri.scheme == "https" && uri.port in listOf(-1, 443) && !RuntimeV2Proxy.isBlockedHost(uri.host))) {
@@ -243,14 +293,14 @@ internal object AndroidRuntimeV2Community {
             val start = when (connection.responseCode) {
                 200 -> 0L
                 206 -> {
-                    require(offset > 0 && connection.getHeaderField("Content-Range") == "bytes $offset-${info.size - 1}/${info.size}") {
+                    require(offset > 0 && connection.getHeaderField("Content-Range") == "bytes $offset-${size - 1}/$size") {
                         "作品包续传范围不匹配"
                     }
                     offset
                 }
                 else -> error("作品包下载失败，请稍后重试")
             }
-            require(connection.contentLengthLong in listOf(-1, info.size - start)) { "作品包大小不匹配" }
+            require(connection.contentLengthLong in listOf(-1, size - start)) { "作品包大小不匹配" }
             connection.inputStream.use { input ->
                 FileOutputStream(file, start > 0).use { output ->
                     val buffer = ByteArray(32 * 1024)
@@ -260,13 +310,13 @@ internal object AndroidRuntimeV2Community {
                         val count = input.read(buffer)
                         if (count == -1) break
                         received += count
-                        if (received > info.size) {
+                        if (received > size) {
                             file.delete()
                             error("作品包超过声明大小")
                         }
                         output.write(buffer, 0, count)
                     }
-                    require(received == info.size) { "作品包未下载完整，请重试" }
+                    require(received == size) { "作品包未下载完整，请重试" }
                 }
             }
         } catch (_: IOException) {

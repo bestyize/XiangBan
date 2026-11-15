@@ -40,9 +40,6 @@ import xyz.xiangban.xiaoban.common.community.Load
 
 internal enum class CommunitySection(val label: String) { Home("首页"), Ideas("创意"), Discuss("讨论"), Resources("资源") }
 
-private const val AllIdeas = ""
-private const val Gallery = "gallery:micro"
-
 /**
  * 社区：顶部是 首页 / 创意 / 讨论 / 资源 四个栏目，每个栏目下面有自己的二级栏目。
  * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
@@ -56,14 +53,12 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
     var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
     var discussSub by rememberSaveable { mutableStateOf(AllDiscussions) }
     var resourceSub by rememberSaveable { mutableStateOf(SoftwareResourceTab) }
-    var ideaTab by rememberSaveable { mutableStateOf(AllIdeas) }
     val current = CommunitySection.valueOf(section)
     val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
     val loader = rememberLoader(env, "forum-categories") { ForumCategories(env.forum.categories()) }
     val categoryState by loader.state.collectAsState()
     val catalog = (categoryState as? Load.Ready)?.value
     val resourceBoards = catalog?.boardsIn(ForumSection.Resources).orEmpty()
-    val ideasGallery = ideaTab == Gallery
     val resourceTab = resourceBoards.firstOrNull { it.slug == resourceSub }?.slug ?: SoftwareResourceTab
     SideEffect {
         onPostDestination(when (current) {
@@ -127,24 +122,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                 }
                 when (current) {
                     CommunitySection.Home -> Unit
-                    CommunitySection.Ideas -> Column(Modifier.fillMaxSize()) {
-                        PageChipRow(
-                            listOf(AllIdeas to "全部", Gallery to "微观展厅"),
-                            if (ideasGallery) Gallery else AllIdeas,
-                            { ideaTab = it }, Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        )
-                        Box(Modifier.weight(1f)) {
-                            if (ideasGallery) {
-                                MicroGalleryTab(env.config.forumBase, open)
-                            } else {
-                                LoadBox(categoryState, loader::reload) { categories ->
-                                    val category = categories.boardsIn(ForumSection.Ideas)
-                                        .joinToString(",") { it.slug }.ifEmpty { NoActiveBoard }
-                                    BoardNoteFeed(env, category, open)
-                                }
-                            }
-                        }
-                    }
+                    CommunitySection.Ideas -> IdeasFeed(env, categoryState, loader::reload, open)
                     CommunitySection.Discuss -> LoadBox(categoryState, loader::reload) {
                         DiscussTab(env, it, discussSub, { discussSub = it }, open)
                     }

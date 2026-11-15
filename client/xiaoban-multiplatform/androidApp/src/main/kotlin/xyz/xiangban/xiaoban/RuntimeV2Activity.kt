@@ -141,8 +141,9 @@ class RuntimeV2Activity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val id = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
         val community = intent.hasExtra(AndroidRuntimeV2Community.PACK_ID)
-        val workspace = !community && intent.getBooleanExtra(EXTRA_WORKSPACE, false) && MOBILE_GAME_ID.matches(id)
-        val root = if (community || workspace) null else bundledGameRoot(id) ?: run { finish(); return }
+        val idea = intent.getStringExtra(AndroidRuntimeV2Community.IDEA_ID)
+        val workspace = !community && idea == null && intent.getBooleanExtra(EXTRA_WORKSPACE, false) && MOBILE_GAME_ID.matches(id)
+        val root = if (community || idea != null || workspace) null else bundledGameRoot(id) ?: run { finish(); return }
         remoteEnabled = root != null && id == BuiltinMobileGames.REMOTE_CONTROL
         if (workspace) log = RuntimeV2Log(filesDir.resolve("workspace/logs/$id.txt"))
         active?.let { previous ->
@@ -165,8 +166,9 @@ class RuntimeV2Activity : ComponentActivity() {
                 runCatching {
                     pack = when {
                         workspace -> RuntimeV2Package.loadWorkspace(filesDir.resolve("workspace/games/$id"), id)
-                        root == null -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
-                        else -> assets.loadBundledRuntimeV2(id, root)
+                        idea != null -> AndroidRuntimeV2Community.loadIdea(this@RuntimeV2Activity, intent)
+                        community -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
+                        else -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
                     }
                     quickLaunchEnabled = pack.manifest.id == "quick-launch" && runCatching {
                         val expected = assets.open("game-packs-v2/quick-launch/index.html").use { it.readBytes() }
@@ -175,14 +177,14 @@ class RuntimeV2Activity : ComponentActivity() {
                     }.getOrDefault(false)
                     script = assets.open("runtime-v2/bridge.js").bufferedReader().use { it.readText() }
                     legacySave = when {
-                        workspace -> null
+                        workspace || idea != null -> null
                         community -> LegacySaves.community(
                             filesDir, intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0),
                             intent.getIntArrayExtra(AndroidRuntimeV2Community.LEGACY_VERSIONS) ?: intArrayOf(),
                         )
                         else -> LegacySaves.builtin(filesDir, id)
                     }
-                    networkDisabled = remoteEnabled || intent.getBooleanExtra(EXTRA_NETWORK_DISABLED, true)
+                    networkDisabled = remoteEnabled || idea != null || intent.getBooleanExtra(EXTRA_NETWORK_DISABLED, true)
                     decodeIcon()?.asImageBitmap()
                 }
             }
@@ -210,7 +212,7 @@ class RuntimeV2Activity : ComponentActivity() {
                 val shortcut = RuntimeWorkShortcut.forWork(id, workspace, intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0))
                 chrome = RuntimeV2Chrome(
                     this@RuntimeV2Activity, container, pack.manifest.name, kindLabel, icon,
-                    official = !community && !workspace, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
+                    official = !community && !workspace && idea == null, author = intent.getStringExtra(AndroidRuntimeV2Community.AUTHOR),
                     onRestart = { leave(reopen = true) }, onExit = ::exit,
                     onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
                     onShare = if (!remoteEnabled) ({ shareWork(id, workspace) }) else null,
@@ -330,7 +332,12 @@ class RuntimeV2Activity : ComponentActivity() {
                 } else {
                     val site = CommunityConfig().forumBase
                     val packId = intent.getLongExtra(AndroidRuntimeV2Community.PACK_ID, 0)
-                    val url = if (packId > 0) "$site/packs/$packId" else "$site/create?game=$id"
+                    val idea = intent.getStringExtra(AndroidRuntimeV2Community.IDEA_ID)
+                    val url = when {
+                        idea != null -> "$site/create/run/ideas/$idea"
+                        packId > 0 -> "$site/packs/$packId"
+                        else -> "$site/create?game=$id"
+                    }
                     shareText(this@RuntimeV2Activity, pack.manifest.name, url)
                 }
                 chrome.closeMenu()

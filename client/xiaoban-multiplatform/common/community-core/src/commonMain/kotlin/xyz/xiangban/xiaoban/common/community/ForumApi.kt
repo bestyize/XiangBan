@@ -45,6 +45,19 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun featuredTools(): List<Pack> =
         packHttp.send(HttpMethod.Get, "/api/packs?kind=app&page=1&featured=true", serializer<Page<Pack>>()).items
 
+    /** 与网页创意页共用公开目录，读取不依赖账号恢复。 */
+    suspend fun featuredIdeas(): List<FeaturedIdea> =
+        http.send(HttpMethod.Get, "/ideas-catalog.json", serializer<FeaturedIdeaCatalog>()).items
+
+    suspend fun ideaRuntime(id: String): IdeaRuntimeDownload {
+        require(isIdeaPlayerId(id)) { "作品标识无效" }
+        val base = "/idea-players/v1/packages/$id"
+        val spec = http.send(HttpMethod.Get, "$base.json", serializer<IdeaRuntimeDescriptor>())
+        require(spec.kind in setOf("app", "game") && spec.version.matches(Regex("[a-zA-Z0-9.-]{1,32}")) &&
+            spec.sha256.matches(Regex("[a-f0-9]{64}")) && spec.size in 1..(100L * 1024 * 1024)) { "作品包信息无效" }
+        return IdeaRuntimeDownload(id, spec.kind, spec.version, spec.sha256, spec.size, "$site$base-${spec.sha256}.zip")
+    }
+
     suspend fun pack(id: Long, recordView: Boolean = false): Pack =
         getPack("/api/packs/$id${query("view" to recordView.takeIf { it })}")
     suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = getPack("/api/packs/$id/download?version=$version")

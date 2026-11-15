@@ -21,7 +21,8 @@ for (const asset of ['starter-man.glb', 'starter-man-clips.glb']) {
 }
 const html = await readFile(join(dist, 'index.html'), 'utf8')
 if (!html.includes('</head>')) throw new Error('入口 HTML 缺少 head')
-const bridge = await readFile(new URL('../runtime-v2/bridge.js', import.meta.url), 'utf8')
+const [bridge, touchJs, touchCss] = await Promise.all(['bridge.js', 'oil-paint-touch.js', 'oil-paint-touch.css']
+  .map(file => readFile(new URL(`../runtime-v2/${file}`, import.meta.url), 'utf8')))
 const bootstrap = `<script>
 if (!window.xb) {
   document.currentScript.dataset.parentOrigin = location.origin;
@@ -35,7 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
 const player = join(out, 'oil-paint')
 await mkdir(out, { recursive: true })
 await cp(dist, player, { recursive: true, force: false, errorOnExist: true })
-await writeFile(join(player, 'index.html'), html.replace('</head>', () => `${bootstrap}\n</head>`))
+const entry = html
+  .replace('width=device-width, initial-scale=1', 'width=device-width, initial-scale=1, viewport-fit=cover')
+  .replace('</head>', () => `${bootstrap}\n<style>${touchCss}</style>\n<script>${touchJs}</script>\n</head>`)
+await writeFile(join(player, 'index.html'), entry)
 await copyFile(values.cover, join(player, 'cover.webp'))
 await copyFile(values.icon, join(player, 'icon.webp'))
 await writeFile(join(player, 'SOURCE.md'), `# Oil Paint\n\nBy Blendi (@BlendiByl), published at https://patch.gg/blendi/oil-paint.\n\nBuilt from https://git.patch.gg/blendi/oil-paint.git at 804c65f (1.1.3), with an added Xiaoban runtime bridge. Original licensing and third-party notices are included.\n`)
@@ -46,13 +50,13 @@ const manifest = {
   id: 'oil-paint',
   name: 'Oil Paint',
   description: '在实时笔触绘成的 3D 油画里漫步，探索秋林与极光下的雪脊。',
-  version: '1.1.3',
+  version: '1.1.3-xb1',
   category: 'casual',
   entry: 'index.html',
   cover: 'cover.webp',
   icon: 'icon.webp',
   orientation: 'landscape',
-  input: ['mouse', 'keyboard'],
+  input: ['mouse', 'keyboard', 'touch'],
 }
 await writeFile(join(player, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 

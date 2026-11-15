@@ -69,15 +69,68 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
         }
     }
     pendingDownload?.let { (size, decision) ->
-        val dismiss = { decision.complete(false); Unit }
-        Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            CenterDialog(dismiss) {
-                Text("使用移动网络下载？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                Text("作品包大小为 ${formatSize(size)}。", Modifier.padding(top = 8.dp), style = XType.Body)
-                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GhostPillButton("取消", dismiss, Modifier.weight(1f), height = 44.dp)
-                    AppActionButton("下载", { decision.complete(true) }, Modifier.weight(1f), primary = true, height = 44.dp)
+        RuntimeDownloadConfirmation(size, decision)
+    }
+}
+
+@Composable
+internal fun IdeaRuntimeScreen(env: CommunityEnv, id: String, title: String, back: () -> Unit) {
+    val platform = env.platform
+    var attempt by remember(id) { mutableIntStateOf(0) }
+    var error by remember(id) { mutableStateOf<String?>(null) }
+    var pending by remember(id) { mutableStateOf<Pair<Long, CompletableDeferred<Boolean>>?>(null) }
+    val onBack by rememberUpdatedState(back)
+
+    LaunchedEffect(env, id, attempt) {
+        if (platform == null || !env.config.runtimeV2) return@LaunchedEffect
+        error = null
+        try {
+            val download = env.forum.ideaRuntime(id)
+            if (platform.needsIdeaRuntimeMobileConfirmation(download)) {
+                val decision = CompletableDeferred<Boolean>()
+                pending = download.size to decision
+                val accepted = decision.await()
+                pending = null
+                if (!accepted) {
+                    onBack()
+                    return@LaunchedEffect
                 }
+            }
+            check(platform.playIdeaRuntime(download)) { "无法打开作品，请重试" }
+            onBack()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = if (e is ApiException && e.status == 404) "这个作品暂时没有可用的小程序包"
+                else e.message ?: "作品加载失败，请重试"
+        } finally {
+            pending = null
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        ScreenBar(title, onBack = back)
+        val body = Modifier.weight(1f).fillMaxWidth()
+        val message = error
+        when {
+            platform == null || !env.config.runtimeV2 -> CenterMessage("当前设备暂不支持小程序运行", modifier = body)
+            message != null -> CenterMessage(message, "重试", { attempt++ }, body)
+            else -> CenterMessage("正在准备作品…", modifier = body)
+        }
+    }
+    pending?.let { (size, decision) -> RuntimeDownloadConfirmation(size, decision) }
+}
+
+@Composable
+private fun RuntimeDownloadConfirmation(size: Long, decision: CompletableDeferred<Boolean>) {
+    val dismiss = { decision.complete(false); Unit }
+    Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        CenterDialog(dismiss) {
+            Text("使用移动网络下载？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            Text("作品包大小为 ${formatSize(size)}。", Modifier.padding(top = 8.dp), style = XType.Body)
+            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GhostPillButton("取消", dismiss, Modifier.weight(1f), height = 44.dp)
+                AppActionButton("下载", { decision.complete(true) }, Modifier.weight(1f), primary = true, height = 44.dp)
             }
         }
     }

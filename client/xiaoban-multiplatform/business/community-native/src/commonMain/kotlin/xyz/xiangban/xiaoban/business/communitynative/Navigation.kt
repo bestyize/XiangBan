@@ -4,6 +4,7 @@ import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.decodeURLPart
 import xyz.xiangban.xiaoban.common.community.ForumSection
+import xyz.xiangban.xiaoban.common.community.isIdeaPlayerId
 
 /** 页面栈里的一页。编码成字符串，方便旋转屏幕后恢复。 */
 sealed interface Route {
@@ -33,7 +34,9 @@ sealed interface Route {
     /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
     data class Repo(val owner: String, val repo: String) : Route
     data class WebPage(val url: String) : Route
+    data object MicroGallery : Route
     data class GalleryExhibit(val id: String) : Route
+    data class IdeaRuntime(val id: String, val title: String) : Route
     data class Software(val project: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
     data class OpenSourceCollection(val key: String) : Route
@@ -86,7 +89,9 @@ sealed interface Route {
         is Articles -> "articles:${category.encodeURLParameter()}:${title.encodeURLParameter()}"
         is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is WebPage -> "web:${url.encodeURLParameter()}"
+        MicroGallery -> "micro-gallery"
         is GalleryExhibit -> "gallery-exhibit:$id"
+        is IdeaRuntime -> "idea-runtime:$id:${title.encodeURLParameter()}"
         is Software -> "software:${project.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
@@ -135,7 +140,13 @@ sealed interface Route {
                 "frontier" -> if (value.isEmpty()) Frontier else runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::FrontierArticle) }.getOrNull()
                 "articles" -> runCatching { Articles(value.substringBefore(':').decodeURLPart(), value.substringAfter(':').decodeURLPart()) }.getOrNull()
                 "web" -> runCatching { webPageRoute(value.decodeURLPart()) }.getOrNull()
+                "micro-gallery" -> MicroGallery
                 "gallery-exhibit" -> MicroGalleryExhibit.byId(value)?.let { GalleryExhibit(it.id) }
+                "idea-runtime" -> runCatching {
+                    val id = value.substringBefore(':')
+                    val title = value.substringAfter(':', "").decodeURLPart()
+                    if (isIdeaPlayerId(id) && title.isNotBlank()) IdeaRuntime(id, title) else null
+                }.getOrNull()
                 "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
                 "software" -> runCatching { value.decodeURLPart().takeIf { it.matches(Regex("[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+")) }?.let(::Software) }.getOrNull()
                 "repo", "opensource" -> runCatching {
