@@ -38,7 +38,6 @@ const originalReadLevel = ref<number | null>(null)
 const originalCategoryId = ref<number>()
 const originalReady = ref(false)
 const selectionTouched = ref(false)
-const activeGroupId = ref<number>()
 const attachments = ref<Attachment[]>([])
 const tagDraft = ref('')
 const busy = ref(false)
@@ -49,23 +48,16 @@ const myLevel = computed(() => session.user?.trust_level ?? 0)
 
 const destinations = computed(() => postingSections(meta.categories, myLevel.value, originalCategoryId.value))
 const destination = computed(() => destinations.value.find(s => s.key === form.sectionKey))
-const leaves = computed(() => destination.value?.groups.flatMap(g => g.categories) ?? [])
-const activeGroup = computed(() => destination.value?.groups.find(group => group.expandable && group.id === activeGroupId.value))
+const leaves = computed(() => destination.value?.boards ?? [])
 const leaf = computed(() => leaves.value.find(c => c.id === form.categoryId && !c.unavailableReason))
 const noDestinations = computed(() => !destinations.value.some(section =>
-  section.groups.some(group => group.categories.some(category => !category.unavailableReason)),
+  section.boards.some(board => !board.unavailableReason),
 ))
 const parent = computed(() => meta.byId.get(leaf.value?.parent_id ?? 0))
-const isCasual = computed(() => leaf.value?.slug === 'casual' || parent.value?.slug === 'casual')
+const isCasual = computed(() => leaf.value?.allow_short_title ?? (leaf.value?.slug === 'casual' || parent.value?.slug === 'casual'))
 const isHelp = computed(() => canonicalCategory(leaf.value?.slug ?? '') === 'resource-help')
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
 const requestedSlug = computed(() => !editId.value && typeof route.query.category === 'string' ? route.query.category : '')
-const defaultBoard = computed(() => {
-  const boards = activeGroup.value?.categories ?? leaves.value
-  const requestedId = meta.bySlug.get(requestedSlug.value)?.id
-  return boards.find(board => !board.unavailableReason && board.id === requestedId)
-    ?? boards.find(board => !board.unavailableReason)
-})
 const selectionNote = computed(() => {
   if (selectionTouched.value || !requestedSlug.value) return ''
   const requested = meta.bySlug.get(requestedSlug.value)
@@ -85,10 +77,6 @@ watch(
     if (selectionTouched.value) return
     const fallback = section === 'ideas' || section === 'resources' ? section : 'discuss'
     Object.assign(form, postingSelection(destinations.value, slug, categories, fallback))
-    const targetId = meta.bySlug.get(slug)?.id
-    activeGroupId.value = destination.value?.groups.find(group => group.expandable && (
-      group.id === targetId || group.categories.some(board => board.id === targetId)
-    ))?.id
   },
   { immediate: true },
 )
@@ -98,18 +86,7 @@ watch(leaf, (current, previous) => {
 
 function selectSection(key: PostingSectionKey) {
   selectionTouched.value = true
-  activeGroupId.value = undefined
   Object.assign(form, postingSelection(destinations.value, '', meta.categories, key))
-}
-
-function selectDefault() {
-  if (!defaultBoard.value) return
-  const board = defaultBoard.value
-  form.categoryId = board.id
-  activeGroupId.value = destination.value?.groups.find(group =>
-    group.expandable && group.categories.some(category => category.id === board.id),
-  )?.id
-  selectionTouched.value = true
 }
 
 // 编辑：载入原帖。
@@ -119,7 +96,6 @@ watch(
     originalReady.value = false
     originalCategoryId.value = undefined
     originalReadLevel.value = null
-    activeGroupId.value = undefined
     if (previousId) {
       Object.assign(form, { title: '', body: '', tags: [], readLevel: 0, bounty: 0, helpDays: 7 })
       attachments.value = []
@@ -142,9 +118,6 @@ watch(
       originalCategoryId.value = t.category.id
       form.sectionKey = c ? navigationSection(c) : 'discuss'
       form.categoryId = t.category.id
-      activeGroupId.value = destination.value?.groups.find(group =>
-        group.expandable && group.categories.some(board => board.id === t.category.id),
-      )?.id
       form.title = t.title
       form.body = t.body_md
       form.tags = [...t.tags]
@@ -263,28 +236,14 @@ const blocked = computed(() => {
           </div>
         </fieldset>
         <fieldset v-if="destination" class="category-group" :disabled="meta.categoriesLoading || !!meta.categoriesError">
-          <legend class="sr-only">{{ activeGroup?.name ?? destination.name }}板块</legend>
-          <button v-if="activeGroup" type="button" class="btn btn-sm group-back" @click="activeGroupId = undefined">
-            ‹ {{ activeGroup.name }}
-          </button>
+          <legend class="sr-only">{{ destination.name }}板块</legend>
           <div class="leaves">
-            <button type="button" class="leaf" :disabled="!defaultBoard" @click="selectDefault">
-              默认 <small>{{ defaultBoard?.name ?? '暂无可发板块' }}</small>
-            </button>
-            <template v-for="group in activeGroup ? [activeGroup] : destination.groups" :key="group.id">
-              <button v-if="group.expandable && !activeGroup" type="button" class="leaf"
-                :class="{ on: group.categories.some(board => board.id === form.categoryId) }"
-                @click="activeGroupId = group.id; selectionTouched = true">
-                {{ group.name }} <span aria-hidden="true">›</span>
-              </button>
-              <template v-else>
-                <label v-for="board in group.categories" :key="board.id" class="leaf" :class="{ on: form.categoryId === board.id }">
-                  <input v-model="form.categoryId" type="radio" name="leaf" :value="board.id" :disabled="!!board.unavailableReason" @change="selectionTouched = true" />
-                  {{ board.name }}
-                  <small v-if="board.unavailableReason">{{ board.unavailableReason }}</small>
-                </label>
-              </template>
-            </template>
+            <label v-for="board in destination.boards" :key="board.id" class="leaf" :class="{ on: form.categoryId === board.id }">
+              <input v-model="form.categoryId" type="radio" name="leaf" :value="board.id" :disabled="!!board.unavailableReason" @change="selectionTouched = true" />
+              {{ board.name }}
+              <small v-if="board.kind === 'uncategorized'">未分类</small>
+              <small v-if="board.unavailableReason">{{ board.unavailableReason }}</small>
+            </label>
           </div>
         </fieldset>
         <p v-if="meta.categoriesLoading" class="leaf-note" role="status">正在加载板块</p>
@@ -505,9 +464,6 @@ legend {
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
-.group-back {
-  margin-bottom: 8px;
-}
 .leaves {
   display: flex;
   flex-wrap: wrap;
@@ -523,8 +479,7 @@ legend {
   font-size: var(--fs-sm);
   cursor: pointer;
 }
-.leaf:has(input:disabled),
-.leaf:disabled {
+.leaf:has(input:disabled) {
   color: var(--ink-3);
   cursor: not-allowed;
 }

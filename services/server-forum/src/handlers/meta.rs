@@ -33,6 +33,7 @@ pub struct Category {
     pub on_home: bool,
     pub award_points: bool,
     pub admin_only: bool,
+    pub allow_short_title: bool,
     /// 内置标签：发帖时按这个分类给出的可一键选用的标签。
     pub preset_tags: Vec<String>,
     pub topic_count: i64,
@@ -41,10 +42,13 @@ pub struct Category {
 pub async fn categories(State(state): State<AppState>) -> AppResult<Json<Vec<Category>>> {
     let rows = sqlx::query_as(
         "SELECT c.id, c.parent_id, c.slug, c.name, c.description, c.kind, c.sort_order, c.min_post_level,
-                c.on_home, c.award_points, c.admin_only, c.preset_tags, c.section,
+                c.on_home, c.award_points, c.admin_only,
+                (c.allow_short_title OR c.slug = 'casual' OR COALESCE(p.slug = 'casual',false)) AS allow_short_title,
+                c.preset_tags, c.section,
                 CASE WHEN p.status='archived' THEN 'archived' ELSE c.status END AS status,
                 c.posting_enabled AND COALESCE(p.posting_enabled,true) AS posting_enabled,
-                (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status = 'normal' AND t.min_read_level = 0) AS topic_count
+                (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status = 'normal'
+                    AND t.min_read_level = 0 AND t.visible_in_active_lists) AS topic_count
          FROM categories c LEFT JOIN categories p ON p.id=c.parent_id ORDER BY c.sort_order, c.id",
     )
     .fetch_all(&state.pool)

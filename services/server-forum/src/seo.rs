@@ -491,13 +491,23 @@ async fn category_page(
 ) -> Res {
     let cx = Ctx::new(&state, &index);
     let canonical = crate::taxonomy::canonical(&slug);
-    if canonical != slug {
-        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM categories WHERE slug=$1)").bind(canonical).fetch_one(&state.pool).await?;
-        if exists { return Ok(axum::response::Redirect::permanent(&format!("/c/{}", percent_encode(canonical))).into_response()); }
+    let cat: Option<(i32, String, String, String)> = sqlx::query_as(
+        "SELECT id, slug, name, description FROM categories
+         WHERE slug IN ($1,$2) OR id=(SELECT category_id FROM category_redirects WHERE old_slug=$2)
+         ORDER BY (slug=$2) DESC, (slug=$1) DESC LIMIT 1",
+    ).bind(canonical).bind(&slug).fetch_optional(&state.pool).await?;
+    let legacy_section = match canonical {
+        "create" => Some("/ideas"),
+        "casual" if cat.is_none() => Some("/discuss"),
+        _ => None,
+    };
+    if let Some(path) = legacy_section {
+        return Ok(axum::response::Redirect::permanent(path).into_response());
     }
-    let cat: Option<(i32, String, String)> =
-        sqlx::query_as("SELECT id, name, description FROM categories WHERE slug = $1").bind(&slug).fetch_optional(&state.pool).await?;
-    let Some((cid, name, desc)) = cat else { return Ok(cx.not_found()) };
+    let Some((cid, current_slug, name, desc)) = cat else { return Ok(cx.not_found()) };
+    if current_slug != slug {
+        return Ok(axum::response::Redirect::permanent(&format!("/c/{}", percent_encode(&current_slug))).into_response());
+    }
     let children: Vec<(String, String)> =
         sqlx::query_as("SELECT slug, name FROM categories WHERE parent_id = $1 ORDER BY sort_order, id")
             .bind(cid)

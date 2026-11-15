@@ -65,6 +65,7 @@ pub struct CategoryRef {
     pub slug: String,
     pub name: String,
     pub parent_slug: Option<String>,
+    pub allow_short_title: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -139,6 +140,7 @@ struct TopicRow {
     category_slug: String,
     category_name: String,
     category_parent_slug: Option<String>,
+    category_allow_short_title: bool,
     author_uid: Uuid,
     author_nickname: String,
     author_avatar: Option<String>,
@@ -162,7 +164,8 @@ impl TopicRow {
             id: self.id,
             title: self.title,
             excerpt: self.excerpt,
-            category: CategoryRef { id: self.category_id, slug: self.category_slug, name: self.category_name, parent_slug: self.category_parent_slug },
+            category: CategoryRef { id: self.category_id, slug: self.category_slug, name: self.category_name, parent_slug: self.category_parent_slug,
+                allow_short_title: self.category_allow_short_title },
             author: PublicUser {
                 uid: self.author_uid,
                 nickname: self.author_nickname,
@@ -194,6 +197,9 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         (SELECT p.slug FROM categories p WHERE p.id = c.parent_id) AS category_parent_slug,
+        (c.allow_short_title OR c.slug = 'casual' OR EXISTS(
+            SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual'
+        )) AS category_allow_short_title,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
         h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at, t.images
     FROM topics t
@@ -245,6 +251,14 @@ pub struct Page<T> {
     pub total: i64,
 }
 
+fn push_category_match(qb: &mut QueryBuilder<'_, Postgres>, slugs: &[String]) {
+    qb.push("(c.slug = ANY(")
+        .push_bind(slugs.to_vec())
+        .push(") OR c.id IN (SELECT category_id FROM category_redirects r WHERE r.old_slug = ANY(")
+        .push_bind(slugs.to_vec())
+        .push(") AND NOT EXISTS(SELECT 1 FROM categories live WHERE live.slug = r.old_slug)))");
+}
+
 fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     qb.push(" WHERE t.status = 'normal'");
     qb.push(" AND NOT EXISTS(SELECT 1 FROM content_discussions d WHERE d.topic_id=t.id AND d.managed)");
@@ -263,9 +277,9 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
         // 可以用逗号同时指定几个分类（如电影和音乐），一级分类仍然包含它的子分类。
         let slugs = crate::taxonomy::equivalents(slug);
-        qb.push(" AND (c.slug = ANY(")
-            .push_bind(slugs.clone())
-            .push(") OR c.parent_id IN (SELECT id FROM categories WHERE slug = ANY(")
+        qb.push(" AND (");
+        push_category_match(qb, &slugs);
+        qb.push(" OR c.parent_id IN (SELECT id FROM categories WHERE slug = ANY(")
             .push_bind(slugs)
             .push(")))");
     }
@@ -293,10 +307,10 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
             .push(")");
     }
     if f.active_only {
-        qb.push(" AND c.status='active' AND NOT EXISTS(SELECT 1 FROM categories parent WHERE parent.id=c.parent_id AND parent.status<>'active')");
+        qb.push(" AND t.visible_in_active_lists AND c.status='active' AND NOT EXISTS(SELECT 1 FROM categories parent WHERE parent.id=c.parent_id AND parent.status<>'active')");
     }
     if f.home {
-        qb.push(" AND c.on_home");
+        qb.push(" AND c.on_home AND t.on_home");
     }
     if f.featured {
         qb.push(" AND t.featured");
@@ -329,10 +343,9 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
             .push_bind(scope.clone())
             .push(")) OR c.parent_id IN (SELECT parent_id FROM categories WHERE slug = ANY(")
             .push_bind(scope.clone())
-            .push("))) THEN 1
-            WHEN t.pin_scope = 'category' AND c.id IN (SELECT id FROM categories WHERE slug = ANY(")
-            .push_bind(scope)
-            .push(")) THEN 2 ELSE 3 END, ");
+            .push("))) THEN 1 WHEN t.pin_scope = 'category' AND ");
+        push_category_match(&mut qb, &scope);
+        qb.push(" THEN 2 ELSE 3 END, ");
     } else if f.home {
         qb.push(" ORDER BY CASE WHEN t.pin_scope = 'site' THEN 0 ELSE 1 END, ");
     } else {

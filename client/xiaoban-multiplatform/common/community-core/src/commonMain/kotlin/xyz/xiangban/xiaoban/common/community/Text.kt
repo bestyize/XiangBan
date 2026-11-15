@@ -86,7 +86,9 @@ fun formatDownloadSize(bytes: Long): String = when {
 }
 
 /** Casual notes keep a genuinely optional title; feeds and share labels use an excerpt when absent. */
-val Topic.isCasual: Boolean get() = category.slug == "casual" || (category.parentSlug?.let { it == "casual" } ?: category.slug.startsWith("casual-"))
+val Topic.isCasual: Boolean
+    get() = category.allowShortTitle
+        ?: (category.slug == "casual" || (category.parentSlug?.let { it == "casual" } ?: category.slug.startsWith("casual-")))
 val Topic.cardTitle: String get() = title.ifBlank { excerpt.trim().take(80).ifBlank { "分享生活" } }
 
 data class CasualArticle(val images: List<BodyBlock.Image>, val paragraphs: List<BodyBlock.Text>)

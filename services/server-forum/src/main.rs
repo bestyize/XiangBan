@@ -147,6 +147,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     taxonomy::migrate_sections(&pool).await?;
     taxonomy::add_app_channel(&pool).await?;
     taxonomy::retire_open_source_board(&pool).await?;
+    taxonomy::add_uncategorized_boards(&pool).await?;
+    taxonomy::flatten_community_boards(&pool).await?;
     discover::seed(&pool).await?;
     discover::backfill_topic_images(&pool).await?;
     discover::backfill_editor_topic_images(&pool).await?;

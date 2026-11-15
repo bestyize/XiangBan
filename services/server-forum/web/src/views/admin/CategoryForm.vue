@@ -14,6 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [body: CategoryInput]; cancel: [] }>()
 
 const editing = computed(() => !!props.category)
+const availableParents = computed(() => props.parents.filter(parent => parent.section === 'resources' && parent.kind === 'normal'))
 
 const form = reactive({
   parent_id: props.category?.parent_id ?? (null as number | null),
@@ -60,11 +61,11 @@ function submit() {
 <template>
   <form class="adm-form" @submit.prevent="submit">
     <div class="adm-form-grid">
-      <label v-if="!editing" class="field">
+      <label v-if="!editing && form.section === 'resources' && availableParents.length" class="field">
         <span>父分类</span>
         <select v-model="form.parent_id" class="select" style="width: 100%">
-          <option :value="null">无（一级分类）</option>
-          <option v-for="p in parents" :key="p.id" :value="p.id">{{ p.name }}</option>
+          <option :value="null">独立板块</option>
+          <option v-for="p in availableParents" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
       </label>
       <label v-if="!editing" class="field">
@@ -72,7 +73,7 @@ function submit() {
         <input v-model="form.slug" class="input" required maxlength="40" placeholder="tech-example" />
         <small>2-40 位小写字母、数字或连字符，创建后不可修改</small>
       </label>
-      <label class="field"><span>所属页面</span><select v-model="form.section" :disabled="form.parent_id !== null" class="select"><option value="ideas">创意</option><option value="discuss">讨论</option><option value="resources">资源</option><option value="site">站务</option></select><small>子分类新增时沿用父分类归属；修改一级分类会同步其子分类。</small></label>
+      <label class="field"><span>所属页面</span><select v-model="form.section" :disabled="form.parent_id !== null || category?.kind === 'uncategorized'" class="select"><option value="ideas">创意</option><option value="discuss">讨论</option><option value="resources">资源</option><option value="site">站务</option></select></label>
       <label class="field"><span>分类状态</span><select v-model="form.status" class="select"><option value="active">启用</option><option value="archived">停用</option></select></label>
       <label class="field">
         <span>名称</span>
@@ -96,7 +97,7 @@ function submit() {
       <label class="field wide">
         <span>内置标签</span>
         <input v-model="form.preset_tags" class="input" placeholder="用逗号或空格分隔，比如：windows，macos，开源" />
-        <small>发帖选了这个分类后，这些标签会出现在标签栏下面，点一下就加上；最多 20 个，每个最多 20 个字。只对二级分类有用。</small>
+        <small>选中这个板块发帖时可直接使用这些标签。最多 20 个，每个最多 20 个字。</small>
       </label>
     </div>
     <div class="adm-checks">

@@ -147,6 +147,156 @@ impl Harness {
 }
 
 #[tokio::test]
+async fn uncategorized_topics_stay_in_their_own_boards() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    crate::taxonomy::migrate(&h.pool).await?;
+    crate::taxonomy::migrate_sections(&h.pool).await?;
+    tokio::try_join!(
+        crate::taxonomy::add_uncategorized_boards(&h.pool),
+        crate::taxonomy::add_uncategorized_boards(&h.pool),
+    )?;
+
+    let (status, categories) = call(&h.app, "GET", "/api/categories", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let defaults: Vec<_> = categories.as_array().unwrap().iter()
+        .filter(|board| board["kind"] == crate::taxonomy::UNCATEGORIZED_KIND)
+        .collect();
+    assert_eq!(defaults.len(), 3);
+    let member = h.member().await?;
+    for (section, specific) in [("ideas", "create-wallpaper"), ("discuss", "learn"), ("resources", "resource-help")] {
+        let board = defaults.iter().find(|board| board["section"] == section).unwrap();
+        let slug = format!("{section}-uncategorized");
+        assert_eq!(board["slug"], slug.as_str());
+        assert_eq!(board["name"], "默认");
+        let (status, created) = call(&h.app, "POST", "/api/topics", Some(&member), json!({
+            "category_id": board["id"], "title": "Uncategorized topic", "body": "This post belongs to the default board."
+        })).await;
+        assert_eq!(status, StatusCode::OK, "{created}");
+
+        let (_, list) = call(&h.app, "GET", &format!("/api/topics?category={slug}&active_only=true"), None, Value::Null).await;
+        assert_eq!(list["total"], 1);
+        assert_eq!(list["items"][0]["id"], created["id"]);
+        assert_eq!(list["items"][0]["category"]["id"], board["id"]);
+        assert!(list["items"][0]["help"].is_null());
+        let (_, other) = call(&h.app, "GET", &format!("/api/topics?category={specific}"), None, Value::Null).await;
+        assert_eq!(other["total"], 0);
+    }
+
+    let board_id = defaults[0]["id"].as_i64().unwrap();
+    let uri = format!("/api/admin/categories/{board_id}");
+    let (status, _) = call(&h.app, "PATCH", &uri, Some(&h.admin_t), json!({"section": "site"})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = call(&h.app, "PATCH", &uri, Some(&h.admin_t), json!({"posting_enabled": false})).await;
+    assert_eq!(status, StatusCode::OK);
+    crate::taxonomy::add_uncategorized_boards(&h.pool).await?;
+    let (status, _) = call(&h.app, "POST", "/api/topics", Some(&member), json!({
+        "category_id": board_id, "title": "Closed uncategorized board", "body": "This post must not be published."
+    })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    h.finish().await
+}
+
+#[tokio::test]
+async fn community_board_flattening_preserves_content_and_prevents_new_subcategories() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    crate::taxonomy::migrate(&h.pool).await?;
+    crate::taxonomy::migrate_sections(&h.pool).await?;
+    crate::taxonomy::add_app_channel(&h.pool).await?;
+    crate::taxonomy::retire_open_source_board(&h.pool).await?;
+    crate::taxonomy::add_uncategorized_boards(&h.pool).await?;
+
+    let ids: std::collections::HashMap<String, i32> = sqlx::query_as("SELECT slug, id FROM categories")
+        .fetch_all(&h.pool).await?.into_iter().collect();
+    let author = Uuid::new_v4();
+    sqlx::query("INSERT INTO users (uid,nickname,trust_level) VALUES ($1,'Old board author',3)")
+        .bind(author).execute(&h.pool).await?;
+    sqlx::query("UPDATE categories SET on_home=false WHERE slug='learn-codex'").execute(&h.pool).await?;
+    sqlx::query("UPDATE categories SET min_post_level=1 WHERE slug='site-feedback'").execute(&h.pool).await?;
+    let archived: i32 = sqlx::query_scalar(
+        "INSERT INTO categories(slug,name,section,parent_id,status)
+         VALUES('old-tutorials','Archived tutorials','discuss',$1,'archived') RETURNING id",
+    ).bind(ids["learn"]).fetch_one(&h.pool).await?;
+    let casual: i32 = sqlx::query_scalar(
+        "INSERT INTO categories(slug,name,section,parent_id) VALUES('local-chat','Local chat','discuss',$1) RETURNING id",
+    ).bind(ids["casual"]).fetch_one(&h.pool).await?;
+    let mut topics = std::collections::HashMap::new();
+    for (name, category, pin) in [
+        ("Tutorial", ids["learn-codex"], "parent"),
+        ("Archived", archived, "none"),
+        ("Feedback", ids["site-feedback"], "site"),
+        ("Wallpaper", ids["create-wallpaper"], "category"),
+        ("General idea", ids["create"], "none"),
+    ] {
+        let topic: i64 = sqlx::query_scalar(
+            "INSERT INTO topics(category_id,author_uid,title,body_md,body_html,pin_scope,pinned)
+             VALUES($1,$2,$3,'Public body','Public body',$4,$4 <> 'none') RETURNING id",
+        ).bind(category).bind(author).bind(name).bind(pin).fetch_one(&h.pool).await?;
+        topics.insert(name, topic);
+    }
+    let draft = Uuid::new_v4();
+    sqlx::query("INSERT INTO editor_drafts(id,author_uid,external_id,category_id,title,body_md) VALUES ($1,$2,'old-draft',$3,'Tutorial draft','draft')")
+        .bind(draft).bind(author).bind(ids["learn-codex"]).execute(&h.pool).await?;
+
+    tokio::try_join!(
+        crate::taxonomy::flatten_community_boards(&h.pool),
+        crate::taxonomy::flatten_community_boards(&h.pool),
+    )?;
+    crate::db::seed(&h.pool).await?;
+    crate::taxonomy::migrate(&h.pool).await?;
+    let (status, categories) = call(&h.app, "GET", "/api/categories", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let boards = categories.as_array().unwrap();
+    assert!(boards.iter().filter(|row| row["section"] != "resources").all(|row| row["parent_id"].is_null()));
+    assert!(boards.iter().all(|row| !["create","casual","learn-codex","site-feedback","old-tutorials"]
+        .contains(&row["slug"].as_str().unwrap())));
+    for slug in ["learn", "site", "create-wallpaper", "casual-games", "resource-help"] {
+        let board = boards.iter().find(|row| row["slug"] == slug).unwrap();
+        assert_eq!(board["id"], ids[slug]);
+    }
+    assert_eq!(boards.iter().find(|row| row["id"] == casual).unwrap()["allow_short_title"], true);
+    for (name, board, pin) in [
+        ("Tutorial", "learn", "category"),
+        ("Archived", "learn", "none"),
+        ("Feedback", "site", "site"),
+        ("Wallpaper", "create-wallpaper", "category"),
+        ("General idea", "ideas-uncategorized", "none"),
+    ] {
+        let (_, topic) = call(&h.app, "GET", &format!("/api/topics/{}", topics[name]), None, Value::Null).await;
+        assert_eq!(topic["category"]["slug"], board, "{topic}");
+        assert_eq!(topic["pin_scope"], pin);
+    }
+    let draft_board: i32 = sqlx::query_scalar("SELECT category_id FROM editor_drafts WHERE id=$1")
+        .bind(draft).fetch_one(&h.pool).await?;
+    assert_eq!(draft_board, ids["learn"]);
+    for (query, count) in [("learn-codex&active_only=true", 1), ("learn&active_only=true&home=true", 0), ("old-tutorials", 2)] {
+        let (_, list) = call(&h.app, "GET", &format!("/api/topics?category={query}"), None, Value::Null).await;
+        assert_eq!(list["total"], count, "{query}: {list}");
+    }
+    for (old, destination) in [("learn-codex","/c/learn"),("old-tutorials","/c/learn"),("site-feedback","/c/site"),("create","/ideas")] {
+        let request = Request::builder().uri(format!("/c/{old}")).body(Body::empty())?;
+        let response = h.app.clone().oneshot(request).await?;
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(response.headers()["location"], destination);
+    }
+    let member = h.member().await?;
+    for (category, title) in [(ids["learn"], "New tutorial"), (ids["site"], "New feedback"), (casual, ""), (ids["create-wallpaper"], "New wallpaper")] {
+        let (status, post) = call(&h.app, "POST", "/api/topics", Some(&member), json!({
+            "category_id": category, "title": title, "body": "This is a post in a flat board."
+        })).await;
+        assert_eq!(status, StatusCode::OK, "{post}");
+    }
+    for parent in [ids["learn"], ids["site"], ids["create-wallpaper"]] {
+        let (status, _) = call(&h.app, "POST", "/api/admin/categories", Some(&h.admin_t),
+            json!({"name":"Invalid child","kind":"normal","slug":"invalid-child","parent_id":parent})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+    let attempted_child = sqlx::query("INSERT INTO categories(slug,name,section,parent_id) VALUES('invalid','Invalid','resources',$1)")
+        .bind(ids["learn"]).execute(&h.pool).await;
+    assert!(attempted_child.is_err());
+    h.finish().await
+}
+
+#[tokio::test]
 async fn newcomers_can_upload_and_publish_discover_comment_images() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let upload_dir = std::env::temp_dir().join(&h.schema);

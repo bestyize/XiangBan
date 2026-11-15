@@ -196,7 +196,7 @@ export interface AdminCategory {
   posting_enabled: boolean
   name: string
   description: string
-  kind: 'normal'
+  kind: 'normal' | 'uncategorized'
   sort_order: number
   min_post_level: number
   on_home: boolean

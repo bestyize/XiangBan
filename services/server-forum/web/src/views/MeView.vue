@@ -45,7 +45,7 @@ const profile = computed(() => session.user ? '/u/' + encodeURIComponent(session
       <RouterLink class="me-row" to="/settings#blocks-title">屏蔽的用户<AppIcon name="arrow" :size="16" /></RouterLink>
       <RouterLink class="me-row" to="/ai">AI 额度<small>在客户端查看</small><AppIcon name="arrow" :size="16" /></RouterLink>
       <RouterLink class="me-row" to="/ai">我的设备<small>在客户端管理</small><AppIcon name="arrow" :size="16" /></RouterLink>
-      <RouterLink class="me-row" to="/c/site-feedback">帮助与反馈<AppIcon name="arrow" :size="16" /></RouterLink>
+      <RouterLink class="me-row" to="/discuss?tab=site">帮助与反馈<AppIcon name="arrow" :size="16" /></RouterLink>
       <RouterLink class="me-row" to="/contact">交流群<AppIcon name="arrow" :size="16" /></RouterLink>
     </nav>
 

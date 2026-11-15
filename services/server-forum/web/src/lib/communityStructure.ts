@@ -11,7 +11,7 @@ export function activeCategories(categories: Category[]) {
 export function sectionCategories(categories: Category[], section: CommunitySection) {
   return activeCategories(categories).filter(c => c.section === section)
 }
-export function sectionLeaves(categories:Category[], section:CommunitySection) {
+export function sectionBoards(categories:Category[], section:CommunitySection) {
   return sectionCategories(categories,section).filter(c=>!categories.some(child=>child.parent_id===c.id))
 }
 const discussionOrder = [
@@ -35,7 +35,8 @@ export function discussionDestinations(categories: Category[]) {
     ? c.slug !== 'casual' || !parents.has(c.id)
     : byId.get(c.parent_id)?.slug === 'casual')
   const bySlug = new Map(primary.map(c => [c.slug, c]))
-  const order = new Set([...discussionOrder, ...bySlug.keys()])
+  const defaultBoards = primary.filter(category => category.kind === 'uncategorized')
+  const order = new Set([...defaultBoards.map(category => category.slug), ...discussionOrder, ...bySlug.keys()])
   return Array.from(order).flatMap(key => {
     const category = bySlug.get(key)
     const label = key === '3d' ? '3D' : discussionTopicTag(key) ?? category?.name
@@ -45,58 +46,43 @@ export function discussionDestinations(categories: Category[]) {
 export function discussionTabs(categories: Category[]) {
   return [{key:'all',label:'全部'}, ...discussionDestinations(categories).map(({ key, label }) => ({ key, label }))]
 }
-export function discussionFilters(categories: Category[], tab: string) {
-  const rows = discussionBoards(categories)
-  const root = rows.find(c => c.slug === tab && c.parent_id === null)
-  return root ? [{key:'',label:'全部'},...rows.filter(c => c.parent_id === root.id).map(c=>({key:c.slug,label:categoryLabel(c)}))] : []
-}
-export function learnFilters(categories: Category[]) { return discussionFilters(categories,'learn') }
-export function discussionFilter(categories:Category[],tab:string,raw:string) {
-  const options = discussionFilters(categories,tab)
-  const direct = canonicalCategory(raw)
-  const key = options.some(c=>c.key === direct) ? direct : tab === 'learn' ? learnCategory(raw) : ''
-  return options.some(c=>c.key === key) ? key : ''
-}
-// Legacy query parameters are input aliases; current labels and availability come from the API.
-export function learnCategory(filter:string) {
-  return ({'claude-code':'learn-claude-code',codex:'learn-codex','提示词':'learn-prompts','工作流':'learn-workflows','本地部署':'learn-local','ai-硬件':'learn-hardware'} as Record<string,string>)[filter] || (filter.startsWith('learn-') ? filter : 'learn')
-}
 export function sectionScope(categories:Category[], section:CommunitySection) {
-  return sectionLeaves(categories,section).map(c=>c.slug).join(',') || '__no_active_category__'
+  return sectionBoards(categories,section).map(c=>c.slug).join(',') || '__no_active_category__'
 }
-export function discussionCategory(tab:string, filter='', categories:Category[] = []) {
+export function discussionCategory(tab:string, categories:Category[]) {
   if (tab === 'all' || discussionTopicTag(tab)) return sectionScope(categories,'discuss')
-  return discussionFilter(categories,tab,filter) || canonicalCategory(tab)
+  return tab
 }
-export function discussionRoute(categories: Category[], rawTab: string, rawFilter = '', rawBoard = '') {
-  const legacyTab = canonicalCategory(rawTab === 'casual' && rawFilter ? rawFilter : rawTab)
-  const tab = discussionTabs(categories).some(item => item.key === legacyTab) ? legacyTab : 'all'
-  const requested = canonicalCategory(rawBoard || legacyTab)
-  const board = requested !== tab && discussionBoards(categories).some(category => category.slug === requested)
-    ? requested
-    : ''
-  const filter = discussionFilter(categories, board || tab, rawFilter)
-  return { tab, board, filter }
+export function discussionTab(categories: Category[], rawTab: string, rawFilter = '', rawBoard = '') {
+  const tabs = discussionTabs(categories)
+  for (const raw of [rawBoard, rawTab === 'casual' ? rawFilter : '', rawTab]) {
+    if (!raw) continue
+    const slug = canonicalCategory(raw)
+    if (tabs.some(tab => tab.key === slug)) return slug
+    const board = categories.find(category => category.slug === raw)
+    const parent = categories.find(category => category.id === board?.parent_id)
+    if (parent && tabs.some(tab => tab.key === parent.slug)) return parent.slug
+  }
+  return 'all'
+}
+export function ideaBoard(categories: Category[], raw: string) {
+  const slug = canonicalCategory(raw)
+  return sectionBoards(categories, 'ideas').find(category => category.slug === slug)?.slug ?? ''
 }
 export function resourceTopicCategory(tab:string) {
   return ({media:'resource-movies',help:'resource-help'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
 export function categoryLabel(category:Pick<Category,'name'>) { return category.name }
 export function resourceTabs(categories:Category[]) {
-  return [{key:'software',label:'开源软件'}, ...sectionLeaves(categories, 'resources').map(c => ({key:c.slug,label:c.name}))]
+  return [{key:'software',label:'开源软件'}, ...sectionBoards(categories, 'resources').map(c => ({key:c.slug,label:c.name}))]
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
   if (!activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
   const leaf=!categories.some(child=>child.parent_id===category.id)
   if(category.section==='resources') return leaf ? '/resources?tab=' + category.slug : '/resources'
   if(category.section==='ideas') return leaf ? `/ideas?category=${category.slug}` : '/ideas'
-  if(category.section==='discuss') {
-    const parent=categories.find(c=>c.id===category.parent_id)
-    return parent && parent.slug !== 'casual'
-      ? `/discuss?tab=${parent.slug}&filter=${category.slug}`
-      : `/discuss?tab=${category.slug === 'casual' && !leaf ? 'all' : category.slug}`
-  }
-  return `/c/${category.slug}`
+  const tab = discussionTab(categories, category.slug)
+  return tab === 'all' ? '/discuss' : `/discuss?tab=${tab}`
 }
 
 export type NavigationSectionKey = 'ideas' | 'discuss' | 'resources'
@@ -107,8 +93,11 @@ export function navigationSections(categories:Category[]) {
   const active = activeCategories(categories)
   return (['ideas','discuss','resources'] as const).map(key=>{
     const rows = active.filter(c=>navigationSection(c)===key)
+    const children = key === 'discuss'
+      ? discussionDestinations(categories).flatMap(({ category }) => category ? [category] : [])
+      : sectionBoards(categories, key)
     return {key,name:SECTION_LABELS[key],href:key==='ideas'?'/ideas':key==='resources'?'/resources':'/discuss',
-      children:rows.filter(c=>!categories.some(child=>child.parent_id===c.id)),
+      children,
       topic_count:rows.reduce((total,c)=>total+c.topic_count,0)}
   })
 }

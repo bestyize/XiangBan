@@ -12,7 +12,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "从官方使用说明提炼具体使用场景、操作和限制，保留未实测说明。",
-      "category": "learn-claude-code",
+      "category": "learn",
       "tags": [
         "Claude-Code"
       ],
@@ -146,8 +146,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "learn-codex",
@@ -155,7 +154,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "依据官方文档写清功能边界，不比较没有依据的能力。 官方仓库技能的导读要注明依赖和安装条件，不声称用户已安装，也不声称所有环境都支持。",
-      "category": "learn-codex",
+      "category": "learn",
       "tags": [
         "Codex"
       ],
@@ -206,8 +205,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "learn-prompts",
@@ -215,7 +213,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "给出可复用的提示编写方法，示例标为示例，不编造测试结果。",
-      "category": "learn-prompts",
+      "category": "learn",
       "tags": [
         "提示词"
       ],
@@ -263,8 +261,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "learn-workflows",
@@ -272,7 +269,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "分析编码与协作流程的具体改变、使用条件和验证办法。",
-      "category": "learn-workflows",
+      "category": "learn",
       "tags": [
         "工作流"
       ],
@@ -306,8 +303,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "learn-local",
@@ -315,7 +311,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "以官方运行说明为准，区分硬件、模型、上下文与系统限制，不编造亲测。",
-      "category": "learn-local",
+      "category": "learn",
       "tags": [
         "本地部署"
       ],
@@ -366,8 +362,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "learn-hardware",
@@ -375,7 +370,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "解释硬件技术与适用条件，厂商数据必须注明来源，不作购买建议。",
-      "category": "learn-hardware",
+      "category": "learn",
       "tags": [
         "AI-硬件"
       ],
@@ -448,8 +443,7 @@
       ],
       "daily_limit": 2,
       "bootstrap_daily_limit": 20,
-      "native_destination": "topic",
-      "count_by_category": true
+      "native_destination": "topic"
     },
     {
       "id": "casual-work",
@@ -1608,7 +1602,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
-      "category": "site-notice",
+      "category": "site",
       "tags": [],
       "hosts": [
         "chat.xiangban.xyz"
@@ -1629,7 +1623,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
-      "category": "site-rules",
+      "category": "site",
       "tags": [],
       "hosts": [
         "chat.xiangban.xyz"
@@ -1650,7 +1644,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "围绕具体问题反馈和可核对的界面观察写站方导读，不冒充真实工单或用户体验。可依据W3C WAI基础检查资料讲解可访问性观察与反馈方法，明确草案、初步自查与正式WCAG合规评估的区别，不声称本站已有相关缺陷、已修复或已经符合标准，不把外部建议改写为社区强制规则。",
-      "category": "site-feedback",
+      "category": "site",
       "tags": [],
       "hosts": [
         "chat.xiangban.xyz",
@@ -1682,7 +1676,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
-      "category": "site-reports",
+      "category": "site",
       "tags": [],
       "hosts": [
         "chat.xiangban.xyz"

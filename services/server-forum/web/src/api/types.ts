@@ -40,12 +40,13 @@ export interface Category {
   posting_enabled: boolean
   name: string
   description: string
-  kind: 'normal'
+  kind: 'normal' | 'uncategorized'
   sort_order: number
   min_post_level: number
   on_home: boolean
   award_points: boolean
   admin_only: boolean
+  allow_short_title?: boolean
   /** 内置标签：发帖时按这个分类给出的可一键选用的标签 */
   preset_tags: string[]
   topic_count: number
@@ -57,7 +58,7 @@ export interface TopicItem {
   id: number
   title: string
   excerpt: string
-  category: { id: number; slug: string; name: string }
+  category: { id: number; slug: string; name: string; allow_short_title?: boolean }
   author: PublicUser
   tags: string[]
   status: string

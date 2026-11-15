@@ -9,10 +9,9 @@ import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
-import { discussionTabs, discussionFilters, discussionRoute, discussionCategory, discussionTopicTag, sectionScope, sectionLeaves } from '@/lib/communityStructure'
+import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, ideaBoard, sectionScope, sectionBoards } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import FilterChips from '@/components/community/FilterChips.vue'
-import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import MicroGallery from '@/components/community/MicroGallery.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
@@ -22,38 +21,26 @@ import '@/components/community/community.css'
 
 const route = useRoute(), router = useRouter(), session = useSession()
 const meta = useMeta()
-const ideaCategories = computed(()=>sectionLeaves(meta.categories,'ideas'))
-const ideaTabs = [{key:'',label:'全部'}, galleryTab]
-const ideaFilters = computed(() => [{key:'',label:'全部板块'}, ...ideaCategories.value.map(c => ({key:c.slug,label:c.name}))])
-const ideaFilter = computed(()=>ideaCategories.value.some(c=>c.slug===query('category')) ? query('category') : '')
+const ideaCategories = computed(() => sectionBoards(meta.categories,'ideas'))
+const ideaTabs = computed(() => [{key:'',label:'全部'}, galleryTab, ...ideaCategories.value.map(c => ({key:c.slug,label:c.name}))])
+const ideaFilter = computed(() => ideaBoard(meta.categories, query('category')))
 const ideaKind = computed(()=>ideaFilter.value.replace(/^create-/,''))
 const packKinds = new Set(['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'])
 const ideas = computed(() => route.name === 'ideas')
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
 const showGallery = computed(() => ideas.value && query('tab') === galleryTab.key)
-const discussion = computed(() => discussionRoute(meta.categories, query('tab'), query('filter'), query('board')))
-const tab = computed(() => ideas.value ? 'create' : discussion.value.tab)
-const board = computed(() => ideas.value ? '' : discussion.value.board)
+const tab = computed(() => discussionTab(meta.categories, query('tab'), query('filter'), query('board')))
+const discussionOptions = computed(() => discussionTabs(meta.categories))
 const tag = computed(() => query('tag'))
-const subFilters = computed(() => ideas.value ? [] : discussionFilters(meta.categories,board.value || tab.value))
-const filter = computed(() => ideas.value ? '' : discussion.value.filter)
-const discussionTabsWithBoards = computed(() => [
-  ...discussionTabs(meta.categories).flatMap(item =>
-    item.key === tab.value && !board.value ? [item, ...subFilters.value.filter(option => option.key)] : [item],
-  ),
-])
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
-const category = computed(() => ideas.value ? ideaFilter.value || sectionScope(meta.categories,'ideas') : discussionCategory(board.value || tab.value, filter.value, meta.categories))
+const category = computed(() => ideas.value ? ideaFilter.value || sectionScope(meta.categories,'ideas') : discussionCategory(tab.value, meta.categories))
 const scope = computed(() => ({
   category:category.value,
-  tag:(!ideas.value && !board.value ? discussionTopicTag(tab.value) : undefined) || tag.value || undefined,
+  tag:(!ideas.value ? discussionTopicTag(tab.value) : undefined) || tag.value || undefined,
   active_only:true,
-  home:!ideas.value && !board.value && (tab.value === 'all' || Boolean(discussionTopicTag(tab.value))),
+  home:!ideas.value && (tab.value === 'all' || Boolean(discussionTopicTag(tab.value))),
 }))
-const topicLabel = computed(() => tag.value || (!ideas.value && board.value
-  ? meta.bySlug.get(board.value)?.name
-  : '') || '')
 
 type Entry = {kind:'topic'; value:TopicItem} | {kind:'pack'; value:PackItem} | {kind:'scheme'; value:CommunityScheme}
 function date(entry:Entry) {
@@ -75,25 +62,21 @@ const { data, loading, error, load } = useCommunityResource(async () => {
   ]
   return { entries:entries.sort((a,b) => date(b)-date(a)), hasMore:[topics,packs,schemes].some(result => result && result.page * result.page_size < result.total) }
 })
-watch([() => meta.categories,ideas,ideaFilter,showGallery,tab,board,tag,filter,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
+watch([() => meta.categories,ideas,ideaFilter,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 
 function navigate(values:Record<string,string|undefined>) {
-  void router.replace({query:{tab:ideas.value ? undefined : tab.value, category:ideas.value ? ideaFilter.value || undefined : undefined, board:board.value || undefined, tag:tag.value || undefined,
-    filter:filter.value || undefined, mode:following.value ? 'following' : undefined, ...values}})
+  void router.replace({query:{
+    tab: ideas.value ? (showGallery.value ? galleryTab.key : undefined) : tab.value,
+    category: ideas.value ? ideaFilter.value || undefined : undefined,
+    tag: tag.value || undefined, mode: following.value ? 'following' : undefined, ...values,
+  }})
 }
 function changeIdeaTab(key:string) {
-  if (key === galleryTab.key) {
-    if (!showGallery.value) void router.push({ name:'ideas', query:{ tab:galleryTab.key, category:ideaFilter.value || undefined } })
-  } else if (showGallery.value) {
-    void router.push({ name:'ideas', query:{ category:ideaFilter.value || undefined } })
-  }
+  const gallery = key === galleryTab.key
+  navigate({tab:gallery ? galleryTab.key : undefined, category:!gallery && key ? key : undefined, tag:undefined, page:undefined})
 }
 function changeDiscussionTab(key:string) {
-  if (subFilters.value.some(option => option.key === key)) {
-    navigate({ filter:key, tag:undefined, page:undefined })
-  } else {
-    navigate({ tab:key, filter:undefined, board:undefined, tag:undefined, page:undefined })
-  }
+  navigate({ tab:key, tag:undefined, page:undefined })
 }
 function go(value:number) { navigate({page:String(value)}) }
 
@@ -103,14 +86,11 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 <template>
   <main class="community-page discuss-page">
     <h1 class="sr-only">{{ ideas ? '社区创意' : '社区讨论' }}</h1>
-    <FilterChips v-if="!ideas" class="discussion-tabs" :items="discussionTabsWithBoards" :active="filter || tab" label="讨论分类"
+    <FilterChips v-if="!ideas" class="discussion-tabs" :items="discussionOptions" :active="tab" label="讨论板块"
       @change="changeDiscussionTab" />
-    <FilterChips v-if="board && subFilters.length" :items="subFilters"
-      :active="filter" label="分类主题" @change="key => navigate({filter:key || undefined,page:undefined})" />
-    <CommunityTabs v-if="ideas" :items="ideaTabs" :active="showGallery ? galleryTab.key : ''" label="创意栏目" @change="changeIdeaTab" />
-    <FilterChips v-if="ideas && !showGallery && ideaCategories.length" :items="ideaFilters" :active="ideaFilter" label="创意板块"
-      @change="key => navigate({category:key || undefined,tag:undefined,page:undefined})" />
-    <button v-if="!showGallery && topicLabel" class="active-topic" type="button" @click="navigate({tag:undefined,board:undefined,category:undefined,filter:undefined,page:undefined})">{{ tag ? '# ' : '' }}{{ topicLabel }} ×</button>
+    <FilterChips v-else class="discussion-tabs" :items="ideaTabs" :active="showGallery ? galleryTab.key : ideaFilter" label="创意板块"
+      @change="changeIdeaTab" />
+    <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
     <MicroGallery v-if="showGallery" />
     <RequestState v-else-if="!meta.categories.length && (meta.categoriesLoading || meta.categoriesError)"
@@ -122,7 +102,7 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
       <RequestState :loading="loading" :error="error" @retry="load" />
       <MasonryGrid v-if="data?.entries.length" class="discussion-grid" :columns="2">
         <template v-for="entry in data.entries" :key="entry.kind + ':' + entry.value.id">
-          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:ideas ? undefined : 'all',filter:undefined,board:undefined,tag:$event})" />
+          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:ideas ? undefined : 'all',tag:$event,page:undefined})" />
           <CommunityPackCard v-else-if="entry.kind === 'pack'" :pack="entry.value" layout="masonry" discussion />
           <RouterLink v-else :to="'/schemes/' + entry.value.id" class="scheme-card">
             <span>创意 · 桌面方案</span><strong>{{ entry.value.title }}</strong><p>{{ entry.value.summary }}</p>

@@ -45,6 +45,7 @@ const posterInput = computed(() =>
     : null,
 )
 const pinScopeDraft = ref<Exclude<PinScope, 'none'>>('site')
+const pinBoard = computed(() => topic.value && meta.byId.get(topic.value.category.id))
 const pinActionLabel = computed(() => {
   if (!topic.value?.pinned) return '置顶'
   return topic.value.pin_scope === pinScopeDraft.value ? '取消置顶' : '更新置顶范围'
@@ -382,8 +383,8 @@ function breadcrumbDestination(slug: string) {
             <span>置顶范围</span>
             <select v-model="pinScopeDraft" class="select is-sm" aria-label="置顶范围">
               <option value="site">全站</option>
-              <option value="parent">一级板块</option>
-              <option value="category">二级板块</option>
+              <option v-if="pinBoard?.section === 'resources'" value="parent">一级板块</option>
+              <option v-if="pinBoard?.section !== 'resources' || pinBoard.parent_id" value="category">当前板块</option>
             </select>
           </label>
           <button type="button" class="btn btn-ghost" :aria-pressed="topic.pinned" @click="togglePin">
@@ -469,8 +470,8 @@ function breadcrumbDestination(slug: string) {
             <span>置顶范围</span>
             <select v-model="pinScopeDraft" aria-label="置顶范围">
               <option value="site">全站</option>
-              <option value="parent">一级板块</option>
-              <option value="category">二级板块</option>
+              <option v-if="pinBoard?.section === 'resources'" value="parent">一级板块</option>
+              <option v-if="pinBoard?.section !== 'resources' || pinBoard.parent_id" value="category">当前板块</option>
             </select>
           </label>
           <button type="button" class="more-row" @click="fromMore(togglePin)">{{ pinActionLabel }}</button>

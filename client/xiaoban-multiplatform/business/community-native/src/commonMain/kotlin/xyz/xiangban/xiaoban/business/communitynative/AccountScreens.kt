@@ -236,7 +236,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
                 NavRow("AI 额度") { open(Route.Models) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
-                NavRow("帮助与反馈") { env.platform?.openUrl("$site/c/site-feedback") }
+                NavRow("帮助与反馈") { env.platform?.openUrl("$site/discuss?tab=site") }
                 NavRow("交流群") { env.platform?.openInBrowser(CONTACT_URL) }
             }
             Spacer(Modifier.height(NavInset))

@@ -67,6 +67,13 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS preset_tags TEXT[] NOT NULL DEFA
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS section TEXT NOT NULL DEFAULT 'discuss' CHECK(section IN ('ideas','discuss','resources','site'));
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived'));
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS posting_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS allow_short_title BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS category_redirects (
+    old_id INT PRIMARY KEY,
+    old_slug TEXT NOT NULL UNIQUE,
+    category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS topics (
     id             BIGSERIAL PRIMARY KEY,
@@ -92,6 +99,8 @@ CREATE TABLE IF NOT EXISTS topics (
 );
 -- 帖子阅读权限：0 所有人（含游客）、1 成员以上、2 老用户以上、3 守护者以上。
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS visible_in_active_lists BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS on_home BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS pin_scope TEXT NOT NULL DEFAULT 'none';
 UPDATE topics SET pin_scope = 'site' WHERE pinned AND pin_scope = 'none';
 CREATE INDEX IF NOT EXISTS topics_category_idx ON topics (category_id, last_reply_at DESC);

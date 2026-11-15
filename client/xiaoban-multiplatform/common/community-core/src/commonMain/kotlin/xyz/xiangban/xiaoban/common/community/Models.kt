@@ -111,7 +111,13 @@ data class ProjectList(val items: List<Project> = emptyList())
 // ───────────── 帖子 ─────────────
 
 @Serializable
-data class CategoryRef(val id: Int, val slug: String, val name: String, @SerialName("parent_slug") val parentSlug: String? = null)
+data class CategoryRef(
+    val id: Int,
+    val slug: String,
+    val name: String,
+    @SerialName("parent_slug") val parentSlug: String? = null,
+    @SerialName("allow_short_title") val allowShortTitle: Boolean? = null,
+)
 
 @Serializable
 data class PublicUser(val uid: String, val nickname: String, @SerialName("avatar_url") val avatarUrl: String? = null, @SerialName("trust_level") val trustLevel: Int = 0)
@@ -171,6 +177,8 @@ data class Category(
     val section: String? = null,
     val status: String = "active",
     @SerialName("posting_enabled") val postingEnabled: Boolean = true,
+    val kind: String = "normal",
+    @SerialName("allow_short_title") val allowShortTitle: Boolean? = null,
 )
 
 @Serializable

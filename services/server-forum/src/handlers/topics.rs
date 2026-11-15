@@ -179,9 +179,10 @@ async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
         "SELECT c.id, c.min_post_level, c.admin_only,
                 EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children,
-                (c.slug = 'casual' OR EXISTS(SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual')) AS casual,
+                (c.allow_short_title OR c.slug = 'casual' OR EXISTS(SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual')) AS casual,
                 c.status='active' AND c.posting_enabled AND NOT EXISTS(SELECT 1 FROM categories p WHERE p.id=c.parent_id AND (p.status<>'active' OR NOT p.posting_enabled)) AS posting_available
-         FROM categories c WHERE c.id = $1",
+         FROM categories c WHERE c.id = $1 OR c.id = (SELECT category_id FROM category_redirects WHERE old_id = $1)
+         ORDER BY (c.id = $1) DESC LIMIT 1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -385,6 +386,8 @@ pub async fn update(
     let mut tx = state.pool.begin().await?;
     sqlx::query(
         "UPDATE topics SET category_id = $2, title = $3, body_md = $4, body_html = $5, excerpt = $6, min_read_level = $7,
+            visible_in_active_lists = category_id <> $2 OR visible_in_active_lists,
+            on_home = category_id <> $2 OR on_home,
             images = $8, edited_at = now()
          WHERE id = $1",
     )
@@ -452,14 +455,15 @@ async fn set_pinned(state: &AppState, auth: &AuthUser, id: i64, pinned: bool, re
         return Err(AppError::BadRequest("置顶范围只能是全站、一级板块或二级板块".into()));
     }
     if pinned && scope == "category" {
-        let (parent_id,): (Option<i32>,) = sqlx::query_as(
-            "SELECT c.parent_id FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
+        let (allowed,): (bool,) = sqlx::query_as(
+            "SELECT c.parent_id IS NOT NULL OR c.section <> 'resources'
+             FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
         )
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
-        if parent_id.is_none() {
-            return Err(AppError::BadRequest("二级板块置顶只能用于二级板块中的帖子".into()));
+        if !allowed {
+            return Err(AppError::BadRequest("请选择适用于当前板块的置顶范围".into()));
         }
     }
     if was != pinned || old_scope != scope {

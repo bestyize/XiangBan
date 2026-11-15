@@ -44,9 +44,9 @@ import xyz.xiangban.xiaoban.common.community.ForumImage
 import xyz.xiangban.xiaoban.common.community.FORUM_IMAGE_MAX_BYTES
 import xyz.xiangban.xiaoban.common.community.forumImageMarkdown
 import xyz.xiangban.xiaoban.common.community.ForumCategories
-import xyz.xiangban.xiaoban.common.community.ForumDiscussionTab
 import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.isHelpBoard
+import xyz.xiangban.xiaoban.common.community.isUncategorized
 import xyz.xiangban.xiaoban.common.community.messageOf
 import xyz.xiangban.xiaoban.common.community.parsePollOptions
 import xyz.xiangban.xiaoban.common.community.pollDraftError
@@ -146,20 +146,22 @@ fun NewPostScreen(
         catalog?.let {
             mapOf(
                 CommunitySection.Ideas to it.boardsIn(ForumSection.Ideas),
-                CommunitySection.Discuss to it.discussionTabs.mapNotNull(ForumDiscussionTab::category),
+                CommunitySection.Discuss to it.discussionBoards,
                 CommunitySection.Resources to it.boardsIn(ForumSection.Resources),
             ).filterValues { boards -> boards.isNotEmpty() }
         }.orEmpty()
     }
     val section = PostingSections.getOrNull(sectionIndex) ?: CommunitySection.Discuss
-    var activeGroupId by rememberSaveable { mutableIntStateOf(-1) }
-    val activeGroup = destinations[section]?.firstOrNull { it.id == activeGroupId }
     val chosen = catalog?.boards?.firstOrNull { it.id == categoryId && catalog.canPost(it, trustLevel) }
     val startingBoard = if (help) destinations[CommunitySection.Resources]?.firstOrNull { it.isHelpBoard }
-        else catalog?.find(initialBoardSlug)
+        else catalog?.find(initialBoardSlug) ?: catalog?.discussionTab(initialBoardSlug)?.category
     LaunchedEffect(catalog, trustLevel) {
         if (catalog != null) {
-            val preferred = chosen ?: startingBoard?.takeIf { catalog.canPost(it, trustLevel) }
+            val preferred = chosen ?: if (help || initialBoardSlug != null) {
+                startingBoard?.takeIf { catalog.canPost(it, trustLevel) }
+            } else {
+                catalog.defaultBoard(destinations[section].orEmpty(), trustLevel)
+            }
             categoryId = preferred?.id ?: -1
             val preferredSection = (preferred ?: startingBoard)?.let { catalog.section(it).postingSection() }
                 ?: section.takeIf { it in destinations } ?: PostingSections.firstOrNull { it in destinations }
@@ -167,7 +169,7 @@ fun NewPostScreen(
         }
     }
     val isHelp = chosen?.isHelpBoard == true
-    val isCasual = chosen?.let { it.slug == "casual" || catalog.parent(it)?.slug == "casual" } == true
+    val isCasual = chosen?.let { catalog.allowsShortTitle(it) } == true
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
     val titleLength = title.trim().split(Regex("\\s+")).joinToString(" ").count { !it.isLowSurrogate() }
@@ -213,16 +215,10 @@ fun NewPostScreen(
                     Row(Modifier.padding(top = 8.dp, bottom = 20.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
                         .clickable(enabled = !busy && !uploading) {
                             focus.clearFocus()
-                            activeGroupId = -1
                             val displayedBoard = chosen ?: startingBoard
                             if (catalog != null && displayedBoard != null) {
                                 val selectedSection = catalog.section(displayedBoard).postingSection()
                                 sectionIndex = PostingSections.indexOf(selectedSection)
-                                if (catalog.children(displayedBoard).isNotEmpty()) {
-                                    activeGroupId = displayedBoard.id
-                                } else if (displayedBoard !in destinations[selectedSection].orEmpty()) {
-                                    activeGroupId = displayedBoard.parentId ?: -1
-                                }
                             }
                             choosingCategory = true
                         }
@@ -313,47 +309,14 @@ fun NewPostScreen(
                             if (item in destinations) index to item.label else null
                         }, sectionIndex) {
                             sectionIndex = it
-                            activeGroupId = -1
                         }
-                        if (activeGroup != null) {
-                            BackHandler { activeGroupId = -1 }
-                            Row(
-                                Modifier.fillMaxWidth().clickable { activeGroupId = -1 }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                XIcon(XIcons.ChevronLeft, description = "返回板块列表", size = 18.dp)
-                                Text(activeGroup.name, style = XType.Body, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        key(section, activeGroupId) {
-                            val options = if (activeGroup != null) catalog.children(activeGroup)
-                                else destinations[section].orEmpty()
+                        key(section) {
+                            val options = destinations[section].orEmpty()
                             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                                if (options.isNotEmpty()) {
-                                    val default = catalog.defaultBoard(options, trustLevel, startingBoard?.id)
-                                    Row(
-                                        Modifier.fillMaxWidth().clickable(enabled = default != null) {
-                                            default?.let {
-                                                categoryId = it.id
-                                                choosingCategory = false
-                                            }
-                                        }.padding(vertical = 16.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        Text("默认", Modifier.weight(1f), style = XType.Body)
-                                        Text(default?.name ?: "暂无可发板块", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                                    }
-                                    Hairline()
-                                }
                                 for (category in options) {
-                                    PostingBoardOption(catalog, category, trustLevel, category.id == categoryId) { group ->
-                                        if (group) activeGroupId = category.id
-                                        else {
-                                            categoryId = category.id
-                                            choosingCategory = false
-                                        }
+                                    PostingBoardOption(catalog, category, trustLevel, category.id == categoryId) {
+                                        categoryId = category.id
+                                        choosingCategory = false
                                     }
                                 }
                                 if (options.isEmpty()) {
@@ -406,12 +369,11 @@ private fun PostingBoardOption(
     board: Category,
     trustLevel: Int,
     selected: Boolean,
-    onSelect: (group: Boolean) -> Unit,
+    onSelect: () -> Unit,
 ) {
-    val group = catalog.children(board).isNotEmpty()
-    val enabled = group || catalog.canPost(board, trustLevel)
+    val enabled = catalog.canPost(board, trustLevel)
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = enabled) { onSelect(group) }.padding(vertical = 16.dp),
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onSelect).padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(board.name, Modifier.weight(1f), style = XType.Body, color = when {
@@ -419,8 +381,10 @@ private fun PostingBoardOption(
             selected -> Brand
             else -> MaterialTheme.colorScheme.onSurface
         })
+        if (board.isUncategorized) {
+            Text("未分类", Modifier.padding(end = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+        }
         when {
-            group -> XIcon(XIcons.ChevronRight, size = 18.dp, tint = LocalExtraColors.current.ink3)
             !enabled -> {
                 val reason = if (catalog.postingEnabled(board)) {
                     "需${PostingLevels[board.requiredPostLevel]}"

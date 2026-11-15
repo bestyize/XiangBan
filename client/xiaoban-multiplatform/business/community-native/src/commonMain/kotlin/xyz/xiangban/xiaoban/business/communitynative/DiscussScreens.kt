@@ -294,17 +294,10 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
     val likes = remember(session.accountId) { mutableStateMapOf<Long, LikeState>() }
     val liking = remember(session.accountId) { mutableStateMapOf<Long, Unit>() }
     var toast by remember(session.accountId) { mutableStateOf<String?>(null) }
-    val discussion = remember(catalog) { catalog.activeIn(ForumSection.Discuss) + catalog.activeIn(ForumSection.Site) }
-    val bySlug = remember(discussion) { discussion.associateBy { it.slug } }
-    val activeBoard = bySlug[sub]
-    val activeParent = activeBoard?.let(catalog::parent)
-    val activeGroup = activeParent?.takeUnless { it.slug == "casual" }?.slug ?: sub
-    val tagFilter = catalog.discussionTabs.firstOrNull { it.key == sub }?.topicTag
-    val selected = when {
-        tag.isNotBlank() -> ActiveDiscussionTag
-        activeBoard != null || tagFilter != null -> sub
-        else -> AllDiscussions
-    }
+    val activeTab = catalog.discussionTab(sub)
+    val activeBoard = activeTab?.category
+    val tagFilter = activeTab?.topicTag
+    val selected = if (tag.isNotBlank()) ActiveDiscussionTag else activeTab?.key ?: AllDiscussions
     val category = activeBoard?.slug ?: catalog.boardsIn(ForumSection.Discuss)
         .joinToString(",") { it.slug }.ifBlank { NoActiveBoard }
     val topicTag = tagFilter ?: tag.ifBlank { null }
@@ -316,13 +309,7 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
     val topics = buildList {
         add(AllDiscussions to "全部")
         if (tag.isNotBlank()) add(ActiveDiscussionTag to "# $tag ×")
-        for (tab in catalog.discussionTabs) {
-            add(tab.key to tab.label)
-            val board = tab.category
-            if (activeGroup == tab.key && board != null) {
-                catalog.children(board).forEach { add(it.slug to it.name) }
-            }
-        }
+        catalog.discussionTabs.forEach { add(it.key to it.label) }
     }
 
     fun selectTopic(key: String) {
@@ -334,8 +321,8 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
 
     fun selectCategory(topic: Topic) {
         val slug = topic.category.slug
-        if (slug in bySlug) selectTopic(slug)
-        else open(Route.Articles(slug, topic.category.name))
+        val tab = catalog.discussionTab(slug)
+        if (tab != null) selectTopic(tab.key) else open(Route.Articles(slug, topic.category.name))
     }
 
     fun refresh() {

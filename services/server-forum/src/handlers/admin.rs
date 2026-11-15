@@ -685,14 +685,15 @@ async fn moderate_topic(
         if !matches!(scope, "site" | "parent" | "category") {
             return Err(AppError::BadRequest("pin_scope 只能是 site / parent / category".into()));
         }
-        let (parent_id,): (Option<i32>,) = sqlx::query_as(
-            "SELECT c.parent_id FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
+        let (allows_category_pin,): (bool,) = sqlx::query_as(
+            "SELECT c.parent_id IS NOT NULL OR c.section <> 'resources'
+             FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
         )
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
-        if scope == "category" && parent_id.is_none() {
-            return Err(AppError::BadRequest("二级板块置顶只能用于二级板块中的帖子".into()));
+        if scope == "category" && !allows_category_pin {
+            return Err(AppError::BadRequest("请选择适用于当前板块的置顶范围".into()));
         }
         sqlx::query("UPDATE topics SET pinned = true, pin_scope = $2 WHERE id = $1")
             .bind(id)
@@ -771,7 +772,10 @@ async fn move_topic(
     if has_children {
         return Err(AppError::BadRequest("请选择具体的子分类".into()));
     }
-    sqlx::query("UPDATE topics SET category_id = $2 WHERE id = $1").bind(id).bind(input.category_id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE topics SET category_id = $2,
+        visible_in_active_lists = category_id <> $2 OR visible_in_active_lists,
+        on_home = category_id <> $2 OR on_home WHERE id = $1")
+        .bind(id).bind(input.category_id).execute(&mut *tx).await?;
     super::help::ensure_category(&mut tx, id, input.category_id).await?;
     audit(&mut tx, &admin, "topic.move", "topic", id, format!("{from_id} -> {} ({name})", input.category_id)).await?;
     tx.commit().await?;
@@ -1103,9 +1107,12 @@ async fn create_category(
     let mut tx = state.pool.begin().await?;
     if let Some(pid) = input.parent_id {
         let parent: Option<(Option<i32>, String, String)> =
-            sqlx::query_as("SELECT parent_id, kind, section FROM categories WHERE id = $1").bind(pid).fetch_optional(&mut *tx).await?;
+            sqlx::query_as("SELECT parent_id, kind, section FROM categories WHERE id = $1 FOR SHARE").bind(pid).fetch_optional(&mut *tx).await?;
         let (grand, parent_kind, parent_section) = parent.ok_or_else(|| AppError::BadRequest("父分类不存在".into()))?;
         section = parent_section;
+        if section != "resources" {
+            return Err(AppError::BadRequest("只有资源栏目支持子板块".into()));
+        }
         if grand.is_some() {
             return Err(AppError::BadRequest("分类最多两级".into()));
         }
@@ -1172,8 +1179,23 @@ async fn update_category(
     let preset_tags = patch.preset_tags.as_deref().map(validate_preset_tags).transpose()?;
     let mut tx = state.pool.begin().await?;
     if let Some(section) = &patch.section {
-        let parent: Option<(String,)> = sqlx::query_as("SELECT p.section FROM categories c JOIN categories p ON p.id=c.parent_id WHERE c.id=$1").bind(id).fetch_optional(&mut *tx).await?;
-        if parent.is_some_and(|(s,)|s != *section) { return Err(AppError::BadRequest("子分类归属需与父分类一致，请修改父分类".into())); }
+        let (kind, current, parent): (String, String, Option<String>) = sqlx::query_as(
+            "SELECT c.kind, c.section, p.section FROM categories c
+             LEFT JOIN categories p ON p.id=c.parent_id WHERE c.id=$1 FOR UPDATE OF c",
+        ).bind(id).fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::not_found("分类"))?;
+        if kind == crate::taxonomy::UNCATEGORIZED_KIND && current != *section {
+            return Err(AppError::BadRequest("默认板块的所属栏目不能更改".into()));
+        }
+        if parent.is_some_and(|s| s != *section) {
+            return Err(AppError::BadRequest("子分类归属需与父分类一致，请修改父分类".into()));
+        }
+        if section != "resources" {
+            let has_children: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM categories WHERE parent_id=$1)")
+                .bind(id).fetch_one(&mut *tx).await?;
+            if has_children {
+                return Err(AppError::BadRequest("含子板块的资源板块只能归在资源栏目".into()));
+            }
+        }
     }
     let done = sqlx::query(
         "UPDATE categories SET

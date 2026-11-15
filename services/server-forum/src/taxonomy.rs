@@ -4,24 +4,32 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use std::{collections::BTreeMap, sync::OnceLock};
 
+pub const UNCATEGORIZED_KIND: &str = "uncategorized";
+
 #[derive(Deserialize)]
 struct Node { id: String, label: String }
 #[derive(Deserialize)]
 struct Channel { id: String, parent: String, label: String, description: String }
 #[derive(Deserialize)]
 struct Manifest { parents: Vec<Node>, channels: Vec<Channel>, aliases: BTreeMap<String, String> }
-fn manifest() -> &'static Manifest {
+fn legacy_manifest() -> &'static Manifest {
     static VALUE: OnceLock<Manifest> = OnceLock::new();
-    VALUE.get_or_init(|| serde_json::from_str(include_str!("../editorial/channels.json")).expect("valid channel manifest"))
+    VALUE.get_or_init(|| serde_json::from_str(include_str!("taxonomy_v1.json")).expect("valid migration manifest"))
+}
+fn aliases() -> &'static BTreeMap<String, String> {
+    #[derive(Deserialize)]
+    struct Catalog { aliases: BTreeMap<String, String> }
+    static VALUE: OnceLock<Catalog> = OnceLock::new();
+    &VALUE.get_or_init(|| serde_json::from_str(include_str!("../editorial/channels.json")).expect("valid channel catalog")).aliases
 }
 pub fn canonical(slug: &str) -> &str {
-    manifest().aliases.get(slug).map(String::as_str).unwrap_or(slug)
+    aliases().get(slug).map(String::as_str).unwrap_or(slug)
 }
 pub fn equivalents(raw: &str) -> Vec<String> {
     let mut result = Vec::new();
     for slug in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
         let name = canonical(slug);
-        for value in [slug, name].into_iter().chain(manifest().aliases.iter().filter(|(_, v)| v.as_str() == name).map(|(k, _)| k.as_str())) {
+        for value in [slug, name].into_iter().chain(aliases().iter().filter(|(_, v)| v.as_str() == name).map(|(k, _)| k.as_str())) {
             if !result.iter().any(|s| s == value) { result.push(value.to_string()); }
         }
     }
@@ -36,7 +44,7 @@ pub async fn migrate(pool: &PgPool) -> AppResult<()> {
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
     let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
     if done { return Ok(()); }
-    for (old, new) in &manifest().aliases {
+    for (old, new) in &legacy_manifest().aliases {
         let old_id: Option<(i32,)> = sqlx::query_as("SELECT id FROM categories WHERE slug=$1 FOR UPDATE").bind(old).fetch_optional(&mut *tx).await?;
         if let Some((id,)) = old_id {
             let (collision,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM categories WHERE slug=$1 AND id<>$2)").bind(new).bind(id).fetch_one(&mut *tx).await?;
@@ -44,11 +52,11 @@ pub async fn migrate(pool: &PgPool) -> AppResult<()> {
             sqlx::query("UPDATE categories SET slug=$2 WHERE id=$1").bind(id).bind(new).execute(&mut *tx).await?;
         }
     }
-    for (order, parent) in manifest().parents.iter().enumerate() {
+    for (order, parent) in legacy_manifest().parents.iter().enumerate() {
         sqlx::query("INSERT INTO categories(slug,name,sort_order,award_points) VALUES($1,$2,$3,false) ON CONFLICT(slug) DO UPDATE SET name=$2,sort_order=$3")
             .bind(&parent.id).bind(&parent.label).bind((order * 100) as i32).execute(&mut *tx).await?;
     }
-    for (order, channel) in manifest().channels.iter().enumerate() {
+    for (order, channel) in legacy_manifest().channels.iter().enumerate() {
         sqlx::query("INSERT INTO categories(slug,name,description,parent_id,sort_order,award_points,admin_only,min_post_level) VALUES($1,$2,$3,(SELECT id FROM categories WHERE slug=$4),$5,$6,$7,$8) ON CONFLICT(slug) DO UPDATE SET name=$2,description=$3,parent_id=(SELECT id FROM categories WHERE slug=$4)")
             .bind(&channel.id).bind(&channel.label).bind(&channel.description).bind(&channel.parent).bind(order as i32)
             .bind(channel.parent == "learn" || channel.parent == "resources")
@@ -95,7 +103,7 @@ pub async fn add_app_channel(pool: &PgPool) -> AppResult<()> {
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
     let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
     if done { return Ok(()); }
-    let channel = manifest().channels.iter().find(|channel| channel.id == "create-app").expect("create-app channel");
+    let channel = legacy_manifest().channels.iter().find(|channel| channel.id == "create-app").expect("create-app channel");
     sqlx::query("INSERT INTO categories(slug,name,description,parent_id,section,sort_order,award_points) VALUES($1,$2,$3,(SELECT id FROM categories WHERE slug='create'),'ideas',(SELECT COALESCE(MAX(sort_order),0)+1 FROM categories WHERE parent_id=(SELECT id FROM categories WHERE slug='create')),false) ON CONFLICT(slug) DO NOTHING")
         .bind(&channel.id).bind(&channel.label).bind(&channel.description).execute(&mut *tx).await?;
     sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
@@ -131,6 +139,46 @@ pub async fn retire_open_source_board(pool: &PgPool) -> AppResult<()> {
     sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
     sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.retire_board','categories',$1,$2)")
         .bind(NAME).bind(format!("open-source board retired: {removed} removed, {archived} archived (boards with content are kept)")).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Each publishing section has a board for posts without a more specific category.
+pub async fn add_uncategorized_boards(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "community-uncategorized-boards-v1";
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(NAME).execute(&mut *tx).await?;
+    let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)")
+        .bind(NAME).fetch_one(&mut *tx).await?;
+    if done { return Ok(()); }
+    sqlx::query(
+        "INSERT INTO categories (slug, name, description, kind, section, sort_order, award_points)
+         VALUES ('ideas-uncategorized', '默认', '未分类帖子', $1, 'ideas', -1, false),
+                ('discuss-uncategorized', '默认', '未分类帖子', $1, 'discuss', -1, false),
+                ('resources-uncategorized', '默认', '未分类帖子', $1, 'resources', -1, false)
+         ON CONFLICT (slug) DO NOTHING",
+    ).bind(UNCATEGORIZED_KIND).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.uncategorized.add','categories',$1,'Added the default posting boards for ideas, discuss, and resources')")
+        .bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Run after the historical seeds and section migrations.
+pub async fn flatten_community_boards(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "community-flat-boards-v1";
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(NAME).execute(&mut *tx).await?;
+    let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)")
+        .bind(NAME).fetch_one(&mut *tx).await?;
+    if done { return Ok(()); }
+    sqlx::raw_sql(include_str!("flatten_community_boards.sql")).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.boards.flatten','categories',$1,'Flattened ideas and discussion boards and reassigned topics and drafts')")
+        .bind(NAME).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
 }

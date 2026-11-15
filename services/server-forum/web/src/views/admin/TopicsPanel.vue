@@ -24,13 +24,14 @@ const pinScopeLabel: Record<PinScope, string> = {
   none: '不置顶',
   site: '全站置顶',
   parent: '一级板块置顶',
-  category: '二级板块置顶',
+  category: '当前板块置顶',
 }
 
 /** 可移动到的分类：叶子分类。 */
 function moveTargets(t: AdminTopic) {
   const kind = catById.value.get(t.category_id)?.kind
-  return postableCategories(categories.value).filter(c => c.kind === kind && c.id !== t.category_id)
+  return postableCategories(categories.value).filter(c =>
+    (c.kind === kind || c.kind === 'uncategorized' || kind === 'uncategorized') && c.id !== t.category_id)
 }
 
 function categoryLabel(c: AdminCategory) {
@@ -160,8 +161,8 @@ onMounted(async () => {
               <select class="select is-sm" :value="t.pin_scope" aria-label="置顶范围" @change="changePinScope(t, $event)">
                 <option value="none">不置顶</option>
                 <option value="site">全站置顶</option>
-                <option value="parent">一级板块置顶</option>
-                <option value="category">二级板块置顶</option>
+                <option v-if="catById.get(t.category_id)?.section === 'resources'" value="parent">一级板块置顶</option>
+                <option v-if="catById.get(t.category_id)?.section !== 'resources' || catById.get(t.category_id)?.parent_id" value="category">当前板块置顶</option>
               </select>
               <button
                 class="btn btn-sm"
