@@ -50,7 +50,7 @@
 
 ## 其他模块
 
-[社区讨论卡片](../../../xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 是社区桌面浏览与手机 App 共享的设计稿。桌面宽窗口双列，窄窗口单列。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
+[社区讨论卡片](../../../xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 是社区桌面浏览与手机 App 共享的设计稿。单列列表，每张卡片显示单行标题和一行底部信息。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
 
 模型配置专项预览：[小伴 AI · 多模型配置](prototypes/ai-model-settings.html)。默认展示 macOS 白与浅灰轻毛玻璃视觉提案：原生窗口轮廓、统一白色内容面、轻薄标题栏、单页额度概览与模型布局、无逐行分隔线的紧凑列表、灰阶选中态、无边框输入框、按钮与品牌色确认操作；取消搜索框和页签切换，上方紧凑展示账户、额度明细与兑换，在“兑换”右侧提供“获取额度”，下方提供模型滚动浏览、键盘选择、确认与取消、4 / 24 / 80 个演示模型、明暗及窄窗口。可切换“现行界面”对照实际组件，或查看已移除重复“使用模式”模块的设置概览。在桌面项目运行 `npm run dev`，打开[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，沿用原链接。提案源码在 [AiModelSettingsMacPreview.vue](prototypes/AiModelSettingsMacPreview.vue)，作为设计参考；正式独立窗口已接入同款布局与自绘窗口控件，不保留系统顶部标题栏；左右分栏窗口将控件收在左栏顶部。此稿需要 Vite 编译组件，不支持直接双击或纯静态服务；不调用真实账户、兑换或模型服务，不修改既有在线画布。
 

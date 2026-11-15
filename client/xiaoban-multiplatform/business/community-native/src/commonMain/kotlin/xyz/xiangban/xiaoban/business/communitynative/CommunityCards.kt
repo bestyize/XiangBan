@@ -147,53 +147,20 @@ internal fun DiscussionPostCard(
     onCategory: () -> Unit,
     onTag: (String) -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
-    val title = topic.cardTitle
-    val excerpt = topic.excerpt.trim().takeIf { topic.title.isNotBlank() && it.isNotEmpty() && it != title }
-    val images = remember(topic.images) { topic.images.filter { it.isNotBlank() }.distinct() }
-    var imageIndex by remember(topic.id, images) { mutableIntStateOf(0) }
-    val image = images.getOrNull(imageIndex)?.let(env.forum::imageUrl)
     val tag = topic.tags.firstOrNull { it.isNotBlank() && it != topic.category.name }
 
     Column(
         Modifier.fillMaxWidth().outlinedCard(14.dp)
             .clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, end = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (topic.category.name.isNotBlank()) DiscussionCardTag(
-                topic.category.name, Modifier.weight(1f, fill = false), category = true, onClick = onCategory,
-            )
-            if (tag != null) DiscussionCardTag("# $tag", Modifier.weight(1f, fill = false)) { onTag(tag) }
-            if (topic.pinned || topic.featured) Text(
-                if (topic.pinned) "置顶" else "精选", style = XType.Caption, color = extra.brandInk, maxLines = 1,
-            )
-            if (topic.poll != null) Text("投票", style = XType.Caption, color = extra.brandInk, maxLines = 1)
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                excerpt?.let {
-                    Text(it, style = XType.Secondary, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            if (image != null) AsyncImage(
-                model = image,
-                contentDescription = null,
-                imageLoader = rememberImageLoader(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(9.dp)).background(extra.fill),
-                onError = { imageIndex++ },
-            )
-        }
+        Text(
+            topic.title.trim().ifEmpty { "未命名讨论" },
+            Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 12.dp),
+            style = XType.Section,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Row(
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -203,20 +170,18 @@ internal fun DiscussionPostCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TopicAuthorAvatar(env, topic.author, 21.dp)
-                Text(
-                    topic.author.nickname,
-                    Modifier.weight(1f, fill = false),
-                    style = XType.Caption,
-                    color = extra.ink3,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                if (topic.category.name.isNotBlank()) DiscussionCardTag(
+                    topic.category.name, Modifier.weight(2f, fill = false), category = true, onClick = onCategory,
                 )
+                if (tag != null) DiscussionCardTag("# $tag", Modifier.weight(1f, fill = false)) { onTag(tag) }
+                Box(Modifier.clearAndSetSemantics { contentDescription = topic.author.nickname }) {
+                    TopicAuthorAvatar(env, topic.author, 21.dp)
+                }
                 if (topic.createdAt.isNotBlank()) Text(
-                    "· ${agoText(topic.createdAt)}",
+                    agoText(topic.createdAt),
                     Modifier.widthIn(max = 100.dp),
                     style = XType.Caption,
-                    color = extra.ink3,
+                    color = LocalExtraColors.current.ink3,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

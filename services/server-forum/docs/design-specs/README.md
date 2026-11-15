@@ -1,6 +1,6 @@
 # 超级小伴社区设计预览
 
-[讨论卡片设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 中，讨论列表在内容区达到 680px 时使用双列，窄窗口使用单列。有图帖仅在标题和摘要旁呈现一张 76px 缩略图，标题和摘要各最多两行。可切换桌面、移动和深色预览。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
+[讨论卡片设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 使用单列列表，标题单行。底部左侧依次显示标签、头像、发布时间，右侧为回复和点赞。可切换桌面、移动和深色预览。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
 
 [创意页作品卡片](prototypes/ideas-cards/index.html) 展示微观展厅、《小王子：星辰之旅》和「运输船：Saltline」。卡片使用 16:9 封面、右上角可选类型标签、标题、说明、作者及收录日期。示例日期用于展示。
 

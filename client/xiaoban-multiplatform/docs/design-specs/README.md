@@ -4,7 +4,7 @@
 
 | 设计稿 | 内容与预览 |
 | --- | --- |
-| [讨论卡片](prototypes/discussion-cards.html) | 讨论帖以标题和摘要为主。无图帖通栏，有图帖在正文摘要旁展示一张 64dp 缩略图；桌面宽屏双列，窄窗口和手机单列。回复数放在点赞数前，零回复保留。支持双端和明暗切换，使用示例数据。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile) |
+| [讨论卡片](prototypes/discussion-cards.html) | 单列列表，每张卡片显示单行标题。底部左侧依次显示标签、头像、发布时间，右侧为回复与点赞。点击标题查看正文。支持双端和明暗切换。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile) |
 | [评论组件](prototypes/comment-composer.html) | 小伴手机 App 的评论列表、吸底入口与输入面板。点笑脸展开表情面板，点图片图标从系统相册选图。输入一个字或表情即可发布。支持回复、展开编辑、图片预览和深浅色。Compose 已用于帖子、求助、作品与方案、AI 日报、小伴前沿、开源精选、仓库和软件详情，图片评论需配套论坛服务。设计稿的相册网格使用小伴壁纸图库素材。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
 | [MBTI · 向内看](prototypes/mbti-native.html) | 原生 iOS 质感提案（第四版：珊瑚橙红、暖白与墨灰，配套暖色首页插画、紧凑间距与更清晰字号）：首页、答题、结果三页总览与单页体验，6 题缩略流程、前后切题、揭晓过渡、六章报告、16 型角色切换、行动勾选、分享卡预览及深浅色。题目不参与正式计分，报告和历史记录为示例，保存分享为模拟。复用 `app-plaza-assets/` 原创角色与类型数据，已应用到内置 MBTI 1.3.0 运行包（正式版为真实 48 题和实际报告）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，沿用下方应用广场的 1424 端口启动方式，后续迭代保持此链接。 |
 | [轻启](prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |
@@ -20,7 +20,5 @@
 游戏中心保留 A / B 对比稿，已选择 A 版并接入 Compose 正式页面；Android 官方游戏与运行能力说明见项目 README。稿内最近游玩和示例作品仍为演示内容；所有操作仅影响预览页面。封面资源位于 `prototypes/game-center-assets/`，复用小伴桌面内置游戏 SVG。
 
 预览：在仓库根运行 `python3 -m http.server 1421 --bind 127.0.0.1 --directory client/xiaoban-multiplatform/docs/design-specs`，访问上方链接。后续迭代沿用同一链接。
-
-讨论卡片示例缩略图来自 Felix Rieseberg 的 [Saltline](https://saltline.games/)，复用社区创意页设计稿素材。
 
 开源精选详情页预览：在仓库根运行 `python3 -m http.server 1423 --bind 127.0.0.1 --directory client/xiaoban-multiplatform/docs/design-specs`。素材见 `prototypes/open-source-detail-assets/`，后续迭代沿用同一预览地址。
