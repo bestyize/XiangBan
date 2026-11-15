@@ -10,9 +10,8 @@ import RequestState from '@/components/community/RequestState.vue'
 import { webLink } from '@/components/community/contract'
 import { useCommunityResource } from '@/components/community/resource'
 import { ANDROID_DOWNLOAD_URL, BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WANCISOU_ICON } from '@/lib/builtinCreation'
-import { appRunLocation } from '@/lib/appRuntime'
+import { appRunLocation, builtinRunLocation } from '@/lib/appRuntime'
 
-const emit = defineEmits<{ play: [id: string] }>()
 const route = useRoute(), router = useRouter()
 const playableGames = BUILTIN_GAMES.filter(game => game.id !== 'mbti')
 const games = [
@@ -81,10 +80,10 @@ function go(page: number) {
     </header>
     <div class="game-strip" :class="{ 'game-grid': showAllGames }">
       <template v-for="game in games" :key="game.id">
-        <button v-if="game.playable" type="button" class="game-tile" :aria-label="`试玩${game.name}`" @click="emit('play', game.id)">
+        <RouterLink v-if="game.playable" class="game-tile" :aria-label="`试玩${game.name}`" :to="builtinRunLocation(game.id)">
           <img class="shortcut-icon" :src="game.icon" alt="" decoding="async" />
           <strong>{{ game.name }}</strong><small>{{ game.genre }}</small>
-        </button>
+        </RouterLink>
         <RouterLink v-else class="game-tile" to="/ai">
           <img class="shortcut-icon" :src="game.icon" alt="" decoding="async" />
           <strong>{{ game.name }}</strong><small>在手机 App 游玩</small>
@@ -100,7 +99,7 @@ function go(page: number) {
       <RouterLink v-else to="/create">返回广场</RouterLink>
     </header>
     <div class="tool-grid">
-      <RouterLink class="tool-tile" :to="{ name: 'mbti-run' }">
+      <RouterLink class="tool-tile" :to="builtinRunLocation(mbti.id)">
         <img class="shortcut-icon" :src="mbti.icon" alt="" decoding="async" />
         <strong>{{ mbti.name }}</strong>
       </RouterLink>

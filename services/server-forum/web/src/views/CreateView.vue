@@ -7,8 +7,8 @@ import AppIcon from '@/components/AppIcon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import CreationPreviewContent from '@/components/creation/CreationPreviewContent.vue'
 import ClientCreationPrompt from '@/components/creation/ClientCreationPrompt.vue'
-import BuiltinGamePlayer from '@/components/creation/BuiltinGamePlayer.vue'
-import { BUILTIN_GAMES } from '@/lib/builtinCreation'
+import { builtinRunLocation } from '@/lib/appRuntime'
+import { builtinGame } from '@/lib/builtinCreation'
 import BuiltinEffectPreview from '@/components/creation/BuiltinEffectPreview.vue'
 import BuiltinWidgetPreview from '@/components/creation/BuiltinWidgetPreview.vue'
 import BuiltinPetPreview from '@/components/creation/BuiltinPetPreview.vue'
@@ -31,20 +31,19 @@ const decorationSections = computed(() => [
   {kind:'effect',title:'给桌面一点氛围',items:BUILTIN_EFFECTS as Preview[]},
   {kind:'pet',title:'找一位桌面小伙伴',items:BUILTIN_PETS as Preview[]},
 ].filter(section => !category.value || section.kind === category.value))
-const promptOpen = ref(false), playing = ref('')
+const promptOpen = ref(false)
 type Preview = {id:string; name:string; cover?:string; description:string; kind:string}
 const preview = ref<Preview | null>(null)
 function label(kind:string) { return categories.find(c => c.key === kind)?.label || kind }
 function select(kind:string) { void router.push({path:'/create',query:kind ? {kind} : {}}) }
 const wide = ref(false), showcase = ref<HTMLElement>(), content = ref<HTMLElement>()
 let contentObserver:ResizeObserver | undefined
-// 已分享的 ?game=<id> 链接直接打开试玩。
+// 已分享的 ?game=<id> 链接直接进入运行页。
 watch(() => route.query.game, game => {
-  if (game === 'mbti' && route.name === 'create') {
-    void router.replace({ name: 'mbti-run' })
-    return
+  if (route.name === 'create' && typeof game === 'string' && builtinGame(game)) {
+    const { game: _, ...query } = route.query
+    void router.replace({ ...builtinRunLocation(game), query })
   }
-  playing.value = BUILTIN_GAMES.find(item => item.id === game)?.id || ''
 }, { immediate: true })
 onMounted(() => {
   contentObserver=new ResizeObserver(([entry]) => { wide.value=(entry?.contentRect.width || 0) >= 900 })
@@ -56,11 +55,6 @@ watch(category,() => { preview.value=null })
 function choose(item:Preview) {
   preview.value=item
   if (wide.value) showcase.value?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'})
-}
-const gameSession=ref(0)
-function closeGame() {
-  playing.value=''; gameSession.value++
-  if (route.query.game) void router.replace({query:{...route.query,game:undefined}})
 }
 </script>
 <template>
@@ -80,10 +74,10 @@ function closeGame() {
         <button v-if="!session.loggedIn" class="btn btn-primary" type="button" @click="session.requireLogin()">登录</button>
       </section>
     </template>
-    <AppPlaza v-else-if="!category" @play="playing = $event" />
+    <AppPlaza v-else-if="!category" />
     <template v-else>
       <nav class="creation-filters" aria-label="作品分类"><button v-for="item in categories" :key="item.key" type="button" :class="{active:category === item.key}" :aria-pressed="category === item.key" @click="select(item.key)">{{ item.label }}</button></nav>
-      <section v-if="wide && featured" ref="showcase" class="desktop-showcase" aria-label="作品预览"><CreationPreviewContent :item="featured" wide :active="!playing" /></section>
+      <section v-if="wide && featured" ref="showcase" class="desktop-showcase" aria-label="作品预览"><CreationPreviewContent :item="featured" wide /></section>
       <section v-for="section in decorationSections" :key="section.kind" :aria-labelledby="`builtin-${section.kind}-heading`">
         <header class="creation-section"><h2 :id="`builtin-${section.kind}-heading`">{{ section.title }}</h2><span>{{ section.kind === 'wallpaper' ? '电脑创作灵感' : `${section.items.length} 款 · 小伴官方` }}</span></header>
         <div class="creation-grid"><button v-for="item in section.items" :key="item.id" class="creation-card" type="button" :aria-label="`预览${item.name}`" :class="{selected:wide && featured?.id === item.id}" :aria-pressed="wide ? featured?.id === item.id : undefined" @click="choose({...item})">
@@ -97,7 +91,6 @@ function closeGame() {
       </section>
     </template>
     <ModalDialog :open="!wide && preview !== null" :title="preview?.name || '作品预览'" :width="640" @close="preview = null"><CreationPreviewContent v-if="!wide && preview" :item="preview" /></ModalDialog>
-    <BuiltinGamePlayer v-if="playing" :key="`${playing}:${gameSession}`" :game-id="playing" autostart @close="closeGame" />
     <ClientCreationPrompt v-model:show="promptOpen" />
   </div>
 </template>

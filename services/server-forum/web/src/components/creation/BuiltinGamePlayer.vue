@@ -3,20 +3,20 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
 import { checkedMbtiResultLink, decodeMbtiPng } from '@/lib/mbtiExport'
-const props = defineProps<{ gameId: string; autostart?: boolean; standalone?: boolean }>()
+const props = defineProps<{ gameId: string }>()
 const emit = defineEmits<{ close: [] }>()
-const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), dialog = ref<HTMLElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
-const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false), started=ref(props.standalone === true)
+const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
+const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false)
 const stage=ref<HTMLElement>(), stageSize=ref({width:0,height:0})
 const desktopInput=window.matchMedia('(hover: hover) and (pointer: fine)'), desktop=ref(desktopInput.matches)
-const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value && !props.standalone))
+const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value && props.gameId !== 'mbti'))
 const frameStyle=computed(() => stageSize.value.width && stageSize.value.height ? {width:`${frameSize.value.width}px`,height:`${frameSize.value.height}px`} : {width:'100%',height:'100%'})
 const exportRequest=ref<{ action:'save'|'image'|'link'; file?:File; url?:string } | null>(null)
 const exportError=ref('')
 let exportSequence=0
 let imageAssets = new Map<string, Promise<Blob>>()
 async function provideMbtiAsset(d:Record<string,unknown>, target:Window) {
-  if(props.gameId!=='mbti'||!connected.value||!started.value||!Number.isSafeInteger(d.id)||
+  if(props.gameId!=='mbti'||!connected.value||!Number.isSafeInteger(d.id)||
     (d.key!=='characters'&&d.key!=='observer'&&d.key!=='qr'))return
   const key=d.key, activeNonce=nonce.value
   let asset=imageAssets.get(key)
@@ -30,10 +30,10 @@ async function provideMbtiAsset(d:Record<string,unknown>, target:Window) {
     imageAssets.set(key,asset)
     asset.catch(()=>imageAssets.delete(key))
   }
-  try{const blob=await asset;if(nonce.value===activeNonce&&frame.value?.contentWindow===target&&started.value)target.postMessage({channel:'xiaban.game-host',protocol:1,nonce:activeNonce,type:'mbti.asset',id:d.id,blob},'*')}catch{/* game shows a retry message */}
+  try{const blob=await asset;if(!disposed&&nonce.value===activeNonce&&frame.value?.contentWindow===target)target.postMessage({channel:'xiaban.game-host',protocol:1,nonce:activeNonce,type:'mbti.asset',id:d.id,blob},'*')}catch{/* game shows a retry message */}
 }
 async function prepareExport(d:Record<string,unknown>) {
-  if(props.gameId!=='mbti'||!started.value||exportRequest.value)return
+  if(props.gameId!=='mbti'||exportRequest.value)return
   const current=++exportSequence; exportError.value=''
   if(d.action==='link') {
     const url=checkedMbtiResultLink(d.url);if(url)exportRequest.value={action:'link',url}
@@ -44,7 +44,7 @@ async function prepareExport(d:Record<string,unknown>) {
     const bytes=decodeMbtiPng(d.image);if(!bytes)return
     const file=new File([bytes],'小伴人格画像.png',{type:'image/png'})
     const valid=await validateImageDimensions(file)
-    if(valid&&current===exportSequence&&started.value)exportRequest.value={action:d.action,file}
+    if(valid&&current===exportSequence)exportRequest.value={action:d.action,file}
   }catch{if(current===exportSequence)exportError.value='图片准备失败，请重新打开分享页。'}
 }
 async function validateImageDimensions(file:File):Promise<boolean>{
@@ -64,7 +64,7 @@ async function shareExport(){
 }
 async function copyResultLink(){if(!exportRequest.value?.url)return;try{await navigator.clipboard.writeText(exportRequest.value.url);closeExport()}catch{exportError.value='无法复制，请手动复制链接。'}}
 let stageObserver:ResizeObserver | undefined
-let previousOverflow='', disposed=false, orientationLocked=false
+let disposed=false, orientationLocked=false
 const orientation=screen.orientation as ScreenOrientation & {lock?:(value:string)=>Promise<void>}
 function fullscreenChanged() { fullscreen.value=!!document.fullscreenElement }
 async function enterFullscreen() {
@@ -81,7 +81,6 @@ async function enterFullscreen() {
 function updateInput() { desktop.value=desktopInput.matches }
 let sequence = 0
 let handshakeTimer: ReturnType<typeof setTimeout> | undefined
-let previousFocus: HTMLElement | null = null
 let manifestController:AbortController | undefined
 async function restart() {
   closeExport(); imageAssets = new Map()
@@ -110,23 +109,7 @@ onMounted(() => {
   document.addEventListener('fullscreenchange',fullscreenChanged)
   stageObserver=new ResizeObserver(([entry]) => { if (entry) stageSize.value={width:entry.contentRect.width,height:entry.contentRect.height} })
   if (stage.value) stageObserver.observe(stage.value)
-  // 从卡片点击直接进入：弹层立刻打开并显示加载状态，全屏请求沿用这次点击的用户激活。
-  if (props.autostart && !props.standalone) open()
 })
-// Resources and the handshake finish inside the preview. Keep fullscreen in
-// this direct click handler so waiting for the network cannot lose activation.
-function open() {
-  if (!(dialog.value instanceof HTMLDialogElement)) return false
-  previousFocus=document.activeElement instanceof HTMLElement ? document.activeElement : null
-  previousOverflow=document.documentElement.style.overflow
-  document.documentElement.style.overflow='hidden'
-  started.value=true
-  dialog.value.showModal()
-  if (!desktop.value) void enterFullscreen()
-  return true
-}
-function start() { return connected.value && !error.value && open() }
-defineExpose({start,restart,readyToPlay:connected,error})
 const url = computed(() => game.value && ready.value ? `/builtin-games/${game.value.id}/index.html?hostNonce=${encodeURIComponent(nonce.value)}` : '')
 function initialize() { frame.value?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.init',nonce:nonce.value,save:null,safeArea:{top:0,right:0,bottom:0,left:0}}, '*') }
 function receive(event:MessageEvent) {
@@ -138,15 +121,26 @@ function receive(event:MessageEvent) {
   if (d.type === 'mbti.export' && props.gameId === 'mbti') void prepareExport(d)
 }
 window.addEventListener('message',receive)
-onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListener('fullscreenchange',fullscreenChanged); if (orientationLocked) orientation?.unlock(); if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) void document.exitFullscreen().catch(() => {}); stageObserver?.disconnect(); desktopInput.removeEventListener('change',updateInput); if (started.value && !props.standalone) document.documentElement.style.overflow=previousOverflow; sequence++; manifestController?.abort(); clearTimeout(handshakeTimer); window.removeEventListener('message',receive); if (dialog.value instanceof HTMLDialogElement) dialog.value.close(); previousFocus?.focus() })
+onBeforeUnmount(() => {
+  closeExport()
+  disposed = true
+  document.removeEventListener('fullscreenchange', fullscreenChanged)
+  if (orientationLocked) orientation?.unlock()
+  if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) {
+    void document.exitFullscreen().catch(() => {})
+  }
+  stageObserver?.disconnect()
+  desktopInput.removeEventListener('change', updateInput)
+  sequence++
+  manifestController?.abort()
+  clearTimeout(handshakeTimer)
+  window.removeEventListener('message', receive)
+})
 </script>
 <template>
-  <component :is="standalone ? 'section' : 'dialog'" ref="dialog" class="player" :class="{ standalone }"
-    :aria-hidden="!started" :aria-label="game ? (standalone ? game.name : `${game.name}试玩`) : '游戏试玩'" @cancel.prevent="emit('close')">
-    <div ref="surface" class="player-surface" :class="{mobile:!desktop}">
-    <div v-if="started && (loading || !connected || error)" class="player-status"><p v-if="error" role="alert">{{ error }} <button class="btn" type="button" @click="restart">重试</button></p><p v-else role="status">{{ standalone ? '正在加载应用…' : '游戏加载中…' }}</p></div>
-    <button v-if="!standalone && (!connected || error)" class="player-exit btn" type="button" @click="emit('close')">退出试玩</button>
-    <button v-if="!standalone && !desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
+  <section ref="surface" class="player" :aria-label="game?.name || '游戏试玩'">
+    <div v-if="loading || !connected || error" class="player-status"><p v-if="error" role="alert">{{ error }} <button class="btn" type="button" @click="restart">重试</button></p><p v-else role="status">{{ gameId === 'mbti' ? '正在加载应用…' : '游戏加载中…' }}</p></div>
+    <button v-if="gameId !== 'mbti' && !desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
     <div ref="stage" class="game-stage"><iframe v-if="game && ready" :style="frameStyle" :key="generation" ref="frame" :src="url" :title="`${game.name}游戏区域`" sandbox="allow-scripts allow-orientation-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" @load="initialize" /></div>
     <div v-if="exportRequest" class="export-overlay" role="dialog" aria-modal="true" aria-label="分享人格画像">
       <div class="export-panel"><h2>{{ exportRequest.action === 'link' ? '分享结果链接' : '分享人格海报' }}</h2>
@@ -156,15 +150,13 @@ onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListen
         <div class="export-actions"><button v-if="exportRequest.file" class="btn" type="button" @click="downloadExport">保存图片</button><button v-if="exportRequest.action !== 'save'" class="btn btn-primary" type="button" @click="shareExport">打开分享面板</button><button v-if="exportRequest.url" class="btn" type="button" @click="copyResultLink">复制链接</button><button class="btn" type="button" @click="closeExport">取消</button></div>
       </div>
     </div>
-    </div>
-  </component>
+  </section>
 </template>
 <style scoped>
-.player{position:fixed;inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0 0 env(safe-area-inset-bottom);border:0;background:var(--surface);color:var(--ink);overflow:hidden}
+.player{position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:var(--surface);color:var(--ink)}
 .export-overlay{position:absolute;inset:0;z-index:9;display:grid;place-items:center;padding:20px;background:#0007}.export-panel{width:min(100%,440px);padding:20px;border-radius:16px;background:var(--surface);box-shadow:0 8px 32px #0003}.export-panel h2{font-size:18px;margin:0}.export-panel p{padding:10px 0;font-size:13px;line-height:1.7}.export-panel input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:12px}.export-actions{display:flex;flex-wrap:wrap;gap:8px}.export-actions button{min-height:44px}
-.player{display:flex;flex-direction:column;visibility:hidden;pointer-events:none}.player[open]{visibility:visible;pointer-events:auto}.player-surface{position:relative;display:flex;flex-direction:column;flex:1;min-height:0;width:100%;background:var(--surface);color:var(--ink)}.player-surface:fullscreen{width:100%;height:100%;padding:0}.player:has(.mobile){padding-bottom:0}.fullscreen-button,.player-exit{position:absolute;z-index:2;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);font-size:13px}.player-exit{top:auto;bottom:max(8px,env(safe-area-inset-bottom))}.player::backdrop{background:rgba(0,0,0,.5)}
+.fullscreen-button{position:absolute;z-index:2;top:8px;right:max(8px,env(safe-area-inset-right));min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);font-size:13px}
 .player-status{position:absolute;inset:0;z-index:1;display:grid;place-items:center;background:var(--surface-2)}.player p{padding:12px;color:var(--ink-2)}
 .game-stage{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;background:var(--surface-2)}
 .player iframe{display:block;flex:none;border:0;background:var(--surface-2)}
-.player.standalone{position:relative;inset:auto;height:100%;padding:0;visibility:visible;pointer-events:auto}
 </style>

@@ -4,6 +4,10 @@ export function appRunLocation(id: number, version: number) {
   return { name: 'app-run', params: { id, version } }
 }
 
+export function builtinRunLocation(gameId: string) {
+  return { name: 'builtin-run', params: { gameId } }
+}
+
 export function canTrialPack(kind: string, status: string, trustLevel: number, protocol: unknown): boolean {
   return status === 'published' && (kind === 'game' || (kind === 'app' && protocol === 2)) &&
     (protocol === 2 || trustLevel === 0 || trustLevel === 1)

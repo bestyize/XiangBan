@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { contentApi, runtimeBase } from '@/api/content'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { contentApi, gameSandboxUrl, runtimeBase } from '@/api/content'
 import AppRuntimeWindow from '@/components/creation/AppRuntimeWindow.vue'
 import BuiltinGamePlayer from '@/components/creation/BuiltinGamePlayer.vue'
 import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
@@ -12,23 +12,23 @@ import { builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY 
 import { useHead } from '@/lib/head'
 
 const route = useRoute(), router = useRouter()
-const isMbti = computed(() => route.name === 'mbti-run')
-const mbti = builtinGame('mbti')!
+const isBuiltin = computed(() => route.name === 'builtin-run')
+const builtin = computed(() => typeof route.params.gameId === 'string' ? builtinGame(route.params.gameId) : undefined)
 const packId = computed(() => Number(route.params.id))
 const version = computed(() => Number(route.params.version))
 const launch = useCommunityResource(async () => {
-  if (isMbti.value) return null
+  if (isBuiltin.value) return null
   const id = packId.value, requestedVersion = version.value
   if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(requestedVersion) || requestedVersion < 1) {
     throw new Error('作品地址无效')
   }
   const pack = await contentApi.pack(id)
   const manifest = pack.versions.find(item => item.version === requestedVersion)?.manifest
-  if (pack.id !== id || pack.kind !== 'app' || manifest?.runtimeProtocol !== 2 ||
+  if (pack.id !== id || !manifest ||
       !canTrialPack(pack.kind, pack.status, pack.trust_level, manifest.runtimeProtocol)) {
-    throw new Error('这个版本的应用已不可用')
+    throw new Error('这个版本的作品已不可用')
   }
-  if (pack.slug === 'wancisou' && pack.network_disabled === false && pack.version === requestedVersion) {
+  if (pack.kind === 'app' && pack.slug === 'wancisou' && pack.network_disabled === false && pack.version === requestedVersion) {
     try {
       const response = await fetch('/builtin-games/wancisou/version.json', { signal: AbortSignal.timeout(5000) })
       if (response.ok && canOpenBundledWancisou(pack, (await response.json())?.version)) {
@@ -36,11 +36,12 @@ const launch = useCommunityResource(async () => {
       }
     } catch { /* The published version may still run on the configured app host. */ }
   }
-  return { pack, mode: runtimeBase ? 'runtime' as const : 'client' as const }
+  const hasHost = manifest.runtimeProtocol === 2 ? runtimeBase : gameSandboxUrl
+  return { pack, mode: hasHost ? 'runtime' as const : 'client' as const }
 })
-const title = computed(() => isMbti.value ? mbti.name : launch.data.value?.pack.title || '小伴应用')
-const icon = computed(() => isMbti.value ? mbti.icon :
-  launch.data.value?.pack.slug === 'wancisou' ? WANCISOU_ICON : webLink(launch.data.value?.pack.cover_url))
+const title = computed(() => builtin.value?.name || launch.data.value?.pack.title || '小伴应用')
+const icon = computed(() => builtin.value?.icon ||
+  (launch.data.value?.pack.slug === 'wancisou' ? WANCISOU_ICON : webLink(launch.data.value?.pack.cover_url)))
 useHead(() => ({ title: title.value }))
 
 const player = ref<InstanceType<typeof CommunityGameTrial> | null>(null)
@@ -49,7 +50,7 @@ const reloading = ref(false), closing = ref(false)
 const bundledReady = ref(false), bundledTimedOut = ref(false)
 let bundledTimer: ReturnType<typeof setTimeout> | undefined
 let disposed = false
-watch([isMbti, packId, version], () => void launch.load(), { immediate: true })
+watch([isBuiltin, packId, version], () => void launch.load(), { immediate: true })
 watch(() => launch.data.value?.mode, mode => {
   clearTimeout(bundledTimer)
   bundledReady.value = false
@@ -61,9 +62,17 @@ function bundledLoaded() {
   bundledTimedOut.value = false
   bundledReady.value = true
 }
+onBeforeRouteLeave(() => player.value?.prepareExit())
+onBeforeRouteUpdate((to, from) => {
+  if (to.path !== from.path) return player.value?.prepareExit()
+})
+const removeNavigationHook = router.afterEach((_to, from, failure) => {
+  if (failure && route.fullPath === from.fullPath) player.value?.resume()
+})
 onBeforeUnmount(() => {
   disposed = true
   clearTimeout(bundledTimer)
+  removeNavigationHook()
 })
 
 async function reload() {
@@ -74,7 +83,7 @@ async function reload() {
     await player.value?.prepareExit()
     if (disposed || closing.value || route.fullPath !== currentPath) return
     revision.value++
-    if (!isMbti.value) await launch.load()
+    if (!isBuiltin.value) await launch.load()
   } finally {
     reloading.value = false
   }
@@ -87,17 +96,19 @@ function returnPage() {
     if ((entry.name === 'create' && !entry.query.tool && !entry.query.game) ||
         (entry.name === 'pack' && Number(entry.params.id) === packId.value)) return entry.fullPath
   }
-  return launch.data.value ? `/packs/${packId.value}` : '/create'
+  if (launch.data.value) return `/packs/${packId.value}`
+  if (isBuiltin.value) {
+    return router.resolve({ name: 'create', query: { ...route.query, tool: undefined, game: undefined } }).fullPath
+  }
+  return '/create'
 }
 
 async function close() {
   if (closing.value) return
-  const currentPath = route.fullPath
   closing.value = true
   try {
-    await player.value?.prepareExit()
     // Replace the host entry directly. A work may have added its own frame history.
-    if (!disposed && route.fullPath === currentPath) await router.replace(returnPage())
+    await router.replace(returnPage())
   } finally {
     closing.value = false
   }
@@ -105,9 +116,10 @@ async function close() {
 </script>
 
 <template>
-  <AppRuntimeWindow :title="title" :icon="icon" :compact="isMbti"
+  <AppRuntimeWindow :title="title" :icon="icon" :compact="builtin?.id === 'mbti'"
     :busy="reloading || launch.loading.value" :closing="closing" @reload="reload" @close="close">
-    <BuiltinGamePlayer v-if="isMbti" :key="revision" :game-id="mbti.id" standalone @close="close" />
+    <BuiltinGamePlayer v-if="builtin" :key="revision" :game-id="builtin.id" @close="close" />
+    <div v-else-if="isBuiltin" class="state" role="alert">找不到这个内置作品</div>
     <div v-else-if="launch.loading.value" class="state" role="status">正在加载应用…</div>
     <div v-else-if="launch.error.value" class="state" role="alert">
       <p>{{ launch.error.value }}</p>
@@ -122,10 +134,10 @@ async function close() {
       </div>
     </div>
     <CommunityGameTrial v-else-if="launch.data.value?.mode === 'runtime'" ref="player"
-      :key="`${packId}:${version}:${revision}`" :pack="launch.data.value.pack" :version="version" standalone autostart
+      :key="`${packId}:${version}:${revision}`" :pack="launch.data.value.pack" :version="version"
       @retry="reload" @exit="close" />
     <div v-else-if="launch.data.value" class="state">
-      <p>请在小伴客户端打开这个应用。</p>
+      <p>请在小伴客户端打开这个作品。</p>
       <RouterLink class="btn" :to="`/packs/${packId}`">查看作品详情</RouterLink>
     </div>
   </AppRuntimeWindow>

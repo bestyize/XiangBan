@@ -8,8 +8,7 @@ import ContentSocialActions from '@/components/ContentSocialActions.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ClientCreationPrompt from '@/components/creation/ClientCreationPrompt.vue'
 import WorkDiscussion from '@/components/creation/WorkDiscussion.vue'
-import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
-import { contentApi, runtimeBase, type PackDetail } from '@/api/content'
+import { contentApi, gameSandboxUrl, runtimeBase, type PackDetail } from '@/api/content'
 import { appRunLocation, canTrialPack } from '@/lib/appRuntime'
 import { applyLink, coverStyle, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
@@ -55,13 +54,18 @@ watch(
 
 const isAuthor = computed(() => !!pack.value?.author && pack.value.author.uid === session.user?.uid)
 const latest = computed(() => pack.value?.versions[0])
-const appWindow = computed(() => {
+const trialVersion = computed(() => {
   const work = pack.value, selected = latest.value
-  const canOpenOnWeb = runtimeBase || (work?.slug === 'wancisou' && work.network_disabled === false)
-  return canOpenOnWeb && work?.kind === 'app' && selected &&
-    canTrialPack(work.kind, work.status, work.trust_level, selected.manifest.runtimeProtocol)
-    ? appRunLocation(work.id, selected.version)
-    : null
+  if (work && selected && canTrialPack(work.kind, work.status, work.trust_level, selected.manifest.runtimeProtocol)) {
+    return selected
+  }
+})
+const runLocation = computed(() => {
+  const work = pack.value, selected = trialVersion.value
+  if (!work || !selected) return null
+  const hasHost = selected.manifest.runtimeProtocol === 2 ? runtimeBase : gameSandboxUrl
+  const bundled = work.kind === 'app' && work.slug === 'wancisou' && work.network_disabled === false && work.version === selected.version
+  return hasHost || bundled ? appRunLocation(work.id, selected.version) : null
 })
 const manualOnly = computed(() => latest.value?.manifest.manualOnly === true)
 const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, latest.value.version, latest.value.sha256) : ''))
@@ -120,9 +124,9 @@ async function copyLink() {
         <p v-if="pack.tags.length" class="tags">
           <RouterLink v-for="t in pack.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
         </p>
-        <RouterLink v-if="appWindow" class="btn btn-primary web-app-launch" :to="appWindow">打开应用</RouterLink>
-        <CommunityGameTrial v-else-if="latest" :key="`${pack.id}-${latest.version}`" :pack="pack" :version="latest.version" />
-        <p v-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
+        <RouterLink v-if="runLocation" class="btn btn-primary web-app-launch" :to="runLocation">{{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}</RouterLink>
+        <p v-else-if="trialVersion" class="notice">请在小伴客户端打开{{ pack.kind === 'game' ? '此游戏' : '此应用' }}。</p>
+        <p v-else-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
         <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
         <p v-else-if="!pack.one_click && pack.kind !== 'game' && pack.kind !== 'app'" class="notice">
           {{ pack.trust_level === 2 && pack.kind !== 'game' && pack.kind !== 'app' ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
