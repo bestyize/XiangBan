@@ -34,6 +34,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 「创意 → 微观展厅」的封面和交互预览随前端产物一起部署。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
 
+「龙鱼」展品播放朱红龙鱼，沿用 `/gallery-exhibits/fish/arowana/preview.html`。水族箱默认展示朱红龙鱼和砂石水草，设置中可切换蓝色龙鱼及孔雀鱼组合。两张展品封面位于 `web/assets/gallery/`。
+
 创意页 `/ideas` 的作品卡片使用 3:2 封面。首张卡通往微观展厅。碎花垂耳兔、《星夜骑士》《小王子》、Saltline 和 Oil Paint 的卡片先打开 `/ideas/works/:slug`。详情顶部通栏展示作品图片，多图时可横滑或点分页圆点切换。图片下方展示介绍、作者、来源和体验入口。体验按钮打开 `/create/run/ideas/:slug` 或作品官网。从详情打开站内作品时，关闭后回到该详情。从展厅打开的展品关闭后回到展厅。
 
 精选作品评论使用 `/api/ideas/:slug/comments`，接受公开目录中的 `work` 和 `exhibit`。网页复用全站评论组件，手机读写同一接口。留言、回复、点赞、图片和删除沿用日报评论的处理逻辑，各作品和日报按独立存储键隔离。

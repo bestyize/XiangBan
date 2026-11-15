@@ -3,10 +3,17 @@ import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises
 import { galleryAssets, galleryExhibits } from '../src/lib/microGallery.ts'
 
 // RealWorldBuilder commits the self-contained players alongside their source.
-const upstream = 'https://raw.githubusercontent.com/bestyize/RealWorldBuilder/48eef09d9a1e2546de4329a3d0490170e63699f2/'
+const upstream = 'https://raw.githubusercontent.com/bestyize/RealWorldBuilder/'
+const galleryRevision = '48eef09d9a1e2546de4329a3d0490170e63699f2'
+const vermilionRevision = '1a04202725f8387ed5dbbb6bf917edbf73936bc4'
+const vermilionSources = new Map([
+  ['aquarium.html', 'aquarium.html'],
+  // Keep the standalone exhibit URL used by existing mobile clients.
+  ['fish/arowana/preview.html', 'fish/vermilion-arowana/preview.html'],
+])
 const destination = new URL('../public' + galleryAssets, import.meta.url)
 const marker = new URL('.gallery-source-version', import.meta.url)
-const maxFileBytes = 32 * 1024 * 1024
+const maxFileBytes = 40 * 1024 * 1024
 
 const policy = [
   "default-src 'none'",
@@ -70,7 +77,9 @@ function embedPlayer(html, source) {
 }
 
 async function download(source) {
-  const response = await fetch(upstream + source, {
+  const vermilion = vermilionSources.get(source)
+  const revision = vermilion ? vermilionRevision : galleryRevision
+  const response = await fetch(`${upstream}${revision}/${vermilion ?? source}`, {
     redirect: 'error',
     signal: AbortSignal.timeout(45_000),
   })
@@ -79,7 +88,7 @@ async function download(source) {
   let bytes = 0
   for await (const chunk of response.body) {
     bytes += chunk.byteLength
-    if (bytes > maxFileBytes) throw new Error(`展品资源超过 32 MiB：${source}`)
+    if (bytes > maxFileBytes) throw new Error(`展品资源超过 40 MiB：${source}`)
     chunks.push(chunk)
   }
   return Buffer.concat(chunks, bytes)
@@ -87,7 +96,13 @@ async function download(source) {
 
 async function sync() {
   const files = galleryExhibits.flatMap(({ source, cover }) => [source, `assets/gallery/${cover}.webp`])
-  const stamp = createHash('sha256').update(await readFile(new URL(import.meta.url))).update(files.join('\n')).digest('hex')
+  const covers = new Map(await Promise.all(['arowana', 'living-room'].map(async cover => {
+    const path = `assets/gallery/${cover}.webp`
+    return [path, await readFile(new URL(`../${path}`, import.meta.url))]
+  })))
+  const hash = createHash('sha256').update(await readFile(new URL(import.meta.url))).update(files.join('\n'))
+  for (const cover of covers.values()) hash.update(cover)
+  const stamp = hash.digest('hex')
   const current = await readFile(marker, 'utf8').catch(() => '')
   if (current === stamp &&
       await Promise.all(files.map(source => access(new URL(source, destination)))).then(() => true, () => false)) return
@@ -95,7 +110,7 @@ async function sync() {
   await rm(marker, { force: true })
   await rm(new URL('.source-version', destination), { force: true })
   await Promise.all(files.map(async source => {
-    const buffer = await download(source)
+    const buffer = covers.get(source) ?? await download(source)
     const output = new URL(source, destination)
     const content = source.endsWith('.html') ? embedPlayer(buffer.toString('utf8'), source) : buffer
     await mkdir(new URL('./', output), { recursive: true })

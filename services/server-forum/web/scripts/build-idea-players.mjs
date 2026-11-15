@@ -94,9 +94,10 @@ for (const [id, html] of players) {
   } : undefined)
   if (!item) throw new Error(`精选目录缺少 ${id}`)
   const kind = id === 'saltline' ? 'game' : 'app'
+  const version = id === aquariumExhibit.id ? '1.0.2' : kind === 'game' ? '1.0.0' : '1.0.1'
   const manifest = {
     schemaVersion: 3, runtimeProtocol: 2, id, name: item.title, description: item.description,
-    version: kind === 'game' ? '1.0.0' : '1.0.1', kind, category: kind === 'game' ? 'action' : 'tool',
+    version, kind, category: kind === 'game' ? 'action' : 'tool',
     entry: 'index.html', icon: 'cover.webp', cover: 'cover.webp',
     orientation: id === rabbitExhibit.id ? 'any' : 'landscape', input: ['touch', 'mouse', 'keyboard'],
   }
