@@ -10,6 +10,8 @@
 
 [创意页作品卡片](../../services/server-forum/docs/design-specs/README.md) 首张卡片直达微观展厅，后两张分别展示《小王子：星辰之旅》及「运输船：Saltline」的详情和打开方式。[本机在线预览](http://127.0.0.1:1448/)。
 
+[创意作品详情页](../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) 用「碎花垂耳兔」展示通栏详情、完整作品图和灰底的体验按钮。评论区沿用全站列表、入口和编辑弹层样式。预览沿用创意页作品卡片的服务。[电脑预览](http://127.0.0.1:1448/work-detail.html) · [手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile)
+
 [讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示双端单列布局：单行标题，底部左侧为标签、头像和发布时间，右侧为回复与点赞。支持明暗切换。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
 
 ## 小伴桌面

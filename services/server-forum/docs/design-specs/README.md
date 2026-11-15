@@ -12,4 +12,6 @@ python3 -m http.server 1448 --bind 127.0.0.1 --directory services/server-forum/d
 
 [本机在线预览](http://127.0.0.1:1448/) 也可直接打开 HTML 文件。首张「微观展厅」卡片直接打开现有社区展厅，《小王子》和 Saltline 点击后进入各自的作品详情。
 
+[创意作品详情页](prototypes/ideas-cards/work-detail.html) 以「碎花垂耳兔」展示完整作品图、短介绍、作者与来源。两端通栏，电脑端将作品图和介绍并排，手机端纵向呈现。封面取自 RealWorldBuilder 的微观展厅，「体验 3D 模型」使用灰底深色字，通往现有作品运行页。评论列表、评论入口和编辑弹层沿用全站评论样式。留言、回复和点赞可在预览中体验，刷新后恢复示例评论。[全站评论组件](../../web/src/components/comments/CommentSection.vue) · [电脑预览](http://127.0.0.1:1448/work-detail.html) · [手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile)
+
 微观展厅使用社区展品的水族箱封面，来源为 RealWorldBuilder。《小王子》的封面使用 [Sac 的作品官网](https://littleprince.dev/)主视觉，Saltline 的封面使用 [作品展示页](https://saltline.games/)中的游戏画面，作者为 Felix Rieseberg。设计稿独立于生产页面。
