@@ -102,6 +102,8 @@ const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.
     COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
     COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count,
     COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1)::smallint AS runtime_protocol,
+    (p.kind IN ('wallpaper','effect','widget','pet') AND EXISTS(SELECT 1 FROM pack_versions v
+        WHERE v.pack_id=p.id AND v.version=p.current_version AND v.manifest->'schemaVersion'='3'::jsonb)) AS desktop_resource,
     p.allow_remix, p.remix_of_pack_id, p.remix_of_version, p.remix_of_author_uid,
     (SELECT ra.nickname FROM users ra WHERE ra.uid=p.remix_of_author_uid) AS remix_author_name,
     (SELECT count(*) FROM packs r WHERE r.remix_of_pack_id=p.id AND r.status='published') AS remix_count,
@@ -127,6 +129,7 @@ struct PackRow {
     like_count: i32,
     reply_count: i32,
     runtime_protocol: i16,
+    desktop_resource: bool,
     allow_remix: bool,
     remix_of_pack_id: Option<i64>,
     remix_of_version: Option<i32>,
@@ -140,6 +143,10 @@ struct PackRow {
 }
 
 impl PackRow {
+    fn one_click(&self) -> bool {
+        !self.desktop_resource && content::one_click_allowed(&self.kind, self.trust_level, &self.status)
+    }
+
     fn json(&self, state: &AppState) -> Value {
         // 改编关系：原作品被删后 pack_id 为空，但原作者仍保留署名。
         let remix_of = (self.remix_of_pack_id.is_some() || self.remix_of_author_uid.is_some()).then(|| {
@@ -166,7 +173,8 @@ impl PackRow {
             "topic_id": self.topic_id,
             "like_count": self.like_count,
             "reply_count": self.reply_count,
-            "one_click": content::one_click_allowed(&self.kind, self.trust_level, &self.status),
+            "one_click": self.one_click(),
+            "desktop_resource": self.desktop_resource,
             "pure_data": content::is_pure_data(&self.kind),
             "runtime_protocol": self.runtime_protocol,
             "allow_remix": self.allow_remix,
@@ -344,14 +352,16 @@ async fn download(
     }
     let base = require_resource(&state)?;
     let version = q.version.unwrap_or(pack.current_version);
-    let (label, sha256, size, storage, file_key, mirrors): (String, String, i64, String, String, Value) = sqlx::query_as(
-        "SELECT label, sha256, size, storage, file_key, mirrors FROM pack_versions WHERE pack_id = $1 AND version = $2",
+    let (label, sha256, size, storage, file_key, mirrors, schema_three): (String, String, i64, String, String, Value, bool) = sqlx::query_as(
+        "SELECT label, sha256, size, storage, file_key, mirrors, COALESCE(manifest->'schemaVersion'='3'::jsonb,false)
+         FROM pack_versions WHERE pack_id = $1 AND version = $2",
     )
     .bind(id)
     .bind(version)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::not_found("版本"))?;
+    let desktop_resource = schema_three && content::is_desktop_resource_kind(&pack.kind);
     let exp = Utc::now().timestamp() + state.config.download_url_ttl_secs;
     // 官方镜像（如魔搭）是公开地址，由客户端在主地址失败时按顺序回退；每个来源都要过同一个 sha256 校验。
     Ok(Json(json!({
@@ -366,7 +376,7 @@ async fn download(
         "expires_at": exp,
         "mirrors": mirrors,
         "trust_level": pack.trust_level,
-        "one_click": content::one_click_allowed(&pack.kind, pack.trust_level, &pack.status),
+        "one_click": !desktop_resource && content::one_click_allowed(&pack.kind, pack.trust_level, &pack.status),
     })))
 }
 
@@ -656,6 +666,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     }
     let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
     let info = content::validate_manifest(&manifest, &input.kind).map_err(AppError::BadRequest)?;
+    let slug = info.slug.unwrap_or_else(wallpaper_slug);
     let remix = match input.remix_of_pack_id {
         Some(source) => Some(check_remix_source(&mut tx, source, input.remix_of_version).await?),
         None if input.remix_of_version.is_some() => return Err(AppError::BadRequest("remix_of_version 需要同时给出 remix_of_pack_id".into())),
@@ -667,7 +678,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
          VALUES ($1, $2, $3, $4, $5, $6, 2, 'published', $7, $8, $9, $10, $11) RETURNING id",
     )
     .bind(&input.kind)
-    .bind(&info.slug)
+    .bind(&slug)
     .bind(&title)
     .bind(&summary)
     .bind(&tags)
@@ -680,13 +691,15 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "", info.runtime_protocol).await?;
+    insert_version(&mut tx, id, 1, info.version_label.as_deref().unwrap_or("v1"), &sha256, size, &manifest, &input.file_key, &json!([]), "", info.runtime_protocol).await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
     crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
     tx.commit().await?;
-    Ok(Json(json!({ "id": id, "slug": info.slug, "version": 1, "trust_level": content::T2, "status": "published" })))
+    Ok(Json(json!({ "id": id, "slug": slug, "version": 1, "trust_level": content::T2, "status": "published" })))
 }
+
+fn wallpaper_slug() -> String { format!("wallpaper-{}", Uuid::new_v4().simple()) }
 
 /// 发布前再确认一次配额：凭证签发时已经计过一次占位，这里只拦“已发布数”超限。
 async fn check_pack_quota_for_publish(state: &AppState, auth: &AuthUser) -> AppResult<()> {
@@ -768,11 +781,12 @@ async fn add_version(
     }
     let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &kind, &input.file_key).await?;
     let info = content::validate_manifest(&manifest, &kind).map_err(AppError::BadRequest)?;
-    if info.slug != slug {
+    if info.slug.as_deref().is_some_and(|new_slug| new_slug != slug) {
         return Err(AppError::BadRequest("新版本的 id 必须与原来一致".into()));
     }
     let next = current + 1;
-    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog, info.runtime_protocol)
+    let label = info.version_label.unwrap_or_else(|| format!("v{next}"));
+    insert_version(&mut tx, id, next, &label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog, info.runtime_protocol)
         .await
         .map_err(|e| match e {
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => AppError::Conflict("版本冲突，请重试".into()),
@@ -1128,8 +1142,9 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
             json!({
                 "kind": "pack", "title": pack.title, "summary": pack.summary, "cover_url": cover_url(&state, pack.cover_key.as_deref()),
                 "url": format!("{site}/packs/{}", pack.id),
-                "app_link": format!("xiaoban://community/apply/{}/{}?version={}", pack.kind, pack.id, pack.current_version),
-                "pack_kind": pack.kind, "one_click": content::one_click_allowed(&pack.kind, pack.trust_level, &pack.status),
+                "app_link": if pack.desktop_resource { format!("xiaoban://community/open/pack/{}", pack.id) }
+                    else { format!("xiaoban://community/apply/{}/{}?version={}", pack.kind, pack.id, pack.current_version) },
+                "pack_kind": pack.kind, "one_click": pack.one_click(),
             })
         }
         "topic" => {
@@ -1261,6 +1276,7 @@ async fn admin_create_pack(
     let summary = clean_text(&input.summary, "简介", 500, false)?;
     let tags = clean_tags(&input.tags)?;
     let info = content::validate_manifest(&input.manifest, &input.kind).map_err(AppError::BadRequest)?;
+    let slug = info.slug.unwrap_or_else(wallpaper_slug);
 
     let mut tx = state.pool.begin().await?;
     if let Some(author) = input.author_uid {
@@ -1277,7 +1293,7 @@ async fn admin_create_pack(
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', $8) RETURNING id",
     )
     .bind(&input.kind)
-    .bind(&info.slug)
+    .bind(&slug)
     .bind(&title)
     .bind(&summary)
     .bind(&tags)
@@ -1287,11 +1303,11 @@ async fn admin_create_pack(
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "", info.runtime_protocol)
+    insert_version(&mut tx, id, 1, info.version_label.as_deref().unwrap_or("v1"), &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "", info.runtime_protocol)
         .await?;
-    audit(&mut tx, &admin, "pack.create", "pack", id, format!("{} {}", input.kind, info.slug)).await?;
+    audit(&mut tx, &admin, "pack.create", "pack", id, format!("{} {slug}", input.kind)).await?;
     tx.commit().await?;
-    Ok(Json(json!({ "id": id, "slug": info.slug })))
+    Ok(Json(json!({ "id": id, "slug": slug })))
 }
 
 #[derive(Deserialize)]

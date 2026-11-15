@@ -9,6 +9,8 @@ const ideaPlayers = process.env.FORUM_IDEA_PLAYERS_ORIGIN
 
 export default defineConfig({
   plugins: [vue()],
+  // Preserve the codec module's relative URLs for its WebAssembly binaries in development.
+  optimizeDeps: { exclude: ['@jsquash/webp'] },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port,

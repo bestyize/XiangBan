@@ -18,6 +18,7 @@
 1. 客户端向论坛申请凭证（`POST /api/packs/upload-ticket`），得到 `ticket` 与 `upload_url`。
 2. 客户端 `PUT upload_url`，头 `X-Upload-Ticket: <ticket>`。资源机依次检查：凭证签名与有效期、`Content-Length` 等于凭证声明的大小、边接收边算 SHA-256（超过声明大小立即中止，不进内存）、哈希一致。
 3. 封面只收 PNG、JPEG、WebP（看文件头，不收 SVG 和 GIF）。内容包必须是 zip：条目 ≤ 2000、解压后合计 ≤ 128MB、路径不能含 `..` 或绝对路径、不允许符号链接、根目录必须有合法 JSON 的 `manifest.json`（≤ 64KB）。
+   桌面 V2 的壁纸、特效、组件和伙伴 ZIP 还要通过入口文件和目录结构检查。资源机从特效和伙伴的入口 JSON 读取作品 ID 和名称，再随签名回调发送给论坛。下载时提供上传的原始 ZIP。
 4. 通过后原子改名到最终位置，回调论坛 `RESOURCE_CALLBACK_URL`，请求体 `{file_key,size,sha256,manifest}`，头 `X-Signature` 为请求体的 HMAC-SHA256。论坛不接受（4xx）或不可达（5xx）时撤销文件并返回错误，客户端重传即可。
 5. 同一个键不能覆盖；同时上传数受 `RESOURCE_MAX_UPLOADS` 限制，超出返回 503。
 

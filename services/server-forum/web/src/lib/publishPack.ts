@@ -1,11 +1,12 @@
 import JSZip from 'jszip'
 import { fmtSize, KIND_LIMIT } from './content.ts'
 
-export const WORK_TAGS = ['工具', '游戏', '3D模型'] as const
+export const WORK_TAGS = ['工具', '游戏', '3D模型', '壁纸', '特效', '组件', '伙伴'] as const
 const htmlExtension = /\.html?$/i
 const imageExtension = /\.(svg|png|jpe?g|webp|avif|gif|ico)$/i
 const workExtensions = /\.(html?|m?js|css|json|svg|md|txt|xml|csv|map|atlas|glsl|png|jpe?g|webp|avif|gif|ico|mp3|ogg|wav|m4a|aac|mp4|webm|woff2?|ttf|otf|wasm|glb|gltf|bin|data|ktx2|basis)$/i
 const manifestLimit = 64 * 1024
+const desktopEntryLimit = 4 * 1024 * 1024
 const htmlLimit = 50 * 1024 * 1024
 const readyScript = `<script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +20,7 @@ const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" v
 </svg>`
 
 type WorkKind = 'app' | 'game'
+type DesktopKind = 'wallpaper' | 'effect' | 'widget' | 'pet'
 const categories = { app: ['tool', 'quiz'], game: ['action', 'puzzle', 'board', 'casual', 'story'] }
 const inputs = ['touch', 'mouse', 'keyboard']
 const orientations = ['portrait', 'landscape', 'any']
@@ -39,9 +41,13 @@ export interface PreparedPack {
   description: string
   protocol: number
   converted: boolean
+  desktopResource?: boolean
 }
 
 function isWorkKind(kind: unknown): kind is WorkKind { return kind === 'game' || kind === 'app' }
+function isDesktopKind(kind: string): kind is DesktopKind {
+  return kind === 'wallpaper' || kind === 'effect' || kind === 'widget' || kind === 'pet'
+}
 export function canPublishHtml(previous?: PreviousPack | null): boolean {
   return !previous || (isWorkKind(previous.kind) && /^[a-z0-9_-]{2,64}$/.test(previous.slug))
 }
@@ -102,7 +108,7 @@ function checkWorkFiles(zip: JSZip, manifest: Record<string, unknown>) {
   }
 }
 
-function readManifest(file: JSZip.JSZipObject): Promise<Record<string, unknown>> {
+function readZipJson(file: JSZip.JSZipObject, limit: number): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const stream = (file as JSZip.JSZipObject & {
       internalStream(type: 'uint8array'): JSZip.JSZipStreamHelper<Uint8Array>
@@ -113,19 +119,72 @@ function readManifest(file: JSZip.JSZipObject): Promise<Record<string, unknown>>
     const stop = (error: Error) => { stream.pause(); reject(error) }
     stream.on('data', chunk => {
       bytes += chunk.length
-      if (bytes > manifestLimit) return stop(new Error('manifest.json 不能超过 64 KB'))
-      try { source += decoder.decode(chunk, { stream: true }) } catch { stop(new Error('manifest.json 必须使用 UTF-8 编码')) }
+      if (bytes > limit) return stop(new Error(`${file.name} 不能超过 ${limit === manifestLimit ? '64 KB' : '4 MB'}`))
+      try { source += decoder.decode(chunk, { stream: true }) } catch { stop(new Error(`${file.name} 必须使用 UTF-8 编码`)) }
     })
-    stream.on('error', () => reject(new Error('无法解压 manifest.json')))
+    stream.on('error', () => reject(new Error(`无法解压 ${file.name}`)))
     stream.on('end', () => {
       try {
         const value: unknown = JSON.parse(source + decoder.decode())
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error()
         resolve(value as Record<string, unknown>)
-      } catch { reject(new Error('manifest.json 必须是有效的 JSON 对象')) }
+      } catch { reject(new Error(`${file.name} 必须是有效的 JSON 对象`)) }
     })
     stream.resume()
   })
+}
+
+function checkPrevious(previous: PreviousPack | null | undefined, kind: string, id: unknown) {
+  if (previous && (kind !== previous.kind || (id !== undefined && id !== previous.slug))) {
+    throw new Error('新版本的类型和作品 ID 必须与原版本一致')
+  }
+}
+
+async function inspectDesktopZip(file: File, zip: JSZip, manifest: Record<string, unknown>, kind: DesktopKind, previous?: PreviousPack | null): Promise<PreparedPack> {
+  if (manifest.runtimeProtocol !== undefined) throw new Error('桌面作品的清单不需要 runtimeProtocol')
+  const jsonEntry = kind === 'effect' || kind === 'pet'
+  const path = manifest.entry
+  if (typeof path !== 'string' || !(jsonEntry ? /\.json$/i : htmlExtension).test(path) || path.split('/')[0].toLowerCase() === 'manifest.json') {
+    throw new Error(`manifest.json 的 entry 需要指向${jsonEntry ? ' JSON' : ' HTML'} 文件`)
+  }
+  const entry = zip.file(path)
+  if (!entry) throw new Error(`ZIP 缺少入口文件 ${path}`)
+  const seen = new Set<string>()
+  for (const member of Object.values(zip.files)) {
+    if (member.dir) continue
+    const name = member.name
+    const parts = name.split('/')
+    if (member.unsafeOriginalName !== name ||
+      (typeof member.unixPermissions === 'number' && (member.unixPermissions & 0o170000) === 0o120000)) {
+      throw new Error(`ZIP 包含不安全的文件：${name}`)
+    }
+    if (parts[0] === '__MACOSX' || parts.at(-1) === '.DS_Store' || parts.at(-1)?.startsWith('._')) continue
+    if (parts.length > 8 || parts.some(part => !/^[a-z0-9_@-][a-z0-9._@-]*$/i.test(part) || part.endsWith('.')) ||
+      seen.has(name.toLowerCase())) throw new Error(`ZIP 包含无效或重复的路径：${name}`)
+    seen.add(name.toLowerCase())
+    if (name !== 'manifest.json' && name !== path &&
+      (kind !== 'pet' || !/^assets\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/){0,2}[A-Za-z0-9_-][A-Za-z0-9._-]*\.(png|webp|gif)$/.test(name))) {
+      throw new Error(`桌面作品包不支持额外文件：${name}`)
+    }
+  }
+  if (!seen.has(path.toLowerCase())) throw new Error(`ZIP 缺少入口文件 ${path}`)
+  const metadata = jsonEntry ? await readZipJson(entry, desktopEntryLimit) : manifest
+  if (jsonEntry && metadata.schemaVersion !== 1 && !(kind === 'pet' && metadata.schemaVersion === 2)) {
+    throw new Error(`${path} 的数据版本不受支持`)
+  }
+  if (jsonEntry && manifest.id !== undefined && manifest.id !== metadata.id) throw new Error('清单和入口 JSON 的作品 ID 不一致')
+  if (manifest.version !== undefined && !/^[a-z0-9.-]+$/i.test(textField(manifest, 'version', 32))) {
+    throw new Error('manifest.json 的版本号无效')
+  }
+  const id = metadata.id
+  if ((id !== undefined || kind !== 'wallpaper') && (typeof id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,47}$/.test(id))) {
+    throw new Error('桌面作品的 ID 无效')
+  }
+  checkPrevious(previous, kind, id)
+  const name = typeof metadata.name === 'string' ? metadata.name.trim() : ''
+  if (!name || Array.from(name).length > (kind === 'wallpaper' ? 48 : 24)) throw new Error('桌面作品的名称无效')
+  const description = typeof metadata.description === 'string' ? Array.from(metadata.description.trim()).slice(0, 500).join('') : ''
+  return { file, kind, name, description, protocol: 1, converted: false, desktopResource: true }
 }
 
 export async function inspectPackZip(file: File, previous?: PreviousPack | null): Promise<PreparedPack> {
@@ -134,16 +193,19 @@ export async function inspectPackZip(file: File, previous?: PreviousPack | null)
   try { zip = await JSZip.loadAsync(await file.arrayBuffer()) } catch { throw new Error('无法读取这个 ZIP 文件，请检查压缩包是否完整') }
   const entry = zip.file('manifest.json')
   if (entry?.unsafeOriginalName !== 'manifest.json') throw new Error('ZIP 根目录需要有 manifest.json')
-  const manifest = await readManifest(entry)
+  const manifest = await readZipJson(entry, manifestLimit)
   const { kind, id, schemaVersion, runtimeProtocol = 1 } = manifest
   if (typeof kind !== 'string' || !Object.hasOwn(KIND_LIMIT, kind)) throw new Error('manifest.json 的内容包类型无效')
-  if (previous && (kind !== previous.kind || id !== previous.slug)) throw new Error('新版本的类型和作品 ID 必须与原版本一致')
+  checkSize(file, KIND_LIMIT[kind]!, '内容包')
+  if (schemaVersion === 3 && isDesktopKind(kind)) return inspectDesktopZip(file, zip, manifest, kind, previous)
+  if (kind === 'pet') throw new Error('请选择 V2 伙伴 ZIP')
+  if (previous && id === undefined) throw new Error('新版本的类型和作品 ID 必须与原版本一致')
+  checkPrevious(previous, kind, id)
   if (runtimeProtocol !== 1 && runtimeProtocol !== 2) throw new Error('manifest.json 的 runtimeProtocol 无效')
   const latest = previous?.versions[0]?.manifest
   if (runtimeProtocol === 1 && (kind === 'app' || (kind === 'game' && (!previous || latest?.runtimeProtocol === 2)))) {
     throw new Error('请选择符合 V2 规范的作品 ZIP')
   }
-  checkSize(file, KIND_LIMIT[kind]!, '内容包')
   const v2 = runtimeProtocol === 2
   if (typeof id !== 'string' || !(v2 ? /^[a-z0-9_-]{2,64}$/ : /^[a-z0-9_-]{1,64}$/).test(id)) throw new Error('manifest.json 的作品 ID 无效')
   if (!/^[a-z0-9.-]+$/i.test(textField(manifest, 'version', 32))) throw new Error('manifest.json 的版本号无效')

@@ -83,3 +83,40 @@ test('existing non-runtime content pack formats still use their declared type', 
   const file = new File([await zip.generateAsync({ type: 'blob' })], 'effect.zip')
   assert.equal((await inspectPackZip(file)).kind, 'effect')
 })
+
+test('desktop export ZIPs keep their original bytes and read names from the manifest or JSON entry', async () => {
+  const examples = [
+    { kind: 'wallpaper', entry: 'scene.html', name: '动态壁纸' },
+    { kind: 'widget', entry: 'index.htm', id: 'tiny-clock', name: '小组件' },
+    { kind: 'effect', entry: 'theme/effect.json', name: '星空特效', json: true, id: 'starlight' },
+    { kind: 'pet', entry: 'pet.json', name: '小伙伴', json: true, id: 'little-fox' },
+  ]
+  for (const { kind, entry, id, name, json } of examples) {
+    const zip = new JSZip()
+    zip.file('manifest.json', JSON.stringify({ schemaVersion: 3, kind, entry, ...(json ? {} : { id, name }) }))
+    zip.file(entry, json ? JSON.stringify({ schemaVersion: 1, id, name, description: '来自桌面导出' }) : '<h1>测试</h1>')
+    if (kind === 'pet') zip.file('assets/Face.webp', 'RIFF....WEBP')
+    const file = new File([await zip.generateAsync({ type: 'blob' })], `${kind}.zip`)
+    const inspected = await inspectPackZip(file)
+    assert.equal(inspected.file, file)
+    assert.equal(inspected.kind, kind)
+    assert.equal(inspected.name, name)
+    assert.equal(inspected.desktopResource, true)
+    assert.equal(inspected.protocol, 1)
+    if (kind === 'wallpaper') {
+      await inspectPackZip(file, { kind, slug: 'wallpaper-forum-id', title: name, version: 1, versions: [] })
+    } else {
+      await assert.rejects(inspectPackZip(file, { kind, slug: 'different-id', title: name, version: 1, versions: [] }), /作品 ID/)
+    }
+  }
+})
+
+test('a desktop ZIP needs its declared entry and keeps executable files out of effect packs', async () => {
+  const zip = new JSZip()
+  zip.file('manifest.json', JSON.stringify({ schemaVersion: 3, kind: 'effect', entry: 'effect.json' }))
+  const file = async () => new File([await zip.generateAsync({ type: 'blob' })], 'effect.zip')
+  await assert.rejects(inspectPackZip(await file()), /缺少入口/)
+  zip.file('effect.json', JSON.stringify({ schemaVersion: 1, id: 'starlight', name: '星空特效' }))
+  zip.file('extra.html', '<h1>额外文件</h1>')
+  await assert.rejects(inspectPackZip(await file()), /额外文件/)
+})

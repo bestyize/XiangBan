@@ -7,6 +7,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import { track } from '@/lib/analytics'
 import { COVER_LIMIT, fmtSize, kindLabel, KIND_LIMIT } from '@/lib/content'
+import { preparePublishCover } from '@/lib/publishCover'
 import { canPublishHtml, convertPublishHtml, inspectPackZip, isPublishHtml, WORK_TAGS, type PreparedPack } from '@/lib/publishPack'
 import { uploadFile } from '@/lib/upload'
 import { usePackPublisher } from '@/stores/packPublisher'
@@ -42,13 +43,13 @@ let upload: AbortController | null = null
 const fileStatus = computed(() => {
   if (preparing.value) return isPublishHtml(original.value?.name ?? '') ? '正在转换为 V2 作品…' : '正在检查 ZIP…'
   if (work.value) {
-    const { converted, protocol, kind, file } = work.value
-    const format = converted ? '已转换为 V2 作品' : protocol === 2 ? 'V2 作品' : '内容包'
+    const { converted, protocol, kind, file, desktopResource } = work.value
+    const format = desktopResource ? 'V2 桌面作品' : converted ? '已转换为 V2 作品' : protocol === 2 ? 'V2 作品' : '内容包'
     return `${format} · ${kindLabel(kind)} · ${fmtSize(file.size)}`
   }
   if (original.value) return fmtSize(original.value.size)
-  const zip = existing.value && (!['app', 'game'].includes(existing.value.kind) || existing.value.versions[0]?.manifest.runtimeProtocol !== 2)
-    ? 'ZIP' : 'V2 ZIP'
+  const zip = !existing.value || existing.value.desktop_resource || existing.value.versions[0]?.manifest.runtimeProtocol === 2
+    ? 'V2 ZIP' : 'ZIP'
   const size = KIND_LIMIT[existing.value?.kind ?? 'app'] ?? KIND_LIMIT.app!
   return `${allowHtml.value ? 'HTML、HTM 或 ' : ''}${zip} · ZIP 最大 ${fmtSize(size)}`
 })
@@ -107,8 +108,14 @@ async function pickWork(event: Event) {
 
 function pickCover(event: Event) {
   const input = event.target as HTMLInputElement
-  if (input.files?.[0]) cover.value = input.files[0]
+  const file = input.files?.[0]
   input.value = ''
+  if (file && !busy.value) selectCover(file)
+}
+
+function selectCover(file: File | null) {
+  cover.value = file
+  error.value = ''
 }
 
 function toggleTag(tag: string) {
@@ -122,7 +129,6 @@ async function submit() {
   if (!prepared) { if (!fileError.value) error.value = '请选择要发布的作品文件'; return }
   if (!packId.value) {
     if (!form.title.trim()) { error.value = '请填写标题'; return }
-    if (cover.value && cover.value.size > COVER_LIMIT) { error.value = `封面不能超过 ${fmtSize(COVER_LIMIT)}`; return }
     if (!form.rights) { error.value = '请确认你拥有这份内容的发布权利'; return }
   }
   const controller = new AbortController()
@@ -132,12 +138,16 @@ async function submit() {
   let posting = false
   try {
     const id = packId.value
-    const coverFile = cover.value
+    let coverFile: File | undefined
+    if (!id && cover.value) {
+      step.value = '处理封面'
+      coverFile = await preparePublishCover(cover.value, signal)
+    }
     step.value = '上传作品文件'
     progress.value = 0
     const fileKey = await uploadFile(prepared.kind, prepared.file, ratio => (progress.value = ratio), signal)
     let coverKey: string | undefined
-    if (!id && coverFile) {
+    if (coverFile) {
       step.value = '上传封面'
       progress.value = 0
       coverKey = await uploadFile('cover', coverFile, ratio => (progress.value = ratio), signal)
@@ -201,7 +211,8 @@ async function submit() {
             </span>
             <span v-if="original" class="change-file">更换</span>
           </button>
-          <small v-if="allowHtml">单个 HTML 会自动转换为 V2 作品。包含独立脚本、样式或素材时，请上传 V2 ZIP。</small>
+          <small v-if="!packId">支持应用、游戏、壁纸、特效、组件和伙伴 ZIP。单个 HTML 会自动转换为 V2 应用。</small>
+          <small v-else-if="allowHtml">单个 HTML 会自动转换为 V2 作品。包含独立脚本、样式或素材时，请上传 V2 ZIP。</small>
           <small v-else>ZIP 根目录需要有清单，作品的类型和 ID 需与原版本一致。</small>
           <p v-if="fileError" class="error" role="alert">{{ fileError }}</p>
         </div>
@@ -224,13 +235,13 @@ async function submit() {
           </div>
           <div class="field">
             <span>封面（选填）</span>
-            <input ref="coverInput" type="file" hidden accept="image/png,image/jpeg,image/webp" @change="pickCover" />
+            <input ref="coverInput" type="file" hidden accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" @change="pickCover" />
             <div class="cover-picker">
               <button type="button" class="btn btn-sm" @click="coverInput?.click()">选择封面</button>
               <span v-if="cover" :title="cover.name">{{ cover.name }}</span>
-              <button v-if="cover" type="button" class="btn btn-sm btn-ghost" @click="cover = null">移除封面</button>
+              <button v-if="cover" type="button" class="btn btn-sm btn-ghost" @click="selectCover(null)">移除封面</button>
             </div>
-            <small>PNG、JPEG 或 WebP，不超过 {{ fmtSize(COVER_LIMIT) }}</small>
+            <small>支持 PNG、JPG 和 WebP。上传为 WebP，文件不超过 {{ fmtSize(COVER_LIMIT) }}。</small>
           </div>
           <label class="rights">
             <input v-model="form.rights" type="checkbox" required />

@@ -30,6 +30,7 @@ export interface PackItem {
   apply_count: number
   topic_id: number | null
   one_click: boolean
+  desktop_resource?: boolean
   pure_data: boolean
   created_at: string
   updated_at: string

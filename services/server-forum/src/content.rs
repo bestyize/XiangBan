@@ -18,6 +18,7 @@ const KINDS: &[(&str, u64, bool)] = &[
     ("task", MB, true),
     ("goal", MB, true),
     ("widget", 8 * MB, false),
+    ("pet", 32 * MB, true),
     ("game", 100 * MB, false),
     ("app", 100 * MB, false),
     ("wallpaper", 32 * MB, false),
@@ -43,6 +44,10 @@ pub fn is_pure_data(kind: &str) -> bool {
 
 pub fn is_known_kind(kind: &str) -> bool {
     kind_limit(kind).is_some()
+}
+
+pub fn is_desktop_resource_kind(kind: &str) -> bool {
+    matches!(kind, "wallpaper" | "effect" | "widget" | "pet")
 }
 
 /// 上传凭证可用的类型：内容包类型或封面。
@@ -80,8 +85,9 @@ pub fn valid_file_key(value: &str) -> bool {
 }
 
 pub struct ManifestInfo {
-    pub slug: String,
-    pub version_label: String,
+    /// A desktop wallpaper may have no ID. The forum assigns one on first publication.
+    pub slug: Option<String>,
+    pub version_label: Option<String>,
     /// 运行时协议版本：清单没有 `runtimeProtocol` 时是 1。
     pub runtime_protocol: i16,
 }
@@ -100,6 +106,17 @@ const ORIENTATIONS: &[&str] = &["portrait", "landscape", "any"];
 /// 检查资源包清单（`manifest.json`）：结构、类型与内容包类型一致、id 与版本号合法。
 pub fn validate_manifest(manifest: &Value, kind: &str) -> Result<ManifestInfo, String> {
     let obj = manifest.as_object().ok_or("manifest 必须是对象")?;
+    let declared = obj.get("kind").and_then(Value::as_str).ok_or("缺少 kind")?;
+    if declared != kind {
+        return Err(format!("manifest 的 kind 是 {declared}，与所选类型 {kind} 不一致"));
+    }
+    let schema = obj.get("schemaVersion").and_then(Value::as_i64).ok_or("缺少 schemaVersion")?;
+    if schema == 3 && is_desktop_resource_kind(kind) {
+        return validate_desktop_resource(obj, kind);
+    }
+    if kind == "pet" {
+        return Err("请选择 V2 伙伴 ZIP".into());
+    }
     let protocol = match obj.get("runtimeProtocol") {
         None => 1,
         Some(v) => match v.as_i64() {
@@ -111,13 +128,8 @@ pub fn validate_manifest(manifest: &Value, kind: &str) -> Result<ManifestInfo, S
     if protocol == 2 {
         return validate_manifest_v2(obj, kind);
     }
-    let schema = obj.get("schemaVersion").and_then(Value::as_i64).ok_or("缺少 schemaVersion")?;
     if schema < 1 {
         return Err("schemaVersion 必须大于等于 1".into());
-    }
-    let declared = obj.get("kind").and_then(Value::as_str).ok_or("缺少 kind")?;
-    if declared != kind {
-        return Err(format!("manifest 的 kind 是 {declared}，与所选类型 {kind} 不一致"));
     }
     let slug = obj.get("id").and_then(Value::as_str).ok_or("缺少 id")?;
     if !valid_slug(slug) {
@@ -127,11 +139,16 @@ pub fn validate_manifest(manifest: &Value, kind: &str) -> Result<ManifestInfo, S
     if name.is_empty() || name.chars().count() > 60 {
         return Err("name 必填，最长 60 个字".into());
     }
+    let version = manifest_version(obj)?;
+    Ok(ManifestInfo { slug: Some(slug.to_string()), version_label: Some(version.to_string()), runtime_protocol: 1 })
+}
+
+fn manifest_version(obj: &serde_json::Map<String, Value>) -> Result<&str, String> {
     let version = obj.get("version").and_then(Value::as_str).unwrap_or("").trim();
     if version.is_empty() || version.len() > 32 || !version.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
         return Err("version 必填，只能含字母、数字、点和连字符".into());
     }
-    Ok(ManifestInfo { slug: slug.to_string(), version_label: version.to_string(), runtime_protocol: 1 })
+    Ok(version)
 }
 
 fn nonempty_str<'a>(obj: &'a serde_json::Map<String, Value>, field: &str) -> Result<&'a str, String> {
@@ -139,6 +156,38 @@ fn nonempty_str<'a>(obj: &'a serde_json::Map<String, Value>, field: &str) -> Res
         Some(v) if !v.is_empty() => Ok(v),
         _ => Err(format!("{field} 必填，且必须是非空文本")),
     }
+}
+
+/// Resource uploads include trusted entry metadata in the signed callback for effects and pets.
+fn validate_desktop_resource(obj: &serde_json::Map<String, Value>, kind: &str) -> Result<ManifestInfo, String> {
+    if obj.contains_key("runtimeProtocol") {
+        return Err("桌面作品的清单不需要 runtimeProtocol".into());
+    }
+    let entry = obj.get("entry").and_then(Value::as_str).ok_or("缺少 entry")?;
+    let extension = entry.rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase());
+    let format_matches = if matches!(kind, "effect" | "pet") {
+        extension.as_deref() == Some("json")
+    } else {
+        matches!(extension.as_deref(), Some("html" | "htm"))
+    };
+    if !format_matches || entry.split('/').next().is_some_and(|part| part.eq_ignore_ascii_case("manifest.json")) || entry.split('/').count() > 8 ||
+        !entry.split('/').all(|part| !part.is_empty() && !part.starts_with('.') && !part.ends_with('.') &&
+            part.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-@".contains(&b))) {
+        return Err("entry 路径或文件格式无效".into());
+    }
+    let name = nonempty_str(obj, "name")?;
+    let max_name = if kind == "wallpaper" { 48 } else { 24 };
+    if name.chars().count() > max_name {
+        return Err(format!("name 最多 {max_name} 个字"));
+    }
+    let slug = match obj.get("id") {
+        None if kind == "wallpaper" => None,
+        Some(Value::String(id)) if id.len() <= 48 && valid_slug(id) && id.as_bytes()[0].is_ascii_alphanumeric() => Some(id.clone()),
+        _ => return Err("桌面作品的 ID 无效".into()),
+    };
+    let version_label = if obj.contains_key("version") { Some(manifest_version(obj)?.to_string()) } else { None };
+    // Desktop ZIPs use schema 3 without a web/game runtime protocol.
+    Ok(ManifestInfo { slug, version_label, runtime_protocol: 1 })
 }
 
 /// 取文本列表字段并逐项检查是否在允许范围内；字段不存在时返回 None。
@@ -164,10 +213,6 @@ fn validate_manifest_v2(obj: &serde_json::Map<String, Value>, kind: &str) -> Res
     if kind != "game" && kind != "app" {
         return Err("协议 2 只用于 game 和 app".into());
     }
-    let declared = obj.get("kind").and_then(Value::as_str).ok_or("缺少 kind")?;
-    if declared != kind {
-        return Err(format!("manifest 的 kind 是 {declared}，与所选类型 {kind} 不一致"));
-    }
     let slug = obj.get("id").and_then(Value::as_str).ok_or("缺少 id")?;
     if !valid_slug(slug) {
         return Err("id 只能用小写字母、数字、连字符和下划线，最长 64 位".into());
@@ -180,10 +225,7 @@ fn validate_manifest_v2(obj: &serde_json::Map<String, Value>, kind: &str) -> Res
     if description.is_empty() || description.chars().count() > 80 {
         return Err("description 必填，最长 80 个字".into());
     }
-    let version = obj.get("version").and_then(Value::as_str).unwrap_or("").trim();
-    if version.is_empty() || version.len() > 32 || !version.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-') {
-        return Err("version 必填，只能含字母、数字、点和连字符".into());
-    }
+    let version = manifest_version(obj)?;
     let categories = if kind == "game" { GAME_CATEGORIES } else { APP_CATEGORIES };
     let category = obj.get("category").and_then(Value::as_str).unwrap_or("");
     if !categories.contains(&category) {
@@ -215,7 +257,7 @@ fn validate_manifest_v2(obj: &serde_json::Map<String, Value>, kind: &str) -> Res
             }
         }
     }
-    Ok(ManifestInfo { slug: slug.to_string(), version_label: version.to_string(), runtime_protocol: 2 })
+    Ok(ManifestInfo { slug: Some(slug.to_string()), version_label: Some(version.to_string()), runtime_protocol: 2 })
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -371,8 +413,8 @@ packs/effect/a.zip
     fn manifest_checks() {
         let ok = json!({"schemaVersion": 1, "kind": "effect", "id": "rain-night", "name": "雨夜窗台", "version": "1.0.0"});
         let info = validate_manifest(&ok, "effect").unwrap();
-        assert_eq!(info.slug, "rain-night");
-        assert_eq!(info.version_label, "1.0.0");
+        assert_eq!(info.slug.as_deref(), Some("rain-night"));
+        assert_eq!(info.version_label.as_deref(), Some("1.0.0"));
         assert!(validate_manifest(&ok, "widget").is_err());
         assert!(validate_manifest(&json!({"kind": "effect"}), "effect").is_err());
         assert!(validate_manifest(&json!({"schemaVersion": 1, "kind": "effect", "id": "Bad Id", "name": "x", "version": "1"}), "effect").is_err());
@@ -392,7 +434,7 @@ packs/effect/a.zip
     #[test]
     fn protocol_two_manifest_accepts_a_good_manifest() {
         let info = validate_manifest(&v2_manifest(), "app").unwrap();
-        assert_eq!((info.slug.as_str(), info.version_label.as_str(), info.runtime_protocol), ("mbti-lite", "1.0.0", 2));
+        assert_eq!((info.slug.as_deref(), info.version_label.as_deref(), info.runtime_protocol), (Some("mbti-lite"), Some("1.0.0"), 2));
         let mut game = v2_manifest();
         game["kind"] = json!("game");
         game["category"] = json!("puzzle");

@@ -13,9 +13,11 @@ const ELIGIBLE:&str="p.status='published' AND (p.author_uid IS NULL OR u.status<
 const PACK_JSON:&str="jsonb_build_object('id',p.id,'kind',p.kind,'slug',p.slug,'title',p.title,'summary',p.summary,'tags',p.tags,
  'author',CASE WHEN p.author_uid IS NULL THEN NULL ELSE jsonb_build_object('uid',p.author_uid,'nickname',u.nickname) END,
  'trust_level',p.trust_level,'status',p.status,'version',p.current_version,'cover_key',p.cover_key,'cover_url',NULL,
- 'apply_count',p.apply_count,'topic_id',p.topic_id,'created_at',p.created_at,'updated_at',p.updated_at)";
+ 'apply_count',p.apply_count,'topic_id',p.topic_id,'created_at',p.created_at,'updated_at',p.updated_at,
+ 'desktop_resource',(p.kind IN ('wallpaper','effect','widget','pet') AND EXISTS(SELECT 1 FROM pack_versions v
+     WHERE v.pack_id=p.id AND v.version=p.current_version AND v.manifest->'schemaVersion'='3'::jsonb)))";
 fn pack_json(mut value: Value) -> Value {
-    value["one_click"] = json!(content::one_click_allowed(
+    value["one_click"] = json!(value["desktop_resource"] != true && content::one_click_allowed(
         value["kind"].as_str().unwrap_or_default(),
         value["trust_level"].as_i64().unwrap_or(2) as i16,
         value["status"].as_str().unwrap_or_default()

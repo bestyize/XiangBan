@@ -71,6 +71,7 @@ const runLocation = computed(() => {
   return hasHost || bundled ? appRunLocation(work.id, selected.version) : null
 })
 const manualOnly = computed(() => latest.value?.manifest.manualOnly === true)
+const desktopResource = computed(() => pack.value?.desktop_resource === true)
 const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, latest.value.version, latest.value.sha256) : ''))
 
 async function download() {
@@ -89,7 +90,7 @@ async function download() {
 
 const posterInput = computed(() =>
   pack.value
-    ? { tag: kindLabel(pack.value.kind), title: pack.value.title, summary: pack.value.summary || '在小伴里一键应用', cover: pack.value.cover_url, url: `${window.location.origin}/packs/${pack.value.id}`, seed: pack.value.id }
+    ? { tag: kindLabel(pack.value.kind), title: pack.value.title, summary: pack.value.summary || (desktopResource.value ? '下载后导入小伴桌面' : '在小伴里一键应用'), cover: pack.value.cover_url, url: `${window.location.origin}/packs/${pack.value.id}`, seed: pack.value.id }
     : null,
 )
 
@@ -130,7 +131,8 @@ async function copyLink() {
         <RouterLink v-if="runLocation" class="btn btn-primary web-app-launch" :to="runLocation">{{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}</RouterLink>
         <p v-else-if="trialVersion" class="notice">请在小伴客户端打开{{ pack.kind === 'game' ? '此游戏' : '此应用' }}。</p>
         <p v-else-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
-        <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
+        <p v-if="desktopResource" class="notice">下载 ZIP 后，在小伴桌面的「应用 → 导入作品」中选择文件。</p>
+        <p v-else-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
         <p v-else-if="!pack.one_click && pack.kind !== 'game' && pack.kind !== 'app'" class="notice">
           {{ pack.trust_level === 2 && pack.kind !== 'game' && pack.kind !== 'app' ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
@@ -138,15 +140,15 @@ async function copyLink() {
         <WorkDiscussion v-if="pack.status === 'published'" :id="pack.id" />
         <div class="actions">
           <button class="btn" type="button" @click="creationOpen = true">在客户端创作或修改</button>
-          <a v-if="!manualOnly" class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
-          <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>
+          <a v-if="!manualOnly && !desktopResource" class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
+          <button class="btn" :class="{ 'btn-primary': desktopResource }" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <button class="btn" type="button" @click="posterOpen = true">生成海报</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
           <button v-if="isAuthor" type="button" class="btn" aria-haspopup="dialog" @click="publisher.open(pack.id)">发布新版本</button>
         </div>
-        <p v-if="!manualOnly && pack.kind !== 'app'" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
-        <p class="hint only-phone">{{ manualOnly ? '可以复制链接，在电脑上下载并阅读使用说明。' : pack.kind === 'game' ? '支持的游戏可在网页试玩；持续体验或创作请使用客户端。' : pack.kind === 'app' ? '支持的应用可在小伴手机端打开。' : '桌面作品请在 Windows 或 macOS 客户端使用。' }}</p>
+        <p v-if="!manualOnly && !desktopResource && pack.kind !== 'app'" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
+        <p v-if="!desktopResource" class="hint only-phone">{{ manualOnly ? '可以复制链接，在电脑上下载并阅读使用说明。' : pack.kind === 'game' ? '支持的游戏可在网页试玩；持续体验或创作请使用客户端。' : pack.kind === 'app' ? '支持的应用可在小伴手机端打开。' : '桌面作品请在 Windows 或 macOS 客户端使用。' }}</p>
       </div>
 
       <section v-if="pack.versions.length" class="versions">

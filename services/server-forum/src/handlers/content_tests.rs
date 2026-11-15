@@ -596,6 +596,76 @@ async fn publish_pack(app: &axum::Router, secret: &[u8], token: &str, kind: &str
     call(app, "POST", "/api/packs", Some(token), body).await
 }
 
+#[tokio::test]
+async fn desktop_resources_publish_and_download_with_stable_wallpaper_identity() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else { return Ok(()); };
+    let schema = format!("desktop_content_test_{}", Uuid::new_v4().simple());
+    let admin_pool = crate::db::connect(&url, None).await?;
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin_pool).await?;
+    let pool = crate::db::connect(&url, Some(&schema)).await?;
+    crate::db::migrate(&pool).await?;
+    let mut config = AppConfig::from_env();
+    config.resource_base_url = Some("https://res.test".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    config.daily_pack_publishes = 10;
+    let secret = config.resource_secret.clone();
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let verifier = JwksVerifier::with_static_key("iss".into(), "aud".into(), DecodingKey::from_ed_components(&x).unwrap());
+    let token = encode(&Header::new(Algorithm::EdDSA), &json!({
+        "iss":"iss", "sub":Uuid::new_v4(), "aud":"aud", "exp":chrono::Utc::now().timestamp() + 600
+    }), &EncodingKey::from_ed_der(pkcs8.as_ref()))?;
+    let app = crate::build_router(AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() });
+
+    for (kind, entry, id) in [
+        ("wallpaper", "index.html", None),
+        ("effect", "effect.json", Some("sunset-effects")),
+        ("widget", "index.htm", Some("little-clock")),
+        ("pet", "pet.json", Some("tiny-pet")),
+    ] {
+        // The signed resource callback adds the actual entry metadata for effect and pet.
+        let mut manifest = json!({"schemaVersion":3, "kind":kind, "name":"桌面作品", "entry":entry});
+        if let Some(id) = id { manifest["id"] = json!(id); }
+        let (status, created) = publish_pack(&app, &secret, &token, kind, manifest.clone(), json!({})).await;
+        assert_eq!(status, StatusCode::OK, "{created}");
+        let slug = created["slug"].as_str().unwrap();
+        if let Some(id) = id { assert_eq!(slug, id); } else { assert!(slug.starts_with("wallpaper-")); }
+        let id = created["id"].as_i64().unwrap();
+        let (status, detail) = call(&app, "GET", &format!("/api/packs/{id}"), None, Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(detail["kind"], kind);
+        assert_eq!(detail["desktop_resource"], true);
+        assert_eq!(detail["one_click"], false);
+        assert_eq!(detail["runtime_protocol"], 1);
+        assert_eq!(detail["versions"][0]["label"], "v1");
+        let (status, download) = call(&app, "GET", &format!("/api/packs/{id}/download"), None, Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(download["one_click"], false);
+        assert!(download["url"].as_str().unwrap().contains(&format!("/packs/{kind}/")));
+        let (_, share) = call(&app, "GET", &format!("/api/share/pack/{id}"), None, Value::Null).await;
+        assert_eq!(share["app_link"], format!("xiaoban://community/open/pack/{id}"));
+        if kind == "wallpaper" {
+            let sha = "b".repeat(64);
+            let (status, ticket) = call(&app, "POST", "/api/packs/upload-ticket", Some(&token), json!({"kind":kind,"size":100,"sha256":sha})).await;
+            assert_eq!(status, StatusCode::OK);
+            let file_key = &ticket["file_key"];
+            assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":100,"sha256":sha,"manifest":manifest}), true).await, StatusCode::OK);
+            let (status, _) = call(&app, "POST", &format!("/api/packs/{id}/versions"), Some(&token), json!({"file_key":file_key})).await;
+            assert_eq!(status, StatusCode::OK);
+            let (_, updated) = call(&app, "GET", &format!("/api/packs/{id}"), None, Value::Null).await;
+            assert_eq!(updated["slug"], slug);
+            assert_eq!(updated["versions"][0]["label"], "v2");
+        }
+    }
+    let (status, pet_packs) = call(&app, "GET", "/api/packs?kind=pet", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(pet_packs["total"], 1);
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
+    Ok(())
+}
+
 /// 需要 TEST_DATABASE_URL；每次使用独立 schema。
 #[tokio::test]
 async fn app_plaza_kind_remix_protocol_filter_and_network_switch() -> Result<(), Box<dyn std::error::Error>> {
