@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import RightRail from '@/components/RightRail.vue'
 import TopicList from '@/components/TopicList.vue'
@@ -8,6 +8,7 @@ import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 import { tagLabel } from '@/lib/format'
@@ -15,9 +16,9 @@ import { articleLayout } from '@/lib/cardPresentation'
 import { canonicalCategory, categoryHref, postableCategories } from '@/lib/communityStructure'
 
 const route = useRoute()
-const router = useRouter()
 const meta = useMeta()
 const session = useSession()
+const composer = useTopicComposer()
 
 const slug = computed(() => String(route.params.slug))
 const category = computed(() => meta.bySlug.get(slug.value))
@@ -41,6 +42,7 @@ const list = useTopicList(
   p => api.topics({ category: slug.value, tag: tag.value || undefined, sort: sort.value, help_status: helpStatus.value, page: p }),
   [slug, sort, tag, helpStatus],
 )
+watch(() => composer.saved, saved => { if (saved) void list.load(list.page.value) })
 
 /** 切排序时保留标签，切标签时保留排序。 */
 function withQuery(patch: { sort?: string; tag?: string; help?: string }) {
@@ -54,18 +56,17 @@ function withQuery(patch: { sort?: string; tag?: string; help?: string }) {
   return { query: q }
 }
 
-/** 一级分类有可发帖的子板块时可以进入发帖页。 */
+/** 一级分类有可发帖的子板块时允许打开编辑器。 */
 const composeTarget = computed(() => {
   const c = category.value
   if (!c || c.status !== 'active' || !c.posting_enabled) return null
   const level = session.user?.trust_level ?? 3
   if (!postableCategories(meta.categories, level).some(board => board.id === c.id || board.parent_id === c.id)) return null
-  return `/new?category=${c.slug}`
+  return c.slug
 })
 
 function compose() {
-  if (!composeTarget.value || !session.requireLogin()) return
-  router.push(composeTarget.value)
+  if (composeTarget.value) composer.open({ category: composeTarget.value })
 }
 </script>
 

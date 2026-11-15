@@ -119,7 +119,7 @@ function focus() {
 /** 紧凑模式没有工具栏，由外面的按钮来选图。 */
 function pickImage() { picker.value?.click() }
 
-defineExpose({ focus, pickImage })
+defineExpose({ focus, pickImage, uploading })
 </script>
 
 <template>

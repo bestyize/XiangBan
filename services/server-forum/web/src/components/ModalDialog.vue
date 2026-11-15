@@ -1,26 +1,27 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-const props = defineProps<{ open: boolean; title: string; width?: number }>()
+const props = defineProps<{ open: boolean; title: string; width?: number; scrollable?: boolean; keepOnBackdrop?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
+onBeforeUnmount(() => dialog.value?.close())
 
 // 用原生 <dialog>：自带焦点圈定、Esc 关闭和无障碍语义。
 watch(
   () => props.open,
-  async open => {
+  async () => {
     await nextTick()
     const el = dialog.value
     if (!el) return
-    if (open && !el.open) el.showModal()
-    if (!open && el.open) el.close()
+    if (props.open && !el.open) el.showModal()
+    if (!props.open && el.open) el.close()
   },
   { immediate: true },
 )
 
 function onBackdrop(e: MouseEvent) {
-  if (e.target === dialog.value) emit('close')
+  if (!props.keepOnBackdrop && e.target === dialog.value) emit('close')
 }
 </script>
 
@@ -28,9 +29,11 @@ function onBackdrop(e: MouseEvent) {
   <dialog
     ref="dialog"
     class="dialog"
+    :class="{ scrollable }"
     :style="{ '--w': `${width ?? 420}px` }"
     :aria-label="title"
-    @close="emit('close')"
+    @cancel.prevent="emit('close')"
+    @close="open && !dialog?.open && emit('close')"
     @click="onBackdrop"
   >
     <div class="body">
@@ -100,6 +103,23 @@ h2 {
   stroke-width: 1.8;
   stroke-linecap: round;
 }
+.dialog.scrollable {
+  --dialog-max-height: min(860px, calc(100dvh - 32px));
+  max-height: var(--dialog-max-height);
+  overflow: hidden;
+}
+.scrollable .body {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--dialog-max-height) - 2px);
+  padding: 0;
+}
+.scrollable header {
+  flex: none;
+  margin: 0;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
 @media (max-width: 767px) {
   .dialog {
     margin: auto auto 0;
@@ -111,5 +131,7 @@ h2 {
   .body {
     padding-bottom: calc(22px + env(safe-area-inset-bottom));
   }
+  .dialog.scrollable { --dialog-max-height: calc(100dvh - 12px); }
+  .scrollable header { padding-inline: 16px; }
 }
 </style>

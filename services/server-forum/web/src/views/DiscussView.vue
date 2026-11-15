@@ -7,6 +7,7 @@ import type { TopicItem } from '@/api/types'
 import type { CommunityScheme } from '@/api/schemes'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
 import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope } from '@/lib/communityStructure'
@@ -21,6 +22,7 @@ import '@/components/community/community.css'
 
 const route = useRoute(), router = useRouter(), session = useSession()
 const meta = useMeta()
+const composer = useTopicComposer()
 const ideaTabs = [{ key: '', label: '全部' }, galleryTab] as const
 const ideas = computed(() => route.name === 'ideas')
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
@@ -42,7 +44,7 @@ type Entry = {kind:'topic'; value:TopicItem} | {kind:'pack'; value:PackItem} | {
 function date(entry:Entry) {
   return Date.parse(entry.kind === 'pack' ? entry.value.updated_at : entry.value.created_at) || 0
 }
-const { data, loading, error, load } = useCommunityResource(async () => {
+const { data, loading, error, load, refresh } = useCommunityResource(async () => {
   const current = page.value
   if (showGallery.value || (following.value && !session.loggedIn) || !meta.categories.length) return null
   const [topics, packs, schemes] = await Promise.all([
@@ -59,6 +61,7 @@ const { data, loading, error, load } = useCommunityResource(async () => {
   return { entries:entries.sort((a,b) => date(b)-date(a)), hasMore:[topics,packs,schemes].some(result => result && result.page * result.page_size < result.total) }
 })
 watch([() => meta.categories,ideas,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
+watch(() => composer.saved, saved => { if (saved && !showGallery.value) void refresh() })
 
 function navigate(values:Record<string,string|undefined>) {
   void router.replace({query:{

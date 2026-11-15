@@ -6,7 +6,10 @@ const toast = useToast()
 
 <template>
   <div class="toasts" role="status" aria-live="polite">
-    <div v-for="t in toast.items" :key="t.id" class="toast" :class="`is-${t.tone}`">{{ t.text }}</div>
+    <div v-for="t in toast.items" :key="t.id" class="toast" :class="`is-${t.tone}`">
+      {{ t.text }}
+      <RouterLink v-if="t.action" class="action" :to="t.action.to">{{ t.action.label }}</RouterLink>
+    </div>
   </div>
 </template>
 
@@ -40,6 +43,7 @@ const toast = useToast()
   background: var(--danger);
   color: #fff;
 }
+.action { margin-inline-start: 8px; text-decoration: underline; text-underline-offset: 2px; pointer-events: auto; }
 @keyframes pop {
   from {
     opacity: 0;

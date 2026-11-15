@@ -3,12 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { postingLocation } from '@/lib/postingStructure'
 import { useMeta } from '@/stores/meta'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { areaOf, isCommunityRoot } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
 import AppIcon from './AppIcon.vue'
 import ModalDialog from './ModalDialog.vue'
 const meta = useMeta()
+const composer = useTopicComposer()
 const route = useRoute(), router = useRouter(), { preference, openAppearance } = useTheme()
 const publishing = ref(false)
 const lastCommunity = ref('/')
@@ -24,12 +26,13 @@ const links = computed(() => [
   {to:'/me',key:'me',label:'我的',icon:'me'},
 ])
 const current = computed(() => areaOf(route))
-function publish(path: string) {
+function publishTopic() {
   publishing.value = false
-  if (path === '/new') void router.push({
-    path, query: postingLocation(route.name, route.query, meta.categories, route.params.slug),
-  })
-  else void router.push(path)
+  composer.open(postingLocation(route.name, route.query, meta.categories, route.params.slug))
+}
+function publishWork() {
+  publishing.value = false
+  void router.push('/publish')
 }
 </script>
 <template>
@@ -49,8 +52,8 @@ function publish(path: string) {
   </nav>
   <ModalDialog :open="publishing" title="分享一点新鲜事" @close="publishing = false">
     <div class="publish-options">
-      <button @click="publish('/new')"><span class="option-icon"><AppIcon name="community" /></span><span><b>发布帖子</b><small>交流想法、分享经验或发起求助</small></span><AppIcon name="arrow" :size="18" /></button>
-      <button @click="publish('/publish')"><span class="option-icon"><AppIcon name="upload" /></span><span><b>分享已有作品</b><small>上传你在客户端完成的作品资源包</small></span><AppIcon name="arrow" :size="18" /></button>
+      <button @click="publishTopic"><span class="option-icon"><AppIcon name="community" /></span><span><b>发布帖子</b><small>交流想法、分享经验或发起求助</small></span><AppIcon name="arrow" :size="18" /></button>
+      <button @click="publishWork"><span class="option-icon"><AppIcon name="upload" /></span><span><b>分享已有作品</b><small>上传你在客户端完成的作品资源包</small></span><AppIcon name="arrow" :size="18" /></button>
     </div>
   </ModalDialog>
 </template>

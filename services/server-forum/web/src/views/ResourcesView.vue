@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMeta } from '@/stores/meta'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { api } from '@/api/forum'
 import type { Page, TopicItem } from '@/api/types'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
@@ -16,6 +17,7 @@ import { useHead } from '@/lib/head'
 import { resourceTabs, resourceTopicCategory } from '@/lib/communityStructure'
 import '@/components/community/community.css'
 const meta = useMeta()
+const composer = useTopicComposer()
 const route = useRoute(), router = useRouter()
 const tabs = computed(()=>resourceTabs(meta.categories))
 const requestedTab = computed(() => resourceTopicCategory(typeof route.query.tab === 'string' ? route.query.tab : ''))
@@ -25,12 +27,13 @@ const tab = computed(() => {
 const sectionTitle = computed(() => tabs.value.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 type ResourceData = { kind:'topics'; result:Page<TopicItem> }
-const { data, loading, error, load } = useCommunityResource<ResourceData | null>(async () => {
+const { data, loading, error, load, refresh } = useCommunityResource<ResourceData | null>(async () => {
   if (tab.value === 'software') return null
   const category = resourceTopicCategory(tab.value)
   return { kind:'topics', result: await api.topics({ category, page:page.value, sort:'new', active_only:true }) }
 })
 watch([() => meta.categories,tab,page], load, { immediate:true })
+watch(() => composer.saved, saved => { if (saved && tab.value !== 'software') void refresh() })
 function setTab(tab:string) { void router.replace({ query: { tab } }) }
 function go(page:number) { void router.replace({ query:{ ...route.query, page } }) }
 useHead(() => ({ title:'资源' }))

@@ -25,6 +25,7 @@ import { api, ApiError } from '@/api/forum'
 import type { PinScope, PostItem, TopicDetail } from '@/api/types'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { useToast } from '@/stores/toast'
 import { TRUST_LABEL, formatDateTime, pinScopeLabel, readLevelBadge, tagLabel, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
@@ -34,6 +35,7 @@ const route = useRoute()
 const router = useRouter()
 const session = useSession()
 const meta = useMeta()
+const topicComposer = useTopicComposer()
 const toast = useToast()
 
 const id = computed(() => Number(route.params.id))
@@ -136,6 +138,16 @@ async function loadPosts(page = 1) {
     if (!(e instanceof ApiError && e.status === 403)) toast.error(e)
   }
 }
+
+function editTopic() {
+  if (!topic.value?.viewer.can_edit) return
+  moreOpen.value = false
+  topicComposer.open({ editId: topic.value.id })
+}
+
+watch(() => topicComposer.saved, saved => {
+  if (saved?.id === id.value) void loadTopic()
+})
 
 watch(
   id,
@@ -392,7 +404,7 @@ function breadcrumbDestination(slug: string) {
           </button>
         </template>
         <template v-if="topic.viewer.can_edit">
-          <RouterLink :to="`/t/${topic.id}/edit`" class="btn btn-ghost">编辑</RouterLink>
+          <button type="button" class="btn btn-ghost" @click="editTopic">编辑</button>
           <button type="button" class="btn btn-ghost btn-danger" @click="removeTopic">删除</button>
         </template>
         <button
@@ -477,7 +489,7 @@ function breadcrumbDestination(slug: string) {
           <button type="button" class="more-row" @click="fromMore(togglePin)">{{ pinActionLabel }}</button>
         </template>
         <template v-if="topic.viewer.can_edit">
-          <RouterLink :to="`/t/${topic.id}/edit`" class="more-row" @click="moreOpen = false">编辑</RouterLink>
+          <button type="button" class="more-row" @click="editTopic">编辑</button>
           <button type="button" class="more-row danger" @click="fromMore(removeTopic)">删除</button>
         </template>
         <button v-else-if="session.user?.uid !== topic.author.uid" type="button" class="more-row" @click="fromMore(reportTopic)">举报</button>

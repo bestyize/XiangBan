@@ -41,8 +41,11 @@ const routes: RouteRecordRaw[] = [
   { path: '/projects/:slug', name: 'project', component: () => import('@/views/ProjectView.vue') },
   { path: '/c/:slug', name: 'category', component: () => import('@/views/CategoryView.vue') },
   { path: '/t/:id(\\d+)', name: 'topic', component: () => import('@/views/TopicView.vue') },
-  { path: '/t/:id(\\d+)/edit', name: 'edit', component: () => import('@/views/ComposeView.vue'), meta: { auth: true } },
-  { path: '/new', name: 'new', component: () => import('@/views/ComposeView.vue'), meta: { auth: true } },
+  { path: '/t/:id(\\d+)/edit', name: 'edit', redirect: to => ({ name: 'topic', params: to.params, query: { ...to.query, postDialog: 'edit' } }) },
+  { path: '/new', name: 'new', redirect: ({ query }) => ({
+    name: query.section === 'ideas' || query.section === 'resources' ? query.section : 'discuss',
+    query: { postDialog: 'new', postSection: query.section, postBoard: query.category },
+  }) },
   { path: '/tag/:name', name: 'tag', component: () => import('@/views/TagView.vue') },
   { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
   { path: '/u/:uid', name: 'user', component: () => import('@/views/UserView.vue') },

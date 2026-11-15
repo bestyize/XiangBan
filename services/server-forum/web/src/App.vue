@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import TabBar from '@/components/TabBar.vue'
 import LoginDialog from '@/components/LoginDialog.vue'
@@ -8,9 +8,12 @@ import AppearanceDialog from '@/components/AppearanceDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
+import { useTopicComposer } from '@/stores/topicComposer'
 import { captureInvite } from '@/lib/invite'
 import { areaOf, isCommunityRoot } from '@/lib/sections'
-const route = useRoute(), session = useSession(), meta = useMeta()
+const route = useRoute(), router = useRouter(), session = useSession(), meta = useMeta()
+const composer = useTopicComposer()
+const TopicComposer = defineAsyncComponent(() => import('@/components/TopicComposer.vue'))
 // 这些详情页在手机上有底部互动栏，页脚链接会被它挤在评论和栏之间，所以隐藏。
 const DOCK_PAGES = new Set(['topic', 'daily-detail', 'frontier-detail', 'open-source-project', 'repo-detail', 'pack', 'scheme'])
 captureInvite()
@@ -23,6 +26,19 @@ watch([() => route.fullPath, () => session.user?.uid], () => {
 const bare = computed(() => route.meta.bare === true)
 const hasOwnHeader = computed(() => ['ai', 'create', 'app-works', 'me'].includes(String(route.name)))
 onMounted(() => {meta.load();session.restore()})
+// Old posting links open the editor over their destination page.
+watch(() => route.fullPath, async () => {
+  composer.close()
+  const { postDialog, postSection, postBoard, ...query } = route.query
+  const editing = postDialog === 'edit' && route.name === 'topic'
+  if (!editing && (postDialog !== 'new' || !isCommunityRoot(route))) return
+  const page = router.resolve({ path: route.path, query, hash: route.hash })
+  const editId = editing ? Number(route.params.id) : undefined
+  const section = postSection === 'ideas' || postSection === 'resources' ? postSection : 'discuss'
+  const category = typeof postBoard === 'string' ? postBoard : undefined
+  if (await router.replace(page) || route.fullPath !== page.fullPath) return
+  composer.open({ editId, section, category })
+}, { immediate: true })
 // Keep the current editor mounted while reauthenticating, but conceal protected content.
 const viewIdentity = ref('guest')
 const protectedReady = computed(() => session.loggedIn && Boolean(session.user?.uid) && session.user?.uid === viewIdentity.value)
@@ -42,6 +58,7 @@ watch(() => session.loggedIn, v => {
     </main>
     <footer v-if="route.name !== 'ai'" class="app-footer" :class="{'footer-hide-narrow':hasOwnHeader || DOCK_PAGES.has(String(route.name))}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><RouterLink to="/contact">联系我们</RouterLink><RouterLink to="/ai">下载客户端</RouterLink></nav></footer>
     <TabBar />
+    <TopicComposer v-if="composer.target" />
   </div>
   <LoginDialog /><ToastHost /><AppearanceDialog />
 </template>
