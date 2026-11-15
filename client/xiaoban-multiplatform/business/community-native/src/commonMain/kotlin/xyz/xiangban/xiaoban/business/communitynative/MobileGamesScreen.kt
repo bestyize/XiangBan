@@ -69,6 +69,7 @@ import xyz.xiangban.xiaoban.common.community.CommunityJson
 import xyz.xiangban.xiaoban.common.community.FeaturedToolsCache
 import xyz.xiangban.xiaoban.common.community.MobileGame
 import xyz.xiangban.xiaoban.common.community.MobileGameStore
+import xyz.xiangban.xiaoban.common.community.importHtml
 import kotlin.time.Clock
 
 private val LocalCreationTypes = listOf("游戏", "小程序")
@@ -142,6 +143,7 @@ internal fun GamesScreen(
     val remote by env.remoteChat.state.collectAsState()
     val workRevision = env.games?.revision?.collectAsState()?.value
     val creationTypes = if (env.games != null) CreationTypes else CreationTypes.filterNot { it == "小程序" }
+    val canImportHtml = env.config.runtimeV2 && env.games != null && env.platform?.forumFilePickerSupported == true
     val context = LocalPlatformContext.current
     val imageLoader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
@@ -210,6 +212,17 @@ internal fun GamesScreen(
             finally { busy = false }
         }
     }
+    fun importHtmlWork() {
+        val store = env.games ?: return
+        runAction {
+            val file = env.platform?.pickAppHtml() ?: return@runAction
+            val game = store.importHtml(file)
+            category = "全部"
+            detail = CreationItem(game.id, game.name, game.description, "小程序", game, owned = true)
+            panel = "actions"
+            message = "已导入「${game.name}」"
+        }
+    }
     LaunchedEffect(env.games, workRevision, reload) {
         loading = true
         val failures = mutableListOf<String>()
@@ -268,6 +281,7 @@ internal fun GamesScreen(
                         }
                     }
                     IconTap(XIcons.Search, "搜索应用", {}) // Search destination is reserved for a later version.
+                    if (mine && canImportHtml) IconTap(XIcons.Download, "导入 HTML 作品", ::importHtmlWork)
                     if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
                 }
                 Box(Modifier.fillMaxSize()) {

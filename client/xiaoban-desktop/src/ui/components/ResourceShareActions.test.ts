@@ -44,7 +44,7 @@ describe('portable resource actions',()=>{
   vi.mocked(invoke).mockResolvedValue({kind:'game',id:'star-catcher',name:'接星星'});const {wrapper,store}=create();
   await wrapper.get('[data-testid="import-resource"]').trigger('click');await flushPromises();
   expect(wrapper.emitted('imported')).toBeUndefined();
-  expect(store.notify).toHaveBeenCalledWith('已导入「接星星」，在游戏空间页查看。','success');wrapper.unmount();
+  expect(store.notify).toHaveBeenCalledWith('已导入「接星星」，在应用页的“我的作品”查看。','success');wrapper.unmount();
  });
  it('reports failed imports without emitting a success',async()=>{
   vi.mocked(invoke).mockRejectedValue('资源包版本暂不支持');const {wrapper,store}=create();

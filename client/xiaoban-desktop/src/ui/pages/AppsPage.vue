@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
-import { computed, onActivated, onMounted, ref } from "vue";
-import { Compass, Gamepad2, LayoutGrid, Palette, Save, Search, Sparkles, Square, Trash2, Wrench } from "lucide-vue-next";
-import { NAlert, NPopconfirm, NSkeleton } from "naive-ui";
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
+import { Compass, Ellipsis, Gamepad2, LayoutGrid, Save, Search, Sparkles, Square, Trash2, Wrench } from "lucide-vue-next";
+import { NAlert, NPopconfirm, NPopover, NSkeleton } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 import { coverUrl, fallbackCoverUrl, iconUrl } from "../../games/catalog.ts";
 import type { GameManifest } from "../../games/protocol.ts";
@@ -25,6 +25,7 @@ const loading = ref(true);
 const catalogError = ref("");
 const folderErrors = ref<string[]>([]);
 const opening = ref(false);
+const menuAppId = ref<string | null>(null);
 
 const primaryTabs = computed(() => {
   if (isGamesMode.value) {
@@ -91,6 +92,27 @@ const filteredApps = computed(() => {
     return true;
   });
 });
+
+watch([primaryTab, searchQuery], () => { menuAppId.value = null; });
+onDeactivated(() => { menuAppId.value = null; });
+
+function setAppMenu(id: string, show: boolean) {
+  if (show) menuAppId.value = id;
+  else if (menuAppId.value === id) menuAppId.value = null;
+}
+
+function closeAppMenu(returnFocus = false) {
+  const id = menuAppId.value;
+  menuAppId.value = null;
+  if (returnFocus && id) document.getElementById(`app-more-${id}`)?.focus();
+}
+
+function focusAppMenu(id: string) {
+  if (menuAppId.value === id) {
+    document.getElementById(`app-menu-${id}`)
+      ?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  }
+}
 
 function descriptionFor(app: GameManifest) {
   if (app.id === 'snake-arena') return '无尽成长或三分钟冲分，吃糖果长成大蛇，反击 AI。';
@@ -172,6 +194,7 @@ async function removeApp(app: GameManifest) {
 
 async function imported() {
   await loadApps();
+  searchQuery.value = '';
   primaryTab.value = 'custom';
 }
 
@@ -216,6 +239,7 @@ onActivated(() => {
           kind="game"
           variant="xb"
           import-label="导入作品"
+          allow-html
           :disabled="opening"
           @imported="imported"
         />
@@ -273,7 +297,7 @@ onActivated(() => {
           有 {{ folderErrors.length }} 个{{ isGamesMode ? '游戏' : '作品' }}文件夹无法使用：{{ folderErrors.join('；') }}
         </NAlert>
 
-        <div v-if="loading && showFeaturedApps" class="featured-app-grid" aria-label="正在读取应用资料">
+        <div v-if="loading && !isGamesMode" class="featured-app-grid" aria-label="正在读取应用资料">
           <div v-for="item in 6" :key="item" class="featured-app-skeleton">
             <NSkeleton class="featured-app-icon" :sharp="false" />
             <NSkeleton width="64px" height="12px" :sharp="false" />
@@ -287,22 +311,63 @@ onActivated(() => {
           </article>
         </div>
 
-        <div v-else-if="showFeaturedApps && filteredApps.length" class="featured-app-grid">
-          <button
-            v-for="app in filteredApps"
-            :key="app.id"
-            type="button"
-            class="featured-app"
-            :data-testid="`app-${app.id}`"
-            :title="descriptionFor(app)"
-            :aria-label="`启动${app.name}`"
-            :aria-description="descriptionFor(app)"
-            :aria-disabled="opening || !store.desktop"
-            @click="launchApp(app)"
-          >
-            <img class="featured-app-icon" :src="iconUrl(app)" alt="" loading="lazy" @error="onIconError($event, app)" />
-            <span class="featured-app-name">{{ app.name }}</span>
-          </button>
+        <div v-else-if="!isGamesMode && filteredApps.length" class="featured-app-grid">
+          <div v-for="app in filteredApps" :key="app.id" class="app-icon-tile">
+            <button
+              type="button"
+              class="featured-app"
+              :data-testid="`${app.source === 'user' ? 'user-app' : 'app'}-${app.id}`"
+              :title="descriptionFor(app)"
+              :aria-label="`启动${app.name}`"
+              :aria-description="descriptionFor(app)"
+              :aria-disabled="opening || !store.desktop"
+              @click="launchApp(app)"
+            >
+              <img class="featured-app-icon" :src="iconUrl(app)" alt="" loading="lazy" @error="onIconError($event, app)" />
+              <span class="featured-app-name">{{ app.name }}</span>
+            </button>
+            <NPopover
+              v-if="app.source === 'user' && store.desktop"
+              :show="menuAppId === app.id"
+              trigger="click"
+              placement="bottom-end"
+              raw
+              :show-arrow="false"
+              @update:show="setAppMenu(app.id, $event)"
+              @after-enter="focusAppMenu(app.id)"
+            >
+              <template #trigger>
+                <button
+                  :id="`app-more-${app.id}`"
+                  type="button"
+                  class="xb-icon-btn is-sm app-tile-more"
+                  title="更多操作"
+                  :aria-label="`${app.name}更多操作`"
+                  aria-haspopup="menu"
+                  :aria-expanded="menuAppId === app.id"
+                  :disabled="opening"
+                  @keydown.esc.prevent.stop="closeAppMenu(true)"
+                ><Ellipsis :size="15" /></button>
+              </template>
+              <div :id="`app-menu-${app.id}`" class="xb-menu" role="menu" :aria-label="`${app.name}更多操作`" @keydown.esc.prevent.stop="closeAppMenu(true)">
+                <ResourceShareActions :store="store" :kind="app.kind ?? 'game'" :id="app.id" variant="menu" :disabled="opening" @click.capture="closeAppMenu(true)" />
+                <div class="xb-menu-sep"></div>
+                <NPopconfirm
+                  :to="false"
+                  positive-text="删除"
+                  negative-text="取消"
+                  @positive-click="closeAppMenu(); removeApp(app)"
+                >
+                  <template #trigger>
+                    <button type="button" class="xb-menu-item is-danger" role="menuitem" :data-testid="`delete-app-${app.id}`">
+                      <Trash2 :size="15" />删除作品
+                    </button>
+                  </template>
+                  确定要删除作品「{{ app.name }}」吗？相关文件夹和存档都会被清除。
+                </NPopconfirm>
+              </div>
+            </NPopover>
+          </div>
         </div>
 
         <div v-else-if="filteredApps.length" class="app-grid">
@@ -311,8 +376,8 @@ onActivated(() => {
               class="app-card game-card"
               role="button"
               tabindex="0"
-              :data-testid="app.source === 'user' ? (isGamesMode ? `user-game-${app.id}` : `user-app-${app.id}`) : (isGamesMode ? undefined : `app-${app.id}`)"
-              :aria-label="isGamesMode ? `开始${app.name}` : `启动${app.name}`"
+              :data-testid="app.source === 'user' ? `user-game-${app.id}` : undefined"
+              :aria-label="`开始${app.name}`"
               :aria-disabled="opening || !store.desktop"
               @click="launchApp(app)"
               @keydown.enter.prevent="launchApp(app)"
@@ -352,15 +417,15 @@ onActivated(() => {
                 <button
                   type="button"
                   class="app-delete-btn game-delete-btn"
-                  :title="`删除这个自创${isGamesMode ? '游戏' : '作品'}`"
-                  :aria-label="`删除${isGamesMode ? '游戏' : '作品'} ${app.name}`"
-                  :data-testid="isGamesMode ? `delete-game-${app.id}` : `delete-app-${app.id}`"
+                  title="删除这个自创游戏"
+                  :aria-label="`删除游戏 ${app.name}`"
+                  :data-testid="`delete-game-${app.id}`"
                   @click.stop
                 >
                   <Trash2 :size="13" />
                 </button>
               </template>
-              确定要删除{{ isGamesMode ? '自创游戏' : '作品' }}「{{ app.name }}」吗？{{ isGamesMode ? '游戏文件夹和它的存档都会被清除。' : '相关文件夹和存档都会被清除。' }}
+              确定要删除自创游戏「{{ app.name }}」吗？游戏文件夹和它的存档都会被清除。
             </NPopconfirm>
           </div>
         </div>
@@ -480,6 +545,29 @@ onActivated(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 12px 14px;
+}
+.app-icon-tile {
+  position: relative;
+  min-width: 0;
+}
+.app-icon-tile .featured-app {
+  width: 100%;
+  height: 100%;
+}
+.app-tile-more {
+  position: absolute;
+  inset: 4px 4px auto auto;
+  background: var(--ui-surface-raised);
+}
+@media (hover: hover) {
+  .app-tile-more {
+    opacity: 0;
+  }
+  .app-icon-tile:hover .app-tile-more,
+  .app-icon-tile:focus-within .app-tile-more,
+  .app-tile-more[aria-expanded="true"] {
+    opacity: 1;
+  }
 }
 .featured-app,
 .featured-app-skeleton {

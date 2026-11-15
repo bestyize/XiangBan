@@ -12,6 +12,44 @@ class MobileGamesTest {
         MobileGameFile("icon.svg", svg), MobileGameFile("cover.svg", svg))
 
     @Test
+    fun `import single HTML creates an exportable V2 app with startup handshake`() = runTest {
+        val store = MobileGameStore(MemoryMobileWorkspace())
+        val prolog = "\uFEFF<!-- local source --><!DOCTYPE html><html lang='zh'><head data-example='a>b'>"
+        val body = "<title>计数</title></head><body><button onclick='this.textContent++'>0</button></body></html>"
+        val file = ForumUploadFile("计数 & 练习.HTM", "text/html", (prolog + body).encodeToByteArray())
+        val imported = store.importHtml(file)
+        assertEquals("计数 & 练习", imported.name)
+        assertEquals("app", imported.kind)
+        assertNotEquals(imported.id, store.importHtml(file).id)
+        assertEquals(imported, store.validate(imported.id))
+
+        val exported = store.exportFiles(imported.id).associate { it.path to it.content }
+        assertEquals(setOf("manifest.json", "index.html", "icon.svg", "cover.svg"), exported.keys)
+        val manifest = Json.parseToJsonElement(exported.getValue("manifest.json")).jsonObject
+        assertEquals(3, manifest.getValue("schemaVersion").jsonPrimitive.int)
+        assertEquals(2, manifest.getValue("runtimeProtocol").jsonPrimitive.int)
+        val page = exported.getValue("index.html")
+        assertTrue(page.startsWith("$prolog<script>"))
+        assertContains(page, "window.xb?.ready?.()")
+        assertTrue(page.endsWith(body))
+        assertContains(exported.getValue("cover.svg"), "计数 &amp; 练习")
+    }
+
+    @Test
+    fun `invalid HTML selections do not create work`() = runTest {
+        val store = MobileGameStore(MemoryMobileWorkspace())
+        for (file in listOf(
+            ForumUploadFile("notes.txt", "text/plain", "<p>Valid text".encodeToByteArray()),
+            ForumUploadFile("empty.html", "text/html", "\uFEFF \n".encodeToByteArray()),
+            ForumUploadFile("binary.html", "text/html", byteArrayOf(0xFF.toByte())),
+            ForumUploadFile("large.html", "text/html", ByteArray(MaxImportedHtmlBytes + 1)),
+        )) {
+            assertFailsWith<IllegalArgumentException> { store.importHtml(file) }
+        }
+        assertTrue(store.list().isEmpty())
+    }
+
+    @Test
     fun `delete removes only selected work progress and logs`() = runTest {
         val workspace = MemoryMobileWorkspace()
         val store = MobileGameStore(workspace)

@@ -1,6 +1,7 @@
 //! Portable authoring resources, shared as plain `.zip` files so any tool can make or open them.
 //! Packs contain templates, never runtime user data or saves. The layout is in docs/resource-pack-format.md.
 use crate::{app_runtime::pack as app_pack, custom_widgets, effect_packs, game_packs, local_media, pet_packs};
+use crate::app_runtime::html_import;
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -217,8 +218,9 @@ fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
     add("manifest.json", &manifest_bytes)?;
     for (name, bytes) in files { add(name, bytes)?; }
     let content = writer.finish().map_err(|e| e.to_string())?.into_inner();
-    if v2 && content.len() as u64 > app_pack::MAX_PACK_BYTES {
-        return Err("V2 作品 ZIP 不能超过 100 MB".into());
+    let limit = if v2 { app_pack::MAX_PACK_BYTES } else { MAX_PACK };
+    if content.len() as u64 > limit {
+        return Err(if v2 { "V2 作品 ZIP 不能超过 100 MB" } else { "资源包不能超过 32 MB" }.into());
     }
     Ok(content)
 }
@@ -389,7 +391,6 @@ fn import_pack(root: &Path, pack: Pack) -> Result<Value, String> {
 pub fn export_with_dialog(app: &tauri::AppHandle, kind: &str, id: &str) -> Result<Option<(std::path::PathBuf, u64)>, String> {
     let pack = export(&crate::storage::root(app)?, kind, id)?;
     let content = to_zip(&pack)?;
-    if content.len() as u64 > MAX_PACK { return Err("资源包不能超过 32 MB".into()); }
     let filename = format!("{}-{id}.zip", pack.kind);
     let Some(file) = app.dialog().file().set_title("导出小伴资源包").add_filter("小伴资源包（zip）", &["zip"]).set_file_name(&filename).blocking_save_file() else { return Ok(None); };
     let path = file.into_path().map_err(|_| "请选择本机文件")?;
@@ -406,14 +407,23 @@ pub async fn export_resource_pack(window: tauri::WebviewWindow, kind: String, id
 }
 
 #[tauri::command]
-pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option<Value>, String> {
+pub async fn import_resource_pack(
+    window: tauri::WebviewWindow,
+    allow_html: Option<bool>,
+) -> Result<Option<Value>, String> {
     if window.label() != "control" { return Err("只能从控制台导入资源".into()); }
     let app = window.app_handle().clone();
+    let allow_html = allow_html.unwrap_or(false);
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(file) = app.dialog().file().set_title("导入小伴资源包").add_filter("小伴资源包（zip）", &["zip"]).blocking_pick_file() else { return Ok(None); };
+        let dialog = app.dialog().file();
+        let dialog = if allow_html {
+            dialog.set_title("导入作品").add_filter("作品文件（ZIP、HTML）", &["zip", "html", "htm"])
+        } else {
+            dialog.set_title("导入小伴资源包").add_filter("小伴资源包（zip）", &["zip"])
+        };
+        let Some(file) = dialog.blocking_pick_file() else { return Ok(None); };
         let path = file.into_path().map_err(|_| "请选择本机文件")?;
-        let content = read_bytes(&path, app_pack::MAX_PACK_BYTES)?;
-        let pack = from_zip(&content)?;
+        let pack = pack_from_file(&path, allow_html)?;
         if pack.kind == "pet" {
             let theme: pet_packs::Theme = serde_json::from_value(pack.data).map_err(|e|e.to_string())?;
             let result = json!({"kind":"pet", "id":theme.id, "name":theme.name});
@@ -426,6 +436,17 @@ pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option
         let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
         import_pack(&root, pack).map(Some)
     }).await.map_err(|e| e.to_string())?
+}
+
+fn pack_from_file(path: &Path, allow_html: bool) -> Result<Pack, String> {
+    let html = path.extension().and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ["html", "htm"].iter().any(|candidate| ext.eq_ignore_ascii_case(candidate)));
+    if html && allow_html {
+        let stem = path.file_stem().and_then(|name| name.to_str()).unwrap_or_default();
+        let (data, assets) = html_import::make_pack(stem, read_text(path, html_import::MAX_HTML_BYTES)?)?;
+        return Ok(Pack { kind: "app".into(), data, assets });
+    }
+    from_zip(&read_bytes(path, app_pack::MAX_PACK_BYTES)?)
 }
 
 #[cfg(test)]
@@ -462,6 +483,47 @@ mod tests {
         let root = std::env::temp_dir().join(format!("xiaoban-resource-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         root
+    }
+
+    #[test]
+    fn single_html_installs_as_a_portable_v2_app() {
+        let root = temp_root("single-html");
+        fs::create_dir_all(&root).unwrap();
+        let input = root.join("计数 & 练习.HTM");
+        let prolog = "\u{feff}<!-- local source --><!DOCTYPE html><html lang='zh'><head data-example='a>b'>";
+        let body = "<title>计数</title></head><body><button onclick='this.textContent++'>0</button></body></html>";
+        let html = format!("{prolog}{body}");
+        fs::write(&input, &html).unwrap();
+        assert!(pack_from_file(&input, false).is_err());
+
+        let install = || import_pack(&root, pack_from_file(&input, true).unwrap()).unwrap();
+        let imported = install();
+        let id = imported["id"].as_str().unwrap();
+        assert_ne!(imported["id"], install()["id"]);
+        assert_eq!(imported["name"], "计数 & 练习");
+        let catalog = game_packs::find_user_game(&root, id).unwrap();
+        assert_eq!(catalog["runtimeProtocol"], 2);
+        assert_eq!(catalog["kind"], "app");
+        assert_eq!(catalog["entry"], "index.html");
+
+        let served = crate::app_runtime::protocol::serve_for(
+            &root, &format!("app-runtime-{id}"), &format!("/{id}/index.html"), None,
+        );
+        assert_eq!(served.status, 200);
+        let page = String::from_utf8(served.body).unwrap();
+        assert!(page.starts_with(&format!("{prolog}<script>")));
+        assert!(page.contains("window.xb?.ready?.()"));
+        assert!(page.ends_with(body));
+        assert_eq!(fs::read_to_string(&input).unwrap(), html);
+
+        let zip = to_zip(&export(&root, "app", id).unwrap()).unwrap();
+        import(&root.join("restored"), &zip).unwrap();
+        let (manifest, files) = game_packs::read_v2_pack(&root.join("restored"), id).unwrap();
+        assert_eq!(manifest["icon"], "icon.svg");
+        assert_eq!(manifest["cover"], "cover.svg");
+        assert!(files.iter().any(|(path, bytes)| path == "cover.svg"
+            && String::from_utf8_lossy(bytes).contains("计数 &amp; 练习")));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

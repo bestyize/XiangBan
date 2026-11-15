@@ -1,5 +1,6 @@
 //! V2 App Runtime module for Xiaoban Desktop.
 
+pub(crate) mod html_import;
 pub mod protocol;
 pub mod network;
 pub mod pack;

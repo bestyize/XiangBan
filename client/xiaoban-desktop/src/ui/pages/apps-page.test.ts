@@ -37,6 +37,8 @@ const userApp = {
   name: '番茄时钟',
   description: '自创极简番茄钟',
   entry: 'pages/timer.html',
+  icon: 'icon.svg',
+  cover: 'cover.svg',
   runtimeProtocol: 2,
   kind: 'app' as const,
   category: 'tool',
@@ -95,11 +97,14 @@ it('switches to My Works after importing a V2 small app from the header', async 
   try {
     vi.mocked(invoke).mockResolvedValueOnce({ kind: 'app', id: userApp.id, name: userApp.name });
     await flushPromises();
+    await wrapper.get('[data-testid="apps-search-input"]').setValue('other work');
     await wrapper.get('[data-testid="import-resource"]').trigger('click');
     await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('import_resource_pack');
+    expect(invoke).toHaveBeenCalledWith('import_resource_pack', { allowHtml: true });
     expect(store.listGames).toHaveBeenCalledTimes(2);
-    expect(wrapper.get('[data-testid="user-apps"]').text()).toContain(userApp.name);
+    const tile = wrapper.get('[data-testid="user-apps"] .featured-app');
+    expect(tile.text()).toBe(userApp.name);
+    expect(tile.get('img').attributes('src')).toBe(`${userApp.base}${userApp.icon}`);
   } finally {
     wrapper.unmount();
   }
@@ -193,7 +198,7 @@ it('filters apps by category filter chips and search keyword', async () => {
   }
 });
 
-it('switches to user apps tab and displays user creations', async () => {
+it('shows a user work with its icon and name, and opens it in V2', async () => {
   const { wrapper, openApp } = setupApps();
   try {
     await flushPromises();
@@ -202,11 +207,12 @@ it('switches to user apps tab and displays user creations', async () => {
 
     expect(wrapper.find('.apps-filter-bar').exists()).toBe(false); // chips hidden on user apps
     const section = wrapper.get('[data-testid="user-apps"]');
-    expect(section.findAll('.app-card')).toHaveLength(1);
-    expect(section.text()).toContain('番茄时钟');
-    expect(section.text()).toContain('自创工具');
+    const tile = section.get('[data-testid="user-app-pomodoro-timer"]');
+    expect(tile.text()).toBe('番茄时钟');
+    expect(tile.attributes('title')).toBe(userApp.description);
+    expect(section.get('button[aria-label="番茄时钟更多操作"]').attributes('aria-expanded')).toBe('false');
 
-    await section.get('.app-card').trigger('click');
+    await tile.trigger('click');
     await flushPromises();
     expect(openApp).toHaveBeenCalledWith('pomodoro-timer', {
       title: '番茄时钟',

@@ -5,7 +5,7 @@ import { FileDown, Share2, Download } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 // `icons` drops the wording and keeps only the two marks, for the narrow strip at a card's lower right.
-const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'app' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean; /** `xb` is the console's secondary button, `menu` a row of a dropdown menu; both only for the import button. */ variant?: 'default' | 'xb' | 'menu' }>();
+const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'app' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; allowHtml?: boolean; icons?: boolean; /** `xb` is the console's secondary import button; `menu` renders actions as menu rows. */ variant?: 'default' | 'xb' | 'menu' }>();
 const emit = defineEmits<{ imported: [result: { kind: string; id: string; name: string }] }>();
 const busy = ref(false);
 // Where each kind of pack lands, for the note shown when a pack is picked on another kind's page.
@@ -20,11 +20,14 @@ async function run(share = false) {
       props.store.notify(share ? '资源包已导出，请在论坛发帖，添加预览图和资源包附件。' : '资源包已导出，其他用户可在对应页面导入使用。', 'success');
       if (share) await invoke('open_download_url', { url: 'https://chat.xiangban.xyz' });
     } else {
-      const result = await invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack');
+      const result = await (props.allowHtml
+        ? invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack', { allowHtml: true })
+        : invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack'));
       if (!result) return;
       if (result.kind === props.kind || (props.kind === 'game' && result.kind === 'app')) {
         emit('imported', result);
-        props.store.notify(`已导入「${result.name}」，可预览后再使用。`, 'success');
+        const hint = props.allowHtml ? '点击作品即可打开。' : '可预览后再使用。';
+        props.store.notify(`已导入「${result.name}」，${hint}`, 'success');
       } else {
         props.store.notify(`已导入「${result.name}」，在${PLACES[result.kind] ?? '对应页面'}查看。`, 'success');
       }
@@ -34,14 +37,18 @@ async function run(share = false) {
 }
 </script>
 <template>
-  <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons, plain: !id && (variant === 'xb' || variant === 'menu') }" @click.stop @keydown.stop>
-    <button v-if="!id && variant === 'xb'" type="button" class="xb-btn" :disabled="busy || disabled || !store.desktop" :title="importLabel || '导入资源包'" data-testid="import-resource" @click="run()"><Download :size="14" />{{ importLabel || '导入资源包' }}</button>
+  <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons, plain: variant === 'menu' || (!id && variant === 'xb') }" @click.stop @keydown="variant !== 'menu' && $event.stopPropagation()">
+    <button v-if="!id && variant === 'xb'" type="button" class="xb-btn" :disabled="busy || disabled || !store.desktop" :title="allowHtml ? '支持 ZIP 资源包和单个 HTML 文件' : importLabel || '导入资源包'" :aria-description="allowHtml ? '支持 ZIP 资源包和单个 HTML 文件' : undefined" data-testid="import-resource" @click="run()"><Download :size="14" />{{ importLabel || '导入资源包' }}</button>
     <button v-else-if="!id && variant === 'menu'" type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="import-resource" @click="run()"><FileDown :size="15" />{{ importLabel || '导入资源包' }}</button>
+    <template v-else-if="variant === 'menu'">
+      <button type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="export-resource" @click="run()"><FileDown :size="15" />导出资源包</button>
+      <button type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="share-resource" @click="run(true)"><Share2 :size="15" />分享到论坛</button>
+    </template>
     <NButton v-else :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled || !store.desktop" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
       <template v-if="icons" #icon><FileDown :size="15" /></template>
       <template v-if="!icons">{{ id ? '导出资源包' : importLabel || '导入资源包' }}</template>
     </NButton>
-    <NButton v-if="id" size="small" :circle="!!icons" :secondary="!!icons" :quaternary="!icons" :disabled="busy || disabled || !store.desktop" :title="icons ? '分享到论坛' : undefined" :aria-label="icons ? '分享到论坛' : undefined" data-testid="share-resource" @click="run(true)">
+    <NButton v-if="id && variant !== 'menu'" size="small" :circle="!!icons" :secondary="!!icons" :quaternary="!icons" :disabled="busy || disabled || !store.desktop" :title="icons ? '分享到论坛' : undefined" :aria-label="icons ? '分享到论坛' : undefined" data-testid="share-resource" @click="run(true)">
       <template v-if="icons" #icon><Share2 :size="15" /></template>
       <template v-if="!icons">分享到论坛</template>
     </NButton>
