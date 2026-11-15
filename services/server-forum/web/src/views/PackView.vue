@@ -15,11 +15,13 @@ import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { track } from '@/lib/analytics'
 import { useSession } from '@/stores/session'
+import { usePackPublisher } from '@/stores/packPublisher'
 import { useToast } from '@/stores/toast'
 
 const route = useRoute()
 const toast = useToast()
 const session = useSession()
+const publisher = usePackPublisher()
 const pack = ref<PackDetail | null>(null)
 const missing = ref(false)
 const loadError = ref('')
@@ -30,6 +32,7 @@ const creationOpen = ref(false)
 let loadSequence = 0
 
 useHead(() => ({ title: pack.value?.title ?? '内容详情' }))
+watch(() => publisher.saved, saved => { if (saved?.id === Number(route.params.id)) reload.value++ })
 
 watch(
   () => [route.params.id, reload.value] as const,
@@ -140,7 +143,7 @@ async function copyLink() {
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <button class="btn" type="button" @click="posterOpen = true">生成海报</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
-          <RouterLink v-if="isAuthor" class="btn" :to="`/publish?pack=${pack.id}`">发布新版本</RouterLink>
+          <button v-if="isAuthor" type="button" class="btn" aria-haspopup="dialog" @click="publisher.open(pack.id)">发布新版本</button>
         </div>
         <p v-if="!manualOnly && pack.kind !== 'app'" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
         <p class="hint only-phone">{{ manualOnly ? '可以复制链接，在电脑上下载并阅读使用说明。' : pack.kind === 'game' ? '支持的游戏可在网页试玩；持续体验或创作请使用客户端。' : pack.kind === 'app' ? '支持的应用可在小伴手机端打开。' : '桌面作品请在 Windows 或 macOS 客户端使用。' }}</p>

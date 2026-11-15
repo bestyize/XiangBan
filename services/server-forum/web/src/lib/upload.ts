@@ -7,13 +7,18 @@ export async function sha256Hex(file: Blob): Promise<string> {
 }
 
 /** 用 XHR 上传以便报告进度；资源机失败时返回它给出的中文原因。 */
-function put(url: string, ticket: string, file: Blob, onProgress: (ratio: number) => void): Promise<void> {
+function put(url: string, ticket: string, file: Blob, onProgress: (ratio: number) => void, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
     xhr.setRequestHeader('X-Upload-Ticket', ticket)
     xhr.upload.onprogress = e => e.lengthComputable && onProgress(e.loaded / e.total)
     xhr.onerror = () => reject(new Error('上传失败，请检查网络后重试'))
+    const abort = () => xhr.abort()
+    const cleanup = () => signal?.removeEventListener('abort', abort)
+    xhr.onabort = () => reject(signal?.reason ?? new Error('上传已取消'))
+    xhr.onloadend = cleanup
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) return resolve()
       let message = `上传失败（${xhr.status}）`
@@ -24,14 +29,17 @@ function put(url: string, ticket: string, file: Blob, onProgress: (ratio: number
       }
       reject(new Error(message))
     }
-    xhr.send(file)
+    signal?.addEventListener('abort', abort, { once: true })
+    try { xhr.send(file) } catch (e) { cleanup(); reject(e) }
   })
 }
 
 /** 上传一个文件，返回资源机上的文件键。kind 是内容包类型，或 `cover`。 */
-export async function uploadFile(kind: string, file: File, onProgress: (ratio: number) => void): Promise<string> {
+export async function uploadFile(kind: string, file: File, onProgress: (ratio: number) => void, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted()
   const sha256 = await sha256Hex(file)
-  const ticket = await contentApi.uploadTicket(kind, file.size, sha256)
-  await put(ticket.upload_url, ticket.ticket, file, onProgress)
+  signal?.throwIfAborted()
+  const ticket = await contentApi.uploadTicket(kind, file.size, sha256, signal)
+  await put(ticket.upload_url, ticket.ticket, file, onProgress, signal)
   return ticket.file_key
 }

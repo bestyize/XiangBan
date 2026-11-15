@@ -7,11 +7,13 @@ import { contentApi, type MyPack } from '@/api/content'
 import { kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
+import { usePackPublisher } from '@/stores/packPublisher'
 import { useToast } from '@/stores/toast'
 
 const props = defineProps<{ embedded?: boolean }>()
 useHead(() => ({ title: '我的作品' }))
 const toast = useToast()
+const publisher = usePackPublisher()
 const route = useRoute()
 const worksPath = computed(() => props.embedded ? '/create/works' : '/me/works')
 const schemeTab = computed(() => route.query.tab === 'schemes')
@@ -55,7 +57,8 @@ watch(schemeTab, value => { if (!value) load() }, { immediate: true })
   <ContentShell>
     <div class="head">
       <component :is="embedded ? 'h2' : 'h1'">{{ embedded ? '已发布作品' : '我的作品' }}</component><RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
-      <RouterLink class="btn btn-primary" :to="schemeTab ? '/schemes/new' : '/publish'">{{ schemeTab ? '发布方案' : '发布内容包' }}</RouterLink>
+      <RouterLink v-if="schemeTab" class="btn btn-primary" to="/schemes/new">发布方案</RouterLink>
+      <button v-else type="button" class="btn btn-primary" aria-haspopup="dialog" @click="publisher.open()">发布内容包</button>
     </div>
     <nav class="works-tabs" aria-label="我的社区内容"><RouterLink :to="worksPath" :class="{ active: !schemeTab }">内容包</RouterLink><RouterLink :to="{ path: worksPath, query: { tab: 'schemes' } }" :class="{ active: schemeTab }">方案</RouterLink></nav>
     <template v-if="!schemeTab">
@@ -75,7 +78,7 @@ watch(schemeTab, value => { if (!value) load() }, { immediate: true })
           </p>
         </div>
         <div class="ops">
-          <RouterLink v-if="p.status !== 'removed'" class="btn btn-sm" :to="`/publish?pack=${p.id}`">发布新版本</RouterLink>
+          <button v-if="p.status !== 'removed'" type="button" class="btn btn-sm" aria-haspopup="dialog" @click="publisher.open(p.id)">发布新版本</button>
           <button v-if="p.status !== 'removed'" class="btn btn-sm" type="button" @click="remove(p)">下架</button>
         </div>
       </li>

@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/schemes/:id(\\d+)', name: 'scheme', component: () => import('@/views/SchemeView.vue') },
   { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
   { path: '/weekly', redirect: { path: '/', query: { tab: 'weekly' } } },
-  { path: '/publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { auth: true } },
+  { path: '/publish', name: 'publish', redirect: to => ({ name: 'works', query: { packDialog: to.query.pack ?? 'new' } }) },
   { path: '/me/content-bookmarks', name: 'content-bookmarks', component: () => import('@/views/ContentBookmarksView.vue'), meta: { auth: true } },
   { path: '/me/scheme-backups', name:'scheme-backups', component:()=>import('@/views/SchemeBackupsView.vue'), meta:{auth:true} },
   { path: '/me/works', name: 'works', component: () => import('@/views/MyWorksView.vue'), meta: { auth: true } },

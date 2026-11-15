@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-const props = defineProps<{ open: boolean; title: string; width?: number; scrollable?: boolean; keepOnBackdrop?: boolean }>()
+const props = defineProps<{ open: boolean; title: string; width?: number; scrollable?: boolean; keepOnBackdrop?: boolean; closeDisabled?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -21,8 +21,9 @@ watch(
 )
 
 function onBackdrop(e: MouseEvent) {
-  if (!props.keepOnBackdrop && e.target === dialog.value) emit('close')
+  if (!props.keepOnBackdrop && e.target === dialog.value) requestClose()
 }
+function requestClose() { if (!props.closeDisabled) emit('close') }
 </script>
 
 <template>
@@ -32,14 +33,14 @@ function onBackdrop(e: MouseEvent) {
     :class="{ scrollable }"
     :style="{ '--w': `${width ?? 420}px` }"
     :aria-label="title"
-    @cancel.prevent="emit('close')"
+    @cancel.prevent="requestClose"
     @close="open && !dialog?.open && emit('close')"
     @click="onBackdrop"
   >
     <div class="body">
       <header>
         <h2>{{ title }}</h2>
-        <button type="button" class="close" aria-label="关闭" @click="emit('close')">
+        <button type="button" class="close" aria-label="关闭" :disabled="closeDisabled" @click="requestClose">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" /></svg>
         </button>
       </header>
@@ -93,9 +94,10 @@ h2 {
   border-radius: 50%;
   margin-right: -6px;
 }
-.close:hover {
+.close:hover:not(:disabled) {
   background: var(--surface-2);
 }
+.close:disabled { opacity: 0.45; }
 .close svg {
   width: 16px;
   height: 16px;

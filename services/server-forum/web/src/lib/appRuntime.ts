@@ -31,7 +31,7 @@ export function appRuntimeEntry(base: URL, id: number, version: number, manifest
   if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(version) || version < 1 ||
       manifest.schemaVersion !== 3 || manifest.runtimeProtocol !== 2) throw new Error('作品版本信息无效')
   const entry = manifest.entry ?? 'index.html'
-  if (typeof entry !== 'string' || !entry.endsWith('.html') ||
+  if (typeof entry !== 'string' || !/\.html?$/i.test(entry) ||
       !entry.split('/').every(part => /^[A-Za-z0-9_@-][A-Za-z0-9._@-]*$/.test(part))) throw new Error('作品入口无效')
   const url = new URL(base)
   url.hostname = `${id}.${base.hostname}`

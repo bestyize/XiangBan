@@ -90,6 +90,5 @@ export function trackRoute(name: unknown, query: Record<string, unknown>) {
     case 'project': track('view_project'); break
     case 'discuss': track('view_discuss'); break
     case 'search': track('search'); break
-    case 'publish': track('publish_start'); break
   }
 }

@@ -24,7 +24,7 @@ export function kindLabel(kind: string): string {
 const MB = 1024 * 1024
 export const KIND_LIMIT: Record<string, number> = {
   effect: MB, reminder: MB, routine: MB, task: MB, goal: MB, expert: MB,
-  widget: 8 * MB, game: 8 * MB, app: 100 * MB, skill: 8 * MB, workflow: 8 * MB, wallpaper: 32 * MB,
+  widget: 8 * MB, game: 100 * MB, app: 100 * MB, skill: 8 * MB, workflow: 8 * MB, wallpaper: 32 * MB,
 }
 export const COVER_LIMIT = 2 * MB
 

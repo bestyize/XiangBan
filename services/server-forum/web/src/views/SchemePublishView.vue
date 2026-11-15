@@ -7,8 +7,10 @@ import { schemesApi } from '@/api/schemes'
 import { ApiError } from '@/api/forum'
 import { kindLabel } from '@/lib/content'
 import { useHead } from '@/lib/head'
+import { usePackPublisher } from '@/stores/packPublisher'
 useHead(() => ({ title: '发布方案' }))
 const router = useRouter()
+const publisher = usePackPublisher()
 const title = ref(''), summary = ref(''), query = ref('')
 const packs = ref<MyPack[]>([])
 const selected = ref<{ pack_id: number; version: number; title: string; kind: string }[]>([])
@@ -62,7 +64,7 @@ onMounted(load)
       <p v-if="!selected.length" class="hint">从下方作品列表添加，顺序将保留在方案中。</p>
       <ol class="selected-list"><li v-for="(item, index) in selected" :key="item.pack_id"><span>{{ item.title }} · {{ kindLabel(item.kind) }} · v{{ item.version }}</span><span class="selected-actions"><button class="btn btn-sm" type="button" :disabled="busy || index === 0" @click="move(index, -1)">上移</button><button class="btn btn-sm" type="button" :disabled="busy || index === selected.length - 1" @click="move(index, 1)">下移</button><button class="btn btn-sm" type="button" :disabled="busy" @click="selected.splice(index, 1)">移除</button></span></li></ol>
       <section class="picker"><div class="publish-heading"><h2>自己的已上架作品</h2><button class="btn btn-sm" type="button" :disabled="loading || busy" @click="load">刷新作品</button></div><input v-model="query" class="input" placeholder="筛选标题、标识或类型" aria-label="筛选自己的作品" :disabled="busy">
-        <p v-if="loading" class="hint" role="status">正在读取作品…</p><p v-else-if="loadError" role="alert">{{ loadError }} <button class="btn" type="button" @click="load">重试</button></p><p v-else-if="!packs.length" class="hint">还没有已上架作品。<RouterLink to="/publish">先发布内容包</RouterLink></p><p v-else-if="!filtered.length" class="hint">没有匹配的作品，请调整筛选词。</p>
+        <p v-if="loading" class="hint" role="status">正在读取作品…</p><p v-else-if="loadError" role="alert">{{ loadError }} <button class="btn" type="button" @click="load">重试</button></p><p v-else-if="!packs.length" class="hint">还没有已上架作品。<button class="btn btn-sm" type="button" aria-haspopup="dialog" @click="publisher.open()">先发布内容包</button></p><p v-else-if="!filtered.length" class="hint">没有匹配的作品，请调整筛选词。</p>
         <ul v-else class="candidate-list"><li v-for="pack in filtered" :key="pack.id"><span><RouterLink :to="`/packs/${pack.id}`" target="_blank">{{ pack.title }}</RouterLink> · {{ kindLabel(pack.kind) }} · v{{ pack.version }}</span><button class="btn btn-sm" type="button" :disabled="busy || selected.length >= 20 || selected.some(item => item.pack_id === pack.id)" @click="add(pack)">{{ selected.some(item => item.pack_id === pack.id) ? '已选择' : '加入方案' }}</button></li></ul>
       </section>
       <p v-if="error" role="alert">{{ error }} <RouterLink v-if="uncertain" to="/me/works?tab=schemes">查看我的方案</RouterLink></p>

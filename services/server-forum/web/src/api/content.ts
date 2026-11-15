@@ -142,11 +142,11 @@ export interface PublishInput {
 }
 
 export const contentApi = {
-  uploadTicket: (kind: string, size: number, sha256: string) =>
-    request<UploadTicket>('POST', '/packs/upload-ticket', { kind, size, sha256 }),
-  publish: (input: PublishInput) => request<{ id: number; slug: string }>('POST', '/packs', input),
-  addVersion: (id: number, file_key: string, changelog: string) =>
-    request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }),
+  uploadTicket: (kind: string, size: number, sha256: string, signal?: AbortSignal) =>
+    request<UploadTicket>('POST', '/packs/upload-ticket', { kind, size, sha256 }, true, undefined, signal),
+  publish: (input: PublishInput, signal?: AbortSignal) => request<{ id: number; slug: string }>('POST', '/packs', input, true, undefined, signal),
+  addVersion: (id: number, file_key: string, changelog: string, signal?: AbortSignal) =>
+    request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }, true, undefined, signal),
   removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
   packs: ({ following, featured, ...params }: PackListParams) =>
