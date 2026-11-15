@@ -91,13 +91,15 @@ async function reload() {
 }
 
 function returnPage() {
-  if (isIdea.value) return router.resolve(ideaReturnLocation(ideaId.value, router.hasRoute('idea-work'))).fullPath
   const previous = router.options.history.state.back
   if (typeof previous === 'string' && /^\/(?!\/)/.test(previous)) {
     const entry = router.resolve(previous)
-    if ((entry.name === 'create' && !entry.query.tool && !entry.query.game) ||
+    if (isIdea.value) {
+      if (entry.name === 'ideas' && !entry.query.exhibit) return entry.fullPath
+    } else if ((entry.name === 'create' && !entry.query.tool && !entry.query.game) ||
         (entry.name === 'pack' && Number(entry.params.id) === packId.value)) return entry.fullPath
   }
+  if (isIdea.value) return router.resolve(ideaReturnLocation(ideaId.value, router.hasRoute('idea-work'))).fullPath
   if (launch.data.value) return `/packs/${packId.value}`
   if (isBuiltin.value) {
     return router.resolve({ name: 'create', query: { ...route.query, tool: undefined, game: undefined } }).fullPath

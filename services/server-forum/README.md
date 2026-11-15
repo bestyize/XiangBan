@@ -34,6 +34,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 「创意 → 微观展厅」的封面和交互预览随前端产物一起部署。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
 
+创意页的碎花垂耳兔卡片标注「3D模型」。点击卡片直接打开作品，关闭容器后返回打开作品时所在的创意页。
+
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 
 ## 移动优先网页版（2026-11-01，本地实现）

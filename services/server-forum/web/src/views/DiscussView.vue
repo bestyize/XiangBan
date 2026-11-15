@@ -10,11 +10,13 @@ import { useSession } from '@/stores/session'
 import { useTopicComposer } from '@/stores/topicComposer'
 import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
+import { rabbitIdeaCard } from '@/lib/ideaCards'
 import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import MicroGallery from '@/components/community/MicroGallery.vue'
+import IdeaCard from '@/components/community/IdeaCard.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import { useCommunityResource } from '@/components/community/resource'
@@ -32,6 +34,7 @@ const discussionOptions = computed(() => discussionTabs(meta.categories))
 const tag = computed(() => query('tag'))
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
+const showRabbitIdea = computed(() => ideas.value && !showGallery.value && !tag.value && !following.value && page.value === 1)
 const category = computed(() => ideas.value ? sectionScope(meta.categories, 'ideas') : discussionCategory(tab.value, meta.categories))
 const scope = computed(() => ({
   category:category.value,
@@ -89,6 +92,9 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
       @change="changeIdeaTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
+    <MasonryGrid v-if="showRabbitIdea" class="discussion-grid" :columns="2">
+      <IdeaCard :card="rabbitIdeaCard" />
+    </MasonryGrid>
     <MicroGallery v-if="showGallery" />
     <RequestState v-else-if="!meta.categories.length && (meta.categoriesLoading || meta.categoriesError)"
       :loading="meta.categoriesLoading" :error="meta.categoriesError" @retry="meta.load()" />
@@ -107,7 +113,7 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
           </RouterLink>
         </template>
       </MasonryGrid>
-      <RequestState v-if="data && !data.entries.length" empty />
+      <RequestState v-if="data && !data.entries.length && !showRabbitIdea" empty />
       <div v-if="data && (page > 1 || data.hasMore)" class="discussion-pager">
         <button class="community-button" :disabled="page <= 1" @click="go(page - 1)">上一页</button>
         <span>第 {{ page }} 页</span>
