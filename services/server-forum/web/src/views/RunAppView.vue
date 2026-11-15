@@ -100,7 +100,7 @@ function returnPage() {
   if (typeof previous === 'string' && /^\/(?!\/)/.test(previous)) {
     const entry = router.resolve(previous)
     if (isIdea.value) {
-      if (entry.name === 'ideas' && !entry.query.exhibit) return entry.fullPath
+      if (entry.name === 'idea-work' || (entry.name === 'ideas' && !entry.query.exhibit)) return entry.fullPath
     } else if ((entry.name === 'create' && !entry.query.tool && !entry.query.game) ||
         (entry.name === 'pack' && Number(entry.params.id) === packId.value)) return entry.fullPath
   }

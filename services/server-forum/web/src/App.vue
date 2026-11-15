@@ -18,7 +18,7 @@ const publisher = usePackPublisher()
 const TopicComposer = defineAsyncComponent(() => import('@/components/TopicComposer.vue'))
 const PackPublishDialog = defineAsyncComponent(() => import('@/components/PackPublishDialog.vue'))
 // 这些详情页在手机上有底部互动栏，页脚链接会被它挤在评论和栏之间，所以隐藏。
-const DOCK_PAGES = new Set(['topic', 'daily-detail', 'frontier-detail', 'open-source-project', 'repo-detail', 'pack', 'scheme'])
+const DOCK_PAGES = new Set(['topic', 'daily-detail', 'frontier-detail', 'open-source-project', 'repo-detail', 'pack', 'scheme', 'idea-work'])
 captureInvite()
 let visitDay = ''
 watch([() => route.fullPath, () => session.user?.uid], () => {
@@ -62,7 +62,7 @@ watch(() => session.loggedIn, v => {
   <div v-else class="site-layout" :class="{'community-layout':areaOf(route) === 'community','community-root':isCommunityRoot(route)}">
     <a class="skip-link" href="#main-content">跳到正文</a>
     <AppHeader :hidden="hasOwnHeader" />
-    <main id="main-content" class="app-main">
+    <main id="main-content" class="app-main" :class="{ 'idea-work-main': route.name === 'idea-work' }">
       <section v-if="route.meta.auth && !protectedReady" class="session-locked"><template v-if="session.loggedIn"><p>正在确认账号信息…</p><button class="btn" @click="session.loadSession()">重新读取</button></template><template v-else><p>登录已过期，重新登录后可以继续。</p><button class="btn btn-primary" @click="session.loginOpen = true">重新登录</button></template></section>
       <RouterView v-slot="{ Component }"><component :is="Component" v-if="!route.meta.auth || viewIdentity !== 'guest'" :key="viewIdentity" v-show="!route.meta.auth || protectedReady" /></RouterView>
     </main>
@@ -92,5 +92,6 @@ watch(() => session.loggedIn, v => {
   .app-footer p{margin:0}.app-footer nav{gap:16px}
 }
 @media(min-width:1600px){.app-main{padding-left:40px;padding-right:40px}}
+#main-content.idea-work-main { padding-inline: 0; padding-block-start: 0; }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>

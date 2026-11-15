@@ -14,7 +14,7 @@ class CommunityIdeasTest {
         server.on("/ideas-catalog.json", body = """
             {"items":[
               {"id":"gallery","kind":"gallery","title":"展厅","description":"预览","cover":"/gallery.webp","author":"A","date":"2026-11-15","href":"/ideas?tab=gallery"},
-              {"id":"game","kind":"work","title":"游戏","description":"简介","cover":"/game.webp","author":"B","date":"2026-11-16","href":"/ideas/works/game","pack_slug":"test-game","site":"https://example.com"}
+              {"id":"game","kind":"work","title":"游戏","description":"简介","cover":"/game.webp","images":["/game-detail.webp"],"author":"B","date":"2026-11-16","href":"/ideas/works/game","pack_slug":"test-game","site":"https://example.com"}
             ]}
         """.trimIndent())
         val api = ForumApi(server.client, CommunityConfig()) { error("公开精选目录无需读取令牌") }
@@ -25,6 +25,8 @@ class CommunityIdeasTest {
         assertNull(server.requests.single().headers["Authorization"])
         assertEquals(listOf("gallery", "game"), featured.map { it.id })
         assertEquals("test-game", featured.last().packSlug)
+        assertEquals(listOf("/game-detail.webp"), featured.last().images)
+        assertTrue(featured.first().images.isEmpty())
         assertEquals("/ideas?tab=gallery", featured.first().href)
     }
 

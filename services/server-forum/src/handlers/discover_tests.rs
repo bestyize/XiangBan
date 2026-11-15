@@ -398,6 +398,51 @@ async fn news_article_and_comments_are_published_scoped_and_moderated() -> Resul
 }
 
 #[tokio::test]
+async fn idea_comments_share_the_comment_contract_without_mixing_with_daily() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let mut state = h.state.clone();
+    Arc::make_mut(&mut state.config).web_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("web/public");
+    let app = crate::build_router(state);
+    sqlx::query("INSERT INTO discover_items(kind,key,status,published_at,data) VALUES('news','plush-rabbit','published',now(),'{}')")
+        .execute(&h.pool).await?;
+
+    let work = "/api/ideas/plush-rabbit/comments";
+    let daily = "/api/discover/daily/plush-rabbit/comments";
+    let other_work = "/api/ideas/saltline/comments";
+    for key in ["micro-gallery", "not-a-work"] {
+        let path = format!("/api/ideas/{key}/comments");
+        assert_eq!(call(&app, "GET", &path, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    }
+    let (status, empty) = call(&app, "GET", work, None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK, "{empty}");
+    assert_eq!(empty["total"], 0);
+    assert_eq!(call(&app, "POST", work, None, json!({"body":"留言"})).await.0, StatusCode::UNAUTHORIZED);
+
+    let author = h.member().await?;
+    let reader = h.member().await?;
+    let (status, comment) = call(&app, "POST", work, Some(&author), json!({"body":"作品评论"})).await;
+    assert_eq!(status, StatusCode::OK, "{comment}");
+    let id = comment["id"].as_i64().unwrap();
+    assert_eq!(call(&app, "POST", work, Some(&author), json!({"body":"太快了"})).await.0, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(call(&app, "POST", daily, Some(&author), json!({"body":"日报评论"})).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "POST", other_work, Some(&reader), json!({"body":"回复", "reply_to":id})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(call(&app, "POST", work, Some(&reader), json!({"body":"回复", "reply_to":id})).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "PUT", &format!("{daily}/{id}/like"), Some(&reader), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "PUT", &format!("{work}/{id}/like"), Some(&reader), Value::Null).await.0, StatusCode::OK);
+
+    let (_, comments) = call(&app, "GET", work, Some(&reader), Value::Null).await;
+    assert_eq!(comments["total"], 2);
+    assert_eq!(comments["items"][0]["reply_to"], id);
+    assert_eq!(comments["items"][1]["liked"], true);
+    let (_, comments) = call(&app, "GET", daily, None, Value::Null).await;
+    assert_eq!(comments["total"], 1);
+    assert_eq!(comments["items"][0]["body"], "日报评论");
+    assert_eq!(call(&app, "DELETE", &format!("{work}/{id}"), Some(&reader), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "DELETE", &format!("{work}/{id}"), Some(&author), Value::Null).await.0, StatusCode::OK);
+    h.finish().await
+}
+
+#[tokio::test]
 async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let app = &h.app;

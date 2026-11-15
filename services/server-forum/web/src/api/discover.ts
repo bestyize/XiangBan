@@ -27,7 +27,14 @@ export interface RepoDetail {
 import type { Board as ModelBoard, Usage as UsageBoard } from '@/lib/modelRankings'
 export type { Board as ModelBoard, Usage as UsageBoard } from '@/lib/modelRankings'
 const get = <T>(url: string, auth = false) => request<T>('GET', url, undefined, auth)
+const ideaCommentsPath = (key: string) => '/ideas/' + encodeURIComponent(key) + '/comments'
 export const discoverApi = {
+  ideaComments: (key: string, page: number) => get<Page<NewsComment>>(ideaCommentsPath(key) + '?page=' + page, true),
+  commentIdea: (key: string, body: string, reply_to?: number, image_ids?: string[]) =>
+    request<{ id: number }>('POST', ideaCommentsPath(key), { body, reply_to, image_ids }),
+  likeIdeaComment: (key: string, id: number, on: boolean) =>
+    request(on ? 'PUT' : 'DELETE', ideaCommentsPath(key) + '/' + id + '/like'),
+  deleteIdeaComment: (key: string, id: number) => request('DELETE', ideaCommentsPath(key) + '/' + id),
   home: () => get<HomeBundle>(path.home),
   frontier: (page = 1) => get<Page<NewsItem>>(`/discover/frontier?page=${page}`),
   frontierArticle: (key: string) => get<NewsItem>(`/discover/frontier/${encodeURIComponent(key)}`),

@@ -11,6 +11,7 @@ class RouteTest {
         val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Topic(7, showComments = true), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices,
             Route.Tool("cc-switch"), Route.Frontier, Route.FrontierArticle("中文:1"), Route.Articles("create-game", "图文分享"), Route.Daily, Route.News("news-article-1"), Route.Leaderboard, Route.Scatter, Route.Search, Route.NewPost(), Route.NewPost(ForumSection.Resources, "resource-movies"), Route.NewHelp, Route.Settings, Route.Models, Route.AiChat, Route.RemoteChat("dsk_abc123"),
             Route.OpenSource("AppFlowy-IO", "AppFlowy"), Route.OpenSourceCollection("ideas-to-things"),
+            Route.IdeaWork("plush-rabbit"),
             Route.WebPage("https://github.com/example/project?tab=readme&x=a%20b#license"))
         routes.forEach { assertEquals(it, Route.decode(it.encode())) }
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))

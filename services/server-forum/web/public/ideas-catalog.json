@@ -15,7 +15,16 @@
       "kind": "exhibit",
       "title": "碎花垂耳兔",
       "description": "转动 3D 模型，近看绒毛、碎花和蝴蝶结。",
+      "introduction": "奶白色的垂耳兔，内耳和头顶的蝴蝶结用了同样的碎花布。打开模型转一圈，可以近看耳朵的弧度和绒毛的纹理。",
+      "controls": {
+        "desktop": "拖动旋转，滚轮缩放",
+        "mobile": "拖动旋转，双指缩放"
+      },
       "cover": "/gallery-exhibits/assets/gallery/rabbit.webp",
+      "images": [
+        "/ideas-covers/plush-rabbit-side.webp",
+        "/ideas-covers/plush-rabbit-texture.webp"
+      ],
       "label": "3D模型",
       "author": "RealWorldBuilder",
       "date": "2026-11-15",

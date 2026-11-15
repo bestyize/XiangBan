@@ -1,6 +1,6 @@
-//! 站内日报与评论。只公开已发布的条目；评论使用论坛账号、屏蔽与敏感词规则。
+//! 站内日报与精选作品的评论。两者共用账号、图片附件、屏蔽与敏感词规则。
 use crate::{auth::{AuthUser, MaybeUser}, error::{AppError, AppResult}, markdown, state::AppState, users};
-use axum::{extract::{Path, Query, State}, Json};
+use axum::{extract::{Path, Query, State}, routing::{delete as delete_route, get, put}, Extension, Json, Router};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -35,11 +35,70 @@ pub async fn detail(State(state): State<AppState>, Path(key): Path<String>) -> A
     Ok(Json(article(&state.pool, &key).await?))
 }
 
-#[derive(Deserialize)]
-pub struct PageQuery { page: Option<i64> }
+// 日报的 key 只允许小写字母、数字、连字符和下划线。作品用详情路径作存储键，
+// 因此沿用原评论表和附件关联也不会与同名日报冲突。
+const IDEA_KEY_PREFIX: &str = "/ideas/works/";
 
-pub async fn list(State(state): State<AppState>, MaybeUser(viewer): MaybeUser, Path(key): Path<String>, Query(q): Query<PageQuery>) -> AppResult<Json<Value>> {
-    ensure_article(&state.pool, &key).await?;
+#[derive(Clone, Copy)]
+pub(super) enum CommentScope {
+    Daily,
+    Idea,
+}
+
+pub(super) fn comment_routes(path: &str, scope: CommentScope) -> Router<AppState> {
+    Router::new()
+        .route(path, get(list).post(create))
+        .route(&format!("{path}/{{id}}"), delete_route(delete))
+        .route(&format!("{path}/{{id}}/like"), put(like).delete(unlike))
+        .layer(Extension(scope))
+}
+
+#[derive(Deserialize)]
+struct IdeaCatalog {
+    items: Vec<IdeaCatalogItem>,
+}
+
+#[derive(Deserialize)]
+struct IdeaCatalogItem {
+    id: String,
+    kind: String,
+}
+
+impl CommentScope {
+    async fn key(self, state: &AppState, key: String) -> AppResult<String> {
+        if matches!(self, Self::Daily) {
+            if key.starts_with(IDEA_KEY_PREFIX) {
+                return Err(AppError::not_found("日报"));
+            }
+            ensure_article(&state.pool, &key).await?;
+            return Ok(key);
+        }
+
+        if !crate::discover::valid_key(&key) {
+            return Err(AppError::not_found("创意作品"));
+        }
+        // 与网页和手机读取同一份随网页产物发布的目录。
+        let bytes = tokio::fs::read(state.config.web_dir.join("ideas-catalog.json")).await.map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                AppError::not_found("创意作品")
+            } else {
+                AppError::Internal(format!("读取创意目录失败: {error}"))
+            }
+        })?;
+        let catalog: IdeaCatalog = serde_json::from_slice(&bytes)
+            .map_err(|error| AppError::Internal(format!("创意目录格式错误: {error}")))?;
+        if !catalog.items.iter().any(|item| item.id == key && matches!(item.kind.as_str(), "work" | "exhibit")) {
+            return Err(AppError::not_found("创意作品"));
+        }
+        Ok(format!("{IDEA_KEY_PREFIX}{key}"))
+    }
+}
+
+#[derive(Deserialize)]
+struct PageQuery { page: Option<i64> }
+
+async fn list(State(state): State<AppState>, Extension(scope): Extension<CommentScope>, MaybeUser(viewer): MaybeUser, Path(key): Path<String>, Query(q): Query<PageQuery>) -> AppResult<Json<Value>> {
+    let key = scope.key(&state, key).await?;
     let uid = viewer.map(|v| v.uid);
     let page = q.page.unwrap_or(1).clamp(1, 10_000);
     let rows: Vec<(i64, Option<i64>, String, DateTime<Utc>, Uuid, String, Option<String>, i64, bool, Vec<Uuid>)> = sqlx::query_as(
@@ -62,25 +121,32 @@ pub async fn list(State(state): State<AppState>, MaybeUser(viewer): MaybeUser, P
 }
 
 #[derive(Deserialize)]
-pub struct CommentInput {
+struct CommentInput {
     body: String,
     reply_to: Option<i64>,
     #[serde(default)]
     image_ids: Vec<Uuid>,
 }
 
-pub async fn create(State(state): State<AppState>, auth: AuthUser, Path(key): Path<String>, Json(input): Json<CommentInput>) -> AppResult<Json<Value>> {
+async fn create(State(state): State<AppState>, Extension(scope): Extension<CommentScope>, auth: AuthUser, Path(key): Path<String>, Json(input): Json<CommentInput>) -> AppResult<Json<Value>> {
     users::ensure_can_write(&auth.user)?;
-    ensure_article(&state.pool, &key).await?;
+    let key = scope.key(&state, key).await?;
     let body = input.body.trim();
     images::validate_comment_content(body, &input.image_ids)?;
     if crate::moderation::screen(&state.pool, &[body]).await?.is_some() {
         return Err(AppError::BadRequest("评论暂不能发布，请修改后重试".into()));
     }
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))").bind(format!("news-comment:{}", auth.user.uid)).execute(&mut *tx).await?;
-    let (recent, daily): (bool, i64) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM discover_news_comments WHERE author_uid=$1 AND created_at>now()-interval '15 seconds'), count(*) FROM discover_news_comments WHERE author_uid=$1 AND created_at>=date_trunc('day',now())")
-        .bind(auth.user.uid).fetch_one(&mut *tx).await?;
+    let is_idea = matches!(scope, CommentScope::Idea);
+    let lock = if is_idea { "idea-comment" } else { "news-comment" };
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))").bind(format!("{lock}:{}", auth.user.uid)).execute(&mut *tx).await?;
+    let (recent, daily): (bool, i64) = sqlx::query_as(
+        "SELECT coalesce(bool_or(created_at>now()-interval '15 seconds'), false),
+                count(*) FILTER (WHERE created_at>=date_trunc('day',now()))
+         FROM discover_news_comments WHERE author_uid=$1
+           AND created_at>=LEAST(date_trunc('day',now()),now()-interval '15 seconds')
+           AND starts_with(news_key,$2)=$3"
+    ).bind(auth.user.uid).bind(IDEA_KEY_PREFIX).bind(is_idea).fetch_one(&mut *tx).await?;
     if recent || daily >= 50 { return Err(AppError::TooManyRequests { message: "评论太频繁，请稍后再试".into(), retry_after: 15 }); }
     if let Some(parent) = input.reply_to {
         let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM discover_news_comments WHERE id=$1 AND news_key=$2 AND status='normal')")
@@ -94,8 +160,8 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Path(key): Pa
     Ok(Json(json!({"id":id})))
 }
 
-pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
-    ensure_article(&state.pool, &key).await?;
+async fn delete(State(state): State<AppState>, Extension(scope): Extension<CommentScope>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
+    let key = scope.key(&state, key).await?;
     let (deleted,): (bool,) = sqlx::query_as(
         "WITH deleted AS (
             UPDATE discover_news_comments SET status='deleted'
@@ -108,9 +174,9 @@ pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path((key,id)
     Ok(Json(json!({"ok":true})))
 }
 
-pub async fn like(State(state): State<AppState>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
+async fn like(State(state): State<AppState>, Extension(scope): Extension<CommentScope>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
     users::ensure_can_write(&auth.user)?;
-    ensure_article(&state.pool, &key).await?;
+    let key = scope.key(&state, key).await?;
     let done = sqlx::query("INSERT INTO discover_news_comment_likes(comment_id,uid) SELECT c.id,$3 FROM discover_news_comments c JOIN users u ON u.uid=c.author_uid WHERE c.news_key=$1 AND c.id=$2 AND c.status='normal' AND u.status<>'banned' AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$3 AND b.blocked=c.author_uid) ON CONFLICT DO NOTHING")
         .bind(&key).bind(id).bind(auth.user.uid).execute(&state.pool).await?;
     // Repeated likes are idempotent; an unavailable comment is checked separately.
@@ -122,8 +188,8 @@ pub async fn like(State(state): State<AppState>, auth: AuthUser, Path((key,id)):
     Ok(Json(json!({"ok":true})))
 }
 
-pub async fn unlike(State(state): State<AppState>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
-    ensure_article(&state.pool, &key).await?;
+async fn unlike(State(state): State<AppState>, Extension(scope): Extension<CommentScope>, auth: AuthUser, Path((key,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
+    let key = scope.key(&state, key).await?;
     sqlx::query("DELETE FROM discover_news_comment_likes l USING discover_news_comments c WHERE l.comment_id=c.id AND c.news_key=$1 AND c.id=$2 AND l.uid=$3")
         .bind(key).bind(id).bind(auth.user.uid).execute(&state.pool).await?;
     Ok(Json(json!({"ok":true})))

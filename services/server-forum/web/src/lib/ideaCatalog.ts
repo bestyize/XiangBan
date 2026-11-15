@@ -3,7 +3,10 @@ export interface FeaturedIdea {
   kind: 'gallery' | 'exhibit' | 'work'
   title: string
   description: string
+  introduction?: string
+  controls?: { desktop?: string; mobile?: string }
   cover: string
+  images?: string[]
   label?: string
   author: string
   date: string

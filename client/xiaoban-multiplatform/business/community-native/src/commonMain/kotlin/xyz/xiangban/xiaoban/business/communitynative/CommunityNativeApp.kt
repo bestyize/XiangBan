@@ -239,6 +239,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
             if (exhibit.usesIdeaRuntime) IdeaRuntimeScreen(env, exhibit.id, exhibit.title, back = pop)
             else GalleryExhibitScreen(env.config.forumBase, exhibit, back = pop, open = push)
         }
+        is Route.IdeaWork -> IdeaWorkScreen(env, route.id, back = pop, open = push)
         is Route.IdeaRuntime -> IdeaRuntimeScreen(env, route.id, route.title, back = pop)
         is Route.Software -> SoftwareDetailScreen(env, route.project, pop, push)
         is Route.OpenSource -> RepoDetailScreen(env, route.owner, route.repo, pop, push, curated = true)

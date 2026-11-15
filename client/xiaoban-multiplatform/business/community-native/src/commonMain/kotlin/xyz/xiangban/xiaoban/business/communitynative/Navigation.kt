@@ -36,6 +36,7 @@ sealed interface Route {
     data class WebPage(val url: String) : Route
     data object MicroGallery : Route
     data class GalleryExhibit(val id: String) : Route
+    data class IdeaWork(val id: String) : Route
     data class IdeaRuntime(val id: String, val title: String) : Route
     data class Software(val project: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
@@ -91,6 +92,7 @@ sealed interface Route {
         is WebPage -> "web:${url.encodeURLParameter()}"
         MicroGallery -> "micro-gallery"
         is GalleryExhibit -> "gallery-exhibit:$id"
+        is IdeaWork -> "idea-work:${id.encodeURLParameter()}"
         is IdeaRuntime -> "idea-runtime:$id:${title.encodeURLParameter()}"
         is Software -> "software:${project.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
@@ -142,6 +144,7 @@ sealed interface Route {
                 "web" -> runCatching { webPageRoute(value.decodeURLPart()) }.getOrNull()
                 "micro-gallery" -> MicroGallery
                 "gallery-exhibit" -> MicroGalleryExhibit.byId(value)?.let { GalleryExhibit(it.id) }
+                "idea-work" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::IdeaWork) }.getOrNull()
                 "idea-runtime" -> runCatching {
                     val id = value.substringBefore(':')
                     val title = value.substringAfter(':', "").decodeURLPart()

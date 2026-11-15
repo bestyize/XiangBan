@@ -146,13 +146,8 @@ internal fun IdeasFeed(
 private fun IdeaFeedCard(entry: IdeaFeedEntry, env: CommunityEnv, open: (Route) -> Unit) {
     when (entry) {
         is IdeaFeedEntry.Featured -> with(entry.item) {
-            val runtime = player
             IdeaCard(title, description, env.forum.imageUrl(cover), label, author, date.take(10)) {
-                when {
-                    kind == "gallery" -> open(Route.MicroGallery)
-                    runtime != null -> open(Route.IdeaRuntime(runtime, title))
-                    else -> webPageRoute(env.forum.imageUrl(href))?.let(open)
-                }
+                open(if (kind == "gallery") Route.MicroGallery else Route.IdeaWork(id))
             }
         }
         is IdeaFeedEntry.Work -> with(entry.pack) {

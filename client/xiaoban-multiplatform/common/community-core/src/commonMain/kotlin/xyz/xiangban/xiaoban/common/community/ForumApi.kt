@@ -49,6 +49,22 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun featuredIdeas(): List<FeaturedIdea> =
         http.send(HttpMethod.Get, "/ideas-catalog.json", serializer<FeaturedIdeaCatalog>()).items
 
+    private fun ideaCommentsPath(key: String) = "/api/ideas/${key.encodeURLParameter()}/comments"
+
+    suspend fun ideaComments(key: String, page: Int = 1): Page<NewsComment> =
+        get("${ideaCommentsPath(key)}${query("page" to page)}")
+
+    suspend fun commentIdea(key: String, body: String, replyTo: Long?, imageIds: List<String>) =
+        publishComment(ideaCommentsPath(key), body, replyTo, imageIds)
+
+    suspend fun likeIdeaComment(key: String, id: Long, liked: Boolean) {
+        write(if (liked) HttpMethod.Put else HttpMethod.Delete, "${ideaCommentsPath(key)}/$id/like")
+    }
+
+    suspend fun deleteIdeaComment(key: String, id: Long) {
+        write(HttpMethod.Delete, "${ideaCommentsPath(key)}/$id")
+    }
+
     suspend fun ideaRuntime(id: String): IdeaRuntimeDownload {
         require(isIdeaPlayerId(id)) { "作品标识无效" }
         val base = "/idea-players/v1/packages/$id"
@@ -92,8 +108,13 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun news(key: String, frontier: Boolean = false): NewsItem = get(articlePath(key, frontier))
     suspend fun newsComments(key: String, page: Int = 1, frontier: Boolean = false): Page<NewsComment> = get("${articlePath(key, frontier)}/comments${query("page" to page)}")
     suspend fun commentNews(key: String, body: String, replyTo: Long? = null, frontier: Boolean = false, imageIds: List<String> = emptyList()) {
-        write(HttpMethod.Post, "${articlePath(key, frontier)}/comments", buildJsonObject {
-            put("body", body); if (replyTo != null) put("reply_to", replyTo)
+        publishComment("${articlePath(key, frontier)}/comments", body, replyTo, imageIds)
+    }
+
+    private suspend fun publishComment(path: String, body: String, replyTo: Long?, imageIds: List<String>) {
+        write(HttpMethod.Post, path, buildJsonObject {
+            put("body", body)
+            if (replyTo != null) put("reply_to", replyTo)
             if (imageIds.isNotEmpty()) put("image_ids", buildJsonArray { imageIds.forEach { add(JsonPrimitive(it)) } })
         })
     }
@@ -135,10 +156,7 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     }
     suspend fun repoComments(owner: String, repo: String, page: Int = 1): Page<NewsComment> = get("${repoPath(owner, repo)}/comments${query("page" to page)}")
     suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null, imageIds: List<String> = emptyList()) {
-        write(HttpMethod.Post, "${repoPath(owner, repo)}/comments", buildJsonObject {
-            put("body", body); if (replyTo != null) put("reply_to", replyTo)
-            if (imageIds.isNotEmpty()) put("image_ids", buildJsonArray { imageIds.forEach { add(JsonPrimitive(it)) } })
-        })
+        publishComment("${repoPath(owner, repo)}/comments", body, replyTo, imageIds)
     }
     suspend fun likeRepoComment(owner: String, repo: String, id: Long, liked: Boolean) {
         write(if (liked) HttpMethod.Put else HttpMethod.Delete, "${repoPath(owner, repo)}/comments/$id/like")

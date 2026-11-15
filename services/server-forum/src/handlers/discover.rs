@@ -21,6 +21,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use sqlx::PgPool;
+use super::discover_news::{comment_routes, CommentScope};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -42,9 +43,8 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/frontier/{key}/comments/{id}", axum::routing::delete(super::discover_frontier::delete))
         .route("/discover/frontier/{key}/comments/{id}/like", put(super::discover_frontier::like).delete(super::discover_frontier::unlike))
         .route("/discover/daily/{key}", get(super::discover_news::detail))
-        .route("/discover/daily/{key}/comments", get(super::discover_news::list).post(super::discover_news::create))
-        .route("/discover/daily/{key}/comments/{id}", axum::routing::delete(super::discover_news::delete))
-        .route("/discover/daily/{key}/comments/{id}/like", put(super::discover_news::like).delete(super::discover_news::unlike))
+        .merge(comment_routes("/discover/daily/{key}/comments", CommentScope::Daily))
+        .merge(comment_routes("/ideas/{key}/comments", CommentScope::Idea))
         .route("/discover/repos", get(repos))
         .route("/discover/repos/v2", get(repos_v2))
         .route("/discover/repos/issues", get(repo_issues))

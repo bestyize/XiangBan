@@ -19,7 +19,15 @@ data class FeaturedIdea(
     val href: String,
     @SerialName("pack_slug") val packSlug: String? = null,
     val player: String? = null,
+    val introduction: String? = null,
+    val controls: FeaturedIdeaControls? = null,
+    val site: String? = null,
+    val repository: String? = null,
+    val images: List<String> = emptyList(),
 )
+
+@Serializable
+data class FeaturedIdeaControls(val mobile: String? = null, val desktop: String? = null)
 
 private val ideaPlayerId = Regex("[a-z0-9][a-z0-9-]{1,39}")
 
