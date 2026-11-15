@@ -360,7 +360,7 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
                 LoadBox(state, ::refresh) { result ->
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = DiscussionGutter, end = DiscussionGutter, top = 10.dp, bottom = 24.dp + NavInset),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 24.dp + NavInset),
                         verticalArrangement = Arrangement.spacedBy(Gap),
                     ) {
                         if (result.items.isEmpty()) item {

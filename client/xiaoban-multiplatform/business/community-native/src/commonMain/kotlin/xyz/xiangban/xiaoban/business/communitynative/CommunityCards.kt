@@ -156,61 +156,43 @@ internal fun DiscussionPostCard(
     val image = images.getOrNull(imageIndex)?.let(env.forum::imageUrl)
     val tag = topic.tags.firstOrNull { it.isNotBlank() && it != topic.category.name }
 
-    Column(Modifier.fillMaxWidth().outlinedCard(16.dp)) {
-        Column(
-            Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen)
-                .padding(start = 12.dp, top = 12.dp, end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
+        Modifier.fillMaxWidth().outlinedCard(14.dp)
+            .clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, end = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TopicAuthorAvatar(env, topic.author, 26.dp)
-                Text(
-                    topic.author.nickname,
-                    Modifier.weight(1f),
-                    style = XType.Caption,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (topic.createdAt.isNotBlank()) Text(
-                    agoText(topic.createdAt),
-                    Modifier.widthIn(max = 128.dp),
-                    style = XType.Caption,
-                    color = extra.ink3,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (topic.pinned || topic.featured || topic.poll != null) Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (topic.pinned || topic.featured) Text(
-                            if (topic.pinned) "置顶" else "精选",
-                            style = XType.Caption,
-                            color = extra.brandInk,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        if (topic.poll != null) Text("投票", style = XType.Caption, color = extra.brandInk)
-                    }
-                    Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    excerpt?.let {
-                        Text(it, style = XType.Secondary, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
+            if (topic.category.name.isNotBlank()) DiscussionCardTag(
+                topic.category.name, Modifier.weight(1f, fill = false), category = true, onClick = onCategory,
+            )
+            if (tag != null) DiscussionCardTag("# $tag", Modifier.weight(1f, fill = false)) { onTag(tag) }
+            if (topic.pinned || topic.featured) Text(
+                if (topic.pinned) "置顶" else "精选", style = XType.Caption, color = extra.brandInk, maxLines = 1,
+            )
+            if (topic.poll != null) Text("投票", style = XType.Caption, color = extra.brandInk, maxLines = 1)
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                excerpt?.let {
+                    Text(it, style = XType.Secondary, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                if (image != null) AsyncImage(
-                    model = image,
-                    contentDescription = null,
-                    imageLoader = rememberImageLoader(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(width = 76.dp, height = 68.dp)
-                        .clip(RoundedCornerShape(10.dp)).background(extra.fill),
-                    onError = { imageIndex++ },
-                )
             }
+            if (image != null) AsyncImage(
+                model = image,
+                contentDescription = null,
+                imageLoader = rememberImageLoader(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(9.dp)).background(extra.fill),
+                onError = { imageIndex++ },
+            )
         }
         Row(
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp),
@@ -221,12 +203,25 @@ internal fun DiscussionPostCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (topic.category.name.isNotBlank()) DiscussionCardTag(
-                    topic.category.name, Modifier.weight(1f, fill = false), onCategory,
+                TopicAuthorAvatar(env, topic.author, 21.dp)
+                Text(
+                    topic.author.nickname,
+                    Modifier.weight(1f, fill = false),
+                    style = XType.Caption,
+                    color = extra.ink3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (tag != null) DiscussionCardTag(tag, Modifier.weight(1f, fill = false)) { onTag(tag) }
+                if (topic.createdAt.isNotBlank()) Text(
+                    "· ${agoText(topic.createdAt)}",
+                    Modifier.widthIn(max = 100.dp),
+                    style = XType.Caption,
+                    color = extra.ink3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            DiscussionCountButton(XIcons.Message, "查看评论", topic.replyCount, onClick = onComments)
+            DiscussionCountButton(XIcons.Message, "查看回复", topic.replyCount, onClick = onComments, emphasized = true)
             DiscussionCountButton(
                 XIcons.Heart, if (liked) "取消点赞" else "点赞", likeCount,
                 onClick = onLike, active = liked, enabled = !liking,
@@ -236,13 +231,21 @@ internal fun DiscussionPostCard(
 }
 
 @Composable
-private fun DiscussionCardTag(label: String, modifier: Modifier, onClick: () -> Unit) {
+private fun DiscussionCardTag(label: String, modifier: Modifier, category: Boolean = false, onClick: () -> Unit) {
+    val extra = LocalExtraColors.current
     Box(
-        modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(8.dp))
+        modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(8.dp))
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Text("# $label", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            label,
+            if (category) Modifier.background(extra.fill, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp) else Modifier,
+            style = XType.Caption,
+            color = extra.ink3,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -254,9 +257,14 @@ private fun DiscussionCountButton(
     onClick: () -> Unit,
     active: Boolean = false,
     enabled: Boolean = true,
+    emphasized: Boolean = false,
 ) {
     val extra = LocalExtraColors.current
-    val color = if (active) extra.brandInk else extra.ink3
+    val color = when {
+        active -> extra.brandInk
+        emphasized -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> extra.ink3
+    }
     Row(
         Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp).clip(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -264,8 +272,9 @@ private fun DiscussionCountButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
     ) {
-        XIcon(icon, tint = color, size = 16.dp, description = label)
-        Text(compactCount(count), style = XType.Caption, color = color, maxLines = 1)
+        XIcon(icon, tint = color, size = 14.dp, description = label)
+        Text(compactCount(count), style = XType.Caption, color = color,
+            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
     }
 }
 

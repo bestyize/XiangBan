@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>讨论卡片 · 超级小伴社区</title>
+  <style>
+    html { color-scheme: light dark; }
+    body { margin: 0; background: light-dark(#fff, #141416); }
+    main { max-width: 1080px; margin-inline: auto; padding: 24px clamp(8px, 3vw, 28px); }
+  </style>
+</head>
+<body>
+<main>
+<!-- Discussion card preview -->
+<div id="discussion-cards-preview" lang="zh-CN" role="region" aria-label="讨论卡片">
+  <div class="dc-controls">
+    <strong class="dc-preview-title">讨论卡片</strong>
+    <div class="dc-switch" role="group" aria-label="预览设备">
+      <button type="button" data-device="desktop" aria-pressed="true">桌面端</button>
+      <button type="button" data-device="mobile" aria-pressed="false">移动端</button>
+    </div>
+    <button class="dc-theme" type="button" data-theme-toggle aria-pressed="false">深色</button>
+  </div>
+
+  <div class="dc-stage viz-dotted-background">
+    <section class="dc-screen" aria-label="讨论列表预览">
+      <header class="dc-header">
+        <div class="dc-sections">
+          <span>首页</span><span>创意</span><span class="dc-section-current">讨论</span><span>资源</span>
+        </div>
+        <div class="dc-categories">
+          <span class="dc-category-current">全部</span><span>默认</span><span>设计</span><span>游戏</span><span>学习和教程</span>
+        </div>
+      </header>
+
+      <div class="dc-feed">
+        <article class="dc-topic">
+          <div class="dc-topic-category">副业与独立开发</div>
+          <div class="dc-lead">
+            <div class="dc-copy">
+              <h2>有哪些检测 Claude 环境封号的工具？</h2>
+              <p>被封了 4 个 Pro 和 1 个 Max，有没有靠谱的环境检测工具或者网站？</p>
+            </div>
+          </div>
+          <footer class="dc-footer">
+            <div class="dc-byline"><span class="dc-avatar" aria-hidden="true">r</span><span class="dc-author">read</span><span class="dc-time">2 小时前</span></div>
+            <div class="dc-metrics">
+              <span class="dc-replies"><i data-lucide="message-circle" aria-hidden="true"></i><span>0<span class="dc-sr"> 条回复</span></span></span>
+              <span><i data-lucide="heart" aria-hidden="true"></i><span>0<span class="dc-sr"> 个赞</span></span></span>
+            </div>
+          </footer>
+        </article>
+
+        <article class="dc-topic">
+          <div class="dc-topic-category">设计</div>
+          <div class="dc-lead">
+            <div class="dc-copy">
+              <h2>这张像素港口的画面，哪里最抢眼？</h2>
+              <p>我想让视线先落到船和码头，截图里的建筑和海面会不会太抢戏？</p>
+            </div>
+            <img class="dc-thumbnail" src="discussion-card-saltline.webp" alt="Saltline 游戏中的像素港口画面" width="76" height="76">
+          </div>
+          <footer class="dc-footer">
+            <div class="dc-byline"><span class="dc-avatar" aria-hidden="true">临</span><span class="dc-author">临风</span><span class="dc-time">3 小时前</span></div>
+            <div class="dc-metrics">
+              <span class="dc-replies"><i data-lucide="message-circle" aria-hidden="true"></i><span>8<span class="dc-sr"> 条回复</span></span></span>
+              <span><i data-lucide="heart" aria-hidden="true"></i><span>12<span class="dc-sr"> 个赞</span></span></span>
+            </div>
+          </footer>
+        </article>
+
+        <article class="dc-topic">
+          <div class="dc-topic-category">学习和教程</div>
+          <div class="dc-lead">
+            <div class="dc-copy">
+              <h2>从零做一个桌面小组件，先学布局还是先学动画？</h2>
+              <p>能改一些 HTML 和 CSS，想先做个时钟或待办清单。大家有哪些适合照着做的小项目？</p>
+            </div>
+          </div>
+          <footer class="dc-footer">
+            <div class="dc-byline"><span class="dc-avatar" aria-hidden="true">阿</span><span class="dc-author">阿栗</span><span class="dc-time">4 小时前</span></div>
+            <div class="dc-metrics">
+              <span class="dc-replies"><i data-lucide="message-circle" aria-hidden="true"></i><span>5<span class="dc-sr"> 条回复</span></span></span>
+              <span><i data-lucide="heart" aria-hidden="true"></i><span>9<span class="dc-sr"> 个赞</span></span></span>
+            </div>
+          </footer>
+        </article>
+
+        <article class="dc-topic">
+          <div class="dc-topic-category">副业与独立开发</div>
+          <div class="dc-lead">
+            <div class="dc-copy">
+              <h2>你们会把副项目的开发进度公开吗？</h2>
+              <p>想每周发一篇短记录，也担心反过来给自己加压力。试过的朋友是怎么坚持下来的？</p>
+            </div>
+          </div>
+          <footer class="dc-footer">
+            <div class="dc-byline"><span class="dc-avatar" aria-hidden="true">半</span><span class="dc-author">半杯茶</span><span class="dc-time">昨天</span></div>
+            <div class="dc-metrics">
+              <span class="dc-replies"><i data-lucide="message-circle" aria-hidden="true"></i><span>14<span class="dc-sr"> 条回复</span></span></span>
+              <span><i data-lucide="heart" aria-hidden="true"></i><span>7<span class="dc-sr"> 个赞</span></span></span>
+            </div>
+          </footer>
+        </article>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+  #discussion-cards-preview {
+    --dc-page: light-dark(#fafafa, #19191b);
+    --dc-surface: light-dark(#fff, #222224);
+    --dc-ink: light-dark(#222, #f0eff0);
+    --dc-copy: light-dark(#545154, #c2bfc3);
+    --dc-muted: light-dark(#686468, #b0abb1);
+    --dc-line: light-dark(#ededed, #363337);
+    --dc-chip: light-dark(#f2f2f2, #313033);
+    --dc-accent: light-dark(#bd1833, #ff8396);
+    --dc-accent-soft: light-dark(#fff1f3, #3c242b);
+    --dc-stage: light-dark(#f6f5f5, #19191b);
+    --dc-dot: light-dark(#dedadc, #383438);
+    --dc-radius: 14px;
+    color: var(--dc-ink);
+    font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  #discussion-cards-preview[data-theme="light"] { color-scheme: light; }
+  #discussion-cards-preview[data-theme="dark"] { color-scheme: dark; }
+  #discussion-cards-preview *, #discussion-cards-preview *::before, #discussion-cards-preview *::after { box-sizing: border-box; }
+  #discussion-cards-preview :is(h2, p) { margin: 0; }
+  #discussion-cards-preview .dc-sr { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  #discussion-cards-preview .dc-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-block-end: 12px;
+  }
+  #discussion-cards-preview .dc-preview-title { font-size: 14px; font-weight: 650; }
+  #discussion-cards-preview .dc-switch {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--dc-line);
+    border-radius: 10px;
+    background: var(--dc-chip);
+  }
+  #discussion-cards-preview .dc-controls button {
+    min-block-size: 28px;
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--dc-muted);
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  #discussion-cards-preview .dc-controls button[aria-pressed="true"] {
+    border-color: var(--dc-line);
+    background: var(--dc-surface);
+    color: var(--dc-ink);
+    font-weight: 600;
+  }
+  #discussion-cards-preview .dc-controls button:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 2px; }
+  #discussion-cards-preview .dc-controls .dc-theme { border-color: var(--dc-line); min-block-size: 35px; }
+
+  #discussion-cards-preview .dc-stage {
+    display: grid;
+    justify-items: center;
+    padding: clamp(8px, 2vw, 20px);
+    border-radius: 16px;
+    background: radial-gradient(var(--dc-dot) .7px, transparent .7px) 0 0 / 12px 12px var(--dc-stage);
+  }
+  #discussion-cards-preview .dc-screen {
+    inline-size: 100%;
+    max-inline-size: 990px;
+    overflow: clip;
+    border: 1px solid var(--dc-line);
+    border-radius: 14px;
+    background: var(--dc-page);
+    container: discussion-screen / inline-size;
+  }
+  #discussion-cards-preview[data-device="mobile"] .dc-screen { max-inline-size: 390px; }
+  #discussion-cards-preview .dc-header { background: var(--dc-surface); }
+  #discussion-cards-preview .dc-sections,
+  #discussion-cards-preview .dc-categories {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 28px;
+    padding-inline: 16px;
+    color: var(--dc-muted);
+  }
+  #discussion-cards-preview .dc-sections { min-block-size: 48px; }
+  #discussion-cards-preview .dc-sections > span {
+    display: grid;
+    position: relative;
+    align-self: stretch;
+    align-items: center;
+  }
+  #discussion-cards-preview .dc-section-current { color: var(--dc-accent); font-weight: 650; }
+  #discussion-cards-preview .dc-section-current::after {
+    position: absolute;
+    inset-inline: 4px;
+    inset-block-end: 0;
+    block-size: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    content: "";
+  }
+  #discussion-cards-preview .dc-categories { min-block-size: 42px; gap: 24px; font-size: 13px; }
+  #discussion-cards-preview .dc-category-current {
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--dc-accent-soft);
+    color: var(--dc-accent);
+    font-weight: 600;
+  }
+
+  #discussion-cards-preview .dc-feed { display: grid; gap: 12px; padding: 16px; }
+  #discussion-cards-preview .dc-topic {
+    display: flex;
+    min-inline-size: 0;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 15px 16px 13px;
+    border: 1px solid var(--dc-line);
+    border-radius: var(--dc-radius);
+    background: var(--dc-surface);
+  }
+  #discussion-cards-preview .dc-topic-category {
+    align-self: flex-start;
+    max-inline-size: 100%;
+    margin-block-end: 8px;
+    padding: 2px 7px;
+    overflow: hidden;
+    border-radius: 5px;
+    background: var(--dc-chip);
+    color: var(--dc-muted);
+    font-size: 11px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #discussion-cards-preview .dc-lead { display: flex; align-items: flex-start; gap: 12px; margin-block-end: 12px; }
+  #discussion-cards-preview .dc-copy { flex: 1; min-inline-size: 0; }
+  #discussion-cards-preview .dc-copy :is(h2, p) {
+    display: -webkit-box;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  #discussion-cards-preview .dc-copy h2 { font-size: 17px; font-weight: 650; line-height: 1.42; }
+  #discussion-cards-preview .dc-copy p { margin-block-start: 5px; color: var(--dc-copy); font-size: 14px; line-height: 1.55; }
+  #discussion-cards-preview .dc-thumbnail {
+    flex: none;
+    inline-size: 76px;
+    block-size: 76px;
+    border-radius: 9px;
+    background: var(--dc-chip);
+    object-fit: cover;
+  }
+  #discussion-cards-preview .dc-footer,
+  #discussion-cards-preview .dc-byline,
+  #discussion-cards-preview .dc-metrics,
+  #discussion-cards-preview .dc-metrics > span { display: flex; align-items: center; }
+  #discussion-cards-preview .dc-footer { justify-content: space-between; gap: 8px; margin-block-start: auto; color: var(--dc-muted); font-size: 12px; }
+  #discussion-cards-preview .dc-byline { min-inline-size: 0; gap: 6px; }
+  #discussion-cards-preview .dc-avatar {
+    display: grid;
+    flex: none;
+    inline-size: 21px;
+    block-size: 21px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--dc-chip);
+    color: var(--dc-copy);
+    font-size: 11px;
+    line-height: 1;
+  }
+  #discussion-cards-preview .dc-author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #discussion-cards-preview .dc-time::before { margin-inline-end: 6px; content: "·"; }
+  #discussion-cards-preview .dc-time { flex: none; white-space: nowrap; }
+  #discussion-cards-preview .dc-metrics { flex: none; gap: 13px; font-variant-numeric: tabular-nums; }
+  #discussion-cards-preview .dc-metrics > span { gap: 4px; min-inline-size: 25px; }
+  #discussion-cards-preview .dc-metrics .dc-replies { color: var(--dc-copy); font-weight: 600; }
+  #discussion-cards-preview .dc-metrics :is(i, svg) { display: block; inline-size: 14px; block-size: 14px; }
+
+  @container discussion-screen (min-width: 680px) {
+    #discussion-cards-preview .dc-feed { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 20px; }
+  }
+  @container discussion-screen (max-width: 480px) {
+    #discussion-cards-preview .dc-header { border-block-end: 1px solid var(--dc-line); }
+    #discussion-cards-preview .dc-sections { justify-content: flex-start; min-block-size: 45px; }
+    #discussion-cards-preview .dc-sections > span:not(.dc-section-current),
+    #discussion-cards-preview .dc-section-current::after { display: none; }
+    #discussion-cards-preview .dc-section-current { color: var(--dc-ink); font-size: 19px; }
+    #discussion-cards-preview .dc-categories { justify-content: flex-start; min-block-size: 39px; gap: clamp(9px, 3.8cqi, 17px); padding-inline: 12px; }
+    #discussion-cards-preview .dc-feed { gap: 9px; padding: 10px 12px 12px; }
+    #discussion-cards-preview .dc-topic { padding: 12px; }
+    #discussion-cards-preview .dc-topic-category { margin-block-end: 6px; }
+    #discussion-cards-preview .dc-lead { gap: 10px; margin-block-end: 10px; }
+    #discussion-cards-preview .dc-copy h2 { font-size: 16px; }
+    #discussion-cards-preview .dc-copy p { font-size: 13px; }
+    #discussion-cards-preview .dc-thumbnail { inline-size: 64px; block-size: 64px; }
+    #discussion-cards-preview .dc-metrics { gap: 8px; }
+  }
+  @media (pointer: coarse) {
+    #discussion-cards-preview .dc-controls button { min-block-size: 44px; }
+  }
+</style>
+
+<script>
+  (() => {
+    const preview = document.getElementById('discussion-cards-preview');
+    const devices = preview.querySelectorAll('button[data-device]');
+    const theme = preview.querySelector('[data-theme-toggle]');
+    const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+
+    function selectDevice(device) {
+      preview.dataset.device = device;
+      for (const button of devices) {
+        button.setAttribute('aria-pressed', String(button.dataset.device === device));
+      }
+    }
+
+    selectDevice(new URLSearchParams(location.search).get('view') === 'mobile' ? 'mobile' : 'desktop');
+    for (const button of devices) {
+      button.addEventListener('click', () => selectDevice(button.dataset.device));
+    }
+
+    function updateThemeButton() {
+      const dark = preview.dataset.theme ? preview.dataset.theme === 'dark' : systemTheme.matches;
+      theme.setAttribute('aria-pressed', String(dark));
+    }
+
+    updateThemeButton();
+    systemTheme.addEventListener('change', updateThemeButton);
+    theme.addEventListener('click', () => {
+      preview.dataset.theme = theme.getAttribute('aria-pressed') === 'true' ? 'light' : 'dark';
+      updateThemeButton();
+    });
+
+    if (globalThis.Tweak) {
+      const settings = { radius: 14, thumbnail: true };
+      const tweak = new Tweak({ container: preview, onChange() {
+        preview.style.setProperty('--dc-radius', `${settings.radius}px`);
+        preview.querySelector('.dc-thumbnail').hidden = !settings.thumbnail;
+      } });
+      tweak.addSlider(settings, 'radius', { label: '卡片圆角', min: 0, max: 24, unit: 'px' });
+      tweak.addToggle(settings, 'thumbnail', { label: '显示缩略图' });
+    }
+  })();
+</script>
+<!-- End discussion card preview -->
+</main>
+<script>
+  (() => {
+    // Lucide (ISC), copied from the project's lucide-vue-next icons for offline use.
+    const paths = {
+      'message-circle': 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z',
+      heart: 'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5',
+    };
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const icon of document.querySelectorAll('#discussion-cards-preview [data-lucide]')) {
+      const svg = document.createElementNS(ns, 'svg');
+      const path = document.createElementNS(ns, 'path');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '1.75');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('aria-hidden', 'true');
+      path.setAttribute('d', paths[icon.dataset.lucide]);
+      svg.append(path);
+      icon.replaceWith(svg);
+    }
+  })();
+</script>
+</body>
+</html>

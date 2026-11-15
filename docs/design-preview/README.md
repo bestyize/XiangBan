@@ -10,6 +10,8 @@
 
 [创意页作品卡片](../../services/server-forum/docs/design-specs/README.md) 首张卡片直达微观展厅，后两张分别展示《小王子：星辰之旅》及「运输船：Saltline」的详情和打开方式。[本机在线预览](http://127.0.0.1:1448/)。
 
+[讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示桌面双列、移动单列、纯文字帖与右侧小图帖。支持明暗切换，作者和互动数据为示例。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
+
 ## 小伴桌面
 
 [倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。

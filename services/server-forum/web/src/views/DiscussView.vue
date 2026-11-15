@@ -14,7 +14,6 @@ import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, 
 import type { IdeaCardItem } from '@/lib/ideaCards'
 import { loadFeaturedIdeas } from '@/lib/ideaCatalog'
 import { kindLabel } from '@/lib/content'
-import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import IdeaCard from '@/components/community/IdeaCard.vue'
 import MicroGallery from '@/components/community/MicroGallery.vue'
@@ -139,11 +138,12 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
     </div>
     <template v-else>
       <RequestState :loading="loading" :error="error" @retry="load" />
-      <MasonryGrid v-if="!ideas && data?.entries.length" class="discussion-grid" :columns="2">
+      <div v-if="!ideas && data?.entries.length" class="discussion-grid">
         <template v-for="entry in data.entries" :key="entry.kind + ':' + entry.value.id">
-          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:'all',tag:$event,page:undefined})" />
+          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" mode="discussion"
+            @select-tag="navigate({tab:'all',tag:$event,page:undefined})" />
         </template>
-      </MasonryGrid>
+      </div>
       <RequestState v-if="data && !data.entries.length && !ideaCards.length && (!showFeaturedIdeas || (!featuredCatalog.loading.value && !featuredCatalog.error.value))" empty />
       <div v-if="data && (page > 1 || data.hasMore)" class="discussion-pager">
         <button class="community-button" :disabled="page <= 1" @click="go(page - 1)">上一页</button>
@@ -155,12 +155,16 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 </template>
 
 <style scoped>
-.discussion-grid{margin:4px 12px}
-@container page (min-width: 720px) {
-  .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.discussion-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+  max-width: 950px;
+  margin: 4px auto 0;
+  padding-inline: 4px;
 }
-@container page (min-width: 960px) {
-  .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@container card-feed (min-width: 680px) {
+  .discussion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 }
 .ideas-grid {
   display: grid;
@@ -179,5 +183,5 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 .active-topic{margin:0 12px 8px;padding:6px 10px;border:0;border-radius:14px;background:var(--brand-soft);color:var(--brand);font-size:12px}
 .feed-note{font-size:12px;color:var(--ink-3);margin:0}
 .feed-note{padding:0 12px 8px}.login-prompt{text-align:center;padding:24px}.discussion-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;font-size:12px}
-@media(min-width:1100px){.discuss-page{max-width:1120px}.discussion-grid{margin-inline:0}}
+@media(min-width:1100px){.discuss-page{max-width:1120px}}
 </style>
