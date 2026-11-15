@@ -290,7 +290,7 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
-  it('opens AI quota directly in the native model window, including when signed out', async () => {
+  it('opens the contact page from the AI quota entry, including when signed out', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
       await flushPromises();
@@ -298,7 +298,8 @@ describe('ControlShell sidebar', () => {
       store.navigate('games');
       await wrapper.get('[data-testid="account-entry"]').trigger('click');
       await wrapper.get('[data-testid="nav-ai-quota"]').trigger('click');
-      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'model', tab: null, provider: 'xiaoban-ai' });
+      expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://chat.xiangban.xyz/contact' });
+      expect(invoke).not.toHaveBeenCalledWith('configuration_window_open', expect.anything());
       expect(wrapper.find('[data-testid="account-menu"]').exists()).toBe(false);
       expect(store.page).toBe('games');
       expect(store.settingsOpen).toBe(false);

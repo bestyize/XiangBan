@@ -16,7 +16,7 @@
 
 ## 账号 ID 与 AI 额度入口
 
-「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），「AI 额度」直接进入现有模型与点数页面。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
+「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），「获取 AI 额度」通过浏览器打开[联系我们](https://chat.xiangban.xyz/contact)。已有兑换码仍可在小伴 AI 的「模型与点数」里使用。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
 
 验证：`:common:community-core:jvmTest --tests '*AccountAndSessionTest*'`、`:business:community-native:compileAndroidMain`。本次未做 Android/iOS 实机验收或 iOS 编译。
 

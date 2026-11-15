@@ -234,7 +234,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 NavRow("我的收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
                 NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
-                NavRow("AI 额度") { open(Route.Models) }
+                NavRow("获取 AI 额度") { env.platform?.openInBrowser(CONTACT_URL) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/discuss?tab=site") }
                 NavRow("交流群") { env.platform?.openInBrowser(CONTACT_URL) }

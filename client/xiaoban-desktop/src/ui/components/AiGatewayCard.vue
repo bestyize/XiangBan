@@ -7,10 +7,10 @@ import type { ControlStore } from '../control-types.ts';
 import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
 import { bucketLabel, expiryText, formatAiCredits, pickTier } from '../ai-gateway.ts';
 
-const props = defineProps<{ store: ControlStore; config: AiConfigView | null; detached?: boolean; initialOpen?: boolean; hideSummary?: boolean }>();
+const props = defineProps<{ store: ControlStore; config: AiConfigView | null; detached?: boolean }>();
 const emit = defineEmits<{ config: [view: AiConfigView]; close: [] }>();
 
-const open = ref(!!props.detached || !!props.initialOpen);
+const open = ref(!!props.detached);
 watch(open, value => { if (!value) emit('close'); });
 watch(open, value => { if (props.detached && !value) void closeConfigurationWindow().catch(error => props.store.notify(error, 'error')); });
 const balance = ref<AiBalance | null>(null);
@@ -200,7 +200,7 @@ watch(uid, () => {
 </script>
 
 <template>
-  <template v-if="!detached && !hideSummary">
+  <template v-if="!detached">
   <div class="xb-group gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
     <div class="xb-row gw-row">
       <span class="gw-logo" aria-hidden="true"><Sprout :size="22" :stroke-width="2" /></span>
