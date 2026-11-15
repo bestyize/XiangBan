@@ -9,8 +9,8 @@ const { values } = parseArgs({ options: {
   saltline: { type: 'string' },
   out: { type: 'string' },
 } })
-if (!values.saltline || !values.out) {
-  throw new Error('用法：node --experimental-strip-types scripts/build-idea-players.mjs --saltline <原始 HTML> --out <输出目录>')
+if (!values.out) {
+  throw new Error('用法：node --experimental-strip-types scripts/build-idea-players.mjs --out <输出目录> [--saltline <原始 HTML>]')
 }
 
 const bridge = await readFile(new URL('../runtime-v2/bridge.js', import.meta.url), 'utf8')
@@ -46,6 +46,12 @@ function saltlinePlayer(html) {
 }
 
 function galleryPlayer(html, id) {
+  // GLTFLoader's TextureLoader branch decodes embedded images through <img>.
+  // Android's offline CSP allows blob images but blocks ImageBitmapLoader's fetch(blob:).
+  const bitmapLoaderChoice = /typeof createImageBitmap>"u"\|\|[^?]{1,60}(?=\?\(this\.textureLoader=new )/
+  if (!bitmapLoaderChoice.test(html)) throw new Error(`${id} 的 glTF 贴图加载器与固定版本不一致`)
+  html = html.replace(bitmapLoaderChoice, 'true')
+
   const controls = `<style>
   #fullscreen, #preview-fullscreen, [data-host-capsule] .gallery-link,
   [data-host-capsule] .masthead button[onclick="window.xb.exit()"] { display: none !important; }
@@ -73,13 +79,12 @@ document.addEventListener('keydown', event => {
 
 const gallery = new URL('../public/gallery-exhibits/', import.meta.url)
 const output = resolve(values.out)
-const players = await Promise.all([
-  readFile(values.saltline, 'utf8').then(html => ['saltline', saltlinePlayer(html)]),
-  ...[aquariumExhibit, rabbitExhibit].map(async ({ id, source }) => {
-    const html = await readFile(new URL(source, gallery), 'utf8')
-    return [id, galleryPlayer(html, id)]
-  }),
-])
+const sources = [aquariumExhibit, rabbitExhibit].map(async ({ id, source }) => {
+  const html = await readFile(new URL(source, gallery), 'utf8')
+  return [id, galleryPlayer(html, id)]
+})
+if (values.saltline) sources.unshift(readFile(values.saltline, 'utf8').then(html => ['saltline', saltlinePlayer(html)]))
+const players = await Promise.all(sources)
 await mkdir(output, { recursive: true })
 for (const [id, html] of players) {
   await writeFile(resolve(output, `${id}.html`), html)
@@ -91,7 +96,7 @@ for (const [id, html] of players) {
   const kind = id === 'saltline' ? 'game' : 'app'
   const manifest = {
     schemaVersion: 3, runtimeProtocol: 2, id, name: item.title, description: item.description,
-    version: '1.0.0', kind, category: kind === 'game' ? 'action' : 'tool',
+    version: kind === 'game' ? '1.0.0' : '1.0.1', kind, category: kind === 'game' ? 'action' : 'tool',
     entry: 'index.html', icon: 'cover.webp', cover: 'cover.webp',
     orientation: id === rabbitExhibit.id ? 'any' : 'landscape', input: ['touch', 'mouse', 'keyboard'],
   }
