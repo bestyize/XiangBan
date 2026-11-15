@@ -788,10 +788,12 @@ pub fn serve(
             if validate_stored(&item).is_ok() { items.push(item); }
         }
     }
+    let builtin_resource = crate::builtin_assets::find(name);
     let resource = items
         .iter()
         .flat_map(|item| assets(item).into_iter().chain(item.cover.iter()))
-        .find(|r| r.sha256 == name);
+        .find(|r| r.sha256 == name)
+        .or(builtin_resource.as_ref());
     let Some(resource) = resource else {
         return error(404);
     };

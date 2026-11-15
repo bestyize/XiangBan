@@ -2,10 +2,50 @@ package xyz.xiangban.xiaoban.common.community
 
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class NativeDownloadTest {
+    @Test fun signedResourceDownloadNeverForwardsForumToken() = runTest {
+        val id = "00112233-4455-6677-8899-aabbccddeeff"
+        val signed = "https://res.xiangban.xyz/forum-files/$id?exp=2000000000&sig=${"a".repeat(64)}"
+        var count = 0
+        val client = HttpClient(MockEngine { request ->
+            count++
+            if (request.url.host == "chat.xiangban.xyz") {
+                assertEquals("Bearer forum-token", request.headers[HttpHeaders.Authorization])
+                respond("", HttpStatusCode.TemporaryRedirect, headersOf(HttpHeaders.Location, signed))
+            } else {
+                assertEquals("res.xiangban.xyz", request.url.host)
+                assertNull(request.headers[HttpHeaders.Authorization])
+                respond("file", HttpStatusCode.OK)
+            }
+        })
+        val api = ForumApi(client, CommunityConfig()) { "forum-token" }
+        assertContentEquals("file".encodeToByteArray(), api.downloadAttachment(ForumAttachment(id,"file.txt",4)))
+        assertEquals(2, count)
+        client.close()
+    }
+
+    @Test fun rejectsRedirectToAnotherHost() = runTest {
+        val id = "00112233-4455-6677-8899-aabbccddeeff"
+        var count = 0
+        val client = HttpClient(MockEngine {
+            count++
+            respond("", HttpStatusCode.TemporaryRedirect, headersOf(HttpHeaders.Location,
+                "https://evil.example/forum-files/$id?exp=2000000000&sig=${"a".repeat(64)}"))
+        })
+        val api = ForumApi(client, CommunityConfig()) { "forum-token" }
+        assertFailsWith<ApiException> { api.downloadAttachment(ForumAttachment(id,"file.txt",4)) }
+        assertEquals(1, count)
+        client.close()
+    }
+
     @Test fun purchaseAndDownloadUseForumAuth() = runTest {
         val server = FakeServer()
         server.on("/api/attachments/test/purchase", body = """{"purchased":true,"charged":3,"balance":7}""")

@@ -93,7 +93,7 @@ async fn purchases_are_atomic_idempotent_and_keep_read_permissions() -> Result<(
     let Some(f) = Fixture::new().await? else { return Ok(()) };
     let buyer = f.user().await?;
     let seller = f.user().await?;
-    let topic = f.topic(seller, "share-learn").await?;
+    let topic = f.topic(seller, "share-software").await?;
     let id = Uuid::new_v4();
     sqlx::query("INSERT INTO attachments (id, topic_id, uploader_uid, filename, size, price) VALUES ($1, $2, $3, 'test.txt', 4, 10)")
         .bind(id).bind(topic).bind(seller).execute(&f.state.pool).await?;

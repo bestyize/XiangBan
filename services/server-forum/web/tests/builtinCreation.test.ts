@@ -6,7 +6,7 @@ const root = new URL('../../../../', import.meta.url)
 const publicDir = new URL('../public/builtin-games/', import.meta.url)
 const mobile = new URL('client/xiaoban-multiplatform/', root)
 const mobilePacks = new URL('androidApp/src/main/assets/game-packs-v2/', mobile)
-const asset = (url: string) => new URL(url.replace('/builtin-games/', ''), publicDir)
+const asset = (url: string) => new URL(url.split('/builtin-games/')[1], publicDir)
 
 test('playable games match mobile order and use the manifest icons', async () => {
   const mobile = await readFile(new URL('client/xiaoban-multiplatform/common/community-core/src/commonMain/kotlin/xyz/xiangban/xiaoban/common/community/GameLibrary.kt',root),'utf8')
@@ -18,7 +18,7 @@ test('playable games match mobile order and use the manifest icons', async () =>
     const dir = new URL(`${game.id}/`,publicDir)
     const manifest = JSON.parse(await readFile(new URL('manifest.json',dir),'utf8'))
     assert.equal(manifest.id,game.id); assert.ok(manifest.runtimeProtocol === 1 || manifest.runtimeProtocol === 2); assert.equal(manifest.entry,'index.html')
-    assert.equal(game.icon,`/builtin-games/${game.id}/${manifest.icon}`)
+    assert.equal(game.icon,`https://res.xiangban.xyz/builtin-games/${game.id}/${manifest.icon}`)
     await access(asset(game.icon))
     const html = await readFile(new URL('index.html',dir),'utf8')
     assert.match(html,/Content-Security-Policy/); assert.match(html,/connect-src 'none'/)

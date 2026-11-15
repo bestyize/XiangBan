@@ -9,10 +9,17 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.ContentType
+import io.ktor.http.Url
+import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 const val FORUM_IMAGE_MAX_BYTES = 5L * 1024 * 1024
 /** 现行服务端普通用户 5 MiB、守护者 30 MiB；内存上传另有 32 MiB 硬上限。 */
@@ -36,6 +43,9 @@ data class ForumAttachment(val id: String, val name: String, val size: Long, val
 
 @Serializable
 data class AttachmentPurchase(val purchased: Boolean, val charged: Int, val balance: Int)
+
+@Serializable
+private data class DirectForumTicket(val id: String, @SerialName("upload_url") val uploadUrl: String, val headers: Map<String, String>)
 
 
 internal val ForumAssetId = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -75,10 +85,12 @@ fun validateTopicAttachments(attachments: List<ForumAttachment>) {
 /** 不自动重放上传：先取会话提供的最新令牌，网络失败保留选中文件，由用户明确重试。 */
 class ForumUploads(private val client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val base = config.forumBase.trimEnd('/')
+    private val resourceBase = config.resourceBase.trimEnd('/')
+    private val directUploads = config.directForumUploads
 
     suspend fun image(file: ForumUploadFile, maxBytes: Long): ForumImage {
         validateForumUpload(file, maxBytes, true)
-        val uploaded = CommunityJson.decodeFromString<ForumImage>(upload("/api/images", file))
+        val uploaded = CommunityJson.decodeFromString<ForumImage>(if (directUploads) direct("image", file) else upload("/api/images", file))
         if (uploaded.size != file.bytes.size.toLong()) throw ApiException(200, "图片上传结果无效，请重试")
         forumImageMarkdown(uploaded, file.name)
         return uploaded
@@ -86,10 +98,64 @@ class ForumUploads(private val client: HttpClient, config: CommunityConfig, priv
 
     suspend fun attachment(file: ForumUploadFile, maxBytes: Long): ForumAttachment {
         validateForumUpload(file, maxBytes, false)
-        val uploaded = CommunityJson.decodeFromString<ForumAttachment>(upload("/api/attachments", file))
+        val uploaded = CommunityJson.decodeFromString<ForumAttachment>(if (directUploads) direct("attachment", file) else upload("/api/attachments", file))
         validateTopicAttachments(listOf(uploaded))
         if (uploaded.size <= 0 || uploaded.size != file.bytes.size.toLong()) throw ApiException(200, "附件上传结果无效，请重试")
         return uploaded
+    }
+
+    private suspend fun jsonPost(path: String, body: String, access: String): String {
+        val response = try {
+            client.post("$base$path") {
+                header(HttpHeaders.Authorization, "Bearer $access")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { throw ApiException(0, "上传连接失败，请重试") }
+        val text = response.bodyAsText()
+        if (response.status.value !in 200..299) throw parseApiError(response.status.value, text)
+        return text
+    }
+
+    private suspend fun direct(kind: String, file: ForumUploadFile): String {
+        val access = token() ?: throw ApiException(401, "无法取得登录凭据，请重试或重新登录")
+        val hash = withContext(Dispatchers.Default) { Sha256().apply { update(file.bytes) }.hex() }
+        val mime = if (kind == "image") file.mime.lowercase() else "application/octet-stream"
+        val payload = buildJsonObject { put("kind", kind); put("name", forumUploadName(file.name)); put("mime", mime); put("size", file.bytes.size); put("sha256", hash) }.toString()
+        val ticket = try { CommunityJson.decodeFromString<DirectForumTicket>(jsonPost("/api/resource-uploads/ticket", payload, access)) }
+            catch (e: ApiException) { throw e }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { throw ApiException(0, "上传凭证无效") }
+        if (!ForumAssetId.matches(ticket.id)) throw ApiException(0, "上传凭证无效")
+        val target = runCatching { Url(ticket.uploadUrl) }.getOrElse { throw ApiException(0, "上传地址无效") }
+        val expected = runCatching { Url(resourceBase) }.getOrElse { throw ApiException(0, "资源机地址无效") }
+        val path = if (kind == "image") "/internal/forum-image/images/${ticket.id}" else "/internal/forum-file/${ticket.id}"
+        if (target.protocol != expected.protocol || target.host != expected.host || target.port != expected.port ||
+            target.user != null || target.password != null || target.fragment.isNotEmpty() || target.encodedPath != path || target.encodedQuery.isNotEmpty())
+            throw ApiException(0, "上传地址无效")
+        val allowed = setOf("Content-Type", "X-Content-Sha256", "X-Expiration", "X-Signature") + if (kind == "attachment") setOf("X-File-Ext") else emptySet()
+        val headers = ticket.headers
+        if (headers.keys != allowed || headers["Content-Type"] != mime || headers["X-Content-Sha256"] != hash ||
+            headers["X-Expiration"]?.toLongOrNull() == null || headers["X-Signature"]?.matches(Regex("[a-f0-9]{64}")) != true ||
+            (kind == "attachment" && headers["X-File-Ext"]?.matches(Regex("[a-z0-9]{1,8}")) != true))
+            throw ApiException(0, "上传凭证无效")
+        val resource = client.config { followRedirects = false }
+        val receipt = try {
+            val response = resource.post(ticket.uploadUrl) {
+                this.headers.remove(HttpHeaders.Authorization)
+                headers.forEach { (name, value) -> header(name, value) }
+                setBody(file.bytes)
+            }
+            val text = response.bodyAsText()
+            if (response.status.value !in 200..299) throw parseApiError(response.status.value, text)
+            text
+        } catch (e: CancellationException) { throw e }
+        catch (e: ApiException) { throw e }
+        catch (e: Exception) { throw ApiException(0, "资源机上传失败，请重试") }
+        finally { resource.close() }
+        val latest = token() ?: throw ApiException(401, "无法取得登录凭据，请重试或重新登录")
+        return jsonPost("/api/resource-uploads/${ticket.id}/complete", receipt, latest)
     }
 
     private suspend fun upload(path: String, file: ForumUploadFile): String {

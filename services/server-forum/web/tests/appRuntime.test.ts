@@ -46,6 +46,17 @@ const ideaUrl = new URL('https://forum.example/idea-players/v1/aquarium.html')
 const ideaHtml = '<!doctype html><html><head><script>\ndocument.currentScript.dataset.parentOrigin = location.origin;\n</script></head><body>水族箱</body></html>'
 const ideaPolicy = "sandbox allow-scripts; frame-ancestors 'self'; default-src 'none'; script-src 'unsafe-inline'"
 
+test('a resource-hosted player retains the actual parent origin', async t => {
+  const url = new URL('https://res.xiangban.xyz/idea-players/v1/aquarium.html')
+  const policy = ideaPolicy.replace("frame-ancestors 'self'", "frame-ancestors 'self' https://forum.example")
+  t.mock.method(globalThis, 'fetch', async () => new Response(ideaHtml, {
+    headers: { 'content-type': 'text/html', 'content-security-policy': policy },
+  }))
+  const srcdoc = await readIdeaPlayerDocument(url, 'allow-scripts', new AbortController().signal, () => {}, 'https://forum.example')
+  assert.ok(srcdoc)
+  assert.match(srcdoc, /<script data-parent-origin="https:\/\/forum.example">/)
+})
+
 test('a static gzip player reports its decoded size and keeps the response policy in srcdoc', async t => {
   const size = Buffer.byteLength(ideaHtml)
   t.mock.method(globalThis, 'fetch', async () => new Response(ideaHtml, {

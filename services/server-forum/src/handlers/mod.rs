@@ -21,6 +21,8 @@ pub mod model_rankings;
 pub mod follows;
 pub mod help;
 pub mod images;
+mod resource_mirror;
+pub mod resource_uploads;
 pub mod interact;
 pub mod me;
 pub mod meta;

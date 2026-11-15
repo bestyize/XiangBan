@@ -9,4 +9,6 @@ data class CommunityConfig(
     val linkBase: String = "https://link.xiangban.xyz/api/link",
     val deviceName: String = "小伴手机应用",
     val runtimeV2: Boolean = false,
+    val resourceBase: String = "https://res.xiangban.xyz",
+    val directForumUploads: Boolean = true,
 )

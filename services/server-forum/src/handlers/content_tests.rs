@@ -112,7 +112,9 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":999,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::CONFLICT);
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha}), true).await, StatusCode::BAD_REQUEST, "内容包回调必须带 manifest");
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("reminder","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST, "manifest 类型要与上传类型一致");
-    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::OK);
+    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"object_key":"files/../bad.zip","size":1000,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST);
+    let object_key = format!("files/{}.zip", "a".repeat(32));
+    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"object_key":object_key,"size":1000,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::OK);
 
     // 别人不能拿走这个文件；作者可以发布，并且是 T2、一键可用（effect）。
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), publish.clone()).await;
@@ -149,12 +151,13 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::BAD_REQUEST, "封面未确认");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), with_cover.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "别人的封面和文件不能用");
-    assert_eq!(callback(&app, &secret, json!({"file_key":cover_key,"size":5000,"sha256":"e".repeat(64)}), true).await, StatusCode::OK);
+    let cover_object = format!("img/{}.webp", "b".repeat(32));
+    assert_eq!(callback(&app, &secret, json!({"file_key":cover_key,"object_key":cover_object,"size":5000,"sha256":"e".repeat(64)}), true).await, StatusCode::OK);
     let (s, dawn) = call(&app, "POST", "/api/packs", Some(&author_t), with_cover).await;
     assert_eq!(s, StatusCode::OK, "{dawn}");
     let dawn_id = dawn["id"].as_i64().unwrap();
     let (_, dd) = call(&app, "GET", &format!("/api/packs/{dawn_id}"), None, Value::Null).await;
-    assert_eq!(dd["cover_url"], format!("https://res.test/{cover_key}"));
+    assert_eq!(dd["cover_url"], format!("https://res.test/{cover_object}"));
 
     // 列表与详情。
     let (s, list) = call(&app, "GET", "/api/packs?kind=effect&q=%E5%A4%95", None, Value::Null).await;
@@ -174,6 +177,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(d["sha256"], sha);
     let url = d["url"].as_str().unwrap();
     let (path, query) = url.strip_prefix("https://res.test/").unwrap().split_once('?').unwrap();
+    assert_eq!(path, object_key);
     let exp: i64 = query.split('&').find_map(|kv| kv.strip_prefix("exp=")).unwrap().parse()?;
     let sig = query.split('&').find_map(|kv| kv.strip_prefix("sig=")).unwrap();
     assert!(content::verify_download(path, exp, sig, chrono::Utc::now().timestamp(), &secret));

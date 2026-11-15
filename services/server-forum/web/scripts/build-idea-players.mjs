@@ -16,7 +16,7 @@ if (!values.out) {
 const bridge = await readFile(new URL('../runtime-v2/bridge.js', import.meta.url), 'utf8')
 const bootstrap = `<script>
 if (!window.xb) {
-  document.currentScript.dataset.parentOrigin = location.origin;
+  document.currentScript.dataset.parentOrigin = location.hostname === 'res.xiangban.xyz' ? 'https://chat.xiangban.xyz' : location.origin;
   ${bridge}
 }
 function syncHostCapsule() {

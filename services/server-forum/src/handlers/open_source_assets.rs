@@ -67,6 +67,7 @@ async fn store(
     let mime = image(&data)?;
     let id = Uuid::new_v4();
     let size = data.len();
+    super::images::mirror_to_resource(state, "open-source/assets", id, mime, &data).await?;
     let mut tx = state.pool.begin().await?;
     sqlx::query("INSERT INTO open_source_assets(id,project,mime,data,source_url,created_by) VALUES($1,$2,$3,$4,$5,$6)").bind(id).bind(project.to_ascii_lowercase()).bind(mime).bind(data).bind(source).bind(&admin.username).execute(&mut *tx).await?;
     audit(
@@ -202,6 +203,12 @@ pub async fn public(State(s): State<AppState>, Path(id): Path<Uuid>) -> AppResul
     let row:Option<(String,Vec<u8>)>=sqlx::query_as("SELECT mime,data FROM open_source_assets a WHERE a.id=$1 AND EXISTS(SELECT 1 FROM open_source_catalog c,jsonb_array_elements(c.published->'projects') p WHERE c.singleton AND (p->>'icon_url'=$2 OR p->>'cover_url'=$2))").bind(id).bind(url).fetch_optional(&s.pool).await?;
     let (mime, data) = row.ok_or_else(|| AppError::not_found("已发布素材"))?;
     Ok(response(mime, data, true))
+}
+pub async fn public_head(State(s): State<AppState>, Path(id): Path<Uuid>) -> AppResult<axum::http::StatusCode> {
+    let url = format!("/api/open-source/assets/{id}");
+    let (allowed,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM open_source_assets a WHERE a.id=$1 AND EXISTS(SELECT 1 FROM open_source_catalog c,jsonb_array_elements(c.published->'projects') p WHERE c.singleton AND (p->>'icon_url'=$2 OR p->>'cover_url'=$2)))")
+        .bind(id).bind(url).fetch_one(&s.pool).await?;
+    if allowed { Ok(axum::http::StatusCode::OK) } else { Err(AppError::not_found("已发布素材")) }
 }
 async fn preview(
     State(s): State<AppState>,

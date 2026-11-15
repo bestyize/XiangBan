@@ -261,6 +261,7 @@ async fn curated_assets_are_private_until_referenced_by_the_exact_published_proj
         asset_status(&h.app, url, None).await.0,
         StatusCode::NOT_FOUND
     );
+    assert_eq!(call(&h.app, "HEAD", url, None, Value::Null).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
         asset_status(
             &h.app,
@@ -307,6 +308,7 @@ async fn curated_assets_are_private_until_referenced_by_the_exact_published_proj
     let (status, bytes) = asset_status(&h.app, url, None).await;
     assert_eq!(status, StatusCode::OK);
     assert!(bytes.starts_with(b"\x89PNG"));
+    assert_eq!(call(&h.app, "HEAD", url, None, Value::Null).await.0, StatusCode::OK);
     let mut wrong = one_project();
     wrong["projects"][0]["full_name"] = json!("Other/Project");
     wrong["projects"][0]["icon_url"] = json!(url);

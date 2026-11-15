@@ -47,6 +47,12 @@ fn path_for(dir: &FsPath, id: Uuid) -> PathBuf {
     dir.join(format!("img-{id}"))
 }
 
+/// Store a private copy on the resource host before making an upload visible.
+/// The resource host checks the public forum endpoint before serving the image.
+pub(super) async fn mirror_to_resource(state: &AppState, kind: &str, id: Uuid, mime: &str, data: &[u8]) -> AppResult<()> {
+    super::resource_mirror::store(state, kind, id, mime, data, None).await
+}
+
 pub async fn upload(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -108,6 +114,15 @@ pub async fn upload(
     };
     tokio::fs::rename(&tmp_path, &final_path).await.map_err(io_err)?;
 
+    let mirrored = async {
+        let bytes = tokio::fs::read(&final_path).await.map_err(io_err)?;
+        mirror_to_resource(&state, "images", id, mime, &bytes).await
+    }.await;
+    if let Err(err) = mirrored {
+        let _ = tokio::fs::remove_file(&final_path).await;
+        return Err(err);
+    }
+
     let inserted = sqlx::query("INSERT INTO images (id, uploader_uid, mime, size) VALUES ($1, $2, $3, $4)")
         .bind(id)
         .bind(user.uid)
@@ -140,6 +155,13 @@ pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppRes
     h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; sandbox"));
     h.insert(header::CONTENT_LENGTH, HeaderValue::from(size.max(0) as u64));
     Ok(response)
+}
+
+/// Authorization-only HEAD for the resource host; do not read the image body.
+pub async fn head(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppResult<axum::http::StatusCode> {
+    let (allowed,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM images WHERE id=$1 AND NOT editor_pending)")
+        .bind(id).fetch_one(&state.pool).await?;
+    if allowed { Ok(axum::http::StatusCode::OK) } else { Err(AppError::not_found("图片")) }
 }
 
 pub enum CommentImageTarget {
@@ -238,6 +260,48 @@ mod tests {
         assert_eq!(sniff(b"<svg xmlns=\"http://www.w3.org/2000/svg\">"), None);
         assert_eq!(sniff(b"<!DOCTYPE html>"), None);
         assert_eq!(sniff(b""), None);
+    }
+
+    #[tokio::test]
+    async fn mirror_signs_content_and_rejects_a_bad_receipt() {
+        use axum::{body::Bytes, routing::post, Router};
+        use crate::{auth::JwksVerifier, config::AppConfig};
+        use std::sync::Arc;
+
+        const SECRET: &[u8] = b"0123456789abcdef0123456789abcdef";
+        let app = Router::new().route("/internal/forum-image/images/{id}", post(|Path(id): Path<Uuid>, headers: HeaderMap, body: Bytes| async move {
+            let hash = headers["X-Content-Sha256"].to_str().unwrap();
+            let expires = headers["X-Expiration"].to_str().unwrap();
+            let message = format!("POST\nimages/{id}\n{hash}\n{}\n{expires}", body.len());
+            assert!(crate::content::verify_callback(message.as_bytes(), headers["X-Signature"].to_str().unwrap(), SECRET));
+            let receipt_hash = if body.ends_with(b"bad") { "bad" } else { hash };
+            Json(json!({"object_key":format!("forum-content/objects/{}.png", "a".repeat(32)),"sha256":receipt_hash,"size":body.len()}))
+        })).route("/internal/forum-file/{id}", post(|Path(id): Path<Uuid>, headers: HeaderMap, body: Bytes| async move {
+            let hash = headers["X-Content-Sha256"].to_str().unwrap();
+            let expires = headers["X-Expiration"].to_str().unwrap();
+            let ext = headers["X-File-Ext"].to_str().unwrap();
+            let message = format!("POST\nattachments/{id}\n{hash}\n{}\n{expires}\n{ext}", body.len());
+            assert!(crate::content::verify_callback(message.as_bytes(), headers["X-Signature"].to_str().unwrap(), SECRET));
+            Json(json!({"object_key":format!("forum-content/objects/{}.{ext}", "b".repeat(32)),"sha256":hash,"size":body.len()}))
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let mut config = AppConfig::from_env();
+        config.resource_base_url = Some(format!("http://{addr}"));
+        config.resource_secret = SECRET.to_vec();
+        let state = AppState {
+            pool: sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://localhost/test").unwrap(),
+            config: Arc::new(config),
+            verifier: Arc::new(JwksVerifier::new("test".into(), "test".into(), "test".into())),
+            http: reqwest::Client::new(),
+        };
+        assert!(mirror_to_resource(&state, "images", Uuid::new_v4(), "image/png", b"good").await.is_ok());
+        assert!(mirror_to_resource(&state, "images", Uuid::new_v4(), "image/png", b"bad").await.is_err());
+        assert!(mirror_to_resource(&state, "../bad", Uuid::new_v4(), "image/png", b"good").await.is_err());
+        assert!(super::super::resource_mirror::store(&state, "attachments", Uuid::new_v4(), "application/octet-stream", b"file", Some("zip")).await.is_ok());
+        assert!(super::super::resource_mirror::store(&state, "attachments", Uuid::new_v4(), "application/octet-stream", b"file", Some("../zip")).await.is_err());
+        server.abort();
     }
 }
 

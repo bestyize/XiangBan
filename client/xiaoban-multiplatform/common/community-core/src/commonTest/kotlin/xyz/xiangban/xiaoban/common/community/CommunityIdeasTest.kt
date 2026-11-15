@@ -31,11 +31,11 @@ class CommunityIdeasTest {
     }
 
     @Test
-    fun ideaRuntimeUsesSameOriginAndContentAddressedArchive() = runTest {
+    fun ideaRuntimeUsesResourceOriginAndContentAddressedArchive() = runTest {
         val sha256 = "c".repeat(64)
         val server = FakeServer()
         server.on("/idea-players/v1/packages/oil-paint.json", body = """
-            {"kind":"game","version":"1.1.3","sha256":"$sha256","size":3408}
+            {"kind":"game","version":"1.1.3","sha256":"$sha256","size":3408,"url":"https://res.xiangban.xyz/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip"}
         """.trimIndent())
         val config = CommunityConfig()
         val api = ForumApi(server.client, config) { error("公开作品包无需读取令牌") }
@@ -43,7 +43,8 @@ class CommunityIdeasTest {
         assertFailsWith<IllegalArgumentException> { api.ideaRuntime("../settings") }
         val download = api.ideaRuntime("oil-paint")
 
-        assertEquals("${config.forumBase}/idea-players/v1/packages/oil-paint-$sha256.zip", download.url)
+        assertEquals("${config.resourceBase}/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip", download.url)
+        assertEquals("res.xiangban.xyz", server.requests.single().url.host)
         assertEquals("1.1.3", download.version)
         assertEquals("game", download.kind)
         assertEquals(3408L, download.size)

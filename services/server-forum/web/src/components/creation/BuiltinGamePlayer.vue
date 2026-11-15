@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppRuntimeStatus from '@/components/creation/AppRuntimeStatus.vue'
-import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
+import { builtinAsset, builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
 import { checkedMbtiResultLink, decodeMbtiPng } from '@/lib/mbtiExport'
 const props = defineProps<{ gameId: string }>()
@@ -23,7 +23,7 @@ async function provideMbtiAsset(d:Record<string,unknown>, target:Window) {
   let asset=imageAssets.get(key)
   if(!asset){
     const file=key==='characters'?'characters.webp':key==='observer'?'observer-jade-share.webp':'test-qr.webp'
-    asset=fetch(`/builtin-games/mbti/assets/${file}`,{credentials:'omit',redirect:'error'}).then(async response=>{
+    asset=fetch(builtinAsset(`mbti/assets/${file}`),{credentials:'omit',redirect:'error'}).then(async response=>{
       if(!response.ok)throw new Error('素材不可用')
       const blob=await response.blob();if(blob.type!=='image/webp'||blob.size>3*1024*1024)throw new Error('素材无效')
       return blob
@@ -81,7 +81,7 @@ async function restart() {
   message.value = '正在读取作品信息…'
   try {
     if (!game.value) throw new Error('找不到这个内置游戏')
-    const response = await fetch(`/builtin-games/${game.value.id}/manifest.json`, {credentials:'omit',signal:controller.signal})
+    const response = await fetch(builtinAsset(`${game.value.id}/manifest.json`), {credentials:'omit',signal:controller.signal})
     if (!response.ok) throw new Error('游戏资源不可用')
     const manifest = await response.json()
     if (manifest.id !== game.value.id || manifest.entry !== 'index.html' || (manifest.runtimeProtocol !== 1 && manifest.runtimeProtocol !== 2)) throw new Error('游戏资源不完整')
@@ -98,7 +98,7 @@ onMounted(() => {
   stageObserver=new ResizeObserver(([entry]) => { if (entry) stageSize.value={width:entry.contentRect.width,height:entry.contentRect.height} })
   if (stage.value) stageObserver.observe(stage.value)
 })
-const url = computed(() => game.value && ready.value ? `/builtin-games/${game.value.id}/index.html?hostNonce=${encodeURIComponent(nonce.value)}` : '')
+const url = computed(() => game.value && ready.value ? `${builtinAsset(`${game.value.id}/index.html`)}?hostNonce=${encodeURIComponent(nonce.value)}` : '')
 function initialize() {
   if (!connected.value) message.value = '正在启动作品…'
   frame.value?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.init',nonce:nonce.value,save:null,safeArea:{top:0,right:0,bottom:0,left:0}}, '*')

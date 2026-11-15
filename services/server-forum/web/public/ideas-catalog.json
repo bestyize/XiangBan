@@ -5,7 +5,7 @@
       "kind": "gallery",
       "title": "微观展厅",
       "description": "看龙鱼与孔雀鱼共游，探索更多 3D 展品。",
-      "cover": "/gallery-exhibits/assets/gallery/living-room.webp",
+      "cover": "https://res.xiangban.xyz/img/ef56ba0d3867da8b55406d775adbc4f0.webp",
       "author": "RealWorldBuilder",
       "date": "2026-11-15",
       "href": "/ideas?tab=gallery"
@@ -20,10 +20,10 @@
         "desktop": "拖动旋转，滚轮缩放",
         "mobile": "拖动旋转，双指缩放"
       },
-      "cover": "/gallery-exhibits/assets/gallery/rabbit.webp",
+      "cover": "https://res.xiangban.xyz/img/3539039a46f6944dff71c6e7ba324180.webp",
       "images": [
-        "/ideas-covers/plush-rabbit-side.webp",
-        "/ideas-covers/plush-rabbit-texture.webp"
+        "https://res.xiangban.xyz/img/25d95ab3a4ab5f1f00e6f3e243f101b5.webp",
+        "https://res.xiangban.xyz/img/8fb2c90e7e44e57493fe28d1ae88e18f.webp"
       ],
       "label": "3D模型",
       "author": "RealWorldBuilder",
@@ -36,7 +36,7 @@
       "kind": "work",
       "title": "星夜骑士：Starry Nightrider",
       "description": "骑车穿过梵高《星夜》里的村庄，把收集到的光球送进教堂尖塔。",
-      "cover": "/ideas-covers/starry-nightrider.webp",
+      "cover": "https://res.xiangban.xyz/img/b3a297969ddca58158a658be5ea56cc9.webp",
       "label": "游戏",
       "author": "@ebbyamir",
       "date": "2026-11-15",
@@ -49,7 +49,7 @@
       "kind": "work",
       "title": "小王子：星辰之旅",
       "description": "从 B-612 出发，踏上星球间的 3D 旅程。",
-      "cover": "/ideas-covers/little-prince.webp",
+      "cover": "https://res.xiangban.xyz/img/645e956967eccfb3eb86b7100619f298.webp",
       "label": "游戏",
       "author": "Sac",
       "date": "2026-11-15",
@@ -61,7 +61,7 @@
       "kind": "work",
       "title": "运输船：Saltline",
       "description": "潜入雨夜货港，切断中继站后乘船撤离。",
-      "cover": "/ideas-covers/saltline.webp",
+      "cover": "https://res.xiangban.xyz/img/292254612ca74de8a8a2453a53349e46.webp",
       "label": "游戏",
       "author": "Felix Rieseberg",
       "date": "2026-11-15",
@@ -74,7 +74,7 @@
       "kind": "work",
       "title": "Oil Paint",
       "description": "在实时笔触绘成的 3D 油画里漫步，探索秋林与极光下的雪脊。",
-      "cover": "/ideas-covers/oil-paint.webp",
+      "cover": "https://res.xiangban.xyz/img/f2169b1229ba2765a71c63a0ba089f08.webp",
       "label": "游戏",
       "author": "@BlendiByl",
       "date": "2026-11-15",

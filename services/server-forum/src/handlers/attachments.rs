@@ -1,6 +1,6 @@
 //! 帖子附件：先上传（得到 id），发帖或编辑时用 `attachment_ids` 挂到帖子上。
 //!
-//! 文件放在 `FORUM_UPLOAD_DIR/{id}`，数据库只记文件名和大小。下载一律按
+//! 新客户端直接上传资源机，旧入口暂存到 `FORUM_UPLOAD_DIR/{id}` 后转存。下载一律按
 //! `application/octet-stream` + `attachment` 输出，浏览器不会在站内直接打开用户上传的 HTML 或 SVG。
 
 use super::topics::GUARDIAN_LEVEL;
@@ -33,6 +33,8 @@ use uuid::Uuid;
 pub const MAX_PER_TOPIC: usize = 5;
 /// 已上传但还没挂到帖子上的附件上限，防止只传不发占满磁盘。
 const MAX_PENDING: i64 = 10;
+// Bound memory while forwarding large files to the resource service.
+static MIRROR_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
 /// multipart 头部和边界的余量，用于按 Content-Length 提前拒绝超大请求。
 pub(super) const MULTIPART_OVERHEAD: u64 = 64 * 1024;
 
@@ -94,6 +96,12 @@ pub fn clean_filename(raw: &str) -> String {
     format!("{}{ext}", stem.chars().take(keep).collect::<String>())
 }
 
+pub(super) fn resource_extension(filename: &str) -> String {
+    filename.rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
+        .filter(|ext| !ext.is_empty() && ext.len() <= 8 && ext.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+        .unwrap_or_else(|| "bin".into())
+}
+
 pub async fn upload(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -143,6 +151,17 @@ pub async fn upload(
         return Err(AppError::BadRequest("文件是空的".into()));
     }
     tokio::fs::rename(&tmp_path, &final_path).await.map_err(io_err)?;
+
+    let mirrored = async {
+        let _permit = MIRROR_SLOTS.acquire().await.map_err(|_| AppError::Internal("资源上传暂不可用".into()))?;
+        let bytes = tokio::fs::read(&final_path).await.map_err(io_err)?;
+        let ext = resource_extension(&filename);
+        super::resource_mirror::store(&state, "attachments", id, "application/octet-stream", &bytes, Some(&ext)).await
+    }.await;
+    if let Err(err) = mirrored {
+        let _ = tokio::fs::remove_file(&final_path).await;
+        return Err(err);
+    }
 
     let inserted = sqlx::query("INSERT INTO attachments (id, uploader_uid, filename, size) VALUES ($1, $2, $3, $4)")
         .bind(id)
@@ -241,6 +260,15 @@ pub async fn download(
         if !purchased { return Err(AppError::Forbidden(format!("请先确认购买，附件需要 {} 积分", row.price))); }
     }
 
+    if let Some(base) = &state.config.resource_base_url {
+        let exp = Utc::now().timestamp() + state.config.download_url_ttl_secs;
+        let signed = crate::content::signed_download_url(base, &format!("forum-files/{id}"), exp, &state.config.resource_secret);
+        let url = format!("{signed}&name={}", encode_filename(&row.filename));
+        return Response::builder().status(StatusCode::TEMPORARY_REDIRECT)
+            .header(header::LOCATION, url).header(header::CACHE_CONTROL, "private, no-store")
+            .body(Body::empty()).map_err(|e| AppError::Internal(e.to_string()));
+    }
+
     let file = File::open(state.config.upload_dir.join(id.to_string()))
         .await
         .map_err(|_| AppError::not_found("附件"))?;
@@ -258,9 +286,7 @@ pub async fn download(
     Ok(response)
 }
 
-pub fn content_disposition(filename: &str) -> String {
-    let fallback: String =
-        filename.chars().map(|c| if c.is_ascii_graphic() && !matches!(c, '"' | '\\' | '%') || c == ' ' { c } else { '_' }).collect();
+fn encode_filename(filename: &str) -> String {
     let mut encoded = String::new();
     for b in filename.bytes() {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
@@ -269,7 +295,13 @@ pub fn content_disposition(filename: &str) -> String {
             encoded.push_str(&format!("%{b:02X}"));
         }
     }
-    format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
+    encoded
+}
+
+pub fn content_disposition(filename: &str) -> String {
+    let fallback: String =
+        filename.chars().map(|c| if c.is_ascii_graphic() && !matches!(c, '"' | '\\' | '%') || c == ' ' { c } else { '_' }).collect();
+    format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{}", encode_filename(filename))
 }
 
 pub async fn list_for_topic(pool: &PgPool, topic_id: i64, viewer: Option<Uuid>) -> AppResult<Vec<AttachmentItem>> {
@@ -320,7 +352,19 @@ pub async fn purchase(
     Reader::from_user(Some(&auth.user)).check(row.min_read_level.unwrap_or(0), row.author_uid.unwrap())?;
     crate::reply_content::ensure_attachment_visible(&state.pool, id, Some(auth.user.uid)).await?;
     // 文件不存在时不收费；解锁后下载失败可以凭购买记录重试。
-    File::open(state.config.upload_dir.join(id.to_string())).await.map_err(|_| AppError::not_found("附件"))?;
+    if let Some(base) = &state.config.resource_base_url {
+        let exp = Utc::now().timestamp() + state.config.download_url_ttl_secs;
+        let url = crate::content::signed_download_url(base, &format!("forum-files/{id}"), exp, &state.config.resource_secret);
+        let response = state.http.head(url).timeout(std::time::Duration::from_secs(15)).send().await
+            .map_err(|_| AppError::ServiceUnavailable("附件资源暂不可用，请稍后重试".into()))?;
+        if response.status() == StatusCode::NOT_FOUND { return Err(AppError::not_found("附件")); }
+        let length = response.headers().get(header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<u64>().ok());
+        if !response.status().is_success() || length != Some(row.size.max(0) as u64) {
+            return Err(AppError::ServiceUnavailable("附件资源暂不可用，请稍后重试".into()));
+        }
+    } else {
+        File::open(state.config.upload_dir.join(id.to_string())).await.map_err(|_| AppError::not_found("附件"))?;
+    }
     let buyer = auth.user.uid;
     let seller = row.uploader_uid;
     points::lock_users(&mut tx, &[buyer, seller]).await?;

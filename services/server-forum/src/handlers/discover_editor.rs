@@ -68,6 +68,8 @@ async fn store_article_asset(s:AppState,e:Editor,kind:String,key:String,input:Fr
     let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM frontier_assets WHERE article_key=$1 AND kind=$2")
         .bind(&key).bind(&kind).fetch_one(&mut *tx).await?;
     if count >= 20 { return Err(AppError::BadRequest("每篇文章最多上传 20 张图片".into())); }
+    let resource_kind = if kind == "frontier" { "discover/frontier-assets" } else { "discover/article-assets" };
+    super::images::mirror_to_resource(&s, resource_kind, id, mime, &bytes).await?;
     sqlx::query("INSERT INTO frontier_assets(id,article_key,mime,data,kind) VALUES($1,$2,$3,$4,$5)")
         .bind(id).bind(&key).bind(mime).bind(bytes).bind(&kind).execute(&mut *tx).await?;
     log(&mut tx, &e.operator, "article.asset.upload", &kind, &key, &format!("asset={id}")).await?;

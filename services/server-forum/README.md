@@ -32,7 +32,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 前端开发：`npm --prefix services/server-forum/web run dev`，默认端口 5185，`/api` 代理到 55010；可用 `FORUM_WEB_PORT`、`FORUM_API` 覆盖。
 
-「创意 → 微观展厅」的封面和交互预览随前端产物一起部署。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
+「创意 → 微观展厅」的交互预览在生产环境由 `https://res.xiangban.xyz/gallery-exhibits/` 分发。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
 
 「龙鱼」展品播放朱红龙鱼，沿用 `/gallery-exhibits/fish/arowana/preview.html`。水族箱默认展示朱红龙鱼和砂石水草，设置中可切换蓝色龙鱼及孔雀鱼组合。两张展品封面位于 `web/assets/gallery/`。
 
@@ -40,17 +40,17 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 精选作品评论使用 `/api/ideas/:slug/comments`，接受公开目录中的 `work` 和 `exhibit`。网页复用全站评论组件，手机读写同一接口。留言、回复、点赞、图片和删除沿用日报评论的处理逻辑，各作品和日报按独立存储键隔离。
 
-网页和手机版实时读取同一份公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署为 `/ideas-catalog.json`。目录顺序就是创意首页的精选顺序。`cover` 用作列表封面和详情首图，可按显示顺序在 `images` 补充作品图。更新精选时只需发布新版网页产物，手机无需重新打包。作品包、方案和帖子仍从现有论坛接口读取。
+网页和手机版实时读取同一份公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署到 `https://res.xiangban.xyz/forum-web/ideas-catalog.json`，原 `/ideas-catalog.json` 地址会跳转到资源机。目录顺序就是创意首页的精选顺序。`cover` 用作列表封面和详情首图，可按显示顺序在 `images` 补充作品图。更新精选时只需发布新版网页产物，手机无需重新打包。作品包、方案和帖子仍从现有论坛接口读取。
 
-目录中的 `player` 标记站内可运行的精选。Android 从 `/idea-players/v1/packages/{id}.json` 读取版本、大小和 SHA-256，校验同目录下的 `{id}-{sha256}.zip` 后进入 V2 小程序容器。水族箱从微观展厅进入同一运行容器。将下文产出的五个通用 V2 ZIP 暂存为网站下载文件：
+目录中的 `player` 标记站内可运行的精选。Android 从 `https://res.xiangban.xyz/idea-players/v1/packages/{id}.json` 读取版本、大小、SHA-256 和资源机 URL，下载 `files/{md5}.zip` 并验证 SHA-256 后进入 V2 小程序容器；在非计费网络启动时后台预缓存。水族箱从微观展厅进入同一运行容器。将下文产出的五个通用 V2 ZIP 暂存：
 
 ```sh
-node scripts/stage-idea-runtime-packs.mjs --out /path/to/idea-players-v1/packages \
+node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging \
   /path/to/saltline.zip /path/to/aquarium.zip /path/to/plush-rabbit.zip \
   /path/to/Starry-Nightrider-v2.zip /path/to/Oil-Paint-v2.zip
 ```
 
-该脚本逐字节复用已有 ZIP，只生成下载名和描述文件。先部署带哈希的 ZIP，再更新描述文件。网页的播放器文件与 ZIP 从同一次构建生成，桌面可以直接导入同一个 ZIP。
+该脚本逐字节复用已有 ZIP，只生成 MD5 下载名和描述文件。先将 ZIP 上传到资源机 `/var/www/res.xiangban.xyz/files/` 并核对 SHA-256，再将 JSON 更新到 `/srv/xiangban-resource/idea-players-v1/packages/`。网页的播放器文件与 ZIP 从同一次构建生成，桌面可以直接导入同一个 ZIP。
 
 站内作品由 Nginx 从论坛 Web 根目录之外提供。先在 `web/` 执行 `npm run build`，再用原始的 Saltline 单文件和已同步的展品生成三个 HTML 及对应的通用 V2 ZIP：
 
@@ -58,7 +58,7 @@ node scripts/stage-idea-runtime-packs.mjs --out /path/to/idea-players-v1/package
 node --experimental-strip-types scripts/build-idea-players.mjs --saltline /path/to/Saltline.html --out /path/to/idea-players-v1
 ```
 
-将生成目录部署到 `/srv/xiangban-replica/apps/forum/idea-players-v1/`，在论坛 HTTPS 站点引入 [`deploy/nginx-idea-players.conf`](deploy/nginx-idea-players.conf)。作品响应和 iframe 均启用沙箱。Vite 开发时可设 `FORUM_IDEA_PLAYERS_ORIGIN=https://chat.xiangban.xyz`，通过本地代理使用已部署的作品文件。
+将生成目录部署到资源机 `/srv/xiangban-resource/idea-players-v1/`，在资源域名 HTTPS 站点引入 [`nginx-ideas.conf`](../../infra/resource/nginx-ideas.conf)。作品响应和 iframe 均启用沙箱。Vite 开发时可设 `FORUM_IDEA_PLAYERS_ORIGIN=https://res.xiangban.xyz`，通过本地代理使用已部署的作品文件。网页内置游戏也由资源机 `/builtin-games/` 提供。
 
 Oil Paint 使用 [作者仓库](https://patch.gg/blendi/oil-paint/files) 的 `804c65f`（1.1.3）。检出后拉取 Git LFS 模型，在本机执行作者提供的构建，再从论坛 `web/` 目录生成部署目录和可导入小伴的 V2 ZIP：
 
@@ -123,15 +123,17 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 | `FORUM_WEB_DIR` | `services/server-forum/web/dist` | 前端产物；index.html 启动时读一次，换前端后要重启 |
 | `FORUM_TL1_DAYS` / `FORUM_TL1_READS` | 3 / 30 | 新人自动升级为成员的门槛 |
 | `FORUM_DAILY_TOPICS` / `FORUM_DAILY_POSTS` | `2,5,20,50` / `10,60,200,500` | 按信任等级 0-3 的每日发帖、回复上限。新人（TL0）能发帖的只有最低发帖等级为 0 的板块，即小伴壁纸、小伴游戏 |
-| `FORUM_UPLOAD_DIR` | `services/server-forum/data/uploads` | 帖子附件存放目录，需要持久化和备份 |
+| `FORUM_UPLOAD_DIR` | `services/server-forum/data/uploads` | 旧上传入口的本地暂存及历史文件目录，需要持久化和备份；新版图片和附件直接上传资源机 |
 | `FORUM_UPLOAD_MAX_MB_USER` / `FORUM_UPLOAD_MAX_MB_ADMIN` | 5 / 30 | 单个附件上限（MB）：成员及以上 / 守护者 |
 | `FORUM_UPLOAD_MAX_MB_IMAGE` | 5 | 正文插图上限（MB），所有人一样 |
-| `FORUM_RESOURCE_BASE_URL` | 空 | 资源机对外地址（内容包、封面）。为空时下载与上传凭证接口返回 503 |
+| `FORUM_RESOURCE_BASE_URL` | 空 | 资源机对外地址（内容包、图片、附件和封面）。为空时资源机上传凭证不可用，旧接口沿用本地存储 |
 | `FORUM_RESOURCE_SECRET` | 随机 | 与资源机共用的 HMAC 密钥（≥32 位），签下载地址与上传凭证、校验回调；生产必须设置，且两台机器一致 |
 | `FORUM_DOWNLOAD_URL_TTL_SECS` / `FORUM_UPLOAD_TICKET_TTL_SECS` | 600 / 1800 | 下载地址与上传凭证的有效期 |
 | `FORUM_DAILY_PACK_PUBLISHES` | 5 | 普通用户每天最多发布（含已申请凭证未使用）的内容包数 |
 
 ## 页面与接口
+
+论坛图片和附件的新客户端通过 `/api/resource-uploads/ticket` 申请限时凭证，直接向资源机上传并用 `/api/resource-uploads/{id}/complete` 提交签名回执。正文和运营图片由资源机提供，公开前仍由论坛核验可见性；附件下载与购买由论坛核验权限后签发短期资源地址。资源机部署、备份和 Nginx 配置见 [资源服务部署](../../infra/resource/README.md)。
 
 社区顶栏「站务」（`/contact`）公开展示微信公众号、QQ 群和微信群，桌面及手机的「交流群」按钮直达此页。访客可保存二维码及复制 QQ 群号。管理员可在「管理后台 → 联系方式」更新名称、群号、邀请链接、二维码和失效日期。保存时一起更新配置和选中的图片。微信群码从失效日零时（中国标准时间）起隐藏。单张二维码支持 5 MiB 以内的 PNG、JPG 和 WebP。
 

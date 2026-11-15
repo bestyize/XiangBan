@@ -29,12 +29,13 @@ for (const file of positionals) {
 await mkdir(values.out, { recursive: true })
 for (const { bytes, manifest: { id, kind, version } } of packs) {
   const sha256 = createHash('sha256').update(bytes).digest('hex')
-  const zip = join(values.out, `${id}-${sha256}.zip`)
+  const md5 = createHash('md5').update(bytes).digest('hex')
+  const zip = join(values.out, `${md5}.zip`)
   const descriptor = join(values.out, `${id}.json`)
   // Publish the immutable download before making its digest visible in the descriptor.
   await writeFile(`${zip}.${process.pid}.tmp`, bytes)
   await rename(`${zip}.${process.pid}.tmp`, zip)
-  await writeFile(`${descriptor}.${process.pid}.tmp`, JSON.stringify({ kind, version, sha256, size: bytes.length }) + '\n')
+  await writeFile(`${descriptor}.${process.pid}.tmp`, JSON.stringify({ kind, version, sha256, size: bytes.length, url: `https://res.xiangban.xyz/files/${md5}.zip` }) + '\n')
   await rename(`${descriptor}.${process.pid}.tmp`, descriptor)
   console.log(`${id} · ${version} · ${bytes.length} bytes`)
 }

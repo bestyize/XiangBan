@@ -9,6 +9,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import io.ktor.http.HttpMethod
+import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonObject
@@ -27,6 +28,8 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     private val http = JsonHttp(client, config.forumBase)
     private val packHttp = if (config.runtimeV2) JsonHttp(client, config.forumBase, mapOf("X-Xiaoban-Runtime" to "1,2")) else http
     private val site = config.forumBase.trimEnd('/')
+    private val resourceBase = config.resourceBase.trimEnd('/')
+    private val resourceHttp = JsonHttp(client, resourceBase)
     private val uploads = ForumUploads(client, config, token)
 
     private fun query(vararg pairs: Pair<String, Any?>): String =
@@ -68,10 +71,12 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun ideaRuntime(id: String): IdeaRuntimeDownload {
         require(isIdeaPlayerId(id)) { "作品标识无效" }
         val base = "/idea-players/v1/packages/$id"
-        val spec = http.send(HttpMethod.Get, "$base.json", serializer<IdeaRuntimeDescriptor>())
+        val spec = resourceHttp.send(HttpMethod.Get, "$base.json", serializer<IdeaRuntimeDescriptor>())
         require(spec.kind in setOf("app", "game") && spec.version.matches(Regex("[a-zA-Z0-9.-]{1,32}")) &&
             spec.sha256.matches(Regex("[a-f0-9]{64}")) && spec.size in 1..(100L * 1024 * 1024)) { "作品包信息无效" }
-        return IdeaRuntimeDownload(id, spec.kind, spec.version, spec.sha256, spec.size, "$site$base-${spec.sha256}.zip")
+        val prefix = "$resourceBase/files/"
+        require(spec.url.startsWith(prefix) && spec.url.removePrefix(prefix).matches(Regex("[a-f0-9]{32}\\.zip"))) { "作品包地址无效" }
+        return IdeaRuntimeDownload(id, spec.kind, spec.version, spec.sha256, spec.size, spec.url)
     }
 
     suspend fun pack(id: Long, recordView: Boolean = false): Pack =
@@ -269,17 +274,36 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         val size = attachment.size
         if (size !in 0..(64L * 1024 * 1024)) throw ApiException(0, "附件大小超出 App 下载范围")
         val access = token()
-        return client.prepareGet("$site/api/attachments/${attachment.id.encodeURLParameter()}") {
-            if (access != null) header(HttpHeaders.Authorization, "Bearer $access")
-        }.execute { response ->
-            if (response.status.value !in 200..299) {
-                throw parseApiError(response.status.value, response.bodyAsText())
+        val direct = client.config { followRedirects = false }
+        try {
+            val first: Pair<String?, ByteArray?> = direct.prepareGet("$site/api/attachments/${attachment.id.encodeURLParameter()}") {
+                if (access != null) header(HttpHeaders.Authorization, "Bearer $access")
+            }.execute { response ->
+                when (response.status.value) {
+                    200 -> null to response.bodyAsChannel().readRemaining(size + 1).readByteArray()
+                    302, 303, 307, 308 -> (response.headers[HttpHeaders.Location] ?: throw ApiException(0, "附件下载地址无效")) to null
+                    else -> throw parseApiError(response.status.value, response.bodyAsText())
+                }
             }
-            if (response.status.value != 200) throw ApiException(0, "附件下载响应无效")
-            val bytes = response.bodyAsChannel().readRemaining(size + 1).readByteArray()
+            val bytes = first.second ?: run {
+                val url = first.first ?: throw ApiException(0, "附件下载地址无效")
+                if (!ForumAssetId.matches(attachment.id)) throw ApiException(0, "附件编号无效")
+                val target = runCatching { Url(url) }.getOrElse { throw ApiException(0, "附件下载地址无效") }
+                val expected = runCatching { Url(resourceBase) }.getOrElse { throw ApiException(0, "资源机地址无效") }
+                if (target.protocol != expected.protocol || target.host != expected.host || target.port != expected.port ||
+                    target.user != null || target.password != null || target.fragment.isNotEmpty() ||
+                    target.encodedPath != "/forum-files/${attachment.id.lowercase()}" ||
+                    target.parameters["sig"]?.matches(Regex("[a-f0-9]{64}")) != true || target.parameters["exp"]?.toLongOrNull() == null) {
+                    throw ApiException(0, "附件下载地址无效")
+                }
+                direct.prepareGet(url) { headers.remove(HttpHeaders.Authorization) }.execute { response ->
+                    if (response.status.value != 200) throw parseApiError(response.status.value, response.bodyAsText())
+                    response.bodyAsChannel().readRemaining(size + 1).readByteArray()
+                }
+            }
             if (bytes.size.toLong() != size) throw ApiException(0, "附件下载不完整，请重试")
-            bytes
-        }
+            return bytes
+        } finally { direct.close() }
     }
 
     suspend fun uploadAttachment(file: ForumUploadFile, maxBytes: Long): ForumAttachment = uploads.attachment(file, maxBytes)

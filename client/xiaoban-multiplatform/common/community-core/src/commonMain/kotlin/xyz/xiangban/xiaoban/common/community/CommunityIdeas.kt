@@ -34,7 +34,7 @@ private val ideaPlayerId = Regex("[a-z0-9][a-z0-9-]{1,39}")
 fun isIdeaPlayerId(id: String): Boolean = ideaPlayerId.matches(id)
 
 @Serializable
-internal data class IdeaRuntimeDescriptor(val kind: String, val version: String, val sha256: String, val size: Long)
+internal data class IdeaRuntimeDescriptor(val kind: String, val version: String, val sha256: String, val size: Long, val url: String)
 
 data class IdeaRuntimeDownload(
     val id: String,

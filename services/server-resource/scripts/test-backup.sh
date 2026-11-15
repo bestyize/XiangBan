@@ -4,12 +4,17 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/data/packs/effect" "$work/data/covers" "$work/data/tools"
+mkdir -p "$work/data/packs/effect" "$work/data/covers" "$work/data/files" "$work/data/img" "$work/data/tools" "$work/data/forum-archive" "$work/data/forum-content"
 printf 'pack one' > "$work/data/packs/effect/a.zip"
 printf 'installer' > "$work/data/tools/a.bin"
 printf 'partial' > "$work/data/tools/interrupted.part"
 printf 'lock' > "$work/data/tools/.quota.lock"
 printf 'cover' > "$work/data/covers/c1"
+printf 'addressed pack' > "$work/data/files/pack.zip"
+printf 'addressed cover' > "$work/data/img/cover.webp"
+printf 'private snapshot' > "$work/data/forum-archive/mapping.json"
+printf 'forum content' > "$work/data/forum-content/object"
+printf 'incomplete' > "$work/data/forum-content/interrupted.tmp"
 export RESOURCE_DATA_DIR="$work/data" BACKUP_TARGET="$work/backup"
 
 "$here/backup.sh"
@@ -17,6 +22,11 @@ export RESOURCE_DATA_DIR="$work/data" BACKUP_TARGET="$work/backup"
 [ "$(cat "$work/backup/packs/effect/a.zip")" = "pack one" ]
 
 [ "$(cat "$work/backup/tools/a.bin")" = "installer" ]
+[ "$(cat "$work/backup/files/pack.zip")" = "addressed pack" ]
+[ "$(cat "$work/backup/img/cover.webp")" = "addressed cover" ]
+[ "$(cat "$work/backup/forum-archive/mapping.json")" = "private snapshot" ]
+[ "$(cat "$work/backup/forum-content/object")" = "forum content" ]
+[ ! -e "$work/backup/forum-content/interrupted.tmp" ]
 [ ! -e "$work/backup/tools/interrupted.part" ]
 [ ! -e "$work/backup/tools/.quota.lock" ]
 # 实际恢复到第三个空目录并用备份清单验证。

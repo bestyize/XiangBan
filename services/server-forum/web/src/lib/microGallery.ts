@@ -1,5 +1,5 @@
 export const galleryTab = { key: 'gallery', label: '微观展厅' }
-export const galleryAssets = '/gallery-exhibits/'
+export const galleryAssets = import.meta.env?.DEV ? '/gallery-exhibits/' : 'https://res.xiangban.xyz/gallery-exhibits/'
 
 export const aquariumExhibit = {
   id: 'aquarium',

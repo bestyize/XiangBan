@@ -1,0 +1,17 @@
+#!/usr/bin/python3
+import os
+from pathlib import Path
+
+creds = Path(os.environ['CREDENTIALS_DIRECTORY']) / 'environment'
+settings = dict(item.split(b'=', 1) for item in creds.read_bytes().split(b'\0') if item and b'=' in item)
+env = os.environb.copy()
+env.update(settings)
+env.update({
+    b'RESOURCE_HOST': b'127.0.0.1',
+    b'RESOURCE_PORT': b'55020',
+    b'RESOURCE_DATA_DIR': b'/srv/xiangban-resource/data',
+    b'RESOURCE_CALLBACK_URL': b'https://chat.xiangban.xyz/api/internal/pack-uploaded',
+    b'RESOURCE_CORS_ORIGINS': b'https://chat.xiangban.xyz',
+    b'RESOURCE_MAX_UPLOADS': b'4',
+})
+os.execve('/srv/xiangban-resource/app', ['/srv/xiangban-resource/app'], env)

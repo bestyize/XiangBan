@@ -9,7 +9,7 @@ import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
 import { webLink } from '@/components/community/contract'
 import { useCommunityResource } from '@/components/community/resource'
 import { canTrialPack } from '@/lib/appRuntime'
-import { builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY } from '@/lib/builtinCreation'
+import { builtinAsset, builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY } from '@/lib/builtinCreation'
 import { useHead } from '@/lib/head'
 import { ideaPlayerId, ideaPlayers, ideaReturnLocation } from '@/lib/ideaPlayers'
 
@@ -43,7 +43,7 @@ const launch = useCommunityResource(async () => {
   }
   if (pack.kind === 'app' && pack.slug === 'wancisou' && pack.network_disabled === false && pack.version === requestedVersion) {
     try {
-      const response = await fetch('/builtin-games/wancisou/version.json', { signal: controller.signal })
+      const response = await fetch(builtinAsset('wancisou/version.json'), { signal: controller.signal })
       if (response.ok && canOpenBundledWancisou(pack, (await response.json())?.version)) {
         return { pack, mode: 'bundled' as const }
       }

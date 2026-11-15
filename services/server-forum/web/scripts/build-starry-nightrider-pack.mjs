@@ -57,7 +57,7 @@ game = game.replaceAll('fetch(zh,', 'starryLocalBoard(zh,')
   .replaceAll('无法连接排行榜,请检查网络后重试。', '无法读取本机成绩，请重试。')
   .replaceAll('画作资源加载失败,请检查网络后刷新。', '画作资源加载失败，请重新打开。')
 
-const bootstrap = `<script>\n` + 'document.currentScript.dataset.parentOrigin = location.origin;\n' + `if (!window.xb) {\n${bridge}\n}
+const bootstrap = `<script>\n` + "document.currentScript.dataset.parentOrigin = location.hostname === 'res.xiangban.xyz' ? 'https://chat.xiangban.xyz' : location.origin;\n" + `if (!window.xb) {\n${bridge}\n}
 document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(() => window.xb.ready()), { once: true });
 </script>`
 const module = [`const starryTextures = ${JSON.stringify(Object.fromEntries(textures))};`, offline, game]

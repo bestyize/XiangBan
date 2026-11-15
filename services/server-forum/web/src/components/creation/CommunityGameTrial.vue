@@ -45,13 +45,13 @@ async function start() {
   try {
     const { pack, version } = props
     if (idea.value) {
-      const url = new URL(`/idea-players/v1/${idea.value.entry}`, location.origin)
+      const url = new URL(`/idea-players/v1/${idea.value.entry}`, import.meta.env.DEV ? location.origin : 'https://res.xiangban.xyz')
       if (idea.value.selfContained && window === window.top) {
         message.value = '正在下载作品资源…'
         ideaDocument.value = await readIdeaPlayerDocument(url, sandbox.value, download.signal, (received, total) => {
           receivedBytes.value = received
           totalBytes.value = total
-        })
+        }, location.origin)
         if (disposed) return
       }
       loadHost(url)

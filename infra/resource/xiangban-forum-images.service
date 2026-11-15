@@ -1,0 +1,24 @@
+[Unit]
+Description=Xiangban forum image storage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xb-resource
+Group=xb-resource
+WorkingDirectory=/srv/xiangban-resource
+ExecStart=/usr/local/bin/node /usr/local/libexec/xiangban-forum-image-cache.mjs
+Restart=on-failure
+RestartSec=3
+UMask=027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/xiangban-resource/data/forum-content
+LoadCredential=environment:/etc/xiangban-resource/environment
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -74,6 +74,7 @@ mod design_mcp;
 mod configuration_window;
 mod voice_turn;
 mod inference;
+mod builtin_assets;
 mod network;
 mod shutdown;
 
@@ -971,6 +972,7 @@ fn main() {
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             network::initialize(app.handle()).map_err(std::io::Error::other)?;
+            builtin_assets::start(app.handle());
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
             }

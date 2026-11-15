@@ -493,6 +493,9 @@ async fn check_cover_quota(state: &AppState, auth: &AuthUser) -> AppResult<()> {
 #[derive(Deserialize)]
 struct UploadedCallback {
     file_key: String,
+    /// The resource server calculates this from the uploaded bytes after validation.
+    #[serde(default)]
+    object_key: Option<String>,
     size: u64,
     sha256: String,
     /// 资源机从压缩包根目录读出的 `manifest.json`；内容包必带，封面没有。发布时以这里为准，不信客户端自己报的。
@@ -511,23 +514,42 @@ async fn pack_uploaded(State(state): State<AppState>, headers: HeaderMap, body: 
         .fetch_optional(&state.pool)
         .await?;
     let (kind,) = kind.ok_or_else(|| AppError::Conflict("没有匹配的上传记录".into()))?;
+    if let Some(key) = cb.object_key.as_deref() {
+        let valid = if kind == content::COVER {
+            key.strip_prefix("img/").is_some_and(|name| {
+                name.rsplit_once('.').is_some_and(|(hash, ext)| {
+                    valid_md5(hash) && matches!(ext, "png" | "jpg" | "webp")
+                })
+            })
+        } else {
+            key.strip_prefix("files/").and_then(|name| name.strip_suffix(".zip")).is_some_and(valid_md5)
+        };
+        if !valid {
+            return Err(AppError::BadRequest("资源对象键无效".into()));
+        }
+    }
     if kind != content::COVER {
         let manifest = cb.manifest.as_ref().ok_or_else(|| AppError::BadRequest("缺少 manifest".into()))?;
         content::validate_manifest(manifest, &kind).map_err(AppError::BadRequest)?;
     }
     let updated = sqlx::query(
-        "UPDATE pack_uploads SET verified = true, manifest = $4 WHERE file_key = $1 AND size = $2 AND sha256 = $3",
+        "UPDATE pack_uploads SET verified = true, manifest = $4, object_key = COALESCE($5, object_key) WHERE file_key = $1 AND size = $2 AND sha256 = $3",
     )
     .bind(&cb.file_key)
     .bind(cb.size as i64)
     .bind(&cb.sha256)
     .bind(&cb.manifest)
+    .bind(&cb.object_key)
     .execute(&state.pool)
     .await?;
     if updated.rows_affected() == 0 {
         return Err(AppError::Conflict("没有匹配的上传记录，或文件大小、哈希与凭证不一致".into()));
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+fn valid_md5(value: &str) -> bool {
+    value.len() == 32 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 // ───────────────────────── 发布与版本 ─────────────────────────
@@ -615,16 +637,16 @@ async fn claim_upload(
     uid: Uuid,
     kind: &str,
     file_key: &str,
-) -> AppResult<(i64, String, Value)> {
-    let row: Option<(i64, String, Option<Value>, bool, bool)> = sqlx::query_as(
-        "SELECT size, sha256, manifest, verified, used FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = $3 FOR UPDATE",
+) -> AppResult<(i64, String, Value, String)> {
+    let row: Option<(i64, String, Option<Value>, bool, bool, String)> = sqlx::query_as(
+        "SELECT size, sha256, manifest, verified, used, COALESCE(object_key, file_key) FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = $3 FOR UPDATE",
     )
     .bind(file_key)
     .bind(uid)
     .bind(kind)
     .fetch_optional(&mut *tx)
     .await?;
-    let (size, sha256, manifest, verified, used) = row.ok_or_else(|| AppError::BadRequest("没有找到这次上传，请重新上传".into()))?;
+    let (size, sha256, manifest, verified, used, object_key) = row.ok_or_else(|| AppError::BadRequest("没有找到这次上传，请重新上传".into()))?;
     if !verified {
         return Err(AppError::Conflict("文件还没有通过资源服务器校验，请稍后再试或重新上传".into()));
     }
@@ -632,20 +654,20 @@ async fn claim_upload(
         return Err(AppError::Conflict("这个文件已经用于发布".into()));
     }
     sqlx::query("UPDATE pack_uploads SET used = true WHERE file_key = $1").bind(file_key).execute(&mut *tx).await?;
-    Ok((size, sha256, manifest.unwrap_or(Value::Null)))
+    Ok((size, sha256, manifest.unwrap_or(Value::Null), object_key))
 }
 
 /// 封面必须是自己上传并已被资源机确认的图片。
-async fn check_cover(tx: &mut sqlx::PgConnection, uid: Uuid, cover_key: &str) -> AppResult<()> {
-    let ok: Option<(bool,)> = sqlx::query_as("SELECT verified FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = 'cover'")
+async fn check_cover(tx: &mut sqlx::PgConnection, uid: Uuid, cover_key: &str) -> AppResult<String> {
+    let row: Option<(bool, String)> = sqlx::query_as("SELECT verified, COALESCE(object_key, file_key) FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = 'cover'")
         .bind(cover_key)
         .bind(uid)
         .fetch_optional(&mut *tx)
         .await?;
-    if ok != Some((true,)) {
-        return Err(AppError::BadRequest("封面还没有上传完成，请重新上传".into()));
+    match row {
+        Some((true, object_key)) => Ok(object_key),
+        _ => Err(AppError::BadRequest("封面还没有上传完成，请重新上传".into())),
     }
-    Ok(())
 }
 
 async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreatePackInput>) -> AppResult<Json<Value>> {
@@ -661,10 +683,11 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     let tags = clean_tags(&input.tags)?;
     let review = crate::moderation::screen(&state.pool, &[&title, &summary, &tags.join(" ")]).await?;
     let mut tx = state.pool.begin().await?;
-    if let Some(cover) = &input.cover_key {
-        check_cover(&mut tx, auth.user.uid, cover).await?;
-    }
-    let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
+    let cover_key = match &input.cover_key {
+        Some(cover) => Some(check_cover(&mut tx, auth.user.uid, cover).await?),
+        None => None,
+    };
+    let (size, sha256, manifest, object_key) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
     let info = content::validate_manifest(&manifest, &input.kind).map_err(AppError::BadRequest)?;
     let slug = info.slug.unwrap_or_else(wallpaper_slug);
     let remix = match input.remix_of_pack_id {
@@ -683,7 +706,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .bind(&summary)
     .bind(&tags)
     .bind(auth.user.uid)
-    .bind(&input.cover_key)
+    .bind(&cover_key)
     .bind(input.allow_remix.unwrap_or(true))
     .bind(remix.as_ref().map(|r| r.pack_id))
     .bind(remix.as_ref().map(|r| r.version))
@@ -691,7 +714,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, info.version_label.as_deref().unwrap_or("v1"), &sha256, size, &manifest, &input.file_key, &json!([]), "", info.runtime_protocol).await?;
+    insert_version(&mut tx, id, 1, info.version_label.as_deref().unwrap_or("v1"), &sha256, size, &manifest, &object_key, &json!([]), "", info.runtime_protocol).await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
     crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
@@ -779,14 +802,14 @@ async fn add_version(
     if author != Some(auth.user.uid) {
         return Err(AppError::Forbidden("只有作者可以更新自己的内容包".into()));
     }
-    let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &kind, &input.file_key).await?;
+    let (size, sha256, manifest, object_key) = claim_upload(&mut tx, auth.user.uid, &kind, &input.file_key).await?;
     let info = content::validate_manifest(&manifest, &kind).map_err(AppError::BadRequest)?;
     if info.slug.as_deref().is_some_and(|new_slug| new_slug != slug) {
         return Err(AppError::BadRequest("新版本的 id 必须与原来一致".into()));
     }
     let next = current + 1;
     let label = info.version_label.unwrap_or_else(|| format!("v{next}"));
-    insert_version(&mut tx, id, next, &label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog, info.runtime_protocol)
+    insert_version(&mut tx, id, next, &label, &sha256, size, &manifest, &object_key, &json!([]), &changelog, info.runtime_protocol)
         .await
         .map_err(|e| match e {
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => AppError::Conflict("版本冲突，请重试".into()),

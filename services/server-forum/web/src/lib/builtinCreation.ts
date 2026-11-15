@@ -1,4 +1,5 @@
 /** Browser-playable built-ins in mobile display order. Assets sync before dev and build. */
+export const builtinAsset = (path: string) => `${import.meta.env?.DEV ? '' : 'https://res.xiangban.xyz'}/builtin-games/${path}`
 export const BUILTIN_GAMES = [
   { id:'dusk-glider', name:'暮色滑翔', genre:'冒险', description:'横屏 3D 滑翔，在日落之前飞过一座座岛。', orientation:'landscape', icon:'cover.svg' },
   { id:'ink-blade', name:'水墨剑客', genre:'冒险', description:'横屏水墨动作，出剑弹反，闯过竹林、雪江和烽火边关。', orientation:'landscape', icon:'cover.svg' },
@@ -10,16 +11,16 @@ export const BUILTIN_GAMES = [
   { id:'water-sort', name:'倒杯快乐', genre:'解压', description:'36 关调饮解谜，解封签、接订单，每日特调。', orientation:'portrait', icon:'icon.webp' },
   { id:'falling-blocks', name:'俄罗斯方块', genre:'益智', description:'移动和旋转方块，填满一行就能消除。', orientation:'portrait', icon:'cover.svg' },
   { id:'mbti', name:'MBTI 性格测评', genre:'测评', description:'48 道原创情境题，观察日常偏好。', orientation:'portrait', icon:'icon.webp' },
-].map(game => ({ ...game, icon:`/builtin-games/${game.id}/${game.icon}` }))
+].map(game => ({ ...game, icon:builtinAsset(`${game.id}/${game.icon}`) }))
 
 export const MOBILE_ONLY_APPS = {
-  pocketSprites: { id:'pocket-sprites', name:'口袋精灵', genre:'益智', icon:'/builtin-games/pocket-sprites/assets/icon.webp' },
-  remoteControl: { id:'remote-control', name:'遥控器', icon:'/builtin-games/remote-control/icon.webp' },
-  quickLaunch: { id:'quick-launch', name:'轻启', icon:'/builtin-games/quick-launch/icon.webp' },
+  pocketSprites: { id:'pocket-sprites', name:'口袋精灵', genre:'益智', icon:builtinAsset('pocket-sprites/assets/icon.webp') },
+  remoteControl: { id:'remote-control', name:'遥控器', icon:builtinAsset('remote-control/icon.webp') },
+  quickLaunch: { id:'quick-launch', name:'轻启', icon:builtinAsset('quick-launch/icon.webp') },
 } as const
 
-export const WANCISOU_ICON = '/builtin-games/wancisou/icon.webp'
-export const WANCISOU_WEB_ENTRY = '/builtin-games/wancisou/index.html'
+export const WANCISOU_ICON = builtinAsset('wancisou/icon.webp')
+export const WANCISOU_WEB_ENTRY = builtinAsset('wancisou/index.html')
 export const ANDROID_DOWNLOAD_URL = 'https://github.com/bestyize/XiangBan/releases/latest'
 
 /** The bundled search tool can launch only while this published work version allows it. */

@@ -10,15 +10,12 @@ import { createSwimmer } from './swim.js';
 import { createGuppySchool } from './guppy/school.js';
 import { soloGuppyRoute } from './guppy/solo-route.js';
 import { createSwimmer as createGuppySwimmer } from './guppy/swim.js';
+import { loadModelBytes } from './model-source.js';
 
 const bytesBySpecies = new Map();
 function modelBytes(species) {
   if (!bytesBySpecies.has(species)) {
-    const file = species === 'guppy' ? 'blue-guppy.glb' : 'arowana.glb';
-    const bytes = fetch(`/effects/arowana/${file}`).then(response => {
-      if (!response.ok) throw new Error(`${species === 'guppy' ? '孔雀鱼' : '龙鱼'}模型加载失败（${response.status}）`);
-      return response.arrayBuffer();
-    }).catch(error => { bytesBySpecies.delete(species); throw error; });
+    const bytes = loadModelBytes(species).catch(error => { bytesBySpecies.delete(species); throw error; });
     bytesBySpecies.set(species, bytes);
   }
   return bytesBySpecies.get(species);

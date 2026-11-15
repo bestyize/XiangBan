@@ -759,3 +759,157 @@ async fn discover_v2_preserves_nullable_truth_while_legacy_apps_decode_only_repr
     assert_eq!(old_issues["items"].as_array().unwrap().len(),1);assert_eq!(old_issues["items"][0]["key"],"numeric-old");
     h.finish().await?;Ok(())
 }
+
+#[tokio::test]
+async fn resource_head_checks_visibility_without_reading_image_bodies() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let owner = Uuid::new_v4();
+    sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'test',1)").bind(owner).execute(&h.pool).await?;
+    let image = Uuid::new_v4();
+    sqlx::query("INSERT INTO images(id,uploader_uid,mime,size,editor_pending) VALUES($1,$2,'image/png',1,true)")
+        .bind(image).bind(owner).execute(&h.pool).await?;
+    let path = format!("/api/images/{image}");
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE images SET editor_pending=false WHERE id=$1").bind(image).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::OK);
+    sqlx::query("DELETE FROM images WHERE id=$1").bind(image).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::NOT_FOUND);
+
+    let asset = Uuid::new_v4();
+    sqlx::query("INSERT INTO frontier_assets(id,article_key,mime,data,kind) VALUES($1,'resource-head','image/png',$2,'frontier')")
+        .bind(asset).bind(vec![1u8]).execute(&h.pool).await?;
+    let data = json!({"cover_url":format!("/api/discover/frontier-assets/{asset}")});
+    sqlx::query("INSERT INTO discover_items(kind,key,status,data) VALUES('frontier','resource-head','draft',$1)")
+        .bind(&data).execute(&h.pool).await?;
+    let path = format!("/api/discover/frontier-assets/{asset}");
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE discover_items SET status='published' WHERE kind='frontier' AND key='resource-head'").execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::OK);
+    sqlx::query("UPDATE discover_items SET data='{}'::jsonb WHERE kind='frontier' AND key='resource-head'").execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"HEAD",&path,None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    h.finish().await
+}
+
+#[tokio::test]
+async fn direct_resource_uploads_require_bound_signed_receipts() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let token = h.member().await?;
+    let other = h.member().await?;
+    let mut state = h.state.clone();
+    let config = Arc::make_mut(&mut state.config);
+    config.resource_base_url = Some("https://res.xiangban.xyz".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    let secret = config.resource_secret.clone();
+    let app = crate::build_router(state.clone());
+    for (kind, resource_kind, mime, ext) in [("image","images","image/png","png"),("attachment","attachments","application/octet-stream","zip")] {
+        let hash = "a".repeat(64);
+        let (status, ticket) = call(&app,"POST","/api/resource-uploads/ticket",Some(&token),json!({
+            "kind":kind,"name":format!("asset.{ext}"),"mime":mime,"size":8,"sha256":hash,
+        })).await;
+        assert_eq!(status,StatusCode::OK,"{ticket}");
+        let id = ticket["id"].as_str().unwrap();
+        let headers = &ticket["headers"];
+        let expiry = headers["X-Expiration"].as_str().unwrap();
+        let mut upload_message = format!("POST\n{resource_kind}/{id}\n{hash}\n8\n{expiry}");
+        if kind == "attachment" { upload_message.push_str("\nzip"); }
+        assert!(crate::content::verify_callback(upload_message.as_bytes(),headers["X-Signature"].as_str().unwrap(),&secret));
+        let object = format!("forum-content/objects/{}.{ext}","b".repeat(32));
+        let receipt_message = format!("RECEIPT\n{resource_kind}/{id}\n{hash}\n8\n{object}");
+        let signature = crate::content::sign_callback(receipt_message.as_bytes(),&secret);
+        let mut receipt = json!({"object_key":object,"sha256":hash,"size":8,"signature":signature});
+        let complete = format!("/api/resource-uploads/{id}/complete");
+        assert_eq!(call(&app,"POST",&complete,Some(&other),receipt.clone()).await.0,StatusCode::NOT_FOUND);
+        receipt["signature"] = json!("0".repeat(64));
+        assert_eq!(call(&app,"POST",&complete,Some(&token),receipt.clone()).await.0,StatusCode::FORBIDDEN);
+        receipt["signature"] = json!(signature);
+        let (status, result) = call(&app,"POST",&complete,Some(&token),receipt.clone()).await;
+        assert_eq!(status,StatusCode::OK,"{result}");
+        assert_eq!(result["id"],id);
+        assert_eq!(call(&app,"POST",&complete,Some(&token),receipt).await.0,StatusCode::OK);
+        if kind == "image" { assert_eq!(call(&app,"HEAD",&format!("/api/images/{id}"),None,Value::Null).await.0,StatusCode::OK); }
+    }
+    h.finish().await
+}
+
+#[tokio::test]
+async fn contact_qr_head_identifies_current_public_bytes_and_respects_visibility() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let uri = "/api/contact/qr/qq-group";
+    let response = h.app.clone().oneshot(Request::builder().uri(uri).body(Body::empty())?).await?;
+    assert_eq!(response.status(),StatusCode::OK);
+    let expected = response.headers()["x-resource-sha256"].to_str()?.to_owned();
+    let bytes = to_bytes(response.into_body(),6 * 1024 * 1024).await?;
+    let actual = ring::digest::digest(&ring::digest::SHA256,&bytes).as_ref().iter().map(|b|format!("{b:02x}")).collect::<String>();
+    assert_eq!(expected,actual);
+    let head = h.app.clone().oneshot(Request::builder().method("HEAD").uri(uri).body(Body::empty())?).await?;
+    assert_eq!(head.headers()["x-resource-sha256"],expected.as_str());
+    assert!(to_bytes(head.into_body(),1).await?.is_empty());
+    let (_,mut config) = call(&h.app,"GET","/api/contact",None,Value::Null).await;
+    config["qqGroupQr"] = json!(false);
+    sqlx::query("INSERT INTO contact_settings (id,config) VALUES (true,$1) ON CONFLICT (id) DO UPDATE SET config=EXCLUDED.config")
+        .bind(sqlx::types::Json(config)).execute(&h.pool).await?;
+    let head = h.app.clone().oneshot(Request::builder().method("HEAD").uri(uri).body(Body::empty())?).await?;
+    assert_eq!(head.status(),StatusCode::NOT_FOUND);
+    h.finish().await
+}
+
+#[tokio::test]
+async fn direct_uploads_reach_real_resource_service_without_forum_file_copy() -> Result<(), Box<dyn std::error::Error>> {
+    use axum::{extract::{Path, State}, Json};
+    let Ok(base) = std::env::var("TEST_DIRECT_RESOURCE_BASE") else { return Ok(()) };
+    let Some(h) = harness().await? else { return Ok(()) };
+    let token = h.member().await?;
+    let mut state = h.state.clone();
+    let config = Arc::make_mut(&mut state.config);
+    config.resource_base_url = Some(base);
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    let app = crate::build_router(state.clone());
+    for (kind, name, mime, bytes) in [
+        ("image","picture.png","image/png",b"\x89PNG\r\n\x1a\n".as_slice()),
+        ("attachment","private.zip","application/octet-stream",b"private-test-file".as_slice()),
+    ] {
+        let hash = ring::digest::digest(&ring::digest::SHA256,bytes).as_ref().iter().map(|b|format!("{b:02x}")).collect::<String>();
+        let (status,ticket) = call(&app,"POST","/api/resource-uploads/ticket",Some(&token),json!({"kind":kind,"name":name,"mime":mime,"size":bytes.len(),"sha256":hash})).await;
+        assert_eq!(status,StatusCode::OK,"{ticket}");
+        let id = ticket["id"].as_str().unwrap();
+        let mut upload = reqwest::Client::new().post(ticket["upload_url"].as_str().unwrap());
+        for (key,value) in ticket["headers"].as_object().unwrap() { upload=upload.header(key,value.as_str().unwrap()); }
+        let response = upload.body(bytes.to_vec()).send().await?;
+        assert_eq!(response.status(),StatusCode::CREATED);
+        let receipt: Value = response.json().await?;
+        let (status,stored) = call(&app,"POST",&format!("/api/resource-uploads/{id}/complete"),Some(&token),receipt).await;
+        assert_eq!(status,StatusCode::OK,"{stored}");
+        assert!(!h.state.config.upload_dir.join(if kind=="image" {format!("img-{id}")} else {id.to_string()}).exists());
+        if kind == "image" {
+            assert_eq!(call(&app,"HEAD",&format!("/api/images/{id}"),None,Value::Null).await.0,StatusCode::OK);
+        } else {
+            assert_ne!(call(&app,"GET",&format!("/api/attachments/{id}"),None,Value::Null).await.0,StatusCode::OK);
+            let req = Request::builder().uri(format!("/api/attachments/{id}")).header("authorization",format!("Bearer {token}")).body(Body::empty())?;
+            let response = app.clone().oneshot(req).await?;
+            assert_eq!(response.status(),StatusCode::TEMPORARY_REDIRECT);
+            let url = response.headers()["location"].to_str()?;
+            let download = reqwest::get(url).await?;
+            assert_eq!(download.status(),StatusCode::OK);
+            assert_eq!(download.bytes().await?.as_ref(),bytes);
+            // Paid attachments stored only on the resource host still check
+            // access and existence before charging the buyer.
+            let attachment_id = Uuid::parse_str(id)?;
+            let (owner,): (Uuid,) = sqlx::query_as("SELECT uid FROM forum_direct_uploads WHERE id=$1").bind(attachment_id).fetch_one(&h.pool).await?;
+            let buyer = Uuid::new_v4();
+            sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'buyer',1)").bind(buyer).execute(&h.pool).await?;
+            crate::points::on_visit(&h.pool,buyer,None).await?;
+            let (topic,): (i64,) = sqlx::query_as("INSERT INTO topics(author_uid,category_id,title,body_md,body_html) VALUES($1,(SELECT id FROM categories LIMIT 1),'test','body','body') RETURNING id")
+                .bind(owner).fetch_one(&h.pool).await?;
+            sqlx::query("UPDATE attachments SET topic_id=$2,price=3 WHERE id=$1").bind(attachment_id).bind(topic).execute(&h.pool).await?;
+            let buyer_user = crate::users::find(&h.pool,buyer).await?.unwrap();
+            assert!(crate::handlers::attachments::download(State(state.clone()),crate::auth::MaybeUser(Some(buyer_user.clone())),Path(attachment_id)).await.is_err());
+            let auth = crate::auth::AuthUser { user:buyer_user, token:"test".into() };
+            let purchase = crate::handlers::attachments::purchase(State(state.clone()),auth,Path(attachment_id),Json(crate::handlers::attachments::PurchaseInput {price:3})).await?;
+            assert_eq!(purchase.0["charged"],3);
+            let buyer_user = crate::users::find(&h.pool,buyer).await?.unwrap();
+            let bought = crate::handlers::attachments::download(State(state.clone()),crate::auth::MaybeUser(Some(buyer_user)),Path(attachment_id)).await?;
+            assert_eq!(bought.status(),StatusCode::TEMPORARY_REDIRECT);
+        }
+    }
+    h.finish().await
+}

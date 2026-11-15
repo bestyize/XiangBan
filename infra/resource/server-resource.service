@@ -1,22 +1,24 @@
 [Unit]
-Description=Xiaoban community resource service
+Description=Xiangban community resource service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=ubuntu
-Group=ubuntu
-WorkingDirectory=/home/ubuntu/xiangban-resource
-EnvironmentFile=/home/ubuntu/xiangban-resource/.env
-ExecStart=/home/ubuntu/xiangban-resource/server-resource
+Type=simple
+User=xb-resource
+Group=xb-resource
+WorkingDirectory=/srv/xiangban-resource
+ExecStart=/usr/local/libexec/xiangban-resource-launch
 Restart=on-failure
-RestartSec=5
+RestartSec=3
+UMask=027
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/ubuntu/xiangban-resource/data
-UMask=0077
+ProtectHome=true
+ReadWritePaths=/srv/xiangban-resource/data
+LoadCredential=environment:/etc/xiangban-resource/environment
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target

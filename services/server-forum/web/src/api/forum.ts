@@ -1,3 +1,4 @@
+import { directForumUpload } from './directUpload'
 import type { ReplyExtras, ReplyContent, ReplySource } from './replyContent'
 import type {
   Attachment,
@@ -155,40 +156,16 @@ export const api = {
     request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`),
 }
 
-async function uploadFile<T>(path: string, file: File, onProgress?: (ratio: number) => void): Promise<T> {
-  const token = await tokenProvider()
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', `/api${path}`)
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable) onProgress?.(e.loaded / e.total)
-    }
-    xhr.onerror = () => reject(new ApiError(0, '网络连接失败，请稍后再试'))
-    xhr.onload = () => {
-      let data: { message?: string } | null = null
-      try {
-        data = JSON.parse(xhr.responseText)
-      } catch {
-        data = null
-      }
-      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as unknown as T)
-      if (xhr.status === 401 && token) onUnauthorized(token)
-      const fallback = xhr.status === 413 ? '文件太大，被服务器拒绝了' : `上传失败（${xhr.status}）`
-      reject(new ApiError(xhr.status, data?.message ?? fallback))
-    }
-    const form = new FormData()
-    form.append('file', file)
-    xhr.send(form)
-  })
+async function uploadFile<T>(kind: 'image' | 'attachment', file: File, onProgress?: (ratio: number) => void): Promise<T> {
+  return directForumUpload<T>(kind, file, request, (status, message) => new ApiError(status, message), onProgress)
 }
 
 /** 上传一个附件，进度用 0-1 回调。返回的 id 在发帖或编辑时通过 attachment_ids 挂到帖子上。 */
 export const uploadAttachment = (file: File, onProgress?: (ratio: number) => void) =>
-  uploadFile<Attachment>('/attachments', file, onProgress)
+  uploadFile<Attachment>('attachment', file, onProgress)
 
 /** 上传一张正文插图，返回可直接写进 Markdown 的站内地址。 */
-export const uploadImage = (file: File) => uploadFile<{ id: string; url: string; size: number }>('/images', file)
+export const uploadImage = (file: File) => uploadFile<{ id: string; url: string; size: number }>('image', file)
 
 export const attachmentUrl = (id: string) => `/api/attachments/${id}`
 

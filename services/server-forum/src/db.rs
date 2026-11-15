@@ -223,6 +223,21 @@ CREATE TABLE IF NOT EXISTS images (
 );
 CREATE INDEX IF NOT EXISTS images_uploader_idx ON images (uploader_uid, created_at DESC);
 
+-- Short-lived capabilities for direct resource-host uploads.
+CREATE TABLE IF NOT EXISTS forum_direct_uploads (
+    id UUID PRIMARY KEY,
+    uid UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('image', 'attachment')),
+    filename TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size BIGINT NOT NULL,
+    sha256 TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS forum_direct_uploads_pending_idx ON forum_direct_uploads(uid, kind, expires_at) WHERE NOT used;
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,
@@ -914,6 +929,7 @@ CREATE TABLE IF NOT EXISTS pack_uploads (
     used          BOOLEAN NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE pack_uploads ADD COLUMN IF NOT EXISTS object_key TEXT;
 
 CREATE TABLE IF NOT EXISTS pack_applies (
     pack_id       BIGINT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,

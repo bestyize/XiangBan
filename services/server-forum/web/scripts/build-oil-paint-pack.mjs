@@ -25,7 +25,7 @@ const [bridge, touchJs, touchCss] = await Promise.all(['bridge.js', 'oil-paint-t
   .map(file => readFile(new URL(`../runtime-v2/${file}`, import.meta.url), 'utf8')))
 const bootstrap = `<script>
 if (!window.xb) {
-  document.currentScript.dataset.parentOrigin = location.origin;
+  document.currentScript.dataset.parentOrigin = location.hostname === 'res.xiangban.xyz' ? 'https://chat.xiangban.xyz' : location.origin;
   ${bridge}
 }
 document.addEventListener('DOMContentLoaded', () => {

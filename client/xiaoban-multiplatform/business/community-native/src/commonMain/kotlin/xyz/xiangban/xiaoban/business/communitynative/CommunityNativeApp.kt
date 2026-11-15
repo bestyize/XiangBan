@@ -234,10 +234,10 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.News -> NewsDetailScreen(env, route.key, pop, push)
         is Route.Repo -> RepoDetailScreen(env, route.owner, route.repo, pop, push)
         is Route.WebPage -> EmbeddedWebPage(route.url, pop, env.platform)
-        Route.MicroGallery -> MicroGalleryScreen(env.config.forumBase, back = pop, open = push)
+        Route.MicroGallery -> MicroGalleryScreen(env.config.resourceBase, back = pop, open = push)
         is Route.GalleryExhibit -> MicroGalleryExhibit.byId(route.id)?.let { exhibit ->
             if (exhibit.usesIdeaRuntime) IdeaRuntimeScreen(env, exhibit.id, exhibit.title, back = pop)
-            else GalleryExhibitScreen(env.config.forumBase, exhibit, back = pop, open = push)
+            else GalleryExhibitScreen(env.config.resourceBase, exhibit, back = pop, open = push)
         }
         is Route.IdeaWork -> IdeaWorkScreen(env, route.id, back = pop, open = push)
         is Route.IdeaRuntime -> IdeaRuntimeScreen(env, route.id, route.title, back = pop)

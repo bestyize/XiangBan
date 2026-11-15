@@ -31,13 +31,13 @@ pub fn routes() -> Router<AppState> {
         .route("/open-source/projects", get(super::open_source::projects))
         .route("/open-source/projects/{owner}/{repo}", get(super::open_source::project))
         .route("/open-source/collections/{key}", get(super::open_source::collection))
-        .route("/open-source/assets/{id}", get(super::open_source_assets::public))
+        .route("/open-source/assets/{id}", get(super::open_source_assets::public).head(super::open_source_assets::public_head))
         .route("/discover/home", get(home))
         .route("/discover/home/v2", get(home_v2))
         .route("/discover/daily", get(daily))
         .route("/discover/frontier", get(frontier))
-        .route("/discover/frontier-assets/{id}", get(frontier_asset))
-        .route("/discover/article-assets/{id}", get(frontier_asset))
+        .route("/discover/frontier-assets/{id}", get(frontier_asset).head(frontier_asset_head))
+        .route("/discover/article-assets/{id}", get(frontier_asset).head(frontier_asset_head))
         .route("/discover/frontier/{key}", get(super::discover_frontier::detail))
         .route("/discover/frontier/{key}/comments", get(super::discover_frontier::list).post(super::discover_frontier::create))
         .route("/discover/frontier/{key}/comments/{id}", axum::routing::delete(super::discover_frontier::delete))
@@ -71,6 +71,12 @@ async fn frontier_asset(State(state): State<AppState>, Path(id): Path<uuid::Uuid
     Response::builder().header(header::CONTENT_TYPE, mime).header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
         .header(header::CACHE_CONTROL, "no-store")
         .body(Body::from(data)).map_err(|e| AppError::Internal(e.to_string()))
+}
+
+async fn frontier_asset_head(State(state): State<AppState>, Path(id): Path<uuid::Uuid>) -> AppResult<axum::http::StatusCode> {
+    let (allowed,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM frontier_assets a JOIN discover_items i ON i.kind=a.kind AND i.key=a.article_key WHERE a.id=$1 AND i.status='published' AND i.published_at<=now() AND position(a.id::text in i.data::text)>0)")
+        .bind(id).fetch_one(&state.pool).await?;
+    if allowed { Ok(axum::http::StatusCode::OK) } else { Err(AppError::not_found("图片")) }
 }
 
 pub fn admin_routes() -> Router<AppState> {

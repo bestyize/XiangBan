@@ -1,14 +1,19 @@
 const maxDocumentBytes = 32 * 1024 * 1024
-const bridgeStart = '<script>\ndocument.currentScript.dataset.parentOrigin = location.origin;\n'
+const bridgeStarts = [
+  '<script>\ndocument.currentScript.dataset.parentOrigin = location.origin;\n',
+  "<script>\ndocument.currentScript.dataset.parentOrigin = location.hostname === 'res.xiangban.xyz' ? 'https://chat.xiangban.xyz' : location.origin;\n",
+]
 
-function documentPolicy(response: Response, sandbox: string): string | undefined {
+function documentPolicy(response: Response, sandbox: string, resourceOrigin: string, parentOrigin: string): string | undefined {
   const header = response.headers.get('content-security-policy')
   const frameOptions = response.headers.get('x-frame-options')?.toLowerCase()
   if (!header || header.includes(',') || (frameOptions && frameOptions !== 'sameorigin')) return
 
   const directives = header.split(';').map(value => value.trim()).filter(Boolean)
   const serverSandbox = directives.find(value => value.startsWith('sandbox '))?.split(/\s+/).slice(1)
-  if (!directives.includes("frame-ancestors 'self'") || !directives.includes("default-src 'none'") ||
+  const ancestors = directives.find(value => value.startsWith('frame-ancestors '))?.split(/\s+/).slice(1) ?? []
+  const parentAllowed = ancestors.includes(parentOrigin) || (resourceOrigin === parentOrigin && ancestors.includes("'self'"))
+  if (!parentAllowed || !directives.includes("default-src 'none'") ||
       !sandbox.split(' ').every(permission => serverSandbox?.includes(permission))) return
   // The iframe applies sandboxing and the caller runs in a top-level forum page.
   return directives.filter(value => !/^(sandbox|frame-ancestors|report-uri|report-to)\s/.test(value)).join('; ')
@@ -33,6 +38,7 @@ export async function readIdeaPlayerDocument(
   sandbox: string,
   signal: AbortSignal,
   progress: (received: number, total: number | undefined) => void,
+  parentOrigin = url.origin,
 ): Promise<string | undefined> {
   const response = await fetch(url, {
     credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error', signal,
@@ -40,7 +46,7 @@ export async function readIdeaPlayerDocument(
   if (!response.ok) throw new Error(`作品资源请求失败（HTTP ${response.status}）`)
   if (!response.body) return
 
-  const policy = documentPolicy(response, sandbox)
+  const policy = documentPolicy(response, sandbox, url.origin, parentOrigin)
   const encoding = response.headers.get('content-encoding')
   const length = Number(response.headers.get('content-length'))
   const declared = (!encoding || encoding === 'identity') && Number.isSafeInteger(length) && length > 0 ? length : undefined
@@ -74,10 +80,11 @@ export async function readIdeaPlayerDocument(
   if (declared !== undefined && received !== declared) throw new Error('作品资源下载不完整')
   chunks.push(decoder.decode())
   const html = chunks.join('')
-  if (!html.includes(bridgeStart)) return
+  const bridgeStart = bridgeStarts.find(start => html.includes(start))
+  if (!bridgeStart) return
   // An opaque srcdoc keeps the work sandboxed. Apply the response's resource
   // policy before its markup and tell the bridge the actual parent origin.
   const secured = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${attribute(policy)}">`
   return secured + html.replace(/^\s*<!doctype html>/i, '')
-    .replace(bridgeStart, `<script data-parent-origin="${attribute(url.origin)}">\n`)
+    .replace(bridgeStart, `<script data-parent-origin="${attribute(parentOrigin)}">\n`)
 }

@@ -557,6 +557,7 @@ async fn save(
             let (image,mime,data)=&assets[&path];let file=s.config.upload_dir.join(format!("img-{image}"));
             written.push(file.clone());
             tokio::fs::write(file,data).await.map_err(|e|AppError::Internal(e.to_string()))?;
+            super::images::mirror_to_resource(&s, "images", *image, mime, data).await?;
             sqlx::query("INSERT INTO images(id,uploader_uid,mime,size,editor_pending) VALUES ($1,$2,$3,$4,true)")
                 .bind(image).bind(input.author_uid).bind(mime).bind(data.len() as i64).execute(&mut *tx).await?;
             sqlx::query("INSERT INTO editor_draft_assets(draft_id,image_id,path) VALUES ($1,$2,$3)").bind(id).bind(image).bind(path).execute(&mut *tx).await?;

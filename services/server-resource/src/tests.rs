@@ -99,6 +99,9 @@ async fn upload_verify_callback_and_signed_download() {
         assert_eq!(*sig, sign::sign_callback(body, SECRET));
         let v: Value = serde_json::from_slice(body).unwrap();
         assert_eq!(v["file_key"], key);
+        let object_key = format!("files/{:x}.zip", Md5::digest(&pack));
+        assert_eq!(v["object_key"], object_key);
+        assert_eq!(std::fs::read(dir.join(object_key)).unwrap(), pack);
         assert_eq!(v["sha256"], sha(&pack));
         assert_eq!(v["manifest"]["id"], "a");
     }
@@ -118,6 +121,9 @@ async fn upload_verify_callback_and_signed_download() {
         }
     };
     assert_eq!(get(format!("/{key}"), None).await.status(), StatusCode::FORBIDDEN);
+    let object_key = format!("files/{:x}.zip", Md5::digest(&pack));
+    assert_eq!(get(format!("/{object_key}"), None).await.status(), StatusCode::FORBIDDEN);
+    assert_eq!(get(signed_url(&object_key, now() + 60), None).await.status(), StatusCode::OK);
     assert_eq!(get(signed_url(key, now() - 10), None).await.status(), StatusCode::FORBIDDEN);
     let other_sig = signed_url("packs/effect/other.zip", now() + 60);
     let borrowed = format!("/{key}?{}", other_sig.split_once('?').unwrap().1);
@@ -149,6 +155,10 @@ async fn covers_are_checked_and_public() {
     assert_eq!(put(&app, &ticket("cover", &png, "covers/good"), png.clone()).await, StatusCode::OK);
     let body: Value = serde_json::from_slice(&log.lock().unwrap()[0].1).unwrap();
     assert!(body["manifest"].is_null());
+    let object_key = format!("img/{:x}.png", Md5::digest(&png));
+    assert_eq!(body["object_key"], object_key);
+    let object = app.clone().oneshot(Request::builder().uri(format!("/{object_key}")).body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(object.status(), StatusCode::OK);
 
     let res = app.clone().oneshot(Request::builder().uri("/covers/good").body(Body::empty()).unwrap()).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK, "封面公开，不需要签名");
@@ -172,6 +182,25 @@ async fn forum_rejection_removes_the_file() {
     let app = build_router(state(&dir, cb), &[]);
     assert_eq!(put(&app, &ticket("effect", &pack, "packs/effect/y.zip"), pack.clone()).await, StatusCode::BAD_GATEWAY);
     assert!(!dir.join("packs/effect/y.zip").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn shared_objects_are_reused_and_md5_collisions_are_rejected() {
+    let dir = std::env::temp_dir().join(format!("res-{}", uuid::Uuid::new_v4()));
+    let (cb, _) = fake_forum(StatusCode::OK).await;
+    let app = build_router(state(&dir, cb), &[]);
+    let pack = zip_bytes(&[("manifest.json", b"{}")]);
+    let object_key = format!("files/{:x}.zip", Md5::digest(&pack));
+
+    assert_eq!(put(&app, &ticket("game", &pack, "packs/game/first.zip"), pack.clone()).await, StatusCode::OK);
+    assert_eq!(put(&app, &ticket("game", &pack, "packs/game/second.zip"), pack.clone()).await, StatusCode::OK);
+    assert_eq!(std::fs::read(dir.join(&object_key)).unwrap(), pack);
+
+    // Replacing an existing object with different bytes must never be silently accepted.
+    std::fs::write(dir.join(&object_key), b"corrupt").unwrap();
+    assert_eq!(put(&app, &ticket("game", &pack, "packs/game/third.zip"), pack).await, StatusCode::CONFLICT);
+    assert!(!dir.join("packs/game/third.zip").exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
 

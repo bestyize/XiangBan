@@ -41,6 +41,44 @@ private suspend fun OutgoingContent.multipartBytes(): ByteArray = coroutineScope
 
 class ForumUploadsTest {
     @Test
+    fun `direct uploads send file bytes to the resource host without forum credentials`() = runTest {
+        for (kind in listOf("image", "attachment")) {
+            val file = if (kind == "image") imageFile() else ForumUploadFile("note.txt", "text/plain", "abc".encodeToByteArray())
+            val hash = Sha256().apply { update(file.bytes) }.hex()
+            val mime = if (kind == "image") "image/png" else "application/octet-stream"
+            val path = if (kind == "image") "/internal/forum-image/images/$ASSET" else "/internal/forum-file/$ASSET"
+            val extra = if (kind == "attachment") ",\"X-File-Ext\":\"txt\"" else ""
+            val ticket = """{"id":"$ASSET","upload_url":"https://res.xiangban.xyz$path","headers":{"Content-Type":"$mime","X-Content-Sha256":"$hash","X-Expiration":"2000000000","X-Signature":"${"a".repeat(64)}"$extra}}"""
+            val seen = mutableListOf<String>()
+            val client = HttpClient(MockEngine { request ->
+                seen += "${request.url.host}${request.url.encodedPath}"
+                when (request.url.encodedPath) {
+                    "/api/resource-uploads/ticket" -> {
+                        assertEquals("Bearer access", request.headers[HttpHeaders.Authorization])
+                        respond(ticket, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                    }
+                    path -> {
+                        assertEquals("res.xiangban.xyz",request.url.host)
+                        assertNull(request.headers[HttpHeaders.Authorization])
+                        assertEquals(hash,request.headers["X-Content-Sha256"])
+                        respond("""{"object_key":"forum-content/objects/${"b".repeat(32)}.${if (kind=="image") "png" else "txt"}","sha256":"$hash","size":${file.bytes.size},"signature":"${"c".repeat(64)}"}""", HttpStatusCode.Created, headersOf(HttpHeaders.ContentType,"application/json"))
+                    }
+                    "/api/resource-uploads/$ASSET/complete" -> {
+                        assertEquals("Bearer access", request.headers[HttpHeaders.Authorization])
+                        respond(if (kind == "image") IMAGE_RESPONSE else ATTACHMENT_RESPONSE, headers = headersOf(HttpHeaders.ContentType,"application/json"))
+                    }
+                    else -> error("unexpected request")
+                }
+            })
+            val api = ForumApi(client, CommunityConfig()) { "access" }
+            if (kind == "image") assertEquals(ASSET,api.uploadImage(file,100).id)
+            else assertEquals(ASSET,api.uploadAttachment(file,100).id)
+            assertEquals(3,seen.size)
+            client.close()
+        }
+    }
+
+    @Test
     fun `image sends multipart file and freshest bearer without local uri or token in URL`() = runTest {
         var multipart = ""
         var binary = byteArrayOf()
@@ -53,7 +91,7 @@ class ForumUploadsTest {
             multipart = binary.decodeToString()
             respond(IMAGE_RESPONSE, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         })
-        val api = ForumApi(client, CommunityConfig()) { "fresh-access" }
+        val api = ForumApi(client, CommunityConfig(directForumUploads = false)) { "fresh-access" }
         val image = api.uploadImage(imageFile(), FORUM_IMAGE_MAX_BYTES)
         assertTrue(multipart.contains("name=file") || multipart.contains("name=\"file\""))
         assertTrue(multipart.contains("filename=\"photo.png\""))
@@ -68,7 +106,7 @@ class ForumUploadsTest {
     fun `limits use authenticated forum session and zero forbids images before any upload`() = runTest {
         val server = FakeServer()
         server.on("/api/session", body = """{"user":{"uid":"u","nickname":"昵称","trust_level":0},"limits":{"image_max_bytes":0,"upload_max_bytes":5242880}}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         val session = api.uploadSession()
         assertEquals(0, session.user.trustLevel)
         assertEquals(5_242_880L, session.limits.uploadMaxBytes)
@@ -81,7 +119,7 @@ class ForumUploadsTest {
     @Test
     fun `over limit empty and unsupported files fail locally without multipart request`() = runTest {
         val server = FakeServer()
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         assertFailsWith<ApiException> { api.uploadImage(imageFile(), 7) }
         assertFailsWith<ApiException> { api.uploadImage(imageFile().copy(mime = "image/svg+xml"), 100) }
         assertFailsWith<ApiException> { api.uploadAttachment(ForumUploadFile("empty", "text/plain", byteArrayOf()), 100) }
@@ -105,7 +143,7 @@ class ForumUploadsTest {
     fun `upload failure returns server reason and explicit retry reuses selected bytes`() = runTest {
         val server = FakeServer()
         server.on("/api/images", HttpStatusCode.TooManyRequests, """{"message":"今天图片已达上限","retry_after":3600}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         val error = assertFailsWith<ApiException> { api.uploadImage(imageFile(), FORUM_IMAGE_MAX_BYTES) }
         assertEquals(429, error.status); assertEquals(3600L, error.retryAfter?.toLong())
         assertEquals(1, server.requests.size)
@@ -119,10 +157,10 @@ class ForumUploadsTest {
     fun `401 is not automatically replayed and missing credentials never send anonymous upload`() = runTest {
         val server = FakeServer()
         server.on("/api/images", HttpStatusCode.Unauthorized, """{"message":"登录已过期"}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "expired" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "expired" }
         assertEquals(401, assertFailsWith<ApiException> { api.uploadImage(imageFile(), 100) }.status)
         assertEquals(1, server.requests.size)
-        val anonymous = ForumApi(server.client, CommunityConfig()) { null }
+        val anonymous = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { null }
         assertEquals(401, assertFailsWith<ApiException> { anonymous.uploadImage(imageFile(), 100) }.status)
         assertEquals(1, server.requests.size)
         server.client.close()
@@ -134,8 +172,8 @@ class ForumUploadsTest {
         server.on("/api/auth/refresh", body = """{"access_token":"new","refresh_token":"next","expires_in":900}""")
         server.on("/api/images", body = IMAGE_RESPONSE)
         val store = InMemoryTokenStorage(Tokens("old", "refresh", 10000))
-        val manager = SessionManager(AccountApi(server.client, CommunityConfig()), store, now = { 5000 })
-        val api = ForumApi(server.client, CommunityConfig()) { manager.accessToken() }
+        val manager = SessionManager(AccountApi(server.client, CommunityConfig(directForumUploads = false)), store, now = { 5000 })
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { manager.accessToken() }
         api.uploadImage(imageFile(), 100)
         assertEquals(listOf("/api/auth/refresh", "/api/images"), server.requests.map { it.url.encodedPath })
         assertEquals("Bearer new", server.requests.last().headers[HttpHeaders.Authorization])
@@ -143,8 +181,8 @@ class ForumUploadsTest {
 
         val offline = FakeServer(); offline.onThrow("/api/auth/refresh")
         val kept = InMemoryTokenStorage(Tokens("old", "refresh", 10000))
-        val offlineManager = SessionManager(AccountApi(offline.client, CommunityConfig()), kept, now = { 5000 })
-        val offlineApi = ForumApi(offline.client, CommunityConfig()) { offlineManager.accessToken() }
+        val offlineManager = SessionManager(AccountApi(offline.client, CommunityConfig(directForumUploads = false)), kept, now = { 5000 })
+        val offlineApi = ForumApi(offline.client, CommunityConfig(directForumUploads = false)) { offlineManager.accessToken() }
         assertFailsWith<ApiException> { offlineApi.uploadImage(imageFile(), 100) }
         assertEquals(listOf("/api/auth/refresh"), offline.requests.map { it.url.encodedPath })
         assertTrue(offlineManager.state.value.loggedIn)
@@ -157,7 +195,7 @@ class ForumUploadsTest {
         val server = FakeServer()
         server.on("/api/attachments", body = ATTACHMENT_RESPONSE)
         server.on("/api/topics", body = """{"id":7}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         val attachment = api.uploadAttachment(ForumUploadFile("note.txt", "text/plain", "abc".encodeToByteArray()), 100)
         assertEquals(7L, api.createTopic(1, "标题", "正文足够十个字以上的示例", attachments = listOf(attachment)))
         val payload = CommunityJson.parseToJsonElement((server.requests.last().body as TextContent).text).jsonObject
@@ -177,7 +215,7 @@ class ForumUploadsTest {
         val server = FakeServer()
         server.on("/api/attachments", body = ATTACHMENT_RESPONSE)
         server.on("/api/topics", HttpStatusCode.ServiceUnavailable, """{"message":"稍后重试"}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         val attachment = api.uploadAttachment(ForumUploadFile("note.txt", "text/plain", "abc".encodeToByteArray()), 100)
         assertEquals(503, assertFailsWith<ApiException> {
             api.createTopic(1, "标题", "正文足够十个字以上的示例", attachments = listOf(attachment))
@@ -199,7 +237,7 @@ class ForumUploadsTest {
         assertFailsWith<ApiException> { validateTopicAttachments(List(6) { attachment }) }
         assertFailsWith<ApiException> { validateTopicAttachments(listOf(attachment.copy(price = 11))) }
         val server = FakeServer()
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         assertFailsWith<ApiException> { api.deletePendingAttachment("../images/123") }
         assertEquals(0, server.requests.size)
         server.client.close()
@@ -210,7 +248,7 @@ class ForumUploadsTest {
         val server = FakeServer()
         server.on("/api/images", body = IMAGE_RESPONSE)
         server.on("/api/topics/7/posts", body = """{"id":8}""")
-        val api = ForumApi(server.client, CommunityConfig()) { "access" }
+        val api = ForumApi(server.client, CommunityConfig(directForumUploads = false)) { "access" }
         val image = api.uploadImage(imageFile(), 100)
         val body = "我的回复" + forumImageMarkdown(image, "photo.png")
         api.reply(7, body)
@@ -223,7 +261,7 @@ class ForumUploadsTest {
     @Test
     fun `cancelled upload propagates cancellation instead of reporting upload failure`() = runTest {
         val client = HttpClient(MockEngine { throw CancellationException("cancelled") })
-        val api = ForumApi(client, CommunityConfig()) { "access" }
+        val api = ForumApi(client, CommunityConfig(directForumUploads = false)) { "access" }
         assertFailsWith<CancellationException> { api.uploadImage(imageFile(), 100) }
         client.close()
     }

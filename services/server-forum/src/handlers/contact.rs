@@ -218,17 +218,22 @@ async fn qr_response(pool: &PgPool, channel: Channel, public: bool) -> AppResult
     if !config.qr(channel) {
         return Ok(([(header::CACHE_CONTROL, "no-store")], StatusCode::NOT_FOUND).into_response());
     }
-    let (mime, body) = match (mime, data) {
-        (Some(mime), Some(data)) => (mime, Body::from(data)),
-        _ => ("image/webp".into(), Body::from(channel.default_image())),
+    let (mime, data) = match (mime, data) {
+        (Some(mime), Some(data)) => (mime, data),
+        _ => ("image/webp".into(), channel.default_image().to_vec()),
     };
+    // The resource host can detect an updated QR code with a HEAD request,
+    // and fetch the bytes only when the content actually changes.
+    let digest = ring::digest::digest(&ring::digest::SHA256, &data)
+        .as_ref().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
     Ok((
         [
             (header::CACHE_CONTROL, "no-store"),
             (header::CONTENT_TYPE, mime.as_str()),
             (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::HeaderName::from_static("x-resource-sha256"), digest.as_str()),
         ],
-        body,
+        Body::from(data),
     )
         .into_response())
 }

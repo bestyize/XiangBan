@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 资源机异地备份：把 packs/、covers/ 和 tools/ 追加式同步到备份机，并核对校验清单。
+# 资源机异地备份：把资源对象追加式同步到备份机，并核对校验清单。
 #
 # 内容包和封面的文件键不会复用，所以备份只增不删：主机上误删文件不会连带删掉备份。
 # 用法：
@@ -27,9 +27,9 @@ backup() {
   sums="$(mktemp)"
   # 先生成本机清单：之后在备份端按它核对，才能发现传输中的损坏。
   (cd "$DATA_DIR" && {
-    for tree in packs covers tools; do
+    for tree in packs covers files img tools forum-archive forum-content; do
       if [ -d "$tree" ]; then
-        if [ "$tree" = tools ]; then find "$tree" -type f -name '*.bin'; else find "$tree" -type f; fi
+        if [ "$tree" = tools ]; then find "$tree" -type f -name '*.bin'; else find "$tree" -type f ! -name '*.part' ! -name '*.tmp' ! -name '.quota.lock'; fi
       fi
     done
   } | LC_ALL=C sort | xargs -r sha256sum) > "$sums"
@@ -38,9 +38,9 @@ backup() {
   local tree destination
   destination="$TARGET"
   if ! is_remote; then destination="$(cd "$TARGET" && pwd)"; fi
-  for tree in packs covers tools; do
+  for tree in packs covers files img tools forum-archive forum-content; do
     if [ -d "$DATA_DIR/$tree" ]; then
-      (cd "$DATA_DIR" && rsync -a --partial --ignore-existing --relative --exclude='*.part' --exclude='.quota.lock' "$tree" "$destination/")
+      (cd "$DATA_DIR" && rsync -a --partial --ignore-existing --relative --exclude='*.part' --exclude='*.tmp' --exclude='.quota.lock' "$tree" "$destination/")
     fi
   done
   # 备份端的清单只增不删：和旧清单按路径合并（新的覆盖旧的），主机上删掉的文件仍然在清单里被核对。

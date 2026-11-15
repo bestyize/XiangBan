@@ -68,6 +68,7 @@ internal object AndroidRuntimeV2Community {
     }
 
     suspend fun play(activity: Activity, info: CommunityGameDownload, pack: Pack): Boolean {
+        (activity.application as? XiaobanApplication)?.cancelIdeaPrefetch()
         require(info.validate(pack, info.version) == 2)
         val legacyVersions = pack.versions.asSequence()
             .filter { it.version in 1 until info.version }
@@ -90,6 +91,7 @@ internal object AndroidRuntimeV2Community {
     }
 
     suspend fun playIdea(activity: Activity, info: IdeaRuntimeDownload): Boolean {
+        (activity.application as? XiaobanApplication)?.cancelIdeaPrefetch()
         val target = ideaDirectory(activity, info.id, info.sha256)
         withContext(Dispatchers.IO) {
             lock.withLock {
@@ -107,6 +109,17 @@ internal object AndroidRuntimeV2Community {
                 .putExtra(KIND, info.kind)
                 .putExtra(RuntimeV2Activity.EXTRA_NETWORK_DISABLED, true))
             true
+        }
+    }
+
+    suspend fun prefetchIdea(context: Context, info: IdeaRuntimeDownload) {
+        val target = ideaDirectory(context, info.id, info.sha256)
+        withContext(Dispatchers.IO) {
+            lock.withLock {
+                prepare(target, info.url, info.size, info.sha256, info.kind, info.id,
+                    load = { RuntimeV2Package.loadIdea(it, info.id, info.version, info.kind) },
+                )
+            }
         }
     }
 

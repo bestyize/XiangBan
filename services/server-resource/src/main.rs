@@ -11,6 +11,7 @@ use axum::{
     Json, Router,
 };
 use futures_util::StreamExt;
+use md5::{Digest, Md5};
 use ring::digest;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -20,7 +21,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{fs, io::AsyncWriteExt, sync::Semaphore};
+use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, sync::Semaphore};
 use tower::ServiceExt;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -103,10 +104,7 @@ async fn upload(State(state): State<AppState>, headers: HeaderMap, body: Body) -
     fs::create_dir_all(&tmp_dir).await.map_err(internal)?;
     let tmp = tmp_dir.join(uuid::Uuid::new_v4().simple().to_string());
     let outcome = receive_and_check(&state, &claims, body, &tmp, &target).await;
-    if outcome.is_err() {
-        let _ = fs::remove_file(&tmp).await;
-        let _ = fs::remove_file(&target).await;
-    }
+    let _ = fs::remove_file(&tmp).await;
     outcome.map(|()| Json(json!({ "ok": true, "file_key": claims.file_key })))
 }
 
@@ -119,6 +117,7 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
     // 边收边写边算哈希，超过凭证声明的大小立即中止，不把整个文件放进内存。
     let mut file = fs::File::create(tmp).await.map_err(internal)?;
     let mut ctx = digest::Context::new(&digest::SHA256);
+    let mut md5 = Md5::new();
     let mut received: u64 = 0;
     let mut stream = body.into_data_stream();
     while let Some(chunk) = stream.next().await {
@@ -128,6 +127,7 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
             return fail(StatusCode::PAYLOAD_TOO_LARGE, "文件比凭证声明的大");
         }
         ctx.update(&chunk);
+        md5.update(&chunk);
         file.write_all(&chunk).await.map_err(internal)?;
     }
     file.flush().await.map_err(internal)?;
@@ -139,19 +139,22 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
         return fail(StatusCode::UNPROCESSABLE_ENTITY, "文件哈希与凭证不一致");
     }
 
-    let manifest = if claims.kind == "cover" {
+    let (manifest, extension) = if claims.kind == "cover" {
         let mut head = [0u8; 16];
         let mut f = fs::File::open(tmp).await.map_err(internal)?;
         let n = tokio::io::AsyncReadExt::read(&mut f, &mut head).await.map_err(internal)?;
-        if scan::sniff_image(&head[..n]).is_none() {
-            return fail(StatusCode::UNSUPPORTED_MEDIA_TYPE, "封面只支持 PNG、JPEG、WebP");
-        }
-        None
+        let extension = match scan::sniff_image(&head[..n]) {
+            Some("image/png") => "png",
+            Some("image/jpeg") => "jpg",
+            Some("image/webp") => "webp",
+            _ => return fail(StatusCode::UNSUPPORTED_MEDIA_TYPE, "封面只支持 PNG、JPEG、WebP"),
+        };
+        (None, extension)
     } else {
         let path = tmp.to_path_buf();
         let scanned = tokio::task::spawn_blocking(move || scan::scan_pack(&path)).await.map_err(internal)?;
         match scanned {
-            Ok(manifest) => Some(manifest),
+            Ok(manifest) => (Some(manifest), "zip"),
             Err(message) => return fail(StatusCode::UNPROCESSABLE_ENTITY, message),
         }
     };
@@ -159,10 +162,39 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).await.map_err(internal)?;
     }
-    fs::rename(tmp, target).await.map_err(internal)?;
+    let digest = format!("{:x}", md5.finalize());
+    let prefix = if claims.kind == "cover" { "img" } else { "files" };
+    let object_key = format!("{prefix}/{digest}.{extension}");
+    let object = state.data_dir.join(&object_key);
+    fs::create_dir_all(object.parent().expect("object has parent")).await.map_err(internal)?;
+    match fs::hard_link(tmp, &object).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            // MD5 is a name, not an integrity check. Refuse collisions and corrupt objects.
+            let mut existing = fs::File::open(&object).await.map_err(internal)?;
+            let mut existing_hash = digest::Context::new(&digest::SHA256);
+            let mut size = 0u64;
+            let mut buffer = vec![0; 64 * 1024];
+            loop {
+                let read = existing.read(&mut buffer).await.map_err(internal)?;
+                if read == 0 { break; }
+                size += read as u64;
+                existing_hash.update(&buffer[..read]);
+            }
+            if size != claims.size || hex(existing_hash.finish().as_ref()) != claims.sha256 {
+                return fail(StatusCode::CONFLICT, "已有文件与上传内容不一致");
+            }
+        }
+        Err(error) => return Err(internal(error)),
+    }
+    match fs::hard_link(tmp, target).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return fail(StatusCode::CONFLICT, "这个文件已经上传过"),
+        Err(error) => return Err(internal(error)),
+    }
 
     // 回调论坛，论坛确认后这个上传才算有效；回调失败就撤销文件，让客户端重传。
-    let payload = json!({ "file_key": claims.file_key, "size": claims.size, "sha256": claims.sha256, "manifest": manifest });
+    let payload = json!({ "file_key": claims.file_key, "object_key": object_key, "size": claims.size, "sha256": claims.sha256, "manifest": manifest });
     let raw = serde_json::to_vec(&payload).map_err(internal)?;
     let response = state
         .http
@@ -172,7 +204,7 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
         .body(raw)
         .send()
         .await;
-    match response {
+    let result = match response {
         Ok(r) if r.status().is_success() => Ok(()),
         Ok(r) if r.status().is_client_error() => {
             let message = r.json::<Value>().await.ok().and_then(|v| v.get("message").and_then(Value::as_str).map(str::to_string));
@@ -186,7 +218,11 @@ async fn receive_and_check(state: &AppState, claims: &sign::UploadClaims, body: 
             tracing::warn!("callback error: {err}");
             fail(StatusCode::BAD_GATEWAY, "通知论坛失败，请稍后重试")
         }
+    };
+    if result.is_err() {
+        let _ = fs::remove_file(target).await;
     }
+    result
 }
 
 // ───────────────────────── 下载 ─────────────────────────
@@ -201,7 +237,7 @@ async fn download(State(state): State<AppState>, Path(key): Path<String>, Query(
     if !valid_file_key(&key) || key.starts_with("tmp/") {
         return StatusCode::NOT_FOUND.into_response();
     }
-    let public = key.starts_with(PUBLIC_PREFIX);
+    let public = key.starts_with(PUBLIC_PREFIX) || key.starts_with("img/");
     if !public {
         let ok = matches!((q.exp, q.sig.as_deref()), (Some(exp), Some(sig)) if sign::verify_download(&key, exp, sig, now(), &state.secret));
         if !ok {
