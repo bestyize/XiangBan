@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 
 defineProps<{ title: string; icon?: string | null; compact?: boolean; busy?: boolean; closing?: boolean }>()
 const emit = defineEmits<{ reload: []; close: [] }>()
 const workspace = ref<HTMLElement | null>(null)
 const maximized = ref(false)
+const content = ref<HTMLElement | null>(null)
+const fullscreenControl = ref<HTMLButtonElement | null>(null)
 const fullscreen = ref(false)
 const changingSize = ref(false)
 const failedIcon = ref('')
@@ -16,6 +18,14 @@ const windowSizeAction = computed(() => {
   if (maximized.value) return '还原窗口'
   return canFullscreen.value ? '进入全屏' : '最大化窗口'
 })
+
+watch(fullscreen, active => {
+  if (active) {
+    content.value?.focus({ preventScroll: true })
+  } else if (document.activeElement === content.value) {
+    fullscreenControl.value?.focus({ preventScroll: true })
+  }
+}, { flush: 'post' })
 
 function syncFullscreen() {
   fullscreen.value = !!workspace.value && document.fullscreenElement === workspace.value
@@ -56,7 +66,7 @@ function handleEscape(event: KeyboardEvent) {
 </script>
 
 <template>
-  <main ref="workspace" class="workspace" :class="{ maximized: expanded, compact }"
+  <main ref="workspace" class="workspace" :class="{ maximized: expanded, fullscreen, compact }"
     @fullscreenchange="syncFullscreen" @keydown.esc="handleEscape">
     <section class="app-window" :aria-label="title">
       <header class="titlebar">
@@ -68,7 +78,7 @@ function handleEscape(event: KeyboardEvent) {
           <button type="button" aria-label="重新加载" title="重新加载" :disabled="busy || closing" @click="emit('reload')">
             <AppIcon name="refresh" :size="18" />
           </button>
-          <button type="button" class="size-action" :aria-label="windowSizeAction" :title="windowSizeAction"
+          <button ref="fullscreenControl" type="button" class="size-action" :aria-label="windowSizeAction" :title="windowSizeAction"
             :disabled="closing" @click="toggleSize">
             <AppIcon :name="expanded ? 'restore' : 'expand'" :size="17" />
           </button>
@@ -78,7 +88,7 @@ function handleEscape(event: KeyboardEvent) {
           </button>
         </div>
       </header>
-      <div class="window-content" :inert="closing"><slot /></div>
+      <div ref="content" class="window-content" tabindex="-1" :inert="closing"><slot /></div>
     </section>
   </main>
 </template>
@@ -154,6 +164,9 @@ h1 {
 .window-content { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .workspace.maximized { padding: 0; }
 .maximized .app-window { width: 100%; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.fullscreen .app-window { grid-template-rows: minmax(0, 1fr); }
+.fullscreen .titlebar { display: none; }
+.fullscreen .window-content:focus { outline: none; }
 @media (max-width: 640px) {
   .workspace { padding: 0; }
   .workspace .app-window { width: 100%; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
@@ -163,7 +176,6 @@ h1 {
   }
   .window-actions button { width: 44px; height: 44px; }
   .window-actions .size-action { display: none; }
-  .workspace:fullscreen .window-actions .size-action { display: grid; }
   .window-content { padding-bottom: env(safe-area-inset-bottom); }
 }
 </style>
