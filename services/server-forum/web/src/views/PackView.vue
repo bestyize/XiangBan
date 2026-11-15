@@ -9,7 +9,8 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import ClientCreationPrompt from '@/components/creation/ClientCreationPrompt.vue'
 import WorkDiscussion from '@/components/creation/WorkDiscussion.vue'
 import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
-import { contentApi, type PackDetail } from '@/api/content'
+import { contentApi, runtimeBase, type PackDetail } from '@/api/content'
+import { appRunLocation, canTrialPack } from '@/lib/appRuntime'
 import { applyLink, coverStyle, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
@@ -54,6 +55,14 @@ watch(
 
 const isAuthor = computed(() => !!pack.value?.author && pack.value.author.uid === session.user?.uid)
 const latest = computed(() => pack.value?.versions[0])
+const appWindow = computed(() => {
+  const work = pack.value, selected = latest.value
+  const canOpenOnWeb = runtimeBase || (work?.slug === 'wancisou' && work.network_disabled === false)
+  return canOpenOnWeb && work?.kind === 'app' && selected &&
+    canTrialPack(work.kind, work.status, work.trust_level, selected.manifest.runtimeProtocol)
+    ? appRunLocation(work.id, selected.version)
+    : null
+})
 const manualOnly = computed(() => latest.value?.manifest.manualOnly === true)
 const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, latest.value.version, latest.value.sha256) : ''))
 
@@ -111,7 +120,8 @@ async function copyLink() {
         <p v-if="pack.tags.length" class="tags">
           <RouterLink v-for="t in pack.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
         </p>
-        <CommunityGameTrial v-if="latest" :key="`${pack.id}-${latest.version}`" :pack="pack" :version="latest.version" />
+        <RouterLink v-if="appWindow" class="btn btn-primary web-app-launch" :to="appWindow">打开应用</RouterLink>
+        <CommunityGameTrial v-else-if="latest" :key="`${pack.id}-${latest.version}`" :pack="pack" :version="latest.version" />
         <p v-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
         <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
         <p v-else-if="!pack.one_click && pack.kind !== 'game' && pack.kind !== 'app'" class="notice">
@@ -166,6 +176,7 @@ async function copyLink() {
 .head {
   padding: 14px 16px 0;
 }
+.web-app-launch { margin: 16px 0; }
 h1 {
   margin: 0;
   font-size: 22px;

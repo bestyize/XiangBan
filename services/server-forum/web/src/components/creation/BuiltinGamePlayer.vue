@@ -3,13 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
 import { checkedMbtiResultLink, decodeMbtiPng } from '@/lib/mbtiExport'
-const props = defineProps<{ gameId: string; autostart?: boolean }>()
+const props = defineProps<{ gameId: string; autostart?: boolean; standalone?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
-const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), dialog = ref<HTMLDialogElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
-const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false), started=ref(false)
+const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), dialog = ref<HTMLElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
+const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false), started=ref(props.standalone === true)
 const stage=ref<HTMLElement>(), stageSize=ref({width:0,height:0})
 const desktopInput=window.matchMedia('(hover: hover) and (pointer: fine)'), desktop=ref(desktopInput.matches)
-const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value))
+const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value && !props.standalone))
 const frameStyle=computed(() => stageSize.value.width && stageSize.value.height ? {width:`${frameSize.value.width}px`,height:`${frameSize.value.height}px`} : {width:'100%',height:'100%'})
 const exportRequest=ref<{ action:'save'|'image'|'link'; file?:File; url?:string } | null>(null)
 const exportError=ref('')
@@ -111,12 +111,12 @@ onMounted(() => {
   stageObserver=new ResizeObserver(([entry]) => { if (entry) stageSize.value={width:entry.contentRect.width,height:entry.contentRect.height} })
   if (stage.value) stageObserver.observe(stage.value)
   // 从卡片点击直接进入：弹层立刻打开并显示加载状态，全屏请求沿用这次点击的用户激活。
-  if (props.autostart) open()
+  if (props.autostart && !props.standalone) open()
 })
 // Resources and the handshake finish inside the preview. Keep fullscreen in
 // this direct click handler so waiting for the network cannot lose activation.
 function open() {
-  if (!dialog.value) return false
+  if (!(dialog.value instanceof HTMLDialogElement)) return false
   previousFocus=document.activeElement instanceof HTMLElement ? document.activeElement : null
   previousOverflow=document.documentElement.style.overflow
   document.documentElement.style.overflow='hidden'
@@ -138,14 +138,15 @@ function receive(event:MessageEvent) {
   if (d.type === 'mbti.export' && props.gameId === 'mbti') void prepareExport(d)
 }
 window.addEventListener('message',receive)
-onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListener('fullscreenchange',fullscreenChanged); if (orientationLocked) orientation?.unlock(); if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) void document.exitFullscreen().catch(() => {}); stageObserver?.disconnect(); desktopInput.removeEventListener('change',updateInput); if (started.value) document.documentElement.style.overflow=previousOverflow; sequence++; manifestController?.abort(); clearTimeout(handshakeTimer); window.removeEventListener('message',receive); dialog.value?.close(); previousFocus?.focus() })
+onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListener('fullscreenchange',fullscreenChanged); if (orientationLocked) orientation?.unlock(); if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) void document.exitFullscreen().catch(() => {}); stageObserver?.disconnect(); desktopInput.removeEventListener('change',updateInput); if (started.value && !props.standalone) document.documentElement.style.overflow=previousOverflow; sequence++; manifestController?.abort(); clearTimeout(handshakeTimer); window.removeEventListener('message',receive); if (dialog.value instanceof HTMLDialogElement) dialog.value.close(); previousFocus?.focus() })
 </script>
 <template>
-  <dialog ref="dialog" class="player" :aria-hidden="!started" :aria-label="game ? `${game.name}试玩` : '游戏试玩'" @cancel.prevent="emit('close')">
+  <component :is="standalone ? 'section' : 'dialog'" ref="dialog" class="player" :class="{ standalone }"
+    :aria-hidden="!started" :aria-label="game ? (standalone ? game.name : `${game.name}试玩`) : '游戏试玩'" @cancel.prevent="emit('close')">
     <div ref="surface" class="player-surface" :class="{mobile:!desktop}">
-    <div v-if="started && (loading || !connected || error)" class="player-status"><p v-if="error" role="alert">{{ error }} <button class="btn" type="button" @click="restart">重试</button></p><p v-else role="status">游戏加载中…</p></div>
-    <button v-if="!connected || error" class="player-exit btn" type="button" @click="emit('close')">退出试玩</button>
-    <button v-if="!desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
+    <div v-if="started && (loading || !connected || error)" class="player-status"><p v-if="error" role="alert">{{ error }} <button class="btn" type="button" @click="restart">重试</button></p><p v-else role="status">{{ standalone ? '正在加载应用…' : '游戏加载中…' }}</p></div>
+    <button v-if="!standalone && (!connected || error)" class="player-exit btn" type="button" @click="emit('close')">退出试玩</button>
+    <button v-if="!standalone && !desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
     <div ref="stage" class="game-stage"><iframe v-if="game && ready" :style="frameStyle" :key="generation" ref="frame" :src="url" :title="`${game.name}游戏区域`" sandbox="allow-scripts allow-orientation-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" @load="initialize" /></div>
     <div v-if="exportRequest" class="export-overlay" role="dialog" aria-modal="true" aria-label="分享人格画像">
       <div class="export-panel"><h2>{{ exportRequest.action === 'link' ? '分享结果链接' : '分享人格海报' }}</h2>
@@ -156,7 +157,7 @@ onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListen
       </div>
     </div>
     </div>
-  </dialog>
+  </component>
 </template>
 <style scoped>
 .player{position:fixed;inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0 0 env(safe-area-inset-bottom);border:0;background:var(--surface);color:var(--ink);overflow:hidden}
@@ -165,4 +166,5 @@ onBeforeUnmount(() => { closeExport(); disposed=true; document.removeEventListen
 .player-status{position:absolute;inset:0;z-index:1;display:grid;place-items:center;background:var(--surface-2)}.player p{padding:12px;color:var(--ink-2)}
 .game-stage{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;background:var(--surface-2)}
 .player iframe{display:block;flex:none;border:0;background:var(--surface-2)}
+.player.standalone{position:relative;inset:auto;height:100%;padding:0;visibility:visible;pointer-events:auto}
 </style>

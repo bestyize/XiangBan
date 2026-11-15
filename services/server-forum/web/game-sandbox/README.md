@@ -17,6 +17,8 @@ VITE_GAME_SANDBOX_URL=http://127.0.0.1:8191/ VITE_GAME_RESOURCE_ORIGIN=https://c
 
 论坛构建变量 `VITE_APP_RUNTIME_BASE` 指定独立作品域名，例如 `https://app.xiangban.xyz`。配好后，论坛列表和详情会声明同时支持协议 1 和协议 2。协议 2 预览从 `https://<作品编号>.app.xiangban.xyz/v<版本号>/<entry>` 加载，论坛只接受该来源和当前 iframe 发出的 SDK 消息。存储在论坛源的 IndexedDB 中，按作品编号分隔。
 
+网页小程序从「精选工具」或作品详情打开独立运行页 `/create/run/<作品编号>/<版本号>`。标题栏提供重载、最大化和关闭，手机上运行区占满标题栏下方。重载会重新检查同一版本的可用性。
+
 用 [案例打包脚本](../../content/app-plaza-cases-20261108/scripts/build_release.py) 的 `--browser-out` 和 `--browser-version` 生成《墨渡》和《茶签归位》的网页预览目录。脚本在作品代码之前加载 `../runtime-v2/bridge.js` 的副本。文件服务按主机名把请求指向输出目录下对应作品编号的子目录。该服务只提供静态文件，不接账号请求或 Cookie。离线案例的响应应设置 `X-Content-Type-Options: nosniff`，并用 CSP 限制脚本、样式和图片到本源，禁止 `connect-src`、嵌套 iframe 和表单，`frame-ancestors` 仅允许论坛源。
 
 开发模式可用 `http://app.localhost:<端口>`，以 `--forum-origin` 设置本地论坛源。此预览只覆盖离线案例及基础 SDK。正式接入还需要作品域名通配 DNS、HTTPS 证书、发布状态和文件服务联动，以及网页能力验收。

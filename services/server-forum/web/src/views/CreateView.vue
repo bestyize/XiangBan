@@ -40,6 +40,10 @@ const wide = ref(false), showcase = ref<HTMLElement>(), content = ref<HTMLElemen
 let contentObserver:ResizeObserver | undefined
 // 已分享的 ?game=<id> 链接直接打开试玩。
 watch(() => route.query.game, game => {
+  if (game === 'mbti' && route.name === 'create') {
+    void router.replace({ name: 'mbti-run' })
+    return
+  }
   playing.value = BUILTIN_GAMES.find(item => item.id === game)?.id || ''
 }, { immediate: true })
 onMounted(() => {

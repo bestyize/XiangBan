@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { contentApi, runtimeBase, type PackItem } from '@/api/content'
+import { contentApi } from '@/api/content'
 import AppIcon from '@/components/AppIcon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
@@ -9,8 +9,8 @@ import FilterChips from '@/components/community/FilterChips.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import { webLink } from '@/components/community/contract'
 import { useCommunityResource } from '@/components/community/resource'
-import { ANDROID_DOWNLOAD_URL, BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WANCISOU_ICON, WANCISOU_WEB_ENTRY, canOpenBundledWancisou } from '@/lib/builtinCreation'
-import CommunityGameTrial from './CommunityGameTrial.vue'
+import { ANDROID_DOWNLOAD_URL, BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WANCISOU_ICON } from '@/lib/builtinCreation'
+import { appRunLocation } from '@/lib/appRuntime'
 
 const emit = defineEmits<{ play: [id: string] }>()
 const route = useRoute(), router = useRouter()
@@ -40,46 +40,15 @@ const featuredTools = computed(() => (tools.data.value?.items ?? [])
   .slice(0, showAllTools.value ? undefined : 1)
   .map(tool => ({ ...tool, icon: tool.slug === 'wancisou' ? WANCISOU_ICON : webLink(tool.cover_url) })))
 const failedIcons = reactive(new Set<string>())
-const selectedTool = computed(() => {
+const linkedTool = computed(() => {
   const slug = route.query.tool
   if (showAllGames.value || typeof slug !== 'string' || !slug) return null
   return tools.data.value?.items.find(tool => tool.slug === slug) ?? null
 })
-const toolLaunch = useCommunityResource(async () => {
-  const selected = selectedTool.value
-  if (!selected) return null
-  const pack = await contentApi.pack(selected.id)
-  if (pack.kind !== 'app' || pack.status !== 'published' || pack.slug !== selected.slug) {
-    throw new Error('这个工具已不可用')
-  }
-  let opensBundledTool = false
-  if (pack.slug === 'wancisou' && pack.network_disabled === false) {
-    try {
-      const response = await fetch('/builtin-games/wancisou/version.json', { signal: AbortSignal.timeout(5000) })
-      if (response.ok) opensBundledTool = canOpenBundledWancisou(pack, (await response.json())?.version)
-    } catch { /* The published version may still run on the configured app host. */ }
-  }
-  return { pack, opensBundledTool }
-})
-watch(() => selectedTool.value?.id, toolLaunch.load, { immediate: true })
-const activePack = computed(() => toolLaunch.data.value?.pack)
-const opensBundledTool = computed(() => toolLaunch.data.value?.opensBundledTool === true)
-const showsRuntimeTool = computed(() => {
-  const pack = activePack.value
-  return Boolean(runtimeBase && pack?.versions.some(item => item.version === pack.version && item.manifest.runtimeProtocol === 2))
-})
-
-function toolLocation(tool: Pick<PackItem, 'slug'>) {
-  return { path: '/create', query: { ...route.query, tool: tool.slug } }
-}
-
-function closeTool() {
-  if (!route.query.tool) return
-  const query = { ...route.query, tool: undefined }
-  const current = router.resolve({ path: '/create', query }).fullPath
-  if (window.history.state?.back === current) router.back()
-  else void router.replace({ query })
-}
+// Keep links shared before tools moved to the independent window.
+watch(linkedTool, tool => {
+  if (tool) void router.replace(appRunLocation(tool.id, tool.version))
+}, { immediate: true })
 
 const feed = useCommunityResource(async () => {
   if (showAllGames.value || showAllTools.value) return null
@@ -131,15 +100,15 @@ function go(page: number) {
       <RouterLink v-else to="/create">返回广场</RouterLink>
     </header>
     <div class="tool-grid">
-      <button type="button" class="tool-tile" @click="emit('play', mbti.id)">
+      <RouterLink class="tool-tile" :to="{ name: 'mbti-run' }">
         <img class="shortcut-icon" :src="mbti.icon" alt="" decoding="async" />
         <strong>{{ mbti.name }}</strong>
-      </button>
+      </RouterLink>
       <button v-for="tool in mobileTools" :key="tool.id" class="tool-tile" type="button" @click="mobileTool = tool">
         <img class="shortcut-icon" :src="tool.icon" alt="" decoding="async" />
         <strong>{{ tool.name }}</strong><small>在手机 App 使用</small>
       </button>
-      <RouterLink v-for="tool in featuredTools" :key="tool.id" class="tool-tile" :to="toolLocation(tool)">
+      <RouterLink v-for="tool in featuredTools" :key="tool.id" class="tool-tile" :to="appRunLocation(tool.id, tool.version)">
         <img v-if="tool.icon && !failedIcons.has(tool.icon)" class="shortcut-icon" :src="tool.icon" alt="" decoding="async" @error="failedIcons.add(tool.icon)" />
         <span v-else class="shortcut-icon icon-fallback" aria-hidden="true"><AppIcon name="grid" /></span>
         <strong>{{ tool.title }}</strong>
@@ -153,18 +122,6 @@ function go(page: number) {
     <div v-if="mobileTool" class="tool-note">
       <p>{{ mobileTool.note }}</p>
       <a class="btn btn-primary" :href="ANDROID_DOWNLOAD_URL">下载 Android 版</a>
-    </div>
-  </ModalDialog>
-  <ModalDialog :open="Boolean(selectedTool)" :title="selectedTool?.title ?? '应用工具'" :width="680" @close="closeTool">
-    <RequestState :loading="toolLaunch.loading.value" :error="toolLaunch.error.value" @retry="toolLaunch.load" />
-    <iframe v-if="opensBundledTool" class="tool-frame" :src="WANCISOU_WEB_ENTRY" title="万磁搜"
-      sandbox="allow-scripts allow-forms" allow="clipboard-write" referrerpolicy="no-referrer" />
-    <CommunityGameTrial v-else-if="showsRuntimeTool && activePack"
-      :key="`${activePack.id}-${activePack.version}`"
-      :pack="activePack" :version="activePack.version" autostart @exit="closeTool" />
-    <div v-else-if="activePack" class="tool-note">
-      <p>请在 Android 小伴 App 的「精选工具」中打开{{ activePack.title }}。</p>
-      <RouterLink class="btn" :to="`/packs/${activePack.id}`">查看作品详情</RouterLink>
     </div>
   </ModalDialog>
 
@@ -203,7 +160,6 @@ small { color: var(--ink-3); font-size: 12px; }
 .tools-status { margin: 8px 0 0; color: var(--ink-3); font-size: 12px; }
 .tool-note { display: grid; justify-items: start; gap: 14px; }
 .tool-note p { margin: 0; color: var(--ink-2); }
-.tool-frame { display: block; width: 100%; height: min(66dvh, 610px); border: 0; border-radius: 10px; background: var(--surface-2); }
 .plaza-filters { padding-inline: 0; }
 .plaza-packs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .plaza-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 13px; }
