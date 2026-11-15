@@ -6,6 +6,10 @@
 
 实现设计时修改对应 client 工程并验证；不要直接用预览覆盖已有应用、鉴权或平台接入逻辑。
 
+## 超级小伴社区网页版
+
+[创意页作品卡片](../../services/server-forum/docs/design-specs/README.md) 首张卡片直达微观展厅，后两张分别展示《小王子：星辰之旅》及「运输船：Saltline」的详情和打开方式。[本机在线预览](http://127.0.0.1:1448/)。
+
 ## 小伴桌面
 
 [倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。
@@ -34,7 +38,7 @@
 | [手机游戏中心 A / B](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/game-center.html) | A 轻量游戏库与 B 沉浸游乐场；两版并排、390 / 360px、深浅色、我的游戏、详情、创作与启动交互。[在线预览](http://127.0.0.1:1421/prototypes/game-center.html)。已选 A 版接入手机正式页面，Android 使用只读官方游戏与真实最近游玩记录；实机效果待验收 |
 | [社区与小伴AI 手机原型](../../client/xiaoban-multiplatform/docs/design-specs/mobile-prototype/README.md) | 70 个画板：社区、小伴 AI、游戏、我的与设置、分享、设备遥控、聊天状态卡片、实时语音与按住说话；[在线画布](https://claude.ai/artifact/BGtDJ7S7vGenqaY5MvyLLJ) |
 
-两份 Claude Design 画布导出的设计稿由多个 `*.dc.html` 画板组成，需在各自目录运行 `python3 -m http.server` 后打开 `index.html` 总览；其余单个 HTML 设计稿均自包含，可直接用浏览器打开，展示数据为模拟内容。设计稿源文件统一保留在客户端设计目录，避免多份副本产生差异。
+两份 Claude Design 画布导出的设计稿由多个 `*.dc.html` 画板组成，需在各自目录运行 `python3 -m http.server` 后打开 `index.html` 总览；其余 HTML 设计稿可直接用浏览器打开，展示数据为模拟内容。设计稿源文件保留在对应项目的设计目录，避免多份副本产生差异。
 
 完整设计规范与其他设计稿见[小伴桌面设计资源索引](../../client/xiaoban-desktop/docs/design-specs/README.md)。
 

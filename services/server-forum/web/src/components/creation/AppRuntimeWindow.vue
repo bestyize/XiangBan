@@ -1,23 +1,36 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 
-defineProps<{ title: string; icon?: string | null; compact?: boolean; busy?: boolean; closing?: boolean }>()
+const props = defineProps<{
+  title: string
+  icon?: string | null
+  compact?: boolean
+  busy?: boolean
+  closing?: boolean
+  orientation?: 'portrait' | 'landscape'
+}>()
 const emit = defineEmits<{ reload: []; close: [] }>()
-const workspace = ref<HTMLElement | null>(null)
-const maximized = ref(false)
+const workspace = ref<(HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> }) | null>(null)
+const fullscreenDocument = document as Document & {
+  webkitFullscreenEnabled?: boolean
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => void | Promise<void>
+}
+const orientation = screen.orientation as ScreenOrientation & { lock?: (value: string) => Promise<void> }
 const content = ref<HTMLElement | null>(null)
 const fullscreenControl = ref<HTMLButtonElement | null>(null)
 const fullscreen = ref(false)
 const changingSize = ref(false)
+const fullscreenError = ref('')
 const failedIcon = ref('')
-const canFullscreen = computed(() => Boolean(workspace.value?.requestFullscreen && document.fullscreenEnabled))
-const expanded = computed(() => maximized.value || fullscreen.value)
-const windowSizeAction = computed(() => {
-  if (fullscreen.value) return '退出全屏'
-  if (maximized.value) return '还原窗口'
-  return canFullscreen.value ? '进入全屏' : '最大化窗口'
+let orientationLocked = false
+const fullscreenApi = computed(() => {
+  if (document.fullscreenEnabled && workspace.value?.requestFullscreen) return 'standard'
+  if (fullscreenDocument.webkitFullscreenEnabled && workspace.value?.webkitRequestFullscreen) return 'webkit'
+  return null
 })
+const windowSizeAction = computed(() => fullscreen.value ? '退出全屏' : '进入全屏')
 
 watch(fullscreen, active => {
   if (active) {
@@ -27,25 +40,64 @@ watch(fullscreen, active => {
   }
 }, { flush: 'post' })
 
-function syncFullscreen() {
-  fullscreen.value = !!workspace.value && document.fullscreenElement === workspace.value
+function fullscreenElement() {
+  return document.fullscreenElement || fullscreenDocument.webkitFullscreenElement || null
 }
 
-async function toggleSize() {
+function releaseOrientation() {
+  if (!orientationLocked) return
+  orientationLocked = false
+  orientation.unlock()
+}
+
+async function lockOrientation(element: HTMLElement) {
+  if (!props.orientation || !orientation?.lock || window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+  try {
+    await orientation.lock(props.orientation)
+    if (workspace.value === element && fullscreenElement() === element) orientationLocked = true
+    else orientation.unlock()
+  } catch { /* The user can still rotate the device. */ }
+}
+
+function syncFullscreen() {
+  const element = workspace.value
+  const active = element !== null && fullscreenElement() === element
+  if (active === fullscreen.value) return
+  fullscreen.value = active
+  if (active && element) void lockOrientation(element)
+  else releaseOrientation()
+}
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', syncFullscreen)
+  document.addEventListener('webkitfullscreenchange', syncFullscreen)
+  syncFullscreen()
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', syncFullscreen)
+  document.removeEventListener('webkitfullscreenchange', syncFullscreen)
+  releaseOrientation()
+})
+
+async function toggleFullscreen() {
   const element = workspace.value
   if (!element || changingSize.value) return
-  const exiting = document.fullscreenElement === element
-  if (!exiting && (maximized.value || !canFullscreen.value)) {
-    maximized.value = !maximized.value
-    return
-  }
+  const exiting = fullscreenElement() === element
+  if (!exiting && !fullscreenApi.value) return
 
+  fullscreenError.value = ''
   changingSize.value = true
   try {
-    if (exiting) await document.exitFullscreen()
-    else await element.requestFullscreen({ navigationUI: 'hide' })
+    if (exiting) {
+      if (document.fullscreenElement === element) await document.exitFullscreen()
+      else await fullscreenDocument.webkitExitFullscreen?.()
+    } else if (fullscreenApi.value === 'standard') {
+      await element.requestFullscreen()
+    } else {
+      await element.webkitRequestFullscreen?.()
+    }
   } catch {
-    if (!exiting) maximized.value = true
+    fullscreenError.value = exiting ? '无法退出全屏，请重试。' : '无法进入全屏，请重试。'
   } finally {
     syncFullscreen()
     changingSize.value = false
@@ -54,20 +106,19 @@ async function toggleSize() {
 
 function handleEscape(event: KeyboardEvent) {
   if (event.defaultPrevented || event.repeat || changingSize.value) return
-  if (document.fullscreenElement) {
-    if (document.fullscreenElement === workspace.value) void toggleSize()
+  const active = fullscreenElement()
+  if (active) {
+    if (active === workspace.value) void toggleFullscreen()
     return
   }
   if (fullscreen.value) return
   event.preventDefault()
-  if (maximized.value) maximized.value = false
-  else emit('close')
+  emit('close')
 }
 </script>
 
 <template>
-  <main ref="workspace" class="workspace" :class="{ maximized: expanded, fullscreen, compact }"
-    @fullscreenchange="syncFullscreen" @keydown.esc="handleEscape">
+  <main ref="workspace" class="workspace" :class="{ fullscreen, compact }" @keydown.esc="handleEscape">
     <section class="app-window" :aria-label="title">
       <header class="titlebar">
         <img v-if="icon && failedIcon !== icon" :src="icon" alt="" class="app-icon"
@@ -78,9 +129,9 @@ function handleEscape(event: KeyboardEvent) {
           <button type="button" aria-label="重新加载" title="重新加载" :disabled="busy || closing" @click="emit('reload')">
             <AppIcon name="refresh" :size="18" />
           </button>
-          <button ref="fullscreenControl" type="button" class="size-action" :aria-label="windowSizeAction" :title="windowSizeAction"
-            :disabled="closing" @click="toggleSize">
-            <AppIcon :name="expanded ? 'restore' : 'expand'" :size="17" />
+          <button v-if="fullscreenApi || fullscreen" ref="fullscreenControl" type="button" :aria-label="windowSizeAction" :title="windowSizeAction"
+            :disabled="closing || changingSize" @click="toggleFullscreen">
+            <AppIcon :name="fullscreen ? 'restore' : 'expand'" :size="17" />
           </button>
           <button type="button" class="close-action" aria-label="关闭应用" title="关闭应用"
             :disabled="closing" @click="emit('close')">
@@ -88,7 +139,10 @@ function handleEscape(event: KeyboardEvent) {
           </button>
         </div>
       </header>
-      <div ref="content" class="window-content" tabindex="-1" :inert="closing"><slot /></div>
+      <div ref="content" class="window-content" tabindex="-1" :inert="closing">
+        <slot />
+        <p v-if="fullscreenError" class="fullscreen-feedback" role="status">{{ fullscreenError }}</p>
+      </div>
     </section>
   </main>
 </template>
@@ -162,8 +216,22 @@ h1 {
 .window-actions .close-action:not(:disabled):hover { color: var(--danger); }
 .window-actions button:disabled { opacity: .45; }
 .window-content { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
-.workspace.maximized { padding: 0; }
-.maximized .app-window { width: 100%; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.workspace.fullscreen { width: 100%; height: 100%; padding: 0; }
+.fullscreen .app-window { width: 100%; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.fullscreen-feedback {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  pointer-events: none;
+}
 .fullscreen .app-window { grid-template-rows: minmax(0, 1fr); }
 .fullscreen .titlebar { display: none; }
 .fullscreen .window-content:focus { outline: none; }
@@ -175,7 +243,6 @@ h1 {
     padding: env(safe-area-inset-top) max(4px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
   }
   .window-actions button { width: 44px; height: 44px; }
-  .window-actions .size-action { display: none; }
   .window-content { padding-bottom: env(safe-area-inset-bottom); }
 }
 </style>

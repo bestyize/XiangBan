@@ -1,0 +1,78 @@
+{
+  "items": [
+    {
+      "id": "micro-gallery",
+      "kind": "gallery",
+      "title": "微观展厅",
+      "description": "看龙鱼与孔雀鱼共游，探索更多 3D 展品。",
+      "cover": "/gallery-exhibits/assets/gallery/living-room.webp",
+      "author": "RealWorldBuilder",
+      "date": "2026-11-15",
+      "href": "/ideas?tab=gallery"
+    },
+    {
+      "id": "plush-rabbit",
+      "kind": "exhibit",
+      "title": "碎花垂耳兔",
+      "description": "转动 3D 模型，近看绒毛、碎花和蝴蝶结。",
+      "cover": "/gallery-exhibits/assets/gallery/rabbit.webp",
+      "label": "3D模型",
+      "author": "RealWorldBuilder",
+      "date": "2026-11-15",
+      "href": "/create/run/ideas/plush-rabbit",
+      "player": "plush-rabbit"
+    },
+    {
+      "id": "starry-nightrider",
+      "kind": "work",
+      "title": "星夜骑士：Starry Nightrider",
+      "description": "骑车穿过梵高《星夜》里的村庄，把收集到的光球送进教堂尖塔。",
+      "cover": "/ideas-covers/starry-nightrider.webp",
+      "label": "游戏",
+      "author": "@ebbyamir",
+      "date": "2026-11-15",
+      "href": "/ideas/works/starry-nightrider",
+      "player": "starry-nightrider",
+      "site": "https://starrynightrider.com/"
+    },
+    {
+      "id": "little-prince",
+      "kind": "work",
+      "title": "小王子：星辰之旅",
+      "description": "从 B-612 出发，踏上星球间的 3D 旅程。",
+      "cover": "/ideas-covers/little-prince.webp",
+      "label": "游戏",
+      "author": "Sac",
+      "date": "2026-11-15",
+      "href": "/ideas/works/little-prince",
+      "site": "https://littleprince.dev/"
+    },
+    {
+      "id": "saltline",
+      "kind": "work",
+      "title": "运输船：Saltline",
+      "description": "潜入雨夜货港，切断中继站后乘船撤离。",
+      "cover": "/ideas-covers/saltline.webp",
+      "label": "游戏",
+      "author": "Felix Rieseberg",
+      "date": "2026-11-15",
+      "href": "/ideas/works/saltline",
+      "player": "saltline",
+      "pack_slug": "saltline"
+    },
+    {
+      "id": "oil-paint",
+      "kind": "work",
+      "title": "Oil Paint",
+      "description": "在实时笔触绘成的 3D 油画里漫步，探索秋林与极光下的雪脊。",
+      "cover": "/ideas-covers/oil-paint.webp",
+      "label": "游戏",
+      "author": "@BlendiByl",
+      "date": "2026-11-15",
+      "href": "/ideas/works/oil-paint",
+      "player": "oil-paint",
+      "site": "https://patch.gg/blendi/oil-paint",
+      "repository": "https://patch.gg/blendi/oil-paint/files"
+    }
+  ]
+}

@@ -34,7 +34,33 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 「创意 → 微观展厅」的封面和交互预览随前端产物一起部署。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
 
-创意页的碎花垂耳兔卡片标注「3D模型」。点击卡片直接打开作品，关闭容器后返回打开作品时所在的创意页。
+创意页 `/ideas` 直接展示 16:9 作品卡片。首张卡通往微观展厅，紧接着是标注「3D模型」的碎花垂耳兔卡片，之后依次展示《星夜骑士》《小王子》、Saltline、Oil Paint 和社区内容。《星夜骑士》《小王子》和 Oil Paint 的详情页通往各自官网，Oil Paint 的详情页也提供源码链接。《星夜骑士》、Saltline、Oil Paint、展厅水族箱和碎花垂耳兔使用 `/create/run/ideas/:slug` 共用运行容器。兔子卡片直接打开作品，关闭后返回进入时的创意页。关闭从展厅打开的展品会返回展厅，关闭从作品详情打开的游戏会返回各自的详情。
+
+网页版读取公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署为 `/ideas-catalog.json`。目录顺序就是「全部」首屏的精选顺序，手机客户端也可以读取这个入口。更新精选时发布新版网页产物即可。作品包、方案和帖子仍从现有论坛接口读取。
+
+站内作品由 Nginx 从论坛 Web 根目录之外提供。先在 `web/` 执行 `npm run build`，再用原始的 Saltline 单文件和已同步的展品生成三个 HTML：
+
+```sh
+node --experimental-strip-types scripts/build-idea-players.mjs --saltline /path/to/Saltline.html --out /path/to/idea-players-v1
+```
+
+将生成目录部署到 `/srv/xiangban-replica/apps/forum/idea-players-v1/`，在论坛 HTTPS 站点引入 [`deploy/nginx-idea-players.conf`](deploy/nginx-idea-players.conf)。作品响应和 iframe 均启用沙箱。Vite 开发时可设 `FORUM_IDEA_PLAYERS_ORIGIN=https://chat.xiangban.xyz`，通过本地代理使用已部署的作品文件。
+
+Oil Paint 使用 [作者仓库](https://patch.gg/blendi/oil-paint/files) 的 `804c65f`（1.1.3）。检出后拉取 Git LFS 模型，在本机执行作者提供的构建，再从论坛 `web/` 目录生成部署目录和可导入小伴的 V2 ZIP：
+
+```sh
+node scripts/build-oil-paint-pack.mjs --dist /path/to/oil-paint/dist --cover public/ideas-covers/oil-paint.webp --icon /path/to/icon.webp --out /path/to/release
+```
+
+将输出的 `oil-paint/` 放入上述作品部署目录，保留作者许可证。试玩使用 WebGL2、浏览器内的 Rapier WASM 和键鼠。作品沙箱仅可请求自己目录内的模块与模型。
+
+《星夜骑士》使用 [ByteRax 中文复刻](https://github.com/ByteRax/Starrynightrider/tree/0c5714aa67059d1ae804db2d5cfc868cf27c1b6a)。从固定提交的 `site/` 生成内嵌两套分辨率贴图的单 HTML 和 V2 ZIP。站内试玩使用本机排行榜，作品署名和官网链接随页面保留。
+
+```sh
+node scripts/build-starry-nightrider-pack.mjs --site /path/to/Starrynightrider/site --cover public/ideas-covers/starry-nightrider.webp --icon /path/to/icon.webp --out /path/to/release
+```
+
+将输出的 `starry-nightrider.html` 放入上述作品部署目录。
 
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 
@@ -304,7 +330,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 - 二期（PRD 里的 M2 起）未做：关键词订阅、TL2 自动升级、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
-- 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。手机应用的令牌（`aud=xiaoban-android`）由 `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` 接受（默认已含，账号中心要登记该客户端），见 [手机互联上线清单](../../docs/deployment/MOBILE_LINK_ROLLOUT.md)。
+- 部署：上海机 `/srv/xiangban-replica/live/forum`，systemd 服务 `xiangban-live-forum`，监听 127.0.0.1:55010，Nginx 反代 `chat.xiangban.xyz`。在本机完成构建，将发布文件上传到 `/srv/xiangban-replica/apps/forum/`，切换 `live/forum/web` 链接后重启服务（index.html 启动时读取）。`live/forum/app` 链接指向服务端程序的发布目录。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。手机应用的令牌（`aud=xiaoban-android`）由 `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` 接受，见 [手机互联上线清单](../../docs/deployment/MOBILE_LINK_ROLLOUT.md)。
 
 ## 站方图文创作与批量发帖
 

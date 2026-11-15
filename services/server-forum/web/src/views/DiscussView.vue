@@ -10,13 +10,14 @@ import { useSession } from '@/stores/session'
 import { useTopicComposer } from '@/stores/topicComposer'
 import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
-import { rabbitIdeaCard } from '@/lib/ideaCards'
-import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope } from '@/lib/communityStructure'
+import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope, categoryLabel } from '@/lib/communityStructure'
+import type { IdeaCardItem } from '@/lib/ideaCards'
+import { loadFeaturedIdeas } from '@/lib/ideaCatalog'
+import { kindLabel } from '@/lib/content'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
-import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
-import MicroGallery from '@/components/community/MicroGallery.vue'
 import IdeaCard from '@/components/community/IdeaCard.vue'
+import MicroGallery from '@/components/community/MicroGallery.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import { useCommunityResource } from '@/components/community/resource'
@@ -25,7 +26,6 @@ import '@/components/community/community.css'
 const route = useRoute(), router = useRouter(), session = useSession()
 const meta = useMeta()
 const composer = useTopicComposer()
-const ideaTabs = [{ key: '', label: '全部' }, galleryTab] as const
 const ideas = computed(() => route.name === 'ideas')
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
 const showGallery = computed(() => ideas.value && query('tab') === galleryTab.key)
@@ -34,7 +34,6 @@ const discussionOptions = computed(() => discussionTabs(meta.categories))
 const tag = computed(() => query('tag'))
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
-const showRabbitIdea = computed(() => ideas.value && !showGallery.value && !tag.value && !following.value && page.value === 1)
 const category = computed(() => ideas.value ? sectionScope(meta.categories, 'ideas') : discussionCategory(tab.value, meta.categories))
 const scope = computed(() => ({
   category:category.value,
@@ -43,7 +42,7 @@ const scope = computed(() => ({
   home:!ideas.value && (tab.value === 'all' || Boolean(discussionTopicTag(tab.value))),
 }))
 
-type Entry = {kind:'topic'; value:TopicItem} | {kind:'pack'; value:PackItem} | {kind:'scheme'; value:CommunityScheme}
+type Entry = {kind:'topic'; value:TopicItem & { images?: string[] }} | {kind:'pack'; value:PackItem} | {kind:'scheme'; value:CommunityScheme}
 function date(entry:Entry) {
   return Date.parse(entry.kind === 'pack' ? entry.value.updated_at : entry.value.created_at) || 0
 }
@@ -63,6 +62,46 @@ const { data, loading, error, load, refresh } = useCommunityResource(async () =>
   ]
   return { entries:entries.sort((a,b) => date(b)-date(a)), hasMore:[topics,packs,schemes].some(result => result && result.page * result.page_size < result.total) }
 })
+const showFeaturedIdeas = computed(() => ideas.value && !showGallery.value && !tag.value && !following.value && page.value === 1)
+const featuredCatalog = useCommunityResource(loadFeaturedIdeas)
+watch(showFeaturedIdeas, show => { if (show) void featuredCatalog.refresh() }, { immediate: true })
+const featuredIdeas = computed(() => showFeaturedIdeas.value ? featuredCatalog.data.value ?? [] : [])
+
+function communityIdeaCard(entry: Entry): IdeaCardItem {
+  if (entry.kind === 'topic') {
+    const topic = entry.value
+    return {
+      id: 'topic-' + topic.id, to: { name: 'topic', params: { id: topic.id } },
+      title: topic.title, description: topic.excerpt, cover: topic.images?.[0],
+      label: categoryLabel(topic.category), author: topic.author.nickname, date: topic.created_at,
+    }
+  }
+  if (entry.kind === 'pack') {
+    const pack = entry.value
+    return {
+      id: 'pack-' + pack.id, to: { name: 'pack', params: { id: pack.id } },
+      title: pack.title, description: pack.summary, cover: pack.cover_url,
+      label: kindLabel(pack.kind), author: pack.author?.nickname, date: pack.created_at,
+    }
+  }
+  const scheme = entry.value
+  return {
+    id: 'scheme-' + scheme.id, to: { name: 'scheme', params: { id: scheme.id } },
+    title: scheme.title, description: scheme.summary, label: '桌面方案',
+    author: scheme.author.nickname, date: scheme.created_at,
+  }
+}
+
+const ideaCards = computed(() => {
+  if (!ideas.value || showGallery.value) return []
+  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({ ...item, dateLabel: '收录', to: item.href }))
+  const featuredPacks = new Set(featuredIdeas.value.flatMap(item => item.pack_slug ? [item.pack_slug] : []))
+  const entries = data.value?.entries ?? []
+  const community = entries
+    .filter(entry => entry.kind !== 'pack' || !featuredPacks.has(entry.value.slug))
+    .map(communityIdeaCard)
+  return [...featured, ...community]
+})
 watch([() => meta.categories,ideas,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 watch(() => composer.saved, saved => { if (saved && !showGallery.value) void refresh() })
 
@@ -71,9 +110,6 @@ function navigate(values:Record<string,string|undefined>) {
     tab: ideas.value ? (showGallery.value ? galleryTab.key : undefined) : tab.value,
     tag: tag.value || undefined, mode: following.value ? 'following' : undefined, ...values,
   }})
-}
-function changeIdeaTab(key:string) {
-  navigate({ tab: key === galleryTab.key ? galleryTab.key : undefined, tag: undefined, page: undefined })
 }
 function changeDiscussionTab(key:string) {
   navigate({ tab:key, tag:undefined, page:undefined })
@@ -88,13 +124,13 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
     <h1 class="sr-only">{{ ideas ? '社区创意' : '社区讨论' }}</h1>
     <CommunityTabs v-if="!ideas" :items="discussionOptions" :active="tab" label="讨论板块"
       @change="changeDiscussionTab" />
-    <CommunityTabs v-else :items="ideaTabs" :active="showGallery ? galleryTab.key : ''" label="创意板块"
-      @change="changeIdeaTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
-    <MasonryGrid v-if="showRabbitIdea" class="discussion-grid" :columns="2">
-      <IdeaCard :card="rabbitIdeaCard" />
-    </MasonryGrid>
+    <RequestState v-if="showFeaturedIdeas" :loading="featuredCatalog.loading.value" :error="featuredCatalog.error.value"
+      @retry="featuredCatalog.refresh" />
+    <div v-if="ideaCards.length" class="ideas-grid">
+      <IdeaCard v-for="card in ideaCards" :key="card.id" :card="card" />
+    </div>
     <MicroGallery v-if="showGallery" />
     <RequestState v-else-if="!meta.categories.length && (meta.categoriesLoading || meta.categoriesError)"
       :loading="meta.categoriesLoading" :error="meta.categoriesError" @retry="meta.load()" />
@@ -103,17 +139,12 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
     </div>
     <template v-else>
       <RequestState :loading="loading" :error="error" @retry="load" />
-      <MasonryGrid v-if="data?.entries.length" class="discussion-grid" :columns="2">
+      <MasonryGrid v-if="!ideas && data?.entries.length" class="discussion-grid" :columns="2">
         <template v-for="entry in data.entries" :key="entry.kind + ':' + entry.value.id">
-          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:ideas ? undefined : 'all',tag:$event,page:undefined})" />
-          <CommunityPackCard v-else-if="entry.kind === 'pack'" :pack="entry.value" layout="masonry" discussion />
-          <RouterLink v-else :to="'/schemes/' + entry.value.id" class="scheme-card">
-            <span>创意 · 桌面方案</span><strong>{{ entry.value.title }}</strong><p>{{ entry.value.summary }}</p>
-            <small>{{ entry.value.author.nickname || '社区作品' }} · {{ entry.value.items.length }} 项 · 查看导入</small>
-          </RouterLink>
+          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:'all',tag:$event,page:undefined})" />
         </template>
       </MasonryGrid>
-      <RequestState v-if="data && !data.entries.length && !showRabbitIdea" empty />
+      <RequestState v-if="data && !data.entries.length && !ideaCards.length && (!showFeaturedIdeas || (!featuredCatalog.loading.value && !featuredCatalog.error.value))" empty />
       <div v-if="data && (page > 1 || data.hasMore)" class="discussion-pager">
         <button class="community-button" :disabled="page <= 1" @click="go(page - 1)">上一页</button>
         <span>第 {{ page }} 页</span>
@@ -131,9 +162,22 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 @container page (min-width: 960px) {
   .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+.ideas-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0;
+}
+@container page (min-width: 720px) {
+  .ideas-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+@container page (min-width: 1040px) {
+  .ideas-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 19px; }
+}
+@container page (max-width: 530px) { .ideas-grid { gap: 10px; } }
+@container page (max-width: 310px) { .ideas-grid { grid-template-columns: minmax(0, 1fr); } }
 .active-topic{margin:0 12px 8px;padding:6px 10px;border:0;border-radius:14px;background:var(--brand-soft);color:var(--brand);font-size:12px}
-.scheme-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px;color:var(--ink);overflow-wrap:anywhere}
-.scheme-card span,.scheme-card p,.scheme-card small,.feed-note{font-size:12px;color:var(--ink-3);margin:0}
+.feed-note{font-size:12px;color:var(--ink-3);margin:0}
 .feed-note{padding:0 12px 8px}.login-prompt{text-align:center;padding:24px}.discussion-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;font-size:12px}
 @media(min-width:1100px){.discuss-page{max-width:1120px}.discussion-grid{margin-inline:0}}
 </style>

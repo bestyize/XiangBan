@@ -15,11 +15,15 @@ function openDatabase() {
   return database
 }
 
-export async function appRuntimeStorage(packId: number, operation: unknown, key: unknown, value: unknown): Promise<unknown> {
+type StorageOwner = number | string
+type StorageKey = [StorageOwner, string]
+
+export async function appRuntimeStorage(owner: StorageOwner, operation: unknown, key: unknown, value: unknown): Promise<unknown> {
   if (operation !== 'get' && operation !== 'set' && operation !== 'remove' && operation !== 'keys') throw new Error('invalid')
   if (operation !== 'keys' && (typeof key !== 'string' || !key || [...key].length > 128)) throw new Error('invalid')
-  const entry: [number, string] = [packId, typeof key === 'string' ? key : '']
-  const range = IDBKeyRange.bound([packId], [packId + 1], false, true)
+  const entry: StorageKey = [owner, typeof key === 'string' ? key : '']
+  const nextOwner = typeof owner === 'number' ? owner + 1 : `${owner}\u0000`
+  const range = IDBKeyRange.bound([owner], [nextOwner], false, true)
   let json: string | undefined
   if (operation === 'set') {
     try { json = JSON.stringify(value) } catch { throw new Error('invalid') }
@@ -42,7 +46,7 @@ export async function appRuntimeStorage(packId: number, operation: unknown, key:
       }
       case 'keys': {
         const request = store.getAllKeys(range)
-        request.onsuccess = () => { result = request.result.map(item => (item as [number, string])[1]) }
+        request.onsuccess = () => { result = request.result.map(item => (item as StorageKey)[1]) }
         break
       }
       case 'remove':
@@ -55,7 +59,7 @@ export async function appRuntimeStorage(packId: number, operation: unknown, key:
         request.onsuccess = () => {
           const row = request.result
           if (row) {
-            const existing = (row.key as [number, string])[1]
+            const existing = (row.key as StorageKey)[1]
             if (existing !== key) bytes += encoder.encode(existing).length + encoder.encode(row.value).length
             row.continue()
           } else if (bytes > quota) {

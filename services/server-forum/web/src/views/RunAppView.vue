@@ -18,6 +18,11 @@ const isBuiltin = computed(() => route.name === 'builtin-run')
 const isIdea = computed(() => route.name === 'idea-run')
 const ideaId = computed(() => isIdea.value ? ideaPlayerId(route.params.slug) : undefined)
 const builtin = computed(() => typeof route.params.gameId === 'string' ? builtinGame(route.params.gameId) : undefined)
+const fullscreenOrientation = computed(() => {
+  const game = builtin.value
+  if (!game || game.id === 'mbti') return
+  return game.orientation === 'landscape' ? 'landscape' : 'portrait'
+})
 const packId = computed(() => Number(route.params.id))
 const version = computed(() => Number(route.params.version))
 let launchController: AbortController | undefined
@@ -121,6 +126,7 @@ async function close() {
 
 <template>
   <AppRuntimeWindow :title="title" :icon="icon" :compact="builtin?.id === 'mbti'"
+    :orientation="fullscreenOrientation"
     :busy="reloading" :closing="closing" @reload="reload" @close="close">
     <BuiltinGamePlayer v-if="builtin" :key="revision" :game-id="builtin.id" @close="close" />
     <div v-else-if="isBuiltin" class="state" role="alert">找不到这个内置作品</div>

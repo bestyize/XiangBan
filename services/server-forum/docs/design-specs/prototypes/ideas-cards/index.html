@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>创意 · 小伴社区</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f0e7;
+      --surface: #fffdf8;
+      --ink: #2d261e;
+      --description: #62584b;
+      --muted: #736759;
+      --border: #e1d8ca;
+      --divider: #eae2d7;
+      --accent: #935128;
+      --curve: 13px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background-color: var(--canvas);
+      background-image: linear-gradient(#754d2410 1px, transparent 1px),
+                        linear-gradient(90deg, #754d2410 1px, transparent 1px);
+      background-size: 24px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+    .page { width: min(100%, 1240px); margin: auto; padding: 34px 34px 48px; }
+    .page-header { margin-block-end: 21px; }
+    h1 { margin: 0; font-size: 23px; line-height: 1.4; font-weight: 650; }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+      gap: 19px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .card-grid > li { display: flex; min-width: 0; }
+    .work-card {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      flex-direction: column;
+      padding: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--curve);
+      box-shadow: 0 2px 4px #412c1510;
+      transition: border-color .18s, box-shadow .18s, transform .18s;
+    }
+    @media (hover: hover) {
+      .work-card:hover {
+        transform: translateY(-2px);
+        border-color: #bd9e82;
+        box-shadow: 0 6px 17px #412c151b;
+      }
+    }
+    .cover {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #ddd3c4;
+    }
+    .cover img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .cover-tags {
+      position: absolute;
+      inset: 9px 9px auto auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+    .cover-tags:empty { display: none; }
+    .work-tag {
+      padding: 3px 6px;
+      border: 1px solid #ffffff36;
+      border-radius: 5px;
+      background: #734725ed;
+      color: #fff8ed;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+    .card-body {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      flex-direction: column;
+      padding: 12px 10px 4px;
+    }
+    .work-title {
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 16px;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+    .work-description {
+      display: -webkit-box;
+      min-height: 3.2em;
+      margin: 5px 0 0;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      color: var(--description);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .work-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+      margin-top: auto;
+      padding-top: 9px;
+      padding-bottom: 2px;
+      border-top: 1px solid var(--divider);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .card-body .work-meta { margin-top: 10px; }
+    .work-author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 38px;
+      margin: 0 0 12px;
+      color: var(--description);
+      font-size: 13px;
+    }
+    .back:hover { color: var(--accent); }
+    .detail-card {
+      max-width: 960px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--curve);
+      background: var(--surface);
+    }
+    .detail-body { padding: 16px; }
+    .detail-body p { margin: 8px 0 16px; color: var(--description); font-size: 14px; line-height: 1.65; }
+    .detail-body .work-meta { margin-bottom: 18px; }
+    .primary-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 15px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fffaf4;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .primary-action:hover { background: #7c421e; }
+    .container-preview { max-width: 960px; }
+    .container-preview .cover { margin-top: 12px; }
+    @media (min-width: 800px) {
+      .detail-card { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(230px, 1fr); align-items: center; }
+      .detail-body { padding: 20px; }
+    }
+    @media (max-width: 610px) {
+      .page { padding: 20px 14px 36px; }
+      .page-header { margin-block-end: 14px; }
+      h1 { font-size: 20px; }
+      .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .work-card { padding: 5px; border-radius: 10px; }
+      .cover { border-radius: 6px; }
+      .cover-tags { inset: 6px 6px auto auto; }
+      .work-tag { font-size: 10px; }
+      .card-body { padding: 9px 5px 3px; }
+      .work-title { font-size: 14px; }
+      .work-description { font-size: 12px; }
+      .work-meta { display: grid; gap: 3px; }
+      .card-body .work-meta { padding-top: 7px; margin-top: 8px; }
+    }
+    @media (max-width: 339px) {
+      .card-grid { grid-template-columns: minmax(0, 1fr); }
+      .work-meta { display: flex; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .work-card { transition: none; }
+      .work-card:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section id="gallery" aria-labelledby="gallery-title">
+      <header class="page-header"><h1 id="gallery-title" tabindex="-1">创意</h1></header>
+      <ul class="card-grid">
+        <li>
+          <a class="work-card" id="micro-gallery" href="https://chat.xiangban.xyz/ideas?tab=gallery"
+             aria-labelledby="micro-gallery-title">
+            <div class="cover">
+              <img src="images/micro-gallery.webp" width="1480" height="833" alt="水族箱里的龙鱼和孔雀鱼">
+            </div>
+            <div class="card-body">
+              <h2 class="work-title" id="micro-gallery-title">微观展厅</h2>
+              <p class="work-description">看龙鱼与孔雀鱼共游，探索更多 3D 展品。</p>
+              <footer class="work-meta">
+                <span class="work-author">RealWorldBuilder</span>
+                <span>收录 <time datetime="2026-11-15">2026.11.15</time></span>
+              </footer>
+            </div>
+          </a>
+        </li>
+        <li>
+          <a class="work-card" id="little-prince" href="#works/little-prince"
+             data-launch-url="https://littleprince.dev/" data-launch-label="前往官网"
+             aria-labelledby="little-prince-title">
+            <div class="cover">
+              <img src="images/little-prince.webp" width="1120" height="630" alt="星空下，小王子站在小星球的玫瑰旁">
+              <div class="cover-tags"><span class="work-tag">游戏</span></div>
+            </div>
+            <div class="card-body">
+              <h2 class="work-title" id="little-prince-title">小王子：星辰之旅</h2>
+              <p class="work-description">从 B-612 出发，踏上星球间的 3D 旅程。</p>
+              <footer class="work-meta">
+                <span class="work-author">Sac</span>
+                <span>收录 <time datetime="2026-11-15">2026.11.15</time></span>
+              </footer>
+            </div>
+          </a>
+        </li>
+        <li>
+          <a class="work-card" id="saltline" href="#works/saltline"
+             data-launch-url="#container/saltline" data-launch-label="在小伴中打开"
+             aria-labelledby="saltline-title">
+            <div class="cover">
+              <img src="images/saltline.webp" width="1120" height="630" alt="Saltline 游戏中的雨夜集装箱码头">
+              <div class="cover-tags"><span class="work-tag">游戏</span></div>
+            </div>
+            <div class="card-body">
+              <h2 class="work-title" id="saltline-title">运输船：Saltline</h2>
+              <p class="work-description">潜入雨夜货港，切断中继站后乘船撤离。</p>
+              <footer class="work-meta">
+                <span class="work-author">Felix Rieseberg</span>
+                <span>收录 <time datetime="2026-11-15">2026.11.15</time></span>
+              </footer>
+            </div>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <section id="detail" hidden aria-labelledby="detail-title">
+      <a class="back" href="#gallery"><span aria-hidden="true">←</span> 创意</a>
+      <article class="detail-card">
+        <div class="cover" id="detail-cover"></div>
+        <div class="detail-body">
+          <h1 id="detail-title" tabindex="-1"></h1>
+          <p id="detail-description"></p>
+          <footer class="work-meta" id="detail-meta"></footer>
+          <a class="primary-action" id="detail-launch"></a>
+        </div>
+      </article>
+    </section>
+
+    <section class="container-preview" id="container-preview" hidden aria-labelledby="container-title">
+      <a class="back" href="#works/saltline"><span aria-hidden="true">←</span> 作品详情</a>
+      <h1 id="container-title" tabindex="-1">Saltline 容器预览</h1>
+      <div class="cover">
+        <img src="images/saltline.webp" width="1120" height="630" alt="Saltline 游戏画面">
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const gallery = document.querySelector('#gallery');
+    const detail = document.querySelector('#detail');
+    const containerPreview = document.querySelector('#container-preview');
+    const cards = new Map(Array.from(document.querySelectorAll('.work-card[data-launch-url]'), card => [card.id, card]));
+    let priorCard;
+
+    function updatePage(moveFocus) {
+      const [page, id] = location.hash.slice(1).split('/');
+      const card = cards.get(id);
+      const showDetail = page === 'works' && Boolean(card);
+      const showContainer = page === 'container' && id === 'saltline';
+      gallery.hidden = showDetail || showContainer;
+      detail.hidden = !showDetail;
+      containerPreview.hidden = !showContainer;
+
+      if (showDetail) {
+        priorCard = card;
+        const title = card.querySelector('.work-title').textContent;
+        document.querySelector('#detail-title').textContent = title;
+        document.querySelector('#detail-description').textContent = card.querySelector('.work-description').textContent;
+        document.querySelector('#detail-cover').replaceChildren(...Array.from(card.querySelector('.cover').children, node => node.cloneNode(true)));
+        document.querySelector('#detail-meta').replaceChildren(...Array.from(card.querySelector('.work-meta').children, node => node.cloneNode(true)));
+        const action = document.querySelector('#detail-launch');
+        action.href = card.dataset.launchUrl;
+        action.textContent = card.dataset.launchLabel;
+        document.title = title + ' · 创意';
+        if (moveFocus) document.querySelector('#detail-title').focus();
+      } else if (showContainer) {
+        document.title = 'Saltline 容器预览 · 创意';
+        if (moveFocus) document.querySelector('#container-title').focus();
+      } else {
+        document.title = '创意 · 小伴社区';
+        if (moveFocus) (priorCard || document.querySelector('#gallery-title')).focus();
+      }
+    }
+
+    updatePage(false);
+    addEventListener('hashchange', () => updatePage(true));
+  </script>
+</body>
+</html>

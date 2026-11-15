@@ -8,7 +8,6 @@ const props = defineProps<{ gameId: string }>()
 const emit = defineEmits<{ close: [] }>()
 const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), ready = ref(false), connected = ref(false)
 const message = ref('正在读取作品信息…')
-const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false)
 const stage=ref<HTMLElement>(), stageSize=ref({width:0,height:0})
 const desktopInput=window.matchMedia('(hover: hover) and (pointer: fine)'), desktop=ref(desktopInput.matches)
 const frameSize=computed(() => fitGameViewport(stageSize.value.width,stageSize.value.height,game.value?.orientation || 'landscape',desktop.value && props.gameId !== 'mbti'))
@@ -66,20 +65,7 @@ async function shareExport(){
 }
 async function copyResultLink(){if(!exportRequest.value?.url)return;try{await navigator.clipboard.writeText(exportRequest.value.url);closeExport()}catch{exportError.value='无法复制，请手动复制链接。'}}
 let stageObserver:ResizeObserver | undefined
-let disposed=false, orientationLocked=false
-const orientation=screen.orientation as ScreenOrientation & {lock?:(value:string)=>Promise<void>}
-function fullscreenChanged() { fullscreen.value=!!document.fullscreenElement }
-async function enterFullscreen() {
-  const element=surface.value
-  if (!element?.requestFullscreen || !document.fullscreenEnabled) return
-  try {
-    if (!document.fullscreenElement) await element.requestFullscreen()
-    if (disposed) { if (document.fullscreenElement === element) await document.exitFullscreen(); return }
-    if (!desktop.value && orientation?.lock) {
-      try { await orientation.lock(game.value?.orientation === 'landscape' ? 'landscape' : 'portrait'); orientationLocked=true; if (disposed) orientation.unlock() } catch { /* Rotation remains available when the browser declines a lock. */ }
-    }
-  } catch { /* Keep the game usable and offer another user-gesture attempt. */ }
-}
+let disposed=false
 function updateInput() { desktop.value=desktopInput.matches }
 let sequence = 0
 let manifestController:AbortController | undefined
@@ -109,8 +95,6 @@ async function restart() {
 watch(() => props.gameId, restart, { immediate:true })
 onMounted(() => {
   desktopInput.addEventListener('change',updateInput)
-  fullscreenAvailable.value=!!surface.value?.requestFullscreen && document.fullscreenEnabled
-  document.addEventListener('fullscreenchange',fullscreenChanged)
   stageObserver=new ResizeObserver(([entry]) => { if (entry) stageSize.value={width:entry.contentRect.width,height:entry.contentRect.height} })
   if (stage.value) stageObserver.observe(stage.value)
 })
@@ -131,11 +115,6 @@ window.addEventListener('message',receive)
 onBeforeUnmount(() => {
   closeExport()
   disposed = true
-  document.removeEventListener('fullscreenchange', fullscreenChanged)
-  if (orientationLocked) orientation?.unlock()
-  if (document.fullscreenElement && surface.value?.contains(document.fullscreenElement)) {
-    void document.exitFullscreen().catch(() => {})
-  }
   stageObserver?.disconnect()
   desktopInput.removeEventListener('change', updateInput)
   sequence++
@@ -144,9 +123,8 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <section ref="surface" class="player" :aria-label="game?.name || '游戏试玩'">
+  <section class="player" :aria-label="game?.name || '游戏试玩'">
     <AppRuntimeStatus v-if="!connected || error" class="player-status" :message="message" :error="error" @retry="restart" />
-    <button v-if="gameId !== 'mbti' && !desktop && connected && !fullscreen && fullscreenAvailable" class="fullscreen-button" type="button" @click="enterFullscreen">全屏</button>
     <div ref="stage" class="game-stage"><iframe v-if="game && ready" :style="frameStyle" :key="generation" ref="frame" :src="url" :title="`${game.name}游戏区域`" sandbox="allow-scripts allow-orientation-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" @load="initialize" /></div>
     <div v-if="exportRequest" class="export-overlay" role="dialog" aria-modal="true" aria-label="分享人格画像">
       <div class="export-panel"><h2>{{ exportRequest.action === 'link' ? '分享结果链接' : '分享人格海报' }}</h2>
@@ -161,7 +139,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .player{position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:var(--surface);color:var(--ink)}
 .export-overlay{position:absolute;inset:0;z-index:9;display:grid;place-items:center;padding:20px;background:#0007}.export-panel{width:min(100%,440px);padding:20px;border-radius:16px;background:var(--surface);box-shadow:0 8px 32px #0003}.export-panel h2{font-size:18px;margin:0}.export-panel p{padding:10px 0;font-size:13px;line-height:1.7}.export-panel input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:12px}.export-actions{display:flex;flex-wrap:wrap;gap:8px}.export-actions button{min-height:44px}
-.fullscreen-button{position:absolute;z-index:2;top:8px;right:max(8px,env(safe-area-inset-right));min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);font-size:13px}
 .player p{padding:12px;color:var(--ink-2)}
 .game-stage{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;overflow:hidden;background:var(--surface-2)}
 .player iframe{display:block;flex:none;border:0;background:var(--surface-2)}

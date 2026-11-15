@@ -22,7 +22,7 @@ function togglePhoto() {
 }
 
 function exhibitLocation(id?: string) {
-  return galleryRunLocation(id) ?? { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
+  return { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
 }
 
 watch(exhibit, async (current, previous) => {
@@ -56,7 +56,7 @@ function onExhibitMessage(event: MessageEvent) {
   if (event.data === 'gallery:back') {
     returnToGallery()
   } else if (event.data === 'gallery:aquarium') {
-    void router.replace(exhibitLocation('aquarium'))
+    void router.replace(galleryRunLocation('aquarium') ?? exhibitLocation('aquarium'))
   } else if (event.data === 'gallery:unavailable') {
     previewFailed.value = true
     photoMode.value = true
@@ -95,18 +95,21 @@ watch(exhibit, (current, _, onCleanup) => {
         allowfullscreen
       ></iframe>
     </template>
-    <ul v-else class="gallery-grid">
-      <li v-for="(item, index) in galleryExhibits" :key="item.id" :class="{ 'gallery-feature': index === 0 }">
-        <RouterLink :id="`exhibit-${item.id}`" :to="exhibitLocation(item.id)" class="gallery-card">
-          <img :src="coverUrl(item.cover)" alt="" :loading="index === 0 ? 'eager' : 'lazy'" decoding="async">
-          <div class="gallery-copy">
-            <h2>{{ item.name }}</h2>
-            <p>{{ item.description }}</p>
-          </div>
-          <AppIcon name="arrow" :size="16" class="gallery-arrow" />
-        </RouterLink>
-      </li>
-    </ul>
+    <template v-else>
+      <RouterLink :to="{ name: 'ideas' }" class="gallery-back"><AppIcon name="back" :size="16" /> 创意</RouterLink>
+      <ul class="gallery-grid">
+        <li v-for="(item, index) in galleryExhibits" :key="item.id" :class="{ 'gallery-feature': index === 0 }">
+          <RouterLink :id="`exhibit-${item.id}`" :to="galleryRunLocation(item.id) ?? exhibitLocation(item.id)" class="gallery-card">
+            <img :src="coverUrl(item.cover)" alt="" :loading="index === 0 ? 'eager' : 'lazy'" decoding="async">
+            <div class="gallery-copy">
+              <h2>{{ item.name }}</h2>
+              <p>{{ item.description }}</p>
+            </div>
+            <AppIcon name="arrow" :size="16" class="gallery-arrow" />
+          </RouterLink>
+        </li>
+      </ul>
+    </template>
   </section>
 </template>
 

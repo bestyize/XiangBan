@@ -14,7 +14,7 @@ export function isCommunityRoot(route: Route): boolean {
 }
 export function sectionOf(route: Route, categories: Pick<Category,'slug'|'section'>[] = []): Section {
   if (['home', 'frontier', 'frontier-detail', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project', 'open-source', 'open-source-project', 'open-source-collection'].includes(String(route.name))) return 'home'
-  if (route.name === 'ideas') return 'ideas'
+  if (route.name === 'ideas' || route.name === 'idea-work') return 'ideas'
   if (['resources', 'tool-detail'].includes(String(route.name))) return 'resources'
   if (route.name === 'category') {
     const slug = String(route.params.slug ?? '')

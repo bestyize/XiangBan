@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import DiscussView from '@/views/DiscussView.vue'
+import { galleryRunLocation } from '@/lib/ideaPlayers'
+import { galleryTab } from '@/lib/microGallery'
 import { useSession } from '@/stores/session'
 import { trackRoute } from '@/lib/analytics'
 
@@ -25,6 +27,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/open-source/:owner/:repo', name: 'open-source-project', component: () => import('@/views/OpenSourceDetailView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
   { path: '/ideas', name: 'ideas', component: DiscussView },
+  { path: '/ideas/works/:slug', name: 'idea-work', component: () => import('@/views/IdeaWorkView.vue') },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
   { path: '/contact', name: 'contact', component: () => import('@/views/ContactView.vue') },
@@ -81,6 +84,10 @@ router.afterEach(to => trackRoute(to.name, to.query))
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
   if (to.path === '/resources' && to.query.tab === 'docs') return { path:'/resources', replace:true }
+  if (to.name === 'ideas' && to.query.tab === galleryTab.key) {
+    const run = galleryRunLocation(to.query.exhibit)
+    if (run) return run
+  }
   if (to.path === '/ideas' && to.query.category !== undefined) {
     const { category, page, ...query } = to.query
     return { path:'/ideas', query, hash:to.hash, replace:true }

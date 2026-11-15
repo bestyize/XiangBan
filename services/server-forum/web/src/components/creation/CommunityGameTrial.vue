@@ -25,7 +25,10 @@ const selected = computed(() => props.pack?.versions.find(v => v.version === pro
 const usesV2 = computed(() => Boolean(idea.value) || selected.value?.manifest.runtimeProtocol === 2)
 const sandbox = computed(() => {
   if (idea.value) return idea.value.pointerLock ? 'allow-scripts allow-pointer-lock' : 'allow-scripts'
-  return 'allow-scripts allow-same-origin'
+  const input = selected.value?.manifest.input
+  return usesV2.value && props.pack?.kind === 'game' && Array.isArray(input) && input.includes('mouse')
+    ? 'allow-scripts allow-same-origin allow-pointer-lock'
+    : 'allow-scripts allow-same-origin'
 })
 function loadHost(url: URL) {
   receivedBytes.value = undefined
@@ -119,13 +122,14 @@ function receive(event:MessageEvent) {
       error.value = ''
     }
     if (event.data.type === 'exit' && !exitWait) emit('exit')
-    if (event.data.type === 'storage' && props.pack && !idea.value && Number.isSafeInteger(event.data.id)) {
+    const storageOwner = props.ideaId === 'starry-nightrider' ? 'idea:starry-nightrider' : idea.value ? undefined : props.pack?.id
+    if (event.data.type === 'storage' && storageOwner !== undefined && Number.isSafeInteger(event.data.id)) {
       const { id, operation, key, value } = event.data
       const reply = (result: Record<string, unknown>) => {
         if (disposed) return
-        frame.value?.contentWindow?.postMessage({ channel: appRuntimeChannel, type: 'storage-result', id, ...result }, event.origin)
+        frame.value?.contentWindow?.postMessage({ channel: appRuntimeChannel, type: 'storage-result', id, ...result }, idea.value ? '*' : expectedOrigin)
       }
-      void appRuntimeStorage(props.pack.id, operation, key, value).then(
+      void appRuntimeStorage(storageOwner, operation, key, value).then(
         value => reply({ value }),
         error => reply({ error: error?.name === 'QuotaExceededError' || error?.message === 'quota' ? 'quota' :
           error?.message === 'invalid' ? 'invalid' : 'unsupported' }),

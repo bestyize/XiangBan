@@ -2,10 +2,15 @@ import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
 
 // A minimal in-memory IndexedDB: only the calls appRuntimeStorage makes.
-type Key = [number, string]
-const cmp = (a: Key, b: Key) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)
+type Owner = number | string
+type Key = [Owner, string]
+function cmpOwner(a: Owner, b: Owner) {
+  if (typeof a !== typeof b) return typeof a === 'number' ? -1 : 1
+  return a < b ? -1 : a > b ? 1 : 0
+}
+const cmp = (a: Key, b: Key) => cmpOwner(a[0], b[0]) || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)
 const rows = new Map<string, { key: Key; value: string }>()
-const id = (key: Key) => `${key[0]}\u0000${key[1]}`
+const id = (key: Key) => JSON.stringify(key)
 const later = (fn: () => void) => queueMicrotask(fn)
 ;(globalThis as any).IDBKeyRange = { bound: (lower: Key, upper: Key) => ({ lower, upper }) }
 const inRange = (key: Key, range: { lower: Key; upper: Key }) => cmp(key, range.lower) >= 0 && cmp(key, range.upper) < 0
@@ -70,6 +75,16 @@ test('each pack only sees its own keys', async () => {
   await appRuntimeStorage(11, 'remove', 'a')
   assert.equal(await appRuntimeStorage(11, 'get', 'a'), null)
   assert.equal(await appRuntimeStorage(10, 'get', 'a'), 1)
+})
+
+test('an idea sees its own keys alongside numbered packs and other ideas', async () => {
+  const idea = 'idea:starry-nightrider'
+  await appRuntimeStorage(21, 'set', 'score', 25)
+  await appRuntimeStorage(idea, 'set', 'score', 42)
+  await appRuntimeStorage(`${idea}-other`, 'set', 'other', 55)
+  assert.deepEqual(await appRuntimeStorage(idea, 'keys'), ['score'])
+  assert.equal(await appRuntimeStorage(idea, 'get', 'score'), 42)
+  assert.equal(await appRuntimeStorage(21, 'get', 'score'), 25)
 })
 
 test('invalid operations, keys and values are refused', async () => {
