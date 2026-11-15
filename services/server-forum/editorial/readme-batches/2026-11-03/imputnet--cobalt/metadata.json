@@ -31,7 +31,7 @@
     "homepage_url": "https://cobalt.tools",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
-    "icon_url": "/open-source-media/cobalt-icon.png",
+    "icon_url": "/open-source-media/cobalt-icon.webp",
     "last_commit_at": "2026-04-06T11:59:51Z",
     "last_pushed_at": "2026-04-06T11:59:56Z",
     "name": "cobalt",

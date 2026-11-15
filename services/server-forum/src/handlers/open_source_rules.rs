@@ -46,6 +46,20 @@ pub fn asset_url(raw: &str) -> bool {
             && !name.contains(' ')
     })
 }
+
+/// Existing drafts and published revisions can still contain paths from before the conversion.
+pub fn use_webp_media(catalog: &mut Value) {
+    let Some(projects) = catalog.get_mut("projects").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for project in projects {
+        for key in ["cover_url", "icon_url"] {
+            if let Some(path) = project[key].as_str().and_then(crate::static_images::webp_path) {
+                project[key] = json!(path);
+            }
+        }
+    }
+}
 fn text(project: &mut Value, key: &str, max: usize, required: bool) -> AppResult<()> {
     let raw = project[key].as_str().unwrap_or_default().trim();
     if raw.chars().count() > max || raw.contains('\0') || required && raw.is_empty() {
@@ -179,6 +193,7 @@ pub fn normalize(mut catalog: Value, publishing: bool) -> AppResult<Value> {
     }
     catalog.as_object_mut().unwrap().remove("revision");
     catalog.as_object_mut().unwrap().remove("published_at");
+    use_webp_media(&mut catalog);
     let categories = super::open_source::catalog()["categories"].clone();
     let category_keys: HashSet<_> = categories
         .as_array()

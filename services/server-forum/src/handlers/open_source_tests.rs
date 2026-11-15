@@ -11,6 +11,32 @@ fn one_project() -> Value {
     data["collections"] = json!([]);
     data
 }
+
+#[tokio::test]
+async fn legacy_catalog_static_images_return_webp() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let mut catalog = one_project();
+    catalog["projects"][0]["cover_url"] = json!("/open-source-media/vscode-showcase.png");
+    catalog["projects"][0]["icon_url"] = json!("https://example.com/unchanged.png");
+    sqlx::query(
+        "INSERT INTO open_source_catalog (singleton, revision, draft, published, published_revision, updated_by)
+         VALUES (true, 1, $1, $1, 1, 'test')",
+    )
+        .bind(catalog)
+        .execute(&h.pool)
+        .await?;
+
+    let (status, live) = call(&h.app, "GET", "/api/open-source", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(live["projects"][0]["cover_url"], "/open-source-media/vscode-showcase.webp");
+    assert_eq!(live["projects"][0]["icon_url"], "https://example.com/unchanged.png");
+    assert_eq!(live["revision"], 1);
+
+    let (status, settings) = call(&h.app, "GET", "/api/admin/open-source", Some(&h.admin_t), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(settings["draft"]["projects"][0]["cover_url"], "/open-source-media/vscode-showcase.webp");
+    h.finish().await
+}
 #[tokio::test]
 async fn curated_draft_publish_revision_and_scope_are_isolated(
 ) -> Result<(), Box<dyn std::error::Error>> {

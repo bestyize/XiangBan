@@ -58,6 +58,7 @@ pub async fn public_catalog(pool: &PgPool) -> AppResult<Value> {
             None,
         )
     };
+    rules::use_webp_media(&mut value);
     value["revision"] = json!(revision);
     value["published_at"] = json!(published_at);
     Ok(value)
@@ -79,11 +80,12 @@ async fn admin_data(pool: &PgPool) -> AppResult<Value> {
     )
     .fetch_optional(pool)
     .await?;
-    let (revision, draft, published_revision) = row.unwrap_or((
+    let (revision, mut draft, published_revision) = row.unwrap_or((
         0,
         rules::normalize(open_source::catalog().clone(), false)?,
         0,
     ));
+    rules::use_webp_media(&mut draft);
     Ok(
         json!({"scope":"open-source","revision":revision,"published_revision":published_revision,"draft":draft,"live":public_catalog(pool).await?,"cover_rules":rules::manifest()}),
     )

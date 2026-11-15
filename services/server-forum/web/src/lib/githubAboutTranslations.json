@@ -6,7 +6,7 @@
   "freecodecamp/freecodecamp": {
     "original": "freeCodeCamp.org's open-source codebase and curriculum. Learn math, programming, and computer science for free.",
     "zh": "freeCodeCamp.org 的开源代码库与课程，免费学习数学、编程和计算机科学。",
-    "icon_url": "/open-source-media/freecodecamp-icon.png",
+    "icon_url": "/open-source-media/freecodecamp-icon.webp",
     "icon_fit": "contain"
   },
   "ebookfoundation/free-programming-books": {
@@ -67,7 +67,7 @@
     "observed_descriptions": [
       "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models."
     ],
-    "icon_url": "/open-source-media/ollama-icon.png",
+    "icon_url": "/open-source-media/ollama-icon.webp",
     "icon_fit": "contain"
   },
   "huggingface/transformers": {
@@ -91,7 +91,7 @@
   "excalidraw/excalidraw": {
     "original": "Virtual whiteboard for sketching hand-drawn like diagrams",
     "zh": "用于绘制手绘风格图表的虚拟白板。",
-    "icon_url": "/open-source-media/excalidraw-icon.png",
+    "icon_url": "/open-source-media/excalidraw-icon.webp",
     "icon_fit": "contain"
   },
   "ggml-org/llama.cpp": {
@@ -139,7 +139,7 @@
   "neovim/neovim": {
     "original": "Vim-fork focused on extensibility and usability",
     "zh": "注重可扩展性和易用性的 Vim 分支。",
-    "icon_url": "/open-source-media/neovim-icon.png",
+    "icon_url": "/open-source-media/neovim-icon.webp",
     "icon_fit": "contain"
   },
   "punkpeye/awesome-mcp-servers": {
@@ -149,7 +149,7 @@
   "nationalsecurityagency/ghidra": {
     "original": "Ghidra is a software reverse engineering (SRE) framework",
     "zh": "Ghidra 是一个软件逆向工程（SRE）框架。",
-    "icon_url": "/open-source-media/ghidra-icon.png",
+    "icon_url": "/open-source-media/ghidra-icon.webp",
     "icon_fit": "contain"
   },
   "microsoft/web-dev-for-beginners": {
@@ -163,13 +163,13 @@
   "vllm-project/vllm": {
     "original": "A high-throughput and memory-efficient inference and serving engine for LLMs",
     "zh": "面向大语言模型的高吞吐量、内存高效的推理与服务引擎。",
-    "icon_url": "/open-source-media/vllm-icon.png",
+    "icon_url": "/open-source-media/vllm-icon.webp",
     "icon_fit": "contain"
   },
   "stirling-tools/stirling-pdf": {
     "original": "#1 PDF Application on GitHub that lets you edit PDFs on any device anywhere",
     "zh": "GitHub 排名第一的 PDF 应用，让你随时随地在任何设备上编辑 PDF。",
-    "icon_url": "/open-source-media/stirling-icon.png",
+    "icon_url": "/open-source-media/stirling-icon.webp",
     "icon_fit": "contain"
   },
   "infiniflow/ragflow": {
@@ -189,7 +189,7 @@
   "modelcontextprotocol/servers": {
     "original": "Model Context Protocol Reference Servers",
     "zh": "模型上下文协议（MCP）的参考服务器。",
-    "icon_url": "/open-source-media/mcp-icon.png",
+    "icon_url": "/open-source-media/mcp-icon.webp",
     "icon_fit": "contain"
   },
   "django/django": {
@@ -215,7 +215,7 @@
   "hoppscotch/hoppscotch": {
     "original": "Open-Source API Development Ecosystem • https://hoppscotch.io • Offline, On-Prem & Cloud • Web, Desktop & CLI • Open-Source Alternative to Postman, Insomnia",
     "zh": "开源 API 开发生态，支持离线、本地部署和云端，以及 Web、桌面和 CLI，可替代 Postman 与 Insomnia。https://hoppscotch.io",
-    "icon_url": "/open-source-media/hoppscotch-icon.png",
+    "icon_url": "/open-source-media/hoppscotch-icon.webp",
     "icon_fit": "contain"
   },
   "obsproject/obs-studio": {
@@ -233,7 +233,7 @@
   "appflowy-io/appflowy": {
     "original": "Bring projects, wikis, and teams together with AI. AppFlowy is the AI collaborative workspace where you achieve more without losing control of your data. The leading open source Notion alternative.",
     "zh": "借助 AI 将项目、知识库和团队聚在一起。AppFlowy 是 AI 协作工作空间，让你提高效率并保有数据控制权，也是领先的开源 Notion 替代方案。",
-    "icon_url": "/open-source-media/appflowy-icon.png",
+    "icon_url": "/open-source-media/appflowy-icon.webp",
     "icon_fit": "contain"
   },
   "toeverything/affine": {
@@ -320,7 +320,7 @@
   "laurent22/joplin": {
     "original": "Joplin - the privacy-focused note taking app with sync capabilities for Windows, macOS, Linux, Android and iOS.",
     "zh": "Joplin：注重隐私、支持同步的笔记应用，适用于 Windows、macOS、Linux、Android 和 iOS。",
-    "icon_url": "/open-source-media/joplin-icon.png",
+    "icon_url": "/open-source-media/joplin-icon.webp",
     "icon_fit": "contain"
   },
   "werwolv/imhex": {
@@ -360,7 +360,7 @@
   "paperless-ngx/paperless-ngx": {
     "original": "A community-supported supercharged document management system: scan, index and archive all your documents",
     "zh": "社区支持的增强型文档管理系统，可扫描、索引和归档所有文档。",
-    "icon_url": "/open-source-media/paperless-icon.png",
+    "icon_url": "/open-source-media/paperless-icon.webp",
     "icon_fit": "contain"
   },
   "siyuan-note/siyuan": {
@@ -374,7 +374,7 @@
   "imputnet/cobalt": {
     "original": "best way to save what you love",
     "zh": "保存心爱内容的最佳方式。",
-    "icon_url": "/open-source-media/cobalt-icon.png",
+    "icon_url": "/open-source-media/cobalt-icon.webp",
     "icon_fit": "contain"
   },
   "payloadcms/payload": {
@@ -472,13 +472,13 @@
   "anuken/mindustry": {
     "original": "The automation tower defense RTS",
     "zh": "融合自动化与塔防的即时战略游戏。",
-    "icon_url": "/open-source-media/mindustry-icon.png",
+    "icon_url": "/open-source-media/mindustry-icon.webp",
     "icon_fit": "contain"
   },
   "huggingface/lerobot": {
     "original": "🤗 LeRobot: Making AI for Robotics more accessible with end-to-end learning",
     "zh": "LeRobot：通过端到端学习，让机器人 AI 更易用。",
-    "icon_url": "/open-source-media/lerobot-icon.png",
+    "icon_url": "/open-source-media/lerobot-icon.webp",
     "icon_fit": "contain"
   },
   "4ian/gdevelop": {
@@ -520,7 +520,7 @@
   "navidrome/navidrome": {
     "original": "🎧 Your Personal Streaming Service ",
     "zh": "你的个人流媒体服务。",
-    "icon_url": "/open-source-media/navidrome-icon.png",
+    "icon_url": "/open-source-media/navidrome-icon.webp",
     "icon_fit": "contain"
   },
   "frida/frida": {
@@ -630,7 +630,7 @@
   "luanti-org/luanti": {
     "original": "Luanti (formerly Minetest) is an open source voxel game-creation platform with easy modding and game creation",
     "zh": "Luanti（原 Minetest）是开源体素游戏创作平台，方便制作模组和游戏。",
-    "icon_url": "/open-source-media/luanti-icon.png",
+    "icon_url": "/open-source-media/luanti-icon.webp",
     "icon_fit": "contain"
   },
   "cleverraven/cataclysm-dda": {
@@ -684,7 +684,7 @@
   "openttd/openttd": {
     "original": "OpenTTD is an open source simulation game based upon Transport Tycoon Deluxe",
     "zh": "OpenTTD 是基于《运输大亨豪华版》的开源模拟游戏。",
-    "icon_url": "/open-source-media/openttd-icon.png",
+    "icon_url": "/open-source-media/openttd-icon.webp",
     "icon_fit": "contain"
   },
   "fontforge/fontforge": {
@@ -730,7 +730,7 @@
   "vorondesign/voron-2": {
     "original": "Voron 2 CoreXY 3D Printer design",
     "zh": "Voron 2 CoreXY 3D 打印机设计。",
-    "icon_url": "/open-source-media/voron-icon.png",
+    "icon_url": "/open-source-media/voron-icon.webp",
     "icon_fit": "mark-left"
   },
   "beyond-all-reason/beyond-all-reason": {

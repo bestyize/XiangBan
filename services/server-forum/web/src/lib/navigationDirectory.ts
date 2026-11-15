@@ -64,7 +64,7 @@ export function navigationLogo(item: NavItem): string {
   return item.logo || (known && known.vendor === item.vendor ? known.logo : '') || item.name || item.vendor || ''
 }
 export function navigationIcon(item: NavItem): string | undefined {
-  return item.key === 'hermes-agent' && item.vendor === 'Nous Research' ? '/vendor-logos/hermes-agent.png' : undefined
+  return item.key === 'hermes-agent' && item.vendor === 'Nous Research' ? '/vendor-logos/hermes-agent.webp' : undefined
 }
 export function navigationDomain(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' }

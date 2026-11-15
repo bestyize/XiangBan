@@ -7,6 +7,28 @@ const source = path.join(root, 'client/xiaoban-desktop/public/game-packs')
 const mobile = path.join(root, 'client/xiaoban-multiplatform')
 const mobilePacks = path.join(mobile, 'androidApp/src/main/assets/game-packs-v2')
 const destination = fileURLToPath(new URL('../public/builtin-games', import.meta.url))
+const imageAliases = JSON.parse(await readFile(new URL('../static-image-aliases.json', import.meta.url), 'utf8'))
+const webImage = publicPath => new URL(`../assets${publicPath}`, import.meta.url)
+const mbtiRoot = '/builtin-games/mbti/'
+
+async function syncMbtiImages(dest) {
+  const replacements = Object.entries(imageAliases).filter(([old]) => old.startsWith(mbtiRoot))
+  for (const [old, target] of replacements) {
+    await cp(webImage(target), path.join(dest, target.slice(mbtiRoot.length)))
+    await rm(path.join(dest, old.slice(mbtiRoot.length)))
+  }
+  for (const name of ['share.html', 'share.js', 'report.css', 'share-page.css', 'README.md']) {
+    const file = path.join(dest, name)
+    let text = await readFile(file, 'utf8')
+    for (const [old, target] of replacements) {
+      text = text.replaceAll(old.slice(mbtiRoot.length), target.slice(mbtiRoot.length))
+    }
+    // The host provides static WebP assets; the generated share poster still uses PNG.
+    if (name === 'share.js') text = text.replace("d.blob.type!=='image/png'", "d.blob.type!=='image/webp'")
+    await writeFile(file, text)
+  }
+}
+
 const ids = ['dusk-glider','ink-blade','jade-gomoku','pro-cube','snake-arena','block-puzzle','merge-2048','water-sort','falling-blocks','mbti']
 await rm(destination, {recursive:true, force:true}); await mkdir(destination, {recursive:true})
 for (const id of ids) {
@@ -15,6 +37,7 @@ for (const id of ids) {
   if (manifest.id !== id || manifest.entry !== 'index.html' || (manifest.runtimeProtocol !== 1 && manifest.runtimeProtocol !== 2)) throw new Error(`Invalid built-in game manifest: ${id}`)
   await access(path.join(src, manifest.icon))
   await cp(src,dest,{recursive:true})
+  if (id === 'mbti') await syncMbtiImages(dest)
   const entry = path.join(dest,'index.html'), html = await readFile(entry,'utf8')
   if (!/<head(?:\s[^>]*)?>/i.test(html)) throw new Error(`Missing head: ${id}`)
   // Scripts are official bundled files only. The sandbox supplies an opaque origin.
@@ -23,9 +46,11 @@ for (const id of ids) {
 }
 for (const [packRoot, id] of [[source, 'pocket-sprites'], [mobilePacks, 'remote-control'], [mobilePacks, 'quick-launch']]) {
   const { icon } = JSON.parse(await readFile(path.join(packRoot, id, 'manifest.json'), 'utf8'))
-  const output = path.join(destination, id, icon)
+  const publicPath = `/builtin-games/${id}/${icon}`
+  const converted = imageAliases[publicPath]
+  const output = path.join(destination, (converted ?? publicPath).slice('/builtin-games/'.length))
   await mkdir(path.dirname(output), { recursive: true })
-  await cp(path.join(packRoot, id, icon), output)
+  await cp(converted ? webImage(converted) : path.join(packRoot, id, icon), output)
 }
 const wancisou = path.join(destination, 'wancisou')
 await mkdir(wancisou)

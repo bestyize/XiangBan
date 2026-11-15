@@ -31,7 +31,7 @@
     "homepage_url": "https://vllm.ai",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png",
-    "icon_url": "/open-source-media/vllm-icon.png",
+    "icon_url": "/open-source-media/vllm-icon.webp",
     "last_commit_at": "2026-11-02T18:10:40Z",
     "last_pushed_at": "2026-11-02T18:10:41Z",
     "name": "vLLM",

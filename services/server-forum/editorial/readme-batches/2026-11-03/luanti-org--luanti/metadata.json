@@ -32,7 +32,7 @@
     "homepage_url": "https://www.luanti.org/",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/luanti-org/luanti/master/textures/base/pack/logo.png",
-    "icon_url": "/open-source-media/luanti-icon.png",
+    "icon_url": "/open-source-media/luanti-icon.webp",
     "last_commit_at": "2026-10-30T22:55:03Z",
     "last_pushed_at": "2026-10-30T22:55:03Z",
     "name": "Luanti",

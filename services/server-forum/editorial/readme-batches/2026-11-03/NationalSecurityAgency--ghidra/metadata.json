@@ -32,7 +32,7 @@
     "homepage_url": "https://ghidra-sre.org",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
-    "icon_url": "/open-source-media/ghidra-icon.png",
+    "icon_url": "/open-source-media/ghidra-icon.webp",
     "last_commit_at": "2026-10-30T17:50:01Z",
     "last_pushed_at": "2026-11-02T09:44:00Z",
     "name": "Ghidra",

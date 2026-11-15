@@ -144,7 +144,7 @@
         "JavaScript",
         "项目练习"
       ],
-      "icon_url": "/open-source-media/freecodecamp-icon.png",
+      "icon_url": "/open-source-media/freecodecamp-icon.webp",
       "icon_source_url": "https://www.freecodecamp.org/icons/icon-144x144.png",
       "cover_template": "notes",
       "cover_variant": "balanced",
@@ -713,7 +713,7 @@
         "本地模型",
         "API"
       ],
-      "icon_url": "/open-source-media/ollama-icon.png",
+      "icon_url": "/open-source-media/ollama-icon.webp",
       "icon_source_url": "https://ollama.com/public/apple-touch-icon.png",
       "cover_template": "terminal",
       "cover_variant": "balanced",
@@ -927,7 +927,7 @@
         "浏览器"
       ],
       "effort": "打开网页即可尝试",
-      "cover_url": "/open-source-media/excalidraw.png",
+      "cover_url": "/open-source-media/excalidraw.webp",
       "cover_caption": "项目 README 展示图",
       "homepage_url": "https://excalidraw.com",
       "highlights": [
@@ -951,7 +951,7 @@
         "草图",
         "讨论"
       ],
-      "icon_url": "/open-source-media/excalidraw-icon.png",
+      "icon_url": "/open-source-media/excalidraw-icon.webp",
       "icon_source_url": "https://excalidraw.com/apple-touch-icon.png",
       "cover_template": "flow",
       "cover_variant": "balanced",
@@ -1121,7 +1121,7 @@
         "3D"
       ],
       "effort": "安装应用或使用官方演示",
-      "cover_url": "/open-source-media/godot-screen.jpg",
+      "cover_url": "/open-source-media/godot-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://godotengine.org",
       "highlights": [
@@ -1169,7 +1169,7 @@
         "自部署"
       ],
       "effort": "需要开发或部署环境",
-      "cover_url": "/open-source-media/immich-screen.png",
+      "cover_url": "/open-source-media/immich-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://immich.app",
       "highlights": [
@@ -1217,7 +1217,7 @@
         "自部署"
       ],
       "effort": "需要开发或部署环境",
-      "cover_url": "/open-source-media/supabase-screen.png",
+      "cover_url": "/open-source-media/supabase-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://supabase.com",
       "highlights": [
@@ -1420,7 +1420,7 @@
       "last_pushed_at": "2026-11-02T16:06:06Z",
       "collected_at": "2026-11-02T18:01:29.239506+00:00",
       "readme_sha": "e92d0961d7307a7e539b68d5b5ba840727000e00",
-      "icon_url": "/open-source-media/neovim-icon.png",
+      "icon_url": "/open-source-media/neovim-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/neovim/neovim.github.io/master/static/logos/neovim-logo-300x87.png",
       "icon_fit": "contain"
     },
@@ -1508,7 +1508,7 @@
         "反编译",
         "脚本"
       ],
-      "icon_url": "/open-source-media/ghidra-icon.png",
+      "icon_url": "/open-source-media/ghidra-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
       "cover_template": "flow",
       "cover_variant": "balanced",
@@ -1656,7 +1656,7 @@
       "last_pushed_at": "2026-11-02T18:10:41Z",
       "collected_at": "2026-11-02T18:16:58.207659+00:00",
       "readme_sha": "ff92fface4421933f1056f53d736c0840eac4728",
-      "icon_url": "/open-source-media/vllm-icon.png",
+      "icon_url": "/open-source-media/vllm-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png",
       "icon_fit": "contain"
     },
@@ -1704,7 +1704,7 @@
       "last_pushed_at": "2026-11-02T16:59:59Z",
       "collected_at": "2026-11-02T18:01:21.775080+00:00",
       "readme_sha": "d266d6e9ce5b63599afa099b0fd3003f94442fd2",
-      "icon_url": "/open-source-media/stirling-icon.png",
+      "icon_url": "/open-source-media/stirling-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/main/docs/stirling.png",
       "icon_fit": "contain"
     },
@@ -1886,7 +1886,7 @@
         "MCP",
         "智能体"
       ],
-      "icon_url": "/open-source-media/mcp-icon.png",
+      "icon_url": "/open-source-media/mcp-icon.webp",
       "icon_source_url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
       "cover_template": "flow",
       "cover_variant": "offset",
@@ -2134,7 +2134,7 @@
         "开发"
       ],
       "effort": "可先体验官方网页",
-      "cover_url": "/open-source-media/hoppscotch.png",
+      "cover_url": "/open-source-media/hoppscotch.webp",
       "cover_caption": "项目 README 展示图",
       "homepage_url": "https://hoppscotch.io",
       "highlights": [
@@ -2155,7 +2155,7 @@
       "cover_layout": "terminal",
       "cover_accent": "#4A8B7B",
       "cover_lines": [],
-      "icon_url": "/open-source-media/hoppscotch-icon.png",
+      "icon_url": "/open-source-media/hoppscotch-icon.webp",
       "icon_source_url": "https://hoppscotch.io/icon.png",
       "cover_template": "screenshot",
       "cover_variant": "offset",
@@ -2322,7 +2322,7 @@
         "协作"
       ],
       "effort": "安装应用后使用",
-      "cover_url": "/open-source-media/appflowy.png",
+      "cover_url": "/open-source-media/appflowy.webp",
       "cover_caption": "项目 README 展示图",
       "homepage_url": "https://appflowy.io",
       "highlights": [
@@ -2343,7 +2343,7 @@
       "cover_layout": "notes",
       "cover_accent": "#5574B2",
       "cover_lines": [],
-      "icon_url": "/open-source-media/appflowy-icon.png",
+      "icon_url": "/open-source-media/appflowy-icon.webp",
       "icon_source_url": "https://appflowy.com/_next/static/media/appflowy.929cfa16.ico",
       "cover_template": "screenshot",
       "cover_variant": "offset",
@@ -2687,7 +2687,7 @@
         "自部署"
       ],
       "effort": "按官方指南安装或部署",
-      "cover_url": "/open-source-media/memos-screen.png",
+      "cover_url": "/open-source-media/memos-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://usememos.com",
       "highlights": [
@@ -3147,7 +3147,7 @@
         "自部署"
       ],
       "effort": "需要开发或部署环境",
-      "cover_url": "/open-source-media/appwrite-screen.png",
+      "cover_url": "/open-source-media/appwrite-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://appwrite.io",
       "highlights": [
@@ -3190,7 +3190,7 @@
         "离线优先"
       ],
       "effort": "按官方指南安装或使用",
-      "cover_url": "/open-source-media/joplin-screen.png",
+      "cover_url": "/open-source-media/joplin-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://joplinapp.org",
       "highlights": [
@@ -3219,7 +3219,7 @@
       "last_pushed_at": "2026-11-02T15:31:11Z",
       "collected_at": "2026-11-02T18:01:19.895997+00:00",
       "readme_sha": "6f9f342fa1f579f868cc40ae6ddb31bb2d94e2d4",
-      "icon_url": "/open-source-media/joplin-icon.png",
+      "icon_url": "/open-source-media/joplin-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
       "icon_fit": "contain"
     },
@@ -3509,7 +3509,7 @@
         "逆向"
       ],
       "effort": "需要分析与调试基础",
-      "cover_url": "/open-source-media/x64dbg-screen.png",
+      "cover_url": "/open-source-media/x64dbg-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://github.com/x64dbg/x64dbg",
       "highlights": [
@@ -3599,7 +3599,7 @@
         "自部署"
       ],
       "effort": "按官方指南安装或部署",
-      "cover_url": "/open-source-media/paperless-screen.png",
+      "cover_url": "/open-source-media/paperless-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://github.com/paperless-ngx/paperless-ngx",
       "highlights": [
@@ -3628,7 +3628,7 @@
       "last_pushed_at": "2026-11-02T17:22:22Z",
       "collected_at": "2026-11-02T18:17:10.911830+00:00",
       "readme_sha": "f1e5141043dcb5e36b496c7ce71192d9e5e24aea",
-      "icon_url": "/open-source-media/paperless-icon.png",
+      "icon_url": "/open-source-media/paperless-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/main/docs/assets/logo_full_black.png",
       "icon_fit": "contain"
     },
@@ -3764,7 +3764,7 @@
       "last_pushed_at": "2026-04-06T11:59:56Z",
       "collected_at": "2026-11-02T18:01:27.879998+00:00",
       "readme_sha": "795eb7e30a742fbf5ebcf16991e6e5c90332f614",
-      "icon_url": "/open-source-media/cobalt-icon.png",
+      "icon_url": "/open-source-media/cobalt-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
       "icon_fit": "contain"
     },
@@ -3826,7 +3826,7 @@
         "桌面应用"
       ],
       "effort": "按官方指南安装或使用",
-      "cover_url": "/open-source-media/losslesscut-screen.jpg",
+      "cover_url": "/open-source-media/losslesscut-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://losslesscut.app/",
       "highlights": [
@@ -4454,7 +4454,7 @@
         "团队空间"
       ],
       "effort": "按官方指南安装或部署",
-      "cover_url": "/open-source-media/nextcloud-screen.png",
+      "cover_url": "/open-source-media/nextcloud-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://nextcloud.com",
       "highlights": [
@@ -4591,7 +4591,7 @@
         "3D"
       ],
       "effort": "安装应用或使用官方演示",
-      "cover_url": "/open-source-media/freecad-screen.jpg",
+      "cover_url": "/open-source-media/freecad-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://www.freecad.org",
       "highlights": [
@@ -4803,7 +4803,7 @@
       "last_pushed_at": "2026-11-01T19:32:37Z",
       "collected_at": "2026-11-02T18:01:39.769226+00:00",
       "readme_sha": "33b4b0550d1fa9fa6e37623093ca508d0e726c97",
-      "icon_url": "/open-source-media/mindustry-icon.png",
+      "icon_url": "/open-source-media/mindustry-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/Anuken/Mindustry/master/core/assets-raw/sprites/ui/logo.png",
       "icon_fit": "contain"
     },
@@ -4852,7 +4852,7 @@
       "last_pushed_at": "2026-11-02T18:00:46Z",
       "collected_at": "2026-11-02T18:17:45.470581+00:00",
       "readme_sha": "4481c8176f9a119d52a5f5ccf7af9446103ab3f2",
-      "icon_url": "/open-source-media/lerobot-icon.png",
+      "icon_url": "/open-source-media/lerobot-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/huggingface/lerobot/main/media/readme/lerobot-logo-thumbnail.png",
       "icon_fit": "contain"
     },
@@ -4872,7 +4872,7 @@
         "事件系统"
       ],
       "effort": "按官方指南安装或使用",
-      "cover_url": "/open-source-media/gdevelop-screen.png",
+      "cover_url": "/open-source-media/gdevelop-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://gdevelop.io",
       "highlights": [
@@ -5304,7 +5304,7 @@
       "last_pushed_at": "2026-11-02T10:10:39Z",
       "collected_at": "2026-11-02T18:17:26.722969+00:00",
       "readme_sha": "a405319b6f1c61abe72d90f622d2753fdf25aea7",
-      "icon_url": "/open-source-media/navidrome-icon.png",
+      "icon_url": "/open-source-media/navidrome-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/navidrome/navidrome/master/resources/logo-192x192.png",
       "icon_fit": "contain"
     },
@@ -5411,7 +5411,7 @@
         "自部署"
       ],
       "effort": "按官方指南安装或部署",
-      "cover_url": "/open-source-media/docmost-screen.png",
+      "cover_url": "/open-source-media/docmost-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://docmost.com",
       "highlights": [
@@ -5456,7 +5456,7 @@
         "渲染"
       ],
       "effort": "按官方指南安装或使用",
-      "cover_url": "/open-source-media/blender-screen.jpg",
+      "cover_url": "/open-source-media/blender-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://developer.blender.org/docs/handbook/contributing/using_git/#github-mirror",
       "highlights": [
@@ -6513,7 +6513,7 @@
       "last_pushed_at": "2026-10-30T22:55:03Z",
       "collected_at": "2026-11-02T18:01:42.495643+00:00",
       "readme_sha": "07244389126bb1a6e4fe743b1e1599c5eebeb591",
-      "icon_url": "/open-source-media/luanti-icon.png",
+      "icon_url": "/open-source-media/luanti-icon.webp",
       "icon_source_url": "https://raw.githubusercontent.com/luanti-org/luanti/master/textures/base/pack/logo.png",
       "icon_fit": "contain"
     },
@@ -7047,7 +7047,7 @@
         "铁路",
         "港口"
       ],
-      "icon_url": "/open-source-media/openttd-icon.png",
+      "icon_url": "/open-source-media/openttd-icon.webp",
       "icon_source_url": "https://www.openttd.org/static/favicon.ico",
       "cover_template": "flow",
       "cover_variant": "offset",
@@ -7294,7 +7294,7 @@
         "奇幻"
       ],
       "effort": "按官方指南安装或体验",
-      "cover_url": "/open-source-media/wesnoth-screen.jpg",
+      "cover_url": "/open-source-media/wesnoth-screen.webp",
       "cover_caption": "项目官方 README 展示图",
       "homepage_url": "https://www.wesnoth.org/",
       "highlights": [
@@ -7515,7 +7515,7 @@
         "DIY"
       ],
       "effort": "需要采购材料与装配经验",
-      "cover_url": "/open-source-media/voron.jpg",
+      "cover_url": "/open-source-media/voron.webp",
       "cover_caption": "项目 README 实物图",
       "homepage_url": "https://vorondesign.com",
       "highlights": [
@@ -7536,7 +7536,7 @@
       "cover_layout": "flow",
       "cover_accent": "#B36159",
       "cover_lines": [],
-      "icon_url": "/open-source-media/voron-icon.png",
+      "icon_url": "/open-source-media/voron-icon.webp",
       "icon_source_url": "https://vorondesign.com/images/voron_design_logo.png",
       "cover_template": "photo",
       "cover_variant": "offset",

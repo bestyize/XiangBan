@@ -4,7 +4,6 @@ import { readFile, access } from 'node:fs/promises'
 import { BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WANCISOU_ICON } from '../src/lib/builtinCreation.ts'
 const root = new URL('../../../../', import.meta.url)
 const publicDir = new URL('../public/builtin-games/', import.meta.url)
-const desktopPacks = new URL('client/xiaoban-desktop/public/game-packs/', root)
 const mobile = new URL('client/xiaoban-multiplatform/', root)
 const mobilePacks = new URL('androidApp/src/main/assets/game-packs-v2/', mobile)
 const asset = (url: string) => new URL(url.replace('/builtin-games/', ''), publicDir)
@@ -27,9 +26,13 @@ test('playable games match mobile order and use the manifest icons', async () =>
   assert.equal(builtinGame('../game'),undefined)
 })
 
-test('the web plaza uses the exact phone artwork for mobile tools and games', async () => {
+test('the web plaza ships a WebP pocket sprites icon and reuses the other mobile artwork', async () => {
+  const pocketIcon = await readFile(asset(MOBILE_ONLY_APPS.pocketSprites.icon))
+  assert.equal(pocketIcon.toString('ascii', 0, 4), 'RIFF')
+  assert.equal(pocketIcon.toString('ascii', 8, 12), 'WEBP')
   for (const app of Object.values(MOBILE_ONLY_APPS)) {
-    const dir = new URL(app.id + '/', app.id === 'pocket-sprites' ? desktopPacks : mobilePacks)
+    if (app.id === MOBILE_ONLY_APPS.pocketSprites.id) continue
+    const dir = new URL(app.id + '/', mobilePacks)
     const manifest = JSON.parse(await readFile(new URL('manifest.json', dir), 'utf8'))
     assert.deepEqual(await readFile(asset(app.icon)), await readFile(new URL(manifest.icon, dir)))
   }

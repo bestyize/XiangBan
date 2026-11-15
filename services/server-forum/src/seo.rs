@@ -15,7 +15,7 @@ use axum::{
     extract::{Path, Request, State},
     http::{header, StatusCode, Uri},
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::get,
     Extension, Router,
 };
@@ -204,11 +204,24 @@ pub fn routes(state: &AppState) -> Router<AppState> {
     };
     let index = Index(Arc::new(html));
 
-    // 静态文件没命中时走这里：返回 SPA 外壳，交给前端路由。
+    // 已替换的静态图片仍可通过旧链接访问，其他未命中的路径交给 SPA。
     let spa_index = index.clone();
+    let spa_web_dir = web_dir.clone();
     let spa = get(move |uri: Uri| {
         let index = spa_index.clone();
-        async move { spa_fallback(uri.path(), &index) }
+        let web_dir = spa_web_dir.clone();
+        async move {
+            if let Some(path) = crate::static_images::webp_path(uri.path()) {
+                if tokio::fs::metadata(web_dir.join(path.trim_start_matches('/')))
+                    .await
+                    .is_ok_and(|file| file.is_file())
+                {
+                    return Redirect::permanent(path).into_response();
+                }
+                return StatusCode::NOT_FOUND.into_response();
+            }
+            spa_fallback(uri.path(), &index)
+        }
     });
 
     Router::new()

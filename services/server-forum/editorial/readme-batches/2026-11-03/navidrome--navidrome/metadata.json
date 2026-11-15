@@ -32,7 +32,7 @@
     "homepage_url": "https://www.navidrome.org",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/navidrome/navidrome/master/resources/logo-192x192.png",
-    "icon_url": "/open-source-media/navidrome-icon.png",
+    "icon_url": "/open-source-media/navidrome-icon.webp",
     "last_commit_at": "2026-11-01T19:35:11Z",
     "last_pushed_at": "2026-11-02T10:10:39Z",
     "name": "Navidrome",

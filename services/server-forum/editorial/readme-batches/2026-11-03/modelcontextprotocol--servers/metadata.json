@@ -32,7 +32,7 @@
     "homepage_url": "https://modelcontextprotocol.io",
     "icon_fit": "contain",
     "icon_source_url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
-    "icon_url": "/open-source-media/mcp-icon.png",
+    "icon_url": "/open-source-media/mcp-icon.webp",
     "last_commit_at": "2026-10-28T20:43:56Z",
     "last_pushed_at": "2026-10-29T05:27:40Z",
     "name": "MCP Servers",

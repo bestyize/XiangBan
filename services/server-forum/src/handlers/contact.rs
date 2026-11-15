@@ -49,20 +49,11 @@ impl Channel {
         }
     }
 
-    fn default_image(self) -> (&'static str, &'static [u8]) {
+    fn default_image(self) -> &'static [u8] {
         match self {
-            Self::WechatOfficial => (
-                "image/png",
-                include_bytes!("../../assets/contact/wechat-official.png"),
-            ),
-            Self::QqGroup => (
-                "image/jpeg",
-                include_bytes!("../../assets/contact/qq-group.jpg"),
-            ),
-            Self::WechatGroup => (
-                "image/png",
-                include_bytes!("../../assets/contact/wechat-group.png"),
-            ),
+            Self::WechatOfficial => include_bytes!("../../assets/contact/wechat-official.webp"),
+            Self::QqGroup => include_bytes!("../../assets/contact/qq-group.webp"),
+            Self::WechatGroup => include_bytes!("../../assets/contact/wechat-group.webp"),
         }
     }
 }
@@ -229,10 +220,7 @@ async fn qr_response(pool: &PgPool, channel: Channel, public: bool) -> AppResult
     }
     let (mime, body) = match (mime, data) {
         (Some(mime), Some(data)) => (mime, Body::from(data)),
-        _ => {
-            let (mime, data) = channel.default_image();
-            (mime.into(), Body::from(data))
-        }
+        _ => ("image/webp".into(), Body::from(channel.default_image())),
     };
     Ok((
         [

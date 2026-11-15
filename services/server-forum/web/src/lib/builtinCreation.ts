@@ -13,7 +13,7 @@ export const BUILTIN_GAMES = [
 ].map(game => ({ ...game, icon:`/builtin-games/${game.id}/${game.icon}` }))
 
 export const MOBILE_ONLY_APPS = {
-  pocketSprites: { id:'pocket-sprites', name:'口袋精灵', genre:'益智', icon:'/builtin-games/pocket-sprites/assets/icon.png' },
+  pocketSprites: { id:'pocket-sprites', name:'口袋精灵', genre:'益智', icon:'/builtin-games/pocket-sprites/assets/icon.webp' },
   remoteControl: { id:'remote-control', name:'遥控器', icon:'/builtin-games/remote-control/icon.webp' },
   quickLaunch: { id:'quick-launch', name:'轻启', icon:'/builtin-games/quick-launch/icon.webp' },
 } as const

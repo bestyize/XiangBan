@@ -31,7 +31,7 @@
     "homepage_url": "https://huggingface.co/docs/lerobot",
     "icon_fit": "contain",
     "icon_source_url": "https://raw.githubusercontent.com/huggingface/lerobot/main/media/readme/lerobot-logo-thumbnail.png",
-    "icon_url": "/open-source-media/lerobot-icon.png",
+    "icon_url": "/open-source-media/lerobot-icon.webp",
     "last_commit_at": "2026-11-02T14:36:34Z",
     "last_pushed_at": "2026-11-02T18:00:46Z",
     "name": "LeRobot",

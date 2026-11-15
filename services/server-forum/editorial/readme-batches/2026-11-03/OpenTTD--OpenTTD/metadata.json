@@ -33,7 +33,7 @@
     "homepage_url": "https://www.openttd.org",
     "icon_fit": "contain",
     "icon_source_url": "https://www.openttd.org/static/favicon.ico",
-    "icon_url": "/open-source-media/openttd-icon.png",
+    "icon_url": "/open-source-media/openttd-icon.webp",
     "last_commit_at": "2026-11-02T17:13:12Z",
     "last_pushed_at": "2026-11-02T17:13:13Z",
     "name": "OpenTTD",

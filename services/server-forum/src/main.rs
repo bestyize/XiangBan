@@ -20,6 +20,7 @@ mod moderation;
 mod notifications;
 mod points;
 mod seo;
+mod static_images;
 mod state;
 mod taxonomy;
 mod scheme_backups;

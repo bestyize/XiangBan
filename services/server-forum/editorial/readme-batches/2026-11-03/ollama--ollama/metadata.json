@@ -32,7 +32,7 @@
     "homepage_url": "https://ollama.com",
     "icon_fit": "contain",
     "icon_source_url": "https://ollama.com/public/apple-touch-icon.png",
-    "icon_url": "/open-source-media/ollama-icon.png",
+    "icon_url": "/open-source-media/ollama-icon.webp",
     "last_commit_at": "2026-10-31T22:46:17Z",
     "last_pushed_at": "2026-11-02T16:31:35Z",
     "name": "Ollama",

@@ -22,10 +22,10 @@ async function provideMbtiAsset(d:Record<string,unknown>, target:Window) {
   const key=d.key, activeNonce=nonce.value
   let asset=imageAssets.get(key)
   if(!asset){
-    const file=key==='characters'?'characters.png':key==='observer'?'observer-jade.png':'test-qr.png'
+    const file=key==='characters'?'characters.webp':key==='observer'?'observer-jade-share.webp':'test-qr.webp'
     asset=fetch(`/builtin-games/mbti/assets/${file}`,{credentials:'omit',redirect:'error'}).then(async response=>{
       if(!response.ok)throw new Error('素材不可用')
-      const blob=await response.blob();if(blob.type!=='image/png'||blob.size>3*1024*1024)throw new Error('素材无效')
+      const blob=await response.blob();if(blob.type!=='image/webp'||blob.size>3*1024*1024)throw new Error('素材无效')
       return blob
     })
     imageAssets.set(key,asset)
