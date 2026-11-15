@@ -46,6 +46,7 @@ enum AquariumMode { Arowana, Guppy, School, Mixed }
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct AquariumSettings {
     mode: AquariumMode,
+    aquascape: bool,
     lighting: AquariumLighting,
 }
 
@@ -70,7 +71,7 @@ impl AquariumSettings {
         };
         let light = &value["lighting"];
         let intensity = |key| EffectParams::number(light, key, 100.0, 0.0, 300.0);
-        Self { mode, lighting: AquariumLighting {
+        Self { mode, aquascape: value["aquascape"].as_bool().unwrap_or(false), lighting: AquariumLighting {
             main: intensity("main"), fill: intensity("fill"), rim: intensity("rim"), environment: intensity("environment"),
             azimuth: EffectParams::number(light, "azimuth", -31.0, -150.0, 150.0),
             elevation: EffectParams::number(light, "elevation", 49.0, 0.0, 85.0),
@@ -184,16 +185,17 @@ mod tests {
     #[test]
     fn aquarium_controls_survive_a_save_and_only_belong_to_arowana() {
         let choice = EffectsChoice::from_value(&json!({"selected":"arowana", "params": {
-            "arowana": {"speed": 0.5, "aquarium": {"mode":"mixed", "lighting":{"main":345,"warmth":-55,"azimuth":12,"fill":-1}}},
+            "arowana": {"speed": 0.5, "aquarium": {"mode":"mixed", "aquascape":true, "lighting":{"main":345,"warmth":-55,"azimuth":12,"fill":-1}}},
             "rain": {"aquarium": {"mode":"school"}}
         }}));
         let json = serde_json::to_value(&choice).unwrap();
-        assert_eq!(json["params"]["arowana"]["aquarium"], json!({"mode":"mixed", "lighting": {
+        assert_eq!(json["params"]["arowana"]["aquarium"], json!({"mode":"mixed", "aquascape":true, "lighting": {
             "main":300.0, "warmth":-55.0, "azimuth":12.0, "elevation":49.0, "fill":0.0, "rim":100.0, "environment":100.0
         }}));
         assert!(json["params"]["rain"].get("aquarium").is_none());
         assert_eq!(EffectsChoice::from_value(&json), choice);
-        let invalid = EffectParams::from_value("arowana", &json!({"aquarium":{"mode":"other"}}));
-        assert_eq!(invalid.aquarium.unwrap().mode, AquariumMode::Arowana);
+        let old = EffectParams::from_value("arowana", &json!({"aquarium":{"mode":"other"}})).aquarium.unwrap();
+        assert_eq!(old.mode, AquariumMode::Arowana);
+        assert!(!old.aquascape);
     }
 }

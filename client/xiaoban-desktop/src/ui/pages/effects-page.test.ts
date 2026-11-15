@@ -144,28 +144,37 @@ describe('desktop effects page', () => {
       wrapper.unmount();
     } finally { vi.useRealTimers(); }
   });
-  it('previews and saves the fish mix with the latest light, and can reset just the light', async () => {
+  it('previews and saves the fish mix, aquascape and light together', async () => {
     const arowana = pack('arowana', '龙鱼巡游');
     const { wrapper, sent } = setup({ selected: 'arowana', params: { arowana: { density: 1, speed: 0.5, size: 1 } } }, [arowana, pack('rain', '下雨')]);
     const selector = wrapper.get<HTMLSelectElement>('[data-testid="aquarium-mode"]');
+    const aquascape = wrapper.get('[data-testid="aquarium-aquascape"]');
     const inspector = () => wrapper.findAllComponents(EffectPreview).find(p => p.element.closest('.fx-inspector'))!;
     expect(selector.element.value).toBe('arowana');
     expect(Array.from(selector.element.options, option => option.value)).toEqual(['arowana', 'guppy', 'school', 'mixed']);
+    expect(aquascape.attributes('aria-checked')).toBe('false');
 
     const light = wrapper.get('[data-testid="aquarium-light-warmth"]').findComponent({ name: 'SliderStub' });
     light.vm.$emit('update:value', 55);
     await selector.setValue('mixed');
     await flushPromises();
     expect(sent).toHaveLength(1);
-    expect(sent[0].params.arowana).toMatchObject({ speed: 0.5, aquarium: { mode: 'mixed', lighting: { warmth: 55 } } });
-    expect(inspector().props('tuning')?.aquarium).toMatchObject({ mode: 'mixed', lighting: { warmth: 55 } });
+    expect(sent[0].params.arowana).toMatchObject({ speed: 0.5, aquarium: { mode: 'mixed', aquascape: false, lighting: { warmth: 55 } } });
+
+    await aquascape.trigger('click');
+    await flushPromises();
+    expect(sent[1].params.arowana.aquarium).toMatchObject({ mode: 'mixed', aquascape: true, lighting: { warmth: 55 } });
+    expect(inspector().props('tuning')?.aquarium).toMatchObject({ mode: 'mixed', aquascape: true, lighting: { warmth: 55 } });
 
     await wrapper.get('[data-testid="aquarium-light-reset"]').trigger('click');
     await flushPromises();
-    expect(sent[1].params.arowana.aquarium).toMatchObject({ mode: 'mixed', lighting: { warmth: 0 } });
+    expect(sent[2].params.arowana.aquarium).toMatchObject({ mode: 'mixed', aquascape: true, lighting: { warmth: 0 } });
     await wrapper.get('[data-testid="effect-rain"]').trigger('click');
     await wrapper.get('[data-testid="effect-arowana"]').trigger('click');
     expect(wrapper.get<HTMLSelectElement>('[data-testid="aquarium-mode"]').element.value).toBe('mixed');
+    expect(wrapper.get('[data-testid="aquarium-aquascape"]').attributes('aria-checked')).toBe('true');
+    await wrapper.get('[data-testid="effect-reset"]').trigger('click');
+    expect(sent.at(-1)?.params.arowana.aquarium).toMatchObject({ aquascape: false });
     wrapper.unmount();
   });
   it('says so when the chosen effect has gone, and lists the files that could not be used', () => {

@@ -105,6 +105,8 @@ export class EffectsLayer {
     const renderer = this.arowana!;
     const settings = this.params.aquarium ?? defaultAquarium;
     renderer.setLighting(settings.lighting);
+    renderer.setAquascape(settings.aquascape);
+    this.host.classList.toggle("effects-aquascape", settings.aquascape);
     if (settings.mode === this.requestedMode) return;
     this.requestedMode = settings.mode;
     // Keep drawing the previous set until the newly requested one is ready.
@@ -168,6 +170,6 @@ export class EffectsLayer {
     window.removeEventListener("pagehide", this.onPageHide);
     document.removeEventListener("visibilitychange", this.onVisibility);
     this.canvas?.remove(); this.canvas = null; this.context = null; this.system = null;
-    this.host.classList.remove("effects-host", "effects-loading");
+    this.host.classList.remove("effects-host", "effects-loading", "effects-aquascape");
   }
 }

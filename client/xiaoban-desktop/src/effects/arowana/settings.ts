@@ -16,10 +16,15 @@ export const aquariumLightControls = [
   { key: 'environment', label: '环境反射', min: 0, max: 300, step: 5 },
 ] as const;
 export type AquariumLight = typeof aquariumLightControls[number]['key'];
-export interface AquariumSettings { mode: AquariumMode; lighting: Record<AquariumLight, number> }
+export interface AquariumSettings {
+  mode: AquariumMode;
+  aquascape: boolean;
+  lighting: Record<AquariumLight, number>;
+}
 
 export const defaultAquarium: AquariumSettings = {
   mode: 'arowana',
+  aquascape: false,
   lighting: { main: 100, azimuth: -31, elevation: 49, warmth: 0, fill: 100, rim: 100, environment: 100 },
 };
 
@@ -35,7 +40,11 @@ export function normalizeAquarium(value: unknown): AquariumSettings {
     const number = lighting[key];
     if (typeof number === 'number' && Number.isFinite(number)) result[key] = Math.min(max, Math.max(min, number));
   }
-  return { mode: aquariumModes.find(({ value }) => value === raw.mode)?.value ?? defaultAquarium.mode, lighting: result };
+  return {
+    mode: aquariumModes.find(({ value }) => value === raw.mode)?.value ?? defaultAquarium.mode,
+    aquascape: typeof raw.aquascape === 'boolean' ? raw.aquascape : defaultAquarium.aquascape,
+    lighting: result,
+  };
 }
 
 export function lightValue(key: AquariumLight, number: number): string {

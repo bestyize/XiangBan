@@ -4,7 +4,9 @@
 
 内置特效目录在 `public/effects/`。自定义粒子特效包放在用户数据目录的 `effects/` 文件夹，重新载入即可使用。
 
-「龙鱼巡游」使用内置 WebGL 2 渲染器，可在透明桌面层显示单条龙鱼、单条孔雀鱼、六条孔雀鱼群，或龙鱼与孔雀鱼群。鱼类组合与灯光保存在本机特效设置，可与任意壁纸搭配。模型、鱼鳍动画、花色和群游路线来自 [RealWorldBuilder](https://github.com/bestyize/RealWorldBuilder/tree/6b9d23da4c554be8ec1c134633776c1722706aa3)，资源随客户端安装，离线可播放。
+「龙鱼巡游」使用内置 WebGL 2 渲染器，可在透明桌面层显示朱红龙鱼、单条孔雀鱼、六条孔雀鱼群，或朱红龙鱼与孔雀鱼群。可在右侧设置打开「砂石水草」，在桌面底部叠加造景。鱼类组合、造景开关与灯光保存在本机特效设置。资源随客户端安装，离线可播放。
+
+朱红龙鱼模型、游动和砂石水草使用 RealWorldBuilder 的朱红龙鱼版本，孔雀鱼模型、花色和群游路线沿用原水族箱版本。 [朱红龙鱼版本](https://github.com/bestyize/RealWorldBuilder/tree/1a04202725f8387ed5dbbb6bf917edbf73936bc4) · [原水族箱版本](https://github.com/bestyize/RealWorldBuilder/tree/6b9d23da4c554be8ec1c134633776c1722706aa3)
 
 「装扮 → 特效 → 导入」可以选择单个 JSON 或 V2 ZIP。两种入口都会校验粒子数据并刷新列表。导入同 ID 的单个 JSON 时，应用会先询问是否替换。同 ID 的 ZIP 导入会被拒绝。
 

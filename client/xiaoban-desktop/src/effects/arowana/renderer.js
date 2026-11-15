@@ -56,6 +56,7 @@ export function createArowanaRenderer(canvas) {
   let request;
   let mode = null;
   let visible = [];
+  let aquascape = false;
 
   function destroy() {
     if (destroyed) return;
@@ -93,7 +94,14 @@ export function createArowanaRenderer(canvas) {
         object.scale.multiplyScalar(scale);
         return { object, ...createGuppySwimmer(object, route, motion) };
       };
-      const swimmer = kind === 'arowana' ? { object: model, ...createSwimmer(model, cruiseRoute) }
+      if (kind === 'arowana') {
+        model.scale.setScalar(0.9);
+        const { map, normalMap } = model.getObjectByName('Body').material;
+        const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        map.anisotropy = anisotropy;
+        normalMap.anisotropy = anisotropy;
+      }
+      const swimmer = kind === 'arowana' ? { object: model, ...createSwimmer(model, cruiseRoute, { duration: 32 }) }
         : kind === 'guppy' ? createGuppy(soloGuppyRoute) : createGuppySchool(createGuppy, new Group());
       swimmer.object.traverse(object => {
         if (object.isSkinnedMesh) object.frustumCulled = false;
@@ -136,6 +144,15 @@ export function createArowanaRenderer(canvas) {
       camera.updateProjectionMatrix();
     }
 
+    function layoutSchool() {
+      const mixed = mode === 'mixed';
+      if (!mixed && mode !== 'school') return;
+      const { object } = visible.at(-1);
+      const clearance = aquascape ? (mixed ? 0.28 : 0.36) : 0;
+      object.scale.setScalar(mixed ? 0.49 : 0.69);
+      object.position.set(0, (mixed ? -1.22 : -0.18) + clearance, mixed ? -0.34 : -0.35);
+    }
+
     return {
       get mode() { return mode; },
       get fishCount() { return visible.reduce((count, fish) => count + (fish.count ?? 1), 0); },
@@ -146,15 +163,16 @@ export function createArowanaRenderer(canvas) {
         const residents = await Promise.all(mixed ? [prepare('arowana'), prepare('school')] : [prepare(next)]);
         if (destroyed || request !== token) return;
         for (const fish of visible) fish.object.visible = false;
-        if (mixed || next === 'school') {
-          const { object } = residents.at(-1);
-          object.scale.setScalar(mixed ? 0.49 : 0.69);
-          object.position.set(0, mixed ? -1.22 : -0.18, mixed ? -0.34 : -0.35);
-        }
         for (const fish of residents) fish.object.visible = true;
         visible = residents;
         mode = next;
+        layoutSchool();
         frameCamera();
+      },
+      setAquascape(enabled) {
+        if (enabled === aquascape) return;
+        aquascape = enabled;
+        layoutSchool();
       },
       setLighting(light) {
         key.intensity = 1.87 * light.main / 100;

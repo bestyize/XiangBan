@@ -1,200 +1,130 @@
-import * as THREE from 'three';
-import { lowerIndex } from './swim-route.js';
+import { MathUtils, Matrix4, Quaternion, Vector3 } from 'three';
 
-const TAU = 2 * Math.PI;
-const X = new THREE.Vector3(1, 0, 0);
-const Y = new THREE.Vector3(0, 1, 0);
-const JOINTS = [
-  'Head', 'Spine_1', 'Spine_2', 'Spine_3', 'Spine_4', 'Peduncle', 'Tail', 'Tail_Tip',
+const UP = new Vector3(0, 1, 0);
+const FORWARD = new Vector3(1, 0, 0);
+const CYCLE = Math.PI * 2;
+const CRUISE_SPEED = .62;
+const BODY_TRIM = -.064;
+const TURN_REACH = .82;
+const TURN_LIMIT = .89;
+// The swimming wave grows from the head toward the tail.
+const spine = [
+  { name: 'Head', stroke: .010 },
+  { name: 'Shoulder', stroke: .020 },
+  { name: 'SpineA', stroke: .042 },
+  { name: 'SpineB', stroke: .074 },
+  { name: 'Peduncle', stroke: .110 },
+  { name: 'Tail', stroke: .144 },
+  { name: 'TailTip', stroke: .136 },
 ];
 
-const wrap = THREE.MathUtils.euclideanModulo;
-const lerp = THREE.MathUtils.lerp;
-const mix = THREE.MathUtils.smoothstep;
-
-function buildTiming(route) {
-  let elapsed = 0;
-  let cycles = 0;
-  const samples = [];
-  for (const [i, sample] of route.samples.entries()) {
-    const angle = TAU * sample.distance / route.length;
-    const turn = mix(Math.abs(sample.curvature), .20, 1.4);
-    const effort = .48 + .29 * Math.sin(4 * angle - .75)
-      + .15 * Math.sin(7 * angle + .55) + .08 * Math.cos(2 * angle + .8);
-    const speed = .52 + .245 * effort - .105 * turn;
-    const cadence = .56 + .54 * effort + .10 * turn;
-    if (i) {
-      const prior = samples[i - 1];
-      const dt = 2 * (sample.distance - prior.distance) / (prior.speed + speed);
-      elapsed += dt;
-      cycles += .5 * dt * (prior.cadence + cadence);
-    }
-    samples.push({ ...sample, time: elapsed, cycles, speed, cadence, effort });
-  }
-
+function bindBone(object, name, rootRotation) {
+  const bone = object.getObjectByName(name);
+  if (!bone?.isBone) throw new Error(`Vermilion arowana rig is missing ${name}`);
+  // Map the fish's axes into this bone's own rest orientation.
+  const toBone = bone.getWorldQuaternion(new Quaternion()).invert().multiply(rootRotation);
   return {
-    samples, duration: elapsed, cycles,
-    startTime: samples[route.startIndex].time,
+    bone,
+    rest: bone.quaternion.clone(),
+    yaw: UP.clone().applyQuaternion(toBone),
+    roll: FORWARD.clone().applyQuaternion(toBone),
   };
 }
 
-function bindTransform(node, rootInverse) {
-  const matrix = new THREE.Matrix4().multiplyMatrices(rootInverse, node.matrixWorld);
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
-  matrix.decompose(position, rotation, new THREE.Vector3());
-  return { position, rotation };
-}
-
-function bindFin(scene, name, side, type, rootInverse) {
-  const bone = scene.getObjectByName(name);
-  if (!bone) return null;
-  const inverseParent = bindTransform(bone.parent, rootInverse).rotation.invert();
-  return {
-    bone, side, type, bind: bone.quaternion.clone(),
-    sweep: Y.clone().applyQuaternion(inverseParent),
-    feather: X.clone().applyQuaternion(inverseParent),
-  };
-}
-
-/**
- * Animate a glTF rig with +X toward the nose, +Y up and +Z toward the front
- * of the aquarium. The caller provides the route and drives update in seconds.
- */
-export function createSwimmer(scene, route) {
-  const { samples, duration, cycles, startTime } = buildTiming(route);
-  const wholeCycles = Math.round(cycles);
-  scene.updateWorldMatrix(true, true);
-  const rootInverse = scene.matrixWorld.clone().invert();
-  const joints = JOINTS.map((name) => {
-    const bone = scene.getObjectByName(name);
-    if (!bone?.isBone) throw new Error(`Arowana skeleton is missing ${name}`);
-    return {
-      bone,
-      ...bindTransform(bone, rootInverse),
-      parentBind: bindTransform(bone.parent, rootInverse).rotation,
-      rotationInModel: new THREE.Quaternion(),
-      pose: new THREE.Quaternion(),
-    };
+export function createSwimmer(object, route, { duration: requestedDuration } = {}) {
+  object.updateWorldMatrix(true, true);
+  const rootRotation = object.getWorldQuaternion(new Quaternion());
+  const joints = spine.map(({ name, stroke }) => {
+    const joint = bindBone(object, name, rootRotation);
+    const station = object.worldToLocal(joint.bone.getWorldPosition(new Vector3())).x;
+    return { ...joint, station, stroke };
   });
-  for (let i = 1; i < joints.length; i++) {
-    const joint = joints[i];
-    joint.parentOffset = joints[i - 1].rotation.clone().invert().multiply(joint.parentBind);
-  }
+  const [, , frontTrunk, rearTrunk] = joints;
+  const centerBlend = frontTrunk.station / (frontTrunk.station - rearTrunk.station);
+  const fins = ['Pectoral', 'Pelvic'].flatMap((kind) => ['L', 'R'].map((suffix) => {
+    const fin = bindBone(object, `${kind}_${suffix}`, rootRotation);
+    const position = object.worldToLocal(fin.bone.getWorldPosition(new Vector3()));
+    return { ...fin, side: Math.sign(position.z), span: kind === 'Pectoral' ? 1 : .55 };
+  }));
 
-  const fins = ['Pectoral', 'Pelvic', 'Gill'].flatMap((type) => [
-    bindFin(scene, `${type}_L`, 1, type, rootInverse),
-    bindFin(scene, `${type}_R`, -1, type, rootInverse),
-  ]).filter(Boolean);
-
-  const distances = [0];
-  const bodyScale = scene.scale.x;
-  for (let i = 1; i < joints.length; i++) {
-    distances.push(distances[i - 1] + bodyScale *
-      joints[i].position.distanceTo(joints[i - 1].position));
-  }
-  // The trailing end of the fin continues beyond the final joint pivot.
-  distances.push(distances.at(-1) + .23 * bodyScale);
-  const length = distances.at(-1);
-  const points = distances.map(() => new THREE.Vector3());
-  const curveTurns = distances.map(() => 0);
-  const headTangent = new THREE.Vector3();
-  const tangent = new THREE.Vector3();
-  const lateral = new THREE.Vector3();
-  const forward = new THREE.Vector3();
-  const up = new THREE.Vector3();
-  const matrix = new THREE.Matrix4();
-  const rootRotationInverse = new THREE.Quaternion();
-  const axisRotation = new THREE.Quaternion();
-  const parentRotationInverse = new THREE.Quaternion();
-  const motion = {
-    head: new THREE.Vector3(), center: new THREE.Vector3(), heading: new THREE.Vector3(),
-    turn: 0, speed: 0, phase: 0,
-  };
+  const defaultDuration = route.length / CRUISE_SPEED;
+  const duration = requestedDuration ?? defaultDuration;
+  if (!Number.isFinite(duration) || duration <= 0) throw new RangeError('Invalid Vermilion arowana swim duration');
+  const speed = route.length / duration;
+  // Stretch the strokes with the lap so a slower fish also beats its fins more slowly.
+  const tailStrokes = Math.max(1, Math.round(defaultDuration * .54));
+  const finStrokes = Math.max(1, Math.round(defaultDuration * .79));
+  const startDistance = route.samples[route.startIndex].distance;
+  const cadence = 3 * CYCLE;
+  const speedVariation = .16;
+  const motion = { center: new Vector3(), heading: new Vector3(), turn: 0, speed: 0, phase: 0 };
+  const routePoint = new Vector3();
+  const localHeading = new Vector3();
+  const torsoCenter = new Vector3();
+  const rearPosition = new Vector3();
+  const forward = new Vector3();
+  const side = new Vector3();
+  const up = new Vector3();
+  const orientation = new Matrix4();
+  const rotation = new Quaternion();
 
   function update(timeSeconds) {
-    const t = wrap(timeSeconds + startTime, duration);
-    const index = lowerIndex(samples, 'time', t);
-    const a = samples[index];
-    const b = samples[index + 1];
-    const u = (t - a.time) / (b.time - a.time);
-    const distance = lerp(a.distance, b.distance, u);
-    const effort = lerp(a.effort, b.effort, u);
-    const progress = t / duration;
-    const phase = TAU * wholeCycles * lerp(a.cycles, b.cycles, u) / cycles;
-    const finPhase = phase * Math.round(duration * 1.21) / wholeCycles;
-    const breath = TAU * (Math.round(duration * 1.36) * progress +
-      .10 * Math.sin(4 * TAU * progress));
+    const progress = MathUtils.euclideanModulo(timeSeconds / duration, 1);
+    const glide = cadence * progress;
+    // Integrate a periodic speed so distance, phase and speed all close at the loop seam.
+    const travel = progress + speedVariation * Math.sin(glide) / cadence;
+    const effort = .76 + .24 * Math.cos(glide);
+    const phase = CYCLE * tailStrokes * travel;
+    const distance = startDistance + travel * route.length;
+    const curvature = route.sample(distance, motion.center, motion.heading);
+    const reach = object.scale.x * TURN_REACH;
+    const approachingTurn = route.sample(distance + .56 * reach, routePoint, localHeading);
+    const steer = Math.tanh(1.5 * approachingTurn);
+    const strokeEffort = effort * (1 - .18 * Math.abs(steer));
+    const heading = motion.heading;
+    const slope = Math.atan2(heading.y, Math.hypot(heading.x, heading.z));
+    // The model's torso rises toward the snout. Trim that angle and follow the
+    // route's gentle changes in depth with only a small change in body pitch.
+    const pitch = BODY_TRIM + .27 * slope;
+    forward.set(heading.x, 0, heading.z).normalize()
+      .multiplyScalar(Math.cos(pitch)).addScaledVector(UP, Math.sin(pitch));
+    side.crossVectors(forward, UP).normalize();
+    up.crossVectors(side, forward);
+    object.position.copy(motion.center);
+    object.quaternion.setFromRotationMatrix(orientation.makeBasis(forward, up, side))
+      .multiply(rotation.setFromAxisAngle(FORWARD, -.115 * steer + .009 * Math.sin(phase)));
 
-    // The head leads along the route. Each following cross-section samples
-    // farther back along the same curve before the lateral body wave is added.
-    for (let i = 0; i < points.length; i++) {
-      const along = distances[i] / length;
-      const point = points[i];
-      const curve = route.sample(distance - distances[i], point, tangent);
-      curveTurns[i] = curve;
-      if (i === 0) headTangent.copy(tangent);
-      lateral.crossVectors(tangent, Y).normalize();
-      const wave = phase - 4.85 * along;
-      const weight = (.012 * along + .215 * along ** 2.5) *
-        (.58 + .74 * effort) * (1 - .30 * mix(Math.abs(curve), .25, 1.5));
-      point.addScaledVector(lateral, bodyScale * weight * Math.sin(wave));
-      point.y += bodyScale * .011 * along ** 2 * Math.sin(wave - 1.1);
-    }
-
-    for (let i = 0; i < joints.length; i++) {
-      const joint = joints[i];
-      forward.subVectors(points[i], points[i + 1]).normalize();
-      if (i === 0) forward.lerp(headTangent, .42).normalize();
-      lateral.crossVectors(forward, Y).normalize();
-      up.crossVectors(lateral, forward);
-      const roll = -.091 * Math.tanh(1.12 * curveTurns[i])
-        + .021 * Math.sin(2 * TAU * progress + .5 - i * .13);
-      joint.pose.setFromRotationMatrix(matrix.makeBasis(forward, up, lateral))
-        .multiply(axisRotation.setFromAxisAngle(X, roll));
-    }
-
-    scene.quaternion.copy(joints[0].pose);
-    scene.position.copy(joints[0].position).multiply(scene.scale)
-      .applyQuaternion(scene.quaternion).negate().add(points[0]);
-    rootRotationInverse.copy(scene.quaternion).invert();
-
-    // Keep the rig's original bone lengths and roll. Convert route poses
-    // into each parent's space so bends are independent of export orientation.
+    let parentTurn = 0;
     for (const [i, joint] of joints.entries()) {
-      joint.rotationInModel.copy(rootRotationInverse).multiply(joint.pose)
-        .multiply(joint.rotation);
-      parentRotationInverse.copy(i ? joints[i - 1].rotationInModel : joint.parentBind);
-      if (i) parentRotationInverse.multiply(joint.parentOffset);
-      joint.bone.quaternion.copy(parentRotationInverse.invert()).multiply(joint.rotationInModel);
+      // Each section follows the heading where it lies along the route. The
+      // head enters a bend first, and the tail is still turning on the exit.
+      route.sample(distance + joint.station * reach, routePoint, localHeading);
+      const yaw = Math.atan2(heading.z * localHeading.x - heading.x * localHeading.z,
+        heading.x * localHeading.x + heading.z * localHeading.z);
+      const turn = TURN_LIMIT * Math.tanh(yaw / TURN_LIMIT);
+      const angle = turn - parentTurn + joint.stroke * strokeEffort * Math.sin(phase - .67 * i);
+      joint.bone.quaternion.copy(joint.rest).multiply(rotation.setFromAxisAngle(joint.yaw, angle));
+      parentTurn = turn;
     }
+
+    // The rig pivots from the head. Keep the middle of the posed body on the route.
+    frontTrunk.bone.getWorldPosition(torsoCenter).lerp(rearTrunk.bone.getWorldPosition(rearPosition), centerBlend);
+    object.parent?.worldToLocal(torsoCenter);
+    object.position.addScaledVector(torsoCenter.sub(motion.center), -1);
 
     for (const fin of fins) {
-      const { side, type, bone } = fin;
-      let sweep;
-      let feather;
-      if (type === 'Gill') {
-        const opening = (.5 + .5 * Math.sin(breath + .11 * side)) ** 1.7;
-        sweep = side * .011 * opening;
-        feather = -side * (.004 + .033 * opening);
-      } else {
-        const stroke = finPhase + (side > 0 ? .33 : 1.75) +
-          .30 * Math.sin(3 * TAU * progress + side);
-        const power = type === 'Pectoral' ? 1 : .56;
-        const steering = Math.tanh(curveTurns[0]) * side;
-        sweep = side * power * (.029 + .044 * steering +
-          (.073 + .042 * effort) * Math.sin(stroke) + .020 * Math.sin(2 * stroke + .45));
-        feather = side * power * (.013 + (.075 + .026 * effort) * Math.sin(stroke - .92));
-      }
-      bone.quaternion.copy(axisRotation.setFromAxisAngle(fin.sweep, sweep))
-        .multiply(axisRotation.setFromAxisAngle(fin.feather, feather)).multiply(fin.bind);
+      const phaseOffset = fin.side > 0 ? .45 : 1.18;
+      const stroke = CYCLE * finStrokes * travel + phaseOffset;
+      const steering = fin.side * steer;
+      const sweep = fin.side * fin.span * (.022 + .081 * effort * Math.sin(stroke) + .074 * steering);
+      const feather = fin.side * fin.span * (.012 + .070 * effort * Math.sin(stroke + 1.1) + .042 * Math.max(0, steering));
+      fin.bone.quaternion.copy(fin.rest)
+        .multiply(rotation.setFromAxisAngle(fin.yaw, sweep))
+        .multiply(rotation.setFromAxisAngle(fin.roll, feather));
     }
 
-    motion.head.copy(points[0]);
-    motion.center.copy(scene.position);
-    motion.heading.copy(X).applyQuaternion(scene.quaternion);
-    motion.turn = curveTurns[0];
-    motion.speed = lerp(a.speed, b.speed, u);
+    motion.turn = curvature;
+    motion.speed = speed * (1 + speedVariation * Math.cos(glide));
     motion.phase = phase;
     return motion;
   }

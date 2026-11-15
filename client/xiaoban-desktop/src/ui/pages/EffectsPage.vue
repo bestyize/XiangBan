@@ -71,6 +71,10 @@ function changeAquariumMode(mode: AquariumMode) {
   aquarium.value = { ...aquarium.value, mode };
   commit();
 }
+function changeAquascape(aquascape: boolean) {
+  aquarium.value = { ...aquarium.value, aquascape };
+  commit();
+}
 function changeLight(key: AquariumLight, value: number) {
   aquarium.value = { ...aquarium.value, lighting: { ...aquarium.value.lighting, [key]: value } };
   tune();
@@ -175,6 +179,10 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
           </select>
         </label>
         <div v-else class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
+        <div v-if="aquariumSelected" class="kv row">
+          <span class="grow">砂石水草</span>
+          <NSwitch :value="aquarium.aquascape" aria-label="砂石水草" data-testid="aquarium-aquascape" @update:value="changeAquascape" />
+        </div>
         <div class="kv"><div class="h"><span>速度</span><span data-testid="effect-speed-value">×{{ speed }}</span></div><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" :tooltip="false" @update:value="tune" /></div>
         <div class="kv"><div class="h"><span>大小</span><span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></div><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
         <details v-if="aquariumSelected" class="fx-lighting">
