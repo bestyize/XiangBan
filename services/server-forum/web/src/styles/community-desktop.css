@@ -6,20 +6,12 @@
   }
   .site-layout.community-layout.community-root { --header-h: 56px; }
   .site-layout.community-layout .app-main { padding: 20px 32px 40px; }
-  .site-layout.community-layout.community-root .app-main { padding-top: 0; }
   .site-layout.community-layout .app-footer { padding: 20px 32px 24px; font-size: 12px; }
   .site-layout.community-layout .community-page { max-width: none; }
 
-  .site-layout.community-layout .site-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
-  .site-layout.community-layout .community-header { border-bottom: 0; }
+  .site-layout.community-layout .detail-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
   .site-layout.community-layout .header-inner { height: var(--header-h); padding: 0 32px; }
-  .site-layout.community-layout .community-navigation { flex: none; justify-content: flex-start; gap: 32px; height: var(--header-h); }
-  /* Equal side tracks keep the navigation centered when account actions change width. */
-  .site-layout.community-layout .community-header .header-inner { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 16px; }
-  .site-layout.community-layout .community-header .community-navigation { grid-column: 2; grid-row: 1; justify-content: center; }
-  .site-layout.community-layout .community-header .header-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; min-width: 0; }
-  .site-layout.community-layout .community-navigation a { font-size: 15px; }
-  .site-layout.community-layout .community-navigation a.on:after { bottom: 4px; width: 22px; }
+  .site-layout.community-layout .community-header .header-inner { gap: 16px; }
   .site-layout.community-layout .header-actions { gap: 10px; }
   .site-layout.community-layout .header-icon { width: 36px; height: 36px; }
   .site-layout.community-layout .header-icon[aria-label="搜索社区"] { width: 204px; display: flex; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 8px; background: var(--surface-2); color: var(--ink-3); }
@@ -29,56 +21,16 @@
   .site-layout.community-layout .header-search { max-width: var(--page-w); padding: 4px 32px 16px; }
   .site-layout.community-layout .header-search input { height: 40px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--surface-2); }
 
-  /* Secondary tabs for the community's four sections. */
-  .site-layout.community-layout :is(.community-tabs, .discussion-tabs) {
-    justify-content: flex-start;
-    gap: 6px;
-    background: none;
-    padding: 0;
-    margin-bottom: 20px;
-    border-bottom: 0;
-  }
-  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button {
-    min-height: 36px;
-    padding: 6px 14px;
-    border-radius: 8px;
+  /* Selection styles for desktop filters and in-page tabs. */
+  .site-layout .app-main :is(
+    .filter-row, .creation-filters, .directory-filters, .os-tag-filters, .rankings .filters
+  ) > button[aria-pressed="true"],
+  .site-layout .app-main .tag-filter > .chip.on,
+  :is(.tabs, .modes)[role="tablist"] > [role="tab"][aria-selected="true"] {
     background: transparent;
-    color: var(--ink-2);
-    font-size: 14px;
-    white-space: nowrap;
-    transition: background .15s, color .15s;
-  }
-  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button:hover {
-    background: var(--section-tab-hover, var(--surface));
-  }
-  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button.on {
-    background: var(--brand-soft);
     color: var(--brand);
     font-weight: 650;
   }
-  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
-  }
-  .site-layout.community-layout .community-tabs button.on:after { display: none; }
-  .site-layout.community-layout .community-tabs+.community-tabs { margin-top: -8px; }
-  .site-layout.community-layout.community-root .community-page > :is(.community-tabs:first-of-type, .discussion-tabs) {
-    --section-tab-hover: var(--surface-2);
-    padding-block: 2px 6px;
-    background: var(--surface);
-    /* Paint the full-width surface and divider without widening the scroll container. */
-    border-image: linear-gradient(var(--surface) calc(100% - 1px), var(--line) 0) fill 0 / 0 / 0 100vw;
-  }
-  /* Center only the section tabs; filter/sort rows keep their content alignment. */
-  .site-layout.community-layout.community-root .community-page > :is(.community-tabs:first-of-type:not(.with-actions), .discussion-tabs) {
-    justify-content: safe center;
-    overflow-x: auto;
-  }
-  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type.with-actions { column-gap: 16px; }
-  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-items { grid-column: 2; grid-row: 1; }
-  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
-
-
   /* Discovery: three editorial stories, then a news column and compact supporting content. */
   .site-layout.community-layout .home-page .recommend-feed { gap: 20px; padding-top: 0; }
   .site-layout.community-layout .home-card, .site-layout.community-layout .daily-section { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 8px 20px 16px; }

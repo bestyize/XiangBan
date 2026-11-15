@@ -11,7 +11,7 @@ import { useHead } from '@/lib/head'
 import { galleryTab } from '@/lib/microGallery'
 import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
-import FilterChips from '@/components/community/FilterChips.vue'
+import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import MicroGallery from '@/components/community/MicroGallery.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
@@ -80,9 +80,9 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 <template>
   <main class="community-page discuss-page">
     <h1 class="sr-only">{{ ideas ? '社区创意' : '社区讨论' }}</h1>
-    <FilterChips v-if="!ideas" class="discussion-tabs" :items="discussionOptions" :active="tab" label="讨论板块"
+    <CommunityTabs v-if="!ideas" :items="discussionOptions" :active="tab" label="讨论板块"
       @change="changeDiscussionTab" />
-    <FilterChips v-else class="discussion-tabs" :items="ideaTabs" :active="showGallery ? galleryTab.key : ''" label="创意板块"
+    <CommunityTabs v-else :items="ideaTabs" :active="showGallery ? galleryTab.key : ''" label="创意板块"
       @change="changeIdeaTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
@@ -115,9 +115,6 @@ useHead(() => ({title:showGallery.value ? galleryTab.label : ideas.value ? '创�
 </template>
 
 <style scoped>
-.discussion-tabs { margin-bottom: 8px; padding-block: 2px; background: var(--surface); }
-.discussion-tabs :deep(button) { min-height: 42px; background: transparent; }
-.discussion-tabs :deep(button.on) { background: var(--brand-soft); }
 .discussion-grid{margin:4px 12px}
 @container page (min-width: 720px) {
   .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
