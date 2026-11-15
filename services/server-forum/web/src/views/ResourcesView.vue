@@ -62,7 +62,9 @@ useHead(() => ({ title:'资源' }))
   </main>
 </template>
 <style scoped>
-.resource-page .resource-tabs--software { margin-bottom: 4px; }
+@media (width < 1024px) {
+  .resource-page .resource-tabs--software { margin-bottom: 4px; }
+}
 .resource-media-grid { padding: 8px 12px; }
 .resource-page--media { container-type: inline-size; }
 @container (min-width: 880px) {

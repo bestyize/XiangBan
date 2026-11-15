@@ -27,14 +27,41 @@
   .site-layout.community-layout .header-search input { height: 40px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--surface-2); }
 
   /* Secondary tabs for the community's four sections. */
-  .site-layout.community-layout .community-tabs { justify-content: flex-start; gap: 6px; background: none; padding: 0; margin-bottom: 20px; border-bottom: 0; }
-  .site-layout.community-layout .community-tabs button { min-height: 36px; padding: 6px 14px; border-radius: 8px; font-size: 14px; transition: background .15s, color .15s; }
-  .site-layout.community-layout .community-tabs button:hover { background: var(--surface); }
-  .site-layout.community-layout .community-tabs button.on { background: var(--brand-soft); color: var(--brand); }
+  .site-layout.community-layout :is(.community-tabs, .discussion-tabs) {
+    justify-content: flex-start;
+    gap: 6px;
+    background: none;
+    padding: 0;
+    margin-bottom: 20px;
+    border-bottom: 0;
+  }
+  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button {
+    min-height: 36px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 14px;
+    white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button:hover { background: var(--surface); }
+  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button.on {
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-weight: 650;
+  }
+  .site-layout.community-layout :is(.community-tab-items, .discussion-tabs) > button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
   .site-layout.community-layout .community-tabs button.on:after { display: none; }
   .site-layout.community-layout .community-tabs+.community-tabs { margin-top: -8px; }
   /* Center only the section tabs; filter/sort rows keep their content alignment. */
-  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type:not(.with-actions) { justify-content: safe center; overflow-x: auto; }
+  .site-layout.community-layout.community-root .community-page > :is(.community-tabs:first-of-type:not(.with-actions), .discussion-tabs) {
+    justify-content: safe center;
+    overflow-x: auto;
+  }
   .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type.with-actions { column-gap: 16px; }
   .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-items { grid-column: 2; grid-row: 1; }
   .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }

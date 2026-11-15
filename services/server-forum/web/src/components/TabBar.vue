@@ -75,4 +75,13 @@ function publish(path: string) {
   .nav-publish>.publish-icon{display:grid;place-items:center;width:44px;height:32px;border-radius:10px;background:var(--brand-fill);color:#fff}
   .publish-icon>svg{width:20px;height:20px}
   .nav-publish:hover>.publish-icon{background:var(--brand-hover)}
+
+@media (min-width: 1024px) {
+  .primary-nav { max-width: none; }
+  .nav-items {
+    width: 100%;
+    max-width: var(--page-w);
+    margin-inline: auto;
+  }
+}
 </style>
