@@ -34,7 +34,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 「创意 → 微观展厅」的封面和交互预览随前端产物一起部署。`npm run dev` 和 `npm run build` 会先从 RealWorldBuilder 的固定提交同步展品文件，首次同步需要访问 GitHub；同步后可离线构建。单独运行 Vite 时，先在 `web/` 执行 `npm run sync:gallery`。
 
-创意页 `/ideas` 直接展示 16:9 作品卡片。首张卡通往微观展厅，紧接着是标注「3D模型」的碎花垂耳兔卡片，之后依次展示《星夜骑士》《小王子》、Saltline、Oil Paint 和社区内容。《星夜骑士》《小王子》和 Oil Paint 的详情页通往各自官网，Oil Paint 的详情页也提供源码链接。《星夜骑士》、Saltline、Oil Paint、展厅水族箱和碎花垂耳兔使用 `/create/run/ideas/:slug` 共用运行容器。兔子卡片直接打开作品，关闭后返回进入时的创意页。关闭从展厅打开的展品会返回展厅，关闭从作品详情打开的游戏会返回各自的详情。
+创意页 `/ideas` 的作品卡片使用 3:2 封面。首张卡通往微观展厅，紧接着是标注「3D模型」的碎花垂耳兔卡片，之后依次展示《星夜骑士》《小王子》、Saltline、Oil Paint 和社区内容。《星夜骑士》《小王子》和 Oil Paint 的详情页通往各自官网，Oil Paint 的详情页也提供源码链接。《星夜骑士》、Saltline、Oil Paint、展厅水族箱和碎花垂耳兔使用 `/create/run/ideas/:slug` 共用运行容器。兔子卡片直接打开作品，关闭后返回进入时的创意页。关闭从展厅打开的展品会返回展厅，关闭从作品详情打开的游戏会返回各自的详情。
 
 网页和手机版实时读取同一份公开精选目录 [`web/public/ideas-catalog.json`](web/public/ideas-catalog.json)，随网页产物部署为 `/ideas-catalog.json`。目录顺序就是创意首页的精选顺序。更新精选时只需发布新版网页产物，手机无需重新打包。作品包、方案和帖子仍从现有论坛接口读取。
 

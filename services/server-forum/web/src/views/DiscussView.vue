@@ -93,7 +93,7 @@ function communityIdeaCard(entry: Entry): IdeaCardItem {
 
 const ideaCards = computed(() => {
   if (!ideas.value || showGallery.value) return []
-  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({ ...item, dateLabel: '收录', to: item.href }))
+  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({ ...item, to: item.href }))
   const featuredPacks = new Set(featuredIdeas.value.flatMap(item => item.pack_slug ? [item.pack_slug] : []))
   const entries = data.value?.entries ?? []
   const community = entries

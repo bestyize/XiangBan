@@ -22,7 +22,7 @@ const cover = computed(() => {
       <p v-if="card.description" class="description">{{ card.description }}</p>
       <footer v-if="card.author || card.date" class="meta">
         <span v-if="card.author" class="author">{{ card.author }}</span>
-        <time v-if="card.date" :datetime="card.date">{{ card.dateLabel ? card.dateLabel + ' ' : '' }}{{ displayDate(card.date) }}</time>
+        <time v-if="card.date" :datetime="card.date">{{ displayDate(card.date) }}</time>
       </footer>
     </div>
   </RouterLink>
@@ -33,10 +33,10 @@ const cover = computed(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 7px;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: 8px;
   color: var(--ink);
   transition: border-color .18s, box-shadow .18s, transform .18s;
 }
@@ -50,9 +50,8 @@ const cover = computed(() => {
 .cover {
   position: relative;
   flex: none;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
-  border-radius: 8px;
   background: var(--surface-2);
 }
 .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -64,15 +63,17 @@ const cover = computed(() => {
   padding: 3px 6px;
   border: 1px solid #ffffff36;
   border-radius: 5px;
-  color: var(--brand-ink);
-  background: var(--brand);
+  color: #fff;
+  background: #606060;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transform: scale(.666667);
+  transform-origin: top right;
 }
-.copy { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 12px 10px 4px; }
+.copy { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 12px 17px 11px; }
 h2, .description {
   display: -webkit-box;
   overflow: hidden;
@@ -97,9 +98,7 @@ h2 + .meta { margin-top: 8px; }
 .author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 time { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @container page (max-width: 530px) {
-  .idea-card { padding: 5px; }
-  .cover { border-radius: 6px; }
-  .copy { padding: 9px 5px 4px; }
+  .copy { padding: 9px 10px 9px; }
   h2 { font-size: 14px; }
   .description { font-size: 12px; }
   .meta { flex-direction: column; }

@@ -31,8 +31,17 @@ import xyz.xiangban.xiaoban.common.community.*
 
 /** List covers use real dimensions with bounds; failures retain a neutral surface. */
 @Composable
-internal fun CommunityCover(url: String, modifier: Modifier = Modifier, natural: Boolean = false, minimum: Float = 2f / 3f, contain: Boolean = false, onError: () -> Unit = {}, overlay: @Composable BoxScope.() -> Unit = {}) {
-    var ratio by remember(url) { mutableFloatStateOf(16f / 9f) }
+internal fun CommunityCover(
+    url: String,
+    modifier: Modifier = Modifier,
+    natural: Boolean = false,
+    minimum: Float = 2f / 3f,
+    contain: Boolean = false,
+    onError: () -> Unit = {},
+    initialAspectRatio: Float = 16f / 9f,
+    overlay: @Composable BoxScope.() -> Unit = {},
+) {
+    var ratio by remember(url, initialAspectRatio) { mutableFloatStateOf(initialAspectRatio) }
     Box(modifier.fillMaxWidth().aspectRatio(ratio).background(LocalExtraColors.current.fill)) {
         AsyncImage(url, null, imageLoader = rememberImageLoader(), contentScale = if (contain) ContentScale.Fit else ContentScale.Crop,
             modifier = Modifier.fillMaxSize(), onError = { onError() }, onSuccess = { if (natural && it.result.image.height > 0) ratio = (it.result.image.width.toFloat() / it.result.image.height).coerceIn(minimum, 16f / 9f) })

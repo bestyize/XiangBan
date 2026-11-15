@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -107,10 +108,17 @@ internal fun IdeasFeed(
                 maxWidth >= 310.dp -> 2
                 else -> 1
             }
+            val cardArrangement = Arrangement.spacedBy(if (columns == 2) 4.dp else 8.dp)
+            val gridPadding = if (columns == 2) {
+                PaddingValues(
+                    start = 4.dp, end = 4.dp,
+                    top = FeedPadding.calculateTopPadding(), bottom = FeedPadding.calculateBottomPadding(),
+                )
+            } else FeedPadding
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns), state = gridState, modifier = Modifier.fillMaxSize(),
-                contentPadding = FeedPadding, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = gridPadding, horizontalArrangement = cardArrangement,
+                verticalArrangement = cardArrangement,
             ) {
                 if (!loading) {
                     if (failure != null) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -139,7 +147,7 @@ private fun IdeaFeedCard(entry: IdeaFeedEntry, env: CommunityEnv, open: (Route) 
     when (entry) {
         is IdeaFeedEntry.Featured -> with(entry.item) {
             val runtime = player
-            IdeaCard(title, description, env.forum.imageUrl(cover), label, author, "收录 ${date.take(10)}") {
+            IdeaCard(title, description, env.forum.imageUrl(cover), label, author, date.take(10)) {
                 when {
                     kind == "gallery" -> open(Route.MicroGallery)
                     runtime != null -> open(Route.IdeaRuntime(runtime, title))
@@ -148,7 +156,9 @@ private fun IdeaFeedCard(entry: IdeaFeedEntry, env: CommunityEnv, open: (Route) 
             }
         }
         is IdeaFeedEntry.Work -> with(entry.pack) {
-            IdeaCard(title, summary, coverUrl?.let(env.forum::imageUrl), kindLabel(kind), author?.nickname, agoText(updatedAt)) {
+            IdeaCard(
+                title, summary, coverUrl?.let(env.forum::imageUrl), kindLabel(kind), author?.nickname, agoText(updatedAt),
+            ) {
                 open(if (kind in CapabilityPackKinds) Route.Ability(id) else Route.Pack(id))
             }
         }
@@ -156,7 +166,9 @@ private fun IdeaFeedCard(entry: IdeaFeedEntry, env: CommunityEnv, open: (Route) 
             IdeaCard(title, summary, null, "桌面方案", author.nickname, agoText(createdAt)) { open(Route.Scheme(id)) }
         }
         is IdeaFeedEntry.Post -> with(entry.topic) {
-            IdeaCard(cardTitle, excerpt, images.firstOrNull()?.let(env.forum::imageUrl), category.name, author.nickname, agoText(createdAt)) {
+            IdeaCard(
+                cardTitle, excerpt, images.firstOrNull()?.let(env.forum::imageUrl), category.name, author.nickname, agoText(createdAt),
+            ) {
                 open(Route.Topic(id))
             }
         }
@@ -164,18 +176,38 @@ private fun IdeaFeedCard(entry: IdeaFeedEntry, env: CommunityEnv, open: (Route) 
 }
 
 @Composable
-private fun IdeaCard(title: String, description: String, cover: String?, label: String?, author: String?, date: String, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(7.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill)) {
-            if (!cover.isNullOrBlank()) CommunityCover(cover)
-            if (!label.isNullOrBlank()) Text(
-                label,
-                Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(5.dp))
-                    .background(MaterialTheme.colorScheme.primary).padding(horizontal = 5.dp, vertical = 2.dp),
-                color = MaterialTheme.colorScheme.onPrimary, style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+private fun IdeaCard(
+    title: String,
+    description: String,
+    cover: String?,
+    label: String?,
+    author: String?,
+    date: String,
+    onClick: () -> Unit,
+) {
+    val coverRatio = 3f / 2f
+    Column(Modifier.fillMaxWidth().outlinedCard(8.dp).clickable(onClick = onClick)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(coverRatio).background(LocalExtraColors.current.fill)) {
+            if (!cover.isNullOrBlank()) CommunityCover(cover, initialAspectRatio = coverRatio)
+            if (!label.isNullOrBlank()) {
+                val labelScale = 2f / 3f
+                val caption = XType.Caption
+                Text(
+                    label,
+                    Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .background(Color(0xFF606060), RoundedCornerShape(5.dp * labelScale))
+                        .padding(horizontal = 5.dp * labelScale, vertical = 2.dp * labelScale),
+                    color = Color.White,
+                    style = caption.copy(fontSize = caption.fontSize * labelScale, lineHeight = caption.lineHeight * labelScale),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Column(Modifier.padding(horizontal = 5.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(
+            modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 15.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
             Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (description.isNotBlank()) Text(
                 description, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,

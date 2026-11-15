@@ -9,5 +9,4 @@ export interface IdeaCardItem {
   label?: string
   author?: string | null
   date?: string
-  dateLabel?: string
 }
