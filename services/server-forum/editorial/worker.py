@@ -760,10 +760,21 @@ class Worker:
 
     def check_cover(self, image):
         image_url = urllib.parse.urljoin(self.forum, image)
-        if urllib.parse.urlsplit(image_url).netloc != urllib.parse.urlsplit(self.forum).netloc:
+        origin = urllib.parse.urlsplit(self.forum)
+        cover = urllib.parse.urlsplit(image_url)
+        if (cover.scheme, cover.netloc) != (origin.scheme, origin.netloc):
             raise Stop('封面不在站内')
-        req = urllib.request.Request(image_url, method='HEAD')
-        with HTTP.open(req, timeout=20) as response:
+        try:
+            response = HTTP.open(image_url, timeout=20)
+        except urllib.error.HTTPError as exc:
+            # The forum proxy redirects public assets to the same object on the resource host.
+            mirror = 'https://res.xiangban.xyz/forum-content/' + cover.path.removeprefix('/api/')
+            with exc:
+                if (exc.code != 302 or exc.headers.get('Location') != mirror
+                    or not re.fullmatch(r'/api/(?:images|discover/(?:frontier-assets|article-assets)|open-source/assets)/[0-9a-f-]{36}', cover.path)):
+                    raise HTTPFailure(cover.netloc, exc.code) from None
+            response = HTTP.open(mirror, timeout=20)
+        with response:
             if not response.headers.get_content_type().startswith('image/'):
                 raise Stop('封面响应不是图片')
 

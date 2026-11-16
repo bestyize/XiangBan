@@ -57,6 +57,30 @@ class EditorialTests(unittest.TestCase):
             w.atomic(self.root / 'import.json', {'images': [{'path': 'images/cover.' + extension}]})
             self.assertEqual(w.cover_file(self.root).name, 'cover.' + extension)
 
+    def test_cover_readback_accepts_only_the_matching_resource_redirect(self):
+        worker = SimpleNamespace(forum='https://chat.xiangban.xyz')
+        path = '/api/discover/frontier-assets/1dec0dd3-9f33-4fe8-98e3-41459da87739'
+        mirror = 'https://res.xiangban.xyz/forum-content/' + path.removeprefix('/api/')
+        response = MagicMock()
+        response.__enter__.return_value.headers.get_content_type.return_value = 'image/webp'
+
+        for location in (None, mirror, mirror + '?other=1', mirror.replace('res.xiangban.xyz', 'other.example')):
+            with self.subTest(location=location), patch.object(w.HTTP, 'open') as open_cover:
+                if location is None:
+                    open_cover.return_value = response
+                    w.Worker.check_cover(worker, path)
+                    open_cover.assert_called_once_with(worker.forum + path, timeout=20)
+                    continue
+                redirect = w.urllib.error.HTTPError(worker.forum + path, 302, '', {'Location': location}, None)
+                open_cover.side_effect = [redirect, response]
+                if location == mirror:
+                    w.Worker.check_cover(worker, path)
+                    self.assertEqual(open_cover.call_args_list[1].args, (mirror,))
+                else:
+                    with self.assertRaises(w.HTTPFailure):
+                        w.Worker.check_cover(worker, path)
+                    open_cover.assert_called_once()
+
     def test_migrated_cover_keeps_original_and_binds_both_hashes(self):
         raw = image_bytes()
         converted = w.webp_cover(raw)
