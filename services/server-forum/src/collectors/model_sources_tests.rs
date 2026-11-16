@@ -13,7 +13,7 @@ fn model(id: &str) -> Value {
         "evaluations":{"artificial_analysis_intelligence_index":131.2,
             "artificial_analysis_coding_index":null,"artificial_analysis_agentic_index":null},
         "pricing":{"price_1m_input_tokens":1.5,"price_1m_output_tokens":null},
-        "performance":{"median_output_tokens_per_second":80.0,"median_time_to_first_token_seconds":null}})
+        "performance_v3":{"mean_output_tokens_per_second":80.0,"mean_time_to_first_token_seconds":null}})
 }
 fn aa_page_fixture(page: u64, pages: u64, id: &str) -> Value {
     json!({"tier":"free","intelligence_index_version":5.1,
@@ -166,6 +166,83 @@ fn aa_nulls_versions_units_and_identity_are_preserved() {
     assert_eq!(v["models"][0]["pricing"]["input"], 1.5);
     assert!(validate_model_board(v).is_ok());
 }
+#[test]
+fn aa_uses_v3_means_when_legacy_performance_is_null_or_different() {
+    for legacy in [Value::Null, json!(999.0)] {
+        let mut raw = aa_page_fixture(1, 1, "first");
+        raw["data"][0]["performance"] = json!({
+            "median_output_tokens_per_second": legacy,
+            "median_time_to_first_token_seconds": legacy,
+        });
+        raw["data"][0]["performance_v3"] = json!({
+            "mean_output_tokens_per_second": 62.36,
+            "mean_time_to_first_token_seconds": 3.45,
+        });
+        let v = aa_board(raw["data"].as_array().unwrap().clone(), &raw, now()).unwrap();
+        assert_eq!(
+            v["models"][0]["performance"]["output_tokens_per_second"],
+            62.36
+        );
+        assert_eq!(
+            v["models"][0]["performance"]["time_to_first_token_seconds"],
+            3.45
+        );
+        assert!(validate_model_board(v).is_ok());
+    }
+}
+
+#[test]
+fn aa_missing_or_null_v3_stays_null_without_legacy_fallback() {
+    for performance in [
+        None,
+        Some(Value::Null),
+        Some(json!({})),
+        Some(json!({
+            "mean_output_tokens_per_second": null,
+            "mean_time_to_first_token_seconds": null,
+        })),
+    ] {
+        let mut raw = aa_page_fixture(1, 1, "first");
+        let row = &mut raw["data"][0];
+        row["performance"] = json!({
+            "median_output_tokens_per_second": 80.0,
+            "median_time_to_first_token_seconds": 2.22,
+        });
+        row.as_object_mut().unwrap().remove("performance_v3");
+        if let Some(performance) = performance {
+            row["performance_v3"] = performance;
+        }
+        let v = aa_board(raw["data"].as_array().unwrap().clone(), &raw, now()).unwrap();
+        assert!(v["models"][0]["performance"]["output_tokens_per_second"].is_null());
+        assert!(v["models"][0]["performance"]["time_to_first_token_seconds"].is_null());
+        assert!(validate_model_board(v).is_ok());
+    }
+}
+
+#[test]
+fn aa_v3_measurements_preserve_zero_and_reject_invalid_values() {
+    for field in [
+        "mean_output_tokens_per_second",
+        "mean_time_to_first_token_seconds",
+    ] {
+        let raw = aa_page_fixture(1, 1, "first");
+        let mut row = model("first");
+        row["performance_v3"][field] = json!(0.0);
+        let v = aa_board(vec![row], &raw, now()).unwrap();
+        let output = if field == "mean_output_tokens_per_second" {
+            "output_tokens_per_second"
+        } else {
+            "time_to_first_token_seconds"
+        };
+        assert_eq!(v["models"][0]["performance"][output], 0.0);
+        for invalid in [json!(-1), json!("80"), json!(1e16)] {
+            let mut row = model("first");
+            row["performance_v3"][field] = invalid;
+            assert!(aa_board(vec![row], &raw, now()).is_err());
+        }
+    }
+}
+
 #[test]
 fn aa_rejects_duplicate_identity_bad_measurements_missing_vendor_and_pagination() {
     let raw = aa_page_fixture(1, 1, "first");

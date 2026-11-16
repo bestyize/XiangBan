@@ -357,12 +357,14 @@ fn aa_board(rows: Vec<Value>, envelope: &Value, now: DateTime<Utc>) -> SourceRes
         // Deprecated source indices remain null even if an obsolete upstream cache has numeric fields.
         metrics.insert("coding".into(), Value::Null);
         metrics.insert("agentic".into(), Value::Null);
+        // Legacy performance medians become null on 2026-12-10. Use v3 means only;
+        // missing v3 measurements stay null rather than mixing benchmark methodologies.
         models.push(json!({"id":text(&row["id"],100)?,"slug":text(&row["slug"],200)?,
             "name":text(&row["name"],160)?,"vendor_id":vendor_id,"release_date":row["release_date"],
             "metrics":metrics,"pricing":{"input":nullable_number(&row["pricing"]["price_1m_input_tokens"])?,
                 "output":nullable_number(&row["pricing"]["price_1m_output_tokens"])?},
-            "performance":{"output_tokens_per_second":nullable_number(&row["performance"]["median_output_tokens_per_second"])?,
-                "time_to_first_token_seconds":nullable_number(&row["performance"]["median_time_to_first_token_seconds"])?}}));
+            "performance":{"output_tokens_per_second":nullable_number(&row["performance_v3"]["mean_output_tokens_per_second"])?,
+                "time_to_first_token_seconds":nullable_number(&row["performance_v3"]["mean_time_to_first_token_seconds"])?}}));
     }
     models.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
     let data = json!({"source":"Artificial Analysis","source_url":AA_SITE,"as_of":now.to_rfc3339(),
