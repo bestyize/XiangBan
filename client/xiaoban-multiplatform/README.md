@@ -6,9 +6,11 @@
 
 可配置 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages，填写 API 地址和可选密钥；Anthropic 认证支持 `x-api-key` 与 Bearer。高级设置按服务商声明上下文窗口、输出上限以及工具和图片能力。未登录时也能使用自定义模型；官方额度、生图及需要账号的服务仍需登录。普通聊天和 Android 手机 Agent 均使用所选模型，工具调用和图片能力取决于第三方服务。支持 HTTPS 或 HTTP；HTTP 不加密，界面会提示仅在可信网络使用。第三方请求不会携带小伴账号令牌，也不会跟随重定向发送密钥。
 
+手机端与桌面端共用目录中的 `xiaobanAi.enabled` 开关：关闭后隐藏官方模型、点数和新建生图入口，阻止官方模型及新生图请求，已选择官方模型的对话需切换模型才能继续。第三方模型不受影响，已提交的生图任务仍可查回结果。开关随目录启动刷新并按服务端指定周期更新，网络失败时沿用上次成功缓存，旧目录缺省为开启；这是客户端控制，服务端仍需独立执行权限控制。
+
 配置保存在本机应用私有存储：Android 为 SharedPreferences（当前禁止应用备份），iOS 为 NSUserDefaults（可能包含在系统备份中），密钥未单独加密；不随小伴账号同步。iOS 对话历史仍仅保存在内存。尚需 Android/iOS 实机和真实第三方服务验收。
 
-验证：`:common:community-core:jvmTest --tests '*CustomModelCatalogTest*' --tests '*CustomModelTest*' --tests '*ChatHistoryTest*'`、`:business:community-native:compileAndroidMain`、`:shell:compileKotlinIosSimulatorArm64`。
+验证：`:common:community-core:jvmTest --tests '*OfficialAiSwitchTest*' --tests '*ModelCatalogueTest*' --tests '*CustomModelCatalogTest*' --tests '*ImageGenerationTest*'`、`:business:community-native:compileAndroidMain`、`:shell:compileKotlinIosSimulatorArm64`。
 
 ## 统一评论组件
 

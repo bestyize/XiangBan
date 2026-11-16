@@ -127,7 +127,7 @@ fun AiHomeScreen(
     val clock = remember(env.utcOffsetMinutes) { localClock(Clock.System.now().toEpochMilliseconds(), env.utcOffsetMinutes) }
     val (hello, line) = greeting(clock.hour)
     fun signedIn(action: () -> Unit) { if (session.loggedIn) action() else open(Route.Login) }
-    fun chatReady(action: () -> Unit) { if (session.loggedIn || cloud.customModelName != null) action() else open(Route.Models) }
+    fun chatReady(action: () -> Unit) { if (session.loggedIn && cloud.officialAiEnabled || cloud.customProviders.any { it.available }) action() else open(Route.Models) }
 
     val peers = remote.peers
     val computerDesc = when {
@@ -137,12 +137,12 @@ fun AiHomeScreen(
         else -> "电脑都不在线"
     }
     // 新功能加在这里，首页会按两列排开。
-    val features = listOf(
-        HomeFeature(XIcons.Image, "创作图片", "描述画面，生成插画和壁纸", Ochre) { signedIn(onCreateImage) },
-        HomeFeature(XIcons.Gamepad, "创作游戏", "说出想法，做成能玩的小游戏", Pine) { onCreateWork("游戏") },
-        HomeFeature(XIcons.Sparkles, "桌面装扮", "壁纸、小组件、特效和伙伴", Plum) { onCreateWork("壁纸") },
-        HomeFeature(XIcons.Monitor, "遥控电脑", computerDesc, Indigo) { open(Route.Devices) },
-    )
+    val features = buildList {
+        if (cloud.officialAiEnabled) add(HomeFeature(XIcons.Image, "创作图片", "描述画面，生成插画和壁纸", Ochre) { signedIn(onCreateImage) })
+        add(HomeFeature(XIcons.Gamepad, "创作游戏", "说出想法，做成能玩的小游戏", Pine) { onCreateWork("游戏") })
+        add(HomeFeature(XIcons.Sparkles, "桌面装扮", "壁纸、小组件、特效和伙伴", Plum) { onCreateWork("壁纸") })
+        add(HomeFeature(XIcons.Monitor, "遥控电脑", computerDesc, Indigo) { open(Route.Devices) })
+    }
 
     Box(Modifier.fillMaxSize()) {
         HomeBackdrop(Modifier.fillMaxWidth().height(320.dp))
@@ -241,7 +241,7 @@ private fun HomeComposerCard(cloud: CloudChatState, loggedIn: Boolean, modifier:
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown)
             Text(
-                if (xyz.xiangban.xiaoban.common.community.isCustomModelTier(cloud.selectedTier)) "自己的模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
+                if (xyz.xiangban.xiaoban.common.community.isCustomModelTier(cloud.selectedTier)) "自己的模型服务" else if (!cloud.officialAiEnabled) "添加或选择模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
                 Modifier.weight(1f).padding(start = 10.dp), style = XType.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

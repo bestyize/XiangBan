@@ -321,7 +321,7 @@ class AiGatewayApi(
                     ?: local.copy(remoteAvailable = false, apiKey = if (local.remoteType == "third") local.apiKey else "", remoteOwner = null)
             }
             val public = remote.providers.filter { it.type == "third" || (it.type == "free" && it.apikey.isEmpty()) }.map { it.publicPreset() }
-            customModels.saveCatalog(current.copy(providers = providers, presets = public, catalogueReceived = true, refreshAfterSeconds = remote.refreshAfterSeconds))
+            customModels.saveCatalog(current.copy(providers = providers, presets = public, catalogueReceived = true, refreshAfterSeconds = remote.refreshAfterSeconds, officialAiEnabled = remote.xiaobanAi.enabled))
             livePresets = remote.providers
             liveIdentity = owner
         }
@@ -411,7 +411,16 @@ class AiGatewayApi(
             })
             return ChatTarget(custom.chatUrl(), custom.apiKey, updated.toString(), true, custom.protocol, custom.authMode, custom)
         }
-        return ChatTarget("$base/v1/chat/completions", requireToken(), body, false)
+        requireOfficialAiEnabled()
+        val token = requireToken()
+        requireOfficialAiEnabled()
+        return ChatTarget("$base/v1/chat/completions", token, body, false)
+    }
+
+    fun officialAiEnabled(): Boolean = runCatching { customModels.loadCatalog().officialAiEnabled }.getOrDefault(true)
+
+    private fun requireOfficialAiEnabled() {
+        if (!officialAiEnabled()) throw ApiException(0, "小伴 AI 官方服务已关闭，请选择其他模型", "official_ai_disabled")
     }
 
     internal fun bindAccount(account: String?, current: () -> Boolean): AiAccountRequest {
@@ -454,8 +463,10 @@ class AiGatewayApi(
 
     /** 兼容旧网关的同步接口。连接中断后不重发付费请求。 */
     suspend fun generateImages(prompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): List<String> {
+        requireOfficialAiEnabled()
         val payload = imageParameters(prompt, count, size, format, frames, frameDurationMs)
         val token = requireToken()
+        requireOfficialAiEnabled()
         try {
             val items = client.preparePost("$base/v1/images/generations") {
                 header(HttpHeaders.Authorization, "Bearer $token")
@@ -520,7 +531,9 @@ class AiGatewayApi(
     }
 
     private suspend fun requestImageJob(id: String, parameters: JsonObject?): ImageJobResponse {
+        if (parameters != null) requireOfficialAiEnabled()
         val token = requireToken()
+        if (parameters != null) requireOfficialAiEnabled()
         val statement = if (parameters != null) client.preparePost("$base/v1/images/jobs") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -885,6 +898,7 @@ data class ChatQuestion(val id: String, val question: String, val options: List<
 
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
+    val officialAiEnabled: Boolean = true,
     val customProviders: List<CustomProviderView> = emptyList(),
     val customTiers: List<AiTier> = emptyList(),
     val legacyCustomTier: AiTier? = null,
@@ -925,7 +939,7 @@ data class CloudChatState(
     val creationPlanReady: Boolean get() = planningCreation && !sending && messages.lastOrNull()?.let {
         it.creationPlan && it.error == null && !it.cancelled && it.text.isNotBlank()
     } == true
-    val imageCapability: AiMediaCapability? get() = media["image"]
+    val imageCapability: AiMediaCapability? get() = if (officialAiEnabled) media["image"] else null
     val customModelName: String? get() = customTiers.firstOrNull()?.displayName
     val activeTier: AiTier? get() = when {
         selectedTier == CUSTOM_MODEL_TIER -> legacyCustomTier
@@ -1066,7 +1080,7 @@ class CloudChatController(
         runAuthorization = null
         val list = history?.useAccount(account) ?: emptyList()
         val preferred = runCatching { api.preferredTier()?.takeIf { isCustomModelTier(it) && api.customForTier(it) != null } }.getOrNull()
-        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null) _state.value.customTiers.firstOrNull()?.tier.orEmpty() else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -1211,6 +1225,10 @@ class CloudChatController(
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
     fun loadMeta() {
         metaJob?.cancel()
+        if (!_state.value.officialAiEnabled) {
+            _state.value = _state.value.copy(loadingMeta = false)
+            return
+        }
         _state.value = _state.value.copy(loadingMeta = true, metaError = null)
         val request = accountRequest()
         metaJob = scope.launch(request) {
@@ -1221,6 +1239,7 @@ class CloudChatController(
                     val balanceRes = balanceDeferred.await()
                     val tiersRes = tiersDeferred.await()
                     if (!request.isCurrent()) return@coroutineScope
+                    if (!_state.value.officialAiEnabled) { _state.value = _state.value.copy(loadingMeta = false); return@coroutineScope }
                     val current = _state.value
                     val nextTiers = tiersRes.getOrNull()?.tiers ?: current.tiers
                     val nextBalance = balanceRes.getOrNull() ?: current.balance
@@ -1246,6 +1265,7 @@ class CloudChatController(
     }
 
     fun selectReasoning(tier: String, effort: String?) {
+        if (!_state.value.officialAiEnabled) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier } ?: return
         if (!found.available || _state.value.sending) return
         if (effort != null && effort !in found.reasoningEfforts) return
@@ -1258,6 +1278,7 @@ class CloudChatController(
 
     fun selectTier(tier: String) {
         if (_state.value.sending) return
+        if (!_state.value.officialAiEnabled && !isCustomModelTier(tier)) return
         if (isCustomModelTier(tier) && runCatching { api.customForTier(tier)?.let(api::providerAvailable) != true }.getOrDefault(true)) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
@@ -1278,6 +1299,7 @@ class CloudChatController(
 
     suspend fun refreshModelCatalogue(force: Boolean = false) {
         val generation = accountGeneration
+        val wasEnabled = _state.value.officialAiEnabled
         val selected = _state.value.selectedTier
         val selectedProvider = runCatching { api.customForTier(selected) }.getOrNull()
         val previousDefault = selectedProvider?.let { runCatching { api.customProvider(it.id) }.getOrNull() }
@@ -1286,6 +1308,16 @@ class CloudChatController(
             api.refreshModelCatalogue(force)
             if (generation == accountGeneration) {
                 refreshCustomModels()
+                if (wasEnabled && !_state.value.officialAiEnabled) {
+                    if (_state.value.sending && !isCustomModelTier(_state.value.selectedTier) && agentSession !in imageRuns) stop()
+                    if (_state.value.selectedTier.isBlank()) {
+                        _state.value.customTiers.firstOrNull { it.available }?.let { _state.value = _state.value.copy(selectedTier = it.tier) }
+                    }
+                    modelInputError(emptyList())?.let { _state.value = _state.value.copy(inputError = it) }
+                } else if (!wasEnabled && _state.value.officialAiEnabled) {
+                    _state.value = _state.value.copy(inputError = null)
+                    if (accountId != null) loadMeta()
+                }
                 val currentDefault = previousDefault?.let { runCatching { api.customProvider(it.id) }.getOrNull() }
                 if (_state.value.selectedTier == selected && previousDefault?.followRecommended == true && selectedProvider?.model == previousDefault.model &&
                     currentDefault != null && api.providerAvailable(currentDefault) && currentDefault.model != previousDefault.model) {
@@ -1303,13 +1335,15 @@ class CloudChatController(
     }
 
     private fun refreshCustomModels() {
+        val enabled = api.officialAiEnabled()
         try {
-            val providers = api.customCatalog().providers
+            val catalog = api.customCatalog()
+            val providers = catalog.providers
             val tiers = providers.flatMap { p -> p.models.map { p.copy(model = it).asTier().copy(available = api.providerAvailable(p)) } }
             val legacy = api.customForTier(CUSTOM_MODEL_TIER)?.let { it.asTier(CUSTOM_MODEL_TIER).copy(available = api.providerAvailable(it)) }
-            _state.value = _state.value.copy(customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType) }, customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), customConfigError = null)
+            _state.value = _state.value.copy(customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType) }, customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), officialAiEnabled = catalog.officialAiEnabled, customConfigError = null)
         } catch (e: Exception) {
-            _state.value = _state.value.copy(customProviders = emptyList(), customTiers = emptyList(), legacyCustomTier = null, customConfigError = e.message ?: "模型服务配置无法读取")
+            _state.value = _state.value.copy(customProviders = emptyList(), customTiers = emptyList(), legacyCustomTier = null, officialAiEnabled = enabled, customConfigError = e.message ?: "模型服务配置无法读取")
         }
     }
 
@@ -1340,7 +1374,7 @@ class CloudChatController(
         api.deleteCustomProvider(id)
         refreshCustomModels()
         if (deletingActive) {
-            val selection = _state.value.customTiers.firstOrNull()?.tier ?: pickAiTier(_state.value.tiers, "")
+            val selection = _state.value.customTiers.firstOrNull { it.available }?.tier ?: if (_state.value.officialAiEnabled) pickAiTier(_state.value.tiers, "") else ""
             _state.value = _state.value.copy(selectedTier = selection, inputError = null)
             rememberPreferred(selection)
         }
@@ -1351,7 +1385,7 @@ class CloudChatController(
         check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
         api.saveCustomModel(config)
         refreshCustomModels()
-        _state.value = _state.value.copy(selectedTier = if (config != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, ""), inputError = null)
+        _state.value = _state.value.copy(selectedTier = if (config != null) CUSTOM_MODEL_TIER else if (_state.value.officialAiEnabled) pickAiTier(_state.value.tiers, "") else _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty(), inputError = null)
         persist()
     }
 
@@ -1388,6 +1422,10 @@ class CloudChatController(
     fun generateImages(rawPrompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): Boolean {
         val current = _state.value
         if (current.sending) return false
+        if (!current.officialAiEnabled) {
+            _state.value = current.copy(inputError = "小伴 AI 官方服务已关闭，请选择其他模型。")
+            return false
+        }
         val prompt = rawPrompt.trim()
         if (format == "gif") require(current.imageCapability?.formats?.contains("gif") == true) { "当前图片服务尚未开放 GIF" }
         val parameters = api.imageParameters(prompt, count, size, format, frames, frameDurationMs)
@@ -1478,6 +1516,7 @@ class CloudChatController(
         val state = _state.value
         val tier = state.activeTier
         return when {
+            !state.officialAiEnabled && !isCustomModelTier(state.selectedTier) -> "小伴 AI 官方服务已关闭，请选择其他模型。"
             isCustomModelTier(state.selectedTier) && tier == null -> "这个模型服务或模型已删除，请重新选择。"
             state.selectedTier.isNotBlank() && state.tiers.isNotEmpty() && tier == null -> "历史模型已下架，请选择可用模型后发送。"
             tier?.available == false -> "当前档位不可用，请检查点数或选择其他模型。"
@@ -1699,7 +1738,7 @@ class CloudChatController(
         agentSession = newSessionId()
         agentRun = null
         val selection = if (isCustomModelTier(previous) && runCatching { api.customForTier(previous) }.getOrNull() != null) previous
-            else pickAiTier(_state.value.tiers, previous).ifBlank { if (accountId == null) _state.value.customTiers.firstOrNull()?.tier.orEmpty() else "" }
+            else (if (_state.value.officialAiEnabled) pickAiTier(_state.value.tiers, previous) else "").ifBlank { if (accountId == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "" }
         applyOptions(ChatOptions(tier = selection))
         _state.value = _state.value.copy(messages = emptyList(), sending = false, approval = null, question = null, inputError = null)
     }

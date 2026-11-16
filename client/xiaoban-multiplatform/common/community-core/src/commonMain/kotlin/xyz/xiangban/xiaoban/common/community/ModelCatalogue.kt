@@ -17,7 +17,11 @@ data class RemoteModelProvider(
 )
 
 @Serializable
-data class RemoteModelCatalogue(val version: Int, val refreshAfterSeconds: Long = 21600, val providers: List<RemoteModelProvider> = emptyList())
+data class RemoteOfficialAi(val enabled: Boolean = true)
+
+@Serializable
+data class RemoteModelCatalogue(val version: Int, val refreshAfterSeconds: Long = 21600,
+    val providers: List<RemoteModelProvider> = emptyList(), val xiaobanAi: RemoteOfficialAi = RemoteOfficialAi())
 
 data class RemotePresetView(val id: String, val name: String, val description: String, val type: String, val added: Boolean)
 

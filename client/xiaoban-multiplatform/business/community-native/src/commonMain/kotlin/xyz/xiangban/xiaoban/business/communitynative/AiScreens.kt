@@ -99,7 +99,8 @@ internal fun quotaText(balance: AiBalance?): String = when {
     else -> "点数已用完"
 }
 
-internal fun CloudChatState.modelName(): String = activeTier?.displayName ?: tiers.firstOrNull()?.displayName ?: "小伴AI"
+internal fun CloudChatState.modelName(): String = activeTier?.takeIf { officialAiEnabled || xyz.xiangban.xiaoban.common.community.isCustomModelTier(selectedTier) }?.displayName
+    ?: if (officialAiEnabled) tiers.firstOrNull()?.displayName ?: "小伴AI" else "选择模型"
 
 private fun CloudChatState.title(): String = chatTitle(messages, creation)
 
@@ -230,10 +231,12 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val callScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
 
     LaunchedEffect(session.loggedIn, session.accountId, accountGeneration) { if (session.loggedIn) chat.loadMeta() }
+    LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) imageSheet = false }
     LaunchedEffect(openImageSheet) {
         if (openImageSheet) {
             onImageSheetOpened()
             when {
+                !cloud.officialAiEnabled -> Unit
                 !session.loggedIn -> Unit
                 cloud.sending -> toast = "请先结束当前任务"
                 cloud.imageCapability?.available == false -> toast = "生图暂不可用，请检查登录和额度"
@@ -257,7 +260,14 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
             )
             if (!session.loggedIn && cloud.customModelName == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
+                    if (cloud.officialAiEnabled) {
+                        LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
+                    } else {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            EmptyState(XIcons.Sparkle, "添加模型服务", "添加第三方模型服务后即可开始对话。")
+                            PillButton("添加模型服务", { open(Route.Models) }, Modifier.padding(top = 20.dp).fillMaxWidth())
+                        }
+                    }
                 }
             } else {
                 if (cloud.backgroundImageCount > 0) {
@@ -268,7 +278,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        key(conversation) { CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null) }
+                        key(conversation) { CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null, showQuota = cloud.officialAiEnabled) }
                     }
                 }
                 cloud.question?.let { question ->
@@ -382,9 +392,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         }
                     }
                 } else toast = "$label 尚未接入，请从相册或文件选择"
-            }, panel, showImageGeneration = true)
+            }, panel, showImageGeneration = cloud.officialAiEnabled)
         }
-        if (imageSheet) {
+        if (imageSheet && cloud.officialAiEnabled) {
             ImageGenerationSheet(
                 initialPrompt = input,
                 sizes = cloud.imageCapability?.sizes.orEmpty(),
@@ -454,31 +464,33 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                                     onClick = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } })
                             }
                         }
-                        Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (cloud.tiers.isEmpty()) {
-                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                        }
-                        cloud.tiers.forEach { tier ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioRow(
-                                    selected = cloud.selectedTier == tier.tier,
-                                    title = tier.displayName,
-                                    desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = tier.available && !cloud.sending,
-                                    onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
-                                )
-                                if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
-                                    ReasoningMenu(
-                                        modelName = tier.displayName,
-                                        levels = tier.reasoningEfforts,
-                                        selected = cloud.reasoningByTier[tier.tier],
-                                        enabled = !cloud.sending,
-                                        onSelect = { effort ->
-                                            chat.selectReasoning(tier.tier, effort)
-                                            modelSheet = false
-                                        },
+                        if (cloud.officialAiEnabled) {
+                            Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (cloud.tiers.isEmpty()) {
+                                Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                            }
+                            cloud.tiers.forEach { tier ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioRow(
+                                        selected = cloud.selectedTier == tier.tier,
+                                        title = tier.displayName,
+                                        desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
+                                        modifier = Modifier.weight(1f),
+                                        enabled = tier.available && !cloud.sending,
+                                        onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
                                     )
+                                    if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
+                                        ReasoningMenu(
+                                            modelName = tier.displayName,
+                                            levels = tier.reasoningEfforts,
+                                            selected = cloud.reasoningByTier[tier.tier],
+                                            enabled = !cloud.sending,
+                                            onSelect = { effort ->
+                                                chat.selectReasoning(tier.tier, effort)
+                                                modelSheet = false
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -487,7 +499,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("模型与点数（余额、兑换）", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                        Text(if (cloud.officialAiEnabled) "模型与点数（余额、兑换）" else "管理模型服务", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                         XIcon(XIcons.ChevronRight, size = 16.dp)
                     }
                     GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
@@ -505,7 +517,7 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null, showQuota: Boolean = true) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     var followLatest by remember { mutableStateOf(true) }
@@ -559,7 +571,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                     }
                     if (turn.imageJobRecoverable && !sending) LinkText("查回生图结果", { onRecoverImage(turn.id) })
                     if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
-                    if (turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") }) LinkText("去兑换点数 ›", onQuota)
+                    if (showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") }) LinkText("去兑换点数 ›", onQuota)
                 }
             }
         }
@@ -605,6 +617,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
     var presetError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
+    LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) sheet = false }
 
     LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
 
@@ -612,10 +625,10 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
         Column(Modifier.fillMaxSize()) {
             ScreenBar("模型与点数", onBack = back)
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-                if (!session.loggedIn) {
+                if (cloud.officialAiEnabled && !session.loggedIn) {
                     GroupLabel("小伴AI · 官方")
                     GhostPillButton("登录后查看点数", { open(Route.Login) }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
-                } else {
+                } else if (cloud.officialAiEnabled) {
                     GroupLabel("小伴AI · 官方")
                     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -677,7 +690,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 }
             }
         }
-        if (sheet) {
+        if (sheet && cloud.officialAiEnabled) {
             BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
                 val contentHeight = (maxHeight * 0.85f - 48.dp).coerceAtLeast(1.dp)
                 ModalBottomSheet(
