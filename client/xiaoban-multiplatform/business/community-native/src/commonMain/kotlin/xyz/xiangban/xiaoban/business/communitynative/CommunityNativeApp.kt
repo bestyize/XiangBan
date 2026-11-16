@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import xyz.xiangban.xiaoban.common.community.ChatHistory
 import xyz.xiangban.xiaoban.common.community.CloudChatController
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * 社区原生界面入口：四个去处（小伴AI、游戏、社区、我的）加一个页面栈，底部是悬浮胶囊导航，中间的“发布”打开弹层。
@@ -105,7 +107,11 @@ fun CommunityNativeApp(env: CommunityEnv) {
         val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent, history = ChatHistory(env.chatFiles, appScope) { env.agent?.awaitSessionIdle(it) }) }
         // 登录、换号后读出这个账号存下的对话。
         val signedIn by env.session.state.collectAsState()
-        LaunchedEffect(signedIn.loggedIn, signedIn.accountId, signedIn.generation) { chat.useAccount(if (signedIn.loggedIn) signedIn.accountId else null) }
+        LaunchedEffect(signedIn.loggedIn, signedIn.accountId, signedIn.generation) {
+            chat.useAccount(if (signedIn.loggedIn) signedIn.accountId else null)
+            chat.refreshModelCatalogue(force = true)
+            while (isActive) { delay(60_000); chat.refreshModelCatalogue() }
+        }
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }

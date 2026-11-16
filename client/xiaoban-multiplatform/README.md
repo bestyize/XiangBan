@@ -2,9 +2,13 @@
 
 ## 手机自定义模型服务
 
-「小伴 AI → 对话列表 → 模型与点数 → 添加模型服务」可配置 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages，填写 API 地址、可选密钥和模型名；可请求服务商模型列表，也可手动填写。Anthropic 认证支持 `x-api-key` 与 Bearer；高级设置可声明上下文窗口、输出上限以及工具和图片能力。可在对话模型菜单切换官方模型与自己的模型，也可编辑或删除配置。未登录时也能使用自定义模型；官方额度、生图及需要账号的服务仍需登录。普通聊天和 Android 手机 Agent 均使用所选模型，工具调用和图片能力取决于第三方服务。支持 HTTPS 或 HTTP；HTTP 不加密，界面会提示仅在可信网络使用。第三方请求不会携带小伴账号令牌，也不会跟随重定向发送密钥。
+「我的 → 模型与点数 → 添加第三方模型服务」支持添加多个服务商，每个服务商可添加多个模型并选默认模型。预置服务商和推荐模型与桌面版一样由服务端下发，也可以手动添加自定义服务；目录刷新时保留用户填写的密钥、代理地址及自行添加的模型。对话模型菜单按服务商分组，随时切换官方或自定义模型，每段对话记住自己的选择；删除或下架的服务需要重新选择。旧版单服务配置和历史选择会保留。
+
+可配置 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages，填写 API 地址和可选密钥；Anthropic 认证支持 `x-api-key` 与 Bearer。高级设置按服务商声明上下文窗口、输出上限以及工具和图片能力。未登录时也能使用自定义模型；官方额度、生图及需要账号的服务仍需登录。普通聊天和 Android 手机 Agent 均使用所选模型，工具调用和图片能力取决于第三方服务。支持 HTTPS 或 HTTP；HTTP 不加密，界面会提示仅在可信网络使用。第三方请求不会携带小伴账号令牌，也不会跟随重定向发送密钥。
 
 配置保存在本机应用私有存储：Android 为 SharedPreferences（当前禁止应用备份），iOS 为 NSUserDefaults（可能包含在系统备份中），密钥未单独加密；不随小伴账号同步。iOS 对话历史仍仅保存在内存。尚需 Android/iOS 实机和真实第三方服务验收。
+
+验证：`:common:community-core:jvmTest --tests '*CustomModelCatalogTest*' --tests '*CustomModelTest*' --tests '*ChatHistoryTest*'`、`:business:community-native:compileAndroidMain`、`:shell:compileKotlinIosSimulatorArm64`。
 
 ## 统一评论组件
 
@@ -22,7 +26,7 @@
 
 ## 账号 ID 与 AI 额度入口
 
-「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），「获取 AI 额度」通过浏览器打开[联系我们](https://chat.xiangban.xyz/contact)。已有兑换码仍可在小伴 AI 的「模型与点数」里使用。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
+「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），并提供「模型与点数」入口。在「模型与点数 → 小伴 AI → 配置」中可使用兑换码，也可通过「获取 AI 额度」在浏览器打开[联系我们](https://chat.xiangban.xyz/contact)。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
 
 验证：`:common:community-core:jvmTest --tests '*AccountAndSessionTest*'`、`:business:community-native:compileAndroidMain`。本次未做 Android/iOS 实机验收或 iOS 编译。
 

@@ -11,4 +11,5 @@ data class CommunityConfig(
     val runtimeV2: Boolean = false,
     val resourceBase: String = "https://res.xiangban.xyz",
     val directForumUploads: Boolean = true,
+    val modelCatalogueBase: String = "https://wallpaper.xiangban.xyz",
 )

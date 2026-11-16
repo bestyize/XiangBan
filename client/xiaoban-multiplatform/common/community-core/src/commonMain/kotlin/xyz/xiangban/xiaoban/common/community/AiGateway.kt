@@ -43,6 +43,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -75,9 +77,9 @@ data class AiTier(
     @SerialName("_local_source") val localSource: String = "",
 )
 
-private fun CustomModelConfig.asTier() = AiTier(CUSTOM_MODEL_TIER, model, contextWindowTokens = contextTokens,
+private fun CustomModelConfig.asTier(tier: String = customModelTier(id, model)) = AiTier(tier, model, contextWindowTokens = contextTokens,
     supportsTools = supportsTools, supportsVision = supportsVision, maxOutputTokens = maxOutputTokens,
-    localProtocol = protocol, localSource = "$baseUrl|$model")
+    localProtocol = protocol, localSource = if (id == "legacy") "$baseUrl|$model" else "$id|$baseUrl|$model")
 
 @Serializable
 data class AiTiersResponse(
@@ -238,14 +240,136 @@ class AiGatewayApi(
     private val tokenProvider: suspend () -> String?,
 ) {
     private val base = config.aiBase.trimEnd('/')
+    private val catalogueBase = config.modelCatalogueBase.trimEnd('/')
     private val http = JsonHttp(client, base)
     private val directClient by lazy { client.config { followRedirects = false } }
+    private val catalogueLock = Mutex()
+    private var livePresets: List<RemoteModelProvider>? = null
+    private var liveIdentity: SessionIdentity? = null
+    private var catalogueEtag: String? = null
+    private var lastCatalogueAttempt = 0L
+    private var lastCatalogueSuccess = 0L
 
-    fun customModel(): CustomModelConfig? = customModels.load()?.let { runCatching { it.validated() }.getOrNull() }
-    fun saveCustomModel(config: CustomModelConfig?) { customModels.save(config?.validated()) }
+    fun accountChanged(account: String?) {
+        livePresets = null
+        catalogueEtag = null
+        lastCatalogueAttempt = 0
+        lastCatalogueSuccess = 0
+        val catalog = customCatalog()
+        val providers = catalog.providers.map { p ->
+            if (p.remoteType in setOf("free", "paid") && p.remoteOwner != null && p.remoteOwner != account)
+                p.copy(apiKey = "", remoteOwner = null, remoteAvailable = false) else p
+        }
+        if (providers != catalog.providers) customModels.saveCatalog(catalog.copy(providers = providers))
+    }
+
+    fun providerAvailable(provider: CustomModelConfig): Boolean {
+        if (!provider.remoteAvailable) return false
+        if (provider.remoteType == "paid" && provider.apiKey.isBlank()) return false
+        if (provider.remoteType in setOf("free", "paid") && provider.apiKey.isNotBlank()) {
+            val identity = sessions?.identity() ?: return false
+            return identity.accountId != null && identity.accountId == provider.remoteOwner
+        }
+        return true
+    }
+
+    fun presetViews(): List<RemotePresetView> {
+        val catalog = customCatalog()
+        val presets = if (livePresets != null && liveIdentity == sessions?.identity()) livePresets!! else catalog.presets
+        return presets.map { p -> RemotePresetView(p.id, p.provider, p.description, p.type, catalog.providers.any { it.remoteId == p.id }) }
+    }
+
+    fun presetConfig(id: String): CustomModelConfig? {
+        val catalog = customCatalog()
+        val presets = if (livePresets != null && liveIdentity == sessions?.identity()) livePresets!! else catalog.presets
+        val preset = presets.firstOrNull { it.id == id } ?: return null
+        if (preset.type == "paid" && (preset.apikey.isBlank() || sessions?.identity()?.accountId == null)) return null
+        return preset.toConfig(sessions?.identity()?.accountId)
+    }
+
+    suspend fun refreshModelCatalogue(force: Boolean = false) = catalogueLock.withLock {
+        val now = systemNowMs()
+        val catalog = customCatalog()
+        if (!force && (now - lastCatalogueSuccess < catalog.refreshAfterSeconds * 1000 && lastCatalogueSuccess != 0L || now - lastCatalogueAttempt < 60_000 && lastCatalogueAttempt != 0L)) return@withLock
+        lastCatalogueAttempt = now
+        val owner = sessions?.identity()
+        val url = Url(catalogueBase)
+        require(url.protocol.name == "https" && url.host.isNotBlank() && url.user == null && url.password == null && url.parameters.isEmpty() && url.fragment.isEmpty()) { "模型目录地址无效" }
+        val token = if (owner != null) sessions?.accessToken(owner) else null
+        if (owner != sessions?.identity()) throw CancellationException("账号已切换")
+        var receivedEtag: String? = null
+        val response = directClient.prepareGet("$catalogueBase/api/v1/ai/providers") {
+            if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+            if (livePresets != null && liveIdentity == owner) catalogueEtag?.let { header(HttpHeaders.IfNoneMatch, it) }
+            timeout { connectTimeoutMillis = 15_000; requestTimeoutMillis = 30_000; socketTimeoutMillis = 20_000 }
+        }.execute { response ->
+            receivedEtag = response.headers[HttpHeaders.ETag]
+            if (response.status.value == 304 && livePresets != null && liveIdentity == owner) null
+            else {
+                if (!response.status.isSuccess()) throw ApiException(response.status.value, "模型服务目录暂时无法获取")
+                response.readBoundedBytes(1024 * 1024).decodeToString()
+            }
+        }
+        if (owner != sessions?.identity()) throw CancellationException("账号已切换")
+        if (response != null) {
+            val remote = CommunityJson.decodeFromString(RemoteModelCatalogue.serializer(), response).validated()
+            require(remote.providers.none { it.apikey.isNotEmpty() && owner?.accountId == null }) { "模型目录凭证没有对应账号" }
+            val current = customCatalog()
+            val providers = current.providers.map { local ->
+                val id = local.remoteId
+                if (id == null) local else remote.providers.firstOrNull { it.id == id }?.let { mergeRemoteProvider(local, it, owner?.accountId) }
+                    ?: local.copy(remoteAvailable = false, apiKey = if (local.remoteType == "third") local.apiKey else "", remoteOwner = null)
+            }
+            val public = remote.providers.filter { it.type == "third" || (it.type == "free" && it.apikey.isEmpty()) }.map { it.publicPreset() }
+            customModels.saveCatalog(current.copy(providers = providers, presets = public, catalogueReceived = true, refreshAfterSeconds = remote.refreshAfterSeconds))
+            livePresets = remote.providers
+            liveIdentity = owner
+        }
+        catalogueEtag = receivedEtag ?: catalogueEtag
+        lastCatalogueSuccess = now
+    }
+
+    fun customModel(): CustomModelConfig? = customCatalog().providers.firstOrNull { it.id == "legacy" }
+    fun saveCustomModel(config: CustomModelConfig?) {
+        if (config == null) deleteCustomProvider("legacy") else saveCustomProvider(config.copy(id = "legacy"))
+    }
+    fun customCatalog(): CustomModelCatalog {
+        val catalog = customModels.loadCatalog()
+        val providers = catalog.providers.map { it.validated() }
+        require(providers.size <= 50 && providers.map { it.id }.distinct().size == providers.size) { "模型服务配置无效" }
+        return catalog.copy(providers = providers)
+    }
+    fun customProvider(id: String): CustomModelConfig? = customCatalog().providers.firstOrNull { it.id == id }
+    fun customForTier(tier: String): CustomModelConfig? {
+        val providers = customCatalog().providers
+        if (tier == CUSTOM_MODEL_TIER) return providers.firstOrNull { it.id == "legacy" }?.let { provider ->
+            provider.legacyModel.takeIf { it in provider.models }?.let { provider.copy(model = it) }
+        }
+        return providers.firstNotNullOfOrNull { provider ->
+            provider.models.firstOrNull { customModelTier(provider.id, it) == tier }?.let { provider.copy(model = it) }
+        }
+    }
+    fun saveCustomProvider(provider: CustomModelConfig) {
+        val clean = provider.validated()
+        val catalog = customCatalog()
+        val providers = catalog.providers.toMutableList()
+        val index = providers.indexOfFirst { it.id == clean.id }
+        if (index < 0) { require(providers.size < 50) { "最多添加 50 个模型服务" }; providers.add(clean) }
+        else providers[index] = clean.copy(legacyModel = providers[index].legacyModel)
+        customModels.saveCatalog(catalog.copy(providers = providers))
+    }
+    fun deleteCustomProvider(id: String) {
+        val catalog = customCatalog()
+        customModels.saveCatalog(catalog.copy(providers = catalog.providers.filterNot { it.id == id }))
+    }
+    fun preferredTier(): String? = customCatalog().preferredTier
+    fun rememberTier(tier: String) {
+        val catalog = customCatalog()
+        if (catalog.preferredTier != tier) customModels.saveCatalog(catalog.copy(preferredTier = tier))
+    }
 
     suspend fun fetchCustomModels(config: CustomModelConfig): List<String> {
-        val custom = config.copy(model = config.model.ifBlank { "model-list" }).validated()
+        val custom = config.copy(model = config.model.ifBlank { "model-list" }, models = emptyList()).validated()
         val target = ChatTarget(custom.modelsUrl(), custom.apiKey, "", true, custom.protocol, custom.authMode)
         val response = try {
             directClient.prepareGet(target.url) {
@@ -264,7 +388,7 @@ class AiGatewayApi(
             .filter { it.isNotBlank() && it.length <= 200 }.distinct().take(200)
     }
 
-    private data class ChatTarget(val url: String, val token: String, val body: String, val custom: Boolean, val protocol: String = "chat", val authMode: String = "api-key")
+    private data class ChatTarget(val url: String, val token: String, val body: String, val custom: Boolean, val protocol: String = "chat", val authMode: String = "api-key", val customConfig: CustomModelConfig? = null)
     private fun HttpRequestBuilder.chatAuth(target: ChatTarget) {
         if (target.protocol == "anthropic") {
             header("anthropic-version", "2023-06-01")
@@ -273,13 +397,19 @@ class AiGatewayApi(
     }
     private suspend fun chatTarget(body: String): ChatTarget {
         val obj = runCatching { CommunityJson.parseToJsonElement(body) as? JsonObject }.getOrNull()
-        if (obj?.get("model")?.jsonPrimitive?.contentOrNull == CUSTOM_MODEL_TIER) {
-            val custom = customModel() ?: throw ApiException(0, "请先在模型与点数中配置自己的模型服务")
-            val updated = JsonObject(obj.toMutableMap().apply {
+        val tier = obj?.get("model")?.jsonPrimitive?.contentOrNull.orEmpty()
+        if (isCustomModelTier(tier)) {
+            val custom = customForTier(tier) ?: throw ApiException(0, "这个模型服务或模型已删除，请重新选择")
+            if (!providerAvailable(custom)) throw ApiException(0, "这个模型服务暂不可用，请重新选择")
+            if (custom.remoteType in setOf("free", "paid") && custom.apiKey.isNotEmpty()) {
+                requireToken()
+                if (!providerAvailable(custom)) throw ApiException(401, "账号已切换，请重新选择模型", "account_changed")
+            }
+            val updated = JsonObject(requireNotNull(obj).toMutableMap().apply {
                 put("model", kotlinx.serialization.json.JsonPrimitive(custom.model))
                 if (custom.protocol == "chat" && custom.maxOutputTokens != null && !containsKey("max_tokens")) put("max_tokens", kotlinx.serialization.json.JsonPrimitive(custom.maxOutputTokens))
             })
-            return ChatTarget(custom.chatUrl(), custom.apiKey, updated.toString(), true, custom.protocol, custom.authMode)
+            return ChatTarget(custom.chatUrl(), custom.apiKey, updated.toString(), true, custom.protocol, custom.authMode, custom)
         }
         return ChatTarget("$base/v1/chat/completions", requireToken(), body, false)
     }
@@ -587,7 +717,7 @@ class AiGatewayApi(
         val payload = withContext(Dispatchers.Default) { boundedChatBody(messages, tier, reasoningEffort, contextTokens) }
         var target = chatTarget(payload)
         if (target.custom && target.protocol != "chat") {
-            val custom = customModel() ?: throw ApiException(0, "请先配置自己的模型服务")
+            val custom = target.customConfig ?: throw ApiException(0, "请先配置自己的模型服务")
             target = target.copy(body = customPlainBody(payload, custom))
             if (target.body.encodeToByteArray().size > CHAT_BODY_BYTES) throw ApiException(0, "当前请求过大，请减少附件或缩短文本")
         }
@@ -755,8 +885,13 @@ data class ChatQuestion(val id: String, val question: String, val options: List<
 
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
-    val customModelName: String? = null,
-    val customTier: AiTier? = null,
+    val customProviders: List<CustomProviderView> = emptyList(),
+    val customTiers: List<AiTier> = emptyList(),
+    val legacyCustomTier: AiTier? = null,
+    val customConfigError: String? = null,
+    val remotePresets: List<RemotePresetView> = emptyList(),
+    val catalogueLoading: Boolean = false,
+    val catalogueError: String? = null,
     val selectedTier: String = "",
     val reasoningByTier: Map<String, String> = emptyMap(),
     val balance: AiBalance? = null,
@@ -791,7 +926,12 @@ data class CloudChatState(
         it.creationPlan && it.error == null && !it.cancelled && it.text.isNotBlank()
     } == true
     val imageCapability: AiMediaCapability? get() = media["image"]
-    val activeTier: AiTier? get() = if (selectedTier == CUSTOM_MODEL_TIER) customTier else tiers.firstOrNull { it.tier == selectedTier }
+    val customModelName: String? get() = customTiers.firstOrNull()?.displayName
+    val activeTier: AiTier? get() = when {
+        selectedTier == CUSTOM_MODEL_TIER -> legacyCustomTier
+        isCustomModelTier(selectedTier) -> customTiers.firstOrNull { it.tier == selectedTier }
+        else -> tiers.firstOrNull { it.tier == selectedTier }
+    }
 }
 
 @OptIn(ExperimentalTime::class)
@@ -904,8 +1044,8 @@ class CloudChatController(
     }
 
     init {
-        val custom = api.customModel()
-        _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null, customModelName = custom?.model, customTier = custom?.asTier())
+        _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null)
+        refreshCustomModels()
         history?.let { store -> scope.launch { store.saveError.collect { error -> _state.value = _state.value.copy(saveError = error) } } }
         agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
     }
@@ -913,6 +1053,7 @@ class CloudChatController(
     /** 换到某个账号（登录后、换号后调用）：读出这个账号存下的对话列表，当前对话从头开始。 */
     fun useAccount(account: String?) {
         ++accountGeneration
+        runCatching { api.accountChanged(account) }
         metaJob?.cancel()
         balanceJob?.cancel()
         redeemJob?.cancel()
@@ -921,9 +1062,11 @@ class CloudChatController(
         clearConversation()
         stoppingRuns.clear()
         accountId = account
+        refreshCustomModels()
         runAuthorization = null
         val list = history?.useAccount(account) ?: emptyList()
-        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = if (account == null && api.customModel() != null) CUSTOM_MODEL_TIER else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        val preferred = runCatching { api.preferredTier()?.takeIf { isCustomModelTier(it) && api.customForTier(it) != null } }.getOrNull()
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null) _state.value.customTiers.firstOrNull()?.tier.orEmpty() else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -1086,7 +1229,7 @@ class CloudChatController(
                     _state.value = current.copy(
                         tiers = nextTiers,
                         media = tiersRes.getOrNull()?.media ?: current.media,
-                        selectedTier = current.selectedTier.ifBlank { pickAiTier(nextTiers, "") },
+                        selectedTier = current.selectedTier.ifBlank { pickAiTier(nextTiers, runCatching { api.preferredTier() }.getOrNull().orEmpty()) },
                         balance = nextBalance,
                         loadingMeta = false,
                         metaError = if (balanceRes.isFailure && tiersRes.isFailure && err != null) messageOf(err) else null,
@@ -1109,28 +1252,106 @@ class CloudChatController(
         val choices = _state.value.reasoningByTier - tier
         _state.value = _state.value.copy(selectedTier = tier, inputError = null,
             reasoningByTier = if (effort == null) choices else choices + (tier to effort))
+        rememberPreferred(tier)
         persist()
     }
 
     fun selectTier(tier: String) {
         if (_state.value.sending) return
-        if (tier == CUSTOM_MODEL_TIER && api.customModel() == null) return
+        if (isCustomModelTier(tier) && runCatching { api.customForTier(tier)?.let(api::providerAvailable) != true }.getOrDefault(true)) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
         _state.value = _state.value.copy(selectedTier = tier, inputError = null)
+        rememberPreferred(tier)
         persist()
     }
 
     fun customModel(): CustomModelConfig? = api.customModel()
+    fun customProvider(id: String): CustomModelConfig? = api.customProvider(id)
+    fun presetDraft(id: String): CustomModelConfig? = api.presetConfig(id)?.takeIf { it.remoteType == "third" }
+    fun addManagedPreset(id: String) {
+        val preset = requireNotNull(api.presetConfig(id)) { "服务商当前不可用" }
+        require(preset.remoteType in setOf("free", "paid")) { "请填写第三方服务配置" }
+        saveCustomProvider(preset)
+    }
     suspend fun fetchCustomModels(config: CustomModelConfig): List<String> = api.fetchCustomModels(config)
+
+    suspend fun refreshModelCatalogue(force: Boolean = false) {
+        val generation = accountGeneration
+        val selected = _state.value.selectedTier
+        val selectedProvider = runCatching { api.customForTier(selected) }.getOrNull()
+        val previousDefault = selectedProvider?.let { runCatching { api.customProvider(it.id) }.getOrNull() }
+        _state.value = _state.value.copy(catalogueLoading = true, catalogueError = null)
+        try {
+            api.refreshModelCatalogue(force)
+            if (generation == accountGeneration) {
+                refreshCustomModels()
+                val currentDefault = previousDefault?.let { runCatching { api.customProvider(it.id) }.getOrNull() }
+                if (_state.value.selectedTier == selected && previousDefault?.followRecommended == true && selectedProvider?.model == previousDefault.model &&
+                    currentDefault != null && api.providerAvailable(currentDefault) && currentDefault.model != previousDefault.model) {
+                    val next = customModelTier(currentDefault.id, currentDefault.model)
+                    _state.value = _state.value.copy(selectedTier = next)
+                    rememberPreferred(next)
+                    persist()
+                }
+                _state.value = _state.value.copy(catalogueLoading = false)
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) {
+            if (generation == accountGeneration) _state.value = _state.value.copy(catalogueLoading = false, catalogueError = "获取模型服务失败，请检查网络后重试")
+        }
+    }
+
+    private fun refreshCustomModels() {
+        try {
+            val providers = api.customCatalog().providers
+            val tiers = providers.flatMap { p -> p.models.map { p.copy(model = it).asTier().copy(available = api.providerAvailable(p)) } }
+            val legacy = api.customForTier(CUSTOM_MODEL_TIER)?.let { it.asTier(CUSTOM_MODEL_TIER).copy(available = api.providerAvailable(it)) }
+            _state.value = _state.value.copy(customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType) }, customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), customConfigError = null)
+        } catch (e: Exception) {
+            _state.value = _state.value.copy(customProviders = emptyList(), customTiers = emptyList(), legacyCustomTier = null, customConfigError = e.message ?: "模型服务配置无法读取")
+        }
+    }
+
+    private fun rememberPreferred(tier: String) {
+        try { api.rememberTier(tier) }
+        catch (e: Exception) { _state.value = _state.value.copy(customConfigError = e.message ?: "模型服务配置无法读取") }
+    }
+
+    fun saveCustomProvider(config: CustomModelConfig) {
+        check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
+        val old = api.customProvider(config.id)
+        val previous = api.customForTier(_state.value.selectedTier)
+        api.saveCustomProvider(config)
+        refreshCustomModels()
+        val selection = when {
+            old == null -> customModelTier(config.id, config.model.trim())
+            previous?.id == config.id && previous.model !in config.models -> customModelTier(config.id, config.model.trim())
+            else -> _state.value.selectedTier
+        }
+        _state.value = _state.value.copy(selectedTier = selection, inputError = null)
+        if (selection.isNotEmpty()) rememberPreferred(selection)
+        persist()
+    }
+
+    fun deleteCustomProvider(id: String) {
+        check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
+        val deletingActive = api.customForTier(_state.value.selectedTier)?.id == id
+        api.deleteCustomProvider(id)
+        refreshCustomModels()
+        if (deletingActive) {
+            val selection = _state.value.customTiers.firstOrNull()?.tier ?: pickAiTier(_state.value.tiers, "")
+            _state.value = _state.value.copy(selectedTier = selection, inputError = null)
+            rememberPreferred(selection)
+        }
+        persist()
+    }
 
     fun saveCustomModel(config: CustomModelConfig?) {
         check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
         api.saveCustomModel(config)
-        val custom = api.customModel()
-        val name = custom?.model
-        _state.value = _state.value.copy(customModelName = name, customTier = custom?.asTier(),
-            selectedTier = if (name != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, ""), inputError = null)
+        refreshCustomModels()
+        _state.value = _state.value.copy(selectedTier = if (config != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, ""), inputError = null)
         persist()
     }
 
@@ -1257,7 +1478,7 @@ class CloudChatController(
         val state = _state.value
         val tier = state.activeTier
         return when {
-            state.selectedTier == CUSTOM_MODEL_TIER && state.customModelName == null -> "自己的模型服务未配置，请重新填写。"
+            isCustomModelTier(state.selectedTier) && tier == null -> "这个模型服务或模型已删除，请重新选择。"
             state.selectedTier.isNotBlank() && state.tiers.isNotEmpty() && tier == null -> "历史模型已下架，请选择可用模型后发送。"
             tier?.available == false -> "当前档位不可用，请检查点数或选择其他模型。"
             tier?.supportsVision == false && attachments.any { it.imageDataUrl != null } ->
@@ -1472,11 +1693,14 @@ class CloudChatController(
     }
 
     fun clearConversation() {
+        val previous = _state.value.selectedTier
         openJob?.cancel()
         leaveConversation()
         agentSession = newSessionId()
         agentRun = null
-        applyOptions(ChatOptions(tier = if (accountId == null && api.customModel() != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, "")))
+        val selection = if (isCustomModelTier(previous) && runCatching { api.customForTier(previous) }.getOrNull() != null) previous
+            else pickAiTier(_state.value.tiers, previous).ifBlank { if (accountId == null) _state.value.customTiers.firstOrNull()?.tier.orEmpty() else "" }
+        applyOptions(ChatOptions(tier = selection))
         _state.value = _state.value.copy(messages = emptyList(), sending = false, approval = null, question = null, inputError = null)
     }
 

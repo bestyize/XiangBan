@@ -47,7 +47,7 @@ import xyz.xiangban.xiaoban.common.community.AccountSignupMethods
 import xyz.xiangban.xiaoban.common.community.messageOf
 
 private enum class LoginMode(val label: String) { Code("验证码登录"), Password("密码登录") }
-private const val CONTACT_URL = "https://chat.xiangban.xyz/contact"
+internal const val CONTACT_URL = "https://chat.xiangban.xyz/contact"
 
 /** 登录与完成注册共用一个弹窗，成功后回到当前页面。 */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -234,7 +234,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 NavRow("我的收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
                 NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
-                NavRow("获取 AI 额度") { env.platform?.openInBrowser(CONTACT_URL) }
+                NavRow("模型与点数") { open(Route.Models) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/discuss?tab=site") }
                 NavRow("交流群") { env.platform?.openInBrowser(CONTACT_URL) }

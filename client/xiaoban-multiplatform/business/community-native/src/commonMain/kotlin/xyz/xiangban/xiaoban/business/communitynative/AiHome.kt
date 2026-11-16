@@ -241,7 +241,7 @@ private fun HomeComposerCard(cloud: CloudChatState, loggedIn: Boolean, modifier:
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown)
             Text(
-                if (cloud.selectedTier == xyz.xiangban.xiaoban.common.community.CUSTOM_MODEL_TIER) "自己的模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
+                if (xyz.xiangban.xiaoban.common.community.isCustomModelTier(cloud.selectedTier)) "自己的模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
                 Modifier.weight(1f).padding(start = 10.dp), style = XType.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
