@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "falling-blocks",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/6a6fe97f98b2315cb05f83561d602145.zip",
+      "sha256": "cac9711f030b4bb5689cab1aa84fab879047bcbcc9b07d90a9766a147f53a250",
+      "bytes": 8905,
+      "sourceSha256": "7eff5b451eeb50e63a40ba40036980095c2c0806988ecd0a8e823f3a300277df"
+    },
+    {
+      "id": "merge-2048",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/de201dc37dfe5981dae0cf807c410369.zip",
+      "sha256": "04e4e4e91e22b17ac9e7277faca62c10b328a18260712c22e1c4af9db25e9846",
+      "bytes": 94118,
+      "sourceSha256": "dc39451cb42d716bf3d9d459d3354dc54e99cba3943979f7a310e116e0627fcc"
+    },
+    {
+      "id": "block-puzzle",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/2bf0a521af456d9538bf9c885503fea3.zip",
+      "sha256": "6ff3040891489ba6094563a91feed5e6be0f822b83c50569b8562b2fcc2026b0",
+      "bytes": 520583,
+      "sourceSha256": "6f0c0d8642d98bc51b9905e2d4351d1a36982afa6ab48895603a7c529d3f0fc6"
+    },
+    {
+      "id": "pocket-sprites",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/38e3e8333cf603141925a3955f411923.zip",
+      "sha256": "586809cbda58a2148cbd3b9d0baa4466fcc27e347eca16b9491c1db28f6d1824",
+      "bytes": 13239292,
+      "sourceSha256": "b157424123097a835cc271557fb518975814e4ec3f82befc44b30deb5078b03f"
+    },
+    {
+      "id": "water-sort",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/7fdc4ae1b90d5e6dd5c61599256f7777.zip",
+      "sha256": "c64554fc751efe0422ce156e0f9e2d2cceccd050d227520947381d53090e0db5",
+      "bytes": 66078,
+      "sourceSha256": "06bc820c11377279bcb534ed2f51721c1b1923ace556cbee3cfa5efc71d1c058"
+    },
+    {
+      "id": "snake-arena",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/da982c4739076a11f6293c292a20143d.zip",
+      "sha256": "3c87f2a908250525336fcff32f0da239219113276b3b0552c2060f2df471361f",
+      "bytes": 38159,
+      "sourceSha256": "506e9b11131d7ea84c21c7ec88b1562d3dd8f60354596a759b98966fd9ad5d4e"
+    },
+    {
+      "id": "ink-blade",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/33838e912fd6bdc1270efcec71d1bb52.zip",
+      "sha256": "d2be5cd46bf7aa935e93be1ea5fc4b3c547ec90b4ad48489b14e2a199ea120c2",
+      "bytes": 221870,
+      "sourceSha256": "3f2c145d16ffb0473f47a4cef4c1ad7d73688a9b9ecfaa9f96ff8de7598d164d"
+    },
+    {
+      "id": "dusk-glider",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/1195413d73c283e05e164b7440b27c4b.zip",
+      "sha256": "6dc08cb8d1c5ce848fce127fc87f1fad086c7c3e0534b3c27a0aebe669dd43f4",
+      "bytes": 211864,
+      "sourceSha256": "95a9347ec2f7e135dc12f750381c529d275050cb2eb9743d1fd0c313714ea038"
+    },
+    {
+      "id": "pro-cube",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/8fde75cd51761a022fe37f107c073c0b.zip",
+      "sha256": "11f62bc217bb5c9b69cea4ee63eb7e358ab19aa0a42a7afd96e6baaa517bbfde",
+      "bytes": 179030,
+      "sourceSha256": "7fc4cbc37529fdb591beb36c0a6858bc486ee8241465df99ba11d4e0f9f65432"
+    },
+    {
+      "id": "jade-gomoku",
+      "kind": "game",
+      "url": "https://res.xiangban.xyz/files/8ccac7bf16c324399ca80619fc158fe4.zip",
+      "sha256": "ae03f57d75d0238036b944d70da0217ef101f267d4f0b958f20a48fc87087768",
+      "bytes": 129918,
+      "sourceSha256": "64defcb1444ee9ff9e54616cbcee1832cf49862a67f1fc3e21decd5b5052999e"
+    },
+    {
+      "id": "mbti",
+      "kind": "app",
+      "url": "https://res.xiangban.xyz/files/a68a0a4a75326d07016dc146ea468237.zip",
+      "sha256": "9db5a1ac6b02f75ce0fa0357cec13515130cceef5528200b2bde6dda4f96e98f",
+      "bytes": 4561981,
+      "sourceSha256": "15e2624873edd05445a1515463b42d42e445302a75cdd9cfe7c17f51f577874b"
+    }
+  ]
+}

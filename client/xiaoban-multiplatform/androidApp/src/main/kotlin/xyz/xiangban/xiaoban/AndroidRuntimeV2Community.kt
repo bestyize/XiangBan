@@ -286,7 +286,7 @@ internal object AndroidRuntimeV2Community {
         trimCache(root, target, 0)
     }
 
-    private suspend fun download(url: String, size: Long, file: File) {
+    internal suspend fun download(url: String, size: Long, file: File) {
         if (file.length() > size) file.delete()
         val offset = file.length()
         if (offset == size) return
@@ -339,7 +339,7 @@ internal object AndroidRuntimeV2Community {
         }
     }
 
-    private suspend fun sha256(file: File): String {
+    internal suspend fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
             val buffer = ByteArray(32 * 1024)

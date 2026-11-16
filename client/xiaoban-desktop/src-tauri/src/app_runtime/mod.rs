@@ -79,6 +79,10 @@ pub fn app_runtime_close(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn app_runtime_ready(window: WebviewWindow) -> Result<(), String> {
     let _app_id = caller_app_id(&window)?;
+    #[cfg(debug_assertions)]
+    if window.app_handle().state::<crate::DesktopState>().isolated && std::env::var_os("XIAOBAN_BUILTIN_GAMES_SMOKE").is_some() {
+        window.app_handle().state::<window::AppRuntimeState>().smoke_ready.lock().map_err(|e| e.to_string())?.insert(_app_id.to_owned());
+    }
     let _ = window.show();
     let _ = window.set_focus();
     Ok(())

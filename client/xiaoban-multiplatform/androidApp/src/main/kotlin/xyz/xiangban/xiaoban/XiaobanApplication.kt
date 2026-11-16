@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.business.communitynative.defaultLinkHttpClient
@@ -31,6 +32,18 @@ class XiaobanApplication : Application() {
             val client = defaultLinkHttpClient()
             // 下载器随后也被声音设置页复用，客户端保持到进程退出。
             speech.downloads(client).prefetchSilently()
+        }
+        downloadScope.launch {
+            var pending = AndroidBuiltinGames.ids(this@XiaobanApplication)
+            for (wait in listOf(0L, 20_000L, 60_000L, 300_000L)) {
+                if (wait > 0) delay(wait)
+                pending = pending.filter { id ->
+                    val failed = runCatching { AndroidBuiltinGames.ensure(this@XiaobanApplication, id) }.isFailure
+                    currentCoroutineContext().ensureActive()
+                    failed
+                }
+                if (pending.isEmpty()) break
+            }
         }
         val connectivity = getSystemService(ConnectivityManager::class.java)
         val unmetered = connectivity.getNetworkCapabilities(connectivity.activeNetwork)

@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.nio.file.Files
 import com.android.build.api.instrumentation.AsmClassVisitorFactory
 import com.android.build.api.instrumentation.ClassContext
 import com.android.build.api.instrumentation.ClassData
@@ -53,7 +55,7 @@ android {
         applicationId = "xyz.xiangban.xiaoban"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionName = "3.1.7"
+        versionName = "3.1.8"
         val (major, minor, patch) = requireNotNull(versionName).split('.').map(String::toInt)
         require(major in 0..2099 && minor in 0..999 && patch in 0..999)
         versionCode = (major * 1_000_000 + minor * 1_000 + patch).also { require(it > 0) }
@@ -153,6 +155,8 @@ val mobileVoiceAssets = tasks.register<SyncMobileVoiceAssets>("syncMobileVoiceAs
 abstract class SyncMobileGameAssets : DefaultTask() {
     @get:InputDirectory abstract val sourceDirectory: org.gradle.api.file.DirectoryProperty
     @get:InputDirectory abstract val runtimeDirectory: org.gradle.api.file.DirectoryProperty
+    @get:InputDirectory abstract val previewDirectory: org.gradle.api.file.DirectoryProperty
+    @get:InputFile abstract val distributionFile: org.gradle.api.file.RegularFileProperty
     @get:OutputDirectory abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
     @get:javax.inject.Inject abstract val files: org.gradle.api.file.FileSystemOperations
     @TaskAction fun copyGames() {
@@ -164,21 +168,40 @@ abstract class SyncMobileGameAssets : DefaultTask() {
         }.toMap()
         val reviewedIds = source.listFiles().orEmpty().filter { it.resolve("manifest.json").isFile }.map { it.name }.toSet()
         check(categories.keys == reviewedIds) { "Android 内置作品的协议 2 分类与资源目录不一致" }
+        val distribution = JsonSlurper().parse(distributionFile.get().asFile) as Map<*, *>
+        val entries = (distribution["games"] as List<*>).map { it as Map<*, *> }.associateBy { it["id"] as String }
+        check(distribution["version"] == 1 && entries.keys == reviewedIds) { "内置游戏分发清单与资源目录不一致" }
+        val allowed = setOf("html", "htm", "js", "mjs", "css", "json", "svg", "png", "jpg", "jpeg", "webp", "gif", "mp3", "ogg", "wav", "woff2", "md", "txt")
+        for (id in categories.keys) {
+            val input = source.resolve(id)
+            val digest = MessageDigest.getInstance("SHA-256")
+            val sourceFiles = input.walkTopDown().filter { it.isFile && !it.name.contains(".test.") }.sortedBy { it.relativeTo(input).invariantSeparatorsPath }
+            for (file in sourceFiles) {
+                check(!Files.isSymbolicLink(file.toPath()) && file.extension.lowercase() in allowed) { "内置游戏包含不支持的文件：$file" }
+                digest.update(file.relativeTo(input).invariantSeparatorsPath.toByteArray(Charsets.UTF_8))
+                digest.update(0.toByte())
+                digest.update(MessageDigest.getInstance("SHA-256").digest(file.readBytes()))
+            }
+            val checksum = digest.digest().joinToString("") { "%02x".format(it) }
+            check(checksum == entries.getValue(id)["sourceSha256"]) { "内置游戏 $id 已更改，请重新生成并部署资源包" }
+        }
         files.sync {
             for (id in categories.keys) {
                 val target = "game-packs-v2/$id"
+                val manifest = JsonSlurper().parse(source.resolve("$id/manifest.json")) as Map<*, *>
                 from(source.resolve(id)) {
-                    include("**/*.html", "**/*.js", "**/*.mjs", "**/*.css", "**/*.json", "**/*.svg", "**/*.png", "**/*.webp", "**/*.mp3")
-                    exclude("**/*.test.*", "desktop-host.js")
+                    include("manifest.json", manifest["icon"] as String, manifest["cover"] as String)
+                    if (id == "pocket-sprites") exclude(manifest["icon"] as String, manifest["cover"] as String)
                     into(target)
                 }
-                from(listOf(runtime.resolve("builtin-runtime.js"), runtime.resolve("builtin-runtime.css"))) { into(target) }
+                if (id == "pocket-sprites") from(previewDirectory) { into("$target/assets") }
             }
+            from(listOf(runtime.resolve("builtin-runtime.js"), runtime.resolve("builtin-runtime.css"))) { into("builtin-runtime-v2") }
+            from(distributionFile) { into("builtin-games") }
             into(output)
         }
         for ((id, category) in categories) {
             val input = source.resolve(id)
-            val target = output.resolve("game-packs-v2/$id")
             val manifest = JsonSlurper().parse(input.resolve("manifest.json")) as Map<*, *>
             check(manifest["schemaVersion"] == 3 && manifest["runtimeProtocol"] == 2 && manifest["id"] == id && manifest["entry"] == "index.html" && manifest["category"] == category) {
                 "$id 的协议 2 清单无效"
@@ -186,14 +209,14 @@ abstract class SyncMobileGameAssets : DefaultTask() {
 
             val entry = input.resolve("index.html").readText()
             check("</head>" in entry && "<script" in entry) { "$id 的入口缺少脚本或 head 结束标签" }
-            val withStyle = entry.replaceFirst("</head>", "<link rel=\"stylesheet\" href=\"./builtin-runtime.css\"></head>")
-            target.resolve("index.html").writeText(withStyle.replaceFirst("<script", "<script src=\"./builtin-runtime.js\"></script><script"))
         }
     }
 }
 val mobileGameAssets = tasks.register<SyncMobileGameAssets>("syncMobileGameAssets") {
     sourceDirectory.set(rootProject.layout.projectDirectory.dir("../xiaoban-desktop/public/game-packs"))
     runtimeDirectory.set(layout.projectDirectory.dir("src/main/builtin-runtime-v2"))
+    previewDirectory.set(rootProject.layout.projectDirectory.dir("../../assets/game-packs/previews/pocket-sprites"))
+    distributionFile.set(rootProject.layout.projectDirectory.file("../../assets/game-packs/distribution.json"))
     outputDirectory.set(layout.buildDirectory.dir("generated/mobile-games"))
 }
 androidComponents.onVariants { variant ->

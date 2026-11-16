@@ -75,6 +75,7 @@ mod configuration_window;
 mod voice_turn;
 mod inference;
 mod builtin_assets;
+mod builtin_games;
 mod network;
 mod shutdown;
 
@@ -973,6 +974,7 @@ fn main() {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             network::initialize(app.handle()).map_err(std::io::Error::other)?;
             builtin_assets::start(app.handle());
+            builtin_games::start(app.handle());
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
             }
@@ -989,6 +991,19 @@ fn main() {
                 }
             }
             app.manage(chat::ChatState::new(app.handle()));
+            #[cfg(debug_assertions)]
+            if std::env::args().any(|arg| arg == "--smoke-test") && std::env::var_os("XIAOBAN_BUILTIN_GAMES_SMOKE").is_some() {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let result = builtin_games::smoke(&handle).await;
+                    if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
+                        let _ = std::fs::write(path, serde_json::to_string(&result).unwrap());
+                    }
+                    eprintln!("Builtin game smoke: {result:?}");
+                    handle.exit(i32::from(result.is_err()));
+                });
+                return Ok(());
+            }
             if std::env::args().any(|arg| arg == "--smoke-test")
                 && std::env::var_os("XIAOBAN_WIDGET_PREVIEW_SMOKE").is_some()
             {

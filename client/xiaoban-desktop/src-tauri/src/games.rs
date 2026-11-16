@@ -68,7 +68,12 @@ pub fn catalog(app: &tauri::AppHandle) -> Result<Catalog, String> { catalog_in(c
 pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> {
     authorize(&app, &host_token)?;
     // The legacy iframe host only serves games that implement its message protocol.
-    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop" && game["id"] != POCKET_SPRITES).collect())
+    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop" && game["id"] != POCKET_SPRITES).map(|mut game| {
+        if game["source"] == "builtin" {
+            if let Some(id) = game["id"].as_str() { game["base"] = json!(crate::game_packs::base_url(id)); }
+        }
+        game
+    }).collect())
 }
 /// A fresh secret for the window that is about to host a game; commands that touch saves check it.
 pub(crate) fn issue_token(app: &tauri::AppHandle) -> Result<String, String> {
@@ -162,6 +167,7 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
         Some(id) => id,
         None => return show_space_page(app),
     };
+    if crate::game_packs::is_builtin(&game_id) { crate::builtin_games::ensure_async(app, &game_id).await?; }
     let landscape = {
         let known = catalog(app)?;
         let game = known.games.iter().find(|game| game["id"] == game_id.as_str()).ok_or("没有找到这款本地游戏")?;

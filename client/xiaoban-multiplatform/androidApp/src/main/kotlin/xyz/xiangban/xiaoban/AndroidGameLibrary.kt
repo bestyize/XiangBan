@@ -13,7 +13,7 @@ import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 internal class AndroidGameLibrary(private val context: Context) {
     suspend fun games(): List<MobileGame> = withContext(Dispatchers.IO) {
         BuiltinMobileGames.ids.map { id ->
-            context.assets.loadBundledRuntimeV2(id, checkNotNull(bundledGameRoot(id))).manifest.let {
+            RuntimeV2Manifest.read(readRuntimeManifest(context.assets, checkNotNull(bundledGameRoot(id)))).let {
                 MobileGame(it.id, it.name, it.description, it.orientation, it.kind, it.category, it.input, it.capabilities.toList(), it.version,
                     icon = it.icon, cover = it.cover)
             }
@@ -27,13 +27,12 @@ internal class AndroidGameLibrary(private val context: Context) {
 
     // Reuse the classic MIT-licensed Three.js r128 build already shipped for the cube.
     suspend fun threeLibrary(): ByteArray = withContext(Dispatchers.IO) {
-        val root = checkNotNull(bundledGameRoot("pro-cube"))
-        context.assets.open("$root/vendor/three.min.js").use { it.readBytes() }
+        AndroidBuiltinGames.ensure(context, "pro-cube").resolve("vendor/three.min.js").readBytes()
     }
 
     private suspend fun artwork(id: String, path: (RuntimeV2Manifest) -> String): ByteArray? = withContext(Dispatchers.IO) {
         val root = bundledGameRoot(id) ?: return@withContext null
-        val manifest = context.assets.loadBundledRuntimeV2(id, root).manifest
+        val manifest = RuntimeV2Manifest.read(readRuntimeManifest(context.assets, root))
         context.assets.open("$root/${path(manifest)}").use { it.readBytes() }
     }
 }

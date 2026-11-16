@@ -171,6 +171,18 @@ pub fn resolve_app_file(root: &Path, segments: &[String]) -> Option<(PathBuf, &'
     let (_, ext) = filename.rsplit_once('.')?;
     let mime = mime_for(&ext.to_ascii_lowercase())?;
 
+    // Built-in files come from the verified download cache.
+    if let Some(base) = crate::builtin_games::cached_dir(root, app_id) {
+        let mut file = base.clone();
+        for part in &rel_parts { file.push(part); }
+        if let (Ok(real_base), Ok(real_file)) = (base.canonicalize(), file.canonicalize()) {
+            if real_file.starts_with(real_base) && real_file.is_file() { return Some((real_file, mime)); }
+        }
+        return None;
+    }
+    #[cfg(debug_assertions)]
+    if crate::games::IDS.contains(&app_id.as_str()) && std::env::var_os("XIAOBAN_BUILTIN_GAMES_SMOKE").is_some() { return None; }
+
     // The desktop creator and the app plaza both list packs from games/packs.
     let user_pack_dir = crate::game_packs::packs_dir(root).join(app_id);
     let mut candidate = user_pack_dir.clone();
@@ -312,7 +324,8 @@ pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::R
         Ok(root) => serve_for(&root, window_label, request.uri().path(), range),
         Err(_) => Served::status(404),
     };
-    if served.status == 404 && super::window::app_id_from_label(window_label).is_some_and(|id| crate::games::IDS.contains(&id)) {
+    let allow_embedded = cfg!(debug_assertions) && std::env::var_os("XIAOBAN_BUILTIN_GAMES_SMOKE").is_none();
+    if allow_embedded && served.status == 404 && super::window::app_id_from_label(window_label).is_some_and(|id| crate::games::IDS.contains(&id)) {
         served = serve_embedded_pack(window_label, request.uri().path(), range, |path| {
             let assets = app.asset_resolver();
             // AssetResolver::get falls back to the desktop index.html for unknown paths.

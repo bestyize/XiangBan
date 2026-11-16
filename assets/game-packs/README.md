@@ -1,5 +1,5 @@
 # 游戏资源基准包
 
-此目录保存原网页的七款游戏资源及共享文件，供桌面客户端构建时核对目录、清单和允许的适配差异。实际随桌面应用运行的资源位于 `client/xiaoban-desktop/public/game-packs/`，每款游戏均可独立运行。
+此目录保存原网页的游戏资源基准，供桌面客户端构建时核对目录、清单和允许的适配差异。11 款官方作品的源文件位于 `client/xiaoban-desktop/public/game-packs/`；桌面和 Android 运行时从资源机下载同一份游戏包并缓存。[`distribution.json`](distribution.json) 固定每包的内容地址、大小、SHA-256 及源文件校验值，`previews/` 是安装包使用的小尺寸离线缩略图。
 
-更改游戏资源时，按需同步基准和桌面副本，然后运行 `npm --prefix client/xiaoban-desktop run build`。各游戏自带的 README 保留原网页时代的历史说明，提到的网站、后端和测试入口不代表当前仍可用。
+更改游戏资源时，按需同步基准和桌面副本，再按[资源部署说明](../../infra/resource/README.md)重新生成并上传游戏包，最后发布新版客户端。两端构建会检查源文件与分发清单一致。各游戏自带的 README 保留原网页时代的历史说明，提到的网站、后端和测试入口不代表当前仍可用。

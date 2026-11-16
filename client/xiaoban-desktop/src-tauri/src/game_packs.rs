@@ -410,10 +410,14 @@ pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
     let segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     if segments[0] == "__host" { return Served::status(404); }
     let id = segments[0];
-    if check_pack_id(id).is_err() {
-        return Served::status(404);
-    }
-    let directory = packs_dir(root).join(id);
+    let builtin = is_builtin(id);
+    let directory = if builtin {
+        let Some(path) = crate::builtin_games::cached_dir(root, id) else { return Served::status(404) };
+        path
+    } else {
+        if check_pack_id(id).is_err() { return Served::status(404); }
+        packs_dir(root).join(id)
+    };
     let rest = &segments[1..];
     let default_entry = ["index.html"];
     let rest: &[&str] = if rest.is_empty() || rest == [""] { &default_entry } else { rest };
@@ -422,8 +426,10 @@ pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
     }
     let Some(file_name) = rest.last() else { return Served::status(404) };
     let ext = extension(file_name).unwrap_or_default();
-    let Ok(manifest) = load_manifest(&directory, id) else { return Served::status(404) };
-    let v2 = manifest["runtimeProtocol"] == 2;
+    let v2 = if builtin { true } else {
+        let Ok(manifest) = load_manifest(&directory, id) else { return Served::status(404) };
+        manifest["runtimeProtocol"] == 2
+    };
     let mime = if v2 { crate::app_runtime::protocol::mime_for(&ext) } else { mime_for(&ext) };
     let Some(mime) = mime else { return Served::status(403) };
     let file = match resolve_file(&directory, rest) {

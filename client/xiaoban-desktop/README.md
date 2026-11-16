@@ -150,7 +150,9 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 ## 设计规范与交互稿
 
-内置游戏的运行资源在 `public/game-packs/`，构建时会与仓库内独立的 `assets/game-packs/` 基准包核对；修改游戏时需同步相关文件及桌面适配。
+11 款内置游戏的源文件仍在 `public/game-packs/`，构建时核对基准资源和[分发清单](../../assets/game-packs/distribution.json)。安装包只保留游戏目录、清单和缩略图；启动后从资源机后台下载游戏包，校验大小和 SHA-256，再原子写入本地缓存。首次打开尚未缓存的游戏会等待下载；缓存后可离线运行，存档仍在原目录。启动或打开游戏时会核验缓存文件，损坏时优先用已缓存的压缩包修复。更新游戏须先重新生成并部署资源包，再发布客户端，见[资源部署说明](../../infra/resource/README.md)。
+
+验证：`XIAOBAN_BUILTIN_LIVE_TEST=1 cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop builtin_games::tests` 会从资源机下载并验证 11 包、两套运行协议和离线缓存；原生 V2 窗口还可使用隔离的 `XIAOBAN_BUILTIN_GAMES_SMOKE=1` 和 `--smoke-test` 检查逐款就绪。
 
 MBTI 1.3.0 已按确认的手机设计稿更新首页、答题和结果页：珊瑚橙红与暖白、轻量 WebP、选中后手动下一题、六章报告切换、四维解读展开及系统明暗主题。保留 48 题计分、旧存档与真实海报导出。验证：`npx vitest run src/games/mbti-report.test.ts src/games/pack-boundary.test.ts`、`node scripts/check-game-assets.mjs`，并完成浏览器 48 题流程；尚未重新打包或验收原生安装包。
 

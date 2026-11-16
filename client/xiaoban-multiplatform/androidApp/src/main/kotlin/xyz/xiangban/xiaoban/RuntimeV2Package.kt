@@ -129,6 +129,28 @@ internal class RuntimeV2Package private constructor(
             return create(manifest, workHost, version ?: manifest.version) { path -> assets.open("$root/$path") }
         }
 
+        /** Official bytes come from the verified local cache; Android adds its host adapter at read time. */
+        fun loadBuiltin(root: File, id: String, assets: AssetManager): RuntimeV2Package =
+            loadBuiltin(root, id) { path -> assets.open(path) }
+
+        internal fun loadBuiltin(root: File, id: String, openAsset: (String) -> InputStream): RuntimeV2Package {
+            val base = root.canonicalFile
+            val manifest = base.resolve("manifest.json").inputStream().use(::readRuntimeManifest).let(RuntimeV2Manifest::read)
+            require(manifest.id == id) { "内置作品清单不匹配" }
+            return create(manifest, "official-$id", manifest.version) { path ->
+                when (path) {
+                    "builtin-runtime.js", "builtin-runtime.css" -> openAsset("builtin-runtime-v2/$path")
+                    else -> {
+                        val file = base.resolve(path)
+                        require(file.canonicalFile.path.startsWith(base.path + File.separator) && file.canonicalFile == file.absoluteFile) { "路径无效" }
+                        if (path == manifest.entry) {
+                            java.io.ByteArrayInputStream(injectBuiltinRuntime(file.readText(Charsets.UTF_8)).toByteArray(Charsets.UTF_8))
+                        } else file.inputStream()
+                    }
+                }
+            }
+        }
+
         fun loadCommunity(root: File, id: Long, version: Int, kind: String): RuntimeV2Package {
             require(id > 0 && version > 0)
             val manifest = RuntimeV2Manifest.read(root.resolve("manifest.json").inputStream().use(::readRuntimeManifest))
@@ -166,6 +188,12 @@ internal class RuntimeV2Package private constructor(
             }
         }
     }
+}
+
+internal fun injectBuiltinRuntime(html: String): String {
+    require("</head>" in html && "<script" in html) { "作品入口无效" }
+    val styled = html.replaceFirst("</head>", "<link rel=\"stylesheet\" href=\"./builtin-runtime.css\"></head>")
+    return styled.replaceFirst("<script", "<script src=\"./builtin-runtime.js\"></script><script")
 }
 
 internal fun readRuntimeManifest(assets: AssetManager, root: String): String {

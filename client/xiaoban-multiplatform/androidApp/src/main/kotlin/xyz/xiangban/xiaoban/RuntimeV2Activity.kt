@@ -161,6 +161,13 @@ class RuntimeV2Activity : ComponentActivity() {
             showUnavailable("请更新 Android System WebView 或 Chrome，再打开这个作品。")
             return
         }
+        if (root != null && id != BuiltinMobileGames.REMOTE_CONTROL && id != BuiltinMobileGames.QUICK_LAUNCH) {
+            setContentView(TextView(this).apply {
+                text = "正在准备游戏…"
+                textSize = 16f
+                gravity = android.view.Gravity.CENTER
+            })
+        }
         lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 runCatching {
@@ -168,7 +175,8 @@ class RuntimeV2Activity : ComponentActivity() {
                         workspace -> RuntimeV2Package.loadWorkspace(filesDir.resolve("workspace/games/$id"), id)
                         idea != null -> AndroidRuntimeV2Community.loadIdea(this@RuntimeV2Activity, intent)
                         community -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
-                        else -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
+                        id == BuiltinMobileGames.REMOTE_CONTROL || id == BuiltinMobileGames.QUICK_LAUNCH -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
+                        else -> RuntimeV2Package.loadBuiltin(AndroidBuiltinGames.ensure(this@RuntimeV2Activity, id), id, assets)
                     }
                     quickLaunchEnabled = pack.manifest.id == "quick-launch" && runCatching {
                         val expected = assets.open("game-packs-v2/quick-launch/index.html").use { it.readBytes() }
@@ -617,6 +625,7 @@ class RuntimeV2Activity : ComponentActivity() {
                 result()
                 if (!ready && !failed && !closing) {
                     ready = true
+                    if (BuildConfig.DEBUG && pack.host.startsWith("official-")) Log.i("BuiltinGameSmoke", "ready ${pack.manifest.id}")
                     log?.add("game.ready", "readyMs" to System.currentTimeMillis() - startedAt)
                     handler.removeCallbacks(timeout)
                     chrome.loaded()

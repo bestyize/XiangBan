@@ -19,12 +19,16 @@ pub fn app_id_from_label(label: &str) -> Option<&str> {
 
 pub struct AppRuntimeState {
     pub lock: Mutex<()>,
+    #[cfg(debug_assertions)]
+    pub smoke_ready: Mutex<std::collections::HashSet<String>>,
 }
 
 impl Default for AppRuntimeState {
     fn default() -> Self {
         Self {
             lock: Mutex::new(()),
+            #[cfg(debug_assertions)]
+            smoke_ready: Mutex::new(std::collections::HashSet::new()),
         }
     }
 }
@@ -64,6 +68,10 @@ pub async fn open_app(
 ) -> Result<WebviewWindow, String> {
     if !super::storage::valid_app_id(app_id) {
         return Err("非法应用编号".into());
+    }
+
+    if crate::game_packs::is_builtin(app_id) {
+        crate::builtin_games::ensure_async(app, app_id).await?;
     }
 
     let state = app.state::<AppRuntimeState>();
