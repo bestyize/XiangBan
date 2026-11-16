@@ -52,13 +52,15 @@ import xyz.xiangban.xiaoban.common.community.parsePollOptions
 import xyz.xiangban.xiaoban.common.community.pollDraftError
 import xyz.xiangban.xiaoban.common.community.requiredPostLevel
 
-private fun ForumSection.postingSection(): CommunitySection = when (this) {
-    ForumSection.Ideas -> CommunitySection.Ideas
-    ForumSection.Discuss, ForumSection.Site -> CommunitySection.Discuss
-    ForumSection.Resources -> CommunitySection.Resources
+private enum class PostingSection(val label: String) { Ideas("创意"), Discuss("讨论"), Resources("资源") }
+
+private fun ForumSection.postingSection(): PostingSection = when (this) {
+    ForumSection.Ideas -> PostingSection.Ideas
+    ForumSection.Discuss, ForumSection.Site -> PostingSection.Discuss
+    ForumSection.Resources -> PostingSection.Resources
 }
 
-private val PostingSections = CommunitySection.entries.filter { it != CommunitySection.Home }
+private val PostingSections = PostingSection.entries
 private val PostingLevels = listOf("新人", "成员", "老用户", "守护者")
 
 /**
@@ -81,7 +83,7 @@ fun NewPostScreen(
     val session by env.session.state.collectAsState()
     var categories by remember(session.accountId) { mutableStateOf<ForumCategories?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
-    val startingSection = if (help) CommunitySection.Resources else initialSection?.postingSection() ?: CommunitySection.Discuss
+    val startingSection = if (help) PostingSection.Resources else initialSection?.postingSection() ?: PostingSection.Discuss
     var sectionIndex by rememberSaveable {
         mutableIntStateOf(PostingSections.indexOf(startingSection))
     }
@@ -145,15 +147,15 @@ fun NewPostScreen(
     val destinations = remember(catalog) {
         catalog?.let {
             mapOf(
-                CommunitySection.Ideas to it.boardsIn(ForumSection.Ideas),
-                CommunitySection.Discuss to it.discussionBoards,
-                CommunitySection.Resources to it.boardsIn(ForumSection.Resources),
+                PostingSection.Ideas to it.boardsIn(ForumSection.Ideas),
+                PostingSection.Discuss to it.discussionBoards,
+                PostingSection.Resources to it.boardsIn(ForumSection.Resources),
             ).filterValues { boards -> boards.isNotEmpty() }
         }.orEmpty()
     }
-    val section = PostingSections.getOrNull(sectionIndex) ?: CommunitySection.Discuss
+    val section = PostingSections.getOrNull(sectionIndex) ?: PostingSection.Discuss
     val chosen = catalog?.boards?.firstOrNull { it.id == categoryId && catalog.canPost(it, trustLevel) }
-    val startingBoard = if (help) destinations[CommunitySection.Resources]?.firstOrNull { it.isHelpBoard }
+    val startingBoard = if (help) destinations[PostingSection.Resources]?.firstOrNull { it.isHelpBoard }
         else catalog?.find(initialBoardSlug) ?: catalog?.discussionTab(initialBoardSlug)?.category
     LaunchedEffect(catalog, trustLevel) {
         if (catalog != null) {

@@ -4,6 +4,7 @@ import {
   navigationSection, postableCategories, resourceTopicCategory, sectionBoards, SECTION_LABELS, type NavigationSectionKey,
 } from './communityStructure.ts'
 import { requiredPostLevel, TRUST_LABEL } from './format.ts'
+import { homeTabOf } from './homeNavigation.ts'
 
 export type PostingSectionKey = NavigationSectionKey
 export interface PostingCategory extends Category {
@@ -71,7 +72,7 @@ export function postingLocation(page: unknown, query: Record<string, unknown>, c
   const read = (key: string) => typeof query[key] === 'string' ? query[key] : ''
   let section: PostingSectionKey = 'discuss'
   let slug = ''
-  if (page === 'ideas') {
+  if (page === 'ideas' || (page === 'home' && homeTabOf(query.tab) === 'ideas')) {
     section = 'ideas'
   } else if (page === 'resources') {
     section = 'resources'

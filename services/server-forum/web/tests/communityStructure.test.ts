@@ -40,7 +40,7 @@ test('detail navigation links to the available community tabs',()=>{
  deepStrictEqual(sections.map(s=>s.name),['创意','讨论','资源'])
  deepStrictEqual(sections.find(s=>s.key==='discuss')!.children.map(c=>c.slug),['learn','casual-travel','site'])
  deepStrictEqual(sections.find(s=>s.key==='ideas')!.children,[])
- strictEqual(categoryHref(idea,all),'/ideas')
+ strictEqual(categoryHref(idea,all),'/')
  strictEqual(sectionScope(all,'ideas'),'create-effect')
  strictEqual(categoryHref({id:7,slug:'resource-help'},all),'/resources?tab=resource-help')
  strictEqual(categoryHref({id:2,slug:'learn-codex'},all),'/discuss?tab=learn')

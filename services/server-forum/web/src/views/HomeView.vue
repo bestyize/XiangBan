@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { discoverApi } from '@/api/discover'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
+import CommunityPostFeed from '@/components/community/CommunityPostFeed.vue'
 import NewsRow from '@/components/community/NewsRow.vue'
 import FrontierBanner from '@/components/community/FrontierBanner.vue'
 import RequestState from '@/components/community/RequestState.vue'
@@ -16,18 +17,21 @@ import DiscoverRepoRow from '@/components/community/DiscoverRepoRow.vue'
 import WeeklyFeed from '@/components/WeeklyFeed.vue'
 import ProjectFeed from '@/components/ProjectFeed.vue'
 import { useHead } from '@/lib/head'
+import { homeTabOf, homeTabs, newsHomePath } from '@/lib/homeNavigation'
+import { galleryTab } from '@/lib/microGallery'
 import '@/components/community/community.css'
 const route = useRoute(), router = useRouter()
-const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'open-source', label: '精选' }, { key: 'rankings', label: '排行榜' }, { key: 'nav', label: '导航' }]
-const tab = computed(() => {
-  const raw = String(route.query.tab || 'recommend')
-  return tabs.some(t => t.key === raw) || raw === 'weekly' || raw === 'projects' ? raw : 'recommend'
-})
+const tab = computed(() => homeTabOf(route.query.tab))
 const { data, loading, error, load } = useCommunityResource(discoverApi.home)
 const frontier = useCommunityResource(() => discoverApi.frontier(1))
-void frontier.load()
-watch(tab, current => { if (current === 'recommend') void load() }, { immediate: true })
-function setTab(key: string) { void router.replace({ query: key === 'repos' ? { tab:'open-source', category:'hot' } : { ...(key === 'recommend' ? {} : { tab: key }) } }) }
+watch(tab, current => {
+  if (current !== 'recommend') return
+  void load()
+  if (!frontier.data.value && !frontier.loading.value) void frontier.load()
+}, { immediate: true })
+function setTab(key: string) {
+  void router.replace({ query: key === 'repos' ? { tab: 'open-source', category: 'hot' } : { tab: key === 'ideas' ? undefined : key } })
+}
 const banners = computed(() => (data.value?.banners || []).map(banner => {
   const link = banner.link || ''
   const match = /^(topic|pack|tool|weekly):(.+)$/.exec(link)
@@ -36,12 +40,13 @@ const banners = computed(() => (data.value?.banners || []).map(banner => {
   const href = validReference ? paths[match[1]!] + encodeURIComponent(match[2]!) : webLink(link)
   return {...banner,href}
 }).filter(banner => banner.href))
-useHead(() => ({ title: '社区' }))
+useHead(() => ({ title: route.query.tab === galleryTab.key ? galleryTab.label : '社区' }))
 </script>
 <template><main class="community-page home-page">
   <h1 class="sr-only">小伴社区</h1>
-  <CommunityTabs :items="tabs" :active="tab" label="首页栏目" @change="setTab" />
-  <template v-if="tab === 'weekly' || tab === 'projects'"><RouterLink to="/" class="community-back">← 返回推荐</RouterLink><WeeklyFeed v-if="tab === 'weekly'" /><ProjectFeed v-else /></template>
+  <CommunityTabs :items="homeTabs" :active="tab" label="首页栏目" @change="setTab" />
+  <CommunityPostFeed v-if="tab === 'ideas'" ideas />
+  <template v-else-if="tab === 'weekly' || tab === 'projects'"><RouterLink :to="newsHomePath" class="community-back">← 返回资讯</RouterLink><WeeklyFeed v-if="tab === 'weekly'" /><ProjectFeed v-else /></template>
   <template v-else-if="tab === 'recommend'">
     <RequestState :loading="loading" :error="error" @retry="load" />
     <div v-if="data" class="recommend-feed">

@@ -73,10 +73,10 @@ import xyz.xiangban.xiaoban.common.community.rankModels
 
 /** 社区首页栏目。 */
 internal enum class HomeSub(val key: String, val label: String) {
-    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Rank("rank", "排行榜"), Nav("nav", "导航");
+    Ideas("ideas", "创意"), News("recommend", "资讯"), OpenSource("open-source", "精选"), Rank("rank", "排行榜"), Nav("nav", "导航");
 
     companion object {
-        fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Recommend
+        fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Ideas
     }
 }
 
@@ -114,11 +114,11 @@ internal fun LangLine(r: RepoRank) {
     }
 }
 
-// ───────────── 推荐 ─────────────
+// ───────────── 资讯 ─────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, openHotRanking: () -> Unit) {
+internal fun NewsTab(env: CommunityEnv, open: (Route) -> Unit, openHotRanking: () -> Unit) {
     val loader = rememberLoader(env, "home") { env.forum.home() }
     val state by loader.state.collectAsState()
     val frontierLoader = rememberLoader(env, "frontier") { env.forum.frontier() }
@@ -220,7 +220,7 @@ internal fun NewsRow(item: NewsItem, visual: Boolean = false, onClick: () -> Uni
     }
 }
 
-/** 推荐页热榜前三：名次、36dp 图标块、仓库名和语言、7 根小柱、本周新增。 */
+/** 资讯页热榜前三：名次、36dp 图标块、仓库名和语言、7 根小柱、本周新增。 */
 @Composable
 private fun RepoMiniRow(r: RepoRank, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

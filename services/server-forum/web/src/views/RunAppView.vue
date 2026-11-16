@@ -11,6 +11,7 @@ import { useCommunityResource } from '@/components/community/resource'
 import { canTrialPack } from '@/lib/appRuntime'
 import { builtinAsset, builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY } from '@/lib/builtinCreation'
 import { useHead } from '@/lib/head'
+import { homeTabOf } from '@/lib/homeNavigation'
 import { ideaPlayerId, ideaPlayers, ideaReturnLocation } from '@/lib/ideaPlayers'
 
 const route = useRoute(), router = useRouter()
@@ -100,7 +101,8 @@ function returnPage() {
   if (typeof previous === 'string' && /^\/(?!\/)/.test(previous)) {
     const entry = router.resolve(previous)
     if (isIdea.value) {
-      if (entry.name === 'idea-work' || (entry.name === 'ideas' && !entry.query.exhibit)) return entry.fullPath
+      const ideas = entry.name === 'ideas' || (entry.name === 'home' && homeTabOf(entry.query.tab) === 'ideas')
+      if (entry.name === 'idea-work' || (ideas && !entry.query.exhibit)) return entry.fullPath
     } else if ((entry.name === 'create' && !entry.query.tool && !entry.query.game) ||
         (entry.name === 'pack' && Number(entry.params.id) === packId.value)) return entry.fullPath
   }

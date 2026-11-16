@@ -45,7 +45,7 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
 
 <template>
   <section class="community-page idea-work">
-    <RouterLink :to="{ name: 'ideas' }" class="back"><AppIcon name="back" :size="16" /> 创意</RouterLink>
+    <RouterLink :to="{ name: 'home' }" class="back"><AppIcon name="back" :size="16" /> 创意</RouterLink>
     <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="work">
       <article class="work" :class="{ 'has-cover': images.length }">
@@ -57,7 +57,7 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
           <dl class="credits">
             <div><dt>作者</dt><dd>{{ work.author }}</dd></div>
             <div v-if="work.kind === 'exhibit'">
-              <dt>来源</dt><dd><RouterLink :to="{ name: 'ideas', query: { tab: galleryTab.key } }">微观展厅</RouterLink></dd>
+              <dt>来源</dt><dd><RouterLink :to="{ name: 'home', query: { tab: galleryTab.key } }">微观展厅</RouterLink></dd>
             </div>
             <div v-else-if="site && run"><dt>来源</dt><dd><a :href="site">作品官网</a></dd></div>
             <div v-if="repository"><dt>源码</dt><dd><a :href="repository">查看源码</a></dd></div>

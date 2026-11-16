@@ -74,7 +74,7 @@ export function resourceTabs(categories:Category[]) {
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
   if (!activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
-  if (category.section === 'ideas') return '/ideas'
+  if (category.section === 'ideas') return '/'
   const leaf=!categories.some(child=>child.parent_id===category.id)
   if(category.section==='resources') return leaf ? '/resources?tab=' + category.slug : '/resources'
   const tab = discussionTab(categories, category.slug)
@@ -92,7 +92,7 @@ export function navigationSections(categories:Category[]) {
     const children = key === 'discuss'
       ? discussionDestinations(categories).flatMap(({ category }) => category ? [category] : [])
       : key === 'resources' ? sectionBoards(categories, key) : []
-    return {key,name:SECTION_LABELS[key],href:key==='ideas'?'/ideas':key==='resources'?'/resources':'/discuss',
+    return {key,name:SECTION_LABELS[key],href:key==='ideas'?'/':key==='resources'?'/resources':'/discuss',
       children,
       topic_count:rows.reduce((total,c)=>total+c.topic_count,0)}
   })

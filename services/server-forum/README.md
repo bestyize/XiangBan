@@ -36,7 +36,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 「龙鱼」展品播放朱红龙鱼，沿用 `/gallery-exhibits/fish/arowana/preview.html`。水族箱默认展示朱红龙鱼和砂石水草，设置中可切换蓝色龙鱼及孔雀鱼组合。两张展品封面位于 `web/assets/gallery/`。
 
-创意页 `/ideas` 的作品卡片使用 3:2 封面。首张卡通往微观展厅。碎花垂耳兔、《星夜骑士》《小王子》、Saltline 和 Oil Paint 的卡片先打开 `/ideas/works/:slug`。详情顶部通栏展示作品图片，多图时可横滑或点分页圆点切换。图片下方展示介绍、作者、来源和体验入口。体验按钮打开 `/create/run/ideas/:slug` 或作品官网。从详情打开站内作品时，关闭后回到该详情。从展厅打开的展品关闭后回到展厅。
+首页「创意」的作品卡片使用 3:2 封面。首张卡通往微观展厅。碎花垂耳兔、《星夜骑士》《小王子》、Saltline 和 Oil Paint 的卡片先打开 `/ideas/works/:slug`。详情顶部通栏展示作品图片，多图时可横滑或点分页圆点切换。图片下方展示介绍、作者、来源和体验入口。体验按钮打开 `/create/run/ideas/:slug` 或作品官网。从详情打开站内作品时，关闭后回到该详情。从展厅打开的展品关闭后回到展厅。
 
 精选作品评论使用 `/api/ideas/:slug/comments`，接受公开目录中的 `work` 和 `exhibit`。网页复用全站评论组件，手机读写同一接口。留言、回复、点赞、图片和删除沿用日报评论的处理逻辑，各作品和日报按独立存储键隔离。
 
@@ -139,7 +139,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 「小伴前沿」提供 `/frontier` 列表和详情、首页已发布文章入口、发现页 `frontier` 草稿类型与隔离的评论表，沿用发现页人工审核发布。`POST /api/discover-editor/frontier/{key}/assets` 使用允许 `frontier` 的采集令牌接收 JSON `data_base64`，限制每图 5 MiB、每篇 20 张；存入数据库并审计，只有已发布文章引用的图片通过公开接口读取。Nginx 对该前缀需设置 `client_max_body_size 7m`。采集和图文生成可由 `tools/claude-skills/xiaoban-frontier` 使用 server-ai 完成，运行需运营账号和受限采集令牌；日报关联和 SEO 暂未实现。
 
-前台路由：`/` 社区发现（推荐、精选、排行榜、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。
+前台路由：`/` 社区首页（创意、资讯、精选、排行榜、导航），默认展示创意，资讯沿用 `/?tab=recommend`、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧创意页 `/ideas` 和旧首页社区作品分类链接跳转至首页创意，旧展厅链接 `/ideas?tab=gallery` 跳转至 `/?tab=gallery`；作品详情及周刊、项目旧 Tab 继续有效。
 
 服务端对 `/`、`/t/{id}`、`/c/{slug}`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
 

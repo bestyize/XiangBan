@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import { deepStrictEqual, strictEqual } from 'node:assert'
 import { areaOf, communitySections, isCommunityRoot, safeReturnPath, sectionOf } from '../src/lib/sections.ts'
+import { homeTabOf, homeTabs } from '../src/lib/homeNavigation.ts'
 
 test('login destinations keep internal query/hash and reject external or control-character URLs', () => {
   strictEqual(safeReturnPath('/publish?pack=55#details'), true)
@@ -22,7 +23,11 @@ test('canonical resource category URLs belong to the resource section',()=>{
 })
 
 test('community navigation matches the mobile sections and contact remains reachable from Mine', () => {
-  deepStrictEqual(communitySections.map(item => item.label), ['首页', '创意', '讨论', '资源'])
+  deepStrictEqual(communitySections.map(item => item.label), ['首页', '讨论', '资源'])
+  deepStrictEqual(homeTabs.map(tab => tab.label), ['创意', '资讯', '精选', '排行榜', '导航'])
+  strictEqual(homeTabOf(undefined), 'ideas')
+  strictEqual(homeTabOf('gallery'), 'ideas')
+  strictEqual(homeTabOf('recommend'), 'recommend')
   const route = { name: 'contact', params: {} }
   strictEqual(isCommunityRoot(route), false)
   strictEqual(areaOf(route), 'me')
@@ -33,5 +38,5 @@ test('custom category slugs follow metadata instead of historical prefixes',()=>
  const categories=[{slug:'my-tools',section:'resources' as const},{slug:'create-example',section:'discuss' as const},{slug:'custom-art',section:'ideas' as const}]
  strictEqual(sectionOf({name:'category',params:{slug:'my-tools'}},categories),'resources')
  strictEqual(sectionOf({name:'category',params:{slug:'create-example'}},categories),'discuss')
- strictEqual(sectionOf({name:'category',params:{slug:'custom-art'}},categories),'ideas')
+ strictEqual(sectionOf({name:'category',params:{slug:'custom-art'}},categories),'home')
 })

@@ -44,8 +44,9 @@ test('the publish shortcut follows the current page and its active board', () =>
   deepStrictEqual(postingLocation('resources', { tab: 'software' }, rows), { section: 'resources' })
   deepStrictEqual(postingLocation('resources', { tab: 'help' }, rows), { section: 'resources', category: 'resource-help' })
   deepStrictEqual(postingLocation('category', {}, rows, 'site-feedback'), { section: 'discuss', category: 'site' })
-  deepStrictEqual(postingLocation('ideas', { category: 'xiaoban-game' }, rows), { section: 'ideas' })
-  deepStrictEqual(postingLocation('ideas', { tab: 'gallery' }, rows), { section: 'ideas' })
+  deepStrictEqual(postingLocation('home', {}, rows), { section: 'ideas' })
+  deepStrictEqual(postingLocation('home', { tab: 'gallery' }, rows), { section: 'ideas' })
+  deepStrictEqual(postingLocation('home', { tab: 'recommend' }, rows), { section: 'discuss' })
 })
 test('no eligible board is substituted for a specific unavailable board', () => {
   const withMovies = [...rows, row(8, 'resource-movies', 'resources', 7, { min_post_level: 0 })]

@@ -26,7 +26,11 @@ const routes: RouteRecordRaw[] = [
   { path: '/open-source/collections/:key', name: 'open-source-collection', component: () => import('@/views/OpenSourceCollectionView.vue') },
   { path: '/open-source/:owner/:repo', name: 'open-source-project', component: () => import('@/views/OpenSourceDetailView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
-  { path: '/ideas', name: 'ideas', component: DiscussView },
+  { path: '/ideas', name: 'ideas', redirect: to => {
+    const { category, tab, ...query } = to.query
+    if (category !== undefined) delete query.page
+    return { name: 'home', query: { ...query, tab: tab === galleryTab.key || tab === 'following' ? tab : undefined }, hash: to.hash }
+  } },
   { path: '/ideas/works/:slug', name: 'idea-work', component: () => import('@/views/IdeaWorkView.vue') },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
@@ -49,7 +53,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/t/:id(\\d+)', name: 'topic', component: () => import('@/views/TopicView.vue') },
   { path: '/t/:id(\\d+)/edit', name: 'edit', redirect: to => ({ name: 'topic', params: to.params, query: { ...to.query, postDialog: 'edit' } }) },
   { path: '/new', name: 'new', redirect: ({ query }) => ({
-    name: query.section === 'ideas' || query.section === 'resources' ? query.section : 'discuss',
+    name: query.section === 'ideas' ? 'home' : query.section === 'resources' ? 'resources' : 'discuss',
     query: { postDialog: 'new', postSection: query.section, postBoard: query.category },
   }) },
   { path: '/tag/:name', name: 'tag', component: () => import('@/views/TagView.vue') },
@@ -76,7 +80,7 @@ export const router = createRouter({
     }
     if (to.hash) return { el: to.hash, top: 80 }
     if (to.path === from.path) {
-      if (['/', '/discuss', '/ideas', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
+      if (['/', '/discuss', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
       return undefined
     }
     return { top: 0 }
@@ -88,17 +92,13 @@ router.afterEach(to => trackRoute(to.name, to.query))
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
   if (to.path === '/resources' && to.query.tab === 'docs') return { path:'/resources', replace:true }
-  if (to.name === 'ideas' && to.query.tab === galleryTab.key) {
+  if (to.name === 'home' && to.query.tab === galleryTab.key) {
     const run = galleryRunLocation(to.query.exhibit)
     if (run) return run
   }
-  if (to.path === '/ideas' && to.query.category !== undefined) {
-    const { category, page, ...query } = to.query
-    return { path:'/ideas', query, hash:to.hash, replace:true }
-  }
   if (to.path === '/discuss' && to.query.tab === 'create') {
     const { tab, filter, page, ...query } = to.query
-    return { path:'/ideas', query, hash:to.hash, replace:true }
+    return { path:'/', query, hash:to.hash, replace:true }
   }
   if (to.path === '/discuss' && to.query.tab === 'casual-media') {
     if (to.query.filter === 'movies') {
@@ -112,7 +112,7 @@ router.beforeEach((to, from) => {
     const kind = String(to.query.kind || to.query.tab || '')
     if (kind === 'schemes') return { path: '/schemes', query: {...to.query, tab: undefined, kind: undefined} }
     if (['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'].includes(kind)) {
-      return {path:'/ideas', query:{...to.query, filter:undefined, kind:undefined, tab:undefined, page:undefined}}
+      return {path:'/', query:{...to.query, filter:undefined, kind:undefined, tab:undefined, page:undefined}, hash:to.hash}
     }
   }
   if (!to.meta.auth) return

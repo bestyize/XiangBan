@@ -2,7 +2,6 @@ import type { Category } from '../api/types'
 import { canonicalCategory } from './communityStructure.ts'
 export const communitySections = [
   { key: 'home', label: '首页', path: '/' },
-  { key: 'ideas', label: '创意', path: '/ideas' },
   { key: 'discuss', label: '讨论', path: '/discuss' },
   { key: 'resources', label: '资源', path: '/resources' },
 ] as const
@@ -14,12 +13,12 @@ export function isCommunityRoot(route: Route): boolean {
 }
 export function sectionOf(route: Route, categories: Pick<Category,'slug'|'section'>[] = []): Section {
   if (['home', 'frontier', 'frontier-detail', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project', 'open-source', 'open-source-project', 'open-source-collection'].includes(String(route.name))) return 'home'
-  if (route.name === 'ideas' || route.name === 'idea-work') return 'ideas'
+  if (route.name === 'ideas' || route.name === 'idea-work') return 'home'
   if (['resources', 'tool-detail'].includes(String(route.name))) return 'resources'
   if (route.name === 'category') {
     const slug = String(route.params.slug ?? '')
     const category = categories.find(c=>c.slug===canonicalCategory(slug))
-    return category?.section === 'ideas' ? 'ideas' : category?.section === 'resources' ? 'resources' : 'discuss'
+    return category?.section === 'ideas' ? 'home' : category?.section === 'resources' ? 'resources' : 'discuss'
   }
   return 'discuss'
 }

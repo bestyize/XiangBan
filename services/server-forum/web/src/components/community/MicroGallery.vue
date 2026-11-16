@@ -22,7 +22,7 @@ function togglePhoto() {
 }
 
 function exhibitLocation(id?: string) {
-  return { name: 'ideas', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
+  return { name: 'home', query: { ...route.query, tab: galleryTab.key, exhibit: id } }
 }
 
 watch(exhibit, async (current, previous) => {
@@ -96,7 +96,7 @@ watch(exhibit, (current, _, onCleanup) => {
       ></iframe>
     </template>
     <template v-else>
-      <RouterLink :to="{ name: 'ideas' }" class="gallery-back"><AppIcon name="back" :size="16" /> 创意</RouterLink>
+      <RouterLink :to="{ name: 'home' }" class="gallery-back"><AppIcon name="back" :size="16" /> 创意</RouterLink>
       <ul class="gallery-grid">
         <li v-for="(item, index) in galleryExhibits" :key="item.id" :class="{ 'gallery-feature': index === 0 }">
           <RouterLink :id="`exhibit-${item.id}`" :to="galleryRunLocation(item.id) ?? exhibitLocation(item.id)" class="gallery-card">

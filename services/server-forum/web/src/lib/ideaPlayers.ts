@@ -23,7 +23,7 @@ export function galleryRunLocation(exhibit: unknown) {
 }
 
 export function ideaReturnLocation(id: IdeaPlayerId | undefined, hasWorkDetails: boolean) {
-  if (galleryRunLocation(id)) return { name: 'ideas', query: { tab: galleryTab.key } }
+  if (galleryRunLocation(id)) return { name: 'home', query: { tab: galleryTab.key } }
   if (id && hasWorkDetails) return { name: 'idea-work', params: { slug: id } }
-  return { name: 'ideas' }
+  return { name: 'home' }
 }

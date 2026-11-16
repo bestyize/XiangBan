@@ -38,23 +38,27 @@ import xyz.xiangban.xiaoban.common.community.ForumCategories
 import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.Load
 
-internal enum class CommunitySection(val label: String) { Home("首页"), Ideas("创意"), Discuss("讨论"), Resources("资源") }
+private enum class CommunitySection(val label: String) { Home("首页"), Discuss("讨论"), Resources("资源") }
 
 /**
- * 社区：顶部是 首页 / 创意 / 讨论 / 资源 四个栏目，每个栏目下面有自己的二级栏目。
+ * 社区：顶部是 首页 / 讨论 / 资源，首页默认展示创意。
  * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
  */
 @Composable
 fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination: (Route.NewPost) -> Unit = {}) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
-    var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
+    var homeSub by rememberSaveable { mutableStateOf(HomeSub.Ideas.key) }
     // 旧版会把热榜存为独立的首页标签。
     val legacyHotSelected = homeSub == "hot"
     var hotRankingOpenCount by rememberSaveable { mutableIntStateOf(if (legacyHotSelected) 1 else 0) }
     var discussSub by rememberSaveable { mutableStateOf(AllDiscussions) }
     var resourceSub by rememberSaveable { mutableStateOf(SoftwareResourceTab) }
-    val current = CommunitySection.valueOf(section)
-    val currentHome = if (legacyHotSelected) HomeSub.OpenSource else HomeSub.byKey(homeSub)
+    val current = CommunitySection.entries.firstOrNull { it.name == section } ?: CommunitySection.Home
+    val currentHome = when {
+        section == "Ideas" -> HomeSub.Ideas
+        legacyHotSelected -> HomeSub.OpenSource
+        else -> HomeSub.byKey(homeSub)
+    }
     val loader = rememberLoader(env, "forum-categories") { ForumCategories(env.forum.categories()) }
     val categoryState by loader.state.collectAsState()
     val catalog = (categoryState as? Load.Ready)?.value
@@ -62,8 +66,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
     val resourceTab = resourceBoards.firstOrNull { it.slug == resourceSub }?.slug ?: SoftwareResourceTab
     SideEffect {
         onPostDestination(when (current) {
-            CommunitySection.Home -> Route.NewPost()
-            CommunitySection.Ideas -> Route.NewPost(ForumSection.Ideas)
+            CommunitySection.Home -> if (currentHome == HomeSub.Ideas) Route.NewPost(ForumSection.Ideas) else Route.NewPost()
             CommunitySection.Discuss -> Route.NewPost(ForumSection.Discuss, catalog?.discussionTab(discussSub)?.category?.slug)
             CommunitySection.Resources -> Route.NewPost(ForumSection.Resources, catalog?.find(resourceTab)?.slug)
         })
@@ -75,9 +78,16 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
     }
 
     LaunchedEffect(Unit) {
+        if (section == "Ideas") {
+            section = CommunitySection.Home.name
+            homeSub = HomeSub.Ideas.key
+        }
         discussSub = when (discussSub) {
             "create" -> {
-                if (current == CommunitySection.Discuss) section = CommunitySection.Ideas.name
+                if (current == CommunitySection.Discuss) {
+                    section = CommunitySection.Home.name
+                    homeSub = HomeSub.Ideas.key
+                }
                 AllDiscussions
             }
             "casual-media" -> {
@@ -101,7 +111,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, currentHome.key, centered = true) { homeSub = it }
-                CommunitySection.Ideas, CommunitySection.Discuss -> Unit
+                CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(
                     listOf(SoftwareResourceTab to "开源软件") + resourceBoards.map { it.slug to it.name },
                     resourceTab, centered = true,
@@ -112,7 +122,8 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                     key(page.key) {
                         RetainedTabPage(selected = current == CommunitySection.Home && page == currentHome) {
                             when (page) {
-                                HomeSub.Recommend -> RecommendTab(env, open, ::openHotRanking)
+                                HomeSub.Ideas -> IdeasFeed(env, categoryState, loader::reload, open)
+                                HomeSub.News -> NewsTab(env, open, ::openHotRanking)
                                 HomeSub.OpenSource -> OpenSourceTab(env, open, hotRankingOpenCount)
                                 HomeSub.Rank -> RankTab(env, open)
                                 HomeSub.Nav -> NavTab(env)
@@ -122,7 +133,6 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                 }
                 when (current) {
                     CommunitySection.Home -> Unit
-                    CommunitySection.Ideas -> IdeasFeed(env, categoryState, loader::reload, open)
                     CommunitySection.Discuss -> LoadBox(categoryState, loader::reload) {
                         DiscussTab(env, it, discussSub, { discussSub = it }, open)
                     }
