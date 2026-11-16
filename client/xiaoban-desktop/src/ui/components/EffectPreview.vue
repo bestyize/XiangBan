@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+import { FileCode } from 'lucide-vue-next';
 import { EffectsLayer } from '../../effects/layer.ts';
-import { arowanaCover, isArowana, type EffectPack, type EffectParams } from '../../effects/types.ts';
+import { arowanaCover, isArowana, isHtmlEffect, type EffectPack, type EffectParams } from '../../effects/types.ts';
 import { previewParams, subscribeEffectStill } from './effect-stills.ts';
 
 const props = defineProps<{ pack: EffectPack; playing?: boolean; paused?: boolean; fps?: 30 | 60; tuning?: EffectParams }>();
@@ -23,7 +24,7 @@ function syncLayer() {
 }
 function loadStill() {
   unsubscribe?.(); unsubscribe = undefined;
-  if (!active) return;
+  if (!active || isHtmlEffect(props.pack)) return;
   if (isArowana(props.pack)) stillUrl.value = arowanaCover;
   else unsubscribe = subscribeEffectStill(props.pack, url => { stillUrl.value = url; });
 }
@@ -46,10 +47,12 @@ onBeforeUnmount(() => {
 <template>
   <div ref="host" class="effect-preview" :style="{ background: sky }" aria-hidden="true">
     <img v-if="stillUrl" class="effect-still" :src="stillUrl" alt="" draggable="false" />
+    <FileCode v-else-if="isHtmlEffect(pack) && (!playing || paused)" class="html-effect-still" :size="24" />
   </div>
 </template>
 <style scoped>
 .effect-preview{position:relative;width:100%;height:100%}
 .effect-still{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
+.html-effect-still{position:absolute;inset:0;margin:auto;color:var(--ui-text-on-btn);opacity:.85;pointer-events:none}
 .effects-host:not(.effects-loading) .effect-still{visibility:hidden}
 </style>

@@ -32,6 +32,7 @@ mod phone_wire;
 mod speech_agent;
 mod voice_service;
 mod storage;
+mod standalone_html;
 mod local_media;
 mod resource_packs;
 mod application_skins;
@@ -933,11 +934,28 @@ fn main() {
             app_runtime::app_runtime_game_progress, app_runtime::app_runtime_game_result, app_runtime::app_runtime_save_mbti_poster]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(chat_preview::PreviewState::default()).manage(design_mcp::DesignMcpState::default()).manage(voice_turn::VoiceTurnState::default()).manage(app_runtime::AppRuntimeState::default())
-        .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
+        .register_asynchronous_uri_scheme_protocol("wallpaper-asset", |context, request, responder| {
+            if request.uri().path().starts_with("/widget-html/") {
+                let app = context.app_handle().clone();
+                let label = context.webview_label().to_string();
+                tauri::async_runtime::spawn_blocking(move || responder.respond(widgets::serve_html(&app, &label, request)));
+            } else {
+                responder.respond(library::serve(context.app_handle(), request));
+            }
+        })
+        .register_asynchronous_uri_scheme_protocol("effect-html", |context, request, responder| {
+            let app = context.app_handle().clone();
+            let label = context.webview_label().to_string();
+            tauri::async_runtime::spawn_blocking(move || responder.respond(effects::serve_html(&app, &label, request)));
+        })
         .register_uri_scheme_protocol("chat-preview", |context, request| chat_preview::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
-        .register_uri_scheme_protocol("app-pack", |context, request| app_runtime::serve(context.app_handle(), context.webview_label(), request))
+        .register_asynchronous_uri_scheme_protocol("app-pack", |context, request, responder| {
+            let app = context.app_handle().clone();
+            let label = context.webview_label().to_string();
+            tauri::async_runtime::spawn_blocking(move || responder.respond(app_runtime::serve(&app, &label, request)));
+        })
         .manage(widget_preview::State::default())
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();

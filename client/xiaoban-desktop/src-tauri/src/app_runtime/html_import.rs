@@ -1,6 +1,7 @@
 //! Converts an ordinary local HTML document into a portable V2 app pack.
 
-use super::pack::{Files, MAX_FILE_BYTES};
+use super::pack::Files;
+use crate::standalone_html::ENTRY;
 use serde_json::{json, Value};
 use std::fmt::Write;
 
@@ -11,17 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 "#;
 
-pub const MAX_HTML_BYTES: u64 = MAX_FILE_BYTES - READY_SCRIPT.len() as u64;
+pub const LOCAL_HTML: &str = "standaloneHtml";
 
 const ICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <rect width="192" height="192" rx="36" fill="#324475"/>
   <path d="M70 71 43 96l27 25m52-50 27 25-27 25m-17-57-18 64" fill="none" stroke="#e4ebff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"##;
 
-pub fn make_pack(stem: &str, mut html: String) -> Result<(Value, Files), String> {
+pub(crate) fn check_document(html: &str) -> Result<(), String> {
     if html.trim_start_matches('\u{feff}').trim().is_empty() || html.contains('\0') {
         return Err("请选择非空的 UTF-8 HTML 文件".into());
     }
+    Ok(())
+}
+
+pub(crate) fn identity(stem: &str, fallback: &str) -> Result<(String, String), String> {
     let mut name: String = stem
         .trim()
         .chars()
@@ -30,7 +35,7 @@ pub fn make_pack(stem: &str, mut html: String) -> Result<(Value, Files), String>
         .collect();
     name.truncate(name.trim_end().len());
     if name.is_empty() {
-        name = "HTML 作品".into();
+        name = fallback.into();
     }
 
     let mut random = [0u8; 16];
@@ -39,10 +44,16 @@ pub fn make_pack(stem: &str, mut html: String) -> Result<(Value, Files), String>
     for byte in random {
         write!(id, "{byte:02x}").expect("writing to a String cannot fail");
     }
+    Ok((id, name))
+}
+
+pub fn manifest_and_artwork(stem: &str, game: bool) -> Result<(Value, Files), String> {
+    let (kind, category, fallback) = if game { ("game", "casual", "HTML 游戏") } else { ("app", "tool", "HTML 作品") };
+    let (id, name) = identity(stem, fallback)?;
     let manifest = json!({
         "schemaVersion": 3, "runtimeProtocol": 2, "id": id, "name": name,
-        "kind": "app", "category": "tool", "description": "从 HTML 导入的作品",
-        "version": "1.0.0", "entry": "index.html", "orientation": "any",
+        "kind": kind, "category": category, "description": "从 HTML 导入的作品",
+        "version": "1.0.0", "entry": ENTRY, "orientation": "any",
         "input": ["touch", "mouse", "keyboard"], "capabilities": [],
         "icon": "icon.svg", "cover": "cover.svg",
     });
@@ -57,17 +68,20 @@ pub fn make_pack(stem: &str, mut html: String) -> Result<(Value, Files), String>
   <text x="320" y="265" fill="#fff" font-family="sans-serif" font-size="23" text-anchor="middle">{title}</text>
 </svg>"##
     );
-    // Leave the author's doctype and explicit head intact. Register before page scripts
-    // so a document without xb.ready() can use the ordinary V2 startup handshake.
-    let document = html.strip_prefix('\u{feff}').unwrap_or(&html);
-    let offset = html.len() - document.len() + prolog_end(document);
-    html.insert_str(offset, READY_SCRIPT);
     let files = vec![
-        ("index.html".into(), html.into_bytes()),
         ("icon.svg".into(), ICON.as_bytes().to_vec()),
         ("cover.svg".into(), cover.into_bytes()),
     ];
     Ok((manifest, files))
+}
+
+pub fn prepare_document(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+    let mut html = String::from_utf8(bytes).map_err(|_| "作品需要使用 UTF-8 HTML")?;
+    // Preserve the original document mode and register the handshake before author scripts.
+    let document = html.strip_prefix('\u{feff}').unwrap_or(&html);
+    let offset = html.len() - document.len() + prolog_end(document);
+    html.insert_str(offset, READY_SCRIPT);
+    Ok(html.into_bytes())
 }
 
 fn html_space(c: char) -> bool {

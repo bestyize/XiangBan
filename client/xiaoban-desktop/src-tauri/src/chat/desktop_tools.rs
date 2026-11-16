@@ -330,8 +330,7 @@ impl Desktop for TauriDesktop {
 
     fn read_custom_widget(&self, id: &str) -> Result<Value, String> {
         let root = crate::storage::root(&self.app)?;
-        crate::custom_widgets::find(&root.join("custom_widgets"), id)
-            .ok_or_else(|| format!("未找到组件模板「{id}」，可用 widget_list 查看。"))
+        crate::custom_widgets::read_inline(&root.join("custom_widgets"), id)
     }
 
     fn preview_widget(&self, request: crate::widget_preview::Request, ctx: &ToolCtx) -> Result<crate::widget_preview::Preview, String> {

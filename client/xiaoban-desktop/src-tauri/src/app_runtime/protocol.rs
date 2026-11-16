@@ -27,9 +27,9 @@ pub fn csp(windows: bool, network_allowed: bool) -> String {
     let remote = if network_allowed { " https:" } else { "" };
     let remote_connect = if network_allowed { " https: wss:" } else { "" };
     format!(
-        "default-src 'none'; script-src 'self' {origin}{remote} 'unsafe-inline'; style-src 'self' {origin}{remote} 'unsafe-inline'; \
+        "default-src 'none'; script-src 'self' {origin}{remote} 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' {origin}{remote} 'unsafe-inline'; \
          img-src 'self' {origin}{remote} data: blob:; media-src 'self' {origin}{remote} data: blob:; font-src 'self' {origin}{remote} data:; \
-         connect-src 'self' {origin}{remote_connect}; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
+         connect-src 'self' {origin}{remote_connect} data: blob:; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
     )
 }
 
@@ -240,7 +240,8 @@ pub fn serve_from(root: &Path, raw_path: &str, range_header: Option<&str>) -> Se
     };
 
     let length = metadata.len();
-    if length > MAX_SERVED_BYTES {
+    let standalone = crate::game_packs::is_standalone_entry(root, &segments[0], &file_path);
+    if length > MAX_SERVED_BYTES && !standalone {
         return Served::status(413);
     }
 
@@ -248,7 +249,7 @@ pub fn serve_from(root: &Path, raw_path: &str, range_header: Option<&str>) -> Se
         return Served::status(404);
     };
 
-    if let Some(range_str) = range_header {
+    if let Some(range_str) = range_header.filter(|_| !standalone) {
         if let Some((start, end)) = parse_range(range_str, length) {
             let part_len = (end - start + 1) as usize;
             if file.seek(SeekFrom::Start(start)).is_ok() {
@@ -272,6 +273,13 @@ pub fn serve_from(root: &Path, raw_path: &str, range_header: Option<&str>) -> Se
     let mut body = Vec::with_capacity(length as usize);
     if file.read_to_end(&mut body).is_err() {
         return Served::status(500);
+    }
+
+    if standalone {
+        body = match super::html_import::prepare_document(body) {
+            Ok(body) => body,
+            Err(_) => return Served::status(400),
+        };
     }
 
     Served {

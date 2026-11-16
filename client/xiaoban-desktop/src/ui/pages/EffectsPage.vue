@@ -5,7 +5,7 @@ import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, w
 import { NAlert, NPopconfirm, NSlider, NSwitch } from 'naive-ui';
 import { Ban, Sparkles, Trash2, Download } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
-import { defaultParams, isArowana, limits, type EffectsChoice, type EffectParams } from '../../effects/types.ts';
+import { defaultParams, isArowana, isHtmlEffect, limits, type EffectsChoice, type EffectParams } from '../../effects/types.ts';
 import { aquariumLightControls, aquariumModes, defaultAquarium, lightValue, normalizeAquarium, type AquariumLight, type AquariumMode } from '../../effects/arowana/settings.ts';
 import type { ControlStore } from '../control-types.ts';
 import EffectPreview from '../components/EffectPreview.vue';
@@ -22,6 +22,8 @@ const packs = computed(() => props.store.effectList.packs);
 const visiblePacks=computed(()=>packs.value.filter(pack=>filter.value==='mine'?pack.source==='user':filter.value==='desk'?pack.id===choice.value.selected:true));
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
 const aquariumSelected = computed(() => isArowana(chosen.value));
+const htmlSelected = computed(() => isHtmlEffect(chosen.value));
+const importing = ref(false);
 // A saved desktop selection does not autoplay when this page opens.
 const previewId = ref('');
 const hoveredId = ref('');
@@ -103,11 +105,14 @@ async function reload(announce: boolean) {
   catch (error) { props.store.notify(message(error), 'error'); }
 }
 async function importPack() {
+  if (importing.value) return;
+  importing.value = true;
   try {
     const outcome = await props.store.importEffectPack();
     if (outcome.status === 'imported') {filter.value='mine';props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');}
     else if (outcome.status === 'declined') props.store.notify(`特效「${outcome.id}」已经存在，没有替换`, 'info');
   } catch (error) { props.store.notify(message(error), 'error'); }
+  finally { importing.value = false; }
 }
 async function removeEffect(id: string, name: string) {
   try {
@@ -124,7 +129,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
 <template>
   <section class="effects-page" data-testid="effects-page">
     <StudioActions>
-      <button type="button" class="xb-btn" data-testid="effects-import" @click="importPack"><Download :size="14" />导入</button>
+      <button type="button" class="xb-btn" data-testid="effects-import" :disabled="importing" title="支持 ZIP、JSON 和单个 HTML 文件" aria-description="支持 ZIP、JSON 和单个 HTML 文件" @click="importPack"><Download :size="14" />导入</button>
       <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="effects-create" @click="store.startCreation('effect')"><Sparkles :size="14" />让小伴创作</button>
     </StudioActions>
     <div class="fx-browser">
@@ -142,11 +147,11 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </button>
         <div v-for="pack in visiblePacks" :key="pack.id" class="effect-card-wrapper" :class="{ user: pack.source === 'user' }">
           <button class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" :title="pack.description" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
-            <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id && !(aquariumSelected && chosen?.id === pack.id)" :paused="store.settings.paused" :fps="store.settings.fps" /><i v-if="chosen?.id === pack.id" class="lb">使用中</i></span>
+            <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id && !((aquariumSelected || isHtmlEffect(pack)) && chosen?.id === pack.id)" :paused="store.settings.paused" :fps="store.settings.fps" /><i v-if="chosen?.id === pack.id" class="lb">使用中</i></span>
             <span class="effect-name"><b>{{ pack.name }}</b></span>
           </button>
           <div v-if="pack.source === 'user'" class="card-tools">
-            <ResourceShareActions icons :store="store" kind="effect" :id="pack.id" />
+            <ResourceShareActions icons :store="store" kind="effect" :id="pack.id" :local-only="isHtmlEffect(pack)" />
             <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="removeEffect(pack.id, pack.name)">
               <template #trigger><button class="effect-delete-btn" title="删除这个自定义特效" :aria-label="`删除特效 ${pack.name}`" :data-testid="`delete-effect-${pack.id}`" @click.stop><Trash2 :size="13" /></button></template>
               确定要删除自定义特效「{{ pack.name }}」吗？
@@ -154,9 +159,9 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
           </div>
         </div>
       </div>
-      <div v-if="filter === 'mine' && !visiblePacks.length" class="xb-empty" data-testid="custom-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>还没有自定义特效</h3><p>点右上角“导入”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。</p></div>
+      <div v-if="filter === 'mine' && !visiblePacks.length" class="xb-empty" data-testid="custom-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>还没有自定义特效</h3><p>可以导入 ZIP、JSON 或单文件 HTML，也可以让小伴创作。</p></div>
       <div v-if="filter === 'desk' && !visiblePacks.length" class="xb-empty" data-testid="desktop-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>当前没有使用特效</h3><p>挑选喜欢的特效，点一下即可应用到桌面。</p><button type="button" class="xb-link" @click="filter = 'all'">去挑选特效</button></div>
-      <p class="fx-notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
+      <p class="fx-notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。{{ store.settings.paused ? '桌面动画目前已暂停。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
     </div>
     </div>
     <aside class="fx-inspector" aria-label="特效设置" data-testid="effect-inspector">
@@ -172,7 +177,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
           <option v-for="monitor in monitors" :key="monitor.id" :value="monitor.id">{{ monitor.name }}{{ monitor.primary ? '（主屏）' : '' }}</option>
         </select>
       </label>
-      <section v-if="chosen" class="fx-tuning" data-testid="effect-tuning">
+      <section v-if="chosen && !htmlSelected" class="fx-tuning" data-testid="effect-tuning">
         <label v-if="aquariumSelected" class="kv"><span>鱼类组合</span>
           <select class="fx-display" :value="aquarium.mode" data-testid="aquarium-mode" @change="changeAquariumMode(($event.target as HTMLSelectElement).value as AquariumMode)">
             <option v-for="mode in aquariumModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
@@ -195,7 +200,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </details>
       </section>
       <div class="kv row"><div class="grow"><span>伙伴跟着做表情</span><small>只换表情，不弹窗、不出声</small></div><NSwitch :value="store.settings.companionLinks" data-testid="effect-companion-links" @update:value="setLinks" /></div>
-      <div class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
+      <div v-if="!htmlSelected" class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
     </aside>
   </section>
 </template>

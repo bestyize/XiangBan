@@ -1,6 +1,6 @@
 //! Portable authoring resources, shared as plain `.zip` files so any tool can make or open them.
 //! Packs contain templates, never runtime user data or saves. The layout is in docs/resource-pack-format.md.
-use crate::{app_runtime::pack as app_pack, custom_widgets, effect_packs, game_packs, local_media, pet_packs};
+use crate::{app_runtime::pack as app_pack, custom_widgets, effect_packs, game_packs, local_media, pet_packs, standalone_html};
 use crate::app_runtime::html_import;
 use serde_json::{json, Value};
 use std::{
@@ -16,7 +16,7 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 const MAX_PACK: u64 = 32 * 1024 * 1024;
 /// A game holds at most 40 text files and 60 assets, plus the manifest.
 const MAX_ENTRIES: usize = 110;
-/// The largest single file a pack may hold is a wallpaper page.
+/// Desktop resource entry limit, except for the HTML effect document.
 const MAX_ENTRY: u64 = 4 * 1024 * 1024;
 
 pub struct Pack {
@@ -40,7 +40,7 @@ fn game_orientation(value: &Value) -> Result<Option<&str>, String> {
     }
 }
 
-fn read_bytes(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+pub(crate) fn read_bytes(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
     let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() > limit {
         return Err("资源文件过大或不是普通文件".into());
@@ -118,16 +118,23 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
         }
         "effect" => {
             if effect_packs::is_builtin_id(id) { return Err("只能导出自创特效".into()); }
-            let mut pack = effect_packs::find(&root.join("effects"), id).ok_or("没有找到自创特效")?;
+            let directory = root.join("effects");
+            let mut pack = effect_packs::find(&directory, id).ok_or("没有找到自创特效")?;
+            if pack["renderer"] == "html" {
+                let path = effect_packs::html::document(&directory, id)?;
+                let html = read_bytes(&path, effect_packs::html::MAX_ZIP_HTML_BYTES)
+                    .map_err(|error| format!("{error}（特效 ZIP 内单个 HTML 最多 16 MiB）"))?;
+                effect_packs::html::validate_document(&html)?;
+                return Ok(Pack { kind: "effect".into(), data: effect_packs::html::normalize_manifest(&pack)?,
+                    assets: vec![(effect_packs::html::ENTRY.into(), html)] });
+            }
             effect_packs::validate(&pack)?;
             if let Some(object) = pack.as_object_mut() { object.remove("source"); }
             pack
         }
         "widget" => {
             if !custom_widgets::valid_widget_id(id) { return Err("组件标识不合法".into()); }
-            let pack = custom_widgets::find(&root.join("custom_widgets"), id).ok_or("没有找到自创组件")?;
-            custom_widgets::validate(&pack)?;
-            pack
+            custom_widgets::read_inline(&root.join("custom_widgets"), id)?
         }
         "game" | "app" => {
             let manifest = game_packs::find_user_game(root, id)?;
@@ -228,8 +235,9 @@ fn kind_label(kind: &str) -> &'static str {
 
 fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
     let app_v2 = pack.data["runtimeProtocol"] == 2 && matches!(pack.kind.as_str(), "game" | "app");
+    let effect_html = pack.kind == "effect" && pack.data["schemaVersion"] == app_pack::SCHEMA_VERSION;
     let entries;
-    let (manifest, files) = if app_v2 {
+    let (manifest, files) = if app_v2 || effect_html {
         (&pack.data, &pack.assets)
     } else {
         entries = zip_entries(pack)?;
@@ -238,9 +246,7 @@ fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
     let manifest_bytes = if app_v2 { serde_json::to_vec(manifest) } else { serde_json::to_vec_pretty(manifest) }
         .map_err(|e| e.to_string())?;
     if !app_v2 {
-        if let Some((name, _)) = files.iter().find(|(_, content)| content.len() as u64 > MAX_ENTRY) {
-            return Err(format!("文件「{name}」超过 4 MB"));
-        }
+        check_desktop_entry_sizes(files, effect_html.then_some(effect_packs::html::ENTRY))?;
         let total = files.iter().map(|(_, content)| content.len() as u64).sum::<u64>();
         if total + manifest_bytes.len() as u64 > MAX_PACK {
             return Err("资源包解压后不能超过 32 MB".into());
@@ -260,6 +266,16 @@ fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
         return Err(if app_v2 { "V2 作品 ZIP 不能超过 100 MB" } else { "资源包不能超过 32 MB" }.into());
     }
     Ok(content)
+}
+
+fn check_desktop_entry_sizes(files: &[(String, Vec<u8>)], html_effect_entry: Option<&str>) -> Result<(), String> {
+    for (name, content) in files {
+        let limit = if html_effect_entry == Some(name.as_str()) { effect_packs::html::MAX_ZIP_HTML_BYTES } else { MAX_ENTRY };
+        if content.len() as u64 > limit {
+            return Err(format!("文件「{name}」超过 {} MB", limit / (1024 * 1024)));
+        }
+    }
+    Ok(())
 }
 
 fn clean_name(raw: &str) -> Result<String, String> {
@@ -317,9 +333,6 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     }
     if bytes.len() as u64 > MAX_PACK || total > MAX_PACK { return Err("桌面资源包不能超过 32 MB".into()); }
     if archive.len() > MAX_ENTRIES { return Err(format!("压缩包里的文件太多，最多 {MAX_ENTRIES} 个")); }
-    if let Some((name, _)) = entries.iter().find(|(_, content)| content.len() as u64 > MAX_ENTRY) {
-        return Err(format!("文件「{name}」超过 4 MB"));
-    }
     let kind = text(&manifest, "kind")?.to_string();
     let version = manifest.get("schemaVersion").and_then(Value::as_u64);
     let entry = if resource_entry(&kind).is_some() {
@@ -336,14 +349,16 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
         let ext = app_pack::check_file_path(entry)?;
         if matches!(kind.as_str(), "wallpaper" | "widget") {
             if !matches!(ext.as_str(), "html" | "htm") { return Err("entry 需要指向 HTML 文件".into()); }
-        } else if ext != "json" {
-            return Err("entry 需要指向 JSON 文件".into());
+        } else if ext != "json" && !(kind == "effect" && standalone_html::is_html(Path::new(entry))) {
+            return Err(if kind == "effect" { "entry 需要指向特效 JSON 或 HTML 文件" } else { "entry 需要指向 JSON 文件" }.into());
         }
         entry
     } else {
         if !matches!(version, Some(1 | 2)) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
         "index.html"
     };
+    let effect_html = kind == "effect" && standalone_html::is_html(Path::new(entry));
+    check_desktop_entry_sizes(&entries, effect_html.then_some(entry))?;
     let payload = || file(entry).ok_or_else(|| format!("压缩包里缺少 {entry}"));
     // Only the listed files are read. Anything else would be dropped without a word, so it is refused instead.
     let allowed = ["manifest.json", entry];
@@ -357,6 +372,13 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
             };
             return Err(format!("{}包里只能有 {}，多出了：{}。{hint}", kind_label(&kind), allowed.join("、"), extra.join("、")));
         }
+    }
+    if effect_html {
+        let data = effect_packs::html::normalize_manifest(&manifest)?;
+        let (_, document) = entries.into_iter().find(|(name, _)| name == entry)
+            .ok_or_else(|| format!("压缩包里缺少 {entry}"))?;
+        effect_packs::html::validate_document(&document)?;
+        return Ok(Pack { kind, data, assets: vec![(effect_packs::html::ENTRY.into(), document)] });
     }
     let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
     let data = match kind.as_str() {
@@ -426,9 +448,16 @@ fn import_pack(root: &Path, pack: Pack) -> Result<Value, String> {
             (item.id, item.title)
         }
         "effect" => {
-            if effect_packs::find(&root.join("effects"), text(data, "id")?).is_some() { return Err("同名特效已存在，请先修改资源包的 id 或移除原作品".into()); }
-            effect_packs::save(&root.join("effects"), data, false)?;
-            (text(data, "id")?.to_string(), text(data, "name")?.to_string())
+            let id = text(data, "id")?;
+            let name = text(data, "name")?;
+            let directory = root.join("effects");
+            if data["schemaVersion"] == app_pack::SCHEMA_VERSION && pack.assets.len() == 1 {
+                effect_packs::html::save(&directory, data, &pack.assets[0].1)?;
+            } else {
+                if effect_packs::find(&directory, id).is_some() { return Err("同名特效已存在，请先修改资源包的 id 或移除原作品".into()); }
+                effect_packs::save(&directory, data, false)?;
+            }
+            (id.to_string(), name.to_string())
         }
         "widget" => {
             if !custom_widgets::valid_widget_id(text(data, "id")?) { return Err("组件标识不合法".into()); }
@@ -471,31 +500,37 @@ pub async fn export_resource_pack(window: tauri::WebviewWindow, kind: String, id
 #[tauri::command]
 pub async fn import_resource_pack(
     window: tauri::WebviewWindow,
-    allow_html: Option<bool>,
+    html_kind: Option<HtmlKind>,
 ) -> Result<Option<Value>, String> {
     if window.label() != "control" { return Err("只能从控制台导入资源".into()); }
     let app = window.app_handle().clone();
-    let allow_html = allow_html.unwrap_or(false);
     tauri::async_runtime::spawn_blocking(move || {
         let dialog = app.dialog().file();
-        let dialog = if allow_html {
-            dialog.set_title("导入作品").add_filter("作品文件（ZIP、HTML）", &["zip", "html", "htm"])
+        let dialog = if let Some(kind) = html_kind {
+            dialog.set_title(match kind {
+                HtmlKind::App => "导入作品", HtmlKind::Game => "导入游戏", HtmlKind::Widget => "导入组件",
+                HtmlKind::Effect => "导入特效", HtmlKind::Wallpaper => "导入壁纸",
+            })
+                .add_filter("ZIP 资源包或单文件 HTML", &["zip", "html", "htm"])
         } else {
             dialog.set_title("导入小伴资源包").add_filter("小伴资源包（zip）", &["zip"])
         };
         let Some(file) = dialog.blocking_pick_file() else { return Ok(None); };
         let path = file.into_path().map_err(|_| "请选择本机文件")?;
-        let pack = pack_from_file(&path, allow_html)?;
-        if pack.kind == "pet" {
-            let theme: pet_packs::Theme = serde_json::from_value(pack.data).map_err(|e|e.to_string())?;
-            let result = json!({"kind":"pet", "id":theme.id, "name":theme.name});
-            crate::pets::save_theme(&app, theme, false)?;
-            return Ok(Some(result));
-        }
         let root = crate::storage::root(&app)?;
-        // Wallpaper creation and downloads share the same catalog lock.
-        let result = {
-            let state = app.state::<crate::content::ContentState>();
+        let state = app.state::<crate::content::ContentState>();
+        let result = if let Some(kind) = html_kind.filter(|_| standalone_html::is_html(&path)) {
+            let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
+            import_html(&root, &path, kind)?
+        } else {
+            let pack = from_zip(&read_bytes(&path, app_pack::MAX_PACK_BYTES)?)?;
+            if pack.kind == "pet" {
+                let theme: pet_packs::Theme = serde_json::from_value(pack.data).map_err(|e|e.to_string())?;
+                let result = json!({"kind":"pet", "id":theme.id, "name":theme.name});
+                crate::pets::save_theme(&app, theme, false)?;
+                return Ok(Some(result));
+            }
+            // Wallpaper creation and downloads share the same catalog lock.
             let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
             import_pack(&root, pack)?
         };
@@ -506,15 +541,41 @@ pub async fn import_resource_pack(
     }).await.map_err(|e| e.to_string())?
 }
 
-fn pack_from_file(path: &Path, allow_html: bool) -> Result<Pack, String> {
-    let html = path.extension().and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ["html", "htm"].iter().any(|candidate| ext.eq_ignore_ascii_case(candidate)));
-    if html && allow_html {
-        let stem = path.file_stem().and_then(|name| name.to_str()).unwrap_or_default();
-        let (data, assets) = html_import::make_pack(stem, read_text(path, html_import::MAX_HTML_BYTES)?)?;
-        return Ok(Pack { kind: "app".into(), data, assets });
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HtmlKind {
+    App,
+    Game,
+    Widget,
+    Effect,
+    Wallpaper,
+}
+
+pub(crate) fn import_html(root: &Path, path: &Path, kind: HtmlKind) -> Result<Value, String> {
+    if !standalone_html::is_html(path) { return Err("请选择 HTML 或 HTM 文件".into()); }
+    let stem = path.file_stem().and_then(|name| name.to_str()).unwrap_or_default();
+    match kind {
+        HtmlKind::App | HtmlKind::Game => {
+            let game = matches!(kind, HtmlKind::Game);
+            let installed = game_packs::import_html(root, path, stem, game)?;
+            Ok(json!({"kind": if game { "game" } else { "app" }, "id": installed["id"], "name": installed["name"]}))
+        }
+        HtmlKind::Widget => {
+            let (id, name) = html_import::identity(stem, "HTML 组件")?;
+            custom_widgets::import_html(&root.join("custom_widgets"), path, &id, &name)?;
+            Ok(json!({"kind": "widget", "id": id, "name": name}))
+        }
+        HtmlKind::Effect => {
+            let (id, name) = html_import::identity(stem, "HTML 特效")?;
+            let data = json!({"id": id, "name": name});
+            effect_packs::html::save_document(&root.join("effects"), &data, |target| standalone_html::copy(path, target))?;
+            Ok(json!({"kind": "effect", "id": id, "name": name}))
+        }
+        HtmlKind::Wallpaper => {
+            let item = local_media::import_file(&root.join("wallpapers"), path)?;
+            Ok(json!({"kind": "wallpaper", "id": item.id, "name": item.title}))
+        }
     }
-    from_zip(&read_bytes(path, app_pack::MAX_PACK_BYTES)?)
 }
 
 #[cfg(test)]
@@ -569,9 +630,7 @@ mod tests {
         let body = "<title>计数</title></head><body><button onclick='this.textContent++'>0</button></body></html>";
         let html = format!("{prolog}{body}");
         fs::write(&input, &html).unwrap();
-        assert!(pack_from_file(&input, false).is_err());
-
-        let install = || import_pack(&root, pack_from_file(&input, true).unwrap()).unwrap();
+        let install = || import_html(&root, &input, HtmlKind::App).unwrap();
         let imported = install();
         let id = imported["id"].as_str().unwrap();
         assert_ne!(imported["id"], install()["id"]);
@@ -599,6 +658,100 @@ mod tests {
         assert!(files.iter().any(|(path, bytes)| path == "cover.svg"
             && String::from_utf8_lossy(bytes).contains("计数 &amp; 练习")));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn one_htm_file_becomes_the_chosen_desktop_resource() {
+        let root = temp_root("html-desktop-resource");
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("动画演示.HTM");
+        let html = "<!doctype html><style>body{background:transparent}</style><b>hello</b>";
+        fs::write(&path, html).unwrap();
+
+        let result = import_html(&root, &path, HtmlKind::Widget).unwrap();
+        let widget_id = result["id"].as_str().unwrap();
+        assert_eq!(result["kind"], "widget");
+        assert_eq!(result["name"], "动画演示");
+        let widgets = root.join("custom_widgets");
+        assert_eq!(custom_widgets::find(&widgets, widget_id).unwrap()["standaloneHtml"], true);
+        assert_eq!(fs::read_to_string(custom_widgets::standalone_document(&widgets, widget_id).unwrap()).unwrap(), html);
+        assert_eq!(zip_manifest(&to_zip(&export(&root, "widget", widget_id).unwrap()).unwrap())["kind"], "widget");
+
+        let wallpaper = import_html(&root, &path, HtmlKind::Wallpaper).unwrap();
+        assert_eq!(wallpaper["kind"], "wallpaper");
+        let wallpapers = local_media::read(&root.join("wallpapers")).unwrap();
+        assert_eq!(wallpapers.items[0].id, wallpaper["id"].as_str().unwrap());
+        assert_eq!(wallpapers.items[0].kind, "web");
+
+        let game = import_html(&root, &path, HtmlKind::Game).unwrap();
+        assert_eq!(game["kind"], "game");
+        assert_eq!(game_packs::find_user_game(&root, game["id"].as_str().unwrap()).unwrap()["kind"], "game");
+
+        // An embedded model can be larger than the ordinary desktop entry limit.
+        let large_html = format!("{html}<!--{}-->", "x".repeat(MAX_ENTRY as usize));
+        fs::write(&path, &large_html).unwrap();
+        let result = import_html(&root, &path, HtmlKind::Effect).unwrap();
+        let effect_id = result["id"].as_str().unwrap();
+        assert_eq!(result["kind"], "effect");
+        let directory = root.join("effects");
+        let listed = effect_packs::find(&directory, effect_id).unwrap();
+        assert_eq!(listed["renderer"], "html");
+        assert_eq!(listed["name"], "动画演示");
+        assert!(listed.get("html").is_none());
+
+        let zip = to_zip(&export(&root, "effect", effect_id).unwrap()).unwrap();
+        let manifest = zip_manifest(&zip);
+        assert_eq!(manifest["entry"], "index.html");
+        assert_eq!(manifest["schemaVersion"], 3);
+        assert!(import(&root, &zip).is_err(), "duplicate import cannot replace the original");
+        let restored = root.join("restored");
+        import(&restored, &zip).unwrap();
+        assert_eq!(fs::read_to_string(effect_packs::html::document(&restored.join("effects"), effect_id).unwrap()).unwrap(), large_html);
+        effect_packs::delete(&directory, effect_id).unwrap();
+        assert!(effect_packs::find(&directory, effect_id).is_none());
+        assert!(effect_packs::html::document(&directory, effect_id).is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn standalone_html_is_not_bounded_by_zip_or_inline_widget_limits() {
+        let root = temp_root("large-standalone-html");
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("大型模型.html");
+        let mut input = fs::File::create(&path).unwrap();
+        input.write_all(b"<!doctype html><meta charset='utf-8'><b>model</b><!--").unwrap();
+        let chunk = vec![b'x'; 1024 * 1024];
+        for _ in 0..65 { input.write_all(&chunk).unwrap(); }
+        input.write_all(b"-->").unwrap();
+        drop(input);
+        let length = fs::metadata(&path).unwrap().len();
+
+        let widget = import_html(&root, &path, HtmlKind::Widget).unwrap();
+        let id = widget["id"].as_str().unwrap();
+        let widgets = root.join("custom_widgets");
+        let listed = custom_widgets::load_user(&widgets);
+        assert_eq!(listed[0]["standaloneHtml"], true);
+        assert!(listed[0].get("html").is_none());
+        assert_eq!(fs::metadata(custom_widgets::standalone_document(&widgets, id).unwrap()).unwrap().len(), length);
+        assert!(export(&root, "widget", id).is_err());
+        custom_widgets::remove(&widgets, id).unwrap();
+
+        let effect = import_html(&root, &path, HtmlKind::Effect).unwrap();
+        let id = effect["id"].as_str().unwrap();
+        let effects = root.join("effects");
+        assert_eq!(effect_packs::find(&effects, id).unwrap()["renderer"], "html");
+        assert_eq!(fs::metadata(effect_packs::html::document(&effects, id).unwrap()).unwrap().len(), length);
+        assert!(export(&root, "effect", id).is_err());
+        effect_packs::delete(&effects, id).unwrap();
+
+        let app = import_html(&root, &path, HtmlKind::App).unwrap();
+        let id = app["id"].as_str().unwrap();
+        let served = crate::app_runtime::protocol::serve_for(&root, &format!("app-runtime-{id}"), &format!("/{id}/index.html"), None);
+        assert_eq!(served.status, 200);
+        assert!(served.body.len() as u64 > length);
+        assert!(served.body.starts_with(b"<!doctype html><script>"));
+        assert!(export(&root, "app", id).is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

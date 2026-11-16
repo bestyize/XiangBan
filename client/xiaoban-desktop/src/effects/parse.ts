@@ -105,7 +105,8 @@ export type ParsedPack = { ok: true; pack: EffectPack } | { ok: false; error: st
 /** Checks a pack read from a file and returns a safe copy: every number is clamped, every path and colour verified. */
 export function parsePack(raw: unknown): ParsedPack {
   if (!isObj(raw)) return { ok: false, error: "特效包不是一个对象" };
-  if (raw.schemaVersion !== 1) return { ok: false, error: "不支持这个 schemaVersion（需要 1）" };
+  const htmlEffect = raw.schemaVersion === 3 && raw.kind === "effect" && raw.renderer === "html" && raw.source === "user";
+  if (raw.schemaVersion !== 1 && !htmlEffect) return { ok: false, error: "不支持这个 schemaVersion（粒子特效需要 1）" };
   if (typeof raw.id !== "string" || !limits.idPattern.test(raw.id)) return { ok: false, error: "id 只能用小写字母、数字、- 和 _，且不超过 48 个字符" };
   if (typeof raw.name !== "string" || !raw.name.trim()) return { ok: false, error: "缺少 name" };
   const sky = Array.isArray(raw.sky) ? raw.sky.filter((c): c is string => hexToRgb(c) !== null).slice(0, 4) : [];
@@ -117,6 +118,12 @@ export function parsePack(raw: unknown): ParsedPack {
     return raw.source === "builtin" && isArowana(pack)
       ? { ok: true, pack }
       : { ok: false, error: "arowana 是内置特效的名字" };
+  }
+  if (htmlEffect) {
+    if (typeof raw.revision !== "string" || !/^\d{1,24}-\d{1,24}$/.test(raw.revision)) {
+      return { ok: false, error: "HTML 特效缺少有效的文件版本" };
+    }
+    return { ok: true, pack: { ...pack, htmlRevision: raw.revision } };
   }
   if (!Array.isArray(raw.layers) || raw.layers.length === 0 || raw.layers.length > limits.layers) return { ok: false, error: `layers 需要 1 到 ${limits.layers} 层` };
   for (const [index, item] of raw.layers.entries()) {

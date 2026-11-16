@@ -751,7 +751,7 @@ pub fn serve(
     };
     if request.uri().path() == "/widget-sandbox" {
         return tauri::http::Response::builder().header("Content-Type","text/html; charset=utf-8")
-            .header("Content-Security-Policy","default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
+            .header("Content-Security-Policy","default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src data:; connect-src data: blob:; worker-src blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
             .header("X-Content-Type-Options","nosniff").header("Cache-Control","no-store")
             .body(include_bytes!("../../public/widgets/sandbox.html").to_vec()).unwrap();
     }

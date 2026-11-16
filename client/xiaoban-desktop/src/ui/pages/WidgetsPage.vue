@@ -123,7 +123,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);clearTimeout(fl
 <template>
 <section class="widgets-page" data-testid="widgets-page">
  <StudioActions>
-  <ResourceShareActions :store="store" kind="widget" variant="xb" import-label="导入" :disabled="busy" @imported="onImported"/>
+  <ResourceShareActions :store="store" kind="widget" variant="xb" import-label="导入" html-kind="widget" :disabled="busy" @imported="onImported"/>
   <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><Sparkles :size="14"/>让小伴创作</button>
  </StudioActions>
  <div class="wd-toolbar">
@@ -162,7 +162,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);clearTimeout(fl
    <div v-if="filter==='mine'&&!userCustomWidgets.length" class="xb-empty" data-testid="custom-empty">
     <span class="xb-empty-icon"><Sparkles :size="24"/></span>
     <h3>还没有自定义组件</h3>
-    <p>点击右上角的“导入”导入资源包，或点击“让小伴创作”让小伴为你编写。</p>
+    <p>可以导入 ZIP 资源包或单文件 HTML，也可以让小伴创作。</p>
     <button v-if="store.desktop" type="button" class="xb-btn" @click="store.startCreation('widget')">让小伴写一个组件</button>
    </div>
    <div v-else class="gallery" :data-testid="filter==='mine'?'custom-widgets':'widget-gallery'">

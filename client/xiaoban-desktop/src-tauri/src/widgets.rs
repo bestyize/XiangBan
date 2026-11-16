@@ -386,6 +386,26 @@ pub fn list_custom_widgets(app:tauri::AppHandle)->Result<Value,String>{
     Ok(json!(crate::custom_widgets::load_all(&custom_dir(&root))))
 }
 
+pub fn serve_html(app: &tauri::AppHandle, label: &str, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Method, Response};
+    let document = if (label == "control" || is_widget(label)) && request.method() == Method::GET {
+        request.uri().path().strip_prefix("/widget-html/").and_then(|id| {
+            let root = crate::storage::root(app).ok()?;
+            let path = crate::custom_widgets::standalone_document(&custom_dir(&root), id).ok()?;
+            std::fs::read(path).ok()
+        })
+    } else { None };
+    let (status, bytes) = document.map_or((404, Vec::new()), |bytes| (200, bytes));
+    // The trusted widget surface reads text and passes it to its sandbox. This URL cannot execute the document.
+    Response::builder().status(status)
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Cache-Control", "no-store")
+        .body(bytes).unwrap_or_default()
+}
+
 #[tauri::command]
 pub async fn save_custom_widget(app:tauri::AppHandle,pack:Value,overwrite:Option<bool>)->Result<Value,String>{
     let root=crate::storage::root(&app)?;

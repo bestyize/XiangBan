@@ -100,7 +100,7 @@ it('switches to My Works after importing a V2 small app from the header', async 
     await wrapper.get('[data-testid="apps-search-input"]').setValue('other work');
     await wrapper.get('[data-testid="import-resource"]').trigger('click');
     await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('import_resource_pack', { allowHtml: true });
+    expect(invoke).toHaveBeenCalledWith('import_resource_pack', { htmlKind: 'app' });
     expect(store.listGames).toHaveBeenCalledTimes(2);
     const tile = wrapper.get('[data-testid="user-apps"] .featured-app');
     expect(tile.text()).toBe(userApp.name);

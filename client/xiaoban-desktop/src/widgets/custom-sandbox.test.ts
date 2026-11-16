@@ -13,8 +13,8 @@ describe('custom widget isolated shell',()=>{
   new Function('parent','document','addEventListener','removeEventListener',script)(parent,doc,add,remove);
   expect(parent.postMessage).toHaveBeenCalledWith({type:'xiaoban-widget-shell-ready'},'*');
   const send=(source:unknown,data:unknown)=>listeners.get('message')?.({source,data});
-  const init={type:'xiaoban-widget-init',html:'<button>+1</button><script>window.count=0</script>'};
-  send({},init);send(parent,{...init,type:'other'});send(parent,{...init,html:0});send(parent,{...init,html:'x'.repeat(256*1024+1)});
+  const init={type:'xiaoban-widget-init',html:`<button>+1</button><script>window.count=0</script><!--${'x'.repeat(300*1024)}-->`};
+  send({},init);send(parent,{...init,type:'other'});send(parent,{...init,html:0});
   expect(doc.open).not.toHaveBeenCalled();
   send(parent,init);send(parent,init);
   expect(doc.open).toHaveBeenCalledOnce();expect(doc.write).toHaveBeenCalledExactlyOnceWith(init.html);expect(doc.close).toHaveBeenCalledOnce();
@@ -23,7 +23,8 @@ describe('custom widget isolated shell',()=>{
   const doc=new DOMParser().parseFromString(shell,'text/html');
   const csp=doc.querySelector('meta[http-equiv="Content-Security-Policy"]')!.getAttribute('content')!;
   expect(csp).toContain("script-src 'unsafe-inline'");
-  for(const directive of ['connect-src','frame-src','object-src','base-uri','form-action'])expect(csp).toContain(`${directive} 'none'`);
+  expect(csp.split(';').map(directive=>directive.trim()).find(directive=>directive.startsWith('connect-src '))).toBe('connect-src data: blob:');
+  for(const directive of ['frame-src','object-src','base-uri','form-action'])expect(csp).toContain(`${directive} 'none'`);
   const rust=readFileSync('src-tauri/src/library.rs','utf8');
   expect(rust).toContain(`.header("Content-Security-Policy","${csp}")`);
   expect(rust).toContain('include_bytes!("../../public/widgets/sandbox.html")');

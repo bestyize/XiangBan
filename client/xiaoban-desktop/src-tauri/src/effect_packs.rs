@@ -1,6 +1,5 @@
-//! Effect packs: the data files that describe each particle effect. The built-in ones are compiled into the app;
-//! more can be dropped into the `effects` folder of the user data directory. The host only checks that a file is
-//! a sound JSON object with a usable id; the page that draws it checks and clamps every number again.
+//! Built-in effects and the user's particle JSON and HTML effects.
+pub(crate) mod html;
 use crate::effect_choice::valid_id;
 use serde_json::{json, Value};
 use std::{collections::HashSet, fs, path::{Path, PathBuf}};
@@ -56,10 +55,27 @@ pub fn load_user(directory: &Path, taken: &mut HashSet<String>) -> Packs {
             let id = pack["id"].as_str().filter(|id| valid_id(id)).ok_or("缺少有效的 id（小写字母、数字、- 和 _）")?.to_string();
             if pack["schemaVersion"] != 1 { return Err("schemaVersion 需要是 1".into()); }
             if !taken.insert(id.clone()) { return Err(format!("id「{id}」已被其他特效使用")); }
+            if let Some(fields) = pack.as_object_mut() { fields.remove("renderer"); }
             pack["source"] = json!("user");
             Ok(pack)
         })();
         match outcome { Ok(pack) => result.packs.push(pack), Err(error) => result.errors.push(format!("{name}：{error}")) }
+    }
+    let base = html::folder(directory);
+    if fs::symlink_metadata(&base).is_ok_and(|meta| meta.is_dir()) {
+        if let Ok(entries) = fs::read_dir(&base) {
+            let mut ids: Vec<_> = entries.flatten().filter_map(|entry| entry.file_name().into_string().ok())
+                .filter(|id| valid_id(id)).collect();
+            ids.sort();
+            for id in ids {
+                if result.packs.len() >= MAX_USER_PACKS { break; }
+                match html::catalog_entry(directory, &id) {
+                    Ok(pack) if taken.insert(id.clone()) => result.packs.push(pack),
+                    Ok(_) => result.errors.push(format!("html/{id}：id 已被其他特效使用")),
+                    Err(error) => result.errors.push(format!("html/{id}：{error}")),
+                }
+            }
+        }
     }
     result
 }
@@ -148,6 +164,7 @@ pub fn validate(pack: &Value) -> Result<(), String> {
 pub fn save(directory: &Path, pack: &Value, overwrite: bool) -> Result<PathBuf, String> {
     validate(pack)?;
     let id = pack["id"].as_str().unwrap_or_default();
+    if html::occupied(directory, id) { return Err(format!("id「{id}」已被 HTML 特效使用")); }
     let path = directory.join(format!("{id}.json"));
     // The same id in a differently named file would shadow this one, since only the first file wins.
     if let Some(taken) = file_with_id(directory, id).filter(|name| *name != format!("{id}.json")) {
@@ -183,7 +200,10 @@ pub fn delete(directory: &Path, id: &str) -> Result<String, String> {
     if is_builtin_id(id) {
         return Err(format!("「{id}」是内置特效，不能删除"));
     }
-    let file = file_with_id(directory, id).ok_or_else(|| format!("未找到自定义特效「{id}」"))?;
+    let Some(file) = file_with_id(directory, id) else {
+        if valid_id(id) && html::occupied(directory, id) { return html::delete(directory, id); }
+        return Err(format!("未找到自定义特效「{id}」"));
+    };
     let path = directory.join(&file);
     fs::remove_file(&path).map_err(|e| format!("无法删除特效文件：{e}"))?;
     Ok(file)

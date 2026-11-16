@@ -239,7 +239,7 @@ onActivated(() => {
           kind="game"
           variant="xb"
           import-label="导入作品"
-          allow-html
+          :html-kind="isGamesMode ? 'game' : 'app'"
           :disabled="opening"
           @imported="imported"
         />

@@ -284,12 +284,30 @@ pub fn read_v2_pack(root: &Path, id: &str) -> Result<(Value, app_pack::Files), S
     if !fs::symlink_metadata(&dir).is_ok_and(|metadata| metadata.is_dir()) {
         return Err(format!("未找到自创作品目录「{id}」"));
     }
-    let manifest = read_manifest(&dir)?;
+    let mut manifest = read_manifest(&dir)?;
     if manifest["id"] != id { return Err("作品清单 id 与目录不一致".into()); }
     app_pack::check_manifest(&manifest)?;
-    let files = app_pack::read_files(&dir, true)?;
+    let mut files = app_pack::read_files(&dir, true)?;
+    if standalone_html_manifest(&manifest) {
+        let (_, contents) = files.iter_mut().find(|(name, _)| name == crate::standalone_html::ENTRY)
+            .ok_or("找不到独立 HTML 的入口")?;
+        *contents = crate::app_runtime::html_import::prepare_document(std::mem::take(contents))?;
+        manifest.as_object_mut().expect("validated manifest").remove(crate::app_runtime::html_import::LOCAL_HTML);
+    }
     app_pack::validate(&manifest, &files)?;
     Ok((manifest, files))
+}
+
+fn standalone_html_manifest(manifest: &Value) -> bool {
+    manifest[crate::app_runtime::html_import::LOCAL_HTML] == true && matches!(manifest["kind"].as_str(), Some("app" | "game"))
+        && manifest["runtimeProtocol"] == 2 && manifest["entry"] == crate::standalone_html::ENTRY
+}
+
+pub(crate) fn is_standalone_entry(root: &Path, id: &str, resolved: &Path) -> bool {
+    if resolved.file_name().and_then(|name| name.to_str()) != Some(crate::standalone_html::ENTRY) { return false; }
+    let directory = packs_dir(root).join(id);
+    directory.canonicalize().is_ok_and(|dir| resolved == dir.join(crate::standalone_html::ENTRY))
+        && read_manifest(&directory).is_ok_and(|manifest| manifest["id"] == id && standalone_html_manifest(&manifest))
 }
 
 #[derive(Default, Debug)]
@@ -671,7 +689,7 @@ pub fn create_oriented_pack_with_assets(
     }
     let bodies = files.iter().map(|(path, content)| (path.as_str(), content.as_bytes()))
         .chain(assets.iter().map(|(path, bytes)| (path.as_str(), bytes.as_slice())));
-    install_pack(root, id, &manifest, bodies, overwrite)
+    install_pack(root, id, &manifest, bodies, overwrite, None)
 }
 
 pub fn create_v2_pack(root: &Path, manifest: &Value, files: &app_pack::Files, overwrite: bool) -> Result<Value, String> {
@@ -679,7 +697,19 @@ pub fn create_v2_pack(root: &Path, manifest: &Value, files: &app_pack::Files, ov
     let id = manifest["id"].as_str().ok_or("作品缺少 id")?;
     check_pack_id(id)?;
     let bodies = files.iter().map(|(path, bytes)| (path.as_str(), bytes.as_slice()));
-    install_pack(root, id, manifest, bodies, overwrite)
+    let mut installed = manifest.clone();
+    installed.as_object_mut().expect("validated manifest").remove(crate::app_runtime::html_import::LOCAL_HTML);
+    install_pack(root, id, &installed, bodies, overwrite, None)
+}
+
+pub fn import_html(root: &Path, source: &Path, stem: &str, game: bool) -> Result<Value, String> {
+    let (mut manifest, artwork) = crate::app_runtime::html_import::manifest_and_artwork(stem, game)?;
+    manifest[crate::app_runtime::html_import::LOCAL_HTML] = json!(true);
+    app_pack::check_manifest(&manifest)?;
+    let id = manifest["id"].as_str().ok_or("作品缺少 id")?;
+    check_pack_id(id)?;
+    let bodies = artwork.iter().map(|(path, bytes)| (path.as_str(), bytes.as_slice()));
+    install_pack(root, id, &manifest, bodies, false, Some(source))
 }
 
 fn install_pack<'a>(
@@ -688,6 +718,7 @@ fn install_pack<'a>(
     manifest: &Value,
     bodies: impl Iterator<Item = (&'a str, &'a [u8])>,
     overwrite: bool,
+    html_source: Option<&Path>,
 ) -> Result<Value, String> {
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let packs = packs_dir(root);
@@ -718,6 +749,10 @@ fn install_pack<'a>(
                 fs::create_dir_all(parent).map_err(|e| format!("无法创建文件夹：{e}"))?;
             }
             fs::write(&destination, content).map_err(|e| format!("无法写入 {path}：{e}"))?;
+            count += 1;
+        }
+        if let Some(source) = html_source {
+            crate::standalone_html::copy(source, &temporary.join(crate::standalone_html::ENTRY))?;
             count += 1;
         }
         let text = if manifest["runtimeProtocol"] == 2 { serde_json::to_string(manifest) } else { serde_json::to_string_pretty(manifest) }

@@ -87,7 +87,7 @@ describe("drawing the four kinds of shape", () => {
 });
 
 describe("the layer over the desktop", () => {
-  let host: HTMLElement, children: unknown[], doc: EventTarget & { hidden: boolean }, win: EventTarget;
+  let host: HTMLElement, children: unknown[], doc: EventTarget & { hidden: boolean; createElement: (tag: string) => unknown }, win: EventTarget;
   let callbacks: Map<number, FrameRequestCallback>, frames: number, cleared: ReturnType<typeof vi.fn>, disconnect: ReturnType<typeof vi.fn>, canvas: { width: number; height: number };
   beforeEach(() => {
     children = []; callbacks = new Map(); frames = 0; cleared = vi.fn(); disconnect = vi.fn();
@@ -149,5 +149,28 @@ describe("the layer over the desktop", () => {
     const draws = cleared.mock.calls.length;
     win.dispatchEvent(new Event("resize")); expect(cleared.mock.calls.length).toBe(draws);
     layer.update(rain, params); expect(children).toHaveLength(0);
+  });
+  it("uses an isolated frame for HTML effects and unloads it on pause or switch", () => {
+    const parsed = parsePack({ schemaVersion: 3, kind: "effect", source: "user", renderer: "html",
+      revision: "200-100", id: "html-fish", name: "Fish" });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const attributes = new Map<string, string>();
+    const iframe = {
+      src: "", setAttribute: (key: string, value: string) => attributes.set(key, value),
+      getAttribute: (key: string): string | undefined => key === "src" ? iframe.src : attributes.get(key),
+      remove: () => { children.length = 0; },
+    };
+    doc.createElement = tag => tag === "iframe" ? iframe : canvas;
+    const layer = new EffectsLayer(host, parsed.pack, params);
+    expect(attributes.get("sandbox")).toBe("allow-scripts");
+    expect(iframe.src).toMatch(/\/html-fish\?v=200-100$/);
+    expect(layer.snapshot().running).toBe(true);
+    expect(children).toEqual([iframe]);
+    layer.update(parsed.pack, params, { paused: true, fps: 60 });
+    expect(children).toHaveLength(0);
+    layer.update(parsed.pack, params, { paused: false, fps: 60 });
+    layer.update(rain, params);
+    expect(children).toEqual([canvas]);
+    layer.destroy();
   });
 });

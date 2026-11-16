@@ -108,7 +108,10 @@ export interface EffectPack {
   sky: string[];
   layers: Layer[];
   source: "builtin" | "user";
+  htmlRevision?: string;
 }
+
+export const isHtmlEffect = (pack: EffectPack | null | undefined) => pack?.htmlRevision !== undefined;
 
 /** This renderer is bundled with the app and cannot be selected by a user pack. */
 export const isArowana = (pack: Pick<EffectPack, "id" | "source"> | null) =>

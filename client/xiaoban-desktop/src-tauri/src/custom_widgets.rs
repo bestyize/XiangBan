@@ -2,6 +2,7 @@
 //! Each widget is a single JSON pack containing metadata and a self-contained HTML document.
 //! They are stored in `~/.xiaobanwallpaper/custom_widgets/<id>.json`.
 
+use crate::standalone_html;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -73,8 +74,7 @@ pub fn is_builtin_kind(id: &str) -> bool {
     BUILTIN_KINDS.contains(&id) || id == "custom"
 }
 
-/// Validates a custom widget pack structure.
-pub fn validate(pack: &Value) -> Result<(), String> {
+fn validate_metadata(pack: &Value) -> Result<(), String> {
     if pack.get("schemaVersion").and_then(Value::as_u64) != Some(1) {
         return Err("schemaVersion 需要是 1".into());
     }
@@ -119,6 +119,12 @@ pub fn validate(pack: &Value) -> Result<(), String> {
             return Err("theme 必须是 transparent、paper 或 glass".into());
         }
     }
+    Ok(())
+}
+
+/// Validates the inline JSON form used by authoring and ZIP import.
+pub fn validate(pack: &Value) -> Result<(), String> {
+    validate_metadata(pack)?;
     let html = pack
         .get("html")
         .and_then(Value::as_str)
@@ -223,11 +229,25 @@ pub fn load_user(directory: &Path) -> Vec<Value> {
                 if let Ok(text) = fs::read_to_string(&path) {
                     if let Ok(mut val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
                         if validate(&val).is_ok() {
+                            if let Some(fields) = val.as_object_mut() { fields.remove("standaloneHtml"); }
                             val["source"] = json!("user");
                             list.push(val);
                         }
                     }
                 }
+            }
+        }
+    }
+    let base = directory.join("html");
+    if fs::symlink_metadata(&base).is_ok_and(|meta| meta.is_dir()) {
+        if let Ok(entries) = fs::read_dir(base) {
+            let mut ids: Vec<_> = entries.flatten().filter_map(|entry| entry.file_name().into_string().ok())
+                .filter(|id| valid_widget_id(id)).collect();
+            ids.sort();
+            for id in ids {
+                if list.len() >= MAX_USER_WIDGETS { break; }
+                if list.iter().any(|pack| pack["id"] == id) { continue; }
+                if let Ok(pack) = standalone_entry(directory, &id) { list.push(pack); }
             }
         }
     }
@@ -274,11 +294,67 @@ pub fn find(directory: &Path, id: &str) -> Option<Value> {
         if let Ok(mut val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
             if val.get("id").and_then(Value::as_str) == Some(id) && validate(&val).is_ok() {
                 val["source"] = json!("user");
+                if let Some(fields) = val.as_object_mut() { fields.remove("standaloneHtml"); }
                 return Some(val);
             }
         }
     }
-    builtin().into_iter().find(|p| p.get("id").and_then(Value::as_str) == Some(id))
+    standalone_entry(directory, id).ok()
+        .or_else(|| builtin().into_iter().find(|p| p.get("id").and_then(Value::as_str) == Some(id)))
+}
+
+fn standalone_dir(directory: &Path, id: &str) -> Result<PathBuf, String> {
+    standalone_html::installed_dir(&directory.join("html"), id)
+}
+
+fn standalone_entry(directory: &Path, id: &str) -> Result<Value, String> {
+    let path = standalone_dir(directory, id)?;
+    let bytes = crate::resource_packs::read_bytes(&path.join("manifest.json"), MAX_WIDGET_FILE)?;
+    let mut pack: Value = serde_json::from_slice(&bytes).map_err(|_| "组件清单无效")?;
+    if pack["id"] != id { return Err("组件清单 id 与文件夹不一致".into()); }
+    validate_metadata(&pack)?;
+    standalone_html::document(&path)?;
+    pack["standaloneHtml"] = json!(true);
+    pack["source"] = json!("user");
+    Ok(pack)
+}
+
+pub fn standalone_document(directory: &Path, id: &str) -> Result<PathBuf, String> {
+    standalone_html::document(&standalone_dir(directory, id)?)
+}
+
+pub fn import_html(directory: &Path, source: &Path, id: &str, name: &str) -> Result<(), String> {
+    let pack = json!({"schemaVersion": 1, "id": id, "name": name});
+    validate_metadata(&pack)?;
+    if find(directory, id).is_some() { return Err(format!("组件「{id}」已存在")); }
+    if load_user(directory).len() >= MAX_USER_WIDGETS {
+        return Err(format!("最多导入 {MAX_USER_WIDGETS} 个自定义组件"));
+    }
+    standalone_html::install(&directory.join("html"), id, &pack, |target| standalone_html::copy(source, target))
+}
+
+/// The bounded JSON form for ZIP export and the component authoring tool.
+pub fn read_inline(directory: &Path, id: &str) -> Result<Value, String> {
+    let mut pack = find(directory, id).ok_or_else(|| format!("未找到组件模板「{id}」"))?;
+    if pack["standaloneHtml"] == true {
+        let path = standalone_document(directory, id)?;
+        let html = String::from_utf8(crate::resource_packs::read_bytes(&path, MAX_WIDGET_FILE)
+            .map_err(|_| "独立 HTML 超过 128 KiB 的组件 ZIP 和创作工具上限，请直接使用原 HTML 文件".to_string())?)
+            .map_err(|_| "组件源码需要使用 UTF-8")?;
+        if let Some(fields) = pack.as_object_mut() { fields.remove("standaloneHtml"); }
+        pack["html"] = json!(html);
+        validate(&pack)?;
+        let mut payload = pack.clone();
+        payload.as_object_mut().expect("validated pack").remove("source");
+        inline_json(&payload)?;
+    }
+    Ok(pack)
+}
+
+fn inline_json(pack: &Value) -> Result<String, String> {
+    let text = serde_json::to_string_pretty(pack).map_err(|e| e.to_string())?;
+    if text.len() as u64 > MAX_WIDGET_FILE { return Err("小组件文件超过 128 KB".into()); }
+    Ok(text)
 }
 
 /// Atomically saves a custom widget pack into `directory`.
@@ -286,13 +362,11 @@ pub fn save(directory: &Path, pack: &Value, overwrite: bool) -> Result<PathBuf, 
     validate(pack)?;
     let id = pack["id"].as_str().unwrap_or_default();
     let path = directory.join(format!("{id}.json"));
-    if (path.exists() || is_builtin_template(id)) && !overwrite {
+    let standalone = standalone_dir(directory, id).ok();
+    if (path.exists() || standalone.is_some() || is_builtin_template(id)) && !overwrite {
         return Err(format!("小组件「{id}」已经存在，请换个 id 或确认覆盖它"));
     }
-    let text = serde_json::to_string_pretty(pack).map_err(|e| e.to_string())?;
-    if text.len() as u64 > MAX_WIDGET_FILE {
-        return Err("小组件文件超过 128 KB".into());
-    }
+    let text = inline_json(pack)?;
     fs::create_dir_all(directory).map_err(|e| format!("无法创建小组件文件夹：{e}"))?;
     let temporary = directory.join(format!(".{id}-{}.tmp", std::process::id()));
     fs::write(&temporary, text.as_bytes()).map_err(|e| format!("无法写入小组件文件：{e}"))?;
@@ -300,6 +374,7 @@ pub fn save(directory: &Path, pack: &Value, overwrite: bool) -> Result<PathBuf, 
         let _ = fs::remove_file(&temporary);
         format!("无法保存小组件：{e}")
     })?;
+    if let Some(dir) = standalone { let _ = fs::remove_dir_all(dir); }
     Ok(path)
 }
 
@@ -309,8 +384,14 @@ pub fn remove(directory: &Path, id: &str) -> Result<(), String> {
         return Err("组件 id 不合法".into());
     }
     let path = directory.join(format!("{id}.json"));
+    let standalone = standalone_dir(directory, id).ok();
+    if let Some(dir) = &standalone {
+        fs::remove_dir_all(dir).map_err(|e| format!("无法删除 HTML 组件：{e}"))?;
+    }
     if path.exists() {
         fs::remove_file(&path).map_err(|e| format!("无法删除小组件：{e}"))?;
+        Ok(())
+    } else if standalone.is_some() {
         Ok(())
     } else if is_builtin_template(id) {
         Err(format!("「{id}」为内置组件，不能删除"))

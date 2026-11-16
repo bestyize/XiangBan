@@ -1,4 +1,4 @@
-//! The desktop-wide particle layer: one transparent, click-through window laid over the desktop picture, so the
+//! The desktop-wide effects layer: one transparent, click-through window laid over the desktop picture, so the
 //! effect works with any wallpaper (or the plain system desktop) behind it. It is a separate desktop window
 //! and not part of a wallpaper window, so changing the wallpaper never touches it.
 use crate::{effect_packs, preferences::Settings, settings, storage, DesktopState};
@@ -26,6 +26,27 @@ pub fn monitor_state(app: &tauri::AppHandle) -> Result<Value, String> {
 }
 
 fn folder(app: &tauri::AppHandle) -> Result<PathBuf, String> { Ok(storage::root(app)?.join("effects")) }
+
+const HTML_EFFECT_CSP: &str = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' blob:; \
+    style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src data: blob:; \
+    worker-src blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+
+pub fn serve_html(app: &tauri::AppHandle, label: &str, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Method, Response};
+    let allowed = label == "control" || is_effect(label) || crate::content::is_wallpaper(label);
+    let document = if allowed && request.method() == Method::GET {
+        let id = request.uri().path().strip_prefix('/').unwrap_or_default();
+        folder(app).and_then(|directory| effect_packs::html::document(&directory, id)).ok().and_then(|file| std::fs::read(file).ok())
+    } else { None };
+    let (status, body) = document.map_or((404, Vec::new()), |html| (200, html));
+    Response::builder().status(status)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Content-Security-Policy", HTML_EFFECT_CSP)
+        .header("Cache-Control", "no-store")
+        .header("Referrer-Policy", "no-referrer")
+        .header("X-Content-Type-Options", "nosniff")
+        .body(body).unwrap_or_default()
+}
 
 /// What the page needs: the pack's data (it checks it itself), the user's parameters, and the global animation settings.
 fn payload(app: &tauri::AppHandle, config: &Settings, pack: &Value) -> Value {
@@ -174,19 +195,25 @@ pub async fn import_effect_pack(window: tauri::WebviewWindow) -> Result<Value, S
     control_only(&window)?;
     let app = window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let chosen = app.dialog().file().set_parent(&window).set_title("选择特效包（ZIP 或 JSON）")
-            .add_filter("特效包", &["zip", "json"]).blocking_pick_file();
+        let chosen = app.dialog().file().set_parent(&window).set_title("导入桌面特效")
+            .add_filter("特效文件（ZIP、JSON 或 HTML）", &["zip", "json", "html", "htm"]).blocking_pick_file();
         let Some(chosen) = chosen else { return Ok(json!({ "status": "cancelled" })); };
         let source = chosen.into_path().map_err(|e| e.to_string())?;
-        if source.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
+        let is_html = crate::standalone_html::is_html(&source);
+        let is_zip = source.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("zip"));
+        if is_zip || is_html {
             let root = storage::root(&app)?;
             let state = app.state::<crate::content::ContentState>();
             let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
-            let imported = crate::resource_packs::import_effect_zip(&root, &source)?;
+            let imported = if is_html { crate::resource_packs::import_html(&root, &source, crate::resource_packs::HtmlKind::Effect)? }
+                else { crate::resource_packs::import_effect_zip(&root, &source)? };
+            let id = imported["id"].as_str().unwrap_or_default();
+            let file = if is_html || effect_packs::html::occupied(&root.join("effects"), id) {
+                format!("html/{id}/{}", effect_packs::html::ENTRY)
+            } else { format!("{id}.json") };
             sync(&app);
             return Ok(json!({
-                "status": "imported", "id": imported["id"], "name": imported["name"],
-                "file": format!("{}.json", imported["id"].as_str().unwrap_or_default()),
+                "status": "imported", "id": id, "name": imported["name"], "file": file,
             }));
         }
         let text = std::fs::read_to_string(&source).map_err(|_| "无法读取这个文件（需要 UTF-8 文本的 JSON）".to_string())?;
@@ -196,6 +223,7 @@ pub async fn import_effect_pack(window: tauri::WebviewWindow) -> Result<Value, S
         let directory = folder(&app)?;
         ensure_folder(&directory);
         let id = pack["id"].as_str().unwrap_or_default().to_string();
+        if effect_packs::html::occupied(&directory, &id) { return Err(format!("id「{id}」已被 HTML 特效使用")); }
         // Two packs sharing an id would mean the second is silently ignored, so ask before replacing one.
         if let Some(taken) = effect_packs::file_with_id(&directory, &id) {
             let confirmed = app.dialog()

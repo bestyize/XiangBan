@@ -125,9 +125,7 @@ pub fn read(root: &Path) -> Result<Catalog, String> {
 }
 
 pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
-    let is_html = source.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
-        ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm")
-    });
+    let is_html = crate::standalone_html::is_html(source);
     let mut input = fs::File::open(source).map_err(|e| format!("无法读取所选文件：{e}"))?;
     let metadata = input.metadata().map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() == 0 {
@@ -164,7 +162,7 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
             digest.update(chunk);
             output.write_all(chunk).map_err(|e| e.to_string())?;
             if is_html {
-                utf8_tail = check_html_chunk(&mut buffer[..end], &mut has_text)?;
+                utf8_tail = crate::standalone_html::validate_chunk(&mut buffer[..end], &mut has_text)?;
             }
             count = input.read(&mut buffer[utf8_tail..]).map_err(|e| e.to_string())?;
         }
@@ -238,22 +236,6 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
         let _ = fs::remove_file(temporary);
     }
     result
-}
-
-fn check_html_chunk(buffer: &mut [u8], has_text: &mut bool) -> Result<usize, String> {
-    let valid = match std::str::from_utf8(buffer) {
-        Ok(text) => text,
-        Err(error) if error.error_len().is_none() => {
-            std::str::from_utf8(&buffer[..error.valid_up_to()]).expect("validated UTF-8 prefix")
-        }
-        Err(_) => return Err("壁纸必须是 UTF-8 HTML 文件。".into()),
-    };
-    *has_text = *has_text || valid.chars().any(|c| c != '\u{feff}' && !c.is_whitespace());
-    let end = valid.len();
-    let tail = buffer.len() - end;
-    // A multibyte character can straddle two reads. Only keep its incomplete prefix.
-    buffer.copy_within(end.., 0);
-    Ok(tail)
 }
 
 pub(crate) const MAX_HTML_BYTES: u64 = 4 * 1024 * 1024;

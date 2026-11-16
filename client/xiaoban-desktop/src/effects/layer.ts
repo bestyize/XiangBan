@@ -3,16 +3,17 @@ import type { ArowanaRenderer } from "./arowana/renderer.js";
 import { defaultAquarium, type AquariumMode } from './arowana/settings.ts';
 import { drawEffects } from "./draw.ts";
 import { ParticleSystem } from "./sim.ts";
-import { defaultParams, isArowana, type EffectPack, type EffectParams } from "./types.ts";
+import { defaultParams, isArowana, isHtmlEffect, type EffectPack, type EffectParams } from "./types.ts";
 
 export interface LayerConfig { paused: boolean; fps: 30 | 60 }
 
 /**
- * A transparent canvas over `host` that shows one effect pack. Giving it a different pack starts that effect;
+ * A transparent layer over `host` that shows one effect pack. Giving it a different pack starts that effect;
  * giving it the same pack with new parameters adjusts it in place, so the particles do not jump.
  */
 export class EffectsLayer {
   private canvas: HTMLCanvasElement | null = null;
+  private htmlFrame: HTMLIFrameElement | null = null;
   private context: CanvasRenderingContext2D | null = null;
   private observer: ResizeObserver | null = null;
   private system: ParticleSystem | null = null;
@@ -33,7 +34,7 @@ export class EffectsLayer {
   }
   update(pack: EffectPack | null, params: EffectParams, config: LayerConfig = this.config) {
     if (this.destroyed) return;
-    if (isArowana(this.pack) !== isArowana(pack)) this.release();
+    if (isArowana(this.pack) !== isArowana(pack) || isHtmlEffect(this.pack) !== isHtmlEffect(pack)) this.release();
     this.pack = pack; this.params = params; this.config = config;
     this.reconcile();
   }
@@ -43,7 +44,7 @@ export class EffectsLayer {
       canvasPresent: this.canvas !== null && !this.canvas.hidden,
       canvasWidth: this.canvas?.width ?? 0,
       canvasHeight: this.canvas?.height ?? 0,
-      running: this.frame !== 0,
+      running: this.frame !== 0 || this.htmlFrame !== null,
       paused: this.config.paused,
       fps: this.config.fps,
       params: this.params,
@@ -58,6 +59,10 @@ export class EffectsLayer {
 
   private reconcile() {
     if (!this.pack) { this.release(); return; }
+    if (isHtmlEffect(this.pack)) {
+      this.reconcileHtml(this.pack);
+      return;
+    }
     const fish = isArowana(this.pack);
     if (!this.canvas) {
       const canvas = document.createElement("canvas");
@@ -90,6 +95,30 @@ export class EffectsLayer {
     this.resize();
     this.stop();
     if ((this.arowana?.mode || this.system) && !this.config.paused && !document.hidden) this.frame = requestAnimationFrame(this.tick);
+  }
+  private reconcileHtml(pack: EffectPack) {
+    this.host.classList.add("effects-host");
+    window.addEventListener("pagehide", this.onPageHide);
+    document.addEventListener("visibilitychange", this.onVisibility);
+    if (this.config.paused || document.hidden) {
+      this.htmlFrame?.remove();
+      this.htmlFrame = null;
+      return;
+    }
+    const origin = /Windows/i.test(navigator.userAgent) ? "http://effect-html.localhost" : "effect-html://localhost";
+    const src = `${origin}/${encodeURIComponent(pack.id)}?v=${pack.htmlRevision}`;
+    if (this.htmlFrame?.getAttribute("src") === src) return;
+    this.htmlFrame?.remove();
+    const frame = document.createElement("iframe");
+    frame.className = "effects-frame";
+    frame.title = pack.name;
+    frame.tabIndex = -1;
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("sandbox", "allow-scripts");
+    frame.referrerPolicy = "no-referrer";
+    frame.src = src;
+    this.host.append(frame);
+    this.htmlFrame = frame;
   }
   private async loadArowana(canvas: HTMLCanvasElement, signal: AbortSignal) {
     try {
@@ -169,6 +198,7 @@ export class EffectsLayer {
     window.removeEventListener("resize", this.resize);
     window.removeEventListener("pagehide", this.onPageHide);
     document.removeEventListener("visibilitychange", this.onVisibility);
+    this.htmlFrame?.remove(); this.htmlFrame = null;
     this.canvas?.remove(); this.canvas = null; this.context = null; this.system = null;
     this.host.classList.remove("effects-host", "effects-loading", "effects-aquascape");
   }
