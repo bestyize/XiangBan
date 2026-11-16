@@ -5,6 +5,7 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.header
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.post
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.Headers
@@ -70,7 +71,13 @@ data class AiTier(
     @SerialName("supports_tools") val supportsTools: Boolean? = null,
     @SerialName("supports_vision") val supportsVision: Boolean? = null,
     @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
+    @SerialName("_local_protocol") val localProtocol: String = "chat",
+    @SerialName("_local_source") val localSource: String = "",
 )
+
+private fun CustomModelConfig.asTier() = AiTier(CUSTOM_MODEL_TIER, model, contextWindowTokens = contextTokens,
+    supportsTools = supportsTools, supportsVision = supportsVision, maxOutputTokens = maxOutputTokens,
+    localProtocol = protocol, localSource = "$baseUrl|$model")
 
 @Serializable
 data class AiTiersResponse(
@@ -227,14 +234,59 @@ class AiGatewayApi(
     private val client: HttpClient,
     config: CommunityConfig = CommunityConfig(),
     private val sessions: SessionManager? = null,
+    private val customModels: CustomModelStorage = InMemoryCustomModelStorage(),
     private val tokenProvider: suspend () -> String?,
 ) {
     private val base = config.aiBase.trimEnd('/')
     private val http = JsonHttp(client, base)
+    private val directClient by lazy { client.config { followRedirects = false } }
+
+    fun customModel(): CustomModelConfig? = customModels.load()?.let { runCatching { it.validated() }.getOrNull() }
+    fun saveCustomModel(config: CustomModelConfig?) { customModels.save(config?.validated()) }
+
+    suspend fun fetchCustomModels(config: CustomModelConfig): List<String> {
+        val custom = config.copy(model = config.model.ifBlank { "model-list" }).validated()
+        val target = ChatTarget(custom.modelsUrl(), custom.apiKey, "", true, custom.protocol, custom.authMode)
+        val response = try {
+            directClient.prepareGet(target.url) {
+                chatAuth(target)
+                timeout { connectTimeoutMillis = 15_000; requestTimeoutMillis = 30_000; socketTimeoutMillis = 20_000 }
+            }.execute { response ->
+                if (!response.status.isSuccess()) throw parseApiError(response.status.value, response.bodyAsText())
+                response.readBoundedBytes(1024 * 1024).decodeToString()
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (e: ApiException) { throw e }
+        catch (_: Exception) { throw ApiException(0, "连接服务商失败，请检查地址和网络") }
+        val data = runCatching { CommunityJson.parseToJsonElement(response).jsonObject["data"] as? JsonArray }.getOrNull()
+            ?: throw ApiException(0, "服务商未返回可识别的模型列表，请手动填写模型名称")
+        return data.mapNotNull { (it as? JsonObject)?.get("id")?.let { id -> runCatching { id.jsonPrimitive.contentOrNull }.getOrNull() } }
+            .filter { it.isNotBlank() && it.length <= 200 }.distinct().take(200)
+    }
+
+    private data class ChatTarget(val url: String, val token: String, val body: String, val custom: Boolean, val protocol: String = "chat", val authMode: String = "api-key")
+    private fun HttpRequestBuilder.chatAuth(target: ChatTarget) {
+        if (target.protocol == "anthropic") {
+            header("anthropic-version", "2023-06-01")
+            if (target.token.isNotEmpty()) header(if (target.authMode == "bearer") HttpHeaders.Authorization else "x-api-key", if (target.authMode == "bearer") "Bearer ${target.token}" else target.token)
+        } else if (target.token.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer ${target.token}")
+    }
+    private suspend fun chatTarget(body: String): ChatTarget {
+        val obj = runCatching { CommunityJson.parseToJsonElement(body) as? JsonObject }.getOrNull()
+        if (obj?.get("model")?.jsonPrimitive?.contentOrNull == CUSTOM_MODEL_TIER) {
+            val custom = customModel() ?: throw ApiException(0, "请先在模型与点数中配置自己的模型服务")
+            val updated = JsonObject(obj.toMutableMap().apply {
+                put("model", kotlinx.serialization.json.JsonPrimitive(custom.model))
+                if (custom.protocol == "chat" && custom.maxOutputTokens != null && !containsKey("max_tokens")) put("max_tokens", kotlinx.serialization.json.JsonPrimitive(custom.maxOutputTokens))
+            })
+            return ChatTarget(custom.chatUrl(), custom.apiKey, updated.toString(), true, custom.protocol, custom.authMode)
+        }
+        return ChatTarget("$base/v1/chat/completions", requireToken(), body, false)
+    }
 
     internal fun bindAccount(account: String?, current: () -> Boolean): AiAccountRequest {
         val owner = sessions?.identity()?.takeIf { it.accountId == account }
-        return AiAccountRequest(owner) { current() && (sessions == null || owner != null && sessions.identity() == owner) }
+        return AiAccountRequest(owner) { current() && (sessions == null || if (owner == null && account == null) sessions.identity() == null else owner != null && sessions.identity() == owner) }
     }
 
     private suspend fun requireToken(): String {
@@ -483,17 +535,17 @@ class AiGatewayApi(
 
     internal suspend fun postChatRaw(body: String, onLine: suspend (String) -> Unit): ModelResult {
         if (body.encodeToByteArray().size > CHAT_BODY_BYTES) return ModelResult(413, body = "{\"error\":{\"message\":\"request_too_large: 当前请求超过 8 MiB，请减少附件或缩短文本\"}}")
-        val token = try {
-            requireToken()
+        val target = try {
+            chatTarget(body)
         } catch (e: ApiException) {
             return ModelResult(e.status, error = e.message)
         }
         return try {
-            client.preparePost("$base/v1/chat/completions") {
-                header(HttpHeaders.Authorization, "Bearer $token")
+            (if (target.custom) directClient else client).preparePost(target.url) {
+                chatAuth(target)
                 header(HttpHeaders.Accept, "text/event-stream")
                 contentType(ContentType.Application.Json)
-                setBody(body)
+                setBody(target.body)
                 timeout {
                     connectTimeoutMillis = 15_000
                     requestTimeoutMillis = Long.MAX_VALUE
@@ -504,20 +556,21 @@ class AiGatewayApi(
                 if (status !in 200..299) return@execute ModelResult(status, body = response.bodyAsText())
                 val verified = response.headers["x-xiaoban-stream-terminal-version"] == "1"
                 if (response.headers[HttpHeaders.ContentType]?.startsWith("application/json") == true) {
-                    return@execute ModelResult(status, body = response.readBoundedBytes(CHAT_BODY_BYTES).decodeToString(), verifiedToolTerminal = verified)
+                    return@execute ModelResult(status, body = response.readBoundedBytes(CHAT_BODY_BYTES).decodeToString(), verifiedToolTerminal = target.custom || verified)
                 }
                 val channel = response.bodyAsChannel()
+                var done = false
                 while (!channel.isClosedForRead) {
                     val line = channel.readUTF8Line() ?: break
                     onLine(line)
-                    if (line.startsWith("data:") && line.removePrefix("data:").trim() == "[DONE]") break
+                    if (line.startsWith("data:") && line.removePrefix("data:").trim() == "[DONE]") { done = true; break }
                 }
-                ModelResult(status, verifiedToolTerminal = verified)
+                ModelResult(status, verifiedToolTerminal = if (target.custom) done else verified)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ModelResult(0, error = "连接小伴 AI 服务失败，请检查网络后重试")
+            ModelResult(0, error = if (target.custom) "连接第三方模型服务失败，请检查地址和网络" else "连接小伴 AI 服务失败，请检查网络后重试")
         }
     }
 
@@ -531,15 +584,20 @@ class AiGatewayApi(
         contextTokens: Int = 256_000,
         onDelta: (String) -> Unit = {},
     ): String {
-        val token = requireToken()
         val payload = withContext(Dispatchers.Default) { boundedChatBody(messages, tier, reasoningEffort, contextTokens) }
+        var target = chatTarget(payload)
+        if (target.custom && target.protocol != "chat") {
+            val custom = customModel() ?: throw ApiException(0, "请先配置自己的模型服务")
+            target = target.copy(body = customPlainBody(payload, custom))
+            if (target.body.encodeToByteArray().size > CHAT_BODY_BYTES) throw ApiException(0, "当前请求过大，请减少附件或缩短文本")
+        }
 
         val statement = try {
-            client.preparePost("$base/v1/chat/completions") {
-                header(HttpHeaders.Authorization, "Bearer $token")
+            (if (target.custom) directClient else client).preparePost(target.url) {
+                chatAuth(target)
                 header(HttpHeaders.Accept, "text/event-stream")
                 contentType(ContentType.Application.Json)
-                setBody(payload)
+                setBody(target.body)
                 timeout {
                     connectTimeoutMillis = 15_000
                     requestTimeoutMillis = Long.MAX_VALUE
@@ -549,7 +607,7 @@ class AiGatewayApi(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            throw ApiException(0, "连接小伴 AI 服务失败，请检查网络后重试")
+            throw ApiException(0, if (target.custom) "连接第三方模型服务失败，请检查地址和网络" else "连接小伴 AI 服务失败，请检查网络后重试")
         }
 
         val full = StringBuilder()
@@ -561,28 +619,39 @@ class AiGatewayApi(
                 }
                 val contentType = response.headers[HttpHeaders.ContentType].orEmpty()
                 if (!contentType.startsWith("text/event-stream")) {
-                    val text = response.bodyAsText()
-                    val piece = extractSingleReply(text)
+                    val text = response.readBoundedBytes(CHAT_BODY_BYTES).decodeToString()
+                    val piece = if (target.custom && target.protocol != "chat") customSingleText(text, target.protocol) else extractSingleReply(text)
                     if (piece.isNotEmpty()) {
                         full.append(piece)
                         onDelta(piece)
                     }
                     return@execute
                 }
+                val customStream = if (target.custom && target.protocol != "chat") CustomPlainStream(target.protocol) { piece -> full.append(piece); onDelta(piece) } else null
                 val stream = ChatTextStream { piece -> full.append(piece); onDelta(piece) }
                 val channel = response.bodyAsChannel()
+                val event = StringBuilder()
                 while (!channel.isClosedForRead) {
                     val line = channel.readUTF8Line() ?: break
-                    if (stream.line(line)) break
+                    if (customStream == null) { if (stream.line(line)) break }
+                    else if (line.isEmpty()) {
+                        if (event.isNotEmpty()) { customStream.payload(event.toString()); event.clear() }
+                    } else if (line.startsWith("data:")) {
+                        if (event.isNotEmpty()) event.append('\n')
+                        event.append(line.removePrefix("data:").trimStart())
+                    }
                 }
-                stream.finish()
+                if (customStream == null) stream.finish() else {
+                    if (event.isNotEmpty()) customStream.payload(event.toString())
+                    customStream.finish()
+                }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiException) {
             throw e
         } catch (e: Exception) {
-            throw ApiException(0, "连接小伴 AI 服务失败，请检查网络后重试")
+            throw ApiException(0, if (target.custom) "连接第三方模型服务失败，请检查地址和网络" else "连接小伴 AI 服务失败，请检查网络后重试")
         }
         return full.toString()
     }
@@ -592,7 +661,7 @@ class AiGatewayApi(
 data class ModelResult(val status: Int, val body: String? = null, val error: String? = null, val verifiedToolTerminal: Boolean = true)
 
 /**
- * 把已经组好的 chat-completions 请求体（流式）发给 server-ai，响应的每一行原样交给 [onLine]。
+ * 把内核按会话协议组好的流式请求体发给所选服务，响应的每一行原样交给 [onLine]。
  * Agent 内核只负责拼请求和解析流，网络请求（地址、令牌、超时）都在这里，所以手机里不用带 TLS 库。
  */
 suspend fun AiGatewayApi.postChatLines(body: String, onLine: suspend (String) -> Unit): ModelResult = postChatRaw(body, onLine)
@@ -686,6 +755,8 @@ data class ChatQuestion(val id: String, val question: String, val options: List<
 
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
+    val customModelName: String? = null,
+    val customTier: AiTier? = null,
     val selectedTier: String = "",
     val reasoningByTier: Map<String, String> = emptyMap(),
     val balance: AiBalance? = null,
@@ -720,7 +791,7 @@ data class CloudChatState(
         it.creationPlan && it.error == null && !it.cancelled && it.text.isNotBlank()
     } == true
     val imageCapability: AiMediaCapability? get() = media["image"]
-    val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
+    val activeTier: AiTier? get() = if (selectedTier == CUSTOM_MODEL_TIER) customTier else tiers.firstOrNull { it.tier == selectedTier }
 }
 
 @OptIn(ExperimentalTime::class)
@@ -833,7 +904,8 @@ class CloudChatController(
     }
 
     init {
-        _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null)
+        val custom = api.customModel()
+        _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null, customModelName = custom?.model, customTier = custom?.asTier())
         history?.let { store -> scope.launch { store.saveError.collect { error -> _state.value = _state.value.copy(saveError = error) } } }
         agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
     }
@@ -851,7 +923,7 @@ class CloudChatController(
         accountId = account
         runAuthorization = null
         val list = history?.useAccount(account) ?: emptyList()
-        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = if (account == null && api.customModel() != null) CUSTOM_MODEL_TIER else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -1042,9 +1114,23 @@ class CloudChatController(
 
     fun selectTier(tier: String) {
         if (_state.value.sending) return
+        if (tier == CUSTOM_MODEL_TIER && api.customModel() == null) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
         _state.value = _state.value.copy(selectedTier = tier, inputError = null)
+        persist()
+    }
+
+    fun customModel(): CustomModelConfig? = api.customModel()
+    suspend fun fetchCustomModels(config: CustomModelConfig): List<String> = api.fetchCustomModels(config)
+
+    fun saveCustomModel(config: CustomModelConfig?) {
+        check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
+        api.saveCustomModel(config)
+        val custom = api.customModel()
+        val name = custom?.model
+        _state.value = _state.value.copy(customModelName = name, customTier = custom?.asTier(),
+            selectedTier = if (name != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, ""), inputError = null)
         persist()
     }
 
@@ -1171,6 +1257,7 @@ class CloudChatController(
         val state = _state.value
         val tier = state.activeTier
         return when {
+            state.selectedTier == CUSTOM_MODEL_TIER && state.customModelName == null -> "自己的模型服务未配置，请重新填写。"
             state.selectedTier.isNotBlank() && state.tiers.isNotEmpty() && tier == null -> "历史模型已下架，请选择可用模型后发送。"
             tier?.available == false -> "当前档位不可用，请检查点数或选择其他模型。"
             tier?.supportsVision == false && attachments.any { it.imageDataUrl != null } ->
@@ -1389,7 +1476,7 @@ class CloudChatController(
         leaveConversation()
         agentSession = newSessionId()
         agentRun = null
-        applyOptions(ChatOptions(tier = pickAiTier(_state.value.tiers, "")))
+        applyOptions(ChatOptions(tier = if (accountId == null && api.customModel() != null) CUSTOM_MODEL_TIER else pickAiTier(_state.value.tiers, "")))
         _state.value = _state.value.copy(messages = emptyList(), sending = false, approval = null, question = null, inputError = null)
     }
 

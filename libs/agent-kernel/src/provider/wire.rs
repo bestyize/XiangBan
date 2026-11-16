@@ -113,7 +113,7 @@ pub(crate) fn state_source(profile: &ProviderProfile) -> Value {
 pub(crate) fn matching_state<'a>(message: &'a Message, profile: &ProviderProfile, protocol: &str) -> Option<&'a Value> {
     message.provider_state.as_ref().filter(|s| s["protocol"] == protocol && s.get("source").is_some_and(|source| source == &state_source(profile)))
 }
-pub(crate) fn bind_state(message: &mut Message, profile: &ProviderProfile) {
+pub fn bind_state(message: &mut Message, profile: &ProviderProfile) {
     if let Some(state) = message.provider_state.as_mut() { state["source"] = state_source(profile); }
 }
 

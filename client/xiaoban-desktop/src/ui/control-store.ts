@@ -41,6 +41,7 @@ const studioTabs: Partial<Record<ControlPage, StudioTab>> = { wallpapers: "wallp
 const chatLike = (page: ControlPage) => page === "chat" || page === "new-task";
 export function createControlStore(notify: ControlStore["notify"], options: { configuration?: boolean } = {}): ControlStore {
   let disposed = false;
+  let aiConfigVersion = 0;
   const unsubscribers: (() => void)[] = [];
   // The floating assistant has its own microphone and voice; whichever window uses them last has them (`voice/owner.ts`).
   const voice = createVoiceOwner({ me: options.configuration ? 'configuration-settings' : 'control', emit, listen, onLost: () => { store.live?.end(); store.asr.deactivate(); void store.speech.stop(); } });
@@ -57,6 +58,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
     game: { active: false, desktopDoubleClickSupported: false, desktopEntryError: null },
     effectList: noPacks(),
     account: null,
+    gatewayEnabled: true,
     showLoginModal: false,
     page: "new-task", creationDraft: null, goalTemplate: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
@@ -124,7 +126,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         }
         const subscriptions = await Promise.all([
           listen<typeof store.speech.settings>("tts-settings-changed", value => { if (!disposed) store.speech.settings = value; }),
-          listen<AiConfigView>("ai-config-changed", () => { if (!disposed) void store.chat.refresh(); }),
+          listen<AiConfigView>("ai-config-changed", config => { if (!disposed) { aiConfigVersion++; store.gatewayEnabled = config.gatewayEnabled !== false; void store.chat.refresh(); } }),
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
           listen("wallpaper-library-changed", () => { if (!disposed) void store.refreshLibrary().catch(() => {}); }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
@@ -136,9 +138,10 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         ]);
         if (disposed) { subscriptions.forEach((unlisten) => unlisten()); return; }
         unsubscribers.push(...subscriptions);
+        const initialAiConfigVersion = aiConfigVersion;
         const initial = await Promise.allSettled([
           invoke<Settings>("get_settings"), invoke<AppInfo>("get_app_info"), invoke<WallpaperLibrary>("get_wallpaper_library"),
-          invoke<AccountSession | null>("get_account_session"),
+          invoke<AccountSession | null>("get_account_session"), invoke<AiConfigView>("get_ai_config"),
         ]);
         if (disposed) return;
         if (initial[0].status === "rejected") throw initial[0].reason;
@@ -148,6 +151,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         if (initial[2].status === "fulfilled") store.library = initial[2].value;
         else notify(`本地壁纸目录读取失败：${initial[2].reason}`, "error");
         if (initial[3].status === "fulfilled") { store.account = initial[3].value; void restoreDefaultModel(); }
+        if (initial[4].status === "fulfilled" && initialAiConfigVersion === aiConfigVersion) store.gatewayEnabled = initial[4].value?.gatewayEnabled !== false;
         const secondary = await Promise.allSettled([
           invoke<ControlStore["startup"]>("get_startup_status"), invoke<ControlStore["game"]>("get_game_status"), invoke<WebsiteStatus>("get_website_status"),
         ]);

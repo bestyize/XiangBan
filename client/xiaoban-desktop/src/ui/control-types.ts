@@ -39,6 +39,7 @@ export interface ControlStore {
   startup: { available: boolean; error: string | null };
   game: { active: boolean; desktopDoubleClickSupported: boolean; desktopEntryError: string | null; /** The desktop-layer game that is running, if any. */ desk?: { active: boolean; id: string | null } };
   account: AccountSession | null;
+  gatewayEnabled: boolean;
   showLoginModal: boolean;
   page: ControlPage;
   creationDraft: string | null;

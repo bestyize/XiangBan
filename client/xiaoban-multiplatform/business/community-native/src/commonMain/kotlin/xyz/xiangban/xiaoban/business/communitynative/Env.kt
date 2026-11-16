@@ -191,7 +191,15 @@ class CommunityEnv(
     val contentSocial = xyz.xiangban.xiaoban.common.community.ContentSocialApi(client, config) { session.accessToken() }
     val social = xyz.xiangban.xiaoban.common.community.SocialApi(client, config) { session.accessToken() }
     val challenges = xyz.xiangban.xiaoban.common.community.ChallengesApi(client, config) { session.accessToken() }
-    val ai = AiGatewayApi(client, config, session) { session.accessToken() }
+    val ai = AiGatewayApi(client, config, session, object : xyz.xiangban.xiaoban.common.community.CustomModelStorage {
+        private val key = "custom_model_config"
+        override fun load(): xyz.xiangban.xiaoban.common.community.CustomModelConfig? = prefs.get(key)?.takeIf { it.isNotBlank() }?.let {
+            runCatching { xyz.xiangban.xiaoban.common.community.CommunityJson.decodeFromString(xyz.xiangban.xiaoban.common.community.CustomModelConfig.serializer(), it) }.getOrNull()
+        }
+        override fun save(config: xyz.xiangban.xiaoban.common.community.CustomModelConfig?) {
+            prefs.put(key, config?.let { xyz.xiangban.xiaoban.common.community.CommunityJson.encodeToString(xyz.xiangban.xiaoban.common.community.CustomModelConfig.serializer(), it) }.orEmpty())
+        }
+    }) { session.accessToken() }
 
     val games: MobileGameStore? = workspace?.let(::MobileGameStore)
 

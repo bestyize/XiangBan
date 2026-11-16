@@ -2,7 +2,7 @@
 
 ## 账号 ID 与 AI 额度入口
 
-账号菜单展示账号中心的数字字符串 `account_id`，内部 `uid` 继续用于身份和业务关联。旧登录缓存缺少数字 ID 时保留登录，通过续期后的 `/api/me` 补取；暂未取得时不显示 ID，也不回退展示 UUID。菜单中的「获取 AI 额度」通过浏览器打开[联系我们](https://chat.xiangban.xyz/contact)。已有兑换码仍可在「设置 → AI 模型 → 小伴 AI」里使用。
+账号菜单展示账号中心的数字字符串 `account_id`，内部 `uid` 继续用于身份和业务关联。旧登录缓存缺少数字 ID 时保留登录，通过续期后的 `/api/me` 补取；暂未取得时不显示 ID，也不回退展示 UUID。菜单中的「获取 AI 额度」通过浏览器打开[联系我们](https://chat.xiangban.xyz/contact)，并跟随壁纸网站后台的「小伴 AI 入口」开关显示或隐藏。已有兑换码仍可在「设置 → AI 模型 → 小伴 AI」里使用。
 
 验证：`npx vitest run src/ui/ControlShell.test.ts src/ui/components/AiGatewayCard.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop account::tests`。
 

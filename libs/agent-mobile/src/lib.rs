@@ -13,7 +13,7 @@
 //!
 //! Engine to host ([`Engine::poll`]):
 //! - the `stdio` protocol: `hello`, `event`, `run_end`, `approval_request`, `question`, `error`
-//! - `{"type":"model_request","id":"m1","body":"{..}"}` POST this OpenAI-style chat-completions body (already streaming)
+//! - `{"type":"model_request","id":"m1","body":"{..}"}` POST the streaming body for the session's protocol
 //!   and send the reply back line by line; the host adds the address and the credentials
 //! - `{"type":"model_cancel","id":"m1"}` stop that request
 //! - `{"type":"tool_request","id":"t1","name":"set_reminder","arguments":{..}}` run a tool the host declared
@@ -22,6 +22,7 @@
 use agent_kernel::builtin::{AskUser, TimeNow, Todo};
 use agent_kernel::provider::stream::{SseParser, StreamAccumulator};
 use agent_kernel::provider::wire::{encode_request_body, ProviderProfile};
+use agent_kernel::provider::{anthropic, responses, wire};
 use agent_kernel::stdio::StdioBridge;
 use agent_kernel::*;
 use serde::Deserialize;
@@ -193,6 +194,80 @@ struct HostModel {
     attachments: std::path::PathBuf,
 }
 
+enum AlternativeStream { Responses(responses::ResponsesStream), Anthropic(anthropic::AnthropicStream) }
+impl AlternativeStream {
+    fn push(&mut self, payload: &str, text: &mut dyn FnMut(&str), reasoning: &mut dyn FnMut(ReasoningKind, &str)) -> Result<bool, HarnessError> {
+        match self {
+            Self::Responses(s) => s.push_payload_with_reasoning(payload, text, reasoning),
+            Self::Anthropic(s) => s.push_payload_with_reasoning(payload, text, reasoning),
+        }
+    }
+    fn finish(self) -> Reply {
+        match self { Self::Responses(s) => s.finish(), Self::Anthropic(s) => s.finish() }
+    }
+    fn valid_tool_calls(&self) -> bool {
+        match self { Self::Responses(s) => s.valid_tool_calls(), Self::Anthropic(s) => s.valid_tool_calls() }
+    }
+}
+
+impl HostModel {
+    fn alternative(&self, session: &str, protocol: &str, profile: &ProviderProfile, request: &ChatRequest,
+        on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+        let body = if protocol == "responses" { responses::encode_request_body(profile, request)? } else { anthropic::encode_request_body(profile, request)? };
+        let id = self.rpc.id("m");
+        let (tx, rx) = mpsc::channel();
+        lock(&self.rpc.models).insert(id.clone(), tx);
+        self.rpc.emit(&json!({"type":"model_request", "id":id, "session":session, "body":String::from_utf8_lossy(&body)}));
+        let mut parser = SseParser::default();
+        let mut decoder = if protocol == "responses" { AlternativeStream::Responses(Default::default()) } else { AlternativeStream::Anthropic(Default::default()) };
+        let outcome = (|| {
+            let mut terminal = false;
+            loop {
+                if cancel.load(Ordering::SeqCst) || self.rpc.stopping.load(Ordering::SeqCst) {
+                    self.rpc.emit(&json!({"type":"model_cancel", "id":id}));
+                    return Err(HarnessError::Cancelled);
+                }
+                match rx.recv_timeout(POLL_STEP) {
+                    Ok(ModelMsg::Line(line)) => if let Some(payload) = parser.push_line(&line) {
+                        if payload.trim() != "[DONE]" { terminal |= decoder.push(&payload, on_text, on_reasoning)?; }
+                    },
+                    Ok(ModelMsg::End { status, error, body, .. }) => {
+                        if let Some(payload) = parser.flush() { if payload.trim() != "[DONE]" { terminal |= decoder.push(&payload, on_text, on_reasoning)?; } }
+                        if let Some(error) = error { return Err(HarnessError::provider(error, status == 0 || status == 429 || status >= 500)); }
+                        if !(200..300).contains(&status) { return Err(http_error(status, body.as_deref().unwrap_or(""))); }
+                        if let Some(body) = body {
+                            let response: Value = serde_json::from_str(&body).map_err(|_| HarnessError::provider("模型返回了无效的 JSON 回复", false))?;
+                            if protocol == "responses" {
+                                terminal |= decoder.push(&json!({"type":"response.completed","response":response}).to_string(), on_text, on_reasoning)?;
+                            } else {
+                                decoder.push(&json!({"type":"message_start","message":response}).to_string(), on_text, on_reasoning)?;
+                                for (index, block) in response["content"].as_array().into_iter().flatten().enumerate() {
+                                    decoder.push(&json!({"type":"content_block_start","index":index,"content_block":block}).to_string(), on_text, on_reasoning)?;
+                                }
+                                decoder.push(&json!({"type":"message_delta","delta":{"stop_reason":response["stop_reason"]},"usage":response["usage"]}).to_string(), on_text, on_reasoning)?;
+                                terminal |= decoder.push(&json!({"type":"message_stop"}).to_string(), on_text, on_reasoning)?;
+                            }
+                        }
+                        if !terminal { return Err(HarnessError::provider("模型回复未完整结束，请重试", false)); }
+                        if !decoder.valid_tool_calls() { return Err(HarnessError::provider("工具调用未完整结束，未执行操作", false)); }
+                        let mut reply = decoder.finish();
+                        if reply.message.tool_calls.iter().any(|call| call.id.is_empty() || call.name.is_empty() || serde_json::from_str::<Value>(&call.arguments).is_err()) {
+                            return Err(HarnessError::provider("工具调用未完整结束，未执行操作", false));
+                        }
+                        wire::bind_state(&mut reply.message, profile);
+                        if protocol == "anthropic" { if let Some(state) = reply.message.provider_state.as_mut() { state["prefix"] = json!(anthropic::request_prefix(profile, request)); } }
+                        return Ok(reply);
+                    }
+                    Err(RecvTimeoutError::Timeout) => continue,
+                    Err(RecvTimeoutError::Disconnected) => return Err(HarnessError::provider("the host stopped answering", true)),
+                }
+            }
+        })();
+        lock(&self.rpc.models).remove(&id);
+        outcome
+    }
+}
+
 fn http_error(status: u16, body: &str) -> HarnessError {
     let detail = serde_json::from_str::<Value>(body)
         .ok()
@@ -220,12 +295,15 @@ impl ModelProvider for HostModel {
     fn chat_with_output_budget(&self, request: &ChatRequest, output_limit: Option<u32>, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), on_tool: &mut dyn FnMut(&ToolProgress), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
         let session = policy::MODEL_SESSION.with(|s| s.borrow().clone());
         let settings = lock(&self.settings).get(&session).cloned();
-        let mut profile = ProviderProfile::new("host", "", settings.as_ref().map(|s| s.model.clone()).unwrap_or_else(|| lock(&self.model).clone()));
+        let mut profile = ProviderProfile::new(settings.as_ref().map(|s| s.model_source.as_str()).filter(|s| !s.is_empty()).unwrap_or("host"), "", settings.as_ref().map(|s| s.model.clone()).unwrap_or_else(|| lock(&self.model).clone()));
         profile.max_request_bytes = Some(8 * 1024 * 1024 - 4096);
         if let Some(settings) = &settings { profile.supports_tools = settings.supports_tools; profile.max_output_tokens = settings.max_output_tokens; }
+        if profile.max_output_tokens.is_none() && settings.as_ref().is_some_and(|s| s.protocol == "anthropic") { profile.max_output_tokens = Some(8192); }
         if let Some(configured) = profile.max_output_tokens {
             let limit = configured.min(output_limit.unwrap_or(configured));
-            profile.extra_body.insert("max_tokens".into(), json!(limit));
+            let field = if settings.as_ref().is_some_and(|s| s.protocol == "responses") { "max_output_tokens" } else { "max_tokens" };
+            profile.extra_body.insert(field.into(), json!(limit));
+            profile.max_output_tokens = Some(limit);
         }
         let mut hydrated;
         let request = if media::has_references(&request.messages) {
@@ -233,6 +311,9 @@ impl ModelProvider for HostModel {
             media::hydrate(&self.attachments, &session, &mut hydrated)?;
             &hydrated
         } else { request };
+        if let Some(settings) = &settings {
+            if settings.protocol != "chat" { return self.alternative(&session, &settings.protocol, &profile, request, on_text, on_reasoning, cancel); }
+        }
         let mut body: Value = serde_json::from_slice(&encode_request_body(&profile, request)?).map_err(|e|HarnessError::Config(e.to_string()))?;
         if profile.model.trim().is_empty() {
             // No model chosen: leave the field out so the server uses its default.

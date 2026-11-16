@@ -600,7 +600,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'apps',
             <span class="login-copy"><b>登录 / 注册</b><small>登录后即可使用小伴 AI</small></span><LogIn :size="15" class="xb-menu-hint" />
           </button>
           <div class="xb-menu-sep"></div>
-          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-ai-quota" title="在浏览器打开「联系我们」" aria-description="在浏览器打开「联系我们」" @click="openAiQuota"><Sparkles :size="16" />获取 AI 额度<span class="xb-menu-hint" aria-hidden="true">↗</span></button>
+          <button v-if="store.gatewayEnabled" type="button" class="xb-menu-item" role="menuitem" data-testid="nav-ai-quota" title="在浏览器打开「联系我们」" aria-description="在浏览器打开「联系我们」" @click="openAiQuota"><Sparkles :size="16" />获取 AI 额度<span class="xb-menu-hint" aria-hidden="true">↗</span></button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-settings" @click="openSettings()"><SlidersHorizontal :size="16" />设置<span class="xb-menu-hint">{{ mod }},</span></button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-appearance" @click="openSettings('appearance')"><Palette :size="16" />外观<span class="xb-menu-hint">{{ modeLabel }}</span></button>
           <button v-if="store.desktop" type="button" class="xb-menu-item" role="menuitem" data-testid="nav-desktop-schemes" @click="openDesktopSchemes"><LayoutGrid :size="16" />我的桌面方案</button>

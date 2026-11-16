@@ -105,6 +105,11 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
     body
 }
 
+/// Encode with the same request-size limits used by the native HTTP provider.
+pub fn encode_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Result<Vec<u8>, HarnessError> {
+    super::budget::encode(profile, request, build_request_body)
+}
+
 /// Only replay original output objects when middleware did not edit the visible
 /// message or tool arguments. This preserves phase and cross-item ordering.
 fn replay_matches(message: &Message, items: &[Value]) -> bool {
@@ -445,6 +450,12 @@ impl ResponsesStream {
 
     pub fn is_complete(&self) -> bool {
         self.done
+    }
+
+    /// Reject incomplete tool calls before the mobile host authorizes any side effect.
+    pub fn valid_tool_calls(&self) -> bool {
+        self.calls.iter().flatten().all(|call| !call.call_id.is_empty() && !call.name.is_empty()
+            && serde_json::from_str::<Value>(&call.arguments).is_ok_and(|v| v.is_object()))
     }
 
     pub fn finish(self) -> Reply {

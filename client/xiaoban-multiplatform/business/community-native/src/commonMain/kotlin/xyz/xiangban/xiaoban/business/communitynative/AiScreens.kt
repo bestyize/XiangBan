@@ -54,6 +54,7 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,8 @@ import xyz.xiangban.xiaoban.common.community.ChatTurn
 import xyz.xiangban.xiaoban.common.community.chatTitle
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
+import xyz.xiangban.xiaoban.common.community.CustomModelConfig
+import xyz.xiangban.xiaoban.common.community.CUSTOM_MODEL_TIER
 import xyz.xiangban.xiaoban.common.community.formatAiCredits
 import xyz.xiangban.xiaoban.common.community.bucketKindLabel
 
@@ -249,7 +252,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 },
             )
-            if (!session.loggedIn) {
+            if (!session.loggedIn && cloud.customModelName == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
                 }
@@ -438,8 +441,14 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 BottomSheet({ modelSheet = false }, panel.heightIn(max = maxHeight * 0.8f)) {
                     Text("选择模型", style = XType.Title, fontWeight = FontWeight.SemiBold)
                     Text("选择模型，右侧可调整思考等级。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        cloud.customModelName?.let { name ->
+                            Text("自己的模型服务", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            RadioRow(selected = cloud.selectedTier == CUSTOM_MODEL_TIER, title = name,
+                                desc = "自己的模型服务", enabled = !cloud.sending,
+                                onClick = { chat.selectTier(CUSTOM_MODEL_TIER); modelSheet = false })
+                        }
+                        Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (cloud.tiers.isEmpty()) {
                             Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                         }
@@ -582,6 +591,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
         }
     }
     var code by remember { mutableStateOf("") }
+    var editCustom by remember { mutableStateOf(false) }
 
     LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
 
@@ -590,12 +600,11 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             ScreenBar("模型与点数", onBack = back)
-            if (!session.loggedIn) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoginPrompt("登录后查看点数", "小伴点跟着账号走，换手机、换电脑自动同步。", { open(Route.Login) })
-                }
-            } else {
-                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                if (!session.loggedIn) {
+                    GroupLabel("小伴AI · 官方")
+                    GhostPillButton("登录后查看点数", { open(Route.Login) }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
+                } else {
                     GroupLabel("小伴AI · 官方")
                     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -611,14 +620,19 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                         )
                         GhostPillButton("配置", { sheet = true; chat.clearRedeemFeedback() }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
                     }
-                    GroupLabel("自己的模型服务")
-                    Text(
-                        "用自己的密钥接入 DeepSeek、OpenAI 兼容服务等，目前只能在电脑版的“设置”里添加；手机上的填写入口会在后续版本提供。",
-                        Modifier.padding(horizontal = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
+                    GroupLabel("自己的模型服务")
+                    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
+                        Text(cloud.customModelName ?: "尚未配置", style = XType.Section)
+                        Text("支持 OpenAI 与 Anthropic 接口", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        GhostPillButton(if (cloud.customModelName == null) "添加模型服务" else "修改模型服务", { editCustom = true }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
+                        if (cloud.customModelName != null) {
+                            GhostPillButton(if (cloud.selectedTier == CUSTOM_MODEL_TIER) "当前使用" else "使用此模型", { chat.selectTier(CUSTOM_MODEL_TIER) }, Modifier.padding(top = 8.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
+                        }
+                    }
             }
         }
+        if (editCustom) CustomModelDialog(chat, { editCustom = false })
         if (sheet) {
             BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
                 val contentHeight = (maxHeight * 0.85f - 48.dp).coerceAtLeast(1.dp)
@@ -687,6 +701,129 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 PillButton("完成", dismissSheet, Modifier.padding(top = 14.dp).fillMaxWidth())
                 }
             }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomModelDialog(chat: CloudChatController, dismiss: () -> Unit) {
+    val saved = remember { chat.customModel() }
+    var address by remember { mutableStateOf(saved?.baseUrl.orEmpty()) }
+    var key by remember { mutableStateOf(saved?.apiKey.orEmpty()) }
+    var model by remember { mutableStateOf(saved?.model.orEmpty()) }
+    var protocol by remember { mutableStateOf(saved?.protocol ?: "chat") }
+    var authMode by remember { mutableStateOf(saved?.authMode ?: "api-key") }
+    var context by remember { mutableStateOf(saved?.contextTokens?.toString().orEmpty()) }
+    var maxOutput by remember { mutableStateOf(saved?.maxOutputTokens?.toString().orEmpty()) }
+    var supportsTools by remember { mutableStateOf(saved?.supportsTools ?: true) }
+    var supportsVision by remember { mutableStateOf(saved?.supportsVision ?: true) }
+    var advanced by remember { mutableStateOf(saved?.contextTokens != null || saved?.maxOutputTokens != null || saved?.supportsTools == false || saved?.supportsVision == false) }
+    val scope = rememberCoroutineScope()
+    var fetching by remember { mutableStateOf(false) }
+    var fetchedModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var fetchNote by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var revealKey by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf(false) }
+    fun save() {
+        try {
+            fun number(value: String): Int? = if (value.isBlank()) null else value.toIntOrNull() ?: throw IllegalArgumentException("请填写有效的 token 数量")
+            chat.saveCustomModel(CustomModelConfig(address, key, model, protocol, number(context), number(maxOutput), supportsTools, supportsVision, authMode))
+            dismiss()
+        } catch (e: Exception) { error = e.message ?: "保存失败" }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
+        BottomSheet(onDismiss = dismiss, panelModifier = Modifier.heightIn(max = maxHeight * .92f)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.Globe, size = 22.dp)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(if (saved == null) "添加模型服务" else "编辑模型服务", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text("连接自己的模型", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconTap(XIcons.Close, "关闭", dismiss, size = 20.dp)
+            }
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 20.dp)) {
+                Text("接口协议", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.padding(top = 8.dp).fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("chat" to "Chat", "responses" to "Responses", "anthropic" to "Anthropic").forEach { (id, name) ->
+                        ChipPill(name, selected = protocol == id, onClick = { protocol = id; error = null; fetchedModels = emptyList(); fetchNote = null })
+                    }
+                }
+                Text(when (protocol) { "responses" -> "OpenAI Responses"; "anthropic" -> "Anthropic Messages"; else -> "OpenAI Chat Completions" }, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("API 地址", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                TextBox(address, { address = it; error = null; fetchedModels = emptyList(); fetchNote = null }, Modifier.padding(top = 8.dp), placeholder = "https://api.example.com/v1", keyboardType = KeyboardType.Uri, filled = true)
+                Text(if (address.trim().startsWith("http://", true)) "HTTP 不加密，密钥和内容会明文传输，仅建议用于可信内网。" else "填写服务商提供的接口地址", Modifier.padding(top = 5.dp), style = XType.Caption, color = if (address.trim().startsWith("http://", true)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("API 密钥（可选）", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill), verticalAlignment = Alignment.CenterVertically) {
+                    TextBox(key, { key = it; error = null; fetchedModels = emptyList(); fetchNote = null }, Modifier.weight(1f), placeholder = "没有密钥可留空", password = !revealKey, filled = true)
+                    IconTap(XIcons.Eye, if (revealKey) "隐藏密钥" else "显示密钥", { revealKey = !revealKey }, size = 20.dp)
+                }
+                Text("密钥保存在本机应用私有存储中，未单独加密。", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (protocol == "anthropic") {
+                    Text("密钥认证方式", Modifier.padding(top = 14.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChipPill("x-api-key", selected = authMode == "api-key", onClick = { authMode = "api-key"; fetchedModels = emptyList(); fetchNote = null })
+                        ChipPill("Bearer", selected = authMode == "bearer", onClick = { authMode = "bearer"; fetchedModels = emptyList(); fetchNote = null })
+                    }
+                }
+                Text("模型名称", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                TextBox(model, { model = it; error = null }, Modifier.padding(top = 8.dp), placeholder = "例如 deepseek-chat", filled = true)
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
+                    GhostPillButton(if (fetching) "正在连接…" else "获取可用模型", {
+                        val current = CustomModelConfig(address, key, model, protocol = protocol, authMode = authMode)
+                        fetching = true; fetchNote = null
+                        scope.launch {
+                            try {
+                                val result = chat.fetchCustomModels(current)
+                                if (address == current.baseUrl && key == current.apiKey && protocol == current.protocol && authMode == current.authMode) {
+                                    fetchedModels = result
+                                    fetchNote = if (result.isEmpty()) "未发现模型，请手动填写。" else "发现 ${result.size} 个模型，点击选择。"
+                                }
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { if (address == current.baseUrl && key == current.apiKey && protocol == current.protocol && authMode == current.authMode) fetchNote = e.message ?: "连接失败，请手动填写模型。" }
+                            finally { fetching = false }
+                        }
+                    }, enabled = !fetching && address.isNotBlank(), height = 36.dp, fontSize = 14)
+                }
+                fetchNote?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (fetchedModels.isNotEmpty()) Row(Modifier.padding(top = 8.dp).fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    fetchedModels.forEach { id -> ChipPill(id, selected = model == id, onClick = { model = id; error = null }) }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp).clickable { advanced = !advanced }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("高级设置", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                    XIcon(if (advanced) XIcons.ChevronUp else XIcons.ChevronDown, size = 18.dp)
+                }
+                if (advanced) {
+                    Text("上下文窗口（token）", Modifier.padding(top = 10.dp), style = XType.Secondary)
+                    TextBox(context, { context = it; error = null }, Modifier.padding(top = 6.dp), placeholder = "默认自动", keyboardType = KeyboardType.Number, filled = true)
+                    Text("单次输出上限（token）", Modifier.padding(top = 12.dp), style = XType.Secondary)
+                    TextBox(maxOutput, { maxOutput = it; error = null }, Modifier.padding(top = 6.dp), placeholder = "默认自动", keyboardType = KeyboardType.Number, filled = true)
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("支持工具调用", Modifier.weight(1f), style = XType.Secondary); Toggle(supportsTools, { supportsTools = it })
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("支持图片输入", Modifier.weight(1f), style = XType.Secondary); Toggle(supportsVision, { supportsVision = it })
+                    }
+                }
+                error?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error, style = XType.Secondary) }
+                if (saved != null) {
+                    if (confirmingDelete) {
+                        Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("删除此模型服务？", Modifier.weight(1f), style = XType.Secondary)
+                            LinkText("取消", { confirmingDelete = false })
+                            LinkText("确认删除", { try { chat.saveCustomModel(null); dismiss() } catch (e: Exception) { error = e.message ?: "删除失败" } })
+                        }
+                    } else {
+                        Text("删除此模型服务", Modifier.padding(top = 18.dp).clickable { confirmingDelete = true }.padding(vertical = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostPillButton("取消", dismiss, Modifier.weight(1f))
+                PillButton("保存并使用", ::save, Modifier.weight(2f))
             }
         }
     }

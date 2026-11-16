@@ -19,7 +19,7 @@
 
 | 方向 | 消息 | 作用 |
 | --- | --- | --- |
-| 内核 → 手机 | `model_request` | 请把这个（已是流式的）chat-completions 请求体发给 server-ai |
+| 内核 → 手机 | `model_request` | 把按会话协议构造的流式请求体发送给所选服务；支持 Chat Completions、Responses 和 Anthropic Messages |
 | 手机 → 内核 | `model_line` / `model_end` | 响应的每一行 / 响应结束（HTTP 状态、错误） |
 | 内核 → 手机 | `tool_request` | 请执行这个手机侧工具 |
 | 手机 → 内核 | `tool_result` | 工具的结果 |
@@ -64,7 +64,7 @@ GitHub 工作流 `BuildXiaoBanWallpaper` 的 Android 任务用 `cargo-ndk` 编�
 
 ## 手机可靠性配置（2026-11-02）
 
-- `configure_session`：`session` 与 `settings`，包括 model、context_tokens（默认 256000）、可选 model_window / max_output_tokens、supports_tools、max_turns、permission（ask / auto）和 grants 工具名清单。清单是完整快照，撤销不会清除不可信内容或结果复核状态。
+- `configure_session`：`session` 与 `settings`，包括 model、protocol（默认 chat）、model_source、context_tokens（默认 256000）、可选 model_window / max_output_tokens、supports_tools、max_turns、permission（ask / auto）和 grants 工具名清单。清单是完整快照，撤销不会清除不可信内容或结果复核状态。
 - `run` 可传 `retry:true`（不能同时带 input/parts），只重试尚未产生助手/工具记录的用户消息；已有副作用时应发起“检查状态后继续”，不能重放原请求。可选 max_tool_calls、max_millis、max_tokens；手机宿主传 isolate:true 启用资源域隔离，旧 stdio 调用方默认行为不变。
 - `tool_request` 带 session / run_id；取消或超时后发 `tool_cancel`。宿主须停止对应协程并回 `tool_result`，带 cancelled / outcome_unknown。无法确认停止或真实结果时暂停并保留复核状态，不能把离开等待当作平台动作已经停止。`reviewed_session` 只在用户明确核对结果后使用。
 - 按会话使用 TokenBudget 与模型窗口计算上下文，先做有界历史摘录，再裁剪；raw JSONL 保留，通过 history_read 分页回看。过长工具结果按会话落盘，可用 tool_output_read 分页读取，不能读取另一段对话。请求体按实际 JSON 字节限制，预留宿主参数空间。

@@ -73,6 +73,74 @@ fn ask_tool(engine: &Engine, request: &Value, name: &str, arguments: Value, call
 }
 
 #[test]
+fn responses_and_anthropic_run_tools_with_their_native_wire_formats() {
+    for protocol in ["responses", "anthropic"] {
+        let engine = Engine::start(&config(&temp_dir(&format!("native-{protocol}")))).unwrap();
+        engine.send(&json!({"type":"configure_session","session":"s1","settings":{
+            "model":"__xiaoban_custom_model__","protocol":protocol,"model_source":"https://example.test|model","permission":"ask"
+        }}).to_string()).unwrap();
+        engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"提醒我"}).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+        assert!(body["tools"].to_string().contains("set_reminder"));
+        assert!(if protocol == "responses" { body["input"].is_array() } else { body["messages"].is_array() && body["max_tokens"] == 8192 });
+        let events = if protocol == "responses" {
+            data(json!({"type":"response.completed","response":{"output":[{"type":"function_call","call_id":"c1","name":"set_reminder","arguments":"{\"title\":\"喝水\",\"minutes\":10}"}]}}))
+        } else {
+            let mut events = data(json!({"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"c1","name":"set_reminder","input":{"title":"喝水","minutes":10}}}));
+            events.extend(data(json!({"type":"message_delta","delta":{"stop_reason":"tool_use"}})));
+            events.extend(data(json!({"type":"message_stop"})));
+            events
+        };
+        reply_with(&engine, request["id"].as_str().unwrap(), &events);
+        let approval = next_of(&engine, "approval_request");
+        engine.send(&json!({"type":"approval","id":approval["id"],"decision":"once"}).to_string()).unwrap();
+        let tool = next_of(&engine, "tool_request");
+        assert_eq!(tool["arguments"]["title"], "喝水");
+        engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":"已设置"}).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+        assert!(body.to_string().contains("已设置"));
+        let events = if protocol == "responses" {
+            data(json!({"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"好了"}]}]}}))
+        } else {
+            let mut events = data(json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":"好了"}}));
+            events.extend(data(json!({"type":"message_delta","delta":{"stop_reason":"end_turn"}})));
+            events.extend(data(json!({"type":"message_stop"})));
+            events
+        };
+        reply_with(&engine, request["id"].as_str().unwrap(), &events);
+        let end = next_of(&engine, "run_end");
+        assert_eq!(end["ok"], true, "{protocol}: {end}");
+        assert_eq!(end["text"], "好了");
+        engine.stop();
+    }
+}
+
+#[test]
+fn incomplete_alternative_stream_never_runs_tools() {
+    for protocol in ["responses", "anthropic"] {
+        let engine = Engine::start(&config(&temp_dir(&format!("incomplete-{protocol}")))).unwrap();
+        engine.send(&json!({"type":"configure_session","session":"s1","settings":{"model":"m","protocol":protocol,"permission":"auto"}}).to_string()).unwrap();
+        engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"提醒我"}).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let event = if protocol == "responses" {
+            json!({"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"c1","name":"set_reminder","arguments":"{}"}})
+        } else {
+            json!({"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"c1","name":"set_reminder","input":{}}})
+        };
+        reply_with(&engine, request["id"].as_str().unwrap(), &data(event));
+        loop {
+            let event = next(&engine, Duration::from_secs(5));
+            assert_ne!(event["type"], "tool_request");
+            assert_ne!(event["type"], "approval_request");
+            if event["type"] == "run_end" { assert_eq!(event["ok"], false); break; }
+        }
+        engine.stop();
+    }
+}
+
+#[test]
 fn a_run_calls_a_host_tool_after_the_user_agrees_and_answers_in_text() {
     let dir = temp_dir("tool");
     let engine = Engine::start(&config(&dir)).unwrap();

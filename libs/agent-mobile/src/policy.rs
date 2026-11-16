@@ -10,6 +10,8 @@ thread_local! { pub static MODEL_SESSION: RefCell<String> = const { RefCell::new
 #[serde(default)]
 pub struct SessionSettings {
     pub model: String,
+    pub protocol: String,
+    pub model_source: String,
     pub context_tokens: usize,
     pub model_window: Option<usize>,
     pub supports_tools: bool,
@@ -21,7 +23,7 @@ pub struct SessionSettings {
 }
 impl Default for SessionSettings {
     fn default() -> Self {
-        Self { model: String::new(), context_tokens: 256_000, model_window: None,
+        Self { model: String::new(), protocol: "chat".into(), model_source: String::new(), context_tokens: 256_000, model_window: None,
             supports_tools: true, supports_vision: true, max_output_tokens: None, max_turns: None,
             permission: "ask".into(), grants: Vec::new() }
     }
@@ -38,7 +40,8 @@ pub fn configure(settings: &Settings, permission: &Permission, trust: &Path, ses
         || next.max_turns.is_some_and(|n| n == 0 || n > 1_000_000)
         || next.model_window == Some(0)
         || next.max_output_tokens == Some(0)
-        || !matches!(next.permission.as_str(), "ask" | "auto") {
+        || !matches!(next.permission.as_str(), "ask" | "auto")
+        || !matches!(next.protocol.as_str(), "chat" | "responses" | "anthropic") || next.model_source.len() > 4096 {
         return Err("invalid session settings".into());
     }
     permission.restore_trust(trust, session, false)?;

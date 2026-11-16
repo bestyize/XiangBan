@@ -306,6 +306,39 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
+  it('follows the saved gateway switch and live configuration changes in the account menu', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'get_ai_config'
+      ? Promise.resolve({ gatewayEnabled: false }) : original(command, args));
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      await wrapper.get('[data-testid="account-entry"]').trigger('click');
+      expect(wrapper.find('[data-testid="nav-ai-quota"]').exists()).toBe(false);
+      const handler = vi.mocked(listen).mock.calls.find(([name]) => name === 'ai-config-changed')![1];
+      handler({ gatewayEnabled: true }); await flushPromises();
+      expect(wrapper.find('[data-testid="nav-ai-quota"]').exists()).toBe(true);
+      handler({ gatewayEnabled: false }); await flushPromises();
+      expect(wrapper.find('[data-testid="nav-ai-quota"]').exists()).toBe(false);
+    } finally { wrapper.unmount(); vi.mocked(invoke).mockImplementation(original); }
+  });
+
+  it('keeps a newer gateway switch event when the initial configuration arrives late', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    let resolveConfig!: (value: unknown) => void;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'get_ai_config'
+      ? new Promise(resolve => { resolveConfig = resolve; }) : original(command, args));
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      const handler = vi.mocked(listen).mock.calls.find(([name]) => name === 'ai-config-changed')![1];
+      handler({ gatewayEnabled: false });
+      resolveConfig({ gatewayEnabled: true }); await flushPromises();
+      await wrapper.get('[data-testid="account-entry"]').trigger('click');
+      expect(wrapper.find('[data-testid="nav-ai-quota"]').exists()).toBe(false);
+    } finally { wrapper.unmount(); vi.mocked(invoke).mockImplementation(original); }
+  });
+
   it('never falls back to displaying the UID of a legacy session', async () => {
     const wrapper = mount(ControlShell);
     try {

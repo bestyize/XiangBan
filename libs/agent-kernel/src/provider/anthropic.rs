@@ -219,6 +219,11 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
     body
 }
 
+/// Encode with the same request-size limits used by the native HTTP provider.
+pub fn encode_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Result<Vec<u8>, HarnessError> {
+    super::budget::encode(profile, request, build_request_body)
+}
+
 /// Three of the four allowed cache breakpoints: the end of the tools (which come first in the prompt), the end of
 /// the system prompt, and the last block of the newest message. The API looks back from a breakpoint for an earlier
 /// cached prefix, so the moving last one keeps hitting what the previous turn wrote.
@@ -442,6 +447,17 @@ impl AnthropicStream {
 
     pub fn is_complete(&self) -> bool {
         self.done || self.stop_reason.is_some()
+    }
+
+    /// Reject incomplete tool calls before the mobile host authorizes any side effect.
+    pub fn valid_tool_calls(&self) -> bool {
+        self.blocks.iter().flatten().all(|block| match block {
+            Block::Tool { id, name, partial, initial } => {
+                let args = if !partial.trim().is_empty() { partial.as_str() } else if !initial.is_empty() { initial.as_str() } else { "{}" };
+                !id.is_empty() && !name.is_empty() && serde_json::from_str::<Value>(args).is_ok_and(|v| v.is_object())
+            }
+            _ => true,
+        })
     }
 
     /// Prompt tokens include cache reads and writes, which the API reports separately.

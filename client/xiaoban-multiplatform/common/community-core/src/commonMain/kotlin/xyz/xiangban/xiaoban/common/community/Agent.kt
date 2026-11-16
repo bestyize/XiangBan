@@ -206,6 +206,8 @@ class AgentRuntime(
             put("type", "configure_session"); put("session", session)
             put("settings", buildJsonObject {
                 put("model", options.tier); put("context_tokens", options.contextTokens)
+                put("protocol", if (options.tier == CUSTOM_MODEL_TIER) tier?.localProtocol ?: "chat" else "chat")
+                put("model_source", if (options.tier == CUSTOM_MODEL_TIER) tier?.localSource.orEmpty() else "")
                 tier?.contextWindowTokens?.takeIf { it > 0 }?.let { put("model_window", it) }
                 tier?.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
                 put("supports_tools", tier?.supportsTools ?: true)

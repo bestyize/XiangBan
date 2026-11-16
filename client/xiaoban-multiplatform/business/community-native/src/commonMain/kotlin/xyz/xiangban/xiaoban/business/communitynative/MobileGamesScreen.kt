@@ -170,7 +170,7 @@ internal fun GamesScreen(
         else if (!busy && detail != null && panel != "actions") panel = "actions" else close()
     }
     fun createLocal(title: String, brief: String, request: String) {
-        if (!session.loggedIn) { open(Route.Login); return }
+        if (!session.loggedIn && chat.state.value.customModelName == null) { open(Route.Models); return }
         if (env.agent == null) { message = "当前安装包不支持手机本地创作，可连接电脑创作。"; return }
         if (!chat.startCreation(title, brief, request)) return
         close()

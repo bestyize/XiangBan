@@ -122,13 +122,12 @@ fun AiHomeScreen(
         if (session.loggedIn) {
             chat.loadMeta()
             env.remoteChat.refreshPeers()
-        } else {
-            chat.reset()
         }
     }
     val clock = remember(env.utcOffsetMinutes) { localClock(Clock.System.now().toEpochMilliseconds(), env.utcOffsetMinutes) }
     val (hello, line) = greeting(clock.hour)
     fun signedIn(action: () -> Unit) { if (session.loggedIn) action() else open(Route.Login) }
+    fun chatReady(action: () -> Unit) { if (session.loggedIn || cloud.customModelName != null) action() else open(Route.Models) }
 
     val peers = remote.peers
     val computerDesc = when {
@@ -151,14 +150,14 @@ fun AiHomeScreen(
             Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
                 Text("小伴AI", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                IconTap(XIcons.NewChat, "新对话", { signedIn { chat.clearConversation(); open(Route.AiChat) } }, size = 22.dp)
+                IconTap(XIcons.NewChat, "新对话", { chatReady { chat.clearConversation(); open(Route.AiChat) } }, size = 22.dp)
             }
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(homeScroll).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                 Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(hello, Modifier.padding(top = 6.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
                 Text(line, Modifier.padding(top = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                HomeComposerCard(cloud, session.loggedIn, Modifier.padding(top = 20.dp)) { signedIn { open(Route.AiChat) } }
+                HomeComposerCard(cloud, session.loggedIn || cloud.customModelName != null, Modifier.padding(top = 20.dp)) { chatReady { open(Route.AiChat) } }
 
                 SectionTitle("用小伴创作", Modifier.padding(top = 28.dp))
                 features.chunked(2).forEach { pair ->
@@ -174,12 +173,12 @@ fun AiHomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     HomeStarters.forEach { starter ->
-                        StarterCard(starter) { signedIn { chat.clearConversation(); chat.send(starter.text); open(Route.AiChat) } }
+                        StarterCard(starter) { chatReady { chat.clearConversation(); chat.send(starter.text); open(Route.AiChat) } }
                     }
                 }
 
                 val recent = cloud.conversations.take(3)
-                if (session.loggedIn && recent.isNotEmpty()) {
+                if ((session.loggedIn || cloud.customModelName != null) && recent.isNotEmpty()) {
                     SectionTitle("继续对话", Modifier.padding(top = 28.dp))
                     Column(Modifier.padding(top = 10.dp).fillMaxWidth().outlinedCard(16.dp)) {
                         recent.forEachIndexed { i, item ->
@@ -242,7 +241,7 @@ private fun HomeComposerCard(cloud: CloudChatState, loggedIn: Boolean, modifier:
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown)
             Text(
-                if (loggedIn) quotaText(cloud.balance) else "登录后可用",
+                if (cloud.selectedTier == xyz.xiangban.xiaoban.common.community.CUSTOM_MODEL_TIER) "自己的模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
                 Modifier.weight(1f).padding(start = 10.dp), style = XType.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
