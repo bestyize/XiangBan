@@ -18,6 +18,10 @@ mod checkpoints;
 mod task_outcome;
 #[path = "../../../client/xiaoban-desktop/src-tauri/src/chat/task_runtime.rs"]
 mod task_runtime;
+#[path = "../../../client/xiaoban-desktop/src-tauri/src/chat/hooks.rs"]
+mod hooks;
+#[path = "../../../client/xiaoban-desktop/src-tauri/src/chat/goal_resume.rs"]
+mod goal_resume;
 #[path = "../../../client/xiaoban-desktop/src-tauri/src/chat/agent_settings.rs"]
 mod agent_settings;
 

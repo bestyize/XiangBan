@@ -56,9 +56,14 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
     }
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
-      const text = withoutVoiceNotes(legacyCommunityMessage(textOf(message)).text);
+      const metadata = message.structured_content;
+      // Native goal dispatch expands the model input while retaining what the
+      // user actually sent for history and live message projection.
+      const original = metadata && typeof metadata === 'object' && 'goalResumeText' in metadata && typeof metadata.goalResumeText === 'string' ? metadata.goalResumeText : textOf(message);
+      const text = withoutVoiceNotes(legacyCommunityMessage(original).text);
       const files = attachmentCards(message.structured_content);
-      if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(message.structured_content && typeof message.structured_content === 'object' && 'delivery' in message.structured_content && message.structured_content.delivery === 'steer' ? { delivery: 'steer' as const } : {}), ...(files.length ? { files } : {}) });
+      const outboxId = metadata && typeof metadata === 'object' && 'outboxId' in metadata && typeof metadata.outboxId === 'string' ? metadata.outboxId : undefined;
+      if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(outboxId ? { outboxId } : {}), ...(message.structured_content && typeof message.structured_content === 'object' && 'delivery' in message.structured_content && message.structured_content.delivery === 'steer' ? { delivery: 'steer' as const } : {}), ...(files.length ? { files } : {}) });
     } else if (message.role === 'assistant') {
       for (const segment of message.reasoning ?? []) {
         if (segment.text.trim()) items.push({

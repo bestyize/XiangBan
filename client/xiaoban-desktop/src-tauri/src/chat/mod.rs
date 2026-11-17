@@ -39,6 +39,7 @@ mod hooks;
 // Public so `generate_handler!` can reach the commands by their own module path: a `pub use` re-export of a command
 // does not carry the hidden items Tauri's macro generates next to it.
 pub mod goals;
+mod goal_resume;
 mod prompt;
 mod project_rules;
 mod sandbox_gate;
@@ -181,6 +182,8 @@ pub struct ChatState {
     remote_runs: RemoteRuns,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Model execution has ended, but the host still owns cleanup/compaction.
+    finishing: Mutex<std::collections::HashSet<String>>,
     delivery: Mutex<()>,
     outbox: Mutex<Option<outbox::Outbox>>,
     /// Held for every active model/tool run, independent of whether its window is open.
@@ -226,6 +229,7 @@ impl ChatState {
                 Err(_) => Todo::new(),
             }),
             runs: Mutex::new(HashMap::new()),
+            finishing: Mutex::new(std::collections::HashSet::new()),
             delivery: Mutex::new(()),
             outbox: Mutex::new(None),
             leases: Mutex::new(HashMap::new()),
@@ -245,6 +249,11 @@ impl ChatState {
 use permission_policy::{RemoteRuns, Workspaces, folder_for, permission_with_danger_check};
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
+    if name == "chat-event" && matches!(payload["event"]["type"].as_str(), Some("done" | "cancelled" | "error")) {
+        if let (Some(state), Some(session)) = (app.try_state::<ChatState>(), payload["session"].as_str()) {
+            lock(&state.finishing).insert(session.to_string());
+        }
+    }
     crate::phone_link::observe_chat_event(app, name, &payload);
     // One emit, not one per window: a listener registered the usual way (the page's global `listen`) matches every
     // targeted emit, so emitting to each window in turn would hand that listener every event twice.
@@ -1098,7 +1107,10 @@ fn finish_run(app: &tauri::AppHandle, session: &str, success: Option<bool>) {
     let _delivery = lock(&state.delivery);
     lock(&state.remote_runs).remove(session);
     lock(&state.runs).remove(session);
+    lock(&state.finishing).remove(session);
     lock(&state.leases).remove(session);
+    // Published only after the execution lease is released, before a queued run can start.
+    emit(app, "chat-host-idle", json!({ "session": session }));
     state.broker.drop_session(session);
     emit(app,"chat-pending-changed",json!({"session":session,"pending":state.broker.snapshot(session)}));
     if let Ok(sessions) = mutate(app, |index| {
@@ -1116,7 +1128,12 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::Webview) -> Result<Va
     let config = ai_config::current(&app)?;
     pin_session_defaults(&app, &config)?;
     let default = ai_config::default_workspace(&app)?;
-    let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
+    let state = app.state::<ChatState>();
+    let busy: Vec<String> = lock(&state.runs).keys().cloned().collect();
+    let running: Vec<String> = {
+        let finishing = lock(&state.finishing);
+        busy.iter().filter(|id| !finishing.contains(*id)).cloned().collect()
+    };
     let mode = if app.state::<ChatState>().permission.mode() == PermissionMode::Auto { "auto" } else { "ask" };
     let mut queues = serde_json::Map::new();
     for saved in list(&app)? { queues.insert(saved.id.clone(), json!(outbox_host::snapshot(&app, &saved.id)?)); }
@@ -1127,6 +1144,7 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::Webview) -> Result<Va
         "sessions": list(&app)?,
         "groups": mutate(&app, |index| index.groups())?,
         "running": running,
+        "hostLifecycleProtocol": 1, "busy": busy,
         "workspace": config.workspace_or(&default).display().to_string(),
         "recentWorkspaces": workspace::recent(&app)?,
         "permissionMode": mode,
@@ -1182,7 +1200,9 @@ fn chat_session_snapshot_blocking(app: tauri::AppHandle, window: tauri::Webview,
     for _ in 0..3 {
         let trace = run_history::latest_events(&dirs.runs().join(&session_id), &session_id);
         let messages = JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())?;
-        let running = lock(&app.state::<ChatState>().runs).contains_key(&session_id);
+        let state = app.state::<ChatState>();
+        let running = lock(&state.runs).contains_key(&session_id)
+            && !lock(&state.finishing).contains(&session_id);
         match trace {
             Ok((run_id, sequence, events)) => {
                 // A new run can start between the trace and history reads.
@@ -1330,21 +1350,20 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>, community_context: Option<community_context::CommunityContext>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>, community_context: Option<community_context::CommunityContext>, request_id: Option<String>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
+    if retry != Some(true) {
+        // First messages and button-originated continuations have the same durable
+        // acceptance boundary as composer messages. Preparing a model may fail later.
+        static SUBMISSIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let request_id = request_id.unwrap_or_else(|| format!("send-{:x}-{:x}-{:x}", now().1,
+            std::process::id(), SUBMISSIONS.fetch_add(1, Ordering::Relaxed)));
+        outbox_host::chat_enqueue(app.clone(), window, session_id.clone(), text, outbox::Delivery::Queue,
+            images, attachments, mentions, request_id, None, design_id, preview_target, community_context)?;
+        return mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("会话不存在".into());
+    }
     if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
     let preview_target=preview_target.map(|target|target.context(&app,&session_id)).transpose()?;
-    // The existing Continue button must resume the saved goal and its cumulative
-    // budget, rather than silently starting a fresh ordinary-chat budget.
-    if matches!(text.trim(), "请接着上面的内容继续写完。" | "继续" | "继续目标" | "继续任务" | "继续执行" | "接着做") && retry != Some(true)
-        && images.as_ref().is_none_or(Vec::is_empty) && attachments.as_ref().is_none_or(Vec::is_empty) {
-        if let Some(goal) = agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).load(&session_id)? {
-            if goal.state != agent_kernel::goals::GoalState::Completed {
-                goals::start_saved(&app, session_id.clone())?;
-                return mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("会话不存在".into());
-            }
-        }
-    }
     // 点名只对这一条消息有效；先放好，构建 agent 时取走。
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
@@ -1466,6 +1485,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
             .map_err(|e| e.to_string())? { eprintln!("{warning}"); }
         lock(&state.leases).insert(summary.id.clone(), lease);
         runs.insert(summary.id.clone(), cancel.clone());
+        lock(&state.finishing).remove(&summary.id);
     }
     let mut inputs = attachments;
     for (index, image) in images.iter().enumerate() {
@@ -1500,6 +1520,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
     let parts = user_parts(&text, &model_images);
     let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
     let from_queue = queued.is_some();
+    let submission_id = queued.as_ref().map(|entry| entry.id.clone());
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let mut cleanup=HostRunCleanup{app:handle.clone(),session:id.clone(),success:Some(false)};
         if remote_run {
@@ -1512,7 +1533,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         // labelling a large folder takes a moment, so it happens here and not on the page's thread.
         if let Ok(dirs) = Dirs::of(&handle) {
             if let Err(error) = sandbox_gate::ensure_labelled(&dirs.chat, &workspace_owned) {
-                emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": format!("无法为 Windows 沙箱准备工作目录：{error}") } }));
+                emit(&sender, "chat-event", json!({ "session": session, "outboxId": submission_id, "event": { "type": "error", "message": format!("无法为 Windows 沙箱准备工作目录：{error}") } }));
                 return;
             }
         }
@@ -1523,7 +1544,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         if cancel.load(Ordering::SeqCst) {
             if queued.is_none() { attachment_store.rollback(&saved_for_thread); }
             let _ = goals::failed_before_run(&handle, &id, "任务已取消");
-            emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "cancelled" } }));
+            emit(&sender, "chat-event", json!({ "session": session, "outboxId": submission_id, "event": { "type": "cancelled" } }));
             return;
         }
         let (agent, config_owned, key_source) = match prepared {
@@ -1531,7 +1552,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
             Err(error) => {
                 if queued.is_none() { attachment_store.rollback(&saved_for_thread); }
                 let _ = goals::failed_before_run(&handle, &id, &error);
-                emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
+                emit(&sender, "chat-event", json!({ "session": session, "outboxId": submission_id, "event": { "type": "error", "message": error } }));
                 return;
             }
         };

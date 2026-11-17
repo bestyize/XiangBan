@@ -217,6 +217,9 @@ impl Middleware for VerificationGuard {
         if permission_denied(stop) {
             return StopDecision::Pause("permission_denied".into());
         }
+        if stop.waiting_for_user() {
+            return StopDecision::Finish;
+        }
         if stop.finish != agent_kernel::FinishReason::Stop {
             return StopDecision::Finish;
         }
@@ -242,6 +245,9 @@ impl Middleware for GoalProgressGuard {
     fn before_stop(&self, stop: &Stop<'_>) -> StopDecision {
         if permission_denied(stop) {
             return StopDecision::Pause("permission_denied".into());
+        }
+        if stop.waiting_for_user() {
+            return StopDecision::Finish;
         }
         if stop.finish != agent_kernel::FinishReason::Stop {
             return StopDecision::Finish;
@@ -343,6 +349,30 @@ mod tests {
             arguments: serde_json::json!({"command":command}).to_string(),
         });
         m
+    }
+    #[test]
+    fn goal_guards_accept_a_concrete_handoff_but_keep_permission_denials_authoritative() {
+        use agent_kernel::{Tool, ToolCtx};
+        let todo = std::sync::Arc::new(agent_kernel::builtin::Todo::new());
+        todo.execute(serde_json::json!({"todos":[{"content":"确认上线地区","status":"pending"}]}), &ToolCtx::detached("s")).unwrap();
+        let progress = GoalProgressGuard(todo);
+        let verification = VerificationGuard { command: "npm test".into() };
+        let decision = |history: &[Message], guard: &dyn Middleware| {
+            guard.before_stop(&Stop {session:"s", history, run_start:0, finish:agent_kernel::FinishReason::Stop,
+                continuations:0, continuations_without_progress:0})
+        };
+        let waiting = vec![Message::user_text("制作网站"), Message::assistant("请确认部署在哪个地区？", Vec::new())];
+        for guard in [&progress as &dyn Middleware, &verification as &dyn Middleware] {
+            assert_eq!(decision(&waiting, guard), StopDecision::Finish);
+            for text in ["还有问题请告诉我。", "还有其他问题吗？", "Is there anything else I can help with?"] {
+                let generic = vec![Message::user_text("制作网站"), Message::assistant(text, Vec::new())];
+                assert!(matches!(decision(&generic, guard), StopDecision::Continue(_)), "generic sign-off must not bypass goal checks: {text}");
+            }
+            let denied = vec![Message::user_text("制作网站"), call("exec", "shell", "npm test"),
+                ToolResult::error("denied").with_structured_content(serde_json::json!({"harness_status":"permission_denied"})).message("exec"),
+                Message::assistant("请确认部署在哪个地区？", Vec::new())];
+            assert_eq!(decision(&denied, guard), StopDecision::Pause("permission_denied".into()));
+        }
     }
     #[test]
     fn only_fresh_exact_successful_commands_count() {

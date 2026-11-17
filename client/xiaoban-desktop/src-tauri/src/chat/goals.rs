@@ -189,6 +189,26 @@ fn prompt(goal: &GoalRecord) -> String {
     text
 }
 
+pub(super) use super::goal_resume::is_resume_request;
+
+/// The caller owns delivery. Never wait for goal_io in the reverse lock order:
+/// a competing goal update keeps this request queued instead of deadlocking.
+pub(super) fn dispatch_queued<T>(app: &tauri::AppHandle, session: &str, resume: bool,
+    dispatch: impl FnOnce(Option<String>) -> Result<T, String>) -> Result<T, String> {
+    if !resume { return dispatch(None); }
+    let state = app.state::<ChatState>();
+    let _write = match state.goal_io.try_lock() {
+        Ok(guard) => guard,
+        Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+        Err(std::sync::TryLockError::WouldBlock) => return Err("目标状态正在更新，消息已保留，请稍后继续发送队列".into()),
+    };
+    let _lease = metadata_lease(app, session)?;
+    let Some(goal) = current(app, session)? else { return dispatch(None); };
+    if goal.state == GoalState::Completed { return dispatch(None); }
+    let db = store(app)?;
+    super::goal_resume::resume(&db, goal, millis(), |goal| dispatch(Some(prompt(goal))), |goal| changed(app, session, Some(goal)))
+}
+
 /// Starts a *new* turn with the saved contract. No service runs while the
 /// user is offline; no historical tool call is replayed by this API.
 #[tauri::command]
@@ -209,21 +229,12 @@ pub(super) fn start_saved(app: &tauri::AppHandle, session_id: String) -> Result<
     let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("当前会话正在运行".into()); }
-    let mut goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
-    let previous = goal.clone();
-    goal.begin(millis())?;
-    store(&app)?.save(&goal)?;
-    match super::send(app.clone(), session_id.clone(), prompt(&goal), None, Some(false), None) {
-        Ok(_) => {
-            changed(&app, &session_id, Some(&goal));
-            Ok(goal)
-        }
-        Err(error) => {
-            store(&app)?.save(&previous)?;
-            changed(&app, &session_id, Some(&previous));
-            Err(error)
-        }
-    }
+    let goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
+    let db = store(&app)?;
+    super::goal_resume::resume(&db, goal, millis(), |goal| {
+        super::send(app.clone(), session_id.clone(), prompt(goal), None, Some(false), None)?;
+        Ok(goal.clone())
+    }, |goal| changed(&app, &session_id, Some(goal)))
 }
 
 /// Only used after the host proves that the sole unresolved dispatch was ask_user.

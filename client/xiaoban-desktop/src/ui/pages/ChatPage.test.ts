@@ -124,7 +124,8 @@ describe('compact task execution cards', () => {
   });
 
   it('restores persisted plans even when raw tool cards are hidden, without claiming an interrupted plan completed', async () => {
-    await open({
+    const h = await open({
+      chat_send: () => summary('s1', '生成周报'),
       chat_overview: () => overview({ sessions: [summary('s1', '生成周报')], hideToolCalls: true }),
       chat_load_session: () => [
         { role: 'user', parts: [{ type: 'text', text: '生成周报' }] },
@@ -139,6 +140,8 @@ describe('compact task execution cards', () => {
     expect(q('chat-activity')).toBeNull();
     await click('task-toggle');
     expect(q('task-resume')).not.toBeNull();
+    await click('task-resume');
+    expect(h.calls.find(([command]) => command === 'chat_send')?.[1]).toMatchObject({sessionId: 's1', text: CONTINUE_TEXT});
   });
 
   it('submits a revision only after the original task has stopped', async () => {
@@ -177,19 +180,19 @@ describe('chat workbench composer actions', () => {
   });
   it('restores the selected tool and task when sending fails', async () => {
     const h = await open({ chat_new_session: () => { throw new Error('创建失败'); }, chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
-    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-phone');
-    await type('打开相册'); await click('chat-send');
-    expect(h.chat.draft.text).toBe('打开相册');
-    expect(h.chat.draft.tool).toBe('phone');
-    expect(q('chat-selected-tool')?.textContent).toContain('操作手机');
+    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-design');
+    await type('制作封面'); await click('chat-send');
+    expect(h.chat.draft.text).toBe('制作封面');
+    expect(h.chat.draft.tool).toBe('design');
+    expect(q('chat-selected-tool')?.textContent).toContain('设计画板');
     await click('chat-remove-tool'); expect(q('chat-selected-tool')).toBeNull();
   });
   it('preserves the selected tool in a queued message', async () => {
     const h = await open({ ...startChat, chat_enqueue: () => ({ revision: 1, paused: false, reason: '', items: [] }), chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
     await type('先处理当前任务'); await click('chat-send');
-    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-phone');
-    await type('打开相册'); await click('chat-send');
-    expect(h.calls.find(([c]) => c === 'chat_enqueue')?.[1]).toMatchObject({ sessionId: 's1', text: '请使用手机操作工具完成以下任务：\n打开相册', mode: 'queue' });
+    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-design');
+    await type('制作封面'); await click('chat-send');
+    expect(h.calls.find(([c]) => c === 'chat_enqueue')?.[1]).toMatchObject({ sessionId: 's1', text: '请使用设计画板处理以下设计稿任务：\n制作封面', mode: 'queue' });
     expect(q('chat-selected-tool')).toBeNull();
   });
   it('keeps capability menus in the composer and uses the desktop AI Store inventories', async () => {
@@ -509,7 +512,7 @@ describe('talking', () => {
 
     const sent = await press({ key: 'Enter', keyCode: 13 });
     expect(sent.defaultPrevented).toBe(true);
-    expect(h.calls.find(([c]) => c === 'chat_send')![1]).toEqual({ sessionId: 's1', text: '第一行' });
+    expect(h.calls.find(([c]) => c === 'chat_send')![1]).toEqual({ sessionId: 's1', requestId: expect.any(String), text: '第一行' });
   });
 
   it('does not send an empty message, and gives the text back when the send is refused', async () => {
@@ -587,7 +590,7 @@ describe('talking', () => {
     await h.events('s1', { type: 'text_delta', text: '写到一半' }, { type: 'truncated' }, { type: 'done' });
     expect(q('notice-warning')!.textContent).toContain('单次输出上限');
     await click('chat-continue');
-    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: CONTINUE_TEXT }]);
+    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', requestId: expect.any(String), text: CONTINUE_TEXT }]);
     expect(q('chat-continue'), 'hidden while the new answer runs').toBeNull();
   });
 
@@ -602,7 +605,7 @@ describe('talking', () => {
     expect(q('notice-warning')!.textContent).toContain('未取得新进展');
     expect(q('notice-error')).toBeNull();
     await click('chat-continue');
-    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: CONTINUE_TEXT }]);
+    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', requestId: expect.any(String), text: CONTINUE_TEXT }]);
     expect(q('chat-continue')).toBeNull();
     await h.events('s1', { type: 'text_delta', text: '已经完成。' }, { type: 'done' });
     expect(q('chat-send')).not.toBeNull();
@@ -615,6 +618,18 @@ describe('talking', () => {
     await h.events('s1', { type: 'error', message: '模型不可用：HTTP 401' });
     expect(q('notice-error')!.getAttribute('role')).toBe('alert');
     expect(q('notice-error')!.textContent).toContain('HTTP 401');
+  });
+
+  it('hides recovery actions on historical errors after another user turn finishes', async () => {
+    const h = await open(startChat);
+    await type('任务 A'); await click('chat-send');
+    await h.events('s1', {type: 'error', message: '模型不可用：HTTP 503'});
+    expect(q('chat-retry')).not.toBeNull();
+    await h.chat.send('任务 B');
+    await h.events('s1', {type: 'text_delta', text: '任务 B 已完成'}, {type: 'done'});
+    expect(q('notice-error')).not.toBeNull();
+    expect(q('chat-retry')).toBeNull();
+    expect([...q('notice-error')!.querySelectorAll('button')].map(button => button.textContent)).not.toContain('切换模型');
   });
 });
 
@@ -797,7 +812,7 @@ describe('a conversation in the page', () => {
     await click('chat-copy-reply');
     expect(writeText).toHaveBeenCalledWith('早上好，**今天**天气不错');
     await click('chat-regenerate');
-    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: '早' }]);
+    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', requestId: expect.any(String), text: '早' }]);
   });
 
   it('branches a new conversation from a message to edit, or from the end of a reply', async () => {
@@ -1217,7 +1232,7 @@ describe('sending images', () => {
     const h = await open({ ...startChat });
     await type('只是文字');
     await click('chat-send');
-    expect(h.calls.find(([c]) => c === 'chat_send')![1]).toEqual({ sessionId: 's1', text: '只是文字' });
+    expect(h.calls.find(([c]) => c === 'chat_send')![1]).toEqual({ sessionId: 's1', requestId: expect.any(String), text: '只是文字' });
   });
 
   it('shows images that were sent earlier and opens one larger when clicked', async () => {

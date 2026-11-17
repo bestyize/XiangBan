@@ -26,7 +26,7 @@ export interface ChatStore {
   queues: Record<string, MessageQueue>;
   readonly queue: MessageQueue | null;
   enqueue(text: string, attachments: PendingAttachment[], mentions: Mention[], mode?: 'queue' | 'steer' | 'replace', designId?:string, previewTarget?:PreviewTarget): Promise<boolean>;
-  updateQueue(action: 'pause' | 'resume' | 'remove' | 'edit' | 'reorder' | 'send_now', id?: string, options?: { text?: string; order?: string[]; removeImages?: number[]; removeFiles?: string[] }, sessionId?: string): Promise<boolean>;
+  updateQueue(action: 'pause' | 'resume' | 'remove' | 'edit' | 'reorder' | 'send_now' | 'retry', id?: string, options?: { text?: string; order?: string[]; removeImages?: number[]; removeFiles?: string[] }, sessionId?: string): Promise<boolean>;
   drafts: Record<string, ComposerDraft>;
   readonly draft: ComposerDraft;
   draftFor(id: string | null): ComposerDraft;
@@ -98,7 +98,8 @@ export interface ChatStore {
    * and only the one the user spoke or typed into should read the answer aloud.
    */
   sentHere(session: string): boolean;
-  retry(): Promise<boolean>;
+  canRecover(noticeId: string): boolean;
+  retry(noticeId?: string): Promise<boolean>;
   cancel(): Promise<void>;
   /** Stop the current run and wait for its terminal event before sending a plan revision. */
   revisePlan(instruction: string): Promise<boolean>;
@@ -168,6 +169,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   let refreshedAfterErrorAt = 0;
   let supportsSnapshots = false;
   let supportsPending = false;
+  let supportsHostLifecycle = false;
+  let overviewRevision = 0;
+  const runStateRevisions = new Map<string, number>();
   const revisions = new Map<string,number>();
   interface PendingSnapshot {revision:number;approvals:ApprovalRequest[];questions:QuestionRequest[]}
   const pendingEvents: Record<string, ChatEventPayload[]> = {};
@@ -417,6 +421,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         try {
           const listeners = await Promise.all([
             deps.listen<ChatEventPayload>('chat-event', payload => { if (!disposed) receive(payload); }),
+            deps.listen<{session: string}>('chat-host-idle', ({ session }) => {
+              if (disposed) return;
+              touchRunState(session);
+              const view = store.views[session];
+              if (view) { view.hostBusy = false; view.running = false; }
+            }),
             deps.listen<{session: string; queue: MessageQueue}>('chat-queue-changed', payload => { if (!disposed) applyQueue(payload.session, payload.queue); }),
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).questions, request); }),
@@ -464,11 +474,14 @@ export function createChatStore(deps: ChatDeps): ChatStore {
 
     async refresh() {
       if (!deps.desktop) return;
+      const revision = ++overviewRevision;
+      const before = new Map(runStateRevisions);
       try {
         const overview = await deps.invoke<Overview | undefined>('chat_overview');
-        if (disposed || !overview) return;
+        if (disposed || !overview || revision !== overviewRevision) return;
         supportsSnapshots = overview.snapshotProtocol === 1;
-      supportsPending = overview.pendingProtocol === 1;
+        supportsPending = overview.pendingProtocol === 1;
+        supportsHostLifecycle = overview.hostLifecycleProtocol === 1;
         store.configured = overview.configured;
         store.workspace = overview.workspace;
         store.recentWorkspaces = overview.recentWorkspaces ?? [];
@@ -477,7 +490,14 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         store.sessions = overview.sessions;
         for (const [session, queue] of Object.entries(overview.queues ?? {})) applyQueue(session, queue);
         store.groups = overview.groups ?? [];
-        for (const id of overview.running) viewOf(id, false).running = true;
+        const running = new Set(overview.running);
+        const busy = new Set(overview.busy ?? overview.running);
+        for (const id of new Set([...Object.keys(store.views), ...running, ...busy])) {
+          if ((runStateRevisions.get(id) ?? 0) !== (before.get(id) ?? 0)) continue;
+          const view = viewOf(id, false);
+          view.running = running.has(id);
+          view.hostBusy = busy.has(id);
+        }
         store.loadError = '';
         void store.refreshContext();
       } catch (error) {
@@ -588,14 +608,17 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
       const view = viewOf(id, true);
       if (view.running) return false;
-      const item = { kind: 'user' as const, id: nextId(view), text, images: [...images], ...(files.length ? { files: files.map(({ name, size, mime }) => ({ name, size, mime })) } : {}) };
+      const requestId = `send-${typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
+      const item = { kind: 'user' as const, id: nextId(view), outboxId: requestId, text, images: [...images], ...(files.length ? { files: files.map(({ name, size, mime }) => ({ name, size, mime })) } : {}) };
       view.items.push(item);
+      touchRunState(id);
       view.running = true;
+      view.hostBusy = true;
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
         const communityContext = await messageContext;
-        const args = { sessionId: id, text: note + text, ...(communityContext ? { communityContext } : {}), ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
+        const args = { sessionId: id, requestId, text: note + text, ...(communityContext ? { communityContext } : {}), ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
         sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
@@ -603,7 +626,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         // The host refused before starting, so nothing of this message happened.
         sent.delete(id);
         view.items = view.items.filter(i => i.id !== item.id);
+        touchRunState(id);
         view.running = false;
+        view.hostBusy = false;
         deps.notify(error, 'error');
         if (created && !view.items.length) {
           const sessionId = id;
@@ -622,19 +647,36 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
-    async retry() {
+    canRecover(noticeId) {
+      const items = store.current()?.items ?? [];
+      const lastUser = items.map(item => item.kind).lastIndexOf('user');
+      return lastUser >= 0 && items.some((item, index) => index > lastUser && item.id === noticeId
+        && item.kind === 'notice' && !!(item.canRetry || item.canContinue || item.canSwitchModel));
+    },
+
+    async retry(noticeId) {
       deps.onActivity?.();
       const id = store.currentId, view = store.current();
       if (!id || !view || view.running) return false;
-      view.running = true; view.status = '';
+      if (supportsHostLifecycle && view.hostBusy) { deps.notify('任务仍在收尾，请稍后重试。', 'info'); return false; }
+      if (noticeId && !store.canRecover(noticeId)) { deps.notify('这条提示所属的任务已变化，请使用最新任务的操作。', 'info'); return false; }
+      touchRunState(id);
+      view.running = true; view.hostBusy = true; view.status = '';
       const previousFailure = [...view.items].reverse().find(i => i.kind === 'notice' && i.canRetry)?.id;
       try {
         sent.add(id);
-        upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text: '', retry: true }));
+        const user = [...view.items].reverse().find(item => item.kind === 'user');
+        const pending = user?.kind === 'user' && user.outboxId
+          ? store.queues[id]?.items.find(entry => entry.id === user.outboxId) : undefined;
+        if (pending) {
+          if (!await store.updateQueue('retry', pending.id, {}, id)) throw new Error('消息仍保留在队列，请稍后重试。');
+        } else {
+          upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text: '', retry: true }));
+        }
         // Keep the original user message and drop only the now-resolved failure notice.
         view.items = view.items.filter(i => i.id !== previousFailure);
         return true;
-      } catch (e) { sent.delete(id); view.running = false; deps.notify(e, 'error'); return false; }
+      } catch (e) { sent.delete(id); touchRunState(id); view.running = false; view.hostBusy = false; deps.notify(e, 'error'); return false; }
     },
 
     async cancel() {
@@ -649,11 +691,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       const run = activeRun.get(id);
       revisingPlan = true;
       try {
-        if (view.running) {
+        const busy = () => view.running || supportsHostLifecycle && !!view.hostBusy;
+        if (busy()) {
           // A cancellation request returning does not mean native tools have finished stopping.
           await deps.invoke('chat_cancel', { sessionId: id });
-          if (view.running) await new Promise<void>((resolve, reject) => {
-            const stop = watch(() => view.running, running => {
+          if (busy()) await new Promise<void>((resolve, reject) => {
+            const stop = watch(busy, running => {
               if (!running) { clearTimeout(timeout); stop(); resolve(); }
             }, { flush: 'sync' });
             const timeout = setTimeout(() => { stop(); reject(new Error('任务尚未停止，修改要求已保留，请稍后再试。')); }, 5000);
@@ -828,7 +871,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     const { session, runId, sequence } = payload;
     const key = `${session}/${runId ?? ''}`;
     if (runId && sequence !== undefined && sequence <= (cursors.get(key) ?? 0)) return;
+    touchRunState(session);
     const view = viewOf(session, !runId); // legacy hosts have no cursor/snapshot contract
+    view.hostBusy = true;
     if (!runId) {
       present(view, payload);
       if (!view.loaded) { (pendingEvents[session] ??= []).push(payload); void loadView(session); }
@@ -843,10 +888,28 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     present(view, payload);
   }
 
+  function touchRunState(session: string) {
+    runStateRevisions.set(session, (runStateRevisions.get(session) ?? 0) + 1);
+  }
+
   /** Conversations whose current answer was asked from this window. */
   const sent = new Set<string>();
-  function present(view: SessionView, { session, event }: ChatEventPayload) {
+  function applyScopedEvent(view: SessionView, { event, outboxId }: ChatEventPayload) {
     applyEvent(view, event);
+    if (event.type === 'error' && outboxId) {
+      const user = [...view.items].reverse().find(item => item.kind === 'user');
+      const notice = view.items.at(-1);
+      // This queued input has not entered history yet. Its queue card owns
+      // recovery; actions beside an older user turn would target the wrong task.
+      if (notice?.kind === 'notice' && (user?.kind !== 'user' || user.outboxId !== outboxId)) {
+        delete notice.canRetry; delete notice.canContinue; delete notice.canSwitchModel;
+      }
+    }
+    if (!supportsHostLifecycle && (event.type === 'done' || event.type === 'cancelled' || event.type === 'error')) view.hostBusy = false;
+  }
+  function present(view: SessionView, payload: ChatEventPayload) {
+    const {session, event} = payload;
+    applyScopedEvent(view, payload);
     if (event.type === 'done' && store.currentId === session) {
       const last = view.items.at(-1);
       if (last?.kind === 'assistant' && last.text.trim()) {
@@ -968,7 +1031,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
             if (!beforeRequest.has(payload)) pendingEvents[id].push(payload);
           } else if (!payload.runId || payload.sequence === undefined || payload.sequence > (cursors.get(`${id}/${payload.runId}`) ?? snapshot.sequence ?? 0)) {
             if (payload.runId && payload.sequence !== undefined) cursors.set(`${id}/${payload.runId}`, payload.sequence);
-            if (payload.runId) present(view, payload); else applyEvent(view, payload.event);
+            if (payload.runId) present(view, payload); else applyScopedEvent(view, payload);
           }
         }
       } catch (error) {
