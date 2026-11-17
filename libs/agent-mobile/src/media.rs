@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const REF_PREFIX: &str = "xiaoban-attachment:";
-const MAX_IMAGE_BYTES: u64 = 2_800_000;
+pub(crate) const MAX_IMAGE_BYTES: u64 = 2_800_000;
 const MAX_SESSION_MEDIA_BYTES: u64 = 128 * 1024 * 1024;
 static NEXT_IMAGE: AtomicU64 = AtomicU64::new(0);
 

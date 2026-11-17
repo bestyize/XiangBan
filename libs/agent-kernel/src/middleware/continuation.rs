@@ -55,7 +55,7 @@ impl ContinueGuard {
             };
             let applied = run[at + 1..]
                 .iter()
-                .any(|m| m.role == Role::Tool && m.tool_call_id.as_deref() == Some(call.id.as_str()) && m.text().starts_with("Todo list updated"));
+                .any(|m| m.role == Role::Tool && !m.is_error && m.tool_call_id.as_deref() == Some(call.id.as_str()) && m.text().starts_with("Todo list updated"));
             if !applied {
                 continue;
             }
@@ -96,6 +96,50 @@ fn asks_user(sentence: &str) -> bool {
     sentence.ends_with('?') || sentence.ends_with('？') || sentence.ends_with("吗") || sentence.ends_with("呢")
 }
 
+fn signoff_question(sentence: &str) -> bool {
+    let lower = sentence.to_lowercase();
+    ["还有其他问题", "还有其它问题", "还有什么问题", "还有其他需要", "还有其它需要", "还有什么需要",
+        "还需要其他帮助", "还需要其它帮助", "还需要更多帮助", "还需要我帮"].iter().any(|s| lower.contains(s))
+        || ["is there anything else", "anything else", "do you need anything else", "can i help you with anything else",
+            "do you have any other questions", "any other questions", "any further questions"].iter().any(|s| lower.trim_start().starts_with(s))
+}
+
+/// Deliberately narrower than "contains a blocker word": a generic sign-off,
+/// quoted instructions, or a promise of more work must not hide an unfinished plan.
+fn explicit_handoff(sentence: &str) -> bool {
+    let lower = sentence.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '*' | '-')).to_lowercase();
+    if lower.starts_with(['>', '"', '\'', '“', '「', '`']) { return false; }
+    let user = ["请先", "请你", "请您", "需要你", "需要您", "等你", "等您", "等待你", "等待您", "等待用户"].iter().any(|s| lower.contains(s));
+    let action = ["登录", "授权", "提供", "上传", "确认", "选择", "回复", "补充", "告诉我", "告知"].iter().any(|s| lower.contains(s));
+    let waiting = ["再继续", "后继续", "后我", "才能继续", "等待", "等你", "等您", "通知我", "告诉我", "需要你先", "需要您先"].iter().any(|s| lower.contains(s));
+    (user && action && waiting) || [
+        "please log in", "please sign in", "please authorize", "please provide", "please upload", "please confirm",
+        "i need you to", "i'm waiting for you", "i am waiting for you", "waiting for your",
+        "i cannot continue until you", "i can't continue until you",
+    ].iter().any(|prefix| lower.starts_with(prefix))
+}
+
+pub(super) fn waiting_for_user(stop: &Stop<'_>, todo_tool: &str) -> bool {
+    if stop.finish != FinishReason::Stop { return false; }
+    let Some(reply) = stop.history.last().filter(|m| m.role == Role::Assistant) else { return false };
+    let text = reply.text();
+    if text.trim().is_empty() { return false; }
+    let sentence = last_sentence(&text);
+    if (asks_user(sentence) && !signoff_question(sentence)) || explicit_handoff(sentence) { return true; }
+
+    let run = stop.history.get(stop.run_start..).unwrap_or_default();
+    // Only the last completed tool may declare a wait. Later work or real user
+    // input invalidates it, so an old handoff cannot silently end a resumed task.
+    let Some(at) = run.iter().rposition(|m| m.role == Role::Tool) else { return false };
+    let result = &run[at];
+    if result.is_error || run[at + 1..].iter().any(|m| !m.tool_calls.is_empty() || (m.role == Role::User && !m.synthetic)) { return false; }
+    let Some(id) = result.tool_call_id.as_deref() else { return false };
+    if !run[..at].iter().any(|m| m.role == Role::Assistant && m.tool_calls.iter().any(|c| c.id == id && c.name == todo_tool)) { return false; }
+    result.structured_content.as_ref().and_then(|v| v.get("todo_handoff")).is_some_and(|handoff|
+        handoff.get("waiting_for_user").and_then(Value::as_bool) == Some(true)
+        && handoff.get("handoff").and_then(Value::as_str).is_some_and(|reason| !reason.trim().is_empty()))
+}
+
 /// The reply ends by introducing something that should follow ("…as follows:") or by saying what the
 /// model will do now, with nothing after it.
 fn announces_action(text: &str) -> bool {
@@ -117,14 +161,20 @@ impl Middleware for ContinueGuard {
         }
         let Some(reply) = stop.history.last() else { return StopDecision::Finish };
         let text = reply.text();
+        let run = stop.history.get(stop.run_start..).unwrap_or_default();
+        if run.iter().any(|m| m.role == Role::Tool && m.is_error
+            && m.structured_content.as_ref().is_some_and(|v| v["harness_status"] == "permission_denied")) {
+            // Do not pressure the model to work around a refusal. Leave any host
+            // policy that pauses denied tasks in charge of the final run state.
+            return StopDecision::Finish;
+        }
         let nudge = if stop.finish == FinishReason::Length {
             Nudge { reason: "length".into(), message: LENGTH.into() }
-        } else if stop.finish != FinishReason::Stop || asks_user(last_sentence(&text)) {
+        } else if stop.finish != FinishReason::Stop || waiting_for_user(stop, &self.todo_tool) {
             return StopDecision::Finish;
         } else if text.trim().is_empty() {
             Nudge { reason: "empty".into(), message: EMPTY.into() }
         } else {
-            let run = stop.history.get(stop.run_start..).unwrap_or_default();
             let open = self.open_todos(run);
             if open.is_empty() {
                 if announces_action(&text) {
@@ -137,8 +187,10 @@ impl Middleware for ContinueGuard {
                 reason: "unfinished_todos".into(),
                 message: format!(
                     "You stopped, but your todo list still has unfinished items:{list}\n\
-                     If you can keep going, continue now with tool calls. If you are waiting for the user or are blocked, \
-                     say so in one or two sentences and end your turn. If the plan changed, update the todo list first."
+                     If you can keep going, continue now with tool calls. If you must wait for the user or missing input, \
+                     record waiting_for_user=true and the concrete blocker/next user action in the todo handoff, keep unfinished items open, \
+                     then explain the handoff briefly and end your turn. Never treat this as task completion or new permission. \
+                     If the plan changed, update the todo list first."
                 ),
             }
         };

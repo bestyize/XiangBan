@@ -361,15 +361,16 @@ impl Agent {
             self.store.append(session, std::slice::from_ref(&assistant))?;
             let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
             history.push(assistant);
+            let rejected_ctx = crate::ToolCtx::for_run(session, run_id, cancel, budget.as_ref(), &control);
             if let Err(error) = control.check() {
-                let results = self.reject_calls(session, &calls, "Not run: the run budget was exhausted.", on_event);
+                let results = self.reject_calls(&rejected_ctx, &calls, "Not run: the run budget was exhausted.", on_event);
                 let messages: Vec<_> = calls.iter().zip(results).map(|(call, result)| result.message(&call.id)).collect();
                 self.store.append(session, &messages)?;
                 return Err(error);
             }
             if matches!(finish, FinishReason::ContentFilter | FinishReason::Other) || invalid_ids
                 || (finish == FinishReason::ToolCalls && calls.is_empty()) {
-                let results = self.reject_calls(session, &calls, "Not run: abnormal model terminal state or duplicate/empty tool identity. The entire batch was rejected.", on_event);
+                let results = self.reject_calls(&rejected_ctx, &calls, "Not run: abnormal model terminal state or duplicate/empty tool identity. The entire batch was rejected.", on_event);
                 let messages: Vec<_> = calls.iter().zip(results).map(|(c,r)|r.message(&c.id)).collect();
                 self.store.append(session, &messages)?;
                 return Err(HarnessError::Paused("invalid_model_terminal_or_call_identity".into()));
@@ -410,9 +411,9 @@ impl Agent {
             let over_budget = !budget.as_ref().map_or(true, |budget| budget.take(calls.len())) || over_own;
             tool_calls = tool_calls.saturating_add(calls.len());
             let results = if over_budget {
-                self.reject_calls(session, &calls, "Not run: this batch exceeds the run tool-call budget. No calls in the batch were executed.", on_event)
+                self.reject_calls(&rejected_ctx, &calls, "Not run: this batch exceeds the run tool-call budget. No calls in the batch were executed.", on_event)
             } else if cut_calls {
-                self.reject_calls(session, &calls, CUT_OFF_MESSAGE, on_event)
+                self.reject_calls(&rejected_ctx, &calls, CUT_OFF_MESSAGE, on_event)
             } else {
                 self.execute_calls(session, run_id, &calls, cancel, budget.as_ref(), &control, on_event)
             };
@@ -572,7 +573,7 @@ impl Agent {
                     completion_tokens: output.div_ceil(3).min(u32::MAX as usize) as u32, ..Default::default() });
             }
             match result {
-                Err(error @ HarnessError::Provider { .. }) if !streamed && matches!(&error, HarnessError::Provider { message, .. } if message.starts_with("request_too_large:")) && recoveries < 2 => {
+                Err(error) if !streamed && error.is_request_too_large() && recoveries < 2 => {
                     let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
                     let budget = used.saturating_mul(3) / 4;
                     let before = request.messages.clone();
@@ -637,7 +638,7 @@ mod interrupted_output_tests {
     #[test]
     fn oversize_recovery_only_retries_after_changing_request() {
         use crate::provider::scripted::{ScriptedProvider, Step};
-        let error = || HarnessError::provider("request_too_large: local preflight", false);
+        let error = || HarnessError::request_too_large("HTTP 413: lower upstream body limit");
         let provider = Arc::new(ScriptedProvider::new(vec![Step::error(error()), Step::text("ok")]));
         let agent = Agent::builder(provider.clone(), Arc::new(crate::MemoryStore::new())).build().unwrap();
         let mut request = ChatRequest { messages: vec![Message::user_text("a".repeat(10_000)), Message::assistant("old", vec![]), Message::user_text("current question")], tools: vec![] };
@@ -653,6 +654,30 @@ mod interrupted_output_tests {
         let mut request = ChatRequest { messages: vec![Message::user_text("a".repeat(10_000))], tools: vec![] };
         assert!(agent.chat_with_retry("s", "r", &mut request, &mut None, &crate::RunControl::unlimited(), &mut |_| {}, &AtomicBool::new(false)).is_err());
         assert_eq!(provider.requests().len(), 1);
+    }
+
+    #[test]
+    fn request_size_recovery_stops_after_two_smaller_attempts() {
+        use crate::provider::scripted::{ScriptedProvider, Step};
+        let provider = Arc::new(ScriptedProvider::new((0..4)
+            .map(|_| Step::error(HarnessError::request_too_large("HTTP 413"))).collect()));
+        let agent = Agent::builder(provider.clone(), Arc::new(crate::MemoryStore::new())).build().unwrap();
+        let mut messages = Vec::new();
+        for i in 0..12 {
+            messages.push(Message::user_text(format!("old {i}")));
+            messages.push(Message::assistant("x".repeat(8_000), vec![]));
+        }
+        messages.push(Message::user_text("keep this request"));
+        let mut request = ChatRequest { messages, tools: vec![] };
+        let error = agent.chat_with_retry("s", "r", &mut request, &mut None,
+            &crate::RunControl::unlimited(), &mut |_| {}, &AtomicBool::new(false)).unwrap_err();
+        assert!(error.is_request_too_large());
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 3, "one original request and at most two recoveries");
+        for pair in requests.windows(2) {
+            assert!(estimate_tokens(&pair[1].messages) < estimate_tokens(&pair[0].messages));
+            assert_eq!(pair[1].messages.last().unwrap().text(), "keep this request");
+        }
     }
 
     struct InterruptedProvider {

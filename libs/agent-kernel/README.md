@@ -16,6 +16,10 @@
 
 宿主可在 `RunOptions.input` 注入 `RunInput`。内核仅在完整模型请求或整批工具结果之后轮询，把真实用户消息写入历史并发出 `UserMessage` 事件后才调用 `accepted`；最终结束前用 `closing` 封口检查晚到输入。宿主负责持久队列、提交编号去重、取消与失败后的暂停，以及封口后转入下一轮。`input_metadata` 允许为首次输入保存宿主投递编号和附件元数据。此能力不改写进行中的 HTTP 流，也不授予额外权限。
 
+HTTP 413、本地编码超限及宿主明确上报的请求体超限使用 `HarnessError::RequestTooLarge`。仅在尚未流出内容时尝试缩减旧历史，最多两次，且每次必须实际减小上下文；不会重放已执行工具或改写持久会话原文。
+
+未完成计划可通过本轮成功 `todo` 的 `waiting_for_user=true` 和非空 `handoff` 声明具体阻碍及下一步用户动作。`Stop::waiting_for_user()` 供宿主继续执行和验收中间件共享，保留未完成项，不把交还用户当作完成或新增授权。新用户输入、失败工具或后续工具工作不能复用过期的交还状态。`Middleware::after_tool_with_context` 默认委托原 `after_tool`，需要取消支持的宿主可重写它并使用同一 `ToolCtx`。
+
 ## 0.3 运行与进程
 
 - 保留 `run` / `run_parts` / `retry_last`；新增 `run_parts_observed` / `retry_last_observed`，事件带独立 run_id、连续 sequence、时间戳和可选父 run。`RunSummary` 新增 run_id。运行状态与模型消息分开；completed 表示循环正常结束，不替代业务验收。

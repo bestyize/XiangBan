@@ -88,3 +88,20 @@ fn a_multi_line_command_is_refused_and_nothing_runs() {
     assert!(ok.contains("done"), "{ok}");
     let _ = fs::remove_dir_all(&root);
 }
+
+#[test]
+fn managed_process_refuses_the_same_multiline_commands_before_spawning() {
+    let fixture = Fixture::new();
+    let manager = ProcessManager::new(&fixture.0).unwrap();
+    let ctx = ToolCtx::detached("docs");
+    for separator in ["\n", "\r\n", "\r"] {
+        let command = format!("echo first > first.txt{separator}echo second > second.txt");
+        let error = manager.start(&ctx, &command, ProcessScope::Run, Duration::from_secs(30)).unwrap_err();
+        assert!(error.contains("Nothing was executed") && error.contains("write_file"), "{error}");
+        assert!(!fixture.0.join("first.txt").exists() && !fixture.0.join("second.txt").exists());
+    }
+    let started = manager.start(&ctx, "echo done\r\n", ProcessScope::Run, Duration::from_secs(30)).unwrap();
+    let result = manager.read(&ctx, &started.id, 0, 32000, Duration::from_secs(30)).unwrap();
+    assert_eq!(result.exit_code, Some(0), "{result:?}");
+    assert!(result.output.contains("done"));
+}

@@ -166,6 +166,10 @@ impl ProcessManager {
         {
             return Err("invalid command or process timeout".into());
         }
+        #[cfg(windows)]
+        if let Some(error) = crate::child_env::windows_multiline_error(command) {
+            return Err(error);
+        }
         let mut entries = lock(&self.entries);
         if self.closed.load(Ordering::SeqCst) {
             return Err("process manager is closed".into());
@@ -389,7 +393,7 @@ impl ProcessManager {
 
     pub fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {
         let start = ToolSpec::new("process_start", "Start a foreground shell command and return its process id immediately. Read incremental logs with process_read. No PTY. Default run scope stops at the end of this answer; keep_alive=true retains it for this conversation after a successful answer. Cancellation and timeout still stop it.", json!({
-            "type":"object", "properties":{"command":{"type":"string"},"keep_alive":{"type":"boolean"},"outside_sandbox":{"type":"boolean","description":crate::sandbox::OUTSIDE_SANDBOX_ARG},"timeout_seconds":{"type":"integer","minimum":1,"maximum":self.config.max_runtime.as_secs()}},"required":["command"],"additionalProperties":false
+            "type":"object", "properties":{"command":{"type":"string","description":"On Windows, use one cmd.exe line only; write multiline scripts to a file first, then run that file."},"keep_alive":{"type":"boolean"},"outside_sandbox":{"type":"boolean","description":crate::sandbox::OUTSIDE_SANDBOX_ARG},"timeout_seconds":{"type":"integer","minimum":1,"maximum":self.config.max_runtime.as_secs()}},"required":["command"],"additionalProperties":false
         }));
         let read = ToolSpec::new("process_read", "Collect a process's new output and status. Reuse next_cursor to avoid duplicate logs. wait_ms waits up to 60000 ms, returning early when the process exits; prefer 60000 for long builds instead of rapid polling. Waiting remains cancellable. dropped_bytes reports evicted output.", json!({
             "type":"object","properties":{"id":{"type":"string"},"cursor":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":4,"maximum":32000},"wait_ms":{"type":"integer","minimum":0,"maximum":60000}},"required":["id"],"additionalProperties":false

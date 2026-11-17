@@ -31,6 +31,8 @@ pub struct TodoSnapshot {
     pub todos: Vec<TodoItem>,
     #[serde(default)]
     pub handoff: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub waiting_for_user: bool,
 }
 
 /// A per-session task list the model maintains to plan multi-step work. Each call replaces the
@@ -59,7 +61,8 @@ impl Todo {
                         "required": ["content", "status"]
                     }
                 },
-                "handoff": { "type": "string", "maxLength": 2000, "description": "Decisions, blockers and the concrete next step needed to resume. Never put credentials here." }
+                "handoff": { "type": "string", "maxLength": 2000, "description": "Decisions, blockers and the concrete next step needed to resume. Never put credentials here." },
+                "waiting_for_user": { "type": "boolean", "description": "Set true only when work must stop for a concrete user action or missing input. Keep unfinished items open and give the required action in handoff; this does not mark the task complete or grant permission. Defaults to false on each update." }
             },
             "required": ["todos"]
         });
@@ -81,7 +84,8 @@ impl Todo {
                 let value = message.structured_content.as_ref().ok_or_else(|| HarnessError::Store("task progress has no structured record".into()))?;
                 let todos = parse_items(value).map_err(HarnessError::Store)?;
                 let handoff = parse_handoff(value).map_err(HarnessError::Store)?;
-                let state = TodoSnapshot { todos, handoff };
+                let waiting_for_user = parse_waiting(value, &handoff).map_err(HarnessError::Store)?;
+                let state = TodoSnapshot { todos, handoff, waiting_for_user };
                 self.lists.lock().unwrap_or_else(|e| e.into_inner()).insert(session.to_string(), state.clone());
                 return Ok(state);
             }
@@ -142,6 +146,17 @@ fn parse_handoff(args: &Value) -> Result<String, String> {
     Ok(text.to_owned())
 }
 
+fn parse_waiting(args: &Value, handoff: &str) -> Result<bool, String> {
+    let waiting = match args.get("waiting_for_user") {
+        None => false,
+        Some(value) => value.as_bool().ok_or("waiting_for_user must be a boolean")?,
+    };
+    if waiting && handoff.trim().is_empty() {
+        return Err("waiting_for_user requires a concrete blocker and the user's next action in handoff".into());
+    }
+    Ok(waiting)
+}
+
 impl Middleware for Todo {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         // A different host process may have advanced this session while we did not own it.
@@ -167,6 +182,7 @@ impl Tool for Todo {
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let items = parse_items(&args)?;
         let handoff = parse_handoff(&args)?;
+        let waiting_for_user = parse_waiting(&args, &handoff)?;
         let mut out = String::from("Todo list updated:");
         for item in &items {
             let mark = match item.status {
@@ -179,7 +195,7 @@ impl Tool for Todo {
         if items.is_empty() {
             out.push_str(" (empty)");
         }
-        let state = TodoSnapshot { todos: items, handoff };
+        let state = TodoSnapshot { todos: items, handoff, waiting_for_user };
         // A failed disk write is a failed tool call; never acknowledge volatile-only progress.
         if let Some(store) = &self.store {
             let mut record = Message::reminder("Task progress checkpoint");
@@ -188,5 +204,17 @@ impl Tool for Todo {
         }
         self.lists.lock().unwrap_or_else(|e| e.into_inner()).insert(ctx.session().to_string(), state);
         Ok(out)
+    }
+
+    fn execute_result(&self, args: Value, ctx: &ToolCtx) -> crate::ToolResult {
+        let waiting = args.get("waiting_for_user").and_then(Value::as_bool) == Some(true);
+        let handoff = args.get("handoff").and_then(Value::as_str).unwrap_or_default().to_owned();
+        match self.execute(args, ctx) {
+            Ok(output) if waiting => crate::ToolResult::ok(output).with_structured_content(json!({
+                "todo_handoff": { "waiting_for_user": true, "handoff": handoff }
+            })),
+            Ok(output) => crate::ToolResult::ok(output),
+            Err(error) => crate::ToolResult::error(error),
+        }
     }
 }

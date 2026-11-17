@@ -117,6 +117,64 @@ fn a_nudge_the_model_declines_is_accepted() {
 }
 
 #[test]
+fn declarative_handoffs_end_with_open_todos_without_nudging() {
+    for text in ["请先登录后通知我，我再继续。", "我需要你先告诉我目录在哪里。", "Please provide the missing file so I can continue."] {
+        let h = guarded(vec![Step::tool_call("t1", "todo", PLAN), Step::text(text)], &Arc::new(AtomicUsize::new(0)));
+        let (result, events) = run(&h.agent, "继续处理");
+        assert_eq!(result.unwrap().text, text);
+        assert!(reasons(&events).is_empty(), "{text}");
+    }
+}
+
+#[test]
+fn a_successful_structured_handoff_keeps_pending_items_and_stops() {
+    let mut plan: serde_json::Value = serde_json::from_str(PLAN).unwrap();
+    plan["waiting_for_user"] = true.into();
+    plan["handoff"] = "缺少项目文件；请用户上传源文件后继续。".into();
+    let h = guarded(vec![Step::tool_call("t1", "todo", &plan.to_string()), Step::text("已记录恢复步骤。")], &Arc::new(AtomicUsize::new(0)));
+    let (result, events) = run(&h.agent, "继续处理");
+    assert_eq!(result.unwrap().turns, 2);
+    assert!(reasons(&events).is_empty());
+    let history = h.store.load("s1").unwrap();
+    let result = history.iter().find(|m| m.role == Role::Tool).unwrap();
+    assert_eq!(result.structured_content.as_ref().unwrap()["todo_handoff"]["waiting_for_user"], true);
+    assert!(result.text().contains("[ ] 编写 game.js"));
+}
+
+#[test]
+fn generic_signoffs_and_stale_handoffs_do_not_hide_open_work() {
+    let mut waiting: serde_json::Value = serde_json::from_str(PLAN).unwrap();
+    waiting["waiting_for_user"] = true.into();
+    waiting["handoff"] = "Ask for a missing file".into();
+    for signoff in ["Done. Let me know if you want changes.", "还有其他问题吗？", "还需要更多帮助吗？", "Is there anything else I can help with?", "Any other questions?"] {
+        let steps = vec![Step::tool_call("t1", "todo", &waiting.to_string()), Step::tool_call("w1", "echo", "{}"),
+            Step::text(signoff), Step::tool_call("t2", "todo", DONE), Step::text("已核验完成。")];
+        let h = guarded(steps, &Arc::new(AtomicUsize::new(0)));
+        let (result, events) = run(&h.agent, "继续处理");
+        assert_eq!(result.unwrap().text, "已核验完成。");
+        assert_eq!(reasons(&events), vec!["unfinished_todos"], "{signoff}");
+    }
+}
+
+#[test]
+fn waiting_requires_a_successful_todo_and_never_overrides_permission_denial() {
+    let todo = Todo::new();
+    let result = todo.execute_result(serde_json::json!({"todos":[],"waiting_for_user":true}), &ToolCtx::detached("s"));
+    assert!(result.is_error && result.structured_content.is_none());
+
+    let call = ToolCall { id: "t".into(), name: "todo".into(), arguments: PLAN.into() };
+    let mut failed = Message::tool("t", "Todo list updated");
+    failed.is_error = true;
+    failed.structured_content = Some(serde_json::json!({"todo_handoff":{"waiting_for_user":true,"handoff":"missing file"}}));
+    let mut history = vec![Message::user_text("go"), Message::assistant("", vec![call]), failed, Message::assistant("Waiting.", vec![])];
+    fn stop(history: &[Message]) -> Stop<'_> { Stop { session:"s", history, run_start:0, finish:FinishReason::Stop, continuations:0, continuations_without_progress:0 } }
+    assert!(!stop(&history).waiting_for_user());
+    history[2].structured_content = Some(serde_json::json!({"harness_status":"permission_denied"}));
+    history[3] = Message::assistant("请先登录后通知我，我再继续。", vec![]);
+    assert_eq!(ContinueGuard::new().before_stop(&stop(&history)), StopDecision::Finish);
+}
+
+#[test]
 fn a_cut_off_answer_is_continued_without_flagging_truncation() {
     let steps = vec![Step::text("第一部分").finish(FinishReason::Length), Step::text("第二部分。")];
     let h = guarded(steps, &Arc::new(AtomicUsize::new(0)));

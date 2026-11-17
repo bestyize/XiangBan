@@ -15,6 +15,7 @@ struct Inflight {
     rx: Receiver<(Instant, ToolResult)>,
     clock: crate::RunControl,
     scope: crate::RunControl,
+    ctx: ToolCtx,
 
     call_cancel: Arc<AtomicBool>,
     grace: Duration,
@@ -51,6 +52,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
     let run_cancel = ctx.run_cancel.clone();
     let worker_cancel = call_cancel.clone();
     let scope = ctx.control.clone();
+    let completion_ctx = ctx.clone();
     // Each worker owns a watchdog; waiting for another result or an approval
     // must not postpone this call's cancellation.
     let watch = crate::StopWatch::new(
@@ -67,7 +69,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
             let _ = tx.send((Instant::now(), result));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, clock, scope, call_cancel, grace, read_fingerprint, _watch: watch })
+    Ok(Inflight { index, rx, clock, scope, ctx: completion_ctx, call_cancel, grace, read_fingerprint, _watch: watch })
 }
 
 fn reported(call: &Inflight, finished: Instant, mut result: ToolResult) -> ToolResult {
@@ -110,21 +112,22 @@ impl Agent {
     ) -> Vec<ToolResult> {
         let mut results: Vec<Option<ToolResult>> = vec![None; calls.len()];
         let mut inflight = Vec::new();
+        let rejected_ctx = ToolCtx::for_run(session, run_id, cancel, budget, control);
         for (i, call) in calls.iter().enumerate() {
             on_event(Event::ToolStart { id: call.id.clone(), name: call.name.clone(), arguments: call.arguments.clone() });
-            if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
+            if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(&rejected_ctx,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
             match self.prepare(session, run_id, call, cancel, budget, control) {
-                Prepared::Done(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
+                Prepared::Done(result) => results[i] = Some(self.finalize(&rejected_ctx, call, result, on_event)),
                 Prepared::Run { tool, args, mut ctx } => {
                     let serial = !tool.spec().parallel_safe;
                     if serial {
                         self.drain(session, &mut inflight, &mut results, calls, cancel, on_event);
                     }
-                    if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
+                    if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(&ctx,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
                     let resource = match tool.resource(&args) {
                         Ok(resource) => resource,
                         Err(error) => {
-                            results[i] = Some(self.finalize(session, call, ToolResult::error(error), on_event));
+                            results[i] = Some(self.finalize(&ctx, call, ToolResult::error(error), on_event));
                             continue;
                         }
                     };
@@ -136,12 +139,12 @@ impl Agent {
                             on_event(Event::ToolWaiting { id: call.id.clone(), resource: resource.label(), owner_session: owner.map(String::from), waiting });
                         });
                         if let Err(result) = claimed {
-                            results[i] = Some(self.finalize(session, call, result, on_event));
+                            results[i] = Some(self.finalize(&ctx, call, result, on_event));
                             continue;
                         }
                     }
                     if cancel.load(Ordering::Relaxed) {
-                        results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
+                        results[i] = Some(self.finalize(&ctx, call, ToolResult::error("cancelled before dispatch"), on_event));
                         continue;
                     }
                     let blocked = self.middleware.iter().filter(|mw| !mw.authorizes_tool()).find_map(|mw| {
@@ -151,17 +154,17 @@ impl Agent {
                         }
                     });
                     if let Some(result) = blocked {
-                        results[i] = Some(self.finalize(session, call, result, on_event));
+                        results[i] = Some(self.finalize(&ctx, call, result, on_event));
                         continue;
                     }
                     on_event(Event::ToolDispatched { id: call.id.clone() });
                     if cancel.load(Ordering::Relaxed) {
-                        results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
+                        results[i] = Some(self.finalize(&ctx, call, ToolResult::error("cancelled before dispatch"), on_event));
                         continue;
                     }
                     match spawn(i, tool, args, ctx) {
                         Ok(call_in_flight) => inflight.push(call_in_flight),
-                        Err(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
+                        Err(result) => results[i] = Some(self.finalize(&rejected_ctx, call, result, on_event)),
                     }
                     if serial {
                         self.drain(session, &mut inflight, &mut results, calls, cancel, on_event);
@@ -175,12 +178,12 @@ impl Agent {
 
     /// Answers every call with the same error without running anything, still reporting the calls
     /// to the UI and the middleware as ordinary failed calls.
-    pub(crate) fn reject_calls(&self, session: &str, calls: &[ToolCall], message: &str, on_event: &mut dyn FnMut(Event)) -> Vec<ToolResult> {
+    pub(crate) fn reject_calls(&self, ctx: &ToolCtx, calls: &[ToolCall], message: &str, on_event: &mut dyn FnMut(Event)) -> Vec<ToolResult> {
         calls
             .iter()
             .map(|call| {
                 on_event(Event::ToolStart { id: call.id.clone(), name: call.name.clone(), arguments: call.arguments.clone() });
-                self.finalize(session, call, ToolResult::error(message), on_event)
+                self.finalize(ctx, call, ToolResult::error(message), on_event)
             })
             .collect()
     }
@@ -317,7 +320,7 @@ impl Agent {
             let result = await_call(&call, cancel);
             if result.outcome_unknown() { call.scope.mark_uncertain(); }
             let succeeded = !result.is_error;
-            let result = self.finalize(session, &calls[call.index], result, on_event);
+            let result = self.finalize(&call.ctx, &calls[call.index], result, on_event);
             if succeeded && !result.is_error {
                 if let Some(before) = &call.read_fingerprint { self.remember_read(session, &calls[call.index], before); }
             }
@@ -327,7 +330,7 @@ impl Agent {
 
     fn finalize(
         &self,
-        session: &str,
+        ctx: &ToolCtx,
         call: &ToolCall,
         mut result: ToolResult,
         on_event: &mut dyn FnMut(Event),
@@ -359,7 +362,7 @@ impl Agent {
         }
         result.parts = images;
         for mw in &self.middleware {
-            mw.after_tool(session, call, &mut result);
+            mw.after_tool_with_context(ctx, call, &mut result);
         }
         result.output = truncate_middle(&result.output, max);
         on_event(Event::ToolEnd {

@@ -39,6 +39,10 @@
 
 图片 URL 会按 OpenAI chat-completions 的 `image_url` 发送给宿主模型请求并保存到会话。宿主负责选择与缩放图片、限制大小和确认模型支持视觉；stdio 每条消息限 8 MiB。内核能传输图片不代表手机已实现附件界面或游戏试玩。
 
+`tool_result` 也可带可选 `parts`，与 `run.parts` 使用同一文本/图片格式；`output` 保持为文本，媒体遵守既有每帧、每图及 6 MiB 结果上限。取消、失败及结果未知状态优先于媒体解析，图片不能覆盖这些状态。Kotlin 生图原图属于宿主展示字段，不必全部传入原生模型上下文。
+
+`history_read` 的 `offset` 按消息计，`char_offset` 按首条消息内的 Unicode 字符计。每条记录返回 `total_chars`、`truncated`，将返回的 `next` 对象作为下一次参数即可连续取回长原文；`next=null` 表示读完。JSON 转义也计入页大小上限，返回游标保证推进且不能访问其他会话。
+
 ## JNI
 
 类 `xyz.xiangban.xiaoban.common.community.AgentNative`（`common/community-core` 的 androidMain）：`nativeStart(config)`、`nativeSend(handle, line)`、`nativePoll(handle, timeoutMs)`、`nativeStop(handle)`。函数名和类名、包名绑在一起，改了要同步改 `src/jni_api.rs`。

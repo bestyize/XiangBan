@@ -120,24 +120,55 @@ fn summarize(turn: &mut Turn, budget: usize) {
 pub struct HistoryRead { spec: ToolSpec, store: Arc<dyn agent_kernel::SessionStore> }
 impl HistoryRead {
     pub fn new(store: Arc<dyn agent_kernel::SessionStore>) -> Self {
-        Self { store, spec: ToolSpec::new("history_read", "分页读取当前对话原始文本记录；摘要缺少细节时使用，不读取其他对话。", json!({"type":"object","properties":{"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":20}},"additionalProperties":false})).risk(Risk::Read) }
+        Self { store, spec: ToolSpec::new("history_read", "分页读取当前对话原始文本记录；摘要缺少细节时使用，不读取其他对话。offset是消息索引，char_offset是首条消息内的字符位置。长消息的truncated=true表示尚未读完；将返回的next对象原样作为下次参数，可连续取回全部原文，直到next=null。", json!({"type":"object","properties":{
+            "offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":20},
+            "char_offset":{"type":"integer","minimum":0},"char_limit":{"type":"integer","minimum":1,"maximum":8000}
+        },"additionalProperties":false})).risk(Risk::Read) }
     }
 }
 impl Tool for HistoryRead {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String,String> {
         let messages = self.store.load(ctx.session()).map_err(|e|e.to_string())?;
-        let offset = args["offset"].as_u64().unwrap_or(0) as usize;
+        let offset = usize::try_from(args["offset"].as_u64().unwrap_or(0)).map_err(|_| "offset is too large")?;
+        let char_offset = usize::try_from(args["char_offset"].as_u64().unwrap_or(0)).map_err(|_| "char_offset is too large")?;
         let limit = args["limit"].as_u64().unwrap_or(10).clamp(1,20) as usize;
+        let char_limit = args["char_limit"].as_u64().unwrap_or(2000).clamp(1,8000) as usize;
         let mut records = Vec::new();
-        for (i,m) in messages.iter().enumerate().skip(offset).take(limit) {
-            records.push(json!({"index":i,"role":m.role,"text":m.text().chars().take(2000).collect::<String>(),"is_error":m.is_error}));
-            if json!({"records":records,"total":messages.len(),"next_offset":offset+records.len()}).to_string().len() > 14_000 {
+        let mut next_offset = offset.min(messages.len());
+        let mut next_char_offset = char_offset;
+        if next_offset == messages.len() && char_offset > 0 { return Err("char_offset is past the end of history".into()); }
+        let page = |records: &[Value], next_offset: usize, next_char_offset: usize| json!({
+            "records":records,"total":messages.len(),"next_offset":next_offset,"next_char_offset":next_char_offset,
+            "next": if next_offset < messages.len() { json!({"offset":next_offset,"char_offset":next_char_offset,"limit":limit,"char_limit":char_limit}) } else { Value::Null }
+        });
+        while next_offset < messages.len() && records.len() < limit {
+            let message = &messages[next_offset];
+            let text = message.text();
+            let total_chars = text.chars().count();
+            if next_char_offset > total_chars { return Err("char_offset is past the end of this message".into()); }
+            let start = next_char_offset;
+            let mut take = char_limit.min(total_chars - start);
+            loop {
+                let end = start + take;
+                let truncated = end < total_chars;
+                let candidate_next = if truncated { (next_offset, end) } else { (next_offset + 1, 0) };
+                records.push(json!({"index":next_offset,"role":message.role,"text":text.chars().skip(start).take(take).collect::<String>(),
+                    "is_error":message.is_error,"char_offset":start,"char_end":end,"total_chars":total_chars,"truncated":truncated}));
+                if page(&records, candidate_next.0, candidate_next.1).to_string().len() <= 14_000 {
+                    (next_offset, next_char_offset) = candidate_next;
+                    break;
+                }
                 records.pop();
-                break;
+                if !records.is_empty() { return Ok(page(&records, next_offset, start).to_string()); }
+                // JSON escaping (including control characters) counts against the
+                // byte cap. Shorten this first record, never return a stuck cursor.
+                if take <= 1 { return Err("history record metadata exceeds page size".into()); }
+                take = take.div_ceil(2);
             }
+            if next_char_offset > 0 { break; }
         }
-        Ok(json!({"records":records,"total":messages.len(),"next_offset":(offset+records.len()).min(messages.len())}).to_string())
+        Ok(page(&records, next_offset, next_char_offset).to_string())
     }
 }
 
@@ -185,6 +216,52 @@ impl Tool for OutputRead {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn history_pages_recover_every_character_without_crossing_sessions() {
+        let store = Arc::new(MemoryStore::new());
+        let original = format!("{}{}末尾约束", "中🙂\n\"\u{0001}".repeat(3000), "x".repeat(9000));
+        store.append("s1", &[Message::user_text(&original), Message::assistant("next message", vec![])]).unwrap();
+        store.append("s2", &[Message::user_text("private elsewhere")]).unwrap();
+        let tool = HistoryRead::new(store);
+        let mut args = json!({"offset":0,"limit":20,"char_limit":8000});
+        let mut restored = [String::new(), String::new()];
+        let mut previous = (0, 0);
+        let mut saw_truncated = false;
+        for _ in 0..50 {
+            let output = tool.execute(args, &ToolCtx::detached("s1")).unwrap();
+            assert!(output.len() <= 14_000 && !output.contains("private elsewhere"));
+            let page: Value = serde_json::from_str(&output).unwrap();
+            assert_eq!(page["total"], 2);
+            for record in page["records"].as_array().unwrap() {
+                let index = record["index"].as_u64().unwrap() as usize;
+                assert_eq!(record["char_offset"].as_u64().unwrap() as usize, restored[index].chars().count());
+                restored[index].push_str(record["text"].as_str().unwrap());
+                saw_truncated |= record["truncated"] == true;
+            }
+            let cursor = (page["next_offset"].as_u64().unwrap(), page["next_char_offset"].as_u64().unwrap());
+            assert!(cursor > previous, "every nonempty page must advance");
+            previous = cursor;
+            if page["next"].is_null() { break; }
+            args = page["next"].clone();
+        }
+        assert!(saw_truncated);
+        assert_eq!(restored, [original, "next message".into()]);
+    }
+
+    #[test]
+    fn history_cursor_handles_empty_messages_and_rejects_out_of_range_characters() {
+        let store = Arc::new(MemoryStore::new());
+        store.append("s", &[Message::user_text(""), Message::assistant("abc", vec![])]).unwrap();
+        let tool = HistoryRead::new(store);
+        let page: Value = serde_json::from_str(&tool.execute(json!({"offset":0,"limit":1}), &ToolCtx::detached("s")).unwrap()).unwrap();
+        assert_eq!(page["next_offset"], 1);
+        assert_eq!(page["records"][0]["truncated"], false);
+        assert!(tool.execute(json!({"offset":1,"char_offset":4}), &ToolCtx::detached("s")).is_err());
+        let end: Value = serde_json::from_str(&tool.execute(json!({"offset":2}), &ToolCtx::detached("s")).unwrap()).unwrap();
+        assert!(end["next"].is_null());
+        assert!(end["records"].as_array().unwrap().is_empty());
+    }
 
     #[test]
     fn replacing_grants_revokes_an_always_answer_without_losing_review() {

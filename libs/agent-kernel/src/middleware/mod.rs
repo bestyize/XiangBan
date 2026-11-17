@@ -29,6 +29,15 @@ pub struct Stop<'a> {
     pub continuations_without_progress: usize,
 }
 
+impl Stop<'_> {
+    /// A concrete handoff in the final reply or a successfully recorded current-run
+    /// todo handoff. This is a waiting state, never task completion or authorization.
+    /// Hosts must still check permission denials and other hard stop conditions first.
+    pub fn waiting_for_user(&self) -> bool {
+        continuation::waiting_for_user(self, "todo")
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StopDecision {
     Finish,
@@ -75,6 +84,12 @@ pub trait Middleware: Send + Sync {
 
     fn after_tool(&self, _session: &str, _call: &ToolCall, _result: &mut ToolResult) {}
 
+    /// Context-aware completion hook. Blocking middleware must observe cancellation
+    /// here too. Existing text-only hooks keep working through the default adapter.
+    fn after_tool_with_context(&self, ctx: &ToolCtx, call: &ToolCall, result: &mut ToolResult) {
+        self.after_tool(ctx.session(), call, result);
+    }
+
     /// The first non-Finish decision wins; `max_turns` still bounds continuations.
     fn before_stop(&self, _stop: &Stop<'_>) -> StopDecision {
         StopDecision::Finish
@@ -98,6 +113,10 @@ impl<T: Middleware + ?Sized> Middleware for Arc<T> {
 
     fn after_tool(&self, session: &str, call: &ToolCall, result: &mut ToolResult) {
         (**self).after_tool(session, call, result)
+    }
+
+    fn after_tool_with_context(&self, ctx: &ToolCtx, call: &ToolCall, result: &mut ToolResult) {
+        (**self).after_tool_with_context(ctx, call, result)
     }
 
     fn before_stop(&self, stop: &Stop<'_>) -> StopDecision {

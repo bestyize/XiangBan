@@ -151,6 +151,14 @@ pub(crate) fn no_window(cmd: &mut Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
+/// All cmd.exe entry points must reject embedded newlines before starting a process.
+/// cmd /C can otherwise report success after executing only the first line.
+pub(crate) fn windows_multiline_error(command: &str) -> Option<String> {
+    command.trim_end().contains(['\n', '\r']).then(|| {
+        "The command has several lines, but cmd.exe runs only the first one and ignores the rest, so nothing useful would run. Nothing was executed. Write the script to a file with write_file and run that file (for example `python script.py`), or join steps on one line with `&&`.".to_string()
+    })
+}
+
 /// `cmd.exe` running one command line exactly as written.
 ///
 /// Rust quotes each argument the way C programs parse them (`"` becomes `\"`), but cmd.exe does not undo that, so
@@ -168,6 +176,15 @@ pub(crate) fn windows_shell(command: &str) -> Command {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn windows_commands_only_allow_trailing_line_endings() {
+        for command in ["echo first\necho second", "echo first\r\necho second", "echo first\recho second"] {
+            assert!(windows_multiline_error(command).unwrap().contains("Nothing was executed"));
+        }
+        assert!(windows_multiline_error("echo done\r\n").is_none());
+        assert!(windows_multiline_error("echo first && echo second").is_none());
+    }
 
     #[test]
     fn merging_keeps_the_current_order_first_and_drops_repeats() {

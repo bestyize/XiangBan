@@ -105,6 +105,7 @@ impl ToolSpec {
 pub const DEFAULT_MAX_OUTPUT: usize = 32_000;
 
 /// Handed to a running tool. Long-running tools should poll `is_cancelled`.
+#[derive(Clone)]
 pub struct ToolCtx {
     pub(crate) session: String,
     pub(crate) run_id: String,
@@ -116,6 +117,12 @@ pub struct ToolCtx {
 }
 
 impl ToolCtx {
+    pub(crate) fn for_run(session: &str, run_id: &str, cancel: &Arc<AtomicBool>, budget: Option<&Arc<crate::ToolBudget>>, control: &crate::RunControl) -> Self {
+        Self { session: session.into(), run_id: run_id.into(), run_cancel: cancel.clone(),
+            call_cancel: Arc::new(AtomicBool::new(false)), budget: budget.cloned(),
+            control: control.clone(), call_control: Default::default() }
+    }
+
     pub fn session(&self) -> &str {
         &self.session
     }
