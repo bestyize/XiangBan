@@ -490,6 +490,64 @@ fn text_and_image_parts_reach_the_host_model_request_without_changing_jni() {
 }
 
 #[test]
+fn host_tool_images_reach_the_next_model_request_and_survive_restart() {
+    let dir = temp_dir("host-tool-image");
+    let mut settings: Value = serde_json::from_str(&config(&dir)).unwrap();
+    settings["tools"] = json!([{"name":"read_image","description":"read an existing image",
+        "parameters":{"type":"object"},"risk":"read"}]);
+    let engine = Engine::start(&settings.to_string()).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"查看图片"}).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    ask_tool(&engine, &request, "read_image", json!({}), "image");
+    let tool = next_of(&engine, "tool_request");
+    let image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+    engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":"原始图片已读取",
+        "parts":[{"type":"image","url":image}]}).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    let body = request["body"].as_str().unwrap();
+    assert!(body.contains(image) && body.contains("原始图片已读取"));
+    answer_text(&engine, &request, "图片已查看。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+    let stored = std::fs::read_to_string(std::path::Path::new(&dir).join("s-s1.jsonl")).unwrap();
+    assert!(stored.contains("xiaoban-attachment:") && !stored.contains(image));
+
+    let restarted = Engine::start(&settings.to_string()).unwrap();
+    restarted.send(&json!({"type":"run","id":"r2","session":"s1","input":"继续检查同一图片"}).to_string()).unwrap();
+    let request = next_of(&restarted, "model_request");
+    assert!(request["body"].as_str().unwrap().contains(image));
+    answer_text(&restarted, &request, "检查完成。");
+    assert_eq!(next_of(&restarted, "run_end")["ok"], true);
+    restarted.stop();
+}
+
+#[test]
+fn host_413_in_body_or_error_shrinks_only_the_outbound_history() {
+    for error_field in [false, true] {
+        let dir = temp_dir(&format!("http-413-{error_field}"));
+        let engine = Engine::start(&config(&dir)).unwrap();
+        engine.send(&json!({"type":"run","id":"old","session":"s1","input":"a".repeat(20_000)}).to_string()).unwrap();
+        let old = next_of(&engine, "model_request");
+        answer_text(&engine, &old, "Recorded.");
+        assert_eq!(next_of(&engine, "run_end")["ok"], true);
+        engine.send(&json!({"type":"run","id":"current","session":"s1","input":"current request"}).to_string()).unwrap();
+        let rejected = next_of(&engine, "model_request");
+        let mut failure = json!({"type":"model_end","id":rejected["id"],"status":413});
+        if error_field { failure["error"] = "HTTP 413: proxy body limit".into(); }
+        else { failure["body"] = r#"{"error":{"message":"proxy body limit"}}"#.into(); }
+        engine.send(&failure.to_string()).unwrap();
+        let retried = next_of(&engine, "model_request");
+        assert!(retried["body"].as_str().unwrap().len() < rejected["body"].as_str().unwrap().len());
+        assert!(retried["body"].as_str().unwrap().contains("current request"));
+        answer_text(&engine, &retried, "Recovered.");
+        assert_eq!(next_of(&engine, "run_end")["ok"], true);
+        engine.stop();
+        let stored = std::fs::read_to_string(std::path::Path::new(&dir).join("s-s1.jsonl")).unwrap();
+        assert!(stored.contains(&"a".repeat(20_000)), "raw history remains recoverable");
+    }
+}
+
+#[test]
 fn time_now_uses_the_phones_optional_utc_offset() {
     let dir = temp_dir("timezone");
     let engine = Engine::start(&json!({ "sessions_dir": dir, "utc_offset_minutes": 480 }).to_string()).unwrap();

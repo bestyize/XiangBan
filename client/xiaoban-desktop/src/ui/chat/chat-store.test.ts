@@ -75,6 +75,21 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
 }
 
 describe('revising a running task plan', () => {
+  it('waits beyond the model terminal event until the native host releases the execution lease', async () => {
+    const h = harness({ chat_overview: () => overview({hostLifecycleProtocol: 1, busy: []}), chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_cancel: () => undefined });
+    await h.store.init(); await h.store.send('制作汇报');
+    const revised = h.store.revisePlan('改为面向管理层');
+    await Promise.resolve(); await Promise.resolve();
+    h.events('s1', {type: 'cancelled'});
+    await Promise.resolve();
+    expect(h.store.current()?.running).toBe(false);
+    expect(h.store.current()?.hostBusy).toBe(true);
+    expect(h.calls.filter(([command]) => command === 'chat_send')).toHaveLength(1);
+    h.emit('chat-host-idle', {session: 's1'});
+    expect(await revised).toBe(true);
+    expect(h.calls.filter(([command]) => command === 'chat_send')).toHaveLength(2);
+    h.store.dispose();
+  });
   it('waits for cancellation to finish before sending the revision and keeps the original authorization mode', async () => {
     const h = harness({ chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_cancel: () => undefined });
     await h.store.init(); await h.store.send('制作汇报');
@@ -133,8 +148,8 @@ describe('starting up', () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(12);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-host-idle', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(13);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -172,6 +187,36 @@ describe('starting up', () => {
     expect(h.store.views.s1.running).toBe(true);
   });
 
+  it('ignores an overview captured before done and clears stale running on a fresh idle overview', async () => {
+    const h = harness({chat_overview: () => overview({sessions: [summary('s1')], running: ['s1']})});
+    await h.store.init();
+    let resolve!: (value: Overview) => void;
+    h.table.chat_overview = () => new Promise<Overview>(done => { resolve = done; });
+    const refresh = h.store.refresh();
+    h.events('s1', {type: 'done'});
+    resolve(overview({sessions: [summary('s1')], running: ['s1']}));
+    await refresh;
+    expect(h.store.views.s1.running).toBe(false);
+    h.store.views.s1.running = true;
+    h.table.chat_overview = () => overview({sessions: [summary('s1')], running: []});
+    await h.store.refresh();
+    expect(h.store.views.s1.running).toBe(false);
+    h.store.dispose();
+  });
+
+  it('does not let an older idle overview clear a newly submitted run', async () => {
+    const h = harness({chat_new_session: () => summary('s1'), chat_send: () => summary('s1')});
+    await h.store.init();
+    let resolve!: (value: Overview) => void;
+    h.table.chat_overview = () => new Promise<Overview>(done => { resolve = done; });
+    const refresh = h.store.refresh();
+    await h.store.send('新任务');
+    resolve(overview({sessions: [summary('s1')], running: []}));
+    await refresh;
+    expect(h.store.current()?.running).toBe(true);
+    h.store.dispose();
+  });
+
   it('shows nothing from an overview the host did not fill in', async () => {
     const h = harness({ chat_overview: () => undefined });
     await h.store.init();
@@ -186,7 +231,7 @@ describe('sending', () => {
     await h.store.init();
     expect(await h.store.send('整理下载文件夹')).toBe(true);
     expect(h.commands()).toEqual(['chat_overview', 'chat_new_session', 'chat_send']);
-    expect(h.calls[2][1]).toEqual({ sessionId: 's1', text: '整理下载文件夹' });
+    expect(h.calls[2][1]).toEqual({ sessionId: 's1', requestId: expect.any(String), text: '整理下载文件夹' });
     expect(h.store.currentId).toBe('s1');
     expect(h.store.sessions).toEqual([summary('s1', '整理下载文件夹', 5)]);
     expect(h.store.current()).toMatchObject({ running: true, loaded: true });
@@ -528,7 +573,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-host-idle', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -539,7 +584,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-host-idle', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     expect(h.store.sessions).toEqual([]);
   });
 });
@@ -832,7 +877,7 @@ it('sends a named document with an image and retains the attachment card', async
   await h.store.init();
   const doc = {name:'预算.csv',size:9,mime:'text/csv',dataUrl:'data:text/csv;base64,YW1vdW50CjEy'};
   expect(await h.store.send('',[doc,'data:image/png;base64,AA=='])).toBe(true);
-  expect(h.calls.find(([name])=>name==='chat_send')?.[1]).toEqual({sessionId:'s1',text:'',images:['data:image/png;base64,AA=='],attachments:[{name:doc.name,dataUrl:doc.dataUrl}]});
+  expect(h.calls.find(([name])=>name==='chat_send')?.[1]).toEqual({sessionId:'s1',requestId:expect.any(String),text:'',images:['data:image/png;base64,AA=='],attachments:[{name:doc.name,dataUrl:doc.dataUrl}]});
   expect(h.store.current()?.items[0]).toMatchObject({kind:'user',files:[{name:'预算.csv',size:9}]});
 });
 
@@ -1184,6 +1229,55 @@ it('restores each saved outcome to its own reply rather than the latest task', a
 
 describe('durable message queues', () => {
   const queued = (revision = 1) => ({revision,paused:false,reason:'',enqueuedId:'q1',items:[{id:'q1',text:'next',mode:'queue' as const,dispatching:false,images:0,files:[]}]});
+  it('retries a first message that failed before history was saved using its durable id and attachment', async () => {
+    const h = harness({chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_queue_update: () => ({revision: 3, paused: true, reason: '', items: []})});
+    await h.store.init();
+    const file = {name: 'report.csv', size: 1, mime: 'text/csv', dataUrl: 'data:text/csv;base64,YQ=='};
+    expect(await h.store.send('分析附件', [file])).toBe(true);
+    const requestId = h.calls.find(([command]) => command === 'chat_send')?.[1]?.requestId as string;
+    h.emit('chat-queue-changed', {session: 's1', queue: {revision: 2, paused: true, reason: '模型准备失败', items: [{id: requestId, text: '分析附件', mode: 'queue', dispatching: false, images: 0, files: [{name: file.name, size: file.size, mime: file.mime}]}]}});
+    h.emit('chat-event', {session: 's1', outboxId: requestId, event: {type: 'error', message: '模型不可用：HTTP 503'}});
+    const failure = h.store.current()!.items.find(item => item.kind === 'notice' && item.canRetry)!;
+    expect(await h.store.retry(failure.id)).toBe(true);
+    expect(h.calls.find(([command]) => command === 'chat_queue_update')?.[1]).toEqual({sessionId: 's1', action: 'retry', id: requestId});
+    expect(h.calls.filter(([command]) => command === 'chat_send')).toHaveLength(1);
+    expect(h.store.current()!.items.filter(item => item.kind === 'user')).toEqual([expect.objectContaining({text: '分析附件', outboxId: requestId, files: [expect.objectContaining({name: 'report.csv'})]})]);
+    h.store.dispose();
+  });
+
+  it('keeps an undelivered queued failure from offering recovery for the previous completed turn', async () => {
+    const h = harness({chat_new_session: () => summary('s1'), chat_send: () => summary('s1')});
+    await h.store.init(); await h.store.send('任务 A');
+    h.events('s1', {type: 'text_delta', text: 'A 已完成'}, {type: 'done'});
+    h.emit('chat-queue-changed', {session: 's1', queue: {...queued(), paused: true, reason: '模型准备失败'}});
+    h.emit('chat-event', {session: 's1', outboxId: 'q1', event: {type: 'error', message: '模型不可用：HTTP 503'}});
+    const failure = h.store.current()!.items.at(-1)!;
+    expect(failure).toMatchObject({kind: 'notice', tone: 'error'});
+    expect(h.store.canRecover(failure.id)).toBe(false);
+    expect(h.store.queue?.items[0].id).toBe('q1');
+    h.store.dispose();
+  });
+
+  it('keeps old failure notices as history but never retries a later user turn from their actions', async () => {
+    const h = harness({chat_new_session: () => summary('s1'), chat_send: () => summary('s1')});
+    await h.store.init(); await h.store.send('任务 A');
+    h.events('s1', {type: 'error', message: '模型不可用：HTTP 503'});
+    const old = h.store.current()!.items.find(item => item.kind === 'notice' && item.canRetry)!;
+    expect(h.store.canRecover(old.id)).toBe(true);
+    await h.store.send('任务 B');
+    h.events('s1', {type: 'text_delta', text: 'B 已完成'}, {type: 'done'});
+    expect(h.store.current()!.items).toContainEqual(expect.objectContaining({id: old.id}));
+    expect(h.store.canRecover(old.id)).toBe(false);
+    expect(await h.store.retry(old.id)).toBe(false);
+    await h.store.send('任务 C');
+    h.events('s1', {type: 'error', message: '模型不可用：HTTP 503'});
+    expect(await h.store.retry(old.id)).toBe(false);
+    expect(h.calls.filter(([command, args]) => command === 'chat_send' && args?.retry)).toHaveLength(0);
+    const current = h.store.current()!.items.at(-1)!;
+    expect(h.store.canRecover(current.id)).toBe(true);
+    expect(await h.store.retry(current.id)).toBe(true);
+    h.store.dispose();
+  });
   it('keeps a pending enqueue and its attachments bound to the original session after switching', async () => {
     let finish!: (value: unknown) => void;
     const h = harness({chat_overview:()=>overview({sessions:[summary('s1'),summary('s2')]}),chat_load_session:()=>[],chat_enqueue:()=>new Promise(resolve=>{finish=resolve;})});

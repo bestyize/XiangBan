@@ -147,7 +147,11 @@ pub(crate) fn post_stream_with_policy_status(
                 let Some(chunk)=chunk else{break;};let n=chunk.len().min(ERROR_BODY_LIMIT as usize-raw.len());raw.extend_from_slice(&chunk[..n]);
             }
             *error_status = Some(status);
-            return Err(HarnessError::provider(if status==413 { "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".into() } else {format!("HTTP {status}: {}",String::from_utf8_lossy(&raw))},status_is_retryable(status)));
+            return Err(if status == 413 {
+                HarnessError::request_too_large("HTTP 413: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。")
+            } else {
+                HarnessError::provider(format!("HTTP {status}: {}", String::from_utf8_lossy(&raw)), status_is_retryable(status))
+            });
         }
         let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;let mut received_event=false;let mut reported=(Instant::now(),0usize,false);
         loop {

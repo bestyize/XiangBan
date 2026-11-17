@@ -170,12 +170,13 @@ const goalOpen = ref(false);
 watch(() => props.store.goalTemplate, template => { if (template) goalOpen.value = true; }, { immediate: true });
 const goalBusy = ref(false);
 const retryAfterSwitch = ref(false);
-function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
+const retryNoticeId = ref<string | undefined>();
+function chooseModel(retry = false, noticeId?: string) { retryAfterSwitch.value = retry; retryNoticeId.value = noticeId; modelDialog.value = true; }
 async function modelSwitched(sessionId: string | null) {
   if (chat.currentId !== sessionId) return;
   await chat.refresh();
   await composer.value?.refreshModel();
-  if (retryAfterSwitch.value && chat.currentId === sessionId) await chat.retry();
+  if (retryAfterSwitch.value && chat.currentId === sessionId) await chat.retry(retryNoticeId.value);
   props.store.notify('模型已切换', 'success');
 }
 /** 设置 → AI 模型, in the settings dialog. */
@@ -288,7 +289,7 @@ async function showTaskAttention() {
 function resumeTask() {
   props.store.asr?.deactivate();
   stick.value = true;
-  void chat.send('请先核对已完成的进展和当前状态，再从未完成的步骤继续原任务。结果不明的操作先检查，不要直接重放；原有授权范围不变。');
+  void chat.send(CONTINUE_TEXT);
 }
 
 onMounted(async () => {
@@ -312,7 +313,10 @@ watch(signature, async (value, before) => {
   if (stick.value) toBottom();
 });
 const useExample = (text: string) => composer.value?.setDraft(text);
-const continueAnswer = () => { props.store.asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
+const continueAnswer = (noticeId: string) => {
+  if (!chat.canRecover(noticeId)) return;
+  props.store.asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT);
+};
 const confirmingUndo = ref('');
 async function undoRun(itemId: string) { confirmingUndo.value = ''; if (view.value) await chat.undoRun(view.value.id, itemId); }
 
@@ -640,9 +644,9 @@ async function openLink(href: string) {
                   <div v-else-if="item.kind === 'notice' && (item.text || item.details)" class="notice" :class="[item.tone, { 'outcome-details': item.taskStatus && !item.text }]" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                     <span v-if="item.text" class="notice-text">{{ item.text }}</span>
                     <details v-if="item.details"><summary :title="item.detailsLabel ?? '错误详情'" :aria-label="item.detailsLabel ?? '错误详情'"><ChevronRight :size="12" class="notice-chevron" aria-hidden="true" /><FileText :size="14" class="notice-compact-icon" aria-hidden="true" /><span class="notice-action-label">{{ item.detailsLabel ?? '错误详情' }}</span></summary><span class="notice-details">{{ item.details }}</span></details>
-                    <button v-if="item.canSwitchModel && !view.running" type="button" class="xb-link" @click="chooseModel(!!item.canRetry)">切换模型</button>
-                    <button v-if="item.canRetry && !view.running" type="button" class="xb-link" @click="chat.retry()">重试</button>
-                    <button v-if="item.canContinue && !view.running" type="button" class="xb-link" data-testid="chat-continue" @click="continueAnswer">继续</button>
+                    <button v-if="item.canSwitchModel && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" @click="chooseModel(!!item.canRetry, item.id)">切换模型</button>
+                    <button v-if="item.canRetry && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" data-testid="chat-retry" @click="chat.retry(item.id)">重试</button>
+                    <button v-if="item.canContinue && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" data-testid="chat-continue" @click="continueAnswer(item.id)">继续</button>
                     <template v-if="item.undoRun && !view.running">
                       <button v-if="confirmingUndo !== item.id" type="button" class="xb-link" data-testid="chat-undo-run" @click="confirmingUndo = item.id">撤销这些改动</button>
                       <template v-else>

@@ -40,9 +40,11 @@ data class ChatRecord(
 private val ToolLabels = mapOf(
     "shell" to "运行命令", "bash" to "运行命令", "read_file" to "读取文件", "write_file" to "写入文件", "edit_file" to "修改文件",
     "list_dir" to "查看文件夹", "grep" to "搜索文件", "web_fetch" to "打开网页", "web_search" to "搜索网页", "todo" to "任务清单",
-    "history_read" to "查阅对话历史", "tool_output_read" to "读取执行结果",
+    "history_read" to "查阅对话历史", "conversation_read" to "读取原始对话", "tool_output_read" to "读取执行结果",
     "ask_user" to "向你提问", "time_now" to "查看时间", "memory_read" to "读取笔记", "memory_write" to "保存笔记", "load_skill" to "读取技能",
-    "set_reminder" to "设置提醒", "care_set" to "设置提醒", "care_list" to "查看提醒", "care_delete" to "删除提醒",
+    "set_reminder" to "设置提醒", "list_reminders" to "查看提醒", "update_reminder" to "修改提醒", "cancel_reminder" to "取消提醒",
+    "image_generate" to "生成图片", "image_jobs" to "查看生图任务",
+    "care_set" to "设置提醒", "care_list" to "查看提醒", "care_delete" to "删除提醒",
     "wallpaper_list" to "查看壁纸", "wallpaper_apply" to "更换壁纸", "wallpaper_create" to "创作壁纸",
     "effect_list" to "查看特效", "effect_set" to "切换特效", "effect_create" to "创作特效",
     "widget_list" to "查看桌面组件", "widget_add" to "添加桌面组件", "widget_create" to "创作桌面组件",
@@ -64,7 +66,12 @@ fun describeCall(name: String, argumentsJson: String): String {
     }
     val text = when (name) {
         "shell", "bash" -> pick("command")
-        "set_reminder" -> listOfNotNull(pick("title"), pick("minutes")?.let { "$it 分钟后" }).joinToString(" · ").ifBlank { null }
+        "set_reminder", "update_reminder" -> listOfNotNull(pick("title"), pick("minutes")?.let { "$it 分钟后" }, pick("id")?.let { "提醒 $it" }).joinToString(" · ").ifBlank { null }
+        "cancel_reminder" -> pick("id")?.let { "提醒 $it" }
+        "list_reminders" -> "本机提醒"
+        "image_generate" -> pick("prompt")
+        "image_jobs" -> "当前对话的生图记录"
+        "conversation_read" -> listOfNotNull(pick("message_id")?.let { "消息 $it" }, pick("attachment_index")?.toIntOrNull()?.let { "附件 ${it + 1}" }).joinToString(" · ").ifBlank { "原始消息与附件索引" }
         else -> pick("command", "path", "url", "query", "pattern", "kind", "title", "name", "id", "text", "question", "expression", "gameId")
     }
     val line = text.orEmpty().lineSequence().firstOrNull().orEmpty().trim()
@@ -138,7 +145,6 @@ fun unresolvedCalls(calls: List<ToolCallInfo>): List<ToolCallInfo> {
  */
 fun taskProgress(calls: List<ToolCallInfo>, running: Boolean, waiting: String? = null, stopped: Boolean = false, error: String? = null): TaskProgress? {
     val plan = taskPlan(calls) ?: return null
-    if (plan.completed == plan.steps.size) return TaskProgress(plan, TaskState.Completed)
     val unresolved = unresolvedCalls(calls)
     return when {
         running && waiting == "approval" -> TaskProgress(plan, TaskState.Approval)
@@ -147,6 +153,8 @@ fun taskProgress(calls: List<ToolCallInfo>, running: Boolean, waiting: String? =
         error != null -> TaskProgress(plan, TaskState.Blocked, error)
         unresolved.isNotEmpty() -> TaskProgress(plan, TaskState.Blocked, unresolved.last().output.lineSequence().firstOrNull().orEmpty().take(120))
         stopped -> TaskProgress(plan, TaskState.Paused)
+        calls.any { it.status == ToolStatus.Running } -> TaskProgress(plan, TaskState.Paused)
+        plan.completed == plan.steps.size -> TaskProgress(plan, TaskState.Completed)
         else -> TaskProgress(plan, TaskState.Paused)
     }
 }

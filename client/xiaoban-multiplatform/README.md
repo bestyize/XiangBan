@@ -69,6 +69,18 @@ Android 在内置 `agent_mobile` 原生库时，可从「应用 → 我的作品
 
 创作时可用 `lib_add` 把内置的 Three.js r128 加入作品，用 `asset_import` 从系统文件选择器加入图片、音频、GLB 模型或 WOFF2 字体。图标和封面可引用包内图片。导出、分享或提交社区发布时，ZIP 会保留已安装作品的文件和目录结构。单个源码上限 1 MB，单个素材上限 10 MB，作品文件合计上限 24 MB。模块分工见 [手机 Agent 基础能力接入](docs/agent-foundation.md)。
 
+### Agent 任务恢复与工具管理
+
+普通 Agent 和方案聊天按会话保存运行状态。新建或切换对话后，原任务继续执行；侧栏显示其他运行中及待确认的会话，回到原会话处理问答和审批。停止只取消当前任务；换账号取消旧账号全部运行并拒收迟到事件。这是应用进程内的任务管理，不承诺操作系统结束应用后继续运行。
+
+确认创作方案时，执行输入包含全部原始需求、更正和附件索引；过长正文及图片通过只读 `conversation_read` 按消息和附件编号取回。该工具只读取调用所属会话。原生 `history_read` 支持消息内字符分页，长内容返回明确截断标记和后续游标。任务卡优先显示运行、待确认、失败和停止状态，不能仅因 todo 全部勾选而提前宣称完成。Anthropic 输出长度限制、Responses 未完成响应保留已收到文字并阻止确认不完整方案。
+
+`image_generate` 复用官方可恢复生图任务，`image_jobs` 查询当前账号和会话中的回执。同一 `request_id` 固定对应原任务；先保存回执再提交，中断后复用编号取回结果，不能以新编号自动重试付费生成。图片直接展示在聊天中，也可保存至 `drafts/<作品名>` 的图片素材路径供 `app_create` 使用；完整 base64 不进入模型工具文本。不支持任务接口的旧网关仍使用现有手动生图入口。
+
+Android 提醒返回稳定 id；`list_reminders` 查询，`update_reminder` 修改原提醒，`cancel_reminder` 取消并删除指定提醒。等待通知权限表示提醒已保存，允许后才会生效，不能重复创建。仍使用系统非精确闹钟，可能受系统省电策略延迟；修改和取消依然经过写入类工具授权。
+
+针对性 JVM 回归覆盖 `CustomPlainCompletionTest`、`ConversationReadTest`、`MobileConversationIsolationTest`、`ChatModelsTest`、`ChatHistoryTest`、`ImageAgentToolsTest`、`ImageGenerationTest`、`ReminderManagementTest`、`SetReminderToolTest`、`MobileReliabilityTest`。原生桥验证需设置 `AGENT_MOBILE_LIB` 后运行 Agent 测试；Android 通知、后台限制与 iOS 界面仍需设备验收。
+
 ## Android 内置「轻启」（开发中）
 
 「应用 → 广场 → 精选工具 → 轻启」提供 104 个应用的离线目录与系统固定快捷方式。运行包位于 `androidApp/src/main/assets/game-packs-v2/quick-launch`。哔哩哔哩使用已知首页路由 `bilibili://home`（失败自动回退），其余优先使用 Android `ACTION_MAIN` + `CATEGORY_LAUNCHER` 的主入口，不再依赖未验证的空 URL Scheme；系统入口可能恢复该 App 上次停留的页面；已知应用包名优先匹配，其他目录应用按已安装的 Launcher 显示名称（及少量正式别名）匹配，无法识别时明确提示不可启动；仅 Apple 平台的应用不在 Android 上启动。首次检测会受系统应用可见性及设备安装状态影响，实际能否拉起需设备验收。入口能打开不代表能跳过广告。Android 桌面快捷方式带闪电角标，需系统桌面支持并由用户确认。小程序与宿主共用固定的 104 项白名单，不接受作品传入任意包名或 URI；宿主只对与内置作品入口字节一致的包开放该能力，并检查前台用户手势。快捷方式启动时校验固定 ID 和随机令牌。

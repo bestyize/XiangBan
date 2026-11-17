@@ -1,5 +1,15 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## Agent 运行可靠性
+
+首次提交也先写入持久消息队列，再准备模型与账号令牌。准备失败后保留原输入、附件和提交编号；重试当前条时使用修正后的模型配置，其余排队消息保持暂停。输入“继续”、任务卡与目标面板共用目标恢复事务，保留目标合同、累计 token 和活跃时间；模型收到恢复合同，聊天仍显示用户原始输入。
+
+界面分别记录模型运行与宿主收尾状态。较早的 overview 响应不能覆盖更新的终态，宿主释放执行 lease 后再发布空闲事件；修改计划等真正空闲后才发出新要求。历史错误提示仅在仍属于最新用户轮时提供恢复按钮，并校验被点击提示的编号。
+
+用户 hooks 的时限覆盖 stdin 写入、子进程运行与 stderr 收集；停止任务会传递取消信号，清理受管子进程树，收尾不无限等待继承管道的后代进程。after-tool hook 被取消时保留工具的真实执行结果。Windows 的 `process_start` 与普通 shell 共用多行命令校验，防止只执行第一行却报告成功。
+
+前端回归使用 `chat-store.test.ts`、`view.test.ts`、`ChatPage.test.ts`、`ChatComposerQueue.test.ts` 和 `vue-tsc --noEmit`；Rust 回归覆盖 hooks、goal_resume、outbox、task_runtime 与共享内核。Windows/macOS 原生窗口和 Windows 命令执行仍需对应系统验收。
+
 ## 账号 ID 与 AI 额度入口
 
 账号菜单展示账号中心的数字字符串 `account_id`，内部 `uid` 继续用于身份和业务关联。旧登录缓存缺少数字 ID 时保留登录，通过续期后的 `/api/me` 补取；暂未取得时不显示 ID，也不回退展示 UUID。菜单中的「获取 AI 额度」通过浏览器打开[联系我们](https://chat.xiangban.xyz/contact)，并跟随壁纸网站后台的「小伴 AI 入口」开关显示或隐藏。已有兑换码仍可在「设置 → AI 模型 → 小伴 AI」里使用。

@@ -763,7 +763,11 @@ class AiGatewayApi(
                 val contentType = response.headers[HttpHeaders.ContentType].orEmpty()
                 if (!contentType.startsWith("text/event-stream")) {
                     val text = response.readBoundedBytes(CHAT_BODY_BYTES).decodeToString()
-                    val piece = if (target.custom && target.protocol != "chat") customSingleText(text, target.protocol) else extractSingleReply(text)
+                    if (target.custom && target.protocol != "chat") {
+                        customSingleText(text, target.protocol) { piece -> full.append(piece); onDelta(piece) }
+                        return@execute
+                    }
+                    val piece = extractSingleReply(text)
                     if (piece.isNotEmpty()) {
                         full.append(piece)
                         onDelta(piece)
@@ -933,11 +937,14 @@ data class CloudChatState(
     val media: Map<String, AiMediaCapability> = emptyMap(),
     val creation: CreationDraft? = null,
     val imageSessions: Set<String> = emptySet(),
+    val runningSessions: Set<String> = emptySet(),
+    val waitingSessions: Set<String> = emptySet(),
 ) {
     val backgroundImageCount: Int get() = imageSessions.count { it != conversationId }
+    val backgroundTaskCount: Int get() = runningSessions.count { it != conversationId }
     val planningCreation: Boolean get() = creation?.approved == false
     val creationPlanReady: Boolean get() = planningCreation && !sending && messages.lastOrNull()?.let {
-        it.creationPlan && it.error == null && !it.cancelled && it.text.isNotBlank()
+        it.creationPlan && it.error == null && !it.cancelled && !it.truncated && it.text.isNotBlank()
     } == true
     val imageCapability: AiMediaCapability? get() = if (officialAiEnabled) media["image"] else null
     val customModelName: String? get() = customTiers.firstOrNull()?.displayName
@@ -971,13 +978,18 @@ internal fun friendlyAgentError(raw: String?): String {
 /** 给工具卡片和确认框看的一行说明。 */
 internal fun summarizeToolArguments(tool: String, arguments: String): String {
     val obj = runCatching { CommunityJson.parseToJsonElement(arguments) as? JsonObject }.getOrNull() ?: return arguments.take(120)
-    if (tool == "set_reminder") {
+    if (tool == "set_reminder" || tool == "update_reminder") {
         val title = obj["title"].asStr().orEmpty()
         val minutes = obj["minutes"].asStr()
-        return listOfNotNull(title.ifBlank { null }, minutes?.let { "$it 分钟后" }).joinToString(" · ")
+        return listOfNotNull(title.ifBlank { null }, minutes?.let { "$it 分钟后" }, obj["id"].asStr()?.let { "提醒 $it" }).joinToString(" · ")
     }
     fun field(key: String): String? = obj[key].asStr()?.takeIf { it.isNotBlank() }
     when (tool) {
+        "cancel_reminder" -> return field("id")?.let { "取消提醒 $it" }.orEmpty()
+        "list_reminders" -> return "查询本机提醒"
+        "image_jobs" -> return "查找当前对话已提交的生图任务"
+        "image_generate" -> return listOfNotNull(field("prompt")?.take(120), field("path")?.let { "保存到 $it" }).joinToString(" · ")
+        "conversation_read" -> return describeCall(tool, arguments)
         "write_file", "edit_file" -> return listOfNotNull(
             field("path")?.let { "文件：$it" },
             field("content")?.length?.let { "写入 $it 字符" },
@@ -1016,15 +1028,12 @@ class CloudChatController(
     val state: StateFlow<CloudChatState> = _state.asStateFlow()
     private var nextId = 1L
     private var metaJob: Job? = null
-    private var chatJob: Job? = null
     private var openJob: Job? = null
-    private var checkpointJob: Job? = null
-    private var sendEpoch = 0L
+    private val checkpoints = mutableMapOf<String, Job>()
     @kotlin.concurrent.Volatile private var accountGeneration = 0L
     private var accountId: String? = null
     private var balanceJob: Job? = null
     private var redeemJob: Job? = null
-    private var runAuthorization: AiAccountRequest? = null
 
     private fun accountRequest(): AiAccountRequest {
         val generation = accountGeneration
@@ -1032,9 +1041,21 @@ class CloudChatController(
     }
     private var agentSession = newSessionId()
         set(value) { field = value; _state.value = _state.value.copy(conversationId = value) }
-    private var agentRun: String? = null
-    private var agentReplyId: Long = 0
-    private val stoppingRuns = mutableMapOf<String, Pair<String, Long>>()
+    private class RunningChat(
+        val session: String,
+        val replyId: Long,
+        val account: AiAccountRequest,
+        var options: ChatOptions,
+        var messages: List<ChatTurn>,
+    ) {
+        var job: Job? = null
+        var nativeRun: String? = null
+        var approval: ChatApproval? = null
+        var question: ChatQuestion? = null
+    }
+    private val chatRuns = mutableMapOf<String, RunningChat>()
+    private val stoppingRuns = mutableMapOf<String, RunningChat>()
+    private val volatileConversations = mutableMapOf<String, StoredChat>()
     private class RunningImage(var options: ChatOptions, var messages: List<ChatTurn>) {
         lateinit var job: Job
     }
@@ -1047,25 +1068,49 @@ class CloudChatController(
     }
 
     private fun leaveConversation() {
-        val image = imageRuns[agentSession]
-        if (history == null || image == null) {
-            stop()
+        chatRuns[agentSession]?.let { run ->
+            run.options = options()
+            run.messages = _state.value.messages
+            persistRun(run)
             return
         }
-        image.options = options()
-        image.messages = _state.value.messages
-        persist()
+        val image = imageRuns[agentSession]
+        if (image != null) {
+            image.options = options()
+            image.messages = _state.value.messages
+            persist()
+        }
     }
 
     init {
         _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null)
         refreshCustomModels()
         history?.let { store -> scope.launch { store.saveError.collect { error -> _state.value = _state.value.copy(saveError = error) } } }
-        agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
+        agent?.let { runtime ->
+            runtime.setConversationReader { session, arguments ->
+                withContext(scope.coroutineContext.minusKey(Job)) {
+                    val request = kotlinx.coroutines.currentCoroutineContext()[AiAccountRequest] ?: accountRequest()
+                    request.checkCurrent()
+                    val saved = chatRuns[session]?.let { StoredChat(session, it.messages, it.options) }
+                        ?: if (session == agentSession) StoredChat(session, _state.value.messages, options()) else history?.loadInBackground(session) ?: volatileConversations[session]
+                    request.checkCurrent()
+                    if (saved == null || history?.isDeleted(session) == true) AgentToolResult(false, "找不到当前会话的原文。")
+                    else {
+                        val media = history?.mediaFor(session)
+                        readConversation(saved, arguments) { value ->
+                            request.checkCurrent()
+                            if (isChatMediaReference(value)) media?.resolve(value) else value
+                        }.also { request.checkCurrent() }
+                    }
+                }
+            }
+            scope.launch { runtime.events.collect(::onAgentEvent) }
+        }
     }
 
     /** 换到某个账号（登录后、换号后调用）：读出这个账号存下的对话列表，当前对话从头开始。 */
     fun useAccount(account: String?) {
+        stopAllChats()
         ++accountGeneration
         runCatching { api.accountChanged(account) }
         metaJob?.cancel()
@@ -1075,9 +1120,9 @@ class CloudChatController(
         cancelImages()
         clearConversation()
         stoppingRuns.clear()
+        volatileConversations.clear()
         accountId = account
         refreshCustomModels()
-        runAuthorization = null
         val list = history?.useAccount(account) ?: emptyList()
         val preferred = runCatching { api.preferredTier()?.takeIf { isCustomModelTier(it) && api.customForTier(it) != null } }.getOrNull()
         _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
@@ -1087,8 +1132,12 @@ class CloudChatController(
     fun openConversation(id: String) {
         openJob?.cancel()
         if (id == agentSession && _state.value.messages.isNotEmpty()) return
-        val store = history ?: return
         val image = imageRuns[id]
+        if (id in chatRuns || image != null) {
+            showConversation(id, null, image)
+            return
+        }
+        val store = history ?: run { showConversation(id, volatileConversations[id], image); return }
         if (store.backgroundReads) {
             openJob = scope.launch {
                 val saved = store.loadInBackground(id)
@@ -1100,23 +1149,23 @@ class CloudChatController(
 
     private fun showConversation(id: String, saved: StoredChat?, image: RunningImage?) {
         if (history?.isDeleted(id) == true) return
-        if (saved == null && image == null) {
+        val run = chatRuns[id]
+        if (saved == null && image == null && run == null) {
             _state.value = _state.value.copy(conversations = history?.list().orEmpty())
             return
         }
         leaveConversation()
         agentSession = id
-        agentRun = null
-        val messages = (image?.messages ?: requireNotNull(saved).messages).map { turn ->
+        val messages = (run?.messages ?: image?.messages ?: requireNotNull(saved).messages).map { turn ->
             val error = turn.error?.takeIf { it.startsWith("provider error: ") } ?: return@map turn
             turn.copy(error = friendlyAgentError(error))
         }
-        val settings = image?.options ?: requireNotNull(saved).options
+        val settings = run?.options ?: image?.options ?: requireNotNull(saved).options
         nextId = (messages.maxOfOrNull { it.id } ?: 0L) + 1
         applyOptions(settings.copy(creation = settings.creation ?: legacyCreation(messages)))
         val conversations = history?.updateTitle(id, chatTitle(messages, _state.value.creation)) ?: _state.value.conversations
         _state.value = _state.value.copy(messages = messages, conversations = conversations,
-            sending = id in imageRuns, approval = null, question = null, inputError = modelInputError(emptyList()))
+            sending = run != null || id in imageRuns, approval = run?.approval, question = run?.question, inputError = modelInputError(emptyList()))
     }
 
     suspend fun resolveImage(conversation: String, value: String, thumbnail: Boolean = false): String? {
@@ -1143,7 +1192,7 @@ class CloudChatController(
         val generation = accountGeneration
         fun checkOwner() = check(conversation == agentSession && generation == accountGeneration) { "对话已切换，请重新选择图片。" }
         checkOwner()
-        require(_state.value.messages.any { it.imageGeneration && value in it.generatedImages }) { "找不到这张生成图。" }
+        require(_state.value.messages.any { value in it.generatedImages }) { "找不到这张生成图。" }
         modelInputError(listOf(ChatAttachment(label, imageDataUrl = value)))?.let { throw IllegalStateException(it) }
         val media = history?.mediaFor(conversation)
         val original = resolveImage(conversation, value) ?: error("找不到这张生成图。")
@@ -1174,6 +1223,7 @@ class CloudChatController(
         val remaining = store.delete(id)
         _state.value = _state.value.copy(conversations = remaining)
         if (store.isDeleted(id)) {
+            stopConversation(id)
             imageRuns.remove(id)?.job?.cancel()
             _state.value = _state.value.copy(imageSessions = imageRuns.keys.toSet())
             if (id == agentSession) clearConversation()
@@ -1182,8 +1232,51 @@ class CloudChatController(
 
     /** 把当前对话存一下（发出提问、回答结束、停止时）。 */
     private fun persist() {
+        chatRuns[agentSession]?.let { it.options = options(); it.messages = _state.value.messages }
+        if (history == null) { volatileConversations[agentSession] = StoredChat(agentSession, _state.value.messages, options()); return }
         val list = history?.save(agentSession, _state.value.messages, clock(), options()) ?: return
         _state.value = _state.value.copy(conversations = list, workspaces = history?.workspaces().orEmpty())
+    }
+
+    private fun publishRuns() {
+        _state.value = _state.value.copy(
+            runningSessions = chatRuns.keys.toSet(),
+            waitingSessions = chatRuns.values.filter { it.approval != null || it.question != null }.map { it.session }.toSet(),
+        )
+    }
+
+    private fun persistRun(run: RunningChat) {
+        if (!run.account.isCurrent()) return
+        if (history == null) { volatileConversations[run.session] = StoredChat(run.session, run.messages, run.options); return }
+        history?.save(run.session, run.messages, clock(), run.options)?.let {
+            _state.value = _state.value.copy(conversations = it, workspaces = history.workspaces())
+        }
+    }
+
+    private fun updateRun(run: RunningChat, transform: (ChatTurn) -> ChatTurn) {
+        if (!run.account.isCurrent()) return
+        run.messages = run.messages.map { if (it.id == run.replyId) transform(it) else it }
+        if (agentSession == run.session) _state.value = _state.value.copy(messages = run.messages)
+        val turn = run.messages.lastOrNull()?.takeIf { it.id == run.replyId && it.streaming } ?: return
+        val store = history ?: return
+        if (checkpoints[run.session]?.isActive == true) return
+        checkpoints[run.session] = scope.launch {
+            delay(750)
+            if (chatRuns[run.session] === run && run.account.isCurrent()) {
+                run.messages.lastOrNull()?.takeIf { it.id == turn.id }?.let { store.checkpoint(run.session, it) }
+            }
+        }
+    }
+
+    private fun completeRun(run: RunningChat) {
+        if (chatRuns[run.session] !== run) return
+        chatRuns.remove(run.session)
+        checkpoints.remove(run.session)?.cancel()
+        run.approval = null
+        run.question = null
+        if (agentSession == run.session) _state.value = _state.value.copy(sending = false, approval = null, question = null)
+        publishRuns()
+        persistRun(run)
     }
 
     private fun options(): ChatOptions = _state.value.let {
@@ -1390,7 +1483,7 @@ class CloudChatController(
     }
 
     fun canLeaveForCreation(): Boolean =
-        !_state.value.sending || (history != null && agentSession in imageRuns)
+        !_state.value.sending || agentSession in chatRuns || agentSession in imageRuns
 
     fun startCreation(title: String, brief: String, request: String): Boolean {
         if (agent == null || brief.isBlank() || !canLeaveForCreation()) return false
@@ -1539,12 +1632,9 @@ class CloudChatController(
         val replyId = nextId++
         val draft = _state.value.creation
         val planning = draft?.approved == false && !confirmCreation
-        val plan = _state.value.messages.lastOrNull { it.creationPlan && it.error == null && !it.cancelled }?.text
+        val plan = _state.value.messages.lastOrNull { it.creationPlan && it.error == null && !it.cancelled }
         val modelInput = if (draft != null && (confirmCreation || draft.approved && prompt == CREATION_CONFIRMATION) && plan != null) {
-            "作品需求：\n${draft.request}\n\n用户确认的方案：\n${plan.take(10_000)}\n\n" +
-                "用户已通过宿主按钮确认方案。先读取 app_read_format，再按方案制作。" +
-                "先完成可运行的包并安装，只有文件变更或有新证据时才重读相同目录。" +
-                "检查实际运行日志，需等待用户验收时用 ask_user 明确交还，区分静态检查和实测。\n"
+            creationExecutionInput(draft, _state.value.messages, plan)
         } else note + prompt
         val assistantTurn = ChatTurn(id = replyId, role = "assistant", text = "", streaming = true,
             activity = if (planning) "正在拟定方案…" else "正在请求模型…",
@@ -1564,7 +1654,6 @@ class CloudChatController(
             }
             add(ChatMessage("user", note + prompt, attachments))
         }
-        val epoch = ++sendEpoch
         val ownerSession = agentSession
         val media = this.history?.mediaFor(ownerSession)
         val request = accountRequest()
@@ -1578,58 +1667,56 @@ class CloudChatController(
             question = null,
             creation = if (confirmCreation) draft?.copy(approved = true) else draft,
         )
+        val run = RunningChat(ownerSession, replyId, request, options(), _state.value.messages)
+        chatRuns[ownerSession] = run
+        publishRuns()
         persist()
         if (agent != null && !planning) {
             val snapshot = options().copy(reasoningByTier = reasoning?.let { mapOf(tier.orEmpty() to it) }.orEmpty())
             val tierSnapshot = _state.value.activeTier
-            agentReplyId = replyId
-            val session = agentSession
-            chatJob = scope.launch(request) {
+            run.job = scope.launch(request) {
                 try {
                     val resolved = resolveInput(attachments, media)
                     agent.ensureStarted(tier ?: "", reasoning)
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     request.checkCurrent()
+                    if (chatRuns[ownerSession] !== run) return@launch
                     val runId = agent.nextRunId()
-                    runAuthorization = request
-                    agentRun = runId
-                    agent.run(session, modelInput, runId, resolved, snapshot, tierSnapshot, retry = nativeRetry, account = request)
+                    run.nativeRun = runId
+                    agent.run(ownerSession, modelInput, runId, resolved, snapshot, tierSnapshot, retry = nativeRetry, account = request)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
-                    updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true) }
-                    agentRun = null
-                    _state.value = _state.value.copy(sending = false, approval = null, question = null)
-                    persist()
+                    if (!request.isCurrent() || chatRuns[ownerSession] !== run) return@launch
+                    updateRun(run) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true) }
+                    completeRun(run)
                 }
             }
             return true
         }
         val contextTokens = _state.value.contextTokens
         val tierContext = _state.value.activeTier?.contextWindowTokens
-        chatJob = scope.launch(request) {
+        run.job = scope.launch(request) {
             try {
                 val messages = resolveHistory(history, media)
                 api.streamChat(messages, tier, reasoning, tierContext?.let { minOf(it, contextTokens) } ?: contextTokens) { delta ->
-                    if (request.isCurrent() && epoch == sendEpoch && ownerSession == agentSession) updateTurn(replyId) { it.copy(text = it.text + delta) }
+                    if (request.isCurrent() && chatRuns[ownerSession] === run) updateRun(run) { it.copy(text = it.text + delta) }
                 }
-                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
-                updateTurn(replyId) { it.copy(streaming = false, activity = "") }
-                _state.value = _state.value.copy(sending = false)
-                persist()
+                if (!request.isCurrent() || chatRuns[ownerSession] !== run) return@launch
+                updateRun(run) { it.copy(streaming = false, activity = "") }
+                completeRun(run)
                 refreshBalanceQuietly()
             } catch (e: CancellationException) {
-                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) throw e
-                updateTurn(replyId) { it.copy(streaming = false) }
-                _state.value = _state.value.copy(sending = false)
+                if (request.isCurrent() && chatRuns[ownerSession] === run) {
+                    updateRun(run) { it.copy(streaming = false, cancelled = true, activity = "已停止") }
+                    completeRun(run)
+                }
                 throw e
             } catch (e: Exception) {
-                if (!request.isCurrent() || epoch != sendEpoch || ownerSession != agentSession) return@launch
-                updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
-                _state.value = _state.value.copy(sending = false)
-                persist()
+                if (!request.isCurrent() || chatRuns[ownerSession] !== run) return@launch
+                updateRun(run) { it.copy(streaming = false, error = messageOf(e), truncated = e is ApiException && e.code == "response_truncated") }
+                completeRun(run)
                 if (e is ApiException && (e.code == "insufficient_quota" || e.code == "paid_required")) {
                     refreshBalanceQuietly()
                 }
@@ -1709,26 +1796,36 @@ class CloudChatController(
     fun stop() {
         openJob?.cancel()
         openJob = null
-        checkpointJob?.cancel()
-        checkpointJob = null
-        ++sendEpoch
-        val wasSending = _state.value.sending
-        imageRuns.remove(agentSession)?.job?.cancel()
-        _state.value = _state.value.copy(imageSessions = imageRuns.keys.toSet())
-        chatJob?.cancel()
-        chatJob = null
-        val run = agentRun
-        agentRun = null
-        run?.let { stoppingRuns[it] = agentSession to agentReplyId; agent?.cancel(it) }
-        val updated = _state.value.messages.mapNotNull { turn ->
-            if (!turn.streaming) turn
-            else if (turn.imageGeneration) turn.copy(streaming = false,
-                error = "已停止等待。" + if (turn.imageJobRecoverable) RECOVER_IMAGE_RESULT else UNKNOWN_IMAGE_RESULT)
-            else if (turn.text.isEmpty() && turn.error == null && turn.tools.isEmpty() && turn.reasoning.isEmpty() && run == null) null
-            else turn.copy(streaming = false, cancelled = true, activity = "已停止", tools = settleTools(turn.tools, true))
+        stopConversation(agentSession)
+    }
+
+    private fun stopConversation(session: String) {
+        checkpoints.remove(session)?.cancel()
+        val run = chatRuns[session]
+        if (run != null) {
+            run.nativeRun?.let { stoppingRuns[it] = run; agent?.cancel(it) }
+            updateRun(run) { it.copy(streaming = false, cancelled = true, activity = "已停止", tools = settleTools(it.tools, true)) }
+            completeRun(run)
+            run.job?.cancel()
         }
-        _state.value = _state.value.copy(messages = updated, sending = false, approval = null, question = null)
-        if (wasSending) persist()
+        imageRuns.remove(session)?.let { image ->
+            image.job.cancel()
+            image.messages = image.messages.map { turn ->
+                if (!turn.streaming) turn else turn.copy(streaming = false,
+                    error = "已停止等待。" + if (turn.imageJobRecoverable) RECOVER_IMAGE_RESULT else UNKNOWN_IMAGE_RESULT)
+            }
+            if (session == agentSession) {
+                _state.value = _state.value.copy(messages = image.messages, sending = false, approval = null, question = null)
+            }
+            history?.save(session, image.messages, clock(), image.options)?.let { _state.value = _state.value.copy(conversations = it) }
+        }
+        _state.value = _state.value.copy(imageSessions = imageRuns.keys.toSet())
+    }
+
+    private fun stopAllChats() {
+        chatRuns.keys.toList().forEach(::stopConversation)
+        checkpoints.values.forEach { it.cancel() }
+        checkpoints.clear()
     }
 
     fun clearConversation() {
@@ -1736,7 +1833,6 @@ class CloudChatController(
         openJob?.cancel()
         leaveConversation()
         agentSession = newSessionId()
-        agentRun = null
         val selection = if (isCustomModelTier(previous) && runCatching { api.customForTier(previous) }.getOrNull() != null) previous
             else (if (_state.value.officialAiEnabled) pickAiTier(_state.value.tiers, previous) else "").ifBlank { if (accountId == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "" }
         applyOptions(ChatOptions(tier = selection))
@@ -1745,22 +1841,31 @@ class CloudChatController(
 
     /** 回答智能体的确认：`once` 允许这一次，`deny` 拒绝。 */
     fun answerApproval(decision: String) {
-        val pending = _state.value.approval ?: return
+        val run = chatRuns[agentSession] ?: return
+        val pending = run.approval ?: return
+        if (!run.account.isCurrent()) return
+        run.approval = null
+        run.question = null
         _state.value = _state.value.copy(approval = null, question = null)
         agent?.answerApproval(pending.id, decision)
         if (decision == "always" && pending.canRemember && pending.tool !in _state.value.grants) {
             _state.value = _state.value.copy(grants = _state.value.grants + pending.tool)
         }
         val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
-        updateTurn(agentReplyId) { it.copy(records = it.records + record) }
+        updateRun(run) { it.copy(records = it.records + record) }
+        publishRuns()
         persist()
     }
 
     fun answerQuestion(answer: String?) {
-        val pending = _state.value.question ?: return
+        val run = chatRuns[agentSession] ?: return
+        val pending = run.question ?: return
+        if (!run.account.isCurrent()) return
         agent?.answerQuestion(pending.id, answer)
+        run.question = null
         _state.value = _state.value.copy(question = null)
-        updateTurn(agentReplyId) { it.copy(records = it.records + ChatRecord("answer", pending.question, answer)) }
+        updateRun(run) { it.copy(records = it.records + ChatRecord("answer", pending.question, answer)) }
+        publishRuns()
         persist()
     }
 
@@ -1771,35 +1876,71 @@ class CloudChatController(
     private fun settleTools(tools: List<ToolCallInfo>, failed: Boolean): List<ToolCallInfo> =
         tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (failed) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it }
 
-    private fun onAgentEvent(event: AgentEvent) {
-        if (runAuthorization?.isCurrent() == false) return
-        if (event is AgentEvent.ToolEnd && event.run != agentRun) {
-            stoppingRuns[event.run]?.let { stopped ->
-                fun update(turn: ChatTurn) = turn.copy(tools = turn.tools.map { if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it })
-                if (stopped.first == agentSession) { updateTurn(stopped.second, ::update); persist() }
-                else history?.loadSnapshot(stopped.first)?.let { saved ->
-                    history.save(stopped.first, saved.messages.map { if (it.id == stopped.second) update(it) else it }, clock(), saved.options)
+    /** A stopped native call can settle after a new turn starts. Merge its one reply into the latest snapshot. */
+    private fun updateStoppedRun(run: RunningChat, transform: (ChatTurn) -> ChatTurn) {
+        if (!run.account.isCurrent() || history?.isDeleted(run.session) == true) return
+        val active = chatRuns[run.session]
+        val saved = if (run.session != agentSession && active == null) history?.loadSnapshot(run.session) ?: volatileConversations[run.session] else null
+        val latest = if (run.session == agentSession) _state.value.messages else active?.messages ?: saved?.messages ?: run.messages
+        val messages = latest.map { if (it.id == run.replyId) transform(it) else it }
+        val settings = if (run.session == agentSession) options() else active?.options ?: saved?.options ?: run.options
+        run.messages = messages
+        active?.messages = messages
+        if (run.session == agentSession) _state.value = _state.value.copy(messages = messages)
+        if (history == null) volatileConversations[run.session] = StoredChat(run.session, messages, settings)
+        history?.save(run.session, messages, clock(), settings)?.let { _state.value = _state.value.copy(conversations = it) }
+    }
+
+    private suspend fun onAgentEvent(event: AgentEvent) {
+        if (event is AgentEvent.Failure) {
+            chatRuns.values.filter { it.account.isCurrent() && it.nativeRun != null && (event.runs == null || it.nativeRun in event.runs) }.toList().forEach { run ->
+                val rejectedBeforeRun = event.message.let {
+                    "invalid message" in it || "needs exactly one of" in it || "line too long" in it || "cannot start the run" in it || "must be 1 to" in it
                 }
+                updateRun(run) {
+                    val unstarted = rejectedBeforeRun && it.text.isEmpty() && it.reasoning.isEmpty() && it.tools.isEmpty() && it.records.isEmpty()
+                    it.copy(streaming = false, error = event.message, nativeNotStarted = it.nativeNotStarted || unstarted, tools = settleTools(it.tools, true))
+                }
+                completeRun(run)
             }
+            return
         }
-        if (event is AgentEvent.RunEnd && event.run != agentRun) {
-            val stopped = stoppingRuns.remove(event.run)
-            if (stopped != null && event.error.orEmpty().contains("tool_outcome_needs_review")) {
-                val message = friendlyAgentError(event.error)
-                if (stopped.first == agentSession) { updateTurn(stopped.second) { it.copy(error = message, cancelled = false, activity = "结果需要核对") }; persist() }
-                else history?.loadSnapshot(stopped.first)?.let { saved ->
-                    history.save(stopped.first, saved.messages.map { if (it.id == stopped.second) it.copy(error = message, cancelled = false, activity = "结果需要核对") else it }, clock(), saved.options)
+        val runId = when (event) {
+            is AgentEvent.Text -> event.run
+            is AgentEvent.ToolStart -> event.run
+            is AgentEvent.ToolEnd -> event.run
+            is AgentEvent.ToolImages -> event.run
+            is AgentEvent.Approval -> event.run
+            is AgentEvent.Question -> event.run
+            is AgentEvent.RunEnd -> event.run
+            is AgentEvent.Progress -> event.run
+            is AgentEvent.Failure -> return
+        }
+        val run = chatRuns.values.firstOrNull { it.nativeRun == runId && it.account.isCurrent() }
+        if (run == null) {
+            val stopped = stoppingRuns[runId] ?: return
+            when (event) {
+                is AgentEvent.ToolEnd -> updateStoppedRun(stopped) { turn -> turn.copy(tools = turn.tools.map {
+                    if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it
+                }) }
+                is AgentEvent.RunEnd -> {
+                    stoppingRuns.remove(runId)
+                    if (event.error.orEmpty().contains("tool_outcome_needs_review")) updateStoppedRun(stopped) {
+                        it.copy(error = friendlyAgentError(event.error), cancelled = false, activity = "结果需要核对")
+                    }
                 }
+                else -> Unit
             }
+            return
         }
         when (event) {
-            is AgentEvent.Text -> if (event.run == agentRun) updateTurn(agentReplyId) { it.copy(text = it.text + event.text) }
-            is AgentEvent.ToolStart -> if (event.run == agentRun) {
+            is AgentEvent.Text -> updateRun(run) { it.copy(text = it.text + event.text) }
+            is AgentEvent.ToolStart -> {
                 val call = ToolCallInfo(event.id, event.name, event.arguments, startedAtMs = nowMs())
-                updateTurn(agentReplyId) { it.copy(tools = it.tools + call, activity = "正在执行${toolLabel(event.name)}…") }
+                updateRun(run) { it.copy(tools = it.tools + call, activity = "正在执行${toolLabel(event.name)}…") }
             }
-            is AgentEvent.ToolEnd -> if (event.run == agentRun) {
-                updateTurn(agentReplyId) { turn ->
+            is AgentEvent.ToolEnd -> {
+                updateRun(run) { turn ->
                     val tools = turn.tools.map {
                         if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it
                     }
@@ -1807,27 +1948,46 @@ class CloudChatController(
                     turn.copy(tools = tools, activity = running?.let { "正在执行${toolLabel(it.name)}…" } ?: "正在请求下一步…")
                 }
             }
-            is AgentEvent.Approval -> if (event.run == agentRun && _state.value.sending) _state.value = _state.value.copy(
-                approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger, event.canRemember),
-            )
-            is AgentEvent.Question -> if (event.run == agentRun && event.session == agentSession && _state.value.sending) {
-                _state.value = _state.value.copy(question = ChatQuestion(event.id, event.question, event.options))
+            is AgentEvent.ToolImages -> {
+                val images = event.images.filter { it.startsWith("data:image/") }.distinct()
+                if (images.isNotEmpty()) {
+                    val media = history?.mediaFor(run.session)
+                    val stored = try { media?.save(images) ?: images }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { images }
+                    if (run.account.isCurrent() && chatRuns[run.session] === run) {
+                        updateRun(run) { it.copy(generatedImages = (it.generatedImages + stored).distinct()) }
+                        persistRun(run)
+                    }
+                }
             }
-            is AgentEvent.RunEnd -> if (event.run == agentRun) {
+            is AgentEvent.Approval -> if (event.session.isEmpty() || event.session == run.session) {
+                run.approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger, event.canRemember)
+                if (run.session == agentSession) _state.value = _state.value.copy(approval = run.approval)
+                publishRuns()
+            }
+            is AgentEvent.Question -> if (event.session == run.session) {
+                run.question = ChatQuestion(event.id, event.question, event.options)
+                if (run.session == agentSession) _state.value = _state.value.copy(question = run.question)
+                publishRuns()
+            }
+            is AgentEvent.RunEnd -> {
                 val failure = if (event.ok) null else friendlyAgentError(event.error)
-                updateTurn(agentReplyId) { turn ->
+                updateRun(run) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
                     turn.copy(streaming = false, activity = "", error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok), truncated = turn.truncated || event.finish == "length", promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
                 }
-                _state.value = _state.value.copy(sending = false, approval = null, question = null)
-                agentRun = null
-                persist()
+                completeRun(run)
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
                 else if (event.ok) refreshBalanceQuietly()
             }
-            is AgentEvent.Progress -> if (event.run == agentRun) {
-                if (event.kind == "approval_resolved" && _state.value.approval?.id == event.detail["id"].asStr()) _state.value = _state.value.copy(approval = null)
-                updateTurn(agentReplyId) { turn ->
+            is AgentEvent.Progress -> {
+                if (event.kind == "approval_resolved" && run.approval?.id == event.detail["id"].asStr()) {
+                    run.approval = null
+                    if (run.session == agentSession) _state.value = _state.value.copy(approval = null)
+                    publishRuns()
+                }
+                updateRun(run) { turn ->
                 fun str(name: String) = event.detail[name].asStr().orEmpty()
                 fun num(name: String) = str(name).toLongOrNull() ?: 0
                 when (event.kind) {
@@ -1842,18 +2002,7 @@ class CloudChatController(
                 }
                 }
             }
-            is AgentEvent.Failure -> if (agentRun != null && _state.value.sending && (event.runs == null || agentRun in event.runs)) {
-                val rejectedBeforeRun = event.message.let {
-                    "invalid message" in it || "needs exactly one of" in it || "line too long" in it || "cannot start the run" in it || "must be 1 to" in it
-                }
-                updateTurn(agentReplyId) {
-                    val unstarted = rejectedBeforeRun && it.text.isEmpty() && it.reasoning.isEmpty() && it.tools.isEmpty() && it.records.isEmpty()
-                    it.copy(streaming = false, error = event.message, nativeNotStarted = it.nativeNotStarted || unstarted, tools = settleTools(it.tools, true))
-                }
-                agentRun = null
-                _state.value = _state.value.copy(sending = false, approval = null, question = null)
-                persist()
-            }
+            is AgentEvent.Failure -> Unit
         }
     }
 
@@ -1885,34 +2034,23 @@ class CloudChatController(
     }
 
     fun reset() {
+        stopAllChats()
         cancelImages()
         openJob?.cancel()
-        checkpointJob?.cancel()
         ++accountGeneration
         metaJob?.cancel()
         balanceJob?.cancel()
         redeemJob?.cancel()
-        chatJob?.cancel()
-        agentRun?.let { agent?.cancel(it) }
-        agentRun = null
+        stoppingRuns.clear()
+        volatileConversations.clear()
         _state.value = CloudChatState(nativeAgentAvailable = agent != null)
         agentSession = newSessionId()
     }
 
     private fun updateTurn(id: Long, transform: (ChatTurn) -> ChatTurn) {
+        chatRuns[agentSession]?.takeIf { it.replyId == id }?.let { updateRun(it, transform); return }
         val messages = _state.value.messages.map { if (it.id == id) transform(it) else it }
         _state.value = _state.value.copy(messages = messages)
-        val store = history ?: return
-        val last = messages.lastOrNull()?.takeIf { it.id == id && it.streaming && !it.imageGeneration } ?: return
-        if (checkpointJob?.isActive == true) return
-        val owner = agentSession
-        val epoch = sendEpoch
-        checkpointJob = scope.launch {
-            delay(750)
-            if (epoch == sendEpoch && owner == agentSession) {
-                _state.value.messages.lastOrNull()?.takeIf { it.id == last.id }?.let { store.checkpoint(owner, it) }
-            }
-        }
     }
 
     private fun refreshBalanceQuietly() {

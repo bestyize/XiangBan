@@ -9,6 +9,8 @@
 //! UTF-8 is decoded from the OEM code page.
 
 use super::str_arg;
+#[cfg(any(windows, test))]
+use crate::child_env::windows_multiline_error as multi_line_error;
 use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
 use serde_json::{json, Value};
 use std::collections::VecDeque;
@@ -34,15 +36,6 @@ const SHELL_NOTE: &str = "The shell is Windows cmd.exe (`cmd /C`), not bash or s
 #[cfg(not(windows))]
 const SHELL_NOTE: &str = "The shell is /bin/sh.";
 
-
-/// `cmd /C` runs only the first line of a command: everything after the first newline is silently dropped and the call
-/// still reports success, so a multi-line `python -c "…"` looks like it ran. Refuse it, and say what to do instead.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn multi_line_error(command: &str) -> Option<String> {
-    command.trim_end().contains(['\n', '\r']).then(|| {
-        "The command has several lines, but cmd.exe runs only the first one and ignores the rest, so nothing useful would run. Nothing was executed. Write the script to a file with write_file and run that file (for example `python script.py`), or join steps on one line with `&&`.".to_string()
-    })
-}
 
 pub struct Shell {
     spec: ToolSpec,

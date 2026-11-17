@@ -51,7 +51,14 @@ interface AgentBridge {
     fun stop(handle: Long)
 }
 
-data class AgentToolResult(val ok: Boolean, val output: String)
+data class AgentToolResult(
+    val ok: Boolean,
+    val output: String,
+    /** Bounded multimodal content for the model, using the kernel Part wire format. */
+    val parts: JsonArray? = null,
+    /** Host-only generated media; never inserted into model text or the tool transcript. */
+    val generatedImages: List<String> = emptyList(),
+)
 
 /** 手机侧实现的一个工具。风险 `read` 的直接执行，其余的先问用户。 */
 interface AgentTool {
@@ -70,6 +77,7 @@ sealed interface AgentEvent {
     data class Text(val run: String, val text: String) : AgentEvent
     data class ToolStart(val run: String, val id: String, val name: String, val arguments: String) : AgentEvent
     data class ToolEnd(val run: String, val id: String, val output: String, val isError: Boolean) : AgentEvent
+    data class ToolImages(val run: String, val id: String, val images: List<String>) : AgentEvent
     /** 内核请用户确认一个会改动东西的工具调用；用 [AgentRuntime.answerApproval] 回答。 */
     data class Approval(val id: String, val tool: String, val risk: String, val arguments: JsonObject, val danger: String?, val session: String = "", val run: String = "", val canRemember: Boolean = true) : AgentEvent
     data class Question(val id: String, val session: String, val question: String, val options: List<String>, val run: String = "") : AgentEvent
@@ -110,8 +118,16 @@ class AgentRuntime(
     private val mutationRequests = MutableStateFlow<Set<Pair<Long, String>>>(emptySet())
     private val requestRuns = MutableStateFlow<Map<Pair<Long, String>, String>>(emptyMap())
     private var nextRun = 0L
-    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions(), val account: AiAccountRequest? = null)
+    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions(), val account: AiAccountRequest? = null, val supportsVision: Boolean = true)
     private val activeRuns = MutableStateFlow<Map<String, ActiveRun>>(emptyMap())
+    private var conversationReader: AgentTool? = null
+    private val availableTools: List<AgentTool> get() = tools + listOfNotNull(conversationReader)
+
+    /** The UI history also contains planning turns that never went through the native engine. */
+    internal fun setConversationReader(reader: suspend (String, JsonObject) -> AgentToolResult) {
+        check(handle == 0L) { "对话原文读取工具需要在引擎启动前注册" }
+        conversationReader = conversationReadTool(reader)
+    }
 
     private fun line(block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit): String = buildJsonObject(block).toString()
 
@@ -132,7 +148,7 @@ class AgentRuntime(
                 put("system_prompt", systemPrompt)
                 put("utc_offset_minutes", utcOffsetMinutes)
                 put("tools", buildJsonArray {
-                    for (t in tools) add(buildJsonObject {
+                    for (t in availableTools) add(buildJsonObject {
                         put("name", t.name)
                         put("description", t.description)
                         put("parameters", t.parameters)
@@ -165,7 +181,7 @@ class AgentRuntime(
         check(!hasStoppingMutation()) { "上一项本机操作仍在停止，请稍后核对结果再继续" }
         val snapshot = options ?: ChatOptions(tier = currentModel, reasoningByTier = currentReasoning?.let { mapOf(currentModel to it) }.orEmpty())
         account?.checkCurrent()
-        val run = ActiveRun(id, generation, options = snapshot, account = account)
+        val run = ActiveRun(id, generation, options = snapshot, account = account, supportsVision = tier?.supportsVision ?: true)
         activeRuns.update {
             check(session !in it) { "上一轮仍在停止，请稍后重试" }
             it + (session to run)
@@ -383,7 +399,7 @@ class AgentRuntime(
                 val args = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap())
                 val session = obj["session"].str().orEmpty()
                 val running = pendingRun(session, epoch)
-                val tool = tools.firstOrNull { it.name == name }
+                val tool = availableTools.firstOrNull { it.name == name }
                 request(id, epoch, requestScope, running?.id, mutation = tool?.risk != "read", onSkipped = {
                     sendFor(h, epoch, line { put("type", "tool_result"); put("id", id); put("ok", false); put("cancelled", true); put("outcome_unknown", false); put("output", "已取消，工具未开始执行") })
                 }) {
@@ -391,7 +407,7 @@ class AgentRuntime(
                     val result = try {
                         currentCoroutineContext().ensureActive()
                         if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
-                        withContext(running.account ?: kotlin.coroutines.EmptyCoroutineContext) {
+                        withContext((running.account ?: kotlin.coroutines.EmptyCoroutineContext) + AgentToolContext(session, id, running.supportsVision)) {
                             running.account?.checkCurrent()
                             entered = true
                             tool?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")
@@ -408,7 +424,16 @@ class AgentRuntime(
                     } catch (e: Exception) { AgentToolResult(false, e.message ?: "工具执行失败") }
                     // If the operation completed, report its actual outcome even if cancellation raced the reply.
                     withContext(NonCancellable) {
-                        sendFor(h, epoch, line { put("type", "tool_result"); put("id", id); put("ok", result.ok); put("output", result.output) })
+                        if (running != null && pendingRun(session, epoch)?.id == running.id && running.account?.isCurrent() != false && result.generatedImages.isNotEmpty()) {
+                            _events.emit(AgentEvent.ToolImages(running.id, id, result.generatedImages))
+                        }
+                        sendFor(h, epoch, line {
+                            val parts = result.parts?.let { values -> if (running?.supportsVision == false) JsonArray(values.filter { (it as? JsonObject)?.get("type").str() != "image" }) else values }
+                            val omittedImages = parts?.size != result.parts?.size
+                            put("type", "tool_result"); put("id", id); put("ok", result.ok)
+                            put("output", result.output + if (omittedImages) "\n当前模型不支持图片，图片内容未传给模型；已生成的图片仍可在界面查看。" else "")
+                            parts?.let { put("parts", it) }
+                        })
                     }
                 }
             }

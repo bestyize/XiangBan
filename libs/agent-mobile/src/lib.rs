@@ -8,7 +8,7 @@
 //! - `{"type":"model_line","id":"m1","line":"data: {...}"}` one line of the streamed reply to a `model_request`
 //! - `{"type":"model_end","id":"m1","status":200,"error":null,"body":null}` the reply ended; `error` is a connection
 //!   failure, `body` the response text when `status` is not 2xx
-//! - `{"type":"tool_result","id":"t1","ok":true,"output":".."}` the outcome of a `tool_request`
+//! - `{"type":"tool_result","id":"t1","ok":true,"output":"..","parts":[]}` the outcome of a `tool_request`
 //! - `{"type":"set_model","model":".."}` the model (tier) used from the next request on; empty means the server's default
 //!
 //! Engine to host ([`Engine::poll`]):
@@ -114,6 +114,42 @@ struct ToolMsg {
     output: String,
     cancelled: bool,
     outcome_unknown: bool,
+    parts: Result<Vec<Part>, String>,
+}
+
+impl ToolMsg {
+    fn from_value(value: &Value) -> Self {
+        let ok = value["ok"].as_bool().unwrap_or(false);
+        let cancelled = value["cancelled"].as_bool().unwrap_or(false);
+        let outcome_unknown = value["outcome_unknown"].as_bool().unwrap_or(false);
+        let parts = if !ok || cancelled || outcome_unknown || value["parts"].is_null() {
+            Ok(Vec::new())
+        } else {
+            serde_json::from_value::<Vec<Part>>(value["parts"].clone())
+                .map_err(|e| format!("invalid phone tool media: {e}"))
+                .and_then(|parts| {
+                    if parts.len() > 64 || serde_json::to_vec(&parts).map_err(|e| e.to_string())?.len() > 6 * 1024 * 1024 {
+                        return Err("phone tool media exceeds the 6 MiB result limit".into());
+                    }
+                    if parts.iter().any(|part| matches!(part, Part::Image { url }
+                        if url.starts_with("data:image/") && url.len() as u64 > media::MAX_IMAGE_BYTES)) {
+                        return Err("phone tool image exceeds the per-image storage limit".into());
+                    }
+                    Ok(parts)
+                })
+        };
+        Self { ok, output: value["output"].as_str().unwrap_or("").to_owned(), cancelled, outcome_unknown, parts }
+    }
+
+    fn into_result(self) -> ToolResult {
+        if self.outcome_unknown { return ToolResult::unknown(&self.output); }
+        if self.cancelled { return ToolResult::error("cancelled before a confirmed side effect"); }
+        if !self.ok { return ToolResult::error(self.output); }
+        match self.parts {
+            Ok(parts) => ToolResult { parts, ..ToolResult::ok(self.output) },
+            Err(error) => ToolResult::error(format!("{}\n{error}. The tool may already have performed its action; inspect the result before retrying.", self.output)),
+        }
+    }
 }
 
 /// What the engine says to the host, and who is waiting for the host's answers.
@@ -233,7 +269,10 @@ impl HostModel {
                     },
                     Ok(ModelMsg::End { status, error, body, .. }) => {
                         if let Some(payload) = parser.flush() { if payload.trim() != "[DONE]" { terminal |= decoder.push(&payload, on_text, on_reasoning)?; } }
-                        if let Some(error) = error { return Err(HarnessError::provider(error, status == 0 || status == 429 || status >= 500)); }
+                        if let Some(error) = error {
+                            return Err(if status == 413 { HarnessError::request_too_large(error) }
+                                else { HarnessError::provider(error, status == 0 || status == 429 || status >= 500) });
+                        }
                         if !(200..300).contains(&status) { return Err(http_error(status, body.as_deref().unwrap_or(""))); }
                         if let Some(body) = body {
                             let response: Value = serde_json::from_str(&body).map_err(|_| HarnessError::provider("模型返回了无效的 JSON 回复", false))?;
@@ -274,7 +313,63 @@ fn http_error(status: u16, body: &str) -> HarnessError {
         .and_then(|v| v["error"]["message"].as_str().or_else(|| v["message"].as_str()).map(str::to_string))
         .unwrap_or_else(|| body.chars().take(300).collect());
     let retryable = status == 429 || status >= 500;
-    HarnessError::provider(format!("HTTP {status}: {detail}"), retryable)
+    if status == 413 { HarnessError::request_too_large(format!("HTTP {status}: {detail}")) }
+    else { HarnessError::provider(format!("HTTP {status}: {detail}"), retryable) }
+}
+
+#[cfg(test)]
+mod http_error_tests {
+    use super::*;
+
+    #[test]
+    fn host_413_is_structured_for_json_and_plain_proxy_responses() {
+        for body in [r#"{"error":{"message":"body too large"}}"#, "proxy size limit"] {
+            let error = http_error(413, body);
+            assert!(error.is_request_too_large());
+            assert!(error.to_string().contains("HTTP 413"));
+        }
+        assert!(!http_error(400, "413 is not the status").is_request_too_large());
+        assert!(matches!(http_error(503, "unavailable"), HarnessError::Provider { retryable: true, .. }));
+    }
+}
+
+#[cfg(test)]
+mod host_tool_result_tests {
+    use super::*;
+
+    #[test]
+    fn successful_host_media_preserves_text_and_parts() {
+        let result = ToolMsg::from_value(&json!({"ok":true,"output":"saved image",
+            "parts":[{"type":"image","url":"data:image/png;base64,AAAA"},{"type":"text","text":"caption"}]})).into_result();
+        assert!(!result.is_error);
+        assert_eq!(result.output, "saved image");
+        assert_eq!(result.parts.len(), 2);
+        assert!(matches!(&result.parts[0], Part::Image { url } if url.starts_with("data:image/png")));
+        assert!(ToolMsg::from_value(&json!({"ok":true,"output":"legacy"})).into_result().parts.is_empty());
+    }
+
+    #[test]
+    fn failure_cancellation_and_unknown_outcomes_take_priority_over_media() {
+        for flags in [json!({"ok":false}), json!({"ok":true,"cancelled":true}),
+            json!({"ok":true,"cancelled":true,"outcome_unknown":true})] {
+            let mut value = flags;
+            value["output"] = "original status".into();
+            value["parts"] = json!({"malformed":"must not replace the outcome"});
+            let result = ToolMsg::from_value(&value).into_result();
+            assert!(result.is_error && result.parts.is_empty());
+            assert_eq!(result.structured_content.as_ref().is_some_and(|v| v["harness_status"] == "outcome_unknown"), value["outcome_unknown"] == true);
+        }
+    }
+
+    #[test]
+    fn malformed_or_oversized_media_cannot_escape_existing_limits() {
+        for parts in [json!([{"type":"image"}]), json!([{"type":"image","url":format!("data:image/png;base64,{}", "A".repeat(media::MAX_IMAGE_BYTES as usize))}]),
+            json!([{"type":"text","text":"x".repeat(6 * 1024 * 1024 + 1)}])] {
+            let result = ToolMsg::from_value(&json!({"ok":true,"output":"action finished","parts":parts})).into_result();
+            assert!(result.is_error && result.parts.is_empty());
+            assert!(result.output.contains("action finished") && result.output.contains("before retrying"));
+        }
+    }
 }
 
 impl ModelProvider for HostModel {
@@ -360,7 +455,8 @@ impl ModelProvider for HostModel {
                         if let Err(error) = consume(&mut acc, &mut received_done, &payload) { break Err(error); }
                     }
                     if let Some(message) = error {
-                        break Err(HarnessError::provider(message, status == 0 || status == 429 || status >= 500));
+                        break Err(if status == 413 { HarnessError::request_too_large(message) }
+                            else { HarnessError::provider(message, status == 0 || status == 429 || status >= 500) });
                     }
                     if !(200..300).contains(&status) {
                         break Err(http_error(status, body.as_deref().unwrap_or("")));
@@ -442,9 +538,7 @@ impl Tool for HostTool {
                 break ToolResult::unknown("phone tool did not acknowledge cancellation");
             }
             match rx.recv_timeout(POLL_STEP) {
-                Ok(msg) if msg.outcome_unknown => break ToolResult::unknown(&msg.output),
-                Ok(msg) if msg.cancelled => break ToolResult::error("cancelled before a confirmed side effect"),
-                Ok(msg) => break if msg.ok { ToolResult::ok(msg.output) } else { ToolResult::error(msg.output) },
+                Ok(msg) => break msg.into_result(),
                 Err(RecvTimeoutError::Timeout) => continue,
                 Err(RecvTimeoutError::Disconnected) => break ToolResult::unknown("the phone stopped answering"),
             }
@@ -613,7 +707,7 @@ impl Engine {
             }
             "tool_result" => {
                 if let Some(tx) = lock(&self.rpc.tools).get(&id) {
-                    let _ = tx.send(ToolMsg { ok: value["ok"].as_bool().unwrap_or(false), output: value["output"].as_str().unwrap_or("").to_string(), cancelled: value["cancelled"].as_bool().unwrap_or(false), outcome_unknown: value["outcome_unknown"].as_bool().unwrap_or(false) });
+                    let _ = tx.send(ToolMsg::from_value(&value));
                 }
                 Ok(())
             }

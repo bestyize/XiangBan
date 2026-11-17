@@ -11,7 +11,7 @@
 //!
 //! The call is given to the command as JSON on standard input (`event`, `session`, `tool`, `arguments`, and for
 //! `after_tool` also `output` and `is_error`); the command runs in the working folder with the user's environment.
-//! - `before_tool` runs before the permission check. Exit code 0 lets the call go on; anything else (another code,
+//! - `before_tool` runs after permission and resource acquisition, before execution. Exit code 0 lets the call go on; anything else (another code,
 //!   a timeout, a command that cannot start) stops it, and standard error is what the model is told. A check the
 //!   user set up on purpose fails closed.
 //! - `after_tool`: a non-zero exit adds standard error to the tool's result, so the model sees the feedback (a
@@ -25,6 +25,7 @@ use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT: u64 = 10;
@@ -33,6 +34,7 @@ const MAX_TIMEOUT: u64 = 120;
 const MAX_FEEDBACK_BYTES: usize = 4 * 1024;
 /// How much of a tool's output is handed to an `after_tool` hook.
 const MAX_OUTPUT_TO_HOOK: usize = 64 * 1024;
+const PIPE_CLEANUP_GRACE: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +68,7 @@ struct Config {
 #[derive(Debug, PartialEq)]
 enum Outcome {
     Passed,
+    Cancelled,
     /// Exit code (or none: timed out, killed), and its standard error.
     Failed(Option<i32>, String),
     CouldNotRun(String),
@@ -119,7 +122,11 @@ impl Hooks {
         Ok(config.hooks.into_iter().filter(|h| h.event == event && h.matches(tool)).collect())
     }
 
-    fn run(&self, hook: &Hook, input: &Value) -> Outcome {
+    fn run(&self, ctx: &ToolCtx, hook: &Hook, input: &Value) -> Outcome {
+        if ctx.is_cancelled() { return Outcome::Cancelled; }
+        // The deadline covers input delivery and output draining as well as execution.
+        let timeout = Duration::from_secs(hook.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT).clamp(1, MAX_TIMEOUT));
+        let end = Instant::now() + timeout;
         #[cfg(windows)]
         let mut cmd = {
             use std::os::windows::process::CommandExt;
@@ -133,43 +140,80 @@ impl Hooks {
             cmd.args(["-c", &hook.command]);
             cmd
         };
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
         cmd.current_dir(&self.workspace).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
-        let mut child = match cmd.spawn() {
+        let mut child = match agent_kernel::process_tree::ChildTree::spawn(&mut cmd) {
             Ok(child) => child,
             Err(e) => return Outcome::CouldNotRun(format!("cannot start hook `{}`: {e}", hook.command)),
         };
-        if let Some(mut stdin) = child.stdin.take() {
-            // A hook that does not read its input closes the pipe early; that is its choice, not an error.
-            let _ = stdin.write_all(input.to_string().as_bytes());
-        }
-        let stderr = child.stderr.take();
-        let reader = std::thread::spawn(move || {
-            let mut text = String::new();
-            if let Some(mut stderr) = stderr {
-                let _ = stderr.by_ref().take(MAX_FEEDBACK_BYTES as u64 * 4).read_to_string(&mut text);
-            }
-            text
-        });
-        let timeout = Duration::from_secs(hook.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT).clamp(1, MAX_TIMEOUT));
-        let end = Instant::now() + timeout;
-        let status = loop {
-            match child.try_wait() {
-                Ok(Some(status)) => break Some(status),
-                Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(20)),
-                Ok(None) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break None;
+        let mut stderr = child.stderr.take();
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let output = captured.clone();
+        let reader = match std::thread::Builder::new().name("hook-stderr".into()).spawn(move || {
+            if let Some(stderr) = stderr.as_mut() {
+                let mut buffer = [0; 8192];
+                loop {
+                    match stderr.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(count) => {
+                            let mut output = output.lock().unwrap_or_else(|e| e.into_inner());
+                            let keep = count.min(MAX_FEEDBACK_BYTES.saturating_sub(output.len()));
+                            output.extend_from_slice(&buffer[..keep]);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(_) => break,
+                    }
                 }
-                Err(e) => return Outcome::CouldNotRun(format!("cannot wait for hook `{}`: {e}", hook.command)),
+            }
+        }) {
+            Ok(reader) => reader,
+            Err(error) => return Outcome::CouldNotRun(format!("cannot drain hook output: {error}")),
+        };
+        let mut stdin = child.stdin.take();
+        let input = input.to_string();
+        let writer = match std::thread::Builder::new().name("hook-stdin".into()).spawn(move || {
+            if let Some(stdin) = stdin.as_mut() {
+                // A hook may choose not to consume its input. Do not let a full
+                // pipe prevent the supervising thread from enforcing cancellation.
+                let _ = stdin.write_all(input.as_bytes());
+            }
+        }) {
+            Ok(writer) => writer,
+            Err(error) => return Outcome::CouldNotRun(format!("cannot deliver hook input: {error}")),
+        };
+        let outcome = loop {
+            if ctx.is_cancelled() { break Outcome::Cancelled; }
+            if Instant::now() >= end {
+                break Outcome::Failed(None, format!("timed out after {}s", timeout.as_secs()));
+            }
+            match child.try_wait() {
+                Ok(Some(status)) if status.success() => break Outcome::Passed,
+                Ok(Some(status)) => break Outcome::Failed(status.code(), String::new()),
+                Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+                Err(e) => break Outcome::CouldNotRun(format!("cannot wait for hook `{}`: {e}", hook.command)),
             }
         };
-        let stderr = reader.join().unwrap_or_default();
+        // Also terminate descendants when their parent exits normally: inherited
+        // pipes must not keep this call alive or perform later background writes.
+        child.terminate();
+        let _ = child.wait();
+        let cleanup_end = Instant::now() + PIPE_CLEANUP_GRACE;
+        while (!reader.is_finished() || !writer.is_finished()) && Instant::now() < cleanup_end {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let clean = reader.is_finished() && writer.is_finished();
+        // A child escaping its group must not turn a bounded hook into an
+        // unbounded join. Completed readers/writers are reaped; others detach.
+        if reader.is_finished() { let _ = reader.join(); }
+        if writer.is_finished() { let _ = writer.join(); }
+        let stderr = String::from_utf8_lossy(&captured.lock().unwrap_or_else(|e| e.into_inner())).into_owned();
         let stderr = clip(stderr.trim(), MAX_FEEDBACK_BYTES).to_string();
-        match status {
-            Some(status) if status.success() => Outcome::Passed,
-            Some(status) => Outcome::Failed(status.code(), stderr),
-            None => Outcome::Failed(None, format!("timed out after {}s. {stderr}", timeout.as_secs()).trim().to_string()),
+        if ctx.is_cancelled() { return Outcome::Cancelled; }
+        match outcome {
+            Outcome::Passed if !clean => Outcome::Failed(None, "hook left pipes open after process cleanup".into()),
+            Outcome::Failed(code, reason) => Outcome::Failed(code, [reason, stderr].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(". ")),
+            other => other,
         }
     }
 }
@@ -182,8 +226,9 @@ impl Middleware for Hooks {
         };
         let input = json!({ "event": "before_tool", "session": ctx.session(), "tool": spec.name, "arguments": args });
         for hook in &hooks {
-            match self.run(hook, &input) {
+            match self.run(ctx, hook, &input) {
                 Outcome::Passed => {}
+                Outcome::Cancelled => return ToolGate::Block("The user's hook was cancelled; this tool was not executed.".into()),
                 Outcome::Failed(code, stderr) => {
                     let why = if stderr.is_empty() { code.map_or("it did not finish".to_string(), |c| format!("it exited with code {c}")) } else { stderr };
                     return ToolGate::Block(format!("The user's hook `{}` stopped this call: {why}", hook.command));
@@ -195,18 +240,27 @@ impl Middleware for Hooks {
     }
 
     fn after_tool(&self, session: &str, call: &ToolCall, result: &mut ToolResult) {
+        self.after_tool_with_context(&ToolCtx::detached(session), call, result);
+    }
+
+    fn after_tool_with_context(&self, ctx: &ToolCtx, call: &ToolCall, result: &mut ToolResult) {
+        if ctx.is_cancelled() { return; }
         let Ok(hooks) = self.load(Event::AfterTool, &call.name) else { return };
         if hooks.is_empty() {
             return;
         }
         let arguments: Value = serde_json::from_str(&call.arguments).unwrap_or(Value::String(call.arguments.clone()));
         let input = json!({
-            "event": "after_tool", "session": session, "tool": call.name, "arguments": arguments,
+            "event": "after_tool", "session": ctx.session(), "tool": call.name, "arguments": arguments,
             "output": clip(&result.output, MAX_OUTPUT_TO_HOOK), "is_error": result.is_error,
         });
         for hook in &hooks {
-            let feedback = match self.run(hook, &input) {
+            let feedback = match self.run(ctx, hook, &input) {
                 Outcome::Passed => continue,
+                Outcome::Cancelled => {
+                    result.output.push_str("\n[hook: cancelled; the tool result above is unchanged]");
+                    break;
+                }
                 Outcome::Failed(_, stderr) if stderr.is_empty() => format!("the user's hook `{}` reported a problem", hook.command),
                 Outcome::Failed(_, stderr) => format!("the user's hook `{}` reported: {stderr}", hook.command),
                 Outcome::CouldNotRun(error) => error,
@@ -280,5 +334,82 @@ mod tests {
         hooks.after_tool("s1", &ToolCall { id: "d".into(), name: "shell".into(), arguments: "{}".into() }, &mut other);
         assert_eq!(other.output, "ok");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_hook_that_never_reads_large_stdin_still_times_out() {
+        let (dir, hooks) = setup("blocked-stdin", json!({"hooks":[{
+            "event":"before_tool","command":"sleep 30","timeout_seconds":1
+        }]}));
+        let began = Instant::now();
+        let result = before(&hooks, "write_file", json!({"content":"x".repeat(256 * 1024)}));
+        assert!(matches!(result, ToolGate::Block(reason) if reason.contains("timed out")));
+        assert!(began.elapsed() < Duration::from_secs(3), "stdin delivery is inside the hook deadline");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn large_stderr_is_drained_while_delivering_input_without_cutting_the_pipe() {
+        let (dir, hooks) = setup("two-pipes", json!({"hooks":[hook("before_tool", &["*"],
+            "head -c 262144 /dev/zero >&2; cat > seen.json")]}));
+        let result = before(&hooks, "write_file", json!({"content":"x".repeat(256 * 1024)}));
+        if let ToolGate::Block(reason) = result { panic!("unexpected hook failure: {reason}"); }
+        let seen: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("work/seen.json")).unwrap()).unwrap();
+        assert_eq!(seen["arguments"]["content"].as_str().unwrap().len(), 256 * 1024);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn exiting_shell_cleans_up_descendants_and_does_not_wait_on_their_stderr() {
+        let (dir, hooks) = setup("descendant", json!({"hooks":[hook("before_tool", &["*"],
+            "(sleep 2; echo leaked > descendant-ran.txt) & exit 0")]}));
+        let began = Instant::now();
+        assert!(matches!(before(&hooks, "read_file", json!({})), ToolGate::Proceed));
+        assert!(began.elapsed() < Duration::from_secs(1));
+        std::thread::sleep(Duration::from_millis(2200));
+        assert!(!dir.join("work/descendant-ran.txt").exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn cancellation_reaches_before_and_after_hooks_through_the_real_agent() {
+        use agent_kernel::{Agent, HarnessError, MemoryStore, Risk, Tool};
+        use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        struct CountTool { spec: ToolSpec, count: Arc<AtomicUsize> }
+        impl Tool for CountTool {
+            fn spec(&self) -> &ToolSpec { &self.spec }
+            fn execute(&self, _: Value, _: &ToolCtx) -> Result<String, String> {
+                self.count.fetch_add(1, Ordering::SeqCst);
+                Ok("performed once".into())
+            }
+        }
+        for event in ["before_tool", "after_tool"] {
+            let (dir, hooks) = setup(&format!("cancel-{event}"), json!({"hooks":[
+                {"event":event,"command":"touch started; sleep 30","timeout_seconds":30},
+                {"event":event,"command":"touch second-hook","timeout_seconds":30}
+            ]}));
+            let count = Arc::new(AtomicUsize::new(0));
+            let provider = Arc::new(ScriptedProvider::new(vec![Step::tool_call("c", "count", "{}"), Step::text("done")]));
+            let agent = Agent::builder(provider, Arc::new(MemoryStore::new())).middleware(hooks)
+                .tool(CountTool { spec: ToolSpec::new("count", "", json!({"type":"object"})).risk(Risk::Read), count:count.clone() }).build().unwrap();
+            let cancel = Arc::new(AtomicBool::new(false));
+            let flag = cancel.clone();
+            let started = dir.join("work/started");
+            let trigger = std::thread::spawn(move || {
+                let end = Instant::now() + Duration::from_secs(2);
+                while !started.exists() && Instant::now() < end { std::thread::sleep(Duration::from_millis(10)); }
+                let observed = started.exists();
+                flag.store(true, Ordering::SeqCst);
+                observed
+            });
+            let began = Instant::now();
+            assert_eq!(agent.run("s", "run", &mut |_| {}, &cancel), Err(HarnessError::Cancelled));
+            assert!(trigger.join().unwrap(), "the test cancelled an active {event}");
+            assert!(began.elapsed() < Duration::from_secs(3));
+            assert_eq!(count.load(Ordering::SeqCst), usize::from(event == "after_tool"));
+            assert!(!dir.join("work/second-hook").exists());
+            let _ = std::fs::remove_dir_all(dir);
+        }
     }
 }

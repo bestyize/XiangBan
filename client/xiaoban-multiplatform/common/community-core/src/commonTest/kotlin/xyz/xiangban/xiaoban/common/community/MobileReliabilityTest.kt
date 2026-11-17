@@ -31,7 +31,7 @@ class MobileReliabilityTest {
         }
         val tool = SetReminderTool(scheduler) { 1_000 }
         val result = tool.run(buildJsonObject { put("title", "喝水"); put("minutes", 10) })
-        assertFalse(result.ok)
+        assertTrue(result.ok, "the reminder is saved; pending permission must not invite duplicate creation")
         assertContains(result.output, "允许通知后会自动生效")
     }
 

@@ -69,17 +69,19 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
     if lock(&app.state::<ChatState>().runs).contains_key(session) {
         return;
     }
+    let mut rejected_id = None;
     let result = (|| -> Result<(), String> {
-        let Some(entry) = with_queue(app, |q| q.claim(session, false, false))? else {
+        let Some(mut entry) = with_queue(app, |q| q.claim(session, false, false))? else {
             return Ok(());
         };
+        rejected_id = Some(entry.id.clone());
         if entry.binding != binding(app, session)? {
             return Err("会话配置已变化，请检查后继续发送队列".into());
         }
         let mentions: Vec<mentions::Mention> =
             serde_json::from_value(entry.mentions.clone()).map_err(|e| e.to_string())?;
         lock(&app.state::<ChatState>().mentions).insert(session.into(), mentions);
-        let images = entry
+        let images: Vec<String> = entry
             .message
             .parts
             .iter()
@@ -106,18 +108,17 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
                 return Err(format!("附件已不可用：{}，请编辑或删除这条消息", file.name));
             }
         }
-        send_prepared(
-            app.clone(),
-            session.into(),
-            entry.message.text(),
-            Some(images),
-            None,
-            None,
-            Some(entry),
-            None,
-            None,
-            None,
-        )?;
+        let resume = saved.is_empty() && images.is_empty() && entry.mentions.as_array().is_none_or(Vec::is_empty)
+            && goals::is_resume_request(&entry.message.text());
+        goals::dispatch_queued(app, session, resume, |goal_prompt| {
+            if let Some(prompt) = goal_prompt {
+                let original = entry.message.text();
+                entry.message.structured_content.get_or_insert_with(|| json!({}))["goalResumeText"] = json!(original);
+                entry.message.parts = user_parts(&prompt, &[]);
+            }
+            send_prepared(app.clone(), session.into(), entry.message.text(), Some(images), None, None,
+                Some(entry), None, None, None)
+        })?;
         Ok(())
     })();
     if let Err(error) = result {
@@ -127,6 +128,11 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
             let _ = with_queue(app, |q| q.reconcile(session, &history));
         }
         let _ = pause(app, session, &error);
+        // The message was durably accepted, but no worker started. Keep it in
+        // the outbox and close the optimistic sending state in every window.
+        emit(app, "chat-event", json!({"session":session,"outboxId":rejected_id,"event":{"type":"error","message":error}}));
+        lock(&app.state::<ChatState>().finishing).remove(session);
+        emit(app, "chat-host-idle", json!({"session":session}));
     }
     let _ = publish(app, session);
 }
@@ -436,6 +442,13 @@ pub fn chat_queue_update(
                 q.send_now(&session_id, &id.ok_or("缺少消息编号")?)
             })?;
             cancel_run(&app, &session_id);
+        }
+        "retry" => {
+            if lock(&state.runs).contains_key(&session_id) {
+                return Err("任务仍在收尾，请稍后重试".into());
+            }
+            let context = binding(&app, &session_id)?;
+            with_queue(&app, |q| q.retry(&session_id, &id.ok_or("缺少消息编号")?, context))?;
         }
         _ => return Err("未知的队列操作".into()),
     }

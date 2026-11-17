@@ -36,6 +36,8 @@ export interface Library { sessions: SessionSummary[]; groups: ChatGroup[] }
 export interface QueueEntry { id: string; text: string; mode: 'queue' | 'steer'; dispatching: boolean; images: number; files: AttachmentCard[] }
 export interface MessageQueue { enqueuedId?: string; revision: number; paused: boolean; reason: string; items: QueueEntry[] }
 export interface Overview {
+  hostLifecycleProtocol?: number;
+  busy?: string[];
   queueProtocol?: number;
   queues?: Record<string, MessageQueue>;
   pendingProtocol?: number;
@@ -88,7 +90,7 @@ export type KernelEvent =
   | { type: 'cancelled' }
   | { type: 'error'; message: string };
 
-export interface ChatEventPayload { session: string; event: KernelEvent; runId?: string; sequence?: number; timestampMs?: number }
+export interface ChatEventPayload { session: string; event: KernelEvent; outboxId?: string; runId?: string; sequence?: number; timestampMs?: number }
 
 export type Risk = 'read' | 'write' | 'network' | 'exec';
 export interface ApprovalRequest {
@@ -117,7 +119,7 @@ export interface ConnectorSuggestion {
 export interface QuestionRequest { id: string; session: string; question: string; options: string[]; connectors?: ConnectorSuggestion[] }
 
 export type ChatItem =
-  | { kind: 'user'; delivery?: 'steer' | 'queue'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
+  | { kind: 'user'; delivery?: 'steer' | 'queue'; outboxId?: string; id: string; text: string; images: string[]; files?: AttachmentCard[] }
   | { kind: 'reasoning'; id: string; text: string; reasoningKind: 'summary' | 'text'; streaming: boolean }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean; /** Tokens of the whole answer, research helpers included. */ usage?: TokenUsage }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error'; generatedImages?: GeneratedImage[]; waitingFor?: { resource: string; ownerSession?: string } }
@@ -129,6 +131,8 @@ export interface SessionView {
   /** The history was read from disk (or the conversation is new). */
   loaded: boolean;
   running: boolean;
+  /** The native host may still be releasing resources after the last model event. */
+  hostBusy?: boolean;
   approvals: ApprovalRequest[];
   questions: QuestionRequest[];
   /** A short line about what is happening, such as a retry. Empty when nothing needs saying. */

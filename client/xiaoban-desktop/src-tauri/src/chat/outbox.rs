@@ -423,10 +423,18 @@ impl Outbox {
         })
     }
     pub fn send_now(&mut self, session: &str, id: &str) -> Result<(), String> {
+        self.send_one(session, id, None)
+    }
+    /// An explicit retry uses the corrected model/settings for this message
+    /// only; later queued messages stay paused and retain their own bindings.
+    pub fn retry(&mut self, session: &str, id: &str, binding: Value) -> Result<(), String> {
+        self.send_one(session, id, Some(binding))
+    }
+    fn send_one(&mut self, session: &str, id: &str, binding: Option<Value>) -> Result<(), String> {
         self.change(session, |s| {
-            if !s.entries.iter().any(|e| e.id == id && !e.dispatching) {
-                return Err("这条消息已被接收".into());
-            }
+            let entry = s.entries.iter_mut().find(|e| e.id == id && !e.dispatching)
+                .ok_or("这条消息已被接收")?;
+            if let Some(binding) = binding { entry.binding = binding; }
             s.send_next = Some(id.into());
             s.paused = true;
             s.reason = "其余排队消息已暂停".into();
@@ -458,6 +466,36 @@ mod tests {
         assert_eq!(metadata["outboxId"], "q1");
         assert_eq!(metadata["attachments"][0]["id"], "file");
         assert_eq!(metadata["mentions"][0]["id"], "service");
+    }
+
+    #[test]
+    fn first_message_preparation_failure_survives_restart_and_retries_once_with_attachments() {
+        let root = temp();
+        let mut q = Outbox::new(root.clone());
+        let mut message = Message::user_text("分析附件");
+        message.structured_content = Some(json!({"attachments":[{"id":"file-1","name":"report.csv","path":"/saved/report.csv"}]}));
+        let id = q.enqueue("s1", message, Delivery::Queue, json!({"model":"broken"}), json!([]), Some("first-send".into())).unwrap();
+        assert_eq!(q.claim("s1", false, false).unwrap().unwrap().id, id);
+        // Preparation stopped before the kernel appended the initial user message.
+        q.reconcile("s1", &[]).unwrap();
+        q.finish("s1", false).unwrap();
+        drop(q);
+        let mut q = Outbox::new(root.clone());
+        assert!(q.snapshot("s1").unwrap().paused);
+        assert_eq!(q.get("s1", &id).unwrap().message.structured_content.as_ref().unwrap()["attachments"][0]["id"], "file-1");
+        let later = q.enqueue("s1", Message::user_text("稍后再做"), Delivery::Queue, json!({"model":"old"}), json!([]), Some("later".into())).unwrap();
+        q.retry("s1", &id, json!({"model":"working"})).unwrap();
+        let retried = q.claim("s1", false, false).unwrap().unwrap();
+        assert_eq!(retried.id, id);
+        assert_eq!(retried.binding["model"], "working");
+        assert_eq!(retried.message.text(), "分析附件");
+        assert_eq!(retried.message.structured_content.as_ref().unwrap()["attachments"][0]["name"], "report.csv");
+        q.reconcile("s1", &[retried.into_message()]).unwrap();
+        q.finish("s1", true).unwrap();
+        assert!(q.claim("s1", false, false).unwrap().is_none(), "retry does not release later queued work");
+        assert_eq!(q.get("s1", &later).unwrap().binding["model"], "old");
+        assert!(q.get("s1", &id).is_err(), "accepted input cannot be delivered twice");
+        std::fs::remove_dir_all(root).unwrap();
     }
     fn temp() -> PathBuf {
         std::env::temp_dir().join(format!(

@@ -45,7 +45,12 @@ class ChatModelsTest {
         val fixed = failed + ToolCallInfo("c2", "shell", """{"command":"npm test"}""", "ok", ToolStatus.Done)
         assertEquals(TaskState.Paused, taskProgress(fixed, running = false)!!.state)
         val allDone = listOf(todo("""{"todos":[{"content":"a","status":"completed"}]}"""))
-        assertEquals(TaskState.Completed, taskProgress(allDone, running = true)!!.state)
+        assertEquals(TaskState.Running, taskProgress(allDone, running = true)!!.state)
+        assertEquals(TaskState.Completed, taskProgress(allDone, running = false)!!.state)
+        assertEquals(TaskState.Blocked, taskProgress(allDone, running = false, error = "安装失败")!!.state)
+        assertEquals(TaskState.Blocked, taskProgress(allDone + failed.last(), running = false)!!.state)
+        assertEquals(TaskState.Paused, taskProgress(allDone, running = false, stopped = true)!!.state)
+        assertEquals(TaskState.Approval, taskProgress(allDone, running = true, waiting = "approval")!!.state)
         assertNull(taskProgress(listOf(ToolCallInfo("c", "shell")), running = true))
     }
 

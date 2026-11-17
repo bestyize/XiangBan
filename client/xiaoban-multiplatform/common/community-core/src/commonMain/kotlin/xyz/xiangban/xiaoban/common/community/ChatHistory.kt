@@ -32,7 +32,7 @@ interface ChatHistoryFiles {
     fun agentCopy(id: String): String? = null
     /** 内核持久任务清单，随会话一起删除。 */
     fun agentProgressCopy(id: String): String? = null
-    fun agentSidecars(id: String): List<String> = listOfNotNull(agentCopy(id), agentProgressCopy(id))
+    fun agentSidecars(id: String): List<String> = listOfNotNull(agentCopy(id), agentProgressCopy(id), imageToolJobFile(id))
     fun deletionMarker(folder: String, id: String): String = "$folder/deleted/$id"
     fun deletedIds(folder: String): Set<String> = emptySet()
 }
@@ -273,7 +273,7 @@ class ChatHistory(
     /** 存下一个对话（没有内容就不存），把它挪到列表最前面；返回新的列表。 */
     fun save(id: String, messages: List<ChatTurn>, nowMs: Long, settings: ChatOptions? = null): List<ChatSummary> {
         if (id in deleted) return index
-        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.streaming || it.imageGeneration || it.role == "user" }
+        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.streaming || it.generatedImages.isNotEmpty() || it.imageGeneration || it.role == "user" }
             .map {
                 when {
                     it.streaming && it.imageGeneration -> it.copy(streaming = false,

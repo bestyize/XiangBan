@@ -57,9 +57,9 @@ pub(crate) fn encode(
             if body.len() <= limit { return Ok(body); }
         }
     }
-    Err(HarnessError::provider(format!(
-        "request_too_large: 请求大小为 {} 字节，上限为 {limit} 字节。旧图片已按需省略；请减少当前图片、降低图片尺寸，或新开会话后继续。", body.len()
-    ), false))
+    Err(HarnessError::request_too_large(format!(
+        "请求大小为 {} 字节，上限为 {limit} 字节。旧图片已按需省略；请减少当前图片、降低图片尺寸，或新开会话后继续。", body.len()
+    )))
 }
 
 #[cfg(test)]

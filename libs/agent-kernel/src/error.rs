@@ -4,6 +4,9 @@ use std::fmt;
 pub enum HarnessError {
     Config(String),
     Provider { message: String, retryable: bool },
+    /// The transport or local encoder rejected the request body by size. Retrying
+    /// the same body cannot help; the run may make a bounded, smaller request.
+    RequestTooLarge { message: String },
     Store(String),
     Middleware(String),
     SessionBusy(String),
@@ -18,8 +21,21 @@ impl HarnessError {
         Self::Provider { message: message.into(), retryable }
     }
 
+    pub fn request_too_large(message: impl Into<String>) -> Self {
+        Self::RequestTooLarge { message: message.into() }
+    }
+
+    pub fn is_request_too_large(&self) -> bool {
+        matches!(self, Self::RequestTooLarge { .. })
+            // Compatibility for host providers written before the typed error.
+            || matches!(self, Self::Provider { message, .. } if message.starts_with("request_too_large:"))
+    }
+
     pub(crate) fn stream_failure(code: &serde_json::Value, message: String) -> Self {
         let code = code.as_str().map(str::to_string).unwrap_or_else(|| code.to_string());
+        if matches!(code.as_str(), "413" | "request_too_large") {
+            return Self::request_too_large(message);
+        }
         let retryable = matches!(code.as_str(), "server_error" | "rate_limit_exceeded" | "timeout_error" | "upstream_timeout" | "request_timeout")
             || code.parse::<u16>().is_ok_and(|n| matches!(n, 408 | 425 | 429) || (500..600).contains(&n))
             || (matches!(code.as_str(), "" | "null") && message.to_lowercase().contains("upstream idle timeout exceeded"));
@@ -40,6 +56,7 @@ impl fmt::Display for HarnessError {
         match self {
             Self::Config(m) => write!(f, "config error: {m}"),
             Self::Provider { message, .. } => write!(f, "provider error: {message}"),
+            Self::RequestTooLarge { message } => write!(f, "provider error: request_too_large: {message}"),
             Self::Store(m) => write!(f, "session store error: {m}"),
             Self::Middleware(m) => write!(f, "middleware error: {m}"),
             Self::SessionBusy(id) => write!(f, "session `{id}` already has a run in progress"),
@@ -79,5 +96,15 @@ mod model_limit_tests {
             "context_length_exceeded: input token count exceeds model window", false
         ).is_context_limit());
         assert!(!HarnessError::provider("HTTP 400: invalid request", false).is_context_limit());
+    }
+
+    #[test]
+    fn request_size_is_a_typed_failure_not_an_http_text_guess() {
+        assert!(HarnessError::request_too_large("proxy limit").is_request_too_large());
+        for code in [serde_json::json!(413), serde_json::json!("request_too_large")] {
+            assert!(HarnessError::stream_failure(&code, "too big".into()).is_request_too_large());
+        }
+        assert!(!HarnessError::provider("HTTP 400: payload includes 413", false).is_request_too_large());
+        assert!(!HarnessError::request_too_large("limit").is_context_limit());
     }
 }

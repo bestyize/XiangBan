@@ -8,6 +8,7 @@ import android.graphics.Color
 import java.io.ByteArrayOutputStream
 import java.io.File
 import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
+import xyz.xiangban.xiaoban.common.community.imageToolJobFile
 
 /** 小伴AI 的对话历史存在应用私有目录里（`files/chats/…`）；先写临时文件再换名，写一半断电也不会坏掉原来的。 */
 class AndroidChatHistoryFiles(context: Context) : ChatHistoryFiles {
@@ -87,7 +88,7 @@ class AndroidChatHistoryFiles(context: Context) : ChatHistoryFiles {
     override fun agentCopy(id: String): String = "agent/s-${escapedId(id)}.jsonl"
     override fun agentProgressCopy(id: String): String = "agent/progress/s-${escapedId(id)}.jsonl"
     override fun agentSidecars(id: String): List<String> =
-        listOf(agentCopy(id), agentProgressCopy(id), "agent/tool-output/${escapedId(id)}", "agent/attachments/${escapedId(id)}", "agent/trust/$id")
+        listOf(agentCopy(id), agentProgressCopy(id), "agent/tool-output/${escapedId(id)}", "agent/attachments/${escapedId(id)}", "agent/trust/$id", imageToolJobFile(id))
 
     override fun deletionMarker(folder: String, id: String): String = "agent/deleted/$id"
 

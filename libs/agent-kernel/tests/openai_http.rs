@@ -79,6 +79,26 @@ fn http_errors_map_to_retryable_or_not() {
 }
 
 #[test]
+fn an_upstream_413_enters_bounded_history_recovery() {
+    let oversized = "HTTP/1.1 413 Payload Too Large\r\nConnection: close\r\nContent-Length: 4\r\n\r\nnope".to_string();
+    let (url, server) = serve(vec![oversized, sse(&HELLO)]);
+    let store = Arc::new(MemoryStore::new());
+    store.append("s", &[Message::user_text("a".repeat(10_000)), Message::assistant("old answer", vec![])]).unwrap();
+    let agent = Agent::builder(Arc::new(provider(&url)), store.clone()).build().unwrap();
+    let mut retrying = 0;
+    let result = agent.run("s", "current question", &mut |event| {
+        if matches!(event, Event::Retrying { delay_ms: 0, .. }) { retrying += 1; }
+    }, &Arc::new(AtomicBool::new(false))).unwrap();
+    assert_eq!(result.text, "Hello");
+    assert_eq!(retrying, 1);
+    let seen = server.join().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert!(seen[1].len() < seen[0].len());
+    assert!(seen[1].contains("current question"));
+    assert_eq!(store.load("s").unwrap()[0].text().len(), 10_000, "only the outbound copy is reduced");
+}
+
+#[test]
 fn truncated_stream_is_a_retryable_error() {
     let (url, server) = serve(vec![sse(&[r#"{"choices":[{"delta":{"content":"cut"}}]}"#])]);
     let err = provider(&url).chat(&request("x"), &mut |_| {}, &AtomicBool::new(false)).unwrap_err();
