@@ -56,12 +56,15 @@ internal fun customPlainBody(chatBody: String, config: CustomModelConfig): Strin
 internal class CustomPlainStream(private val protocol: String, private val onText: (String) -> Unit) {
     private val full = StringBuilder()
     private var terminal = false
+    private var stopReason: String? = null
     fun payload(raw: String) {
         if (raw == "[DONE]") return
         val event = CommunityJson.parseToJsonElement(raw).jsonObject
         val type = event["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        if (type == "error" || type == "response.failed") throw ApiException(0, "模型服务返回错误，请检查服务配置")
-        if (type == "response.incomplete") throw ApiException(0, "模型回复因输出上限而未完成，请调整上限后重试")
+        if (type == "error") throw ApiException(0, "模型服务返回错误，请检查服务配置")
+        if (protocol == "anthropic" && type == "message_delta") {
+            stopReason = event["delta"]?.jsonObject?.get("stop_reason")?.jsonPrimitive?.contentOrNull ?: stopReason
+        }
         val text = when {
             protocol == "responses" && type == "response.output_text.delta" -> event["delta"]?.jsonPrimitive?.contentOrNull
             protocol == "anthropic" && type == "content_block_start" && event["content_block"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull == "text" -> event["content_block"]?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
@@ -69,15 +72,20 @@ internal class CustomPlainStream(private val protocol: String, private val onTex
             else -> null
         }
         if (!text.isNullOrEmpty()) { full.append(text); onText(text) }
-        if (protocol == "responses" && type == "response.completed") {
-            val snapshot = event["response"]?.let { customSingleText(it.toString(), protocol) }.orEmpty()
-            if (snapshot.isNotEmpty()) {
+        if (protocol == "responses" && type in setOf("response.completed", "response.incomplete", "response.failed")) {
+            event["response"]?.let { response -> customSingleText(response.toString(), protocol) { snapshot ->
                 if (!snapshot.startsWith(full.toString())) throw ApiException(0, "模型返回的内容不一致，请重试")
                 val rest = snapshot.substring(full.length)
                 if (rest.isNotEmpty()) { full.append(rest); onText(rest) }
-            }
+            } }
+            if (type == "response.incomplete") throw truncatedCustomReply()
+            if (type == "response.failed") throw ApiException(0, "模型回复未完成，请重试", "stream_interrupted")
+            terminal = true
         }
-        if (type == "response.completed" || type == "message_stop") terminal = true
+        if (protocol == "anthropic" && type == "message_stop") {
+            checkCustomStopReason(stopReason)
+            terminal = true
+        }
     }
     fun finish(): String {
         if (!terminal) throw ApiException(0, "模型回复未完整结束，请重试")
@@ -85,15 +93,38 @@ internal class CustomPlainStream(private val protocol: String, private val onTex
     }
 }
 
-internal fun customSingleText(body: String, protocol: String): String {
+internal fun customSingleText(body: String, protocol: String, onText: (String) -> Unit = {}): String {
     val obj = runCatching { CommunityJson.parseToJsonElement(body).jsonObject }.getOrElse { throw ApiException(0, "模型返回了无法识别的内容") }
+    if (obj["error"] is JsonObject) throw ApiException(0, "模型服务返回错误，请检查服务配置")
     val blocks = if (protocol == "responses") {
         obj["output"]?.jsonArray.orEmpty().flatMap { item ->
             if (item.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "message") item.jsonObject["content"]?.jsonArray.orEmpty() else emptyList()
         }
     } else obj["content"]?.jsonArray.orEmpty()
-    return blocks.mapNotNull { block ->
+    val text = blocks.mapNotNull { block ->
         val item = block.jsonObject
         if (item["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "output_text")) item["text"]?.jsonPrimitive?.contentOrNull else null
     }.joinToString("")
+    // Preserve useful partial output before rejecting an incomplete terminal snapshot.
+    if (text.isNotEmpty()) onText(text)
+    if (protocol == "responses") {
+        when (obj["status"]?.jsonPrimitive?.contentOrNull) {
+            "incomplete" -> throw truncatedCustomReply()
+            "failed", "cancelled" -> throw ApiException(0, "模型回复未完成，请重试", "stream_interrupted")
+            null, "completed" -> Unit // Some compatible providers omit status in their final JSON snapshot.
+            else -> throw ApiException(0, "模型回复尚未结束，请重试", "stream_interrupted")
+        }
+    } else checkCustomStopReason(obj["stop_reason"]?.jsonPrimitive?.contentOrNull)
+    return text
+}
+
+private fun truncatedCustomReply() =
+    ApiException(0, "模型回复因输出上限而未完成，已保留收到的内容；请继续生成或调整输出上限。", "response_truncated")
+
+private fun checkCustomStopReason(reason: String?) {
+    when (reason) {
+        "max_tokens", "model_context_window_exceeded" -> throw truncatedCustomReply()
+        null, "end_turn", "stop_sequence", "refusal" -> Unit
+        else -> throw ApiException(0, "模型回复未完整结束，已保留收到的内容。", "stream_interrupted")
+    }
 }

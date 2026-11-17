@@ -24,7 +24,8 @@ import xyz.xiangban.xiaoban.common.community.MobileWorkspace
 import xyz.xiangban.xiaoban.common.community.MobileGameStore
 import xyz.xiangban.xiaoban.common.community.mobileWorkspaceTools
 import xyz.xiangban.xiaoban.common.community.mobileGameTools
-import xyz.xiangban.xiaoban.common.community.SetReminderTool
+import xyz.xiangban.xiaoban.common.community.reminderTools
+import xyz.xiangban.xiaoban.common.community.imageAgentTools
 import xyz.xiangban.xiaoban.common.community.gatewayWebTools
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
@@ -198,9 +199,10 @@ class CommunityEnv(
 
     @OptIn(ExperimentalTime::class)
     val agent: AgentRuntime? = if (agentBridge != null && agentDir != null) {
-        val tools = listOfNotNull(reminders?.let { SetReminderTool(it) { Clock.System.now().toEpochMilliseconds() } }) +
+        val tools = reminders?.let { reminderTools(it) { Clock.System.now().toEpochMilliseconds() } }.orEmpty() +
             workspace?.let(::mobileWorkspaceTools).orEmpty() + games?.let(::mobileGameTools).orEmpty() +
-            mobileGameActionTools(games, workspace, platform) + gatewayWebTools(ai)
+            mobileGameActionTools(games, workspace, platform) + gatewayWebTools(ai) +
+            imageAgentTools(ai, chatFiles, { session.state.value.accountId }, workspace)
         AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope, utcOffsetMinutes = utcOffsetMinutes)
     } else null
 
@@ -238,6 +240,8 @@ private const val AGENT_SYSTEM_PROMPT =
         "只有用户提出试玩或导出时才打开作品或分享面板。用 app_runtime_read 查看试玩记录，" +
         "没有实际试玩记录不能声称已测试通过。作品在手机上全屏独立运行，需要触控操作，" +
         "也保留键鼠操作。用 lib_add 加入内置 Three.js，用 asset_import 请用户选择本地素材；" +
+        "需要生成图片素材时用 image_generate，生图中断用 image_jobs 查找并复用原任务标记，避免重复扣费；" +
+        "需要修改或取消提醒时先用 list_reminders 获取编号，再用 update_reminder 或 cancel_reminder。" +
         "按规范从草稿目录安装并使用相对路径引用素材，避免依赖 CDN。"
 
 private val EmptyRecentCommunityGames = kotlinx.coroutines.flow.MutableStateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>>(emptyList())

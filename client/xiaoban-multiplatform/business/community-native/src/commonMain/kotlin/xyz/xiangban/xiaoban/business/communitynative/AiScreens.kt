@@ -270,8 +270,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
             } else {
-                if (cloud.backgroundImageCount > 0) {
-                    LinkText("${cloud.backgroundImageCount} 个生图任务在其他对话中进行 · 查看对话", { drawer = true },
+                if (cloud.backgroundTaskCount + cloud.backgroundImageCount > 0) {
+                    val waiting = cloud.waitingSessions.count { it != cloud.conversationId }
+                    val status = if (waiting > 0) "，其中 $waiting 个等待你处理" else ""
+                    LinkText("${cloud.backgroundTaskCount + cloud.backgroundImageCount} 个任务在其他对话中进行$status · 查看对话", { drawer = true },
                         Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -564,7 +566,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                             onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
                     if (turn.generatedImages.isNotEmpty()) {
-                        val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" && it.imageGeneration }?.text
+                        val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" }?.text
                         turn.generatedImages.forEachIndexed { index, data ->
                             ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true, prompt = brief), resolveImage, onPreview)
                         }
