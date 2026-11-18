@@ -277,7 +277,7 @@
     };
   }
 
-  window.createWallpaperScene = (canvas, kind, fps) => {
+  window.createWallpaperScene = (canvas, kind, fps, resolution) => {
     const view = kind === 'galaxy' ? galaxy(canvas, fps) : aquarium(canvas, fps);
     let active = false, resize = true, frame = 0, elapsed = 0, previous = 0, next = 0;
     const interval = 1000 / fps;
@@ -289,8 +289,8 @@
       if (now + .5 >= next) {
         if (resize) {
           const ratio = Math.min(devicePixelRatio || 1, 2);
-          canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-          canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+          canvas.width = resolution?.width ?? Math.max(1, Math.round(canvas.clientWidth * ratio));
+          canvas.height = resolution?.height ?? Math.max(1, Math.round(canvas.clientHeight * ratio));
           resize = false;
         }
         if (previous) elapsed += Math.min(.1, (now - previous) / 1000);

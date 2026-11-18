@@ -16,7 +16,7 @@
   const timeFormat = new Intl.DateTimeFormat('zh-CN', {hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
   const dateFormat = new Intl.DateTimeFormat('zh-CN', {month: 'numeric', day: 'numeric', weekday: 'short'});
 
-  let selection = {home: null, lock: null};
+  let selection = {home: null, lock: null, switchTargets: {}};
   let supported = null;
   let selected = null;
   let mode = 'wallpaper';
@@ -39,7 +39,9 @@
 
   function updateApply() {
     apply.disabled = applying || !supported;
-    apply.textContent = applying ? '等待系统确认…' : '设为壁纸';
+    const target = selection.switchTargets[mode];
+    const switchLabel = {home: '切换桌面壁纸', lock: '切换锁屏壁纸', both: '切换桌面和锁屏壁纸'}[target];
+    apply.textContent = applying ? '正在应用…' : switchLabel || '设为壁纸';
   }
 
   function notify(message) {
@@ -50,7 +52,7 @@
   }
 
   function updateSelection(current) {
-    selection = {home: current.home, lock: current.lock};
+    selection = {home: current.home, lock: current.lock, switchTargets: current.switchTargets || {}};
     for (const [id, card] of cards) {
       const onHome = selection.home === id;
       const onLock = selection.lock === id;
@@ -89,6 +91,7 @@
 
   function showMode(next) {
     mode = next;
+    updateApply();
     for (const button of modes) button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
     overlays.replaceChildren();
     const template = document.getElementById(mode + '-overlay');
@@ -126,8 +129,10 @@
     else setStatus('');
 
     let initialMode = 'wallpaper';
-    if (selection.home === id) initialMode = 'home';
-    else if (selection.lock === id) initialMode = 'lock';
+    if (selection.switchTargets.wallpaper !== 'both') {
+      if (selection.home === id) initialMode = 'home';
+      else if (selection.lock === id) initialMode = 'lock';
+    }
     showMode(initialMode);
 
     canvas = document.createElement('canvas');
@@ -166,7 +171,7 @@
     updateApply();
     setStatus('');
     try {
-      const result = await host.liveWallpapers.preview(requested);
+      const result = await host.liveWallpapers.preview(requested, mode);
       updateSelection(result);
       if (requested !== selected) return;
       if (result.outcome === 'applied') {
@@ -178,10 +183,9 @@
         setStatus('没有检测到新的小伴壁纸。请在系统壁纸预览中确认应用。');
       }
     } catch (error) {
-      const message = error.code === 'gesture'
-        ? '请再次点「设为壁纸」，然后在系统预览中确认。'
-        : '未能打开本机的动态壁纸预览，请重试。';
-      setStatus(message);
+      if (error.code === 'gesture') setStatus('请再点一次按钮。');
+      else if (error.code === 'save_failed') setStatus('未能保存壁纸，请重试。');
+      else setStatus('未能打开系统动态壁纸预览，请重试。');
     } finally {
       applying = false;
       updateApply();

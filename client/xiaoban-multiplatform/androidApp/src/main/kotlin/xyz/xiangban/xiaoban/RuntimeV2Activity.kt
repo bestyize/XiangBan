@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.WallpaperManager
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.Intent
@@ -661,8 +662,40 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
                 if (wallpaperResult != null) { error("busy"); return }
                 lastUserGesture = 0L
+                val scene = params.optString("scene")
+                if (!MobileLiveWallpapers.isScene(scene) || !MobileLiveWallpapers.supported(this)) {
+                    error("unavailable")
+                    return
+                }
+                val mode = params.optString("mode", "wallpaper")
+                if (mode != "wallpaper" && mode != "home" && mode != "lock") { error("unsupported"); return }
                 val before = MobileLiveWallpapers.selection(this)
-                wallpaperResult = { code ->
+                val activeSlot = before.switchSlot(mode)
+                if (activeSlot != null) {
+                    if (MobileLiveWallpapers.setScene(this, activeSlot, scene)) {
+                        result(MobileLiveWallpapers.selection(this).toJson().put("outcome", "applied"))
+                    } else error("save_failed")
+                    return
+                }
+                val slot = before.unusedSlot(scene)
+                if (slot == null || !MobileLiveWallpapers.setScene(this, slot, scene)) {
+                    error("save_failed")
+                    return
+                }
+                var directPreviewStartedAt: Long? = null
+                fun finishPicker(code: Int) {
+                    val returnedImmediately = directPreviewStartedAt?.let {
+                        SystemClock.elapsedRealtime() - it < 750
+                    } ?: false
+                    directPreviewStartedAt = null
+                    // HyperOS can accept the intent, then reject it before displaying the preview.
+                    if (returnedImmediately && code == Activity.RESULT_CANCELED &&
+                        Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) && reply === document && !closing
+                    ) {
+                        wallpaperResult = ::finishPicker
+                        if (MobileLiveWallpapers.openChooser(this, slot, wallpaperPicker::launch)) return
+                        wallpaperResult = null
+                    }
                     lifecycleScope.launch {
                         var after = MobileLiveWallpapers.selection(this@RuntimeV2Activity)
                         if (code == Activity.RESULT_OK && !after.hasNewWallpaper(before)) {
@@ -677,7 +710,13 @@ class RuntimeV2Activity : ComponentActivity() {
                         if (reply === document && !closing) result(after.toJson().put("outcome", outcome))
                     }
                 }
-                val opened = MobileLiveWallpapers.openPicker(this, params.optString("scene")) { wallpaperPicker.launch(it) }
+                wallpaperResult = ::finishPicker
+                val opened = MobileLiveWallpapers.openPicker(this, slot) { intent ->
+                    directPreviewStartedAt = if (intent.action == WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER) {
+                        SystemClock.elapsedRealtime()
+                    } else null
+                    wallpaperPicker.launch(intent)
+                }
                 if (!opened) {
                     wallpaperResult = null
                     error("unavailable")

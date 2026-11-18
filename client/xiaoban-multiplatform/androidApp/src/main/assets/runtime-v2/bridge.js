@@ -68,7 +68,7 @@
       supported: () => call('builtin.wallpaper.supported'),
       status: () => call('builtin.wallpaper.status'),
       previewing: active => call('builtin.wallpaper.previewing', { active }),
-      preview: scene => call('builtin.wallpaper.preview', { scene }),
+      preview: (scene, mode) => call('builtin.wallpaper.preview', { scene, mode }),
     },
     storage: {
       get: key => call('storage.get', { key }),

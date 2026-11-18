@@ -35,11 +35,13 @@ import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-// Distinct components let Android preserve the other screen when only one is changed.
-class AquariumWallpaperService : XiaobanLiveWallpaperService("aquarium")
-class GalaxyWallpaperService : XiaobanLiveWallpaperService("galaxy")
+// Retain the original components as independently configurable slots for Android's two screens.
+class AquariumWallpaperService : XiaobanLiveWallpaperService(MobileLiveWallpapers.Slot.PRIMARY)
+class GalaxyWallpaperService : XiaobanLiveWallpaperService(MobileLiveWallpapers.Slot.SECONDARY)
 
-abstract class XiaobanLiveWallpaperService(private val scene: String) : WallpaperService() {
+abstract class XiaobanLiveWallpaperService internal constructor(
+    private val slot: MobileLiveWallpapers.Slot,
+) : WallpaperService() {
     private val power by lazy { getSystemService(PowerManager::class.java) }
     private val displays by lazy { getSystemService(DisplayManager::class.java) }
     private val lowMemory by lazy { getSystemService(ActivityManager::class.java).isLowRamDevice }
@@ -75,6 +77,7 @@ abstract class XiaobanLiveWallpaperService(private val scene: String) : Wallpape
                     addAction(Intent.ACTION_SCREEN_ON)
                     addAction(Intent.ACTION_SCREEN_OFF)
                     addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+                    addAction(MobileLiveWallpapers.SCENE_CHANGED)
                 },
                 ContextCompat.RECEIVER_NOT_EXPORTED,
             )
@@ -149,6 +152,7 @@ abstract class XiaobanLiveWallpaperService(private val scene: String) : Wallpape
                 (width * scale).roundToInt().coerceAtLeast(1),
                 (height * scale).roundToInt().coerceAtLeast(1),
                 if (powerSaver) 15 else 30,
+                MobileLiveWallpapers.sceneFor(this@XiaobanLiveWallpaperService, slot),
             )
             val current = renderer
             if (current?.profile == profile) {
@@ -172,9 +176,10 @@ abstract class XiaobanLiveWallpaperService(private val scene: String) : Wallpape
                 if (!configureWallpaperWebView(this@XiaobanLiveWallpaperService)) return
                 val virtual = displays.createVirtualDisplay(
                     "Xiaoban wallpaper",
-                    profile.width,
-                    profile.height,
-                    (resources.displayMetrics.densityDpi * profile.width.toFloat() / width).roundToInt().coerceAtLeast(1),
+                    // The wallpaper surface may place smaller buffers at the top left without scaling.
+                    width,
+                    height,
+                    resources.displayMetrics.densityDpi,
                     target,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
                 ) ?: return
@@ -192,7 +197,8 @@ abstract class XiaobanLiveWallpaperService(private val scene: String) : Wallpape
                 presentation.show()
                 presentation.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
                 renderer = Renderer(profile, virtual, presentation, web)
-                web.loadUrl("https://appassets.androidplatform.net/assets/game-packs-v2/${BuiltinMobileGames.LIVE_WALLPAPERS}/wallpaper.html?scene=$scene&fps=${profile.fps}")
+                val wallpaperUrl = "https://appassets.androidplatform.net/assets/game-packs-v2/${BuiltinMobileGames.LIVE_WALLPAPERS}/wallpaper.html"
+                web.loadUrl("$wallpaperUrl?scene=${profile.scene}&fps=${profile.fps}&width=${profile.width}&height=${profile.height}")
             } catch (error: RuntimeException) {
                 Log.w(TAG, "Unable to start wallpaper renderer", error)
                 renderer = null
@@ -256,7 +262,7 @@ abstract class XiaobanLiveWallpaperService(private val scene: String) : Wallpape
         }
     }
 
-    private data class Profile(val width: Int, val height: Int, val fps: Int)
+    private data class Profile(val width: Int, val height: Int, val fps: Int, val scene: String)
 
     private class Renderer(
         val profile: Profile,

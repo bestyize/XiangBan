@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="live_wallpaper_aquarium">小伴 · 水下花园</string>
-    <string name="live_wallpaper_galaxy">小伴 · 银河</string>
+    <string name="live_wallpaper_aquarium">小伴动态壁纸</string>
+    <string name="live_wallpaper_galaxy">小伴动态壁纸（独立）</string>
 </resources>
