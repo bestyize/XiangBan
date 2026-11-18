@@ -1,13 +1,18 @@
 /* Xiaoban Desktop App Runtime V2 Bridge SDK */
 (() => {
   'use strict';
+  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
+    try { Object.defineProperty(window, name, { value: undefined, configurable: false }); } catch {}
+  }
+  // The network restrictions run in every frame. Only the package entry can use the SDK.
+  const { protocol, hostname } = window.location;
+  const isPackageDocument = (protocol === 'app-pack:' && hostname === 'localhost') ||
+    (protocol === 'http:' && hostname === 'app-pack.localhost');
+  if (window !== window.top || !isPackageDocument) return;
   const invoke = window.__TAURI__?.core?.invoke;
   try {
     delete window.__TAURI__;
   } catch {}
-  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
-    try { Object.defineProperty(window, name, { value: undefined, configurable: false }); } catch {}
-  }
 
   const events = new Map();
   const zeroInsets = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });

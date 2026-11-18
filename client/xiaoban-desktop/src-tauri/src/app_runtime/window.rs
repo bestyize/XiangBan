@@ -7,6 +7,9 @@ use std::sync::Mutex;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
+#[cfg(target_os = "macos")]
+mod macos_navigation;
+
 const BRIDGE_JS: &str = include_str!("../../resources/runtime-v2/bridge.js");
 
 pub fn window_label(app_id: &str) -> String {
@@ -97,17 +100,17 @@ pub async fn open_app(
     };
     let (width, height) = default_dimensions(orientation);
     let entry_file = entry.unwrap_or("index.html");
+    let allow_network = network_allowed();
+    let entry_url = url::Url::parse(&format!("{}{entry_file}", super::protocol::base_url(app_id)))
+        .map_err(|e| format!("URL 解析错误: {e}"))?;
 
     let webview_url = if cfg!(windows) {
-        WebviewUrl::External(
-            url::Url::parse(&format!("http://app-pack.localhost/{app_id}/{entry_file}"))
-                .map_err(|e| format!("URL 解析错误: {e}"))?,
-        )
+        WebviewUrl::External(entry_url.clone())
+    } else if cfg!(target_os = "macos") && allow_network {
+        // Start the package only after WebKit's frame-aware navigation policy is installed.
+        WebviewUrl::External(url::Url::parse("about:blank").expect("valid blank URL"))
     } else {
-        WebviewUrl::CustomProtocol(
-            url::Url::parse(&format!("app-pack://localhost/{app_id}/{entry_file}"))
-                .map_err(|e| format!("URL 解析错误: {e}"))?,
-        )
+        WebviewUrl::CustomProtocol(entry_url.clone())
     };
 
     let display_title = if title.trim().is_empty() {
@@ -117,7 +120,7 @@ pub async fn open_app(
     };
 
     let own_path_for_navigation = format!("/{app_id}/");
-    let proxy = if network_allowed() {
+    let proxy = if allow_network {
         Some(url::Url::parse(&format!("http://127.0.0.1:{}", super::network::port()?))
             .map_err(|e| format!("应用网络代理地址无效: {e}"))?)
     } else { None };
@@ -140,7 +143,7 @@ pub async fn open_app(
             own_origin && url.path().starts_with(&own_path_for_navigation)
         })
         .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-        .initialization_script(BRIDGE_JS.to_string());
+        .initialization_script_for_all_frames(BRIDGE_JS);
 
     #[cfg(windows)]
     let builder = builder
@@ -161,6 +164,13 @@ pub async fn open_app(
     };
 
     let window = builder.build().map_err(|e| format!("创建应用窗口失败: {e}"))?;
+    #[cfg(target_os = "macos")]
+    if allow_network {
+        if let Err(error) = macos_navigation::open(&window, entry_url) {
+            let _ = window.close();
+            return Err(error);
+        }
+    }
     let _ = window.set_focus();
 
     Ok(window)

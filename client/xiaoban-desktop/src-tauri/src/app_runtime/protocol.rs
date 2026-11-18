@@ -26,10 +26,11 @@ pub fn csp(windows: bool, network_allowed: bool) -> String {
     };
     let remote = if network_allowed { " https:" } else { "" };
     let remote_connect = if network_allowed { " https: wss:" } else { "" };
+    let frames = if network_allowed { "https:" } else { "'none'" };
     format!(
         "default-src 'none'; script-src 'self' {origin}{remote} 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' {origin}{remote} 'unsafe-inline'; \
          img-src 'self' {origin}{remote} data: blob:; media-src 'self' {origin}{remote} data: blob:; font-src 'self' {origin}{remote} data:; \
-         connect-src 'self' {origin}{remote_connect} data: blob:; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
+         connect-src 'self' {origin}{remote_connect} data: blob:; frame-src {frames}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
     )
 }
 
@@ -364,6 +365,14 @@ pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frame_policy_allows_only_https_when_network_is_available() {
+        for windows in [false, true] {
+            assert!(csp(windows, true).contains("; frame-src https:;"));
+            assert!(csp(windows, false).contains("; frame-src 'none';"));
+        }
+    }
 
     #[test]
     fn packaged_assets_are_scoped_and_support_ranges() {
