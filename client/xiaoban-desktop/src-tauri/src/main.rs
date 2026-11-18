@@ -14,6 +14,7 @@ mod library;
 mod website;
 mod desktop_update;
 mod content;
+mod lock_screen;
 mod account;
 mod ai_config;
 mod model_selection;
@@ -890,6 +891,7 @@ fn main() {
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info,
+            lock_screen::lock_screen_picture_supported, lock_screen::lock_screen_apply_picture, lock_screen::lock_screen_save_picture,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::set_automatic_updates, website::open_official_site, website::fetch_site_wallpapers, website::fetch_site_categories,
             website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message,
@@ -959,6 +961,10 @@ fn main() {
         .manage(widget_preview::State::default())
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if command.starts_with("lock_screen_") && label != "control" {
+                invoke.resolver.reject("只能在主窗口设置锁屏");
+                return true;
+            }
             if label.starts_with("baidu-auth-") { invoke.resolver.reject("授权页面没有原生命令权限"); return true; }
             if label.starts_with("app-runtime-") && (!command.starts_with("app_runtime_") || command == "app_runtime_open" || command == "app_runtime_close") {
                 invoke.resolver.reject("应用沙箱窗口没有此原生命令权限");
