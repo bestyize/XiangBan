@@ -66,6 +66,8 @@
     },
     liveWallpapers: {
       supported: () => call('builtin.wallpaper.supported'),
+      status: () => call('builtin.wallpaper.status'),
+      previewing: active => call('builtin.wallpaper.previewing', { active }),
       preview: scene => call('builtin.wallpaper.preview', { scene }),
     },
     storage: {

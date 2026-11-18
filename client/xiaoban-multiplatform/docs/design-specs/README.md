@@ -4,6 +4,7 @@
 
 | 设计稿 | 内容与预览 |
 | --- | --- |
+| [动态壁纸](prototypes/live-wallpapers.html) | Android 壁纸库与全屏预览。封面显示已应用位置，支持纯壁纸、桌面和锁屏三种预览。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
 | [创意作品详情页](../../../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) | 「碎花垂耳兔」使用通栏布局，完整作品图下显示介绍、作者、来源和灰底体验按钮。评论区采用全站统一的列表、底部入口和编辑弹层。与网页共用同一份设计稿。[手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile) |
 | [讨论卡片](prototypes/discussion-cards.html) | 单列列表，每张卡片显示单行标题。底部左侧依次显示标签、头像、发布时间，右侧为回复与点赞。点击标题查看正文。支持双端和明暗切换。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile) |
 | [评论组件](prototypes/comment-composer.html) | 小伴手机 App 的评论列表、吸底入口与输入面板。点笑脸展开表情面板，点图片图标从系统相册选图。输入一个字或表情即可发布。支持回复、展开编辑、图片预览和深浅色。Compose 已用于帖子、求助、作品与方案、AI 日报、小伴前沿、开源精选、仓库和软件详情，图片评论需配套论坛服务。设计稿的相册网格使用小伴壁纸图库素材。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |

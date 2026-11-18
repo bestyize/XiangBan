@@ -1,16 +1,12 @@
 package xyz.xiangban.xiaoban
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.ActivityManager
 import android.app.Presentation
-import android.app.WallpaperManager
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
@@ -38,27 +34,6 @@ import androidx.webkit.WebViewFeature
 import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-
-internal object MobileLiveWallpapers {
-    fun supported(context: Context): Boolean {
-        val manager = WallpaperManager.getInstance(context)
-        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_WALLPAPER) &&
-            manager.isWallpaperSupported && manager.isSetWallpaperAllowed
-    }
-
-    fun openPreview(activity: Activity, scene: String): Boolean {
-        val service = when (scene) {
-            "aquarium" -> AquariumWallpaperService::class.java
-            "galaxy" -> GalaxyWallpaperService::class.java
-            else -> return false
-        }
-        if (!supported(activity)) return false
-        // The system picker owns the desktop and lock-screen destination choices.
-        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
-            .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(activity, service))
-        return runCatching { activity.startActivity(intent) }.isSuccess
-    }
-}
 
 // Distinct components let Android preserve the other screen when only one is changed.
 class AquariumWallpaperService : XiaobanLiveWallpaperService("aquarium")

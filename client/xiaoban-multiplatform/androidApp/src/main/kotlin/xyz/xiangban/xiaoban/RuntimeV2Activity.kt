@@ -40,6 +40,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
@@ -109,6 +110,13 @@ class RuntimeV2Activity : ComponentActivity() {
     private var info: JSONObject? = null
     private var safeInsets = Rect()
     private var lastUserGesture = 0L
+    private var wallpaperPreviewing = false
+    private var wallpaperResult: ((Int) -> Unit)? = null
+    private val wallpaperPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val pending = wallpaperResult
+        wallpaperResult = null
+        pending?.invoke(result.resultCode)
+    }
     private var exportInFlight = false
     private var remoteEnabled = false
     private var quickLaunchEnabled = false
@@ -428,7 +436,7 @@ class RuntimeV2Activity : ComponentActivity() {
             } else {
                 show(WindowInsetsCompat.Type.systemBars())
                 val useDarkIcons = when {
-                    pocketSpritesFullBleed -> false
+                    pocketSpritesFullBleed || wallpaperPreviewing -> false
                     blockPuzzleFullBleed -> !blockPuzzleShowingResult
                     else -> !dark
                 }
@@ -486,6 +494,7 @@ class RuntimeV2Activity : ComponentActivity() {
         failed = false
         playing = false
         blockPuzzleShowingResult = false
+        if (wallpaperPreviewing) setWallpaperPreviewing(false)
         if (blockPuzzleFullBleed || pocketSprites) updateSystemBars()
         acceptingStorage = true
         chrome.loading()
@@ -634,20 +643,45 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "exit" -> { result(); log?.add("game.exit"); exit() }
-            "builtin.wallpaper.supported", "builtin.wallpaper.preview" -> {
+            "builtin.wallpaper.supported", "builtin.wallpaper.status", "builtin.wallpaper.previewing", "builtin.wallpaper.preview" -> {
                 val official = pack.host == "official-${BuiltinMobileGames.LIVE_WALLPAPERS}.app.xiangban.xyz"
                 if (!official || reply !== document) { error("unsupported"); return }
-                if (method == "builtin.wallpaper.supported") {
-                    result(MobileLiveWallpapers.supported(this))
-                    return
+                when (method) {
+                    "builtin.wallpaper.supported" -> { result(MobileLiveWallpapers.supported(this)); return }
+                    "builtin.wallpaper.status" -> {
+                        result(MobileLiveWallpapers.selection(this).toJson().put("supported", MobileLiveWallpapers.supported(this)))
+                        return
+                    }
+                    "builtin.wallpaper.previewing" -> { setWallpaperPreviewing(params.optBoolean("active")); result(); return }
                 }
                 if (!ready || !resumed || !hasWindowFocus() || closing || failed || chrome.menuOpen || chrome.consentOpen ||
-                    lastUserGesture == 0L || SystemClock.elapsedRealtime() - lastUserGesture !in 0..1000) {
+                    lastUserGesture == 0L || SystemClock.elapsedRealtime() - lastUserGesture !in 0..3000) {
                     error("gesture")
                     return
                 }
+                if (wallpaperResult != null) { error("busy"); return }
                 lastUserGesture = 0L
-                if (MobileLiveWallpapers.openPreview(this, params.optString("scene"))) result(true) else error("unavailable")
+                val before = MobileLiveWallpapers.selection(this)
+                wallpaperResult = { code ->
+                    lifecycleScope.launch {
+                        var after = MobileLiveWallpapers.selection(this@RuntimeV2Activity)
+                        if (code == Activity.RESULT_OK && !after.hasNewWallpaper(before)) {
+                            delay(250)
+                            after = MobileLiveWallpapers.selection(this@RuntimeV2Activity)
+                        }
+                        val outcome = when {
+                            after.hasNewWallpaper(before) -> "applied"
+                            code == Activity.RESULT_OK -> "unverified"
+                            else -> "unchanged"
+                        }
+                        if (reply === document && !closing) result(after.toJson().put("outcome", outcome))
+                    }
+                }
+                val opened = MobileLiveWallpapers.openPicker(this, params.optString("scene")) { wallpaperPicker.launch(it) }
+                if (!opened) {
+                    wallpaperResult = null
+                    error("unavailable")
+                }
             }
             "quickLaunch.available", "quickLaunch.open", "quickLaunch.pin" -> {
                 val name = params.optString("name")
@@ -789,6 +823,13 @@ class RuntimeV2Activity : ComponentActivity() {
         toDouble().let { it in 0.0..9_007_199_254_740_991.0 && it == toLong().toDouble() }
 
     private fun envelope(kind: String) = JSONObject().put("channel", "xiaban.host").put("protocol", 2).put("kind", kind)
+
+    private fun setWallpaperPreviewing(active: Boolean) {
+        if (wallpaperPreviewing == active) return
+        wallpaperPreviewing = active
+        chrome.capsuleOnDarkBackground = active
+        updateSystemBars()
+    }
 
     private fun post(reply: JavaScriptReplyProxy, value: JSONObject) {
         if (!isDestroyed) runCatching { reply.postMessage(value.toString()) }
