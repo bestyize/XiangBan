@@ -925,12 +925,79 @@
     stoneLantern(g, x - 261, G, .58, paint, true); stoneLantern(g, x + 274, G, .68, paint, true)
   }
 
+  // A close pine silhouetted against the open summit. Model the pads with
+  // forks and needle fans so the sky still shows between the loaded brushes.
+  function summitPine(g, paint) {
+    const rand = A.rng(3817)
+    const shaded = [24, 38, 33], jade = [55, 78, 60], tips = [104, 114, 78]
+    function limb(points, width) {
+      g.fillStyle = '#383931'
+      A.ribbon(g, points, t => .65 + width * (1 - t) ** .83)
+      dryLine(g, points, width * .42, [155, 129, 92], .73, Math.floor(rand() * 7000), 5)
+    }
+    function tuft(x, y, size, sign) {
+      const fans = 7 + Math.floor(rand() * 5)
+      dab(g, x, y - 2, 23 * size, 13 * size, paint.ink, .98)
+      for (let f = 0; f < fans; f++) {
+        const side = (f + rand() * .7) / fans * 2 - 1
+        const px = x + side * size * 19, py = y - (1 - side * side) * 4 * size + (rand() - .5) * 5
+        const axis = -Math.PI * .48 + side * .96 + sign * .22
+        const length = (8 + rand() * 5) * size
+        g.fillStyle = A.rgba(shaded, .94)
+        A.leaf(g, px, py + 2, axis, length + 1, 3.8 * size)
+        for (let n = 0; n < 13; n++) {
+          const t = n / 12
+          const a = axis + (t - .5) * 2.6 + (rand() - .5) * .18
+          g.fillStyle = A.rgba(n % 5 ? shaded : jade, .72 + rand() * .27)
+          A.leaf(g, px, py, a, length * (.58 + rand() * .72), (.5 + rand() * .52) * size)
+        }
+        g.fillStyle = A.rgba(tips, .7)
+        A.leaf(g, px - 1, py - 2, axis - .55, length * .67, .65 * size)
+      }
+    }
+    g.save(); g.translate(5352, G + 1)
+    limb([[-18, 0], [-4, -7], [7, -6], [19, -2], [33, -4]], 6)
+    const trunk = [[0, 1], [3, -13], [-5, -33], [-20, -48], [-27, -67], [-21, -82],
+      [-31, -104], [-28, -122], [-15, -131], [-10, -148], [3, -159], [26, -166]]
+    limb(trunk, 18)
+    dryLine(g, [[-3, -3], [0, -17], [-8, -31], [-22, -48], [-25, -64]], 4.1,
+      [209, 180, 132], .88, 3781, 4)
+    const boughs = [
+      [[-27, -72], [-43, -69], [-62, -78], [-81, -76], [-98, -83]],
+      [[-26, -104], [-47, -107], [-55, -120], [-76, -124], [-84, -132]],
+      [[-5, -32], [14, -47], [35, -48], [53, -63], [77, -67]],
+      [[-24, -80], [-3, -92], [25, -90], [55, -101], [86, -98], [113, -107], [131, -111]],
+      [[-26, -121], [-9, -118], [4, -132], [24, -136], [45, -146], [66, -146]],
+      [[-10, -148], [-16, -158], [-12, -171], [4, -174], [15, -180]],
+      [[-9, -149], [4, -158], [26, -164], [44, -162], [56, -169]],
+    ]
+    for (const bough of boughs) {
+      const dir = Math.sign(bough.at(-1)[0] - bough[0][0])
+      limb(bough, 6.7)
+      for (let j = 2; j < bough.length; j++) {
+        const [x, y] = bough[j], rise = 5 + rand() * 7
+        const tip = x + dir * (5 + rand() * 7)
+        limb([[x - dir * 6, y + 3], [x + dir, y - rise * .65], [tip, y - rise]], 2.7)
+        // A short fork above the bough carries a second rank, behind the lit needle tips.
+        if (j < bough.length - 1) {
+          const fork = x - dir * (5 + rand() * 8), height = rise + 7 + rand() * 10
+          limb([[x - dir * 7, y], [fork - dir * 4, y - height * .58], [fork, y - height]], 2.2)
+          tuft(fork, y - height, .87 + rand() * .35, -dir)
+        }
+        tuft(tip, y - rise, .9 + rand() * .45, dir)
+        if (j % 2 === 0) tuft(x - dir * 5, y - 3, .73 + rand() * .26, -dir)
+      }
+    }
+    g.restore()
+  }
+
   function summitTerrace(g, paint) {
-    pine(g, 5340, G + 4, .7, 811, [58, 60, 64])
     wash(g, [[5310, G - 1], [5330, G - 14], [5372, G - 12], [5394, G - 2]], '#655e58')
+    summitPine(g, paint)
     stoneLantern(g, 5468, G, .56, paint)
     stoneLantern(g, 5850, G, .47, paint)
     const x = 5960
+    g.save(); g.translate(x, G); g.scale(.54, .54); g.translate(-x, -G)
     const body = [[x - 45, G], [x - 37, G - 17], [x - 32, G - 50], [x - 33, G - 88], [x - 29, G - 108],
       [x - 17, G - 128], [x - 2, G - 123], [x + 16, G - 132], [x + 32, G - 115], [x + 36, G - 91],
       [x + 34, G - 57], [x + 38, G - 21], [x + 44, G]]
@@ -948,6 +1015,7 @@
     g.fillStyle = '#47464a'; g.font = '600 23px ' + FONT; g.textAlign = 'center'
     g.fillText('止', x - 1, G - 75); g.fillText('戈', x + 1, G - 47)
     inkLine(g, [[x - 13, G - 32], [x + 14, G - 32]], 3.3, [154, 66, 54], 810)
+    g.restore()
   }
 
   function chapterScenery(g, i, paint) {
@@ -1043,6 +1111,21 @@
         }
       }
       if (i === 5) {
+        // A narrow sunlit tread breaks into a steep ink face directly below the duel.
+        const lip = []
+        for (let x = from; x <= to + 6; x += 6) {
+          lip.push([x, G + 23 + 5 * Math.sin(x * .019) + 3 * Math.sin(x * .055) + A.hash(x, 383) * 2])
+        }
+        g.save(); path(g, [...lip, [to + 6, G + 112], [from, G + 112]], true); g.clip()
+        g.fillStyle = gradient(g, 0, G + 16, 0, G + 95, [[0, '#514d49'], [.34, '#736b63'], [1, '#a19483']])
+        g.fillRect(from, G + 14, to - from, 99)
+        for (let x = from; x < to + 24; x += 3 + Math.round(16 * A.hash(x, 15))) {
+          const t = A.hash(x, 370), y = G + 18 + 18 * A.hash(x, 18), n = 13 + 48 * t
+          const cleft = [[x, y], [x - 3, y + n * .28], [x - 10, y + n * .53], [x - 14, y + n]]
+          dryLine(g, cleft, 2 + t * 4, t > .62 ? PAPER : INK, .56, x, 5)
+        }
+        g.restore()
+        dryLine(g, lip, 2.9, PAPER, .84, 3687, 5)
         // Broken horizontal strata under the arena, well below the actors' feet.
         // Old sword cuts run obliquely across the lip, deepening at the edge of the dais.
         for (const [x, y, span] of [[5542, 321, 58], [5618, 332, 88], [5637, 337, 46], [5802, 327, 74]]) {
@@ -1281,6 +1364,53 @@
     g.fillRect(0, 0, cam.width, cam.height)
   }
 
+  // The skyline sits below eye level at the summit. Each range has its own
+  // parallax and wash; a strip of cloud hides its foot before the next range.
+  const SUMMIT_RANGES = [
+    { scroll: .09, base: 222, peaks: [9, 20], widths: [25, 65], color: [113, 113, 129], alpha: .42 },
+    { scroll: .17, base: 251, peaks: [12, 37], widths: [28, 81], color: [98, 106, 121], alpha: .62 },
+    { scroll: .32, base: 286, peaks: [17, 53], widths: [34, 104], color: [82, 91, 102], alpha: .79 },
+    { scroll: .49, base: 325, peaks: [21, 63], widths: [41, 128], color: [64, 74, 78], alpha: .86 },
+  ]
+
+  function summitView(g, a, cam, clock, layer, amount) {
+    const cache = a.mountain.summitRanges ||= []
+    for (const [i, r] of SUMMIT_RANGES.entries()) {
+      const seed = 3321 + i * 79
+      // The horizon is continuous; nearer ridges surface in clusters with cloud-filled gaps.
+      const top = r.base - r.peaks[1] - 12
+      const range = cache[i] ||= i < 2 ? A.mountains({
+        width: 2000, top, height: 122, base: r.base,
+        peakW: r.widths, peakH: r.peaks, gap: [.5, 1.27], round: 1.05,
+        seed, res: a.mountain.res, detail: 11 + i * 3, detailAmp: 5 + i * 3,
+        depth: 15 + i * 7, strokeCell: 3.4, strokeDensity: .41 + i * .08,
+        fadeH: 85, strokeLen: 4 + i * 2, outline: .38, color: r.color, alpha: r.alpha,
+      }) : A.strip(2000, top, 129, a.mountain.res, ink => {
+        const rand = A.rng(seed), paper = [229, 214, 196]
+        for (let x = -40; x < 2140; x += 150 + rand() * 157) {
+          const w = 114 + rand() * 117, h = 22 + rand() * (i === 2 ? 24 : 38)
+          const y = r.base - h + rand() * 8
+          rockInk(ink, x - w * .39, y + h * .23, w * .69, h * .88, r.color, paper,
+            Math.round(x) + 1793, 2, .47, .48)
+          rockInk(ink, x, y, w, h + 13, r.color, paper, Math.round(x) + seed, i % 3, .55 + i * .08, .69)
+        }
+      })
+      layer(g, cam, r.scroll)
+      g.globalAlpha = amount
+      const origin = 5150 * r.scroll - 500
+      g.save(); g.translate(origin, 0)
+      A.drawStrip(g, range, cam.left * r.scroll - origin, cam.viewW)
+      g.restore()
+      if (i === 2) {
+        a.mountain.hermitage ||= summitHermitage(a.mountain.res)
+        g.save(); g.translate(5700 * r.scroll + 150, 245); g.scale(.36, .36)
+        A.drawSprite(g, a.mountain.hermitage, 0, 0)
+        g.restore()
+      }
+      mistBelt(g, a, cam, r.scroll, r.base - 11, 48 + i * 4, 205 + i * 15, clock, .84, seed)
+    }
+  }
+
   function background(g, a, cam, clock, env, layer) {
     paintSky(g, cam, env)
     const middle = cam.left + cam.viewW / 2
@@ -1288,9 +1418,10 @@
     const climb = smooth((middle - 3200) / 2360)
     const chasm = smooth((middle - 1370) / 280) * (1 - smooth((middle - 2060) / 300))
     const dusk = smooth((middle - 4120) / 390) * (1 - smooth((middle - 4940) / 430))
-    const sunSize = 60 + 96 * climb
+    const summit = smooth((middle - 5000) / 395)
+    const sunSize = 60 + 96 * climb - 62 * summit
     const sunX = A.lerp(448 + middle * .32, 5700 * FAR_SCROLL + 37, climb)
-    const sunY = 72 + 31 * climb
+    const sunY = 72 + 31 * climb + 36 * summit
 
     g.save()
     layer(g, cam, FAR_SCROLL)
@@ -1320,12 +1451,11 @@
         g.quadraticCurveTo(x + 1.5, y - 2, x + 4.3, y - wing); g.stroke()
       }
     }
-    g.globalAlpha = 1
-    g.globalAlpha = 1 - .63 * chasm
+    g.globalAlpha = (1 - .63 * chasm) * (1 - summit)
     g.translate(0, 55 * climb + 49 * chasm)
     for (let i = 0; i < RIDGES.length; i++) {
       const [x, , width] = RIDGES[i], at = x * FAR_SCROLL + 245
-      if (!visible(at, width / 2 + 12, FAR_SCROLL)) continue
+      if (summit === 1 || !visible(at, width / 2 + 12, FAR_SCROLL)) continue
       a.mountain.ridges[i] ||= distant(i, a.mountain.res * .79)
       A.drawSprite(g, a.mountain.ridges[i], at, 0)
     }
@@ -1335,11 +1465,11 @@
 
     layer(g, cam, CLIFF_SCROLL)
     // As the path rises, the nearer shoulders sink below the sword line.
-    g.globalAlpha = 1 - .53 * chasm
+    g.globalAlpha = (1 - .53 * chasm) * (1 - summit)
     g.translate(0, 83 * climb + 38 * chasm)
     for (let i = 0; i < CLIFFS.length; i++) {
       const [x, , width] = CLIFFS[i], at = x * CLIFF_SCROLL + 120
-      if (!visible(at, width * 1.25, CLIFF_SCROLL)) continue
+      if (summit === 1 || !visible(at, width * 1.25, CLIFF_SCROLL)) continue
       a.mountain.cliffs[i] ||= closeCliff(i, a.mountain.res)
       A.drawSprite(g, a.mountain.cliffs[i], at, 0)
     }
@@ -1347,12 +1477,6 @@
       const at = x * CLIFF_SCROLL + 120
       if (visible(at, width, CLIFF_SCROLL)) waterfall(g, at, y, height, width, clock)
     }
-    const hermitageX = 5770 * CLIFF_SCROLL
-    if (climb > .32 && visible(hermitageX + 160, 160, CLIFF_SCROLL)) {
-      a.mountain.hermitage ||= summitHermitage(a.mountain.res)
-      A.drawSprite(g, a.mountain.hermitage, hermitageX, 18, .88)
-    }
-    g.globalAlpha = 1
     const crossing = 1830 * CLIFF_SCROLL + 35
     if (visible(crossing + 205, 205, CLIFF_SCROLL)) {
       a.mountain.valleyBridge ||= valleyCrossing(a.mountain.res)
@@ -1361,6 +1485,7 @@
     }
     mistBelt(g, a, cam, CLIFF_SCROLL, 217, 125, 260, clock, .58, 37)
     mistBelt(g, a, cam, CLIFF_SCROLL, 280, 113, 270, clock, .70, 41)
+    if (summit > 0) summitView(g, a, cam, clock, layer, summit)
     g.restore()
     if (dusk > 0) {
       // Deep indigo under the eaves, fading to paper behind the combat silhouettes.
@@ -1549,7 +1674,7 @@
   const FOREGROUND = [
     [725, 'pine', 1], [1160, 'bank', 1], [1670, 'bank', -1], [2160, 'vine', -1],
     [2550, 'vine', 1], [2925, 'grass', -1], [3550, 'pine', 1], [3985, 'bank', -1],
-    [4480, 'grass', 1], [4940, 'vine', -1], [5480, 'pine', -1], [5890, 'bank', 1],
+    [4480, 'grass', 1], [4940, 'vine', -1], [5890, 'bank', 1],
   ]
 
   function nearBrush(kind, seed, res) {

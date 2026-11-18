@@ -2006,6 +2006,16 @@
     ctx.save()
     ctx.lineCap = 'round'
     for (const [x, side] of [[state.lock[0], 1], [state.lock[1], -1]]) {
+      if (state.plan[state.encounter]?.id === 'summit') {
+        // Wind curling along the lip marks the arena edge without fencing off the sky.
+        for (let i = 0; i < 3; i++) {
+          const lift = Math.sin(clock * 2 + i) * 2
+          ctx.beginPath(); ctx.moveTo(x + side * (21 + i * 4), rules.GROUND - 2)
+          ctx.quadraticCurveTo(x - side * (9 + i), rules.GROUND - 5 - i * 2, x + side * (i - 2), rules.GROUND - 13 - i * 4 + lift)
+          ctx.strokeStyle = 'rgba(95,82,68,.52)'; ctx.lineWidth = 1.4 - i * .23; ctx.stroke()
+        }
+        continue
+      }
       for (let i = 0; i < 6; i++) {
         ctx.strokeStyle = 'rgba(20,20,22,' + (0.1 + (i % 3) * 0.08) + ')'
         ctx.lineWidth = 1.2 + (i % 3) * 1.4
