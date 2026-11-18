@@ -11,6 +11,25 @@
       "href": "/ideas?tab=gallery"
     },
     {
+      "id": "jiangshan-map",
+      "kind": "work",
+      "title": "江山时序",
+      "description": "沿时间轴看历代疆域，查古今地名，跟着历史人物走一程。",
+      "introduction": "从公元前 403 年到 1948 年，拖动时间轴查看历代疆域，点击古城了解沿革，也可以搜索苏轼、李白等人物，沿地图回看他们的行迹。小伴版支持离线使用，完整图层可在原作官网查看。",
+      "controls": {
+        "desktop": "拖动时间轴，滚轮缩放，点击古城",
+        "mobile": "拖动时间轴，双指缩放，轻触古城"
+      },
+      "cover": "https://res.xiangban.xyz/ideas-covers/jiangshan-map.webp",
+      "label": "工具",
+      "author": "DeanChensj",
+      "date": "2026-11-18",
+      "href": "/ideas/works/jiangshan-map",
+      "player": "jiangshan-map",
+      "site": "https://deanchen.me/jiangshan-map/",
+      "repository": "https://github.com/DeanChensj/jiangshan-map"
+    },
+    {
       "id": "plush-rabbit",
       "kind": "exhibit",
       "title": "碎花垂耳兔",

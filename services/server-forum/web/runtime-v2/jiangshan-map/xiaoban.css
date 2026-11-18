@@ -1,0 +1,15 @@
+.music-pill-group,
+.layer-chip:has(#chk-provinces),
+.layer-chip:has(#chk-prov-names) {
+  display: none;
+}
+
+#nav-bar {
+  padding-top: max(6px, var(--xb-safe-top, 0px));
+  padding-right: max(12px, calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px));
+}
+
+#atlas-shell {
+  box-sizing: border-box;
+  padding-bottom: var(--xb-safe-bottom, 0px);
+}

@@ -76,6 +76,15 @@ node scripts/build-starry-nightrider-pack.mjs --site /path/to/Starrynightrider/s
 
 将输出的 `starry-nightrider.html` 放入上述作品部署目录。
 
+江山时序使用 [DeanChensj 的原作](https://github.com/DeanChensj/jiangshan-map) 固定提交 `6d9c6fdd84b41520d3421eecedf9be7b0b6e6310`。离线版覆盖公元前 403 年至 1948 年，剔除受独立条款约束的郡州府和现代省界图层，保留 GPL-3.0 许可和署名。在 `web/` 目录构建网页文件及通用 V2 包，再用现有脚本生成 Android 下载清单：
+
+```sh
+python3 scripts/build-jiangshan-map-pack.py --source /path/to/jiangshan-map --out /path/to/release
+node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging /path/to/release/Jiangshan-Map-v2.zip
+```
+
+将 `jiangshan-map/` 部署到资源机的 `idea-players-v1/`，应用 `nginx-ideas.conf` 中对应的资源规则，再发布 ZIP 和 `jiangshan-map.json`。先核对网页入口、ZIP 和封面可以访问，再发布带新条目的精选目录。桌面可以从「我的作品」导入同一 ZIP。
+
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 
 ## 移动优先网页版（2026-11-01，本地实现）
