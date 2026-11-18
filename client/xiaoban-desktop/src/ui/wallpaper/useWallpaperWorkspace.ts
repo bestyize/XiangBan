@@ -71,19 +71,24 @@ export function useWallpaperWorkspace(store: ControlStore) {
     if(!result.library.items.some(item=>item.definition.id === result.id && item.installed)) throw new Error("下载未完成校验，请重试");
     store.library=result.library; prepared.set(key,result.id); return result.id;
   }
-  async function action(apply: boolean, preview = false, monitor?: string) {
+  async function withSelection(run: (id: string, options: WallpaperOptions) => Promise<void>) {
     const chosen=selection.value; if(!chosen || busy.value) return;
     const options=cloneOptions(draft.value); progress.value=null; progressId=chosen.source === "local" ? chosen.item.definition.id : prepared.get(chosen.item.id) || chosen.item.desktop_id; busy.value=true;
     try {
       const id=await prepare(chosen); progressId=id;
-      if (!apply) store.notify("已保存到我的壁纸","success");
-      else if (preview || monitor === undefined) await store.applyWallpaper(id, options, preview);
-      else await store.applyWallpaper(id, options, false, monitor);
+      await run(id, options);
     }
     catch(e) {if(String(e)===DOWNLOAD_CANCELLED) store.notify(DOWNLOAD_CANCELLED,"info"); else store.notify(e,"error");} finally {busy.value=false;progress.value=null;progressId=undefined;}
   }
+  async function action(apply: boolean, preview = false, monitor?: string) {
+    await withSelection(async (id, options) => {
+      if (!apply) store.notify("已保存到我的壁纸","success");
+      else if (preview || monitor === undefined) await store.applyWallpaper(id, options, preview);
+      else await store.applyWallpaper(id, options, false, monitor);
+    });
+  }
   if(store.desktop && !store.info?.uiSmoke && tab.value === "online") {void load();void loadCategories();}
   const saved = computed(() => { const chosen=selection.value; if(chosen?.source!=="online") return false; const id=prepared.get(chosen.item.id) || chosen.item.desktop_id; return store.library.items.some(item=>item.definition.id===id && item.installed); });
-  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action};
+  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action,withSelection};
 }
 

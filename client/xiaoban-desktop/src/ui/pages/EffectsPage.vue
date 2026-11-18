@@ -10,6 +10,9 @@ import { aquariumLightControls, aquariumModes, defaultAquarium, lightValue, norm
 import type { ControlStore } from '../control-types.ts';
 import EffectPreview from '../components/EffectPreview.vue';
 import { createWidgetClient } from '../../widgets/client.ts';
+import { useLockScreenPicture } from '../wallpaper/useLockScreenPicture.ts';
+import { wallpaperFrame } from '../wallpaper/lock-screen-frame.ts';
+import LockScreenPicture from '../wallpaper/LockScreenPicture.vue';
 const props = defineProps<{ store: ControlStore }>();
 
 const displays = createWidgetClient();
@@ -40,6 +43,17 @@ const tuning = computed<EffectParams>(() => ({
   density: density.value, speed: speed.value, size: size.value,
   ...(aquariumSelected.value ? { aquarium: aquarium.value } : {}),
 }));
+const lockScreen = useLockScreenPicture(props.store);
+const canRenderEffectPicture = computed(() => !!chosen.value && !aquariumSelected.value && !htmlSelected.value);
+watch(chosen, lockScreen.close);
+function prepareLockScreen() {
+  const effect = chosen.value;
+  if (!effect || !canRenderEffectPicture.value) return;
+  const size = monitors.value.find(monitor => monitor.primary) ?? { width: 1920, height: 1080 };
+  const params = tuning.value;
+  const { wallpaperId, wallpaperOptions } = props.store.settings;
+  void lockScreen.show(() => wallpaperFrame(wallpaperId, wallpaperOptions, { size, effect, params }));
+}
 let timer: ReturnType<typeof setTimeout> | null = null;
 watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.value, chosen.value.id)) : ''] as const, ([id], previous) => {
   if ((timer && previous?.[0] === id) || !chosen.value) return;
@@ -200,6 +214,8 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </details>
       </section>
       <div class="kv row"><div class="grow"><span>伙伴跟着做表情</span><small>只换表情，不弹窗、不出声</small></div><NSwitch :value="store.settings.companionLinks" data-testid="effect-companion-links" @update:value="setLinks" /></div>
+      <button v-if="lockScreen.picture.supported && canRenderEffectPicture" type="button" class="xb-btn" :disabled="lockScreen.picture.busy" data-testid="effect-lock-screen-picture" @click="prepareLockScreen">将当前效果设为锁屏图片</button>
+      <LockScreenPicture :frame="lockScreen.picture.frame" :busy="lockScreen.picture.busy" :manual="!!lockScreen.picture.manualId" @apply="lockScreen.apply" @save="lockScreen.save" @close="lockScreen.close" />
       <div v-if="!htmlSelected" class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
     </aside>
   </section>

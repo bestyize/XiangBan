@@ -21,6 +21,57 @@ pub fn lock_screen_picture_supported() -> bool {
     cfg!(windows)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PictureSource {
+    url: String,
+    video: bool,
+}
+
+#[tauri::command]
+pub async fn lock_screen_wallpaper_source(
+    window: tauri::WebviewWindow,
+    id: String,
+) -> Result<PictureSource, String> {
+    if !lock_screen_picture_supported() {
+        return Err("当前平台不支持设置独立锁屏图片".into());
+    }
+    use crate::{content, library};
+    use tauri::Manager;
+
+    let app = window.app_handle().clone();
+    let wallpaper_id = id.clone();
+    let source = tauri::async_runtime::spawn_blocking(move || -> Result<Option<PictureSource>, String> {
+        let state = app.state::<content::ContentState>();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
+        let root = content::root(&app)?;
+        let item = library::all_items(&root).into_iter().find(|item| item.id == wallpaper_id)
+            .ok_or("找不到所选壁纸")?;
+        library::validate_stored(&item)?;
+        if item.kind != "image" {
+            if let Some(cover) = &item.cover {
+                let ready = library::download(&root, cover, |_| {});
+                if ready.is_ok() {
+                    return Ok(Some(PictureSource { url: library::asset_url(cover), video: false }));
+                }
+                if item.kind == "canvas" { ready?; }
+            }
+        }
+        match item.kind.as_str() {
+            "image" | "video" => {
+                library::download(&root, &item.resource, |_| {})?;
+                Ok(Some(PictureSource { url: library::asset_url(&item.resource), video: item.kind == "video" }))
+            }
+            "web" if crate::local_media::is_local(&item) => Ok(None),
+            _ => Err("这幅壁纸没有可用的静态锁屏画面".into()),
+        }
+    }).await.map_err(|e| e.to_string())??;
+    match source {
+        Some(source) => Ok(source),
+        None => Ok(PictureSource { url: content::wallpaper_ensure_cover(window, id).await?, video: false }),
+    }
+}
+
 #[tauri::command]
 pub async fn lock_screen_apply_picture(
     window: tauri::WebviewWindow,
