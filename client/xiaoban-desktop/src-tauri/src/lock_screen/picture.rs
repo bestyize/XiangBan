@@ -3,7 +3,7 @@ use image::{ImageFormat, ImageReader, Limits};
 use sha2::{Digest, Sha256};
 use std::{fs, io::Cursor, path::{Path, PathBuf}};
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub(super) static OPERATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const MAX_JPEG_BYTES: usize = 12 * 1024 * 1024;

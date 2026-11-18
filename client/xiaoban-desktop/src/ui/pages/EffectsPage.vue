@@ -214,7 +214,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </details>
       </section>
       <div class="kv row"><div class="grow"><span>伙伴跟着做表情</span><small>只换表情，不弹窗、不出声</small></div><NSwitch :value="store.settings.companionLinks" data-testid="effect-companion-links" @update:value="setLinks" /></div>
-      <button v-if="lockScreen.picture.supported && canRenderEffectPicture" type="button" class="xb-btn" :disabled="lockScreen.picture.busy" data-testid="effect-lock-screen-picture" @click="prepareLockScreen">将当前效果设为锁屏图片</button>
+      <button v-if="lockScreen.picture.mode === 'lockScreen' && canRenderEffectPicture" type="button" class="xb-btn" :disabled="lockScreen.picture.busy" data-testid="effect-lock-screen-picture" @click="prepareLockScreen">将当前效果设为锁屏图片</button>
       <LockScreenPicture :frame="lockScreen.picture.frame" :busy="lockScreen.picture.busy" :manual="!!lockScreen.picture.manualId" @apply="lockScreen.apply" @save="lockScreen.save" @close="lockScreen.close" />
       <div v-if="!htmlSelected" class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
     </aside>

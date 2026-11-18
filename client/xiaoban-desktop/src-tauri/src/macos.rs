@@ -16,7 +16,7 @@ use objc2_core_graphics::{
 use std::{sync::mpsc, time::Duration};
 use tauri::{Emitter, Manager};
 
-fn on_main<T: Send + 'static>(
+pub(crate) fn on_main<T: Send + 'static>(
     app: &tauri::AppHandle,
     operation: impl FnOnce(MainThreadMarker) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -62,9 +62,12 @@ pub fn widget_monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry
         Ok(screens.iter().enumerate().map(|(index,screen)|{
             let frame=screen.frame();let name=screen.localizedName().to_string();
             let (x,y)=crate::widget_geometry::from_bottom_left(primary.size.height,frame.origin.x,frame.origin.y,frame.size.height);
-            crate::widget_geometry::MonitorArea{id:format!("{}@{},{}",name,frame.origin.x,frame.origin.y),name,x,y,width:frame.size.width,height:frame.size.height,scale:1.0,primary:index==0}
+            crate::widget_geometry::MonitorArea{id:screen_id(&name,frame.origin.x,frame.origin.y),name,x,y,width:frame.size.width,height:frame.size.height,scale:1.0,primary:index==0}
         }).collect())
     })
+}
+pub(crate) fn screen_id(name: &str, x: f64, y: f64) -> String {
+    format!("{name}@{x},{y}")
 }
 /// Pointer in assistant CSS points, sampled even when its transparent area ignores mouse events.
 pub fn assistant_pointer(window:&tauri::WebviewWindow)->Result<(f64,f64,f64,bool),String>{

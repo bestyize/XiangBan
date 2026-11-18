@@ -1,9 +1,11 @@
 //! The console submits a prepared wallpaper frame. Only the native host can write it or change
 //! the current user's lock screen.
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "macos", test))]
 mod picture;
 #[cfg(windows)]
 mod windows;
+#[cfg(target_os = "macos")]
+mod macos;
 
 use serde::Serialize;
 
@@ -14,11 +16,17 @@ pub enum PictureResult {
     Applied,
     #[cfg(windows)]
     Manual { id: String },
+    #[cfg(target_os = "macos")]
+    Desktop,
 }
 
 #[tauri::command]
-pub fn lock_screen_picture_supported() -> bool {
-    cfg!(windows)
+pub fn lock_screen_picture_mode() -> Option<&'static str> {
+    match std::env::consts::OS {
+        "windows" => Some("lockScreen"),
+        "macos" => Some("desktop"),
+        _ => None,
+    }
 }
 
 #[derive(Serialize)]
@@ -33,7 +41,7 @@ pub async fn lock_screen_wallpaper_source(
     window: tauri::WebviewWindow,
     id: String,
 ) -> Result<PictureSource, String> {
-    if !lock_screen_picture_supported() {
+    if lock_screen_picture_mode().is_none() {
         return Err("当前平台不支持设置独立锁屏图片".into());
     }
     use crate::{content, library};
@@ -76,9 +84,11 @@ pub async fn lock_screen_wallpaper_source(
 pub async fn lock_screen_apply_picture(
     window: tauri::WebviewWindow,
     jpeg: String,
+    monitor: Option<String>,
 ) -> Result<PictureResult, String> {
     #[cfg(windows)]
     {
+        let _ = monitor;
         let app = window.app_handle().clone();
         tauri::async_runtime::spawn_blocking(move || {
             let _operation = picture::OPERATION.lock().unwrap_or_else(|e| e.into_inner());
@@ -100,9 +110,23 @@ pub async fn lock_screen_apply_picture(
         .await
         .map_err(|e| e.to_string())?
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
     {
-        let _ = (window, jpeg);
+        let app = window.app_handle().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let _operation = picture::OPERATION.lock().unwrap_or_else(|e| e.into_inner());
+            let monitor = monitor.unwrap_or_default();
+            if monitor.len() > 512 { return Err("显示器标识无效".into()); }
+            let directory = crate::content::root(&app)?.join("lock-screen");
+            // macOS can retain a file URL per Space/display, so keep the content-addressed asset.
+            let (_, path) = picture::prepare(&directory, &jpeg)?;
+            crate::macos::on_main(&app, move |mtm| macos::apply_desktop_picture(mtm, &path, &monitor))?;
+            Ok(PictureResult::Desktop)
+        }).await.map_err(|e| e.to_string())?
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = (window, jpeg, monitor);
         Err("当前平台不支持设置独立锁屏图片".into())
     }
 }

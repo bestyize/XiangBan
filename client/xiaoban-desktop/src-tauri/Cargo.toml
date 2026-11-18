@@ -69,9 +69,9 @@ tauri-plugin-autostart = "2"
 block2 = "0.6"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = [
-  "std", "NSApplication", "NSWindow", "NSView", "NSScreen", "NSEvent", "NSColor", "NSAppearance", "NSImage", "NSImageRep", "NSBitmapImageRep", "objc2-core-foundation"
+  "std", "NSApplication", "NSWindow", "NSView", "NSScreen", "NSWorkspace", "NSEvent", "NSColor", "NSAppearance", "NSImage", "NSImageRep", "NSBitmapImageRep", "objc2-core-foundation"
 ] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSUserDefaults", "NSString", "NSData", "NSDictionary", "NSError"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSUserDefaults", "NSString", "NSURL", "NSData", "NSDictionary", "NSError"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = [
   "std", "CFArray", "CFDictionary", "CFString", "CFNumber"

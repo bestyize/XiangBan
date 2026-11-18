@@ -11,7 +11,7 @@ vi.mock('../../bridge.ts', () => ({ invoke: vi.fn() }));
 it('applies the confirmed frame and keeps it available if Windows needs manual setup', async () => {
   const native = vi.mocked(invoke);
   native.mockImplementation(async command => {
-    if (command === 'lock_screen_picture_supported') return true as never;
+    if (command === 'lock_screen_picture_mode') return 'lockScreen' as never;
     if (command === 'lock_screen_apply_picture') return { status: 'manual', id: 'picture' } as never;
     if (command === 'lock_screen_save_picture') return true as never;
     throw new Error(command);
