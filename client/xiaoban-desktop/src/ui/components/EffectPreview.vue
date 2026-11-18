@@ -2,7 +2,7 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { FileCode } from 'lucide-vue-next';
 import { EffectsLayer } from '../../effects/layer.ts';
-import { arowanaCover, isArowana, isHtmlEffect, type EffectPack, type EffectParams } from '../../effects/types.ts';
+import { aquariumId, isHtmlEffect, type EffectPack, type EffectParams } from '../../effects/types.ts';
 import { previewParams, subscribeEffectStill } from './effect-stills.ts';
 
 const props = defineProps<{ pack: EffectPack; playing?: boolean; paused?: boolean; fps?: 30 | 60; tuning?: EffectParams }>();
@@ -25,7 +25,8 @@ function syncLayer() {
 function loadStill() {
   unsubscribe?.(); unsubscribe = undefined;
   if (!active || isHtmlEffect(props.pack)) return;
-  if (isArowana(props.pack)) stillUrl.value = arowanaCover;
+  const fish = aquariumId(props.pack);
+  if (fish) stillUrl.value = `/effects/${fish}/cover.webp`;
   else unsubscribe = subscribeEffectStill(props.pack, url => { stillUrl.value = url; });
 }
 

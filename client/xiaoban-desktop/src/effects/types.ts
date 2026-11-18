@@ -113,11 +113,11 @@ export interface EffectPack {
 
 export const isHtmlEffect = (pack: EffectPack | null | undefined) => pack?.htmlRevision !== undefined;
 
-/** This renderer is bundled with the app and cannot be selected by a user pack. */
-export const isArowana = (pack: Pick<EffectPack, "id" | "source"> | null) =>
-  pack?.id === "arowana" && pack.source === "builtin";
-
-export const arowanaCover = "/effects/arowana/cover.webp";
+/** The aquarium renderer is only available to these built-in packs. */
+export type AquariumId = "arowana" | "koi";
+export const isAquariumId = (id: string): id is AquariumId => id === "arowana" || id === "koi";
+export const aquariumId = (pack: Pick<EffectPack, "id" | "source"> | null): AquariumId | null =>
+  pack?.source === "builtin" && isAquariumId(pack.id) ? pack.id : null;
 
 export interface EffectParams { density: number; speed: number; size: number; aquarium?: AquariumSettings }
 export interface EffectsChoice { selected: string; params: Record<string, EffectParams>; monitor?: string }

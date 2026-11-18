@@ -5,7 +5,7 @@ import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, w
 import { NAlert, NPopconfirm, NSlider, NSwitch } from 'naive-ui';
 import { Ban, Sparkles, Trash2, Download } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
-import { defaultParams, isArowana, isHtmlEffect, limits, type EffectsChoice, type EffectParams } from '../../effects/types.ts';
+import { aquariumId, defaultParams, isHtmlEffect, limits, type EffectsChoice, type EffectParams } from '../../effects/types.ts';
 import { aquariumLightControls, aquariumModes, defaultAquarium, lightValue, normalizeAquarium, type AquariumLight, type AquariumMode } from '../../effects/arowana/settings.ts';
 import type { ControlStore } from '../control-types.ts';
 import EffectPreview from '../components/EffectPreview.vue';
@@ -24,7 +24,7 @@ const filter=ref<'all'|'desk'|'mine'>('all');
 const packs = computed(() => props.store.effectList.packs);
 const visiblePacks=computed(()=>packs.value.filter(pack=>filter.value==='mine'?pack.source==='user':filter.value==='desk'?pack.id===choice.value.selected:true));
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
-const aquariumSelected = computed(() => isArowana(chosen.value));
+const aquariumSelected = computed(() => aquariumId(chosen.value));
 const htmlSelected = computed(() => isHtmlEffect(chosen.value));
 const importing = ref(false);
 // A saved desktop selection does not autoplay when this page opens.
@@ -60,7 +60,7 @@ watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.val
   if (timer) { clearTimeout(timer); timer = null; }
   const params = paramsOf(choice.value, chosen.value.id);
   density.value = params.density; speed.value = params.speed; size.value = params.size;
-  aquarium.value = normalizeAquarium(params.aquarium);
+  aquarium.value = normalizeAquarium(params.aquarium, aquariumSelected.value ?? undefined);
 }, { immediate: true });
 
 async function apply(next: EffectsChoice) {
@@ -102,7 +102,7 @@ function resetLights() {
 function restoreDefaults() {
   if (!chosen.value) return;
   density.value = defaultParams.density; speed.value = defaultParams.speed; size.value = defaultParams.size;
-  aquarium.value = normalizeAquarium(undefined);
+  aquarium.value = normalizeAquarium(undefined, aquariumSelected.value ?? undefined);
   commit();
 }
 /** 基于它创作: opens AI creation with this effect as the starting point. */
@@ -192,12 +192,12 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
         </select>
       </label>
       <section v-if="chosen && !htmlSelected" class="fx-tuning" data-testid="effect-tuning">
-        <label v-if="aquariumSelected" class="kv"><span>鱼类组合</span>
+        <label v-if="aquariumSelected === 'arowana'" class="kv"><span>鱼类组合</span>
           <select class="fx-display" :value="aquarium.mode" data-testid="aquarium-mode" @change="changeAquariumMode(($event.target as HTMLSelectElement).value as AquariumMode)">
             <option v-for="mode in aquariumModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
           </select>
         </label>
-        <div v-else class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
+        <div v-if="!aquariumSelected" class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
         <div v-if="aquariumSelected" class="kv row">
           <span class="grow">砂石水草</span>
           <NSwitch :value="aquarium.aquascape" aria-label="砂石水草" data-testid="aquarium-aquascape" @update:value="changeAquascape" />
@@ -216,7 +216,7 @@ onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); co
       <div class="kv row"><div class="grow"><span>伙伴跟着做表情</span><small>只换表情，不弹窗、不出声</small></div><NSwitch :value="store.settings.companionLinks" data-testid="effect-companion-links" @update:value="setLinks" /></div>
       <button v-if="lockScreen.picture.mode === 'lockScreen' && canRenderEffectPicture" type="button" class="xb-btn" :disabled="lockScreen.picture.busy" data-testid="effect-lock-screen-picture" @click="prepareLockScreen">将当前效果设为锁屏图片</button>
       <LockScreenPicture :frame="lockScreen.picture.frame" :busy="lockScreen.picture.busy" :manual="!!lockScreen.picture.manualId" @apply="lockScreen.apply" @save="lockScreen.save" @close="lockScreen.close" />
-      <div v-if="!htmlSelected" class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!isArowana(chosen)" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
+      <div v-if="!htmlSelected" class="fx-buttons"><button type="button" class="xb-btn" :disabled="!chosen" data-testid="effect-reset" @click="restoreDefaults">恢复默认</button><button v-if="!aquariumSelected" type="button" class="xb-btn" :disabled="!store.desktop" data-testid="effect-derive" @click="createFrom">基于它创作</button></div>
     </aside>
   </section>
 </template>

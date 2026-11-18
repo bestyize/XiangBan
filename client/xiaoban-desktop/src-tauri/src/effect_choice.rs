@@ -33,15 +33,15 @@ impl EffectParams {
             density: Self::number(value, "density", 1.0, 0.2, 2.5),
             speed: Self::number(value, "speed", 1.0, 0.25, 3.0),
             size: Self::number(value, "size", 1.0, 0.5, 2.0),
-            aquarium: (id == "arowana" && value["aquarium"].is_object())
-                .then(|| AquariumSettings::from_value(&value["aquarium"])),
+            aquarium: (matches!(id, "arowana" | "koi") && value["aquarium"].is_object())
+                .then(|| AquariumSettings::from_value(id, &value["aquarium"])),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-enum AquariumMode { Arowana, Guppy, School, Mixed }
+enum AquariumMode { Arowana, Guppy, School, Mixed, Koi }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct AquariumSettings {
@@ -62,11 +62,12 @@ struct AquariumLighting {
 }
 
 impl AquariumSettings {
-    fn from_value(value: &Value) -> Self {
-        let mode = match value["mode"].as_str() {
-            Some("guppy") => AquariumMode::Guppy,
-            Some("school") => AquariumMode::School,
-            Some("mixed") => AquariumMode::Mixed,
+    fn from_value(id: &str, value: &Value) -> Self {
+        let mode = match (id, value["mode"].as_str()) {
+            ("koi", _) => AquariumMode::Koi,
+            (_, Some("guppy")) => AquariumMode::Guppy,
+            (_, Some("school")) => AquariumMode::School,
+            (_, Some("mixed")) => AquariumMode::Mixed,
             _ => AquariumMode::Arowana,
         };
         let light = &value["lighting"];
@@ -183,12 +184,16 @@ mod tests {
         assert_eq!(choice.params_of("unknown"), EffectParams::default());
     }
     #[test]
-    fn aquarium_controls_survive_a_save_and_only_belong_to_arowana() {
+    fn aquarium_controls_survive_a_save_for_both_official_fish_effects() {
         let choice = EffectsChoice::from_value(&json!({"selected":"arowana", "params": {
             "arowana": {"speed": 0.5, "aquarium": {"mode":"mixed", "aquascape":true, "lighting":{"main":345,"warmth":-55,"azimuth":12,"fill":-1}}},
+            "koi": {"size": 1.5, "aquarium": {"mode":"mixed", "aquascape":true, "lighting":{"warmth":35}}},
             "rain": {"aquarium": {"mode":"school"}}
         }}));
         let json = serde_json::to_value(&choice).unwrap();
+        assert_eq!(json["params"]["koi"]["aquarium"]["mode"], "koi");
+        assert_eq!(json["params"]["koi"]["aquarium"]["aquascape"], true);
+        assert_eq!(json["params"]["koi"]["aquarium"]["lighting"]["warmth"], 35.0);
         assert_eq!(json["params"]["arowana"]["aquarium"], json!({"mode":"mixed", "aquascape":true, "lighting": {
             "main":300.0, "warmth":-55.0, "azimuth":12.0, "elevation":49.0, "fill":0.0, "rim":100.0, "environment":100.0
         }}));

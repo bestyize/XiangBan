@@ -1,7 +1,7 @@
 import { desktop, invoke } from "./bridge.ts";
 import { EffectsLayer } from "./effects/layer.ts";
 import { normalizeParams, parsePack } from "./effects/parse.ts";
-import { isArowana, type EffectPack } from "./effects/types.ts";
+import { aquariumId, type EffectPack } from "./effects/types.ts";
 
 interface Payload {
   /** The pack's data, exactly as read from its file; it is checked here before it is drawn. */
@@ -46,16 +46,16 @@ export async function mountEffects() {
     report.error = error;
     if (desktop) void invoke("scene_ready", { report: { kind: "effects", error } }).catch(() => {});
   };
-  const layer = new EffectsLayer(host, initial, normalizeParams(state.params, isArowana(initial)), config, undefined, reportError);
+  const layer = new EffectsLayer(host, initial, normalizeParams(state.params, aquariumId(initial)), config, undefined, reportError);
   window.addEventListener("effects-config", (event) => {
     state = { ...state, ...(event as CustomEvent<Partial<Payload>>).detail };
     const next = resolve();
-    layer.update(next, normalizeParams(state.params, isArowana(next)), { paused: state.paused, fps: state.fps });
+    layer.update(next, normalizeParams(state.params, aquariumId(next)), { paused: state.paused, fps: state.fps });
   }, { signal: lifecycle.signal });
   const dispose = () => { lifecycle.abort(); layer.destroy(); };
   window.addEventListener("pagehide", dispose, { once: true });
   window.addEventListener("beforeunload", dispose, { once: true });
-  if (isArowana(initial)) await layer.whenReady();
+  if (aquariumId(initial)) await layer.whenReady();
   if (lifecycle.signal.aborted || report.error) return;
   if (state.test && desktop) {
     // In the isolated test profile, prove this page cannot reach commands that change the desktop.

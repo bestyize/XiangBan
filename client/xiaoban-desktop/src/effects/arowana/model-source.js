@@ -23,6 +23,12 @@ async function checkedModelBytes(response, model) {
 }
 
 export async function loadModelBytes(species) {
+  // The koi is small enough to ship with the client and works on the first offline launch.
+  if (species === 'koi') {
+    const response = await fetch('/effects/koi/kohaku-koi.glb');
+    if (!response.ok) throw new Error('锦鲤模型加载失败');
+    return response.arrayBuffer();
+  }
   const model = models[species];
   if (!model) throw new Error('未知的鱼模型');
   if (import.meta.env?.DEV) {

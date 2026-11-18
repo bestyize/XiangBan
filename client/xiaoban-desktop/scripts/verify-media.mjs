@@ -40,7 +40,7 @@ try{
    assert.ok(state.report.effects.particles.length>0&&state.report.effects.particles.every(n=>n>0),`effects.cases[${index}] every layer has particles`)
    assert.equal(state.report.privilegedIpcBlocked,true,`effects.cases[${index}] overlay must not reach desktop commands`)
   }
-  assert.deepEqual(effects.cases.map(item=>item.effect),['rain','snow','fireflies','petals','maple','meteors','stars','butterfly-dream','lanterns','fireworks','aurora','galaxy','arowana'])
+  assert.deepEqual(effects.cases.map(item=>item.effect),['rain','snow','fireflies','petals','maple','meteors','stars','butterfly-dream','lanterns','fireworks','aurora','galaxy','arowana','koi'])
   assert.equal(effects.independent?.length,4,'effects.independent')
   assert.ok(effects.independent.every(item=>item.overlayPresent===true),'The overlay must survive every wallpaper, including the plain system desktop')
   assert.equal(effects.turnedOff,true,'effects.turnedOff')

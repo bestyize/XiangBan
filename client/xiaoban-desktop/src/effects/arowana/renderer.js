@@ -11,6 +11,7 @@ import { createGuppySchool } from './guppy/school.js';
 import { soloGuppyRoute } from './guppy/solo-route.js';
 import { createSwimmer as createGuppySwimmer } from './guppy/swim.js';
 import { loadModelBytes } from './model-source.js';
+import { createKoiSwimmer } from '../koi/swim.js';
 
 const bytesBySpecies = new Map();
 function modelBytes(species) {
@@ -37,7 +38,7 @@ function disposeModels(roots) {
   for (const texture of textures) texture.dispose();
 }
 
-export function createArowanaRenderer(canvas) {
+export function createAquariumRenderer(canvas, id) {
   const loader = new GLTFLoader();
   // Embedded GLB textures use blob URLs; route them through the image policy.
   loader.register(parser => {
@@ -49,6 +50,7 @@ export function createArowanaRenderer(canvas) {
   const prepared = new Map();
   const scene = new Scene();
   const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
+  const koi = id === 'koi';
   let destroyed = false;
   let request;
   let mode = null;
@@ -82,8 +84,15 @@ export function createArowanaRenderer(canvas) {
   }
 
   function prepare(kind) {
-    if (!prepared.has(kind)) prepared.set(kind, rig(kind === 'arowana' ? 'arowana' : 'guppy').then(model => {
+    if (!prepared.has(kind)) prepared.set(kind, rig(kind === 'school' ? 'guppy' : kind).then(model => {
       if (destroyed) throw new DOMException('Renderer closed', 'AbortError');
+      if (kind === 'koi') {
+        model.scale.setScalar(.66);
+        const swimmer = createKoiSwimmer(model);
+        model.visible = false;
+        scene.add(model);
+        return swimmer;
+      }
       const createGuppy = (route, { scale = 1, ...motion } = {}) => {
         // Each fish owns its bones and deforming tail, while textures are shared.
         const object = clone(model);
@@ -116,11 +125,13 @@ export function createArowanaRenderer(canvas) {
     renderer.toneMappingExposure = 0.99;
     renderer.setClearAlpha(0);
     scene.environment = createTankEnvironment(renderer);
-    const key = new DirectionalLight(0xf5f9ff, 1.87);
+    const mainLevel = koi ? 1.6 : 1.87, fillLevel = koi ? .20 : .64;
+    const rimLevel = koi ? .65 : 1.18, environmentLevel = koi ? .48 : .85;
+    const key = new DirectionalLight(koi ? 0xfff1db : 0xf5f9ff, mainLevel);
     key.position.set(-2.2, 4.8, 3.6);
-    const rim = new DirectionalLight(0xd5e6ff, 1.18);
+    const rim = new DirectionalLight(koi ? 0xf3ecdf : 0xd5e6ff, rimLevel);
     rim.position.set(2.1, 3.5, -4.3);
-    const fill = new DirectionalLight(0xe9f6ff, 0.64);
+    const fill = new DirectionalLight(koi ? 0xe5e5dc : 0xe9f6ff, fillLevel);
     fill.position.set(2, -0.85, 4.7);
     scene.add(key, rim, fill);
     const aim = new Spherical().setFromVector3(key.position);
@@ -136,7 +147,7 @@ export function createArowanaRenderer(canvas) {
       const distance = baseDistance * (1 / size + 0.2) / 1.2;
       const y = mode === 'mixed' ? -0.31 : mode === 'arowana' ? 0.18 : 0.05;
       camera.fov = MathUtils.radToDeg(2 * Math.atan(fitHeight / (2 * baseDistance)));
-      camera.position.set(0, y, distance);
+      camera.position.set(0, y + (koi ? distance * .16 : 0), distance);
       camera.lookAt(0, y, 0);
       camera.updateProjectionMatrix();
     }
@@ -172,10 +183,10 @@ export function createArowanaRenderer(canvas) {
         layoutSchool();
       },
       setLighting(light) {
-        key.intensity = 1.87 * light.main / 100;
-        fill.intensity = 0.64 * light.fill / 100;
-        rim.intensity = 1.18 * light.rim / 100;
-        scene.environmentIntensity = 0.85 * light.environment / 100;
+        key.intensity = mainLevel * light.main / 100;
+        fill.intensity = fillLevel * light.fill / 100;
+        rim.intensity = rimLevel * light.rim / 100;
+        scene.environmentIntensity = environmentLevel * light.environment / 100;
         key.position.setFromSphericalCoords(aim.radius,
           aim.phi - MathUtils.degToRad(light.elevation - 49),
           aim.theta + MathUtils.degToRad(light.azimuth + 31));

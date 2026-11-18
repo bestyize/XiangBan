@@ -177,6 +177,25 @@ describe('desktop effects page', () => {
     expect(sent.at(-1)?.params.arowana.aquarium).toMatchObject({ aquascape: false });
     wrapper.unmount();
   });
+  it('keeps the koi and arowana as separate effects with independent settings', async () => {
+    const start = { selected: 'arowana', params: { arowana: { density: 1, speed: 0.5, size: 1 } } };
+    const { wrapper, sent } = setup(start, [pack('arowana', '龙鱼巡游'), pack('koi', '锦鲤巡游')]);
+    const choose = (id: string) => wrapper.get(`[data-testid="effect-${id}"]`).trigger('click');
+    await wrapper.get<HTMLSelectElement>('[data-testid="aquarium-mode"]').setValue('mixed');
+    await choose('koi');
+    expect(wrapper.find('[data-testid="aquarium-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="effect-density-value"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="effect-speed-value"]').text()).toBe('×1');
+    await wrapper.get('[data-testid="aquarium-aquascape"]').trigger('click');
+    expect(sent.at(-1)?.params.koi.aquarium).toMatchObject({ mode: 'koi', aquascape: true });
+    await choose('arowana');
+    expect(wrapper.get<HTMLSelectElement>('[data-testid="aquarium-mode"]').element.value).toBe('mixed');
+    expect(wrapper.get('[data-testid="effect-speed-value"]').text()).toBe('×0.5');
+    expect(wrapper.get('[data-testid="aquarium-aquascape"]').attributes('aria-checked')).toBe('false');
+    await choose('koi');
+    expect(wrapper.get('[data-testid="aquarium-aquascape"]').attributes('aria-checked')).toBe('true');
+    wrapper.unmount();
+  });
   it('says so when the chosen effect has gone, and lists the files that could not be used', () => {
     const gone = setup({ selected: 'removed', params: {} }, [pack('rain', '下雨')], ['broken.json：JSON 格式错误']);
     expect(gone.wrapper.get('[data-testid="effect-missing"]').text()).toContain('removed');

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "koi",
+  "name": "锦鲤巡游",
+  "description": "一尾红白锦鲤轻摆鱼鳍，在桌面上自在巡游。",
+  "sky": ["#152d33", "#315652"],
+  "source": "builtin"
+}

@@ -1,9 +1,9 @@
 import "./layer.css";
-import type { ArowanaRenderer } from "./arowana/renderer.js";
-import { defaultAquarium, type AquariumMode } from './arowana/settings.ts';
+import type { AquariumRenderer } from "./arowana/renderer.js";
+import { normalizeAquarium, type AquariumMode } from './arowana/settings.ts';
 import { drawEffects } from "./draw.ts";
 import { ParticleSystem } from "./sim.ts";
-import { defaultParams, isArowana, isHtmlEffect, type EffectPack, type EffectParams } from "./types.ts";
+import { aquariumId, defaultParams, isHtmlEffect, type AquariumId, type EffectPack, type EffectParams } from "./types.ts";
 
 export interface LayerConfig { paused: boolean; fps: 30 | 60 }
 
@@ -17,7 +17,7 @@ export class EffectsLayer {
   private context: CanvasRenderingContext2D | null = null;
   private observer: ResizeObserver | null = null;
   private system: ParticleSystem | null = null;
-  private arowana: ArowanaRenderer | null = null;
+  private aquarium: AquariumRenderer | null = null;
   private requestedMode: AquariumMode | null = null;
   private loading: AbortController | null = null;
   private time = 0;
@@ -34,7 +34,7 @@ export class EffectsLayer {
   }
   update(pack: EffectPack | null, params: EffectParams, config: LayerConfig = this.config) {
     if (this.destroyed) return;
-    if (isArowana(this.pack) !== isArowana(pack) || isHtmlEffect(this.pack) !== isHtmlEffect(pack)) this.release();
+    if (aquariumId(this.pack) !== aquariumId(pack) || isHtmlEffect(this.pack) !== isHtmlEffect(pack)) this.release();
     this.pack = pack; this.params = params; this.config = config;
     this.reconcile();
   }
@@ -48,7 +48,7 @@ export class EffectsLayer {
       paused: this.config.paused,
       fps: this.config.fps,
       params: this.params,
-      particles: this.arowana?.fishCount ? [this.arowana.fishCount] : this.system?.counts() ?? [],
+      particles: this.aquarium?.fishCount ? [this.aquarium.fishCount] : this.system?.counts() ?? [],
     };
   }
   async whenReady(): Promise<void> {
@@ -63,7 +63,7 @@ export class EffectsLayer {
       this.reconcileHtml(this.pack);
       return;
     }
-    const fish = isArowana(this.pack);
+    const fish = aquariumId(this.pack);
     if (!this.canvas) {
       const canvas = document.createElement("canvas");
       canvas.className = "effects-canvas";
@@ -80,7 +80,7 @@ export class EffectsLayer {
         this.host.classList.add("effects-loading");
         this.loading = new AbortController();
         canvas.addEventListener("webglcontextlost", this.onContextLost, { signal: this.loading.signal });
-        this.pending = this.loadArowana(canvas, this.loading.signal);
+        this.pending = this.loadAquarium(canvas, fish, this.loading.signal);
       }
       if (typeof ResizeObserver !== "undefined") {
         this.observer = new ResizeObserver(this.resize);
@@ -91,10 +91,10 @@ export class EffectsLayer {
       document.addEventListener("visibilitychange", this.onVisibility);
     }
     if (!fish && this.system?.pack !== this.pack) this.system = new ParticleSystem(this.pack, this.random);
-    if (this.arowana) this.syncAquarium();
+    if (fish && this.aquarium) this.syncAquarium(this.aquarium, fish);
     this.resize();
     this.stop();
-    if ((this.arowana?.mode || this.system) && !this.config.paused && !document.hidden) this.frame = requestAnimationFrame(this.tick);
+    if ((this.aquarium?.mode || this.system) && !this.config.paused && !document.hidden) this.frame = requestAnimationFrame(this.tick);
   }
   private reconcileHtml(pack: EffectPack) {
     this.host.classList.add("effects-host");
@@ -120,19 +120,18 @@ export class EffectsLayer {
     this.host.append(frame);
     this.htmlFrame = frame;
   }
-  private async loadArowana(canvas: HTMLCanvasElement, signal: AbortSignal) {
+  private async loadAquarium(canvas: HTMLCanvasElement, id: AquariumId, signal: AbortSignal) {
     try {
-      const { createArowanaRenderer } = await import("./arowana/renderer.js");
+      const { createAquariumRenderer } = await import("./arowana/renderer.js");
       if (signal.aborted) return;
-      this.arowana = createArowanaRenderer(canvas);
+      this.aquarium = createAquariumRenderer(canvas, id);
       this.reconcile();
     } catch (error) {
-      if (!signal.aborted) this.failArowana(error);
+      if (!signal.aborted) this.failAquarium(error);
     }
   }
-  private syncAquarium() {
-    const renderer = this.arowana!;
-    const settings = this.params.aquarium ?? defaultAquarium;
+  private syncAquarium(renderer: AquariumRenderer, id: AquariumId) {
+    const settings = normalizeAquarium(this.params.aquarium, id);
     renderer.setLighting(settings.lighting);
     renderer.setAquascape(settings.aquascape);
     this.host.classList.toggle("effects-aquascape", settings.aquascape);
@@ -140,26 +139,26 @@ export class EffectsLayer {
     this.requestedMode = settings.mode;
     // Keep drawing the previous set until the newly requested one is ready.
     const pending = renderer.setMode(settings.mode).then(() => {
-      if (this.pending !== pending || this.arowana !== renderer || !this.canvas) return;
+      if (this.pending !== pending || this.aquarium !== renderer || !this.canvas) return;
       this.canvas.hidden = false;
       this.host.classList.remove("effects-loading");
       this.reconcile();
     }).catch(error => {
-      if (this.pending === pending && this.arowana === renderer) this.failArowana(error);
+      if (this.pending === pending && this.aquarium === renderer) this.failAquarium(error);
     });
     this.pending = pending;
   }
-  private failArowana(error: unknown) {
+  private failAquarium(error: unknown) {
     this.release();
-    this.onError?.(`龙鱼巡游无法显示：${error instanceof Error ? error.message : String(error)}`);
+    this.onError?.(`${this.pack?.name ?? '鱼类特效'}无法显示：${error instanceof Error ? error.message : String(error)}`);
   }
-  private onContextLost = () => this.failArowana("图形连接已中断，请重新选择特效。");
+  private onContextLost = () => this.failAquarium("图形连接已中断，请重新选择特效。");
   private resize = () => {
     if (!this.canvas) return;
     const rect = this.host.getBoundingClientRect();
     this.width = Math.max(1, rect.width); this.height = Math.max(1, rect.height);
     const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-    if (this.arowana) this.arowana.resize(this.width, this.height, dpr, this.params.size);
+    if (this.aquarium) this.aquarium.resize(this.width, this.height, dpr, this.params.size);
     else if (this.context && this.system) {
       this.canvas.width = Math.round(this.width * dpr); this.canvas.height = Math.round(this.height * dpr);
       this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -169,18 +168,18 @@ export class EffectsLayer {
   };
   private tick = (now: number) => {
     this.frame = 0;
-    if ((!this.system && !this.arowana?.mode) || this.config.paused || document.hidden || this.destroyed) return;
+    if ((!this.system && !this.aquarium?.mode) || this.config.paused || document.hidden || this.destroyed) return;
     const elapsed = this.last === null ? 1 / this.config.fps : (now - this.last) / 1000;
     if (this.last === null || elapsed >= 1 / this.config.fps - 0.001) {
       this.system?.advance(elapsed);
-      if (this.arowana) this.time += Math.min(elapsed, 0.1) * this.params.speed;
+      if (this.aquarium) this.time += Math.min(elapsed, 0.1) * this.params.speed;
       this.draw();
       this.last = now;
     }
     if (this.canvas) this.frame = requestAnimationFrame(this.tick);
   };
   private draw() {
-    if (this.arowana?.mode) this.arowana.render(this.time);
+    if (this.aquarium?.mode) this.aquarium.render(this.time);
     else if (this.context && this.system) drawEffects(this.context, this.system);
   }
   private stop() {
@@ -193,7 +192,7 @@ export class EffectsLayer {
     this.stop();
     this.loading?.abort(); this.loading = null;
     this.pending = Promise.resolve();
-    this.arowana?.destroy(); this.arowana = null; this.requestedMode = null; this.time = 0;
+    this.aquarium?.destroy(); this.aquarium = null; this.requestedMode = null; this.time = 0;
     this.observer?.disconnect(); this.observer = null;
     window.removeEventListener("resize", this.resize);
     window.removeEventListener("pagehide", this.onPageHide);
