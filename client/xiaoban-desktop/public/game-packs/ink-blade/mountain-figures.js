@@ -17,6 +17,7 @@
     monk: ['#2e3130', '#57584b', '#888270', '#b5ab8f', '#e0cfac'],
     disciple: ['#24292a', '#45504e', '#748278', '#a5ae97', '#ded5ba'],
     rope: ['#272d30', '#46565c', '#6b8185', '#a5aaa0', '#e4d8b7'],
+    quarrier: ['#282720', '#594b3e', '#8d7b61', '#bfad85', '#decfa8'],
     crossbow: ['#272b30', '#454c56', '#6a7982', '#a3aa9e', '#dcdac3'],
     axeman: ['#292928', '#514642', '#7b6959', '#ad9d7a', '#ded0b1'],
     yanhui: ['#222829', '#3b4c4c', '#647c76', '#aab39b', '#e8d7b7'],
@@ -60,6 +61,10 @@
       t.reach = 1.22; t.l1 = .91; t.l2 = -.62; t.b1 = .74; t.b2 = .1
       t.flutter = .96; anim.snap = true
     }
+    if (e.state === 'pineCross') {
+      t.lean = .84; t.sw = -2.58; t.crouch = 8; t.flutter = 1; t.l1 = .92; t.l2 = -.8
+    }
+    if (e.type === 'quarrier' && e.state === 'recover') { t.sw = -1.75; t.ou = -1.4; t.of = -.9 }
     if (e.state === 'bowTell') {
       t.sw = -.1; t.crouch = 2 + q * 2; t.lean = -.08; t.reach = 1.19
       t.draw = q; t.l1 = .38; t.l2 = -.42; t.b1 = .42
@@ -80,6 +85,13 @@
       t.lean = e.sweep ? .54 : .32; t.crouch = e.sweep ? 6.4 : 3.4
       t.sw = e.move === 'lift' ? -.76 : e.sweep ? .60 : .47
       t.ou = .22; t.of = .61; t.l1 = .54; t.l2 = -.42
+    }
+    if (e.type === 'yue' && e.state === 'recover' && e.move === 'groundedBlade') {
+      const release = Math.max(0, 1 - e.t / .38)
+      t.lean = .73 - release * .40; t.crouch = 10 - release * 6
+      t.sw = .89 - release * .5; t.reach = 1.1
+      t.l1 = .97; t.l2 = -.74; t.b1 = 1.38; t.b2 = .40
+      t.head = .21; t.flutter = .3
     }
     if (['hurt', 'stagger', 'broken', 'dying'].includes(e.state)) {
       const kneel = e.state === 'broken' || e.state === 'dying'
@@ -149,6 +161,7 @@
       }
     }
     function weaponAngle(len, clearance) {
+      if (kind === 'yue' && e.state === 'recover' && e.move === 'groundedBlade') clearance = 0
       if (p.sw <= 0) return p.sw
       return Math.min(p.sw, Math.asin(Math.max(-.95, Math.min(.95, (-s.hand[1] - clearance) / len))))
     }
@@ -228,6 +241,12 @@
       }
       g.fillStyle=C(3);g.beginPath();g.arc(ux+1,uy-1,2.3,0,TAU);g.fill()
       arm(s.shoulder,s.elbow,s.hand,3.2);blade(33)
+    }else if(kind==='quarrier'){
+      face()
+      fill([[sx-10,sy-6],[sx-3,sy+1],[bx-7,by+5],[bx-18,by+1],[sx-20,sy-4]],1)
+      for(let i=0;i<4;i++)line([[sx-19,sy-3+i*3],[sx-8,sy+i*3]],3,1)
+      fill([[hx-12,hy-3],[hx-5,hy-11],[hx+2,hy-13],[hx+13,hy-3]],2)
+      arm(s.shoulder,s.elbow,s.hand,4); pole('hammer')
     }else if(kind==='crossbow'){
       face();fill([[hx-10,hy-3],[hx-7,hy-10],[hx+6,hy-9],[hx+12,hy-2]],1)
       fill([[sx-7,sy],[sx+7,sy],[bx+10,by],[bx-10,by]],2)

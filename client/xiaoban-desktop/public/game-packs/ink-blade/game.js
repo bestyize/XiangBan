@@ -375,11 +375,13 @@
     tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
     mirror: ['镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回', '镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回'],
     borrow: ['迎着伞尖朱光出剑。「闪」亮时点按绕背，再斩处决。', '迎着伞尖朱光按 J。弹反后松方向键，按 L 借势绕背，再按 J。'],
+    highwalk: ['迎伞借势踏上挑栈，再跃下出剑。', '弹开伞刺按冲刺上栈，下落时按 J 出剑。'],
     rope: ['索客沿朱线落斩。刀到身前时出剑，弩箭也能斩回。', '索客沿朱线落斩。刀到身前时按 J，弩箭也能斩回。'],
-    mountwind: ['风幡扬起时可以迎风弹反。看见贴地朱线就跳，落地再斩。', '风幡扬起时可以迎风弹反。看见贴地朱线就跳，落地再斩。'],
+    quarry: ['碎石先落。引伞客入石影，落石压住铁伞时可借势。', '引伞客入石影；落石压伞后，朝他冲刺绕背。'],
+    mountwind: ['柱后背风，柱间箭偏。遇杖扫就跳，落地再斩。', '柱后背风，柱间箭偏。遇杖扫就跳，落地再斩。'],
     heavyguard: ['看斧刃起手：高处见朱光可弹，贴地横扫要跳。', '看斧刃起手：高处见朱光可弹，贴地横扫要跳。'],
-    mountbell: ['跳起斩钟。石震在钟下时，钟声能震松架势。', '跳起按 J 斩钟。石震在钟下时，钟声能震松架势。'],
-    mountduel: ['弹反重剑后借势背击。架势满后，再出一剑决胜。', '弹反重剑后借势背击。架势满后，再出一剑决胜。'],
+    mountbell: ['引石震到钟下，等他抬臂再跳斩击钟。', '石震抬臂时跳起按 J 击钟，震断起手。'],
+    mountduel: ['借重劈绕背。换架后引他踏进石影，落石也能破势。', '借重劈绕背。换架后引他踏进石影，落石也能破势。'],
     elite: ['精英有独立架势条：多次弹反破势，出现「斩」再处决', '精英有独立架势条：多次弹反破势，出现「斩」再处决'],
     watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
     writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
@@ -773,6 +775,7 @@
     umbrella:{a0:-1.2,a1:.7,r:39,width:9,color:'#30372d'},
     monk:{a0:-.4,a1:.4,r:72,width:8,color:'#30372d'},
     disciple:{a0:-2,a1:.7,r:35,width:9,color:'#30372d'},
+    quarrier:{a0:-1.6,a1:.72,r:41,width:11,color:'#494237'},
     rope:{a0:-2,a1:.8,r:37,width:8,color:'#30372d'},
     axeman:{a0:-2.5,a1:1.1,r:65,width:17,color:'#273025'},
     yanhui:{a0:-2.3,a1:.8,r:49,width:12,color:'#273025'},
@@ -1072,6 +1075,34 @@
           audio.play('mountBell')
           FX.shake(fx, e.effective ? 3.8 : 2)
           if (e.effective) FX.seal(fx, '震', e.x, e.y + 26, 20, .8)
+          break
+        case 'boltReturn':
+          FX.seal(fx, '还', e.x, e.y - 9, 15, .55)
+          break
+        case 'stoneCounter':
+          FX.trail(fx, { x: e.x, y: e.y - 2, facing: 1, a0: -3.05, a1: -.12, r: 37,
+            width: 5, hairs: 7, grow: .07, life: .32, color: '#554740' })
+          FX.seal(fx, '震', e.x, e.y - 70, 16, .6)
+          break
+        case 'bellInterrupt':
+          FX.seal(fx, '断', e.x, e.y - 27, 17, .65)
+          break
+        case 'swordStone':
+          FX.puff(fx, e.x, e.y - 2, 9, { speed: 90, size: 3, alpha: .32 })
+          FX.sparks(fx, e.x, e.y - 2, 7, '#d5c19d', { len: 9, speed: 135 })
+          audio.play('slam')
+          break
+        case 'plungeHit':
+          FX.trail(fx, { x: e.x - e.facing * 22, y: e.y - 22, facing: e.facing,
+            a0: -.95, a1: .91, r: 34, width: 6, hairs: 6, grow: .05, life: .24, color: '#343934' })
+          audio.play('heavy')
+          break
+        case 'rockImpact':
+          FX.puff(fx, e.x, e.y - 2, 12, { speed: 130, size: 5, alpha: .37 })
+          audio.play('slam')
+          break
+        case 'boltShaken':
+          FX.drops(fx, e.x, e.y, 5, { speed: 56, size: 1.5 })
           break
         case 'summitImpact':
           FX.puff(fx, e.x + e.facing * 58, e.y - 3, e.move === 'slam' ? 14 : 7, { speed: 115, size: 5, alpha: .26 })
@@ -2046,7 +2077,7 @@
       const landing = rules.borrowLanding(state)
       if (landing) {
         ctx.strokeStyle = '#dfc694'; ctx.lineWidth = 1.7
-        ctx.beginPath(); ctx.ellipse(landing.x, state.player.y - 1, 12, 3.6, 0, 0, Math.PI * 2); ctx.stroke()
+        ctx.beginPath(); ctx.ellipse(landing.x, landing.y - 1, 12, 3.6, 0, 0, Math.PI * 2); ctx.stroke()
       }
     }
     const simDt = phase === 'playing' && !state.strike && state.hitstop <= 0 ? fxDt : 0

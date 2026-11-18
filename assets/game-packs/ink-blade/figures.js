@@ -34,6 +34,7 @@
     monk:{thigh:16,shin:15,torso:24,upper:13,fore:12,head:5.8,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
     disciple:{thigh:13,shin:13,torso:19,upper:11,fore:10,head:5.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
     rope:{thigh:14,shin:13,torso:20,upper:11,fore:11,head:5.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
+    quarrier:{thigh:14,shin:14,torso:23,upper:12,fore:11,head:5.4,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
     crossbow:{thigh:14,shin:14,torso:21,upper:12,fore:11,head:5.4,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},
     axeman:{thigh:16,shin:15,torso:26,upper:14,fore:13,head:6.2,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true,grip:{span:13}},
     yanhui:{thigh:16,shin:16,torso:24,upper:13,fore:12,head:5.8,limbs:[6,5,5,4],blade:0,color:'#292e28',robe:'robe',summit:true},

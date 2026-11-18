@@ -225,6 +225,23 @@
         g.beginPath(); g.ellipse(px, py, .4 + rand() * 2.2, .4 + rand(), -.56 + rand(), 0, TAU); g.fill()
       }
     }
+    // Axe-cut shadow faces: pool ink along a broken ridge, drag it down the
+    // shale, then lift the brush to expose narrow veins of paper.
+    if (rooted) {
+      for (let k = 0; k < 7; k++) {
+        const px = left + (.12 + .77 * rand()) * w, py = y + rand() * h * .35
+        const width = (.045 + rand() * .12) * w, drop = (.29 + rand() * .42) * h
+        const face = [[px, py], [px + width, py - 13], [px + width * .74, py + drop * .31],
+          [px + width * .33, py + drop * .53], [px - width * .16, py + drop]]
+        wash(g, face, gradient(g, px, py, px - 7, py + drop,
+          [[0, A.rgba(INK,.30)], [.52,A.rgba(dark,.17)], [1,A.rgba(dark,0)]]))
+        for (let j = 0; j < 7; j++) {
+          const xx = px + rand() * width, yy = py + rand() * drop * .44
+          dryLine(g, [[xx, yy], [xx - 2, yy + 8], [xx - width * .24, yy + 12 + rand() * drop * .21]],
+            1.2 + rand() * 2.5, j % 4 ? INK : PAPER, j % 4 ? .39 : .64, seed + k * 31 + j, 4)
+        }
+      }
+    }
     g.restore()
 
     // Alternate soft wet edges with broken brush crests and ink dots near the ridge.
@@ -879,6 +896,18 @@
   }
 
   function bellTower(g, x, paint) {
+    // The two side aisles funnel the eye toward the bronze bell in the open bay.
+    for (const side of [-1, 1]) {
+      g.save(); g.translate(x, 0); g.scale(side, 1)
+      const edge = [[143, 55], [208, 54], [298, 42], [372, 22], [442, -5]]
+      wash(g, [[140, -65], [444, -65], ...edge.slice().reverse()], '#303b3a')
+      dryLine(g, edge, 7, [194, 183, 154], .85, 3061)
+      for (let i = 0; i < 26; i++) {
+        const t = i / 26, xx = 150 + 280 * t, yy = 54 - 58 * t * t
+        inkLine(g, [[xx + 9, yy - 27], [xx + 5, yy - 11], [xx, yy]], 3.7, [132, 141, 129], 3100 + i, .71)
+      }
+      g.restore()
+    }
     for (const d of [-173, -113, 113, 173]) {
       const y = Math.abs(d) === 173 ? 107 : 50
       timber(g, x + d - 8, y, 16, G - y, true)
@@ -921,6 +950,76 @@
     inkLine(g, [[x - 13, G - 32], [x + 14, G - 32]], 3.3, [154, 66, 54], 810)
   }
 
+  function chapterScenery(g, i, paint) {
+    const rand = A.rng(2080 + i)
+    if (i === 0) {
+      // The split stele is partly buried in the scree, with seal ink surviving in its cuts.
+      g.save(); g.translate(1265, G); g.rotate(.085)
+      const slab = [[-35,2],[-30,-87],[-22,-118],[5,-127],[29,-109],[35,-23],[43,3]]
+      wash(g, slab, '#716e5c'); dryLine(g, slab.slice(0,5), 4, INK, .87, 1781, 7)
+      for (let j=0;j<45;j++) {
+        const x=-23+rand()*49, y=-101+rand()*94
+        dryLine(g,[[x,y],[x-3,y+4],[x-6,y+11]],2.4,j%3?INK:PAPER,.37,173+j,4)
+      }
+      g.fillStyle='#383d35'; g.textAlign='center'; g.font='600 21px '+FONT
+      g.fillText('問',0,-76); g.fillText('山',0,-48)
+      inkLine(g,[[-13,-27],[11,-29]],3.5,[129,56,43],199)
+      g.restore()
+    } else if (i === 1) {
+      // A timber winding drum above the chasm; its basket hangs below the walk.
+      g.save();g.translate(1810,G)
+      beam(g,[[-32,0],[-18,-111],[32,-116]],7,1310)
+      beam(g,[[-27,-65],[10,-113]],5,1311)
+      g.strokeStyle='#4d4437';g.lineWidth=4;g.beginPath();g.arc(20,-110,13,0,TAU);g.stroke()
+      for(let j=0;j<6;j++){const q=j*Math.PI/3;stroke(g,[[20,-110],[20+12*Math.cos(q),-110+12*Math.sin(q)]],'#574c3c',1.8)}
+      stroke(g,[[31,-111],[34,32]],'#544a3c',1.4)
+      wash(g,[[18,33],[51,31],[47,48],[24,50]],'#75644e')
+      for(let j=0;j<5;j++)stroke(g,[[21+j*6,33],[25+j*5,48]],'#ae9a77',1)
+      g.restore()
+    } else if (i === 2) {
+      for (const x of [2547, 2800, 3010]) {
+        const y = 115 + rand()*17, n = 37 + rand()*25
+        const silk=[[x,y],[x+15,y+1],[x+13,y+n],[x+9,y+n-8],[x+6,y+n+4],[x+5,y+n-6],[x+1,y+n]]
+        wash(g,silk,'#735446');dryLine(g,silk.slice(1,5),2.3,PAPER,.5,x,5)
+        for(let j=0;j<6;j++)stroke(g,[[x+2+j*1.8,y+4],[x+2+j*1.8,y+n-10]],'#bea37a70',.55)
+      }
+    } else if (i === 3) {
+      // An actual opening in the old lime wall frames the distant range.
+      g.save();g.translate(3833,G)
+      g.beginPath();g.rect(-147,-94,294,96);g.arc(8,-37,53,0,TAU,true)
+      g.fillStyle='#c1b9a1';g.fill('evenodd');g.clip('evenodd')
+      for(let j=0;j<110;j++){
+        const x=-148+rand()*296,y=-94+rand()*96
+        dryLine(g,[[x,y],[x+3,y+1],[x+6+rand()*14,y+1.6]],2.4,j%3?PAPER:INK,.26,630+j,4)
+      }
+      for(let j=0;j<8;j++){const x=-147+j*38;stroke(g,[[x,-94],[x-3,-78],[x+3,-70],[x+1,-60]],'#716e5b75',1)}
+      g.restore()
+      inkLine(g,[[3683,G-94],[3761,G-97],[3856,G-93],[3983,G-96]],5.5,INK,910,.85)
+    } else if (i === 4) {
+      // Shadowed side gallery, lit beneath the eaves; front pillars belong to the bell tower.
+      g.save();g.translate(4432,G)
+      wash(g,[[-110,0],[-107,-72],[106,-72],[111,0]],'#656963')
+      for(let x=-94;x<97;x+=34){
+        wash(g,[[x,-57],[x+22,-57],[x+22,-22],[x,-22]],'#c8a778')
+        for(let y=-54;y<-22;y+=8)stroke(g,[[x,y],[x+22,y]],'#53564d',1.4)
+        stroke(g,[[x+11,-57],[x+11,-22]],'#464a44',2)
+      }
+      g.translate(0,-63);g.scale(.86,.58);roof(g,0,0,267,paint,1591);g.restore()
+    } else {
+      // Old practice swords stand in the rock on either side of the empty duelling ground.
+      for (const x of [5382,5407,5444,5883,5911,5935]) {
+        g.save();g.translate(x,G+1);g.rotate((rand()-.5)*.51)
+        const h=35+rand()*38
+        wash(g,[[-2,0],[-3,-h],[2,-h],[1,0]],'#59615d')
+        stroke(g,[[1,-h],[0,-4]],'#dfd8bc',1)
+        inkLine(g,[[-8,-h],[8,-h-1]],2.8,INK,x)
+        stroke(g,[[0,-h],[0,-h-12]],'#353733',3)
+        wash(g,[[1,-h-10],[6,-h-11],[13,-h-6],[18,-h-7],[12,-h-3]],'#87483c')
+        g.restore()
+      }
+    }
+  }
+
   function terrain(a, i) {
     const from = a.world.areas[i].x, to = a.world.areas[i + 1]?.x ?? a.world.length + 110
     const { paint, detailRes } = a.mountain
@@ -931,6 +1030,7 @@
         stoneLantern(g, 1196, G, .68, paint)
         stoneLantern(g, 552, G, .61, paint)
       }
+      chapterScenery(g, i, paint)
       if (i === 2) corridor(g, paint)
       if (i === 3) courtyard(g, paint)
       if (i === 4) bellTower(g, a.world.bell.x, paint)
@@ -942,14 +1042,70 @@
           terrace(g, start, end, from + lo, from + hi, a.world.areas.at(-1).x)
         }
       }
-      if (i === 0) stoneGate(g)
+      if (i === 5) {
+        // Broken horizontal strata under the arena, well below the actors' feet.
+        // Old sword cuts run obliquely across the lip, deepening at the edge of the dais.
+        for (const [x, y, span] of [[5542, 321, 58], [5618, 332, 88], [5637, 337, 46], [5802, 327, 74]]) {
+          const cut = [[x, y], [x + span * .27, y - 4], [x + span * .41, y - 4], [x + span, y - 14]]
+          inkLine(g, cut, 3.7, [70, 58, 58], x, .92)
+          dryLine(g, cut.map(([xx, yy]) => [xx, yy + 1.8]), 2.2, PAPER, .75, x + 1, 4)
+        }
+        const rand = A.rng(909)
+        for (let x = from + 14; x < to; x += 100 + rand() * 147) {
+          const y = G + 26 + rand() * 18, width = 57 + rand() * 74
+          const lip = [[x, y], [x + 12, y - 3], [x + width * .63, y - 1], [x + width, y - 6]]
+          wash(g, [...lip, [x + width - 16, y + 3], [x + width * .48, y + 7], [x + 4, y + 5]],
+            A.rgba([124, 112, 104], .17))
+          dryLine(g, lip, 2.5, [97, 89, 82], .44, Math.round(x), 5)
+        }
+      }
+      if (i === 0) {
+        stoneGate(g)
+        // Scree fans below the gate: the pale chips echo the falling-rock tell.
+        const stone = A.rng(629)
+        for (const base of [843, 1135, 1290]) for (let j = 0; j < 28; j++) {
+          const t = stone(), x = base + t * 104, y = G + 9 + t * 20 + stone() * 14
+          const w = 1.7 + stone() * 8 * (1 - t)
+          wash(g, [[x, y], [x + w * .43, y - w * .48], [x + w, y - 1], [x + w * .91, y + 1]], '#776b56')
+          stroke(g, [[x, y], [x + w * .43, y - w * .48]], '#e0cfab', .85)
+        }
+      }
+      if (i === 3) {
+        // Raked arcs around the old practice stone leave a still centre for the duel.
+        for (let j = 0; j < 9; j++) {
+          const arc = []
+          for (let k = 0; k <= 26; k++) {
+            const q = -.45 + k / 26 * 3.4
+            arc.push([3828 + (101 + 10 * j) * Math.cos(q), G + 17 + (8 + j * 1.6) * Math.sin(q)])
+          }
+          dryLine(g, arc, 1.7, j % 2 ? INK : PAPER, .48, 4100 + j, 4)
+        }
+      }
       for (const p of a.world.platforms) if (p.x >= from && p.x < to) A.drawSprite(g, a.mountain.platforms.get(p), p.x, p.y)
     })
   }
 
   function platform(p, res, paint) {
     return A.sprite(p.w + 26, G - p.y + 20, res, g => {
-      if (p.material === 'wood') {
+      if (p.material === 'cantilever') {
+        const depth = G - p.y
+        // Joints gather at the old bridge posts; leave open air under the free end.
+        beam(g, [[14, depth + 1], [17, 8]], 7, p.x + 3, true)
+        beam(g, [[17, depth - 1], [p.w - 13, 7]], 5.8, p.x + 5, true)
+        beam(g, [[14, 9], [p.w - 6, 9]], 5.2, p.x + 7)
+        planks(g, 0, 0, p.w, 8, p.x, paint)
+        for (let i = 0; i < 3; i++) stroke(g, [[10, 9 + i * 2], [21, 11 + i * 2]], '#cfb995', 1.1)
+      } else if (p.material === 'ledge') {
+        const depth = G - p.y
+        const face = [[0, 0], [p.w, 0], [p.w + 4, depth], [p.w * .52, depth + 2],
+          [p.w * .57, depth * .58], [p.w * .27, depth * .30], [8, 14]]
+        wash(g, face, gradient(g, 0, 0, 12, depth, [[0, '#a29e88'], [.24, '#868c7e'], [1, '#c5c3ac']]))
+        for (let j = 0; j < 23; j++) {
+          const x = 26 + A.hash(j, p.x) * (p.w - 32), y = A.hash(j, 17) * 14
+          dryLine(g, [[x, y], [x - 2, y + 5], [x + 9, y + 13]], 2.6, INK, .38, p.x + j, 4)
+        }
+        dryLine(g, [[0, 0], [p.w * .28, 1], [p.w * .67, -1], [p.w, 0]], 3, INK, .88, p.x, 8)
+      } else if (p.material === 'wood') {
         for (const x of [8, p.w - 15]) timber(g, x, 6, 8, G - p.y - 6)
         beam(g, [[10, 11], [p.w - 9, G - p.y - 1]], 7, p.x + 1)
         beam(g, [[p.w - 8, 11], [13, G - p.y - 1]], 7, p.x + 2)
@@ -975,7 +1131,7 @@
     const stamp = brushStamp(861)
     const paint = { ink: tintBrush(stamp, INK), paper: tintBrush(stamp, PAPER) }
     return {
-      panels: new Map(), ridges: [], cliffs: [], banks: [], world, res, detailRes, paint,
+      foreground: {}, panels: new Map(), ridges: [], cliffs: [], banks: [], world, res, detailRes, paint,
       platforms: new Map(world.platforms.map(p => [p, platform(p, res, paint)])),
       cloud: A.mist(480, 102),
       sun: A.sun(256, [195, 72, 51], 49),
@@ -1027,6 +1183,78 @@
     g.restore()
   }
 
+  // A distant stretch of the pilgrims' path sits below the playable traverse.
+  // Paint to a small retained surface once, so its fine brush marks never swim.
+  function summitHermitage(res) {
+    return A.sprite(320, 285, res, g => {
+      const rock = [77, 76, 76], paper = [219, 209, 194]
+      rockInk(g, 164, 84, 246, 189, rock, paper, 1663, 1, .77, .73, true)
+      // Follow the same chipped crest as the rock wash, including the roots of the pine.
+      const crest = rockProfile(164, 84, 246, 189, PROFILES[1], 1696, true)
+      const surface = x => crest.find(([px]) => px >= x)[1]
+      const bench = [[143, 96], [196, 98], [215, 92]]
+      const footing = crest.filter(([x]) => x >= 138 && x <= 217).reverse().map(([x, y]) => [x, y + 9])
+      wash(g, [...bench, ...footing], '#9e9788')
+      dryLine(g, bench, 2.3, PAPER, .66, 1710)
+      for (let j = 0; j < 10; j++) {
+        const x = 144 + 4.9 * j, length = Math.max(2, surface(x) - 96)
+        dryLine(g, [[x, 98], [x - 2, 98 + length * .52], [x - 3, 98 + length]], 1.8, rock, .45, 1720 + j, 4)
+      }
+      pine(g, 129, surface(129) + 4, .22, 1692, [83, 86, 76])
+
+      // Three bays face the viewer. The short return wall, plinth and eave recede together.
+      wash(g, [[147, 92], [195, 94], [210, 89], [210, 93], [195, 98], [147, 96]], '#716d62')
+      wash(g, [[149, 77], [194, 79], [194, 94], [149, 92]], '#c1b5a0')
+      wash(g, [[194, 79], [207, 70], [207, 89], [194, 94]], '#9c9282')
+      wash(g, [[150, 78], [194, 80], [194, 82], [150, 80]], '#8b8375')
+      wash(g, [[168, 81], [177, 81.4], [177, 93], [168, 92.7]], '#625f58')
+      for (const x of [154, 181]) {
+        const y = 82 + (x - 154) * .045
+        wash(g, [[x, y], [x + 7, y + .3], [x + 7, y + 6], [x, y + 5.7]], '#7a776a')
+        stroke(g, [[x + 3.4, y], [x + 3.4, y + 5.8]], '#b0a68f', .8)
+      }
+      for (const x of [149, 165, 179, 194]) {
+        const lean = (x - 149) * .045
+        stroke(g, [[x, 78 + lean], [x, 92 + lean]], '#73695d', 1.35)
+      }
+
+      // A continuous ridge and a gently sagging tiled plane, with the gable visible at right.
+      wash(g, [[194, 78], [201, 59], [213, 70], [207, 72]], '#aca08d')
+      const eave = [[139, 72], [144, 75], [154, 76.5], [181, 78], [193, 78.1], [200, 76.6]]
+      const ridge = [[151, 58], [154, 59.6], [192, 61], [201, 59.5]]
+      wash(g, [...ridge, ...eave.slice().reverse()], '#696c67')
+      for (let j = 0; j < 14; j++) {
+        const t = j / 13, x = 153 + t * 46, tip = 144 + t * 52
+        stroke(g, [[x, 61 + t], [x - 2, 67 + t], [tip, 74.7 + 2 * t]], j % 3 ? '#797b72' : '#8a8a7e', .68)
+      }
+      stroke(g, ridge, '#575b57', 1.6)
+      stroke(g, eave, '#515653', 2)
+      stroke(g, [[199, 77], [201, 60], [206, 66], [213, 70], [215, 69]], '#5e625c', 1.65)
+      dryLine(g, eave.slice(1), 1.3, PAPER, .50, 1743, 4)
+    })
+  }
+
+  function valleyCrossing(res) {
+    return A.sprite(410, 121, res, g => {
+      const ink = [79, 94, 89]
+      const deck = []
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24, x = 64 + t * 224, y = 48 + 16 * Math.sin(Math.PI * t) - t * 11
+        deck.push([x, y])
+        if (i % 2 === 0) stroke(g, [[x, y + 1], [x - 1, y - 8]], A.rgba(ink, .72), 1)
+      }
+      dryLine(g, deck, 3.4, ink, .86, 831, 5)
+      stroke(g, deck.map(([x, y]) => [x, y - 8]), A.rgba(ink, .59), .9)
+      for (const [x, y, w] of [[38, 47, 88], [328, 37, 94]]) {
+        rockInk(g, x, y, w, 78, ink, [216, 221, 202], Math.round(x), 1, .64, .5)
+      }
+      // A wayside shelter anchors the far end of the crossing.
+      wash(g, [[287, 26], [296, 24], [307, 15], [325, 17], [336, 23], [343, 23],
+        [337, 28], [298, 30]], A.rgba(ink, .85))
+      for (const x of [298, 330]) stroke(g, [[x, 27], [x, 41]], A.rgba(ink, .88), 1.8)
+    })
+  }
+
   function birds(g, a, cam, clock) {
     g.save()
     const left = cam.left * FAR_SCROLL, right = left + cam.viewW
@@ -1058,15 +1286,43 @@
     const middle = cam.left + cam.viewW / 2
     const visible = (x, half, parallax) => x + half > cam.left * parallax - 12 && x - half < cam.left * parallax + cam.viewW + 12
     const climb = smooth((middle - 3200) / 2360)
+    const chasm = smooth((middle - 1370) / 280) * (1 - smooth((middle - 2060) / 300))
+    const dusk = smooth((middle - 4120) / 390) * (1 - smooth((middle - 4940) / 430))
     const sunSize = 60 + 96 * climb
-    const sunX = 448 + middle * .32 + 450 * climb
-    const sunY = 72 + 47 * climb
+    const sunX = A.lerp(448 + middle * .32, 5700 * FAR_SCROLL + 37, climb)
+    const sunY = 72 + 31 * climb
 
     g.save()
     layer(g, cam, FAR_SCROLL)
-    g.globalAlpha = .74 + climb * .21
+    // Layer watered ink into long cloud shoulders on paper. Leave the centre open for the ridge crests.
+    a.mountain.cloudInk ||= A.sprite(550, 87, a.mountain.res, c => {
+      const rand=A.rng(449), pigment=a.mountain.paint.ink
+      for(let j=0;j<64;j++){
+        const x=34+rand()*475, envelope=Math.sin(x/550*Math.PI)
+        const y=50-19*envelope+Math.sin(x*.017)*6+rand()*11
+        dab(c,x,y,26+rand()*52,3+rand()*11*envelope,pigment,.08+rand()*.12)
+      }
+    })
+    const cloudLeft=cam.left*FAR_SCROLL
+    for (let band=Math.floor((cloudLeft-525)/700);band*700<cloudLeft+cam.viewW;band++){
+      A.drawSprite(g,a.mountain.cloudInk,band*700+12,29+18*Math.sin(band*3.7),.71)
+    }
+    g.globalAlpha = (.74 + climb * .21) * (1 - .78 * chasm) * (1 - .88 * dusk)
     g.drawImage(a.mountain.sun, sunX - sunSize / 2, sunY - sunSize / 2, sunSize, sunSize)
+    if (climb > .35) {
+      g.strokeStyle = A.rgba([64, 60, 64], .6 * climb)
+      g.lineWidth = 1.15
+      for (let i = 0; i < 6; i++) {
+        const x = sunX + 38 + i * 12 + 16 * Math.sin(clock * .12)
+        const y = sunY + 31 - (i < 3 ? i : 6 - i) * 4
+        const wing = Math.sin(clock * 3 + i * .9) * 2.1
+        g.beginPath(); g.moveTo(x - 4, y - wing); g.quadraticCurveTo(x - 1.5, y - 1.7, x, y)
+        g.quadraticCurveTo(x + 1.5, y - 2, x + 4.3, y - wing); g.stroke()
+      }
+    }
     g.globalAlpha = 1
+    g.globalAlpha = 1 - .63 * chasm
+    g.translate(0, 55 * climb + 49 * chasm)
     for (let i = 0; i < RIDGES.length; i++) {
       const [x, , width] = RIDGES[i], at = x * FAR_SCROLL + 245
       if (!visible(at, width / 2 + 12, FAR_SCROLL)) continue
@@ -1078,6 +1334,9 @@
     birds(g, a, cam, clock)
 
     layer(g, cam, CLIFF_SCROLL)
+    // As the path rises, the nearer shoulders sink below the sword line.
+    g.globalAlpha = 1 - .53 * chasm
+    g.translate(0, 83 * climb + 38 * chasm)
     for (let i = 0; i < CLIFFS.length; i++) {
       const [x, , width] = CLIFFS[i], at = x * CLIFF_SCROLL + 120
       if (!visible(at, width * 1.25, CLIFF_SCROLL)) continue
@@ -1088,9 +1347,27 @@
       const at = x * CLIFF_SCROLL + 120
       if (visible(at, width, CLIFF_SCROLL)) waterfall(g, at, y, height, width, clock)
     }
+    const hermitageX = 5770 * CLIFF_SCROLL
+    if (climb > .32 && visible(hermitageX + 160, 160, CLIFF_SCROLL)) {
+      a.mountain.hermitage ||= summitHermitage(a.mountain.res)
+      A.drawSprite(g, a.mountain.hermitage, hermitageX, 18, .88)
+    }
+    g.globalAlpha = 1
+    const crossing = 1830 * CLIFF_SCROLL + 35
+    if (visible(crossing + 205, 205, CLIFF_SCROLL)) {
+      a.mountain.valleyBridge ||= valleyCrossing(a.mountain.res)
+      g.save(); g.translate(crossing, 195); g.rotate(-.14)
+      A.drawSprite(g, a.mountain.valleyBridge, 0, 0, .82); g.restore()
+    }
     mistBelt(g, a, cam, CLIFF_SCROLL, 217, 125, 260, clock, .58, 37)
     mistBelt(g, a, cam, CLIFF_SCROLL, 280, 113, 270, clock, .70, 41)
     g.restore()
+    if (dusk > 0) {
+      // Deep indigo under the eaves, fading to paper behind the combat silhouettes.
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = dusk
+      g.fillStyle = gradient(g, 0, 0, 0, cam.height, [[0, '#283941ec'], [.36, '#405158b8'], [.69, '#77796754'], [1, '#a5876220']])
+      g.fillRect(0, 0, cam.width, cam.height); g.restore()
+    }
   }
 
   function ground(g, a, cam) {
@@ -1149,6 +1426,15 @@
     for (let j = 0; j < 4; j++) {
       g.beginPath(); g.moveTo(-22 - j * 2, 9 + j * 9); g.quadraticCurveTo(0, 16 + j * 9, 22 + j * 2, 9 + j * 9); g.stroke()
     }
+    // Worn raised bosses and a broken gold rim catch the last light.
+    for (const side of [-1, 1]) {
+      for (let row = 0; row < 3; row++) for (let col = 0; col < 2; col++) {
+        const x = side * (6 + col * 8 + row * 1.2), y = 7 + row * 6
+        g.fillStyle = '#615337'; g.fillRect(x, y, 2.6, 2.8)
+        g.fillStyle = '#e3c18b'; g.fillRect(x, y, 1.6, 1)
+      }
+    }
+    stroke(g, [[-31, 43], [-19, 46], [-6, 47]], '#eacb92', 1.5)
     for (const x of [-14, 0, 14]) stroke(g, [[x, 7], [x * 1.48, 40]], '#c8a77b', .72)
     stroke(g, [[0, 42], [0, 62]], '#4a4944', 2.5)
     if (active) {
@@ -1174,10 +1460,57 @@
       if (x >= left && x <= right) pennant(g, x, y, reducedMotion ? 0 : time, state.wind)
     }
     if (state.bell && state.bell.x >= left && state.bell.x <= right) {
-      const active = state.enemies.some(e => e.type === 'shizhen' && e.alive && e.delay <= 0 && Math.abs(e.x - state.bell.x) <= state.bell.radius)
+      const active = state.enemies.some(e => e.type === 'shizhen' && e.alive && e.state === 'mountTell' && Math.abs(e.x - state.bell.x) <= state.bell.radius)
       bell(g, state.bell, clock, reducedMotion ? 0 : time, active && clock - state.bell.ringAt >= 1.6)
     }
+    const dash = state.player.action?.borrow
+    if (dash && !reducedMotion) {
+      const feet = state.player.y, end = state.player.x
+      const sweep = Math.min(1, Math.abs(end - dash.from) / 55)
+      for (let j = 0; j < 3; j++) {
+        const from = A.lerp(dash.from, end, j * .17)
+        g.beginPath(); g.moveTo(from, feet - 3 - j * 4)
+        g.quadraticCurveTo((from + end) * .5, feet - 5 - (13 + j * 2) * sweep, end, feet - 8 - j * 3)
+        g.strokeStyle = A.rgba(j === 1 ? PAPER : INK, .45 * sweep)
+        g.lineWidth = j === 1 ? 1.8 : 1; g.stroke()
+      }
+    }
+    for (const e of state.enemies) {
+      const cut = e.needleCut
+      if (cut && !reducedMotion && clock - cut.at < .85) {
+        const t = (clock - cut.at) / .85
+        for (let j = 0; j < 9; j++) {
+          const x = cut.x + cut.dir * t * (33 + A.hash(j, 42) * 56)
+          const y = cut.y - Math.sin(t * Math.PI) * (11 + j * 3) + t * t * 28
+          g.fillStyle = A.rgba([64, 76, 55], .9 * (1 - t))
+          A.leaf(g, x, y, j + t * 4, 5 + j % 4, .85)
+        }
+      }
+      if (e.plantedAt == null) continue
+      const age = clock - e.plantedAt
+      if (age < 0 || age > 3.2) continue
+      g.save(); g.translate(e.plantedX, e.y); g.scale(e.plantedDir, 1)
+      g.globalAlpha *= Math.min(1, (3.2 - age) / .8)
+      stroke(g, [[-16, 1], [-4, 0], [4, 2], [19, 0], [26, -1]], '#514a43', 1.6)
+      stroke(g, [[2, 2], [8, 4], [16, 3]], '#7c7060', .8)
+      g.restore()
+    }
     if (reducedMotion) return
+    if (state.bell && state.bell.x >= left && state.bell.x <= right) {
+      const age = clock - state.bell.ringAt
+      if (age >= 0 && age < 1.55) {
+        for (let j = 0; j < 5; j++) {
+          const t = age - j * .085
+          if (t <= 0) continue
+          const dir = j % 2 ? -1 : 1
+          const x = state.bell.x + dir * (36 + j * 8 + t * 72)
+          const y = state.bell.y - 110 - t * (23 + j * 4) + Math.sin(t * 4 + j) * 3
+          const wing = Math.sin(t * 16 + j) * 3
+          stroke(g, [[x - 4, y - wing], [x, y], [x + 4, y - wing * .72]],
+            A.rgba(INK, Math.min(1, (1.55 - age) * 2) * .79), 1.3)
+        }
+      }
+    }
     if (left < 4080 && right > 3400) {
       for (let j = 0; j < 16; j++) {
         const q = (time * (.09 + A.hash(j, 87) * .09) + A.hash(j, 19)) % 1
@@ -1200,10 +1533,105 @@
         g.moveTo(x, y); g.quadraticCurveTo(x + dir * 18, y + 3, x + dir * (30 + power * 70), y - 4)
       }
       g.stroke()
+      for (let j = 0; j < 9; j++) {
+        const span = hi - lo, phase = time * dir * (30 + power * 140) + A.hash(j, 73) * span
+        const x = lo + ((phase % span + span) % span)
+        if (x < left || x > right || a.world.wind.posts.some(post => (x - post) * dir >= 0 && (x - post) * dir < 47)) continue
+        const y = 245 + Math.sin(time * 1.8 + j) * 10 + A.hash(j, 811) * 47
+        g.fillStyle = A.rgba([75, 79, 63], .38 + power * .26)
+        A.leaf(g, x, y, dir * .2 + Math.sin(time * 2 + j) * .45, 4 + j % 4, .85)
+      }
     }
   }
 
+  // Close brushwork frames the scroll from above and below. Keep the horizontal
+  // band where enemies wind up completely clear, even on short landscape phones.
+  const FOREGROUND = [
+    [725, 'pine', 1], [1160, 'bank', 1], [1670, 'bank', -1], [2160, 'vine', -1],
+    [2550, 'vine', 1], [2925, 'grass', -1], [3550, 'pine', 1], [3985, 'bank', -1],
+    [4480, 'grass', 1], [4940, 'vine', -1], [5480, 'pine', -1], [5890, 'bank', 1],
+  ]
+
+  function nearBrush(kind, seed, res) {
+    const rand = A.rng(seed), black=[30,34,29], grey=[84,86,70]
+    return A.sprite(267, 113, res, g => {
+      if (kind === 'pine' || kind === 'vine') {
+        const limb=[[0,3],[31,16],[56,19],[85,37],[113,34],[143,45],[174,41],[206,52],[246,45]]
+        g.fillStyle=A.rgba(black,.92)
+        A.ribbon(g,limb,t=>1+15*Math.pow(1-t,1.5))
+        dryLine(g,limb,13,black,.77,seed,8)
+        dryLine(g,limb.map(([x,y])=>[x,y-2.5]),4.6,[157,154,126],.62,seed+5,4)
+        for(let j=0;j<12;j++){
+          const k=1+j%6, [x,y]=limb[k], dir=j%3===0?-1:1
+          const reach=13+rand()*27, ex=x+reach,ey=y+dir*(9+rand()*20)
+          inkLine(g,[[x,y],[x+6,y+dir*7],[ex-6,ey+2],[ex,ey]],3.2,black,seed+j,.96)
+          for(let n=0;n<(kind==='pine'?32:7);n++){
+            const a=-Math.PI*.96+rand()*Math.PI*1.8,len=7+rand()*17
+            const xx=ex+(rand()-.5)*12,yy=ey+(rand()-.5)*6
+            g.fillStyle=A.rgba(n%5?black:grey,.60+rand()*.35)
+            A.leaf(g,xx,yy,a,len,kind==='pine'?.6+rand()*.55:1.3+rand())
+          }
+        }
+        return
+      }
+      for(let j=0;j<6;j++){
+        const x=24+j*39+rand()*15, y=35+rand()*24,w=15+rand()*39
+        const lip=[[x-w,y+8],[x-w*.5,y-4],[x+w*.22,y-11],[x+w*.6,y-9],[x+w,y+2]]
+        wash(g,[...lip,[x+w*.55,y+20],[x-w*.6,y+23]],A.rgba(j%3?grey:black,.83))
+        wash(g,[lip[1],lip[2],lip[3],[x+w*.35,y],[x-w*.6,y+12]],'#a39f83')
+        dryLine(g,lip,3.1,black,.86,seed+j,6)
+        for(let n=0;n<12;n++){const xx=x+(rand()-.5)*w,yy=y+rand()*8;stroke(g,[[xx,yy],[xx-4,yy+3],[xx-8,yy+4]],'#42453b9c',.9)}
+      }
+      for(let j=0;j<(kind==='grass'?68:24);j++){
+        const x=31+rand()*202,y=39+rand()*22,dx=(rand()-.64)*32,h=8+rand()*31
+        g.fillStyle=A.rgba(black,.37+rand()*.55)
+        A.ribbon(g,[[x,y],[x+dx*.34,y-h*.65],[x+dx,y-h]],t=>.16+(1-t)*1.25)
+      }
+    })
+  }
+
+  function foreground(g,a,cam,layer) {
+    const speed=1.14, left=cam.left*speed, right=left+cam.viewW
+    g.save();layer(g,cam,speed)
+    for (const [worldX,kind,dir] of FOREGROUND) {
+      const x=worldX*speed
+      if(x+267<left || x-267>right)continue
+      // Share four brush studies across the scroll; cropped views differ by location and direction.
+      const images=a.mountain.foreground
+      images[kind] ||= nearBrush(kind,{pine:673,vine:951,bank:724,grass:859}[kind],a.mountain.res)
+      const canopy=kind==='pine'||kind==='vine'
+      g.save();g.translate(x,canopy?cam.top-22:G+14);g.scale(dir,1)
+      A.drawSprite(g,images[kind],0,0,canopy?.91:.88);g.restore()
+    }
+    g.restore()
+  }
+
   function attackGuides(g, state) {
+    for (const fall of state.mountainFalls) {
+      if (fall.landed) continue
+      const q = Math.min(1,fall.age/fall.warning), x=fall.x, radius=33
+      g.beginPath();g.ellipse(x,G-1,radius,5,0,0,TAU)
+      g.fillStyle=A.rgba([102,57,44],.17+.38*q);g.fill()
+      stroke(g,[[x-radius,G-3],[x-radius,G+2],[x+radius,G+2],[x+radius,G-3]],CINNABAR,1.4)
+      const y=G-182+169*Math.pow(q,3)
+      wash(g,[[x-12,y-9],[x+4,y-16],[x+17,y-7],[x+13,y+4],[x-7,y+7]],'#52574e')
+      stroke(g,[[x-12,y-9],[x+3,y-13],[x+8,y-6]],'#b1ac94',1.9)
+      for(let j=0;j<7;j++){
+        const t=(q*2+j/7)%1,dx=(j-3)*6
+        stroke(g,[[x+dx,y+9+t*23],[x+dx-2,y+12+t*23]],'#797968',1.35)
+      }
+    }
+    const wave=state.bellWave
+    if(wave) {
+      for(const dir of [-1,1]){
+        const x=wave.x+dir*wave.radius
+        if(wave.t<.58) stroke(g,[[x,G-4],[x+dir*48,G-4]],CINNABAR,2)
+        else {
+          wash(g,[[x-dir*27,G],[x-dir*10,G-6],[x-dir*3,G-23],[x+dir*5,G-3],[x+dir*10,G]],'#65574b')
+          stroke(g,[[x-dir*10,G-6],[x-dir*3,G-23],[x+dir*5,G-3]],'#c7ad85',1.8)
+        }
+      }
+    }
     for (const enemy of state.enemies) {
       if (!enemy.alive || enemy.delay > 0) continue
       const progress = Math.max(0, 1 - enemy.t / (enemy.teleTotal || 1))
@@ -1238,5 +1666,5 @@
     }
   }
 
-  globalThis.XiabanInkMountain = { build, background, ground, moving, attackGuides }
+  globalThis.XiabanInkMountain = { build, background, ground, moving, foreground, attackGuides }
 })()

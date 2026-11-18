@@ -80,6 +80,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .game.night .boss-hp span { background: linear-gradient(90deg, #e9e0c9, #f6f0e2); }
 .game.ink-night-title .area-title small { color: #e2d3b2; text-shadow: 0 1px 5px #1b2229; }
 .game.ink-night-title .area-title strong { color: #f3e6c8; text-shadow: 0 2px 14px #111824, 0 0 3px #151c22; }
+.game.mountain.boss-fight .area-title { display: none; }
 .game.mountain .prompt { padding: 6px 12px; font-size: clamp(11px, 1.65vh, 14px); line-height: 1.45; white-space: normal; width: max-content; max-width: 62%; }
 .game.mountain:not(.night) .hp i:not(.empty) { filter: drop-shadow(0 0 2px #f1e2bb9c); }
 .game.mountain:not(.night) .ink-meter small { color: #333b36; text-shadow: 0 0 5px #eee5cd, 0 0 2px #eee5cd; }

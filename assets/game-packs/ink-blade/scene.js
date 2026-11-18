@@ -54,11 +54,11 @@
     {x:5200,top:[161,157,147],low:[240,235,222],tint:[226,223,211,.04],sun:0,moon:.3},
   ]
   const SKY_SUMMIT = [
-    { x: 0, top: [208, 201, 177], middle: [229, 221, 193], low: [248, 241, 215], tint: [0, 0, 0, 0] },
-    { x: 1450, top: [181, 193, 181], middle: [208, 218, 201], low: [238, 236, 218], tint: [0, 0, 0, 0], blend: 360 },
+    { x: 0, top: [193, 187, 162], middle: [236, 228, 201], low: [248, 241, 215], tint: [0, 0, 0, 0] },
+    { x: 1450, top: [151, 171, 165], middle: [213, 224, 211], low: [238, 236, 218], tint: [0, 0, 0, 0], blend: 360 },
     { x: 2370, top: [175, 188, 188], middle: [209, 219, 211], low: [239, 238, 219], tint: [0, 0, 0, 0], blend: 385 },
     { x: 3350, top: [211, 199, 171], middle: [232, 218, 192], low: [247, 234, 210], tint: [0, 0, 0, 0], blend: 475 },
-    { x: 4300, top: [117, 137, 146], middle: [172, 186, 186], low: [228, 234, 220], tint: [0, 0, 0, 0], blend: 475 },
+    { x: 4300, top: [76, 87, 97], middle: [156, 167, 170], low: [228, 234, 220], tint: [0, 0, 0, 0], blend: 475 },
     { x: 5310, top: [167, 151, 155], middle: [228, 197, 178], low: [249, 234, 211], tint: [0, 0, 0, 0], blend: 535 },
   ]
   const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
@@ -589,7 +589,7 @@
   }
 
   function drawForeground(ctx, a, cam, e, clock) {
-    if(a.volumeId===6)return
+    if (a.volumeId === 6) return globalThis.XiabanInkMountain.foreground(ctx, a, cam, layer)
     if (a.volumeId === 5) {
       layer(ctx,cam,1)
       globalThis.XiabanInkLantern.foreground(ctx,a,cam,clock)
