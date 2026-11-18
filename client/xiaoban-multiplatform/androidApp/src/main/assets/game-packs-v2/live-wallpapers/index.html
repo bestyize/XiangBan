@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>动态壁纸</title>
+  <link rel="stylesheet" href="gallery.css">
+  <script defer src="scenes.js"></script>
+  <script defer src="gallery.js"></script>
+</head>
+<body>
+  <main>
+    <section class="library" id="library" aria-labelledby="library-title">
+      <header class="topbar"><h1 id="library-title">动态壁纸</h1></header>
+      <div class="gallery" aria-label="内置壁纸">
+        <button class="wallpaper-card" type="button" data-scene="aquarium" aria-label="预览水下花园">
+          <span class="poster-frame">
+            <img class="poster" src="aquarium.webp" width="360" height="600" alt="">
+            <span class="applied-badge" hidden></span>
+          </span>
+          <span class="card-caption">
+            <span><strong>水下花园</strong><small>互动涟漪</small></span>
+            <i class="play-mark" aria-hidden="true"></i>
+          </span>
+        </button>
+        <button class="wallpaper-card" type="button" data-scene="galaxy" aria-label="预览银河">
+          <span class="poster-frame">
+            <img class="poster" src="galaxy.webp" width="360" height="600" alt="">
+            <span class="applied-badge" hidden></span>
+          </span>
+          <span class="card-caption">
+            <span><strong>银河</strong><small>实时星系</small></span>
+            <i class="play-mark" aria-hidden="true"></i>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="preview" id="preview" aria-labelledby="preview-title" hidden>
+      <div class="preview-visual" aria-hidden="true">
+        <div class="preview-scrim"></div>
+        <div class="overlays"></div>
+      </div>
+      <header class="preview-bar">
+        <button class="back-button" type="button" id="back" aria-label="返回壁纸库"><i class="back-mark" aria-hidden="true"></i></button>
+        <h1 id="preview-title"></h1>
+      </header>
+      <footer class="preview-footer">
+        <div class="preview-modes" role="group" aria-label="预览模式">
+          <button type="button" data-mode="wallpaper" aria-pressed="true">壁纸</button>
+          <button type="button" data-mode="home" aria-pressed="false">桌面</button>
+          <button type="button" data-mode="lock" aria-pressed="false">锁屏</button>
+        </div>
+        <button type="button" id="apply" disabled>设为壁纸</button>
+        <p id="status" role="status" hidden></p>
+      </footer>
+    </section>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </main>
+
+  <template id="home-overlay">
+    <div class="home-screen">
+      <div><span class="home-time" data-time></span><span class="demo-date" data-date></span></div>
+      <div class="mock-apps">
+        <span class="mock-app"><i class="mock-badge photos"><i class="mock-symbol"></i></i>相册</span>
+        <span class="mock-app"><i class="mock-badge notes"><i class="mock-symbol"></i></i>便签</span>
+        <span class="mock-app"><i class="mock-badge clock"><i class="mock-symbol"></i></i>时钟</span>
+        <span class="mock-app"><i class="mock-badge camera"><i class="mock-symbol"></i></i>相机</span>
+      </div>
+    </div>
+  </template>
+  <template id="lock-overlay">
+    <div class="lock-screen">
+      <i class="outline-lock"></i>
+      <span class="demo-date" data-date></span>
+      <span class="lock-time" data-time></span>
+    </div>
+  </template>
+</body>
+</html>

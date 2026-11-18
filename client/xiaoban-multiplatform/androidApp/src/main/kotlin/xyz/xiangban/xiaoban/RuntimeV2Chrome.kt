@@ -125,6 +125,7 @@ internal class RuntimeV2Chrome(
     var favoriteBusy by mutableStateOf(false)
     var shareBusy by mutableStateOf(false)
     var shortcutBusy by mutableStateOf(false)
+    var capsuleOnDarkBackground by mutableStateOf(false)
 
     // Only the capsule's small view receives touches while the work is running.
     private val capsuleView = ComposeView(activity).apply {
@@ -244,7 +245,7 @@ internal class RuntimeV2Chrome(
 
     @Composable
     private fun Capsule() {
-        val ink = MaterialTheme.colorScheme.onSurface
+        val ink = if (capsuleOnDarkBackground) Color.White else MaterialTheme.colorScheme.onSurface
         val shadow = if (ink.luminance() < .5f) Color.White else Color.Black
         Box(
             Modifier.fillMaxSize().chromeClick(onClick = ::openMenu)

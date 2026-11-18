@@ -64,6 +64,12 @@
       catalog: () => call('builtin.remote.catalog'),
       send: (profile, key, state) => call('builtin.remote.send', { profile, key, state }),
     },
+    liveWallpapers: {
+      supported: () => call('builtin.wallpaper.supported'),
+      status: () => call('builtin.wallpaper.status'),
+      previewing: active => call('builtin.wallpaper.previewing', { active }),
+      preview: scene => call('builtin.wallpaper.preview', { scene }),
+    },
     storage: {
       get: key => call('storage.get', { key }),
       set: (key, value) => call('storage.set', { key, value }),
