@@ -4,6 +4,7 @@
 
 | 设计稿 | 内容与预览 |
 | --- | --- |
+| [小伴 AI 首页](prototypes/ai-home.html) | 纸色首页与手绘小伴、单排彩色 App 风格快捷工具图标、双列提问卡，以及底栏上方的固定对话入口。静态预览展示未登录状态。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
 | [动态壁纸](prototypes/live-wallpapers.html) | Android 壁纸库与全屏预览。封面显示已应用位置，支持纯壁纸、桌面和锁屏三种预览。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
 | [创意作品详情页](../../../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) | 「碎花垂耳兔」使用通栏布局，完整作品图下显示介绍、作者、来源和灰底体验按钮。评论区采用全站统一的列表、底部入口和编辑弹层。与网页共用同一份设计稿。[手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile) |
 | [讨论卡片](prototypes/discussion-cards.html) | 单列列表，每张卡片显示单行标题。底部左侧依次显示标签、头像、发布时间，右侧为回复与点赞。点击标题查看正文。支持双端和明暗切换。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile) |

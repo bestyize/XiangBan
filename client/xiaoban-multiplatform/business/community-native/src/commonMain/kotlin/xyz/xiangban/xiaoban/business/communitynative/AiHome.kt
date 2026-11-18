@@ -1,11 +1,9 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -39,19 +36,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontFamily
 import xyz.xiangban.xiaoban.common.community.ChatSummary
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
+import xiaoban.business.community_native.generated.resources.Res
+import xiaoban.business.community_native.generated.resources.home_companion
+import xiaoban.business.community_native.generated.resources.home_tool_computer
+import xiaoban.business.community_native.generated.resources.home_tool_decor
+import xiaoban.business.community_native.generated.resources.home_tool_game
+import xiaoban.business.community_native.generated.resources.home_tool_image
+import xyz.xiangban.xiaoban.common.community.isCustomModelTier
 import kotlin.time.Clock
 
 /** 首页用的几种点缀色，浅色和深色各一套；只用在图标和极浅的底上。 */
@@ -64,15 +69,15 @@ private val Pine = Tint(0xFF4C7D5FL, 0xFF8CC3A0L)
 private val Plum = Tint(0xFF7A5A8CL, 0xFFBFA2D0L)
 private val Indigo = Tint(0xFF3D6B8CL, 0xFF8DB4D2L)
 
-private class HomeFeature(val icon: ImageVector, val title: String, val desc: String, val tint: Tint, val onClick: () -> Unit)
+private class HomeFeature(val icon: DrawableResource, val title: String, val status: String? = null, val onClick: () -> Unit)
 
-private class HomeStarter(val icon: ImageVector, val text: String, val tint: Tint)
+private class HomeStarter(val icon: ImageVector, val label: String, val text: String, val tint: Tint)
 
 private val HomeStarters = listOf(
-    HomeStarter(XIcons.Target, StarterPrompts[0], Ochre),
-    HomeStarter(XIcons.Book, StarterPrompts[1], Indigo),
-    HomeStarter(XIcons.Pen, StarterPrompts[2], Pine),
-    HomeStarter(XIcons.Sparkles, "给我讲一个三分钟能读完的小故事", Plum),
+    HomeStarter(XIcons.Target, "理清思路", StarterPrompts[0], Ochre),
+    HomeStarter(XIcons.Book, "理解概念", StarterPrompts[1], Indigo),
+    HomeStarter(XIcons.Pen, "润色文字", StarterPrompts[2], Pine),
+    HomeStarter(XIcons.Sparkles, "听个故事", "给我讲一个三分钟能读完的小故事", Plum),
 )
 
 private class LocalClock(val month: Int, val day: Int, val weekday: Int, val hour: Int)
@@ -132,155 +137,134 @@ fun AiHomeScreen(
     val peers = remote.peers
     val computerDesc = when {
         !session.loggedIn -> "登录后可用"
-        peers.isEmpty() -> "还没有连接电脑"
+        peers.isEmpty() -> "尚未连接"
         peers.any { it.online } -> peers.first { it.online }.name + " 在线"
-        else -> "电脑都不在线"
+        else -> "电脑离线"
     }
-    // 新功能加在这里，首页会按两列排开。
     val features = buildList {
-        if (cloud.officialAiEnabled) add(HomeFeature(XIcons.Image, "创作图片", "描述画面，生成插画和壁纸", Ochre) { signedIn(onCreateImage) })
-        add(HomeFeature(XIcons.Gamepad, "创作游戏", "说出想法，做成能玩的小游戏", Pine) { onCreateWork("游戏") })
-        add(HomeFeature(XIcons.Sparkles, "桌面装扮", "壁纸、小组件、特效和伙伴", Plum) { onCreateWork("壁纸") })
-        add(HomeFeature(XIcons.Monitor, "遥控电脑", computerDesc, Indigo) { open(Route.Devices) })
+        if (cloud.officialAiEnabled) add(HomeFeature(Res.drawable.home_tool_image, "创作图片") { signedIn(onCreateImage) })
+        add(HomeFeature(Res.drawable.home_tool_game, "创作游戏") { onCreateWork("游戏") })
+        add(HomeFeature(Res.drawable.home_tool_decor, "桌面装扮") { onCreateWork("壁纸") })
+        add(HomeFeature(Res.drawable.home_tool_computer, "遥控电脑", computerDesc) { open(Route.Devices) })
     }
 
-    Box(Modifier.fillMaxSize()) {
-        HomeBackdrop(Modifier.fillMaxWidth().height(320.dp))
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
-                Text("小伴AI", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                IconTap(XIcons.NewChat, "新对话", { chatReady { chat.clearConversation(); open(Route.AiChat) } }, size = 22.dp)
+    val paper = if (ThemeState.dark) Color(0xFF211F20) else Color(0xFFFAF7F1)
+    Column(Modifier.fillMaxSize().background(paper).navigationBarsPadding().padding(bottom = 56.dp)) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().height(48.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
+            Text("小伴 AI", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.Bold)
+            IconTap(XIcons.NewChat, "新对话", { chatReady { chat.clearConversation(); open(Route.AiChat) } }, size = 21.dp)
+        }
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(homeScroll).padding(horizontal = 20.dp)) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 126.dp).padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = LocalExtraColors.current.brandInk)
+                    Text(hello, Modifier.padding(vertical = 3.dp), style = XType.Headline.copy(fontSize = 32.sp, lineHeight = 40.sp),
+                        fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    Text(line, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Image(painterResource(Res.drawable.home_companion), null, Modifier.fillMaxWidth(0.38f).height(102.dp), contentScale = ContentScale.Fit)
             }
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(homeScroll).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
-                Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(hello, Modifier.padding(top = 6.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                Text(line, Modifier.padding(top = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SectionTitle("快捷工具")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                features.forEach { FeatureShortcut(it, Modifier.weight(1f)) }
+            }
 
-                HomeComposerCard(cloud, session.loggedIn || cloud.customModelName != null, Modifier.padding(top = 20.dp)) { chatReady { open(Route.AiChat) } }
-
-                SectionTitle("用小伴创作", Modifier.padding(top = 28.dp))
-                features.chunked(2).forEach { pair ->
-                    Row(Modifier.padding(top = 10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { FeatureCard(it, Modifier.weight(1f)) }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+            val recent = cloud.conversations.take(3)
+            if ((session.loggedIn || cloud.customModelName != null) && recent.isNotEmpty()) {
+                SectionTitle("继续对话")
+                Column(Modifier.fillMaxWidth().outlinedCard(16.dp)) {
+                    recent.forEachIndexed { i, item ->
+                        if (i > 0) Hairline(Modifier.padding(start = 60.dp))
+                        RecentRow(item, first = i == 0) { chat.openConversation(item.id); open(Route.AiChat) }
                     }
                 }
-
-                SectionTitle("试试这样问我", Modifier.padding(top = 28.dp))
-                Row(
-                    Modifier.padding(top = 10.dp).fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    HomeStarters.forEach { starter ->
-                        StarterCard(starter) { chatReady { chat.clearConversation(); chat.send(starter.text); open(Route.AiChat) } }
-                    }
-                }
-
-                val recent = cloud.conversations.take(3)
-                if ((session.loggedIn || cloud.customModelName != null) && recent.isNotEmpty()) {
-                    SectionTitle("继续对话", Modifier.padding(top = 28.dp))
-                    Column(Modifier.padding(top = 10.dp).fillMaxWidth().outlinedCard(16.dp)) {
-                        recent.forEachIndexed { i, item ->
-                            if (i > 0) Hairline(Modifier.padding(start = 60.dp))
-                            RecentRow(item, first = i == 0) { chat.openConversation(item.id); open(Route.AiChat) }
+                if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            SectionTitle("从这里聊起")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeStarters.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pair.forEach { starter ->
+                            StarterNote(starter, Modifier.weight(1f)) {
+                                chatReady { chat.clearConversation(); chat.send(starter.text); open(Route.AiChat) }
+                            }
                         }
                     }
-                    if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Spacer(Modifier.height(NavInset + 12.dp))
             }
+            Spacer(Modifier.height(14.dp))
         }
-    }
-}
-
-/** 顶部的淡色晕染和两道远山，往下渐隐到页面底色。 */
-@Composable
-private fun HomeBackdrop(modifier: Modifier) {
-    val brand = Brand
-    val soft = LocalExtraColors.current.brandSoft
-    val page = MaterialTheme.colorScheme.background
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        drawRect(Brush.verticalGradient(listOf(soft.copy(alpha = 0.9f), page), startY = 0f, endY = h))
-        val far = Path().apply {
-            moveTo(0f, h * 0.62f)
-            cubicTo(w * 0.16f, h * 0.48f, w * 0.30f, h * 0.58f, w * 0.46f, h * 0.50f)
-            cubicTo(w * 0.62f, h * 0.42f, w * 0.80f, h * 0.60f, w, h * 0.46f)
-            lineTo(w, h); lineTo(0f, h); close()
-        }
-        val near = Path().apply {
-            moveTo(0f, h * 0.78f)
-            cubicTo(w * 0.22f, h * 0.64f, w * 0.38f, h * 0.80f, w * 0.58f, h * 0.70f)
-            cubicTo(w * 0.74f, h * 0.62f, w * 0.88f, h * 0.76f, w, h * 0.70f)
-            lineTo(w, h); lineTo(0f, h); close()
-        }
-        drawPath(far, brand.copy(alpha = 0.05f))
-        drawPath(near, brand.copy(alpha = 0.07f))
-        drawRect(Brush.verticalGradient(listOf(page.copy(alpha = 0f), page), startY = h * 0.6f, endY = h), topLeft = Offset(0f, h * 0.6f))
+        HomeChatEntry(cloud, session.loggedIn || cloud.customModelName != null) { chatReady { open(Route.AiChat) } }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier, style = XType.Section, fontWeight = FontWeight.SemiBold)
+private fun SectionTitle(text: String) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(text, style = XType.Section, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.weight(1f).height(1.dp).background(LocalExtraColors.current.line))
+    }
 }
 
 @Composable
-private fun HomeComposerCard(cloud: CloudChatState, loggedIn: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(22.dp)
+private fun StarterNote(starter: HomeStarter, modifier: Modifier, onClick: () -> Unit) {
+    val ink = starter.tint.color
     Column(
-        modifier.fillMaxWidth()
-            .shadow(14.dp, shape, ambientColor = Brand.copy(alpha = 0.25f), spotColor = Brand.copy(alpha = 0.25f))
-            .clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, Brand.copy(alpha = 0.28f), shape)
-            .clickable(onClick = onClick).padding(start = 18.dp, end = 14.dp, top = 18.dp, bottom = 14.dp),
+        modifier.clip(RoundedCornerShape(12.dp)).background(ink.copy(alpha = if (ThemeState.dark) 0.12f else 0.075f))
+            .clickable(onClick = onClick).heightIn(min = 96.dp).padding(12.dp),
     ) {
-        Text("问点什么，或描述想要的内容…", style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown)
-            Text(
-                if (xyz.xiangban.xiaoban.common.community.isCustomModelTier(cloud.selectedTier)) "自己的模型服务" else if (!cloud.officialAiEnabled) "添加或选择模型服务" else if (loggedIn) quotaText(cloud.balance) else "登录或添加模型服务",
-                Modifier.weight(1f).padding(start = 10.dp), style = XType.Caption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Box(Modifier.size(40.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
-                XIcon(XIcons.ArrowUp, tint = Color.White, size = 20.dp)
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            XIcon(starter.icon, tint = ink, size = 15.dp)
+            Text(starter.label, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(starter.text, Modifier.padding(top = 7.dp), style = XType.Body, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun HomeChatEntry(cloud: CloudChatState, loggedIn: Boolean, onClick: () -> Unit) {
+    val modelStatus = when {
+        isCustomModelTier(cloud.selectedTier) -> "自己的模型服务"
+        !cloud.officialAiEnabled -> "添加或选择模型服务"
+        loggedIn -> quotaText(cloud.balance)
+        else -> "登录或添加模型服务"
+    }
+    val background = MaterialTheme.colorScheme.onSurface
+    val foreground = MaterialTheme.colorScheme.surface
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(background).clickable(onClick = onClick).heightIn(min = 62.dp).padding(horizontal = 16.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("和小伴聊聊", style = XType.Section, fontWeight = FontWeight.SemiBold, color = foreground)
+            Text("${cloud.modelName()} · $modelStatus", style = XType.Caption, color = foreground.copy(alpha = 0.78f))
+        }
+        Box(Modifier.size(34.dp).clip(CircleShape).background(foreground), contentAlignment = Alignment.Center) {
+            XIcon(XIcons.ArrowRight, tint = background, size = 18.dp)
         }
     }
 }
 
 @Composable
-private fun FeatureCard(feature: HomeFeature, modifier: Modifier) {
-    val tint = feature.tint.color
-    val shape = RoundedCornerShape(18.dp)
+private fun FeatureShortcut(feature: HomeFeature, modifier: Modifier) {
     Column(
-        modifier.clip(shape).background(MaterialTheme.colorScheme.surface)
-            .background(tint.copy(alpha = if (ThemeState.dark) 0.12f else 0.07f))
-            .border(1.dp, tint.copy(alpha = 0.16f), shape)
-            .clickable(onClick = feature.onClick).padding(14.dp),
+        modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = feature.onClick).padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            XIcon(feature.icon, tint = tint, size = 22.dp)
-        }
-        Text(feature.title, Modifier.padding(top = 12.dp), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(
-            feature.desc, Modifier.padding(top = 2.dp).heightIn(min = 32.dp), style = XType.Caption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        Image(
+            painterResource(feature.icon), contentDescription = null,
+            modifier = Modifier.size(50.dp),
         )
-    }
-}
-
-@Composable
-private fun StarterCard(starter: HomeStarter, onClick: () -> Unit) {
-    val tint = starter.tint.color
-    Column(
-        Modifier.width(156.dp).outlinedCard(16.dp).clickable(onClick = onClick).padding(14.dp),
-    ) {
-        XIcon(starter.icon, tint = tint, size = 20.dp)
-        Text(starter.text, Modifier.padding(top = 10.dp).heightIn(min = 44.dp), style = XType.Secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(feature.title, Modifier.padding(top = 6.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        feature.status?.let {
+            Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
