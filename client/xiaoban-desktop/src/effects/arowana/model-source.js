@@ -1,9 +1,9 @@
 const models = {
   arowana: {
     file: 'arowana.glb',
-    url: 'https://res.xiangban.xyz/files/5b97664f1eb0e64a3253c5f38e866d14.glb',
-    sha256: 'db223def3a0d109110b8a27901b3ae52157c1961bd2d11b972b89ec203bc6cb6',
-    bytes: 15033348,
+    url: 'https://res.xiangban.xyz/files/7b68680fe1757d50cd22ece7a157dc43.glb',
+    sha256: 'bda5a32ecd70e6247e0b6946db7e1db4e2393e32aacad9416597f2dac8d714ad',
+    bytes: 16247268,
   },
   guppy: {
     file: 'blue-guppy.glb',

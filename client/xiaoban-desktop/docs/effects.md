@@ -6,9 +6,9 @@
 
 「龙鱼巡游」和「锦鲤巡游」是两个独立的官方特效，共用内置 WebGL 2 渲染器。「龙鱼巡游」可在透明桌面层显示朱红龙鱼、单条孔雀鱼、六条孔雀鱼群，或朱红龙鱼与孔雀鱼群。「锦鲤巡游」显示一尾红白锦鲤。两款特效各自保存速度、大小、灯光和「砂石水草」设置。锦鲤模型随客户端安装；龙鱼和孔雀鱼模型下载并缓存后可离线播放。
 
-朱红龙鱼模型、游动和砂石水草使用 RealWorldBuilder 的朱红龙鱼版本，孔雀鱼模型、花色和群游路线沿用原水族箱版本。 [朱红龙鱼版本](https://github.com/bestyize/RealWorldBuilder/tree/1a04202725f8387ed5dbbb6bf917edbf73936bc4) · [原水族箱版本](https://github.com/bestyize/RealWorldBuilder/tree/6b9d23da4c554be8ec1c134633776c1722706aa3)
+朱红龙鱼使用 RealWorldBuilder 的新版模型和交叉巡游路线，转弯时鱼身分段跟随，升潜时鱼头与躯干依次调整俯仰。红白锦鲤采用同一提交中独立预览的内嵌 GLB、宽弯路线和游动算法，按桌面固定镜头缩放路线；划水与滑行交替，转向时内侧胸鳍收放。 [模型与游动源码](https://github.com/bestyize/RealWorldBuilder/tree/cb1212a3af11131b69a6cd47d0d0e5d37e84a9da/fish)
 
-红白锦鲤模型取自 RealWorldBuilder 的独立预览 HTML 内嵌 GLB，游动沿用预览中的摆尾算法和水族箱路线。 [红白锦鲤源项目](https://github.com/bestyize/RealWorldBuilder/tree/d4c307571070dc846023239d1f1d3c1dc37840d8/fish/kohaku-koi)
+桌面孔雀鱼的模型、花色与群游路线沿用[原水族箱版本](https://github.com/bestyize/RealWorldBuilder/tree/6b9d23da4c554be8ec1c134633776c1722706aa3)。砂石水草沿用[朱红龙鱼初版造景](https://github.com/bestyize/RealWorldBuilder/tree/1a04202725f8387ed5dbbb6bf917edbf73936bc4)。
 
 「装扮 → 特效 → 导入」可以选择单个 `.html`、`.htm`、粒子 JSON 或 V2 ZIP。导入后在「我的」里预览或选用。导入同 ID 的单个 JSON 时，应用会先询问是否替换。同 ID 的 ZIP 导入会被拒绝。
 

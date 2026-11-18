@@ -1,17 +1,19 @@
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { galleryAssets, galleryExhibits } from '../src/lib/microGallery.ts'
+import { galleryExhibits } from '../src/lib/microGallery.ts'
 
 // RealWorldBuilder commits the self-contained players alongside their source.
 const upstream = 'https://raw.githubusercontent.com/bestyize/RealWorldBuilder/'
 const galleryRevision = '48eef09d9a1e2546de4329a3d0490170e63699f2'
-const vermilionRevision = '1a04202725f8387ed5dbbb6bf917edbf73936bc4'
-const vermilionSources = new Map([
+const fishRevision = 'cb1212a3af11131b69a6cd47d0d0e5d37e84a9da'
+const fishSources = new Map([
   ['aquarium.html', 'aquarium.html'],
+  ['fish/blue-guppy/preview.html', 'fish/blue-guppy/preview.html'],
+  ['fish/blue-guppy/school-preview.html', 'fish/blue-guppy/school-preview.html'],
   // Keep the standalone exhibit URL used by existing mobile clients.
   ['fish/arowana/preview.html', 'fish/vermilion-arowana/preview.html'],
 ])
-const destination = new URL('../public' + galleryAssets, import.meta.url)
+const destination = new URL('../public/gallery-exhibits/', import.meta.url)
 const marker = new URL('.gallery-source-version', import.meta.url)
 const maxFileBytes = 40 * 1024 * 1024
 
@@ -77,9 +79,9 @@ function embedPlayer(html, source) {
 }
 
 async function download(source) {
-  const vermilion = vermilionSources.get(source)
-  const revision = vermilion ? vermilionRevision : galleryRevision
-  const response = await fetch(`${upstream}${revision}/${vermilion ?? source}`, {
+  const fish = fishSources.get(source)
+  const revision = fish ? fishRevision : galleryRevision
+  const response = await fetch(`${upstream}${revision}/${fish ?? source}`, {
     redirect: 'error',
     signal: AbortSignal.timeout(45_000),
   })

@@ -79,7 +79,8 @@ document.addEventListener('keydown', event => {
 
 const gallery = new URL('../public/gallery-exhibits/', import.meta.url)
 const output = resolve(values.out)
-const sources = [aquariumExhibit, rabbitExhibit].map(async ({ id, source }) => {
+const exhibits = [aquariumExhibit, rabbitExhibit]
+const sources = exhibits.map(async ({ id, source }) => {
   const html = await readFile(new URL(source, gallery), 'utf8')
   return [id, galleryPlayer(html, id)]
 })
@@ -94,7 +95,7 @@ for (const [id, html] of players) {
   } : undefined)
   if (!item) throw new Error(`精选目录缺少 ${id}`)
   const kind = id === 'saltline' ? 'game' : 'app'
-  const version = id === aquariumExhibit.id ? '1.0.2' : kind === 'game' ? '1.0.0' : '1.0.1'
+  const version = id === aquariumExhibit.id ? '1.0.3' : kind === 'game' ? '1.0.0' : '1.0.1'
   const manifest = {
     schemaVersion: 3, runtimeProtocol: 2, id, name: item.title, description: item.description,
     version, kind, category: kind === 'game' ? 'action' : 'tool',
@@ -104,7 +105,9 @@ for (const [id, html] of players) {
   const archive = new JSZip()
   archive.file('manifest.json', JSON.stringify(manifest, null, 2) + '\n')
   archive.file('index.html', html)
-  archive.file('cover.webp', await readFile(new URL(`../public${item.cover}`, import.meta.url)))
+  const exhibit = exhibits.find(exhibit => exhibit.id === id)
+  const cover = exhibit ? new URL(`assets/gallery/${exhibit.cover}.webp`, gallery) : new URL(`../public${item.cover}`, import.meta.url)
+  archive.file('cover.webp', await readFile(cover))
   const bytes = await archive.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   await writeFile(resolve(output, `${id}.zip`), bytes)
   console.log(`${id}.html + ${id}.zip  ${bytes.length} bytes`)
