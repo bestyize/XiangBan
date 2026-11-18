@@ -262,7 +262,7 @@
     }
   }
 
-  function pine(g, x, y, scale, seed, color = [42, 54, 43]) {
+  function pine(g, x, y, scale, seed, color = [42, 54, 43], crownBrush) {
     const rand = A.rng(seed)
     g.save(); g.translate(x, y); g.scale(scale, Math.abs(scale))
     const trunk = [[0, 5], [-13, -20], [-18, -48], [-38, -72], [-41, -106], [-67, -132], [-75, -168], [-59, -190]]
@@ -283,6 +283,17 @@
       for (let j = 0; j < 7; j++) {
         const q = .29 + j * .128
         const px = bx + side * width * q, py = by - rise * q - rand() * 9
+        if (crownBrush && j !== 2 && j !== 5) {
+          // Alternate wide, flat pads with bare elbows and a fork pitched into the canopy.
+          const h = (j % 3 === 0 ? 18 : 6) + rand() * 9
+          const tip = px + side * (4 + rand() * 11)
+          inkLine(g, [[px-side*5,py+5],[px,py-h*.53],[tip,py-h]], 2.8, color, seed+at*9+j)
+          dab(g,tip,py-h,15+rand()*12,7+rand()*5,crownBrush,.93)
+          for (let fan=0;fan<6;fan++) {
+            const f=(fan-2.5)/2.5, fx=tip+f*16, fy=py-h-Math.cos(f*1.45)*3
+            A.leafCluster(g,fx,fy,-1.42+f*.98,9,6+rand()*5,.84,[38,57,39],.9,rand)
+          }
+        }
         const needleWash = g.createRadialGradient(px, py - 1, 0, px, py - 1, 18)
         needleWash.addColorStop(0, A.rgba(color, .64 + rand() * .14))
         needleWash.addColorStop(.47, A.rgba(color, .32)); needleWash.addColorStop(1, A.rgba(color, 0))
@@ -753,6 +764,17 @@
       gateSeam(g, opening.slice(start, end).map(([x, y]) => [x * 1.07, y - 1]), [82, 82, 69], 682 + start, 1.1)
     }
 
+    // Rain threads emerge from a shelf of moss and turn into heavier ink in the joints.
+    for (const [x, y, span] of [[-119,-158,29],[-91,-187,25],[-103,-62,31],[67,-176,22],[79,-41,29]]) {
+      const joint = [[x,y],[x+span*.3,y-2],[x+span*.62,y+1],[x+span,y-1]]
+      inkLine(g, joint, 3.8, [56,61,49], Math.round(x + 631))
+      for (let k=0;k<34;k++) {
+        const t=rand(), xx=x+t*span, yy=y-1.5-rand()**2*5
+        g.fillStyle = k%4 ? '#58634c' : '#81906b'
+        A.leaf(g,xx,yy,-2.8+rand()*2.5,1.5+rand()*4,1+rand())
+        if (k%8===0) axeStroke(g,xx,yy+2,-2,6+rand()*14,3,[74,75,59],.45,rand)
+      }
+    }
     const plaque = [[-29, -218], [-11, -219], [34, -215], [32, -192], [11, -189], [-31, -192]]
     gateStone(g, plaque, [166, 151, 119], rand)
     gateSeam(g, plaque.slice(1, 4), [77, 71, 57], 581, 1.2)
@@ -814,7 +836,10 @@
       const top = anchor ? 91 : G - 68
       timber(g, x - 8, top, 14, G + 66 - top)
       if (!anchor) beam(g, [[x - 4, G - 8], [x + 34, G + 21], [x + 88, G + 58]], 11, x + 3)
-      for (const d of [0, 5, 10]) stroke(g, [[x - 11, G - 48 + d], [x + 7, G - 47 + d]], '#c1a380', 1.7)
+      for (const d of [0, 5, 10]) {
+        stroke(g, [[x-11,G-48+d],[x-3,G-45+d],[x+8,G-47+d]], '#584435', 3.5)
+        stroke(g, [[x-9,G-48+d],[x-3,G-46+d],[x+5,G-47+d]], '#c9b38d', 1.1)
+      }
     }
     const cable = Array.from({ length: 22 }, (_, i) => {
       const t = i / 21
@@ -824,6 +849,20 @@
     beam(g, [cable.at(-1), [2332, 93]], 3.3, 698)
     stroke(g, cable, '#483a2cc4', 1.2)
     dryLine(g, cable, 3.1, [61, 47, 37], .85, 690, 5)
+    // Twisted hemp catches light on one side. Cloth knots mark the loaded suspension ties.
+    for (let i = 1; i < cable.length; i++) {
+      const [x,y] = cable[i-1], [xx,yy] = cable[i]
+      for (let j=0;j<8;j++) {
+        const px=A.lerp(x,xx,j/8), py=A.lerp(y,yy,j/8)
+        stroke(g, [[px,py+.8],[px+2.4,py-1.1]], '#b49b74', 1.05)
+      }
+      if (i%4!==2) continue
+      const deck = G + 4
+      stroke(g, [[xx,yy+1],[xx-1,yy+32],[xx+2,deck]], '#76634fc2', 1.5)
+      stroke(g, [[xx-2,deck-2],[xx+2,deck],[xx+6,deck-2]], '#534838', 2.1)
+      for (let k=-2;k<=2;k++) stroke(g, [[xx+k*1.8,yy-1.8],[xx+k*1.8-1,yy+3]], '#433e34', 1.4)
+      wash(g, [[xx+3,yy+2],[xx+5,yy+3],[xx+9,yy+14],[xx+6,yy+12],[xx+4,yy+16]], '#8c5844')
+    }
     planks(g, from, G, to - from, 18, 209, paint)
     for (const x of [1498, 1634, 1819, 1974, 2150, 2282]) {
       inkLine(g, [[x, G + 13], [x + 17, G + 12], [x + 43, G + 13]], 5.5, [43, 39, 35], x)
@@ -842,6 +881,15 @@
   function corridor(g, paint) {
     for (const x of [2455, 2580, 2705, 2830, 2955]) {
       timber(g, x - 8, 103, 16, 194, true)
+      g.save(); g.translate(x, 0)
+      // Worn cinnabar is strongest under the roof and in the deep edge of the post.
+      wash(g,[[-7,103],[4,104],[4,161],[1,173],[2,194],[-2,207],[-4,195],[-7,210]],'#844f40')
+      dryLine(g,[[-5,110],[-4,140],[-5,179],[-5,201]],2.7,[194,157,111],.76,x,5)
+      for (const y of [141,149,278]) {
+        wash(g,[[-8,y],[-1,y+1],[8,y-1],[7,y+3],[-7,y+4]],'#45483f')
+        stroke(g,[[-7,y],[-1,y+1],[7,y]],'#b4a17b',1)
+      }
+      g.restore()
       footing(g, x, G - 1, 19, x)
       beam(g, [[x - 6, 153], [x + 15, 130], [x + 40, 109]], 9.5, x + 29, true)
       beam(g, [[x + 6, 151], [x - 14, 130], [x - 36, 111]], 8.1, x + 32, true)
@@ -876,7 +924,7 @@
   }
 
   function courtyard(g, paint) {
-    pine(g, 3553, G + 2, 1.16, 707, [47, 61, 43])
+    pine(g, 3553, G + 2, 1.16, 707, [47, 61, 43], paint.ink)
     pine(g, 3483, G + 6, -.51, 718, [67, 79, 61])
     stoneLantern(g, 3422, G, .74, paint)
     stoneLantern(g, 4067, G, .62, paint)
@@ -887,6 +935,10 @@
     inkLine(g, [[3894, G - 18], [3912, G - 26], [3948, G - 25], [4008, G - 27], [4020, G - 20]], 3, [62, 59, 49], 721, .75)
     dryLine(g, [[3908, G - 20], [3944, G - 22], [3980, G - 20], [4006, G - 22]], 4.3, PAPER, .71, 719)
     const rand = A.rng(717)
+    for (const [x,y] of [[3909,G-21],[3963,G-24],[3994,G-24]]) {
+      const fault=[[x,y],[x+6,y-1],[x+12,y+1],[x+17,y],[x+22,y+2]]
+      dryLine(g,fault,2.8,[65,64,55],.81,x,5)
+    }
     for (let i = 0; i < 39; i++) {
       const x = (i < 20 ? 3457 : 4018) + rand() * 120
       const y = G - rand() ** 2 * 12
@@ -918,6 +970,10 @@
     }
     for (let d = -134; d <= 134; d += 33) {
       inkLine(g, [[x + d - 12, 160], [x + d, 143], [x + d + 13, 160]], 3.6, [74, 80, 75], x + d, .73)
+    }
+    beam(g, [[x-35,144],[x-23,154],[x-7,157],[x+7,157],[x+23,154],[x+35,144]],5,x+140,true)
+    for(const side of [-1,1]) {
+      inkLine(g,[[x+side*31,145],[x+side*22,143],[x+side*16,148],[x+side*17,151]],3.3,[82,68,47],x+side)
     }
     roof(g, x, 100, 430, paint, 753)
     roof(g, x, 29, 302, paint, 759)
@@ -991,30 +1047,93 @@
     g.restore()
   }
 
+  function summitSapling(g, x, size, lean, seed) {
+    const rand = A.rng(seed)
+    g.save(); g.translate(x, G); g.scale(lean * size, size)
+    const stem = [[0, 1], [2, -11], [-3, -22], [1, -30], [10, -41], [9, -52]]
+    g.fillStyle = '#504f41'; A.ribbon(g, stem, t => 4.3 * (1 - t) + .5)
+    for (let j = 0; j < 7; j++) {
+      const [sx, sy] = stem[1 + Math.floor(j * .62)]
+      const dir = j % 2 ? -1 : 1
+      const x1 = sx + dir * (7 + 5 * rand()), y1 = sy - 8 - 3 * rand()
+      const x2 = x1 + dir * (7 + 9 * rand()), y2 = y1 - 4 - 6 * rand()
+      stroke(g, [[sx, sy], [x1, y1], [x2, y2]], '#666551', 1.45)
+      for (let k = 0; k < 9; k++) {
+        const t = k / 9, px = A.lerp(x1, x2, t), py = A.lerp(y1, y2, t)
+        const angle = (dir > 0 ? -.6 : Math.PI + .6) + (k % 2 ? -.75 : .65) + (rand() - .5) * .55
+        g.fillStyle = k % 4 === 0 ? '#808163' : k % 3 ? '#495849' : '#666e51'
+        A.leaf(g, px, py, angle, 3.8 + rand() * 4.2, 1.4 + rand() * .9)
+      }
+    }
+    g.restore()
+  }
+
+  function summitGrass(g, x, y, height, seed) {
+    const rand = A.rng(seed)
+    for (let tuft = 0; tuft < 3; tuft++) {
+      const root = x + (tuft - 1) * height * .54, h = height * (.5 + rand() * .5)
+      for (let j = 0; j < 11; j++) {
+        const dx = (j / 10 - .39) * h * (1.1 + rand()), dy = h * (.48 + rand() * .68)
+        const blade = [[root + (rand() - .5) * 3, y], [root + dx * .29, y - dy * .62],
+          [root + dx * .65, y - dy], [root + dx, y - dy * (.78 + rand() * .24)]]
+        g.fillStyle = j % 4 === 0 ? '#95866a' : j % 3 ? '#53604b' : '#38483e'
+        A.ribbon(g, blade, t => (1.35 + .55 * (j % 3)) * (1 - t) + .08)
+      }
+    }
+  }
+
   function summitTerrace(g, paint) {
     wash(g, [[5310, G - 1], [5330, G - 14], [5372, G - 12], [5394, G - 2]], '#655e58')
     summitPine(g, paint)
     stoneLantern(g, 5468, G, .56, paint)
     stoneLantern(g, 5850, G, .47, paint)
-    const x = 5960
-    g.save(); g.translate(x, G); g.scale(.54, .54); g.translate(-x, -G)
-    const body = [[x - 45, G], [x - 37, G - 17], [x - 32, G - 50], [x - 33, G - 88], [x - 29, G - 108],
-      [x - 17, G - 128], [x - 2, G - 123], [x + 16, G - 132], [x + 32, G - 115], [x + 36, G - 91],
-      [x + 34, G - 57], [x + 38, G - 21], [x + 44, G]]
-    g.save(); path(g, body, true); g.clip()
-    g.fillStyle = gradient(g, x - 33, G, x + 41, G, [[0, '#77726d'], [.42, '#a79d8d'], [1, '#585457']])
-    g.fillRect(x - 46, G - 134, 93, 136)
-    for (let j = 0; j < 20; j++) {
-      dab(g, x - 32 + A.hash(j, 792) * 72, G - 131 + A.hash(j, 795) * 132, 15, 18,
-        j % 4 ? paint.ink : paint.paper, .16 + A.hash(j, 796) * .27)
+    for (const [x, size, lean] of [[5286, .57, -1], [5425, .66, 1], [5821, .48, -1], [6014, .82, 1], [6108, .51, 1]]) {
+      summitSapling(g, x, size, lean, x)
     }
+
+    // A pale, split front plane carries the inscription. Load the side and foot with ink.
+    g.save(); g.translate(5960, G); g.scale(.79, .79)
+    const body = [[-46, 1], [-36, -24], [-34, -77], [-31, -105], [-24, -113],
+      [-19, -128], [-5, -126], [12, -133], [23, -129], [34, -111], [32, -94],
+      [38, -75], [35, -28], [43, -11], [46, 1]]
+    g.save(); path(g, body, true); g.clip()
+    g.fillStyle = gradient(g, -42, -114, 40, -36, [[0, '#a59d86'], [.39, '#d1c6a9'], [.68, '#b7ad97'], [1, '#867d70']])
+    g.fillRect(-47, -135, 95, 138)
+    const seam = [[13, -132], [21, -111], [16, -98], [24, -74], [23, -47], [29, -22], [24, 1]]
+    wash(g, [...seam, [48, 3], [48, -134]], '#756f64')
+    const rand = A.rng(806)
+    for (let k = 0; k < 54; k++) {
+      const x = -43 + rand() * 88, y = -132 + rand() * 134
+      const edge = x < -18 || x > 17 || y > -32
+      dab(g, x, y, 6 + rand() * 17, 4 + rand() * 12, k % 4 ? paint.ink : paint.paper, edge ? .30 : .085)
+      if (edge) axeStroke(g, x, y, -3 - rand() * 7, 5 + rand() * 14, 2 + rand() * 6, INK, .44, rand)
+    }
+    dryLine(g, seam, 4.5, INK, .81, 886, 7)
+    dryLine(g, body.slice(1, 9), 4.1, PAPER, .95, 889, 7)
     g.restore()
-    inkLine(g, body, 4.4, [51, 46, 48], 796, .89)
-    dryLine(g, [[x - 31, G - 14], [x - 25, G - 105], [x - 17, G - 121], [x + 18, G - 126], [x + 30, G - 111]], 3.2, PAPER, .77, 803)
-    inkLine(g, [[x + 16, G - 126], [x + 6, G - 105], [x + 17, G - 99], [x + 6, G - 83]], 2.9, INK, 806, .64)
-    g.fillStyle = '#47464a'; g.font = '600 23px ' + FONT; g.textAlign = 'center'
-    g.fillText('止', x - 1, G - 75); g.fillText('戈', x + 1, G - 47)
-    inkLine(g, [[x - 13, G - 32], [x + 14, G - 32]], 3.3, [154, 66, 54], 810)
+    inkLine(g, body.slice(0, 6), 3.2, [70, 65, 57], 796)
+    dryLine(g, body.slice(8), 3.8, INK, .86, 804, 7)
+
+    // 止 and 戈 share a carved edge, with varying pressure on each individual stroke.
+    const strokes = [
+      [[-4,-101],[-3,-97],[-3.5,-76]], [[-3,-89],[3,-90],[10,-91]],
+      [[-14,-91],[-13,-87],[-13,-76]], [[-20,-75],[-14,-74],[-4,-75],[14,-76]],
+      [[-18,-56],[-13,-55],[0,-57],[13,-60]], [[-5,-68],[-3,-64],[0,-53],[5,-43],[11,-37],[15,-36],[16,-43]],
+      [[8,-55],[6,-51],[0,-45],[-9,-40],[-15,-38]], [[5,-68],[8,-66],[11,-63]],
+    ]
+    for (const [j, line] of strokes.entries()) {
+      stroke(g, line.map(([px, py]) => [px + .85, py + .9]), '#e2d4b3', 2.8)
+      g.fillStyle = '#343934'
+      A.ribbon(g, line, t => 1.4 + 2.9 * Math.sin(.55 + t * 2.48))
+      dryLine(g, line, 3.4, INK, .82, 860 + j, 4)
+    }
+    wash(g, [[-7,-26],[1,-26],[1,-19],[-7,-18]], '#925846')
+    dryLine(g, [[-6,-22],[-3,-24],[-2,-20],[0,-22]], 1.1, PAPER, .85, 880, 3)
+    for (let k = 0; k < 32; k++) {
+      const x = -33 + rand() * 70, y = -3 - rand() ** 2 * 16
+      g.fillStyle = k % 3 ? '#59604a' : '#7e8061'
+      A.leaf(g, x, y, rand() * Math.PI, 1 + rand() * 4, 1.3)
+    }
     g.restore()
   }
 
@@ -1056,6 +1175,18 @@
       g.save();g.translate(3833,G)
       g.beginPath();g.rect(-147,-94,294,96);g.arc(8,-37,53,0,TAU,true)
       g.fillStyle='#c1b9a1';g.fill('evenodd');g.clip('evenodd')
+      // The ring is masked by the actual opening. Radial joints turn across its face.
+      g.save();g.translate(8,-37)
+      for(let k=0;k<18;k++){
+        const angle = k*TAU/18, end = angle+TAU/18-.012
+        g.beginPath();g.arc(0,0,62,angle,end);g.arc(0,0,52,end,angle,true);g.closePath()
+        g.fillStyle=k%4 ? '#777b70' : '#929382';g.fill()
+        stroke(g,[[54*Math.cos(angle),54*Math.sin(angle)],[61*Math.cos(angle),61*Math.sin(angle)]],'#545b50',1.2)
+      }
+      g.restore()
+      for (const [x,y,w,h] of [[-125,-26,35,19],[-95,-8,44,17],[94,-33,27,21]]) {
+        for(let k=0;k<19;k++) dab(g,x+(rand()-.5)*w,y+(rand()-.5)*h,6+rand()*8,3+rand()*4,paint.ink,.32)
+      }
       for(let j=0;j<110;j++){
         const x=-148+rand()*296,y=-94+rand()*96
         dryLine(g,[[x,y],[x+3,y+1],[x+6+rand()*14,y+1.6]],2.4,j%3?PAPER:INK,.26,630+j,4)
@@ -1126,6 +1257,11 @@
         }
         g.restore()
         dryLine(g, lip, 2.9, PAPER, .84, 3687, 5)
+        for (const [x, height] of [[5272, 20], [5369, 13], [5414, 18], [5479, 11], [5530, 8],
+          [5614, 6], [5747, 8], [5815, 14], [5887, 10], [5928, 17], [5983, 19], [6054, 15], [6116, 13]]) {
+          const y = G + 23 + 5 * Math.sin(x * .019) + 3 * Math.sin(x * .055)
+          summitGrass(g, x, y - 2 - A.hash(x, 583) * 7, height, x)
+        }
         // Broken horizontal strata under the arena, well below the actors' feet.
         // Old sword cuts run obliquely across the lip, deepening at the edge of the dais.
         for (const [x, y, span] of [[5542, 321, 58], [5618, 332, 88], [5637, 337, 46], [5802, 327, 74]]) {
@@ -1530,24 +1666,45 @@
     const len = 26 + power * 48
     const wave = Math.sin(time * (4 + power * 8) + x * .08) * (4 + power * 9)
     const lift = 16 - power * 21
-    g.fillStyle = '#a55341'
+    g.fillStyle = '#9c4a37'
     g.beginPath(); g.moveTo(x, y)
     g.bezierCurveTo(x + dir * len * .38, y + lift * .45, x + dir * len * .77, y + lift + wave, x + dir * len, y + lift + wave - 5)
-    g.lineTo(x + dir * len * .85, y + lift + wave + 3)
+    const tipY = y + lift + wave
+    g.lineTo(x + dir * len * .79, tipY - 1)
+    g.lineTo(x + dir * (len + 4), tipY + 3)
+    g.lineTo(x + dir * len * .73, tipY + 2)
+    g.lineTo(x + dir * len * .88, tipY + 7)
     g.quadraticCurveTo(x + dir * len * .42, y + 17, x, y + 13)
     g.closePath(); g.fill()
+    stroke(g, [[x + dir*3, y+9],[x+dir*len*.29,y+10+lift*.37],[x+dir*len*.62,y+lift+wave*.66+2]], '#623e329e', 2.2)
     stroke(g, [[x, y + 3], [x + dir * len * .35, y + lift * .4 + 4], [x + dir * len * .7, y + lift + wave + 1]], '#dec3a8', .8)
   }
 
-  function bell(g, bell, clock, time, active) {
-    const age = clock - bell.ringAt
-    const swing = Math.sin(time * .94) * .026 + Math.sin(age * 13) * Math.exp(-age * 2.1) * bell.dir * .22
-    g.save(); g.translate(bell.x, bell.y - 45); g.rotate(swing)
-    stroke(g, [[0, -28], [0, 4]], '#535354', 3)
+  function paintBellBody(g) {
+    stroke(g, [[0,-29],[-1,-13],[0,1]], '#464a43', 3)
+    for (const side of [-1,1]) {
+      g.beginPath();g.moveTo(0,-1);g.bezierCurveTo(side*16,-19,side*3,-17,0,-8)
+      g.strokeStyle='#57553e';g.lineWidth=3.5;g.stroke()
+    }
     g.fillStyle = gradient(g, -33, 0, 33, 0, [[0, '#524b3e'], [.33, '#b59c70'], [.64, '#897553'], [1, '#494839']])
     g.strokeStyle = '#4b473e'; g.lineWidth = 1.2
     g.beginPath(); g.moveTo(-14, 0); g.quadraticCurveTo(-27, 6, -30, 37); g.lineTo(-35, 45)
     g.quadraticCurveTo(0, 53, 35, 45); g.lineTo(30, 37); g.quadraticCurveTo(27, 6, 14, 0); g.closePath(); g.fill(); g.stroke()
+    g.save(); g.clip()
+    const rand = A.rng(3483)
+    for(let i=0;i<94;i++) {
+      const x=(rand()-.5)*71, y=rand()*52
+      const oxidized = x < -11 || x > 17 || y > 36
+      g.fillStyle=A.rgba(oxidized ? [52,82,68] : [221,185,121],oxidized ? .36 : .27)
+      A.leaf(g,x,y,rand()*TAU,1+rand()*7,1+rand()*2)
+    }
+    for(let j=-2;j<=2;j++){
+      const x=j*11
+      const scroll=[[x-5,30],[x-5,24],[x+3,24],[x+3,29],[x-1,29],[x-1,27]]
+      stroke(g,scroll,'#61583e',1.6)
+      stroke(g,scroll.map(([px,py])=>[px-.45,py-.55]),'#ccae76',.85)
+    }
+    g.restore()
     for (let j = 0; j < 4; j++) {
       g.beginPath(); g.moveTo(-22 - j * 2, 9 + j * 9); g.quadraticCurveTo(0, 16 + j * 9, 22 + j * 2, 9 + j * 9); g.stroke()
     }
@@ -1562,6 +1719,14 @@
     stroke(g, [[-31, 43], [-19, 46], [-6, 47]], '#eacb92', 1.5)
     for (const x of [-14, 0, 14]) stroke(g, [[x, 7], [x * 1.48, 40]], '#c8a77b', .72)
     stroke(g, [[0, 42], [0, 62]], '#4a4944', 2.5)
+  }
+
+  function bell(g, a, bell, clock, time, active) {
+    const age = clock - bell.ringAt
+    const swing = Math.sin(time * .94) * .026 + Math.sin(age * 13) * Math.exp(-age * 2.1) * bell.dir * .22
+    g.save(); g.translate(bell.x, bell.y - 45); g.rotate(swing)
+    a.mountain.bellBody ||= A.sprite(82, 100, a.mountain.detailRes, paintBellBody, 41, 32)
+    A.drawSprite(g, a.mountain.bellBody, 0, 0)
     if (active) {
       stroke(g, [[-23, 37], [-29, 45], [0, 49], [29, 45], [23, 37]], '#efd09e', 1.5)
       g.fillStyle = '#9b3b31'; g.beginPath(); g.roundRect(-9, 15, 18, 18, 2); g.fill()
@@ -1586,7 +1751,7 @@
     }
     if (state.bell && state.bell.x >= left && state.bell.x <= right) {
       const active = state.enemies.some(e => e.type === 'shizhen' && e.alive && e.state === 'mountTell' && Math.abs(e.x - state.bell.x) <= state.bell.radius)
-      bell(g, state.bell, clock, reducedMotion ? 0 : time, active && clock - state.bell.ringAt >= 1.6)
+      bell(g, a, state.bell, clock, reducedMotion ? 0 : time, active && clock - state.bell.ringAt >= 1.6)
     }
     const dash = state.player.action?.borrow
     if (dash && !reducedMotion) {
