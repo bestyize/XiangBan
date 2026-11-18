@@ -9,7 +9,7 @@ class BuiltinGameSmokeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val id = intent.getStringExtra("id")
-        if (id in BuiltinMobileGames.ids && id !in setOf(BuiltinMobileGames.REMOTE_CONTROL, BuiltinMobileGames.QUICK_LAUNCH)) {
+        if (id != null && id in BuiltinMobileGames.ids && !BuiltinMobileGames.isBundledTool(id)) {
             startActivity(RuntimeV2Activity.launchIntent(this).putExtra(RuntimeV2Activity.EXTRA_GAME_ID, id))
         }
         finish()

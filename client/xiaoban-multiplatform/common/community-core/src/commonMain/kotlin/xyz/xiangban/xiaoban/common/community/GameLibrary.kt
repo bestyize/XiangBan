@@ -6,9 +6,12 @@ import kotlinx.serialization.json.*
 object BuiltinMobileGames {
     const val REMOTE_CONTROL = "remote-control"
     const val QUICK_LAUNCH = "quick-launch"
-    val ids = listOf("dusk-glider", "ink-blade", "block-puzzle", "pocket-sprites", "pro-cube", "snake-arena", "jade-gomoku", "merge-2048", "water-sort", "falling-blocks", "mbti", REMOTE_CONTROL, QUICK_LAUNCH)
+    const val LIVE_WALLPAPERS = "live-wallpapers"
+    val ids = listOf("dusk-glider", "ink-blade", "block-puzzle", "pocket-sprites", "pro-cube", "snake-arena", "jade-gomoku", "merge-2048", "water-sort", "falling-blocks", "mbti", REMOTE_CONTROL, QUICK_LAUNCH, LIVE_WALLPAPERS)
     /** Builtins shown under 精选工具 instead of 精选游戏. */
-    val tools = setOf("mbti", REMOTE_CONTROL, QUICK_LAUNCH)
+    val tools = setOf("mbti", REMOTE_CONTROL, QUICK_LAUNCH, LIVE_WALLPAPERS)
+    /** Tools whose entry and resources are shipped in the APK. */
+    fun isBundledTool(id: String): Boolean = id == REMOTE_CONTROL || id == QUICK_LAUNCH || id == LIVE_WALLPAPERS
     fun isTool(id: String): Boolean = id in tools
     /** Tools draw a one-character serif mark instead of a cropped cover. */
     fun glyph(id: String): String? = when (id) {
@@ -21,6 +24,7 @@ object BuiltinMobileGames {
         "mbti" -> "测评"
         REMOTE_CONTROL -> "工具"
         QUICK_LAUNCH -> "工具"
+        LIVE_WALLPAPERS -> "壁纸"
         "water-sort", "snake-arena" -> "解压"
         "dusk-glider", "ink-blade" -> "冒险"
         else -> "益智"

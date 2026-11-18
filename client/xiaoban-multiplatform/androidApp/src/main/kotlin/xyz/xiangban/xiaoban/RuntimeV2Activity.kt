@@ -161,7 +161,7 @@ class RuntimeV2Activity : ComponentActivity() {
             showUnavailable("请更新 Android System WebView 或 Chrome，再打开这个作品。")
             return
         }
-        if (root != null && id != BuiltinMobileGames.REMOTE_CONTROL && id != BuiltinMobileGames.QUICK_LAUNCH) {
+        if (root != null && !BuiltinMobileGames.isBundledTool(id)) {
             setContentView(TextView(this).apply {
                 text = "正在准备游戏…"
                 textSize = 16f
@@ -175,7 +175,7 @@ class RuntimeV2Activity : ComponentActivity() {
                         workspace -> RuntimeV2Package.loadWorkspace(filesDir.resolve("workspace/games/$id"), id)
                         idea != null -> AndroidRuntimeV2Community.loadIdea(this@RuntimeV2Activity, intent)
                         community -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
-                        id == BuiltinMobileGames.REMOTE_CONTROL || id == BuiltinMobileGames.QUICK_LAUNCH -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
+                        BuiltinMobileGames.isBundledTool(id) -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
                         else -> RuntimeV2Package.loadBuiltin(AndroidBuiltinGames.ensure(this@RuntimeV2Activity, id), id, assets)
                     }
                     quickLaunchEnabled = pack.manifest.id == "quick-launch" && runCatching {
@@ -634,6 +634,21 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "exit" -> { result(); log?.add("game.exit"); exit() }
+            "builtin.wallpaper.supported", "builtin.wallpaper.preview" -> {
+                val official = pack.host == "official-${BuiltinMobileGames.LIVE_WALLPAPERS}.app.xiangban.xyz"
+                if (!official || reply !== document) { error("unsupported"); return }
+                if (method == "builtin.wallpaper.supported") {
+                    result(MobileLiveWallpapers.supported(this))
+                    return
+                }
+                if (!ready || !resumed || !hasWindowFocus() || closing || failed || chrome.menuOpen || chrome.consentOpen ||
+                    lastUserGesture == 0L || SystemClock.elapsedRealtime() - lastUserGesture !in 0..1000) {
+                    error("gesture")
+                    return
+                }
+                lastUserGesture = 0L
+                if (MobileLiveWallpapers.openPreview(this, params.optString("scene"))) result(true) else error("unavailable")
+            }
             "quickLaunch.available", "quickLaunch.open", "quickLaunch.pin" -> {
                 val name = params.optString("name")
                 if (!quickLaunchEnabled || reply !== document || !QuickLaunchShortcut.targets.containsKey(name)) { error("unsupported"); return }

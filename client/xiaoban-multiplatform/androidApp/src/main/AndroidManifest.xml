@@ -85,6 +85,24 @@
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".QuickLaunchEntryActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <service
+            android:name=".AquariumWallpaperService"
+            android:exported="true"
+            android:label="@string/live_wallpaper_aquarium"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:process=":live_wallpaper">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/live_wallpaper" />
+        </service>
+        <service
+            android:name=".GalaxyWallpaperService"
+            android:exported="true"
+            android:label="@string/live_wallpaper_galaxy"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:process=":live_wallpaper">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/live_wallpaper" />
+        </service>
         <receiver android:name=".ReminderReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

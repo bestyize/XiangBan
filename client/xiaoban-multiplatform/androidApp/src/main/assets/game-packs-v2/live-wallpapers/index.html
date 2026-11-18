@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>动态壁纸</title>
+  <link rel="stylesheet" href="gallery.css">
+  <script defer src="scenes.js"></script>
+  <script defer src="gallery.js"></script>
+</head>
+<body>
+  <header><h1>动态壁纸</h1></header>
+  <main>
+    <div id="preview" class="preview" aria-label="水下花园实时预览">
+      <div class="preview-label">
+        <span id="scene-name">水下花园</span>
+        <small id="scene-note">轻触水面，泛起涟漪</small>
+      </div>
+    </div>
+    <div class="choices" role="group" aria-label="壁纸作品">
+      <button type="button" data-scene="aquarium" aria-pressed="true"><span class="swatch water"></span>水下花园</button>
+      <button type="button" data-scene="galaxy" aria-pressed="false"><span class="swatch stars"></span>银河</button>
+    </div>
+    <button type="button" id="apply" disabled>设为壁纸</button>
+    <p id="status" role="status">在系统预览中选择桌面或锁屏，可用位置因手机系统而异。</p>
+  </main>
+</body>
+</html>
