@@ -5,7 +5,7 @@ import { galleryExhibits } from '../src/lib/microGallery.ts'
 // RealWorldBuilder commits the self-contained players alongside their source.
 const upstream = 'https://raw.githubusercontent.com/bestyize/RealWorldBuilder/'
 const galleryRevision = '48eef09d9a1e2546de4329a3d0490170e63699f2'
-const fishRevision = 'cb1212a3af11131b69a6cd47d0d0e5d37e84a9da'
+const fishRevision = 'a92b6dd2fc7caa4b45c8b65dcaf0dec087aea74b'
 const fishSources = new Map([
   ['aquarium.html', 'aquarium.html'],
   ['fish/blue-guppy/preview.html', 'fish/blue-guppy/preview.html'],

@@ -4,7 +4,7 @@ export const galleryAssets = import.meta.env?.DEV ? '/gallery-exhibits/' : 'http
 export const aquariumExhibit = {
   id: 'aquarium',
   name: '水族箱',
-  description: '看龙鱼和孔雀鱼在山水客厅共游，切换鱼类、背景和灯光。',
+  description: '看龙鱼和宝莲灯鱼在山水客厅共游，点按水面投喂，切换背景和灯光。',
   cover: 'living-room',
   source: 'aquarium.html',
   query: '?scene=living-room',
