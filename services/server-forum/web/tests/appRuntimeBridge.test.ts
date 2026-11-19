@@ -7,7 +7,7 @@ const source = await readFile(new URL('../runtime-v2/bridge.js', import.meta.url
 const channel = 'xiaoban.app-runtime.v2'
 const parentOrigin = 'https://chat.xiangban.xyz'
 
-function load(options: { framed?: boolean } = {}) {
+function load(options: { framed?: boolean; instance?: string; preview?: string } = {}) {
   const framed = options.framed !== false
   const listeners = new Map<string, Array<(event: any) => void>>()
   const posted: Array<{ message: any; origin: string }> = []
@@ -19,13 +19,13 @@ function load(options: { framed?: boolean } = {}) {
   window.parent = framed ? parent : window
   const document = {
     hidden: false,
-    currentScript: { dataset: { parentOrigin } },
+    currentScript: { dataset: { parentOrigin, instance: options.instance, preview: options.preview } },
     documentElement: { style: { setProperty() {} } },
     addEventListener: (name: string, fn: (event: any) => void) => listeners.set(`doc:${name}`, [...(listeners.get(`doc:${name}`) ?? []), fn]),
   }
   const context: any = {
     window, document, parent: window.parent, navigator: { language: 'zh-CN' }, matchMedia: () => media,
-    addEventListener: window.addEventListener, setTimeout, clearTimeout, console, Object, Promise, Number, Map, Set, Error,
+    addEventListener: window.addEventListener, setTimeout, clearTimeout, console, Object, Promise, Number, Map, Set, Error, TextEncoder,
   }
   Object.defineProperty(context, 'window', { value: window })
   window.window = window
@@ -89,6 +89,19 @@ test('messages from another window, origin or channel are ignored', async () => 
 test('storage outside a host frame is unsupported', async () => {
   const { xb } = load({ framed: false })
   await assert.rejects(xb.storage.get('save'), (error: any) => error.code === 'unsupported')
+})
+
+test('draft storage stays in the preview frame and does not outlive it', async () => {
+  const { xb, posted } = load({ instance: 'first-preview', preview: 'true' })
+  const value = { score: 2 }
+  await xb.storage.set('save', value)
+  value.score = 3
+  assert.equal((await xb.storage.get('save')).score, 2)
+  assert.deepEqual([...await xb.storage.keys()], ['save'])
+  assert.equal(posted.length, 0)
+  assert.equal(await load({ instance: 'new-preview', preview: 'true' }).xb.storage.get('save'), null)
+  await xb.ready()
+  assert.equal(posted[0]?.message.instance, 'first-preview')
 })
 
 test('scores need a started round and a non-negative integer', async () => {

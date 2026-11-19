@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import JSZip from 'jszip'
-import { convertPublishHtml, inspectPackZip, type PreviousPack } from '../src/lib/publishPack.ts'
+import { convertPublishHtml, inspectPackZip, readRuntimeArchive, type PreviousPack } from '../src/lib/publishPack.ts'
 import { appRuntimeEntry } from '../src/lib/appRuntime.ts'
 
 const manifest = {
@@ -55,6 +55,19 @@ test('a V2 ZIP keeps its original bytes and the game type in its manifest', asyn
   assert.equal(ready.protocol, 2)
   assert.equal(ready.name, manifest.name)
   assert.equal(appRuntimeEntry(new URL('https://app.xiangban.xyz'), 1, 1, manifest).pathname, '/v1/play/main.HTM')
+})
+
+test('runtime preview reads the manifest entry and binary assets from the same package', async () => {
+  const file = await archive({}, zip => zip.file('assets/mesh.glb', new Uint8Array([0, 255, 1])))
+  const abort = new AbortController()
+  const runtime = await readRuntimeArchive(file, 'game', abort.signal)
+  assert.equal(runtime.entry, 'play/main.HTM')
+  assert.equal(runtime.pointerLock, true)
+  assert.match(await runtime.files[runtime.entry]!.text(), /社区游戏/)
+  assert.deepEqual([...new Uint8Array(await runtime.files['assets/mesh.glb']!.arrayBuffer())], [0, 255, 1])
+  await assert.rejects(readRuntimeArchive(file, 'app', abort.signal), /V2/)
+  abort.abort()
+  await assert.rejects(readRuntimeArchive(file, 'game', abort.signal), { name: 'AbortError' })
 })
 
 test('incomplete V2 packages and old game packages are rejected before uploading a new work', async () => {

@@ -1,3 +1,6 @@
+import type { DownloadInfo, PackDetail } from '../api/content.ts'
+import { KIND_LIMIT } from './content.ts'
+
 export const appRuntimeChannel = 'xiaoban.app-runtime.v2'
 
 export function appRunLocation(id: number, version: number) {
@@ -11,6 +14,16 @@ export function builtinRunLocation(gameId: string) {
 export function canTrialPack(kind: string, status: string, trustLevel: number, protocol: unknown): boolean {
   return status === 'published' && (kind === 'game' || (kind === 'app' && protocol === 2)) &&
     (protocol === 2 || trustLevel === 0 || trustLevel === 1)
+}
+
+export function validateRuntimeDownload(pack: PackDetail, info: DownloadInfo, version: number) {
+  const selected = pack.versions.find(item => item.version === version)
+  if (!selected || selected.manifest.runtimeProtocol !== 2 || !canTrialPack(pack.kind, pack.status, pack.trust_level, 2) ||
+      info.pack_id !== pack.id || info.kind !== pack.kind || info.version !== version ||
+      !/^[a-f0-9]{64}$/i.test(info.sha256) || info.sha256.toLowerCase() !== selected.sha256.toLowerCase() ||
+      info.size !== selected.size || !Number.isSafeInteger(info.size) || info.size < 1 || info.size > KIND_LIMIT[pack.kind]!) {
+    throw new Error('作品已下架或版本校验信息不匹配')
+  }
 }
 
 export function appRuntimeBase(value: unknown, development: boolean): URL | null {

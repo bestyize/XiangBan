@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { contentSocialApi, CONTENT_REPORT_REASONS, type ContentKind } from '@/api/contentSocial'
 import { useSession } from '@/stores/session'
 import ModalDialog from './ModalDialog.vue'
-const props = defineProps<{ kind: ContentKind; id: number }>()
+const props = withDefaults(defineProps<{ kind: ContentKind; id: number; enabled?: boolean }>(), { enabled: true })
 const session = useSession()
 const bookmarked = ref(false), loaded = ref(false), loading = ref(false), busy = ref(false), error = ref(''), message = ref(''), reportOpen = ref(false), reason = ref(''), detail = ref('')
+const bookmarkDisabled = computed(() => busy.value || loading.value || (session.loggedIn && !loaded.value))
 let sequence = 0
 async function load() {
   const current = ++sequence
   loaded.value = false; bookmarked.value = false; error.value = ''; message.value = ''; reportOpen.value = false
-  if (!session.loggedIn) { loading.value = false; return }
+  if (!props.enabled || !session.loggedIn) { loading.value = false; return }
   loading.value = true
   try { const data = await contentSocialApi.state(props.kind, props.id); if (current === sequence) { bookmarked.value = data.bookmarked; loaded.value = true } }
   catch (e) { if (current === sequence) error.value = e instanceof Error ? e.message : '读取收藏失败' }
@@ -35,16 +36,19 @@ async function submitReport() {
   catch (e) { if (current === sequence) error.value = e instanceof Error ? e.message : '提交失败，请重试' }
   finally { busy.value = false }
 }
-watch(() => [props.kind, props.id, session.user?.uid], load, { immediate: true })
+watch(() => [props.kind, props.id, props.enabled, session.user?.uid], load, { immediate: true })
 </script>
 <template>
-  <div class="social">
-    <button class="btn" type="button" :disabled="busy || loading || (session.loggedIn && !loaded)" :aria-pressed="bookmarked" @click="bookmark">{{ bookmarked ? '已收藏 · 取消' : '收藏' }}</button>
-    <button class="btn" type="button" :disabled="busy" @click="openReport">举报</button>
-    <RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
-    <span v-if="message" role="status">{{ message }}</span>
-    <span v-if="error && !reportOpen" class="error" role="alert">{{ error }} <button type="button" class="btn btn-sm" :disabled="busy || loading" @click="load">重新读取</button></span>
-  </div>
+  <slot :bookmarked="bookmarked" :bookmark-disabled="bookmarkDisabled" :bookmark="bookmark"
+    :report="openReport" :message="message" :error="reportOpen ? '' : error" :busy="busy || loading" :reload="load">
+    <div v-if="enabled" class="social">
+      <button class="btn" type="button" :disabled="bookmarkDisabled" :aria-pressed="bookmarked" @click="bookmark">{{ bookmarked ? '已收藏 · 取消' : '收藏' }}</button>
+      <button class="btn" type="button" :disabled="busy" @click="openReport">举报</button>
+      <RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
+      <span v-if="message" role="status">{{ message }}</span>
+      <span v-if="error && !reportOpen" class="error" role="alert">{{ error }} <button type="button" class="btn btn-sm" :disabled="busy || loading" @click="load">重新读取</button></span>
+    </div>
+  </slot>
   <ModalDialog :open="reportOpen" title="举报社区内容" @close="!busy && (reportOpen = false)">
     <form class="report" @submit.prevent="submitReport">
       <p>说明仅供管理员审核，不会向内容作者公开。</p>

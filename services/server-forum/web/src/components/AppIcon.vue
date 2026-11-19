@@ -13,7 +13,7 @@ const paths: Record<string, string[]> = {
   me: ['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z', 'M4 21v-2a8 8 0 0 1 16 0v2'],
   plus: ['M12 5v14M5 12h14'], search: ['M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z', 'm15 15 6 6'],
   bell: ['M6 17v-6a6 6 0 0 1 12 0v6l2 2H4Z', 'M10 22h4'],
-  arrow: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'],
+  arrow: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'], play: ['M8 5v14l11-7Z'],
   bookmark: ['M6 3h12v18l-6-4-6 4Z'], folder: ['M3 6h6l2 3h10v11H3Z'],
   monitor: ['M3 4h18v13H3Z', 'M12 17v4M8 21h8'],
   settings: ['M4 7h16M4 17h16', 'M8 4v6M16 14v6'],

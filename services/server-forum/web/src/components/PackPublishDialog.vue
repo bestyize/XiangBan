@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { contentApi, type PackDetail } from '@/api/content'
 import { ApiError } from '@/api/forum'
 import AppIcon from '@/components/AppIcon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
+import CommunityGameTrial from '@/components/creation/CommunityGameTrial.vue'
 import { track } from '@/lib/analytics'
 import { COVER_LIMIT, fmtSize, kindLabel, KIND_LIMIT } from '@/lib/content'
 import { preparePublishCover } from '@/lib/publishCover'
@@ -28,15 +29,20 @@ const form = reactive({ title: '', summary: '', tags: [] as string[], changelog:
 let defaults = { title: '', summary: '' }
 const workInput = useTemplateRef<HTMLInputElement>('workInput')
 const coverInput = useTemplateRef<HTMLInputElement>('coverInput')
+const previewButton = useTemplateRef<HTMLButtonElement>('previewButton')
+const backButton = useTemplateRef<HTMLButtonElement>('backButton')
 const original = shallowRef<File | null>(null)
 const work = shallowRef<PreparedPack | null>(null)
 const cover = shallowRef<File | null>(null)
+const coverPreview = ref('')
 const preparing = ref(false)
 const fileError = ref('')
 const busy = ref(false)
 const step = ref('')
 const progress = ref(0)
 const error = ref('')
+const previewing = ref(false)
+const previewRevision = ref(0)
 let selection = 0
 let upload: AbortController | null = null
 
@@ -72,8 +78,30 @@ watch([packId, () => publisher.ready, retry], async ([id, ready], _, onCleanup) 
   }
 }, { immediate: true })
 
-watch(() => publisher.ready, ready => { if (!ready) upload?.abort() }, { flush: 'sync' })
+watch(() => publisher.ready, ready => {
+  if (!ready) {
+    previewing.value = false
+    upload?.abort()
+  }
+}, { flush: 'sync' })
+watch(cover, (file, _, onCleanup) => {
+  const url = file ? URL.createObjectURL(file) : ''
+  coverPreview.value = url
+  if (url) onCleanup(() => URL.revokeObjectURL(url))
+})
 onBeforeUnmount(() => { selection++; upload?.abort() })
+
+async function openPreview() {
+  previewing.value = true
+  await nextTick()
+  backButton.value?.focus()
+}
+
+async function closePreview() {
+  previewing.value = false
+  await nextTick()
+  previewButton.value?.focus()
+}
 
 async function pickWork(event: Event) {
   const input = event.target as HTMLInputElement
@@ -123,7 +151,7 @@ function toggleTag(tag: string) {
 }
 
 async function submit() {
-  if (busy.value || preparing.value || !publisher.ready || (packId.value && !existing.value)) return
+  if (busy.value || preparing.value || previewing.value || !publisher.ready || (packId.value && !existing.value)) return
   const prepared = work.value
   error.value = ''
   if (!prepared) { if (!fileError.value) error.value = '请选择要发布的作品文件'; return }
@@ -140,7 +168,7 @@ async function submit() {
     const id = packId.value
     let coverFile: File | undefined
     if (!id && cover.value) {
-      step.value = '处理封面'
+      step.value = '处理正文图片'
       coverFile = await preparePublishCover(cover.value, signal)
     }
     step.value = '上传作品文件'
@@ -148,7 +176,7 @@ async function submit() {
     const fileKey = await uploadFile(prepared.kind, prepared.file, ratio => (progress.value = ratio), signal)
     let coverKey: string | undefined
     if (coverFile) {
-      step.value = '上传封面'
+      step.value = '上传正文图片'
       progress.value = 0
       coverKey = await uploadFile('cover', coverFile, ratio => (progress.value = ratio), signal)
     }
@@ -186,8 +214,8 @@ async function submit() {
 </script>
 
 <template>
-  <ModalDialog :open="publisher.visible" :title="packId ? '发布新版本' : '发布内容包'" :width="640"
-    scrollable keep-on-backdrop :close-disabled="busy" @close="publisher.close()">
+  <ModalDialog :open="publisher.visible" :title="previewing ? '预览作品' : packId ? '发布新版本' : '发布内容包'" :width="previewing ? 920 : 640"
+    scrollable keep-on-backdrop :close-disabled="busy" @close="previewing ? closePreview() : publisher.close()">
     <div v-if="!publisher.ready" class="dialog-state" role="status">
       <p>正在确认账号信息…</p>
       <button v-if="!session.restoring" type="button" class="btn btn-sm" @click="session.loadSession()">重新读取</button>
@@ -197,7 +225,16 @@ async function submit() {
       <button v-if="loadError" type="button" class="btn btn-sm" @click="retry++">重试</button>
     </div>
 
-    <form v-if="!packId || existing" v-show="publisher.ready" class="publish" novalidate @submit.prevent="submit">
+    <template v-if="previewing && work && publisher.ready">
+      <div class="preview-stage">
+        <CommunityGameTrial :key="previewRevision" :draft="work" @retry="previewRevision++" @exit="closePreview" />
+      </div>
+      <footer class="actions">
+        <button ref="backButton" type="button" class="btn btn-primary cancel" @click="closePreview">返回发布</button>
+      </footer>
+    </template>
+
+    <form v-if="!packId || existing" v-show="publisher.ready && !previewing" class="publish" novalidate @submit.prevent="submit">
       <div class="form-body" :inert="busy">
         <p v-if="existing" class="version-note">{{ existing.title }} · 当前版本 v{{ existing.version }}</p>
         <div class="field">
@@ -215,6 +252,10 @@ async function submit() {
           <small v-else-if="allowHtml">单个 HTML 会自动转换为 V2 作品。包含独立脚本、样式或素材时，请上传 V2 ZIP。</small>
           <small v-else>ZIP 根目录需要有清单，作品的类型和 ID 需与原版本一致。</small>
           <p v-if="fileError" class="error" role="alert">{{ fileError }}</p>
+          <div v-if="work?.protocol === 2" class="preview-action">
+            <button ref="previewButton" type="button" class="btn btn-sm" :disabled="busy" @click="openPreview">预览作品</button>
+            <small>使用本机文件，发布时才上传。</small>
+          </div>
         </div>
 
         <template v-if="!packId">
@@ -223,25 +264,27 @@ async function submit() {
             <input v-model="form.title" class="input" required maxlength="60" placeholder="给作品起个名字" />
           </label>
           <label class="field">
-            <span>简介（选填）</span>
-            <textarea v-model="form.summary" class="input" rows="3" maxlength="500" placeholder="介绍一下你的作品" />
+            <span>正文（选填）</span>
+            <textarea v-model="form.summary" class="input" rows="4" maxlength="500" placeholder="介绍你的作品、玩法或用法" />
           </label>
+          <div class="field">
+            <span>正文图片（选填）</span>
+            <input ref="coverInput" type="file" hidden accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" @change="pickCover" />
+            <img v-if="coverPreview" class="cover-preview" :src="coverPreview" alt="正文图片预览" />
+            <div class="cover-picker">
+              <button type="button" class="btn btn-sm" @click="coverInput?.click()">{{ cover ? '更换图片' : '添加图片' }}</button>
+              <span v-if="cover" :title="cover.name">{{ cover.name }}</span>
+              <button v-if="cover" type="button" class="btn btn-sm btn-ghost" @click="selectCover(null)">移除图片</button>
+            </div>
+            <small>游戏和应用可以上传运行截图。图片会显示在正文里，同时用作作品封面。</small>
+            <small>支持 PNG、JPG 和 WebP。上传为 WebP，文件不超过 {{ fmtSize(COVER_LIMIT) }}。</small>
+          </div>
           <div class="field" role="group" aria-label="标签（选填）">
             <span>标签（选填）</span>
             <div class="tags">
               <button v-for="tag in WORK_TAGS" :key="tag" type="button" class="tag"
                 :aria-pressed="form.tags.includes(tag)" @click="toggleTag(tag)">{{ tag }}</button>
             </div>
-          </div>
-          <div class="field">
-            <span>封面（选填）</span>
-            <input ref="coverInput" type="file" hidden accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" @change="pickCover" />
-            <div class="cover-picker">
-              <button type="button" class="btn btn-sm" @click="coverInput?.click()">选择封面</button>
-              <span v-if="cover" :title="cover.name">{{ cover.name }}</span>
-              <button v-if="cover" type="button" class="btn btn-sm btn-ghost" @click="selectCover(null)">移除封面</button>
-            </div>
-            <small>支持 PNG、JPG 和 WebP。上传为 WebP，文件不超过 {{ fmtSize(COVER_LIMIT) }}。</small>
           </div>
           <label class="rights">
             <input v-model="form.rights" type="checkbox" required />
@@ -289,6 +332,9 @@ async function submit() {
 .tag:hover:not(:disabled) { border-color: var(--line-strong); }
 .tag[aria-pressed='true'] { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
 .cover-picker { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-sm); }
+.cover-preview { display: block; width: auto; height: auto; max-width: 100%; max-height: 160px; border-radius: 8px; }
+.preview-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.preview-stage { height: min(68dvh, 680px); min-height: 200px; background: var(--surface-2); }
 .cover-picker button { flex: none; }
 .cover-picker span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rights { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); }

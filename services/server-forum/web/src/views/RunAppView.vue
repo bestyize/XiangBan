@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
-import { contentApi, gameSandboxUrl, runtimeBase } from '@/api/content'
+import { contentApi, gameSandboxUrl } from '@/api/content'
 import AppRuntimeStatus from '@/components/creation/AppRuntimeStatus.vue'
 import AppRuntimeWindow from '@/components/creation/AppRuntimeWindow.vue'
 import BuiltinGamePlayer from '@/components/creation/BuiltinGamePlayer.vue'
@@ -50,10 +50,9 @@ const launch = useCommunityResource(async () => {
       }
     } catch (error) {
       if (controller.signal.aborted) throw error
-      if (!runtimeBase && error instanceof TypeError) throw new Error('应用版本请求失败，请检查网络。')
     }
   }
-  const hasHost = manifest.runtimeProtocol === 2 ? runtimeBase : gameSandboxUrl
+  const hasHost = manifest.runtimeProtocol === 2 || gameSandboxUrl
   return { pack, mode: hasHost ? 'runtime' as const : 'client' as const }
 })
 const title = computed(() => ideaId.value ? ideaPlayers[ideaId.value].title :

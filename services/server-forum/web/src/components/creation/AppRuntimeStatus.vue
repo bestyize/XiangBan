@@ -2,11 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { fmtSize } from '@/lib/content'
 
-const props = defineProps<{ message: string; error?: string; receivedBytes?: number; totalBytes?: number }>()
+const props = defineProps<{ message: string; error?: string; local?: boolean; receivedBytes?: number; totalBytes?: number }>()
 defineEmits<{ retry: [] }>()
 
 const offline = ref(!navigator.onLine)
-const failure = computed(() => props.error || (offline.value ? '网络连接已断开。' : ''))
+const failure = computed(() => props.error || (!props.local && offline.value ? '网络连接已断开。' : ''))
 const percent = computed(() => props.totalBytes
   ? Math.floor((props.receivedBytes ?? 0) / props.totalBytes * 100)
   : undefined)

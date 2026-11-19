@@ -140,6 +140,15 @@ function checkPrevious(previous: PreviousPack | null | undefined, kind: string, 
   }
 }
 
+async function openPackZip(file: File) {
+  checkSize(file, KIND_LIMIT.app, 'ZIP 文件')
+  let zip: JSZip
+  try { zip = await JSZip.loadAsync(await file.arrayBuffer()) } catch { throw new Error('无法读取这个 ZIP 文件，请检查压缩包是否完整') }
+  const entry = zip.file('manifest.json')
+  if (entry?.unsafeOriginalName !== 'manifest.json') throw new Error('ZIP 根目录需要有 manifest.json')
+  return { zip, manifest: await readZipJson(entry, manifestLimit) }
+}
+
 async function inspectDesktopZip(file: File, zip: JSZip, manifest: Record<string, unknown>, kind: DesktopKind, previous?: PreviousPack | null): Promise<PreparedPack> {
   if (manifest.runtimeProtocol !== undefined) throw new Error('桌面作品的清单不需要 runtimeProtocol')
   const jsonEntry = kind === 'effect' || kind === 'pet'
@@ -188,12 +197,7 @@ async function inspectDesktopZip(file: File, zip: JSZip, manifest: Record<string
 }
 
 export async function inspectPackZip(file: File, previous?: PreviousPack | null): Promise<PreparedPack> {
-  checkSize(file, KIND_LIMIT.app, 'ZIP 文件')
-  let zip: JSZip
-  try { zip = await JSZip.loadAsync(await file.arrayBuffer()) } catch { throw new Error('无法读取这个 ZIP 文件，请检查压缩包是否完整') }
-  const entry = zip.file('manifest.json')
-  if (entry?.unsafeOriginalName !== 'manifest.json') throw new Error('ZIP 根目录需要有 manifest.json')
-  const manifest = await readZipJson(entry, manifestLimit)
+  const { zip, manifest } = await openPackZip(file)
   const { kind, id, schemaVersion, runtimeProtocol = 1 } = manifest
   if (typeof kind !== 'string' || !Object.hasOwn(KIND_LIMIT, kind)) throw new Error('manifest.json 的内容包类型无效')
   checkSize(file, KIND_LIMIT[kind]!, '内容包')
@@ -224,6 +228,49 @@ export async function inspectPackZip(file: File, previous?: PreviousPack | null)
     throw new Error('manifest.json 的 schemaVersion 无效')
   }
   return { file, kind, name, description, protocol: runtimeProtocol, converted: false }
+}
+
+export async function readRuntimeArchive(file: File, kind: string, signal: AbortSignal) {
+  signal.throwIfAborted()
+  const { zip, manifest } = await openPackZip(file)
+  if (!isWorkKind(kind) || manifest.kind !== kind || manifest.schemaVersion !== 3 || manifest.runtimeProtocol !== 2) {
+    throw new Error('请选择 V2 应用或游戏作品')
+  }
+  checkWorkFiles(zip, manifest)
+  const files: Record<string, Blob> = {}
+  let remaining = 128 * 1024 * 1024 // Match the resource service's uncompressed size limit.
+  for (const member of Object.values(zip.files)) {
+    signal.throwIfAborted()
+    if (member.dir) continue
+    files[member.name] = await new Promise<Blob>((resolve, reject) => {
+      const stream = (member as JSZip.JSZipObject & {
+        internalStream(type: 'uint8array'): JSZip.JSZipStreamHelper<Uint8Array<ArrayBuffer>>
+      }).internalStream('uint8array')
+      const parts: BlobPart[] = []
+      const stop = (error: unknown) => {
+        stream.pause()
+        signal.removeEventListener('abort', abort)
+        reject(error)
+      }
+      const abort = () => stop(signal.reason)
+      signal.addEventListener('abort', abort, { once: true })
+      stream.on('data', chunk => {
+        remaining -= chunk.length
+        if (remaining < 0) return stop(new Error('作品包解压后不能超过 128 MB'))
+        parts.push(chunk)
+      })
+      stream.on('error', stop)
+      stream.on('end', () => {
+        signal.removeEventListener('abort', abort)
+        resolve(new Blob(parts))
+      })
+      stream.resume()
+    })
+  }
+  return {
+    entry: (manifest.entry as string | undefined) ?? 'index.html', files,
+    pointerLock: kind === 'game' && Array.isArray(manifest.input) && manifest.input.includes('mouse'),
+  }
 }
 
 // Match the desktop and Android importers: preserve the prolog and register the V2

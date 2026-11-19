@@ -384,17 +384,11 @@ function breadcrumbDestination(slug: string) {
   <PosterDialog :open="posterOpen" :poster="posterInput" :name="topic?.title ?? ''" @close="posterOpen = false" />
 </template>
 
+<style scoped src="../styles/forum-post.css"></style>
+
 <style scoped>
 .accepted { color: var(--brand); font-size: var(--fs-sm); font-weight: 600; padding-top: 12px; }
 .accept-control { display: flex; justify-content: flex-end; padding: 0 0 12px; }
-.topic {
-  max-width: 760px;
-  margin:0 auto;
-  min-width:0;
-}
-.topic-shell { display:block; max-width:820px; margin:0 auto; }
-.topic-shell :deep(.left), .topic-shell :deep(.chips) { display:none; }
-.topic-shell :deep(.center) { margin:0; padding:20px 22px 28px; border-radius:16px; }
 .body { overflow-wrap:anywhere; }
 .body :deep(img) { max-width:100%; height:auto; }
 .body :deep(pre), .body :deep(table) { max-width:100%; overflow:auto; }
@@ -414,13 +408,6 @@ function breadcrumbDestination(slug: string) {
 .crumbs a:hover {
   color: var(--ink);
 }
-.title {
-  margin: 0 0 10px;
-  font-size: 26px;
-  line-height: 1.35;
-  font-weight: 650;
-  overflow-wrap: anywhere;
-}
 .pin-badge {
   display: inline-block;
   margin-right: 8px;
@@ -431,25 +418,6 @@ function breadcrumbDestination(slug: string) {
   font-size: var(--fs-sm);
   line-height: 22px;
   vertical-align: 3px;
-}
-.byline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-  margin-bottom: 18px;
-}
-.who {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.name {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--ink);
 }
 .tl {
   border: 1px solid var(--line-strong);
@@ -559,16 +527,12 @@ function breadcrumbDestination(slug: string) {
   width: 40%;
 }
 @media (max-width: 767px) {
-  /* 内容栏铺满屏幕宽度并去掉卡片圆角；左右 8px、底部 20px 是 App.vue 里手机社区页 app-main 的留白，抵消后移除正文容器的圆角。 */
-  .topic-shell :deep(.center) { margin:0 -8px -20px; border-radius:0; }
   .byline-top { display:flex; align-items:center; justify-content:space-between; width:100%; }
   .more-btn { display:grid; place-items:center; width:44px; height:44px; margin:-8px -12px -8px 0; border:0; background:none; color:var(--ink-2); }
   .byline .tl { display:none; }
   /* 分享、海报、举报、编辑等收进“更多”菜单；赞和收藏在底部栏。 */
   .actions { display:none; }
   .tags { margin-bottom:4px; }
-  .topic-shell :deep(.center) { padding:16px 16px 24px; }
-  .title { font-size:20px; line-height:1.4; font-weight:600; }
   .more-row {
     display: flex;
     align-items: center;
