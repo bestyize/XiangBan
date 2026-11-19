@@ -4,7 +4,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { cruiseRoute } from './cruise-route.js';
+import { cruiseRoute, vermilionCruiseDuration } from './cruise-route.js';
 import { createTankEnvironment } from './environment.js';
 import { createSwimmer } from './swim.js';
 import { createGuppySchool } from './guppy/school.js';
@@ -107,7 +107,7 @@ export function createAquariumRenderer(canvas, id) {
         map.anisotropy = anisotropy;
         normalMap.anisotropy = anisotropy;
       }
-      const swimmer = kind === 'arowana' ? { object: model, ...createSwimmer(model, cruiseRoute, { duration: 32 }) }
+      const swimmer = kind === 'arowana' ? { object: model, ...createSwimmer(model, cruiseRoute, { duration: vermilionCruiseDuration }) }
         : kind === 'guppy' ? createGuppy(soloGuppyRoute) : createGuppySchool(createGuppy, new Group());
       swimmer.object.traverse(object => {
         if (object.isSkinnedMesh) object.frustumCulled = false;
