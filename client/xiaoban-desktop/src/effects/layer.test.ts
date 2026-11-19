@@ -5,6 +5,16 @@ import { parsePack } from "./parse.ts";
 import { ParticleSystem } from "./sim.ts";
 import type { EffectPack } from "./types.ts";
 
+const renderFish = vi.hoisted(() => vi.fn());
+vi.mock("./arowana/renderer.js", () => ({
+  createAquariumRenderer: () => ({
+    mode: null as string | null,
+    async setMode(mode: string) { this.mode = mode; },
+    setLighting() {}, setAquascape() {}, resize() {}, destroy() {},
+    render: renderFish,
+  }),
+}));
+
 const make = (shape: Record<string, unknown>, extra: Record<string, unknown> = {}): EffectPack => {
   const parsed = parsePack({ schemaVersion: 1, id: "t", name: "t", layers: [{ count: 6, shape, colors: [["#ffffff", "#aabbcc"]], size: 20, speed: 50, alpha: 1, ...extra }] });
   if (!parsed.ok) throw new Error(parsed.error);
@@ -91,11 +101,11 @@ describe("the layer over the desktop", () => {
   let callbacks: Map<number, FrameRequestCallback>, frames: number, cleared: ReturnType<typeof vi.fn>, disconnect: ReturnType<typeof vi.fn>, canvas: { width: number; height: number };
   beforeEach(() => {
     children = []; callbacks = new Map(); frames = 0; cleared = vi.fn(); disconnect = vi.fn();
-    host = { classList: { add: vi.fn(), remove: vi.fn() }, append: (node: unknown) => children.push(node), getBoundingClientRect: () => ({ width: 960, height: 600 }) } as unknown as HTMLElement;
+    host = { classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() }, append: (node: unknown) => children.push(node), getBoundingClientRect: () => ({ width: 960, height: 600 }) } as unknown as HTMLElement;
     const gradient = { addColorStop: vi.fn() };
     const context = new Proxy({ clearRect: cleared, setTransform: vi.fn() } as Record<string, unknown>, {
       get: (target, key: string) => key in target ? target[key] : /^create/.test(key) ? () => gradient : vi.fn(), set: () => true });
-    canvas = { width: 0, height: 0, setAttribute: vi.fn(), getContext: () => context, remove: () => { children.length = 0; } } as typeof canvas;
+    canvas = Object.assign(new EventTarget(), { width: 0, height: 0, setAttribute: vi.fn(), getContext: () => context, remove: () => { children.length = 0; } });
     doc = Object.assign(new EventTarget(), { hidden: false, createElement: () => canvas });
     win = Object.assign(new EventTarget(), { devicePixelRatio: 3 });
     vi.stubGlobal("document", doc); vi.stubGlobal("window", win);
@@ -119,6 +129,38 @@ describe("the layer over the desktop", () => {
     expect(callbacks.size).toBe(0); expect(children).toHaveLength(1);
     layer.update(rain, params, { paused: false, fps: 60 });
     expect(callbacks.size).toBe(1); layer.destroy(); expect(callbacks.size).toBe(0);
+  });
+  it.each([30, 60] as const)("draws %i frames per second on a 75 Hz display", (fps) => {
+    const layer = new EffectsLayer(host, rain, params, { paused: false, fps });
+    cleared.mockClear();
+    for (let refresh = 0; refresh < 75; refresh++) frame(refresh * 1000 / 75);
+    expect(cleared).toHaveBeenCalledTimes(fps);
+    layer.destroy();
+  });
+  it("skips missed render deadlines after a stall", () => {
+    const layer = new EffectsLayer(host, rain, params, { paused: false, fps: 60 });
+    frame(0);
+    cleared.mockClear();
+    frame(1000);
+    frame(1000 + 1000 / 75);
+    expect(cleared).toHaveBeenCalledOnce();
+    frame(1000 + 2000 / 75);
+    expect(cleared).toHaveBeenCalledTimes(2);
+    layer.destroy();
+  });
+  it("synchronizes arowana to 75 Hz in smooth mode and limits energy-saving mode to 30 fps", async () => {
+    const parsed = parsePack({ schemaVersion: 1, id: "arowana", name: "Arowana", source: "builtin" });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const layer = new EffectsLayer(host, parsed.pack, params);
+    await layer.whenReady();
+    renderFish.mockClear();
+    for (let refresh = 0; refresh < 75; refresh++) frame(refresh * 1000 / 75);
+    expect(renderFish).toHaveBeenCalledTimes(75);
+    layer.update(parsed.pack, params, { paused: false, fps: 30 });
+    renderFish.mockClear();
+    for (let refresh = 75; refresh < 150; refresh++) frame(refresh * 1000 / 75);
+    expect(renderFish).toHaveBeenCalledTimes(30);
+    layer.destroy();
   });
   it("adjusts a running effect in place and starts over only for a different one", () => {
     const layer = new EffectsLayer(host, rain, params, { paused: false, fps: 60 }, () => 0.4);

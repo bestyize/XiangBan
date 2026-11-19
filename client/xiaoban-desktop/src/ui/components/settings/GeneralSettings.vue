@@ -10,7 +10,8 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
   busy.value = key;
   try { await action(); if (success) props.store.notify(success); } catch (error) { props.store.notify(error, 'error'); } finally { busy.value = ''; }
 }
-const fpsOptions = [{ label: '30 帧 · 节能', value: 30 }, { label: '60 帧 · 流畅', value: 60 }];
+const fpsOptions = [{ label: '30 帧 · 节能', value: 30 }, { label: '流畅', value: 60 }];
+const fpsHint = '流畅模式下，龙鱼巡游和内置水族箱的水波跟随屏幕刷新，其他动画以每秒 60 帧为目标';
 </script>
 <template>
   <div class="settings-general" data-testid="settings-general">
@@ -25,7 +26,7 @@ const fpsOptions = [{ label: '30 帧 · 节能', value: 30 }, { label: '60 帧 �
       <div class="xb-row" title="暂停伙伴与动态壁纸，不影响提醒计时" aria-description="暂停伙伴与动态壁纸，不影响提醒计时"><div class="xb-row-text"><b>暂停桌面动画</b></div>
         <NSwitch :value="store.settings.paused" aria-label="暂停桌面动画" :disabled="!!busy" :loading="busy === 'pause'" @update:value="value => act('pause', () => store.updateAppearance({ paused: value }))" /></div>
       <div class="xb-row"><div class="xb-row-text"><b>动画帧率</b></div>
-        <NSelect style="width:150px" :value="store.settings.fps" :options="fpsOptions" :disabled="!!busy" @update:value="value => act('fps', () => store.updateAppearance({ fps: value }))" /></div>
+        <NSelect style="width:150px" aria-label="动画帧率" :title="fpsHint" :aria-description="fpsHint" :value="store.settings.fps" :options="fpsOptions" :disabled="!!busy" @update:value="value => act('fps', () => store.updateAppearance({ fps: value }))" /></div>
     </div>
     <div class="xb-group-title">本地数据</div>
     <div class="xb-group">

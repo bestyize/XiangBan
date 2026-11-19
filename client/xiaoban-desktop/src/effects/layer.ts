@@ -22,7 +22,8 @@ export class EffectsLayer {
   private loading: AbortController | null = null;
   private time = 0;
   private frame = 0;
-  private last: number | null = null;
+  private lastDrawAt: number | null = null;
+  private nextDrawAt: number | null = null;
   private width = 0;
   private height = 0;
   private destroyed = false;
@@ -169,12 +170,20 @@ export class EffectsLayer {
   private tick = (now: number) => {
     this.frame = 0;
     if ((!this.system && !this.aquarium?.mode) || this.config.paused || document.hidden || this.destroyed) return;
-    const elapsed = this.last === null ? 1 / this.config.fps : (now - this.last) / 1000;
-    if (this.last === null || elapsed >= 1 / this.config.fps - 0.001) {
+    const interval = 1000 / this.config.fps;
+    const deadline = this.nextDrawAt ?? now;
+    const tolerance = 1;
+    const lateness = now - deadline;
+    if (lateness >= -tolerance) {
+      const elapsed = this.lastDrawAt === null ? interval / 1000 : (now - this.lastDrawAt) / 1000;
       this.system?.advance(elapsed);
       if (this.aquarium) this.time += Math.min(elapsed, 0.1) * this.params.speed;
       this.draw();
-      this.last = now;
+      this.lastDrawAt = now;
+      // In smooth mode, arowana uses every refresh so non-integer refresh ratios do not cause judder.
+      const followDisplay = this.config.fps === 60 && aquariumId(this.pack) === "arowana";
+      const missed = Math.floor((lateness + tolerance) / interval);
+      this.nextDrawAt = followDisplay ? null : deadline + (missed + 1) * interval;
     }
     if (this.canvas) this.frame = requestAnimationFrame(this.tick);
   };
@@ -184,7 +193,9 @@ export class EffectsLayer {
   }
   private stop() {
     if (this.frame) cancelAnimationFrame(this.frame);
-    this.frame = 0; this.last = null;
+    this.frame = 0;
+    this.lastDrawAt = null;
+    this.nextDrawAt = null;
   }
   private onVisibility = () => this.reconcile();
   private onPageHide = () => this.destroy();

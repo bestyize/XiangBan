@@ -12,6 +12,12 @@ import { normalizeParams, parsePack } from "./effects/parse.ts";
 import { aquariumId, type EffectPack } from "./effects/types.ts";
 import { isPresenceKind, presenceBeats } from "./companion/presence.ts";
 
+const aquariumWallpapers = new Set([
+  "builtin-aquarium-living-room",
+  "builtin-aquarium-blackwater",
+  "builtin-aquarium-aquascape",
+]);
+
 interface Payload {
   item: {
     id: string;
@@ -75,6 +81,26 @@ export async function mountContent() {
   let pet: PetView | null = null,
     video: HTMLVideoElement | null = null,
     frame: HTMLIFrameElement | null = null;
+  const followDisplay = state.item.kind === "canvas" && aquariumWallpapers.has(state.item.id);
+  let canvasReady = false;
+  let displayFrame = 0;
+  let waitingForCanvas = false;
+  const syncDisplayClock = () => {
+    if (!followDisplay || disposed || !canvasReady || document.hidden || state.config.paused || state.config.fps !== 60) {
+      if (displayFrame) cancelAnimationFrame(displayFrame);
+      displayFrame = 0;
+      return;
+    }
+    if (displayFrame || waitingForCanvas) return;
+    // WebKit may throttle the isolated iframe's own clock. Keep one frame in flight from this window.
+    displayFrame = requestAnimationFrame((now) => {
+      displayFrame = 0;
+      const target = frame?.contentWindow;
+      if (!target) return;
+      waitingForCanvas = true;
+      target.postMessage({ type: "canvas-frame", now }, "*");
+    });
+  };
   const update = (detail: Pick<Payload, "options" | "config" | "effects" | "petPosition">) => {
     if (disposed) return;
     state = { ...state, ...detail };
@@ -97,6 +123,7 @@ export async function mountContent() {
         },
         "*",
       );
+    syncDisplayClock();
     document.body.dataset.theme = state.config.theme;
     document.body.dataset.paused = String(state.config.paused);
     const settings = { ...defaults, ...state.config } as Settings;
@@ -158,6 +185,7 @@ export async function mountContent() {
   };
   window.addEventListener("content-config", (event) =>
     update((event as CustomEvent).detail), eventOptions);
+  if (followDisplay) document.addEventListener("visibilitychange", syncDisplayClock, eventOptions);
   window.addEventListener("content-cursor", (event) => {
     const cursor = (event as CustomEvent<CursorSample>).detail;
     pet?.look(cursor.x, cursor.y, cursor.moved);
@@ -172,6 +200,7 @@ export async function mountContent() {
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    syncDisplayClock();
     lifecycle.abort();
     effects.destroy();
     pet?.destroy(); pet = null;
@@ -268,7 +297,10 @@ export async function mountContent() {
             typeof event.data !== "object"
           )
             return;
-          if (event.data.type === "canvas-shell-ready")
+          if (event.data.type === "canvas-shell-ready") {
+            canvasReady = false;
+            waitingForCanvas = false;
+            syncDisplayClock();
             frame!.contentWindow!.postMessage(
               {
                 type: "canvas-init",
@@ -276,18 +308,25 @@ export async function mountContent() {
                 assets,
                 settings: state.options.values,
                 config: state.config,
+                followDisplay,
                 width: innerWidth,
                 height: innerHeight,
                 dpr: Math.min(devicePixelRatio, 2),
               },
               "*",
             );
-          else if (event.data.type === "canvas-ready") {
+          } else if (event.data.type === "canvas-ready") {
+            canvasReady = true;
             ready({ width: event.data.width, height: event.data.height }).then(
               resolve,
               reject,
             );
+          } else if (event.data.type === "canvas-frame-done") {
+            waitingForCanvas = false;
+            syncDisplayClock();
           } else if (event.data.type === "canvas-error") {
+            canvasReady = false;
+            syncDisplayClock();
             window.removeEventListener("message", listener);
             fail(event.data.message);
             reject(new Error(event.data.message));
