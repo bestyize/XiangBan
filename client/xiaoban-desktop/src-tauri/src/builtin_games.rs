@@ -1,4 +1,4 @@
-//! Verified, content-addressed official game packages shared with Android.
+//! Verified, content-addressed official game and app packages.
 use crate::{app_runtime::pack, library::{self, Resource}};
 use serde::Deserialize;
 use serde_json::Value;
@@ -6,20 +6,43 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashSet, fs, io::{Read, Write}, path::{Path, PathBuf}, sync::{atomic::{AtomicU64, Ordering}, Mutex, OnceLock}, time::Duration};
 
 #[derive(Clone, Deserialize)]
-struct Game { id: String, kind: String, url: String, sha256: String, bytes: u64, #[serde(rename = "sourceSha256")] source_sha256: String }
+struct Game {
+    id: String,
+    #[serde(rename = "packId")]
+    pack_id: Option<String>,
+    kind: String,
+    url: String,
+    sha256: String,
+    bytes: u64,
+    #[serde(rename = "sourceSha256")]
+    source_sha256: String,
+}
+impl Game {
+    fn pack_id(&self) -> &str { self.pack_id.as_deref().unwrap_or(&self.id) }
+
+    fn matches_manifest(&self, manifest: &Value) -> bool {
+        manifest["id"] == self.pack_id() && manifest["kind"] == self.kind
+    }
+}
 #[derive(Deserialize)]
 struct Distribution { version: u32, games: Vec<Game> }
 
 fn distribution() -> Result<Vec<Game>, String> {
-    let data: Distribution = serde_json::from_str(include_str!("../../../../assets/game-packs/distribution.json")).map_err(|e| e.to_string())?;
+    let mut data: Distribution = serde_json::from_str(include_str!("../../../../assets/game-packs/distribution.json")).map_err(|e| e.to_string())?;
     let ids: HashSet<_> = data.games.iter().map(|game| game.id.as_str()).collect();
     if data.version != 1 || data.games.len() != crate::games::IDS.len() || ids != crate::games::IDS.into_iter().collect() {
         return Err("内置游戏目录不一致".into());
     }
+    // Keep the published pack's ID available for users who already imported it.
+    let aquarium: Game = serde_json::from_str(include_str!("featured-aquarium.json")).map_err(|e| e.to_string())?;
+    if aquarium.id != crate::games::FEATURED_AQUARIUM || aquarium.kind != "app" {
+        return Err("精选水族箱分发清单无效".into());
+    }
+    data.games.push(aquarium);
     for game in &data.games {
         let md5 = game.url.strip_prefix("https://res.xiangban.xyz/files/").and_then(|url| url.strip_suffix(".zip"));
         if !md5.is_some_and(|hash| hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
-            || !library::hash_name(&game.sha256) || !library::hash_name(&game.source_sha256) || !(1..=pack::MAX_PACK_BYTES).contains(&game.bytes) || !["game", "app"].contains(&game.kind.as_str()) {
+            || !pack::valid_id(game.pack_id()) || !library::hash_name(&game.sha256) || !library::hash_name(&game.source_sha256) || !(1..=pack::MAX_PACK_BYTES).contains(&game.bytes) || !["game", "app"].contains(&game.kind.as_str()) {
             return Err("内置游戏资源信息无效".into());
         }
     }
@@ -37,7 +60,7 @@ pub fn cached_dir(root: &Path, id: &str) -> Option<PathBuf> {
     let path = target(root, &game);
     if fs::read_to_string(path.join(".complete")).ok()?.trim() != game.sha256 { return None; }
     let manifest: Value = serde_json::from_slice(&fs::read(path.join("manifest.json")).ok()?).ok()?;
-    if manifest["id"] != game.id || manifest["kind"] != game.kind { return None; }
+    if !game.matches_manifest(&manifest) { return None; }
     let paths = pack::check_manifest(&manifest).ok()?;
     if paths.iter().any(|item| !path.join(item).is_file()) { return None; }
     Some(path)
@@ -87,12 +110,13 @@ fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
 }
 
 pub fn ensure(root: &Path, id: &str) -> Result<PathBuf, String> {
-    let index = crate::games::IDS.iter().position(|item| *item == id).ok_or("没有找到内置游戏")?;
-    let locks = LOCKS.get_or_init(|| crate::games::IDS.iter().map(|_| Mutex::new(())).collect());
+    let games = distribution()?;
+    let index = games.iter().position(|item| item.id == id).ok_or("没有找到内置游戏")?;
+    let locks = LOCKS.get_or_init(|| games.iter().map(|_| Mutex::new(())).collect());
     let _lock = locks[index].lock().map_err(|_| "游戏缓存暂不可用")?;
-    let game = game(id)?;
+    let game = &games[index];
     if let Some(cached) = cached_dir(root, id) {
-        if verify_cached(&cached, &game).unwrap_or(false) { return Ok(cached); }
+        if verify_cached(&cached, game).unwrap_or(false) { return Ok(cached); }
     }
     let resource = Resource { url: game.url.clone(), sha256: game.sha256.clone(), bytes: game.bytes, mime: "application/octet-stream".into() };
     let archive = root.join("cache").join(&game.sha256);
@@ -118,9 +142,9 @@ pub fn ensure(root: &Path, id: &str) -> Result<PathBuf, String> {
     let staging = parent.join(format!(".unpack-{}-{}-{}", id, std::process::id(), STAGING.fetch_add(1, Ordering::Relaxed)));
     fs::create_dir(&staging).map_err(|e| e.to_string())?;
     let result = (|| {
-        extract(&archive, &staging, &game)?;
+        extract(&archive, &staging, game)?;
         fs::write(staging.join(".complete"), &game.sha256).map_err(|e| e.to_string())?;
-        let dest = target(root, &game);
+        let dest = target(root, game);
         if dest.exists() { fs::remove_dir_all(&dest).map_err(|e| e.to_string())?; }
         fs::rename(&staging, &dest).map_err(|e| e.to_string())?;
         if let Ok(entries) = fs::read_dir(&parent) {
@@ -163,7 +187,7 @@ fn extract(archive_path: &Path, staging: &Path, game: &Game) -> Result<(), Strin
         } else { files.push((name, bytes)); }
     }
     let (manifest, manifest_bytes) = manifest.ok_or("游戏缺少清单")?;
-    if manifest["id"] != game.id || manifest["kind"] != game.kind { return Err("游戏包标识不匹配".into()); }
+    if !game.matches_manifest(&manifest) { return Err("游戏包标识不匹配".into()); }
     pack::validate(&manifest, &files)?;
     fs::write(staging.join("manifest.json"), manifest_bytes).map_err(|e| e.to_string())?;
     for (name, bytes) in files {
@@ -218,8 +242,11 @@ mod tests {
     #[test]
     fn catalog_is_pinned_and_covers_every_builtin() {
         let games = distribution().unwrap();
-        assert_eq!(games.len(), 11);
+        assert_eq!(games.len(), crate::games::IDS.len() + 1);
         assert!(games.iter().all(|item| item.url.starts_with("https://res.xiangban.xyz/files/") && item.bytes > 0));
+        let aquarium = games.iter().find(|item| item.id == crate::games::FEATURED_AQUARIUM).unwrap();
+        assert_eq!(aquarium.pack_id(), "aquarium");
+        assert!(!crate::game_packs::is_builtin(aquarium.pack_id()));
     }
 
     #[test]

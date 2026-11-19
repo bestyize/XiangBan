@@ -68,7 +68,7 @@ function kindBadge(app: GameManifest): string {
   return app.orientation === 'landscape' ? '横屏游戏' : app.orientation === 'portrait' ? '竖屏游戏' : '休闲游戏';
 }
 
-const builtinApps = computed(() => games.value.filter(g => g.source !== 'user'));
+const builtinApps = computed(() => games.value.filter(g => g.source !== 'user' && (!isGamesMode.value || !g.featuredOnly)));
 const userApps = computed(() => games.value.filter(g => g.source === 'user'));
 const isPlazaOrBuiltin = computed(() => primaryTab.value === 'plaza' || primaryTab.value === 'builtin');
 

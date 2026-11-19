@@ -54,9 +54,10 @@ export function readCatalog(raw: unknown): GameCatalog {
 export async function loadBuiltinCatalog(): Promise<GameCatalog> {
   const response = await fetch('/game-packs/catalog.json');
   if (!response.ok) throw new Error('游戏目录暂时无法读取。');
-  const catalog = (await response.json()) as { games?: unknown };
+  const catalog = (await response.json()) as { games?: unknown; featuredApps?: unknown };
   if (!Array.isArray(catalog.games)) throw new Error('游戏目录格式暂时无法读取。');
-  const ids = catalog.games.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]+$/.test(id));
+  const entries = [...catalog.games, ...(Array.isArray(catalog.featuredApps) ? catalog.featuredApps : [])];
+  const ids = entries.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]+$/.test(id));
   const results = await Promise.all(ids.map(async (id) => {
     try {
       const reply = await fetch(`${builtinBase(id)}manifest.json`);
@@ -64,5 +65,5 @@ export async function loadBuiltinCatalog(): Promise<GameCatalog> {
     } catch { return null; }
   }));
   const games = readGames(results.filter((item) => item !== null));
-  return { games, errors: games.length < catalog.games.length ? ['部分游戏资料暂时无法显示。'] : [], directory: null };
+  return { games, errors: games.length < entries.length ? ['部分游戏资料暂时无法显示。'] : [], directory: null };
 }

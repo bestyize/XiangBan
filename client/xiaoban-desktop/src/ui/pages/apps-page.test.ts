@@ -2,6 +2,9 @@
 import { mount, flushPromises } from '@vue/test-utils';
 import { it, expect, vi } from 'vitest';
 import { invoke } from '../../bridge.ts';
+import aquariumManifest from '../../../public/game-packs/featured-aquarium/manifest.json';
+import { readGames } from '../../games/catalog.ts';
+import type { GameManifest } from '../../games/protocol.ts';
 import AppsPage from './AppsPage.vue';
 import type { ControlStore } from '../control-types';
 
@@ -54,12 +57,12 @@ const stubs = {
   NPopconfirm: { template: '<div><slot name="trigger" /><slot /></div>', emits: ['positive-click'] }
 };
 
-function setupApps(appsList = [mbti, game2048, userApp]) {
+function setupApps(appsList: GameManifest[] = [mbti, game2048, userApp], page = 'apps') {
   const openApp = vi.fn().mockResolvedValue(undefined);
   const openGames = vi.fn().mockResolvedValue(undefined);
   const store = {
     desktop: true,
-    page: 'apps',
+    page,
     settings: { gameDesktopDoubleClick: false },
     game: { desktopDoubleClickSupported: true },
     openApp,
@@ -73,6 +76,24 @@ function setupApps(appsList = [mbti, game2048, userApp]) {
   const wrapper = mount(AppsPage, { props: { store }, global: { stubs } });
   return { store, openApp, openGames, wrapper };
 }
+
+it('opens the featured aquarium as a landscape app and omits it from the games page', async () => {
+  const [aquarium] = readGames([aquariumManifest]);
+  const apps = setupApps([aquarium, game2048]);
+  const games = setupApps([aquarium, game2048], 'games');
+  try {
+    await flushPromises();
+    await apps.wrapper.get('[data-testid="apps-filter-tool"]').trigger('click');
+    await apps.wrapper.get('[data-testid="app-featured-aquarium"]').trigger('click');
+    expect(apps.openApp).toHaveBeenCalledWith(aquarium.id, {
+      title: '水族箱', orientation: 'landscape', entry: 'index.html',
+    });
+    expect(games.wrapper.find('[data-testid="app-featured-aquarium"]').exists()).toBe(false);
+  } finally {
+    apps.wrapper.unmount();
+    games.wrapper.unmount();
+  }
+});
 
 it('renders App Plaza tabs, category filters and search bar when store.page is apps', async () => {
   const { wrapper, store } = setupApps();

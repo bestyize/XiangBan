@@ -1,0 +1,9 @@
+{
+  "id": "featured-aquarium",
+  "packId": "aquarium",
+  "kind": "app",
+  "url": "https://res.xiangban.xyz/files/38b23b0a85bb3480890df29096af05ff.zip",
+  "sha256": "d771435b8d3ef84637a54f591b2291cd7e50f1b48bde9f42c45b81ec721879d4",
+  "bytes": 28353705,
+  "sourceSha256": "850b91c0b2ed7dba53f46584ce228f0bae0c38479f90719a02c68b787c0330d6"
+}
