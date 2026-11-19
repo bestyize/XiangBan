@@ -162,6 +162,23 @@ describe("the layer over the desktop", () => {
     expect(renderFish).toHaveBeenCalledTimes(30);
     layer.destroy();
   });
+  it("bounds arowana motion after a stalled refresh", async () => {
+    const parsed = parsePack({ schemaVersion: 1, id: "arowana", name: "Arowana", source: "builtin" });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const layer = new EffectsLayer(host, parsed.pack, params);
+    await layer.whenReady();
+    renderFish.mockClear();
+    const refresh = 1000 / 75;
+    frame(0);
+    frame(refresh);
+    frame(refresh + 151);
+    frame(2 * refresh + 151);
+    const [first, second, resumed, next] = renderFish.mock.calls.map(([time]) => time);
+    expect(second - first).toBeCloseTo(refresh / 1000, 8);
+    expect(resumed - second).toBeCloseTo(2 / 60, 8);
+    expect(next - resumed).toBeCloseTo(refresh / 1000, 8);
+    layer.destroy();
+  });
   it("adjusts a running effect in place and starts over only for a different one", () => {
     const layer = new EffectsLayer(host, rain, params, { paused: false, fps: 60 }, () => 0.4);
     expect(layer.snapshot()).toMatchObject({ effect: "t", particles: [10], canvasPresent: true });

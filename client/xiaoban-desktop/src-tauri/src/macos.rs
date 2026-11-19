@@ -4,7 +4,7 @@
 use crate::coordinates::{content_point_to_css, is_desktop_level, scene_level, Levels};
 use objc2::{rc::autoreleasepool, MainThreadMarker};
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
+    NSAccessibility, NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSColor, NSEvent, NSScreen, NSWindow, NSWindowCollectionBehavior,
 };
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
@@ -192,7 +192,14 @@ pub fn configure_scene(
         if click_through {
             ns.setIgnoresMouseEvents(true);
         }
-        if !click_through || crate::effects::is_effect(window.label()) {
+        let decorative_effect = crate::effects::is_effect(window.label());
+        if decorative_effect {
+            if let Some(view) = ns.contentView() {
+                // This click-through surface has no controls. Avoid waking WebKit's accessibility tree.
+                view.setAccessibilityHidden(true);
+            }
+        }
+        if !click_through || decorative_effect {
             ns.setOpaque(false);
             ns.setBackgroundColor(Some(&NSColor::clearColor()));
         }

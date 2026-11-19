@@ -175,13 +175,17 @@ export class EffectsLayer {
     const tolerance = 1;
     const lateness = now - deadline;
     if (lateness >= -tolerance) {
-      const elapsed = this.lastDrawAt === null ? interval / 1000 : (now - this.lastDrawAt) / 1000;
-      this.system?.advance(elapsed);
-      if (this.aquarium) this.time += Math.min(elapsed, 0.1) * this.params.speed;
-      this.draw();
-      this.lastDrawAt = now;
       // In smooth mode, arowana uses every refresh so non-integer refresh ratios do not cause judder.
       const followDisplay = this.config.fps === 60 && aquariumId(this.pack) === "arowana";
+      const elapsed = this.lastDrawAt === null ? interval / 1000 : (now - this.lastDrawAt) / 1000;
+      this.system?.advance(elapsed);
+      if (this.aquarium) {
+        // Bound the pose advance when the compositor misses several refreshes.
+        const maxStep = followDisplay ? 2 * interval / 1000 : 0.1;
+        this.time += Math.min(elapsed, maxStep) * this.params.speed;
+      }
+      this.draw();
+      this.lastDrawAt = now;
       const missed = Math.floor((lateness + tolerance) / interval);
       this.nextDrawAt = followDisplay ? null : deadline + (missed + 1) * interval;
     }
