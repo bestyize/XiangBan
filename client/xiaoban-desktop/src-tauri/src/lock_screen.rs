@@ -8,6 +8,7 @@ mod windows;
 mod macos;
 
 use serde::Serialize;
+use tauri::Manager;
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
@@ -45,7 +46,6 @@ pub async fn lock_screen_wallpaper_source(
         return Err("当前平台不支持设置独立锁屏图片".into());
     }
     use crate::{content, library};
-    use tauri::Manager;
 
     let app = window.app_handle().clone();
     let wallpaper_id = id.clone();
