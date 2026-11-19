@@ -45,7 +45,7 @@
     [3220, 86, 248, 0, 2, -1], [4190, 47, 265, 2, 3, -1],
     [5160, 52, 270, 1, 4, -1], [6250, -19, 278, 1, 5, -1],
   ]
-  const FALLS = [[645, 132, 236, 24], [1455, 164, 221, 18], [2270, 122, 247, 18], [5100, 149, 214, 11]]
+  const FALLS = [[1455, 164, 221, 18], [2270, 122, 247, 18], [5100, 149, 214, 11]]
   const EARTH = [
     [0, [195, 180, 149]], [1170, [195, 180, 149]], [1550, [182, 173, 148]],
     [2240, [178, 181, 161]], [2775, [176, 186, 175]], [3710, [209, 183, 143]],
@@ -262,7 +262,7 @@
     }
   }
 
-  function pine(g, x, y, scale, seed, color = [42, 54, 43], crownBrush) {
+  function pine(g, x, y, scale, seed, color = [42, 54, 43]) {
     const rand = A.rng(seed)
     g.save(); g.translate(x, y); g.scale(scale, Math.abs(scale))
     const trunk = [[0, 5], [-13, -20], [-18, -48], [-38, -72], [-41, -106], [-67, -132], [-75, -168], [-59, -190]]
@@ -283,17 +283,6 @@
       for (let j = 0; j < 7; j++) {
         const q = .29 + j * .128
         const px = bx + side * width * q, py = by - rise * q - rand() * 9
-        if (crownBrush && j !== 2 && j !== 5) {
-          // Alternate wide, flat pads with bare elbows and a fork pitched into the canopy.
-          const h = (j % 3 === 0 ? 18 : 6) + rand() * 9
-          const tip = px + side * (4 + rand() * 11)
-          inkLine(g, [[px-side*5,py+5],[px,py-h*.53],[tip,py-h]], 2.8, color, seed+at*9+j)
-          dab(g,tip,py-h,15+rand()*12,7+rand()*5,crownBrush,.93)
-          for (let fan=0;fan<6;fan++) {
-            const f=(fan-2.5)/2.5, fx=tip+f*16, fy=py-h-Math.cos(f*1.45)*3
-            A.leafCluster(g,fx,fy,-1.42+f*.98,9,6+rand()*5,.84,[38,57,39],.9,rand)
-          }
-        }
         const needleWash = g.createRadialGradient(px, py - 1, 0, px, py - 1, 18)
         needleWash.addColorStop(0, A.rgba(color, .64 + rand() * .14))
         needleWash.addColorStop(.47, A.rgba(color, .32)); needleWash.addColorStop(1, A.rgba(color, 0))
@@ -308,6 +297,146 @@
           A.leaf(g, xx, yy, angle, 5 + rand() * 11, .65 + rand() * 1.45)
         }
       }
+    }
+    g.restore()
+  }
+
+  const TREES = {
+    gate: {
+      bark: [53, 54, 44], light: [131, 117, 89], foliage: [[26, 43, 34], [49, 66, 46], [88, 98, 66]],
+      width: 27,
+      trunk: [[0, 2], [6, -22], [-5, -44], [-30, -58], [-45, -77], [-40, -104], [-67, -125], [-84, -149], [-83, -163]],
+      boughs: [
+        [[-23,-54],[-11,-66],[11,-72],[38,-88],[58,-87]],
+        [[-44,-79],[-61,-80],[-85,-77],[-109,-86],[-123,-90]],
+        [[-40,-105],[-22,-113],[-9,-128],[14,-133],[33,-129]],
+        [[-63,-122],[-84,-125],[-108,-134],[-134,-132]],
+        [[-82,-148],[-64,-157],[-49,-169],[-33,-171]],
+        [[-84,-151],[-105,-156],[-120,-165]],
+      ],
+    },
+    ledge: {
+      bark: [58, 59, 47], light: [141, 133, 100], foliage: [[44, 62, 54], [67, 86, 71], [107, 118, 91]],
+      width: 16,
+      trunk: [[0,1],[-5,-13],[3,-27],[28,-36],[51,-51],[65,-67],[91,-72]],
+      boughs: [
+        [[3,-27],[23,-28],[45,-25],[68,-29]],
+        [[29,-37],[37,-53],[55,-63],[72,-59]],
+        [[51,-51],[73,-50],[90,-54],[111,-55]],
+        [[64,-65],[70,-77],[91,-83],[106,-83]],
+      ],
+    },
+    wind: {
+      bark: [61, 66, 57], light: [150, 150, 118], foliage: [[46, 65, 62], [73, 91, 78], [105, 124, 104]],
+      width: 15,
+      trunk: [[0,1],[4,-19],[15,-39],[36,-60],[57,-73],[86,-90],[115,-98]],
+      boughs: [
+        [[9,-29],[30,-37],[59,-38],[83,-49],[108,-52]],
+        [[34,-58],[38,-79],[51,-89],[67,-96]],
+        [[55,-72],[79,-67],[103,-73],[132,-73]],
+        [[84,-89],[102,-109],[127,-116],[148,-120]],
+      ],
+    },
+    court: {
+      bark: [52, 51, 40], light: [135, 115, 81], foliage: [[24, 43, 29], [45, 67, 42], [100, 111, 68]],
+      width: 31,
+      trunk: [[0,2],[-8,-18],[-4,-43],[14,-61],[18,-88],[2,-103],[-15,-128],[-12,-152],[9,-170],[16,-192]],
+      boughs: [
+        [[-7,-38],[-27,-48],[-51,-52],[-72,-68],[-104,-65]],
+        [[13,-62],[37,-64],[54,-78],[81,-80],[103,-79]],
+        [[18,-88],[8,-89],[-17,-83],[-41,-91],[-67,-96]],
+        [[5,-99],[24,-113],[45,-111],[67,-125],[87,-124],[112,-133]],
+        [[-13,-128],[-36,-129],[-56,-141],[-84,-145]],
+        [[-12,-151],[8,-154],[30,-166],[54,-165]],
+        [[9,-172],[-5,-184],[-30,-191],[-55,-192]],
+        [[15,-188],[36,-192],[53,-204]],
+      ],
+    },
+    bell: {
+      bark: [57, 52, 43], light: [156, 123, 78], foliage: [[78, 56, 41], [143, 91, 52], [181, 131, 69]],
+      width: 18, broadleaf: true,
+      trunk: [[0,1],[8,-21],[7,-42],[-6,-65],[-12,-91],[-3,-119],[9,-137]],
+      boughs: [
+        [[7,-43],[-18,-49],[-34,-61],[-61,-66]],
+        [[-6,-65],[12,-71],[29,-85],[56,-92]],
+        [[-11,-88],[-33,-95],[-48,-112],[-68,-120]],
+        [[-4,-113],[16,-120],[36,-133],[60,-131]],
+        [[5,-131],[-11,-145],[-24,-154]],
+      ],
+    },
+  }
+
+  function treeCluster(g, x, y, size, palette, airy, broadleaf, brush, rand) {
+    const [shadow, midtone, highlight] = palette
+    dab(g, x, y - 2, (broadleaf ? 20 : 24) * size, (broadleaf ? 15 : 11) * size, brush, .76)
+    const sprays = broadleaf ? 13 : 8
+    for (let j = 0; j < sprays; j++) {
+      const spread = ((j + rand() * .7) / sprays - .5) * 2
+      const px = x + spread * 19 * size
+      const py = y + (rand() - .8) * (broadleaf ? 16 : 8) * size
+      const axis = -1.55 + spread * 1.24 + airy
+      if (broadleaf) {
+        const tipX = px + Math.cos(axis) * 10 * size, tipY = py + Math.sin(axis) * 10 * size
+        stroke(g, [[x, y + size * 2], [px, py], [tipX, tipY]], A.rgba(shadow, .65), .65)
+        for (let n = 0; n < 5; n++) {
+          const t = n / 5
+          g.fillStyle = A.rgba(n === 3 ? highlight : n % 3 ? midtone : shadow, .66 + rand() * .27)
+          A.leaf(g, A.lerp(px, tipX, t), A.lerp(py, tipY, t), axis + (n % 2 ? .96 : -.86),
+            (4 + rand() * 6) * size, (1.7 + rand()) * size)
+        }
+      } else {
+        g.fillStyle = A.rgba(shadow, .90)
+        A.leaf(g, px, py + 2, axis, 10 * size, 3.3 * size)
+        for (let n = 0; n < 11; n++) {
+          const angle = axis + (n / 10 - .5) * 2.76 + (rand() - .5) * .21
+          g.fillStyle = A.rgba(n % 7 === 0 ? highlight : n % 3 ? shadow : midtone, .7 + rand() * .25)
+          A.leaf(g, px, py, angle, (5.5 + rand() * 8) * size, (.42 + rand() * .67) * size)
+        }
+      }
+    }
+  }
+
+  function characterTree(g, x, y, scale, seed, tree, paint) {
+    const { trunk, width, bark, light, foliage, boughs, broadleaf } = tree
+    const rand = A.rng(seed)
+    const shadow = mix(bark, INK, .55)
+    g.save(); g.translate(x, y); g.scale(scale, Math.abs(scale))
+    const roots = [[-30, 2], [-12, -4], [-5, -8], [4, -6], [13, -1], [34, 3]]
+    g.fillStyle = pigment(bark)
+    A.ribbon(g, roots, t => 1 + Math.sin(t * Math.PI) * width * .53)
+    g.fillStyle = gradient(g, -16, 0, 13, 0, [[0, pigment(light)], [.44, pigment(bark)], [1, pigment(shadow)]])
+    A.ribbon(g, trunk, t => 1.25 + width * (1 - t) ** 1.12)
+    dryLine(g, trunk, width * .6, light, .78, seed, 8)
+    dryLine(g, roots, width * .27, light, .77, seed + 7, 6)
+    for (let j = 1; j < Math.min(trunk.length, 8); j++) {
+      const [bx, by] = trunk[j]
+      const spread = Math.max(2.5, width * (.44 - .051 * j))
+      const ridges = [[bx - spread, by + 8], [bx - spread*.34, by + 4], [bx+spread*.09, by - 1]]
+      axeStroke(g, bx - spread*.67, by+6, spread, -8, spread*.52, shadow, .76, rand)
+      dryLine(g, ridges, 1.8, light, .84, seed+j, 4)
+    }
+    const canopy = []
+    for (const points of boughs) {
+      const direction = Math.sign(points.at(-1)[0] - points[0][0])
+      g.fillStyle = pigment(shadow)
+      A.ribbon(g, points, t => .62 + width * .30 * (1 - t) ** .93)
+      dryLine(g, points, width * .13, light, .68, Math.floor(rand() * 7600), 5)
+      for (let j = 2; j < points.length; j++) {
+        const [bx, by] = points[j]
+        const reach = direction * (5 + rand()*14), rise = 6 + rand()*12
+        inkLine(g, [[bx-direction*5, by+2],[bx+reach*.44,by-rise*.65],[bx+reach,by-rise]], 2.7,
+          bark, Math.floor(rand()*7600))
+        canopy.push([bx+reach, by-rise, .73+rand()*.48, direction*.27])
+        if (j % 2 === 0) {
+          const fork = bx-direction*(8+rand()*6)
+          inkLine(g, [[bx,by],[bx-direction*4,by-10],[fork,by-14]], 2, bark, Math.floor(rand()*7600))
+          canopy.push([fork, by-14, .65+rand()*.3, -direction*.2])
+        }
+      }
+    }
+    const density = tree === TREES.court ? 1.27 : tree === TREES.gate ? 1.13 : 1
+    for (const [bx, by, size, angle] of canopy) {
+      treeCluster(g, bx, by, size * density, foliage, angle, broadleaf, paint.ink, rand)
     }
     g.restore()
   }
@@ -491,6 +620,127 @@
 
   const PATH_NOISE = A.noise(849, 256)
   const pathEdge = x => G + (A.fbm(PATH_NOISE, x / 26, 3) - .52) * 3.4
+
+  const GROUND_COLOR = {
+    gate: { stone: [109, 109, 96], grass: [57, 76, 54], bloom: [137, 95, 125], bend: .16 },
+    bridge: { stone: [96, 113, 110], grass: [64, 90, 73], bloom: [224, 219, 182], bend: .44 },
+    wind: { stone: [102, 114, 104], grass: [81, 99, 71], bloom: [183, 155, 104], bend: .79, seedHeads: true },
+    court: { stone: [118, 118, 91], grass: [65, 86, 48], bloom: [168, 110, 108], bend: -.19 },
+    bell: { stone: [111, 103, 86], grass: [90, 93, 60], bloom: [203, 164, 97], bend: .22 },
+    summit: { stone: [124, 114, 105], grass: [77, 88, 67], bloom: [217, 209, 178], bend: -.35 },
+  }
+
+  // Roots sit back from the fighting edge. Heights and group sizes vary between
+  // sheltered stone seams, exposed gravel and swept ground.
+  const GROUND_PATCHES = [
+    [[106,34,.92], [263,43,1.08], [431,20,.72], [526,53,1.17], [654,31,.95], [755,49,1.26],
+      [866,24,.78], [922,49,1.23], [1046,36,.73], [1116,52,1.18], [1224,26,.9], [1327,44,1.1]],
+    [],
+    [[2432,40,.95], [2499,24,.85], [2611,39,1.16], [2690,51,1.23], [2784,24,.71], [2847,45,1.31],
+      [2935,33,.86], [3009,54,1.10], [3095,32,.92], [3157,49,1.23], [3233,25,.75]],
+    [[3358,39,.96], [3436,23,.81], [3515,48,1.28], [3602,31,.84], [3688,49,1.2], [3765,40,.63],
+      [3884,49,.72], [3968,41,.88], [4072,27,1.0], [4152,51,1.22], [4215,24,.68]],
+    [[4280,41,.96], [4374,24,.76], [4482,45,1.19], [4559,30,.84], [4642,51,1.22], [4742,27,.75],
+      [4817,45,.86], [4917,33,.98], [4993,49,1.14], [5104,26,.96], [5180,43,1.21]],
+    [[5272,16,.81], [5366,18,.88], [5431,16,.8], [5498,16,.66], [5564,18,.55], [5641,14,.45],
+      [5747,15,.48], [5825,14,.57], [5887,17,.68], [5935,15,.79], [6004,18,.87], [6080,15,.75], [6150,16,.71]],
+  ]
+  const GROUND_BY_AREA = [GROUND_COLOR.gate, GROUND_COLOR.bridge, GROUND_COLOR.wind,
+    GROUND_COLOR.court, GROUND_COLOR.bell, GROUND_COLOR.summit]
+
+  function groundStone(g, x, y, width, height, tone, paint, rand) {
+    const dark = mix(tone, INK, .60), light = mix(tone, PAPER, .49)
+    const slope = (rand() - .5) * .46
+    const foot = [x - width * (.44 + rand() * .14), y - height * .07]
+    const ledge = [x - width * (.31 + rand() * .21), y - height * (.42 + rand() * .3)]
+    const crown = [x + width * slope, y - height * (.86 + rand() * .14)]
+    const shoulder = [x + width * (.17 + rand() * .25), y - height * (.43 + rand() * .38)]
+    const side = [x + width * (.46 + rand() * .09), y - height * (.10 + rand() * .15)]
+    const base = [x + width * (.13 + rand() * .27), y + height * .16]
+    const split = [x + width * (slope - .15), y - height * (.23 + rand() * .22)]
+    const seed = Math.floor(rand() * 9000)
+    const crownEdge = chippedEdge([foot, ledge, crown, shoulder], seed)
+    dab(g, x + width * .12, y + 1, width * .78, height * .43, paint.ink, .43)
+    wash(g, [...crownEdge, side, base], pigment(dark))
+    wash(g, [...crownEdge, split], gradient(g, x, y - height, x, y,
+      [[0, pigment(light)], [.60, pigment(tone)], [1, pigment(mix(tone, dark, .48))]]))
+    wash(g, [split, shoulder, side, base], A.rgba(tone, .63))
+    dryLine(g, [ledge, crown, shoulder], 1.75, light, .82, seed + 1, 4)
+    for (let i = 0; i < 4; i++) {
+      const px = A.lerp(ledge[0], shoulder[0], .20 + i * .16)
+      const py = y - height * (.34 + rand() * .18)
+      axeStroke(g, px, py, width * .13, height * .17, 1.2 + rand() * 1.7, dark, .43, rand)
+    }
+  }
+
+  function groundBlades(g, x, y, height, palette, rand) {
+    const { grass, bend } = palette
+    const shaded = mix(grass, INK, .49), sunlit = mix(grass, PAPER, .37)
+    for (let j = 0; j < 14; j++) {
+      const spread = (j / 13 - .5) * 2, root = x + (rand() - .5) * height * .48
+      const h = height * (.37 + rand() * .67)
+      const lean = h * (spread * .72 + bend)
+      const points = [[root, y], [root + lean * .24, y - h * .56], [root + lean * .69, y - h], [root + lean, y - h * .91]]
+      g.fillStyle = A.rgba(j % 6 === 0 ? sunlit : j % 3 ? grass : shaded, .68 + rand() * .31)
+      const width = .8 + height * .13 * rand()
+      A.ribbon(g, points, t => width * (1 - t) + .10)
+    }
+  }
+
+  function groundBlooms(g, x, y, height, palette, rand) {
+    const { bloom, grass, bend, seedHeads } = palette
+    const flowers = 3 + Math.floor(rand() * 4)
+    for (let j = 0; j < flowers; j++) {
+      const root = x + (rand() - .5) * height * .82 + j * .7, rise = height * (.57 + rand() * .47)
+      const end = root + rise * ((rand() - .5) * .6 + bend * .73)
+      const top = y - rise, size = height * (.073 + rand() * .048)
+      stroke(g, [[root, y], [root + (end - root) * .38, y - rise * .52], [end, top]], A.rgba(grass, .92), .65 + size * .18)
+      g.fillStyle = A.rgba(grass, .76)
+      A.leaf(g, root + (end - root) * .29, y - rise * .37, j % 2 ? -2.62 : -.64, rise * .34, size * .79)
+      if (seedHeads) {
+        g.fillStyle = pigment(bloom)
+        A.leaf(g, end, top + 1, -1.06, size * 3.6, size * .86)
+        g.fillStyle = A.rgba(PAPER, .71)
+        A.leaf(g, end + .5, top - 1, -1.09, size * 2.5, size * .23)
+        continue
+      }
+      for (let petal = 0; petal < 5; petal++) {
+        const angle = petal * TAU / 5 + j * .37
+        g.fillStyle = pigment(petal % 3 ? bloom : mix(bloom, PAPER, .49))
+        A.leaf(g, end, top, angle, size * (1.14 + rand() * .43), size * .72)
+      }
+      g.fillStyle = pigment(mix(bloom, INK, .24))
+      g.fillRect(end - size * .27, top - size * .25, size * .62, size * .56)
+    }
+  }
+
+  function groundPatch(g, x, y, size, palette, paint, seed) {
+    const rand = A.rng(seed + Math.round(x) * 31)
+    const stone = palette.stone, direction = rand() < .47 ? -1 : 1
+    const root = x + direction * (17 + rand() * 8) * size
+    const meadow = rand() < .34
+    const width = (meadow ? 10 + rand() * 13 : 20 + rand() * 25) * size
+    const shadow = mix(stone, INK, .31)
+    const seam = [[x - 41 * size, y + size * 3], [x - 20 * size, y + size], [x + 8 * size, y + size * 2],
+      [x + 20 * size, y - size], [x + 31 * size, y + size]]
+    dryLine(g, seam, 2.1 * size, shadow, .52, seed + 41, 4)
+    for (let j = 0; j < 9; j++) {
+      const drift = (rand() - .5) * 91 * size, px = x + drift
+      const py = y + (rand() - .28) * 12 * size
+      const w = (2 + rand() ** 2 * 10) * size
+      inkPebble(g, px, py, w, w * (.24 + rand() * .2), shadow, rand)
+    }
+    groundStone(g, x - 8 * size, y - 1.5 * size, width, width * (.17 + rand() * .22), stone, paint, rand)
+    groundStone(g, x + 11 * size, y + size, width * .46, width * (.11 + rand() * .07), mix(stone, PAPER, .11), paint, rand)
+    groundBlades(g, root, y, (13 + rand() * 10) * size, palette, rand)
+    groundBlades(g, x - 20 * size, y + size * 3, (6 + rand() * (meadow ? 11 : 6)) * size, palette, rand)
+    if (meadow) {
+      groundBlades(g, x + 5 * size, y - size * 2, (9 + rand() * 9) * size, palette, rand)
+    }
+    if (size > .57 && rand() > .15) {
+      groundBlooms(g, root + direction * 10 * size, y + 1, (19 + rand() * 9) * size, palette, rand)
+    }
+  }
 
   function terrace(g, from, to, visibleFrom, visibleTo, exposeAt) {
     const width = to - from
@@ -790,7 +1040,7 @@
     const edge = [[99, 14], [93, 29], [71, 38], [66, 57], [43, 69], [31, 104], [24, 110], [-168, 110]]
     const stone = earthAt(x)
     const sprites = a.mountain.banks
-    sprites[side] ||= A.sprite(280, 121, a.mountain.detailRes, ink => {
+    sprites[side] ||= A.sprite(280, 236, a.mountain.detailRes, ink => {
       ink.save(); path(ink, [...top, ...edge], true); ink.clip()
       ink.fillStyle = gradient(ink, 0, 0, 24, 105,
         [[0, pigment(mix(stone, PAPER, .36))], [.29, '#9b9881'], [.66, '#7e8270'], [1, '#616a62']])
@@ -808,7 +1058,12 @@
       ink.globalCompositeOperation = 'destination-in'
       ink.fillStyle = gradient(ink, -168, 0, -15, 0, [[0, '#0000'], [.25, '#0002'], [.78, '#000c'], [1, '#000']])
       ink.fillRect(-168, -6, 280, 121)
-    }, 168, 6)
+      ink.globalCompositeOperation = 'source-over'
+      characterTree(ink, 11, 2, side > 0 ? .75 : .62, seed, TREES.ledge, a.mountain.paint)
+      groundPatch(ink, -18, 18, .68, GROUND_COLOR.bridge, a.mountain.paint, seed)
+      groundPatch(ink, 39, 9, .73, GROUND_COLOR.bridge, a.mountain.paint, seed + 11)
+      groundPatch(ink, 73, 9, .46, GROUND_COLOR.bridge, a.mountain.paint, seed + 19)
+    }, 168, 116)
     g.save(); g.translate(x, G); g.scale(side, 1)
     A.drawSprite(g, sprites[side], 0, 0)
     g.restore()
@@ -864,6 +1119,14 @@
       wash(g, [[xx+3,yy+2],[xx+5,yy+3],[xx+9,yy+14],[xx+6,yy+12],[xx+4,yy+16]], '#8c5844')
     }
     planks(g, from, G, to - from, 18, 209, paint)
+    for (const x of [1524, 1694, 1789, 2026, 2148, 2281]) {
+      const rand = A.rng(x * 17)
+      for (let j = 0; j < 9; j++) {
+        const px = x + rand() * 41, py = G + .6 + rand() * 5
+        g.fillStyle = A.rgba([137, 119, 78], .66 + rand() * .24)
+        A.leaf(g, px, py, (rand() - .5) * 2, 2 + rand() * 5, .55 + rand() * .68)
+      }
+    }
     for (const x of [1498, 1634, 1819, 1974, 2150, 2282]) {
       inkLine(g, [[x, G + 13], [x + 17, G + 12], [x + 43, G + 13]], 5.5, [43, 39, 35], x)
       dryLine(g, [[x, G + 11], [x + 42, G + 11]], 2.3, [170, 143, 109], .66, x + 19, 4)
@@ -924,8 +1187,8 @@
   }
 
   function courtyard(g, paint) {
-    pine(g, 3553, G + 2, 1.16, 707, [47, 61, 43], paint.ink)
-    pine(g, 3483, G + 6, -.51, 718, [67, 79, 61])
+    characterTree(g, 3479, G + 2, -.51, 718, TREES.ledge, paint)
+    characterTree(g, 3553, G + 2, 1.06, 707, TREES.court, paint)
     stoneLantern(g, 3422, G, .74, paint)
     stoneLantern(g, 4067, G, .62, paint)
     wash(g, [[3893, G - 18], [3903, G - 27], [3916, G - 32], [3977, G - 30], [4006, G - 32], [4020, G - 20],
@@ -947,7 +1210,38 @@
     }
   }
 
+  function lanternWash(g, x, y, rx, ry, strength) {
+    g.save(); g.translate(x, y); g.scale(rx, ry)
+    const glow = g.createRadialGradient(0, -.12, 0, 0, -.12, 1)
+    glow.addColorStop(0, A.rgba([255, 215, 143], strength))
+    glow.addColorStop(.37, A.rgba([243, 180, 101], strength * .63))
+    glow.addColorStop(.71, A.rgba([193, 135, 72], strength * .19))
+    glow.addColorStop(1, '#d4a05a00')
+    g.fillStyle = glow
+    g.fillRect(-1, -1.12, 2, 2)
+    g.restore()
+  }
+
+  function lanternGround(g, x, paint) {
+    const rand = A.rng(7642)
+    for (const light of [x - 156, x + 156]) {
+      lanternWash(g, light, G + 14, 112, 23, .66)
+      for (let j = 0; j < 19; j++) {
+        const px = light + (rand() - .5) * 129, y = G + 3 + rand() ** 1.5 * 32
+        const span = 4 + rand() * 18
+        dab(g, px, y, span * .63, 2 + rand() * 2.6, paint.paper, .35)
+        axeStroke(g, px, y, span, (rand() - .53) * 2, 1.35, [171, 120, 65], .47, rand)
+      }
+      wash(g, [[light - 21,G+1],[light-12,G+1],[light-40,G+31],[light-59,G+35]], '#38362738')
+    }
+  }
+
   function bellTower(g, x, paint) {
+    for (const side of [-1, 1]) {
+      lanternWash(g, x + side * 153, 205, 104, 125, .66)
+      lanternWash(g, x + side * 115, 167, 80, 31, .42)
+    }
+    lanternWash(g, x, 206, 100, 63, .34)
     // The two side aisles funnel the eye toward the bronze bell in the open bay.
     for (const side of [-1, 1]) {
       g.save(); g.translate(x, 0); g.scale(side, 1)
@@ -1068,20 +1362,6 @@
     g.restore()
   }
 
-  function summitGrass(g, x, y, height, seed) {
-    const rand = A.rng(seed)
-    for (let tuft = 0; tuft < 3; tuft++) {
-      const root = x + (tuft - 1) * height * .54, h = height * (.5 + rand() * .5)
-      for (let j = 0; j < 11; j++) {
-        const dx = (j / 10 - .39) * h * (1.1 + rand()), dy = h * (.48 + rand() * .68)
-        const blade = [[root + (rand() - .5) * 3, y], [root + dx * .29, y - dy * .62],
-          [root + dx * .65, y - dy], [root + dx, y - dy * (.78 + rand() * .24)]]
-        g.fillStyle = j % 4 === 0 ? '#95866a' : j % 3 ? '#53604b' : '#38483e'
-        A.ribbon(g, blade, t => (1.35 + .55 * (j % 3)) * (1 - t) + .08)
-      }
-    }
-  }
-
   function summitTerrace(g, paint) {
     wash(g, [[5310, G - 1], [5330, G - 14], [5372, G - 12], [5394, G - 2]], '#655e58')
     summitPine(g, paint)
@@ -1173,6 +1453,19 @@
     } else if (i === 3) {
       // An actual opening in the old lime wall frames the distant range.
       g.save();g.translate(3833,G)
+      g.save()
+      g.beginPath();g.arc(8,-37,53,0,TAU);g.clip()
+      g.fillStyle = gradient(g,0,-88,0,1,[[0,'#eadcbb32'],[.57,'#eadcb277'],[1,'#d0c49eeb']])
+      g.fillRect(-50,-96,116,111)
+      wash(g,[[-16,4],[-4,-16],[12,-29],[24,-27],[18,-16],[25,2]],'#b2a68f')
+      for (const [x,y,span] of [[-16,-2,46],[-7,-9,31],[1,-16,22],[9,-23,14]]) {
+        dryLine(g,[[x,y],[x+span*.58,y-.6],[x+span,y+1]],2.4,[94,91,74],.61,713+x,5)
+      }
+      characterTree(g,37,-9,-.53,814,{
+        ...TREES.bell, foliage: [[103,55,43],[161,76,55],[195,113,72]],
+      },paint)
+      pine(g,-34,-10,.19,3172,[120,127,99])
+      g.restore()
       g.beginPath();g.rect(-147,-94,294,96);g.arc(8,-37,53,0,TAU,true)
       g.fillStyle='#c1b9a1';g.fill('evenodd');g.clip('evenodd')
       // The ring is masked by the actual opening. Radial joints turn across its face.
@@ -1225,14 +1518,23 @@
     return A.strip(to - from, -70, 479, detailRes, (g, lo, hi) => {
       g.translate(-from, 0)
       if (i === 0) {
-        pine(g, 799, G + 5, .88, 701)
+        characterTree(g, 630, G + 2, -.47, 845, TREES.ledge, paint)
+        characterTree(g, 799, G + 2, .91, 701, TREES.gate, paint)
         stoneLantern(g, 1196, G, .68, paint)
         stoneLantern(g, 552, G, .61, paint)
       }
       chapterScenery(g, i, paint)
-      if (i === 2) corridor(g, paint)
+      if (i === 2) {
+        characterTree(g, 2442, G + 1, -.52, 919, TREES.wind, paint)
+        characterTree(g, 3108, G + 1, .75, 924, TREES.wind, paint)
+        corridor(g, paint)
+      }
       if (i === 3) courtyard(g, paint)
-      if (i === 4) bellTower(g, a.world.bell.x, paint)
+      if (i === 4) {
+        characterTree(g, 4563, G + 1, .74, 1857, TREES.bell, paint)
+        characterTree(g, 5087, G + 2, -.60, 1861, TREES.bell, paint)
+        bellTower(g, a.world.bell.x, paint)
+      }
       if (i === 5) summitTerrace(g, paint)
       if (i !== 1) {
         const start = i === 2 ? BRIDGE[1] - 10 : from
@@ -1257,11 +1559,6 @@
         }
         g.restore()
         dryLine(g, lip, 2.9, PAPER, .84, 3687, 5)
-        for (const [x, height] of [[5272, 20], [5369, 13], [5414, 18], [5479, 11], [5530, 8],
-          [5614, 6], [5747, 8], [5815, 14], [5887, 10], [5928, 17], [5983, 19], [6054, 15], [6116, 13]]) {
-          const y = G + 23 + 5 * Math.sin(x * .019) + 3 * Math.sin(x * .055)
-          summitGrass(g, x, y - 2 - A.hash(x, 583) * 7, height, x)
-        }
         // Broken horizontal strata under the arena, well below the actors' feet.
         // Old sword cuts run obliquely across the lip, deepening at the edge of the dais.
         for (const [x, y, span] of [[5542, 321, 58], [5618, 332, 88], [5637, 337, 46], [5802, 327, 74]]) {
@@ -1299,6 +1596,11 @@
           }
           dryLine(g, arc, 1.7, j % 2 ? INK : PAPER, .48, 4100 + j, 4)
         }
+      }
+      if (i === 4) lanternGround(g, a.world.bell.x, paint)
+      for (const [x, depth, size] of GROUND_PATCHES[i]) {
+        if (x + 85 < from + lo || x - 85 > from + hi) continue
+        groundPatch(g, x, G + depth, size, GROUND_BY_AREA[i], paint, 510 + i * 101)
       }
       for (const p of a.world.platforms) if (p.x >= from && p.x < to) A.drawSprite(g, a.mountain.platforms.get(p), p.x, p.y)
     })
@@ -1399,6 +1701,90 @@
       stroke(g, [[px, py], [px + .7, py + 8], [px + 1.5, Math.min(height, py + 15 + q * 19)]],
         A.rgba(PAPER, .44 * Math.sin(q * Math.PI)), .65 + i * .11)
     }
+    g.restore()
+  }
+
+  function cascadeCliff(res, paint) {
+    return A.sprite(450, 436, res, g => {
+      const profile = [
+        [-326,-106],[-119,-106],[-93,-74],[-89,-33],[-47,-23],[-34,6],[11,18],[40,42],[65,45],
+        [71,87],[90,110],[93,149],[112,181],[107,209],[127,237],[137,309],[155,330],[-326,330],
+      ]
+      const cliff = chippedEdge(profile,1296)
+      g.save(); path(g,cliff,true);g.clip()
+      g.fillStyle = gradient(g,-170,0,105,252,[[0,'#2e423f'],[.42,'#546359'],[.73,'#788074'],[1,'#91968a']])
+      g.fillRect(-326,-106,485,437)
+      const rand = A.rng(1867)
+      for (let i = 0; i < 64; i++) {
+        const x = -235 + rand() * 354, y = -93 + rand() * 425
+        dab(g,x,y,17 + rand() * 45,15 + rand() * 69,i % 9 ? paint.ink : paint.paper,.16 + rand() * .18)
+        axeStroke(g,x,y,7 + rand() * 20,19 + rand() * 91,6 + rand() * 16,
+          i % 5 ? [38,54,49] : [174,174,145],.34,rand)
+      }
+      const folds = [
+        [[-115,-96],[-116,-32],[-128,7],[-104,58],[-113,105],[-84,176],[-67,219]],
+        [[-50,-26],[-50,17],[-20,51],[-27,95],[-45,135],[-33,168],[-24,220]],
+        [[29,39],[44,63],[57,119],[42,172],[70,202],[63,236],[83,273]],
+      ]
+      for (const [i, fold] of folds.entries()) {
+        inkLine(g,fold,14,[34,49,45],1946+i,.77)
+        dryLine(g,fold.map(([x,y])=>[x-4,y]),5.8,[179,180,145],.45,1950+i,8)
+      }
+      g.restore()
+      dryLine(g,profile.slice(2,14),4.1,[165,168,145],.54,1954,7)
+      // Feather the left crop into the larger valley wash on the approach.
+      g.globalCompositeOperation = 'destination-in'
+      g.fillStyle = gradient(g,-296,0,-220,0,[[0,'#0000'],[.48,'#0007'],[1,'#000']])
+      g.fillRect(-296,-106,450,436)
+      g.globalCompositeOperation = 'source-over'
+    }, 296, 106)
+  }
+
+  function gateCascade(g, a, cam, clock, layer) {
+    const scroll = .84, x = 786 * scroll
+    const left = cam.left * scroll
+    if (x + 155 < left || x - 296 > left + cam.viewW) return
+    g.save(); layer(g, cam, scroll)
+    a.mountain.cascadeCliff ||= cascadeCliff(a.mountain.detailRes, a.mountain.paint)
+    A.drawSprite(g, a.mountain.cascadeCliff, x, 0)
+    const bank = [[x-28,38],[x-9,38],[x+8,41],[x+29,51]]
+    inkLine(g, bank, 7.8, [100,112,101], 1911, .88)
+    dryLine(g, bank, 5.9, PAPER, .88, 1917, 7)
+    waterfall(g, x-9, 39, 274, 91, clock)
+    waterfall(g, x+12, 49, 265, 70, clock*.87)
+    const drift = Math.sin(clock * .67) * 11
+    g.drawImage(a.mountain.cloud, x-121+drift, 265, 242, 61)
+    g.drawImage(a.mountain.cloud, x-141-drift, 289, 270, 47)
+    g.restore()
+  }
+
+  function bridgeCloudSea(g, a, cam, clock, layer, amount) {
+    const scroll = .80, origin = 1690 * scroll - 170
+    a.mountain.cloudSea ||= A.sprite(910, 162, a.mountain.res, cloud => {
+      const rand = A.rng(2907)
+      // Overlap pigment and paper in soft lobes. A few dry highlights carry the sweep across the gap.
+      for (let i = 0; i < 12; i++) {
+        const t = i / 11, x = 44 + 816 * t
+        const crest = 91 - t * 43 + Math.sin(t * TAU * 2.3) * 9
+        const envelope = Math.sin(Math.PI * (.10 + .80 * t))
+        dab(cloud,x,crest,101 + rand()*75,23 + 25 * envelope,a.mountain.paint.paper,.79)
+        dab(cloud,x + 12,crest + 22,113 + rand()*53,17 + 16 * envelope,a.mountain.paint.paper,.61)
+      }
+      const coolBrush = tintBrush(brushStamp(2857),[111,134,135])
+      for (let i = 0; i < 72; i++) {
+        const x = 26 + rand()*854, t=x/910
+        const crest = 76 - t*43 + Math.sin(t*TAU*2.3)*7
+        const y = crest + (rand()-.32)*(12+40*Math.sin(Math.PI*t))
+        dab(cloud,x,y,24+rand()*102,3+rand()*12,i%8 ? a.mountain.paint.paper : coolBrush,.27+rand()*.36)
+      }
+      for (const [i, ribbon] of [
+        [[40,76],[212,83],[327,65],[478,68],[600,55],[768,56],[901,40]],
+        [[105,105],[250,101],[416,91],[540,96],[656,85],[825,77]],
+        [[174,124],[316,112],[439,120],[584,106],[736,105]],
+      ].entries()) dryLine(cloud,ribbon,7-i*1.4,PAPER,.51-i*.10,2924+i,9)
+    })
+    g.save(); layer(g, cam, scroll)
+    A.drawSprite(g,a.mountain.cloudSea,origin+Math.sin(clock*.23)*27,188,amount*.91)
     g.restore()
   }
 
@@ -1621,6 +2007,8 @@
     }
     mistBelt(g, a, cam, CLIFF_SCROLL, 217, 125, 260, clock, .58, 37)
     mistBelt(g, a, cam, CLIFF_SCROLL, 280, 113, 270, clock, .70, 41)
+    if (middle < 1450) gateCascade(g, a, cam, clock, layer)
+    if (chasm > 0) bridgeCloudSea(g, a, cam, clock, layer, chasm)
     if (summit > 0) summitView(g, a, cam, clock, layer, summit)
     g.restore()
     if (dusk > 0) {
@@ -1743,6 +2131,20 @@
     }
   }
 
+  function windRibbon(res) {
+    return A.sprite(260, 73, res, g => {
+      const path = Array.from({ length: 29 }, (_, i) => {
+        const t = i / 28
+        return [3 + 247*t, 50 - 40*t + Math.sin(t*TAU*1.65 + .3) * (2.5 + 5*t)]
+      })
+      g.fillStyle = gradient(g,0,0,247,0,[[0,'#e2ebdc00'],[.19,'#edf1ddcc'],[.56,'#eef2ddce'],[1,'#e2ebdc00']])
+      A.ribbon(g,path,t=>.5+6*Math.sin(Math.PI*t))
+      dryLine(g,path,6.4,[237,243,224],.81,1784,9)
+      dryLine(g,path.map(([x,y],i)=>[x,y+9+Math.sin(i)*2]),3.0,[101,133,127],.41,1811,7)
+      dryLine(g,path.slice(9,23).map(([x,y])=>[x+8,y-8]),2.1,[248,244,222],.65,1824,5)
+    })
+  }
+
   function moving(g, a, cam, state, time, reducedMotion) {
     const left = cam.left - 85, right = cam.left + cam.viewW + 85
     const clock = state.clock
@@ -1813,6 +2215,18 @@
     if (state.wind.phase !== 'calm') {
       const dir = state.wind.dir || 1, power = state.wind.power
       const [lo, hi] = a.world.wind.zone
+      a.mountain.windRibbon ||= windRibbon(a.mountain.res)
+      for (let j = 0; j < 4; j++) {
+        const span = hi - lo + 240
+        const phase = time * dir * (72 + power * 166) + A.hash(j,461) * span
+        const x = lo - 120 + ((phase % span + span) % span)
+        if (x + 260 < left || x - 260 > right) continue
+        const opacity = smooth((x - lo + 91) / 132) * smooth((hi - x + 96) / 158)
+        if (!opacity) continue
+        g.save();g.translate(x,120 + j*26 + Math.sin(time*.66+j)*12);g.scale(dir*(.57 + power*.37),.70 + j*.065)
+        A.drawSprite(g,a.mountain.windRibbon,0,0,opacity*(.25 + power*.56))
+        g.restore()
+      }
       g.strokeStyle = A.rgba([245, 242, 226], .14 + .32 * power); g.lineWidth = .9
       g.beginPath()
       for (let j = 0; j < 20; j++) {
@@ -1846,20 +2260,34 @@
     const rand = A.rng(seed), black=[30,34,29], grey=[84,86,70]
     return A.sprite(267, 113, res, g => {
       if (kind === 'pine' || kind === 'vine') {
-        const limb=[[0,3],[31,16],[56,19],[85,37],[113,34],[143,45],[174,41],[206,52],[246,45]]
-        g.fillStyle=A.rgba(black,.92)
-        A.ribbon(g,limb,t=>1+15*Math.pow(1-t,1.5))
-        dryLine(g,limb,13,black,.77,seed,8)
-        dryLine(g,limb.map(([x,y])=>[x,y-2.5]),4.6,[157,154,126],.62,seed+5,4)
-        for(let j=0;j<12;j++){
-          const k=1+j%6, [x,y]=limb[k], dir=j%3===0?-1:1
-          const reach=13+rand()*27, ex=x+reach,ey=y+dir*(9+rand()*20)
-          inkLine(g,[[x,y],[x+6,y+dir*7],[ex-6,ey+2],[ex,ey]],3.2,black,seed+j,.96)
-          for(let n=0;n<(kind==='pine'?32:7);n++){
-            const a=-Math.PI*.96+rand()*Math.PI*1.8,len=7+rand()*17
-            const xx=ex+(rand()-.5)*12,yy=ey+(rand()-.5)*6
-            g.fillStyle=A.rgba(n%5?black:grey,.60+rand()*.35)
-            A.leaf(g,xx,yy,a,len,kind==='pine'?.6+rand()*.55:1.3+rand())
+        const limb = kind === 'pine'
+          ? [[0,2],[24,10],[48,29],[77,30],[108,44],[137,48],[156,55],[186,53],[219,61],[246,56]]
+          : [[0,0],[16,14],[44,16],[67,29],[96,32],[114,52],[132,57],[153,78],[182,92],[210,96]]
+        g.fillStyle = A.rgba(black,.91)
+        A.ribbon(g,limb,t=>.8 + 17 * (1-t)**1.3)
+        dryLine(g,limb,9,black,.77,seed,8)
+        dryLine(g,limb.map(([x,y])=>[x,y-2]),4.2,[139,129,103],.72,seed+5,4)
+        if (kind === 'pine') {
+          const palette = [[25,36,29],[45,62,47],[85,91,68]]
+          const brush = tintBrush(brushStamp(seed), palette[0])
+          for (const [index, reach, drop, size] of [[1,45,20,1.03],[3,52,22,.92],[4,42,-10,.86],[6,55,22,1.12],[8,28,-8,.80]]) {
+            const [x,y] = limb[index], tx = x+reach, ty = y+drop
+            inkLine(g,[[x,y],[x+reach*.38,y+drop*.74],[tx,ty]],4,black,seed+index)
+            treeCluster(g,tx,ty,size,palette,.55,false,brush,rand)
+            treeCluster(g,x+reach*.63,y+drop*.67-8,size*.72,palette,-.32,false,brush,rand)
+          }
+        } else {
+          for (const [index, reach, drop] of [[1,40,30],[3,38,-2],[4,53,31],[5,17,44],[7,49,-11],[8,45,7]]) {
+            const [x,y] = limb[index]
+            const points = [[x,y],[x+reach*.29,y+drop*.57],[x+reach*.67,y+drop*.94],[x+reach,y+drop]]
+            inkLine(g,points,2.4,black,seed+index)
+            for(let n=1;n<=14;n++){
+              const ix = n<=7 ? 1 : 2, t = (n%7)/7
+              const px = A.lerp(points[ix][0],points[ix+1][0],t), py = A.lerp(points[ix][1],points[ix+1][1],t)
+              const dir = n%2 ? 1 : -1
+              g.fillStyle=A.rgba(n%4 ? black : grey,.62+rand()*.33)
+              A.leaf(g,px,py,dir*(.72+rand()*.73),6+rand()*13,1.6+rand()*2.1)
+            }
           }
         }
         return
