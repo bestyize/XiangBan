@@ -14,6 +14,7 @@ export interface FeaturedIdea {
   player?: string
   site?: string
   repository?: string
+  desktop_download?: string
   pack_slug?: string
 }
 

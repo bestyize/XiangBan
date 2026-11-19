@@ -89,7 +89,7 @@ pub fn valid_id(id: &str) -> bool {
 }
 
 pub fn is_builtin(id: &str) -> bool {
-    crate::games::IDS.contains(&id) || id == crate::games::FEATURED_AQUARIUM
+    crate::games::IDS.contains(&id) || crate::games::FEATURED_APP_IDS.contains(&id)
 }
 
 fn check_id(id: &str) -> Result<(), String> {

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "app",
+  "id": "featured-whale-girl",
+  "name": "潮汐书房 · 鲸鱼娘",
+  "description": "拜访月湾书房的溟月，看她读书、写信，从书页间发现藏品。",
+  "version": "1.0.0",
+  "category": "tool",
+  "entry": "index.html",
+  "icon": "icon.webp",
+  "cover": "cover.webp",
+  "orientation": "any",
+  "input": [
+    "touch",
+    "mouse",
+    "keyboard"
+  ],
+  "featuredOnly": true
+}

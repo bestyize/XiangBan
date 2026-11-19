@@ -26,6 +26,7 @@ const images = computed(() => {
 })
 const site = computed(() => webLink(work.value?.site))
 const repository = computed(() => webLink(work.value?.repository))
+const desktopDownload = computed(() => webLink(work.value?.desktop_download))
 const run = computed(() => {
   const id = ideaPlayerId(work.value?.player)
   return id ? ideaRunLocation(id) : undefined
@@ -61,6 +62,7 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
             </div>
             <div v-else-if="site && run"><dt>来源</dt><dd><a :href="site">作品官网</a></dd></div>
             <div v-if="repository"><dt>源码</dt><dd><a :href="repository">查看源码</a></dd></div>
+            <div v-if="desktopDownload"><dt>桌面</dt><dd><a :href="desktopDownload">下载 V2 作品包</a></dd></div>
           </dl>
           <div v-if="run || site" class="launch">
             <RouterLink v-if="run" class="launch-link" :to="run">

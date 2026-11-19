@@ -85,6 +85,18 @@ node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging /path/to/releas
 
 将 `jiangshan-map/` 部署到资源机的 `idea-players-v1/`，应用 `nginx-ideas.conf` 中对应的资源规则，再发布 ZIP 和 `jiangshan-map.json`。先核对网页入口、ZIP 和封面可以访问，再发布带新条目的精选目录。桌面可以从「我的作品」导入同一 ZIP。
 
+《潮汐书房 · 鲸鱼娘》使用 RealWorldBuilder 固定提交 `ebc9919e183f62eac0b24ad816982ec1e0fea66a` 的 `games/whale-girl/`。模型保留 CC BY-NC-SA 4.0 和原作者署名，作为免费、非商业展品分发。在 `web/` 目录构建：
+
+```sh
+node scripts/build-whale-girl-pack.mjs --source /path/to/RealWorldBuilder/games/whale-girl \
+  --cover public/ideas-covers/whale-girl.webp \
+  --icon ../../../client/xiaoban-desktop/public/game-packs/featured-whale-girl/icon.webp \
+  --out /path/to/release
+node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging /path/to/release/whale-girl.zip
+```
+
+按上述顺序发布 `whale-girl.html`、ZIP、`whale-girl.json` 和封面，再更新精选目录。桌面精选应用使用构建输出的 `featured-whale-girl.json` 固定 ZIP 校验值，`desktop-manifest.json` 对应桌面卡片。已安装的桌面版可以从作品详情下载同一 ZIP，在「应用 → 导入作品」打开。
+
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 
 ## 移动优先网页版（2026-11-01，本地实现）

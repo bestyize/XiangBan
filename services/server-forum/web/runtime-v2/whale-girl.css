@@ -1,0 +1,32 @@
+:root {
+  --study-safe-top: max(env(safe-area-inset-top, 0px), var(--xb-safe-top, 0px));
+  --study-safe-right: max(env(safe-area-inset-right, 0px), var(--xb-safe-right, 0px));
+  --study-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--xb-safe-bottom, 0px));
+  --study-safe-left: max(env(safe-area-inset-left, 0px), var(--xb-safe-left, 0px));
+}
+
+[data-host-capsule] #skip-opening,
+[data-host-capsule] .greeting-skip,
+[data-host-capsule] .tools {
+  right: max(var(--study-safe-right), calc(var(--xb-capsule-right) + var(--xb-capsule-width) + 8px));
+}
+
+@media (max-width: 540px) {
+  [data-host-capsule] .tools {
+    top: max(var(--study-safe-top), calc(var(--xb-capsule-top) + var(--xb-capsule-height) + 8px));
+    right: max(10px, var(--study-safe-right));
+  }
+}
+
+.dock {
+  max-width: calc(100% - 2 * max(9px, var(--study-safe-left), var(--study-safe-right)));
+}
+
+.greeting-band {
+  padding-left: max(6vw, var(--study-safe-left));
+  padding-bottom: max(22px, var(--study-safe-bottom));
+}
+
+@media (max-height: 480px) {
+  .greeting-band { padding-bottom: max(6px, var(--study-safe-bottom)); }
+}

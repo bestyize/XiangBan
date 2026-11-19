@@ -1,6 +1,7 @@
 import { aquariumExhibit, galleryTab, rabbitExhibit } from './microGallery'
 
 export const ideaPlayers = {
+  'whale-girl': { title: '潮汐书房 · 鲸鱼娘', entry: 'whale-girl.html', pointerLock: false, selfContained: false },
   'jiangshan-map': { title: '江山时序', entry: 'jiangshan-map/index.html', pointerLock: false, selfContained: false },
   saltline: { title: '运输船：Saltline', entry: 'saltline.html', pointerLock: true, selfContained: true },
   'starry-nightrider': { title: '星夜骑士：Starry Nightrider', entry: 'starry-nightrider.html', pointerLock: false, selfContained: true },
