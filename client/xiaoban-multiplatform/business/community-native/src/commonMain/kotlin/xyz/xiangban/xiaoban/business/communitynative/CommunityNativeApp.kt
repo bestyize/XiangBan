@@ -116,7 +116,6 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
-        var showMyWorks by rememberSaveable { mutableStateOf(false) }
         var communityPost by remember { mutableStateOf(Route.NewPost()) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
         // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
@@ -141,7 +140,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 val gamesSelected = selectedTab == Tab.Games
                 RetainedMainTab(selected = gamesSelected) {
                     GamesScreen(
-                        env, chat, ::push, mine = showMyWorks, onMineChanged = { showMyWorks = it }, active = gamesSelected,
+                        env, chat, ::push, active = gamesSelected,
                         onOverlayChanged = { gameOverlayOpen = it },
                         createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null },
                     )
