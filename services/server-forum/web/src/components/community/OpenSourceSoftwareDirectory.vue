@@ -85,11 +85,8 @@ const hasHotData = computed(() => categoryEntries.value.some(({ snapshot }) =>
   snapshot?.starGain != null,
 ))
 
-function selectSort(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  if (sortOptions.some(item => item.key === value)) {
-    void router.replace({ query: { ...route.query, sort: value === 'stars' ? undefined : value } })
-  }
+function selectSort(value: typeof sortOptions[number]['key']) {
+  void router.replace({ query: { ...route.query, sort: value === 'stars' ? undefined : value } })
 }
 
 function selectCategory(category: string) {
@@ -133,9 +130,10 @@ function updateLabel(value?: string) {
   <section class="software-directory" aria-label="开源软件">
     <div class="software-toolbar">
       <FilterChips class="software-category-tabs" :items="softwareCategories" :active="activeCategory" label="软件分类" @change="selectCategory" />
-      <select class="software-sort" aria-label="软件排序" :value="sort" @change="selectSort">
-        <option v-for="item in sortOptions" :key="item.key" :value="item.key">{{ item.label }}</option>
-      </select>
+      <div class="software-sort" role="group" aria-label="软件排序">
+        <button v-for="item in sortOptions" :key="item.key" type="button" :aria-pressed="sort === item.key"
+          @click="selectSort(item.key)">{{ item.label }}</button>
+      </div>
     </div>
     <p v-if="sort === 'hot' && categoryEntries.length" class="software-sort-status" role="status">
       {{ hotLoading ? '正在读取近期星标数据…' : hotError ? '近期星标数据暂不可用，按最近更新展示。' : hasHotData ? '按近一周 GitHub 星标净增排序，暂无数据的软件排在后面。' : '暂无近一周星标数据，按最近更新展示。' }}
@@ -186,7 +184,7 @@ function updateLabel(value?: string) {
 </template>
 
 <style scoped>
-.software-directory{padding:0 12px 24px}
+.software-directory{padding-bottom:24px}
 .software-more {
   display: block;
   margin: 16px auto 0;
@@ -214,24 +212,21 @@ function updateLabel(value?: string) {
   min-height: 40px;
   padding-inline: 10px;
 }
-.software-category-tabs :deep(button.on) { background: var(--brand-soft); }
+.software-category-tabs :deep(button.on) { background: transparent; color: var(--ink); font-weight: 700; }
 .software-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: none;
-  min-height: 36px;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
 }
+.software-sort button { min-height: 40px; padding: 3px 9px; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+.software-sort button[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+.software-sort button:hover { background: var(--surface-2); }
 .software-sort-status { margin: 0 0 12px; color: var(--ink-3); font-size: 12px; }
 .software-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px;margin:0;padding:0;list-style:none}
 .software-list li{min-width:0}
-.software-card{position:relative;display:flex;flex-direction:column;height:100%;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.software-card::before{position:absolute;inset:0 auto 0 0;width:2px;content:'';background:var(--brand);opacity:0;transition:opacity .2s}
-.software-card:hover::before,.software-card:focus-visible::before{opacity:1}
+.software-card{display:flex;flex-direction:column;height:100%;padding:16px;background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-card)}
+.software-card:hover .software-identity h3{color:var(--brand)}
 .software-card-top{display:flex;align-items:flex-start;gap:10px}
 .software-icon{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:10px;background:var(--surface-2);overflow:hidden;font-weight:700}
 .software-icon img{width:100%;height:100%;object-fit:contain}
@@ -251,4 +246,11 @@ function updateLabel(value?: string) {
 .software-card-footer{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 10px;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
 .software-platforms{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;color:var(--ink-3)}
 .software-platforms svg{display:block}
+@media (max-width: 620px) {
+  .software-toolbar { flex-wrap: wrap; justify-content: flex-end; gap: 0; margin-bottom: 8px; }
+  .software-toolbar .software-category-tabs { flex: 1 0 100%; }
+  .software-sort button { min-height: 34px; font-size: 12px; }
+  .software-list { gap: 8px; }
+  .software-card { padding: 13px; border-radius: 14px; }
+}
 </style>

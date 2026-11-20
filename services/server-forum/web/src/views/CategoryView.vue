@@ -13,7 +13,7 @@ import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 import { tagLabel } from '@/lib/format'
 import { articleLayout } from '@/lib/cardPresentation'
-import { canonicalCategory, categoryHref, postableCategories } from '@/lib/communityStructure'
+import { canonicalCategory, categoryHref, categoryLabel, isHiddenDiscussionBoard, postableCategories } from '@/lib/communityStructure'
 
 const route = useRoute()
 const meta = useMeta()
@@ -22,6 +22,7 @@ const composer = useTopicComposer()
 
 const slug = computed(() => String(route.params.slug))
 const category = computed(() => meta.bySlug.get(slug.value))
+const title = computed(() => category.value ? categoryLabel(category.value) : '')
 const parent = computed(() => {
   const c = category.value
   return c?.parent_id ? meta.byId.get(c.parent_id) : undefined
@@ -29,7 +30,7 @@ const parent = computed(() => {
 const sort = computed(() => (route.query.sort === 'new' || route.query.sort === 'hot' ? route.query.sort : 'latest'))
 const helpStatus = computed(() => ['share-help','resource-help'].includes(slug.value) && ['open', 'solved', 'bounty'].includes(String(route.query.help)) ? route.query.help as 'open' | 'solved' | 'bounty' : undefined)
 
-useHead(() => ({ title: category.value?.name ?? '分类' }))
+useHead(() => ({ title: title.value || '分类' }))
 
 // 板块的内置标签可以当筛选用：?tag=xxx。换了板块或者标签不在这个板块里，就当没选。
 const presetTags = computed(() => category.value?.preset_tags ?? [])
@@ -59,7 +60,7 @@ function withQuery(patch: { sort?: string; tag?: string; help?: string }) {
 /** 一级分类有可发帖的子板块时允许打开编辑器。 */
 const composeTarget = computed(() => {
   const c = category.value
-  if (!c || c.status !== 'active' || !c.posting_enabled) return null
+  if (!c || c.status !== 'active' || !c.posting_enabled || isHiddenDiscussionBoard(c.slug)) return null
   const level = session.user?.trust_level ?? 3
   if (!postableCategories(meta.categories, level).some(board => board.id === c.id || board.parent_id === c.id)) return null
   return c.slug
@@ -75,9 +76,9 @@ function compose() {
     <header class="head">
       <div>
         <p v-if="parent" class="crumb">
-          <RouterLink :to="categoryHref(parent,meta.categories)">{{ parent.name }}</RouterLink>
+          <RouterLink :to="categoryHref(parent,meta.categories)">{{ categoryLabel(parent) }}</RouterLink>
         </p>
-        <h1>{{ category?.name ?? '' }}</h1>
+        <h1>{{ title }}</h1>
         <p v-if="category?.description" class="muted desc">{{ category.description }}</p>
       </div>
       <button v-if="composeTarget" type="button" class="btn btn-primary" @click="compose">在这里发帖</button>

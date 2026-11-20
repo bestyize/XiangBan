@@ -6,6 +6,7 @@ export const communitySections = [
   { key: 'resources', label: '资源', path: '/resources' },
 ] as const
 export type Section = (typeof communitySections)[number]['key']
+export type CommunityLink = { key: Section; label: string; to: string }
 export type Area = 'community' | 'ai' | 'create' | 'me'
 type Route = { name?: unknown; params: Record<string, unknown> }
 export function isCommunityRoot(route: Route): boolean {

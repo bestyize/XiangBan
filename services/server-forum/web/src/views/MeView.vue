@@ -60,25 +60,21 @@ const profile = computed(() => session.user ? '/u/' + encodeURIComponent(session
 
 <style scoped>
 .me-page { max-width: 680px; margin: 0 auto; }
-.me-header { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 48px; background: var(--surface); border-radius: 14px 14px 0 0; padding-inline: 8px; }
+.me-header { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 48px; margin-bottom: 6px; padding-inline: 8px; }
 h1 { grid-column: 2; margin: 0; font-size: 17px; font-weight: 650; text-align: center; }
 .me-setting { display: grid; place-items: center; min-height: 44px; border: 0; background: none; color: var(--ink-2); }
-.profile-block { display: flex; align-items: center; gap: 14px; padding: 10px 16px 18px; background: var(--surface); border-radius: 0 0 14px 14px; }
+.profile-block { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-card); }
 .profile-copy { flex: 1; min-width: 0; }
 .profile-name { font-size: 22px; font-weight: 650; overflow-wrap: anywhere; }
 .profile-copy p, .points { display: block; margin: 4px 0 0; color: var(--ink-2); font-size: 12px; }
 .profile-block .btn { flex: none; border-radius: 99px; min-height: 36px; }
-.me-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: 8px; padding: 14px 6px; border-radius: 14px; background: var(--surface); }
+.me-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: 10px; padding: 14px 6px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-card); }
 .me-quick a { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; }
 .me-quick a > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--surface-2); color: var(--ink); }
-.me-group { margin-block: 8px; border-radius: 14px; overflow: hidden; background: var(--surface); }
+.me-group { margin-block: 10px; border-radius: 16px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow-card); }
 .me-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: start; font-size: 15px; }
 .me-row:last-child { border-bottom: 0; }
 .me-row small, .me-row > svg { margin-inline-start: auto; color: var(--ink-3); }
 .me-row small + svg { margin-inline-start: 0; }
 .me-row:hover, .me-quick a:hover, .me-setting:hover { color: var(--brand); }
-@media (max-width: 767px) {
-  .me-page { margin-inline: -12px; }
-  .me-header, .profile-block, .me-quick, .me-group { border-radius: 0; }
-}
 </style>

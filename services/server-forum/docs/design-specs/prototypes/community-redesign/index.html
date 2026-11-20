@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>超级小伴社区 · 活力社区风 UI 设计稿（PC + 移动 H5）</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="wb-body">
+  <header id="workbench-bar" class="wb-bar" role="region" aria-label="设计评审控制栏">
+    <div class="wb-left">
+      <div class="wb-brand">
+        <span class="wb-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="20" height="20">
+            <path fill="currentColor" d="M10 8h44a4 4 0 0 1 4 4v13a7 7 0 0 0 0 14v13a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V39a7 7 0 0 0 0-14V12a4 4 0 0 1 4-4z"/>
+            <path fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" d="M21 33l8 8 15-17"/>
+          </svg>
+        </span>
+        <strong>小伴社区 · 活力社区风</strong>
+        <span class="wb-tag">设计稿</span>
+      </div>
+
+      <div class="wb-seg" role="group" aria-label="预览设备形态">
+        <button type="button" class="wb-seg-btn" data-set-device="desktop">PC 网页</button>
+        <button type="button" class="wb-seg-btn" data-set-device="mobile">移动 H5</button>
+        <button type="button" class="wb-seg-btn" data-set-device="both">PC + H5 同屏</button>
+      </div>
+    </div>
+
+    <div class="wb-right">
+      <label class="wb-page-jump" aria-label="快速跳转页面">
+        <span>页面</span>
+        <select id="wb-page-select">
+          <option value="ideas">首页 · 创意</option>
+          <option value="news">首页 · 资讯</option>
+          <option value="opensource">首页 · 精选</option>
+          <option value="rankings">首页 · 排行榜</option>
+          <option value="nav">首页 · 导航</option>
+          <option value="discuss">社区 · 讨论</option>
+          <option value="resources">社区 · 资源</option>
+          <option value="apps">应用广场</option>
+          <option value="ai">小伴 AI</option>
+          <option value="me">我的</option>
+        </select>
+      </label>
+
+      <div class="wb-accents" role="group" aria-label="客户端主题色">
+        <button type="button" class="wb-dot" data-set-accent="red" title="小伴红" style="--dot:#D93A44"></button>
+        <button type="button" class="wb-dot" data-set-accent="green" title="薄荷绿" style="--dot:#07C160"></button>
+        <button type="button" class="wb-dot" data-set-accent="blue" title="海湾蓝" style="--dot:#2F6FDB"></button>
+        <button type="button" class="wb-dot" data-set-accent="purple" title="暮紫" style="--dot:#7152D8"></button>
+        <button type="button" class="wb-dot" data-set-accent="amber" title="琥珀" style="--dot:#A8640C"></button>
+        <button type="button" class="wb-dot" data-set-accent="graphite" title="石墨" style="--dot:#2B2B30"></button>
+      </div>
+
+      <button type="button" id="wb-theme-btn" class="wb-btn" aria-pressed="false" title="切换日间/夜间模式">
+        <span id="wb-theme-icon" aria-hidden="true"></span>
+        <span id="wb-theme-label">日间</span>
+      </button>
+
+      <button type="button" id="wb-spec-btn" class="wb-btn wb-btn-subtle">设计说明</button>
+      <button type="button" id="wb-collapse-btn" class="wb-btn wb-btn-icon" title="收起评审栏" aria-label="收起评审栏">▲</button>
+    </div>
+  </header>
+
+  <button type="button" id="wb-restore-btn" class="wb-restore-btn" hidden>
+    <span>展开评审栏</span>
+  </button>
+
+  <main id="stage" class="stage" aria-label="设计稿预览舞台"></main>
+
+  <div id="overlay-root"></div>
+  <div id="toast-root" class="wb-toast-root" aria-live="polite"></div>
+
+  <script defer src="./app.js"></script>
+</body>
+</html>

@@ -7,7 +7,7 @@ import {dateKey,lunarDate} from './calendar';
 import {emptyNote,emptyCountdown,countdownValue,occursOn,itemDone,toggleItem,scheduleLabel} from './content';
 import ItemForm from './ItemForm.vue';
 import {cornerResize} from './resize';
-import {customWidgetDocument,customWidgetShell,isCustomDragMessage} from './custom-drag';
+import {customWidgetDocument,customWidgetHtmlUrl,customWidgetShell,isCustomDragMessage} from './custom-drag';
 
 const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;renderScale?:number;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false,renderScale:1});
 const emit=defineEmits<{settings:[]}>();
@@ -22,6 +22,38 @@ const customDocument=computed(()=>{
   const html=props.widget.custom?.html||'<div style="color:#999;padding:12px;font-size:12px">未找到小组件内容</div>';
   return customWidgetDocument(html,!props.preview);
 });
+const standaloneId = computed(() => desktop && props.widget.custom?.standaloneHtml ? props.widget.custom.id : undefined);
+const customFrameKey = computed(() => standaloneId.value ? `local:${standaloneId.value}` : customDocument.value);
+let initializedFrame: HTMLIFrameElement | undefined;
+let htmlLoad: AbortController | undefined;
+watch(customFrame, () => {
+  if (initializedFrame !== customFrame.value) htmlLoad?.abort();
+});
+
+async function initializeCustomFrame(frame: HTMLIFrameElement) {
+  if (initializedFrame === frame || !frame.contentWindow) return;
+  htmlLoad?.abort();
+  initializedFrame = frame;
+  const id = standaloneId.value;
+  if (!id) {
+    frame.contentWindow.postMessage({ type: 'xiaoban-widget-init', html: customDocument.value }, '*');
+    return;
+  }
+  const load = new AbortController();
+  htmlLoad = load;
+  try {
+    const response = await fetch(customWidgetHtmlUrl(id), { signal: load.signal });
+    if (!response.ok) throw new Error('找不到组件的 HTML 文件');
+    const html = await response.text();
+    if (!load.signal.aborted && customFrame.value === frame) {
+      frame.contentWindow?.postMessage({ type: 'xiaoban-widget-init', html: customWidgetDocument(html, !props.preview) }, '*');
+    }
+  } catch (cause) {
+    if (!load.signal.aborted) error.value = cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    if (htmlLoad === load) htmlLoad = undefined;
+  }
+}
 const lunarLabel=computed(()=>{const year=new Intl.DateTimeFormat('zh-CN-u-ca-chinese',{year:'numeric'}).formatToParts(now.value).find(p=>(p.type as string)==='yearName')?.value;return `${year?year+'年 ':''}${lunarDate(now.value).full}`;});
 const greeting=computed(()=>now.value.getHours()<6?'夜深了':now.value.getHours()<12?'上午好':now.value.getHours()<18?'下午好':'晚上好');
 const locked=computed(()=>props.editing),living=computed<LivingData>(()=>props.widget.living??{count:0,symbol:'116.00700',reminders:[]});
@@ -132,7 +164,8 @@ function move(e:Pick<PointerEvent,'screenX'|'screenY'>,commit=false){if(!drag)re
 function customDrag(event:MessageEvent){
  if(!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow)return;
  if(event.data?.type==='xiaoban-widget-shell-ready'){
-  customFrame.value.contentWindow.postMessage({type:'xiaoban-widget-init',html:customDocument.value},'*');return;
+  void initializeCustomFrame(customFrame.value);
+  return;
  }
  if(props.preview||!props.payload)return;
  if(event.data?.type==='xiaoban-widget-settings'){settings();return;}
@@ -144,7 +177,7 @@ function customDrag(event:MessageEvent){
  }else move(data,data.phase==='end');
 }
 onMounted(()=>window.addEventListener('message',customDrag));
-onBeforeUnmount(()=>window.removeEventListener('message',customDrag));
+onBeforeUnmount(()=>{htmlLoad?.abort();window.removeEventListener('message',customDrag);});
 function capture(e:MouseEvent){if((e.target as Element).closest('.widget-settings-button'))return;if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
 let clockTimer:ReturnType<typeof setTimeout>|undefined,networkTimer:ReturnType<typeof setInterval>|undefined,active=true;
 function scheduleClock(){if(!active||clockTimer)return;clockTimer=setTimeout(()=>{clockTimer=undefined;now.value=new Date();scheduleClock();},60000-Date.now()%60000+20);}
@@ -198,7 +231,7 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
  <template v-else-if="widget.kind==='custom'">
   <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
    <iframe
-     :key="customDocument"
+     :key="customFrameKey"
      ref="customFrame"
      @load="customLayout"
      :src="customShell"

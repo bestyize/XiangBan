@@ -1,5 +1,21 @@
 # 超级小伴社区设计预览
 
+## 全站 UI 重设计稿（活力社区风 · PC + 移动 H5）
+
+[社区全站 UI 重设计稿](prototypes/community-redesign/index.html) 采用 **现代活力视觉社区风**，同时覆盖 **PC 端网页**（左导轨 + 精简顶栏）与 **移动端 H5**（390px 交互样机与真机适配）：顶部搜索与提醒纯图标收进右上角不带底色、「首页 / 讨论 / 资源」严格居中，创意页卡片统一 `3:2` 视觉封面与轻盈小红心互动；包含首页五栏目（创意、资讯、精选、排行榜、导航）、讨论、资源、应用、小伴 AI、我的以及作品/帖子详情与评论互动，支持 6 套客户端同款主题色与日间/夜间模式。
+
+从仓库根目录启动本机预览：
+
+```sh
+python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs/prototypes/community-redesign
+```
+
+- [PC + H5 同屏预览](http://127.0.0.1:1449/) · [PC 端网页预览](http://127.0.0.1:1449/?device=desktop) · [移动端 H5 预览](http://127.0.0.1:1449/?device=mobile)
+
+---
+
+## 既有单页与卡片参考稿
+
 [讨论卡片设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 使用单列列表，标题单行。底部左侧依次显示标签、头像、发布时间，右侧为回复和点赞。可切换桌面、移动和深色预览。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
 
 [创意页作品卡片](prototypes/ideas-cards/index.html) 展示微观展厅、《小王子：星辰之旅》和「运输船：Saltline」。卡片使用 16:9 封面、右上角可选类型标签、标题、说明、作者及收录日期。示例日期用于展示。

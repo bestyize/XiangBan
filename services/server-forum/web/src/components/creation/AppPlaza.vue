@@ -5,7 +5,6 @@ import { contentApi } from '@/api/content'
 import AppIcon from '@/components/AppIcon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
-import FilterChips from '@/components/community/FilterChips.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import { webLink } from '@/components/community/contract'
 import { useCommunityResource } from '@/components/community/resource'
@@ -20,9 +19,10 @@ const games = [
   ...playableGames.slice(3).map(game => ({ ...game, playable: true })),
 ]
 const mbti = builtinGame('mbti')!
+const wallpaperIcon = `${import.meta.env.BASE_URL}creation-previews/live-wallpapers.webp`
 const mobileTools = [
-  { ...MOBILE_ONLY_APPS.remoteControl, note: '在支持红外的 Android 手机中，打开「应用 → 广场 → 精选工具 → 遥控器」。' },
-  { ...MOBILE_ONLY_APPS.quickLaunch, note: '在 Android 小伴 App 中打开「应用 → 广场 → 精选工具 → 轻启」，为已安装的应用创建桌面快捷方式。' },
+  { ...MOBILE_ONLY_APPS.remoteControl, genre: '工具', note: '在支持红外的 Android 手机中，打开「应用 → 广场 → 精选工具 → 遥控器」。' },
+  { ...MOBILE_ONLY_APPS.quickLaunch, genre: '效率', note: '在 Android 小伴 App 中打开「应用 → 广场 → 精选工具 → 轻启」，为已安装的应用创建桌面快捷方式。' },
 ]
 const mobileTool = ref<(typeof mobileTools)[number] | null>(null)
 const showAllGames = computed(() => route.query.kind === 'game')
@@ -35,8 +35,7 @@ const filter = computed(() => filters.find(item => item.key === route.query.feed
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(route.query.page)) || 1)))
 const tools = useCommunityResource(() => contentApi.packs({ kind: 'app', featured: true }))
 watch(showAllGames, gamesOnly => { if (!gamesOnly) void tools.load() }, { immediate: true })
-const featuredTools = computed(() => (tools.data.value?.items ?? [])
-  .slice(0, showAllTools.value ? undefined : 1)
+const featuredTools = computed(() => (showAllTools.value ? tools.data.value?.items ?? [] : [])
   .map(tool => ({ ...tool, icon: tool.slug === 'wancisou' ? WANCISOU_ICON : webLink(tool.cover_url) })))
 const failedIcons = reactive(new Set<string>())
 const linkedTool = computed(() => {
@@ -73,48 +72,58 @@ function go(page: number) {
 
 <template>
   <section v-if="!showAllTools" class="plaza-section" aria-labelledby="plaza-games">
-    <header>
+    <header class="plaza-head">
       <h2 id="plaza-games">精选游戏</h2>
-      <RouterLink v-if="!showAllGames" to="/create?kind=game">全部 <span aria-hidden="true">›</span></RouterLink>
-      <RouterLink v-else to="/create">返回广场</RouterLink>
+      <RouterLink v-if="!showAllGames" class="plaza-more-btn" to="/create?kind=game">全部 <AppIcon name="arrow" :size="13" /></RouterLink>
+      <RouterLink v-else class="plaza-more-btn" to="/create">返回广场</RouterLink>
     </header>
-    <div class="game-strip" :class="{ 'game-grid': showAllGames }">
-      <template v-for="game in games" :key="game.id">
-        <RouterLink v-if="game.playable" class="game-tile" :aria-label="`试玩${game.name}`" :to="builtinRunLocation(game.id)">
-          <img class="shortcut-icon" :src="game.icon" alt="" decoding="async" />
-          <strong>{{ game.name }}</strong><small>{{ game.genre }}</small>
-        </RouterLink>
-        <RouterLink v-else class="game-tile" to="/ai">
-          <img class="shortcut-icon" :src="game.icon" alt="" decoding="async" />
-          <strong>{{ game.name }}</strong><small>在手机 App 游玩</small>
-        </RouterLink>
-      </template>
+    <div class="plaza-icon-grid">
+      <RouterLink v-for="game in (showAllGames ? games : games.slice(0, 4))" :key="game.id"
+        class="plaza-icon-item" :aria-label="game.playable ? `试玩${game.name}` : `${game.name}（在手机 App 游玩）`"
+        :to="game.playable ? builtinRunLocation(game.id) : '/ai'">
+        <span class="plaza-app-icon"><img :src="game.icon" alt="" decoding="async" /></span>
+        <span class="plaza-app-name">{{ game.name }}</span>
+        <small class="plaza-app-sub">{{ game.genre }}</small>
+      </RouterLink>
     </div>
   </section>
 
   <section v-if="!showAllGames" class="plaza-section" aria-labelledby="plaza-tools">
-    <header>
+    <header class="plaza-head">
       <h2 id="plaza-tools">精选工具</h2>
-      <RouterLink v-if="!showAllTools" to="/create?kind=app">全部 <span aria-hidden="true">›</span></RouterLink>
-      <RouterLink v-else to="/create">返回广场</RouterLink>
+      <RouterLink v-if="!showAllTools" class="plaza-more-btn" to="/create?kind=app">全部 <AppIcon name="arrow" :size="13" /></RouterLink>
+      <RouterLink v-else class="plaza-more-btn" to="/create">返回广场</RouterLink>
     </header>
-    <div class="tool-grid">
-      <RouterLink class="tool-tile" :to="builtinRunLocation(mbti.id)">
-        <img class="shortcut-icon" :src="mbti.icon" alt="" decoding="async" />
-        <strong>{{ mbti.name }}</strong>
+    <div class="plaza-icon-grid">
+      <RouterLink class="plaza-icon-item" :to="builtinRunLocation(mbti.id)">
+        <span class="plaza-app-icon"><img :src="mbti.icon" alt="" decoding="async" /></span>
+        <span class="plaza-app-name">{{ mbti.name }}</span>
+        <small v-if="showAllTools" class="plaza-app-sub">{{ mbti.genre }}</small>
       </RouterLink>
-      <button v-for="tool in mobileTools" :key="tool.id" class="tool-tile" type="button" @click="mobileTool = tool">
-        <img class="shortcut-icon" :src="tool.icon" alt="" decoding="async" />
-        <strong>{{ tool.name }}</strong><small>在手机 App 使用</small>
+      <button v-for="tool in mobileTools" :key="tool.id" class="plaza-icon-item" type="button"
+        :aria-label="`${tool.name}（在手机 App 使用）`" @click="mobileTool = tool">
+        <span class="plaza-app-icon"><img :src="tool.icon" alt="" decoding="async" /></span>
+        <span class="plaza-app-name">{{ tool.name }}</span>
+        <small v-if="showAllTools" class="plaza-app-sub">{{ tool.genre }}</small>
       </button>
-      <RouterLink v-for="tool in featuredTools" :key="tool.id" class="tool-tile" :to="appRunLocation(tool.id, tool.version)">
-        <img v-if="tool.icon && !failedIcons.has(tool.icon)" class="shortcut-icon" :src="tool.icon" alt="" decoding="async" @error="failedIcons.add(tool.icon)" />
-        <span v-else class="shortcut-icon icon-fallback" aria-hidden="true"><AppIcon name="grid" /></span>
-        <strong>{{ tool.title }}</strong>
+      <RouterLink class="plaza-icon-item" to="/create?kind=wallpaper">
+        <span class="plaza-app-icon"><img :src="wallpaperIcon" alt="" decoding="async" /></span>
+        <span class="plaza-app-name">动态壁纸</span>
+        <small v-if="showAllTools" class="plaza-app-sub">桌面</small>
+      </RouterLink>
+      <RouterLink v-for="tool in featuredTools" :key="tool.id" class="plaza-icon-item" :to="appRunLocation(tool.id, tool.version)">
+        <span class="plaza-app-icon">
+          <img v-if="tool.icon && !failedIcons.has(tool.icon)" :src="tool.icon" alt="" decoding="async" @error="failedIcons.add(tool.icon)" />
+          <AppIcon v-else name="grid" />
+        </span>
+        <span class="plaza-app-name">{{ tool.title }}</span>
+        <small v-if="tool.slug === 'wancisou'" class="plaza-app-sub">检索</small>
       </RouterLink>
     </div>
-    <p v-if="tools.loading.value" class="tools-status" role="status">正在加载社区工具…</p>
-    <p v-else-if="tools.error.value" class="tools-status" role="alert">{{ tools.error.value }} <button class="btn btn-sm" type="button" @click="tools.load">重试</button></p>
+    <template v-if="showAllTools">
+      <p v-if="tools.loading.value" class="tools-status" role="status">正在加载社区工具…</p>
+      <p v-else-if="tools.error.value" class="tools-status" role="alert">{{ tools.error.value }} <button class="btn btn-sm" type="button" @click="tools.load">重试</button></p>
+    </template>
   </section>
 
   <ModalDialog :open="Boolean(mobileTool)" :title="mobileTool?.name ?? '在手机 App 使用'" @close="mobileTool = null">
@@ -125,44 +134,109 @@ function go(page: number) {
   </ModalDialog>
 
   <section v-if="!showAllGames && !showAllTools" class="plaza-section" aria-labelledby="plaza-community">
-    <header><h2 id="plaza-community">社区作品</h2></header>
-    <FilterChips class="plaza-filters" :items="filters" :active="filter" label="社区作品筛选" @change="select" />
+    <header class="plaza-head"><h2 id="plaza-community">社区作品</h2></header>
+    <div class="plaza-filters" role="group" aria-label="社区作品筛选">
+      <button v-for="item in filters" :key="item.key" class="filter-pill" type="button"
+        :aria-pressed="filter === item.key" @click="select(item.key)">{{ item.label }}</button>
+    </div>
     <RequestState :loading="feed.loading.value" :error="feed.error.value"
       :empty="Boolean(feed.data.value && !feed.data.value.items.length)"
       :message="filter === 'featured' ? '暂无精选作品' : filter === 'app' ? '还没有社区工具' : '还没有社区作品'" @retry="feed.load" />
     <div v-if="feed.data.value?.items.length" class="plaza-packs">
-      <CommunityPackCard v-for="pack in feed.data.value.items" :key="pack.id" :pack="pack" layout="visual" />
+      <CommunityPackCard v-for="pack in feed.data.value.items" :key="pack.id" :pack="pack" layout="visual" plaza />
     </div>
     <nav v-if="feed.data.value && (page > 1 || page * feed.data.value.page_size < feed.data.value.total)" class="plaza-pager" aria-label="社区作品分页">
       <button class="btn" type="button" :disabled="page <= 1" @click="go(page - 1)">上一页</button>
       <span>第 {{ page }} 页</span>
       <button class="btn" type="button" :disabled="page >= 1000 || page * feed.data.value.page_size >= feed.data.value.total" @click="go(page + 1)">下一页</button>
     </nav>
+    <p v-else-if="feed.data.value?.items.length" class="plaza-end">已看完所有作品</p>
   </section>
 </template>
 
 <style scoped>
-.plaza-section { margin-bottom: 24px; min-width: 0; }
-.plaza-section > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 8px; }
-h2 { margin: 0; font-size: 16px; font-weight: 650; }
-header a { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--ink-2); font-size: 13px; }
-header a:hover { color: var(--brand); }
-.game-strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; padding: 4px 2px 6px; }
-.game-tile { flex: 0 0 min(100px, calc((100% - 24px) / 4)); }
-.game-grid, .tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 100px)); gap: 8px; }
-.game-tile, .tool-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 4px 0; border: 0; border-radius: 8px; background: none; color: var(--ink); text-align: center; }
-.game-tile:hover, .tool-tile:hover { color: var(--brand); }
-.shortcut-icon { display: block; width: min(56px, 100%); aspect-ratio: 1; border-radius: 16px; object-fit: cover; background: var(--surface-2); }
-.icon-fallback { display: grid; place-items: center; color: var(--brand); }
-.game-tile strong, .tool-tile strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
-small { color: var(--ink-3); font-size: 12px; }
-.tools-status { margin: 8px 0 0; color: var(--ink-3); font-size: 12px; }
+.plaza-section { margin-bottom: 24px; }
+.plaza-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.plaza-head h2 { margin: 0; font-size: 16.5px; font-weight: 700; color: var(--ink); }
+.plaza-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--community-muted);
+}
+.plaza-more-btn:hover { color: var(--ink); }
+.plaza-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));
+  gap: 16px 14px;
+}
+.plaza-icon-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  text-align: center;
+  color: var(--ink);
+}
+.plaza-app-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 17px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--community-divider);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  transition: transform 0.16s ease;
+}
+.plaza-icon-item:hover .plaza-app-icon { transform: translateY(-2px); }
+.plaza-app-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.plaza-app-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.plaza-app-sub { font-size: 11px; color: var(--community-muted); line-height: 1.15; margin-top: -3px; }
+.tools-status { margin: 8px 0 0; color: var(--community-muted); font-size: 12px; }
 .tool-note { display: grid; justify-items: start; gap: 14px; }
 .tool-note p { margin: 0; color: var(--ink-2); }
-.plaza-filters { padding-inline: 0; }
-.plaza-packs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.plaza-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.filter-pill {
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--community-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.filter-pill:hover, .filter-pill[aria-pressed="true"] { color: var(--ink); }
+.filter-pill[aria-pressed="true"] { font-weight: 700; }
+.plaza-packs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.plaza-end { margin: 16px 0 6px; font-size: 12px; color: var(--community-muted); }
 .plaza-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 13px; }
-@media (min-width: 768px) {
-  .plaza-packs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1023px) {
+  .plaza-section { margin-bottom: 18px; }
+  .plaza-head, .plaza-icon-grid, .plaza-end { padding-inline: 6px; }
+  .plaza-icon-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 10px; }
+  .plaza-app-icon { width: 60px; height: 60px; border-radius: 15px; }
+  .plaza-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin-bottom: 8px; padding-bottom: 2px; }
+  .filter-pill { height: 26px; padding: 0 7px; font-size: 12px; }
+  .plaza-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 }
 </style>

@@ -41,7 +41,7 @@ useHead(() => ({ title:'资源' }))
 <template>
   <main class="community-page resource-page" :class="{ 'resource-page--media': tab === 'resource-movies' }">
     <h1 class="sr-only">社区资源</h1>
-    <CommunityTabs :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
+    <CommunityTabs class="page-section-tabs" :items="tabs" :active="tab" label="资源栏目" scrollable @change="setTab" />
     <RequestState v-if="requestedTab && requestedTab !== 'software' && !meta.categories.length && (meta.categoriesLoading || meta.categoriesError)"
       :loading="meta.categoriesLoading" :error="meta.categoriesError" @retry="meta.load()" />
     <OpenSourceSoftwareDirectory v-else-if="tab === 'software'" />

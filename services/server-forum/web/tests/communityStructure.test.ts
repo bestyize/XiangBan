@@ -33,6 +33,27 @@ test('a stopped parent hides descendants and legacy routes do not reopen them',(
  deepStrictEqual(resourceTabs(changed),[{key:'software',label:'开源软件'}])
 })
 
+test('web discussion uses the new names and leaves historical board URLs accessible', () => {
+  const renamed = [
+    ['learn', '学习和教程', '教程'],
+    ['casual-screen', '影视动漫', '影视'],
+    ['casual-feelings', '情感心理', '情感'],
+    ['casual-indie', '副业与独立开发', '副业'],
+  ] as const
+  const removed = ['casual-offwork', 'casual-loss', 'casual-dream', 'casual-think', 'casual-books', 'casual-fun']
+  const boards = renamed.map(([slug, name], index) => category(index + 1, slug, 'discuss', null, { name }))
+  const historical = removed.map((slug, index) => category(index + 20, slug, 'discuss'))
+  const all = [...boards, ...historical]
+  const tabs = discussionTabs(all)
+  deepStrictEqual(tabs.filter(tab => boards.some(board => board.slug === tab.key)).map(tab => tab.label), renamed.map(([, , label]) => label))
+  deepStrictEqual(boards.map(categoryLabel), renamed.map(([, , label]) => label))
+  deepStrictEqual(sectionScope(all, 'discuss').split(','), boards.map(board => board.slug))
+  for (const board of historical) {
+    strictEqual(tabs.some(tab => tab.key === board.slug), false)
+    strictEqual(categoryDestination(board, all), `/c/${board.slug}`)
+  }
+})
+
 test('detail navigation links to the available community tabs',()=>{
  const idea = category(10,'create-effect','ideas')
  const all=[...rows,idea,category(11,'site','site')]

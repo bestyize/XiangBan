@@ -26,10 +26,12 @@ useHead(() => ({ title: '小伴 AI' }))
   display: grid;
   justify-items: center;
   align-content: center;
-  min-height: min(68dvh, 620px);
-  max-width: 560px;
-  margin-inline: auto;
-  padding: 32px 12px;
+  max-width: 540px;
+  margin: 20px auto;
+  padding: 34px 22px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   text-align: center;
 }
 .ai-mark {
@@ -41,9 +43,9 @@ useHead(() => ({ title: '小伴 AI' }))
   background: var(--brand-soft);
   color: var(--brand);
 }
-h1 { margin: 16px 0 6px; font-size: 27px; }
+h1 { margin: 14px 0 6px; font-size: 22px; }
 p { margin: 0; color: var(--ink-2); font-size: 14px; }
-.download-links { display: grid; gap: 10px; width: min(100%, 300px); margin-top: 28px; }
-.download-links a { justify-content: flex-start; gap: 8px; min-height: 48px; padding: 8px 14px; }
-.download-links small { margin-inline-start: auto; font-size: 12px; font-weight: 400; }
+.download-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+.download-links a { gap: 7px; min-height: 44px; padding: 8px 13px; border-radius: 999px; }
+.download-links small { font-size: 11px; font-weight: 400; }
 </style>

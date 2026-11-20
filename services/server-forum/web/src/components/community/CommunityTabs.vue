@@ -8,7 +8,7 @@ const props = defineProps<{
   items: readonly TabItem[]
   active: string
   label: string
-  primary?: boolean
+  scrollable?: boolean
 }>()
 const emit = defineEmits<{ change: [key: string] }>()
 const row = useTemplateRef<HTMLDivElement>('row')
@@ -31,7 +31,7 @@ function closeMenu(restoreFocus = false) {
 }
 
 function measure() {
-  if (!row.value || !more.value) return
+  if (props.scrollable || !row.value || !more.value) return
   const tabs = Array.from(row.value.querySelectorAll<HTMLElement>(':scope > .tab-item'))
   const widths = tabs.map(tab => tab.getBoundingClientRect().width)
   const gap = parseFloat(getComputedStyle(row.value).columnGap) || 0
@@ -108,7 +108,7 @@ function onEscape(event: KeyboardEvent) {
 </script>
 
 <template>
-  <nav class="community-tabs" :class="{ 'primary-tabs': primary }" :aria-label="label" @keydown.esc="onEscape">
+  <nav class="community-tabs" :aria-label="label" @keydown.esc="onEscape">
     <div ref="row" class="community-tab-items" :class="{ 'menu-open': menuOpen }">
       <component :is="item.to ? RouterLink : 'button'" v-for="(item, index) in items" :key="item.key"
         :to="item.to" :type="item.to ? undefined : 'button'" class="tab-item"
@@ -216,26 +216,4 @@ function onEscape(event: KeyboardEvent) {
   overflow-wrap: anywhere;
 }
 .tab-menu :is(button, a):hover { background: var(--surface-2); }
-.primary-tabs {
-  --tab-justify: safe center;
-  gap: clamp(9px, 2.7vw, 32px);
-  margin-bottom: 0;
-}
-.primary-tabs .tab-item, .primary-tabs .tab-more {
-  min-height: var(--header-h);
-  padding: 0;
-  font-size: clamp(14px, 1.5vw, 15px);
-}
-.primary-tabs .tab-item:hover:not(.on) { background: transparent; color: var(--brand); }
-.primary-tabs .tab-item.on::after {
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 22px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--brand);
-  content: '';
-}
 </style>

@@ -6,7 +6,9 @@ export interface IdeaCardItem {
   to: RouteLocationRaw
   description?: string | null
   cover?: string | null
+  fallbackCover?: string
   label?: string
   author?: string | null
+  avatarColor?: string
   date?: string
 }

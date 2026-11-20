@@ -18,6 +18,21 @@ export interface FeaturedIdea {
   pack_slug?: string
 }
 
+const bundledCovers: Record<string, string> = {
+  'whale-girl': 'whale-girl.webp',
+  'jiangshan-map': 'jiangshan-map.webp',
+  'micro-gallery': 'micro-gallery.webp',
+  'plush-rabbit': 'plush-rabbit.webp',
+  'starry-nightrider': 'starry-nightrider.webp',
+  'little-prince': 'little-prince.webp',
+  'saltline': 'saltline.webp',
+  'oil-paint': 'oil-paint.webp',
+}
+
+export function ideaCoverFallback(id: string): string | undefined {
+  if (Object.hasOwn(bundledCovers, id)) return `${import.meta.env.BASE_URL}ideas-covers/${bundledCovers[id]}`
+}
+
 export async function loadFeaturedIdeas(): Promise<FeaturedIdea[]> {
   try {
     const response = await fetch('/ideas-catalog.json', { cache: 'no-cache', credentials: 'omit' })

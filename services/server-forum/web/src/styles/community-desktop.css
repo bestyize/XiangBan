@@ -1,25 +1,10 @@
-/* Public community desktop layout. Keep mobile and admin styles independent. */
+/* Content layout beside the desktop navigation rail. */
 @media (min-width: 1024px) {
-  .site-layout.community-layout {
-    --header-h: 68px;
-    background: color-mix(in srgb, var(--surface) 72%, var(--paper));
-  }
-  .site-layout.community-layout.community-root { --header-h: 56px; }
-  .site-layout.community-layout .app-main { padding: 20px 32px 40px; }
+  .site-layout.community-root { --header-h: 0px; }
+  .site-layout.community-root .page-section-tabs { display: none; }
+  .site-layout.community-layout .app-main { padding: 22px 28px 40px; }
   .site-layout.community-layout .app-footer { padding: 20px 32px 24px; font-size: 12px; }
   .site-layout.community-layout .community-page { max-width: none; }
-
-  .site-layout.community-layout .detail-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
-  .site-layout.community-layout .header-inner { height: var(--header-h); padding: 0 32px; }
-  .site-layout.community-layout .community-header .header-inner { gap: 16px; }
-  .site-layout.community-layout .header-actions { gap: 10px; }
-  .site-layout.community-layout .header-icon { width: 36px; height: 36px; }
-  .site-layout.community-layout .header-icon[aria-label="搜索社区"] { width: 204px; display: flex; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 8px; background: var(--surface-2); color: var(--ink-3); }
-  .site-layout.community-layout .header-icon[aria-label="搜索社区"] svg { width: 18px; height: 18px; flex: none; }
-  .site-layout.community-layout .desktop-search-label { display: block; font-size: 12px; }
-  .site-layout.community-layout .header-login { height: 34px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 16px; font-size: 13px; }
-  .site-layout.community-layout .header-search { max-width: var(--page-w); padding: 4px 32px 16px; }
-  .site-layout.community-layout .header-search input { height: 40px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--surface-2); }
 
   /* Selection styles for desktop filters and in-page tabs. */
   .site-layout .app-main :is(
@@ -33,7 +18,7 @@
   }
   /* Discovery: three editorial stories, then a news column and compact supporting content. */
   .site-layout.community-layout .home-page .recommend-feed { gap: 20px; padding-top: 0; }
-  .site-layout.community-layout .home-card, .site-layout.community-layout .daily-section { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 8px 20px 16px; }
+  .site-layout.community-layout .home-card, .site-layout.community-layout .daily-section { min-width: 0; border-radius: 16px; background: var(--surface); padding: 8px 20px 16px; box-shadow: var(--shadow-card); }
   .site-layout.community-layout .section-heading { min-height: 48px; margin-bottom: 4px; }
   .site-layout.community-layout .section-heading h2 { font-size: 16px; letter-spacing: -.02em; }
   .site-layout.community-layout .section-heading>a:hover, .site-layout.community-layout .section-heading>button:hover { color: var(--brand); }
@@ -60,7 +45,7 @@
 }
 
 @media (min-width: 1024px) {
-  @container page (min-width: 960px) {
+  @container page (min-width: 840px) {
     .site-layout.community-layout .home-page .recommend-feed { grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
     .site-layout.community-layout .home-page .banner-strip, .site-layout.community-layout .frontier-section { grid-column: 1/-1; }
     .site-layout.community-layout .daily-section { grid-column: 1; grid-row: span 3; }
@@ -80,11 +65,5 @@
   }
 }
 @media (min-width: 1600px) {
-  .site-layout.community-layout .app-main, .site-layout.community-layout .app-footer, .site-layout.community-layout .header-inner { padding-left: 40px; padding-right: 40px; }
-}
-
-/* Compact the search affordance before it can crowd the centered navigation. */
-@media (min-width: 1024px) and (max-width: 1199px) {
-  .site-layout.community-layout .community-header .header-icon[aria-label="搜索社区"] { width: 36px; padding: 0; justify-content: center; }
-  .site-layout.community-layout .community-header .desktop-search-label { display: none; }
+  .site-layout.community-layout .app-main, .site-layout.community-layout .app-footer { padding-inline: 40px; }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { categoryDestination } from '@/lib/communityStructure'
+import { categoryDestination, categoryLabel } from '@/lib/communityStructure'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
@@ -39,7 +39,7 @@ const commentRestriction = computed(() => {
 const posterOpen = ref(false)
 const posterInput = computed(() =>
   topic.value
-    ? { tag: topic.value.category.name, title: topic.value.title, summary: topic.value.excerpt || topic.value.title, url: `${window.location.origin}/t/${topic.value.id}`, seed: topic.value.id }
+    ? { tag: categoryLabel(topic.value.category), title: topic.value.title, summary: topic.value.excerpt || topic.value.title, url: `${window.location.origin}/t/${topic.value.id}`, seed: topic.value.id }
     : null,
 )
 const pinScopeDraft = ref<Exclude<PinScope, 'none'>>('site')
@@ -260,7 +260,7 @@ function breadcrumbDestination(slug: string) {
     <article v-else class="topic">
       <nav class="crumbs" aria-label="位置">
         <RouterLink v-if="parentCategory" :to="breadcrumbDestination(parentCategory.slug)">{{ parentCategory.name }}</RouterLink>
-        <RouterLink :to="breadcrumbDestination(topic.category.slug)">{{ topic.category.name }}</RouterLink>
+        <RouterLink :to="breadcrumbDestination(topic.category.slug)">{{ categoryLabel(topic.category) }}</RouterLink>
       </nav>
       <h1 v-if="topic.title || topic.pinned" class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
       <div class="byline">

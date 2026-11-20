@@ -25,6 +25,7 @@ const mine = computed(() => route.name === 'app-works')
 useHead(() => ({ title: mine.value ? '我的作品' : '应用' }))
 const categories = [{key:'wallpaper',label:'壁纸'},{key:'widget',label:'小组件'},{key:'effect',label:'特效'},{key:'pet',label:'伙伴'}]
 const category = computed(() => categories.find(c => c.key === route.query.kind)?.key || '')
+const plaza = computed(() => !mine.value && !category.value)
 const decorationSections = computed(() => [
   {kind:'wallpaper',title:'让桌面有点不一样',items:CREATION_IDEAS.filter(item => item.kind === 'wallpaper') as Preview[]},
   {kind:'widget',title:'把日常放在眼前',items:BUILTIN_WIDGETS as Preview[]},
@@ -58,9 +59,12 @@ function choose(item:Preview) {
 }
 </script>
 <template>
-  <div ref="content" class="creation-home">
-    <h1 class="sr-only">应用</h1>
-    <nav class="creation-tabs" aria-label="应用栏目">
+  <div ref="content" class="creation-home" :class="{ 'creation-home--plaza': plaza }">
+    <header v-if="plaza" class="plaza-masthead">
+      <h1>应用</h1>
+    </header>
+    <h1 v-else class="sr-only">应用</h1>
+    <nav v-if="!plaza" class="creation-tabs" aria-label="应用栏目">
       <RouterLink to="/create" :class="{ active: !mine }" :aria-current="!mine ? 'page' : undefined">广场</RouterLink>
       <RouterLink to="/create/works" :class="{ active: mine }" :aria-current="mine ? 'page' : undefined">我的作品</RouterLink>
     </nav>
@@ -105,6 +109,35 @@ function choose(item:Preview) {
 </style>
 
 <style scoped>
+:global(.site-layout .app-main:has(.creation-home--plaza)) {
+  max-width: 1200px;
+  padding: 22px 28px 48px;
+}
+.creation-home.creation-home--plaza {
+  max-width: none;
+  padding: 0;
+  font-family: var(--community-font);
+  line-height: 1.5;
+}
+.plaza-masthead h1 { margin: 0; font-size: 16px; font-weight: 700; }
+@media (min-width: 1024px) {
+  .plaza-masthead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+@media (max-width: 1023px) {
+  :global(.site-layout .app-main:has(.creation-home--plaza)) { padding: 0 6px 20px; }
+  :global(.site-layout:has(.creation-home--plaza) .app-footer) { display: none; }
+  .plaza-masthead {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    margin: 0 -6px 8px;
+    padding-top: env(safe-area-inset-top);
+    border-bottom: 1px solid var(--community-divider);
+    background: var(--mobile-nav-surface);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+  .plaza-masthead h1 { display: grid; place-items: center; height: 46px; padding: 0 10px; }
+}
 @media(min-width:1100px){
 .creation-home{max-width:960px;padding:12px 0 24px}.creation-tabs a{font-size:18px;min-height:44px}.creation-prompt{margin-bottom:16px}.creation-filters button{min-height:40px;padding:0 14px}.desktop-showcase{scroll-margin-top:88px}.creation-section{margin:34px 0 18px}.creation-section h2{font-size:20px;letter-spacing:-.02em}.creation-section>span{font-size:13px}.creation-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}.creation-card{background:var(--surface);padding:8px 8px 14px;border:1px solid var(--line);border-radius:18px;transition:border-color .18s,box-shadow .18s}.creation-card.selected{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}.creation-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow)}.creation-card.selected:hover{border-color:var(--brand)}.creation-card h3{font-size:16px;font-weight:600;margin:12px 6px 6px}.creation-meta{font-size:12px;margin:0 6px;gap:8px}.creation-cover{aspect-ratio:1.5;border-radius:12px}.creation-cover.pet{aspect-ratio:1.35}.creation-card:hover .creation-cover{transform:none}
 }

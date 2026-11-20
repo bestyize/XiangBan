@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
-const props = defineProps<{ images: string[]; title: string }>()
+const props = defineProps<{ images: string[]; title: string; fallbackCover?: string }>()
 const track = ref<HTMLDivElement>()
 const active = ref(0)
+const failedCover = ref<string>()
+const cover = computed(() => failedCover.value === props.images[0] && props.fallbackCover ? props.fallbackCover : props.images[0])
 
 function syncPage() {
   const rail = track.value
@@ -20,7 +22,7 @@ function goTo(index: number) {
 
 <template>
   <div class="work-gallery">
-    <img v-if="images.length === 1" :src="images[0]" :alt="title + '封面'" class="cover">
+    <img v-if="images.length === 1" :src="cover" :alt="title + '封面'" class="cover" @error="failedCover = images[0]">
     <template v-else>
       <div
         ref="track"
@@ -35,9 +37,10 @@ function goTo(index: number) {
       >
         <div v-for="(image, index) in images" :key="image" class="slide" :aria-hidden="index !== active">
           <img
-            :src="image"
+            :src="index === 0 ? cover : image"
             :alt="title + '，第 ' + (index + 1) + ' 张'"
             :loading="index === 0 ? 'eager' : 'lazy'"
+            @error="index === 0 && (failedCover = image)"
           >
         </div>
       </div>

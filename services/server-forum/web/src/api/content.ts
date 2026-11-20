@@ -28,6 +28,8 @@ export interface PackItem {
   version: number
   cover_url: string | null
   apply_count: number
+  view_count?: number
+  reply_count?: number
   topic_id: number | null
   one_click: boolean
   desktop_resource?: boolean

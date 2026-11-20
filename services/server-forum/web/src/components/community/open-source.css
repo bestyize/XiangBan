@@ -18,6 +18,7 @@
 .os-feed-heading>div{display:flex;align-items:baseline;gap:8px;min-width:0}.os-feed-heading h3{margin:0;font-size:16px;line-height:22px;overflow-wrap:anywhere}
 .os-feed-heading span{font-size:12px;color:var(--ink-3);flex:none}.os-category-description{display:none}
 .os-project-grid{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+.os-feed .os-project-card, .os-feed .os-collection-card { border: 0; border-radius: 16px; box-shadow: var(--shadow-card); }
 .os-feed > .os-project-grid.masonry-grid {
   grid-template-columns: repeat(var(--os-project-columns, 1), minmax(0, 1fr));
 }

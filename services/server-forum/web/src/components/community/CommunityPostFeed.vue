@@ -11,7 +11,7 @@ import { useTopicComposer } from '@/stores/topicComposer'
 import { galleryTab } from '@/lib/microGallery'
 import { discussionTabs, discussionTab, discussionCategory, discussionTopicTag, sectionScope, categoryLabel } from '@/lib/communityStructure'
 import type { IdeaCardItem } from '@/lib/ideaCards'
-import { loadFeaturedIdeas } from '@/lib/ideaCatalog'
+import { ideaCoverFallback, loadFeaturedIdeas } from '@/lib/ideaCatalog'
 import { kindLabel } from '@/lib/content'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import IdeaCard from '@/components/community/IdeaCard.vue'
@@ -89,18 +89,41 @@ function communityIdeaCard(entry: Entry): IdeaCardItem {
   }
 }
 
+const featuredCardPresentation = new Map<string, Pick<IdeaCardItem, 'avatarColor'> & { title?: string; label?: string }>([
+  ['jiangshan-map', { avatarColor: '#A8640C' }],
+  ['micro-gallery', { avatarColor: '#07C160', title: '微观展厅 · 龙鱼水族箱', label: '展厅' }],
+  ['plush-rabbit', { avatarColor: '#D93A44', label: '3D 模型' }],
+  ['starry-nightrider', { avatarColor: '#7152D8' }],
+  ['little-prince', { avatarColor: '#2F6FDB' }],
+  ['saltline', { avatarColor: '#2B2B30' }],
+  ['oil-paint', { avatarColor: '#D93A44', title: 'Oil Paint · 实时油画漫步' }],
+  ['whale-girl', { avatarColor: '#2F6FDB' }],
+])
+const featuredCards = computed<IdeaCardItem[]>(() => {
+  const catalog = new Map(featuredIdeas.value.map(item => [item.id, item]))
+  const order = new Set([...featuredCardPresentation.keys(), ...catalog.keys()])
+  return [...order].flatMap(id => {
+    const item = catalog.get(id)
+    if (!item) return []
+    const bundledCover = ideaCoverFallback(id)
+    return [{
+      ...item,
+      ...featuredCardPresentation.get(id),
+      cover: bundledCover ?? item.cover,
+      fallbackCover: bundledCover ? item.cover : undefined,
+      to: item.kind === 'gallery' ? item.href : { name: 'idea-work', params: { slug: id } },
+    }]
+  })
+})
+const spotlight = computed(() => featuredCards.value.find(card => card.id === 'whale-girl' && card.cover))
 const ideaCards = computed(() => {
   if (!ideas || showGallery.value) return []
-  const featured: IdeaCardItem[] = featuredIdeas.value.map(item => ({
-    ...item,
-    to: item.kind === 'gallery' ? item.href : { name: 'idea-work', params: { slug: item.id } },
-  }))
   const featuredPacks = new Set(featuredIdeas.value.flatMap(item => item.pack_slug ? [item.pack_slug] : []))
   const entries = data.value?.entries ?? []
   const community = entries
     .filter(entry => entry.kind !== 'pack' || !featuredPacks.has(entry.value.slug))
     .map(communityIdeaCard)
-  return [...featured, ...community]
+  return [...featuredCards.value, ...community]
 })
 watch([() => meta.categories,() => ideas,showGallery,tab,tag,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 watch(() => composer.saved, saved => { if (saved && !showGallery.value) void refresh() })
@@ -119,12 +142,13 @@ function go(value:number) { navigate({page:String(value)}) }
 
 <template>
   <div class="community-post-feed">
-    <CommunityTabs v-if="!ideas" :items="discussionOptions" :active="tab" label="讨论板块"
+    <CommunityTabs v-if="!ideas" class="page-section-tabs discussion-tabs" :items="discussionOptions" :active="tab" label="讨论板块" scrollable
       @change="changeDiscussionTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
     <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
     <RequestState v-if="showFeaturedIdeas" :loading="featuredCatalog.loading.value" :error="featuredCatalog.error.value"
       @retry="featuredCatalog.refresh" />
+    <IdeaCard v-if="spotlight" class="ideas-spotlight" :card="spotlight" spotlight />
     <div v-if="ideaCards.length" class="ideas-grid">
       <IdeaCard v-for="card in ideaCards" :key="card.id" :card="card" />
     </div>
@@ -156,27 +180,20 @@ function go(value:number) { navigate({page:String(value)}) }
 .discussion-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 9px;
-  max-width: 950px;
-  margin: 4px auto 0;
-  padding-inline: 4px;
+  gap: 12px;
+  max-width: 880px;
 }
+.ideas-spotlight { margin-bottom: 8px; }
 .ideas-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 4px 0;
+  gap: 6px;
 }
-@container page (min-width: 720px) {
-  .ideas-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (min-width: 1024px) {
+  .ideas-spotlight { margin-bottom: 18px; }
+  .ideas-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 }
-@container page (min-width: 1040px) {
-  .ideas-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 19px; }
-}
-@container page (max-width: 530px) { .ideas-grid { gap: 10px; } }
-@container page (max-width: 310px) { .ideas-grid { grid-template-columns: minmax(0, 1fr); } }
 .active-topic{margin:0 12px 8px;padding:6px 10px;border:0;border-radius:14px;background:var(--brand-soft);color:var(--brand);font-size:12px}
 .feed-note{font-size:12px;color:var(--ink-3);margin:0}
 .feed-note{padding:0 12px 8px}.login-prompt{text-align:center;padding:24px}.discussion-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;font-size:12px}
-@media(min-width:1100px){.community-post-feed{max-width:1120px;margin-inline:auto}}
 </style>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useMeta } from '@/stores/meta'
-import { categoryHref, categoryLabel } from '@/lib/communityStructure'
+import { canonicalCategory, categoryHref, categoryLabel } from '@/lib/communityStructure'
+import { buttonInk, paletteFor, type AccentId } from '@/lib/accentPalette'
+import { useTheme } from '@/lib/theme'
 const meta = useMeta()
 import { computed, ref, watch } from 'vue'
 import type { TopicItem } from '@/api/types'
@@ -15,6 +17,7 @@ import { displayDate, webLink } from './contract'
 const props = withDefaults(defineProps<{ topic: TopicItem & { images?: string[] }; mode?: 'topic'|'media'|'open'|'help'|'discussion'; layout?: ArticleLayout; showCategory?: boolean; noteCover?: boolean }>(), { mode:'topic', layout:'reading', showCategory:false })
 const emit = defineEmits<{selectTag:[tag:string]}>()
 const session = useSession()
+const { resolved } = useTheme()
 const liked = ref(false), likeCount = ref(0), liking = ref(false), likeError = ref('')
 watch(() => props.topic, topic => { liked.value = !!topic.liked; likeCount.value = topic.like_count; likeError.value = '' }, {immediate:true})
 async function toggleLike() {
@@ -33,6 +36,23 @@ watch(() => props.topic.id, () => { broken.value = []; ratio.value=16/9 })
 const image = computed(() => (props.topic.images || []).map(webLink).find((v): v is string => !!v && !broken.value.includes(v)))
 const discussionTag = computed(() => props.topic.tags?.find(tag => tag.trim() && tag !== props.topic.category.name))
 const discussionTitle = computed(() => props.topic.title.trim() || '未命名讨论')
+const discussionAccents = new Map<string, AccentId>([
+  ['learn', 'green'], ['casual-indie', 'blue'], ['casual-games', 'red'],
+])
+const discussionColors = computed(() => {
+  if (props.mode !== 'discussion') return undefined
+  const category = canonicalCategory(props.topic.category.slug)
+  const hasDesignTag = props.topic.tags?.some(tag => ['设计', '3d'].includes(tag.trim().toLowerCase()))
+  const accent = discussionAccents.get(category) ?? (hasDesignTag ? 'purple' : undefined)
+  if (!accent) return undefined
+  const palette = paletteFor(accent, resolved.value === 'dark')
+  return {
+    '--discussion-badge-bg': palette.soft,
+    '--discussion-badge-ink': palette.ink,
+    '--discussion-avatar-bg': palette.btn,
+    '--discussion-avatar-ink': buttonInk(palette.btn),
+  }
+})
 const presentation = computed(() => props.topic.help || props.mode === 'help' ? 'reading' : props.layout)
 const visual=computed(()=>presentation.value==='visual' || presentation.value==='masonry')
 const coverStats=computed(()=>!!image.value && presentation.value!=='plain')
@@ -41,20 +61,26 @@ function loaded(event:Event) { const img=event.target as HTMLImageElement; ratio
 const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h.status==='solved') return '已采纳'; if(h.status==='closed') return '已关闭'; return h.status==='open' && new Date(h.expires_at).getTime()>Date.now() ? '进行中' : '已到期' })
 </script>
 <template>
-  <article v-if="mode === 'discussion'" class="discussion-card">
+  <article v-if="mode === 'discussion'" class="discussion-card" :style="discussionColors">
     <h2 class="discussion-card-title">
       <RouterLink :to="`/t/${topic.id}`" :title="discussionTitle">{{ discussionTitle }}</RouterLink>
     </h2>
+    <p v-if="topic.excerpt && topic.excerpt !== discussionTitle" class="discussion-card-excerpt">{{ topic.excerpt }}</p>
     <footer class="discussion-card-footer">
       <div class="discussion-card-byline">
         <RouterLink class="discussion-card-category" :to="categoryHref(topic.category, meta.categories)"
           :title="categoryLabel(topic.category)">{{ categoryLabel(topic.category) }}</RouterLink>
         <button v-if="discussionTag" class="discussion-card-tag" type="button" :title="`# ${discussionTag}`"
           @click="emit('selectTag', discussionTag)"># {{ discussionTag }}</button>
-        <RouterLink :to="`/u/${topic.author.uid}`" class="discussion-card-author" :aria-label="topic.author.nickname">
-          <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="21" />
-        </RouterLink>
-        <time v-if="topic.created_at" :datetime="topic.created_at">{{ timeAgo(topic.created_at) }}</time>
+        <span class="discussion-card-identity">
+          <RouterLink :to="`/u/${topic.author.uid}`" class="discussion-card-author">
+            <UserAvatar class="discussion-card-avatar" :name="topic.author.nickname" :src="topic.author.avatar_url" :size="20" />
+            <span>{{ topic.author.nickname }}</span>
+          </RouterLink>
+          <template v-if="topic.created_at">
+            <span aria-hidden="true">·</span><time :datetime="topic.created_at">{{ timeAgo(topic.created_at) }}</time>
+          </template>
+        </span>
       </div>
       <div class="discussion-card-actions">
         <RouterLink class="discussion-card-replies" :to="`/t/${topic.id}#replies`" :aria-label="`${topic.reply_count} 条回复`">
@@ -62,7 +88,7 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
         </RouterLink>
         <button class="discussion-card-like" type="button" :aria-pressed="liked" :disabled="liking"
           :aria-label="`${liked ? '取消点赞' : '点赞'}，${likeCount} 个赞`" @click="toggleLike">
-          <AppIcon name="heart" :size="14" />{{ compactCount(likeCount) }}
+          <AppIcon name="heart" :size="14" /><span v-if="likeCount">{{ compactCount(likeCount) }}</span>
         </button>
       </div>
     </footer>
@@ -90,54 +116,57 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 <style scoped>
 .discussion-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  gap: 9px;
   min-width: 0;
-  padding: 12px 16px 9px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow));
 }
-.discussion-card:hover, .discussion-card:focus-within { border-color: var(--line-strong); }
+.discussion-card:hover .discussion-card-title a { color: var(--brand); }
 .discussion-card-category, .discussion-card-tag {
   position: relative;
   z-index: 1;
   min-width: 0;
-  max-width: 128px;
+  max-width: 100%;
   overflow: hidden;
   color: var(--ink-3);
-  font-size: 11px;
-  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.discussion-card-category { padding: 2px 7px; border-radius: 5px; background: var(--surface-2); }
-.discussion-card-tag { padding: 2px 0; border: 0; background: none; }
+.discussion-card-category { padding: 2px 8px; border-radius: 999px; background: var(--discussion-badge-bg, var(--surface-2)); color: var(--discussion-badge-ink, var(--ink-2)); font-size: 11px; font-weight: 600; }
+.discussion-card-tag { max-width: 128px; padding: 2px 0; border: 0; background: none; font: inherit; }
 .discussion-card-title {
-  margin: 0 0 6px;
-  overflow: hidden;
-  font-size: 17px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 650;
-  line-height: 1.42;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 .discussion-card-title a::after { position: absolute; inset: 0; content: ''; }
-.discussion-card-footer, .discussion-card-byline, .discussion-card-author, .discussion-card-actions {
+.discussion-card-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.discussion-card-footer, .discussion-card-byline, .discussion-card-identity, .discussion-card-author, .discussion-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
 }
-.discussion-card-footer { justify-content: space-between; margin-top: auto; color: var(--ink-3); font-size: 12px; }
-.discussion-card-byline { flex: 1; min-width: 0; }
-.discussion-card-author { flex: none; }
-.discussion-card-byline time {
-  min-width: 0;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.discussion-card-footer { justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; color: var(--ink-3); font-size: 12px; }
+.discussion-card-byline { flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; }
+.discussion-card-identity, .discussion-card-author { gap: 5px; min-width: 0; }
+.discussion-card-avatar { --surface-2: var(--discussion-avatar-bg, var(--brand-fill)); --ink-2: var(--discussion-avatar-ink, var(--brand-ink)); --line: transparent; }
+.discussion-card-author > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.discussion-card-byline time { flex: none; white-space: nowrap; }
 .discussion-card-actions { flex: none; gap: 4px; font-variant-numeric: tabular-nums; }
 .discussion-card-author, .discussion-card-actions > * { position: relative; z-index: 1; }
 .discussion-card-actions > * {
@@ -147,21 +176,22 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
   min-width: 25px;
   min-height: 24px;
   gap: 4px;
-  padding: 0 3px;
+  padding: 3px 6px;
   border: 0;
+  border-radius: 999px;
   background: none;
   color: inherit;
   font: inherit;
 }
 .discussion-card-actions svg { flex: none; }
-.discussion-card-actions .discussion-card-replies { color: var(--ink-2); font-weight: 600; }
 .discussion-card-like[aria-pressed="true"] { color: var(--brand); }
 .discussion-card-like[aria-pressed="true"] svg { fill: currentColor; }
 .discussion-card :is(.discussion-card-author, .discussion-card-category, .discussion-card-tag, .discussion-card-actions > *):hover { color: var(--brand); }
 .discussion-card-error { margin: 4px 0 0; color: var(--danger); font-size: 12px; }
-@container card-feed (max-width: 480px) {
-  .discussion-card { padding: 12px 12px 4px; }
-  .discussion-card-title { margin-bottom: 4px; font-size: 16px; }
+@media (max-width: 1023px) {
+  .discussion-card { padding: 13px 14px; gap: 7px; }
+  .discussion-card-title { font-size: 14.5px; }
+  .discussion-card-category { padding: 1.5px 6px; font-size: 10px; line-height: 1.35; }
 }
 @media (pointer: coarse) {
   .discussion-card-actions > * { min-width: 44px; min-height: 44px; }

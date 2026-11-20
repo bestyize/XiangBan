@@ -8,6 +8,10 @@ export function customWidgetShell(desktop: boolean): string {
     : 'wallpaper-asset://localhost/widget-sandbox';
 }
 
+export function customWidgetHtmlUrl(id: string): string {
+  return customWidgetShell(true).replace(/widget-sandbox$/, `widget-html/${encodeURIComponent(id)}`);
+}
+
 // This function runs inside the opaque-origin iframe; keep it self-contained.
 export function installCustomDrag() {
   let pointer: { id: number; x: number; y: number; target: Element; moved: boolean } | null = null;

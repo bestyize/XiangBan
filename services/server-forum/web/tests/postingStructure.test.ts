@@ -68,7 +68,7 @@ test('the default is a separate uncategorized board in each section', () => {
     deepStrictEqual(postingSelection(sections, '', all, key), { sectionKey: key, boardKey: board.slug })
   }
   const boards = sections.find(s => s.key === 'discuss')!.boards
-  deepStrictEqual(boards.map(board => board.name), ['默认', '设计', 'casual-games', '3D', 'learn', 'casual-travel', 'site'])
+  deepStrictEqual(boards.map(board => board.name), ['默认', '设计', 'casual-games', '3D', '教程', 'casual-travel', 'site'])
   deepStrictEqual(boards.filter(board => board.topicTag).map(board => [board.key, board.id, board.topicTag]),
     [['design', 21, '设计'], ['3d', 21, '3d']])
   deepStrictEqual(postingSelection(sections, '3d', all), { sectionKey: 'discuss', boardKey: '3d' })

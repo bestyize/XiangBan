@@ -1,6 +1,6 @@
 import type { Category } from '../api/types'
 import {
-  activeCategories, canonicalCategory, discussionDestinations, discussionTab, discussionTopicTag,
+  activeCategories, canonicalCategory, categoryLabel, discussionDestinations, discussionTab, discussionTopicTag,
   navigationSection, postableCategories, resourceTopicCategory, sectionBoards, SECTION_LABELS, type NavigationSectionKey,
 } from './communityStructure.ts'
 import { requiredPostLevel, TRUST_LABEL } from './format.ts'
@@ -25,7 +25,7 @@ export function postingSections(categories: Category[], level: number, editingCa
   if (edited) eligibleIds.add(edited.id)
 
   const byId = new Map(categories.map(category => [category.id, category]))
-  function option(board: Category, key = board.slug, name = board.name, topicTag?: string): PostingCategory {
+  function option(board: Category, key = board.slug, name = categoryLabel(board), topicTag?: string): PostingCategory {
     const parent = board.parent_id === null ? undefined : byId.get(board.parent_id)
     let unavailableReason = ''
     if (!eligibleIds.has(board.id)) {

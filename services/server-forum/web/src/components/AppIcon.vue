@@ -3,6 +3,7 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
 const paths: Record<string, string[]> = {
   grid: ['M4 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z','M15 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z','M4 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z','M15 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z'],
   chat: ['M4 4h16v13h-8l-5 4v-4H4Z'],
+  compass: ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'm15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z'],
   message: ['M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.6-4.3A8.5 8.5 0 1 1 21 11.5Z'],
   smile: ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'M8 14a4 4 0 0 0 8 0M8 9h.01M16 9h.01'],
   keyboard: ['M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z', 'M6 10h.01m4 0h.01m4 0h.01m4 0h.01M8 14h8'],
@@ -14,6 +15,7 @@ const paths: Record<string, string[]> = {
   plus: ['M12 5v14M5 12h14'], search: ['M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z', 'm15 15 6 6'],
   bell: ['M6 17v-6a6 6 0 0 1 12 0v6l2 2H4Z', 'M10 22h4'],
   arrow: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'], play: ['M8 5v14l11-7Z'],
+  share: ['M12 15V3m-4 4 4-4 4 4', 'M5 11v9h14v-9'],
   bookmark: ['M6 3h12v18l-6-4-6 4Z'], folder: ['M3 6h6l2 3h10v11H3Z'],
   monitor: ['M3 4h18v13H3Z', 'M12 17v4M8 21h8'],
   settings: ['M4 7h16M4 17h16', 'M8 4v6M16 14v6'],

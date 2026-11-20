@@ -15,9 +15,22 @@ export function sectionBoards(categories:Category[], section:CommunitySection) {
   return sectionCategories(categories,section).filter(c=>!categories.some(child=>child.parent_id===c.id))
 }
 const discussionOrder = [
-  'design', 'casual-games', '3d', 'learn', 'casual-travel', 'casual-books',
+  'design', 'casual-games', '3d', 'learn', 'casual-travel',
   'casual-screen', 'casual-feelings', 'casual-food', 'casual-work',
 ]
+const hiddenDiscussionBoards = new Set([
+  'casual-offwork', 'casual-loss', 'casual-dream', 'casual-think', 'casual-books', 'casual-fun',
+])
+const discussionBoardNames = new Map([
+  ['learn', '教程'],
+  ['casual-screen', '影视'],
+  ['casual-feelings', '情感'],
+  ['casual-indie', '副业'],
+])
+
+export function isHiddenDiscussionBoard(slug: string) {
+  return hiddenDiscussionBoards.has(canonicalCategory(slug))
+}
 
 export function discussionTopicTag(tab: string): string | undefined {
   if (tab === 'design') return '设计'
@@ -25,7 +38,7 @@ export function discussionTopicTag(tab: string): string | undefined {
 }
 
 function discussionBoards(categories: Category[]) {
-  return activeCategories(categories).filter(c => navigationSection(c) === 'discuss')
+  return activeCategories(categories).filter(c => navigationSection(c) === 'discuss' && !isHiddenDiscussionBoard(c.slug))
 }
 
 export function discussionDestinations(categories: Category[]) {
@@ -39,7 +52,7 @@ export function discussionDestinations(categories: Category[]) {
   const order = new Set([...defaultBoards.map(category => category.slug), ...discussionOrder, ...bySlug.keys()])
   return Array.from(order).flatMap(key => {
     const category = bySlug.get(key)
-    const label = key === '3d' ? '3D' : discussionTopicTag(key) ?? category?.name
+    const label = key === '3d' ? '3D' : discussionTopicTag(key) ?? (category && categoryLabel(category))
     return label ? [{ key, label, category: discussionTopicTag(key) ? undefined : category }] : []
   })
 }
@@ -47,7 +60,9 @@ export function discussionTabs(categories: Category[]) {
   return [{key:'all',label:'全部'}, ...discussionDestinations(categories).map(({ key, label }) => ({ key, label }))]
 }
 export function sectionScope(categories:Category[], section:CommunitySection) {
-  return sectionBoards(categories,section).map(c=>c.slug).join(',') || '__no_active_category__'
+  const boards = sectionBoards(categories, section)
+  return boards.filter(board => section !== 'discuss' || !isHiddenDiscussionBoard(board.slug))
+    .map(board => board.slug).join(',') || '__no_active_category__'
 }
 export function discussionCategory(tab:string, categories:Category[]) {
   if (tab === 'all' || discussionTopicTag(tab)) return sectionScope(categories,'discuss')
@@ -68,12 +83,14 @@ export function discussionTab(categories: Category[], rawTab: string, rawFilter 
 export function resourceTopicCategory(tab:string) {
   return ({media:'resource-movies',help:'resource-help'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
-export function categoryLabel(category:Pick<Category,'name'>) { return category.name }
+export function categoryLabel(category: Pick<Category, 'slug' | 'name'>) {
+  return discussionBoardNames.get(canonicalCategory(category.slug)) ?? category.name
+}
 export function resourceTabs(categories:Category[]) {
   return [{key:'software',label:'开源软件'}, ...sectionBoards(categories, 'resources').map(c => ({key:c.slug,label:c.name}))]
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
-  if (!activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
+  if (isHiddenDiscussionBoard(category.slug) || !activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
   if (category.section === 'ideas') return '/'
   const leaf=!categories.some(child=>child.parent_id===category.id)
   if(category.section==='resources') return leaf ? '/resources?tab=' + category.slug : '/resources'

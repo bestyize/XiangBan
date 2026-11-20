@@ -8,6 +8,8 @@
 
 ## 超级小伴社区网页版
 
+[社区全站 UI 重设计稿（活力社区风 · PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) 采用现代活力视觉社区风，覆盖 PC 端网页（左导轨 + 精简顶栏）与移动端 H5（390px 交互样机，右上角纯图标搜索与提醒不带背景，创意页卡片统一 `3:2` 封面），包含创意、资讯、精选、排行榜、导航、讨论、资源及作品详情评论，支持日夜切换与 6 套客户端主题色（仓库根运行 `python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs/prototypes/community-redesign`）。[PC + H5 同屏预览](http://127.0.0.1:1449/) · [PC 端网页](http://127.0.0.1:1449/?device=desktop) · [移动端 H5](http://127.0.0.1:1449/?device=mobile)
+
 [创意页作品卡片](../../services/server-forum/docs/design-specs/README.md) 首张卡片直达微观展厅，后两张分别展示《小王子：星辰之旅》及「运输船：Saltline」的详情和打开方式。[本机在线预览](http://127.0.0.1:1448/)。
 
 [创意作品详情页](../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) 用「碎花垂耳兔」展示通栏详情、完整作品图和灰底的体验按钮。评论区沿用全站列表、入口和编辑弹层样式。预览沿用创意页作品卡片的服务。[电脑预览](http://127.0.0.1:1448/work-detail.html) · [手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile)
