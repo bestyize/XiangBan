@@ -53,13 +53,14 @@
     {x:4200,top:[73,79,80],low:[198,205,199],tint:[171,188,184,.06],sun:0,moon:.55},
     {x:5200,top:[161,157,147],low:[240,235,222],tint:[226,223,211,.04],sun:0,moon:.3},
   ]
+  // 悬山卷 (青绿薄染): warm Xuan-paper sky like Vol 1, six distinct mountain topographies, mid-ground pine/bamboo woods, night belfry & dawn summit.
   const SKY_SUMMIT = [
-    { x: 0, top: [193, 187, 162], middle: [236, 228, 201], low: [248, 241, 215], tint: [0, 0, 0, 0] },
-    { x: 1450, top: [151, 171, 165], middle: [213, 224, 211], low: [238, 236, 218], tint: [0, 0, 0, 0], blend: 360 },
-    { x: 2370, top: [175, 188, 188], middle: [209, 219, 211], low: [239, 238, 219], tint: [0, 0, 0, 0], blend: 385 },
-    { x: 3350, top: [211, 199, 171], middle: [232, 218, 192], low: [247, 234, 210], tint: [0, 0, 0, 0], blend: 475 },
-    { x: 4300, top: [76, 87, 97], middle: [156, 167, 170], low: [228, 234, 220], tint: [0, 0, 0, 0], blend: 475 },
-    { x: 5310, top: [167, 151, 155], middle: [228, 197, 178], low: [249, 234, 211], tint: [0, 0, 0, 0], blend: 535 },
+    { x: 0,    top: [216, 209, 189], low: [242, 235, 218], tint: [248, 244, 232, 0.04], sun: 0.92, leaves: 0.65, forest: 0.85 },
+    { x: 1380, top: [206, 210, 196], low: [244, 239, 222], tint: [238, 242, 232, 0.08], sun: 1.0,  leaves: 0.25, forest: 0 },
+    { x: 2330, top: [154, 156, 154], low: [216, 214, 204], tint: [196, 202, 206, 0.34], sun: 0.22, leaves: 0.85, forest: 0.35 },
+    { x: 3290, top: [210, 184, 160], low: [244, 222, 196], tint: [255, 226, 202, 0.26], sun: 0.95, leaves: 0.55, forest: 1.0 },
+    { x: 4230, top: [38, 40, 46],    low: [194, 186, 172], tint: [190, 186, 198, 0.32], sun: 0, moon: 0.95, night: 0.8, leaves: 0.15, forest: 0.75 },
+    { x: 5230, top: [148, 128, 126], low: [242, 218, 190], tint: [248, 218, 192, 0.22], sun: 1.0, moon: 0, petals: 0.85, forest: 0 },
   ]
   const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
 
@@ -76,7 +77,6 @@
     const mix = (p, q) => p.map((v, j) => v + (q[j] - v) * t)
     const out = { top: mix(a.top, b.top), low: mix(a.low, b.low), tint: volumeId === 4 ? [0,0,0,0] : mix(a.tint, b.tint) }
     for (const key of ENV_KEYS) out[key] = (a[key] ?? 0) + ((b[key] ?? 0) - (a[key] ?? 0)) * t
-    if (volumeId === 6) out.middle = mix(a.middle, b.middle)
     if (volumeId === 4) {
       out.middle = mix(a.middle, b.middle)
       out.glow = mix(a.glow, b.glow)
@@ -170,7 +170,9 @@
     a.vignette = art.vignette(o.width, o.height)
 
     if (volumeId === 6) {
-      a.mountain = globalThis.XiabanInkMountain.build(r, world)
+      a.ground = art.ground({ period: 1024, line: GROUND, depth: 92, res: r(1), seed: 19 })
+      a.grass = grass(r(0.6), [28, 34, 34], 97)
+      a.mountain = globalThis.XiabanInkMountain.build(r, world, viewW)
     } else if (volumeId === 5) {
       Object.assign(a, globalThis.XiabanInkLantern.build(r,span))
     } else if (volumeId === 2) {
@@ -363,7 +365,6 @@
 
   function drawBackground(ctx, a, cam, e, clock) {
     if (a.volumeId === 4) { drawSeaBackground(ctx, a, cam, e, clock); return }
-    if (a.volumeId === 6) { globalThis.XiabanInkMountain.background(ctx, a, cam, clock, e, layer); return }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     const sky = ctx.createLinearGradient(0, 0, 0, cam.height)
     sky.addColorStop(0, rgb(e.top)); sky.addColorStop(0.72, rgb(e.low)); sky.addColorStop(1, rgb(e.low))
@@ -393,6 +394,10 @@
         ctx.drawImage(a.clouds[n & 1], n * 640 + clock * 2.5 + art.hash(n, 7) * 140, 18 + art.hash(n, 8) * 70, w, w * 0.25)
       }
       ctx.globalAlpha = 1
+    }
+    if (a.volumeId === 6) {
+      globalThis.XiabanInkMountain.drawMountains(ctx, a, cam, e, clock, layer, mist)
+      return
     }
     layer(ctx, cam, 0.06); art.drawStrip(ctx, a.far, cam.left * 0.06, cam.viewW)
     mist(ctx, a, cam, 0.1, 236, 64, 0.7, clock * 5, 7)
@@ -470,7 +475,7 @@
     const left = cam.left - 60, right = cam.left + cam.viewW + 60
 
     if (a.volumeId === 6) {
-      globalThis.XiabanInkMountain.ground(ctx, a, cam)
+      globalThis.XiabanInkMountain.ground(ctx, a, cam, e, clock)
     } else if (a.volumeId === 5) {
       globalThis.XiabanInkLantern.ground(ctx,a,cam,clock)
     } else if (a.volumeId === 2) {
@@ -589,7 +594,7 @@
   }
 
   function drawForeground(ctx, a, cam, e, clock) {
-    if (a.volumeId === 6) return globalThis.XiabanInkMountain.foreground(ctx, a, cam, layer)
+    if (a.volumeId === 6) return globalThis.XiabanInkMountain.foreground(ctx, a, cam, e, clock, layer)
     if (a.volumeId === 5) {
       layer(ctx,cam,1)
       globalThis.XiabanInkLantern.foreground(ctx,a,cam,clock)

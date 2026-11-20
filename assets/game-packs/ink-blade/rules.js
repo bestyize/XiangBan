@@ -46,24 +46,20 @@
     mirror: {hp:4,w:16,h:60,score:280,speed:62,reach:86,tele:0.6,active:0.14,recover:0.85,lunge:210,damage:1},
     watchman: {hp:5,w:23,h:73,score:300,speed:54,reach:135,tele:0.75,active:0.16,recover:0.95,lunge:120,damage:1},
     judge: {hp:60,w:24,h:86,score:3800},
-    umbrella:{hp:4,w:18,h:62,score:260,speed:65,reach:100,tele:.7,active:.15,recover:.9,lunge:130,damage:1},
-    monk:{hp:5,w:19,h:66,score:240,speed:75,reach:119,tele:.65,active:.16,recover:1,lunge:160,damage:1},
-    disciple:{hp:3,w:14,h:54,score:160,speed:125,reach:82,tele:.5,active:.13,recover:.7,lunge:250,damage:1},
-    rope:{hp:3,w:15,h:56,score:240,speed:112,reach:85,tele:.6,active:.15,recover:.9,lunge:200,damage:1},
-    quarrier: { hp: 4, w: 17, h: 58, score: 230, speed: 70, reach: 82, tele: .76, active: .15, recover: .9, lunge: 110, damage: 1 },
-    crossbow:{hp:3,w:16,h:56,score:200},
-    axeman:{hp:6,w:24,h:70,score:300,speed:58,reach:115,tele:.9,active:.2,recover:1.25,lunge:130,damage:1},
-    yanhui:{hp:14,w:20,h:67,score:950,speed:108,reach:102,tele:.65,active:.16,recover:.9,lunge:270,damage:1},
-    shizhen:{hp:18,w:25,h:76,score:1200,speed:62,reach:110,tele:.7,active:.18,recover:1.1,lunge:160,damage:1},
+    umbrella: { hp: 4, w: 18, h: 62, score: 260, speed: 65, reach: 100, tele: 0.7, active: 0.15, recover: 0.9, lunge: 130, damage: 1 },
+    monk: { hp: 5, w: 19, h: 66, score: 240, speed: 75, reach: 119, tele: 0.65, active: 0.16, recover: 1, lunge: 160, damage: 1 },
+    disciple: { hp: 3, w: 14, h: 54, score: 160, speed: 125, reach: 82, tele: 0.5, active: 0.13, recover: 0.7, lunge: 250, damage: 1 },
+    crossbow: { hp: 3, w: 16, h: 56, score: 200 },
+    yanhui: { hp: 14, w: 20, h: 67, score: 950, speed: 108, reach: 102, tele: 0.65, active: 0.16, recover: 0.9, lunge: 270, damage: 1 },
     yue: { hp: 46, w: 24, h: 80, score: 4000, speed: 118, reach: 132, tele: 0.8, active: 0.18, recover: 1.05, lunge: 240, damage: 1 },
   }
   const BOSSES = new Set(['boss', 'angler', 'general', 'dragon', 'judge', 'yue'])
   // Damage a raised shield cannot stop: the ink stroke and the terrain (falling ice, cracks, arrow rain, fire).
   const UNBLOCKED = new Set(['strike', 'icicle', 'crack', 'volley', 'fire'])
   const isBoss = (enemy) => BOSSES.has(enemy.type)
-  const ELITES=new Set(['yanhui','shizhen'])
-  const SUMMIT=new Set(['umbrella','monk','disciple','rope','crossbow','quarrier','axeman','yanhui','shizhen','yue'])
-  const isElite=e=>ELITES.has(e.type)
+  const ELITES = new Set(['yanhui'])
+  const SUMMIT = new Set(['umbrella', 'monk', 'disciple', 'crossbow', 'yanhui', 'yue'])
+  const isElite = (e) => ELITES.has(e.type)
   const POT_GRAVITY = 900
 
   function mulberry(seed) {
@@ -101,7 +97,6 @@
       tide: { phase: 'calm', t: world.tide?.cycle[0] || 0, zone: null, dir: 1, x: 0, hits: [] },
       rigging: (world.rigging || []).map((r, id) => ({ ...r, id, state: 'hang', t: 0, y: GROUND - 155 })),
       mirrors: [], reflection: null, writing: [], writingClock: 1.4, writingCount: 0,
-      mountainFalls: [], bellWave: null,
       bell: world.bell ? { ...world.bell, ringAt: -20, dir: 1 } : null,
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
@@ -115,7 +110,7 @@
         volleyKills: 0, fireKills: 0, unhorses: 0, formationBreaks: 0,
         hookPulls: 0, tideKills: 0, riggingKills: 0, mirrorReturns: 0, mirrorExecutions: 0, guardBreaks: 0, writingDodges: 0,
         borrowUntil: 0, borrowTarget: 0, borrowMark: null, borrowSteps: 0, backHits: 0,
-        umbrellaExecutions: 0, ropeParries: 0, boltDeflects: 0, boltReturns: 0, bellInterrupts: 0, windParries: 0, monkCounters: 0,
+        umbrellaExecutions: 0, boltDeflects: 0, boltReturns: 0, monkCounters: 0,
         yanBackHits: 0, yueBackHits: 0, eliteExecutions: 0, bellRings: 0,
       },
     }
@@ -242,7 +237,6 @@
       if (target && Math.abs(target.x - player.x) < 135) player.facing = sign(target.x - player.x) || player.facing
     }
     const air = !player.onGround
-    const plunge = air && player.vy > 60 && player.perchY != null
     const current = player.action?.type === 'slash' ? player.action : null
     // A swing started while the previous one is still running continues the combo (and, in a strict 卷, cannot parry).
     const chained = Boolean(current)
@@ -253,7 +247,7 @@
     const rested = state.clock <= player.freeUntil || (!chained && state.clock - settleFrom >= rest)
     let stage = current ? (current.stage + 1) % STAGES.length : state.clock - player.slashEndClock < 0.3 ? player.nextStage : 0
     if (air && stage === 2) stage = 0
-    player.action = { type: 'slash', stage, t: 0, hits: [], air, plunge, ambush: player.hidden, chained, rested }
+    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden, chained, rested }
     player.slashStartClock = state.clock
     player.slashBuffer = 0
     if (air && player.vy > -80) player.vy = Math.min(player.vy, 40)
@@ -338,7 +332,6 @@
   function updatePlayer(state, input, dt) {
     const player = state.player
     const move = clamp(Number(input.move) || 0, -1, 1)
-    if (state.world.borrowStep && player.onGround) player.perchY = player.y < GROUND ? player.y : null
     player.iframes = Math.max(0, player.iframes - dt)
     player.hurt = Math.max(0, player.hurt - dt)
     player.dashCd -= dt
@@ -362,8 +355,7 @@
     const canAct = player.hurt <= 0 && (!action ||
       (action.type === 'slash' && action.t >= STAGES[action.stage].chain) ||
       (action.type === 'dash' && !action.borrow && action.t >= action.dur * 0.8))
-    const landing = player.dashBuffer > 0 ? borrowLanding(state) : null
-    const borrowed = landing && (!move || sign(move) === landing.dir) ? landing : null
+    const borrowed = player.dashBuffer > 0 ? borrowLanding(state) : null
     const canDash = player.hurt <= 0 && player.dashCd <= 0 && (player.onGround || player.airDash > 0) &&
       (!action || action.type !== 'slash' || action.t >= STAGES[action.stage].a1)
 
@@ -409,18 +401,6 @@
           player.x = action.borrow.x; player.facing = -action.borrow.dir; player.vx = 0
           player.action = null; player.borrowSteps++
           player.borrowMark = { id: action.borrow.id, until: state.clock + 1.15, used: false }
-          const opponent = state.enemies.find(e => e.id === action.borrow.id)
-          if (opponent?.type === 'yue' && opponent.phase2 && opponent.state === 'recover' &&
-              opponent.deflectedHeavy && opponent.alive) {
-            // His blade follows the original line. Stay facing away until he pulls it free.
-            opponent.deflectedHeavy = false
-            opponent.move = 'groundedBlade'
-            opponent.plantedAt = state.clock
-            opponent.plantedX = opponent.x + opponent.facing * 52
-            opponent.plantedDir = opponent.facing
-            opponent.t = 1.35
-            emit(state, 'swordStone', { x: opponent.plantedX, y: opponent.y, facing: opponent.facing })
-          }
           emit(state, 'borrowLand', { x: player.x, y: player.y, facing: player.facing })
         }
       } else {
@@ -493,10 +473,7 @@
       action.hits.push(enemy.id)
       const unaware = action.ambush && !isBoss(enemy) && (enemy.state === 'idle' || enemy.state === 'walk')
       const before = enemy.hp
-      const plunge = action.plunge && !player.onGround && enemy.y >= player.perchY + 25 &&
-        !isBoss(enemy) && !isElite(enemy)
-      hitEnemy(state, enemy, stage.damage + (unaware ? 2 : 0) + (plunge ? 1 : 0), action.stage === 2 ? 'heavy' : 'slash')
-      if (plunge && enemy.hp < before) emit(state, 'plungeHit', { x: enemy.x, y: enemy.y - 25, facing: player.facing })
+      hitEnemy(state, enemy, stage.damage + (unaware ? 2 : 0), action.stage === 2 ? 'heavy' : 'slash')
       if (unaware && !action.ambushed && enemy.hp < before) {
         action.ambushed = true
         player.ambushes += 1
@@ -624,11 +601,6 @@
     if (state.world.borrowStep) {
       player.borrowUntil = state.clock + (state.difficulty === 'easy' ? 0.95 : 0.78)
       player.borrowTarget = attacker.id
-      if (windSpeed(state, player.x) !== 0) player.windParries++
-    }
-    if (attacker.type === 'rope' && attacker.state === 'ropeDive') {
-      player.ropeParries++
-      attacker.y = attacker.homeY = GROUND; attacker.vy = 0; attacker.ropeMounted = false; attacker.ropeCd = 5
     }
     addCombo(state)
     addScore(state, 50)
@@ -639,17 +611,9 @@
     state.slow = 0.42; state.slowScale = 0.28
     const x = (attacker.x + player.x) / 2
     emit(state, 'parry', { x, y: player.y - 38, target: attacker.type, id: attacker.id })
-    if (attacker.type === 'yue' && attacker.move === 'shove' && !attacker.chain && attacker.phase2) {
-      player.borrowUntil = 0
-      startSummitStrike(state, attacker, 'reverse', state.difficulty === 'easy' ? .88 : .65, 1)
-      return
-    }
     if (attacker.type === 'crow') { kill(state, attacker, 'parry'); return }
-    if (isBoss(attacker)||isElite(attacker)) {
+    if (isBoss(attacker) || isElite(attacker)) {
       // Meeting the general's lance head-on reins the horse in: a long opening and a big posture blow.
-      if (attacker.type === 'yue') {
-        attacker.deflectedHeavy = attacker.phase2 && ['cleave', 'rush'].includes(attacker.move)
-      }
       const charge = attacker.type === 'general' && attacker.state === 'charge'
       const summit = SUMMIT.has(attacker.type)
       const posture = charge ? 34 : attacker.type === 'yanhui' ? 20 : summit ? 26 : 22
@@ -813,7 +777,6 @@
         // The general's barded horse turns most blades: in the saddle a slash barely scratches him; parry the charge instead.
         const barded = enemy.type === 'general' && enemy.mounted && melee
         enemy.hp -= source === 'strike' ? 6 : barded ? (source === 'heavy' ? 1 : 0) : damage
-        if (enemy.type === 'yue' && enemy.hp <= 0) enemy.hp = 1
         enemy.posture = Math.min(enemy.postureMax, enemy.posture + (source === 'strike' ? 30 : barded ? (source === 'heavy' ? 2 : 1) : source === 'heavy' ? 6 : 3))
         // Pressing a guarded boss provokes a fast counter; the punish window is after its own attacks.
         if (melee && (enemy.state === 'idle' || enemy.state === 'walk')) {
@@ -940,12 +903,11 @@
       enemy.moves = 0
     }
     if (isElite(enemy)) {
-      enemy.posture = 0; enemy.postureMax = spec.type === 'yanhui' ? 64 : 72; enemy.postureClock = 0
-      prompt(state, spec.type === 'shizhen' ? 'mountbell' : 'elite')
+      enemy.posture = 0; enemy.postureMax = 64; enemy.postureClock = 0
+      prompt(state, 'elite')
     }
     if (SUMMIT.has(enemy.type)) { enemy.moves = 0; enemy.chain = 0; enemy.sweep = false; enemy.pressure = 0 }
-    if(spec.type==='rope'){enemy.ropeMounted=true;enemy.ropeCd=5;enemy.y=GROUND-125;enemy.homeY=GROUND;enemy.onPlatform=false;prompt(state,'rope')}
-    if(spec.type==='umbrella')prompt(state,'borrow')
+    if (spec.type === 'umbrella') prompt(state, 'borrow')
     if (spec.type === 'shield') prompt(state, 'shield')
     if (spec.type === 'cavalry') prompt(state, 'cavalry')
     if (spec.type === 'pavise') { enemy.group = spec.group || 'p' + enemy.id; prompt(state, 'pavise') }
@@ -954,7 +916,6 @@
     if (spec.type === 'mirror') { enemy.mirrorCd=0; prompt(state,'mirror') }
     if (spec.type === 'watchman') prompt(state,'watchman')
     if (spec.type === 'judge') { enemy.judgeStage=1;enemy.mirrorCd=1;enemy.chain=0 }
-    if (spec.type === 'quarrier') prompt(state, 'quarry')
     if (spec.type === 'yue') { enemy.state = 'intro'; enemy.t = 0.8 }
     enemy.burnCd = 0
     state.enemies.push(enemy)
@@ -964,7 +925,7 @@
 
   function attackers(state) {
     if(state.world.id===6){
-      const sources=new Set(state.enemies.filter(e=>e.alive&&['mountTell','mountAttack','ropeTell','ropeDive','bowTell'].includes(e.state)).map(e=>e.id))
+      const sources=new Set(state.enemies.filter(e=>e.alive&&['mountTell','mountAttack','bowTell'].includes(e.state)).map(e=>e.id))
       for(const shot of state.projectiles)if(!shot.dead&&shot.owner==='enemy'&&shot.originType==='crossbow')sources.add(shot.source)
       return sources.size
     }
@@ -2215,12 +2176,10 @@
     rush: { tele: 0.72, reach: 118, lunge: 490, active: 0.42, recover: 1.06 },
     reverse: { tele: 0.51, reach: 121, lunge: 220, recover: 0.98 },
     sweep: { tele: 0.98, reach: 148, height: 30, lunge: 0, recover: 1.25 },
-    slam: { tele: 1.08, reach: 168, height: 26, lunge: 0, recover: 1.45 },
   }
 
   function startSummitStrike(state, enemy, move = 'thrust', duration, chain = 0) {
     const strike = MOUNTAIN_STRIKES[move]
-    enemy.deflectedHeavy = false
     enemy.move = move
     enemy.sweep = Boolean(strike.height)
     enemy.sweepEvaded = false
@@ -2245,36 +2204,28 @@
     }
   }
 
-  function ringMountainBell(state, dir, playerRang) {
+  function ringMountainBell(state, dir) {
     const bell = state.bell
     if (!bell || state.clock - bell.ringAt < 1.6) return
     bell.ringAt = state.clock; bell.dir = dir
-    if (!playerRang) state.bellWave = { x: bell.x, t: 0, radius: 0, hit: false }
-    else state.bellWave = null
-    if (playerRang) {
-      for (const shot of state.projectiles) {
-        if (shot.dead || shot.owner !== 'enemy' || shot.originType !== 'crossbow') continue
-        if (Math.hypot(shot.x - bell.x, shot.y - bell.y) > bell.radius) continue
-        shot.dead = true
-        emit(state, 'boltShaken', { x: shot.x, y: shot.y })
-      }
+    state.player.bellRings++
+    let shaken = 0
+    for (const shot of state.projectiles) {
+      if (shot.dead || shot.owner !== 'enemy' || shot.originType !== 'crossbow') continue
+      if (Math.hypot(shot.x - bell.x, shot.y - bell.y) > bell.radius) continue
+      shot.dead = true; shaken++
+      emit(state, 'boltShaken', { x: shot.x, y: shot.y })
     }
-    const enemy = state.enemies.find(e => e.type === 'shizhen' && e.alive && e.delay <= 0 &&
-      e.state !== 'spawn' && Math.abs(e.x - bell.x) <= bell.radius)
-    if (playerRang && enemy) {
-      state.player.bellRings++
-      if (enemy.state === 'mountTell') {
-        state.player.bellInterrupts++
-        enemy.state = 'recover'; enemy.t = 1.15; enemy.vx = 0; enemy.sweep = false
-        enemy.flash = .18
-        emit(state, 'bellInterrupt', { x: enemy.x, y: enemy.y - 36 })
-      }
-      addScore(state, 120)
-      enemy.posture = Math.min(enemy.postureMax, enemy.posture + 26)
-      enemy.postureClock = state.clock
-      if (enemy.state !== 'broken' && enemy.posture >= enemy.postureMax) breakBoss(state, enemy)
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || isBoss(enemy) || isElite(enemy)) continue
+      if (Math.abs(enemy.x - bell.x) > 165) continue
+      enemy.state = enemy.type === 'umbrella' ? 'umbrellaOpen' : 'stagger'
+      enemy.openedAt = state.clock
+      enemy.t = 1.15; enemy.vx = sign(enemy.x - bell.x) * 140; enemy.sweep = false; enemy.flash = 0.16
+      shaken++
     }
-    emit(state, 'mountainBell', { x: bell.x, y: bell.y, effective: Boolean(playerRang && enemy), dir })
+    if (shaken) addScore(state, 60)
+    emit(state, 'mountainBell', { x: bell.x, y: bell.y, effective: shaken > 0, dir })
   }
 
   function aimMountainBolt(state, enemy, duration) {
@@ -2311,87 +2262,6 @@
     }
     e.hopCd-=dt;moveGround(state,e,dt)
   }
-  function summitRope(state,e,dt){
-    const p=state.player
-    e.ropeCd=Math.max(0,e.ropeCd-dt)
-    if(e.ropeMounted){
-      if(e.state==='idle'){
-        e.ropeAnchorX = e.x
-        e.vx=0;e.y=GROUND-125+Math.sin(state.clock*2+e.seed)*2;e.facing=sign(p.x-e.x)||e.facing
-        if (!p.dead && e.cd <= 0 && Math.abs(p.x - e.x) < 360 && mayAttack(state)) {
-          e.state = 'ropeTell'; e.t = 0.85 * state.diff.tele; e.teleTotal = e.t
-          const [lo, hi] = bounds(state)
-          e.aimX = clamp(p.x, lo + 30, hi - 30)
-          e.ropeAnchorX = e.x + e.facing * 65
-          emit(state, 'tell', { id: e.id, x: e.x, y: e.y - 30, facing: e.facing })
-        }
-      }else if(e.state==='ropeTell'&&e.t<=0){e.state='ropeDive';e.t=.42;e.hitDone=false;e.vx=(e.aimX-e.x)/.42;e.vy=(GROUND-e.y)/.42;emit(state,'enemySwing',{id:e.id,x:e.x,y:e.y,facing:e.facing,kind:e.type})}
-      else if(e.state==='ropeDive'){
-        e.x+=e.vx*dt;e.y=Math.min(GROUND,e.y+e.vy*dt)
-        if(!e.hitDone&&overlaps(enemyBox(e),playerBox(p))){e.hitDone=true;if(enemyStrike(state,e,1)==='parry')return}
-        if(e.t<=0||e.y>=GROUND){e.y=GROUND;e.vy=0;e.ropeMounted=false;e.ropeCd=5;e.state='recover';e.t=.9;e.vx=0}
-      }else if(['hurt','stagger'].includes(e.state)){e.ropeMounted=false;e.homeY=GROUND;moveGround(state,e,dt)}
-      return
-    }
-    if(e.state==='ropeClimb'){
-      e.vx=0;e.y=GROUND-125*(1-clamp(e.t/.8,0,1))
-      if(e.t<=0){e.ropeMounted=true;e.state='idle';e.cd=.6}return
-    }
-    if(e.state==='idle'&&e.ropeCd<=0&&Math.abs(p.x-e.x)>110&&!p.dead){e.state='ropeClimb';e.t=.8;return}
-    updateSummitMelee(state,e,dt)
-  }
-  // The dust column fixes the footprint before a stone falls. A fighter can
-  // leave it, borrow through the warning, or keep an opponent underneath.
-  function markMountainFall(state, x, owner) {
-    const [left, right] = bounds(state)
-    state.mountainFalls.push({ x: clamp(x, left + 34, right - 34), age: 0,
-      warning: state.difficulty === 'easy' ? 1.48 : 1.08, owner, landed: false })
-  }
-
-  function updateMountainHazards(state, dt) {
-    if (!state.lock || state.player.dead) {
-      state.mountainFalls.length = 0; state.bellWave = null
-      return
-    }
-    for (const fall of state.mountainFalls) {
-      fall.age += dt
-      if (fall.landed || fall.age < fall.warning) continue
-      fall.landed = true
-      const p = state.player
-      if (Math.abs(p.x - fall.x) < 33 + p.w && !p.iframes && !state.strike) hurtPlayer(state, 1, fall.x)
-      for (const enemy of state.enemies) {
-        if (!enemy.alive || enemy.delay > 0 || Math.abs(enemy.x - fall.x) >= 33 + enemy.w) continue
-        if (enemy.id === fall.owner) {
-          if (enemy.type === 'yue' && enemy.phase2 && !['broken', 'roar', 'dying'].includes(enemy.state)) {
-            enemy.posture = Math.min(enemy.postureMax, enemy.posture + 19)
-            enemy.postureClock = state.clock; enemy.flash = .18
-            emit(state, 'stoneCounter', { x: enemy.x, y: enemy.y })
-            if (enemy.posture >= enemy.postureMax) breakBoss(state, enemy)
-          }
-        } else if (enemy.type === 'umbrella' && enemy.state !== 'spawn') {
-          // The canopy takes the impact. Its bearer can be passed while he braces underneath.
-          enemy.state = 'umbrellaOpen'; enemy.t = 1.45; enemy.vx = 0; enemy.openedAt = state.clock
-          enemy.flash = .16
-          if (Math.abs(p.x - enemy.x) < 125 && !p.dead) {
-            p.borrowTarget = enemy.id; p.borrowUntil = state.clock + 1.05
-          }
-        } else hitEnemy(state, enemy, 2, 'rock')
-      }
-      emit(state, 'rockImpact', { x: fall.x, y: GROUND })
-    }
-    state.mountainFalls = state.mountainFalls.filter(f => f.age < f.warning + .35)
-    const wave = state.bellWave
-    if (!wave) return
-    wave.t += dt
-    const last = wave.radius
-    wave.radius = Math.max(0, wave.t - .58) * 260
-    const p = state.player, distance = Math.abs(p.x - wave.x)
-    if (wave.t >= .58 && distance >= last - p.w && distance <= wave.radius + p.w &&
-        !wave.hit && p.y > GROUND - 27 && !p.iframes && !state.strike) {
-      wave.hit = true; hurtPlayer(state, 1, wave.x)
-    }
-    if (wave.radius > 247) state.bellWave = null
-  }
 
   function updateSummitMelee(state,e,dt){
     const p=state.player,kind=ENEMY[e.type],dx=p.x-e.x,distance=Math.abs(dx),posture=isBoss(e)||isElite(e)
@@ -2410,11 +2280,8 @@
       case 'idle':case 'walk':{
         if (p.dead) { e.vx = 0; break }
         e.facing=sign(dx)||e.facing
-        if (e.type === 'quarrier' && e.cd <= 0 && distance > 78 && distance < 540 && mayAttack(state) && !state.mountainFalls.length) {
-          markMountainFall(state, p.x, e.id)
-          e.state = 'recover'; e.t = 2.6; e.vx = 0
-        } else if (e.type === 'yue' && distance > 170 && distance < 325 && e.cd <= 0 && mayAttack(state)) {
-          startSummitStrike(state, e, 'rush', e.phase2 ? 0.66 : 0.77)
+        if (e.type === 'yue' && e.phase2 && distance > 170 && distance < 325 && e.cd <= 0 && mayAttack(state)) {
+          startSummitStrike(state, e, 'rush', 0.66)
         } else if (e.guardPost != null && distance > kind.reach * .82) {
           const gap = e.guardPost - e.x
           e.state = 'walk'; e.vx = sign(gap) * Math.min(kind.speed, Math.abs(gap) / dt)
@@ -2423,11 +2290,11 @@
           if(e.cd<=0&&mayAttack(state)){
             e.moves++
             if (e.type === 'yue') {
-              const moves = e.phase2 ? ['cleave', 'shove', 'sweep', 'lift'] : ['cleave', 'sweep', 'lift', 'shove']
+              const moves = e.phase2 ? ['cleave', 'sweep', 'lift', 'shove'] : ['cleave', 'lift', 'shove']
               const move = moves[(e.moves - 1) % moves.length]
-              startSummitStrike(state, e, move, e.phase2 && move === 'cleave' ? 0.63 : undefined)
-            } else if ((e.type === 'monk' && e.moves % 2 === 1) || (e.type === 'axeman' || e.type === 'shizhen') && e.moves % 3 === 0) {
-              startSummitStrike(state, e, e.type === 'shizhen' ? 'slam' : 'sweep')
+              startSummitStrike(state, e, move, e.phase2 && move === 'cleave' ? 0.65 : undefined)
+            } else if (e.type === 'monk' && e.moves % 2 === 1) {
+              startSummitStrike(state, e, 'sweep')
             } else {
               startSummitStrike(state, e)
             }
@@ -2441,8 +2308,6 @@
           e.hitDone = false; e.vx = e.facing * (strike.lunge ?? kind.lunge)
           emit(state, 'enemySwing', { id: e.id, x: e.x, y: e.y, facing: e.facing, kind: e.type, move: e.move })
           if (e.sweep) emit(state, 'summitImpact', { x: e.x, y: e.y, facing: e.facing, move: e.move })
-          if (e.type === 'yue' && e.phase2 && e.move === 'sweep') markMountainFall(state, p.x, e.id)
-          if (e.move === 'slam' && state.bell && Math.abs(e.x - state.bell.x) < state.bell.radius) ringMountainBell(state, e.facing, false)
         }
         break
       case 'mountAttack': {
@@ -2491,7 +2356,6 @@
   }
   function updateSummitEnemy(state,e,dt){
     if(e.type==='crossbow')summitBow(state,e,dt)
-    else if(e.type==='rope')summitRope(state,e,dt)
     else updateSummitMelee(state,e,dt)
   }
 
@@ -3207,7 +3071,6 @@
     updateTide(state, sdt)
     updateRigging(state, sdt)
     updateLanternWorld(state, sdt)
-    if (state.world.borrowStep) updateMountainHazards(state, sdt)
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)

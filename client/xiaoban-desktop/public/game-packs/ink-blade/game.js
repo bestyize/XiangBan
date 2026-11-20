@@ -374,15 +374,12 @@
     hookPull: ['钩镰朱光亮起时出剑弹反，海寇会被拽到身前；收剑后再斩可处决', '钩镰朱光亮起时按 J 弹反，海寇会被拽到身前；收剑后再斩可处决'],
     tide: ['看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇', '看浪头方向，迎浪跳起；也可登上高台，借浪卷走海寇'],
     mirror: ['镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回', '镜伶会举镜挡剑；等镜面返锋近身，再出新一剑弹回'],
-    borrow: ['迎着伞尖朱光出剑。「闪」亮时点按绕背，再斩处决。', '迎着伞尖朱光按 J。弹反后松方向键，按 L 借势绕背，再按 J。'],
-    highwalk: ['迎伞借势踏上挑栈，再跃下出剑。', '弹开伞刺按冲刺上栈，下落时按 J 出剑。'],
-    rope: ['索客沿朱线落斩。刀到身前时出剑，弩箭也能斩回。', '索客沿朱线落斩。刀到身前时按 J，弩箭也能斩回。'],
-    quarry: ['碎石先落。引伞客入石影，落石压住铁伞时可借势。', '引伞客入石影；落石压伞后，朝他冲刺绕背。'],
-    mountwind: ['柱后背风，柱间箭偏。遇杖扫就跳，落地再斩。', '柱后背风，柱间箭偏。遇杖扫就跳，落地再斩。'],
-    heavyguard: ['看斧刃起手：高处见朱光可弹，贴地横扫要跳。', '看斧刃起手：高处见朱光可弹，贴地横扫要跳。'],
-    mountbell: ['引石震到钟下，等他抬臂再跳斩击钟。', '石震抬臂时跳起按 J 击钟，震断起手。'],
-    mountduel: ['借重劈绕背。换架后引他踏进石影，落石也能破势。', '借重劈绕背。换架后引他踏进石影，落石也能破势。'],
-    elite: ['精英有独立架势条：多次弹反破势，出现「斩」再处决', '精英有独立架势条：多次弹反破势，出现「斩」再处决'],
+    borrow: ['铁伞正面难破：弹反后按「闪」借势绕背，再斩处决', '铁伞正面难破：弹反后按 L 借势绕背，再按 J 处决'],
+    crossbow: ['连弩连发两箭：箭到身前时出剑，可将箭斩回', '连弩连发两箭：箭到身前时按 J，可将箭斩回'],
+    mountwind: ['山风起时身形受推，立在廊柱后可避风；遇杖扫跳起', '山风起时身形受推，立在廊柱后可避风；遇杖扫跳起'],
+    mountbell: ['跳起斩响铜钟，可震落周围弩箭并震退近处敌人', '跳起按 J 敲响铜钟，可震落周围弩箭并震退近处敌人'],
+    mountduel: ['守山剑师岳停云：弹反重剑破势，也可借势绕到身后出剑', '守山剑师岳停云：弹反重剑破势，也可借势绕到身后出剑'],
+    elite: ['燕回有独立架势条：多次弹反破势，出现「斩」再处决', '燕回有独立架势条：多次弹反破势，出现「斩」再处决'],
     watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
     writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
     rigging: ['斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下', '斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下'],
@@ -772,15 +769,11 @@
     mirror: {a0:-2.3,a1:.7,r:35,width:8,color:'#20352a'},
     watchman: {a0:-.3,a1:.2,r:72,width:8,color:'#25382c'},
     judge: [{a0:-2.5,a1:.8}],
-    umbrella:{a0:-1.2,a1:.7,r:39,width:9,color:'#30372d'},
-    monk:{a0:-.4,a1:.4,r:72,width:8,color:'#30372d'},
-    disciple:{a0:-2,a1:.7,r:35,width:9,color:'#30372d'},
-    quarrier:{a0:-1.6,a1:.72,r:41,width:11,color:'#494237'},
-    rope:{a0:-2,a1:.8,r:37,width:8,color:'#30372d'},
-    axeman:{a0:-2.5,a1:1.1,r:65,width:17,color:'#273025'},
-    yanhui:{a0:-2.3,a1:.8,r:49,width:12,color:'#273025'},
-    shizhen:{a0:-2.5,a1:1,r:65,width:17,color:'#273025'},
-    yue:[{a0:-2.5,a1:1}],
+    umbrella: { a0: -1.2, a1: 0.7, r: 39, width: 10, color: '#1b1d22' },
+    monk: { a0: -0.4, a1: 0.4, r: 72, width: 9, color: '#1b1d22' },
+    disciple: { a0: -2, a1: 0.7, r: 35, width: 10, color: '#222429' },
+    yanhui: { a0: -2.3, a1: 0.8, r: 49, width: 12, color: '#15171b' },
+    yue: [{ a0: -2.5, a1: 1 }],
   }
   const MOUNTAIN_SWINGS = {
     cleave: { a0: -2.38, a1: 0.77, r: 79, width: 23 },
@@ -789,7 +782,6 @@
     rush: { a0: -0.47, a1: 0.24, r: 81, width: 15 },
     shove: { a0: -0.45, a1: 0.58, r: 43, width: 11 },
     sweep: { a0: 0.45, a1: 0.12, r: 103, width: 13, lift: 25 },
-    slam: { a0: -1.9, a1: 0.82, r: 75, width: 23, lift: 41 },
   }
 
   function snapshot(enemy) {
@@ -934,13 +926,13 @@
           const enemy = byId(e.id)
           const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge' || e.kind === 'yue'
           const mountain = MOUNTAIN_SWINGS[e.move]
-          const spec = mountain ? { color: '#242924', ...mountain } : big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
+          const spec = mountain ? { color: '#141518', ...mountain } : big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
           const lift = spec.lift ?? (e.mounted ? 70 : big ? 50 : 36)
           FX.trail(fx, {
             x: enemy.x, y: enemy.y - lift, follow: () => [enemy.x, enemy.y - lift], followFor: 0.12,
             facing: e.facing, a0: spec.a0, a1: spec.a1, r: spec.r, width: spec.width, grow: 0.09, life: 0.3, color: spec.color,
-            edge: big || e.move === 'sweep' || e.move === 'slam' ? CINNABAR : null, hairs: big ? 14 : 9,
+            edge: big || e.move === 'sweep' ? CINNABAR : null, hairs: big ? 14 : 9,
           })
           audio.play(big ? 'heavy' : 'slash')
           break
@@ -1014,26 +1006,19 @@
           break
         }
         case 'bossPhase': {
-          if (e.kind === 'yue') {
-            $('bossSub').textContent = '开山势'
-            FX.ring(fx, e.x, rules.GROUND - 2, 8, 84, .6, '#cda26f', 2)
-            FX.shake(fx, 3)
-            audio.play('mountBell')
-          } else {
-            FX.invert(fx, 0.7)
-            FX.shake(fx, 9)
-            FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
-            FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-            toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
-            audio.play('roar')
-          }
+          FX.invert(fx, 0.7)
+          FX.shake(fx, 9)
+          FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
+          FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
+          if (e.kind === 'yue') $('bossSub').textContent = '开山势'
+          toast(e.kind === 'judge' ? (e.stage === 3 ? '停笔拔剑 · 照见本心' : '落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
+          audio.play(e.kind === 'yue' ? 'mountBell' : 'roar')
           break
         }
         case 'broken': {
-          const enemy = byId(e.id)
           FX.seal(fx, '破', e.x, e.y - 18, 26, 1.2)
           FX.sparks(fx, e.x, e.y + 20, 16, CINNABAR, { len: 20, speed: 320 })
-          if (enemy?.type !== 'yue' || enemy.hp !== 1) promptOnce('broken')
+          promptOnce('broken')
           audio.play('parry')
           break
         }
@@ -1073,40 +1058,18 @@
           break
         case 'mountainBell':
           audio.play('mountBell')
-          FX.shake(fx, e.effective ? 3.8 : 2)
+          FX.shake(fx, e.effective ? 4.2 : 2)
+          FX.ring(fx, e.x, e.y + 8, 12, 175, 0.55, 'rgba(30,36,40,0.45)', 3)
           if (e.effective) FX.seal(fx, '震', e.x, e.y + 26, 20, .8)
           break
         case 'boltReturn':
           FX.seal(fx, '还', e.x, e.y - 9, 15, .55)
           break
-        case 'stoneCounter':
-          FX.trail(fx, { x: e.x, y: e.y - 2, facing: 1, a0: -3.05, a1: -.12, r: 37,
-            width: 5, hairs: 7, grow: .07, life: .32, color: '#554740' })
-          FX.seal(fx, '震', e.x, e.y - 70, 16, .6)
-          break
-        case 'bellInterrupt':
-          FX.seal(fx, '断', e.x, e.y - 27, 17, .65)
-          break
-        case 'swordStone':
-          FX.puff(fx, e.x, e.y - 2, 9, { speed: 90, size: 3, alpha: .32 })
-          FX.sparks(fx, e.x, e.y - 2, 7, '#d5c19d', { len: 9, speed: 135 })
-          audio.play('slam')
-          break
-        case 'plungeHit':
-          FX.trail(fx, { x: e.x - e.facing * 22, y: e.y - 22, facing: e.facing,
-            a0: -.95, a1: .91, r: 34, width: 6, hairs: 6, grow: .05, life: .24, color: '#343934' })
-          audio.play('heavy')
-          break
-        case 'rockImpact':
-          FX.puff(fx, e.x, e.y - 2, 12, { speed: 130, size: 5, alpha: .37 })
-          audio.play('slam')
-          break
         case 'boltShaken':
           FX.drops(fx, e.x, e.y, 5, { speed: 56, size: 1.5 })
           break
         case 'summitImpact':
-          FX.puff(fx, e.x + e.facing * 58, e.y - 3, e.move === 'slam' ? 14 : 7, { speed: 115, size: 5, alpha: .26 })
-          if (e.move === 'slam') { audio.play('slam'); FX.shake(fx, 5) }
+          FX.puff(fx, e.x + e.facing * 58, e.y - 3, 7, { speed: 115, size: 5, alpha: .26 })
           break
         case 'mirrorSpawn':
           FX.ring(fx,e.x,e.y,10,55,.7,'rgba(207,224,198,0.65)',1);audio.play('mirror');break
@@ -1412,7 +1375,7 @@
     ctx.restore()
   }
 
-  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite', 'mountTell', 'ropeTell', 'bowTell'])
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite', 'mountTell', 'bowTell'])
   const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeWrite'])
 
   function teleProgress(enemy) {
@@ -1428,12 +1391,6 @@
 
   function drawEnemy(enemy, dt) {
     if (enemy.delay > 0 || !enemy.alive && enemy.state !== 'dying') return
-    if (enemy.type === 'rope' && (enemy.ropeMounted || enemy.state === 'ropeClimb')) {
-      const anchor = enemy.ropeAnchorX ?? enemy.x
-      ctx.save(); ctx.strokeStyle = '#554438a8'; ctx.lineWidth = 1.7
-      ctx.beginPath(); ctx.moveTo(anchor, rules.GROUND - 205); ctx.quadraticCurveTo(anchor + (enemy.x - anchor) * .28, enemy.y - 52, enemy.x, enemy.y - 42); ctx.stroke()
-      ctx.restore()
-    }
     const a = anim(enemy.id, enemy)
     const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
     const flash = enemy.flash > 0
@@ -1464,7 +1421,7 @@
       const pose = fig.updatePose(enemy.type, enemy, a, dt, clock, rules)
       const isBoss = rules.isBoss(enemy)
       shadow(enemy.x, enemy.y, isBoss ? 26 : 16)
-      if (isBoss && enemy.type !== 'yue' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
+      if (isBoss && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
       if (isBoss && (enemy.state === 'phantom' || enemy.state === 'rush') && phantomImage > 0) {
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
         FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
@@ -2086,8 +2043,8 @@
       globalThis.XiabanInkMountain.attackGuides(ctx, state)
       const landing = rules.borrowLanding(state)
       if (landing) {
-        ctx.strokeStyle = '#dfc694'; ctx.lineWidth = 1.7
-        ctx.beginPath(); ctx.ellipse(landing.x, landing.y - 1, 12, 3.6, 0, 0, Math.PI * 2); ctx.stroke()
+        ctx.strokeStyle = 'rgba(184,50,42,0.78)'; ctx.lineWidth = 1.8
+        ctx.beginPath(); ctx.ellipse(landing.x, landing.y - 1, 13, 3.8, 0, 0, Math.PI * 2); ctx.stroke()
       }
     }
     const simDt = phase === 'playing' && !state.strike && state.hitstop <= 0 ? fxDt : 0
@@ -2183,14 +2140,10 @@
     } else if (!$('bossBar').hidden && !inBossFight()) $('bossBar').hidden = true
 
     let bossHint = ''
-    if (boss?.type === 'yue' && boss.hp === 1) {
-      const slashControl = touchUI ? '「斩」' : 'J'
-      bossHint = boss.state === 'broken' ? `架势已破，按 ${slashControl} 处决。` : '只剩 1 滴墨血，先破势，再出剑处决。'
-    }
     if (bossHint !== hud.bossHint) {
       const hint = $('bossHint')
       hint.textContent = bossHint
-      hint.hidden = !bossHint
+      hint.hidden = true
       hud.bossHint = bossHint
     }
     gameNode.classList.toggle('boss-fight', !$('bossBar').hidden)

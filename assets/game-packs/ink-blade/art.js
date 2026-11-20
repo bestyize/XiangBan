@@ -237,6 +237,14 @@
         indigo.addColorStop(0, 'rgba(70,96,120,' + o.indigo + ')'); indigo.addColorStop(1, 'rgba(70,96,120,0)')
         g.fillStyle = indigo; g.fill()
       }
+      if (o.celadon) {
+        // 石绿薄染: restrained mineral green-blue wash over steep mountain flanks.
+        const cel = g.createLinearGradient(0, o.base - o.peakH[1] * 0.85, 0, bottom)
+        cel.addColorStop(0, 'rgba(64,104,98,' + o.celadon + ')')
+        cel.addColorStop(0.55, 'rgba(82,118,104,' + (o.celadon * 0.6) + ')')
+        cel.addColorStop(1, 'rgba(82,118,104,0)')
+        g.fillStyle = cel; g.fill()
+      }
       // Ink settles along ridges and bleeds downward (墨分五色).
       for (let i = 0; i < ys.length; i++) {
         const x = a + i
@@ -285,6 +293,21 @@
         }
       }
       if (o.pavilions) for (const px of o.pavilions) if (px > a - 40 && px < b + 40) pavilion(g, px, ridge(px) + 2, o.pavilionScale || 1, o.color, Math.min(1, o.alpha * 1.6))
+      if (o.waterfalls) {
+        for (const wf of o.waterfalls) {
+          if (wf < a - 20 || wf > b + 20) continue
+          const topY = ridge(wf) + 12
+          const grad = g.createLinearGradient(0, topY, 0, bottom)
+          grad.addColorStop(0, rgba(PAPER, 0.55)); grad.addColorStop(0.65, rgba(PAPER, 0.35)); grad.addColorStop(1, rgba(PAPER, 0))
+          g.fillStyle = grad
+          g.beginPath()
+          g.moveTo(wf - 1.4, topY); g.lineTo(wf + 1.4, topY)
+          g.quadraticCurveTo(wf + 2.4, (topY + bottom) * 0.5, wf + 3.2, bottom - 8)
+          g.lineTo(wf - 3.2, bottom - 8)
+          g.quadraticCurveTo(wf - 2.2, (topY + bottom) * 0.5, wf - 1.4, topY)
+          g.closePath(); g.fill()
+        }
+      }
       if (o.wall && o.wall.to > a - 20 && o.wall.from < b + 20) {
         // Distant Great Wall (长城): a thin crenellated line riding the ridge, with small watchtowers.
         const w = o.wall, wa = w.alpha ?? o.alpha * 1.4
