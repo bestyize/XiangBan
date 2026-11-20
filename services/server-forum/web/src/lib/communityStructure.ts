@@ -21,11 +21,14 @@ const discussionOrder = [
 const hiddenDiscussionBoards = new Set([
   'casual-offwork', 'casual-loss', 'casual-dream', 'casual-think', 'casual-books', 'casual-fun',
 ])
-const discussionBoardNames = new Map([
+const boardNames = new Map([
   ['learn', '教程'],
   ['casual-screen', '影视'],
   ['casual-feelings', '情感'],
   ['casual-indie', '副业'],
+  ['casual-gear', '数码'],
+  ['casual-chat', '闲聊'],
+  ['resource-help', '求助'],
 ])
 
 export function isHiddenDiscussionBoard(slug: string) {
@@ -84,10 +87,17 @@ export function resourceTopicCategory(tab:string) {
   return ({media:'resource-movies',help:'resource-help'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
 export function categoryLabel(category: Pick<Category, 'slug' | 'name'>) {
-  return discussionBoardNames.get(canonicalCategory(category.slug)) ?? category.name
+  return boardNames.get(canonicalCategory(category.slug)) ?? category.name
+}
+function resourceNavigationBoards(categories: Category[]) {
+  return sectionBoards(categories, 'resources').filter(board => board.kind !== 'uncategorized')
 }
 export function resourceTabs(categories:Category[]) {
-  return [{key:'software',label:'开源软件'}, ...sectionBoards(categories, 'resources').map(c => ({key:c.slug,label:c.name}))]
+  return [{key:'software',label:'开源软件'}, ...resourceNavigationBoards(categories).map(c => ({key:c.slug,label:categoryLabel(c)}))]
+}
+export function resourceTab(categories: Category[], rawTab: string) {
+  const slug = resourceTopicCategory(rawTab)
+  return sectionBoards(categories, 'resources').some(board => board.slug === slug) ? slug : 'software'
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
   if (isHiddenDiscussionBoard(category.slug) || !activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`
@@ -108,7 +118,7 @@ export function navigationSections(categories:Category[]) {
     const rows = active.filter(c=>navigationSection(c)===key)
     const children = key === 'discuss'
       ? discussionDestinations(categories).flatMap(({ category }) => category ? [category] : [])
-      : key === 'resources' ? sectionBoards(categories, key) : []
+      : key === 'resources' ? resourceNavigationBoards(categories) : []
     return {key,name:SECTION_LABELS[key],href:key==='ideas'?'/':key==='resources'?'/resources':'/discuss',
       children,
       topic_count:rows.reduce((total,c)=>total+c.topic_count,0)}

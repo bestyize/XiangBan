@@ -1,13 +1,13 @@
 import { test } from 'node:test'
 import { strictEqual, deepStrictEqual } from 'node:assert'
-import { discussionTabs, discussionTab, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionTopicTag, postableCategories } from '../src/lib/communityStructure.ts'
+import { discussionTabs, discussionTab, resourceTab, resourceTabs, categoryDestination, sectionScope, activeCategories, navigationSections, categoryHref, categoryLabel, discussionCategory, discussionTopicTag, postableCategories } from '../src/lib/communityStructure.ts'
 import type { Category } from '../src/api/types.ts'
 function category(id:number, slug:string, section:Category['section'], parent_id:number|null=null, extra:Partial<Category>={}):Category {
   return {id,slug,name:slug,section,parent_id,status:'active',posting_enabled:true,description:'',kind:'normal',sort_order:id,min_post_level:1,on_home:true,award_points:false,admin_only:false,preset_tags:[],topic_count:0,...extra}
 }
 const learn = category(1,'learn','discuss')
 const movies = category(6,'resource-movies','resources',5)
-const help = category(7,'resource-help','resources',5)
+const help = category(7,'resource-help','resources',5,{name:'求助悬赏'})
 const rows=[learn,category(4,'casual-travel','discuss'),category(5,'resources','resources'),movies,help]
 test('mobile tabs keep their order and reflect the published boards and tags',()=>{
  const added=category(9,'writing-lab','discuss',null,{name:'写作实践'})
@@ -39,6 +39,8 @@ test('web discussion uses the new names and leaves historical board URLs accessi
     ['casual-screen', '影视动漫', '影视'],
     ['casual-feelings', '情感心理', '情感'],
     ['casual-indie', '副业与独立开发', '副业'],
+    ['casual-gear', '数码装备', '数码'],
+    ['casual-chat', '闲聊灌水', '闲聊'],
   ] as const
   const removed = ['casual-offwork', 'casual-loss', 'casual-dream', 'casual-think', 'casual-books', 'casual-fun']
   const boards = renamed.map(([slug, name], index) => category(index + 1, slug, 'discuss', null, { name }))
@@ -73,7 +75,20 @@ test('old discussion URLs select their current board',()=>{
  strictEqual(discussionTab(all,'learn-codex'),'learn')
  strictEqual(discussionTab(all,'all','','site-feedback'),'site')
  strictEqual(discussionTab(all,'casual','casual-travel'),'casual-travel')
- strictEqual(categoryLabel({...help,name:'自定义求助板块'}),'自定义求助板块')
+})
+test('resource navigation hides the default board and keeps its direct link working', () => {
+  const uncategorized = category(20, 'resources-uncategorized', 'resources', null, { kind: 'uncategorized', name: '默认' })
+  const all = [uncategorized, ...rows]
+  deepStrictEqual(resourceTabs(all), [
+    { key: 'software', label: '开源软件' },
+    { key: 'resource-movies', label: movies.name },
+    { key: 'resource-help', label: '求助' },
+  ])
+  deepStrictEqual(navigationSections(all).find(section => section.key === 'resources')?.children, [movies, help])
+  strictEqual(categoryLabel(help), '求助')
+  strictEqual(resourceTab(all, 'help'), help.slug)
+  strictEqual(resourceTab(all, uncategorized.slug), uncategorized.slug)
+  strictEqual(categoryDestination(uncategorized, all), '/resources?tab=resources-uncategorized')
 })
 test('administrative posting and move selectors exclude stopped categories and descendants',()=>{
  const stopped=rows.map(c=>c.id===5?{...c,posting_enabled:false}:c)

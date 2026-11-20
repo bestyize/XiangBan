@@ -145,7 +145,7 @@ function go(value:number) { navigate({page:String(value)}) }
     <CommunityTabs v-if="!ideas" class="page-section-tabs discussion-tabs" :items="discussionOptions" :active="tab" label="讨论板块" scrollable
       @change="changeDiscussionTab" />
     <button v-if="!showGallery && tag" class="active-topic" type="button" @click="navigate({tag:undefined,page:undefined})"># {{ tag }} ×</button>
-    <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
+    <p v-if="category === 'casual-chat'" class="feed-note">闲聊不进首页，也不加积分</p>
     <RequestState v-if="showFeaturedIdeas" :loading="featuredCatalog.loading.value" :error="featuredCatalog.error.value"
       @retry="featuredCatalog.refresh" />
     <IdeaCard v-if="spotlight" class="ideas-spotlight" :card="spotlight" spotlight />

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { discussionTab, discussionTabs, resourceTabs, resourceTopicCategory } from '@/lib/communityStructure'
+import { discussionTab, discussionTabs, resourceTab, resourceTabs } from '@/lib/communityStructure'
 import { homeTabOf, homeTabs } from '@/lib/homeNavigation'
 import { postingLocation } from '@/lib/postingStructure'
 import { areaOf, isCommunityRoot, type CommunityLink, type Section } from '@/lib/sections'
@@ -22,6 +22,7 @@ const meta = useMeta(), session = useSession(), inbox = useNotifications()
 const composer = useTopicComposer(), publisher = usePackPublisher()
 const route = useRoute(), { preference, resolved, openAppearance } = useTheme()
 const publishing = ref(false)
+const sectionCollapsed = ref(false)
 const lastCommunity = ref('/')
 const lastApps = ref('/create')
 watch(() => route.fullPath, path => {
@@ -30,6 +31,8 @@ watch(() => route.fullPath, path => {
 }, { immediate: true })
 
 const current = computed(() => areaOf(route))
+const expandedSection = computed(() => current.value === 'community' && !sectionCollapsed.value ? props.section : null)
+watch(() => route.name, () => { sectionCollapsed.value = false })
 const communityIcons = { home: 'compass', discuss: 'message', resources: 'folder' }
 const productLinks = computed(() => [
   { to: lastApps.value, key: 'create', label: '应用', icon: 'grid' },
@@ -47,13 +50,19 @@ const activeTab = computed(() => {
   if (!rootPage.value) return ''
   if (props.section === 'home') return homeTabOf(route.query.tab)
   if (props.section === 'discuss') return discussionTab(meta.categories, findQuery('tab'), findQuery('filter'), findQuery('board'))
-  const key = resourceTopicCategory(findQuery('tab'))
-  return sectionTabs.value.some(item => item.key === key) ? key : 'software'
+  return resourceTab(meta.categories, findQuery('tab'))
 })
 function tabLocation(key: string) {
   const tab = ['ideas', 'all', 'software'].includes(key) ? undefined : key
   const isFollowing = route.name === 'discuss' && [route.query.mode, route.query.sort, route.query.tab].includes('following')
   return { name: props.section, query: { tab, mode: isFollowing ? 'following' : undefined } }
+}
+
+function toggleCurrentSection(key: Section, event: MouseEvent) {
+  if (!rootPage.value || key !== props.section || event.defaultPrevented || event.button !== 0 ||
+    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  sectionCollapsed.value = !sectionCollapsed.value
 }
 
 const searchKey = /mac|iphone|ipad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K'
@@ -87,23 +96,27 @@ function publishWork() {
         <div class="rail-label">社区</div>
         <template v-for="item in communityLinks" :key="item.key">
           <RouterLink :to="item.to" class="rail-link" :class="{ active: current === 'community' && item.key === section }"
-            :aria-current="current === 'community' && item.key === section ? 'location' : undefined">
+            :aria-current="current === 'community' && item.key === section ? 'location' : undefined"
+            :aria-expanded="rootPage && item.key === section ? expandedSection === item.key : undefined"
+            :aria-controls="rootPage && item.key === section ? `rail-${item.key}-subtabs` : undefined"
+            @click.capture="toggleCurrentSection(item.key, $event)">
             <span class="rail-icon"><AppIcon :name="communityIcons[item.key]" :size="16" /></span>
-            {{ item.label }} <AppIcon class="rail-chevron" name="arrow" :size="13" />
+            {{ item.label }} <AppIcon class="rail-chevron" :class="{ expanded: expandedSection === item.key }" name="arrow" :size="13" />
           </RouterLink>
-          <div v-if="current === 'community' && item.key === section" class="rail-subtabs">
+          <div v-if="current === 'community' && item.key === section" v-show="expandedSection === item.key"
+            :id="`rail-${item.key}-subtabs`" class="rail-subtabs">
             <RouterLink v-for="tab in sectionTabs" :key="tab.key" :to="tabLocation(tab.key)" :replace="rootPage"
               :title="tab.label" :aria-current="activeTab === tab.key ? 'page' : undefined">{{ tab.label }}</RouterLink>
           </div>
         </template>
       </div>
-      <div class="rail-group rail-products">
-        <div class="rail-label">产品空间</div>
-        <RouterLink v-for="item in productLinks" :key="item.key" :to="item.to" class="rail-link"
-          :class="{ active: current === item.key }" :aria-current="current === item.key ? 'location' : undefined">
-          <span class="rail-icon"><AppIcon :name="item.icon" :size="16" /></span> {{ item.label }}
-        </RouterLink>
-      </div>
+    </div>
+    <div class="rail-group rail-products">
+      <div class="rail-label">产品空间</div>
+      <RouterLink v-for="item in productLinks" :key="item.key" :to="item.to" class="rail-link"
+        :class="{ active: current === item.key }" :aria-current="current === item.key ? 'location' : undefined">
+        <span class="rail-icon"><AppIcon :name="item.icon" :size="16" /></span> {{ item.label }}
+      </RouterLink>
     </div>
 
     <div class="rail-bottom">
@@ -206,9 +219,9 @@ function publishWork() {
   .rail-search kbd { margin-left: auto; padding: 0 5px; border-radius: 4px; background: var(--surface); color: var(--ink-3); font-family: inherit; font-size: 11px; }
   .rail-search:hover { border-color: var(--line-strong); }
   .rail-publish { justify-content: center; min-height: 40px; padding: 0 12px; border: 0; font-weight: 650; }
-  .rail-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px; margin-inline: -2px; scrollbar-width: thin; }
+  .rail-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior-y: contain; padding: 2px; margin-inline: -2px; scrollbar-width: thin; }
   .rail-group { display: grid; gap: 2px; }
-  .rail-products { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .rail-products { flex: none; padding-top: 10px; border-top: 1px solid var(--line); }
   .rail-label { padding: 4px 10px; color: var(--ink-3); font-size: 11px; font-weight: 600; }
   .rail-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 12px; color: var(--ink-2); font-size: 14px; }
   .rail-link:hover, .rail-subtabs a:hover { color: var(--ink); background: var(--surface-2); }
@@ -216,11 +229,11 @@ function publishWork() {
   .rail-icon { flex: none; display: grid; place-items: center; width: 25px; height: 25px; border-radius: 7px; background: var(--surface-2); }
   .active .rail-icon { background: color-mix(in srgb, var(--brand-fill) 14%, transparent); }
   .rail-chevron { margin-left: auto; }
-  .active .rail-chevron { transform: rotate(90deg); }
+  .rail-chevron.expanded { transform: rotate(90deg); }
   .rail-subtabs { display: grid; gap: 2px; padding-inline-start: 26px; margin: 2px 0 6px; }
   .rail-subtabs a { align-content: center; min-width: 0; min-height: 28px; overflow: hidden; padding: 0 10px; border-radius: 7px; color: var(--ink-3); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
   .rail-subtabs a[aria-current] { color: var(--ink); font-weight: 700; }
-  .rail-bottom { display: grid; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .rail-bottom { flex: none; display: grid; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line); }
   .rail-account { display: flex; align-items: center; gap: 8px; }
   .rail-account > a:first-child { display: flex; }
   .rail-account-copy { flex: 1; min-width: 0; }

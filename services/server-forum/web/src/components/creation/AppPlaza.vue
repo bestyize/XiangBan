@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { contentApi } from '@/api/content'
 import AppIcon from '@/components/AppIcon.vue'
@@ -27,6 +27,22 @@ const mobileTools = [
 const mobileTool = ref<(typeof mobileTools)[number] | null>(null)
 const showAllGames = computed(() => route.query.kind === 'game')
 const showAllTools = computed(() => route.query.kind === 'app')
+const previewGrid = useTemplateRef<HTMLDivElement>('previewGrid')
+const previewColumns = ref(4)
+const visibleGames = computed(() => showAllGames.value ? games : games.slice(0, previewColumns.value))
+// The two preview grids share the same column layout.
+watch(previewGrid, (grid, _, onCleanup) => {
+  if (!grid) return
+  const measure = () => {
+    const columns = getComputedStyle(grid).gridTemplateColumns
+    if (columns !== 'none') previewColumns.value = columns.split(/\s+/).length
+  }
+  measure()
+  if (typeof ResizeObserver === 'undefined') return
+  const observer = new ResizeObserver(measure)
+  observer.observe(grid)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
 const filters = [
   { key: 'featured', label: '精选' }, { key: 'latest', label: '最新' },
   { key: 'game', label: '游戏' }, { key: 'app', label: '工具' },
@@ -35,8 +51,12 @@ const filter = computed(() => filters.find(item => item.key === route.query.feed
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(route.query.page)) || 1)))
 const tools = useCommunityResource(() => contentApi.packs({ kind: 'app', featured: true }))
 watch(showAllGames, gamesOnly => { if (!gamesOnly) void tools.load() }, { immediate: true })
-const featuredTools = computed(() => (showAllTools.value ? tools.data.value?.items ?? [] : [])
-  .map(tool => ({ ...tool, icon: tool.slug === 'wancisou' ? WANCISOU_ICON : webLink(tool.cover_url) })))
+const featuredTools = computed(() => {
+  const items = tools.data.value?.items ?? []
+  const builtInToolCount = mobileTools.length + 2 // MBTI and dynamic wallpapers
+  const visible = showAllTools.value ? items : items.slice(0, Math.max(0, previewColumns.value - builtInToolCount))
+  return visible.map(tool => ({ ...tool, icon: tool.slug === 'wancisou' ? WANCISOU_ICON : webLink(tool.cover_url) }))
+})
 const failedIcons = reactive(new Set<string>())
 const linkedTool = computed(() => {
   const slug = route.query.tool
@@ -77,8 +97,8 @@ function go(page: number) {
       <RouterLink v-if="!showAllGames" class="plaza-more-btn" to="/create?kind=game">全部 <AppIcon name="arrow" :size="13" /></RouterLink>
       <RouterLink v-else class="plaza-more-btn" to="/create">返回广场</RouterLink>
     </header>
-    <div class="plaza-icon-grid">
-      <RouterLink v-for="game in (showAllGames ? games : games.slice(0, 4))" :key="game.id"
+    <div ref="previewGrid" class="plaza-icon-grid">
+      <RouterLink v-for="game in visibleGames" :key="game.id"
         class="plaza-icon-item" :aria-label="game.playable ? `试玩${game.name}` : `${game.name}（在手机 App 游玩）`"
         :to="game.playable ? builtinRunLocation(game.id) : '/ai'">
         <span class="plaza-app-icon"><img :src="game.icon" alt="" decoding="async" /></span>
@@ -117,7 +137,7 @@ function go(page: number) {
           <AppIcon v-else name="grid" />
         </span>
         <span class="plaza-app-name">{{ tool.title }}</span>
-        <small v-if="tool.slug === 'wancisou'" class="plaza-app-sub">检索</small>
+        <small v-if="showAllTools && tool.slug === 'wancisou'" class="plaza-app-sub">检索</small>
       </RouterLink>
     </div>
     <template v-if="showAllTools">

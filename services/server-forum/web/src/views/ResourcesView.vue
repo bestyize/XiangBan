@@ -14,23 +14,23 @@ import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { useHead } from '@/lib/head'
-import { resourceTabs, resourceTopicCategory } from '@/lib/communityStructure'
+import { categoryLabel, resourceTab, resourceTabs } from '@/lib/communityStructure'
 import '@/components/community/community.css'
 const meta = useMeta()
 const composer = useTopicComposer()
 const route = useRoute(), router = useRouter()
 const tabs = computed(()=>resourceTabs(meta.categories))
-const requestedTab = computed(() => resourceTopicCategory(typeof route.query.tab === 'string' ? route.query.tab : ''))
-const tab = computed(() => {
-  return tabs.value.some(item => item.key === requestedTab.value) ? requestedTab.value : 'software'
+const requestedTab = computed(() => typeof route.query.tab === 'string' ? route.query.tab : '')
+const tab = computed(() => resourceTab(meta.categories, requestedTab.value))
+const sectionTitle = computed(() => {
+  const board = meta.categories.find(item => item.slug === tab.value)
+  return board ? categoryLabel(board) : '资源'
 })
-const sectionTitle = computed(() => tabs.value.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 type ResourceData = { kind:'topics'; result:Page<TopicItem> }
 const { data, loading, error, load, refresh } = useCommunityResource<ResourceData | null>(async () => {
   if (tab.value === 'software') return null
-  const category = resourceTopicCategory(tab.value)
-  return { kind:'topics', result: await api.topics({ category, page:page.value, sort:'new', active_only:true }) }
+  return { kind:'topics', result: await api.topics({ category:tab.value, page:page.value, sort:'new', active_only:true }) }
 })
 watch([() => meta.categories,tab,page], load, { immediate:true })
 watch(() => composer.saved, saved => { if (saved && tab.value !== 'software') void refresh() })
