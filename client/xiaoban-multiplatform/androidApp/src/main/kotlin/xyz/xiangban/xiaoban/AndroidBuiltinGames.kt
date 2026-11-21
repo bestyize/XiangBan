@@ -30,7 +30,7 @@ internal object AndroidBuiltinGames {
             val item = items.getJSONObject(index)
             Game(item.getString("id"), item.getString("kind"), item.getString("url"), item.getString("sha256"), item.getLong("bytes"), item.getString("sourceSha256"))
         }
-        val expected = BuiltinMobileGames.ids.filterNot(BuiltinMobileGames::isBundledTool).toSet()
+        val expected = BuiltinMobileGames.ids.filterNot(BuiltinMobileGames::isBundledAsset).toSet()
         require(games.map { it.id }.toSet() == expected && games.size == expected.size)
         require(games.all { it.kind in setOf("game", "app") && url.matches(it.url) && hash.matches(it.sha256) && hash.matches(it.sourceSha256) && it.bytes in 1..RuntimeV2Archive.MAX_ZIP_BYTES })
         return games

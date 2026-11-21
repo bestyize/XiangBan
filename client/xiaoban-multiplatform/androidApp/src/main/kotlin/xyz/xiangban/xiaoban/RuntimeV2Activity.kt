@@ -170,7 +170,7 @@ class RuntimeV2Activity : ComponentActivity() {
             showUnavailable("请更新 Android System WebView 或 Chrome，再打开这个作品。")
             return
         }
-        if (root != null && !BuiltinMobileGames.isBundledTool(id)) {
+        if (root != null && !BuiltinMobileGames.isBundledAsset(id)) {
             setContentView(TextView(this).apply {
                 text = "正在准备游戏…"
                 textSize = 16f
@@ -184,7 +184,7 @@ class RuntimeV2Activity : ComponentActivity() {
                         workspace -> RuntimeV2Package.loadWorkspace(filesDir.resolve("workspace/games/$id"), id)
                         idea != null -> AndroidRuntimeV2Community.loadIdea(this@RuntimeV2Activity, intent)
                         community -> AndroidRuntimeV2Community.load(this@RuntimeV2Activity, intent)
-                        BuiltinMobileGames.isBundledTool(id) -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
+                        BuiltinMobileGames.isBundledAsset(id) -> assets.loadBundledRuntimeV2(id, checkNotNull(root))
                         else -> RuntimeV2Package.loadBuiltin(AndroidBuiltinGames.ensure(this@RuntimeV2Activity, id), id, assets)
                     }
                     quickLaunchEnabled = pack.manifest.id == "quick-launch" && runCatching {

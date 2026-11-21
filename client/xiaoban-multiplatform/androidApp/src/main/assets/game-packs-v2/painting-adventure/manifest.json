@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "game",
+  "id": "painting-adventure",
+  "name": "画框马里奥",
+  "description": "穿过金色画框切换画风，在八个世界挑战 32 关。",
+  "version": "1.0.2",
+  "category": "action",
+  "entry": "index.html",
+  "icon": "icon.png",
+  "cover": "cover.png",
+  "orientation": "landscape",
+  "input": ["touch", "mouse", "keyboard"]
+}

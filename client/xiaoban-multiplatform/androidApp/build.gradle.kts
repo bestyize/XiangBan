@@ -55,7 +55,7 @@ android {
         applicationId = "xyz.xiangban.xiaoban"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionName = "3.1.8"
+        versionName = "3.1.9"
         val (major, minor, patch) = requireNotNull(versionName).split('.').map(String::toInt)
         require(major in 0..2099 && minor in 0..999 && patch in 0..999)
         versionCode = (major * 1_000_000 + minor * 1_000 + patch).also { require(it > 0) }
@@ -166,14 +166,16 @@ abstract class SyncMobileGameAssets : DefaultTask() {
         val categories = (JsonSlurper().parse(runtime.resolve("catalog.json")) as Map<*, *>).map { (id, category) ->
             (id as String) to (category as String)
         }.toMap()
-        val reviewedIds = source.listFiles().orEmpty().filter { it.resolve("manifest.json").isFile }.map { it.name }.toSet()
-        check(categories.keys == reviewedIds) { "Android 内置作品的协议 2 分类与资源目录不一致" }
         val distribution = JsonSlurper().parse(distributionFile.get().asFile) as Map<*, *>
-        val entries = (distribution["games"] as List<*>).map { it as Map<*, *> }.associateBy { it["id"] as String }
-        check(distribution["version"] == 1 && entries.keys == reviewedIds) { "内置游戏分发清单与资源目录不一致" }
+        val publishedGames = (distribution["games"] as List<*>).map { it as Map<*, *> }
+        val entries = publishedGames.associateBy { it["id"] as String }
+        check(distribution["version"] == 1 && entries.keys == categories.keys && entries.size == publishedGames.size) {
+            "内置游戏分发清单与 Android 分类不一致"
+        }
         val allowed = setOf("html", "htm", "js", "mjs", "css", "json", "svg", "png", "jpg", "jpeg", "webp", "gif", "mp3", "ogg", "wav", "woff2", "md", "txt")
         for (id in categories.keys) {
             val input = source.resolve(id)
+            check(input.resolve("manifest.json").isFile) { "缺少 Android 内置作品：$id" }
             val digest = MessageDigest.getInstance("SHA-256")
             val sourceFiles = input.walkTopDown().filter { it.isFile && !it.name.contains(".test.") }.sortedBy { it.relativeTo(input).invariantSeparatorsPath }
             for (file in sourceFiles) {
