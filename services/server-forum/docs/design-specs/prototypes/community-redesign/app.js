@@ -339,7 +339,7 @@
       id: 101,
       title: '做小伴桌面小组件时，先搭布局还是先调动画曲线？',
       excerpt: '这周尝试把番茄钟和天气卡片做成 2x2 小组件，发现桌面透明底色下阴影参数在深浅壁纸里表现差异很大，大家一般怎么定基准？',
-      category: '学习和教程',
+      category: '教程',
       tabs: ['learn'],
       tone: 'learn',
       tag: '桌面组件',
@@ -367,7 +367,7 @@
       id: 103,
       title: '分享我用单个 HTML 打包进应用广场的小工具工作流',
       excerpt: '写好纯前端小页面后，在「发布 → 分享已有作品」直接选单个 UTF-8 HTML，网页会自动转成 V2 ZIP 包，桌面和手机都能直接导入。',
-      category: '副业与独立开发',
+      category: '副业',
       tabs: ['casual-indie'],
       tone: 'dev',
       tag: 'V2 应用包',
@@ -382,7 +382,7 @@
       title: '大家在桌面养桌面伙伴时，平时喜欢开几个实例、放什么位置？',
       excerpt: '我习惯右上角放一个绿叶盆栽看视线跟随，左下角留给系统监控小组件，你们有什么不遮挡 IDE 的摆法吗？',
       category: '闲聊灌水',
-      tabs: ['casual-chat', 'casual-fun'],
+      tabs: ['casual-chat'],
       tone: 'game',
       tag: '桌面布置',
       author: '木杉',
@@ -732,9 +732,9 @@
   ];
 
   const INITIAL_COMMENTS = [
-    { id: 1, author: '阿栗', avatarBg: '#07C160', time: '28 分钟前', text: '页面信息层级比之前清晰好多，特别是图文卡片和纯文字讨论终于各自有合适的呼吸感了。' },
-    { id: 2, author: '半杯茶', avatarBg: '#2F6FDB', time: '1 小时前', text: '桌面端把底部手机导航拿掉放回左侧以后，宽屏看作品和大图再也不会觉得憋屈了。' },
-    { id: 3, author: '临风', avatarBg: '#7152D8', time: '3 小时前', text: '小伴红和海湾蓝在暗黑模式下的文字对比度都很舒服，评论区吸底胶囊在手机上很顺手。' }
+    { id: 1, author: '阿栗', avatarBg: '#07C160', time: '28 分钟前', region: '上海', likes: 42, text: '页面信息层级比之前清晰好多，特别是图文卡片和纯文字讨论终于各自有合适的呼吸感了。' },
+    { id: 2, author: '半杯茶', avatarBg: '#2F6FDB', time: '1 小时前', region: '北京', likes: 27, text: '桌面端把底部手机导航拿掉放回左侧以后，宽屏看作品和大图再也不会觉得憋屈了。' },
+    { id: 3, author: '临风', avatarBg: '#7152D8', time: '3 小时前', region: '杭州', likes: 19, text: '评论区吸底栏加上弹出写评论面板在手机上特别顺手，点赞和收藏随手就能点。' }
   ];
 
   /* ==========================================================================
@@ -754,6 +754,13 @@
     sun: ['M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M12 2v2', 'M12 20v2', 'M2 12h2', 'M20 12h2', 'm4.9 4.9 1.4 1.4', 'm17.7 17.7 1.4 1.4', 'm4.9 19.1 1.4-1.4', 'm17.7 6.3 1.4-1.4'],
     moon: ['M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z'],
     heart: ['M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z'],
+    star: ['m12 3.2 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z'],
+    share: ['M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7', 'm16 6-4-4-4 4', 'M12 2v13'],
+    image: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 16 5-5 4 4 3-3 6 6'],
+    smile: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2', 'M9 9.5h.01', 'M15 9.5h.01'],
+    at: ['M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M16 8v5a2.5 2.5 0 0 0 5 0v-1a9 9 0 1 0-4 7.5'],
+    edit: ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'],
+    sort: ['M4 7h16', 'M7 12h10', 'M10 17h4'],
     back: ['m15 5-7 7 7 7'],
     arrow: ['m9 5 7 7-7 7'],
     external: ['M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'],
@@ -818,8 +825,14 @@
     frontierIndex: 0,
     selectedModelId: 'deepseek-r1',
     detail: null, // { type: 'work'|'topic'|'project', id: string|number }
+    detailSlide: 0,
     likedIds: new Set(['whale-girl', 'topic-103']),
     savedIds: new Set(['excalidraw/excalidraw', 'toeverything/AFFiNE']),
+    followedAuthors: new Set(),
+    likedCommentIds: new Set([1]),
+    h5ComposerOpen: false,
+    replyTo: '',
+    composerDraft: '',
     commentsByItem: new Map(),
     overlay: null, // 'spec' | 'search' | 'publish' | null
     searchQuery: '',
@@ -863,21 +876,15 @@
     { key: 'design', label: '设计', action: 'discuss-tab' },
     { key: 'casual-games', label: '游戏', action: 'discuss-tab' },
     { key: '3d', label: '3D', action: 'discuss-tab' },
-    { key: 'learn', label: '学习和教程', action: 'discuss-tab' },
+    { key: 'learn', label: '教程', action: 'discuss-tab' },
     { key: 'casual-travel', label: '旅行', action: 'discuss-tab' },
-    { key: 'casual-books', label: '读书', action: 'discuss-tab' },
-    { key: 'casual-screen', label: '影视动漫', action: 'discuss-tab' },
-    { key: 'casual-feelings', label: '情感心理', action: 'discuss-tab' },
+    { key: 'casual-screen', label: '影视', action: 'discuss-tab' },
+    { key: 'casual-feelings', label: '情感', action: 'discuss-tab' },
     { key: 'casual-food', label: '美食', action: 'discuss-tab' },
     { key: 'casual-work', label: '职场', action: 'discuss-tab' },
     { key: 'site', label: '站务', action: 'discuss-tab' },
-    { key: 'casual-offwork', label: '下班了', action: 'discuss-tab' },
-    { key: 'casual-loss', label: '亏了吗', action: 'discuss-tab' },
-    { key: 'casual-dream', label: '梦想和人生', action: 'discuss-tab' },
     { key: 'casual-gear', label: '数码装备', action: 'discuss-tab' },
-    { key: 'casual-indie', label: '副业与独立开发', action: 'discuss-tab' },
-    { key: 'casual-fun', label: '吃喝玩乐', action: 'discuss-tab' },
-    { key: 'casual-think', label: '哲思', action: 'discuss-tab' },
+    { key: 'casual-indie', label: '副业', action: 'discuss-tab' },
     { key: 'casual-help', label: '互助', action: 'discuss-tab' },
     { key: 'casual-chat', label: '闲聊灌水', action: 'discuss-tab' }
   ];
@@ -1482,6 +1489,13 @@
     `;
   }
 
+  const GALLERY_EXTRAS = ['./assets/micro-gallery.webp', './assets/whale-girl.webp', './assets/jiangshan-map.webp', './assets/excalidraw-showcase.webp'];
+
+  function buildGallery(cover) {
+    if (!cover) return [];
+    return [cover, ...GALLERY_EXTRAS.filter(src => src !== cover).slice(0, 2)];
+  }
+
   function getDetailModel() {
     const d = state.detail;
     if (!d) return null;
@@ -1491,15 +1505,19 @@
       return {
         key: w.id,
         badge: w.category,
+        tags: [w.category, '小伴创意', w.kind || '交互作品'].filter((v, i, a) => v && a.indexOf(v) === i),
         title: w.title,
         author: w.author,
         avatarBg: w.avatarBg,
         date: w.date,
+        region: '社区',
         cover: w.cover,
+        gallery: buildGallery(w.cover),
         body: w.introduction,
         controls: w.controls,
         actionLabel: w.actionLabel,
-        likes: w.likes
+        likes: w.likes,
+        saves: Math.max(12, Math.round((w.likes || 40) * 0.26))
       };
     }
     if (d.type === 'topic') {
@@ -1508,15 +1526,19 @@
       return {
         key: 'topic-' + t.id,
         badge: t.category,
+        tags: [t.category, t.tag, '社区讨论'].filter((v, i, a) => v && a.indexOf(v) === i),
         title: t.title,
         author: t.author,
         avatarBg: t.avatarBg,
         date: t.time,
+        region: '社区',
         cover: '',
+        gallery: [],
         body: t.excerpt + '\n\n欢迎在下方留言区继续补充你的桌面实拍图或调试经验。',
         controls: '',
         actionLabel: '',
-        likes: t.likes
+        likes: t.likes,
+        saves: Math.max(8, Math.round((t.likes || 20) * 0.26))
       };
     }
     if (d.type === 'project') {
@@ -1525,15 +1547,19 @@
         return {
           key: p.full_name,
           badge: p.category,
+          tags: [...p.tags, p.category].filter((v, i, a) => v && a.indexOf(v) === i),
           title: `${p.name} (${p.full_name})`,
           author: `GitHub ${p.stars} Stars`,
           avatarBg: '#2B2B30',
           date: '公开资料整理',
+          region: '开源精选',
           cover: p.cover,
+          gallery: buildGallery(p.cover),
           body: p.summary + ' 本条目用于社区精选导读，点击下方按钮可查看官方仓库发布页或保存收藏。',
           controls: '标签：' + p.tags.join(' · '),
           actionLabel: '访问官方仓库',
-          likes: 92
+          likes: 92,
+          saves: 34
         };
       }
       const sw = RESOURCE_SOFTWARE.find(item => item.slug === d.id);
@@ -1541,18 +1567,64 @@
       return {
         key: sw.slug,
         badge: `${sw.cat} · ${sw.ver}`,
+        tags: [sw.cat, sw.lang, ...sw.platforms.slice(0, 2)].filter((v, i, a) => v && a.indexOf(v) === i),
         title: `${sw.name} (${sw.slug})`,
         author: `GitHub ${sw.stars} Stars`,
         avatarBg: '#2B2B30',
         date: sw.updated,
+        region: '开源软件',
         cover: '',
+        gallery: [],
         body: `${sw.desc}\n\n支持平台：${sw.platforms.join(' / ')}。当前收录版本 ${sw.ver}，主要开发语言为 ${sw.lang}。`,
         controls: `平台支持：${sw.platforms.join(' · ')}`,
         actionLabel: `下载安装包 (${sw.ver})`,
-        likes: 120
+        likes: 120,
+        saves: 41
       };
     }
     return null;
+  }
+
+  function renderDetailComments(item, comments, device) {
+    return `
+      <div class="xhs-comments-head">
+        <span>共 ${comments.length} 条评论</span>
+        <button type="button" class="xhs-sort-btn" data-action="toast" data-msg="已切换评论排序">
+          ${icon('sort', 14)}
+        </button>
+      </div>
+      ${device === 'mobile' ? `
+        <div class="xhs-inline-prompt">
+          <span class="mini-avatar" style="background:#D93A44;width:30px;height:30px;font-size:12px">伴</span>
+          <button type="button" class="xhs-inline-pill" data-action="open-h5-composer">
+            <span>留下你的想法吧</span>
+            <span class="xhs-inline-icons">${icon('image', 15)}${icon('smile', 15)}</span>
+          </button>
+        </div>
+      ` : ''}
+      <div class="xhs-comments-list">
+        ${comments.map(c => {
+          const cLiked = state.likedCommentIds.has(c.id);
+          const cLikes = (c.likes || 0) + (cLiked ? 1 : 0);
+          return `
+            <div class="xhs-comment-row">
+              <span class="mini-avatar" style="background:${c.avatarBg};width:32px;height:32px;font-size:12.5px">${esc(c.author[0])}</span>
+              <div class="xhs-comment-body">
+                <div class="xhs-comment-author">${esc(c.author)}</div>
+                <div class="xhs-comment-text">${esc(c.text)}</div>
+                <div class="xhs-comment-foot">
+                  <span class="xhs-comment-meta">${esc(c.time)} ${esc(c.region || '社区')}</span>
+                  <button type="button" class="xhs-reply-btn" data-action="reply-comment" data-author="${esc(c.author)}">回复</button>
+                  <button type="button" class="xhs-comment-like ${cLiked ? 'is-liked' : ''}" data-action="toggle-comment-like" data-cid="${c.id}">
+                    ${icon('heart', 14)}${cLikes ? `<span>${cLikes}</span>` : ''}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   function renderDetailView(device) {
@@ -1561,58 +1633,127 @@
     const comments = state.commentsByItem.get(item.key) || INITIAL_COMMENTS;
     const liked = isLiked(item.key);
     const saved = state.savedIds.has(item.key);
+    const followed = state.followedAuthors.has(item.author);
+    const likeCount = likeDelta(item.key, item.likes);
+    const saveCount = (item.saves || 18) + (saved ? 1 : 0);
+    const gallery = item.gallery || [];
+    const slideIdx = gallery.length ? Math.min(state.detailSlide, gallery.length - 1) : 0;
+    const activeImg = gallery[slideIdx] || item.cover;
+    const dotsHtml = (overlay = false) => gallery.length > 1 ? `
+      <div class="xhs-media-dots ${overlay ? 'is-overlay' : ''}" role="tablist" aria-label="切换图片">
+        ${gallery.map((_, idx) => `<button type="button" class="xhs-media-dot ${idx === slideIdx ? 'is-active' : ''}" data-action="detail-slide" data-idx="${idx}" aria-label="第 ${idx + 1} 张"></button>`).join('')}
+      </div>
+    ` : '';
+    const tagsHtml = (item.tags || []).map(tag => `<span class="xhs-hashtag">#${esc(tag)}</span>`).join(' ');
+    const infoStripsHtml = `
+      ${item.actionLabel ? `
+        <button type="button" class="xhs-info-strip" data-action="toast" data-msg="演示打开：${esc(item.actionLabel)}">
+          <span class="xhs-strip-tag">${icon('spark', 12)} 体验</span>
+          <span class="xhs-strip-text">${esc(item.actionLabel)}</span>
+          ${icon('arrow', 13)}
+        </button>
+      ` : ''}
+      ${item.controls ? `
+        <div class="xhs-info-strip is-static">
+          <span class="xhs-strip-tag is-warm">说明</span>
+          <span class="xhs-strip-text">${esc(item.controls)}</span>
+        </div>
+      ` : ''}
+    `;
 
-    return `
-      <div class="detail-layout">
-        ${device === 'desktop' ? `
-          <div>
+    if (device === 'desktop') {
+      const replyPlaceholder = state.replyTo ? `回复 @${state.replyTo}…` : '说点什么…';
+      return `
+        <div class="xhs-pc-wrap">
+          <div class="xhs-pc-backbar">
             <button type="button" class="btn-outline" style="height:32px;font-size:12.5px" data-action="close-detail">
               ${icon('back', 14)} 返回列表
             </button>
-          </div>` : ''}
-        <article class="detail-card">
-          ${item.cover ? `<div class="detail-cover"><img src="${item.cover}" alt="${esc(item.title)}"></div>` : ''}
-          <span class="tag-chip" style="margin-bottom:10px">${esc(item.badge)}</span>
-          <h1 class="detail-title">${esc(item.title)}</h1>
-          <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;font-size:12.5px;color:var(--ink-2)">
-            <span class="mini-avatar" style="background:${item.avatarBg};width:24px;height:24px">${esc(item.author[0].replace('@', '').toUpperCase())}</span>
-            <strong>${esc(item.author)}</strong>
-            <span class="section-meta">${esc(item.date)}</span>
           </div>
-          <div class="detail-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
-          ${item.controls ? `<p class="section-meta" style="margin:14px 0 0;padding:10px 12px;border-radius:8px;background:var(--bg-subtle)">操作说明：${esc(item.controls)}</p>` : ''}
-          <div class="detail-actions">
-            ${item.actionLabel ? `<button type="button" class="btn-solid" data-action="toast" data-msg="演示打开：${esc(item.actionLabel)}">${esc(item.actionLabel)} ${icon('external', 14)}</button>` : ''}
-            <button type="button" class="btn-outline ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="${esc(item.key)}">
-              ${icon('heart', 14)} 点赞 (${likeDelta(item.key, item.likes)})
-            </button>
-            <button type="button" class="btn-outline" data-action="toggle-save" data-key="${esc(item.key)}">
-              ${saved ? '★ 已收藏' : '☆ 收藏'}
-            </button>
-          </div>
-        </article>
-
-        <section class="detail-card" id="detail-comments-${device}">
-          <div class="section-head" style="margin-bottom:10px">
-            <h2 style="font-size:16px">全部评论 (${comments.length})</h2>
-          </div>
-          <form class="comment-form" data-action="submit-comment" data-key="${esc(item.key)}">
-            <input class="comment-input" type="text" placeholder="写下你的想法，回车即可发布…" maxlength="200" required>
-            <button class="btn-solid" type="submit">发送</button>
-          </form>
-          <div style="margin-top:10px">
-            ${comments.map(c => `
-              <div class="comment-item">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12.5px">
-                  <span class="mini-avatar" style="background:${c.avatarBg}">${esc(c.author[0])}</span>
-                  <strong>${esc(c.author)}</strong>
-                  <span class="section-meta">${esc(c.time)}</span>
-                </div>
-                <div style="font-size:13.5px;line-height:1.65;color:var(--ink-1);padding-left:28px">${esc(c.text)}</div>
+          <div class="xhs-pc-card ${activeImg ? '' : 'is-text-only'}">
+            ${activeImg ? `
+              <div class="xhs-pc-media">
+                <img src="${activeImg}" alt="${esc(item.title)}">
+                <span class="xhs-media-pill">${esc(item.badge)}</span>
+                ${gallery.length > 1 ? `
+                  <span class="xhs-media-count">${slideIdx + 1}/${gallery.length}</span>
+                  <button type="button" class="xhs-pc-nav is-prev" aria-label="上一张" data-action="detail-slide-prev">${icon('back', 16)}</button>
+                  <button type="button" class="xhs-pc-nav is-next" aria-label="下一张" data-action="detail-slide-next">${icon('arrow', 16)}</button>
+                  ${dotsHtml(true)}
+                ` : ''}
               </div>
-            `).join('')}
+            ` : ''}
+            <div class="xhs-pc-panel">
+              <div class="xhs-author-bar">
+                <div class="xhs-head-author">
+                  <span class="mini-avatar" style="background:${item.avatarBg};width:34px;height:34px;font-size:13px">${esc(item.author[0].replace('@', '').toUpperCase())}</span>
+                  <strong>${esc(item.author)}</strong>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>
+                  <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
+                </div>
+              </div>
+              <div class="xhs-pc-scroll">
+                <h1 class="xhs-title">${esc(item.title)}</h1>
+                <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
+                <div class="xhs-hashtags">${tagsHtml}</div>
+                ${infoStripsHtml}
+                <div class="xhs-meta-row">
+                  <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
+                  <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
+                </div>
+                <div class="xhs-divider"></div>
+                ${renderDetailComments(item, comments, 'desktop')}
+              </div>
+              <div class="xhs-pc-dock">
+                <div class="xhs-pc-stats">
+                  <button type="button" class="h5-dock-stat ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="${esc(item.key)}">
+                    ${icon('heart', 19)}<span>${likeCount}</span>
+                  </button>
+                  <button type="button" class="h5-dock-stat ${saved ? 'is-saved' : ''}" data-action="toggle-save" data-key="${esc(item.key)}">
+                    ${icon('star', 19)}<span>${saveCount}</span>
+                  </button>
+                  <button type="button" class="h5-dock-stat" data-action="focus-pc-comment">
+                    ${icon('chat', 18)}<span>${comments.length}</span>
+                  </button>
+                </div>
+                <form class="xhs-pc-form" data-action="submit-comment" data-key="${esc(item.key)}">
+                  <label class="xhs-pc-input-wrap">
+                    ${icon('edit', 14)}
+                    <input class="comment-input" type="text" placeholder="${esc(replyPlaceholder)}" maxlength="200" required>
+                  </label>
+                  <button class="xhs-send-btn is-ready" type="submit">发送</button>
+                </form>
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="xhs-h5-detail">
+        ${activeImg ? `
+          <div class="xhs-h5-media" ${gallery.length > 1 ? 'data-action="detail-slide-next"' : ''}>
+            <img src="${activeImg}" alt="${esc(item.title)}">
+          </div>
+          ${dotsHtml(false)}
+        ` : ''}
+        <div class="xhs-h5-body ${gallery.length > 1 ? 'has-dots' : ''}">
+          <h1 class="xhs-title">${esc(item.title)}</h1>
+          <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
+          <div class="xhs-hashtags">${tagsHtml}</div>
+          ${infoStripsHtml}
+          <div class="xhs-meta-row">
+            <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
+            <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
+          </div>
+        </div>
+        <div class="xhs-divider"></div>
+        <div class="xhs-h5-comments" id="detail-comments-mobile">
+          ${renderDetailComments(item, comments, 'mobile')}
+        </div>
       </div>
     `;
   }
@@ -1747,12 +1888,17 @@
 
     let headerHtml = '';
     if (state.detail && detailItem) {
+      const followed = state.followedAuthors.has(detailItem.author);
       headerHtml = `
         <header class="h5-header">
           <div class="h5-detail-head">
-            <button type="button" class="h5-icon-btn" aria-label="返回" data-action="close-detail">${icon('back', 18)}</button>
-            <strong>${esc(detailItem.title)}</strong>
-            <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('external', 16)}</button>
+            <button type="button" class="h5-icon-btn" aria-label="返回" data-action="close-detail">${icon('back', 19)}</button>
+            <div class="xhs-head-author">
+              <span class="mini-avatar" style="background:${detailItem.avatarBg};width:30px;height:30px;font-size:12px">${esc(detailItem.author[0].replace('@', '').toUpperCase())}</span>
+              <strong>${esc(detailItem.author)}</strong>
+            </div>
+            <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>
+            <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('share', 18)}</button>
           </div>
         </header>
       `;
@@ -1794,15 +1940,51 @@
     }
 
     let bottomBarHtml = '';
+    let sheetHtml = '';
     if (state.detail && detailItem) {
       const liked = isLiked(detailItem.key);
+      const saved = state.savedIds.has(detailItem.key);
+      const comments = state.commentsByItem.get(detailItem.key) || INITIAL_COMMENTS;
+      const likeCount = likeDelta(detailItem.key, detailItem.likes);
+      const saveCount = (detailItem.saves || 18) + (saved ? 1 : 0);
       bottomBarHtml = `
         <div class="h5-comment-dock">
-          <button type="button" class="h5-dock-input" data-action="focus-h5-comment">写评论…</button>
-          <button type="button" class="h5-icon-btn ${liked ? 'is-liked' : ''}" style="${liked ? 'color:#e11d48' : ''}" data-action="toggle-like" data-key="${esc(detailItem.key)}">${icon('heart', 18)}</button>
-          <button type="button" class="h5-icon-btn" data-action="toggle-save" data-key="${esc(detailItem.key)}">${state.savedIds.has(detailItem.key) ? '★' : '☆'}</button>
+          <button type="button" class="h5-dock-input" data-action="open-h5-composer">
+            ${icon('edit', 14)}<span>说点什么…</span>
+          </button>
+          <button type="button" class="h5-dock-stat ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="${esc(detailItem.key)}">
+            ${icon('heart', 19)}<span>${likeCount}</span>
+          </button>
+          <button type="button" class="h5-dock-stat ${saved ? 'is-saved' : ''}" data-action="toggle-save" data-key="${esc(detailItem.key)}">
+            ${icon('star', 19)}<span>${saveCount}</span>
+          </button>
+          <button type="button" class="h5-dock-stat" data-action="scroll-h5-comments">
+            ${icon('chat', 18)}<span>${comments.length}</span>
+          </button>
         </div>
       `;
+      if (state.h5ComposerOpen) {
+        const placeholder = state.replyTo ? `回复 @${state.replyTo}…` : '留下你的想法吧';
+        const emojis = ['👍', '❤️', '🔥', '😂', '✨', '🎉', '👏', '🤩'];
+        sheetHtml = `
+          <div class="h5-sheet-backdrop" data-action="close-h5-composer"></div>
+          <form class="h5-composer-sheet" data-action="submit-comment" data-key="${esc(detailItem.key)}">
+            <textarea class="h5-composer-textarea" placeholder="${esc(placeholder)}" maxlength="200" rows="3" required>${esc(state.composerDraft)}</textarea>
+            <div class="h5-composer-bar">
+              <div class="h5-composer-tools">
+                <button type="button" class="h5-tool-icon" aria-label="图片" data-action="toast" data-msg="示例交互：选择配图">${icon('image', 19)}</button>
+                <button type="button" class="h5-tool-icon" aria-label="提及" data-action="insert-emoji" data-emoji="@">${icon('at', 19)}</button>
+                <button type="button" class="h5-tool-icon" aria-label="表情" data-action="insert-emoji" data-emoji="😊">${icon('smile', 19)}</button>
+                <button type="button" class="h5-tool-icon" aria-label="更多" data-action="toast" data-msg="示例交互：附带作品引用">${icon('plus', 19)}</button>
+              </div>
+              <button type="submit" class="h5-send-btn ${state.composerDraft.trim() ? 'is-ready' : ''}">发送</button>
+            </div>
+            <div class="h5-emoji-bar">
+              ${emojis.map(e => `<button type="button" class="h5-emoji-btn" data-action="insert-emoji" data-emoji="${e}">${e}</button>`).join('')}
+            </div>
+          </form>
+        `;
+      }
     } else {
       bottomBarHtml = `
         <nav class="h5-tabbar" aria-label="移动底栏">
@@ -1816,7 +1998,7 @@
     }
 
     return `
-      <div class="app-shell is-framed" data-scheme="vibrant" data-device="mobile" data-theme="${state.theme}" data-accent="${state.accent}">
+      <div class="app-shell is-framed ${state.detail && detailItem ? 'is-detail' : ''}" data-scheme="vibrant" data-device="mobile" data-theme="${state.theme}" data-accent="${state.accent}">
         ${headerHtml}
         <div class="h5-scroll" data-scroll-key="h5">
           <div class="content-wrap">
@@ -1824,6 +2006,7 @@
           </div>
         </div>
         ${bottomBarHtml}
+        ${sheetHtml}
       </div>
     `;
   }
@@ -2074,6 +2257,10 @@
     switch (action) {
       case 'go-page':
         state.detail = null;
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         state.page = btn.getAttribute('data-page');
         render(true);
         break;
@@ -2143,20 +2330,117 @@
         break;
       case 'open-work':
         state.detail = { type: 'work', id: btn.getAttribute('data-id') };
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         render(true);
         break;
       case 'open-topic':
         state.detail = { type: 'topic', id: Number(btn.getAttribute('data-id')) };
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         render(true);
         break;
       case 'open-os':
         state.detail = { type: 'project', id: btn.getAttribute('data-slug') };
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         render(true);
         break;
       case 'close-detail':
         state.detail = null;
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         render(true);
         break;
+      case 'detail-slide':
+        state.detailSlide = Number(btn.getAttribute('data-idx')) || 0;
+        render(false);
+        break;
+      case 'detail-slide-prev':
+      case 'detail-slide-next': {
+        const len = (getDetailModel()?.gallery || []).length;
+        if (len > 1) {
+          const step = action === 'detail-slide-next' ? 1 : len - 1;
+          state.detailSlide = (state.detailSlide + step) % len;
+          render(false);
+        }
+        break;
+      }
+      case 'toggle-follow': {
+        const author = btn.getAttribute('data-author');
+        if (!author) break;
+        if (state.followedAuthors.has(author)) {
+          state.followedAuthors.delete(author);
+          showToast(`已取消关注 ${author}`);
+        } else {
+          state.followedAuthors.add(author);
+          showToast(`已关注 ${author}`);
+        }
+        render(false);
+        break;
+      }
+      case 'toggle-comment-like': {
+        const raw = btn.getAttribute('data-cid');
+        const cid = Number(raw) || raw;
+        if (state.likedCommentIds.has(cid)) state.likedCommentIds.delete(cid);
+        else state.likedCommentIds.add(cid);
+        render(false);
+        break;
+      }
+      case 'open-h5-composer':
+        state.h5ComposerOpen = true;
+        state.replyTo = '';
+        render(false);
+        setTimeout(() => document.querySelector('.h5-composer-textarea')?.focus(), 30);
+        break;
+      case 'close-h5-composer':
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        render(false);
+        break;
+      case 'reply-comment': {
+        const targetAuthor = btn.getAttribute('data-author') || '';
+        const inMobile = Boolean(btn.closest('[data-device="mobile"]'));
+        state.replyTo = targetAuthor;
+        if (inMobile) {
+          state.h5ComposerOpen = true;
+          render(false);
+          setTimeout(() => document.querySelector('.h5-composer-textarea')?.focus(), 30);
+        } else {
+          render(false);
+          setTimeout(() => document.querySelector('[data-device="desktop"] .comment-input')?.focus(), 30);
+        }
+        break;
+      }
+      case 'insert-emoji': {
+        const em = btn.getAttribute('data-emoji') || '';
+        state.composerDraft += em;
+        const ta = document.querySelector('.h5-composer-textarea');
+        if (ta) {
+          ta.value = state.composerDraft;
+          ta.focus();
+          ta.closest('form')?.querySelector('.h5-send-btn')?.classList.toggle('is-ready', Boolean(state.composerDraft.trim()));
+        }
+        break;
+      }
+      case 'scroll-h5-comments': {
+        const el = btn.closest('.app-shell')?.querySelector('#detail-comments-mobile');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        break;
+      }
+      case 'focus-pc-comment': {
+        const input = btn.closest('.app-shell')?.querySelector('.comment-input');
+        input?.focus();
+        break;
+      }
       case 'toggle-like': {
         const key = btn.getAttribute('data-key');
         if (state.likedIds.has(key)) state.likedIds.delete(key);
@@ -2207,17 +2491,13 @@
         renderOverlay();
         showToast(btn.getAttribute('data-msg') || '演示操作');
         break;
-      case 'focus-h5-comment': {
-        const form = btn.closest('.app-shell')?.querySelector('.comment-input');
-        if (form) {
-          form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => form.focus(), 200);
-        }
-        break;
-      }
       case 'search-pick': {
         const [kind, val] = (btn.getAttribute('data-target') || '').split(':');
         state.overlay = null;
+        state.detailSlide = 0;
+        state.h5ComposerOpen = false;
+        state.replyTo = '';
+        state.composerDraft = '';
         if (kind === 'open-work') state.detail = { type: 'work', id: val };
         if (kind === 'open-topic') state.detail = { type: 'topic', id: Number(val) };
         if (kind === 'open-os') state.detail = { type: 'project', id: val };
@@ -2231,13 +2511,17 @@
     const form = event.target.closest('[data-action="submit-comment"]');
     if (!form) return;
     event.preventDefault();
-    const input = form.querySelector('input');
-    const text = input?.value.trim();
-    if (!text) return;
+    const field = form.querySelector('input, textarea');
+    const raw = field?.value.trim();
+    if (!raw) return;
+    const text = state.replyTo ? `回复 @${state.replyTo}：${raw}` : raw;
     const key = form.getAttribute('data-key');
     const list = [...(state.commentsByItem.get(key) || INITIAL_COMMENTS)];
-    list.unshift({ id: Date.now(), author: '阿伴创作者（我）', avatarBg: '#D93A44', time: '刚刚', text });
+    list.unshift({ id: Date.now(), author: '阿伴创作者（我）', avatarBg: '#D93A44', time: '刚刚', region: '社区', likes: 0, text });
     state.commentsByItem.set(key, list);
+    state.h5ComposerOpen = false;
+    state.replyTo = '';
+    state.composerDraft = '';
     render(false);
     showToast('评论已发布');
   });
@@ -2246,6 +2530,9 @@
     if (event.target.id === 'wb-search-field') {
       state.searchQuery = event.target.value;
       renderSearchResults();
+    } else if (event.target.classList?.contains('h5-composer-textarea')) {
+      state.composerDraft = event.target.value;
+      event.target.closest('form')?.querySelector('.h5-send-btn')?.classList.toggle('is-ready', Boolean(state.composerDraft.trim()));
     }
   });
 
