@@ -92,7 +92,7 @@ const authorInitial = computed(() => Array.from(props.card.author?.replace(/^@/,
   .idea-spotlight:hover .cover img { transform: scale(1.03); }
   .idea-card:hover .card-copy h2 { color: var(--brand); }
 }
-@media (max-width: 1023px) {
+@media (width < 960px) {
   .idea-card { border-radius: 12px; }
   .idea-spotlight { border-radius: 14px; }
   .idea-spotlight .cover { height: 184px; }

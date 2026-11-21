@@ -195,7 +195,11 @@ function publishWork() {
   .mobile-tabbar.with-comment-dock { display: none; }
 }
 
-@media (min-width: 1024px) {
+@media (width < 960px) {
+  :global(.detail-layout .mobile-tabbar.with-comment-dock) { display: none; }
+}
+
+@media (width >= 960px) {
   .mobile-tabbar { display: none; }
   .desktop-rail {
     position: fixed;
@@ -247,7 +251,7 @@ function publishWork() {
   .rail-sign-in:hover, .rail-utils > :hover { background: var(--surface-2); color: var(--ink); }
   .rail-bell:hover, .rail-name:hover, .rail-points:hover { color: var(--brand); }
 }
-@media (min-width: 1024px) and (max-height: 760px) {
+@media (width >= 960px) and (max-height: 760px) {
   .desktop-rail { gap: 10px; }
   .rail-link { min-height: 36px; }
   .rail-subtabs a { min-height: 26px; }

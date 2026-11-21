@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/forum'
 import { openSourceBrowse } from '@/api/openSourceBrowse'
 import { findProject, openSourceCatalog } from '@/lib/openSource'
@@ -13,7 +13,8 @@ import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import { useHead } from '@/lib/head'
 import { curatedProjectAbout } from '@/lib/githubProjectAbout'
 import RequestState from '@/components/community/RequestState.vue'
-import CommunityBack from '@/components/community/CommunityBack.vue'
+import DetailLayout from '@/components/community/DetailLayout.vue'
+import { webLink } from '@/components/community/contract'
 import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
 import RepoComments from '@/components/community/RepoComments.vue'
 import DockButton from '@/components/comments/DockButton.vue'
@@ -24,7 +25,7 @@ import OpenSourceProjectCard from '@/components/community/OpenSourceProjectCard.
 import '@/components/community/community.css'
 import '@/components/community/open-source.css'
 import '@/components/community/project-readme.css'
-const route = useRoute()
+const route = useRoute(), router = useRouter()
 const { data: catalog, loading, error, load } = useCommunityResource(async () => {
   const owner = String(route.params.owner), repo = String(route.params.repo)
   const software = findSoftwareProject(`${owner}/${repo}`)
@@ -43,7 +44,7 @@ const { data: catalog, loading, error, load } = useCommunityResource(async () =>
   return { categories: openSourceCatalog.categories, projects: [item], related }
 })
 const { data: readme, loading: readmeLoading, error: readmeError, load: loadReadme } = useCommunityResource(() => fetchProjectReadme(String(route.params.owner), String(route.params.repo)))
-const language = ref<'zh' | 'en'>('zh'), brokenIcon = ref(false), article = ref<HTMLElement | null>(null), copyMessage = ref('')
+const language = ref<'zh' | 'en'>('zh'), article = ref<HTMLElement | null>(null), copyMessage = ref('')
 const project = computed(() => catalog.value?.projects[0])
 const intro = computed(() => project.value && openSourceProjectIntros[project.value.full_name.toLowerCase()])
 const download = computed(() => project.value && softwareDownload(project.value.full_name))
@@ -73,6 +74,10 @@ const sections = computed(() => [
   ...(download.value ? [{ id: 'release-history', label: '历史版本' }] : []),
   ...(catalog.value?.related.length ? [{ id: 'related-projects', label: '相关项目' }] : []),
 ])
+function back() {
+  if (window.history.state?.back) router.back()
+  else void router.push(fromSoftware.value ? '/resources?tab=software' : '/open-source')
+}
 function jumpToSection(event: MouseEvent, id: string) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
@@ -94,7 +99,10 @@ const summary = computed(() => {
 const github = computed(() => card.value?.github_url || `https://github.com/${project.value?.full_name}`)
 const icon = computed(() => project.value?.icon_url || card.value?.icon_source_url
   || (download.value && project.value ? softwareOwnerIcon(project.value.full_name) : undefined))
-watch(icon, () => { brokenIcon.value = false })
+const images = computed(() => {
+  const cover = webLink(project.value?.cover_url)
+  return cover ? [cover] : []
+})
 const stars = computed(() => snapshot.value?.stars ?? card.value?.stars ?? project.value?.stars)
 const updated = computed(() => snapshot.value?.updatedAt || card.value?.code_updated_at || project.value?.last_pushed_at)
 const rendered = computed(() => readme.value ? renderProjectReadme(readme.value[language.value]) : '')
@@ -107,7 +115,7 @@ const date = (value?: string) => {
 }
 const count = (value: number) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 watch(() => [route.params.owner, route.params.repo], () => {
-  language.value = 'zh'; brokenIcon.value = false; copyMessage.value = ''
+  language.value = 'zh'; copyMessage.value = ''
   void load(); void loadReadme()
 }, { immediate: true })
 useHead(() => ({ title: project.value ? `${project.value.name} · 开源精选` : '开源精选', description: summary.value }))
@@ -138,43 +146,36 @@ async function articleClick(event: MouseEvent) {
 }
 </script>
 <template>
-  <main class="community-page readme-page">
-    <nav class="readme-nav"><CommunityBack :fallback="fromSoftware ? '/resources?tab=software' : '/open-source'" :label="fromSoftware ? '开源软件' : '精选'" /><span>开源精选</span><a v-if="project" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="20" /></a></nav>
-    <template v-if="project">
-      <header class="project-hero">
-        <div class="project-hero-row">
-          <div class="readme-project-top">
-            <div class="readme-project-icon">
-              <img v-if="icon && !brokenIcon" :src="icon" alt="" referrerpolicy="no-referrer" @error="brokenIcon = true">
-              <span v-else aria-hidden="true">{{ project.name.slice(0, 1) }}</span>
-            </div>
-            <div>
-              <h1>{{ card?.name || project.name }}</h1>
-              <a :href="github" target="_blank" rel="noopener noreferrer">{{ project.full_name }}<DiscoverGlyph name="external" :size="12" /></a>
-            </div>
-          </div>
-          <div class="project-actions">
-            <button type="button" :aria-pressed="bookmarks.has(project.full_name)" title="收藏保存在当前浏览器" @click="bookmarks.toggle(project.full_name)">
-              <DiscoverGlyph name="star" :size="15" />{{ bookmarks.has(project.full_name) ? '已收藏' : '收藏' }}
-            </button>
-            <a v-if="card?.primary_url && card.primary_url !== github" :href="card.primary_url" target="_blank" rel="noopener noreferrer">
-              {{ card.primary_label || '项目官网' }}<DiscoverGlyph name="external" :size="13" />
-            </a>
-            <a :href="github" target="_blank" rel="noopener noreferrer"><DiscoverGlyph name="github" :size="16" />GitHub</a>
-          </div>
-        </div>
-        <p class="readme-project-summary">{{ summary }}</p>
-        <div class="readme-project-meta">
-          <span v-if="version" :title="snapshot ? '已同步的 GitHub 正式版本' : '收录时的 GitHub 正式版本'"><DiscoverGlyph name="tag" :size="14" />{{ version }}</span>
-          <span v-if="stars != null" :title="`${stars.toLocaleString()} Stars · 采集于 ${date(snapshot?.syncedAt || card?.stars_fetched_at) || '目录采集日'}`"><DiscoverGlyph name="star" :size="15" />{{ count(stars) }} Stars</span>
-          <span v-if="date(updated)"><DiscoverGlyph name="clock" :size="14" />更新于 {{ date(updated) }}</span>
-          <span>{{ category }}</span>
-        </div>
-        <ul v-if="project.tags.length" class="project-tags" aria-label="项目标签">
-          <li v-for="tag in project.tags" :key="tag">{{ tag }}</li>
-        </ul>
-        <p v-if="card?.icon_attribution" class="readme-icon-credit">{{ card.icon_attribution }}</p>
-      </header>
+  <DetailLayout :key="route.path" :ready="!!project" :title="card?.name || project?.name"
+    :author="project?.full_name" :author-image="icon" :images="images" :badge="category"
+    shareable @back="back">
+    <template #state>
+      <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
+      <section v-else class="os-empty"><h1>这个项目尚未收录</h1><RouterLink to="/open-source">返回精选</RouterLink></section>
+    </template>
+    <template v-if="project" #default>
+      <p v-if="summary" class="xhs-prose project-summary">{{ summary }}</p>
+      <div class="xhs-hashtags">
+        <span>#{{ category }}</span><span v-for="tag in project.tags.filter(tag => tag !== category)" :key="tag">#{{ tag }}</span>
+      </div>
+      <a v-if="download" href="#official-download" class="xhs-info-strip" @click="jumpToSection($event, 'official-download')">
+        <span class="xhs-strip-tag"><AppIcon name="download" :size="12" /> 下载</span>
+        <span class="xhs-strip-text">查看官方安装包{{ version ? ' · ' + version : '' }}</span><AppIcon name="arrow" :size="13" />
+      </a>
+      <a :href="github" class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-strip-tag"><DiscoverGlyph name="github" :size="13" /> GitHub</span>
+        <span class="xhs-strip-text">{{ project.full_name }}</span><AppIcon name="arrow" :size="13" />
+      </a>
+      <a v-if="card?.primary_url && card.primary_url !== github" :href="card.primary_url"
+        class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-strip-tag"><AppIcon name="external" :size="13" /> {{ card.primary_label || '项目官网' }}</span>
+        <span class="xhs-strip-text">{{ card.primary_url }}</span><AppIcon name="arrow" :size="13" />
+      </a>
+      <div class="xhs-meta-row project-meta">
+        <time v-if="date(updated)" :datetime="updated">更新于 {{ date(updated) }}</time>
+        <span v-if="stars != null" :title="`${stars.toLocaleString()} Stars · 采集于 ${date(snapshot?.syncedAt || card?.stars_fetched_at) || '目录采集日'}`">{{ count(stars) }} GitHub Stars</span>
+        <span v-if="card?.icon_attribution" class="readme-icon-credit">{{ card.icon_attribution }}</span>
+      </div>
       <div class="project-layout" :class="{ 'with-sidebar': hasSidebar }">
         <div class="project-main">
           <nav class="project-section-nav" aria-label="项目详情章节">
@@ -242,27 +243,27 @@ async function articleClick(event: MouseEvent) {
           </section>
         </aside>
       </div>
-      <RepoComments style="--comments-bleed: 20px" :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!"><template #actions><a class="readme-bar-action" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="24" /></a><DockButton :label="bookmarks.has(project.full_name) ? '取消收藏' : '收藏'" :text="bookmarks.has(project.full_name) ? '已收藏' : '收藏'" :active="bookmarks.has(project.full_name)" @click="bookmarks.toggle(project.full_name)"><AppIcon name="bookmark" :size="24" /></DockButton></template></RepoComments>
       <p v-if="bookmarks.error.value" class="readme-save-error" role="alert">{{ bookmarks.error.value }}</p>
     </template>
-    <RequestState v-else-if="loading || error" :loading="loading" :error="error" @retry="load" />
-    <section v-else class="os-empty"><h1>这个项目尚未收录</h1><RouterLink to="/open-source">返回精选</RouterLink></section>
-  </main>
+    <template v-if="project" #comments>
+      <RepoComments detail :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!">
+        <template #actions>
+          <DockButton detail :class="{ 'is-saved': bookmarks.has(project.full_name) }"
+            :label="bookmarks.has(project.full_name) ? '取消收藏' : '收藏'"
+            :text="bookmarks.has(project.full_name) ? '已收藏' : '收藏'"
+            :active="bookmarks.has(project.full_name)" title="收藏保存在当前浏览器" @click="bookmarks.toggle(project.full_name)">
+            <AppIcon name="star" :size="19" />
+          </DockButton>
+        </template>
+      </RepoComments>
+    </template>
+  </DetailLayout>
 </template>
 
 <style scoped>
-.community-page.readme-page { max-width: 1200px !important; }
-.project-hero { padding: 8px 0 20px; border-bottom: 1px solid var(--line); }
-.project-hero-row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
-.project-hero h1 { margin: 0 0 4px; font-size: clamp(25px, 4vw, 34px); line-height: 1.2; overflow-wrap: anywhere; }
-.project-hero .readme-project-icon { width: 62px; height: 62px; border: 1px solid var(--line); background: var(--surface); }
-.project-hero .readme-project-icon img { width: 48px; height: 48px; }
-.project-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.project-actions > * { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 36px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
-.project-actions button[aria-pressed="true"] { color: var(--brand); }
-.project-hero .readme-project-meta { padding: 11px 14px; border-radius: 10px; background: var(--surface-2); }
-.project-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 12px 0 0; list-style: none; }
-.project-tags li, .project-source { border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px; background: var(--surface-2); color: var(--ink-2); font-size: 12px; }
+.project-summary { margin: 0; }
+.project-meta { justify-content: flex-start; flex-wrap: wrap; }
+.project-source { border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px; background: var(--surface-2); color: var(--ink-2); font-size: 12px; }
 .project-layout { display: grid; gap: 20px; margin-top: 18px; }
 .project-main, .project-sidebar { min-width: 0; }
 .project-main, .project-sidebar { display: grid; align-content: start; gap: 14px; }

@@ -107,5 +107,5 @@ function loaded(event:Event) {
   background: var(--brand-fill);
 }
 .plaza-avatar--wancisou { color: #fff; background: #d9a726; }
-@media (max-width: 1023px) { .plaza-card { border-radius: 12px; } }
+@media (width < 960px) { .plaza-card { border-radius: 12px; } }
 </style>

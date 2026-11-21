@@ -28,7 +28,8 @@ watch([() => route.fullPath, () => session.user?.uid], () => {
   if (session.user) visitDay = day
 })
 const bare = computed(() => route.meta.bare === true)
-const hasOwnHeader = computed(() => ['ai', 'create', 'app-works', 'me', 'idea-work'].includes(String(route.name)))
+const detailLayout = computed(() => ['topic', 'idea-work', 'open-source-project', 'repo-detail', 'pack', 'scheme'].includes(String(route.name)))
+const hasOwnHeader = computed(() => detailLayout.value || ['ai', 'create', 'app-works', 'me'].includes(String(route.name)))
 const hasCommentDock = computed(() => DOCK_PAGES.has(String(route.name)))
 const section = computed(() => sectionOf(route, meta.categories))
 const destinations = ref<Record<Section, string>>({ home: '/', discuss: '/discuss', resources: '/resources' })
@@ -88,14 +89,14 @@ watch(() => session.loggedIn, v => {
 </script>
 <template>
   <RouterView v-if="bare" />
-  <div v-else class="site-layout" :class="{'community-layout':areaOf(route) === 'community','community-root':isCommunityRoot(route)}">
+  <div v-else class="site-layout" :class="{'community-layout':areaOf(route) === 'community','community-root':isCommunityRoot(route),'detail-layout':detailLayout}">
     <a class="skip-link" href="#main-content">跳到正文</a>
     <AppHeader v-show="!hasOwnHeader" :section="section" :community-links="communityLinks" :search-open="searchOpen" @search="openSearch" />
-    <main id="main-content" class="app-main" :class="{ 'idea-work-main': route.name === 'idea-work' }">
+    <main id="main-content" class="app-main">
       <section v-if="route.meta.auth && !protectedReady" class="session-locked"><template v-if="session.loggedIn"><p>正在确认账号信息…</p><button class="btn" @click="session.loadSession()">重新读取</button></template><template v-else><p>登录已过期，重新登录后可以继续。</p><button class="btn btn-primary" @click="session.loginOpen = true">重新登录</button></template></section>
       <RouterView v-slot="{ Component }"><component :is="Component" v-if="!route.meta.auth || viewIdentity !== 'guest'" :key="viewIdentity" v-show="!route.meta.auth || protectedReady" /></RouterView>
     </main>
-    <footer v-if="route.name !== 'ai'" class="app-footer" :class="{'footer-hide-narrow':hasOwnHeader || hasCommentDock || route.name === 'discuss'}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><RouterLink to="/contact">联系我们</RouterLink><RouterLink to="/ai">下载客户端</RouterLink></nav></footer>
+    <footer v-if="route.name !== 'ai' && !detailLayout" class="app-footer" :class="{'footer-hide-narrow':hasOwnHeader || hasCommentDock || route.name === 'discuss'}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><RouterLink to="/contact">联系我们</RouterLink><RouterLink to="/ai">下载客户端</RouterLink></nav></footer>
     <TabBar :section="section" :community-links="communityLinks" :search-open="searchOpen" :comment-dock="hasCommentDock" @search="openSearch" />
     <ModalDialog :open="searchOpen" title="搜索社区内容" :width="540" @close="searchOpen = false">
       <form class="site-search-form" role="search" @submit.prevent="submitSearch">
@@ -112,6 +113,8 @@ watch(() => session.loggedIn, v => {
 <style>
 :root{--mobile-nav-offset:calc(56px + env(safe-area-inset-bottom));--brand-soft:color-mix(in srgb,var(--brand) 8%,var(--surface))}
 body:has(.site-layout) {
+  --community-font: 'PingFang SC', 'HarmonyOS Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+    'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --paper: #f2f5fa;
   --surface: #fff;
   --surface-2: #ebeff7;
@@ -140,21 +143,20 @@ html[data-theme="dark"] body:has(.site-layout) {
   --shadow-card: 0 8px 26px -8px #0007;
 }
 .site-layout {
-  --page-w: 1023px;
+  --page-w: 960px;
   --header-h: 48px;
-  --community-font: 'PingFang SC', 'HarmonyOS Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
-    'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* The phone draft blends navigation with the canvas outside the scroll area. */
   --mobile-nav-surface: color-mix(in srgb, var(--surface) 80%, var(--paper));
   --site-canvas-gradient:
     radial-gradient(64% 38% at 18% 0%, color-mix(in srgb, var(--brand-fill) 10%, transparent), transparent 72%),
     radial-gradient(52% 32% at 88% 4%, color-mix(in srgb, var(--brand-hover) 8%, transparent), transparent 70%);
-  max-width: 1023px;
+  max-width: var(--page-w);
   min-height: 100dvh;
   margin: 0 auto;
   padding-bottom: var(--mobile-nav-offset);
 }
-@media (max-width: 1023px) {
+@media (width < 960px) {
+  html:has(.site-layout) { scrollbar-gutter: stable; }
   body:has(.site-layout) { isolation: isolate; }
   .site-layout.community-root {
     --header-h: 46px;
@@ -189,9 +191,13 @@ html[data-theme="dark"] body:has(.site-layout) {
 .site-search-form .btn { min-height: 44px; border-radius: 999px; }
 .app-footer{max-width:var(--page-w);margin:0 auto;padding:16px 24px 28px;color:var(--ink-3);font-size:12px}.app-footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}.app-footer p{margin:8px 0 0}.app-footer a:hover{color:var(--ink)}
 .skip-link{position:fixed;left:12px;top:-80px;z-index:100;padding:12px 20px;background:var(--surface);border-radius:12px}.skip-link:focus{top:8px}
-@media(max-width:1023px){.app-main{padding:4px 20px 24px}.app-footer{padding:16px 20px 20px}}
-@media(max-width:767px){.footer-hide-narrow{display:none}.app-main{padding:8px 12px 20px}.community-root .app-main{padding-inline:6px}.app-footer{padding:16px 12px 12px}}
-@media (min-width: 1024px) {
+@media (width < 960px) {
+  .app-main { padding: 4px 20px 24px; }
+  .app-footer { padding: 16px 20px 20px; }
+  .footer-hide-narrow { display: none; }
+}
+@media(max-width:767px){.app-main{padding:8px 12px 20px}.community-root .app-main{padding-inline:6px}.app-footer{padding:16px 12px 12px}}
+@media (width >= 960px) {
   .site-layout {
     max-width: none;
     --page-w: 1440px;
@@ -208,6 +214,15 @@ html[data-theme="dark"] body:has(.site-layout) {
   .app-footer p{margin:0}.app-footer nav{gap:16px}
 }
 @media(min-width:1600px){.app-main{padding-left:40px;padding-right:40px}}
-#main-content.idea-work-main { padding: 0; }
+.site-layout.detail-layout .app-main { max-width: 1200px; padding: 22px 28px 48px; }
+@media (width < 960px) {
+  .site-layout.detail-layout {
+    --header-h: calc(49px + env(safe-area-inset-top));
+    --mobile-nav-offset: calc(52px + env(safe-area-inset-bottom));
+    background: var(--surface);
+  }
+  .site-layout.detail-layout::before { display: none; }
+  .site-layout.detail-layout .app-main { padding: 0 0 24px; }
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>

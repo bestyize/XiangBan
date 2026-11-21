@@ -1,5 +1,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 
+export const MOBILE_SITE_QUERY = '(width < 960px)'
+
 /** 与 CSS 的窄屏断点保持一致。 */
 export function useNarrow(query = '(max-width: 767px)') {
   const media = window.matchMedia(query)

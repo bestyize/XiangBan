@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps<{ name: string; src?: string | null; size?: number }>()
+const props = defineProps<{ name: string; src?: string | null; size?: number; initialSize?: number }>()
 
 /** 没有头像时用昵称首字，黑白灰底色跟随当前主题。 */
 const initial = computed(() => Array.from(props.name.trim())[0] ?? '?')
@@ -10,7 +10,7 @@ const initial = computed(() => Array.from(props.name.trim())[0] ?? '?')
 <template>
   <span class="avatar" :style="{ width: `${size ?? 32}px`, height: `${size ?? 32}px` }" aria-hidden="true">
     <img v-if="src" :src="src" alt="" loading="lazy" />
-    <span v-else :style="{ fontSize: `${Math.round((size ?? 32) * 0.46)}px` }">{{ initial }}</span>
+    <span v-else :style="{ fontSize: `${initialSize ?? Math.round((size ?? 32) * 0.46)}px` }">{{ initial }}</span>
   </span>
 </template>
 

@@ -28,14 +28,18 @@ const mobileTool = ref<(typeof mobileTools)[number] | null>(null)
 const showAllGames = computed(() => route.query.kind === 'game')
 const showAllTools = computed(() => route.query.kind === 'app')
 const previewGrid = useTemplateRef<HTMLDivElement>('previewGrid')
-const previewColumns = ref(4)
-const visibleGames = computed(() => showAllGames.value ? games : games.slice(0, previewColumns.value))
-// The two preview grids share the same column layout.
+const previewLimit = ref(4)
+const visibleGames = computed(() => showAllGames.value ? games : games.slice(0, previewLimit.value))
+// Both preview grids use a scrollable row on H5 and a fitted row on desktop.
 watch(previewGrid, (grid, _, onCleanup) => {
   if (!grid) return
   const measure = () => {
-    const columns = getComputedStyle(grid).gridTemplateColumns
-    if (columns !== 'none') previewColumns.value = columns.split(/\s+/).length
+    const { gridAutoFlow, gridTemplateColumns } = getComputedStyle(grid)
+    if (gridAutoFlow === 'column') {
+      previewLimit.value = Infinity
+    } else if (gridTemplateColumns !== 'none') {
+      previewLimit.value = gridTemplateColumns.split(/\s+/).length
+    }
   }
   measure()
   if (typeof ResizeObserver === 'undefined') return
@@ -54,7 +58,7 @@ watch(showAllGames, gamesOnly => { if (!gamesOnly) void tools.load() }, { immedi
 const featuredTools = computed(() => {
   const items = tools.data.value?.items ?? []
   const builtInToolCount = mobileTools.length + 2 // MBTI and dynamic wallpapers
-  const visible = showAllTools.value ? items : items.slice(0, Math.max(0, previewColumns.value - builtInToolCount))
+  const visible = showAllTools.value ? items : items.slice(0, Math.max(0, previewLimit.value - builtInToolCount))
   return visible.map(tool => ({ ...tool, icon: tool.slug === 'wancisou' ? WANCISOU_ICON : webLink(tool.cover_url) }))
 })
 const failedIcons = reactive(new Set<string>())
@@ -97,7 +101,7 @@ function go(page: number) {
       <RouterLink v-if="!showAllGames" class="plaza-more-btn" to="/create?kind=game">全部 <AppIcon name="arrow" :size="13" /></RouterLink>
       <RouterLink v-else class="plaza-more-btn" to="/create">返回广场</RouterLink>
     </header>
-    <div ref="previewGrid" class="plaza-icon-grid">
+    <div ref="previewGrid" class="plaza-icon-grid" :class="{ 'plaza-icon-strip': !showAllGames }">
       <RouterLink v-for="game in visibleGames" :key="game.id"
         class="plaza-icon-item" :aria-label="game.playable ? `试玩${game.name}` : `${game.name}（在手机 App 游玩）`"
         :to="game.playable ? builtinRunLocation(game.id) : '/ai'">
@@ -114,7 +118,7 @@ function go(page: number) {
       <RouterLink v-if="!showAllTools" class="plaza-more-btn" to="/create?kind=app">全部 <AppIcon name="arrow" :size="13" /></RouterLink>
       <RouterLink v-else class="plaza-more-btn" to="/create">返回广场</RouterLink>
     </header>
-    <div class="plaza-icon-grid">
+    <div class="plaza-icon-grid" :class="{ 'plaza-icon-strip': !showAllTools }">
       <RouterLink class="plaza-icon-item" :to="builtinRunLocation(mbti.id)">
         <span class="plaza-app-icon"><img :src="mbti.icon" alt="" decoding="async" /></span>
         <span class="plaza-app-name">{{ mbti.name }}</span>
@@ -250,11 +254,23 @@ function go(page: number) {
 .plaza-packs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .plaza-end { margin: 16px 0 6px; font-size: 12px; color: var(--community-muted); }
 .plaza-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 13px; }
-@media (max-width: 1023px) {
+@media (width < 960px) {
   .plaza-section { margin-bottom: 18px; }
   .plaza-head, .plaza-icon-grid, .plaza-end { padding-inline: 6px; }
-  .plaza-icon-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 10px; }
-  .plaza-app-icon { width: 60px; height: 60px; border-radius: 15px; }
+  .plaza-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(80px, calc((100% - 30px) / 4)), 1fr));
+    gap: 12px 10px;
+  }
+  .plaza-icon-strip {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 80px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .plaza-icon-strip .plaza-icon-item:focus-visible { outline-offset: -2px; }
+  .plaza-app-icon { width: 60px; max-width: 100%; height: auto; aspect-ratio: 1; border-radius: 15px; }
   .plaza-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin-bottom: 8px; padding-bottom: 2px; }
   .filter-pill { height: 26px; padding: 0 7px; font-size: 12px; }
   .plaza-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }

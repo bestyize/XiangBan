@@ -1,26 +1,30 @@
 <script setup lang="ts">
 import AppIcon from '@/components/AppIcon.vue'
 import { compactCount } from '@/lib/format'
-import { useNarrow } from '@/lib/viewport'
+import { MOBILE_SITE_QUERY, useNarrow } from '@/lib/viewport'
 import DockButton from './DockButton.vue'
 
-withDefaults(defineProps<{ count?: number | null; disabled?: boolean; label?: string }>(), { label: '写评论…' })
+const props = withDefaults(defineProps<{ count?: number | null; disabled?: boolean; label?: string; detail?: boolean }>(), { label: '写评论…' })
 defineEmits<{ compose: []; discuss: [] }>()
-const narrow = useNarrow()
+const narrow = useNarrow(props.detail ? MOBILE_SITE_QUERY : undefined)
 </script>
 
 <template>
   <Teleport to="body" :disabled="!narrow">
-    <div class="comment-dock" role="group" aria-label="评论与互动">
-      <button type="button" class="dock-capsule" aria-haspopup="dialog" :disabled="disabled" @click="$emit('compose')">
-        <AppIcon name="message" :size="16" /><span>{{ label }}</span>
+    <div :class="detail ? narrow ? 'h5-comment-dock' : 'xhs-pc-dock' : 'comment-dock'" role="group" aria-label="评论与互动">
+      <slot v-if="detail && !narrow && $slots.compose" name="compose" />
+      <button v-else type="button" :class="detail ? 'h5-dock-input' : 'dock-capsule'" aria-haspopup="dialog" :disabled="disabled" @click="$emit('compose')">
+        <AppIcon :name="detail ? 'edit' : 'message'" :size="detail ? 14 : 16" /><span>{{ label }}</span>
       </button>
-      <slot :narrow="narrow" />
-      <DockButton
-        :label="count == null ? '查看评论' : `查看评论，共 ${count} 条`"
-        :text="count == null ? '评论' : compactCount(count)"
-        @click="$emit('discuss')"
-      ><AppIcon name="message" :size="20" /></DockButton>
+      <div :class="detail && !narrow ? 'xhs-pc-stats' : 'dock-stats'">
+        <slot :narrow="narrow" />
+        <DockButton
+          :detail="detail"
+          :label="count == null ? '查看评论' : `查看评论，共 ${count} 条`"
+          :text="count == null ? '评论' : compactCount(count)"
+          @click="$emit('discuss')"
+        ><AppIcon name="message" :size="detail ? 18 : 20" /></DockButton>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -53,6 +57,7 @@ const narrow = useNarrow()
 .dock-capsule svg { flex: none; }
 .dock-capsule span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dock-capsule:disabled { opacity: 0.65; }
+.dock-stats { display: contents; }
 @media (max-width: 767px) {
   .comment-dock {
     position: fixed;
@@ -66,4 +71,14 @@ const narrow = useNarrow()
     border-radius: 0;
   }
 }
+.h5-comment-dock {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 38;
+  height: calc(52px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  font: 14px/1.5 var(--community-font);
+}
+.h5-dock-input:disabled { opacity: .65; }
+.h5-dock-input span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

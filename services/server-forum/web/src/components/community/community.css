@@ -30,7 +30,7 @@
 .community-page .community-button{font-weight:550}
 .community-page .community-meta{font-variant-numeric:tabular-nums}
 .community-page .community-back{gap:6px;margin:2px 0 8px;padding:0 4px}
-@media (max-width: 1023px) {
+@media (width < 960px) {
   .site-layout.community-root .app-main { padding-top: 0; }
   .site-layout.community-root .page-section-tabs {
     --tab-justify: safe center;

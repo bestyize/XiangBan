@@ -66,7 +66,10 @@ function back() { if (window.history.state?.back) router.back(); else router.pus
 .notification i { position: absolute; top: 9px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand-fill); }
 .community-header .notification i { top: 5px; right: 5px; box-shadow: 0 0 0 1.5px var(--surface); }
 .detail-header { border-bottom: 1px solid var(--line); }
-@media (min-width: 1024px) {
+@media (max-width: 359px) {
+  .community-navigation { gap: 10px; }
+}
+@media (width >= 960px) {
   .site-header { background: var(--surface-glass); backdrop-filter: blur(16px) saturate(150%); }
   .community-header, .header-actions { display: none; }
   .header-inner { padding-inline: 20px; }

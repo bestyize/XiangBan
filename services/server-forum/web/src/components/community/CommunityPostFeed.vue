@@ -189,7 +189,7 @@ function go(value:number) { navigate({page:String(value)}) }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
-@media (min-width: 1024px) {
+@media (width >= 960px) {
   .ideas-spotlight { margin-bottom: 18px; }
   .ideas-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 }

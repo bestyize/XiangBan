@@ -76,6 +76,7 @@ export interface TopicItem {
   last_reply_at: string
   edited_at: string | null
   help: HelpInfo | null
+  images?: string[]
 }
 
 export interface HelpInfo {

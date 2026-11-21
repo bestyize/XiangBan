@@ -1,5 +1,5 @@
 /* Content layout beside the desktop navigation rail. */
-@media (min-width: 1024px) {
+@media (width >= 960px) {
   .site-layout.community-root { --header-h: 0px; }
   .site-layout.community-root .page-section-tabs { display: none; }
   .site-layout.community-layout .app-main { padding: 22px 28px 40px; }
@@ -44,7 +44,7 @@
   .site-layout.community-layout .community-detail .prose { max-width: 72ch; margin-inline: auto; font-size: 16px; line-height: 1.9; }
 }
 
-@media (min-width: 1024px) {
+@media (width >= 960px) {
   @container page (min-width: 840px) {
     .site-layout.community-layout .home-page .recommend-feed { grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
     .site-layout.community-layout .home-page .banner-strip, .site-layout.community-layout .frontier-section { grid-column: 1/-1; }

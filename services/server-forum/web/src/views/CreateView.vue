@@ -105,7 +105,7 @@ function choose(item:Preview) {
 .creation-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px 18px}.creation-card{min-width:0;display:block;padding:0;text-align:left;background:none;border:0;color:var(--ink);border-radius:16px}.creation-cover{aspect-ratio:1.12;overflow:hidden;border-radius:16px;background:var(--surface);transition:transform .18s}.creation-cover img{display:block;width:100%;height:100%;object-fit:contain}.creation-cover.jade-gomoku{background:#211b13}.creation-cover.ink-blade{background:#e7e0cd}.creation-cover.pro-cube{background:#0a1020}.creation-cover.pet{background:var(--surface-2)}.creation-cover.pet img{object-fit:contain;padding:12px}.creation-card:hover .creation-cover{transform:translateY(-2px)}.creation-card h3{font-size:14px;line-height:1.5;font-weight:550;margin:10px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.creation-meta{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--ink-3)}.creation-meta>span:last-child{display:flex;align-items:center;gap:3px}.creation-meta svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.5}
 .works-signin{padding:32px 12px;text-align:center;color:var(--ink-2)}.works-signin p{margin:0 0 12px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-@media(max-width:1023px){.creation-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.creation-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}.creation-tabs a{font-size:18px}.creation-section h2{font-size:16px}.creation-filters{gap:2px}.creation-filters button{padding:0 10px;font-size:13px}.creation-home{padding-top:8px}}
+@media(width < 960px){.creation-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.creation-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}.creation-tabs a{font-size:18px}.creation-section h2{font-size:16px}.creation-filters{gap:2px}.creation-filters button{padding:0 10px;font-size:13px}.creation-home{padding-top:8px}}
 </style>
 
 <style scoped>
@@ -120,10 +120,10 @@ function choose(item:Preview) {
   line-height: 1.5;
 }
 .plaza-masthead h1 { margin: 0; font-size: 16px; font-weight: 700; }
-@media (min-width: 1024px) {
+@media (width >= 960px) {
   .plaza-masthead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
-@media (max-width: 1023px) {
+@media (width < 960px) {
   :global(.site-layout .app-main:has(.creation-home--plaza)) { padding: 0 6px 20px; }
   :global(.site-layout:has(.creation-home--plaza) .app-footer) { display: none; }
   .plaza-masthead {

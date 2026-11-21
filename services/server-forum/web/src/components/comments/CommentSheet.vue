@@ -2,7 +2,7 @@
 import { onBeforeUnmount, ref, watchPostEffect } from 'vue'
 import ToastHost from '@/components/ToastHost.vue'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{ open: boolean; detail?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement | null>(null)
 const inset = ref(0)
@@ -47,6 +47,7 @@ function backdropClick(event: MouseEvent) {
     <dialog
       ref="dialog"
       class="comment-sheet"
+      :class="{ 'h5-composer-sheet': detail }"
       aria-label="评论编辑"
       :style="{ '--ime-inset': inset + 'px', '--visible-height': visibleHeight ? visibleHeight + 'px' : undefined, '--sheet-safe-bottom': inset ? '0px' : undefined }"
       @cancel.prevent="emit('close')"
@@ -93,5 +94,21 @@ function backdropClick(event: MouseEvent) {
     border: 0;
     border-radius: 16px 16px 0 0;
   }
+}
+@media (width < 960px) {
+  .comment-sheet.h5-composer-sheet {
+    --sheet-max-height: min(640px, calc(var(--visible-height, 100dvh) - 12px));
+    position: fixed;
+    inset: auto 0 var(--ime-inset, 0px);
+    margin: 0;
+    width: 100%;
+    border-color: var(--bd);
+    border-width: 1px 0 0;
+    padding: 0;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 30px rgb(0 0 0 / 14%);
+  }
+  .h5-composer-sheet:not([open]) { display: none; }
+  .h5-composer-sheet::backdrop { background: rgba(15, 23, 42, 0.36); }
 }
 </style>

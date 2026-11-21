@@ -9,7 +9,7 @@ import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
 import { api } from '@/api/forum'
 import { useSession } from '@/stores/session'
 
-const props = defineProps<{ post: PostItem; topicId: number; topicAuthor?: string; canReply: boolean; accepted?: boolean; replyToName?: string }>()
+const props = defineProps<{ post: PostItem; topicId: number; topicAuthor?: string; canReply: boolean; accepted?: boolean; replyToName?: string; detail?: boolean }>()
 const emit = defineEmits<{ reply: [post: PostItem]; report: [post: PostItem]; go: [floor: number]; removed: [] }>()
 const session = useSession()
 
@@ -92,6 +92,7 @@ function remove() {
     :like-count="post.like_count"
     :liked="post.liked"
     :busy="busy"
+    :detail="detail"
     @like="like"
     @reply="emit('reply', post)"
   >
@@ -111,7 +112,7 @@ function remove() {
       </div>
     </template>
     <template v-else>
-      <div class="prose post-body" v-html="post.body_html" />
+      <div class="prose" :class="detail ? 'xhs-comment-text' : 'post-body'" v-html="post.body_html" />
       <ReplyWorkCards :items="post.work_refs ?? []" />
       <AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted />
     </template>
@@ -133,13 +134,14 @@ function remove() {
 <style scoped>
 .op { flex: none; padding: 0 6px; border-radius: 4px; background: var(--surface-2); color: var(--ink-3); font-size: 11px; }
 .post-body { margin-top: 4px; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
-.post-body :deep(> :first-child) { margin-top: 0; }
-.post-body :deep(> :last-child) { margin-bottom: 0; }
-.post-body :deep(pre), .post-body :deep(table) { max-width: 100%; overflow: auto; }
-.post-body :deep(table) { display: block; }
+.prose :deep(> :first-child) { margin-top: 0; }
+.prose :deep(> :last-child) { margin-bottom: 0; }
+.prose :deep(pre), .prose :deep(table) { max-width: 100%; overflow: auto; }
+.prose :deep(table) { display: block; }
 .gone, .post-error { margin: 4px 0 0; color: var(--ink-3); font-size: var(--fs-sm); }
 .post-error { color: var(--danger); }
 .floor { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.xhs-comment-row .floor { margin-inline-start: 0; }
 .floor:hover { color: var(--ink); }
 .edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .blocked-row { padding: 12px 0; color: var(--ink-3); font-size: var(--fs-sm); }

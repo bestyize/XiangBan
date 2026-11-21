@@ -188,7 +188,7 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 .discussion-card-like[aria-pressed="true"] svg { fill: currentColor; }
 .discussion-card :is(.discussion-card-author, .discussion-card-category, .discussion-card-tag, .discussion-card-actions > *):hover { color: var(--brand); }
 .discussion-card-error { margin: 4px 0 0; color: var(--danger); font-size: 12px; }
-@media (max-width: 1023px) {
+@media (width < 960px) {
   .discussion-card { padding: 13px 14px; gap: 7px; }
   .discussion-card-title { font-size: 14.5px; }
   .discussion-card-category { padding: 1.5px 6px; font-size: 10px; line-height: 1.35; }

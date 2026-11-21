@@ -14,6 +14,7 @@ const props = defineProps<{
   busy?: boolean
   uploadingExtras?: boolean
   error?: string
+  detail?: boolean
 }>()
 const emit = defineEmits<{ submit: [body: string, imageIds: string[]]; cancelReply: []; close: [] }>()
 
@@ -23,13 +24,15 @@ const emojis = [
   ['🤩', '星星眼'], ['😎', '墨镜'], ['🫡', '敬礼'], ['👏', '鼓掌'], ['🙏', '感谢'], ['💪', '加油'], ['🙈', '捂眼'],
   ['🔥', '火'], ['✨', '闪光'], ['👀', '看看'], ['💡', '灵感'], ['🌿', '绿叶'], ['☕', '咖啡'], ['💯', '满分'],
 ]
+const quickEmojis = ['👍', '❤️', '🔥', '😂', '✨', '🎉', '👏', '🤩']
+  .map(icon => emojis.find(([emoji]) => emoji === icon)!)
 const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const session = useSession()
 const editable = computed(() => session.loggedIn && !props.lockedReason)
 const editor = ref<HTMLTextAreaElement | null>(null)
 const picker = ref<HTMLInputElement | null>(null)
 const loginButton = ref<HTMLButtonElement | null>(null)
-const draft = ref('')
+const draft = defineModel<string>('draft', { default: '' })
 const images = ref<{ id: string; url: string; name: string }[]>([])
 const uploading = ref(false)
 const imageError = ref('')
@@ -76,7 +79,7 @@ function insert(text: string, mention = false) {
   const { selectionStart: start, selectionEnd: end } = el
   const value = mention && /[\p{L}\p{N}_]$/u.test(draft.value.slice(0, start)) ? ' @' : text
   draft.value = draft.value.slice(0, start) + value + draft.value.slice(end)
-  if (mention) focus()
+  if (mention || (props.detail && !panel.value)) focus()
   void nextTick(() => el.setSelectionRange(start + value.length, start + value.length))
 }
 
@@ -90,7 +93,7 @@ function reset() {
   expanded.value = false
 }
 onScopeDispose(() => { ++generation })
-defineExpose({ focus, reset })
+defineExpose({ focus, reset, hasImages: computed(() => images.value.length > 0) })
 
 async function addImages(files: File[]) {
   if (!files.length || disabled.value || !imageLimit.value) return
@@ -152,8 +155,8 @@ function submit() {
 </script>
 
 <template>
-  <div class="composer">
-    <header class="composer-head">
+  <div class="composer" :class="{ 'detail-composer': detail }">
+    <header class="composer-head" :class="{ 'detail-compact-head': detail && editable }">
       <h2>{{ replyTo ? `回复 ${replyTo}` : '写评论' }}</h2>
       <template v-if="editable">
         <button v-if="replyTo" class="cancel-reply" type="button" :disabled="busy" @click="emit('cancelReply')">取消回复</button>
@@ -168,11 +171,12 @@ function submit() {
     <form v-if="editable" @submit.prevent="submit">
       <textarea
         ref="editor"
+        :class="{ 'h5-composer-textarea': detail }"
         v-model="draft"
         autofocus
         aria-label="评论内容"
-        placeholder="说点什么…"
-        :rows="expanded ? 7 : 2"
+        :placeholder="detail ? replyTo ? `回复 @${replyTo}…` : '留下你的想法吧' : '说点什么…'"
+        :rows="expanded ? 7 : detail ? 3 : 2"
         :maxlength="limit * 2"
         :readonly="busy"
         @focus="panel = null"
@@ -190,26 +194,31 @@ function submit() {
       </div>
       <p v-if="imageError || error" class="composer-error" role="alert">{{ imageError || error }}</p>
       <p v-if="expanded || length > limit" class="character-count" :class="{ 'composer-error': length > limit }">{{ length }} / {{ limit }}</p>
-      <div class="toolbar">
-        <button class="tool" type="button" :disabled="busy" :aria-label="panel === 'emoji' ? '切换到键盘' : '打开表情'" :aria-expanded="panel === 'emoji'" @click="togglePanel('emoji')">
-          <AppIcon :name="panel === 'emoji' ? 'keyboard' : 'smile'" />
-        </button>
-        <button v-if="markdown" class="tool" type="button" :disabled="busy" aria-label="插入 @" @click="insert('@', true)">
-          <AppIcon name="at" />
-        </button>
-        <button v-if="imageLimit" class="tool" type="button" :disabled="busy" :aria-label="panel === 'gallery' ? '切换到键盘' : '打开相册'" :aria-expanded="panel === 'gallery'" @click="togglePanel('gallery')">
-          <AppIcon :name="panel === 'gallery' ? 'keyboard' : 'image'" />
-        </button>
-        <button v-if="$slots.more" class="tool" type="button" :disabled="busy" aria-label="更多评论选项" :aria-expanded="panel === 'more'" @click="togglePanel('more')">
-          <AppIcon name="plus" />
-        </button>
-        <button class="publish" type="submit" :disabled="!ready">{{ busy ? '发布中…' : '发布' }}</button>
+      <div :class="detail ? 'h5-composer-bar' : 'toolbar'">
+        <div :class="detail ? 'h5-composer-tools' : 'composer-tools'">
+          <button v-if="imageLimit" :class="detail ? 'h5-tool-icon' : 'tool image-tool'" type="button" :disabled="busy" :aria-label="panel === 'gallery' ? '切换到键盘' : '打开相册'" :aria-expanded="panel === 'gallery'" @click="togglePanel('gallery')">
+            <AppIcon :name="panel === 'gallery' ? 'keyboard' : detail ? 'landscape' : 'image'" :size="detail ? 19 : undefined" />
+          </button>
+          <button v-if="markdown || detail" :class="detail ? 'h5-tool-icon' : 'tool mention-tool'" type="button" :disabled="busy" aria-label="插入 @" @click="insert('@', true)">
+            <AppIcon :name="detail ? 'at-round' : 'at'" :size="detail ? 19 : undefined" />
+          </button>
+          <button :class="detail ? 'h5-tool-icon' : 'tool emoji-tool'" type="button" :disabled="busy" :aria-label="panel === 'emoji' ? '切换到键盘' : '打开表情'" :aria-expanded="panel === 'emoji'" @click="togglePanel('emoji')">
+            <AppIcon :name="panel === 'emoji' ? 'keyboard' : detail ? 'smile-round' : 'smile'" :size="detail ? 19 : undefined" />
+          </button>
+          <button v-if="$slots.more" :class="detail ? 'h5-tool-icon' : 'tool'" type="button" :disabled="busy" aria-label="更多评论选项" :aria-expanded="panel === 'more'" @click="togglePanel('more')">
+            <AppIcon name="plus" :size="detail ? 19 : undefined" />
+          </button>
+        </div>
+        <button :class="detail ? ['h5-send-btn', { 'is-ready': ready }] : 'publish'" type="submit" :disabled="!ready">{{ detail ? busy ? '发送中…' : '发送' : busy ? '发布中…' : '发布' }}</button>
       </div>
       <div v-if="panel === 'emoji'" class="emoji-panel">
         <p>常用表情</p>
         <div class="emojis">
           <button v-for="[emoji, label] in emojis" :key="label" type="button" :disabled="busy" :aria-label="label" @click="insert(emoji)">{{ emoji }}</button>
         </div>
+      </div>
+      <div v-else-if="detail && !panel" class="h5-emoji-bar">
+        <button v-for="[emoji, label] in quickEmojis" :key="label" class="h5-emoji-btn" type="button" :disabled="busy" :aria-label="label" @click="insert(emoji)">{{ emoji }}</button>
       </div>
       <input v-if="imageLimit" ref="picker" type="file" hidden :accept="imageTypes.join(',')" multiple @change="pick">
       <div v-if="panel === 'gallery'" class="gallery-panel">
@@ -321,4 +330,20 @@ button:disabled { cursor: default; }
 .unavailable { display: grid; justify-items: center; padding: 10px 16px; color: var(--ink-3); }
 .unavailable .publish { margin: 0; }
 .unavailable p { margin: 0; }
+.composer-tools { display: contents; }
+.toolbar .emoji-tool { order: -3; }
+.toolbar .mention-tool { order: -2; }
+.toolbar .image-tool { order: -1; }
+.detail-composer { padding: 12px 14px 16px; font-family: var(--community-font); }
+.detail-compact-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.detail-compact-head:focus-within { position: static; width: auto; height: auto; clip-path: none; }
+.detail-composer form { display: grid; gap: 10px; }
+.detail-composer .h5-composer-textarea {
+  border: 0;
+  border-radius: 12px;
+  color: var(--ink-1);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.detail-composer .h5-composer-textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 </style>

@@ -17,41 +17,48 @@ const props = withDefaults(defineProps<{
   busy?: boolean
   canReply?: boolean
   canLike?: boolean
+  detail?: boolean
 }>(), { canReply: true, canLike: true })
 
 const pictures = computed(() => props.images?.filter(commentImageId) ?? [])
+const likeLabel = computed(() => `${props.liked ? '取消赞' : '赞'}这条评论，${props.likeCount} 个赞`)
 defineEmits<{ like: []; reply: []; remove: [] }>()
 </script>
 
 <template>
-  <article class="comment">
+  <article :class="detail ? 'xhs-comment-row' : 'comment'">
     <RouterLink :to="`/u/${author.uid}`" class="avatar-link" :aria-label="`查看 ${author.nickname} 的主页`">
-      <UserAvatar :name="author.nickname" :src="author.avatar_url" :size="32" />
+      <UserAvatar :name="author.nickname" :src="author.avatar_url" :size="32" :initial-size="detail ? 12.5 : undefined" />
     </RouterLink>
-    <div class="content">
-      <div class="byline">
-        <RouterLink class="nickname" :to="`/u/${author.uid}`">{{ author.nickname }}</RouterLink>
+    <div :class="detail ? 'xhs-comment-body' : 'content'">
+      <div :class="detail ? 'xhs-comment-author' : 'byline'">
+        <RouterLink :class="{ nickname: !detail }" :to="`/u/${author.uid}`">{{ author.nickname }}</RouterLink>
         <slot name="byline" />
       </div>
       <div v-if="replyToName || $slots.parent" class="parent">
         <slot name="parent">回复 {{ replyToName }}</slot>
       </div>
       <slot>
-        <p v-if="body" class="body">{{ body }}</p>
+        <p v-if="body" :class="detail ? 'xhs-comment-text' : 'body'">{{ body }}</p>
         <div v-if="pictures.length" class="pictures">
           <a v-for="src in pictures" :key="src" :href="src" target="_blank" rel="noopener noreferrer" aria-label="查看原图">
             <img :src="src" loading="lazy" alt="评论图片">
           </a>
         </div>
       </slot>
-      <div class="meta">
-        <time :datetime="createdAt" :title="formatDateTime(createdAt)">{{ timeAgo(createdAt) }}</time>
-        <button v-if="canReply" type="button" :disabled="busy" @click="$emit('reply')">回复</button>
+      <div :class="detail ? 'xhs-comment-foot' : 'meta'">
+        <time :class="{ 'xhs-comment-meta': detail }" :datetime="createdAt" :title="formatDateTime(createdAt)">{{ timeAgo(createdAt) }}</time>
+        <button v-if="canReply" :class="{ 'xhs-reply-btn': detail }" type="button" :disabled="busy" @click="$emit('reply')">回复</button>
         <button v-if="mine" type="button" :disabled="busy" @click="$emit('remove')">删除</button>
         <slot name="actions" />
+        <button v-if="detail && canLike" type="button" class="xhs-comment-like" :class="{ 'is-liked': liked }"
+          :disabled="busy" :aria-pressed="liked" :aria-label="likeLabel" @click="$emit('like')">
+          <AppIcon name="heart" :size="14" />
+          <span v-if="likeCount">{{ compactCount(likeCount) }}</span>
+        </button>
       </div>
     </div>
-    <button v-if="canLike" type="button" class="like" :class="{ on: liked }" :disabled="busy" :aria-pressed="liked" :aria-label="`${liked ? '取消赞' : '赞'}这条评论，${likeCount} 个赞`" @click="$emit('like')">
+    <button v-if="!detail && canLike" type="button" class="like" :class="{ on: liked }" :disabled="busy" :aria-pressed="liked" :aria-label="likeLabel" @click="$emit('like')">
       <AppIcon name="heart" :size="20" />
       <span v-if="likeCount">{{ compactCount(likeCount) }}</span>
     </button>
@@ -107,4 +114,14 @@ defineEmits<{ like: []; reply: []; remove: [] }>()
 .like.on { color: var(--brand); }
 .like.on :deep(svg) { fill: currentColor; }
 button:disabled { opacity: 0.5; cursor: default; }
+.xhs-comment-row .avatar-link :deep(.avatar) { border: 0; background: var(--brand-fill); color: var(--brand-ink); }
+.xhs-comment-foot { flex-wrap: wrap; }
+.xhs-comment-foot :deep(button:not(.xhs-comment-like)) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: inherit;
+}
+.xhs-comment-foot :deep(button:hover) { color: var(--ink-1); }
 </style>

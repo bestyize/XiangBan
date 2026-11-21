@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import ForumShell from '@/components/ForumShell.vue'
+import DetailLayout from '@/components/community/DetailLayout.vue'
 import PosterDialog from '@/components/PosterDialog.vue'
 import { ApiError } from '@/api/forum'
 import ContentSocialActions from '@/components/ContentSocialActions.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import ClientCreationPrompt from '@/components/creation/ClientCreationPrompt.vue'
 import WorkDiscussion from '@/components/creation/WorkDiscussion.vue'
 import { webLink } from '@/components/community/contract'
@@ -20,7 +19,7 @@ import { useSession } from '@/stores/session'
 import { usePackPublisher } from '@/stores/packPublisher'
 import { useToast } from '@/stores/toast'
 
-const route = useRoute()
+const route = useRoute(), router = useRouter()
 const toast = useToast()
 const session = useSession()
 const publisher = usePackPublisher()
@@ -92,15 +91,10 @@ const usageNote = computed(() => {
   return ''
 })
 const postImage = computed(() => webLink(pack.value?.cover_url))
-const attachmentIcon = computed(() => {
-  switch (pack.value?.kind) {
-    case 'game': return 'keyboard'
-    case 'wallpaper': return 'image'
-    case 'pet': return 'smile'
-    case 'effect': return 'ai'
-    default: return 'grid'
-  }
-})
+function back() {
+  if (window.history.state?.back) router.back()
+  else void router.push('/create')
+}
 
 function closeActions(restoreFocus = false) {
   if (!actionsMenu.value?.open) return
@@ -156,27 +150,19 @@ async function copyLink() {
 </script>
 
 <template>
-  <ForumShell class="topic-shell" :rail="false">
-    <p v-if="missing" class="state">这个内容不存在或已下架。</p>
-    <p v-else-if="loadError" class="state" role="alert">{{ loadError }} <button class="btn" type="button" @click="reload++">重试</button></p>
-    <p v-else-if="!pack" class="state" role="status">正在读取作品…</p>
+  <DetailLayout :key="String(route.params.id)" :ready="!!pack" :title="pack?.title"
+    :author="pack?.author?.nickname || '社区作品'"
+    :author-to="pack?.author ? '/u/' + pack.author.uid : undefined"
+    :images="postImage ? [postImage] : undefined" :badge="pack ? kindLabel(pack.kind) : undefined"
+    shareable @back="back">
+    <template #state>
+      <p v-if="missing" class="state">这个内容不存在或已下架。</p>
+      <p v-else-if="loadError" class="state" role="alert">{{ loadError }} <button class="btn" type="button" @click="reload++">重试</button></p>
+      <p v-else class="state" role="status">正在读取作品…</p>
+    </template>
 
-    <article v-else :key="pack.id" class="topic" aria-labelledby="pack-title">
-      <h1 id="pack-title" class="title">{{ pack.title }}</h1>
-
+    <template v-if="pack" #actions>
       <ContentSocialActions v-slot="social" kind="pack" :id="pack.id" :enabled="pack.status === 'published'">
-        <div class="byline">
-          <RouterLink v-if="pack.author" :to="`/u/${pack.author.uid}`" class="who">
-            <UserAvatar :name="pack.author.nickname || '社区用户'" :size="28" />
-            <span class="name">{{ pack.author.nickname || '社区用户' }}</span>
-          </RouterLink>
-          <span v-else class="who">
-            <UserAvatar name="社区作品" :size="28" />
-            <span class="name">社区作品</span>
-          </span>
-          <time :datetime="pack.created_at" :title="formatDateTime(pack.created_at)">{{ timeAgo(pack.created_at) }}发布</time>
-          <span v-if="pack.kind !== 'game' && pack.kind !== 'app'">{{ trustLabel(pack.trust_level) }}</span>
-
           <div class="post-controls">
             <button v-if="pack.status === 'published'" class="icon-action" type="button"
               :aria-label="social.bookmarked ? '取消收藏' : '收藏'" :aria-pressed="social.bookmarked"
@@ -192,6 +178,7 @@ async function copyLink() {
                   {{ versionsOpen ? '收起版本记录' : '版本记录' }}
                 </button>
                 <button class="action-item" type="button" @click="copyLink">复制链接</button>
+                <a v-if="postImage" class="action-item" :href="postImage" target="_blank" rel="noopener noreferrer">查看作品原图</a>
                 <button class="action-item" type="button" @click="posterOpen = true">生成海报</button>
                 <button class="action-item" type="button" @click="creationOpen = true">在客户端创作或修改</button>
                 <RouterLink v-if="pack.topic_id" class="action-item" :to="`/t/${pack.topic_id}`">查看关联帖子</RouterLink>
@@ -203,55 +190,43 @@ async function copyLink() {
               </div>
             </details>
           </div>
-        </div>
         <p v-if="social.message" class="post-feedback" role="status">{{ social.message }}</p>
         <p v-if="social.error" class="post-feedback work-error" role="alert">{{ social.error }}
           <button class="retry-link" type="button" :disabled="social.busy" @click="social.reload">重试</button>
         </p>
       </ContentSocialActions>
+    </template>
 
-      <div v-if="pack.summary || postImage" class="prose post-body">
-        <p v-if="pack.summary" class="summary">{{ pack.summary }}</p>
-        <a v-if="postImage" class="post-image" :href="postImage" target="_blank" rel="noopener noreferrer"
-          :aria-label="`查看${pack.title}的作品原图`">
-          <img :src="postImage" :alt="`${pack.title}的作品图片`" decoding="async" />
-        </a>
-      </div>
-      <div v-if="pack.tags.length" class="tags">
+    <template v-if="pack" #default>
+      <div v-if="pack.summary" class="xhs-prose summary">{{ pack.summary }}</div>
+      <div v-if="pack.tags.length" class="xhs-hashtags">
         <RouterLink v-for="tag in pack.tags" :key="tag" :to="`/tag/${encodeURIComponent(tag)}`" class="tag">#{{ tagLabel(tag) }}</RouterLink>
       </div>
-
-      <section class="work-card" :aria-label="runLocation ? '试玩卡片' : '作品附件'">
-        <div class="work-card-row">
-          <div class="work-card-info">
-            <span class="work-icon"><AppIcon :name="attachmentIcon" :size="22" /></span>
-            <div>
-              <strong class="work-title">{{ pack.title }}</strong>
-              <p class="work-meta">
-                {{ kindLabel(pack.kind) }}
-                <template v-if="latest"> · {{ latest.label }}</template>
-                <template v-if="latest && !runLocation"> · {{ fmtSize(latest.size) }}</template>
-                <template v-if="pack.pure_data"> · 纯数据</template>
-                <template v-if="pack.apply_count"> · {{ pack.apply_count }} 次使用</template>
-              </p>
-            </div>
-          </div>
-          <RouterLink v-if="runLocation" class="btn btn-primary launch-action" :to="runLocation">
-            <AppIcon name="play" :size="18" />
-            {{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}
-          </RouterLink>
-          <template v-else>
-            <a v-if="clientLink" class="btn btn-primary launch-action desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">
-              <AppIcon name="monitor" :size="18" /> 在小伴中打开
-            </a>
-            <button class="btn btn-primary launch-action" :class="{ 'mobile-only': clientLink }" type="button" :disabled="busy" @click="download">
-              <AppIcon name="download" :size="18" /> {{ busy ? '正在准备…' : '下载 ZIP' }}
-            </button>
-          </template>
-        </div>
-        <p v-if="usageNote" class="work-note">{{ usageNote }}</p>
-      </section>
-
+      <RouterLink v-if="runLocation" class="xhs-info-strip" :to="runLocation">
+        <span class="xhs-strip-tag"><AppIcon name="play" :size="12" /> 体验</span>
+        <span class="xhs-strip-text">{{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}</span><AppIcon name="arrow" :size="13" />
+      </RouterLink>
+      <template v-else>
+        <a v-if="clientLink" class="xhs-info-strip desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">
+          <span class="xhs-strip-tag"><AppIcon name="monitor" :size="12" /> 打开</span>
+          <span class="xhs-strip-text">在小伴中打开</span><AppIcon name="arrow" :size="13" />
+        </a>
+        <button class="xhs-info-strip" :class="{ 'mobile-only': clientLink }" type="button" :disabled="busy" @click="download">
+          <span class="xhs-strip-tag"><AppIcon name="download" :size="12" /> 下载</span>
+          <span class="xhs-strip-text">{{ busy ? '正在准备…' : '下载 ZIP' }}</span><AppIcon name="arrow" :size="13" />
+        </button>
+      </template>
+      <div v-if="usageNote" class="xhs-info-strip is-static pack-note">
+        <span class="xhs-strip-tag is-warm">说明</span><span class="xhs-strip-text">{{ usageNote }}</span>
+      </div>
+      <div class="xhs-meta-row pack-meta">
+        <time :datetime="pack.created_at" :title="formatDateTime(pack.created_at)">{{ timeAgo(pack.created_at) }}发布</time>
+        <span>{{ kindLabel(pack.kind) }}</span>
+        <span v-if="latest">{{ latest.label }}<template v-if="!runLocation"> · {{ fmtSize(latest.size) }}</template></span>
+        <span v-if="pack.kind !== 'game' && pack.kind !== 'app'">{{ trustLabel(pack.trust_level) }}</span>
+        <span v-if="pack.pure_data">纯数据</span>
+        <span v-if="pack.apply_count">{{ pack.apply_count }} 次使用</span>
+      </div>
       <section v-if="latest" v-show="versionsOpen" id="pack-versions" ref="versionsPanel" class="versions" tabindex="-1" aria-labelledby="pack-versions-title">
         <h2 id="pack-versions-title">版本记录</h2>
         <ul>
@@ -265,40 +240,23 @@ async function copyLink() {
         </ul>
       </section>
 
-      <div v-if="pack.status === 'published'" class="work-comments">
-        <WorkDiscussion :id="pack.id" />
-      </div>
-    </article>
-
-    <ClientCreationPrompt v-model:show="creationOpen" :kind="pack ? kindLabel(pack.kind) : undefined" />
-    <PosterDialog :open="posterOpen" :poster="posterInput" :name="pack?.title ?? ''" @close="posterOpen = false" />
-  </ForumShell>
+    </template>
+    <template v-if="pack?.status === 'published'" #comments>
+      <WorkDiscussion :id="pack.id" :linked-topic-id="pack.topic_id" />
+    </template>
+    <template #dialogs>
+      <ClientCreationPrompt v-model:show="creationOpen" :kind="pack ? kindLabel(pack.kind) : undefined" />
+      <PosterDialog :open="posterOpen" :poster="posterInput" :name="pack?.title ?? ''" @close="posterOpen = false" />
+    </template>
+  </DetailLayout>
 </template>
 
-<style scoped src="../styles/forum-post.css"></style>
-
 <style scoped>
-.topic-shell { max-width: 748px; }
-.topic-shell :deep(.center) { padding-block-start: 28px; }
-.topic { max-width: 660px; }
-.title {
-  margin-bottom: 6px;
-  font-size: clamp(24px, 4vw, 34px);
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-.byline {
-  margin-bottom: 18px;
-  color: var(--ink-2);
-}
 .state {
   padding: 48px 12px;
   text-align: center;
   color: var(--ink-2);
 }
-.who { min-width: 0; }
-.who > .name { overflow-wrap: anywhere; }
 .post-controls {
   display: inline-flex;
   align-items: center;
@@ -308,8 +266,8 @@ async function copyLink() {
 .icon-action {
   display: grid;
   place-items: center;
-  inline-size: 42px;
-  block-size: 42px;
+  inline-size: 34px;
+  block-size: 34px;
   padding: 0;
   border: 0;
   border-radius: 8px;
@@ -354,7 +312,7 @@ summary::-webkit-details-marker { display: none; }
 .report-action,
 .work-error { color: var(--danger); }
 .post-feedback {
-  margin: -8px 0 14px;
+  margin: 0;
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
@@ -365,95 +323,10 @@ summary::-webkit-details-marker { display: none; }
   text-decoration: underline;
   text-underline-offset: 0.16em;
 }
-.summary {
-  max-width: 67ch;
-  color: var(--ink-2);
-  line-height: 1.75;
-  text-wrap: pretty;
-  white-space: pre-line;
-}
-.post-image {
-  display: block;
-  border-radius: 10px;
-  cursor: zoom-in;
-}
-.post-image img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(540px, 66dvh);
-  object-fit: contain;
-  border-radius: inherit;
-}
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 10px;
-}
-.tag {
-  color: var(--ink-2);
-  font-size: var(--fs-xs);
-  overflow-wrap: anywhere;
-}
-.tag:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.work-card {
-  margin-top: 18px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.work-card-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-}
-.work-card-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.work-card-info > div { min-width: 0; }
-.work-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  inline-size: 40px;
-  block-size: 40px;
-  border-radius: 9px;
-  background: var(--brand-soft);
-  color: var(--brand);
-}
-.work-title {
-  display: block;
-  font-size: 15px;
-  font-weight: 650;
-}
-.work-title,
-.work-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.work-meta,
-.work-note {
-  margin: 2px 0 0;
-  color: var(--ink-2);
-  font-size: var(--fs-xs);
-}
-.work-meta { font-variant-numeric: tabular-nums; }
-.work-note { margin-top: 10px; }
-.launch-action {
-  min-height: 44px;
-  gap: 6px;
-  padding-inline: 13px;
-  border-color: var(--ink);
-  border-radius: 7px;
-  background: var(--ink);
-  color: var(--surface);
-}
-.launch-action:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--ink) 84%, var(--surface));
-  background: color-mix(in srgb, var(--ink) 84%, var(--surface));
-}
+.summary { white-space: pre-line; }
+.pack-note .xhs-strip-text { white-space: normal; }
+.tag:hover { text-decoration: underline; }
+.pack-meta { justify-content: flex-start; flex-wrap: wrap; }
 .versions {
   margin-top: 16px;
   scroll-margin-top: calc(var(--header-h) + 12px);
@@ -481,13 +354,9 @@ summary::-webkit-details-marker { display: none; }
   margin: 4px 0 0;
   white-space: pre-line;
 }
-.work-comments { margin-top: 24px; }
 .mobile-only { display: none; }
 @media (max-width: 767px) {
-  .topic-shell :deep(.center) { margin-inline: -12px; padding-block-start: 20px; }
-  .icon-action { inline-size: 44px; block-size: 44px; }
-  .launch-action { padding-inline: 10px; }
   .desktop-only { display: none; }
-  .mobile-only { display: inline-flex; }
+  .mobile-only { display: flex; }
 }
 </style>
