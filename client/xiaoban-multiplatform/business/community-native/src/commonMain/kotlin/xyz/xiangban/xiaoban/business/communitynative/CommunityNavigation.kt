@@ -44,8 +44,9 @@ internal fun CommunityNavLabel(
     active: Boolean,
     style: TextStyle,
     activeWeight: FontWeight = FontWeight.Bold,
+    showUnderline: Boolean = true,
 ) {
-    val underline = if (active) Modifier.drawBehind {
+    val underline = if (active && showUnderline) Modifier.drawBehind {
         val thickness = 2.dp.toPx()
         val width = 20.dp.toPx()
         // Draw below the label without including the underline in its measured height.

@@ -160,7 +160,7 @@ fun FloatingNav(current: Tab, onSelect: (Tab) -> Unit, onPublish: () -> Unit, mo
                         verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                     ) {
                         XIcon(slot.icon, tint = if (active) feedInk else feedMuted, size = 19.dp)
-                        CommunityNavLabel(slot.label, active, feedText(10.5, 15.75), FontWeight(650))
+                        CommunityNavLabel(slot.label, active, feedText(10.5, 15.75), FontWeight(650), showUnderline = false)
                     }
                 }
             }
