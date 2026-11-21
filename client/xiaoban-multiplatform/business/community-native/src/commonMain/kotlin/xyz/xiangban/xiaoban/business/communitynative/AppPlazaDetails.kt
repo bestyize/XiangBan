@@ -25,7 +25,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
@@ -73,36 +72,27 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
     var remix by rememberSaveable(pack.id) { mutableStateOf(false) }
     var share by rememberSaveable(pack.id) { mutableStateOf(false) }
     val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
     val orientation = appOrientation(pack)
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconTap(XIcons.ChevronLeft, "返回", back)
-            val author = pack.author
-            Avatar(author?.nickname ?: "作者", 36.dp, showInitial = true)
-            Text(author?.nickname ?: "社区作者", Modifier.weight(1f).padding(horizontal = 8.dp).clickable(enabled = author != null && open != null) { author?.let { open?.invoke(Route.User(it.uid)) } },
-                style = XType.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (author != null) AppAuthorFollow(env, author.uid, open)
-            IconTap(XIcons.Share, "分享作品", { share = true })
+        val author = pack.author
+        DetailAuthorBar(author?.nickname ?: "社区作者", back, onShare = { share = true },
+            onAuthor = if (author != null && open != null) ({ open(Route.User(author.uid)) }) else null) {
+            author?.let { DetailAuthorFollow(env, it.uid, open) }
         }
         WorkInteractionLayout(env, "pack", pack.id, open, { share = true }, enabled = pack.status == "published",
-            onComments = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } }) { comments ->
+            linkedTopicId = pack.topicId) { comments ->
             Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-                // Pack provides a cover, not a screenshot gallery. Preserve horizontal gallery structure for future images.
-                pack.coverUrl?.let { url -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-                    AsyncImage(env.forum.imageUrl(url), "${pack.title}封面", imageLoader = rememberAppImageLoader(), contentScale = ContentScale.Fit,
-                        modifier = Modifier.width(340.dp).aspectRatio(if (orientation == "landscape") 16f / 9f else 1f).clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill))
-                } }
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                    if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.Body)
-                    if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, style = XType.Secondary, color = LocalExtraColors.current.brandInk)
-                    Text(listOfNotNull(pack.updatedAt.take(10).takeIf { it.isNotBlank() }, if (pack.kind == "app") "工具" else "游戏",
-                        when (orientation) { "landscape" -> "横屏"; "portrait" -> "竖屏"; else -> null }, "${pack.applyCount} 人玩过").joinToString(" · "), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                DetailGallery(listOfNotNull(pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), pack.title)
+                DetailBody {
+                    DetailHeading(pack.title)
+                    if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.DetailBody)
+                    DetailTags(pack.tags)
                     if (pack.status == "published") {
-                        GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (orientation == "landscape") "横屏进入" else "进入", appStyle = true)
-                        AppActionButton("做一个我的版本", { remix = true }, Modifier.fillMaxWidth(), icon = XIcons.Pen)
+                        GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (pack.kind == "game") "试玩游戏" else "打开应用", appStyle = true)
+                        DetailInfoStrip("创作", "做一个我的版本", XIcons.Pen, onClick = { remix = true })
                     } else Text("作品暂不可用", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                    DetailMetadata(listOfNotNull(pack.updatedAt.take(10).takeIf { it.isNotBlank() }, if (pack.kind == "app") "工具" else "游戏",
+                        when (orientation) { "landscape" -> "横屏"; "portrait" -> "竖屏"; else -> null }, "${pack.applyCount} 人玩过").joinToString(" · "))
                 }
                 comments()
             }
@@ -110,31 +100,6 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
     }
     OverlayTransition(remix) { panel -> AppRemixSheet(env, chat, pack.title, pack.summary, { remix = false }, open, panel, kind = pack.kind) }
     OverlayTransition(share) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享作品", null, { share = false }, {}, panel) }
-}
-
-@Composable
-private fun AppAuthorFollow(env: CommunityEnv, uid: String, open: ((Route) -> Unit)?) {
-    val session by env.session.state.collectAsState()
-    if (session.accountId == uid) return
-    val loader = rememberLoader(env, "app-author-$uid-${session.accountId}") { env.social.profile(uid) }
-    val state by loader.state.collectAsState()
-    val profile = (state as? Load.Ready)?.value ?: return // unavailable follow state stays hidden
-    val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    Column {
-        AppActionButton(if (profile.following) "已关注" else "关注", {
-            if (!session.loggedIn) { open?.invoke(Route.Login); return@AppActionButton }
-            busy = true
-            scope.launch {
-                try { env.social.follow(uid, !profile.following); loader.reload(); error = null }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = messageOf(e) }
-                finally { busy = false }
-            }
-        }, primary = !profile.following, enabled = !busy && !profile.blocked && (!profile.banned || profile.following), height = 34.dp)
-        error?.let { Text(it, style = XType.Caption, color = Danger) }
-    }
 }
 
 /** A descriptive reference is carried into the existing local creation chat; no source-copy/provenance claims. */

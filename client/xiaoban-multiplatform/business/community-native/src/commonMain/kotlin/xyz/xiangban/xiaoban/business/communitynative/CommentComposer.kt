@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +54,10 @@ private val CommentEmojis = listOf(
     "🔥" to "火", "✨" to "闪光", "👀" to "看看", "💡" to "灵感", "🌿" to "绿叶", "☕" to "咖啡", "💯" to "满分",
 )
 
+private val DetailQuickEmojis = listOf("👍", "❤️", "🔥", "😂", "✨", "🎉", "👏", "🤩").map { emoji ->
+    CommentEmojis.first { it.first == emoji }
+}
+
 /** 计数与服务端 Rust 的 chars().count() 一致，含代理对的表情按一个 Unicode 码点计。 */
 internal fun commentLength(text: String): Int = text.indices.count {
     !(text[it].isLowSurrogate() && it > 0 && text[it - 1].isHighSurrogate())
@@ -85,6 +90,7 @@ internal fun CommentComposer(
     more: (@Composable () -> Unit)? = null,
     loading: @Composable () -> Unit = {},
 ) {
+    val detail = LocalCommunityDetail.current
     val colors = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
     val focus = remember { FocusRequester() }
@@ -118,7 +124,7 @@ internal fun CommentComposer(
     BottomSheet(
         onDismiss = ::dismiss,
         flush = true,
-        cornerRadius = 16.dp,
+        cornerRadius = if (detail) 18.dp else 16.dp,
         onBack = {
             when (panel) {
                 CommentPanel.Emoji, CommentPanel.Gallery, CommentPanel.More -> switch(CommentPanel.Closed)
@@ -145,7 +151,7 @@ internal fun CommentComposer(
 
             Column(
                 Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+                    .padding(start = if (detail) 14.dp else 16.dp, end = if (detail) 14.dp else 16.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (editorReady) {
@@ -155,13 +161,17 @@ internal fun CommentComposer(
                         modifier = Modifier.fillMaxWidth().semantics { contentDescription = "评论内容" }.focusRequester(focus)
                             .onFocusChanged { if (it.isFocused) panel = CommentPanel.Keyboard },
                         readOnly = locked,
-                        textStyle = XType.Body.copy(color = colors.onSurface),
+                        textStyle = (if (detail) XType.CommentDraft else XType.Body).copy(color = colors.onSurface),
                         cursorBrush = SolidColor(Brand),
-                        minLines = if (expanded) 7 else 2,
+                        minLines = if (expanded) 7 else if (detail) 3 else 2,
                         maxLines = if (expanded) 12 else 4,
                         decorationBox = { input ->
-                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(12.dp)) {
-                                if (value.text.isEmpty()) Text("说点什么…", style = XType.Body, color = colors.onSurfaceVariant)
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(if (detail) 12.dp else 8.dp)).background(extra.fill)
+                                .padding(horizontal = 12.dp, vertical = if (detail) 10.dp else 12.dp)) {
+                                if (value.text.isEmpty()) {
+                                    val hint = if (detail) (replyTo?.let { "回复 @$it…" } ?: "留下你的想法吧") else "说点什么…"
+                                    Text(hint, style = if (detail) XType.CommentDraft else XType.Body, color = colors.onSurfaceVariant)
+                                }
                                 input()
                             }
                         },
@@ -192,7 +202,7 @@ internal fun CommentComposer(
                     enabled = !locked,
                     active = emojiOpen,
                 ) { switch(if (emojiOpen) CommentPanel.Keyboard else CommentPanel.Emoji) }
-                if (canMention) CommentTool(XIcons.AtSign, "插入 @", enabled = !locked) {
+                if (canMention || detail) CommentTool(XIcons.AtSign, "插入 @", enabled = !locked) {
                     val start = value.selection.min
                     val needsSpace = value.text.getOrNull(start - 1)?.let { it.isLetterOrDigit() || it == '_' } == true
                     onValueChange(value.insert(if (needsSpace) " @" else "@"))
@@ -215,17 +225,21 @@ internal fun CommentComposer(
                 Spacer(Modifier.weight(1f))
                 val ready = !locked && length <= limit && (length > 0 || hasImages)
                 Box(
-                    Modifier.heightIn(min = 44.dp).clip(CircleShape)
-                        .background(if (ready) extra.brandSoft else extra.fill)
+                    Modifier.heightIn(min = if (detail) 32.dp else 44.dp).clip(CircleShape)
+                        .background(if (ready && detail) Brand else if (ready) extra.brandSoft else extra.fill)
                         .clickable(enabled = ready, role = Role.Button, onClick = onSubmit)
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(busyLabel ?: submitLabel, style = XType.Secondary, fontWeight = FontWeight.SemiBold,
-                        color = if (ready) extra.brandInk else colors.onSurfaceVariant, maxLines = 1)
+                    Text(busyLabel ?: if (detail && submitLabel == "发布") "发送" else submitLabel,
+                        style = XType.Secondary, fontWeight = FontWeight.SemiBold,
+                        color = if (ready && detail) Color.White else if (ready) extra.brandInk else colors.onSurfaceVariant, maxLines = 1)
                 }
             }
             when {
+                detail && panel == CommentPanel.Keyboard -> Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 4.dp)) {
+                    EmojiRow(DetailQuickEmojis, enabled = !locked) { onValueChange(value.insert(it)) }
+                }
                 panel == CommentPanel.Emoji && !imeVisible -> {
                     Hairline()
                     Column(Modifier.fillMaxWidth().background(colors.background).heightIn(max = 184.dp)

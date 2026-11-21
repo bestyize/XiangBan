@@ -61,12 +61,20 @@ object XIcons {
     val Link: ImageVector by lazy { strokeIcon("Link", "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1") }
     val Lock: ImageVector by lazy { strokeIcon("Lock", "M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3") }
     val Menu: ImageVector by lazy { strokeIcon("Menu", "M4 7h16M4 12h16M4 17h10") }
+    val DetailComment: ImageVector by lazy { strokeIcon("DetailComment", "M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.6-4.3A8.5 8.5 0 1 1 21 11.5Z") }
+    val DetailSort: ImageVector by lazy { strokeIcon("DetailSort", "M4 7h16M7 12h10M10 17h4") }
     val Message: ImageVector by lazy { strokeIcon("Message", "M5 6h14a1 1 0 011 1v9a1 1 0 01-1 1h-7l-4 3v-3H5a1 1 0 01-1-1V7a1 1 0 011-1z") }
     val Mic: ImageVector by lazy { strokeIcon("Mic", "M12 3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h-0a3 3 0 0 1 -3 -3v-5a3 3 0 0 1 3 -3zM5 11a7 7 0 0014 0M12 18v3") }
     val MicOff: ImageVector by lazy { strokeIcon("MicOff", "M5 5l14 14M9 9v2a3 3 0 005.1 2.1M15 9.6V6a3 3 0 00-5.9-.8M5 11a7 7 0 0011.5 5.3M19 11a7 7 0 01-.6 2.8M12 18v3") }
     val Monitor: ImageVector by lazy { strokeIcon("Monitor", "M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2zM8 21h8M12 17v4") }
     val More: ImageVector by lazy { strokeIcon("More", "M3.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM17.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
     val MoreVertical: ImageVector by lazy { strokeIcon("MoreVertical", "M10.4 5a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 19a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
+    internal val NavSpark: ImageVector by lazy { strokeIcon("NavSpark", "m12 3 2.2 6.3L20.5 11.5l-6.3 2.2L12 20l-2.2-6.3L3.5 11.5l6.3-2.2Z") }
+    internal val NavGrid: ImageVector by lazy { strokeIcon("NavGrid", "M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4ZM14 14h6v6h-6Z") }
+    internal val NavCompass: ImageVector by lazy { strokeIcon("NavCompass", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM16.2 7.8l-2.1 6.3-6.3 2.1 2.1-6.3Z") }
+    internal val NavUser: ImageVector by lazy { strokeIcon("NavUser", "M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2") }
+    internal val NavSearch: ImageVector by lazy { strokeIcon("NavSearch", "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14ZM16.2 16.2l4.3 4.3") }
+    internal val NavBell: ImageVector by lazy { strokeIcon("NavBell", "M6 17v-6a6 6 0 0 1 12 0v6l2 2H4ZM10 21h4") }
     val NewChat: ImageVector by lazy { strokeIcon("NewChat", "M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2 2 0 013 3L12 15l-4 1 1-4z") }
     val Poll: ImageVector by lazy { strokeIcon("Poll", "M4 20h16M7 16V9M12 16V4M17 16v-5") }
     val Pen: ImageVector by lazy { strokeIcon("Pen", "M4 20l4-1 11-11a2 2 0 00-3-3L5 16l-1 4z") }

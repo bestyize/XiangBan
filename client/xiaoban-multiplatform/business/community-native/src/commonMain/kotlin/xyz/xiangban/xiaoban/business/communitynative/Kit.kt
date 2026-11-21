@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -44,12 +46,8 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -122,37 +120,47 @@ fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable
 private data class NavSlot(val tab: Tab?, val icon: ImageVector, val label: String)
 
 private val NavSlots = listOf(
-    NavSlot(Tab.Ai, XIcons.Message, "小伴AI"),
-    NavSlot(Tab.Games, XIcons.Sparkle, Tab.Games.label),
+    NavSlot(Tab.Ai, XIcons.NavSpark, Tab.Ai.label),
+    NavSlot(Tab.Games, XIcons.NavGrid, Tab.Games.label),
     NavSlot(null, XIcons.Plus, "发布"),
-    NavSlot(Tab.Community, XIcons.Grid, "社区"),
-    NavSlot(Tab.Mine, XIcons.User, "我的"),
+    NavSlot(Tab.Community, XIcons.NavCompass, Tab.Community.label),
+    NavSlot(Tab.Mine, XIcons.NavUser, Tab.Mine.label),
 )
 
-/** 底部导航：通栏白底、顶部细线，每项上图标下文字，位置固定；当前项深色加粗，其余浅灰。中间的“发布”是唯一的品牌色小方块，打开发布弹层。 */
+/** 应用一级页面共用的五格底栏。 */
 @Composable
-fun FloatingNav(current: Tab, publishOpen: Boolean, onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
-    val extra = LocalExtraColors.current
-    Row(
-        modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
-            .drawBehind { drawLine(extra.hairline, Offset.Zero, Offset(size.width, 0f), 0.5.dp.toPx()) }
-            .navigationBarsPadding().height(56.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        NavSlots.forEach { slot ->
-            val target = slot.tab
-            val click: () -> Unit = if (target == null) onPublish else ({ onSelect(target) })
-            Box(Modifier.weight(1f).fillMaxHeight().clickable(indication = null, interactionSource = null, role = Role.Tab, onClick = click), contentAlignment = Alignment.Center) {
+fun FloatingNav(current: Tab, onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().background(communityBarSurface).navigationBarsPadding()) {
+        Hairline()
+        Row(Modifier.fillMaxWidth().height(55.dp).padding(horizontal = 4.dp).selectableGroup(),
+            verticalAlignment = Alignment.CenterVertically) {
+            NavSlots.forEach { slot ->
+                val target = slot.tab
                 if (target == null) {
-                    Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(10.dp)).background(Brand), contentAlignment = Alignment.Center) {
-                        XIcon(slot.icon, tint = Color.White, size = 20.dp, description = slot.label)
+                    Box(Modifier.weight(1f).height(48.dp).clickable(
+                        indication = null, interactionSource = null, role = Role.Button, onClick = onPublish,
+                    ), contentAlignment = Alignment.Center) {
+                        val shape = RoundedCornerShape(14.dp)
+                        val brand = Brand
+                        val shadow = brand.copy(alpha = .55f)
+                        Box(
+                            Modifier.size(46.dp, 34.dp).shadow(6.dp, shape, clip = false, ambientColor = shadow, spotColor = shadow)
+                                .background(Brush.linearGradient(listOf(brand, Color(ThemeState.palette.hi))), shape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            XIcon(slot.icon, tint = Color.White, size = 19.dp, description = slot.label)
+                        }
                     }
                 } else {
-                    val selected = !publishOpen && target == current
-                    val tint = if (selected) MaterialTheme.colorScheme.onSurface else extra.ink3
-                    Column(Modifier.semantics { this.selected = selected }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        XIcon(slot.icon, tint = tint, size = 23.dp)
-                        Text(slot.label, color = tint, style = XType.Nav, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+                    val active = target == current
+                    Column(
+                        Modifier.weight(1f).height(48.dp)
+                            .selectable(active, interactionSource = null, indication = null, role = Role.Tab) { onSelect(target) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+                    ) {
+                        XIcon(slot.icon, tint = if (active) feedInk else feedMuted, size = 19.dp)
+                        CommunityNavLabel(slot.label, active, feedText(10.5, 15.75), FontWeight(650))
                     }
                 }
             }

@@ -20,15 +20,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.TextButton
@@ -50,15 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
@@ -100,6 +93,8 @@ internal fun TopicFeed(
     pinnedBar: Boolean = false,
     header: (@Composable () -> Unit)? = null,
     initialSort: String = "latest",
+    contentPadding: PaddingValues = FeedPadding,
+    spacing: Dp = Gap,
     card: @Composable (Topic) -> Unit,
 ) {
     val state by controller.state.collectAsState()
@@ -107,7 +102,7 @@ internal fun TopicFeed(
     val pinned = if (pinnedBar) state.topics.firstOrNull { it.pinned } else null
     val rows = if (pinned != null) state.topics.filter { it.id != pinned.id } else state.topics
     PullToRefreshBox(isRefreshing = state.loading && state.topics.isNotEmpty(), onRefresh = controller::refresh, modifier = modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(spacing)) {
             if (header != null) item { header() }
             if (pinned != null) item { PinnedBar(pinned) { open(Route.Topic(pinned.id)) } }
             when {
@@ -264,25 +259,6 @@ internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
 }
 
 private const val ActiveDiscussionTag = "active-tag"
-private val DiscussionGutter = 16.dp
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun BoardNoteFeed(env: CommunityEnv, category: String, open: (Route) -> Unit) {
-    val session by env.session.state.collectAsState()
-    var page by rememberSaveable(category) { mutableIntStateOf(1) }
-    val loader = rememberLoader(env, Triple(category, page, session.accountId)) {
-        env.forum.topics(sort = "new", category = category, page = page, home = false, activeOnly = true)
-    }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { result ->
-            NoteFeed(env, result.items, open, showCategory = true) {
-                if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -353,15 +329,16 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            DiscussionTopics(topics, selected, ::selectTopic)
+            CommunityTabRow(topics, selected, onSelect = ::selectTopic)
+            Hairline()
             PullToRefreshBox(
                 isRefreshing = state is Load.Loading, onRefresh = ::refresh, modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
                 LoadBox(state, ::refresh) { result ->
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 24.dp + NavInset),
-                        verticalArrangement = Arrangement.spacedBy(Gap),
+                        contentPadding = CommunityFeedPadding,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         if (result.items.isEmpty()) item {
                             DiscussionEmpty(
@@ -396,67 +373,6 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
             }
         }
         Toast(toast) { toast = null }
-    }
-}
-
-@Composable
-private fun DiscussionTopics(topics: List<Pair<String, String>>, selected: String, select: (String) -> Unit) {
-    val surface = MaterialTheme.colorScheme.surface
-    val extra = LocalExtraColors.current
-    val scroll = rememberLazyListState()
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    LaunchedEffect(selected, topics) {
-        val index = topics.indexOfFirst { it.first == selected }
-        val layout = scroll.layoutInfo
-        val fullyVisible = layout.visibleItemsInfo.any {
-            it.key == selected && it.offset >= 0 && it.offset + it.size <= layout.viewportEndOffset - layout.afterContentPadding
-        }
-        if (index >= 0 && !fullyVisible) scroll.animateScrollToItem(index)
-    }
-
-    Column(Modifier.fillMaxWidth().background(surface)) {
-        Box {
-            LazyRow(
-                Modifier.fillMaxWidth().selectableGroup(),
-                state = scroll,
-                contentPadding = PaddingValues(horizontal = DiscussionGutter),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(topics, key = { it.first }) { (key, label) ->
-                    val active = key == selected
-                    Box(
-                        Modifier.heightIn(min = 44.dp).clip(CircleShape)
-                            .selectable(active, role = Role.Tab, onClick = { select(key) }),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            label,
-                            Modifier.widthIn(max = 180.dp)
-                                .background(if (active) extra.brandSoft else Color.Transparent, CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 5.dp),
-                            style = XType.Secondary,
-                            color = if (active) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            val clear = surface.copy(alpha = 0f)
-            Box(Modifier.matchParentSize()) {
-                if (scroll.canScrollBackward) Box(
-                    Modifier.align(Alignment.CenterStart).width(22.dp).fillMaxHeight()
-                        .background(Brush.horizontalGradient(if (rtl) listOf(clear, surface) else listOf(surface, clear))),
-                )
-                if (scroll.canScrollForward) Box(
-                    Modifier.align(Alignment.CenterEnd).width(22.dp).fillMaxHeight()
-                        .background(Brush.horizontalGradient(if (rtl) listOf(surface, clear) else listOf(clear, surface))),
-                )
-            }
-        }
-        Hairline()
     }
 }
 

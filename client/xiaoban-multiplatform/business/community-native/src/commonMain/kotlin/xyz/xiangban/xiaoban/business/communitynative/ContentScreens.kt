@@ -184,9 +184,9 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
 
 // ───────────── 详情页 ─────────────
 
-/** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底栏与帖子一样提供评论、点赞、收藏和分享。 */
+/** 社区作品详情，应用、游戏和能力作品沿用各自的内容与操作。 */
 @Composable
-fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null, chat: xyz.xiangban.xiaoban.common.community.CloudChatController? = null) {
+fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null, chat: xyz.xiangban.xiaoban.common.community.CloudChatController? = null) = CommunityDetail {
     val loader = rememberLoader(env, "pack-detail-$id") { env.forum.pack(id, recordView = true) }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
@@ -201,41 +201,37 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                 CapabilityDetailContent(env, pack, back, open = open)
                 return@LoadBox
             }
-            WorkInteractionLayout(env, "pack", pack.id, open, { share = true }, enabled = pack.status == "published") { comments ->
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                    Box(Modifier.fillMaxWidth().height(232.dp)) {
-                        Cover(pack.coverUrl, pack.id, Modifier.fillMaxSize(), contentScale = if (pack.kind == "game" || pack.kind == "widget") androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
-                        CircleOverlayButton(XIcons.ChevronLeft, "返回", back, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 12.dp))
-                        CircleOverlayButton(XIcons.Share, "分享", { share = true }, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 12.dp, top = 12.dp))
-                    }
-                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
-                        Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(kindLabel(pack.kind), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                            if (pack.pureData) Text("纯数据", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                            if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                        }
-                        Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Avatar(pack.author?.nickname ?: "?", 36.dp, showInitial = true)
-                            Column(Modifier.weight(1f)) {
-                                Text(pack.author?.nickname ?: "社区作品", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.fillMaxSize()) {
+                val author = pack.author
+                DetailAuthorBar(author?.nickname ?: "社区作品", back, onShare = { share = true },
+                    onAuthor = if (author != null && open != null) ({ open(Route.User(author.uid)) }) else null) {
+                    author?.let { DetailAuthorFollow(env, it.uid, open) }
+                }
+                WorkInteractionLayout(env, "pack", pack.id, open, { share = true }, enabled = pack.status == "published",
+                    linkedTopicId = pack.topicId) { comments ->
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        DetailGallery(listOfNotNull(pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), pack.title)
+                        DetailBody {
+                            DetailHeading(pack.title)
+                            if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.DetailBody)
+                            DetailTags(pack.tags)
+                            if (pack.kind in setOf("game", "app") && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
+                            DetailMetadata(listOfNotNull(kindLabel(pack.kind), "v${pack.version}",
+                                pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let(::formatSize),
+                                pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { "更新于 $it" },
+                                "纯数据".takeIf { pack.pureData }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "))
+                            if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
+                            val changes = pack.versions.filter { it.changelog.isNotBlank() }
+                            if (changes.isNotEmpty()) {
+                                Text("更新记录", Modifier.padding(top = 24.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                                changes.sortedByDescending { it.version }.forEach { v ->
+                                    Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), style = XType.Body, fontWeight = FontWeight.Medium)
+                                    Text(v.changelog, Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
-                        if (pack.kind in setOf("game", "app") && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
-                        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), style = XType.Body)
-                        if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
-                        val changes = pack.versions.filter { it.changelog.isNotBlank() }
-                        if (changes.isNotEmpty()) {
-                            Text("更新记录", Modifier.padding(top = 24.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
-                            changes.sortedByDescending { it.version }.forEach { v ->
-                                Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), style = XType.Body, fontWeight = FontWeight.Medium)
-                                Text(v.changelog, Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+                        comments()
                     }
-                    comments()
                 }
             }
             OverlayTransition(share) { panel ->
@@ -272,7 +268,7 @@ internal fun CommentsSection(
     topicId: Long,
     reloadKey: Int,
     open: ((Route) -> Unit)?,
-    onReply: ((Post) -> Unit)?,
+    onReply: ((Post?) -> Unit)?,
     onEdit: (Post) -> Unit,
     help: HelpAnswers? = null,
     topicForEditing: Topic? = null,
@@ -280,15 +276,17 @@ internal fun CommentsSection(
 ) {
     val session by env.session.state.collectAsState()
     val scope = rememberCoroutineScope()
+    val detail = LocalCommunityDetail.current
+    var newestFirst by remember(topicId, session.accountId, detail) { mutableStateOf(detail) }
     var editTopic by remember(topicId, reloadKey, session.accountId) { mutableStateOf(topicForEditing) }
-    var posts by remember(topicId, reloadKey, session.accountId) { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember(topicId, reloadKey, session.accountId) { mutableStateOf(0) }
-    var total by remember(topicId, reloadKey, session.accountId) { mutableStateOf<Int?>(null) }
-    var more by remember(topicId, reloadKey, session.accountId) { mutableStateOf(true) }
-    var error by remember(topicId, reloadKey, session.accountId) { mutableStateOf<String?>(null) }
-    var loading by remember(topicId, reloadKey, session.accountId) { mutableStateOf(true) }
+    var posts by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<List<Post>>(emptyList()) }
+    var page by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf(0) }
+    var total by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<Int?>(null) }
+    var more by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf(true) }
+    var error by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<String?>(null) }
+    var loading by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf(true) }
     var pageJob by remember { mutableStateOf<Job?>(null) }
-    DisposableEffect(topicId, reloadKey, session.accountId) {
+    DisposableEffect(topicId, reloadKey, session.accountId, newestFirst) {
         onDispose { pageJob?.cancel() }
     }
 
@@ -296,11 +294,16 @@ internal fun CommentsSection(
         loading = true
         error = null
         try {
-            val next = env.forum.posts(topicId, page + 1)
-            posts = (posts + next.items).distinctBy { it.id }
+            val requested = if (page == 0) 1 else if (newestFirst) page - 1 else page + 1
+            val first = env.forum.posts(topicId, requested)
+            val next = if (page == 0 && newestFirst && first.hasMore) {
+                env.forum.posts(topicId, (first.total - 1) / first.pageSize + 1)
+            } else first
+            val ordered = if (newestFirst) next.items.asReversed() else next.items
+            posts = (posts + ordered).distinctBy { it.id }
             page = next.page
             total = next.total
-            more = next.hasMore
+            more = if (newestFirst) next.page > 1 else next.hasMore
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -309,7 +312,7 @@ internal fun CommentsSection(
             loading = false
         }
     }
-    LaunchedEffect(topicId, reloadKey, session.accountId) { load() }
+    LaunchedEffect(topicId, reloadKey, session.accountId, newestFirst) { load() }
 
     LaunchedEffect(topicId, session.accountId, posts.any { it.mine }, topicForEditing) {
         editTopic = topicForEditing ?: if (session.loggedIn && posts.any { it.mine }) {
@@ -319,8 +322,11 @@ internal fun CommentsSection(
         } else null
     }
     val authors = remember(posts) { posts.associateBy { it.floor } }
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)) {
-        CommentSectionTitle(total, anchor, label = if (help != null) "回答" else "评论")
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = if (detail) 4.dp else 24.dp, bottom = 16.dp)) {
+        if (detail) Hairline()
+        CommentSectionTitle(total, if (detail) anchor.padding(top = 6.dp) else anchor, label = if (help != null) "回答" else "评论",
+            newestFirst = newestFirst, onSort = if (detail && total != null && !loading) ({ newestFirst = !newestFirst }) else null)
+        if (detail && onReply != null) DetailCommentPrompt(env) { onReply(null) }
         posts.forEach { post ->
             key(post.id) {
                 val parent = post.replyToFloor?.let { floor ->
@@ -374,7 +380,8 @@ private fun PostItem(
             Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", style = XType.Secondary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            RichBody(env, post.bodyHtml, fontSize = XType.Body.fontSize, lineHeight = XType.Body.lineHeight)
+            val bodyStyle = if (LocalCommunityDetail.current) XType.DetailComment else XType.Body
+            RichBody(env, post.bodyHtml, fontSize = bodyStyle.fontSize, lineHeight = bodyStyle.lineHeight)
             ReplyContentCards(env, post.workRefs, open)
             LinkedGameCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
             ForumAttachments(env, post.attachments, open)
@@ -390,7 +397,7 @@ private fun PostItem(
 
 /** 帖子详情：标题、作者、正文，下面是回复；底栏可以点赞、收藏、写回复（需要登录）。 */
 @Composable
-fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit, showComments: Boolean = false) {
+fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit, showComments: Boolean = false) = CommunityDetail {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val loader = rememberLoader(env, listOf(id, session.accountId)) { env.forum.topic(id) }
@@ -425,39 +432,33 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
     }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            ScreenBar("帖子", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { share = true }) })
+            if (state !is xyz.xiangban.xiaoban.common.community.Load.Ready<*>) ScreenBar("帖子", onBack = back)
             LoadBox(state, loader::reload) { topic ->
-                var liked by remember(topic.id) { mutableStateOf(topic.viewer?.liked == true) }
-                var bookmarked by remember(topic.id) { mutableStateOf(topic.viewer?.bookmarked == true) }
-                var likeCount by remember(topic.id) { mutableStateOf(topic.likeCount) }
+                val images = remember(topic.images) { topic.images.filter(String::isNotBlank).map(env.forum::imageUrl).distinct() }
+                DetailAuthorBar(topic.author.nickname, back, onShare = { share = true },
+                    onAuthor = { open(Route.User(topic.author.uid)) }, avatar = { TopicAuthorAvatar(env, topic.author, 30.dp) }) {
+                    DetailAuthorFollow(env, topic.author.uid, open)
+                }
+                var liked by remember(topic.id, session.accountId, topic.viewer?.liked) { mutableStateOf(topic.viewer?.liked == true) }
+                var bookmarked by remember(topic.id, session.accountId, topic.viewer?.bookmarked) { mutableStateOf(topic.viewer?.bookmarked == true) }
+                var likeCount by remember(topic.id, session.accountId, topic.likeCount) { mutableStateOf(topic.likeCount) }
                 fun guarded(block: suspend () -> Unit) {
                     if (!session.loggedIn) { open(Route.Login); return }
                     scope.launch { try { block() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { toast = messageOf(e) } }
                 }
                 Column(Modifier.fillMaxSize()) {
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (topic.pinned) Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
-                                if (topic.help != null) {
-                                    Text("求助", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Brand)
-                                    HelpStatusTag(topic.help!!)
-                                    Text(helpRemain(topic.help!!), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                } else {
-                                    LinkText(topic.category.name, { open(Route.Articles(topic.category.slug, topic.category.name)) })
-                                }
-                            }
-                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = 10.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                TopicAuthorAvatar(env, topic.author, 32.dp)
-                                Column {
-                                    Text(topic.author.nickname, Modifier.clickable { open(Route.User(topic.author.uid)) }, style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                    val level = listOf("新人", "成员", "老用户", "守护者").getOrNull(topic.author.trustLevel)
-                                    Text(listOfNotNull(level, "${agoText(topic.createdAt)}发布", "${topic.viewCount} 次浏览",
-                                        topic.editedAt?.let { "编辑于 ${agoText(it)}" },
-                                        "已锁定".takeIf { topic.locked == true },
-                                        "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 },
-                                    ).joinToString(" · "), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        DetailGallery(images, topic.title)
+                        DetailBody(hasDots = images.size > 1) {
+                            DetailHeading(topic.title)
+                            if (topic.pinned || topic.help != null) {
+                                Row(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    if (topic.pinned) Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
+                                    topic.help?.let { help ->
+                                        HelpStatusTag(help)
+                                        Text(helpRemain(help), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                                    }
                                 }
                             }
                             if (topic.help?.status == "open" && topic.author.uid == session.accountId) {
@@ -485,12 +486,17 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     TextButton(enabled = !closingHelp, onClick = { confirmClose = false }) { Text("取消") }
                                 },
                             )
-                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                            RichBody(env, topic.bodyHtml, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
+                                galleryImages = images, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             LinkedGameCards(env, topic.bodyHtml, open)
                             ForumAttachments(env, topic.attachments, open)
-                            Box(Modifier.padding(top = 10.dp)) { NativeReportAction(env, "topic", topic.id, open) }
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
+                            DetailTags(listOf(topic.category.name) + topic.tags) { open(Route.Articles(topic.category.slug, topic.category.name)) }
+                            val stamp = topic.editedAt?.let { "编辑于 ${agoText(it)}" } ?: "发布于 ${agoText(topic.createdAt)}"
+                            DetailMetadata(listOfNotNull(stamp, "${topic.viewCount} 次浏览", "已锁定".takeIf { topic.locked == true },
+                                "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 }).joinToString(" · "))
+                            NativeReportAction(env, "topic", topic.id, open)
                         }
                         val help = topic.help
                         val answers = help?.let {
@@ -501,7 +507,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             )
                         }
                         val anchor = Modifier.bringIntoViewRequester(commentAnchor).onGloballyPositioned { commentsPlaced = true }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                        Column(Modifier.fillMaxWidth()) {
                             CommentsSection(
                                 env, id, reloadKey, open,
                                 onReply = ::beginReply.takeIf { topic.locked != true && topic.viewer?.canReply != false },
@@ -512,28 +518,29 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                     CommentBar(
                         when {
                             topic.locked == true -> "评论已关闭"
-                            !session.loggedIn -> "登录后评论"
-                            topic.viewer?.canReply == false -> "暂不能评论"
+                            topic.viewer?.canReply == false && session.loggedIn -> "暂不能评论"
                             topic.help != null -> "写回答…"
-                            else -> "写评论…"
+                            else -> "说点什么…"
                         },
                         onWrite = { beginReply() },
                         enabled = topic.locked != true && topic.viewer?.canReply != false,
                     ) {
-                        Row(Modifier.clip(CircleShape).clickable {
+                        DetailDockAction(XIcons.Heart, compactCount(likeCount), if (liked) "取消点赞" else "点赞", onClick = {
                             guarded {
-                                val next = !liked
-                                val result = env.forum.setTopicLiked(topic.id, next)
-                                liked = result.liked; likeCount = result.likeCount
+                                val result = env.forum.setTopicLiked(topic.id, !liked)
+                                liked = result.liked
+                                likeCount = result.likeCount
                             }
-                        }.heightIn(min = 44.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, size = 20.dp,
-                                description = if (liked) "取消点赞" else "点赞")
-                            Text(compactCount(likeCount), style = XType.Secondary, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
-                            guarded { val next = !bookmarked; env.forum.setTopicBookmarked(topic.id, next); bookmarked = next; toast = if (next) "已收藏" else "已取消收藏" }
-                        }, tint = if (bookmarked) Brand else MaterialTheme.colorScheme.onSurface)
+                        }, tint = if (liked) Color(0xFFE11D48) else MaterialTheme.colorScheme.onSurface)
+                        DetailDockAction(XIcons.Star, if (bookmarked) "已收藏" else "收藏",
+                            if (bookmarked) "取消收藏" else "收藏", onClick = {
+                                guarded {
+                                    val next = !bookmarked
+                                    env.forum.setTopicBookmarked(topic.id, next)
+                                    bookmarked = next
+                                    toast = if (next) "已收藏" else "已取消收藏"
+                                }
+                            }, tint = if (bookmarked) Amber else MaterialTheme.colorScheme.onSurface)
                         CommentCountAction(commentCount ?: topic.replyCount) { jumpToComments = true }
                     }
                 }

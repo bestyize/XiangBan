@@ -30,7 +30,8 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
         }
         CommunityWorkLaunch(env, id, version) { loading, busy, error, launchGame ->
             val buttonLabel = if (loading) "正在准备试玩…" else label
-            if (appStyle) AppActionButton(buttonLabel, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
+            if (LocalCommunityDetail.current) DetailInfoStrip("体验", buttonLabel, XIcons.Play, onClick = launchGame.takeUnless { busy })
+            else if (appStyle) AppActionButton(buttonLabel, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
             else PillButton(buttonLabel, launchGame, enabled = !busy)
             error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
         }

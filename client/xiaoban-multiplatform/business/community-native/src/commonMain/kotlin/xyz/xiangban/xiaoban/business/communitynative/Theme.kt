@@ -95,6 +95,12 @@ object XType {
     val Caption = Base.copy(fontSize = 12.sp, lineHeight = 16.sp)
     /** 10/13：只给底部导航的文字用。 */
     val Nav = Base.copy(fontSize = 10.sp, lineHeight = 13.sp)
+    // 社区详情与 H5 共用的标题、正文和作者栏排版。
+    internal val DetailTitle = Title.copy(lineHeight = 26.1.sp)
+    internal val DetailBody = Body.copy(lineHeight = 25.2.sp)
+    internal val DetailAuthor = Body.copy(fontSize = 14.5.sp, lineHeight = 21.75.sp)
+    internal val DetailComment = Secondary.copy(fontSize = 13.5.sp, lineHeight = 20.9.sp)
+    internal val CommentDraft = Body.copy(fontSize = 14.sp, lineHeight = 21.sp)
 }
 
 /** 没写 style 的文字和 Material 组件也落到这几档上。 */

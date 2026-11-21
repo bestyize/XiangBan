@@ -21,12 +21,21 @@ import xyz.xiangban.xiaoban.common.community.*
 @Composable
 internal fun WorkInteractionLayout(
     env: CommunityEnv, kind: String, id: Long, open: ((Route) -> Unit)?, onShare: () -> Unit, enabled: Boolean = true,
-    onComments: (() -> Unit)? = null,
+    linkedTopicId: Long? = null,
     content: @Composable (comments: @Composable () -> Unit) -> Unit,
 ) {
     if (!enabled) { content {}; return }
     val session by env.session.state.collectAsState()
-    val loader = rememberLoader(env, "work-discussion-$kind-$id-${session.accountId}") { env.contentSocial.discussion(kind, id) }
+    val detail = LocalCommunityDetail.current
+    val loader = rememberLoader(env, listOf("work-discussion", kind, id, session.accountId, linkedTopicId)) {
+        try { env.contentSocial.discussion(kind, id) }
+        catch (e: ApiException) {
+            if (e.status != 404 || linkedTopicId == null) throw e
+            val topic = env.forum.topic(linkedTopicId)
+            ContentDiscussion(topic.id, topic.likeCount, topic.replyCount, topic.viewer?.liked == true,
+                topic.viewer?.canReply == true, topic.locked == true)
+        }
+    }
     val state by loader.state.collectAsState()
     val scope = rememberCoroutineScope()
     var busy by remember(kind, id, session.accountId) { mutableStateOf(false) }
@@ -65,7 +74,7 @@ internal fun WorkInteractionLayout(
     fun beginReply(parent: Post? = null) {
         if (!canReply) return
         act {
-            val current = discussion ?: return@act
+            val current = discussion
             val target = if (current.topicId == null) env.contentSocial.discussion(kind, id, create = true) else current
             if (target.canReply && target.topicId != null) {
                 replyingTo = parent
@@ -95,7 +104,9 @@ internal fun WorkInteractionLayout(
                         state is Load.Failed -> Banner((state as Load.Failed).message, Modifier.padding(12.dp).then(anchor),
                             warn = true, actionText = "重试", onAction = loader::reload)
                         shownDiscussion != null -> Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            if (detail) Hairline()
                             CommentSectionTitle(0, anchor)
+                            if (detail && canReply) DetailCommentPrompt(env) { beginReply() }
                             Text("还没有评论", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         else -> Spinner(Modifier.fillMaxWidth().height(48.dp).then(anchor))
@@ -106,34 +117,45 @@ internal fun WorkInteractionLayout(
                 when {
                     shownDiscussion == null -> "评论"
                     shownDiscussion.locked -> "评论已关闭"
-                    !session.loggedIn -> "登录后评论"
+                    !session.loggedIn -> if (detail) "说点什么…" else "登录后评论"
                     !shownDiscussion.canReply -> "暂不能评论"
-                    else -> "写评论…"
+                    else -> if (detail) "说点什么…" else "写评论…"
                 },
                 onWrite = { beginReply() },
                 enabled = canReply && !busy,
             ) {
-                Row(Modifier.clip(CircleShape).clickable(enabled = discussion != null && !busy) { act {
-                    val current = env.contentSocial.discussion(kind, id, create = true)
+                val likeWork: () -> Unit = { act {
+                    val current = discussion?.takeIf { it.topicId != null } ?: env.contentSocial.discussion(kind, id, create = true)
                     val topic = current.topicId ?: throw ApiException(503, "讨论暂不可用")
                     env.forum.setTopicLiked(topic, !current.liked)
                     loader.reload()
-                } }.heightIn(min = 44.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    XIcon(XIcons.Heart, tint = if (shownDiscussion?.liked == true) Brand else MaterialTheme.colorScheme.onSurface, size = 20.dp,
-                        description = if (shownDiscussion?.liked == true) "取消点赞" else "点赞")
-                    Text(shownDiscussion?.likeCount?.let(::compactCount) ?: "—", style = XType.Secondary)
-                }
-                IconTap(XIcons.Bookmark, if (bookmarked == true) "取消收藏" else "收藏", { act {
+                } }
+                val toggleBookmark: () -> Unit = { act {
                     val current = bookmarked ?: env.contentSocial.state(kind, id).bookmarked
                     bookmarked = env.contentSocial.bookmark(kind, id, !current).bookmarked
                     env.contentBookmarkRevision.value++
                     bookmarkError = false
-                } }, tint = if (bookmarked == true) Brand else MaterialTheme.colorScheme.onSurface)
-                CommentCountAction(shownDiscussion?.replyCount) {
-                    if (onComments != null) onComments()
-                    else scope.launch { commentAnchor.bringIntoView() }
+                } }
+                val liked = shownDiscussion?.liked == true
+                val likeLabel = if (liked) "取消点赞" else "点赞"
+                val saveLabel = if (bookmarked == true) "取消收藏" else "收藏"
+                if (detail) {
+                    DetailDockAction(XIcons.Heart, shownDiscussion?.likeCount?.let(::compactCount), likeLabel, likeWork,
+                        tint = if (liked) androidx.compose.ui.graphics.Color(0xFFE11D48) else MaterialTheme.colorScheme.onSurface,
+                        enabled = discussion != null && !busy)
+                    DetailDockAction(XIcons.Star, if (bookmarked == true) "已收藏" else "收藏", saveLabel, toggleBookmark,
+                        tint = if (bookmarked == true) Amber else MaterialTheme.colorScheme.onSurface)
+                } else {
+                    Row(Modifier.clip(CircleShape).clickable(enabled = discussion != null && !busy, onClick = likeWork)
+                        .heightIn(min = 44.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, size = 20.dp, description = likeLabel)
+                        Text(shownDiscussion?.likeCount?.let(::compactCount) ?: "—", style = XType.Secondary)
+                    }
+                    IconTap(XIcons.Bookmark, saveLabel, toggleBookmark, tint = if (bookmarked == true) Brand else MaterialTheme.colorScheme.onSurface)
                 }
-                if (onComments == null) IconTap(XIcons.Share, "分享作品", onShare)
+                CommentCountAction(shownDiscussion?.replyCount) { scope.launch { commentAnchor.bringIntoView() } }
+                if (!detail) IconTap(XIcons.Share, "分享作品", onShare)
             }
             if (bookmarkError) Text("收藏状态读取失败，点击收藏可重试", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }

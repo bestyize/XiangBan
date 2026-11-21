@@ -143,6 +143,7 @@ internal fun VisualTopicCard(env: CommunityEnv, topic: Topic, noteCover: Boolean
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DiscussionPostCard(
     env: CommunityEnv,
@@ -156,72 +157,67 @@ internal fun DiscussionPostCard(
     onCategory: () -> Unit,
     onTag: (String) -> Unit,
 ) {
-    val tag = topic.tags.firstOrNull { it.isNotBlank() && it != topic.category.name }
+    val categoryLabel = when (topic.category.slug) {
+        "learn" -> "教程"
+        "casual-screen" -> "影视"
+        "casual-feelings" -> "情感"
+        "casual-indie" -> "副业"
+        "casual-gear" -> "数码"
+        "casual-chat" -> "闲聊"
+        else -> topic.category.name
+    }
+    val tag = topic.tags.firstOrNull { it.isNotBlank() && it != topic.category.name && it != categoryLabel }
 
     Column(
-        Modifier.fillMaxWidth().outlinedCard(14.dp)
-            .clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen),
+        Modifier.fillMaxWidth().communityFeedCard(16.dp)
+            .clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Text(
-            topic.title.trim().ifEmpty { "未命名讨论" },
-            Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 12.dp),
-            style = XType.Section,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Text(topic.title.trim().ifEmpty { "未命名讨论" }, style = feedText(14.5, 21.025),
+            color = feedInk, fontWeight = FontWeight(650), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (topic.excerpt.isNotBlank() && topic.excerpt != topic.cardTitle) {
+            Text(topic.excerpt, style = feedText(13, 20.8), color = feedSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(
-                Modifier.weight(1f).padding(end = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (topic.category.name.isNotBlank()) DiscussionCardTag(
-                    topic.category.name, Modifier.weight(2f, fill = false), category = true, onClick = onCategory,
-                )
-                if (tag != null) DiscussionCardTag("# $tag", Modifier.weight(1f, fill = false)) { onTag(tag) }
-                Box(Modifier.clearAndSetSemantics { contentDescription = topic.author.nickname }) {
-                    TopicAuthorAvatar(env, topic.author, 21.dp)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (categoryLabel.isNotBlank()) {
+                    val (ink, fill) = when (topic.category.slug) {
+                        "design", "3d" -> feedCategoryColors(0xFF6D4AFF, 0xFFBDA8FF, 0xFF7152D8, .12f)
+                        "learn" -> feedCategoryColors(0xFF05964B, 0xFF7CE6A9, 0xFF07C160, .13f)
+                        "casual-indie", "casual-gear" -> feedCategoryColors(0xFF2F6FDB, 0xFF8DB6FF, 0xFF2F6FDB, .12f)
+                        "casual-games" -> feedCategoryColors(0xFFD93A44, 0xFFFF959B, 0xFFD93A44, .12f)
+                        else -> feedSecondary to feedFill
+                    }
+                    FeedTag(categoryLabel, Modifier.align(Alignment.CenterVertically).widthIn(max = 98.dp)
+                        .clip(CircleShape).clickable(role = Role.Button, onClick = onCategory), ink, fill)
                 }
-                if (topic.createdAt.isNotBlank()) Text(
-                    agoText(topic.createdAt),
-                    Modifier.widthIn(max = 100.dp),
-                    style = XType.Caption,
-                    color = LocalExtraColors.current.ink3,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (tag != null) Text("# $tag",
+                    Modifier.align(Alignment.CenterVertically).widthIn(max = 88.dp).clickable(role = Role.Button) { onTag(tag) },
+                    style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    TopicAuthorAvatar(env, topic.author, 20.dp)
+                    val time = topic.createdAt.takeIf(String::isNotBlank)?.let(::agoText)
+                    Text(listOfNotNull(topic.author.nickname.takeIf(String::isNotBlank), time).joinToString(" · "),
+                        Modifier.widthIn(max = 150.dp), style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            DiscussionCountButton(XIcons.Message, "查看回复", topic.replyCount, onClick = onComments, emphasized = true)
-            DiscussionCountButton(
-                XIcons.Heart, if (liked) "取消点赞" else "点赞", likeCount,
-                onClick = onLike, active = liked, enabled = !liking,
-            )
+            Row(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DiscussionCountButton(XIcons.DetailComment, "查看回复", topic.replyCount, onClick = onComments)
+                DiscussionCountButton(XIcons.Heart, if (liked) "取消点赞" else "点赞", likeCount,
+                    onClick = onLike, active = liked, enabled = !liking, showZero = false)
+            }
         }
     }
 }
 
-@Composable
-private fun DiscussionCardTag(label: String, modifier: Modifier, category: Boolean = false, onClick: () -> Unit) {
-    val extra = LocalExtraColors.current
-    Box(
-        modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(8.dp))
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            label,
-            if (category) Modifier.background(extra.fill, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp) else Modifier,
-            style = XType.Caption,
-            color = extra.ink3,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
+private fun feedCategoryColors(light: Long, dark: Long, fill: Long, alpha: Float) =
+    Color(if (ThemeState.dark) dark else light) to Color(fill).copy(alpha = alpha)
 
 @Composable
 private fun DiscussionCountButton(
@@ -231,27 +227,19 @@ private fun DiscussionCountButton(
     onClick: () -> Unit,
     active: Boolean = false,
     enabled: Boolean = true,
-    emphasized: Boolean = false,
+    showZero: Boolean = true,
 ) {
-    val extra = LocalExtraColors.current
-    val color = when {
-        active -> extra.brandInk
-        emphasized -> MaterialTheme.colorScheme.onSurfaceVariant
-        else -> extra.ink3
-    }
+    val color = if (active) Color(0xFFE11D48) else feedMuted
     Row(
-        Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp).clip(CircleShape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 6.dp),
+        Modifier.clip(CircleShape).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
     ) {
-        XIcon(icon, tint = color, size = 14.dp, description = label)
-        Text(compactCount(count), style = XType.Caption, color = color,
-            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+        XIcon(icon, tint = color, size = 13.dp, description = label)
+        if (showZero || count != 0) Text(compactCount(count), style = feedText(12), color = color, maxLines = 1)
     }
 }
-
 
 @Composable
 internal fun TopicAuthorAvatar(env: CommunityEnv, author: PublicUser, size: Dp) {

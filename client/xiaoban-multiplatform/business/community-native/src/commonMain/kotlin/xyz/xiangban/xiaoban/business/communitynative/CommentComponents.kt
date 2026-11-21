@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,21 +33,23 @@ internal fun CommentBar(
     enabled: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val detail = LocalCommunityDetail.current
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).navigationBarsPadding()) {
         Hairline()
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxWidth().heightIn(min = if (detail) 51.dp else 0.dp)
+                .padding(horizontal = 12.dp, vertical = if (detail) 0.dp else 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (detail) 12.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
-                Modifier.weight(1f).heightIn(min = 44.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
+                Modifier.weight(1f).heightIn(min = if (detail) 36.dp else 44.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
                     .clickable(enabled = enabled, role = Role.Button, onClick = onWrite).padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val tint = MaterialTheme.colorScheme.onSurfaceVariant
-                XIcon(XIcons.Message, tint = tint, size = 16.dp)
+                val tint = if (detail) LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurfaceVariant
+                XIcon(if (detail) XIcons.Pen else XIcons.Message, tint = tint, size = if (detail) 14.dp else 16.dp)
                 Text(label, style = XType.Secondary, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             actions()
@@ -55,6 +59,10 @@ internal fun CommentBar(
 
 @Composable
 internal fun CommentCountAction(count: Int?, onClick: () -> Unit) {
+    if (LocalCommunityDetail.current) {
+        DetailDockAction(XIcons.DetailComment, count?.let(::compactCount), count?.let { "查看评论，共 $it 条" } ?: "查看评论", onClick)
+        return
+    }
     Row(
         Modifier.heightIn(min = 44.dp).widthIn(min = 44.dp)
             .semantics { contentDescription = count?.let { "查看评论，共 $it 条" } ?: "查看评论" }
@@ -68,11 +76,70 @@ internal fun CommentCountAction(count: Int?, onClick: () -> Unit) {
 }
 
 @Composable
+internal fun DetailDockAction(
+    icon: ImageVector,
+    text: String?,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
+) {
+    Row(
+        Modifier.heightIn(min = 44.dp).semantics { contentDescription = label }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        XIcon(icon, tint = tint, size = 19.dp)
+        text?.let { Text(it, style = XType.Secondary, color = tint, fontWeight = FontWeight.Medium) }
+    }
+}
+
+@Composable
+internal fun DetailCommentPrompt(env: CommunityEnv, onWrite: () -> Unit) {
+    val user by env.session.state.collectAsState()
+    val muted = LocalExtraColors.current.ink3
+    Row(
+        Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val account = user.user
+        if (account != null) TopicAuthorAvatar(env, PublicUser(account.uid, account.username, account.avatarUrl), 30.dp)
+        else DetailInitial("伴", background = Color(0xFFD93A44))
+        Row(
+            Modifier.weight(1f).heightIn(min = 36.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
+                .clickable(role = Role.Button, onClick = onWrite).padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("留下你的想法吧", Modifier.weight(1f), style = XType.Secondary, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            XIcon(XIcons.Image, tint = muted, size = 15.dp)
+            XIcon(XIcons.Smile, tint = muted, size = 15.dp)
+        }
+    }
+}
+
+@Composable
 internal fun CommentSectionTitle(
     count: Int?,
     modifier: Modifier = Modifier,
     label: String = "评论",
+    newestFirst: Boolean = true,
+    onSort: (() -> Unit)? = null,
 ) {
+    if (LocalCommunityDetail.current) {
+        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("共 ${count ?: 0} 条$label", style = XType.DetailComment, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            onSort?.let {
+                Box(Modifier.size(28.dp).clickable(role = Role.Button, onClick = it), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.DetailSort, tint = LocalExtraColors.current.ink3, size = 14.dp,
+                        description = if (newestFirst) "切换到最早优先" else "切换到最新优先")
+                }
+            }
+        }
+        return
+    }
     Row(modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = XType.Section, fontWeight = FontWeight.SemiBold)
         count?.let {
@@ -112,14 +179,17 @@ internal fun CommentRow(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.onSurfaceVariant
+    val detail = LocalCommunityDetail.current
+    val ink = if (detail) LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurfaceVariant
     val authorClick = if (onAuthor == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onAuthor)
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier.fillMaxWidth().padding(bottom = if (detail) 14.dp else 0.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = if (detail) 0.dp else 12.dp), horizontalArrangement = Arrangement.spacedBy(if (detail) 10.dp else 12.dp)) {
             Box(authorClick.clip(CircleShape)) { TopicAuthorAvatar(env, author, 32.dp) }
             Column(Modifier.weight(1f)) {
                 Text(
-                    author.nickname, authorClick, style = XType.Secondary, fontWeight = FontWeight.SemiBold,
+                    author.nickname, authorClick, style = XType.Secondary,
+                    color = if (detail) ink else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (detail) FontWeight.Normal else FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 parent?.let {
@@ -127,29 +197,33 @@ internal fun CommentRow(
                         .background(LocalExtraColors.current.fill).padding(horizontal = 8.dp, vertical = 4.dp),
                         style = XType.Caption, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(if (detail) 3.dp else 4.dp))
                 content()
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 36.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    Modifier.fillMaxWidth().padding(top = if (detail) 5.dp else 0.dp).heightIn(min = if (detail) 26.dp else 36.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (detail) 10.dp else 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(metadata, Modifier.weight(1f, fill = false), style = XType.Caption, color = ink,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     onReply?.let { CommentTextAction("回复", it) }
                     actions()
+                    if (detail && like != null) {
+                        Spacer(Modifier.weight(1f))
+                        like()
+                    }
                 }
             }
-            like?.invoke()
+            if (!detail) like?.invoke()
         }
-        Hairline(Modifier.padding(start = 44.dp))
+        if (!detail) Hairline(Modifier.padding(start = 44.dp))
     }
 }
 
 @Composable
 internal fun CommentTextAction(label: String, onClick: () -> Unit) {
     Box(
-        Modifier.heightIn(min = 36.dp).clickable(role = Role.Button, onClick = onClick),
+        Modifier.heightIn(min = if (LocalCommunityDetail.current) 26.dp else 36.dp).clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(label, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -158,6 +232,19 @@ internal fun CommentTextAction(label: String, onClick: () -> Unit) {
 
 @Composable
 internal fun CommentLikeAction(liked: Boolean, count: Int, onLike: () -> Unit, enabled: Boolean = true) {
+    if (LocalCommunityDetail.current) {
+        val tint = if (liked) Color(0xFFE11D48) else LocalExtraColors.current.ink3
+        Row(
+            Modifier.heightIn(min = 26.dp).semantics { contentDescription = if (liked) "取消赞" else "点赞评论" }
+                .clickable(enabled = enabled, role = Role.Button, onClick = onLike),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            XIcon(XIcons.Heart, size = 14.dp, tint = tint)
+            if (count > 0) Text(compactCount(count), style = XType.Caption, color = tint)
+        }
+        return
+    }
     val tint = if (liked) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
         Modifier.size(width = 40.dp, height = 44.dp)
@@ -193,7 +280,7 @@ internal fun PlainCommentRow(
         actions = { if (comment.mine) CommentTextAction("删除", onDelete) },
     ) {
         var zoom by remember { mutableStateOf<String?>(null) }
-        if (comment.body.isNotEmpty()) Text(comment.body, style = XType.Body)
+        if (comment.body.isNotEmpty()) Text(comment.body, style = if (LocalCommunityDetail.current) XType.DetailComment else XType.Body)
         comment.images.forEach { path ->
             if (forumImageId(path) != null) {
                 Spacer(Modifier.height(8.dp))

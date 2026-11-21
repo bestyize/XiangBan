@@ -1,9 +1,17 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +58,8 @@ import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.ToolArtifact
 import xyz.xiangban.xiaoban.common.community.ToolDetail
 import xyz.xiangban.xiaoban.common.community.Topic
+import xyz.xiangban.xiaoban.common.community.agoText
+import xyz.xiangban.xiaoban.common.community.cardTitle
 import xyz.xiangban.xiaoban.common.community.formatDownloadSize
 import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
@@ -62,7 +72,7 @@ internal fun ResourceTab(env: CommunityEnv, sub: String, open: (Route) -> Unit) 
     when (sub) {
         SoftwareResourceTab -> SoftwareDirectoryTab(env, open)
         "resource-help", "share-help" -> HelpTab(env, sub, open)
-        else -> BoardNoteFeed(env, sub, open)
+        else -> ResourceBoardFeed(env, sub, open)
     }
 }
 
@@ -114,8 +124,8 @@ private fun HelpTab(env: CommunityEnv, category: String, open: (Route) -> Unit) 
     val controller = remember(env, category) { DiscussController(env.forum, scope, category = category, home = false, activeOnly = true) }
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
-    TopicFeed(controller, "还没有人发求助", open, header = {
-        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    TopicFeed(controller, "还没有人发求助", open, contentPadding = CommunityFeedPadding, spacing = 12.dp, header = {
+        Row(Modifier.fillMaxWidth().communityFeedCard(18.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val s = (statsState as? Load.Ready<HelpStats>)?.value
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 StatNumber(s?.open?.toString() ?: "–", "进行中")
@@ -130,7 +140,7 @@ private fun HelpTab(env: CommunityEnv, category: String, open: (Route) -> Unit) 
                 Text("发求助", style = XType.Body, fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         }
-    }) { HelpCard(env, it, open) }
+    }) { HelpCard(it, open) }
 }
 
 private fun groupDigits(n: Long): String = n.toString().reversed().chunked(3).joinToString(",").reversed()
@@ -143,41 +153,85 @@ private fun StatNumber(value: String, label: String) {
     }
 }
 
-/** 求助卡：第一行 悬赏分、状态、剩余时间；正文左边可带 72dp 的参考图；底下是提问人和回答数。 */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
+private fun HelpCard(topic: Topic, open: (Route) -> Unit) {
     val help = topic.help
-    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
-        if (help != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    XIcon(XIcons.Coin, tint = Amber, size = 14.dp)
-                    Text(if (help.bounty > 0) "悬赏 ${help.bounty} 分" else "无悬赏", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Amber)
+    Column(Modifier.fillMaxWidth().communityFeedCard(18.dp).clickable { open(Route.Topic(topic.id)) }
+        .padding(horizontal = 18.dp, vertical = 15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (help != null) {
+                if (help.bounty > 0) FeedTag("悬赏 ${help.bounty} 积分", Modifier.align(Alignment.CenterVertically),
+                    tint = LocalExtraColors.current.brandInk, fill = LocalExtraColors.current.brandSoft)
+                val active = help.status == "open" && !help.expiredByTime()
+                val status = when {
+                    help.status == "solved" -> "已采纳"
+                    active -> "进行中"
+                    help.status == "closed" -> "已关闭"
+                    else -> "已到期"
                 }
-                HelpStatusTag(help)
-                Spacer(Modifier.weight(1f))
-                XIcon(XIcons.Clock, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                Text(helpRemain(help), style = XType.Caption, color = LocalExtraColors.current.ink3)
-            }
+                FeedTag(status, Modifier.align(Alignment.CenterVertically),
+                    tint = if (active) Color(if (ThemeState.dark) 0xFF7CE6A9 else 0xFF05964B) else feedMuted,
+                    fill = if (active) Color(0xFF07C160).copy(alpha = .13f) else feedFill)
+                Text(helpRemain(help), Modifier.align(Alignment.CenterVertically), style = feedText(12), color = feedMuted)
+            } else FeedTag("站方指南")
         }
-        if (help == null) Text("站方指南", style = XType.Caption, color = Brand)
-        var failed by remember(topic.id, topic.images) { mutableIntStateOf(0) }
-        val thumb = topic.images.getOrNull(failed)?.let(env.forum::imageUrl)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(topic.title, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (topic.excerpt.isNotBlank() && topic.excerpt != topic.title) {
-                    Text(topic.excerpt, style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(topic.cardTitle, style = feedText(14.5, 21.025), color = feedInk, fontWeight = FontWeight(650),
+            maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text("${topic.author.nickname} 发起 · ${topic.replyCount} 个回答", style = feedText(12), color = feedMuted,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResourceBoardFeed(env: CommunityEnv, category: String, open: (Route) -> Unit) {
+    val session by env.session.state.collectAsState()
+    var page by rememberSaveable(category) { mutableIntStateOf(1) }
+    val loader = rememberLoader(env, Triple(category, page, session.accountId)) {
+        env.forum.topics(sort = "new", category = category, page = page, home = false, activeOnly = true)
+    }
+    val state by loader.state.collectAsState()
+    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
+        LoadBox(state, loader::reload) { result ->
+            if (category in setOf("resource-movies", "casual-media")) {
+                LazyVerticalGrid(GridCells.Adaptive(145.dp), Modifier.fillMaxSize(), contentPadding = CommunityFeedPadding,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (result.items.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+                        CenterMessage("这里还没有资源", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp))
+                    }
+                    gridItems(result.items, key = { it.id }) { topic ->
+                        CommunityWorkCard(topic.cardTitle, topic.images.firstOrNull()?.let(env.forum::imageUrl),
+                            topic.category.name, topic.author.nickname, topic.createdAt,
+                            avatarUrl = topic.author.avatarUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)) {
+                            open(Route.Topic(topic.id))
+                        }
+                    }
+                    if (page > 1 || result.hasMore) item(span = { GridItemSpan(maxLineSpan) }) {
+                        NotePager(page, result.hasMore) { page = it }
+                    }
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = CommunityFeedPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (result.items.isEmpty()) item {
+                        CenterMessage("这里还没有资源", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp))
+                    }
+                    items(result.items, key = { it.id }) { topic ->
+                        Column(Modifier.fillMaxWidth().communityFeedCard(18.dp).clickable { open(Route.Topic(topic.id)) }
+                            .padding(horizontal = 18.dp, vertical = 15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                topic.tags.firstOrNull()?.takeIf(String::isNotBlank)?.let { FeedTag(it) }
+                                Text(agoText(topic.createdAt), style = feedText(12), color = feedMuted)
+                            }
+                            Text(topic.cardTitle, style = feedText(14.5, 21.025), color = feedInk, fontWeight = FontWeight(650),
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text("${topic.author.nickname} 分享 · ${topic.replyCount} 条交流", style = feedText(12), color = feedMuted,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (page > 1 || result.hasMore) item { NotePager(page, result.hasMore) { page = it } }
                 }
             }
-            if (thumb != null) Box(Modifier.width(96.dp)) {
-                CommunityCover(thumb, onError = { failed++ }) { TopicCoverStats(topic) }
-            }
-        }
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Avatar(topic.author.nickname, 18.dp)
-            Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Stat(XIcons.Message, "${topic.replyCount} 个回答")
         }
     }
 }

@@ -160,7 +160,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     }
                 }
                 Box(Modifier.fillMaxSize().zIndex(2f)) {
-                    if (!gameOverlayOpen || !gamesSelected) FloatingNav(selectedTab, publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                    if (!gameOverlayOpen || !gamesSelected) FloatingNav(selectedTab, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
                     AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
                 }
             }

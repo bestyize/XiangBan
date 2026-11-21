@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,10 +27,9 @@ import xyz.xiangban.xiaoban.common.community.agoText
 @Composable
 internal fun FrontierSection(env: CommunityEnv, state: Load<Page<NewsItem>>, retry: () -> Unit, open: (Route) -> Unit) {
     if (state is Load.Ready && state.value.items.isEmpty()) return
-    WhiteCard(padding = 12.dp) {
+    Column(Modifier.fillMaxWidth().communityFeedCard(18.dp).padding(12.dp)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            XIcon(XIcons.File, size = 18.dp)
-            Text("小伴前沿", Modifier.weight(1f).padding(start = 6.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
+            Text("前沿", Modifier.weight(1f), style = feedText(16), color = feedInk, fontWeight = FontWeight.Bold)
             LinkText("查看全部", { open(Route.Frontier) })
         }
         when (state) {
@@ -45,28 +44,31 @@ internal fun FrontierSection(env: CommunityEnv, state: Load<Page<NewsItem>>, ret
 private fun FrontierCarousel(env: CommunityEnv, items: List<NewsItem>, open: (Route) -> Unit) {
     val pager = rememberPagerState { items.size }
     val scope = rememberCoroutineScope()
-    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp)).background(Color(0xFF16181F))) {
         HorizontalPager(pager, Modifier.fillMaxSize(), key = { items[it].key }) { page ->
             val article = items[page]
             Box(Modifier.fillMaxSize().clickable { open(Route.FrontierArticle(article.key)) }) {
                 if (article.coverUrl.isNotBlank()) Cover(env.forum.imageUrl(article.coverUrl), article.key.hashCode().toLong(), Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .8f)))))
-                Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
-                    Text(article.title, style = XType.Body, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Spacer(Modifier.width(if (items.size > 1) (items.size * 16).dp else 0.dp))
-                        Text(article.source, Modifier.weight(1f), style = XType.Caption, color = Color.White.copy(alpha = .85f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                        Text(agoText(article.sourcePublishedAt ?: article.publishedAt), style = XType.Caption, color = Color.White.copy(alpha = .85f), maxLines = 1)
-                        if (article.sample) Text("示例", style = XType.Caption, color = Color.White)
-                    }
-                }
+                Text(article.title, Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .84f))))
+                    .padding(start = 16.dp, top = 36.dp, end = 16.dp, bottom = 38.dp),
+                    style = feedText(15.5, 21.7), fontWeight = FontWeight(650), color = Color.White,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val articleMeta = listOfNotNull(article.source.takeIf(String::isNotBlank),
+                    agoText(article.sourcePublishedAt ?: article.publishedAt).takeIf(String::isNotBlank),
+                    "示例".takeIf { article.sample }).joinToString(" · ")
+                Text(articleMeta, Modifier.align(Alignment.BottomEnd).padding(start = 106.dp, end = 14.dp, bottom = 11.dp),
+                    style = feedText(11.5, 16.1), color = Color.White.copy(alpha = .8f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (items.size > 1) Row(Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 4.dp)) {
-            items.forEachIndexed { index, _ ->
-                Box(Modifier.width(16.dp).height(36.dp).clickable { scope.launch { pager.animateScrollToPage(index) } }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(if (pager.currentPage == index) 10.dp else 4.dp, 4.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = if (pager.currentPage == index) 1f else .5f)))
-                }
+        if (items.size > 1) Row(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.forEachIndexed { index, article ->
+                val active = pager.currentPage == index
+                Box(Modifier.size(if (active) 20.dp else 7.dp, 7.dp).clip(CircleShape)
+                    .background(Color.White.copy(alpha = if (active) 1f else .48f))
+                    .clickable(onClickLabel = article.title) { scope.launch { pager.animateScrollToPage(index) } })
             }
         }
     }

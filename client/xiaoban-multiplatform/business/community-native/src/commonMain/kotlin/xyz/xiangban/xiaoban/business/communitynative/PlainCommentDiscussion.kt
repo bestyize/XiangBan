@@ -50,32 +50,45 @@ internal class PlainCommentDiscussion(
     var deleteError by mutableStateOf<String?>(null)
         private set
     var toast by mutableStateOf<String?>(null)
+    var newestFirst by mutableStateOf(true)
+        private set
     private var page = 0
     private var lastRequest = 1
+    private var resetRequest = true
     private var loadJob: Job? = null
     private val pendingLikes = mutableSetOf<Long>()
 
     // Header and footer always occupy one lazy item each.
     val itemCount get() = comments.size + 2
 
-    fun refresh() = load(1)
-    fun retry() = load(lastRequest)
+    fun refresh() = load(1, reset = true)
+    fun retry() = load(lastRequest, reset = resetRequest)
     fun more() {
-        if (!loading && hasMore) load(page + 1)
+        if (!loading && hasMore) load(if (newestFirst) page + 1 else page - 1)
     }
 
-    private fun load(next: Int) {
+    fun toggleSort() {
+        if (loading) return
+        newestFirst = !newestFirst
+        comments = emptyList()
+        refresh()
+    }
+
+    private fun load(next: Int, reset: Boolean = false) {
         loadJob?.cancel()
         lastRequest = next
+        resetRequest = reset
         loading = true
         error = null
         loadJob = scope.launch {
             try {
-                val result = fetch(next)
-                comments = if (next == 1) result.items else (comments + result.items).distinctBy { it.id }
+                val first = fetch(next)
+                val result = if (reset && !newestFirst && first.hasMore) fetch((first.total - 1) / first.pageSize + 1) else first
+                val ordered = if (newestFirst) result.items else result.items.asReversed()
+                comments = if (reset) ordered else (comments + ordered).distinctBy { it.id }
                 page = result.page
                 total = result.total
-                hasMore = result.hasMore
+                hasMore = if (newestFirst) result.hasMore else result.page > 1
                 loading = false
             } catch (e: CancellationException) {
                 throw e
@@ -190,9 +203,13 @@ internal fun LazyListScope.plainCommentItems(
 ) {
     val padding = Modifier.padding(horizontal = horizontalPadding)
     item(key = "comments-head") {
-        Column(Modifier.padding(top = 16.dp)) {
-            Hairline()
-            CommentSectionTitle(discussion.total, padding.padding(top = 8.dp))
+        val detail = LocalCommunityDetail.current
+        Column(Modifier.padding(top = if (detail) 4.dp else 16.dp)) {
+            Hairline(if (detail) padding else Modifier)
+            CommentSectionTitle(discussion.total, padding.padding(top = if (detail) 6.dp else 8.dp),
+                newestFirst = discussion.newestFirst,
+                onSort = (discussion::toggleSort).takeIf { detail && !discussion.loading && discussion.total != null })
+            if (detail) Box(padding) { DetailCommentPrompt(env) { discussion.begin() } }
             if (discussion.comments.isEmpty() && !discussion.loading && discussion.error == null) {
                 Text("还没有评论", padding.padding(vertical = 8.dp), style = XType.Secondary,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

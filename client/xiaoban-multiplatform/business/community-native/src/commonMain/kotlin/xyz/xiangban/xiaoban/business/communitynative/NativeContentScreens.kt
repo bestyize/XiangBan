@@ -38,80 +38,91 @@ private fun ManifestSection(title: String, value: String?, collapsible: Boolean 
 }
 
 @Composable
-fun AbilityDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
-    var sharing by rememberSaveable(id) { mutableStateOf(false) }
+fun AbilityDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) = CommunityDetail {
     val loader = rememberLoader(env, "ability-$id") { env.forum.pack(id) }
     val state by loader.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
-        ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
-        Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { pack -> CapabilityDetailContent(env, pack, back, showBar = false, open = open) } }
+        if (state !is Load.Ready<*>) ScreenBar("能力详情", onBack = back)
+        Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { pack -> CapabilityDetailContent(env, pack, back, open = open) } }
     }
-    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(id), "分享能力", null, { sharing = false }, {}, panel) }
 }
 
-/** 既有 Pack 入口也可委托至此，保持视觉内容的详情代码原样。 */
+/** 能力详情同时服务于能力和通用作品入口。 */
 @Composable
-internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> Unit, showBar: Boolean = true, open: ((Route) -> Unit)? = null) {
+internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> Unit, open: ((Route) -> Unit)? = null) {
     var sharing by rememberSaveable(pack.id) { mutableStateOf(false) }
     val manifest = pack.versions.firstOrNull { it.version == pack.version }?.manifest ?: JsonObject(emptyMap())
     val prompt = manifestValue(manifest, "prompt", "promptText", "systemPrompt", "system_prompt")
     val manualOnly = manifest["manualOnly"]?.toString() == "true"
     Column(Modifier.fillMaxSize()) {
-        if (showBar) ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
-        WorkInteractionLayout(env, "pack", pack.id, open, { sharing = true }, enabled = pack.status == "published") { comments ->
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
-            WhiteCard(padding = 16.dp) {
-                Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, style = XType.Body, color = LocalExtraColors.current.brandInk) }
-                if (manualOnly) BlueTag("手动模板 · 不自动执行", Modifier.padding(top = 8.dp))
-                Text("${kindLabel(pack.kind)} · v${pack.version}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary)
-                if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), style = XType.Body)
-            }
-            if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
-            ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
-            ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
-            ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
-            ManifestSection("运行位置", manifestValue(manifest, "runLocation", "run_location", "runtime", "executionLocation"))
-            ManifestSection("完整提示词", prompt, collapsible = true)
-            if (prompt != null) GhostPillButton("复制提示词", { env.platform?.copy(prompt) }, Modifier.fillMaxWidth(), enabled = env.platform != null)
-            var expanded by rememberSaveable { mutableStateOf(false) }
-            GhostPillButton(if (expanded) "收起完整清单" else "查看完整清单", { expanded = !expanded }, Modifier.fillMaxWidth())
-            if (expanded) ManifestSection("资源清单原文", CommunityJson.encodeToString(manifest))
-            FootNote(if (manualOnly) "这是可下载的手动模板，按说明使用或复制提示词；不会自动执行任务。" else "手机用于浏览和分享。实际运行与授权在电脑端确认，导入不会自动执行；未提供权限说明不代表无需权限。")
-            GhostPillButton("复制电脑端打开链接", { env.platform?.copy(env.forum.packUrl(pack.id)) }, Modifier.fillMaxWidth(), enabled = env.platform != null && pack.status == "published")
-            comments()
+        val author = pack.author
+        DetailAuthorBar(author?.nickname ?: "社区作品", back, onShare = { sharing = true },
+            onAuthor = if (author != null && open != null) ({ open(Route.User(author.uid)) }) else null) {
+            author?.let { DetailAuthorFollow(env, it.uid, open) }
         }
+        WorkInteractionLayout(env, "pack", pack.id, open, { sharing = true }, enabled = pack.status == "published",
+            linkedTopicId = pack.topicId) { comments ->
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                DetailGallery(listOfNotNull(pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), pack.title)
+                DetailBody {
+                    DetailHeading(pack.title)
+                    if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.DetailBody)
+                    DetailTags(pack.tags)
+                    if (manualOnly) BlueTag("手动模板 · 不自动执行", Modifier.padding(top = 8.dp))
+                    DetailMetadata("${kindLabel(pack.kind)} · v${pack.version}")
+                    if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary)
+                }
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = ContentSpacing) {
+                    if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
+                    ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
+                    ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
+                    ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
+                    ManifestSection("运行位置", manifestValue(manifest, "runLocation", "run_location", "runtime", "executionLocation"))
+                    ManifestSection("完整提示词", prompt, collapsible = true)
+                    if (prompt != null) GhostPillButton("复制提示词", { env.platform?.copy(prompt) }, Modifier.fillMaxWidth(), enabled = env.platform != null)
+                    var expanded by rememberSaveable { mutableStateOf(false) }
+                    GhostPillButton(if (expanded) "收起完整清单" else "查看完整清单", { expanded = !expanded }, Modifier.fillMaxWidth())
+                    if (expanded) ManifestSection("资源清单原文", CommunityJson.encodeToString(manifest))
+                    FootNote(if (manualOnly) "这是可下载的手动模板，按说明使用或复制提示词；不会自动执行任务。" else "手机用于浏览和分享。实际运行与授权在电脑端确认，导入不会自动执行；未提供权限说明不代表无需权限。")
+                    GhostPillButton("复制电脑端打开链接", { env.platform?.copy(env.forum.packUrl(pack.id)) }, Modifier.fillMaxWidth(), enabled = env.platform != null && pack.status == "published")
+                }
+                comments()
+            }
         }
     }
     OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享能力", null, { sharing = false }, {}, panel) }
 }
 
 @Composable
-fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit) {
+fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit) = CommunityDetail {
     var sharing by rememberSaveable(id) { mutableStateOf(false) }
     val loader = rememberLoader(env, "scheme-$id") { env.content.scheme(id) }
     val state by loader.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
-        ScreenBar("桌面方案", onBack = back)
+        if (state !is Load.Ready<*>) ScreenBar("桌面方案", onBack = back)
         LoadBox(state, loader::reload) { scheme ->
-            WorkInteractionLayout(env, "scheme", scheme.id, open, { sharing = true }) { comments ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = ContentSpacing) {
-                item { WhiteCard(padding = 16.dp) {
-                    Text(scheme.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                    Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                    if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), style = XType.Body)
-                } }
-                item { NativeReportAction(env, "scheme", scheme.id, open) }
-                item { Text("包含的内容", Modifier.padding(4.dp), style = XType.Section, fontWeight = FontWeight.SemiBold) }
-                itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(padding = 14.dp) {
-                    Text(if (item.available) item.title ?: item.slug else "内容不可用", style = XType.Body, fontWeight = FontWeight.Medium)
-                    Text(if (item.available) "${kindLabel(item.kind)} · 方案版本 v${item.version}" else "此项已下架或当前不可访问", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                    if (item.available) GhostPillButton("查看内容", { open(if (item.kind in CapabilityPackKinds) Route.Ability(item.packId) else Route.Pack(item.packId)) }, Modifier.padding(top = 8.dp))
-                } }
-                item { FootNote("方案是一份内容清单。手机不会应用桌面内容；在电脑上打开后，逐项检查版本、可用性和权限再确认。") }
-                item { comments() }
+            val author = scheme.author
+            DetailAuthorBar(author.nickname ?: "社区作者", back, onShare = { sharing = true }, onAuthor = { open(Route.User(author.uid)) }) {
+                DetailAuthorFollow(env, author.uid, open)
             }
+            WorkInteractionLayout(env, "scheme", scheme.id, open, { sharing = true }) { comments ->
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = ContentSpacing) {
+                    item { DetailBody {
+                        DetailHeading(scheme.title)
+                        if (scheme.summary.isNotBlank()) Text(scheme.summary, style = XType.DetailBody)
+                        DetailTags(listOf("社区方案"))
+                        DetailMetadata("${scheme.createdAt.take(10)} 发布 · ${scheme.items.size} 项作品")
+                    } }
+                    item { Box(Modifier.padding(horizontal = 16.dp)) { NativeReportAction(env, "scheme", scheme.id, open) } }
+                    item { Text("包含的内容", Modifier.padding(horizontal = 16.dp), style = XType.Section, fontWeight = FontWeight.SemiBold) }
+                    itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(Modifier.padding(horizontal = 16.dp), padding = 14.dp) {
+                        Text(if (item.available) item.title ?: item.slug else "内容不可用", style = XType.Body, fontWeight = FontWeight.Medium)
+                        Text(if (item.available) "${kindLabel(item.kind)} · 方案版本 v${item.version}" else "此项已下架或当前不可访问", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                        if (item.available) GhostPillButton("查看内容", { open(if (item.kind in CapabilityPackKinds) Route.Ability(item.packId) else Route.Pack(item.packId)) }, Modifier.padding(top = 8.dp))
+                    } }
+                    item { Box(Modifier.padding(horizontal = 16.dp)) { FootNote("方案是一份内容清单。手机不会应用桌面内容；在电脑上打开后，逐项检查版本、可用性和权限再确认。") } }
+                    item { comments() }
+                }
             }
         }
     }

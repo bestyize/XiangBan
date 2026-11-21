@@ -45,6 +45,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,15 +106,6 @@ internal fun RepoTile(r: RepoRank, size: Dp, corner: Dp) {
     else LetterIcon(r.fullName.substringAfter('/'), hexColor(r.languageColor, DataBlue), tint, size = size)
 }
 
-@Composable
-internal fun LangLine(r: RepoRank) {
-    if (r.language.isEmpty()) return
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Dot(hexColor(r.languageColor), 8.dp)
-        Text(r.language, style = XType.Caption, color = LocalExtraColors.current.ink3)
-    }
-}
-
 // ───────────── 资讯 ─────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,52 +117,60 @@ internal fun NewsTab(env: CommunityEnv, open: (Route) -> Unit, openHotRanking: (
     val frontierState by frontierLoader.state.collectAsState()
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = { loader.reload(); frontierLoader.reload() }, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { home ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                if (home.banners.isNotEmpty()) item { BannerCarousel(home.banners) { openLink(it.link, open) } }
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = CommunityFeedPadding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item(key = "frontier") { FrontierSection(env, frontierState, frontierLoader::reload, open) }
-                item {
-                    Column(Modifier.padding(start = 2.dp, end = 2.dp, top = 10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                XIcon(XIcons.Message, size = 18.dp)
-                                Text("AI 日报", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                                val note = listOf(dayText(home.news.date), "更新").filter { it.isNotEmpty() }.joinToString(" · ")
-                                if (home.news.total > 0) Text(note, style = XType.Caption, color = LocalExtraColors.current.ink3)
+                item(key = "daily") {
+                    Column(Modifier.fillMaxWidth().communityFeedCard(18.dp).padding(horizontal = 18.dp, vertical = 16.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("AI 日报", Modifier.weight(1f), style = feedText(16), color = feedInk, fontWeight = FontWeight.Bold)
+                            if (home.news.total > 0) {
+                                Text("${dayText(home.news.date)} 更新", style = feedText(12), color = feedMuted, maxLines = 1)
+                                Spacer(Modifier.width(8.dp))
                             }
-                            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open(Route.Daily) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("往期", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-                            }
+                            LinkText("往期", { open(Route.Daily) })
+                        }
+                        if (home.news.items.isEmpty()) Text("今天还没有日报", style = feedText(13), color = feedSecondary)
+                        home.news.items.forEachIndexed { index, item ->
+                            if (index > 0) Hairline()
+                            DailyPreviewRow(env, item, last = index == home.news.items.lastIndex) { open(Route.News(item.key)) }
                         }
                     }
                 }
-                if (home.news.items.isEmpty()) item { WhiteCard { Text("今天还没有日报", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                items(home.news.items, key = { "n-${it.key}" }) { NewsRow(it) { open(Route.News(it.key)) } }
                 home.repos?.takeIf { it.ranks.isNotEmpty() }?.let { issue ->
-                    item {
-                        WhiteCard(padding = 0.dp) {
-                            Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        XIcon(XIcons.Star, size = 18.dp)
-                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.isTrending) "GitHub 开源热榜" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                                    }
-                                    Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = openHotRanking).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("完整榜单", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                                        XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-                                    }
-                                }
-                                issue.ranks.take(3).forEachIndexed { i, r ->
-                                    if (i > 0) Hairline()
-                                    RepoMiniRow(r) { openRepo(env, r, open) }
-                                }
+                    item(key = "repositories") {
+                        Column(Modifier.fillMaxWidth().communityFeedCard(18.dp).padding(horizontal = 18.dp, vertical = 16.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("开源热榜", Modifier.weight(1f), style = feedText(16), color = feedInk, fontWeight = FontWeight.Bold)
+                                LinkText("更多精选", openHotRanking)
+                            }
+                            issue.ranks.take(3).forEachIndexed { i, r ->
+                                if (i > 0) Hairline()
+                                RepoMiniRow(r) { openRepo(env, r, open) }
                             }
                         }
                     }
                 }
+                if (home.banners.isNotEmpty()) item(key = "editorial") { BannerCarousel(home.banners) { openLink(it.link, open) } }
                 if (home.sample) item { FootNote("日报、头图和热榜里带「示例」字样的内容为示例数据。") }
             }
         }
+    }
+}
+
+@Composable
+private fun DailyPreviewRow(env: CommunityEnv, item: NewsItem, last: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(top = 12.dp, bottom = if (last) 4.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(item.title, style = feedText(15, 22.5), fontWeight = FontWeight(650), color = feedInk,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
+            val meta = listOfNotNull(item.source.takeIf(String::isNotBlank), if (item.timeBasis == "collected") "采集于 $time" else time,
+                "示例".takeIf { item.sample }).filter(String::isNotBlank).joinToString(" · ")
+            if (meta.isNotBlank()) Text(meta, style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (item.coverUrl.isNotBlank()) Cover(env.forum.imageUrl(item.coverUrl), item.key.hashCode().toLong(),
+            Modifier.size(84.dp, 56.dp).clip(RoundedCornerShape(14.dp)))
     }
 }
 
@@ -180,7 +180,7 @@ private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> U
     val pager = rememberPagerState { banners.size }
     HorizontalPager(pager, Modifier.fillMaxWidth().height(136.dp), pageSpacing = 8.dp) { page ->
         val banner = banners[page]
-        Column(Modifier.fillMaxSize().outlinedCard(16.dp).clickable { onClick(banner) }.padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.fillMaxSize().communityFeedCard(18.dp).clickable { onClick(banner) }.padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(banner.tag, Modifier.weight(1f), style = XType.Caption, color = Brand)
                 XIcon(XIcons.Sparkle, tint = Brand, size = 18.dp)
@@ -220,18 +220,30 @@ internal fun NewsRow(item: NewsItem, visual: Boolean = false, onClick: () -> Uni
     }
 }
 
-/** 资讯页热榜前三：名次、36dp 图标块、仓库名和语言、7 根小柱、本周新增。 */
 @Composable
 private fun RepoMiniRow(r: RepoRank, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("${r.rank}", Modifier.width(16.dp), style = XType.Section, fontWeight = FontWeight.Bold)
-        RepoTile(r, 36.dp, 8.dp)
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        RepoRankBadge(r.rank)
         Column(Modifier.weight(1f)) {
-            Text(r.fullName, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            LangLine(r)
+            Text(r.fullName, style = feedText(13), color = feedInk, fontWeight = FontWeight(650),
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (r.shownDescription.isNotBlank()) Text(r.shownDescription, style = feedText(12), color = feedMuted,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 24.dp)
-        Text(r.starGain?.let(::formatGain) ?: "${formatStars(r.starTotal)}★", Modifier.width(52.dp), style = XType.Body, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, maxLines = 1)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(formatStars(r.starTotal), style = feedText(12.5, 17.5), color = feedInk, fontWeight = FontWeight(650))
+            r.starGain?.let { Text(formatGain(it), style = feedText(11), color = Brand) }
+        }
+    }
+}
+
+@Composable
+private fun RepoRankBadge(rank: Int) {
+    val top = rank in 1..3
+    Box(Modifier.size(22.dp).background(if (top) LocalExtraColors.current.brandSoft else feedFill,
+        if (top) CircleShape else RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+        Text(rank.toString(), style = feedText(11.5, 16.1), color = if (top) Brand else feedSecondary, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -247,7 +259,7 @@ internal fun HotTab(env: CommunityEnv, open: (Route) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
             LoadBox(state, loader::reload) { issue ->
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = CommunityFeedPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item { PeriodCard(issue) { picking = true } }
                     if (issue.ranks.isEmpty()) item { WhiteCard { Text("这一期还没有榜单", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                     items(issue.ranks, key = { it.fullName }) { r -> RepoCard(env, r, open) }
@@ -289,22 +301,28 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
 /** 热榜卡：名次、仓库、简介、语言和实际星数；收藏操作留在详情页。 */
 @Composable
 private fun RepoCard(env: CommunityEnv, r: RepoRank, open: (Route) -> Unit) {
-    WhiteCard(Modifier.clickable { openRepo(env, r, open) }, padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(r.rank.toString().padStart(2, '0'), style = XType.Secondary, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
-            RepoTile(r, 32.dp, 8.dp)
-            Text(r.fullName, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Column(Modifier.fillMaxWidth().communityFeedCard().clickable { openRepo(env, r, open) }.padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            RepoRankBadge(r.rank)
+            RepoTile(r, 28.dp, 8.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(r.fullName.substringAfter('/'), style = feedText(14, 18.2), color = feedInk, fontWeight = FontWeight(650),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(r.fullName, style = feedText(10.5, 14.7), color = feedMuted, fontFamily = FontFamily.Monospace,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-        if (r.shownDescription.isNotBlank()) Text(r.shownDescription, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LangLine(r)
-            Text("☆ ${formatStars(r.starTotal)}", style = XType.Caption, color = LocalExtraColors.current.ink3)
+        if (r.shownDescription.isNotBlank()) Text(r.shownDescription, style = feedText(12, 17.4), color = feedSecondary,
+            maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (r.language.isNotBlank()) FeedTag(r.language)
             Spacer(Modifier.weight(1f))
-            r.starGain?.let { Text("${formatGain(it)} Star", style = XType.Caption, fontWeight = FontWeight.Medium) }
-            if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 20.dp)
+            r.starGain?.let { Text(formatGain(it), style = feedText(11), color = feedMuted) }
+            Text("★ ${formatStars(r.starTotal)}", style = feedText(11), color = feedMuted, fontWeight = FontWeight.SemiBold)
         }
-        if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-        if (r.starGain != null && r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+        if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", style = feedText(11), color = feedMuted)
+        if (r.starGain != null && r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天", style = feedText(11), color = feedMuted)
     }
 }
 

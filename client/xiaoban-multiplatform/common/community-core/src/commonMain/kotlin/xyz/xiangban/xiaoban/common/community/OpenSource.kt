@@ -37,6 +37,7 @@ data class OpenSourceProject(
     @SerialName("source_url") val sourceUrl: String,
     val featured: Boolean = false,
     val order: Int = 0,
+    val stars: Long? = null,
 ) {
     val githubUrl: String get() = "https://github.com/$fullName"
 }

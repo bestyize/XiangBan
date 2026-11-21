@@ -37,9 +37,13 @@ import xyz.xiangban.xiaoban.common.community.parseBody
  * [onCopy] 不为空时，底下多一个“复制全文”。
  */
 @Composable
-fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false) {
+fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
     val site = env.config.forumBase
-    val blocks = remember(html, site, hideImages) { parseBody(html, site).filter { !hideImages || it !is BodyBlock.Image } }
+    val allBlocks = remember(html, site) { parseBody(html, site) }
+    val blocks = remember(allBlocks, hideImages, galleryImages) {
+        val gallery = galleryImages.toSet()
+        allBlocks.filterNot { it is BodyBlock.Image && (hideImages || it.src in gallery) }
+    }
     var zoom by remember { mutableStateOf<String?>(null) }
     if (blocks.isEmpty()) return
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -55,7 +59,7 @@ fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fon
         }
         if (onCopy != null) Text(
             "复制全文",
-            Modifier.clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill).clickable { onCopy(bodyPlainText(blocks)) }.padding(horizontal = 12.dp, vertical = 5.dp),
+            Modifier.clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill).clickable { onCopy(bodyPlainText(allBlocks)) }.padding(horizontal = 12.dp, vertical = 5.dp),
             style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
