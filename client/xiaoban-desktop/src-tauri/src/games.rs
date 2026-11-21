@@ -6,7 +6,7 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 const POCKET_SPRITES: &str = "pocket-sprites";
 pub const FEATURED_AQUARIUM: &str = "featured-aquarium";
 pub const FEATURED_WHALE_GIRL: &str = "featured-whale-girl";
-pub const FEATURED_APP_IDS: [&str; 2] = [FEATURED_AQUARIUM, FEATURED_WHALE_GIRL];
+pub const FEATURED_PACK_IDS: [&str; 2] = [FEATURED_AQUARIUM, FEATURED_WHALE_GIRL];
 pub const IDS: [&str; 11] = ["falling-blocks", "merge-2048", "block-puzzle", POCKET_SPRITES, "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
 #[derive(Default)]
 pub struct GameState {
@@ -45,7 +45,7 @@ pub fn builtin_catalog() -> Result<Vec<Value>, String> {
         include_str!("../../public/game-packs/featured-aquarium/manifest.json"),
         include_str!("../../public/game-packs/featured-whale-girl/manifest.json"),
     ];
-    manifests.into_iter().zip(IDS).chain(featured.into_iter().zip(FEATURED_APP_IDS)).map(|(text, id)| {
+    manifests.into_iter().zip(IDS).chain(featured.into_iter().zip(FEATURED_PACK_IDS)).map(|(text, id)| {
         let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
             .map_err(|e| format!("游戏 {id} 的清单无法读取：{e}"))?;
         if value["id"] != id {
@@ -76,7 +76,7 @@ pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec
     authorize(&app, &host_token)?;
     // The legacy iframe host only serves games that implement its message protocol.
     Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop" && game["id"] != POCKET_SPRITES
-        && (game["source"] != "builtin" || game["featuredOnly"] != true)).map(|mut game| {
+        && (game["source"] != "builtin" || (game["featuredOnly"] != true && game["id"] != FEATURED_WHALE_GIRL))).map(|mut game| {
         if game["source"] == "builtin" {
             if let Some(id) = game["id"].as_str() { game["base"] = json!(crate::game_packs::base_url(id)); }
         }
@@ -346,7 +346,7 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 }
 #[cfg(test)] mod tests {
     use super::*;
-    #[test] fn all_builtin_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),IDS.len()+FEATURED_APP_IDS.len()); assert!(items.iter().all(|v|v["runtimeProtocol"]==2)); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
+    #[test] fn all_builtin_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),IDS.len()+FEATURED_PACK_IDS.len()); assert!(items.iter().all(|v|v["runtimeProtocol"]==2)); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
     #[test] fn the_game_window_doubles_landscape_dimensions_and_preserves_pack_shape() {
         let (landscape_w, landscape_h) = game_window_size(1440.0, 900.0, true);
         let (portrait_w, portrait_h) = game_window_size(1440.0, 900.0, false);
@@ -368,14 +368,14 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
         let root=temp_root("merge"); user_game(&root,"aquarium",false);
         fs::create_dir_all(crate::game_packs::packs_dir(&root).join("broken")).unwrap();
         let merged=catalog_in(Some(&root)).unwrap();
-        let expected: Vec<_> = IDS.into_iter().chain(FEATURED_APP_IDS).chain(["aquarium"]).collect();
+        let expected: Vec<_> = IDS.into_iter().chain(FEATURED_PACK_IDS).chain(["aquarium"]).collect();
         assert_eq!(merged.ids(), expected);
         let original_aquarium = merged.games.last().unwrap();
         assert_eq!(original_aquarium["source"], "user");
         let base = original_aquarium["base"].as_str().unwrap();
         assert!(base.contains("game-pack") && base.ends_with("/aquarium/"));
         assert_eq!(merged.errors.len(),1); assert!(merged.errors[0].contains("broken"));
-        assert_eq!(catalog_in(None).unwrap().games.len(),IDS.len()+FEATURED_APP_IDS.len());
+        assert_eq!(catalog_in(None).unwrap().games.len(),IDS.len()+FEATURED_PACK_IDS.len());
         let _=fs::remove_dir_all(root);
     }
     #[test] fn save_files_follow_the_manifest_flag() {

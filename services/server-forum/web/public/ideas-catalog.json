@@ -21,13 +21,13 @@
         "mobile": "轻触地板散步，拖动环顾，双指缩放"
       },
       "cover": "https://res.xiangban.xyz/ideas-covers/whale-girl.webp",
-      "label": "3D 互动",
+      "label": "游戏",
       "author": "RealWorldBuilder",
       "date": "2026-11-19",
       "href": "/ideas/works/whale-girl",
       "player": "whale-girl",
       "repository": "https://github.com/bestyize/RealWorldBuilder/tree/ebc9919e183f62eac0b24ad816982ec1e0fea66a/games/whale-girl",
-      "desktop_download": "https://res.xiangban.xyz/files/050162f34f07ab08ff7d3b447318af70.zip"
+      "desktop_download": "https://res.xiangban.xyz/files/6aca8cbf69de76a12a10982b9aef86c9.zip"
     },
     {
       "id": "jiangshan-map",

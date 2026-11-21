@@ -95,7 +95,7 @@ node scripts/build-whale-girl-pack.mjs --source /path/to/RealWorldBuilder/games/
 node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging /path/to/release/whale-girl.zip
 ```
 
-按上述顺序发布 `whale-girl.html`、ZIP、`whale-girl.json` 和封面，再更新精选目录。桌面精选应用使用构建输出的 `featured-whale-girl.json` 固定 ZIP 校验值，`desktop-manifest.json` 对应桌面卡片。已安装的桌面版可以从作品详情下载同一 ZIP，在「应用 → 导入作品」打开。
+按上述顺序发布 `whale-girl.html`、ZIP、`whale-girl.json` 和封面，再更新精选目录。V2 包是横屏休闲游戏，桌面使用构建输出的 `featured-whale-girl.json` 固定 ZIP 校验值，`desktop-manifest.json` 对应官方游戏卡片。已安装的桌面版可以从作品详情下载同一 ZIP，在「应用 → 导入作品」打开。
 
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 

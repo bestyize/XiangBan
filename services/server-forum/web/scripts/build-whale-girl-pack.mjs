@@ -45,10 +45,10 @@ const html = source.toString('utf8')
   .replace('<h2 id="credit-title">作品署名</h2>', '$&\n    <p>书房由 RealWorldBuilder 创作。小伴版适配了 V2 宿主，围裙上的 DeepSeek 标志归相应权利人所有。</p>')
 
 const manifest = {
-  schemaVersion: 3, runtimeProtocol: 2, kind: 'app', id: 'whale-girl', name: '潮汐书房 · 鲸鱼娘',
+  schemaVersion: 3, runtimeProtocol: 2, kind: 'game', id: 'whale-girl', name: '潮汐书房 · 鲸鱼娘',
   description: '拜访月湾书房的溟月，看她读书、写信，从书页间发现藏品。',
-  version: '1.0.0', category: 'tool', entry: 'index.html', icon: 'icon.webp', cover: 'cover.webp',
-  orientation: 'any', input: ['touch', 'mouse', 'keyboard'],
+  version: '1.0.1', category: 'casual', entry: 'index.html', icon: 'icon.webp', cover: 'cover.webp',
+  orientation: 'landscape', input: ['touch', 'mouse', 'keyboard'],
 }
 const files = {
   'manifest.json': JSON.stringify(manifest, null, 2) + '\n',
@@ -88,5 +88,5 @@ await Promise.all([
   writeFile(join(out, 'whale-girl.html'), html),
   writeFile(join(out, 'whale-girl.zip'), bytes),
   writeFile(join(out, 'featured-whale-girl.json'), JSON.stringify(distribution, null, 2) + '\n'),
-  writeFile(join(out, 'desktop-manifest.json'), JSON.stringify({ ...manifest, id: distribution.id, featuredOnly: true }, null, 2) + '\n'),
+  writeFile(join(out, 'desktop-manifest.json'), JSON.stringify({ ...manifest, id: distribution.id }, null, 2) + '\n'),
 ])

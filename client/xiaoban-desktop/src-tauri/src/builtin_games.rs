@@ -34,13 +34,16 @@ fn distribution() -> Result<Vec<Game>, String> {
         return Err("内置游戏目录不一致".into());
     }
     // Keep the original package IDs available for users who import the same ZIP.
-    let featured = [include_str!("featured-aquarium.json"), include_str!("featured-whale-girl.json")];
-    for (source, id) in featured.into_iter().zip(crate::games::FEATURED_APP_IDS) {
-        let app: Game = serde_json::from_str(source).map_err(|e| e.to_string())?;
-        if app.id != id || app.kind != "app" {
-            return Err(format!("精选应用 {id} 的分发清单无效"));
+    let featured = [
+        (include_str!("featured-aquarium.json"), "app"),
+        (include_str!("featured-whale-girl.json"), "game"),
+    ];
+    for ((source, kind), id) in featured.into_iter().zip(crate::games::FEATURED_PACK_IDS) {
+        let game: Game = serde_json::from_str(source).map_err(|e| e.to_string())?;
+        if game.id != id || game.kind != kind {
+            return Err(format!("精选作品 {id} 的分发清单无效"));
         }
-        data.games.push(app);
+        data.games.push(game);
     }
     for game in &data.games {
         let md5 = game.url.strip_prefix("https://res.xiangban.xyz/files/").and_then(|url| url.strip_suffix(".zip"));
@@ -245,13 +248,14 @@ mod tests {
     #[test]
     fn catalog_is_pinned_and_covers_every_builtin() {
         let games = distribution().unwrap();
-        assert_eq!(games.len(), crate::games::IDS.len() + crate::games::FEATURED_APP_IDS.len());
+        assert_eq!(games.len(), crate::games::IDS.len() + crate::games::FEATURED_PACK_IDS.len());
         assert!(games.iter().all(|item| item.url.starts_with("https://res.xiangban.xyz/files/") && item.bytes > 0));
         let aquarium = games.iter().find(|item| item.id == crate::games::FEATURED_AQUARIUM).unwrap();
         assert_eq!(aquarium.pack_id(), "aquarium");
         assert!(!crate::game_packs::is_builtin(aquarium.pack_id()));
         let whale_girl = games.iter().find(|item| item.id == crate::games::FEATURED_WHALE_GIRL).unwrap();
         assert_eq!(whale_girl.pack_id(), "whale-girl");
+        assert_eq!(whale_girl.kind, "game");
         assert!(!crate::game_packs::is_builtin(whale_girl.pack_id()));
     }
 

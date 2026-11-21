@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { it, expect, vi } from 'vitest';
 import { invoke } from '../../bridge.ts';
 import aquariumManifest from '../../../public/game-packs/featured-aquarium/manifest.json';
+import whaleGirlManifest from '../../../public/game-packs/featured-whale-girl/manifest.json';
 import { readGames } from '../../games/catalog.ts';
 import type { GameManifest } from '../../games/protocol.ts';
 import AppsPage from './AppsPage.vue';
@@ -92,6 +93,23 @@ it('opens the featured aquarium as a landscape app and omits it from the games p
   } finally {
     apps.wrapper.unmount();
     games.wrapper.unmount();
+  }
+});
+
+it('opens Whale Girl from the official games page in landscape', async () => {
+  const [whaleGirl] = readGames([whaleGirlManifest]);
+  const { wrapper, openApp } = setupApps([whaleGirl], 'games');
+  try {
+    await flushPromises();
+    expect(wrapper.get('[data-testid="games-tab-builtin"]').text()).toBe('官方游戏');
+    const card = wrapper.get('[data-testid="official-games"] [aria-label="开始潮汐书房 · 鲸鱼娘"]');
+    expect(card.text()).toContain('横屏游戏');
+    await card.trigger('click');
+    expect(openApp).toHaveBeenCalledWith(whaleGirl.id, {
+      title: '潮汐书房 · 鲸鱼娘', orientation: 'landscape', entry: 'index.html',
+    });
+  } finally {
+    wrapper.unmount();
   }
 });
 

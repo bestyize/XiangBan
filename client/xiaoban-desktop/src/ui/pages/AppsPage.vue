@@ -216,10 +216,10 @@ onActivated(() => {
           type="button"
           role="tab"
           :aria-selected="primaryTab === tab.id"
-          :data-testid="store.page === 'games' ? `games-tab-${tab.id === 'plaza' ? 'builtin' : 'custom'}` : `apps-tab-${tab.id}`"
+          :data-testid="`${isGamesMode ? 'games' : 'apps'}-tab-${tab.id}`"
           @click="primaryTab = tab.id"
         >
-          {{ store.page === 'games' ? (tab.id === 'plaza' ? '官方游戏' : '我的游戏') : tab.label }}
+          {{ tab.label }}
         </button>
       </div>
 
