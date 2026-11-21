@@ -1670,62 +1670,61 @@
               ${icon('back', 14)} 返回列表
             </button>
           </div>
-          <div class="xhs-pc-card ${activeImg ? '' : 'is-text-only'}">
+          <div class="xhs-pc-card">
+            <div class="xhs-author-bar">
+              <div class="xhs-head-author">
+                <span class="mini-avatar" style="background:${item.avatarBg};width:34px;height:34px;font-size:13px">${esc(item.author[0].replace('@', '').toUpperCase())}</span>
+                <strong>${esc(item.author)}</strong>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>
+                <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
+              </div>
+            </div>
             ${activeImg ? `
-              <div class="xhs-pc-media">
+              <div class="xhs-pc-media" ${gallery.length > 1 ? 'data-action="detail-slide-next"' : ''}>
                 <img src="${activeImg}" alt="${esc(item.title)}">
                 <span class="xhs-media-pill">${esc(item.badge)}</span>
                 ${gallery.length > 1 ? `
                   <span class="xhs-media-count">${slideIdx + 1}/${gallery.length}</span>
                   <button type="button" class="xhs-pc-nav is-prev" aria-label="上一张" data-action="detail-slide-prev">${icon('back', 16)}</button>
                   <button type="button" class="xhs-pc-nav is-next" aria-label="下一张" data-action="detail-slide-next">${icon('arrow', 16)}</button>
-                  ${dotsHtml(true)}
                 ` : ''}
               </div>
+              ${dotsHtml(false)}
             ` : ''}
-            <div class="xhs-pc-panel">
-              <div class="xhs-author-bar">
-                <div class="xhs-head-author">
-                  <span class="mini-avatar" style="background:${item.avatarBg};width:34px;height:34px;font-size:13px">${esc(item.author[0].replace('@', '').toUpperCase())}</span>
-                  <strong>${esc(item.author)}</strong>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px">
-                  <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>
-                  <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
-                </div>
+            <div class="xhs-pc-body ${gallery.length > 1 ? 'has-dots' : ''}">
+              <h1 class="xhs-title">${esc(item.title)}</h1>
+              <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
+              <div class="xhs-hashtags">${tagsHtml}</div>
+              ${infoStripsHtml}
+              <div class="xhs-meta-row">
+                <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
+                <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
               </div>
-              <div class="xhs-pc-scroll">
-                <h1 class="xhs-title">${esc(item.title)}</h1>
-                <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
-                <div class="xhs-hashtags">${tagsHtml}</div>
-                ${infoStripsHtml}
-                <div class="xhs-meta-row">
-                  <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
-                  <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
-                </div>
-                <div class="xhs-divider"></div>
-                ${renderDetailComments(item, comments, 'desktop')}
+            </div>
+            <div class="xhs-pc-dock">
+              <form class="xhs-pc-form" data-action="submit-comment" data-key="${esc(item.key)}">
+                <label class="xhs-pc-input-wrap">
+                  ${icon('edit', 14)}
+                  <input class="comment-input" type="text" placeholder="${esc(replyPlaceholder)}" maxlength="200" required>
+                </label>
+                <button class="xhs-send-btn is-ready" type="submit">发送</button>
+              </form>
+              <div class="xhs-pc-stats">
+                <button type="button" class="h5-dock-stat ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="${esc(item.key)}">
+                  ${icon('heart', 19)}<span>${likeCount}</span>
+                </button>
+                <button type="button" class="h5-dock-stat ${saved ? 'is-saved' : ''}" data-action="toggle-save" data-key="${esc(item.key)}">
+                  ${icon('star', 19)}<span>${saveCount}</span>
+                </button>
+                <button type="button" class="h5-dock-stat" data-action="focus-pc-comment">
+                  ${icon('chat', 18)}<span>${comments.length}</span>
+                </button>
               </div>
-              <div class="xhs-pc-dock">
-                <div class="xhs-pc-stats">
-                  <button type="button" class="h5-dock-stat ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="${esc(item.key)}">
-                    ${icon('heart', 19)}<span>${likeCount}</span>
-                  </button>
-                  <button type="button" class="h5-dock-stat ${saved ? 'is-saved' : ''}" data-action="toggle-save" data-key="${esc(item.key)}">
-                    ${icon('star', 19)}<span>${saveCount}</span>
-                  </button>
-                  <button type="button" class="h5-dock-stat" data-action="focus-pc-comment">
-                    ${icon('chat', 18)}<span>${comments.length}</span>
-                  </button>
-                </div>
-                <form class="xhs-pc-form" data-action="submit-comment" data-key="${esc(item.key)}">
-                  <label class="xhs-pc-input-wrap">
-                    ${icon('edit', 14)}
-                    <input class="comment-input" type="text" placeholder="${esc(replyPlaceholder)}" maxlength="200" required>
-                  </label>
-                  <button class="xhs-send-btn is-ready" type="submit">发送</button>
-                </form>
-              </div>
+            </div>
+            <div class="xhs-pc-comments" id="detail-comments-desktop">
+              ${renderDetailComments(item, comments, 'desktop')}
             </div>
           </div>
         </div>
