@@ -222,12 +222,27 @@ pub async fn attach_to_comment(
     Ok(())
 }
 
+/// 账号中心可能先保存成功，论坛需要保留原图直到同步确认。
+pub async fn hold_avatar(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Value>> {
+    let updated = sqlx::query("UPDATE images SET avatar_pending=true WHERE id=$1 AND uploader_uid=$2 AND NOT editor_pending")
+        .bind(id).bind(auth.user.uid).execute(&state.pool).await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("图片"));
+    }
+    Ok(Json(json!({"ok": true})))
+}
+
 /// 清掉上传超过一天且未关联帖子、评论、待发布稿或用户头像的图片。
 /// 头像存在账号中心，论坛 `users.avatar_url` 是登录时同步的副本，图片 id 出现在里面就保留。
 pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
     let rows: Vec<(Uuid,)> = sqlx::query_as(
         "DELETE FROM images i
          WHERE i.created_at < now() - interval '1 day'
+           AND NOT i.avatar_pending
            AND NOT EXISTS (SELECT 1 FROM topics t WHERE position(i.id::text in t.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM posts p WHERE position(i.id::text in p.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM editor_draft_assets a WHERE a.image_id = i.id)

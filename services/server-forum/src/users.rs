@@ -73,14 +73,28 @@ pub async fn sync_profile(http: &reqwest::Client, account_base: &str, token: &st
     if let Some(me) = me {
         let nickname: String = me.username.trim().chars().take(24).collect();
         if !nickname.is_empty() {
-            let _ = sqlx::query("UPDATE users SET nickname = CASE WHEN display_alias IS NOT NULL THEN display_alias WHEN EXISTS (SELECT 1 FROM editor_authors e WHERE e.uid = users.uid) THEN nickname ELSE $2 END, avatar_url = $3 WHERE uid = $1")
-                .bind(uid)
-                .bind(nickname)
-                .bind(me.avatar_url.filter(|u| u.starts_with("https://")))
-                .execute(pool)
-                .await;
+            if let Err(error) = store_synced_profile(pool, uid, &nickname, me.avatar_url.filter(|u| u.starts_with("https://"))).await {
+                tracing::warn!("保存论坛资料同步结果失败: {error}");
+            }
         }
     }
+}
+
+pub(crate) async fn store_synced_profile(pool: &PgPool, uid: Uuid, nickname: &str, avatar: Option<String>) -> Result<(), AppError> {
+    let image = avatar.as_deref().and_then(|url| url.rsplit_once('/'))
+        .and_then(|(path, id)| (path.ends_with("/api/images") || path.ends_with("/forum-content/images"))
+            .then(|| Uuid::parse_str(id).ok()).flatten());
+    sqlx::query(
+        "WITH synced AS (
+            UPDATE users SET nickname = CASE WHEN display_alias IS NOT NULL THEN display_alias
+                WHEN EXISTS (SELECT 1 FROM editor_authors e WHERE e.uid = users.uid) THEN nickname ELSE $2 END,
+                avatar_url = $3 WHERE uid = $1 RETURNING uid
+         )
+         UPDATE images SET avatar_pending=false FROM synced
+         WHERE images.id=$4 AND images.uploader_uid=synced.uid AND images.avatar_pending",
+    )
+    .bind(uid).bind(nickname).bind(avatar).bind(image).execute(pool).await?;
+    Ok(())
 }
 
 /// 记一次访问（按自然日计访问天数），并检查 TL0 → TL1 自动升级。

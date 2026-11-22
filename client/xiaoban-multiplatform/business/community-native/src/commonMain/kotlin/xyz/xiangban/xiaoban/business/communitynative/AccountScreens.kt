@@ -201,7 +201,7 @@ internal fun rememberAvatarFlow(
     val session by env.session.state.collectAsState()
     val site = env.config.forumBase.trimEnd('/')
     val platform = env.platform
-    val avatar = remember(session.accountId) { AvatarEditorState() }
+    val avatar = remember(session.accountId, session.generation) { AvatarEditorState() }
 
     fun start() {
         if (platform?.avatarEditorSupported == true) avatar.open() else platform?.openUrl("$site/settings")
@@ -225,27 +225,37 @@ internal fun rememberAvatarFlow(
         }
     }
 
-    // 先把裁好的 512 WebP 传到论坛图片库，再把地址写进账号中心；上传过的同一裁剪重试时只重写账号中心。
+    // 同一裁剪重试时复用已上传的图片，直到论坛确认头像同步。
     fun save() {
         val actions = platform ?: return
         val image = avatar.image ?: return
         val crop = avatar.crop ?: return
         if (avatar.saving) return
-        val owner = session.accountId
+        val owner = env.session.identity() ?: return
         avatar.status = AvatarStatus.Saving
         avatar.error = null
         scope.launch {
             try {
                 val signature = avatar.signature()
-                val url = avatar.uploaded?.takeIf { it.first == signature }?.second ?: run {
+                val uploaded = avatar.uploaded?.takeIf { it.first == signature }?.second ?: run {
                     val bytes = actions.encodeAvatarWebp(renderAvatar(image, crop, avatar.diameter)) ?: throw ApiException(0, "生成头像失败，请重试")
-                    val uploaded = env.forum.uploadImage(ForumUploadFile("avatar.webp", "image/webp", bytes), FORUM_IMAGE_MAX_BYTES)
-                    env.forum.imageUrl(uploaded.url).also { avatar.uploaded = signature to it }
+                    env.forum.uploadImage(ForumUploadFile("avatar.webp", "image/webp", bytes), FORUM_IMAGE_MAX_BYTES)
+                        .also { avatar.uploaded = signature to it }
                 }
-                if (env.session.state.value.accountId != owner) throw ApiException(401, "账号已切换，请重新选择图片")
-                env.session.setAvatar(url)
-                // 论坛登录时同步头像；这一步也让论坛记住这张图在用作头像，不被当成未引用图片清理。
-                runCatching { env.forum.session() }
+                if (env.session.identity() != owner) throw ApiException(401, "账号已切换，请重新选择图片")
+                try {
+                    env.forum.holdAvatar(uploaded.id)
+                } catch (e: ApiException) {
+                    if (e.status == 404) avatar.uploaded = null
+                    throw e
+                }
+                val url = env.forum.imageUrl(uploaded.url)
+                env.session.setAvatar(url, owner)
+                val synced = env.forum.session().user
+                if (env.session.identity() != owner) throw ApiException(401, "账号已切换，请重新选择图片")
+                if (synced.uid != env.session.state.value.user?.uid || synced.avatarUrl != url) {
+                    throw ApiException(409, "论坛头像尚未同步，请重试保存")
+                }
                 avatar.clear()
                 onUpdated()
                 onToast("头像已更新")

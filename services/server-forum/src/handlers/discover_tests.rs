@@ -401,19 +401,33 @@ async fn avatar_images_survive_unused_image_purge() -> Result<(), Box<dyn std::e
     let Some(h) = harness().await? else { return Ok(()) };
     let upload_dir = std::env::temp_dir().join(format!("{}-avatar", h.schema));
     tokio::fs::create_dir_all(&upload_dir).await?;
-    let (uid, avatar, unused) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    let (uid, avatar, pending, unused) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
     sqlx::query("INSERT INTO users(uid,nickname,trust_level,avatar_url) VALUES($1,'换头像',0,$2)")
         .bind(uid).bind(format!("https://chat.xiangban.xyz/api/images/{avatar}")).execute(&h.pool).await?;
-    for id in [avatar, unused] {
+    for id in [avatar, pending, unused] {
         sqlx::query("INSERT INTO images(id,uploader_uid,mime,size,created_at) VALUES($1,$2,'image/jpeg',4,now()-interval '2 days')")
             .bind(id).bind(uid).execute(&h.pool).await?;
     }
+    let hold = format!("/api/images/{pending}/avatar-hold");
+    let other = h.member().await?;
+    assert_eq!(call(&h.app, "POST", &hold, Some(&other), Value::Null).await.0, StatusCode::NOT_FOUND);
+    let owner = (h.make_token)(uid);
+    for _ in 0..2 {
+        assert_eq!(call(&h.app, "POST", &hold, Some(&owner), Value::Null).await.0, StatusCode::OK);
+    }
     let left = |pool: sqlx::PgPool| async move {
-        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM images WHERE id = ANY($1)").bind(vec![avatar, unused]).fetch_all(&pool).await
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM images WHERE id = ANY($1)").bind(vec![avatar, pending, unused]).fetch_all(&pool).await
     };
     crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
-    assert_eq!(left(h.pool.clone()).await?, vec![(avatar,)], "正在用作头像的图片不能被清理");
-    sqlx::query("UPDATE users SET avatar_url=NULL WHERE uid=$1").bind(uid).execute(&h.pool).await?;
+    let retained = left(h.pool.clone()).await?;
+    assert_eq!(retained.len(), 2);
+    assert!(retained.contains(&avatar) && retained.contains(&pending));
+    let next = format!("https://res.xiangban.xyz/forum-content/images/{pending}");
+    crate::users::store_synced_profile(&h.pool, uid, "换头像", Some(next)).await?;
+    assert!(!sqlx::query_scalar::<_, bool>("SELECT avatar_pending FROM images WHERE id=$1").bind(pending).fetch_one(&h.pool).await?);
+    crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
+    assert_eq!(left(h.pool.clone()).await?, vec![pending]);
+    crate::users::store_synced_profile(&h.pool, uid, "换头像", None).await?;
     crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
     assert!(left(h.pool.clone()).await?.is_empty(), "换掉头像后旧图按普通未引用图片清理");
     tokio::fs::remove_dir_all(upload_dir).await?;

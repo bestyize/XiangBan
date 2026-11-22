@@ -99,6 +99,7 @@ pub fn build_router(state: AppState) -> Router {
             post(images::upload).layer(DefaultBodyLimit::max((state.config.upload_limit_image + 1024 * 1024) as usize)),
         )
         .route("/images/{id}", get(images::show).head(images::head))
+        .route("/images/{id}/avatar-hold", post(images::hold_avatar))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .route("/resource-uploads/ticket", post(handlers::resource_uploads::ticket))

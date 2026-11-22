@@ -142,12 +142,13 @@ class SessionManager(
     }
 
     /** 把已上传的头像地址写进账号中心。账号切换或令牌失效时抛出，调用方显示原因并允许重试。 */
-    suspend fun setAvatar(avatarUrl: String) {
-        val owner = identity() ?: throw ApiException(401, "登录已过期，请重新登录后再试")
+    suspend fun setAvatar(avatarUrl: String, expected: SessionIdentity? = identity()) {
+        val owner = expected ?: throw ApiException(401, "登录已过期，请重新登录后再试")
         val token = accessToken(owner) ?: throw ApiException(401, "登录已过期，请重新登录后再试")
         val profile = account.updateAvatar(token, avatarUrl)
         lock.withLock {
-            if (identity() == owner) _state.value = _state.value.copy(user = profile)
+            checkIdentity(owner)
+            _state.value = _state.value.copy(user = profile)
         }
     }
 

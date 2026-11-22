@@ -104,6 +104,7 @@ export const api = {
   tags: () => request<{ name: string; count: number }[]>('GET', '/tags', undefined, false),
 
   session: () => request<SessionInfo>('POST', '/session', { invite: pendingInvite() }),
+  holdAvatar: (id: string) => request<{ ok: boolean }>('POST', `/images/${encodeURIComponent(id)}/avatar-hold`),
   points: () => request<PointsWallet>('GET', '/me/points'),
   pointsLedger: (page = 1) => request<Page<PointsLedgerItem>>('GET', `/me/points/ledger${qs({ page })}`),
   invites: (page = 1) => request<Page<InviteItem>>('GET', `/me/points/invites${qs({ page })}`),
