@@ -2289,11 +2289,13 @@
       hud.goal = goal
     }
     if (force || p.hp !== hud.hp || p.maxHp !== hud.max) {
-      const lost = hud.hp > p.hp && !force ? p.hp : -1
+      const lost = hud.hp > p.hp && !force ? Math.floor(p.hp) : -1
       const pips = []
       for (let i = 0; i < p.maxHp; i++) {
         const pip = document.createElement('i')
-        if (i >= p.hp) pip.className = 'empty' + (i === lost ? ' lost' : '')
+        const fill = Math.max(0, Math.min(1, p.hp - i))
+        const stateClass = fill >= 1 ? '' : fill > 0 ? 'half' : 'empty'
+        pip.className = stateClass + (i === lost ? (stateClass ? ' lost' : 'lost') : '')
         pips.push(pip)
       }
       $('hp').replaceChildren(...pips)
@@ -2320,7 +2322,7 @@
     }
     const boss = state.enemies.find((enemy) => rules.isBoss(enemy))
     if (boss) {
-      const hp = Math.round(boss.hp / boss.maxHp * 1000), posture = Math.round(boss.posture)
+      const hp = Math.round(boss.hp / boss.maxHp * 1000), posture = Math.round(boss.posture / (boss.postureMax || 100) * 100)
       if (hp !== hud.boss) { $('bossHp').style.width = hp / 10 + '%'; hud.boss = hp }
       if (posture !== hud.posture) { $('bossPosture').style.width = posture + '%'; hud.posture = posture }
     } else if (!$('bossBar').hidden && !inBossFight()) $('bossBar').hidden = true

@@ -71,7 +71,7 @@ describe('竹林卷 · 架刀', () => {
     const hp = state.player.hp
     const events = run(state, 70, (i) => ({ slashPressed: i % 6 === 0 }))
     expect(events.some((e) => e.type === 'parry')).toBe(false)
-    expect(state.player.hp).toBe(hp - 1)
+    expect(state.player.hp).toBe(hp - 0.5)
     expect(puppet.alive).toBe(true)
   })
 
@@ -164,7 +164,7 @@ describe('竹林卷 · 收刀', () => {
     place(hasty, 'puppet', 1460, { state: 'attack', t: 0.12, hitDone: false })
     const hp = hasty.player.hp
     expect(run(hasty, 3, slashOnce).some((e) => e.type === 'parry')).toBe(false)
-    expect(hasty.player.hp).toBe(hp - 1)
+    expect(hasty.player.hp).toBe(hp - 0.5)
   })
 
   it('keeps a string of parries flowing: the swing after a parry is always settled', () => {
@@ -240,11 +240,12 @@ describe('竹林卷 · 回墨 and grades', () => {
     const state = rules.createGame({ level: '1-2', seed: 3 })
     state.player.x = 1600
     run(state, 2)
-    for (let wave = 0; wave < 2; wave++) {
+    const last = state.plan[0].waves.length - 1
+    for (let wave = 0; wave < last; wave++) {
       for (const enemy of state.enemies) enemy.alive = false
       run(state, 46)
     }
-    expect(state.wave).toBe(2)
+    expect(state.wave).toBe(last)
     expect(state.enemies.some((enemy: Any) => enemy.alive)).toBe(true)
     state.player.hp = 3
     for (const enemy of state.enemies) enemy.alive = false

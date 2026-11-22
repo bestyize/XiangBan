@@ -135,9 +135,10 @@ describe('ink blade rules', () => {
     expect(rules.evaluate(state)).toMatchObject({ seals: 7, grade: 3 })
     expect(rules.challenge(state)).toMatchObject({ value: 3, goal: 3, met: true })
     const scroll = rules.createGame({ level: '1-scroll' })
-    scroll.reason = 'clear'; scroll.time = 400
+    const scrollGoal = levels.level('1-scroll').challenge.goal
+    scroll.reason = 'clear'; scroll.time = scrollGoal + 40
     expect(rules.evaluate(scroll).seals & 4).toBe(0)
-    scroll.time = 300
+    scroll.time = scrollGoal - 60
     expect(rules.evaluate(scroll).seals & 4).toBe(4)
   })
 
@@ -191,7 +192,7 @@ describe('ink blade rules', () => {
     puppet.state = 'tele'; puppet.t = 0.01; puppet.teleTotal = 0.5
     const events = run(state, 12)
     expect(events.some((e) => e.type === 'hurt')).toBe(true)
-    expect(state.player.hp).toBe(4)
+    expect(state.player.hp).toBe(4.5)
     expect(state.player.iframes).toBeGreaterThan(0.5)
     expect(state.player.combo).toBe(0)
   })
@@ -257,7 +258,7 @@ describe('ink blade rules', () => {
     boss.state = 'phantom'; boss.t = 1.2; boss.vx = -1150; boss.hitDone = false
     rules.step(state, { slashPressed: true }, DT)
     run(state, 30)
-    expect(state.player.hp).toBe(4)
+    expect(state.player.hp).toBe(4.5)
     const dodge = arena()
     const second = place(dodge, 'boss', 1700, { facing: -1 })
     second.state = 'phantom'; second.t = 1.2; second.vx = -1150; second.hitDone = false
@@ -374,7 +375,7 @@ describe('ink blade rules', () => {
     expect(events.some((e) => e.type === 'crackBurst')).toBe(true)
     expect(ronin.alive).toBe(false)
     expect(s.player.crackKills).toBe(1)
-    expect(s.player.hp).toBe(s.player.maxHp - 1)
+    expect(s.player.hp).toBe(s.player.maxHp - 0.5)
 
     const dodge = rules.createGame({ level: '2-2', seed: 1 })
     dodge.lock = [1380, 2100]; dodge.encounter = 99; dodge.player.x = 1700
@@ -510,7 +511,7 @@ describe('ink blade rules', () => {
 
   it('ends the round when the swordsman falls', () => {
     const state = arena()
-    state.player.hp = 1
+    state.player.hp = 0.5
     const puppet = place(state, 'puppet', 1460, { facing: -1 })
     puppet.state = 'tele'; puppet.t = 0.01; puppet.teleTotal = 0.5
     const events = run(state, 60 * 4)

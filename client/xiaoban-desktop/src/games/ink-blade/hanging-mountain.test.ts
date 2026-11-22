@@ -204,7 +204,7 @@ describe('悬山卷',()=>{
    expect(s.bellWave).not.toBeNull()
    expect(s.player.damageTaken).toBe(0)
    run(s, 52)
-   expect(s.player.damageTaken).toBe(elevated ? 0 : 1)
+   expect(s.player.damageTaken).toBe(elevated ? 0 : 0.5)
    expect(boss.alive).toBe(true)
   }
  })
@@ -241,7 +241,7 @@ describe('悬山卷',()=>{
   for(const jump of [false,true]){
    const s=arena('6-3',2700);place(s,'monk',2770,{state:'mountTell',t:.15,teleTotal:.9,move:'sweep',sweep:true,facing:-1})
    const events=run(s,18,i=>({jumpPressed:jump&&i===0,jump,slashPressed:!jump&&i===7}))
-   expect(events.some(e=>e.type==='parry')).toBe(false);expect(s.player.hp).toBe(s.player.maxHp-(jump?0:1))
+   expect(events.some(e=>e.type==='parry')).toBe(false);expect(s.player.hp).toBe(s.player.maxHp-(jump?0:0.5))
   }
  })
  it('evaluates both requirements of combined seals',()=>{

@@ -32,6 +32,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .vitals { display: flex; flex-direction: column; gap: 7px; padding-top: 4px; }
 .hp { display: flex; gap: 5px; }
 .hp i { width: 13px; height: 17px; border-radius: 50% 50% 50% 50% / 62% 62% 40% 40%; background: var(--ink); clip-path: polygon(50% 0, 100% 58%, 92% 82%, 72% 98%, 28% 98%, 8% 82%, 0 58%); box-shadow: inset -2px -3px 0 #ffffff14; transition: transform .2s, opacity .3s; }
+.hp i.half { background: linear-gradient(180deg, transparent 0 52%, var(--ink) 52% 100%); box-shadow: inset 0 0 0 1.5px #1b1b1d7a; }
 .hp i.empty { background: transparent; box-shadow: inset 0 0 0 1.5px #1b1b1d66; opacity: .7; }
 .hp i.lost { animation: drop-lost .5s ease-out; }
 @keyframes drop-lost { 0% { transform: scale(1.5); background: var(--cinnabar); } 100% { transform: scale(1); } }
@@ -71,6 +72,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 @keyframes prompt-in { from { opacity: 0; translate: 0 8px; } }
 /* Under the moon the sky is dark ink, so the HUD switches to paper-coloured strokes. */
 .game.night .hp i { background: #efe7d4; box-shadow: none; }
+.game.night .hp i.half { background: linear-gradient(180deg, transparent 0 52%, #efe7d4 52% 100%); box-shadow: inset 0 0 0 1.5px #efe7d4aa; }
 .game.night .hp i.empty { background: transparent; box-shadow: inset 0 0 0 1.5px #efe7d499; }
 .game.night .ink-meter { background: #efe7d41f; box-shadow: inset 0 0 0 1px #efe7d44d; }
 .game.night .ink-fill { background: linear-gradient(90deg, #efe7d4aa, #efe7d4); }

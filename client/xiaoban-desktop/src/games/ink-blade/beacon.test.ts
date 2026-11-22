@@ -48,7 +48,7 @@ describe('烽火卷 · arrow rain', () => {
     expect(tell.tele).toBeCloseTo(1.2)
     const events = run(open, 60 * 1.3)
     expect(events.some((e) => e.type === 'volleyHit')).toBe(true)
-    expect(open.player.hp).toBe(open.player.maxHp - 1)
+    expect(open.player.hp).toBe(open.player.maxHp - 0.5)
 
     const wall = levels.volume(3).ramparts[0]
     const cover = arena('3-1', [740, 1400], wall.x - 20)
@@ -102,7 +102,7 @@ describe('烽火卷 · wildfire', () => {
     const burn = arena('3-2', [1380, 2100], 1490)
     rules.igniteAt(burn, 1490)
     run(burn, 20)
-    expect(burn.player.hp).toBe(burn.player.maxHp - 1)
+    expect(burn.player.hp).toBe(burn.player.maxHp - 0.5)
   })
 
   it('lets a fire pot be batted back at its thrower', () => {

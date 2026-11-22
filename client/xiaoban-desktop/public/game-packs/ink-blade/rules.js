@@ -9,9 +9,10 @@
   const LEVELS = globalThis.XiabanInkLevels
 
   const DIFFICULTIES = {
-    easy: { hp: 7, parry: 0.24, aggression: 0.7, tokens: 1, tele: 1.2, bossHp: 34 },
-    normal: { hp: 5, parry: 0.16, aggression: 1, tokens: 2, tele: 1, bossHp: 46 },
+    easy: { hp: 7, parry: 0.24, aggression: 0.7, tokens: 1, tele: 1.2, bossHp: 62 },
+    normal: { hp: 5, parry: 0.16, aggression: 1, tokens: 2, tele: 1, bossHp: 82 },
   }
+  const PLAYER_DAMAGE_SCALE = 0.5
 
   // Slash stages: duration, active frames, chain point, forward lunge, damage, reach and the drawn arc.
   const STAGES = [
@@ -26,26 +27,26 @@
     shield: { hp: 5, w: 19, h: 56, score: 200, speed: 70, reach: 86, tele: 0.7, active: 0.15, recover: 0.75, lunge: 240, damage: 1 },
     archer: { hp: 2, w: 14, h: 52, score: 120 },
     crow: { hp: 1, w: 14, h: 12, score: 60 },
-    boss: { hp: 36, w: 21, h: 72, score: 2000 },
+    boss: { hp: 64, w: 21, h: 72, score: 2000 },
     ronin: { hp: 3, w: 15, h: 52, score: 180, speed: 130, reach: 85, tele: 0.44, active: 0.12, recover: 0.5, lunge: 360, damage: 1 },
     spearman: { hp: 4, w: 16, h: 56, score: 220, speed: 78, reach: 130, tele: 0.52, active: 0.14, recover: 0.65, lunge: 280, damage: 1 },
     hammer: { hp: 7, w: 22, h: 66, score: 320, speed: 52, reach: 105, tele: 0.68, active: 0.18, recover: 0.85, lunge: 190, damage: 1 },
-    angler: { hp: 48, w: 20, h: 68, score: 2500 },
+    angler: { hp: 88, w: 20, h: 68, score: 2500 },
     // 烽火卷
     soldier: { hp: 3, w: 15, h: 54, score: 120, speed: 112, reach: 82, tele: 0.48, active: 0.12, recover: 0.52, lunge: 330, damage: 1 },
     bomber: { hp: 2, w: 14, h: 52, score: 150 },
     cavalry: { hp: 6, w: 26, h: 76, score: 300, speed: 220, reach: 74, tele: 0.62, active: 1.5, recover: 0.95, lunge: 460, damage: 1 },
     footman: { hp: 3, w: 15, h: 54, score: 300, speed: 104, reach: 80, tele: 0.5, active: 0.12, recover: 0.55, lunge: 300, damage: 1 },
     pavise: { hp: 4, w: 18, h: 56, score: 200, speed: 46, reach: 86, tele: 0.62, active: 0.14, recover: 0.7, lunge: 170, damage: 1 },
-    general: { hp: 56, w: 26, h: 82, score: 3000 },
+    general: { hp: 98, w: 26, h: 82, score: 3000 },
     // 怒涛卷
     pirate: { hp: 4, w: 15, h: 54, score: 170, speed: 118, reach: 84, tele: 0.5, active: 0.13, recover: 0.54, lunge: 320, damage: 1 },
     hooker: { hp: 4, w: 18, h: 56, score: 260, speed: 78, reach: 170, tele: 0.72, active: 0.2, recover: 0.95, lunge: 90, damage: 1 },
-    dragon: { hp: 62, w: 40, h: 90, score: 3600 },
+    dragon: { hp: 108, w: 40, h: 90, score: 3600 },
     lantern: {hp:3,w:16,h:62,score:180,speed:82,reach:110,tele:0.65,active:0.15,recover:0.7,lunge:150,damage:1},
     mirror: {hp:4,w:16,h:60,score:280,speed:62,reach:86,tele:0.6,active:0.14,recover:0.85,lunge:210,damage:1},
     watchman: {hp:5,w:23,h:73,score:300,speed:54,reach:135,tele:0.75,active:0.16,recover:0.95,lunge:120,damage:1},
-    judge: {hp:60,w:24,h:86,score:3800},
+    judge: {hp:105,w:24,h:86,score:3800},
     umbrella:{hp:4,w:18,h:62,score:260,speed:65,reach:100,tele:.7,active:.15,recover:.9,lunge:130,damage:1},
     monk:{hp:5,w:19,h:66,score:240,speed:75,reach:119,tele:.65,active:.16,recover:1,lunge:160,damage:1},
     disciple:{hp:3,w:14,h:54,score:160,speed:125,reach:82,tele:.5,active:.13,recover:.7,lunge:250,damage:1},
@@ -53,14 +54,14 @@
     quarrier: { hp: 4, w: 17, h: 58, score: 230, speed: 70, reach: 82, tele: .76, active: .15, recover: .9, lunge: 110, damage: 1 },
     crossbow:{hp:3,w:16,h:56,score:200},
     axeman:{hp:6,w:24,h:70,score:300,speed:58,reach:115,tele:.9,active:.2,recover:1.25,lunge:130,damage:1},
-    yanhui:{hp:14,w:20,h:67,score:950,speed:108,reach:102,tele:.65,active:.16,recover:.9,lunge:270,damage:1},
-    shizhen:{hp:18,w:25,h:76,score:1200,speed:62,reach:110,tele:.7,active:.18,recover:1.1,lunge:160,damage:1},
-    yue: { hp: 46, w: 24, h: 80, score: 4000, speed: 118, reach: 132, tele: 0.8, active: 0.18, recover: 1.05, lunge: 240, damage: 1 },
+    yanhui:{hp:20,w:20,h:67,score:950,speed:108,reach:102,tele:.65,active:.16,recover:.9,lunge:270,damage:1},
+    shizhen:{hp:26,w:25,h:76,score:1200,speed:62,reach:110,tele:.7,active:.18,recover:1.1,lunge:160,damage:1},
+    yue: { hp: 82, w: 24, h: 80, score: 4000, speed: 118, reach: 132, tele: 0.8, active: 0.18, recover: 1.05, lunge: 240, damage: 1 },
     // 归墨卷（终卷）
     shade: { hp: 3, w: 14, h: 54, score: 180, speed: 115, reach: 84, tele: 0.5, active: 0.12, recover: 0.85, lunge: 320, damage: 1 },
     shadeArcher: { hp: 2, w: 14, h: 54, score: 160 },
     shadeRider: { hp: 6, w: 26, h: 76, score: 320, speed: 220, reach: 74, tele: 0.62, active: 1.5, recover: 0.95, lunge: 460, damage: 1 },
-    nameless: { hp: 60, w: 13, h: 54, score: 4000 },
+    nameless: { hp: 105, w: 13, h: 54, score: 4000 },
   }
   const BOSSES = new Set(['boss', 'angler', 'general', 'dragon', 'judge', 'yue', 'nameless'])
   const SHADES = new Set(['shade', 'shadeArcher', 'shadeRider'])
@@ -606,8 +607,9 @@
 
   function hurtPlayer(state, damage, fromX) {
     const player = state.player
-    player.hp = Math.max(0, player.hp - damage)
-    player.damageTaken += damage
+    const loss = damage * PLAYER_DAMAGE_SCALE
+    player.hp = Math.max(0, player.hp - loss)
+    player.damageTaken += loss
     player.iframes = 1
     player.hurt = 0.3
     player.borrowUntil = 0
@@ -845,12 +847,20 @@
     const melee = source === 'slash' || source === 'heavy'
     // 拆与回锋 (归墨卷): shades and Nameless parry frontal slashes while idle, walking, or early in a telegraph.
     if (state.world.counterGuard && melee && fromFront && (enemy.type === 'shade' || enemy.type === 'nameless') && (enemy.counterCd || 0) <= 0) {
-      const earlyTele = (enemy.state === 'tele' || (enemy.state === 'combo' && enemy.combo?.phase === 'tele') || enemy.state === 'waveTell') &&
+      const earlyTele = (enemy.state === 'tele' || (enemy.state === 'combo' && enemy.combo?.phase === 'tele') || enemy.state === 'waveTell' || enemy.state === 'duelThrustTell') &&
         enemy.teleTotal > 0 && enemy.t >= enemy.teleTotal * 0.55
       if (enemy.state === 'idle' || enemy.state === 'walk' || earlyTele) {
         counterPlayerSlash(state, enemy)
         return
       }
+    }
+    // 无名剑客剑势护体：正面非破绽态下格挡平砍，逼迫玩家以弹反、绕背、招后收势或笔会破之。
+    if (enemy.type === 'nameless' && melee && fromFront && !['intro', 'recover', 'broken', 'blankTell'].includes(enemy.state)) {
+      emit(state, 'block', { x: enemy.x + enemy.facing * 20, y: enemy.y - 38 })
+      state.hitstop = Math.max(state.hitstop, 0.04)
+      player.vx = -player.facing * 120
+      if (source === 'slash') return
+      damage = 1
     }
     if (melee && fromFront && enemy.guard && GUARD_STATES.has(enemy.state)) { guardBlock(state, enemy); return }
     if(enemy.type==='umbrella'&&fromFront&&melee&&enemy.state!=='hurt'){
@@ -903,7 +913,7 @@
     const fresh = melee && player.slashStartClock > (enemy.openedAt ?? Infinity)
     if (isBoss(enemy)||isElite(enemy)) {
       if (enemy.state === 'broken' && fresh) {
-        const execDmg = enemy.type === 'yue' ? 14 : (enemy.type === 'nameless' && enemy.resonanceBroken) ? 12 : 10
+        const execDmg = enemy.type === 'yue' ? 14 : (enemy.type === 'nameless' && enemy.resonanceBroken) ? 16 : 10
         enemy.resonanceBroken = false
         enemy.hp -= execDmg
         enemy.posture = 0
@@ -1066,7 +1076,7 @@
       mono: Boolean(spec.mono), reformed: Boolean(spec.reformed), counterCd: 0,
     }
     if (BOSSES.has(spec.type)) {
-      enemy.hp = enemy.maxHp = spec.type === 'nameless' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'yue' ? (state.difficulty === 'easy' ? 38 : kind.hp) : spec.type === 'judge' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
+      enemy.hp = enemy.maxHp = spec.type === 'nameless' ? (state.difficulty === 'easy' ? 76 : 105) : spec.type === 'yue' ? (state.difficulty === 'easy' ? 68 : kind.hp) : spec.type === 'judge' ? (state.difficulty === 'easy' ? 76 : 105) : spec.type === 'angler' ? (state.difficulty === 'easy' ? 64 : 88) : spec.type === 'general' ? (state.difficulty === 'easy' ? 70 : 98) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 76 : 108) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
@@ -2838,7 +2848,7 @@
   /** 拆: a shade or Nameless parries the player's frontal slash and immediately winds up a riposte. */
   function counterPlayerSlash(state, enemy) {
     const player = state.player
-    enemy.counterCd = 2.4
+    enemy.counterCd = enemy.type === 'nameless' ? 1.3 : 2.4
     enemy.combo = null
     player.action = null
     player.slashEndClock = state.clock
@@ -3053,7 +3063,7 @@
       const p = state.player
       if (!stroke.hit && !p.dead && p.y > GROUND - 70 && p.iframes <= 0 && !state.strike) {
         stroke.hit = true
-        hurtPlayer(state, 1, stroke.dir > 0 ? stroke.x0 : stroke.x1)
+        hurtPlayer(state, 2, stroke.dir > 0 ? stroke.x0 : stroke.x1)
       }
       if (stroke.t >= stroke.dur) state.blankStroke = null
     }
@@ -3092,13 +3102,14 @@
       boss.vx = -boss.facing * 390; boss.vy = -330
       return
     }
-    // Stage 3 (无名): no unblockable moves — pure blade exchange.
+    // Stage 3 (无名): pure blade exchange punctuated periodically by 留白一笔.
+    if (boss.moves % 4 === 0 && !state.blankStroke) return startNamelessBlank(state, boss)
     if (distance > 140) {
-      if (roll < 0.45) return startNamelessThrust(state, boss)
-      boss.state = 'walk'; boss.t = 0.9
+      if (roll < 0.55) return startNamelessThrust(state, boss)
+      boss.state = 'walk'; boss.t = 0.75
       return
     }
-    if (roll < 0.8) return startNamelessCombo(state, boss)
+    if (roll < 0.72) return startNamelessCombo(state, boss)
     return startNamelessThrust(state, boss)
   }
 
@@ -3195,54 +3206,54 @@
       case 'riposteAttack':
         if (!boss.hitDone && overlaps(bossReachBox(boss, 96), playerBox(player))) {
           boss.hitDone = true
-          enemyStrike(state, boss, 1)
+          enemyStrike(state, boss, 2)
           if (boss.state !== 'riposteAttack') break
         }
         boss.vx *= Math.pow(0.02, dt)
-        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.85 }
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.65 }
         break
       case 'duelThrustTell':
         boss.vx *= Math.pow(0.001, dt)
         facePlayer()
         if (boss.t <= 0) {
           boss.state = 'duelThrustAttack'; boss.t = 0.15; boss.hitDone = false
-          boss.vx = boss.facing * 360
+          boss.vx = boss.facing * 380
           emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: 0 })
         }
         break
       case 'duelThrustAttack':
         if (!boss.hitDone && overlaps(bossReachBox(boss, 125), playerBox(player))) {
           boss.hitDone = true
-          enemyStrike(state, boss, 1)
+          enemyStrike(state, boss, 2)
           if (boss.state !== 'duelThrustAttack') break
         }
         boss.vx *= Math.pow(0.02, dt)
-        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.8 }
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.62 }
         break
       case 'duelTell':
         boss.vx *= Math.pow(0.001, dt)
         facePlayer()
         if (boss.t <= 0) {
           boss.state = 'duelAttack'; boss.t = 0.15; boss.hitDone = false
-          boss.vx = boss.facing * (Math.abs(dx) > 76 ? 320 : 220)
+          boss.vx = boss.facing * (Math.abs(dx) > 76 ? 340 : 240)
           emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: (boss.duelChain || 1) % 3, riposte: true })
         }
         break
       case 'duelAttack':
         if (!boss.hitDone && overlaps(bossReachBox(boss, 112), playerBox(player))) {
           boss.hitDone = true
-          const outcome = enemyStrike(state, boss, 1)
+          const outcome = enemyStrike(state, boss, 2)
           if (outcome === 'parry') break
           boss.duelChain = 0
-          if (outcome === 'hit') { boss.state = 'recover'; boss.t = 0.9 }
-          else { boss.state = 'idle'; boss.t = 0.3 }
+          if (outcome === 'hit') { boss.state = 'recover'; boss.t = 0.65 }
+          else { boss.state = 'idle'; boss.t = 0.22 }
           break
         }
         boss.vx *= Math.pow(0.02, dt)
         if (boss.t <= 0) {
           // Player stepped or dashed out of range: breaks exchange without giving recover.
           boss.duelChain = 0
-          boss.state = 'idle'; boss.t = 0.3
+          boss.state = 'idle'; boss.t = 0.22
         }
         break
       case 'crouch':
@@ -3258,10 +3269,10 @@
       case 'leap':
         if (boss.y >= GROUND - 0.5 && boss.vy >= 0 && boss.t < 0.5) {
           boss.vx = 0
-          boss.state = 'recover'; boss.t = 0.85
+          boss.state = 'recover'; boss.t = 0.65
           emit(state, 'slam', { id: boss.id, x: boss.x, y: GROUND })
           const slam = { x0: boss.x - 82, x1: boss.x + 82, y0: GROUND - 50, y1: GROUND + 4 }
-          if (overlaps(slam, playerBox(player))) enemyStrike(state, boss, 1, 'unblockable')
+          if (overlaps(slam, playerBox(player))) enemyStrike(state, boss, 2, 'unblockable')
           spawnWave(state, boss, -1, 360, 0.95)
           spawnWave(state, boss, 1, 360, 0.95)
         }
@@ -3272,7 +3283,7 @@
           facePlayer()
           spawnWave(state, boss, boss.facing, 430, 2.2)
           emit(state, 'wave', { id: boss.id, x: boss.x, y: GROUND, facing: boss.facing })
-          boss.state = 'recover'; boss.t = 0.65
+          boss.state = 'recover'; boss.t = 0.52
         }
         break
       case 'flagTell':
@@ -3282,33 +3293,33 @@
           const side = player.x - min > max - player.x ? -1 : 1
           callVolley(state, player.x + side * 300, 320, 1.5, true)
           emit(state, 'flag', { id: boss.id, x: boss.x, y: boss.y - boss.h })
-          boss.state = 'recover'; boss.t = 0.7
+          boss.state = 'recover'; boss.t = 0.55
         }
         break
       case 'rushTell':
         boss.vx = 0
         if (boss.t <= 0) {
           boss.state = 'rush'; boss.t = 0.9; boss.hitDone = false
-          boss.vx = boss.facing * 900
+          boss.vx = boss.facing * 920
           emit(state, 'phantom', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing })
         }
         break
       case 'rush':
         if (!boss.hitDone && overlaps({ x0: boss.x - 24, x1: boss.x + 24, y0: GROUND - 58, y1: GROUND }, playerBox(player))) {
           boss.hitDone = true
-          enemyStrike(state, boss, 1, 'unblockable')
+          enemyStrike(state, boss, 2, 'unblockable')
         }
         if ((boss.facing > 0 && boss.x >= max - 62) || (boss.facing < 0 && boss.x <= min + 62) || boss.t <= 0) {
-          boss.vx = 0; boss.state = 'recover'; boss.t = 0.85
+          boss.vx = 0; boss.state = 'recover'; boss.t = 0.65
         }
         break
       case 'broken':
         boss.vx = 0
-        if (boss.t <= 0) { boss.resonanceBroken = false; boss.state = 'recover'; boss.t = 0.35; boss.posture = 40 }
+        if (boss.t <= 0) { boss.resonanceBroken = false; boss.state = 'recover'; boss.t = 0.3; boss.posture = 40 }
         break
       case 'recover':
         boss.vx *= Math.pow(0.01, dt)
-        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.42 + state.random() * 0.35) / state.diff.aggression }
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.28 + state.random() * 0.22) / state.diff.aggression }
         break
       case 'dying':
         boss.vx = 0
@@ -3759,11 +3770,14 @@
     if (state.encounter >= state.plan.length) finish(state, 'clear')
   }
 
-  /** 回墨: in a 卷 with respite, clearing a wave or executing its boss restores one 墨血. */
+  /** 回墨: in a 卷 with respite, clearing a wave or executing its boss restores one 墨血; in longer gauntlets, every second wave restores half a drop. */
   function respite(state) {
     const player = state.player
-    if (!(state.world.respite || ((state.world.borrowStep || state.world.counterGuard) && state.difficulty === 'easy')) || player.dead || player.hp >= player.maxHp) return
-    player.hp += 1
+    if (player.dead || player.hp >= player.maxHp) return
+    const full = state.world.respite || ((state.world.borrowStep || state.world.counterGuard) && state.difficulty === 'easy')
+    const amount = full ? 1 : (state.wave > 0 && state.wave % 2 === 1 ? 0.5 : 0)
+    if (!amount) return
+    player.hp = Math.min(player.maxHp, player.hp + amount)
     player.heals += 1
     emit(state, 'heal', { x: player.x, y: player.y - 40, hp: player.hp })
   }
@@ -3777,7 +3791,7 @@
     if (reason === 'clear') {
       state.bonus = {
         time: Math.max(0, Math.round(level.par - state.time) * 6),
-        hp: player.hp * 150,
+        hp: Math.round(player.hp * 150),
         flawless: player.damageTaken === 0 ? (level.scroll ? 1500 : level.boss ? 1000 : 600) : 0,
       }
       player.score += state.bonus.time + state.bonus.hp + state.bonus.flawless

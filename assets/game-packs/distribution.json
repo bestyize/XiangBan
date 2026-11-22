@@ -52,10 +52,10 @@
     {
       "id": "ink-blade",
       "kind": "game",
-      "url": "https://res.xiangban.xyz/files/6f4f4a64edffdf34a248a2f748dbb6b2.zip",
-      "sha256": "ddf5dc0eaec9c0a6ed299a8629291d5a63c0e34747ca0451c06ce6cbfd537a32",
-      "bytes": 266552,
-      "sourceSha256": "868f3d979d1a828d249cd94a059fb57c94c23031a6571024fc476712600108f3"
+      "url": "https://res.xiangban.xyz/files/56eeeb4267944fdb5cebd2ca05dfcc7c.zip",
+      "sha256": "fc30d28178712bc31007daa6b6c83447e954daf60a7d150749eec09a7867f3d0",
+      "bytes": 271357,
+      "sourceSha256": "f6a51a19202177f9d9d7194f9d8c66eb3942b0ebf76655a6c21100ca1822d052"
     },
     {
       "id": "dusk-glider",

@@ -128,6 +128,147 @@
     })
   }
 
+  /** Pure sumi-e ancient pine for 终幅《无名》: gnarled dry-brush trunk + layered radiating 松针 fans. */
+  function ancientPine(res, seed, variant = 'main') {
+    const rand = art.rng(seed)
+    const far = variant === 'far'
+    const w = far ? 290 : 440, h = far ? 225 : 305
+    const ox = far ? 155 : 195, oy = far ? 214 : 292
+    const deep = [20, 21, 24], bark = [46, 48, 52], light = [144, 140, 130], mid = [56, 58, 62], pale = [96, 98, 102]
+    const drawPoly = (g, pts, col, lw) => {
+      g.strokeStyle = col; g.lineWidth = lw
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1])
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1])
+      g.stroke()
+    }
+    const dryOn = (g, pts, width, hairs, col, alpha, s) => {
+      art.dryBrush(g, (t) => {
+        const idx = Math.min(pts.length - 2, Math.floor(t * (pts.length - 1)))
+        const q = t * (pts.length - 1) - idx
+        const a = pts[idx], b = pts[idx + 1]
+        const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
+        return [art.lerp(a[0], b[0], q), art.lerp(a[1], b[1], q), -dy / l, dx / l]
+      }, width, hairs, col, alpha, s, 26)
+    }
+    const needlePad = (g, x, y, size, tilt) => {
+      // Soft feathered ink wash under-shadow (no hard oval edge)
+      const wash = g.createRadialGradient(x, y - 1, 0, x, y - 1, 26 * size)
+      wash.addColorStop(0, art.rgba(deep, 0.28 + rand() * 0.08))
+      wash.addColorStop(0.55, art.rgba(mid, 0.14))
+      wash.addColorStop(1, art.rgba(mid, 0))
+      g.fillStyle = wash
+      g.save(); g.translate(x, y); g.scale(1.15, 0.44); g.translate(-x, -y)
+      g.fillRect(x - 28 * size, y - 28 * size, 56 * size, 56 * size); g.restore()
+
+      const sprays = 8
+      for (let j = 0; j < sprays; j++) {
+        const spread = ((j + rand() * 0.65) / sprays - 0.5) * 2
+        const px = x + spread * 20 * size
+        const py = y + (rand() - 0.78) * 8 * size
+        const axis = -1.56 + spread * 1.18 + tilt
+        // Dark ink knot at the base of each needle fan
+        g.fillStyle = art.rgba(deep, 0.76)
+        art.leaf(g, px, py + 1.6, axis, 8.5 * size, 2.4 * size)
+        // Radiating crisp pine needles in 3 sumi-e ink densities
+        for (let n = 0; n < 11; n++) {
+          const ang = axis + (n / 10 - 0.5) * 2.55 + (rand() - 0.5) * 0.22
+          const tone = n % 7 === 0 ? pale : n % 3 === 0 ? mid : deep
+          g.fillStyle = art.rgba(tone, 0.56 + rand() * 0.34)
+          art.leaf(g, px, py, ang, (5.5 + rand() * 8.5) * size, (0.38 + rand() * 0.58) * size)
+        }
+      }
+    }
+
+    return sprite(w, h, ox, oy, res, (g) => {
+      // Soft ground shadow under roots
+      const sh = g.createRadialGradient(0, 2, 0, 0, 2, far ? 42 : 66)
+      sh.addColorStop(0, 'rgba(20,20,24,0.22)'); sh.addColorStop(1, 'rgba(20,20,24,0)')
+      g.fillStyle = sh
+      g.save(); g.scale(1, 0.2); g.beginPath(); g.arc(0, 10, far ? 42 : 66, 0, TAU); g.fill(); g.restore()
+
+      const trunkW = far ? 18 : 24
+      const roots = far
+        ? [[-24, 2], [-11, -3], [0, -6], [11, -2], [26, 3]]
+        : [[-36, 3], [-16, -4], [-4, -9], [6, -7], [17, -2], [38, 3]]
+      const trunk = far
+        ? [[0, 2], [4, -18], [-3, -40], [-18, -62], [-28, -90], [-22, -118], [-34, -142], [-44, -158]]
+        : [[0, 3], [-6, -24], [5, -52], [22, -78], [16, -112], [-4, -144], [-12, -176], [8, -206], [18, -226]]
+      const boughs = far ? [
+        [[-3, -40], [-26, -48], [-52, -52], [-78, -62]],
+        [[-18, -62], [6, -70], [28, -78], [52, -82]],
+        [[-27, -90], [-50, -96], [-78, -104], [-102, -106]],
+        [[-23, -118], [-4, -128], [18, -134], [38, -136]],
+        [[-34, -142], [-58, -150], [-82, -156]],
+        [[-44, -158], [-26, -168], [-8, -174]],
+      ] : [
+        [[5, -52], [-24, -60], [-56, -68], [-90, -76], [-118, -74]],
+        [[21, -78], [54, -84], [90, -96], [130, -102], [166, -98]],
+        [[16, -112], [-14, -118], [-48, -124], [-84, -134], [-112, -136]],
+        [[-4, -144], [26, -152], [60, -162], [96, -166], [126, -162]],
+        [[-11, -176], [-38, -184], [-68, -194], [-92, -196]],
+        [[8, -206], [34, -214], [62, -224], [84, -224]],
+        [[18, -226], [0, -236], [-24, -242]],
+      ]
+
+      // Roots & gnarled ink trunk (vertical ink density so leaning upper trunks stay dark and legible)
+      g.fillStyle = art.rgba(bark, 0.95)
+      art.ribbon(g, roots, (t) => 1.2 + Math.sin(t * Math.PI) * trunkW * 0.48)
+      const grad = g.createLinearGradient(0, 4, 0, far ? -160 : -230)
+      grad.addColorStop(0, art.rgba(deep, 0.98))
+      grad.addColorStop(0.55, art.rgba(bark, 0.96))
+      grad.addColorStop(1, art.rgba(deep, 0.92))
+      g.fillStyle = grad
+      art.ribbon(g, trunk, (t) => 2.2 + trunkW * Math.pow(1 - t, 1.05))
+
+      // 飞白 dry-brush bark texture & gnarled scale notches
+      dryOn(g, trunk, trunkW * 0.56, 7, light, 0.56, seed + 3)
+      dryOn(g, roots, trunkW * 0.28, 5, light, 0.52, seed + 9)
+      for (let j = 1; j < trunk.length - 1; j++) {
+        const [bx, by] = trunk[j]
+        const sp = Math.max(2.2, trunkW * (0.42 - 0.045 * j))
+        drawPoly(g, [[bx - sp * 0.7, by + 6], [bx - sp * 0.15, by + 2], [bx + sp * 0.5, by - 3]], art.rgba(deep, 0.65), 1.4)
+        drawPoly(g, [[bx - sp * 0.6, by + 3], [bx, by - 1]], art.rgba(light, 0.48), 0.9)
+      }
+
+      // Sweeping boughs + twigs + layered pine needle pads
+      const pads = []
+      for (const pts of boughs) {
+        const dir = Math.sign(pts[pts.length - 1][0] - pts[0][0]) || 1
+        g.fillStyle = art.rgba(deep, 0.92)
+        art.ribbon(g, pts, (t) => 0.7 + trunkW * 0.27 * Math.pow(1 - t, 0.92))
+        dryOn(g, pts, trunkW * 0.13, 4, light, 0.45, Math.floor(rand() * 6000))
+        for (let j = 2; j < pts.length; j++) {
+          const [bx, by] = pts[j]
+          const rx = dir * (6 + rand() * 14), ry = 5 + rand() * 11
+          drawPoly(g, [[bx - dir * 4, by + 2], [bx + rx * 0.45, by - ry * 0.6], [bx + rx, by - ry]], art.rgba(bark, 0.88), 2.1)
+          pads.push([bx + rx, by - ry, (far ? 0.74 : 0.88) + rand() * 0.34, dir * 0.22])
+          if (j % 2 === 0) {
+            const fx = bx - dir * (7 + rand() * 7)
+            drawPoly(g, [[bx, by], [bx - dir * 3, by - 8], [fx, by - 12]], art.rgba(bark, 0.8), 1.6)
+            pads.push([fx, by - 12, (far ? 0.62 : 0.74) + rand() * 0.25, -dir * 0.18])
+          }
+        }
+      }
+      for (const [px, py, sz, tilt] of pads) needlePad(g, px, py, sz, tilt)
+    })
+  }
+
+  function returnGate(res) {
+    const base = art.gate(res)
+    const g = base.node.getContext('2d')
+    g.save()
+    g.setTransform(res, 0, 0, res, base.ox * res, base.oy * res)
+    g.fillStyle = 'rgba(239,231,212,0.96)'; g.fillRect(-30, -152, 60, 30)
+    g.strokeStyle = 'rgba(24,24,26,0.9)'; g.lineWidth = 2.4; g.strokeRect(-30, -152, 60, 30)
+    g.lineWidth = 0.8; g.strokeRect(-26, -148, 52, 22)
+    g.fillStyle = 'rgba(184,50,42,0.95)'
+    g.font = '600 15px "Kaiti SC","STKaiti","KaiTi","Songti SC",serif'
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.fillText('竹 海', 0, -136)
+    g.restore()
+    return base
+  }
+
   const PROPS_RETURN = [
     // 残烽
     { s: 'buriedDrum', x: 340, alpha: 0.9 },
@@ -140,16 +281,17 @@
     { s: 'hitchingPost', x: 2450, alpha: 0.88 },
     { s: 'postPavilion', x: 2770, alpha: 0.82 },
     { s: 'beacon', x: 3120, alpha: 0.55 },
-    // 竹海 (back of Vol 1's 竹林 gate!)
-    { s: 'gate', x: 3440, alpha: 0.88, flipX: true },
+    // 竹海 (archway inscribed 竹海)
+    { s: 'returnGate', x: 3440, alpha: 0.88 },
     { s: 'stele', x: 3960, alpha: 0.88 },
     // 留白 (3 stone lanterns matching whiteout lights)
     { s: 'lantern', x: 4440, alpha: 0.92 },
     { s: 'lantern', x: 4810, alpha: 0.92 },
     { s: 'lantern', x: 5020, alpha: 0.92 },
-    // 无名 (Vol 1 mountain gate steps & pine, which fade out in stage 3!)
-    { s: 'pine', x: 5540, alpha: 0.55, bossFade: true },
+    // 无名 (Vol 1 mountain gate steps & ancient ink pines, which fade out in stage 3!)
+    { s: 'pine', x: 5465, alpha: 0.82, bossFade: true },
     { s: 'gateSteps', x: 5840, alpha: 0.9, bossFade: true },
+    { s: 'pineFar', x: 6015, alpha: 0.62, bossFade: true },
   ]
 
   function fadeAt(x) {
@@ -180,7 +322,8 @@
     a.ground = art.ground({ period: 1024, line: GROUND, depth: 92, res: r(1), seed: 5 })
     a.groundWash = art.desertGround({ period: 1024, line: GROUND, depth: 92, res: r(0.9), seed: 17 })
     a.dust = art.dustSprite(64)
-    a.pine = art.pine(r(0.9), 21)
+    a.pine = ancientPine(r(1), 711, 'main')
+    a.pineFar = ancientPine(r(0.9), 733, 'far')
     a.beacon = art.beaconTower(r(0.9))
     a.ramparts = (world.ramparts || []).map((wall, i) => ({ wall, s: art.rampart(r(1), 7 + i, wall.h) }))
     // Custom Volume 7 landmark sprites
@@ -191,6 +334,7 @@
     a.postPavilion = postPavilion(r(0.95))
     a.hitchingPost = hitchingPost(r(1))
     a.gateSteps = gateSteps(r(1))
+    a.returnGate = returnGate(r(1))
     return a
   }
 

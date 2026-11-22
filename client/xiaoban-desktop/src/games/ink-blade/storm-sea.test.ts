@@ -65,7 +65,7 @@ describe('怒涛卷', () => {
     expect(run(standing, 15).some((event: Any) => event.type === 'tideSurge')).toBe(true)
     expect(standing.player.hp).toBe(standing.player.maxHp) // The visible wave has not reached mid-arena yet.
     run(standing, 70)
-    expect(standing.player.hp).toBe(standing.player.maxHp - 1)
+    expect(standing.player.hp).toBe(standing.player.maxHp - 0.5)
     expect(pirate.alive).toBe(false)
     expect(standing.player.tideKills).toBe(1)
 
@@ -99,7 +99,7 @@ describe('怒涛卷', () => {
     wave.projectiles.push({ id: 999, type: 'seaWave', owner: 'enemy', x: 5730, y: rules.GROUND, vx: -360, vy: 0, life: 1, dead: false })
     const events = run(wave, 8, (i) => ({ slashPressed: i === 0 }))
     expect(events.some((event: Any) => event.type === 'deflect')).toBe(false)
-    expect(wave.player.hp).toBe(wave.player.maxHp - 1)
+    expect(wave.player.hp).toBe(wave.player.maxHp - 0.5)
   })
 
   it('drops a cut spar onto enemies once, without damaging the player', () => {
@@ -160,7 +160,7 @@ describe('怒涛卷', () => {
       if (airborne) { state.player.y = rules.GROUND - 120; state.player.onGround = false }
       const events = run(state, 2, (i) => ({ slashPressed: i === 0 }))
       expect(events.some((e: Any) => e.type === 'parry')).toBe(false)
-      expect(state.player.hp).toBe(state.player.maxHp - (airborne ? 0 : 1))
+      expect(state.player.hp).toBe(state.player.maxHp - (airborne ? 0 : 0.5))
     }
   })
 

@@ -79,7 +79,7 @@ describe('灯市卷',()=>{
    const s=arena('5-6',5700);place(s,'judge',5820,{state:'idle',t:0,moves:2})
    run(s,1);expect(s.writing[0].kind).toBe('horizontal');expect(s.writing[0].phase).toBe('tell')
    run(s,105,i=>({jumpPressed:jump&&i===44,jump:jump&&i>=44}))
-   expect(s.player.hp).toBe(s.player.maxHp-(jump?0:1))
+   expect(s.player.hp).toBe(s.player.maxHp-(jump?0:0.5))
    expect(s.player.writingDodges).toBe(jump?1:0)
   }
  })

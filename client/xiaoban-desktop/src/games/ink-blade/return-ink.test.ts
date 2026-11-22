@@ -448,7 +448,7 @@ describe('归墨卷 · 无名剑客 (Boss)', () => {
       const before = boss.hp
       const exec = run(state, 20, (i) => ({ slashPressed: i === 0 }))
       expect(exec.some((e) => e.type === 'execute')).toBe(true)
-      expect(before - boss.hp).toBe(12)
+      expect(before - boss.hp).toBe(16)
     }
   })
 
@@ -462,11 +462,13 @@ describe('归墨卷 · 无名剑客 (Boss)', () => {
     expect([...bossRun.stages].sort()).toEqual([1, 2, 3])
   })
 
-  it('prevents a pure button-mashing script from getting 神品 or clearing 荒驿 / 无名 on normal', () => {
+  it('prevents a pure button-mashing script from getting 神品 or clearing 荒驿 / 无名', () => {
     for (const id of ['7-3', '7-6']) {
       const { result } = runMashBot(id, 7, 100)
       expect(result.cleared).toBe(false)
     }
+    const easyMashBoss = runMashBot('7-6', 7, 100)
+    expect(easyMashBoss.result.cleared).toBe(false)
     for (const id of ['7-1', '7-2', '7-4', '7-5']) {
       const { result } = runMashBot(id, 7, 100)
       expect(result.grade).toBeLessThanOrEqual(2)
