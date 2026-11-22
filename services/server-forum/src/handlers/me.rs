@@ -72,7 +72,8 @@ pub async fn bookmarks(
     .await?;
     let mut items = Vec::with_capacity(ids.len());
     for (id,) in ids {
-        if let Some(t) = models::get_topic(&state.pool, id).await? {
+        if let Some(mut t) = models::get_topic(&state.pool, id).await? {
+            crate::discussion_images::sign_topic(&state, &mut t, Some(auth.user.uid));
             items.push(t);
         }
     }
@@ -145,7 +146,7 @@ pub async fn user_topics(
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
+    Ok(Json(crate::discussion_images::topic_page(&state, &f).await?))
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -198,6 +199,6 @@ pub async fn search(
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
+    Ok(Json(crate::discussion_images::topic_page(&state, &f).await?))
 }
 

@@ -661,6 +661,87 @@ async fn topic_tags_commit_with_the_topic_and_scores_do_not_gate_creation() -> R
 }
 
 #[tokio::test]
+async fn restricted_discussion_images_follow_the_readers_permissions() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let author = Uuid::new_v4();
+    let reader = Uuid::new_v4();
+    for uid in [author, reader] {
+        sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'测试用户',1)")
+            .bind(uid).execute(&h.pool).await?;
+    }
+    let author_token = (h.make_token)(author);
+    let reader_token = (h.make_token)(reader);
+    let cover = Uuid::new_v4();
+    let reply = Uuid::new_v4();
+    let public = Uuid::new_v4();
+    for (image, owner) in [(cover, author), (reply, reader), (public, author)] {
+        sqlx::query("INSERT INTO images(id,uploader_uid,mime,size) VALUES($1,$2,'image/png',4)")
+            .bind(image).bind(owner).execute(&h.pool).await?;
+    }
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug='casual-fun'").fetch_one(&h.pool).await?;
+    let draft = |title, id, level| json!({"category_id":category,"title":title,
+        "body":format!("测试图片正文\n\n![图](/api/images/{id})"),"min_read_level":level});
+    let (status, created) = call(&h.app, "POST", "/api/topics", Some(&author_token), draft("受限图片测试", cover, 1)).await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let topic = created["id"].as_i64().unwrap();
+    let url = format!("/api/topics/{topic}");
+    let posts = format!("{url}/posts");
+    let (status, result) = call(&h.app, "POST", &posts, Some(&reader_token), json!({"body":format!("![回帖图](/api/images/{reply})")})).await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    let protected: i64 = sqlx::query_scalar("SELECT count(*) FROM images WHERE id=ANY($1) AND discussion_private")
+        .bind(vec![cover,reply]).fetch_one(&h.pool).await?;
+    assert_eq!(protected, 2);
+
+    // Simulate existing rows from before the migration.
+    sqlx::query("UPDATE images SET discussion_private=false WHERE id=ANY($1)").bind(vec![cover,reply]).execute(&h.pool).await?;
+    sqlx::query("DELETE FROM data_migrations WHERE name='restricted-discussion-images-v1'").execute(&h.pool).await?;
+    crate::discussion_images::init(&h.pool).await?;
+    assert_eq!(call(&h.app, "GET", &url, None, Value::Null).await.0, StatusCode::FORBIDDEN);
+    for id in [cover, reply] {
+        for method in ["GET", "HEAD"] {
+            assert_eq!(call(&h.app, method, &format!("/api/images/{id}"), None, Value::Null).await.0, StatusCode::NOT_FOUND);
+        }
+    }
+    assert_eq!(call(&h.app, "HEAD", &format!("/api/images/{public}"), None, Value::Null).await.0, StatusCode::OK);
+    let (_, detail) = call(&h.app, "GET", &url, Some(&reader_token), Value::Null).await;
+    let cover_view = detail["images"][0].as_str().unwrap();
+    assert!(detail["body_html"].as_str().unwrap().contains(cover_view));
+    assert!(!detail["body_md"].as_str().unwrap().contains("/view?"));
+    let mut local_state = h.state.clone();
+    let dir = std::env::temp_dir().join(format!("{}-restricted-image", h.schema));
+    tokio::fs::create_dir_all(&dir).await?;
+    tokio::fs::write(dir.join(format!("img-{cover}")), b"test").await?;
+    Arc::make_mut(&mut local_state.config).upload_dir = dir.clone();
+    let local = crate::build_router(local_state);
+    let image = local.oneshot(Request::builder().uri(cover_view).body(Body::empty())?).await?;
+    assert_eq!(image.status(), StatusCode::OK);
+    assert_eq!(image.headers()["cache-control"], "no-store");
+    assert_eq!(to_bytes(image.into_body(), 4).await?.as_ref(), b"test");
+    tokio::fs::remove_dir_all(dir).await?;
+    let (_, preview) = call(&h.app, "POST", "/api/markdown/preview", Some(&author_token),
+        json!({"body":format!("![受限](/api/images/{cover})\n\n![公开](/api/images/{public})")})).await;
+    let preview = preview["html"].as_str().unwrap();
+    assert!(preview.contains(&format!("/api/images/{cover}/view?key=")));
+    assert!(preview.contains(&format!("src=\"/api/images/{public}\"")));
+    let (_, list) = call(&h.app, "GET", "/api/topics", Some(&reader_token), Value::Null).await;
+    let item = list["items"].as_array().unwrap().iter().find(|v| v["id"] == topic).unwrap();
+    assert!(item["images"][0].as_str().unwrap().contains("/view?key="));
+    assert_eq!(call(&h.app, "HEAD", cover_view, None, Value::Null).await.0, StatusCode::OK);
+    let (_, discussion) = call(&h.app, "GET", &posts, Some(&author_token), Value::Null).await;
+    let html = discussion["items"][0]["body_html"].as_str().unwrap();
+    let reply_view = html.split("src=\"").nth(1).unwrap().split('"').next().unwrap();
+    assert!(reply_view.contains("/view?key="));
+    assert_eq!(call(&h.app, "HEAD", reply_view, None, Value::Null).await.0, StatusCode::OK);
+
+    sqlx::query("UPDATE users SET trust_level=0 WHERE uid=$1").bind(reader).execute(&h.pool).await?;
+    assert_eq!(call(&h.app, "HEAD", cover_view, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    let (status, _) = call(&h.app, "PATCH", &url, Some(&author_token), draft("受限图片改公开", cover, 0)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(call(&h.app, "HEAD", &format!("/api/images/{cover}"), None, Value::Null).await.0, StatusCode::OK);
+    h.finish().await
+}
+
+#[tokio::test]
 async fn topics_carry_images_polls_and_help_stats() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let app = &h.app;

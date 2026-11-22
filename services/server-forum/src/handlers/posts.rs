@@ -68,10 +68,12 @@ pub async fn list(
     Path(topic_id): Path<i64>,
     Query(q): Query<PageQuery>,
 ) -> AppResult<Json<Value>> {
-    models::ensure_readable(&state.pool, &Reader::from_user(user.as_ref()), topic_id).await?;
+    let min_read_level = models::readable_level(&state.pool, &Reader::from_user(user.as_ref()), topic_id).await?;
     let page = q.page.unwrap_or(1).clamp(1, 10_000);
     let size = q.page_size.unwrap_or(50).clamp(1, 100);
     let viewer = user.as_ref().map(|u| u.uid);
+    let image_view = viewer.filter(|_| min_read_level > 0)
+        .map(|uid| crate::discussion_images::ImageView::new(&state, topic_id, uid));
     let (total,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM posts WHERE topic_id = $1")
         .bind(topic_id)
         .fetch_one(&state.pool)
@@ -110,7 +112,11 @@ pub async fn list(
                 avatar_url: r.avatar_url,
                 trust_level: r.trust_level,
             },
-            body_html: if visible { r.body_html } else { String::new() },
+            body_html: match (&image_view, visible) {
+                (Some(view), true) => view.html(&r.body_html),
+                (None, true) => r.body_html,
+                (_, false) => String::new(),
+            },
             status: if r.author_status == "banned" {
                 "hidden".into()
             } else {
@@ -308,7 +314,8 @@ pub async fn update(
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
     }
-    let (topic_id,): (i64,) = sqlx::query_as("SELECT topic_id FROM posts WHERE id=$1")
+    let (topic_id, min_read_level): (i64, i16) = sqlx::query_as(
+        "SELECT p.topic_id, t.min_read_level FROM posts p JOIN topics t ON t.id=p.topic_id WHERE p.id=$1")
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
@@ -326,6 +333,11 @@ pub async fn update(
     super::attachments::remove_files(&state.config.upload_dir, &removed).await;
     let (work_refs, attachments) =
         crate::reply_content::resolve(&state, id, Some(auth.user.uid)).await?;
+    let html = if min_read_level > 0 {
+        crate::discussion_images::ImageView::new(&state, topic_id, auth.user.uid).html(&html)
+    } else {
+        html
+    };
     Ok(Json(
         json!({ "ok": true, "body_html": html,"work_refs":work_refs,"attachments":attachments }),
     ))

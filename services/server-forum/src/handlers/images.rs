@@ -1,22 +1,24 @@
 //! 正文插图：编辑器里上传一张图，得到站内地址 `/api/images/{id}`，写进 Markdown 的 `![](…)`。
 //!
 //! 只收 PNG、JPEG、GIF、WebP，按文件头判断真实类型（不信客户端给的类型和文件名），不收 SVG。
-//! 文件放在 `FORUM_UPLOAD_DIR/img-{id}`，地址靠不可猜的 id 保护，和帖子的阅读等级无关。
+//! 显式限制阅读等级的讨论插图使用限时地址，其余图片可通过原地址访问。
 
 use super::attachments::{io_err, multipart_err, too_large, write_field, MULTIPART_OVERHEAD};
 use crate::{
     auth::AuthUser,
+    discussion_images,
     error::{AppError, AppResult},
     state::AppState,
     users,
 };
 use axum::{
     body::Body,
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::{header, HeaderMap, HeaderValue},
     response::Response,
     Json,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::collections::HashSet;
@@ -137,12 +139,37 @@ pub async fn upload(
     Ok(Json(json!({ "id": id, "url": format!("/api/images/{id}"), "size": size })))
 }
 
-pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppResult<Response> {
-    let (mime, size): (String, i64) = sqlx::query_as("SELECT mime, size FROM images WHERE id = $1 AND NOT editor_pending")
+async fn readable_image(state: &AppState, id: Uuid, key: Option<&str>) -> AppResult<(String, i64)> {
+    let (mime, size, uploader, private, avatar_pending): (String, i64, Uuid, bool, bool) = sqlx::query_as(
+        "SELECT mime, size, uploader_uid, discussion_private, avatar_pending FROM images WHERE id=$1 AND NOT editor_pending")
         .bind(id)
         .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("图片"))?;
+    let public = discussion_images::publicly_available(&state.pool, id, uploader, private, avatar_pending).await?;
+    let allowed = match key {
+        Some(key) => discussion_images::can_view(state, id, uploader, public, key).await?,
+        None => public,
+    };
+    if !allowed { return Err(AppError::not_found("图片")); }
+    Ok((mime, size))
+}
+
+pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppResult<Response> {
+    serve_image(&state, id, None).await
+}
+
+#[derive(Deserialize)]
+pub struct ViewQuery {
+    key: String,
+}
+
+pub async fn show_view(State(state): State<AppState>, Path(id): Path<Uuid>, Query(view): Query<ViewQuery>) -> AppResult<Response> {
+    serve_image(&state, id, Some(&view.key)).await
+}
+
+async fn serve_image(state: &AppState, id: Uuid, key: Option<&str>) -> AppResult<Response> {
+    let (mime, size) = readable_image(state, id, key).await?;
     let file = File::open(path_for(&state.config.upload_dir, id)).await.map_err(|_| AppError::not_found("图片"))?;
     let mut response = Response::new(Body::from_stream(ReaderStream::new(file)));
     let h = response.headers_mut();
@@ -150,8 +177,7 @@ pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppRes
         h.insert(header::CONTENT_TYPE, v);
     }
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    // id 不可变，浏览器和代理都可以长期缓存。
-    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=31536000, immutable"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static(if key.is_some() { "no-store" } else { "no-cache" }));
     h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; sandbox"));
     h.insert(header::CONTENT_LENGTH, HeaderValue::from(size.max(0) as u64));
     Ok(response)
@@ -159,9 +185,13 @@ pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppRes
 
 /// Authorization-only HEAD for the resource host; do not read the image body.
 pub async fn head(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppResult<axum::http::StatusCode> {
-    let (allowed,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM images WHERE id=$1 AND NOT editor_pending)")
-        .bind(id).fetch_one(&state.pool).await?;
-    if allowed { Ok(axum::http::StatusCode::OK) } else { Err(AppError::not_found("图片")) }
+    readable_image(&state, id, None).await?;
+    Ok(axum::http::StatusCode::OK)
+}
+
+pub async fn head_view(State(state): State<AppState>, Path(id): Path<Uuid>, Query(view): Query<ViewQuery>) -> AppResult<axum::http::StatusCode> {
+    readable_image(&state, id, Some(&view.key)).await?;
+    Ok(axum::http::StatusCode::OK)
 }
 
 pub enum CommentImageTarget {

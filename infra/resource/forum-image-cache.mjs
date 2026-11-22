@@ -47,10 +47,13 @@ export function createForumImageServer({ root, origin, secret = Buffer.alloc(0),
   let activeUploads = 0
   const keyPath = (kind,id) => join(root,'index',...kind.split('/'),`${id}.json`)
   const objectPath = object => join(root,'objects',object)
-  const originUrl = (kind,id) => new URL(`/_resource-origin/api/${kind}/${id}`,origin)
-  const fetchOrigin = (kind,id,method) => fetch(originUrl(kind,id), {
-    method, redirect:'error', headers:{'Accept-Encoding':'identity'}, signal:AbortSignal.timeout(timeoutMs),
-  })
+  function fetchOrigin(kind,id,method,viewKey) {
+    const url = new URL(`/_resource-origin/api/${kind}/${id}${viewKey ? '/view' : ''}`,origin)
+    if (viewKey) url.searchParams.set('key',viewKey)
+    return fetch(url, {
+      method, redirect:'error', headers:{'Accept-Encoding':'identity'}, signal:AbortSignal.timeout(timeoutMs),
+    })
+  }
   function receipt(kind,id,item) {
     const object_key = `forum-content/objects/${item.object}`
     const message = `RECEIPT\n${kind}/${id}\n${item.sha256}\n${item.size}\n${object_key}`
@@ -118,13 +121,13 @@ export function createForumImageServer({ root, origin, secret = Buffer.alloc(0),
     return persist('attachments',id,bytes,item,()=>fileRecord(id))
   }
 
-  async function fill(kind,id,expectedHash = null) {
+  async function fill(kind,id,expectedHash = null,viewKey) {
     const key = `${kind}/${id}/${expectedHash || ''}`
     if (inflight.has(key)) return inflight.get(key)
     const work = (async () => {
       const existing = await record(kind,id)
       if (existing && (!expectedHash || existing.sha256 === expectedHash)) return existing
-      const response = await fetchOrigin(kind,id,'GET')
+      const response = await fetchOrigin(kind,id,'GET',viewKey)
       if (response.status === 403 || response.status === 404) throw statusError(404)
       if (!response.ok) throw statusError(502)
       const declared = Number(response.headers.get('content-length'))
@@ -238,14 +241,17 @@ export function createForumImageServer({ root, origin, secret = Buffer.alloc(0),
         createReadStream(objectPath(item.object)).on('error',()=>res.destroy()).pipe(res)
         return
       }
-      if (!m || path.search) return fail(res,404)
+      if (!m) return fail(res,404)
       const [,route,kind,id] = m
+      const viewKey = path.searchParams.get('key')
+      if (path.search && (route !== 'forum-content' || kind !== 'images' ||
+          !viewKey || [...path.searchParams].length !== 1)) return fail(res,404)
       if (route === 'internal/forum-image') return await ingest(req,res,kind,id)
       if (!['GET','HEAD'].includes(req.method)) return fail(res,405)
-      const authorized = await fetchOrigin(kind,id,'HEAD')
+      const authorized = await fetchOrigin(kind,id,'HEAD',viewKey)
       if (authorized.status === 403 || authorized.status === 404) return fail(res,404)
       if (!authorized.ok) return fail(res,502)
-      const item = await record(kind,id) || await fill(kind,id)
+      const item = await record(kind,id) || await fill(kind,id,null,viewKey)
       res.writeHead(200,{'Content-Type':item.mime,'Content-Length':item.size,'Cache-Control':'no-store',
         'Access-Control-Allow-Origin':'*','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"})
       if (req.method === 'HEAD') return res.end()

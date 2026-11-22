@@ -22,7 +22,7 @@ pub async fn list(
     Query(mut f): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
     f.reader = Reader::from_user(user.as_ref());
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
+    Ok(Json(crate::discussion_images::topic_page(&state, &f).await?))
 }
 
 #[derive(Serialize)]
@@ -92,6 +92,12 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
         };
     }
     let attachments = attachments::list_for_topic(&state.pool, id, user.as_ref().map(|u| u.uid)).await?;
+    let uid = user.as_ref().map(|u| u.uid);
+    let body_html = match uid.filter(|_| topic.min_read_level > 0) {
+        Some(uid) => crate::discussion_images::ImageView::new(&state, id, uid).html(&body_html),
+        None => body_html,
+    };
+    crate::discussion_images::sign_topic(&state, &mut topic, uid);
     Ok(Json(TopicDetail { topic, body_html, body_md, attachments, viewer }))
 }
 
@@ -510,11 +516,14 @@ pub struct PreviewInput {
     pub body: String,
 }
 
-pub async fn preview(auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResult<Json<Value>> {
+pub async fn preview(State(state): State<AppState>, auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResult<Json<Value>> {
     if input.body.chars().count() > 20_000 {
         return Err(AppError::BadRequest("内容太长".into()));
     }
-    Ok(Json(json!({ "html": markdown::render(&input.body, auth.user.trust_level >= 1) })))
+    let html = markdown::render(&input.body, auth.user.trust_level >= 1);
+    // Preview can also render the author's own images from a previously restricted post.
+    let html = crate::discussion_images::ImageView::new(&state, 0, auth.user.uid).preview_html(html).await?;
+    Ok(Json(json!({ "html": html })))
 }
 
 #[cfg(test)]
