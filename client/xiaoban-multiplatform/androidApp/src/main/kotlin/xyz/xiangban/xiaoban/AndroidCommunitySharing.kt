@@ -181,10 +181,10 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
 
         // 作者与日期
         if (authorText.isNotBlank()) {
-            paint.color = accentColor
+            paint.color = softBgColor
             canvas.drawCircle((padX + 20).toFloat(), (authorTop + 20).toFloat(), 20f, paint)
             val initial = (content.author.firstOrNull() ?: content.title.firstOrNull() ?: '伴').uppercaseChar().toString()
-            drawText(canvas, initial, padX + 11, authorTop + 5, 24, 22f, Color.WHITE, 1, bold = true)
+            drawText(canvas, initial, padX + 11, authorTop + 5, 24, 22f, inkColor, 1, bold = true)
             drawText(canvas, authorText, padX + 54, authorTop + 6, contentWidth - 54, 26f, mutedColor, 1)
         }
 

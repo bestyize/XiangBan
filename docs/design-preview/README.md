@@ -6,6 +6,8 @@
 
 ## 超级小伴社区网页版
 
+[详情页分享面板重设计稿（PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) 覆盖社区帖子、创意作品、开源精选与 AI 日报，分享面板纯黑白灰中性配色、仅分享图内保留品牌主题色：手机 H5 1:1 对齐手机 App（单行预览条 + 单行可横滑图标轨 + 沉浸式磨砂分享卡片）；PC 端采用 716px 居中双栏弹窗，左栏所见即所得卡片预览（纯白 / 暖纸笺 / 墨夜 + 摘录/二维码开关），右栏集中提供复制链接、复制图片直贴微信/飞书、保存 PNG、复制推荐语/全文、问问小伴与主态内联删除确认（与个人中心共用 1450 端口）。[PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-detail-share.html) · [PC 端](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=desktop) · [手机 H5](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=mobile)
+
 [个人中心四页重设计稿（我的 / 个人主页 / 我的作品 / 通知 · PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/web-profile-suite.html) 对齐手机 App 方案 1 视觉规范与 `community-redesign` PC 端左导轨壳层，支持 PC + H5 同屏预览四页交互、本人/他人主页视角、内容包与方案筛选、未登录/空态、深浅色与 6 套主题色（仓库根运行 `python3 -m http.server 1450 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs`）。[PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-profile-suite.html) · [PC 端](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=desktop) · [手机 H5](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=mobile)
 
 [社区全站 UI 重设计稿（活力社区风 · PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) 采用现代活力视觉社区风，覆盖 PC 端网页（左导轨 + 精简顶栏）与移动端 H5（390px 交互样机，右上角纯图标搜索与提醒不带背景，创意页卡片统一 `3:2` 封面），包含创意、资讯、精选、排行榜、导航、讨论、资源及作品详情评论，支持日夜切换与 6 套客户端主题色（仓库根运行 `python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs/prototypes/community-redesign`）。[PC + H5 同屏预览](http://127.0.0.1:1449/) · [PC 端网页](http://127.0.0.1:1449/?device=desktop) · [移动端 H5](http://127.0.0.1:1449/?device=mobile)

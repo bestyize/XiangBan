@@ -452,11 +452,11 @@ private fun ShareContextThumb(
                 Modifier
                     .size(42.dp)
                     .clip(shape)
-                    .background(Brush.linearGradient(listOf(palette.accentSoft, palette.fill)))
+                    .background(palette.fill)
                     .border(1.dp, palette.hairline, shape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(ShareIcons.FileText, contentDescription = null, tint = palette.accentInk, modifier = Modifier.size(19.dp))
+                Icon(ShareIcons.FileText, contentDescription = null, tint = palette.ink2, modifier = Modifier.size(19.dp))
             }
         }
     }
@@ -513,21 +513,17 @@ private fun ShareRailButton(
     onClick: () -> Unit,
 ) {
     val tileBg = when (item.tone) {
-        ShareTileTone.Primary -> palette.accentSoft
         ShareTileTone.Copied -> palette.successSoft
-        ShareTileTone.Danger -> palette.dangerSoft
-        ShareTileTone.Default -> palette.fill
+        ShareTileTone.Primary, ShareTileTone.Danger, ShareTileTone.Default -> palette.fill
     }
     val tileBorder = when (item.tone) {
-        ShareTileTone.Primary -> palette.accentSoftLine
         ShareTileTone.Copied -> palette.successLine
         else -> null
     }
     val iconTint = when (item.tone) {
-        ShareTileTone.Primary -> palette.accentInk
         ShareTileTone.Copied -> palette.success
         ShareTileTone.Danger -> palette.danger
-        ShareTileTone.Default -> palette.ink
+        ShareTileTone.Primary, ShareTileTone.Default -> palette.ink
     }
     val labelColor = when (item.tone) {
         ShareTileTone.Primary -> palette.ink
@@ -566,16 +562,6 @@ private fun ShareRailButton(
                 tint = iconTint,
                 modifier = Modifier.size(22.dp),
             )
-            if (item.accentDot) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 7.dp, end = 7.dp)
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(palette.accent),
-                )
-            }
         }
         Text(
             text = item.label,
@@ -988,10 +974,10 @@ private fun EditorialShareCardPreview(
                     Modifier
                         .size(20.dp)
                         .clip(CircleShape)
-                        .background(if (content.thumbKind == ShareThumbKind.Repo) Color(0xFF6965DB) else palette.accent),
+                        .background(softBg),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(initial, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(initial, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = ink)
                 }
                 if (content.author.isNotBlank()) {
                     Text(content.author, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1222,7 +1208,7 @@ private fun FloatingCardAction(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (main) accent else Color.White,
+                tint = if (main) Color(0xFF1A1B1F) else Color.White,
                 modifier = Modifier.size(22.dp),
             )
         }
