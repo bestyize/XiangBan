@@ -20,6 +20,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,10 +74,15 @@ fun <T> LoadBox(state: Load<T>, onRetry: () -> Unit, content: @Composable (T) ->
     }
 }
 
+internal val LocalCommunityImageLoader = staticCompositionLocalOf<ImageLoader?> { null }
+
 @Composable
 fun rememberImageLoader(): ImageLoader {
+    LocalCommunityImageLoader.current?.let { return it }
     val context = LocalPlatformContext.current
-    return remember(context) { ImageLoader.Builder(context).components { add(KtorNetworkFetcherFactory()) }.build() }
+    val loader = remember(context) { ImageLoader.Builder(context).components { add(KtorNetworkFetcherFactory()) }.build() }
+    DisposableEffect(loader) { onDispose(loader::shutdown) }
+    return loader
 }
 
 /** 封面：有图就显示图，没有（或没加载出来）时垫一块按编号轮换的渐变，保证列表整齐。 */

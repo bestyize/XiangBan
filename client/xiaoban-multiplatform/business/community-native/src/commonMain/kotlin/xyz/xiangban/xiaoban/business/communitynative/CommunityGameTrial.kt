@@ -186,8 +186,7 @@ suspend fun openCommunityWork(
 
 /** Links in the first post are resolved through public pack metadata, just like structured reply cards. */
 @Composable
-internal fun LinkedWorkCards(env: CommunityEnv, html: String, open: ((Route) -> Unit)?, excluded: List<Long> = emptyList()) {
-    val ids = remember(html, env.config.forumBase, excluded) { linkedCommunityPacks(html, env.config).filterNot { it in excluded } }
+internal fun LinkedWorkCards(env: CommunityEnv, ids: List<Long>, open: ((Route) -> Unit)?) {
     ids.forEach { id ->
         val loader = rememberLoader(env, "linked-work-$id") { env.forum.pack(id) }
         val state by loader.state.collectAsState()

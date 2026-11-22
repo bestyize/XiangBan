@@ -1,11 +1,13 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,11 +32,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import xyz.xiangban.xiaoban.common.community.ChatHistory
 import xyz.xiangban.xiaoban.common.community.CloudChatController
@@ -48,6 +49,12 @@ import kotlinx.coroutines.isActive
 /** 页面进入、返回的转场时长。 */
 internal const val PageMillis = 260
 
+private fun Modifier.layoutVisiblePage(visible: () -> Boolean): Modifier =
+    layout { measurable, constraints ->
+        val page = if (visible()) measurable.measure(constraints) else null
+        layout(constraints.maxWidth, constraints.maxHeight) { page?.placeRelative(0, 0) }
+    }
+
 /** Keep visited pages in composition and leave hidden pages out of layout and hit testing. */
 @Composable
 internal fun RetainedTabPage(
@@ -60,10 +67,7 @@ internal fun RetainedTabPage(
     if (!selected && !visited) return
     if (!visited) SideEffect { visited = true }
 
-    Box(modifier.fillMaxSize().layout { measurable, constraints ->
-        val page = if (visible()) measurable.measure(constraints) else null
-        layout(constraints.maxWidth, constraints.maxHeight) { page?.placeRelative(0, 0) }
-    }) {
+    Box(modifier.fillMaxSize().layoutVisiblePage(visible)) {
         content()
     }
 }
@@ -73,7 +77,10 @@ internal fun RetainedTabPage(
 fun CommunityNativeApp(env: CommunityEnv) {
     remember(env) { ThemeState.load(env.prefs); SpeechState.load(env.prefs) }
     XiaobanTheme {
-      CompositionLocalProvider(LocalReplyReader provides env.reader) {
+      CompositionLocalProvider(
+          LocalReplyReader provides env.reader,
+          LocalCommunityImageLoader provides rememberImageLoader(),
+      ) {
         val appScope = rememberCoroutineScope()
         val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent, history = ChatHistory(env.chatFiles, appScope) { env.agent?.awaitSessionIdle(it) }) }
         // 登录、换号后读出这个账号存下的对话。
@@ -88,7 +95,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var communityPost by remember { mutableStateOf(Route.NewPost()) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
-        val stack = Route.decodeStack(stackText)
+        val stack = remember(stackText) { Route.decodeStack(stackText) }
         val mainAiVisible = tab == Tab.Ai.name && stack.none { it != Route.Login }
         LaunchedEffect(mainAiVisible, signedIn.generation) {
             if (mainAiVisible) chat.openMainConversation()
@@ -103,10 +110,19 @@ fun CommunityNativeApp(env: CommunityEnv) {
         BackHandler(enabled = env.platform != null && stack.isEmpty()) { env.platform?.exitApp() }
 
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            // 一级页（含底部导航和对话列表侧栏）：打开子页面时整层往左推出屏幕，和子页面同步移动，过程中不会露出首页；
-            // 返回时再原样推回来，滚动位置和已加载的数据都在。
-            val tabShift by animateFloatAsState(if (stack.any { it != Route.Login }) 1f else 0f, tween<Float>(PageMillis, easing = FastOutSlowInEasing), label = "一级页让位")
-            Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }) {
+            val pages = stack.filter { it != Route.Login }
+            val pageTransition = updateTransition(pages, label = "页面切换")
+            val tabShift by pageTransition.animateFloat(
+                transitionSpec = { tween(PageMillis, easing = FastOutSlowInEasing) },
+                label = "一级页让位",
+            ) { if (it.isEmpty()) 0f else 1f }
+            // 一级页跟子页面共用转场，返回时保留滚动位置和已加载的数据。
+            Box(
+                Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }
+                    .layoutVisiblePage {
+                        pageTransition.currentState.isEmpty() || pageTransition.targetState.isEmpty()
+                    },
+            ) {
                 val selectedTab = Tab.valueOf(tab)
                 val gamesSelected = selectedTab == Tab.Games
                 RetainedTabPage(selected = gamesSelected) {
@@ -132,23 +148,30 @@ fun CommunityNativeApp(env: CommunityEnv) {
                         modifier = Modifier.align(Alignment.BottomCenter))
                 }
             }
-            val pages = stack.filter { it != Route.Login }
-            AnimatedContent(
-                targetState = pages,
+            pageTransition.AnimatedContent(
                 modifier = Modifier.fillMaxSize(),
-                // 页面一直是实心的，不叠淡入淡出；新旧两页（包括下面的一级页）整屏一起滑动，任何时候都铺满屏幕，不会露出别的页：
-                // 进入时新页从右边推进来、旧页往左推出；返回时反过来。
                 transitionSpec = {
-                    val push = targetState.size > initialState.size
-                    val spec = tween<IntOffset>(PageMillis, easing = FastOutSlowInEasing)
-                    if (push) slideInHorizontally(spec) { it } togetherWith slideOutHorizontally(spec) { -it }
-                    else slideInHorizontally(spec) { -it } togetherWith slideOutHorizontally(spec) { it }
+                    (EnterTransition.None togetherWith ExitTransition.None).using(null)
                 },
-                label = "页面切换",
             ) { visiblePages ->
                 visiblePages.lastOrNull()?.let { route ->
+                    // 在图层上移动已布局的页面，动画帧只更新横向位移。
+                    val pageOffset by transition.animateFloat(
+                        transitionSpec = { tween(PageMillis, easing = FastOutSlowInEasing) },
+                        label = "子页位移",
+                    ) { state ->
+                        when (state) {
+                            EnterExitState.PreEnter -> if (visiblePages.size > pageTransition.currentState.size) 1f else -1f
+                            EnterExitState.Visible -> 0f
+                            EnterExitState.PostExit -> if (visiblePages.size < pageTransition.targetState.size) -1f else 1f
+                        }
+                    }
                     // 子页面盖住一级页，并吃掉点击，免得穿透到下面。
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
+                    Box(
+                        Modifier.fillMaxSize().graphicsLayer { translationX = size.width * pageOffset }
+                            .background(MaterialTheme.colorScheme.background).navigationBarsPadding()
+                            .clickable(indication = null, interactionSource = null) {},
+                    ) {
                         RouteScreen(env, chat, route, ::push, ::pop)
                     }
                 }

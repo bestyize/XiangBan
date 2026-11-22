@@ -16,7 +16,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,6 +30,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.common.community.BodyBlock
 import xyz.xiangban.xiaoban.common.community.bodyPlainText
 import xyz.xiangban.xiaoban.common.community.parseBody
@@ -39,7 +43,16 @@ import xyz.xiangban.xiaoban.common.community.parseBody
 @Composable
 fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
     val site = env.config.forumBase
-    val allBlocks = remember(html, site) { parseBody(html, site) }
+    key(html, site) {
+        val blocks by produceState(emptyList<BodyBlock>()) {
+            value = withContext(Dispatchers.Default) { parseBody(html, site) }
+        }
+        RichBody(blocks, modifier, fontSize, lineHeight, onCopy, hideImages, galleryImages)
+    }
+}
+
+@Composable
+internal fun RichBody(allBlocks: List<BodyBlock>, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
     val blocks = remember(allBlocks, hideImages, galleryImages) {
         val gallery = galleryImages.toSet()
         allBlocks.filterNot { it is BodyBlock.Image && (hideImages || it.src in gallery) }

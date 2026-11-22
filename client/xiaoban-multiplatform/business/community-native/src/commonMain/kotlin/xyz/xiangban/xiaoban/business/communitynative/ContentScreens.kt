@@ -62,13 +62,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import xyz.xiangban.xiaoban.common.community.BodyBlock
 import xyz.xiangban.xiaoban.common.community.DiscussController
 import xyz.xiangban.xiaoban.common.community.FeedController
 import xyz.xiangban.xiaoban.common.community.FeedState
 import xyz.xiangban.xiaoban.common.community.Loader
+import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.PackKinds
 import xyz.xiangban.xiaoban.common.community.Post
@@ -80,7 +84,9 @@ import xyz.xiangban.xiaoban.common.community.formatSize
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.compactCount
 import xyz.xiangban.xiaoban.common.community.kindLabel
+import xyz.xiangban.xiaoban.common.community.linkedCommunityPacks
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.parseBody
 import xyz.xiangban.xiaoban.common.community.replyCanEdit
 
 // ───────────── 共用部件 ─────────────
@@ -261,6 +267,15 @@ internal fun CircleOverlayButton(icon: androidx.compose.ui.graphics.vector.Image
 /** 求助帖的回答区需要的信息：被采纳的是哪条、谁是题主、当前读者能不能采纳，以及采纳的动作。 */
 internal class HelpAnswers(val acceptedPostId: Long?, val authorUid: String, val canAccept: Boolean, val onAccept: (Post) -> Unit)
 
+private data class DiscussionBody(val blocks: List<BodyBlock>, val linkedWorks: List<Long>)
+private data class PreparedTopic(val topic: Topic, val body: DiscussionBody)
+private data class PreparedPost(val post: Post, val body: DiscussionBody)
+
+private fun parseDiscussionBody(env: CommunityEnv, html: String, excluded: Set<Long> = emptySet()) = DiscussionBody(
+    blocks = parseBody(html, env.config.forumBase),
+    linkedWorks = linkedCommunityPacks(html, env.config).filterNot { it in excluded },
+)
+
 /** 作品对应的讨论帖里的评论，分页加载。[reloadKey] 变化时从头重新加载（发完回复后用）。 */
 @Composable
 internal fun CommentsSection(
@@ -279,7 +294,7 @@ internal fun CommentsSection(
     val detail = LocalCommunityDetail.current
     var newestFirst by remember(topicId, session.accountId, detail) { mutableStateOf(detail) }
     var editTopic by remember(topicId, reloadKey, session.accountId) { mutableStateOf(topicForEditing) }
-    var posts by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<List<Post>>(emptyList()) }
+    var posts by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<List<PreparedPost>>(emptyList()) }
     var page by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf(0) }
     var total by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf<Int?>(null) }
     var more by remember(topicId, reloadKey, session.accountId, newestFirst) { mutableStateOf(true) }
@@ -300,7 +315,15 @@ internal fun CommentsSection(
                 env.forum.posts(topicId, (first.total - 1) / first.pageSize + 1)
             } else first
             val ordered = if (newestFirst) next.items.asReversed() else next.items
-            posts = (posts + ordered).distinctBy { it.id }
+            val prepared = withContext(Dispatchers.Default) {
+                ordered.map { post ->
+                    val body = if (!post.blocked && post.status == "normal") {
+                        parseDiscussionBody(env, post.bodyHtml, post.workRefs.map { it.id }.toSet())
+                    } else DiscussionBody(emptyList(), emptyList())
+                    PreparedPost(post, body)
+                }
+            }
+            posts = (posts + prepared).distinctBy { it.post.id }
             page = next.page
             total = next.total
             more = if (newestFirst) next.page > 1 else next.hasMore
@@ -314,27 +337,28 @@ internal fun CommentsSection(
     }
     LaunchedEffect(topicId, reloadKey, session.accountId, newestFirst) { load() }
 
-    LaunchedEffect(topicId, session.accountId, posts.any { it.mine }, topicForEditing) {
-        editTopic = topicForEditing ?: if (session.loggedIn && posts.any { it.mine }) {
+    val hasOwnPost = posts.any { it.post.mine }
+    LaunchedEffect(topicId, session.accountId, hasOwnPost, topicForEditing) {
+        editTopic = topicForEditing ?: if (session.loggedIn && hasOwnPost) {
             try { env.forum.topic(topicId) }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (_: Exception) { null }
         } else null
     }
-    val authors = remember(posts) { posts.associateBy { it.floor } }
+    val authors = remember(posts) { posts.associate { it.post.floor to it.post } }
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = if (detail) 4.dp else 24.dp, bottom = 16.dp)) {
         if (detail) Hairline()
         CommentSectionTitle(total, if (detail) anchor.padding(top = 6.dp) else anchor, label = if (help != null) "回答" else "评论",
             newestFirst = newestFirst, onSort = if (detail && total != null && !loading) ({ newestFirst = !newestFirst }) else null)
         if (detail && onReply != null) DetailCommentPrompt(env) { onReply(null) }
-        posts.forEach { post ->
+        posts.forEach { (post, body) ->
             key(post.id) {
                 val parent = post.replyToFloor?.let { floor ->
                     val name = authors[floor]?.takeUnless { it.blocked }?.author?.nickname
                     "回复 ${name ?: "$floor 楼"}"
                 }
                 PostItem(
-                    env, post, parent, open = open,
+                    env, post, body, parent, open = open,
                     onReply = onReply?.let { reply -> { reply(post) } },
                     onEdit = if (session.loggedIn && replyCanEdit(post, session.accountId, editTopic)) ({ onEdit(post) }) else null,
                     accepted = help?.acceptedPostId == post.id,
@@ -355,6 +379,7 @@ internal fun CommentsSection(
 private fun PostItem(
     env: CommunityEnv,
     post: Post,
+    body: DiscussionBody,
     parent: String?,
     accepted: Boolean,
     onAccept: (() -> Unit)?,
@@ -381,9 +406,9 @@ private fun PostItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             val bodyStyle = if (LocalCommunityDetail.current) XType.DetailComment else XType.Body
-            RichBody(env, post.bodyHtml, fontSize = bodyStyle.fontSize, lineHeight = bodyStyle.lineHeight)
+            RichBody(body.blocks, fontSize = bodyStyle.fontSize, lineHeight = bodyStyle.lineHeight)
             ReplyContentCards(env, post.workRefs, open)
-            LinkedWorkCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
+            LinkedWorkCards(env, body.linkedWorks, open)
             ForumAttachments(env, post.attachments, open)
         }
         likeError?.let { Text(it, style = XType.Caption, color = Danger) }
@@ -400,7 +425,10 @@ private fun PostItem(
 fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit, showComments: Boolean = false) = CommunityDetail {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
-    val loader = rememberLoader(env, listOf(id, session.accountId)) { env.forum.topic(id) }
+    val loader = rememberLoader(env, listOf(id, session.accountId)) {
+        val topic = env.forum.topic(id)
+        withContext(Dispatchers.Default) { PreparedTopic(topic, parseDiscussionBody(env, topic.bodyHtml)) }
+    }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
     var replying by remember(id, session.accountId) { mutableStateOf(false) }
@@ -432,8 +460,8 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
     }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            if (state !is xyz.xiangban.xiaoban.common.community.Load.Ready<*>) ScreenBar("帖子", onBack = back)
-            LoadBox(state, loader::reload) { topic ->
+            if (state !is Load.Ready<*>) ScreenBar("帖子", onBack = back)
+            LoadBox(state, loader::reload) { (topic, body) ->
                 val images = remember(topic.images) { topic.images.filter(String::isNotBlank).map(env.forum::imageUrl).distinct() }
                 DetailAuthorBar(topic.author.nickname, back, onShare = { share = true },
                     onAuthor = { open(Route.User(topic.author.uid)) }, avatar = { TopicAuthorAvatar(env, topic.author, 30.dp) }) {
@@ -486,9 +514,9 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     TextButton(enabled = !closingHelp, onClick = { confirmClose = false }) { Text("取消") }
                                 },
                             )
-                            RichBody(env, topic.bodyHtml, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
+                            RichBody(body.blocks, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
                                 galleryImages = images, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
-                            LinkedWorkCards(env, topic.bodyHtml, open)
+                            LinkedWorkCards(env, body.linkedWorks, open)
                             ForumAttachments(env, topic.attachments, open)
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
@@ -498,8 +526,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 }).joinToString(" · "))
                             NativeReportAction(env, "topic", topic.id, open)
                         }
-                        val help = topic.help
-                        val answers = help?.let {
+                        val answers = topic.help?.let {
                             HelpAnswers(
                                 acceptedPostId = it.acceptedPostId, authorUid = topic.author.uid,
                                 canAccept = topic.viewer?.canEdit == true && it.status == "open",
@@ -550,7 +577,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
             NativeReplyComposer(env, id, ::dismissComposer, onSent = {
                 toast = if (editing != null) "评论已保存" else "评论已发布"
                 if (editing == null) {
-                    val topic = (state as? xyz.xiangban.xiaoban.common.community.Load.Ready)?.value
+                    val topic = (state as? Load.Ready)?.value?.topic
                     commentCount = (commentCount ?: topic?.replyCount ?: 0) + 1
                 }
                 dismissComposer()
@@ -558,7 +585,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
             }, parent = replyingTo, editingPost = editing)
         }
         OverlayTransition(share) { panel ->
-            val topic = (state as? xyz.xiangban.xiaoban.common.community.Load.Ready<Topic>)?.value
+            val topic = (state as? Load.Ready)?.value?.topic
             ShareSheet(env, topic?.cardTitle ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel)
         }
         Toast(toast) { toast = null }

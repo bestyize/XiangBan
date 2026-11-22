@@ -10,6 +10,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -35,7 +38,9 @@ class JsonHttp(private val client: HttpClient, private val base: String, private
     ): T {
         val text = raw(method, path, body, token)
         return try {
-            CommunityJson.decodeFromString(strategy, text)
+            withContext(Dispatchers.Default) { CommunityJson.decodeFromString(strategy, text) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw ApiException(200, "服务返回了无法识别的内容")
         }
