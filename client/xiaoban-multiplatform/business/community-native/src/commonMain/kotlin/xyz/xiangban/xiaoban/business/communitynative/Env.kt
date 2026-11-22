@@ -30,6 +30,7 @@ import xyz.xiangban.xiaoban.common.community.gatewayWebTools
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
 import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
+import xyz.xiangban.xiaoban.common.community.TopicDrafts
 import xyz.xiangban.xiaoban.common.community.InMemoryChatHistoryFiles
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.ForumApi
@@ -177,6 +178,7 @@ class CommunityEnv(
     val workspace: MobileWorkspace? = null,
     val utcOffsetMinutes: Int = 0,
 ) {
+    val topicDrafts = TopicDrafts(chatFiles)
     /** 对话历史是不是会留到下次打开应用。 */
     val chatsKept: Boolean get() = chatFiles !is InMemoryChatHistoryFiles
 

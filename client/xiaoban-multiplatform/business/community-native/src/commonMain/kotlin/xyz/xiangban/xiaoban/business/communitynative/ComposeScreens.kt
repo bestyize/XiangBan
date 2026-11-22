@@ -24,8 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -43,21 +43,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import xyz.xiangban.xiaoban.common.community.Category
-import xyz.xiangban.xiaoban.common.community.CommunityJson
 import xyz.xiangban.xiaoban.common.community.ContentPublishDraft
 import xyz.xiangban.xiaoban.common.community.FORUM_IMAGE_MAX_BYTES
 import xyz.xiangban.xiaoban.common.community.ForumAttachment
 import xyz.xiangban.xiaoban.common.community.ForumCategories
 import xyz.xiangban.xiaoban.common.community.ForumImage
+import xyz.xiangban.xiaoban.common.community.ForumUploadFile
 import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.PreparedForumWork
+import xyz.xiangban.xiaoban.common.community.TopicDraft
+import xyz.xiangban.xiaoban.common.community.TopicDraftCover
+import xyz.xiangban.xiaoban.common.community.TopicDraftCoverText
+import xyz.xiangban.xiaoban.common.community.TopicDraftLink
+import xyz.xiangban.xiaoban.common.community.TopicDraftUpload
 import xyz.xiangban.xiaoban.common.community.formatSize
 import xyz.xiangban.xiaoban.common.community.forumImageMarkdown
 import xyz.xiangban.xiaoban.common.community.isHelpBoard
@@ -90,17 +99,27 @@ private sealed interface DraftPostWork {
     val title: String
 
     data class Linked(val id: Long, override val title: String, val kind: String) : DraftPostWork
-    data class Uploaded(val prepared: PreparedForumWork, val rightsAccepted: Boolean) : DraftPostWork {
-        override val title: String get() = prepared.title.ifBlank { prepared.originalName.substringBeforeLast('.') }
+    data class Uploaded(
+        val file: ForumUploadFile?,
+        val originalName: String,
+        val kind: String,
+        override val title: String,
+        val summary: String,
+        val size: Long,
+        val rightsAccepted: Boolean,
+    ) : DraftPostWork {
+        constructor(prepared: PreparedForumWork, rightsAccepted: Boolean) : this(
+            prepared.file, prepared.originalName, prepared.kind, prepared.title.ifBlank { prepared.originalName.substringBeforeLast('.') },
+            prepared.summary, prepared.file.bytes.size.toLong(), rightsAccepted,
+        )
         val badge: String
             get() = when {
-                prepared.originalName.endsWith(".htm", ignoreCase = true) -> "HTM → V2"
-                prepared.originalName.endsWith(".html", ignoreCase = true) -> "HTML → V2"
+                originalName.endsWith(".htm", ignoreCase = true) -> "HTM → V2"
+                originalName.endsWith(".html", ignoreCase = true) -> "HTML → V2"
                 else -> "V2 容器"
             }
         val converted: Boolean
-            get() = prepared.originalName.endsWith(".html", ignoreCase = true) ||
-                prepared.originalName.endsWith(".htm", ignoreCase = true)
+            get() = originalName.endsWith(".html", ignoreCase = true) || originalName.endsWith(".htm", ignoreCase = true)
     }
 }
 
@@ -122,7 +141,6 @@ private fun cleanWorkLink(title: String, url: String): String {
  * 发帖：顶部栏无底线、单行元信息入口、无框写作区、内联话题胶囊、结构化浅灰功能卡、48dp 固定单行底栏。
  * 「作品」支持上传 V2 ZIP 或 .html/.htm 自动转为 V2 容器，或关联我的创作，每帖限 1 个。
  */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class, ExperimentalUuidApi::class)
 @Composable
 fun NewPostScreen(
     env: CommunityEnv,
@@ -134,38 +152,64 @@ fun NewPostScreen(
     initialSection: ForumSection? = null,
     initialBoardSlug: String? = null,
 ) {
+    val session by env.session.state.collectAsState()
+    key(session.accountId) {
+        NewPostEditor(env, back, open, help, initialTitle, initialBody, initialSection, initialBoardSlug)
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class, ExperimentalUuidApi::class)
+@Composable
+private fun NewPostEditor(
+    env: CommunityEnv,
+    back: () -> Unit,
+    open: (Route) -> Unit,
+    help: Boolean,
+    initialTitle: String,
+    initialBody: String,
+    initialSection: ForumSection?,
+    initialBoardSlug: String?,
+) {
     val extra = LocalExtraColors.current
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
+    val draftOwner = session.accountId
+    val draftSlot = when {
+        help -> "help"
+        initialTitle.isNotBlank() || initialBody.isNotBlank() -> "creation-${initialTitle.hashCode()}-${initialBody.hashCode()}"
+        else -> "new"
+    }
+    val draftWrites = remember { Mutex() }
+    var draftReady by remember { mutableStateOf(draftOwner == null) }
+    var draftReadFailed by remember { mutableStateOf(false) }
     var categories by remember(session.accountId) { mutableStateOf<ForumCategories?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     val startingSection = initialSection?.postingSection() ?: if (help) PostingSection.Resources else PostingSection.Discuss
-    var sectionIndex by rememberSaveable { mutableIntStateOf(PostingSections.indexOf(startingSection)) }
+    var sectionIndex by remember { mutableIntStateOf(PostingSections.indexOf(startingSection)) }
     var trustLevel by remember { mutableIntStateOf(0) }
-    var selectedChoiceKey by rememberSaveable { mutableStateOf(initialBoardSlug ?: "") }
-    var title by rememberSaveable { mutableStateOf(initialTitle) }
-    var body by rememberSaveable { mutableStateOf(initialBody) }
-    var tagsJson by rememberSaveable(session.accountId) { mutableStateOf("[]") }
-    val userTags = remember(tagsJson) { CommunityJson.decodeFromString<List<String>>(tagsJson) }
+    var selectedChoiceKey by remember { mutableStateOf(initialBoardSlug ?: "") }
+    var title by remember { mutableStateOf(initialTitle) }
+    var body by remember { mutableStateOf(initialBody) }
+    var userTags by remember { mutableStateOf<List<String>>(emptyList()) }
     fun updateUserTags(next: List<String>) {
-        tagsJson = CommunityJson.encodeToString(next.distinctBy { it.lowercase() }.take(5))
+        userTags = next.distinctBy { it.lowercase() }.take(5)
     }
 
     var busy by remember { mutableStateOf(false) }
-    var topicRequestId by rememberSaveable(session.accountId) { mutableStateOf<String?>(null) }
+    var topicRequestId by remember { mutableStateOf<String?>(null) }
     var publishStep by remember { mutableStateOf("") }
     var uploading by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
 
     var cover by remember(session.accountId) { mutableStateOf<ForumCoverImage?>(null) }
     var coverSpec by remember(session.accountId) { mutableStateOf<ForumCoverSpec?>(null) }
-    var uploadedCover by remember(cover, session.accountId) { mutableStateOf<ForumImage?>(null) }
+    var coverReference by remember { mutableStateOf<TopicDraftCover?>(null) }
+    var uploadedCover by remember { mutableStateOf<ForumImage?>(null) }
     var choosingCover by remember { mutableStateOf(false) }
     var editingCover by remember { mutableStateOf(false) }
     val currentAccount by rememberUpdatedState(session.accountId)
 
-    var attachmentsJson by rememberSaveable { mutableStateOf("[]") }
-    val attachments = remember(attachmentsJson) { CommunityJson.decodeFromString<List<ForumAttachment>>(attachmentsJson) }
+    var attachments by remember { mutableStateOf<List<ForumAttachment>>(emptyList()) }
 
     var draftWork by remember(session.accountId) { mutableStateOf<DraftPostWork?>(null) }
     var uploadedWorkKey by remember(session.accountId) { mutableStateOf<String?>(null) }
@@ -179,31 +223,126 @@ fun NewPostScreen(
     var tagDraft by remember { mutableStateOf("") }
     var confirmingLeave by remember { mutableStateOf(false) }
 
-    var pollEnabled by rememberSaveable { mutableStateOf(false) }
-    var pollOptionsJson by rememberSaveable(session.accountId) { mutableStateOf("""["",""]""") }
-    val pollInputs = remember(pollOptionsJson) { CommunityJson.decodeFromString<List<String>>(pollOptionsJson) }
+    var pollEnabled by remember { mutableStateOf(false) }
+    var pollInputs by remember { mutableStateOf(listOf("", "")) }
     fun updatePollInputs(next: List<String>) {
-        pollOptionsJson = CommunityJson.encodeToString(next.take(6))
+        pollInputs = next.take(6)
     }
-    var pollDays by rememberSaveable { mutableStateOf(7) }
+    var pollDays by remember { mutableStateOf(7) }
+
+    fun selectCover(image: ForumCoverImage?, spec: ForumCoverSpec?) {
+        cover = image
+        coverSpec = spec
+        val template = spec?.let { TopicDraftCoverText(it.title, it.subtitle, it.template.name, it.portrait, it.highlight) }
+        coverReference = image?.let { TopicDraftCover(Uuid.random().toString(), it.file.name, it.file.mime, template) }
+        uploadedCover = null
+    }
+
+    fun draftSnapshot(): TopicDraft {
+        val link = (draftWork as? DraftPostWork.Linked)?.let { TopicDraftLink(it.id, it.title, it.kind) }
+        val upload = (draftWork as? DraftPostWork.Uploaded)?.let { work ->
+            uploadedWorkKey?.let { TopicDraftUpload(it, work.kind, work.title, work.summary, work.originalName, work.size, work.rightsAccepted) }
+        }
+        return TopicDraft(
+            title = title, body = body, section = sectionIndex, boardKey = selectedChoiceKey,
+            tags = userTags, tagInput = tagDraft, attachments = attachments, pollOptions = pollInputs.takeIf { pollEnabled },
+            pollDays = pollDays, cover = coverReference?.copy(uploaded = uploadedCover),
+            linkedWork = link, uploadedWork = upload, requestId = topicRequestId,
+        )
+    }
+
+    suspend fun persistDraft() {
+        val owner = draftOwner ?: return
+        draftWrites.withLock {
+            if (draftReady && !leaving) {
+                val draft = draftSnapshot()
+                if (draft.title.isNotBlank() || draft.body.isNotBlank() || draft.tags.isNotEmpty() || draft.tagInput.isNotBlank() ||
+                    draft.cover != null || draft.linkedWork != null || draft.uploadedWork != null || draft.attachments.isNotEmpty() ||
+                    draft.pollOptions != null || draft.requestId != null) {
+                    env.topicDrafts.save(owner, draftSlot, draft, cover?.file)
+                } else if (!draftReadFailed) env.topicDrafts.clear(owner, draftSlot)
+            }
+        }
+    }
+
+    suspend fun clearDraft() {
+        val owner = draftOwner ?: return
+        withContext(NonCancellable) { draftWrites.withLock { env.topicDrafts.clear(owner, draftSlot) } }
+    }
+
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(env, draftOwner, draftSlot) {
+        val owner = draftOwner ?: return@LaunchedEffect
+        try {
+            val (draft, savedCover) = env.topicDrafts.load(owner, draftSlot) ?: return@LaunchedEffect
+            if (title != initialTitle || body != initialBody) return@LaunchedEffect
+            title = draft.title
+            body = draft.body
+            sectionIndex = draft.section
+            selectedChoiceKey = draft.boardKey
+            userTags = draft.tags
+            tagDraft = draft.tagInput
+            attachments = draft.attachments
+            pollEnabled = draft.pollOptions != null
+            pollInputs = draft.pollOptions ?: listOf("", "")
+            pollDays = draft.pollDays
+            topicRequestId = draft.requestId
+            draftWork = draft.linkedWork?.let { DraftPostWork.Linked(it.id, it.title, it.kind) }
+                ?: draft.uploadedWork?.let {
+                    uploadedWorkKey = it.key
+                    DraftPostWork.Uploaded(null, it.originalName, it.kind, it.title, it.summary, it.size, it.rightsAccepted)
+                }
+            coverReference = draft.cover
+            uploadedCover = draft.cover?.uploaded
+            coverSpec = draft.cover?.template?.let { saved ->
+                val template = ForumCoverTemplate.entries.firstOrNull { it.name == saved.template } ?: ForumCoverTemplate.Marker
+                ForumCoverSpec(saved.title, saved.subtitle, template, saved.portrait, saved.highlight)
+            }
+            cover = savedCover?.let { env.platform?.previewForumCover(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            draftReadFailed = true
+            error = e.message ?: "无法恢复本地草稿"
+        } finally {
+            draftReady = true
+        }
+    }
+    LaunchedEffect(draftReady) {
+        if (!draftReady || draftOwner == null) return@LaunchedEffect
+        snapshotFlow { draftSnapshot() }.conflate().collect {
+            try { persistDraft() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = e.message ?: "无法保存本地草稿" }
+        }
+    }
 
     val focus = LocalFocusManager.current
     fun cancelDraft() {
         if (leaving) return
         leaving = true
         val pending = attachments.toList()
-        env.scope.launch { pending.forEach { attachment -> runCatching { env.forum.deletePendingAttachment(attachment.id) } } }
-        back()
+        scope.launch {
+            try { clearDraft() }
+            catch (e: Exception) { leaving = false; error = e.message ?: "无法清理本地草稿"; return@launch }
+            env.scope.launch {
+                if (env.session.state.value.accountId == draftOwner) pending.forEach { attachment ->
+                    runCatching { env.forum.deletePendingAttachment(attachment.id) }
+                }
+            }
+            if (env.session.state.value.accountId == draftOwner) back()
+        }
     }
     fun requestBack() {
         if (busy || uploading || leaving || workPicking) return
+        if (!draftReady) { back(); return }
         focus.clearFocus()
-        val dirty = title.isNotBlank() || body.isNotBlank() || userTags.isNotEmpty() || attachments.isNotEmpty() || draftWork != null || cover != null
+        val dirty = title.isNotBlank() || body.isNotBlank() || userTags.isNotEmpty() || tagDraft.isNotBlank() ||
+            attachments.isNotEmpty() || draftWork != null || coverReference != null || pollEnabled
         if (dirty) confirmingLeave = true else cancelDraft()
     }
     BackHandler { requestBack() }
 
-    var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
 
     LaunchedEffect(attempt, session.accountId, session.loggedIn) {
@@ -245,8 +384,8 @@ fun NewPostScreen(
     val selectedChoice = allChoices.firstOrNull { it.key == selectedChoiceKey && catalog?.canPost(it.category, trustLevel) == true }
     val activeSection = PostingSections.getOrNull(sectionIndex) ?: PostingSection.Discuss
 
-    LaunchedEffect(catalog, trustLevel) {
-        if (catalog != null && destinations.isNotEmpty()) {
+    LaunchedEffect(catalog, trustLevel, draftReady) {
+        if (draftReady && catalog != null && destinations.isNotEmpty()) {
             val currentValid = allChoices.firstOrNull { it.key == selectedChoiceKey && catalog.canPost(it.category, trustLevel) }
             if (currentValid == null) {
                 val slugMatch = initialBoardSlug?.let { slug ->
@@ -286,7 +425,7 @@ fun NewPostScreen(
     val titleLength = title.trim().split(Regex("\\s+")).joinToString(" ").count { !it.isLowSurrogate() }
     val bodyLength = body.trim().count { !it.isLowSurrogate() }
     val validTitle = if (isCasual) titleLength <= 80 else titleLength in 4..80
-    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosenBoard != null &&
+    val canPost = draftReady && session.loggedIn && !busy && !uploading && !leaving && chosenBoard != null &&
         validTitle && bodyLength in 10..20_000 && pollError == null && workError == null
 
     fun addUserTag(raw: String) {
@@ -313,6 +452,7 @@ fun NewPostScreen(
                     val limits = env.forum.uploadSession().limits
                     check(currentAccount == account) { "账号已切换，请重新编辑" }
                     uploadedCover = env.forum.uploadImage(selectedCover.file, minOf(limits.imageMaxBytes, FORUM_IMAGE_MAX_BYTES))
+                    persistDraft()
                 }
                 check(currentAccount == account) { "账号已切换，请重新编辑" }
 
@@ -321,25 +461,28 @@ fun NewPostScreen(
                 if (pendingUpload != null) {
                     check(pendingUpload.rightsAccepted) { "请确认作品原创或已获授权" }
                     val packTitle = pendingUpload.title.trim().take(60).ifBlank { title.trim().take(60) }.ifBlank { "社区作品" }
-                    val packSummary = pendingUpload.prepared.summary.trim().ifBlank { body.trim().take(500) }
+                    val packSummary = pendingUpload.summary.trim().ifBlank { body.trim().take(500) }
                     val fileKey = uploadedWorkKey ?: run {
                         publishStep = "正在上传作品…"
-                        env.content.upload(pendingUpload.prepared.kind, pendingUpload.prepared.file).fileKey.also { uploadedWorkKey = it }
+                        val file = checkNotNull(pendingUpload.file) { "请重新选择作品文件" }
+                        env.content.upload(pendingUpload.kind, file).fileKey.also { uploadedWorkKey = it }
                     }
+                    persistDraft()
                     check(currentAccount == account) { "账号已切换，请重新编辑" }
                     publishStep = "正在校验作品…"
                     check(env.content.awaitVerified(fileKey, recoverPublished = true)) { "作品校验尚未完成，请稍后重试" }
                     check(currentAccount == account) { "账号已切换，请重新编辑" }
                     publishStep = "正在登记作品…"
                     val result = env.content.publish(
-                        ContentPublishDraft(pendingUpload.prepared.kind, packTitle, packSummary, allTags, rightsAck = true),
+                        ContentPublishDraft(pendingUpload.kind, packTitle, packSummary, allTags, rightsAck = true),
                         fileKey,
                     )
                     check(currentAccount == account) { "账号已切换，请到我的作品核对" }
-                    val linked = DraftPostWork.Linked(result.id, packTitle, kindLabel(pendingUpload.prepared.kind))
+                    val linked = DraftPostWork.Linked(result.id, packTitle, kindLabel(pendingUpload.kind))
                     draftWork = linked
                     uploadedWorkKey = null
                     linkedWork = linked
+                    persistDraft()
                 }
 
                 val postBody = buildList {
@@ -351,6 +494,8 @@ fun NewPostScreen(
 
                 publishStep = "正在发布…"
                 val requestId = topicRequestId ?: Uuid.random().toString().also { topicRequestId = it }
+                persistDraft()
+                check(currentAccount == account) { "账号已切换，请重新编辑" }
                 val id = env.forum.createTopic(
                     categoryId = board.id,
                     title = title.trim(),
@@ -362,6 +507,9 @@ fun NewPostScreen(
                     attachments = attachments,
                     requestId = requestId,
                 )
+                leaving = true
+                runCatching { clearDraft() }
+                if (env.session.state.value.accountId != account) return@launch
                 back()
                 open(Route.Topic(id))
             } catch (e: CancellationException) {
@@ -408,7 +556,7 @@ fun NewPostScreen(
                     onBusy = { uploading = it },
                     attachments = attachments,
                     onAttachments = { next ->
-                        if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
+                        if (!leaving) attachments = next
                         else env.scope.launch {
                             next.filterNot { file -> attachments.any { it.id == file.id } }
                                 .forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } }
@@ -516,7 +664,7 @@ fun NewPostScreen(
                                             Text("更换", style = XType.Caption, fontWeight = FontWeight.Medium)
                                         }
                                         IconTap(XIcons.Close, "移除封面", {
-                                            if (!busy && !uploading) { cover = null; coverSpec = null }
+                                            if (!busy && !uploading) selectCover(null, null)
                                         }, size = 16.dp)
                                     }
                                 }
@@ -1179,7 +1327,7 @@ fun NewPostScreen(
                             val file = platform.pickForumFile(true, FORUM_IMAGE_MAX_BYTES) ?: return@launch
                             val preview = platform.previewForumCover(file) ?: kotlin.error("无法读取封面")
                             check(currentAccount == account) { "账号已切换，请重新选择" }
-                            cover = preview; coverSpec = null
+                            selectCover(preview, null)
                         } catch (e: CancellationException) { throw e }
                         catch (e: Exception) { error = messageOf(e) }
                         finally { uploading = false }
@@ -1193,7 +1341,7 @@ fun NewPostScreen(
                 platform,
                 coverSpec ?: ForumCoverSpec(title),
                 onDismiss = { editingCover = false },
-                onUse = { spec, image -> coverSpec = spec; cover = image; editingCover = false },
+                onUse = { spec, image -> selectCover(image, spec); editingCover = false },
             )
         }
         if (confirmingLeave) CenterDialog({ confirmingLeave = false }) {
@@ -1221,9 +1369,9 @@ private fun DraftWorkCard(
     val subtitle = when (work) {
         is DraftPostWork.Linked -> "${work.kind} · V2 容器"
         is DraftPostWork.Uploaded -> buildString {
-            append(work.prepared.originalName)
+            append(work.originalName)
             append(if (work.converted) " · 已自动转为 V2 容器 · " else " · V2 作品包 · ")
-            append(formatSize(work.prepared.file.bytes.size.toLong()))
+            append(formatSize(work.size))
         }
     }
     Column(
