@@ -1,0 +1,1865 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 模型配置全链路 重设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; outline: none; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid #222; outline-offset: 2px; }
+body.studio-dark button:focus-visible { outline-color: #ececef; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1420px; margin: 0 auto; padding: 22px 20px 60px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 22px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .86);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── 5-Board Responsive Stage ─── */
+.boards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 28px 24px;
+}
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; }
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .board-mini-seg { background: rgba(255, 255, 255, .08); }
+.board-mini-seg button { height: 22px; padding: 0 7px; border-radius: 6px; font-size: 11px; color: #666; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+/* ─── Summary Card ─── */
+.diff-card {
+  margin: 38px auto 0;
+  max-width: 1222px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 20px;
+}
+body.studio-dark .diff-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.diff-card h3 { font-size: 14px; font-weight: 650; margin-bottom: 12px; }
+.diff-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.diff-item { padding: 12px 13px; border-radius: 12px; background: #f7f7f9; }
+body.studio-dark .diff-item { background: #1f2025; }
+.diff-item strong { display: block; font-size: 12.5px; font-weight: 650; margin-bottom: 4px; }
+.diff-item p { font-size: 11.5px; line-height: 1.56; color: #666970; }
+body.studio-dark .diff-item p { color: #989ba4; }
+@media (max-width: 1060px) { .diff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .diff-grid { grid-template-columns: 1fr; } }
+
+/* ─── Phone Tokens (克制中性工作风 · 严格控色) ─── */
+.phone {
+  --paper: #f7f7f8;
+  --surface: #ffffff;
+  --ink: #1f2024;
+  --ink2: #666870;
+  --ink3: #9698a0;
+  --hairline: #ececef;
+  --fill: #f2f2f4;
+  --fill-hover: #e9e9ed;
+  --line: #e2e2e6;
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --success: #25945d;
+  --success-soft: #eaf6f0;
+  --warn: #a66208;
+  --warn-soft: #fdf4e5;
+  --danger: #d92d3f;
+  --danger-soft: #fff2f3;
+  --scrim: rgba(15, 16, 20, .42);
+  --sheet-shadow: 0 -6px 28px rgba(0, 0, 0, .10);
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  --paper: #111113;
+  --surface: #1c1c1f;
+  --ink: #ececef;
+  --ink2: #9a9ba3;
+  --ink3: #6c6d75;
+  --hairline: #2a2a2f;
+  --fill: #29292e;
+  --fill-hover: #333339;
+  --line: #36363d;
+  --success: #45be83;
+  --success-soft: #183024;
+  --warn: #e8ad52;
+  --warn-soft: #332614;
+  --danger: #ff646b;
+  --danger-soft: #361d22;
+  --scrim: rgba(0, 0, 0, .62);
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .56);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 36px;
+  flex: none;
+  padding: 10px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+}
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 72%; height: 100%; border-radius: 1.5px; background: var(--ink); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+/* Subpage Top Bar */
+.appbar {
+  height: 48px;
+  flex: none;
+  padding: 0 8px;
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: 82px 1fr 82px;
+  align-items: center;
+}
+.appbar-left { display: flex; align-items: center; justify-content: flex-start; }
+.appbar-right { display: flex; align-items: center; justify-content: flex-end; }
+.appbar h3 {
+  text-align: center;
+  font-size: 16.5px;
+  line-height: 22px;
+  font-weight: 650;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.icon-tap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: background .15s;
+}
+.icon-tap:hover { background: var(--fill); }
+.icon-tap svg { width: 20px; height: 20px; }
+.bar-link {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink2);
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.bar-link:hover { background: var(--fill); color: var(--ink); }
+.bar-link.primary { color: var(--accent-ink); font-weight: 600; }
+
+/* Scrollable Page Body */
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 24px;
+}
+.page-body::-webkit-scrollbar { display: none; }
+
+/* Section Header */
+.sec-head {
+  padding: 16px 16px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sec-title { font-size: 12px; font-weight: 500; color: var(--ink3); }
+.sec-meta { font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.sec-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink2);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.sec-action:hover { background: var(--fill); color: var(--ink); }
+.sec-action svg { width: 13px; height: 13px; }
+
+/* Full-bleed White Group */
+.group { background: var(--surface); }
+.sep { height: 0.5px; background: var(--hairline); margin-left: 16px; }
+.sep.inset { margin-left: 68px; }
+.sep.full { margin-left: 0; }
+
+/* Provider Rows (Board 01) */
+.prov-row {
+  width: 100%;
+  min-height: 68px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: background .15s;
+}
+.prov-row:hover { background: var(--paper); }
+
+.prov-ico {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+.prov-ico svg { width: 19px; height: 19px; }
+.prov-ico.official {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-soft-line);
+}
+
+.prov-main { flex: 1; min-width: 0; }
+.prov-top { display: flex; align-items: center; gap: 7px; }
+.prov-name { font-size: 15px; line-height: 21px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prov-sub { margin-top: 2px; font-size: 12.5px; line-height: 17px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.status-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  flex: none;
+}
+.status-active::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+.prov-right { display: flex; align-items: center; gap: 6px; flex: none; color: var(--ink3); }
+.prov-right svg { width: 16px; height: 16px; }
+.balance-val { font-size: 13px; font-weight: 500; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.balance-zero { font-size: 12px; font-weight: 500; color: var(--warn); background: var(--warn-soft); padding: 2px 8px; border-radius: 99px; }
+
+.add-row {
+  width: 100%;
+  height: 50px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink2);
+  transition: background .15s, color .15s;
+}
+.add-row:hover { background: var(--paper); color: var(--ink); }
+.add-row svg { width: 18px; height: 18px; }
+
+.page-note {
+  padding: 10px 16px 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink3);
+}
+
+/* ─── Board 02: Official Xiaoban AI Subpage ─── */
+.quota-block { background: var(--surface); padding: 16px; }
+.quota-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.quota-num { display: flex; align-items: baseline; gap: 5px; }
+.quota-num strong { font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.quota-num span { font-size: 13px; color: var(--ink2); font-weight: 500; }
+.quota-meta { margin-top: 6px; font-size: 12px; color: var(--ink3); display: flex; align-items: center; gap: 8px; }
+.quota-expire { font-size: 12px; color: var(--ink3); text-align: right; }
+
+.redeem-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-box {
+  flex: none;
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.redeem-row .field-box,
+.add-model-bar .field-box {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.field-box input { width: 100%; font-size: 14.5px; line-height: 20px; color: var(--ink); }
+.field-box input::placeholder { color: var(--ink3); }
+.compact-btn {
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 600;
+  flex: none;
+  transition: background .15s, color .15s;
+}
+.compact-btn.ready {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-soft-line);
+}
+
+/* Unified Flush-Left Model Row (Board 02 & Board 05 — ZERO awkward left gap!) */
+.model-row {
+  width: 100%;
+  min-height: 54px;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: background .15s;
+}
+.model-row.selected-tint { background: var(--fill); border-radius: 12px; padding: 11px 12px; }
+.model-hit {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 2px 0;
+}
+.model-row-top { display: flex; align-items: center; gap: 7px; }
+.model-row-name { font-size: 14.5px; line-height: 20px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-row.selected .model-row-name { font-weight: 650; }
+.neutral-tag {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 500;
+  flex: none;
+}
+.model-row.selected-tint .neutral-tag { background: var(--surface); }
+.model-row-desc { margin-top: 2px; font-size: 12px; line-height: 17px; color: var(--ink3); }
+.model-row-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.check-mark { width: 18px; height: 18px; display: grid; place-items: center; color: var(--accent-ink); }
+.check-mark svg { width: 17px; height: 17px; stroke-width: 2.3; }
+
+/* Neutral Reasoning Effort Trigger Chip (fixed 2-char label width so all rows align cleanly!) */
+.effort-chip {
+  height: 28px;
+  min-width: 72px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 11.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  flex: none;
+  transition: background .15s, color .15s;
+}
+.effort-chip span {
+  min-width: 24px;
+  text-align: center;
+}
+.model-row.selected-tint .effort-chip { background: var(--surface); border: 1px solid var(--hairline); }
+.effort-chip:hover { color: var(--ink); }
+.effort-chip svg { width: 13px; height: 13px; }
+
+/* ─── Bottom Sheets (Unified Clean Sheet Language) ─── */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: var(--scrim);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: fadeIn .16s ease;
+}
+.scrim.top-layer { z-index: 20; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+  background: var(--surface);
+  border-radius: 18px 18px 0 0;
+  box-shadow: var(--sheet-shadow);
+  padding-top: 8px;
+  overflow: hidden;
+  max-height: 620px;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-handle { width: 36px; height: 4px; border-radius: 99px; background: var(--line); margin: 0 auto 10px; flex: none; }
+.sheet-head {
+  padding: 2px 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+}
+.sheet-head-copy { min-width: 0; }
+.sheet-head h4 { font-size: 16px; font-weight: 650; color: var(--ink); }
+.sheet-head p { margin-top: 2px; font-size: 12px; color: var(--ink3); }
+.sheet-head-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.sheet-text-act { font-size: 12.5px; font-weight: 550; color: var(--ink2); padding: 4px 8px; border-radius: 8px; }
+.sheet-text-act:hover { background: var(--fill); color: var(--ink); }
+.sheet-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--ink2);
+  display: grid;
+  place-items: center;
+}
+.sheet-close svg { width: 16px; height: 16px; }
+
+.sheet-scroll { overflow-y: auto; scrollbar-width: none; }
+.sheet-scroll::-webkit-scrollbar { display: none; }
+
+.picker-row {
+  width: 100%;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: background .15s;
+}
+.picker-row:hover { background: var(--paper); }
+.picker-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--fill);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 650;
+  flex: none;
+}
+.picker-ico svg { width: 18px; height: 18px; }
+.picker-info { flex: 1; min-width: 0; }
+.picker-name { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.picker-desc { margin-top: 2px; font-size: 12px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-mono { margin-top: 2px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink3); }
+.picker-chev { color: var(--ink3); flex: none; }
+.picker-chev svg { width: 16px; height: 16px; }
+
+/* Multi-select Checkbox inside BottomSheet */
+.chk-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.6px solid var(--line);
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: background .15s, border-color .15s;
+}
+.chk-box.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+.chk-box svg { width: 13px; height: 13px; stroke-width: 2.6; }
+
+/* Uniform Option Row inside Reasoning / Protocol BottomSheet */
+.opt-row {
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  transition: background .15s;
+}
+.opt-row:hover { background: var(--paper); }
+.opt-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.opt-title { font-size: 14.5px; font-weight: 500; color: var(--ink); }
+.opt-row.active .opt-title { font-weight: 650; }
+.opt-sub { font-size: 12px; color: var(--ink3); }
+
+.sheet-foot-pad { padding: 12px 16px 4px; border-top: 0.5px solid var(--hairline); }
+
+.inline-err {
+  margin: 4px 16px 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.inline-err-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.inline-err svg { width: 15px; height: 15px; }
+.inline-err button { font-weight: 650; color: var(--warn); padding: 2px 6px; border-radius: 6px; flex: none; }
+
+.sheet-band { height: 6px; background: var(--paper); }
+.home-bar { height: 18px; background: var(--surface); display: flex; align-items: center; justify-content: center; flex: none; }
+.home-bar span { width: 108px; height: 4px; border-radius: 99px; background: var(--ink); opacity: .18; }
+
+/* ─── Board 04: Third-Party Provider Edit Subpage ─── */
+.form-block { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field-label { font-size: 12.5px; font-weight: 550; color: var(--ink2); }
+.field-link { font-size: 12px; color: var(--ink2); text-decoration: underline; text-underline-offset: 2px; }
+.field-box.mono input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; }
+.endpoint-hint { font-size: 11.5px; color: var(--ink3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eye-btn { color: var(--ink3); width: 28px; height: 28px; display: grid; place-items: center; }
+.eye-btn svg { width: 17px; height: 17px; }
+
+/* Clean Full-Width Selector Row inside Form (exact same 46px height as .field-box) */
+.select-row {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  transition: background .15s;
+}
+.select-row:hover { background: var(--fill-hover); }
+.select-row-val { font-size: 14px; font-weight: 550; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.select-row-sub { font-size: 12px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.select-row svg { width: 16px; height: 16px; color: var(--ink3); }
+
+/* Editable Model Rows */
+.edit-model-row { padding: 11px 16px; display: flex; align-items: center; gap: 10px; }
+.edit-model-hit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
+.radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.6px solid var(--line);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.radio-dot.on { border-color: var(--accent); }
+.radio-dot.on::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.edit-model-name { font-size: 14px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-btn { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--ink3); flex: none; }
+.trash-btn:hover { background: var(--fill); color: var(--danger); }
+.trash-btn svg { width: 16px; height: 16px; }
+.add-model-bar { padding: 10px 16px 12px; display: flex; align-items: center; gap: 8px; }
+
+/* Advanced Collapsible */
+.collapse-row {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.collapse-row svg { width: 16px; height: 16px; color: var(--ink3); transition: transform .18s; }
+.collapse-row.open svg { transform: rotate(180deg); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 14px; color: var(--ink); }
+.setting-link-row {
+  width: 100%;
+  padding: 10px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  border-top: 0.5px solid var(--hairline);
+}
+.setting-link-row .lbl { font-size: 14px; color: var(--ink); flex: none; }
+.setting-link-row .val { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink2); min-width: 0; }
+.setting-link-row .val span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.setting-link-row svg { width: 15px; height: 15px; color: var(--ink3); }
+
+.switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 99px;
+  background: var(--line);
+  padding: 2.5px;
+  transition: background .18s ease;
+  display: flex;
+  align-items: center;
+}
+.switch.on { background: var(--success); }
+.switch span {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+  transition: transform .18s ease;
+}
+.switch.on span { transform: translateX(18px); }
+
+.sticky-foot {
+  flex: none;
+  background: var(--surface);
+  border-top: 0.5px solid var(--hairline);
+  padding: 10px 16px 4px;
+}
+.foot-row { display: flex; align-items: center; gap: 10px; }
+.btn-ghost {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-soft-primary {
+  flex: 1;
+  height: 44px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-soft-line);
+  color: var(--accent-ink);
+  font-size: 14.5px;
+  font-weight: 650;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+/* ─── Board 05: Chat Model Picker (Flush-Left Aligned!) ─── */
+.chat-bg-head { padding: 12px 16px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; }
+.chat-bg-title { font-size: 15px; font-weight: 650; }
+.chat-bg-bubbles { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.bubble-u { align-self: flex-end; max-width: 78%; padding: 10px 13px; border-radius: 14px 14px 4px 14px; background: var(--fill); font-size: 13.5px; color: var(--ink); }
+.bubble-a { align-self: flex-start; max-width: 84%; font-size: 13.5px; line-height: 21px; color: var(--ink2); }
+
+.picker-group-lbl {
+  padding: 12px 16px 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+.chat-list-pad { padding: 0 8px; }
+.chat-list-pad .model-row { padding: 10px 10px; border-radius: 12px; min-height: 48px; }
+
+.picker-foot {
+  width: 100%;
+  border-top: 0.5px solid var(--hairline);
+  padding: 12px 16px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.picker-foot svg { width: 16px; height: 16px; color: var(--ink3); }
+
+/* Toast */
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  top: 94px;
+  transform: translate(-50%, -8px);
+  z-index: 30;
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: rgba(24, 25, 30, .92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: calc(100% - 36px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.phone.dark .phone-toast { background: rgba(240, 240, 244, .94); color: #16171a; }
+.phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 440px) {
+  .studio { padding: 14px 10px 40px; }
+  .board { width: 100%; max-width: 390px; }
+  .phone { height: 760px; border-radius: 30px; border-width: 4px; }
+}
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 模型配置全链路 重设计稿</h1>
+      <p>90% 中性黑白灰控色 · 协议独立选择自动切换预置端点 · 自定义思考等级多选 BottomSheet · 模型列表左对齐</p>
+    </div>
+    <div class="controls">
+      <div class="swatches" role="group" aria-label="主题色" id="swatches"></div>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- Board 01: Model Config Home -->
+    <section class="board">
+      <div class="board-head">
+        <h2>01 · 模型配置主页</h2>
+        <div class="board-mini-seg" role="group" aria-label="主页场景">
+          <button class="active" data-b1="zero">0 点态</button>
+          <button data-b1="normal">有余额</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b1"></div>
+      <p class="board-caption">消灭满屏红粉：第三方图标与添加入口全回归中性灰黑；「使用中」改用冷静绿点；「0 点」用克制琥珀胶囊并点整行直达兑换。</p>
+    </section>
+
+    <!-- Board 02: Official Xiaoban AI Subpage -->
+    <section class="board">
+      <div class="board-head">
+        <h2>02 · 小伴 AI 官方配置</h2>
+        <div class="board-mini-seg" role="group" aria-label="官方配置态">
+          <button class="active" data-b2="zero">0 点</button>
+          <button data-b2="active">有余额</button>
+          <button data-b2="sheet">思考弹层</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b2"></div>
+      <p class="board-caption">官方模型列表补齐右侧「思考等级」胶囊，点选即弹出底部 BottomSheet 切换思考档位；列表齐左无空档，去掉底部实心大红「完成」键。</p>
+    </section>
+
+    <!-- Board 03: Add Provider Sheet -->
+    <section class="board">
+      <div class="board-head">
+        <h2>03 · 添加第三方服务</h2>
+        <div class="board-mini-seg" role="group" aria-label="目录状态">
+          <button class="active" data-b3="normal">正常目录</button>
+          <button data-b3="error">刷新失败</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b3"></div>
+      <p class="board-caption">补齐服务商中性图标与完整「自定义模型服务」入口；目录拉取失败用底部轻量化琥珀条原地重试，不再把巨型灰按钮插进列表中间。</p>
+    </section>
+
+    <!-- Board 04: Edit Third-Party Provider Subpage -->
+    <section class="board">
+      <div class="board-head">
+        <h2>04 · 第三方服务商配置</h2>
+        <div class="board-mini-seg" role="group" aria-label="视图状态">
+          <button class="active" data-b4="base">基础</button>
+          <button data-b4="proto">选协议</button>
+          <button data-b4="effort">思考多选</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b4"></div>
+      <p class="board-caption">协议改为独立选择行（点开底部弹层展示完整协议与端点路径，切换后自动更新对应预置 API 地址）；高级设置新增「支持的思考等级」底部多选弹层（默认勾选 低 / 中 / 高 / 极高 / 最高）。</p>
+    </section>
+
+    <!-- Board 05: Chat Model Picker + BottomSheet Reasoning -->
+    <section class="board">
+      <div class="board-head">
+        <h2>05 · 选择对话模型 + 思考等级</h2>
+        <div class="board-mini-seg" role="group" aria-label="弹层状态">
+          <button class="active" data-b5="list">模型列表</button>
+          <button data-b5="sheet">思考弹层</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b5"></div>
+      <p class="board-caption">修复 Auto 左侧多余留白：全部模型名与分组标题严格左对齐，对号统一放最右侧；点击右侧中性思考胶囊弹出贴底 BottomSheet（告别悬浮白框遮挡）。</p>
+    </section>
+  </main>
+
+  <section class="diff-card" aria-label="本轮迭代要点">
+    <h3>本轮细化与结构修正</h3>
+    <div class="diff-grid">
+      <div class="diff-item">
+        <strong>02 · 补齐官方思考等级</strong>
+        <p>小伴 AI 官方模型行右侧直接展示当前思考档位（如「默认 / 高」），点击从底部弹出思考等级选择器，与对话页完全一致。</p>
+      </div>
+      <div class="diff-item">
+        <strong>04 · 协议独立选择 + 联动地址</strong>
+        <p>取消窄小三列并排协议条，改用清晰单行选择器 + 底部协议弹层；切 Chat / Responses / Anthropic 时自动切到对应预置地址并预览完整端点。</p>
+      </div>
+      <div class="diff-item">
+        <strong>04 · 自定义思考等级多选</strong>
+        <p>高级设置内新增「支持的思考等级」，点击弹出底部多选 BottomSheet，默认勾选「低 / 中 / 高 / 极高 / 最高」五档，由用户自由增删。</p>
+      </div>
+      <div class="diff-item">
+        <strong>05 · 消除 Auto 左侧空档</strong>
+        <p>移除左侧占位勾选槽，所有模型名与分组标题一条直线左对齐；选中对号统一放在最右侧，视觉干净利落。</p>
+      </div>
+      <div class="diff-item">
+        <strong>05 · 统一贴底 BottomSheet</strong>
+        <p>思考等级统一改用贴底 BottomSheet（替代悬浮白弹窗与行内缩进条），五档选项行高一致，彻底告别遮挡与视觉割裂。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red',      name: '小伴红', light: { btn: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c' }, dark: { btn: '#ee4b5f', soft: '#3a2225', line: '#5a2b33', ink: '#ff8c91' } },
+  { id: 'green',    name: '薄荷绿', light: { btn: '#2e8b5e', soft: '#e3f2e9', line: '#c4e3d0', ink: '#1e6a45' }, dark: { btn: '#34a36d', soft: '#1d3328', line: '#2d4f3d', ink: '#72d6a2' } },
+  { id: 'blue',     name: '海湾蓝', light: { btn: '#2f6fdb', soft: '#e6eefc', line: '#c5d8f8', ink: '#1d53ae' }, dark: { btn: '#3b7be8', soft: '#1e2a42', line: '#2f456b', ink: '#8db6ff' } },
+  { id: 'purple',   name: '暮紫',   light: { btn: '#7152d8', soft: '#ede8fc', line: '#d4c8f7', ink: '#5537b8' }, dark: { btn: '#8466e6', soft: '#2a2342', line: '#423669', ink: '#bba8ff' } },
+  { id: 'amber',    name: '琥珀',   light: { btn: '#a8640c', soft: '#faeedb', line: '#ecd4af', ink: '#87500a' }, dark: { btn: '#c27a1a', soft: '#3a2c17', line: '#5a4424', ink: '#f0b65a' } },
+  { id: 'graphite', name: '石墨',   light: { btn: '#2b2b30', soft: '#e9e9ec', line: '#d3d3d8', ink: '#2b2b30' }, dark: { btn: '#636368', soft: '#3a3a3d', line: '#505055', ink: '#e5e5ea' } },
+];
+
+const ICONS = {
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M18 6L6 18M6 6l12 12"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  chevDown: '<path d="M6 9l6 6 6-6"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  sparkles: '<path d="M12 3l1.7 5.1L18.8 9.8l-5.1 1.7L12 16.6l-1.7-5.1-5.1-1.7 5.1-1.7z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8"/><path d="M12 3a13.5 13.5 0 0 1 3.4 9 13.5 13.5 0 0 1-3.4 9 13.5 13.5 0 0 1-3.4-9A13.5 13.5 0 0 1 12 3z"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>',
+  eye: '<path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.2 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.2 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/>',
+  trash: '<polyline points="4 7 20 7"/><path d="M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/>',
+  brain: '<path d="M9.5 4a3.5 3.5 0 0 0-3.3 4.6A3.5 3.5 0 0 0 5 15a3.5 3.5 0 0 0 4.5 4.5V4z"/><path d="M14.5 4a3.5 3.5 0 0 1 3.3 4.6A3.5 3.5 0 0 1 19 15a3.5 3.5 0 0 1-4.5 4.5V4z"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16.2" r=".7" fill="currentColor" stroke="none"/>',
+  wifi: '<path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.3" r=".9" fill="currentColor" stroke="none"/>',
+  signal: '<path d="M4 18v-2M8 18v-5M12 18v-8M16 18v-11"/>',
+};
+const ico = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
+const PROTOCOLS = {
+  chat: {
+    id: 'chat',
+    name: 'OpenAI Chat Completions',
+    short: 'Chat Completions',
+    presetUrl: 'https://api.deepseek.com/v1',
+    endpoint: 'POST https://api.deepseek.com/v1/chat/completions',
+    desc: '兼容绝大多数 OpenAI 接口服务商',
+  },
+  responses: {
+    id: 'responses',
+    name: 'OpenAI Responses',
+    short: 'Responses',
+    presetUrl: 'https://api.openai.com/v1',
+    endpoint: 'POST https://api.openai.com/v1/responses',
+    desc: '新版 OpenAI 推理与多模态响应接口',
+  },
+  anthropic: {
+    id: 'anthropic',
+    name: 'Anthropic Messages',
+    short: 'Anthropic Messages',
+    presetUrl: 'https://api.deepseek.com/anthropic',
+    endpoint: 'POST https://api.deepseek.com/anthropic/v1/messages',
+    desc: 'Claude 原生及 Anthropic 兼容协议',
+  },
+};
+
+const EFFORT_TIERS = [
+  { id: 'low',    label: '低',   desc: '更快响应，适合日常简单问答' },
+  { id: 'medium', label: '中',   desc: '均衡速度与推理深度' },
+  { id: 'high',   label: '高',   desc: '更深入分析与多步推导' },
+  { id: 'xhigh',  label: '极高', desc: '面向复杂工程与长链路推理' },
+  { id: 'max',    label: '最高', desc: '不限步深思，耗时较长' },
+];
+const EFFORT_LABEL = { default: '默认', low: '低', medium: '中', high: '高', xhigh: '极高', max: '最高' };
+
+const state = {
+  accent: 'red',
+  dark: false,
+  compact: false,
+  /* Board 01 */
+  b1Mode: 'zero',
+  b1Active: 'free',
+  /* Board 02 */
+  b2Mode: 'zero', // 'zero' | 'active'
+  b2Model: 'auto',
+  b2Code: '',
+  b2Efforts: { auto: 'default', ds41: 'medium', g38: 'high' },
+  b2SheetFor: null, // model id or null
+  /* Board 03 */
+  b3Mode: 'normal',
+  /* Board 04 */
+  b4Proto: 'chat',
+  b4Url: 'https://api.deepseek.com/v1',
+  b4ShowKey: false,
+  b4DefaultModel: 'deepseek-flash',
+  b4Models: ['deepseek-v4-pro', 'deepseek-flash'],
+  b4NewModel: '',
+  b4AdvOpen: true,
+  b4Tools: true,
+  b4Vision: true,
+  b4SupportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'], // 默认五档全选
+  b4Sheet: null, // null | 'proto' | 'effort'
+  /* Board 05 */
+  b5Selected: 'auto',
+  b5Efforts: { auto: 'default', ds: 'medium', g38: 'high', custom: 'xhigh' },
+  b5SheetFor: null, // model id or null
+};
+
+function statusBar(time = '21:05') {
+  return `
+    <div class="status-bar">
+      <span>${time}</span>
+      <div class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></div>
+    </div>
+  `;
+}
+
+function renderB1() {
+  const zero = state.b1Mode === 'zero';
+  const curName = state.b1Active === 'official' ? 'Auto（自动）' : state.b1Active === 'deepseek' ? 'deepseek-flash' : 'kilo-auto/free';
+  return `
+    ${statusBar('21:05')}
+    <div class="appbar">
+      <div class="appbar-left"><button class="icon-tap" data-toast="b1:返回上一页" aria-label="返回">${ico('back')}</button></div>
+      <h3>模型配置</h3>
+      <div class="appbar-right"><button class="icon-tap" data-toast="b1:打开添加第三方服务弹层" aria-label="添加服务商">${ico('plus')}</button></div>
+    </div>
+    <div class="page-body">
+      <div class="sec-head">
+        <span class="sec-title">官方服务</span>
+        <span class="sec-meta">当前：${curName}</span>
+      </div>
+      <div class="group">
+        <button class="prov-row" data-toast="b1:进入「小伴 AI」官方配置页">
+          <div class="prov-ico official">${ico('sparkles')}</div>
+          <div class="prov-main">
+            <div class="prov-top">
+              <span class="prov-name">小伴 AI</span>
+              ${state.b1Active === 'official' ? '<span class="status-active">使用中</span>' : ''}
+            </div>
+            <div class="prov-sub">${zero ? '点数已用完，点击兑换或获取额度' : '随账号同步 · 默认 Auto（自动）'}</div>
+          </div>
+          <div class="prov-right">
+            ${zero ? '<span class="balance-zero">0 点 · 兑换</span>' : '<span class="balance-val">1,280 点</span>'}
+            ${ico('chev')}
+          </div>
+        </button>
+      </div>
+
+      <div class="sec-head">
+        <span class="sec-title">第三方模型服务</span>
+        <span class="sec-meta">仅本机保存</span>
+      </div>
+      <div class="group">
+        <button class="prov-row" data-b1-pick="free">
+          <div class="prov-ico">免</div>
+          <div class="prov-main">
+            <div class="prov-top">
+              <span class="prov-name">免费模型</span>
+              ${state.b1Active === 'free' ? '<span class="status-active">使用中</span>' : ''}
+            </div>
+            <div class="prov-sub">默认 kilo-auto/free · 1 个模型</div>
+          </div>
+          <div class="prov-right">${ico('chev')}</div>
+        </button>
+        ${zero ? '' : `
+          <div class="sep inset"></div>
+          <button class="prov-row" data-b1-pick="deepseek">
+            <div class="prov-ico">D</div>
+            <div class="prov-main">
+              <div class="prov-top">
+                <span class="prov-name">DeepSeek</span>
+                ${state.b1Active === 'deepseek' ? '<span class="status-active">使用中</span>' : ''}
+              </div>
+              <div class="prov-sub">默认 deepseek-flash · 2 个模型</div>
+            </div>
+            <div class="prov-right">${ico('chev')}</div>
+          </button>
+        `}
+        <div class="sep"></div>
+        <button class="add-row" data-toast="b1:打开添加第三方服务商弹层">
+          ${ico('plus')}
+          <span>添加第三方服务</span>
+        </button>
+      </div>
+
+      <p class="page-note">第三方密钥仅保存在本机，不会上传到小伴账号；对话时也可随时切换不同服务商的模型。</p>
+    </div>
+    <div class="home-bar"><span></span></div>
+    <div class="phone-toast" id="toast-b1"></div>
+  `;
+}
+
+function renderSingleEffortSheet(boardKey, modelName, currentEffort, allowedIds) {
+  const rows = [
+    { id: 'default', label: '默认', desc: '跟随模型自身设定' },
+    ...EFFORT_TIERS.filter(t => allowedIds.includes(t.id)),
+  ];
+  return `
+    <div class="scrim top-layer" data-close-sheet="${boardKey}">
+      <div class="sheet" role="dialog" aria-label="选择思考等级">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-head-copy">
+            <h4>思考等级</h4>
+            <p>${modelName}</p>
+          </div>
+          <button class="sheet-close" data-close-sheet="${boardKey}" aria-label="关闭">${ico('close')}</button>
+        </div>
+        <div class="sheet-scroll">
+          ${rows.map((r, i) => {
+            const on = currentEffort === r.id;
+            return `
+              ${i > 0 ? '<div class="sep"></div>' : ''}
+              <button class="opt-row ${on ? 'active' : ''}" data-pick-effort="${boardKey}:${r.id}">
+                <div class="opt-left">
+                  <span class="opt-title">${r.label}</span>
+                  <span class="opt-sub">${r.desc}</span>
+                </div>
+                <span class="check-mark">${on ? ico('check') : ''}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <div style="height:6px"></div>
+        <div class="home-bar"><span></span></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderB2() {
+  const zero = state.b2Mode === 'zero';
+  const models = [
+    { id: 'auto', name: 'Auto（自动）', tag: '推荐', desc: '自动匹配小伴默认模型，服务调整无需重选', efforts: ['low', 'medium', 'high'] },
+    { id: 'ds41', name: 'deepseek-v4.1-flash', tag: '', desc: '', efforts: ['low', 'medium', 'high'] },
+    { id: 'g38',  name: 'gemini-3.8-flash', tag: '', desc: '', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    { id: 'g4h',  name: 'gemini-4-hydrogen', tag: '', desc: '', efforts: [] },
+  ];
+  const sheetModel = state.b2SheetFor ? models.find(m => m.id === state.b2SheetFor) : null;
+  return `
+    ${statusBar('21:04')}
+    <div class="appbar">
+      <div class="appbar-left"><button class="icon-tap" data-toast="b2:返回模型配置主页" aria-label="返回">${ico('back')}</button></div>
+      <h3>小伴 AI</h3>
+      <div class="appbar-right"><button class="bar-link" data-toast="b2:在浏览器打开获取 AI 额度页">获取额度</button></div>
+    </div>
+    <div class="page-body">
+      <div class="sec-head">
+        <span class="sec-title">额度与兑换</span>
+        <span class="sec-meta">随账号同步</span>
+      </div>
+      <div class="quota-block">
+        <div class="quota-top">
+          <div>
+            <div class="quota-num">
+              <strong>${zero ? '0' : '1,280'}</strong>
+              <span>小伴点</span>
+            </div>
+            <div class="quota-meta">
+              <span>付费点数 ${zero ? '0' : '1,000'} 点</span>
+              <span>·</span>
+              <span>赠送 ${zero ? '0' : '280'} 点</span>
+            </div>
+          </div>
+          <div class="quota-expire">${zero ? '到期 —' : '2026-12-31 到期'}</div>
+        </div>
+        <div class="redeem-row">
+          <div class="field-box">
+            <input type="text" placeholder="输入兑换码补充点数" value="${state.b2Code}" data-b2-code="1" aria-label="兑换码">
+          </div>
+          <button class="compact-btn ${state.b2Code.trim() ? 'ready' : ''}" data-b2-redeem="1">兑换</button>
+        </div>
+      </div>
+
+      <div class="sec-head">
+        <span class="sec-title">默认对话模型</span>
+        <span class="sec-meta">点选即刻生效</span>
+      </div>
+      <div class="group">
+        ${models.map((m, idx) => {
+          const sel = state.b2Model === m.id;
+          const curEff = state.b2Efforts[m.id] || 'default';
+          return `
+            ${idx > 0 ? '<div class="sep"></div>' : ''}
+            <div class="model-row ${sel ? 'selected' : ''}">
+              <button class="model-hit" data-b2-model="${m.id}">
+                <div class="model-row-top">
+                  <span class="model-row-name">${m.name}</span>
+                  ${m.tag ? `<span class="neutral-tag">${m.tag}</span>` : ''}
+                </div>
+                ${m.desc ? `<div class="model-row-desc">${m.desc}</div>` : ''}
+              </button>
+              <div class="model-row-right">
+                ${m.efforts.length ? `
+                  <button class="effort-chip" data-b2-effort-open="${m.id}">
+                    ${ico('brain')}<span>${EFFORT_LABEL[curEff]}</span>${ico('chevDown')}
+                  </button>
+                ` : ''}
+                <span class="check-mark">${sel ? ico('check') : ''}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <p class="page-note">点选模型或右侧思考档位立即生效，无需额外确认；对话页仍可随时切换。</p>
+    </div>
+    <div class="home-bar"><span></span></div>
+    ${sheetModel ? renderSingleEffortSheet('b2', sheetModel.name, state.b2Efforts[sheetModel.id] || 'default', sheetModel.efforts) : ''}
+    <div class="phone-toast" id="toast-b2"></div>
+  `;
+}
+
+function renderB3() {
+  const isErr = state.b3Mode === 'error';
+  return `
+    ${renderB1().replace(/id="toast-b1"/, 'id="toast-b3-bg"')}
+    <div class="scrim">
+      <div class="sheet" role="dialog" aria-label="添加第三方服务">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-head-copy"><h4>添加第三方服务</h4></div>
+          <button class="sheet-close" data-toast="b3:关闭服务商选择弹层" aria-label="关闭">${ico('close')}</button>
+        </div>
+
+        <button class="picker-row" data-toast="b3:进入 DeepSeek 预置配置页">
+          <div class="picker-ico">D</div>
+          <div class="picker-info">
+            <div class="picker-name">DeepSeek</div>
+            <div class="picker-desc">深度求索 · OpenAI 兼容，支持推理与工具调用</div>
+          </div>
+          <span class="picker-chev">${ico('chev')}</span>
+        </button>
+        <div class="sep inset"></div>
+        <button class="picker-row" data-toast="b3:进入 OpenRouter 预置配置页">
+          <div class="picker-ico">O</div>
+          <div class="picker-info">
+            <div class="picker-name">OpenRouter</div>
+            <div class="picker-desc">聚合主流大模型，一个密钥按量调用</div>
+          </div>
+          <span class="picker-chev">${ico('chev')}</span>
+        </button>
+        <div class="sep inset"></div>
+        <button class="picker-row" data-toast="b3:进入免费模型配置页">
+          <div class="picker-ico">免</div>
+          <div class="picker-info">
+            <div class="picker-name">免费模型</div>
+            <div class="picker-desc">免密钥体验，适合日常轻量问答</div>
+          </div>
+          <span class="picker-chev">${ico('chev')}</span>
+        </button>
+
+        ${isErr ? `
+          <div class="inline-err">
+            <span class="inline-err-left">${ico('alert')}<span>未能刷新最新预置目录</span></span>
+            <button data-b3-retry="1">重试</button>
+          </div>
+        ` : '<div style="height:6px"></div>'}
+
+        <div class="sheet-band"></div>
+
+        <button class="picker-row" data-toast="b3:进入自定义模型服务配置页">
+          <div class="picker-ico">${ico('globe')}</div>
+          <div class="picker-info">
+            <div class="picker-name">自定义模型服务</div>
+            <div class="picker-desc">手动填写 API 地址、密钥与模型名称</div>
+          </div>
+          <span class="picker-chev">${ico('chev')}</span>
+        </button>
+        <div class="home-bar"><span></span></div>
+      </div>
+    </div>
+    <div class="phone-toast" id="toast-b3"></div>
+  `;
+}
+
+function renderB4ProtocolSheet() {
+  return `
+    <div class="scrim top-layer" data-close-sheet="b4">
+      <div class="sheet" role="dialog" aria-label="选择接口协议">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-head-copy">
+            <h4>接口协议</h4>
+            <p>切换协议将自动同步该协议的预置 API 地址</p>
+          </div>
+          <button class="sheet-close" data-close-sheet="b4" aria-label="关闭">${ico('close')}</button>
+        </div>
+        <div class="sheet-scroll">
+          ${Object.values(PROTOCOLS).map((p, idx) => {
+            const on = state.b4Proto === p.id;
+            return `
+              ${idx > 0 ? '<div class="sep"></div>' : ''}
+              <button class="picker-row" data-b4-pick-proto="${p.id}">
+                <div class="picker-info">
+                  <div class="picker-name">${p.name}</div>
+                  <div class="picker-desc">${p.desc}</div>
+                  <div class="picker-mono">${p.presetUrl}</div>
+                </div>
+                <span class="check-mark">${on ? ico('check') : ''}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <div style="height:6px"></div>
+        <div class="home-bar"><span></span></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderB4EffortMultiSheet() {
+  const allOn = state.b4SupportedEfforts.length === EFFORT_TIERS.length;
+  return `
+    <div class="scrim top-layer" data-close-sheet="b4">
+      <div class="sheet" role="dialog" aria-label="自定义支持的思考等级">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-head-copy">
+            <h4>支持的思考等级（多选）</h4>
+            <p>勾选后可在对话模型列表中自由切换对应档位</p>
+          </div>
+          <div class="sheet-head-actions">
+            <button class="sheet-text-act" data-b4-effort-all="1">${allOn ? '清空' : '全选'}</button>
+            <button class="sheet-close" data-close-sheet="b4" aria-label="关闭">${ico('close')}</button>
+          </div>
+        </div>
+        <div class="sheet-scroll">
+          ${EFFORT_TIERS.map((t, idx) => {
+            const on = state.b4SupportedEfforts.includes(t.id);
+            return `
+              ${idx > 0 ? '<div class="sep"></div>' : ''}
+              <button class="opt-row ${on ? 'active' : ''}" data-b4-effort-toggle="${t.id}">
+                <div class="opt-left">
+                  <span class="chk-box ${on ? 'on' : ''}">${on ? ico('check') : ''}</span>
+                  <span class="opt-title">${t.label}</span>
+                  <span class="opt-sub">${t.desc}</span>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <div class="sheet-foot-pad">
+          <button class="btn-soft-primary" data-close-sheet="b4">确定（已选 ${state.b4SupportedEfforts.length} 档）</button>
+        </div>
+        <div class="home-bar"><span></span></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderB4() {
+  const proto = PROTOCOLS[state.b4Proto];
+  const effortSummary = state.b4SupportedEfforts.length === 0
+    ? '不支持'
+    : EFFORT_TIERS.filter(t => state.b4SupportedEfforts.includes(t.id)).map(t => t.label).join(' / ');
+
+  return `
+    ${statusBar('21:02')}
+    <div class="appbar">
+      <div class="appbar-left"><button class="icon-tap" data-toast="b4:返回模型配置" aria-label="返回">${ico('back')}</button></div>
+      <h3>DeepSeek</h3>
+      <div class="appbar-right"><button class="bar-link primary" data-toast="b4:已保存 DeepSeek 配置">保存</button></div>
+    </div>
+
+    <div class="page-body">
+      <div class="sec-head">
+        <span class="sec-title">连接设置</span>
+      </div>
+      <div class="form-block">
+        <div class="field-group">
+          <span class="field-label">服务商名称</span>
+          <div class="field-box"><input type="text" value="DeepSeek" aria-label="服务商名称"></div>
+        </div>
+        <div class="field-group">
+          <span class="field-label">接口协议</span>
+          <button class="select-row" data-b4-open-sheet="proto">
+            <span class="select-row-val">${proto.name}</span>
+            ${ico('chev')}
+          </button>
+        </div>
+        <div class="field-group">
+          <span class="field-label">API 地址</span>
+          <div class="field-box mono"><input type="text" value="${state.b4Url}" data-b4-url="1" aria-label="API 地址"></div>
+          <span class="endpoint-hint">${proto.endpoint}</span>
+        </div>
+        <div class="field-group">
+          <div class="field-label-row">
+            <span class="field-label">API 密钥（可选）</span>
+            <button class="field-link" data-toast="b4:打开 DeepSeek 开放平台获取 API Key">获取 Key ↗</button>
+          </div>
+          <div class="field-box mono">
+            <input type="${state.b4ShowKey ? 'text' : 'password'}" placeholder="没有密钥可留空" value="${state.b4ShowKey ? 'sk-demo-8a92c4' : ''}" aria-label="API 密钥">
+            <button class="eye-btn" data-b4-eye="1" aria-label="显示密钥">${ico(state.b4ShowKey ? 'eyeOff' : 'eye')}</button>
+          </div>
+        </div>
+      </div>
+      <p class="page-note">密钥仅保存在本机应用私有存储中，不会上传到小伴账号。</p>
+
+      <div class="sec-head">
+        <span class="sec-title">模型 · ${state.b4Models.length} 个（点选设为默认）</span>
+        <button class="sec-action" data-b4-fetch="1">${ico('refresh')} 拉取模型</button>
+      </div>
+      <div class="group">
+        ${state.b4Models.map((m, i) => {
+          const isDef = state.b4DefaultModel === m;
+          return `
+            ${i > 0 ? '<div class="sep"></div>' : ''}
+            <div class="edit-model-row">
+              <button class="edit-model-hit" data-b4-def="${m}">
+                <span class="radio-dot ${isDef ? 'on' : ''}"></span>
+                <span class="edit-model-name">${m}</span>
+                ${isDef ? '<span class="neutral-tag">默认</span>' : ''}
+              </button>
+              <button class="trash-btn" data-b4-del="${m}" aria-label="移除模型">${ico('trash')}</button>
+            </div>
+          `;
+        }).join('')}
+        <div class="sep"></div>
+        <div class="add-model-bar">
+          <div class="field-box"><input type="text" placeholder="输入模型名称" value="${state.b4NewModel}" data-b4-input="1" aria-label="新模型名称"></div>
+          <button class="compact-btn ${state.b4NewModel.trim() ? 'ready' : ''}" data-b4-add="1">添加</button>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="group">
+        <button class="collapse-row ${state.b4AdvOpen ? 'open' : ''}" data-b4-adv="1">
+          <span>高级设置</span>
+          ${ico('chevDown')}
+        </button>
+        ${state.b4AdvOpen ? `
+          <div class="sep full"></div>
+          <div class="form-block">
+            <div class="two-col">
+              <div class="field-group">
+                <span class="field-label">上下文窗口</span>
+                <div class="field-box"><input type="text" placeholder="默认自动" aria-label="上下文窗口"></div>
+              </div>
+              <div class="field-group">
+                <span class="field-label">单次输出上限</span>
+                <div class="field-box"><input type="text" placeholder="默认自动" aria-label="单次输出上限"></div>
+              </div>
+            </div>
+            <div class="switch-row">
+              <span>支持工具调用</span>
+              <button class="switch ${state.b4Tools ? 'on' : ''}" data-b4-toggle="tools" aria-label="支持工具调用"><span></span></button>
+            </div>
+            <div class="switch-row">
+              <span>支持图片输入</span>
+              <button class="switch ${state.b4Vision ? 'on' : ''}" data-b4-toggle="vision" aria-label="支持图片输入"><span></span></button>
+            </div>
+            <button class="setting-link-row" data-b4-open-sheet="effort">
+              <span class="lbl">支持的思考等级</span>
+              <span class="val"><span>${effortSummary}</span>${ico('chev')}</span>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <div class="sticky-foot">
+      <div class="foot-row">
+        <button class="btn-ghost" data-toast="b4:取消修改并返回">取消</button>
+        <button class="btn-soft-primary" data-toast="b4:已保存 DeepSeek 并设为当前模型">保存并使用</button>
+      </div>
+      <div class="home-bar"><span></span></div>
+    </div>
+    ${state.b4Sheet === 'proto' ? renderB4ProtocolSheet() : ''}
+    ${state.b4Sheet === 'effort' ? renderB4EffortMultiSheet() : ''}
+    <div class="phone-toast" id="toast-b4"></div>
+  `;
+}
+
+function renderB5() {
+  const customEfforts = state.b4SupportedEfforts;
+  const groups = [
+    {
+      title: '免费模型',
+      items: [{ id: 'free', name: 'kilo-auto/free', desc: '', efforts: [] }],
+    },
+    {
+      title: '小伴 AI · 官方',
+      items: [
+        { id: 'auto', name: 'Auto（自动）', tag: '推荐', desc: '小伴默认推荐，自动平衡速度与质量', efforts: ['low', 'medium', 'high'] },
+        { id: 'ds',   name: 'deepseek-v4.1-flash', desc: '', efforts: ['low', 'medium', 'high'] },
+        { id: 'g38',  name: 'gemini-3.8-flash', desc: '', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      ],
+    },
+    {
+      title: 'DeepSeek · 自定义',
+      items: [
+        { id: 'custom', name: 'deepseek-v4-pro', desc: '', efforts: customEfforts },
+      ],
+    },
+  ];
+  const allItems = groups.flatMap(g => g.items);
+  const sheetModel = state.b5SheetFor ? allItems.find(m => m.id === state.b5SheetFor) : null;
+
+  return `
+    ${statusBar('21:07')}
+    <div class="chat-bg-head">
+      <span class="chat-bg-title">小伴 AI</span>
+      <span style="color:var(--ink3);font-size:12px">对话中</span>
+    </div>
+    <div class="chat-bg-bubbles">
+      <div class="bubble-u">帮我对比一下这两个方案的优缺点</div>
+      <div class="bubble-a">好的，我们可以先从信息层级、色彩克制度和单手操作效率三个维度来看……</div>
+    </div>
+
+    <div class="scrim">
+      <div class="sheet" role="dialog" aria-label="选择对话模型">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-head-copy"><h4>选择对话模型</h4></div>
+          <button class="sheet-close" data-toast="b5:关闭模型选择弹层" aria-label="关闭">${ico('close')}</button>
+        </div>
+
+        <div class="sheet-scroll">
+          ${groups.map(g => `
+            <div class="picker-group-lbl">${g.title}</div>
+            <div class="chat-list-pad">
+              ${g.items.map(item => {
+                const sel = state.b5Selected === item.id;
+                const curEffort = state.b5Efforts[item.id] || 'default';
+                return `
+                  <div class="model-row ${sel ? 'selected selected-tint' : ''}">
+                    <button class="model-hit" data-b5-pick="${item.id}">
+                      <div class="model-row-top">
+                        <span class="model-row-name">${item.name}</span>
+                        ${item.tag ? `<span class="neutral-tag">${item.tag}</span>` : ''}
+                      </div>
+                      ${item.desc ? `<div class="model-row-desc">${item.desc}</div>` : ''}
+                    </button>
+                    <div class="model-row-right">
+                      ${item.efforts.length ? `
+                        <button class="effort-chip" data-b5-effort-open="${item.id}">
+                          ${ico('brain')}<span>${EFFORT_LABEL[curEffort]}</span>${ico('chevDown')}
+                        </button>
+                      ` : ''}
+                      <span class="check-mark">${sel ? ico('check') : ''}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `).join('')}
+          <div style="height:8px"></div>
+        </div>
+
+        <button class="picker-foot" data-toast="b5:跳转至模型配置主页">
+          <span>模型配置（余额、兑换与第三方服务）</span>
+          ${ico('chev')}
+        </button>
+        <div class="home-bar"><span></span></div>
+      </div>
+    </div>
+
+    ${sheetModel ? renderSingleEffortSheet('b5', sheetModel.name, state.b5Efforts[sheetModel.id] || 'default', sheetModel.efforts) : ''}
+    <div class="phone-toast" id="toast-b5"></div>
+  `;
+}
+
+function applyAccent() {
+  const preset = ACCENTS.find(a => a.id === state.accent) || ACCENTS[0];
+  const palette = state.dark ? preset.dark : preset.light;
+  document.querySelectorAll('.phone').forEach(el => {
+    el.classList.toggle('dark', state.dark);
+    el.style.setProperty('--accent', palette.btn);
+    el.style.setProperty('--accent-soft', palette.soft);
+    el.style.setProperty('--accent-soft-line', palette.line);
+    el.style.setProperty('--accent-ink', palette.ink);
+  });
+}
+
+const toastTimers = {};
+function showToast(key, msg) {
+  const el = document.getElementById('toast-' + key);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimers[key]);
+  toastTimers[key] = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function render() {
+  document.body.classList.toggle('studio-dark', state.dark);
+  document.body.classList.toggle('compact', state.compact);
+  document.getElementById('phone-b1').innerHTML = renderB1();
+  document.getElementById('phone-b2').innerHTML = renderB2();
+  document.getElementById('phone-b3').innerHTML = renderB3();
+  document.getElementById('phone-b4').innerHTML = renderB4();
+  document.getElementById('phone-b5').innerHTML = renderB5();
+  applyAccent();
+}
+
+/* Swatches */
+const swatchWrap = document.getElementById('swatches');
+ACCENTS.forEach(a => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (a.id === state.accent ? ' active' : '');
+  btn.style.background = a.light.btn;
+  btn.style.color = a.light.btn;
+  btn.title = a.name;
+  btn.setAttribute('aria-label', a.name);
+  btn.addEventListener('click', () => {
+    state.accent = a.id;
+    swatchWrap.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    applyAccent();
+  });
+  swatchWrap.appendChild(btn);
+});
+
+document.getElementById('toggle-width').addEventListener('click', (e) => {
+  state.compact = !state.compact;
+  e.currentTarget.textContent = state.compact ? '360 → 390' : '390 → 360';
+  document.body.classList.toggle('compact', state.compact);
+});
+document.getElementById('toggle-dark').addEventListener('click', (e) => {
+  state.dark = !state.dark;
+  e.currentTarget.textContent = state.dark ? '浅色模式' : '深色模式';
+  render();
+});
+
+/* Header Segmented Controls */
+document.querySelectorAll('[data-b1]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.b1Mode = btn.dataset.b1;
+    state.b1Active = state.b1Mode === 'zero' ? 'free' : 'official';
+    document.querySelectorAll('[data-b1]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-b2]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.b2;
+    if (v === 'sheet') {
+      state.b2SheetFor = 'auto';
+    } else {
+      state.b2Mode = v;
+      state.b2SheetFor = null;
+    }
+    document.querySelectorAll('[data-b2]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-b3]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.b3Mode = btn.dataset.b3;
+    document.querySelectorAll('[data-b3]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-b4]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.b4;
+    if (v === 'proto') { state.b4Sheet = 'proto'; }
+    else if (v === 'effort') { state.b4AdvOpen = true; state.b4Sheet = 'effort'; }
+    else { state.b4Sheet = null; }
+    document.querySelectorAll('[data-b4]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-b5]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.b5SheetFor = btn.dataset.b5 === 'sheet' ? 'custom' : null;
+    document.querySelectorAll('[data-b5]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+
+/* Delegated Inputs & Clicks */
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-b2-code]')) {
+    state.b2Code = e.target.value;
+    const btn = document.querySelector('[data-b2-redeem]');
+    if (btn) btn.classList.toggle('ready', !!state.b2Code.trim());
+  }
+  if (e.target.matches('[data-b4-input]')) {
+    state.b4NewModel = e.target.value;
+    const btn = document.querySelector('[data-b4-add]');
+    if (btn) btn.classList.toggle('ready', !!state.b4NewModel.trim());
+  }
+  if (e.target.matches('[data-b4-url]')) {
+    state.b4Url = e.target.value;
+  }
+});
+
+document.addEventListener('click', (e) => {
+  /* Close overlay bottom sheet */
+  const closeSheet = e.target.closest('[data-close-sheet]');
+  if (closeSheet && (e.target === closeSheet || closeSheet.tagName === 'BUTTON')) {
+    const b = closeSheet.dataset.closeSheet;
+    if (b === 'b2') {
+      state.b2SheetFor = null;
+      document.querySelectorAll('[data-b2]').forEach(el => el.classList.toggle('active', el.dataset.b2 === state.b2Mode));
+    }
+    if (b === 'b4') {
+      state.b4Sheet = null;
+      document.querySelectorAll('[data-b4]').forEach(el => el.classList.toggle('active', el.dataset.b4 === 'base'));
+    }
+    if (b === 'b5') {
+      state.b5SheetFor = null;
+      document.querySelectorAll('[data-b5]').forEach(el => el.classList.toggle('active', el.dataset.b5 === 'list'));
+    }
+    render();
+    return;
+  }
+
+  /* Single effort pick inside BottomSheet (Board 02 & Board 05) */
+  const pickEff = e.target.closest('[data-pick-effort]');
+  if (pickEff) {
+    const [b, eff] = pickEff.dataset.pickEffort.split(':');
+    if (b === 'b2' && state.b2SheetFor) {
+      state.b2Model = state.b2SheetFor;
+      state.b2Efforts[state.b2SheetFor] = eff;
+      state.b2SheetFor = null;
+      document.querySelectorAll('[data-b2]').forEach(el => el.classList.toggle('active', el.dataset.b2 === state.b2Mode));
+      render();
+      showToast('b2', `思考等级已设为：${EFFORT_LABEL[eff]}`);
+    } else if (b === 'b5' && state.b5SheetFor) {
+      state.b5Selected = state.b5SheetFor;
+      state.b5Efforts[state.b5SheetFor] = eff;
+      state.b5SheetFor = null;
+      document.querySelectorAll('[data-b5]').forEach(el => el.classList.toggle('active', el.dataset.b5 === 'list'));
+      render();
+      showToast('b5', `思考等级已设为：${EFFORT_LABEL[eff]}`);
+    }
+    return;
+  }
+
+  const b1Pick = e.target.closest('[data-b1-pick]');
+  if (b1Pick) {
+    state.b1Active = b1Pick.dataset.b1Pick;
+    render();
+    showToast('b1', '进入该服务商配置页');
+    return;
+  }
+
+  const b2Model = e.target.closest('[data-b2-model]');
+  if (b2Model) {
+    state.b2Model = b2Model.dataset.b2Model;
+    render();
+    showToast('b2', '已切换默认模型，立即生效');
+    return;
+  }
+  const b2EffOpen = e.target.closest('[data-b2-effort-open]');
+  if (b2EffOpen) {
+    state.b2SheetFor = b2EffOpen.dataset.b2EffortOpen;
+    document.querySelectorAll('[data-b2]').forEach(el => el.classList.toggle('active', el.dataset.b2 === 'sheet'));
+    render();
+    return;
+  }
+  if (e.target.closest('[data-b2-redeem]')) {
+    if (!state.b2Code.trim()) { showToast('b2', '请先输入兑换码'); return; }
+    state.b2Code = '';
+    state.b2Mode = 'active';
+    document.querySelectorAll('[data-b2]').forEach(b => b.classList.toggle('active', b.dataset.b2 === 'active'));
+    render();
+    showToast('b2', '兑换成功，已补充 1,280 小伴点');
+    return;
+  }
+
+  if (e.target.closest('[data-b3-retry]')) {
+    state.b3Mode = 'normal';
+    document.querySelectorAll('[data-b3]').forEach(b => b.classList.toggle('active', b.dataset.b3 === 'normal'));
+    render();
+    showToast('b3', '已刷新最新预置目录');
+    return;
+  }
+
+  /* Board 04 interactions */
+  const b4Open = e.target.closest('[data-b4-open-sheet]');
+  if (b4Open) {
+    state.b4Sheet = b4Open.dataset.b4OpenSheet;
+    document.querySelectorAll('[data-b4]').forEach(el => el.classList.toggle('active', el.dataset.b4 === state.b4Sheet));
+    render();
+    return;
+  }
+  const b4PickProto = e.target.closest('[data-b4-pick-proto]');
+  if (b4PickProto) {
+    const id = b4PickProto.dataset.b4PickProto;
+    state.b4Proto = id;
+    state.b4Url = PROTOCOLS[id].presetUrl;
+    state.b4Sheet = null;
+    document.querySelectorAll('[data-b4]').forEach(el => el.classList.toggle('active', el.dataset.b4 === 'base'));
+    render();
+    showToast('b4', `已切换为 ${PROTOCOLS[id].short} 并更新预置地址`);
+    return;
+  }
+  const b4EffTog = e.target.closest('[data-b4-effort-toggle]');
+  if (b4EffTog) {
+    const id = b4EffTog.dataset.b4EffortToggle;
+    if (state.b4SupportedEfforts.includes(id)) {
+      state.b4SupportedEfforts = state.b4SupportedEfforts.filter(x => x !== id);
+    } else {
+      state.b4SupportedEfforts = EFFORT_TIERS.map(t => t.id).filter(x => x === id || state.b4SupportedEfforts.includes(x));
+    }
+    render();
+    return;
+  }
+  if (e.target.closest('[data-b4-effort-all]')) {
+    const allOn = state.b4SupportedEfforts.length === EFFORT_TIERS.length;
+    state.b4SupportedEfforts = allOn ? [] : EFFORT_TIERS.map(t => t.id);
+    render();
+    return;
+  }
+  if (e.target.closest('[data-b4-eye]')) { state.b4ShowKey = !state.b4ShowKey; render(); return; }
+  if (e.target.closest('[data-b4-fetch]')) {
+    if (!state.b4Models.includes('deepseek-reasoner')) state.b4Models.push('deepseek-reasoner');
+    render();
+    showToast('b4', '已拉取可用模型（新增 deepseek-reasoner）');
+    return;
+  }
+  const defBtn = e.target.closest('[data-b4-def]');
+  if (defBtn) { state.b4DefaultModel = defBtn.dataset.b4Def; render(); return; }
+  const delBtn = e.target.closest('[data-b4-del]');
+  if (delBtn) {
+    const target = delBtn.dataset.b4Del;
+    if (state.b4Models.length <= 1) { showToast('b4', '至少保留一个模型'); return; }
+    state.b4Models = state.b4Models.filter(x => x !== target);
+    if (state.b4DefaultModel === target) state.b4DefaultModel = state.b4Models[0];
+    render();
+    return;
+  }
+  if (e.target.closest('[data-b4-add]')) {
+    const val = state.b4NewModel.trim();
+    if (!val) { showToast('b4', '请输入模型名称'); return; }
+    if (!state.b4Models.includes(val)) state.b4Models.push(val);
+    state.b4NewModel = '';
+    render();
+    showToast('b4', `已添加模型 ${val}`);
+    return;
+  }
+  if (e.target.closest('[data-b4-adv]')) {
+    state.b4AdvOpen = !state.b4AdvOpen;
+    render();
+    return;
+  }
+  const sw = e.target.closest('[data-b4-toggle]');
+  if (sw) {
+    if (sw.dataset.b4Toggle === 'tools') state.b4Tools = !state.b4Tools;
+    if (sw.dataset.b4Toggle === 'vision') state.b4Vision = !state.b4Vision;
+    render();
+    return;
+  }
+
+  /* Board 05 interactions */
+  const b5Pick = e.target.closest('[data-b5-pick]');
+  if (b5Pick) {
+    state.b5Selected = b5Pick.dataset.b5Pick;
+    render();
+    showToast('b5', '已切换当前对话模型');
+    return;
+  }
+  const b5EffOpen = e.target.closest('[data-b5-effort-open]');
+  if (b5EffOpen) {
+    state.b5SheetFor = b5EffOpen.dataset.b5EffortOpen;
+    document.querySelectorAll('[data-b5]').forEach(el => el.classList.toggle('active', el.dataset.b5 === 'sheet'));
+    render();
+    return;
+  }
+
+  const toastBtn = e.target.closest('[data-toast]');
+  if (toastBtn) {
+    const [key, msg] = toastBtn.dataset.toast.split(':');
+    showToast(key, msg);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
