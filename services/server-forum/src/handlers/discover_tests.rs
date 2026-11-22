@@ -661,6 +661,39 @@ async fn topic_tags_commit_with_the_topic_and_scores_do_not_gate_creation() -> R
 }
 
 #[tokio::test]
+async fn topic_publish_retry_returns_the_same_id_even_after_quota_is_used() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let (author, other) = (h.member().await?, h.member().await?);
+    let mut state = h.state.clone();
+    Arc::make_mut(&mut state.config).trust.daily_topics[1] = 1;
+    let app = crate::build_router(state);
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug='casual-fun'").fetch_one(&h.pool).await?;
+    let attempt = Uuid::new_v4();
+    let input = json!({"category_id":category,"title":"断网重试","body":"这是一篇用来校验发帖回执恢复的测试帖子。","request_id":attempt});
+    let ((first_status, first), (retry_status, retry)) = tokio::join!(
+        call(&app, "POST", "/api/topics", Some(&author), input.clone()),
+        call(&app, "POST", "/api/topics", Some(&author), input.clone()),
+    );
+    assert_eq!(first_status, StatusCode::OK, "{first}");
+    assert_eq!(retry_status, StatusCode::OK, "{retry}");
+    assert_eq!(first["id"], retry["id"]);
+    let (status, after_quota) = call(&app, "POST", "/api/topics", Some(&author), input.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(after_quota["id"], first["id"]);
+    let mut new_input = input.clone();
+    new_input["request_id"] = json!(Uuid::new_v4());
+    assert_eq!(call(&app, "POST", "/api/topics", Some(&author), new_input).await.0, StatusCode::TOO_MANY_REQUESTS);
+
+    let (status, other_post) = call(&app, "POST", "/api/topics", Some(&other), input).await;
+    assert_eq!(status, StatusCode::OK, "{other_post}");
+    assert_ne!(other_post["id"], first["id"]);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM topics WHERE publish_request_id=$1")
+        .bind(attempt).fetch_one(&h.pool).await?;
+    assert_eq!(count, 2);
+    h.finish().await
+}
+
+#[tokio::test]
 async fn restricted_discussion_images_follow_the_readers_permissions() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let author = Uuid::new_v4();

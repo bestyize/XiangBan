@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import xyz.xiangban.xiaoban.common.community.Category
 import xyz.xiangban.xiaoban.common.community.CommunityJson
 import xyz.xiangban.xiaoban.common.community.ContentPublishDraft
@@ -120,7 +122,7 @@ private fun cleanWorkLink(title: String, url: String): String {
  * 发帖：顶部栏无底线、单行元信息入口、无框写作区、内联话题胶囊、结构化浅灰功能卡、48dp 固定单行底栏。
  * 「作品」支持上传 V2 ZIP 或 .html/.htm 自动转为 V2 容器，或关联我的创作，每帖限 1 个。
  */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class, ExperimentalUuidApi::class)
 @Composable
 fun NewPostScreen(
     env: CommunityEnv,
@@ -150,6 +152,7 @@ fun NewPostScreen(
     }
 
     var busy by remember { mutableStateOf(false) }
+    var topicRequestId by rememberSaveable(session.accountId) { mutableStateOf<String?>(null) }
     var publishStep by remember { mutableStateOf("") }
     var uploading by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
@@ -325,7 +328,7 @@ fun NewPostScreen(
                     }
                     check(currentAccount == account) { "账号已切换，请重新编辑" }
                     publishStep = "正在校验作品…"
-                    check(env.content.awaitVerified(fileKey)) { "作品校验尚未完成，请稍后重试" }
+                    check(env.content.awaitVerified(fileKey, recoverPublished = true)) { "作品校验尚未完成，请稍后重试" }
                     check(currentAccount == account) { "账号已切换，请重新编辑" }
                     publishStep = "正在登记作品…"
                     val result = env.content.publish(
@@ -347,6 +350,7 @@ fun NewPostScreen(
                 require(postBody.count { !it.isLowSurrogate() } <= 20_000) { "加上封面和作品链接后正文超过字数上限，请精简正文" }
 
                 publishStep = "正在发布…"
+                val requestId = topicRequestId ?: Uuid.random().toString().also { topicRequestId = it }
                 val id = env.forum.createTopic(
                     categoryId = board.id,
                     title = title.trim(),
@@ -356,6 +360,7 @@ fun NewPostScreen(
                     pollOptions = if (pollEnabled) pollOptions else emptyList(),
                     pollDays = pollDays.takeIf { pollEnabled && it != 0 },
                     attachments = attachments,
+                    requestId = requestId,
                 )
                 back()
                 open(Route.Topic(id))

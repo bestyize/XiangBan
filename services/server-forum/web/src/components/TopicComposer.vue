@@ -47,6 +47,8 @@ const selectionTouched = ref(false)
 const attachments = ref<Attachment[]>([])
 const attachmentUploading = ref(false)
 const draftWork = shallowRef<DraftWebWork | null>(null)
+let uploadedWork: { file: File; key: string } | null = null
+const topicRequestId = ref<string | null>(null)
 const workPickerOpen = ref(false)
 const previewWork = ref(false)
 const previewWorkRev = ref(0)
@@ -388,9 +390,13 @@ async function submit() {
     let linkedWorkTitle = draftWork.value?.source === 'mine' ? draftWork.value.title : ''
     if (draftWork.value?.source === 'upload') {
       const { prepared } = draftWork.value
-      submitStep.value = '上传作品…'
-      const fileKey = await uploadFile(prepared.kind, prepared.file, () => {})
-      if (composer.target !== target) return
+      if (uploadedWork?.file !== prepared.file) {
+        submitStep.value = '上传作品…'
+        const key = await uploadFile(prepared.kind, prepared.file, () => {})
+        if (composer.target !== target) return
+        uploadedWork = { file: prepared.file, key }
+      }
+      const fileKey = uploadedWork.key
       const packTitle = (prepared.name || Array.from(form.title.trim()).slice(0, 60).join('') || '社区作品').trim()
       const packSummary = (prepared.description || Array.from(form.body.trim()).slice(0, 500).join('')).trim()
       submitStep.value = '登记作品…'
@@ -407,6 +413,7 @@ async function submit() {
       linkedWorkTitle = packTitle
       // 已发布即切换为已关联创作，防止后续失败重试时重复创建作品包。
       draftWork.value = { source: 'mine', id: published.id, title: packTitle, kind: prepared.kind, version: 1 }
+      uploadedWork = null
     }
 
     let finalBody = form.body.trim()
@@ -435,6 +442,7 @@ async function submit() {
         days: pollDays.value > 0 ? pollDays.value : undefined,
       }
     }
+    if (!target?.editId) input.request_id = topicRequestId.value ??= crypto.randomUUID()
     const res = target?.editId ? await api.updateTopic(target.editId, input) : await api.createTopic(input)
     if (composer.target !== target) return
     session.loadSession()

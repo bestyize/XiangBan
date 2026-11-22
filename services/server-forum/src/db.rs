@@ -102,6 +102,9 @@ ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level SMALLINT NOT NULL DEF
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS visible_in_active_lists BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS on_home BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS pin_scope TEXT NOT NULL DEFAULT 'none';
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS publish_request_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS topics_publish_request_idx ON topics(author_uid, publish_request_id)
+    WHERE publish_request_id IS NOT NULL;
 UPDATE topics SET pin_scope = 'site' WHERE pinned AND pin_scope = 'none';
 CREATE INDEX IF NOT EXISTS topics_category_idx ON topics (category_id, last_reply_at DESC);
 CREATE INDEX IF NOT EXISTS topics_hot_idx ON topics (hot_score DESC);
@@ -932,6 +935,7 @@ CREATE TABLE IF NOT EXISTS pack_uploads (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE pack_uploads ADD COLUMN IF NOT EXISTS object_key TEXT;
+ALTER TABLE pack_uploads ADD COLUMN IF NOT EXISTS published_pack_id BIGINT REFERENCES packs(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS pack_applies (
     pack_id       BIGINT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,

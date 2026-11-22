@@ -208,10 +208,12 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         pollOptions: List<String> = emptyList(),
         pollDays: Int? = null,
         attachments: List<ForumAttachment> = emptyList(),
+        requestId: String? = null,
     ): Long {
         validateTopicAttachments(attachments)
         val resp = write(HttpMethod.Post, "/api/topics", buildJsonObject {
             put("category_id", categoryId); put("title", title); put("body", body)
+            if (requestId != null) put("request_id", requestId)
             if (tags.isNotEmpty()) put("tags", buildJsonArray { tags.forEach { add(JsonPrimitive(it)) } })
             if (bounty != null) put("help", buildJsonObject { put("bounty", bounty); put("days", bountyDays) })
             if (attachments.isNotEmpty()) {

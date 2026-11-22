@@ -139,8 +139,8 @@ pub fn ensure_can_write(user: &ForumUser) -> Result<(), AppError> {
 }
 
 /// 按等级的每日上限检查；limits 下标为信任等级。
-pub async fn ensure_daily_quota(
-    pool: &PgPool,
+pub async fn ensure_daily_quota<'e>(
+    db: impl sqlx::PgExecutor<'e>,
     user: &ForumUser,
     table: &str,
     limits: &[i64; 4],
@@ -153,7 +153,7 @@ pub async fn ensure_daily_quota(
         )));
     }
     let sql = format!("SELECT COUNT(*) FROM {table} WHERE author_uid = $1 AND created_at > now() - interval '1 day'");
-    let (count,): (i64,) = sqlx::query_as(&sql).bind(user.uid).fetch_one(pool).await?;
+    let (count,): (i64,) = sqlx::query_as(&sql).bind(user.uid).fetch_one(db).await?;
     if count >= limit {
         return Err(AppError::TooManyRequests { message: format!("今天{what}次数已达上限（{limit}）"), retry_after: 3600 });
     }

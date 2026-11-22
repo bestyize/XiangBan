@@ -18,6 +18,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -136,7 +137,8 @@ class ForumApiTest {
         server.on("/api/topics/9/posts", body = """{"id":1}""")
         server.on("/api/categories", body = """[{"id":3,"parent_id":1,"slug":"share-software","name":"精品软件","description":"d","min_post_level":1,"admin_only":false,"kind":"normal","sort_order":1}]""")
         val api = ForumApi(server.client, config) { "T1" }
-        assertEquals(42L, api.createTopic(3, "标题", "这是一段足够长的正文内容"))
+        val requestId = "f62a574a-7c95-4c2d-b177-b9f3b2ba956a"
+        assertEquals(42L, api.createTopic(3, "标题", "这是一段足够长的正文内容", requestId = requestId))
         api.reply(9, "回复内容", replyTo = 5)
         api.setTopicLiked(9, true)
         api.setTopicLiked(9, false)
@@ -147,6 +149,7 @@ class ForumApiTest {
         assertEquals("Bearer T1", create.headers["Authorization"])
         val sent = Json.parseToJsonElement((create.body as TextContent).text).jsonObject
         assertEquals("3", sent["category_id"].toString())
+        assertEquals(requestId, sent["request_id"]?.jsonPrimitive?.content)
         assertEquals("标题", sent["title"].toString().trim('"'))
         val reply = Json.parseToJsonElement((server.requests[1].body as TextContent).text).jsonObject
         assertEquals("回复内容", reply["body"].toString().trim('"'))

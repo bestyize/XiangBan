@@ -204,6 +204,7 @@ export interface UserReply {
 }
 
 export interface TopicInput {
+  request_id?: string
   category_id: number
   title: string
   body: string

@@ -13,7 +13,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 pub async fn list(
@@ -103,6 +102,8 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
 
 #[derive(Deserialize)]
 pub struct TopicInput {
+    /// Optional identifier retained by the composer until the create response arrives.
+    pub request_id: Option<Uuid>,
     pub category_id: i32,
     #[serde(default)]
     pub title: String,
@@ -181,7 +182,7 @@ struct CategoryRules {
     posting_available: bool,
 }
 
-async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
+async fn category_rules<'e>(db: impl sqlx::PgExecutor<'e>, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
         "SELECT c.id, c.min_post_level, c.admin_only,
                 EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children,
@@ -191,7 +192,7 @@ async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
          ORDER BY (c.id = $1) DESC LIMIT 1",
     )
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(db)
     .await?
     .ok_or_else(|| AppError::BadRequest("分类不存在".into()))
 }
@@ -287,8 +288,19 @@ fn clean_read_level(wanted: Option<i16>, user_level: i16, current: Option<i16>) 
 
 pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): Json<TopicInput>) -> AppResult<Json<Value>> {
     let user = &auth.user;
+    let mut tx = state.pool.begin().await?;
+    if let Some(request_id) = input.request_id {
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(format!("topic-publish:{}:{request_id}", user.uid)).execute(&mut *tx).await?;
+        let existing = sqlx::query_scalar::<_, i64>("SELECT id FROM topics WHERE author_uid=$1 AND publish_request_id=$2")
+            .bind(user.uid).bind(request_id).fetch_optional(&mut *tx).await?;
+        if let Some(id) = existing {
+            tx.commit().await?;
+            return Ok(Json(json!({ "id": id })));
+        }
+    }
     users::ensure_can_write(user)?;
-    let cat = category_rules(&state.pool, input.category_id).await?;
+    let cat = category_rules(&mut *tx, input.category_id).await?;
     if !cat.posting_available { return Err(AppError::Forbidden("该分类已停用或已关闭发帖".into())); }
     if cat.has_children {
         return Err(AppError::BadRequest("请选择具体的二级分类".into()));
@@ -297,23 +309,22 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     if user.trust_level < need {
         return Err(level_error(cat.admin_only, need));
     }
-    users::ensure_daily_quota(&state.pool, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
+    users::ensure_daily_quota(&mut *tx, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
 
     let title = clean_topic_title(&input.title, cat.casual)?;
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
-    let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
+    let review = crate::moderation::screen(&mut *tx, &[&title, &body]).await?;
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
     let excerpt = if cat.casual { markdown::article_excerpt(&body, 140) } else { markdown::excerpt(&body, 140) };
     let images = markdown::site_images(&body, 3);
     let poll = input.poll.as_ref().map(clean_poll).transpose()?;
 
-    let mut tx = state.pool.begin().await?;
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level, images)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level, images, publish_request_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
     )
     .bind(cat.id)
     .bind(user.uid)
@@ -323,6 +334,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .bind(&excerpt)
     .bind(read_level)
     .bind(&images)
+    .bind(input.request_id)
     .fetch_one(&mut *tx)
     .await?;
     if let Some((options, closes_at)) = &poll {

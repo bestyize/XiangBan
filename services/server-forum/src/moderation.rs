@@ -4,7 +4,7 @@
 //! 匹配前先归一化：转小写、去掉空白和标点，所以“违 禁-词”也能命中“违禁词”。
 
 use crate::error::{AppError, AppResult};
-use sqlx::{PgConnection, PgPool};
+use sqlx::PgConnection;
 
 pub const BLOCK: &str = "block";
 pub const REVIEW: &str = "review";
@@ -42,13 +42,13 @@ pub fn evaluate(words: &[(String, String)], texts: &[&str]) -> Verdict {
     }
 }
 
-pub async fn load_words(pool: &PgPool) -> AppResult<Vec<(String, String)>> {
-    Ok(sqlx::query_as("SELECT word, action FROM sensitive_words").fetch_all(pool).await?)
+pub async fn load_words<'e>(db: impl sqlx::PgExecutor<'e>) -> AppResult<Vec<(String, String)>> {
+    Ok(sqlx::query_as("SELECT word, action FROM sensitive_words").fetch_all(db).await?)
 }
 
 /// 发布前检查。拦截返回 400；复核返回命中的词，调用方在内容写入后用 [`enqueue`] 入队。
-pub async fn screen(pool: &PgPool, texts: &[&str]) -> AppResult<Option<String>> {
-    match evaluate(&load_words(pool).await?, texts) {
+pub async fn screen<'e>(db: impl sqlx::PgExecutor<'e>, texts: &[&str]) -> AppResult<Option<String>> {
+    match evaluate(&load_words(db).await?, texts) {
         Verdict::Clean => Ok(None),
         Verdict::Review(word) => Ok(Some(word)),
         Verdict::Block => Err(AppError::BadRequest("内容包含不允许发布的词语，请修改后再发布".into())),

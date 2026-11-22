@@ -63,7 +63,12 @@ data class ContentUploadTicket(
     @SerialName("expires_at") val expiresAt: Long,
 )
 @Serializable
-data class ContentUploadStatus(@SerialName("file_key") val fileKey: String, val verified: Boolean, val used: Boolean)
+data class ContentUploadStatus(
+    @SerialName("file_key") val fileKey: String,
+    val verified: Boolean,
+    val used: Boolean,
+    @SerialName("published_pack_id") val publishedPackId: Long? = null,
+)
 @Serializable
 data class ContentPublishResult(val id: Long, val slug: String = "", val version: Int? = null, @SerialName("trust_level") val trustLevel: Int = 2)
 
@@ -143,12 +148,14 @@ class ContentPublishingApi(private val client: HttpClient, private val config: C
     }
 
     /** 最多五次只读校验状态；仍未完成时保留凭证和表单，交由用户稍后继续。 */
-    suspend fun awaitVerified(fileKey: String, attempts: Int = 5, pauseMillis: Long = 1000): Boolean {
+    suspend fun awaitVerified(fileKey: String, attempts: Int = 5, pauseMillis: Long = 1000, recoverPublished: Boolean = false): Boolean {
         require(attempts in 1..5 && pauseMillis in 0..2000)
         repeat(attempts) { index ->
             val status = uploadStatus(fileKey)
             if (status.fileKey != fileKey) throw ApiException(200, "上传校验结果不一致")
-            if (status.used) throw ApiException(409, "这份上传已用于发布，请先查看我的作品")
+            if (status.used && (!recoverPublished || status.publishedPackId == null)) {
+                throw ApiException(409, "这份上传已用于发布，请先查看我的作品")
+            }
             if (status.verified) return true
             if (index + 1 < attempts) delay(pauseMillis)
         }

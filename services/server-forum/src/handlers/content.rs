@@ -674,15 +674,24 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     if !input.rights_ack {
         return Err(AppError::BadRequest("请确认你拥有这份内容的发布权利".into()));
     }
-    check_pack_quota_for_publish(&state, &auth).await?;
     if !content::is_known_kind(&input.kind) {
         return Err(AppError::BadRequest("未知的内容类型".into()));
     }
+    let mut tx = state.pool.begin().await?;
+    let published: Option<Option<i64>> = sqlx::query_scalar(
+        "SELECT published_pack_id FROM pack_uploads WHERE file_key=$1 AND uid=$2 AND kind=$3 FOR UPDATE",
+    ).bind(&input.file_key).bind(auth.user.uid).bind(&input.kind).fetch_optional(&mut *tx).await?;
+    if let Some(Some(id)) = published {
+        let (slug, trust, status): (String, i16, String) = sqlx::query_as("SELECT slug, trust_level, status FROM packs WHERE id=$1")
+            .bind(id).fetch_one(&mut *tx).await?;
+        tx.commit().await?;
+        return Ok(Json(json!({ "id": id, "slug": slug, "version": 1, "trust_level": trust, "status": status })));
+    }
+    check_pack_quota_for_publish(&mut tx, auth.user.uid, state.config.daily_pack_publishes).await?;
     let title = clean_text(&input.title, "标题", 60, true)?;
     let summary = clean_text(&input.summary, "简介", 500, false)?;
     let tags = clean_tags(&input.tags)?;
-    let review = crate::moderation::screen(&state.pool, &[&title, &summary, &tags.join(" ")]).await?;
-    let mut tx = state.pool.begin().await?;
+    let review = crate::moderation::screen(&mut *tx, &[&title, &summary, &tags.join(" ")]).await?;
     let cover_key = match &input.cover_key {
         Some(cover) => Some(check_cover(&mut tx, auth.user.uid, cover).await?),
         None => None,
@@ -718,6 +727,8 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
     crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
+    sqlx::query("UPDATE pack_uploads SET published_pack_id=$2 WHERE file_key=$1")
+        .bind(&input.file_key).bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "slug": slug, "version": 1, "trust_level": content::T2, "status": "published" })))
 }
@@ -725,13 +736,13 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
 fn wallpaper_slug() -> String { format!("wallpaper-{}", Uuid::new_v4().simple()) }
 
 /// 发布前再确认一次配额：凭证签发时已经计过一次占位，这里只拦“已发布数”超限。
-async fn check_pack_quota_for_publish(state: &AppState, auth: &AuthUser) -> AppResult<()> {
+async fn check_pack_quota_for_publish(db: &mut sqlx::PgConnection, uid: Uuid, limit: i64) -> AppResult<()> {
     let (count,): (i64,) =
         sqlx::query_as("SELECT count(*) FROM packs WHERE author_uid = $1 AND created_at > now() - interval '1 day'")
-            .bind(auth.user.uid)
-            .fetch_one(&state.pool)
+            .bind(uid)
+            .fetch_one(db)
             .await?;
-    if count >= state.config.daily_pack_publishes {
+    if count >= limit {
         return Err(AppError::TooManyRequests { message: "今天发布得有点多，明天再来".into(), retry_after: 3600 });
     }
     Ok(())
@@ -873,10 +884,10 @@ async fn remove_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id)
 struct UploadStatusQuery { file_key: String }
 
 async fn upload_status(State(state): State<AppState>, auth: AuthUser, Query(q): Query<UploadStatusQuery>) -> AppResult<Json<Value>> {
-    let row: Option<(bool,bool)> = sqlx::query_as("SELECT verified,used FROM pack_uploads WHERE file_key=$1 AND uid=$2")
+    let row: Option<(bool, bool, Option<i64>)> = sqlx::query_as("SELECT verified,used,published_pack_id FROM pack_uploads WHERE file_key=$1 AND uid=$2")
         .bind(&q.file_key).bind(auth.user.uid).fetch_optional(&state.pool).await?;
-    let (verified,used) = row.ok_or_else(|| AppError::not_found("上传记录"))?;
-    Ok(Json(json!({"file_key":q.file_key,"verified":verified,"used":used})))
+    let (verified, used, published_pack_id) = row.ok_or_else(|| AppError::not_found("上传记录"))?;
+    Ok(Json(json!({"file_key":q.file_key,"verified":verified,"used":used,"published_pack_id":published_pack_id})))
 }
 
 async fn get_scheme(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Json<Value>> {
