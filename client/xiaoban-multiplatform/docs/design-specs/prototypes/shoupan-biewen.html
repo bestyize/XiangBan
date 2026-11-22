@@ -1,0 +1,3358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="重走创业板指的 100 个交易日。一日一题，答完看你的考试成绩。">
+  <title>收盘别问</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --outer: #101417;
+      --screen: #171f25;
+      --chart: #11191e;
+      --surface: #212a31;
+      --line: #354149;
+      --ink: #f2efe5;
+      --muted: #abb6bb;
+      --accent: #94de8f;
+      --accent-hover: #b0ecaa;
+      --accent-ink: #142317;
+      --up: #ff8984;
+      --down: #77c2a9;
+      --body: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      --display: "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
+      --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--outer); font-family: var(--body); }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; background: none; border: 0; cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+    ::selection { background: var(--accent); color: var(--outer); }
+    h1, h2, p, ol, li, figure, blockquote { margin: 0; }
+    .studio { display: grid; grid-template-columns: 390px; align-items: start; justify-content: center; padding: 26px 20px; }
+    .studio.design-preview { grid-template-columns: 180px 390px; gap: 28px; }
+    .preview-nav { display: grid; gap: 4px; padding-top: 8px; }
+    .preview-nav[hidden] { display: none; }
+    .preview-nav p { margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+    .preview-nav button { min-height: 42px; padding: 0 13px; text-align: left; font-size: 14px; border-radius: 6px; }
+    .preview-nav button:is(:hover, [aria-current="true"]) { background: var(--surface); }
+    .preview-nav button[aria-current="true"] { color: var(--accent); }
+    .phone {
+      width: 390px;
+      height: 800px;
+      background: var(--screen);
+      border-radius: 14px;
+      box-shadow: 0 18px 60px #0006;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .app-host body { background: var(--screen); }
+    .app-host .studio { display: block; padding: 0; }
+    .app-host .phone { width: 100%; max-width: 560px; height: 100vh; height: 100dvh; margin: auto; border-radius: 0; box-shadow: none; padding-top: max(env(safe-area-inset-top), var(--xb-safe-top, 0px)); }
+    .app-host .topbar { margin-left: max(24px, calc(var(--xb-safe-left, 0px) + 8px)); margin-right: max(24px, calc(var(--xb-safe-right, 0px) + 8px)); }
+    .app-host .page { padding-left: max(24px, calc(var(--xb-safe-left, 0px) + 8px)); padding-right: max(24px, calc(var(--xb-safe-right, 0px) + 8px)); padding-bottom: max(24px, calc(var(--xb-safe-bottom, 0px) + 8px), env(safe-area-inset-bottom)); }
+    .app-host dialog, .app-host #share-dialog { max-height: calc(100dvh - var(--xb-safe-top, 0px) - var(--xb-safe-bottom, 0px) - 32px); }
+    .topbar { flex: none; display: flex; align-items: center; justify-content: space-between; margin: 0 24px; min-height: 64px; border-bottom: 1px solid var(--line); }
+    .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 650; letter-spacing: .08em; }
+    .brand-mark { display: flex; align-items: center; gap: 3px; width: 20px; height: 20px; }
+    .brand-mark i { position: relative; display: block; width: 4px; margin-top: var(--offset); height: var(--bar); background: var(--accent); }
+    .brand-mark i::before { content: ""; position: absolute; inset: -3px auto; left: 1.5px; width: 1px; background: var(--accent); }
+    .topbar button { min-width: 56px; min-height: 44px; margin-right: -5px; padding: 0 5px; color: var(--muted); font-size: 13px; text-align: right; }
+    .topbar button:hover { color: var(--ink); }
+    .page { min-height: 0; overflow-y: auto; scrollbar-color: var(--line) transparent; flex: 1; display: flex; flex-direction: column; padding: 25px 24px max(24px, env(safe-area-inset-bottom)); }
+    .exam-progress { margin-bottom: 28px; }
+    .progress-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+    .progress-line span:last-child { font-family: var(--mono); font-size: 11px; }
+    progress { display: block; width: 100%; height: 2px; margin-top: 10px; appearance: none; border: 0; background: var(--line); }
+    progress::-webkit-progress-bar { background: var(--line); }
+    progress::-webkit-progress-value { background: var(--accent); }
+    progress::-moz-progress-bar { background: var(--accent); }
+    .page h1 { font-family: var(--display); font-size: 39px; line-height: 1.19; font-weight: 800; letter-spacing: -.035em; }
+    .question-copy { margin: 12px 0 20px; min-height: 50px; color: var(--muted); font-size: 15px; line-height: 1.7; }
+    .chart { margin: 0; border-radius: 10px; background: var(--chart); overflow: hidden; }
+    .chart figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 13px 14px 0; color: var(--muted); font-size: 11px; }
+    .chart-name { font-size: 12px; font-weight: 650; color: var(--ink); }
+    .chart-code { margin-left: 5px; font: 10px var(--mono); color: var(--muted); }
+    .chart-figure { font-family: var(--mono); }
+    .chart-scroll { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+    .chart-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .chart-track { position: relative; height: 178px; }
+    canvas { position: sticky; left: 0; display: block; height: 100%; }
+    .reveal .chart-track { height: 150px; }
+    .choices { display: grid; gap: 9px; margin-top: auto; padding-top: 22px; }
+    .choice { min-height: 57px; display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px; text-align: left; background: var(--surface); }
+    .choice:hover { border-color: var(--accent); }
+    .choice-letter { color: var(--accent); font: 700 13px var(--mono); }
+    .choice-copy { font-size: 14px; line-height: 1.4; }
+    .choice-direction { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .actions { display: grid; gap: 8px; margin-top: auto; padding-top: 17px; }
+    .primary, .secondary { display: flex; align-items: center; justify-content: center; min-height: 52px; padding: 9px 16px; border-radius: 7px; font-size: 14px; font-weight: 650; }
+    .primary { background: var(--accent); color: var(--accent-ink); }
+    .primary:hover { background: var(--accent-hover); }
+    .secondary { border: 1px solid var(--line); }
+    .secondary:hover { background: var(--surface); }
+    .result-mark { margin: 0 0 17px; }
+    .result-date { color: var(--muted); font: 12px var(--mono); letter-spacing: .08em; }
+    .result-mark h1 { margin: 4px 0 3px; font: 660 clamp(57px, 18vw, 73px)/1 "Avenir Next", Arial, sans-serif; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .positive { color: var(--up); }
+    .negative { color: var(--down); }
+    .result-detail { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .result-status { color: var(--muted); font-size: 12px; }
+    .result-points { color: var(--muted); font-size: 12px; }
+    .result-points.correct { color: var(--accent); }
+    .reveal .exam-progress { margin-bottom: 21px; }
+    .reveal-copy { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); font: 750 24px/1.55 var(--display); letter-spacing: -.02em; }
+    .reveal-copy p { max-width: 100%; }
+    .exam-intro h1 { font-size: 46px; }
+    .intro { margin-top: 10px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .exam-rules, .score-breakdown { display: grid; gap: 0; margin: 29px 0 0; border-top: 1px solid var(--line); }
+    .exam-rules div, .score-breakdown div { display: flex; justify-content: space-between; gap: 10px; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .exam-rules dt, .score-breakdown dt { color: var(--muted); }
+    .exam-rules dd, .score-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .score h1 { margin: 15px 0 0; }
+    .score-total { display: flex; align-items: baseline; margin-top: 21px; gap: 11px; font-variant-numeric: tabular-nums; }
+    .score-total strong { color: var(--accent); font: 680 clamp(60px, 19vw, 90px)/1 "Avenir Next", Arial, sans-serif; letter-spacing: -.04em; }
+    .score-total span { color: var(--muted); font: 17px var(--mono); white-space: nowrap; }
+    .score-period { margin-top: 10px; color: var(--muted); font: 12px var(--mono); }
+    .score-line { margin-top: 28px; font: 750 23px/1.5 var(--display); }
+    dialog { position: absolute; width: min(calc(100% - 40px), 342px); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+    dialog::backdrop { background: #080c10c2; }
+    dialog h2 { font-size: 18px; }
+    dialog p { margin-top: 12px; font-size: 14px; color: var(--muted); }
+    dialog :is(input, textarea) { display: block; width: 100%; margin: 14px 0; border: 1px solid var(--line); padding: 9px; border-radius: 5px; color: var(--ink); background: var(--chart); font-size: 13px; }
+    dialog :is(input, textarea)[hidden] { display: none; }
+    dialog textarea { resize: vertical; }
+    dialog .actions { padding-top: 0; }
+    #share-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+    .share-poster { display: block; width: min(100%, 206px); height: auto; margin: 13px auto 15px; border-radius: 7px; }
+    .share-poster[hidden] { display: none; }
+    .share-url-label { display: block; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    #share-url { margin: 6px 0 0; font-size: 16px; }
+    #share-hint { margin: 7px 0 13px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .share-actions button:disabled { opacity: .5; cursor: default; }
+    .share-close { width: 100%; min-height: 44px; margin-top: 5px; color: var(--muted); font-size: 13px; }
+    #exam-disclaimer p { line-height: 1.65; }
+    #exam-disclaimer .actions { margin-top: 20px; }
+    @media (max-width: 649px) {
+      .studio, .studio.design-preview { display: block; padding: 0; }
+      .preview-nav { display: none; }
+      .phone { width: min(100%, 390px); height: 100vh; height: 100dvh; margin: auto; border-radius: 0; box-shadow: none; }
+      .result-mark h1 { font-size: clamp(57px, 18vw, 73px); }
+    }
+    @media (min-width: 650px) {
+      .result-mark h1 { font-size: 73px; }
+    }
+    @media (max-width: 649px) and (max-height: 720px) {
+      .topbar { min-height: 54px; }
+      .page { padding-block-start: 18px; }
+      .exam-progress { margin-bottom: 17px; }
+      .question-copy { min-height: auto; margin-bottom: 14px; }
+      .chart-track { height: 150px; }
+      .reveal .chart-track { height: 128px; }
+      .choices { padding-top: 15px; }
+      .reveal-copy { margin-top: 16px; padding-top: 12px; font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="studio">
+    <nav class="preview-nav" aria-label="设计稿画面" hidden>
+      <p>手机设计预览 · 390 × 800</p>
+      <button type="button" data-view="intro">考试入口</button>
+      <button type="button" data-view="question">选择题</button>
+      <button type="button" data-view="reveal">结果揭晓</button>
+      <button type="button" data-view="score">成绩示例</button>
+    </nav>
+    <main class="phone" id="phone" aria-label="收盘别问"></main>
+  </div>
+  <dialog id="exam-disclaimer" aria-labelledby="exam-disclaimer-title" aria-describedby="exam-disclaimer-copy">
+    <h2 id="exam-disclaimer-title">免责声明</h2>
+    <p id="exam-disclaimer-copy">数据根据公开渠道获取，均为历史数据。本游戏不做任何预测，入市需谨慎。</p>
+    <div class="actions">
+      <button type="button" class="primary" value="start">我已知晓，开始考试</button>
+      <button type="button" class="secondary" value="cancel" autofocus>返回</button>
+    </div>
+  </dialog>
+
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <h2 id="share-title">分享结果</h2>
+    <p id="share-description"></p>
+    <img id="share-poster" class="share-poster" width="780" height="1040" alt="带测评二维码的分享海报" hidden>
+    <label class="share-url-label" for="share-url">测评链接</label>
+    <input id="share-url" type="url" inputmode="url" placeholder="https://" autocomplete="off" aria-describedby="share-hint">
+    <p id="share-hint"></p>
+    <textarea id="share-fallback" aria-label="可复制的分享内容" rows="4" readonly hidden></textarea>
+    <div class="share-actions">
+      <button type="button" class="secondary" id="copy-link">复制链接</button>
+      <button type="button" class="primary" id="save-poster" disabled>保存海报</button>
+    </div>
+    <button type="button" class="share-close">返回</button>
+    <p role="status" id="copy-status" hidden></p>
+  </dialog>
+
+  <script id="qr-generator">
+/*
+MIT License
+Copyright (c) 2009 Kazuhiko Arase
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+// 来自 qrcode-generator 1.4.4（MIT，Kazuhiko Arase），仅把 UMD 出口改成 ES 模块出口。
+// 'QR Code' 是 DENSO WAVE INCORPORATED 的注册商标。
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+  </script>
+  <script type="application/json" id="market-data">
+    {"baseline":{"date":"2026-06-25","close":4371.9891},"history":[
+      {"date":"2026-06-04","open":4072.5489,"high":4114.2369,"low":4051.1466,"close":4088.884},
+      {"date":"2026-06-05","open":4079.9523,"high":4105.2105,"low":3933.0655,"close":3957.935},
+      {"date":"2026-06-08","open":3820.2306,"high":3903.7742,"low":3776.9267,"close":3811.7854},
+      {"date":"2026-06-09","open":3865.6931,"high":3962.8976,"low":3823.7604,"close":3961.7493},
+      {"date":"2026-06-10","open":3897.73,"high":3928.3596,"low":3818.3123,"close":3854.7935},
+      {"date":"2026-06-11","open":3839.1872,"high":3910.278,"low":3755.6132,"close":3811.246},
+      {"date":"2026-06-12","open":3921.0888,"high":3921.5348,"low":3822.4219,"close":3830.353},
+      {"date":"2026-06-15","open":3896.167,"high":4033.5349,"low":3844.0802,"close":4033.5349},
+      {"date":"2026-06-16","open":4065.2708,"high":4142.4326,"low":4053.8784,"close":4102.9421},
+      {"date":"2026-06-17","open":4061.2973,"high":4168.1644,"low":4058.6137,"close":4167.0478},
+      {"date":"2026-06-18","open":4153.6209,"high":4272.0078,"low":4153.6209,"close":4252.3903},
+      {"date":"2026-06-22","open":4272.9877,"high":4359.392,"low":4229.3149,"close":4359.392},
+      {"date":"2026-06-23","open":4343.8755,"high":4350.0633,"low":4159.4762,"close":4192.1945},
+      {"date":"2026-06-24","open":4181.9056,"high":4257.2497,"low":4161.5806,"close":4251.4244},
+      {"date":"2026-06-25","open":4278.3393,"high":4380.4125,"low":4242.8633,"close":4371.9891}
+    ],"days":[
+      {"date":"2026-06-26","open":4319.4094,"high":4328.6995,"low":4175.3771,"close":4194.2089,"previous_close":4371.9891,"change_pct":-4.07},
+      {"date":"2026-06-29","open":4200.674,"high":4265.4634,"low":4103.6328,"close":4216.6985,"previous_close":4194.2089,"change_pct":0.54},
+      {"date":"2026-06-30","open":4217.6332,"high":4353.1051,"low":4205.7421,"close":4342.7123,"previous_close":4216.6985,"change_pct":2.99},
+      {"date":"2026-07-01","open":4336.1611,"high":4361.825,"low":4222.2226,"close":4260.7208,"previous_close":4342.7123,"change_pct":-1.89},
+      {"date":"2026-07-02","open":4135.3424,"high":4168.8728,"low":3999.5674,"close":4017.2735,"previous_close":4260.7208,"change_pct":-5.71},
+      {"date":"2026-07-03","open":4010.8191,"high":4115.6286,"low":3985.363,"close":4019.9341,"previous_close":4017.2735,"change_pct":0.07},
+      {"date":"2026-07-06","open":4050.876,"high":4063.6309,"low":3903.478,"close":3948.86,"previous_close":4019.9341,"change_pct":-1.77},
+      {"date":"2026-07-07","open":3931.4388,"high":3976.114,"low":3859.4262,"close":3911.9075,"previous_close":3948.86,"change_pct":-0.94},
+      {"date":"2026-07-08","open":3932.4198,"high":3965.3879,"low":3824.3295,"close":3845.3513,"previous_close":3911.9075,"change_pct":-1.7},
+      {"date":"2026-07-09","open":3892.1234,"high":4025.316,"low":3812.6552,"close":4018.1744,"previous_close":3845.3513,"change_pct":4.49},
+      {"date":"2026-07-10","open":4041.8593,"high":4060.5332,"low":3842.3475,"close":3842.7314,"previous_close":4018.1744,"change_pct":-4.37},
+      {"date":"2026-07-13","open":3809.8585,"high":3855.7535,"low":3691.2325,"close":3723.5166,"previous_close":3842.7314,"change_pct":-3.1},
+      {"date":"2026-07-14","open":3729.6129,"high":3855.0347,"low":3673.9586,"close":3851.1372,"previous_close":3723.5166,"change_pct":3.43},
+      {"date":"2026-07-15","open":3879.7659,"high":3905.3115,"low":3794.3444,"close":3804.7038,"previous_close":3851.1372,"change_pct":-1.21},
+      {"date":"2026-07-16","open":3710.5069,"high":3796.3456,"low":3658.0684,"close":3692.4573,"previous_close":3804.7038,"change_pct":-2.95},
+      {"date":"2026-07-17","open":3642.0568,"high":3642.0568,"low":3387.2594,"close":3428.6298,"previous_close":3692.4573,"change_pct":-7.15},
+      {"date":"2026-07-20","open":3504.1162,"high":3550.5941,"low":3338.2134,"close":3443.1015,"previous_close":3428.6298,"change_pct":0.42},
+      {"date":"2026-07-21","open":3469.2229,"high":3687.1467,"low":3373.0396,"close":3685.9684,"previous_close":3443.1015,"change_pct":7.05},
+      {"date":"2026-07-22","open":3644.9764,"high":3694.8996,"low":3553.3675,"close":3566.7323,"previous_close":3685.9684,"change_pct":-3.23},
+      {"date":"2026-07-23","open":3596.7348,"high":3621.7275,"low":3538.1062,"close":3575.5202,"previous_close":3566.7323,"change_pct":0.25},
+      {"date":"2026-07-24","open":3515.5037,"high":3561.3499,"low":3480.8702,"close":3480.8702,"previous_close":3575.5202,"change_pct":-2.65},
+      {"date":"2026-07-27","open":3482.0447,"high":3592.1,"low":3449.205,"close":3590.7872,"previous_close":3480.8702,"change_pct":3.16},
+      {"date":"2026-07-28","open":3478.8636,"high":3511.7002,"low":3312.3049,"close":3327.0298,"previous_close":3590.7872,"change_pct":-7.35},
+      {"date":"2026-07-29","open":3333.4807,"high":3411.0318,"low":3249.6469,"close":3378.6964,"previous_close":3327.0298,"change_pct":1.55},
+      {"date":"2026-07-30","open":3331.3212,"high":3353.8096,"low":3158.1393,"close":3244.6179,"previous_close":3378.6964,"change_pct":-3.97},
+      {"date":"2026-07-31","open":3411.6115,"high":3464.8974,"low":3343.9641,"close":3343.9641,"previous_close":3244.6179,"change_pct":3.06},
+      {"date":"2026-08-03","open":3320.0927,"high":3342.173,"low":3280.8429,"close":3302.5534,"previous_close":3343.9641,"change_pct":-1.24},
+      {"date":"2026-08-04","open":3353.5119,"high":3510.5118,"low":3342.4065,"close":3488.9663,"previous_close":3302.5534,"change_pct":5.64},
+      {"date":"2026-08-05","open":3372.0823,"high":3584.0617,"low":3372.042,"close":3535.1431,"previous_close":3488.9663,"change_pct":1.32},
+      {"date":"2026-08-06","open":3472.1465,"high":3574.4058,"low":3444.3585,"close":3515.5603,"previous_close":3535.1431,"change_pct":-0.55},
+      {"date":"2026-08-07","open":3537.44,"high":3613.8713,"low":3507.6151,"close":3563.1165,"previous_close":3515.5603,"change_pct":1.35},
+      {"date":"2026-08-10","open":3567.0459,"high":3575.5891,"low":3470.9529,"close":3537.2136,"previous_close":3563.1165,"change_pct":-0.73},
+      {"date":"2026-08-11","open":3533.8936,"high":3601.59,"low":3517.5721,"close":3549.1641,"previous_close":3537.2136,"change_pct":0.34},
+      {"date":"2026-08-12","open":3542.1326,"high":3625.2678,"low":3540.9478,"close":3602.0835,"previous_close":3549.1641,"change_pct":1.49},
+      {"date":"2026-08-13","open":3656.876,"high":3681.7994,"low":3585.2719,"close":3586.0427,"previous_close":3602.0835,"change_pct":-0.45},
+      {"date":"2026-08-14","open":3610.1936,"high":3633.0339,"low":3578.614,"close":3626.2965,"previous_close":3586.0427,"change_pct":1.12},
+      {"date":"2026-08-17","open":3632.7768,"high":3740.1568,"low":3604.166,"close":3740.1568,"previous_close":3626.2965,"change_pct":3.14},
+      {"date":"2026-08-18","open":3730.9868,"high":3747.5284,"low":3662.4482,"close":3705.5645,"previous_close":3740.1568,"change_pct":-0.92},
+      {"date":"2026-08-19","open":3605.5183,"high":3622.5033,"low":3455.4776,"close":3473.4932,"previous_close":3705.5645,"change_pct":-6.26},
+      {"date":"2026-08-20","open":3517.6522,"high":3531.923,"low":3459.5692,"close":3495.5886,"previous_close":3473.4932,"change_pct":0.64},
+      {"date":"2026-08-21","open":3495.113,"high":3563.0592,"low":3478.5173,"close":3545.5775,"previous_close":3495.5886,"change_pct":1.43},
+      {"date":"2026-08-24","open":3550.2489,"high":3551.5075,"low":3376.6393,"close":3431.8851,"previous_close":3545.5775,"change_pct":-3.21},
+      {"date":"2026-08-25","open":3403.1981,"high":3440.6501,"low":3359.7354,"close":3397.5153,"previous_close":3431.8851,"change_pct":-1.0},
+      {"date":"2026-08-26","open":3409.2787,"high":3455.8882,"low":3379.1423,"close":3414.8832,"previous_close":3397.5153,"change_pct":0.51},
+      {"date":"2026-08-27","open":3437.9013,"high":3474.0689,"low":3408.8011,"close":3473.3547,"previous_close":3414.8832,"change_pct":1.71},
+      {"date":"2026-08-28","open":3453.7284,"high":3521.4689,"low":3423.074,"close":3424.4007,"previous_close":3473.3547,"change_pct":-1.41},
+      {"date":"2026-08-31","open":3367.0432,"high":3438.6813,"low":3359.135,"close":3438.6813,"previous_close":3424.4007,"change_pct":0.42},
+      {"date":"2026-09-01","open":3435.3212,"high":3442.4766,"low":3375.0131,"close":3393.4296,"previous_close":3438.6813,"change_pct":-1.32},
+      {"date":"2026-09-02","open":3347.675,"high":3348.6934,"low":3296.4749,"close":3312.2432,"previous_close":3393.4296,"change_pct":-2.39},
+      {"date":"2026-09-03","open":3342.0916,"high":3356.2458,"low":3285.0583,"close":3312.5411,"previous_close":3312.2432,"change_pct":0.01},
+      {"date":"2026-09-04","open":3344.6208,"high":3370.4681,"low":3266.7959,"close":3286.5457,"previous_close":3312.5411,"change_pct":-0.78},
+      {"date":"2026-09-07","open":3326.4173,"high":3409.3646,"low":3320.265,"close":3398.6812,"previous_close":3286.5457,"change_pct":3.41},
+      {"date":"2026-09-08","open":3394.3456,"high":3418.4845,"low":3346.7138,"close":3359.7155,"previous_close":3398.6812,"change_pct":-1.15},
+      {"date":"2026-09-09","open":3398.2224,"high":3398.2224,"low":3327.1366,"close":3354.969,"previous_close":3359.7155,"change_pct":-0.14},
+      {"date":"2026-09-10","open":3324.3332,"high":3368.7333,"low":3308.705,"close":3338.4224,"previous_close":3354.969,"change_pct":-0.49},
+      {"date":"2026-09-11","open":3310.0129,"high":3335.8144,"low":3261.1001,"close":3322.0389,"previous_close":3338.4224,"change_pct":-0.49},
+      {"date":"2026-09-14","open":3279.3069,"high":3331.0536,"low":3262.4861,"close":3285.5829,"previous_close":3322.0389,"change_pct":-1.1},
+      {"date":"2026-09-15","open":3280.8548,"high":3315.3295,"low":3245.0592,"close":3247.9177,"previous_close":3285.5829,"change_pct":-1.15},
+      {"date":"2026-09-16","open":3246.887,"high":3327.5569,"low":3227.1813,"close":3311.4742,"previous_close":3247.9177,"change_pct":1.96},
+      {"date":"2026-09-17","open":3297.3098,"high":3351.4212,"low":3293.9327,"close":3298.3101,"previous_close":3311.4742,"change_pct":-0.4},
+      {"date":"2026-09-18","open":3351.5586,"high":3398.1581,"low":3313.2082,"close":3372.6763,"previous_close":3298.3101,"change_pct":2.25},
+      {"date":"2026-09-21","open":3403.8954,"high":3429.2744,"low":3373.9323,"close":3399.5899,"previous_close":3372.6763,"change_pct":0.8},
+      {"date":"2026-09-22","open":3446.3286,"high":3472.471,"low":3387.8795,"close":3399.9302,"previous_close":3399.5899,"change_pct":0.01},
+      {"date":"2026-09-23","open":3412.53,"high":3412.53,"low":3372.9531,"close":3379.6099,"previous_close":3399.9302,"change_pct":-0.6},
+      {"date":"2026-09-24","open":3366.8904,"high":3371.6089,"low":3288.9476,"close":3288.9476,"previous_close":3379.6099,"change_pct":-2.68},
+      {"date":"2026-09-28","open":3267.6018,"high":3270.8098,"low":3125.2006,"close":3139.8249,"previous_close":3288.9476,"change_pct":-4.53},
+      {"date":"2026-09-29","open":3136.5272,"high":3158.91,"low":3128.4785,"close":3142.563,"previous_close":3139.8249,"change_pct":0.09},
+      {"date":"2026-09-30","open":3164.702,"high":3173.3613,"low":3125.4912,"close":3135.2767,"previous_close":3142.563,"change_pct":-0.23},
+      {"date":"2026-10-08","open":3140.4636,"high":3168.4045,"low":3012.0309,"close":3036.6573,"previous_close":3135.2767,"change_pct":-3.15},
+      {"date":"2026-10-09","open":3021.33,"high":3053.3768,"low":2932.7956,"close":3043.3346,"previous_close":3036.6573,"change_pct":0.22},
+      {"date":"2026-10-12","open":3023.5069,"high":3049.3353,"low":2962.2445,"close":2963.8238,"previous_close":3043.3346,"change_pct":-2.61},
+      {"date":"2026-10-13","open":2899.1459,"high":2999.7577,"low":2860.8009,"close":2958.3446,"previous_close":2963.8238,"change_pct":-0.18},
+      {"date":"2026-10-14","open":2943.0084,"high":2962.7297,"low":2863.7106,"close":2866.763,"previous_close":2958.3446,"change_pct":-3.1},
+      {"date":"2026-10-15","open":2776.9241,"high":2819.3811,"low":2751.1998,"close":2783.1749,"previous_close":2866.763,"change_pct":-2.92},
+      {"date":"2026-10-16","open":2831.8895,"high":2832.1306,"low":2743.8691,"close":2772.3836,"previous_close":2783.1749,"change_pct":-0.39},
+      {"date":"2026-10-19","open":2760.3522,"high":2770.0788,"low":2708.9191,"close":2746.291,"previous_close":2772.3836,"change_pct":-0.94},
+      {"date":"2026-10-20","open":2732.6841,"high":2790.1198,"low":2706.406,"close":2739.2031,"previous_close":2746.291,"change_pct":-0.26},
+      {"date":"2026-10-21","open":2746.8389,"high":2766.8121,"low":2682.7075,"close":2694.7132,"previous_close":2739.2031,"change_pct":-1.62},
+      {"date":"2026-10-22","open":2687.9399,"high":2688.1097,"low":2576.901,"close":2576.901,"previous_close":2694.7132,"change_pct":-4.37},
+      {"date":"2026-10-23","open":2534.1563,"high":2695.0757,"low":2494.2153,"close":2684.0971,"previous_close":2576.901,"change_pct":4.16},
+      {"date":"2026-10-26","open":2645.7425,"high":2671.8102,"low":2601.0907,"close":2638.2306,"previous_close":2684.0971,"change_pct":-1.71},
+      {"date":"2026-10-27","open":2661.713,"high":2670.4705,"low":2548.1071,"close":2548.1486,"previous_close":2638.2306,"change_pct":-3.41},
+      {"date":"2026-10-28","open":2593.1537,"high":2647.6291,"low":2562.8969,"close":2634.76,"previous_close":2548.1486,"change_pct":3.4},
+      {"date":"2026-10-29","open":2596.2224,"high":2597.451,"low":2516.7799,"close":2517.5882,"previous_close":2634.76,"change_pct":-4.45},
+      {"date":"2026-10-30","open":2434.798,"high":2518.2435,"low":2413.6291,"close":2413.6291,"previous_close":2517.5882,"change_pct":-4.13},
+      {"date":"2026-11-02","open":2439.0839,"high":2500.1412,"low":2406.9749,"close":2458.6984,"previous_close":2413.6291,"change_pct":1.87},
+      {"date":"2026-11-03","open":2429.77,"high":2471.8965,"low":2376.3949,"close":2391.6518,"previous_close":2458.6984,"change_pct":-2.73},
+      {"date":"2026-11-04","open":2399.46,"high":2559.0916,"low":2376.2826,"close":2544.73,"previous_close":2391.6518,"change_pct":6.4},
+      {"date":"2026-11-05","open":2493.729,"high":2625.9847,"low":2493.6668,"close":2566.803,"previous_close":2544.73,"change_pct":0.87},
+      {"date":"2026-11-06","open":2438.715,"high":2506.9669,"low":2438.715,"close":2465.232,"previous_close":2566.803,"change_pct":-3.96},
+      {"date":"2026-11-09","open":2494.6272,"high":2511.7099,"low":2458.0093,"close":2458.5623,"previous_close":2465.232,"change_pct":-0.27},
+      {"date":"2026-11-10","open":2518.4387,"high":2520.0145,"low":2487.5632,"close":2494.3974,"previous_close":2458.5623,"change_pct":1.46},
+      {"date":"2026-11-11","open":2490.0965,"high":2580.3446,"low":2490.0965,"close":2572.0672,"previous_close":2494.3974,"change_pct":3.11},
+      {"date":"2026-11-12","open":2559.1576,"high":2620.2486,"low":2508.2915,"close":2509.4292,"previous_close":2572.0672,"change_pct":-2.44},
+      {"date":"2026-11-13","open":2525.3901,"high":2528.989,"low":2417.2193,"close":2426.0845,"previous_close":2509.4292,"change_pct":-3.32},
+      {"date":"2026-11-16","open":2395.5245,"high":2398.1919,"low":2308.897,"close":2320.0199,"previous_close":2426.0845,"change_pct":-4.37},
+      {"date":"2026-11-17","open":2299.9676,"high":2343.1465,"low":2263.7423,"close":2292.2037,"previous_close":2320.0199,"change_pct":-1.2},
+      {"date":"2026-11-18","open":2306.1181,"high":2329.9116,"low":2265.7642,"close":2311.6208,"previous_close":2292.2037,"change_pct":0.85},
+      {"date":"2026-11-19","open":2290.2089,"high":2315.784,"low":2271.9855,"close":2293.3416,"previous_close":2311.6208,"change_pct":-0.79},
+      {"date":"2026-11-20","open":2244.062,"high":2263.2988,"low":2212.1274,"close":2212.1274,"previous_close":2293.3416,"change_pct":-3.54}
+    ]}
+  </script>
+  <script type="application/json" id="exam-copy">{
+    "2026-06-26": {"question":"昨天收在 4370 上方，群里已经有人喊主升浪。\n周五到了。","choices":["这口气还能续，今天收红。","昨天冲太快了，今天收绿。"],"lines":["那天四个点跌完，群里最镇定的一句是「周一见」。","猜对了。\n周末一到，我还是去翻了下自选。"]},
+    "2026-06-29": {"question":"周五跌了四个点。\n周一一早，群里先发了一句「今天看修复」。","choices":["周五那根够狠了，收红喘口气。","四个点还没消化完，接着绿。"],"lines":["红了半个点。\n我把「问题不大」敲进去，差点顺手加个感叹号。"]},
+    "2026-06-30": {"question":"昨天翻红半个点。\n六月最后一天，群里还想要一根像样的。","choices":["昨儿打了底，今天红盘收官。","半个点我可不敢信，今天绿。"],"lines":["涨了近三个点。\n群里那条「清仓休息」忽然没人接话了。"]},
+    "2026-07-01": {"question":"昨天收涨近 3%。\n七月第一天，群里有人问还能不能续上。","choices":["红盘续上，这波有点东西。","昨天拉得太满，今天要收绿。"],"lines":["那天我还敢说，跌一两个点有什么好截图的。"]},
+    "2026-07-02": {"question":"昨天说是回踩。\n今天能收回来吗？","choices":["回踩到位，今天收红。","底还没踩到，今天收绿。"],"lines":["低开低走。\n早上还想等个翻红。最后把行情推送关了。"]},
+    "2026-07-03": {"question":"昨天盘中踩破 4000，收盘又回到上面。\n群里开始争这个位置。","choices":["红一点也算，今天先收红。","4000 就一根线，今天还得绿。"],"lines":["红了 0.07%，群里还是有人发了句「红了」。\n没人笑他。"]},
+    "2026-07-06": {"question":"周五红了 0.07%。\n过完周末，群里都在等一根像样的。","choices":["周末捂了两天，今天能收红。","周五那点红不顶用，今天绿。"],"lines":["周五收在 4000 上面，周一我把提醒改成了 3900。"]},
+    "2026-07-07": {"question":"昨收不到 3950。\n群里又在发「超跌」两个字。","choices":["跌到这儿，今天得给个红盘。","超跌还能更超跌，今天绿。"],"lines":["只跌了不到一个点。\n听起来像好消息，放前两周我都不敢这么说。"]},
+    "2026-07-08": {"question":"周一到周二连着收绿，群里有人开始数阴线。","choices":["事不过三，今天该红了。","数阴线也没用，今天照样绿。"],"lines":["软件挪到了第二屏。\n我的手还是一解锁就知道往哪划。"]},
+    "2026-07-09": {"question":"周一到周三都跌了。\n昨晚群里的搜索词是「超跌反弹」。","choices":["三天下来，红盘该轮到了。","先别给它起名字，今天收绿。"],"lines":["盘中回到 4000 的时候，我连截图该发给谁都想好了。","我刚打完「别急着叫反转」，转头把 4000 截了下来。"]},
+    "2026-07-10": {"question":"昨天一根大阳线。\n今天还能走强吗？","choices":["昨天那根有分量，今天继续红。","涨得太急，今天得收绿。"],"lines":["高开。以为稳了。\n又跳水了。早上那句「稳了」还挂在群里。"]},
+    "2026-07-13": {"question":"周五又跌回 3800 多。\n周末聊了两天，群里都在等开盘那一眼。","choices":["周五杀过头了，今天修复收红。","周五低点守不住，今天还收绿。"],"lines":["昨晚还算 3800 怎么守，今天打开手机先看 3700 在不在。"]},
+    "2026-07-14": {"question":"昨天盘中摸到 3700 下方。\n群里还在等第一根像样的反抽。","choices":["这回该红了，先别问能走几天。","昨天低点刚漏，今天还是绿。"],"lines":["拉回 3851 以后，群里那句「以后不看了」突然谁也没再提。"]},
+    "2026-07-15": {"question":"昨天拉了三个多点，群里已经有人开始算回本还差多少。","choices":["昨天抢回那么多，今天还能红。","回本先别算，今天得吐点，绿。"],"lines":["涨时算回本差多少，跌时把表格关了。\n今天我又关了一次。"]},
+    "2026-07-16": {"question":"昨天盘中摸过 3900，最后收在 3800 出头。\n群里那张图还挂着。","choices":["3800 附近先稳一次，收红。","摸高都没站住，今天继续绿。"],"lines":["我把 3800 设成提醒。\n再有空看一眼，已经得盯 3700 了。"]},
+    "2026-07-17": {"question":"昨天又收绿。\n今天还等修复吗？","choices":["跌够了，总该收个红吧。","先别说底，今天还得绿。"],"lines":["关灯吃面。面坨了。\n软件还开着。"]},
+    "2026-07-20": {"question":"上周五跌了 7% 多。\n周一一到，群里又有人问开盘看不看。","choices":["上周五那一下够了，今天收红。","情绪还没泄完，今天继续绿。"],"lines":["盘中见过 3338，收盘还能红。\n我对红盘的要求从来没有这么低。"]},
+    "2026-07-21": {"question":"昨天翻红了。\n今天还敢信修复吗？","choices":["昨天都翻红了，今天接着红。","昨天那点算反抽，今天收绿。"],"lines":["大奇迹日。\n盘中还在水下两个点，收盘那张图是我发的。"]},
+    "2026-07-22": {"question":"昨天涨了 7% 多，连好久不说话的人都出来问「怎么看」。","choices":["这么大一根有惯性，今天还红。","昨天涨得太满，今天收绿。"],"lines":["昨天的红盘截图轮流发，今天最好记的一句是「昨天没卖」。"]},
+    "2026-07-23": {"question":"昨天跌回去三个多点。\n有人叫回踩，有人说反抽已经完了。","choices":["踩完就走，今天红盘收。","昨天跌得太实，今天接着绿。"],"lines":["红了 0.25%。\n我发出去的截图裁了时间，顺手也裁了左边那几根。"]},
+    "2026-07-24": {"question":"昨天刚翻一点红，群里已经有人把「企稳」打出来了。","choices":["慢慢修也行，今天收红。","昨天那点红站不住，今天绿。"],"lines":["今天收在全天最低。\n我截了图，联系人都选好了，最后按的是取消分享。"]},
+    "2026-07-27": {"question":"周五收在全天最低。\n过个周末，群里又有人问要不要盯一下开盘。","choices":["周五杀得太急，今天该红了。","周五收最低，今天还是绿。"],"lines":["涨了三个点。\n周末刚定的「一周少看盘」，周一就划掉了。"]},
+    "2026-07-28": {"question":"昨天涨逾 3%。\n盘后群里有人直接说「涨了」，后面没加「反抽」。","choices":["昨天是真修复，今天还能红。","昨天走得快，今天照样绿。"],"lines":["昨天红了，我把群通知打开了。\n今天跌了七个多点，群里一直没响。","说的是今天会跌。\n看见七个多点，我还是退出来确认了一遍指数代码。"]},
+    "2026-07-29": {"question":"昨天跌了七个多点。\n群里有人说，这回总该有个像样的反抽了吧？","choices":["跌成这样，今天收红喘口气。","没到能歇的时候，今天还绿。"],"lines":["终于红了一个多点。\n群里有人冒出一句「先红着，别喊」。"]},
+    "2026-07-30": {"question":"昨天红了一点半。\n离月末只剩两天，群里还在等净值回一点。","choices":["月末前再给点修复，今天红。","昨天反抽幅度一般，今天绿。"],"lines":["收在 3244。\n我找了半天下一道支撑，最后只把点位提醒关了。"]},
+    "2026-07-31": {"question":"昨天跌了快四个点。\n七月就剩最后一个交易日。","choices":["月末给个红盘吧，我先押涨。","昨天那根太重，月末还是绿。"],"lines":["月末红了三个点。\n我切去看了一眼月 K，把截图又删了。"]},
+    "2026-08-03": {"question":"上周五日涨超 3%，日 K 却是绿的。\n八月第一个交易日来了。","choices":["换个月，先来个红盘。","周五涨幅没守全，今天绿。"],"lines":["日历翻到了八月，我自选股备注里的成本价还是原来的。"]},
+    "2026-08-04": {"question":"昨天没站住。\n今天有人接吗？","choices":["跌不动了，今天能收红。","先别接，再收一根绿的。"],"lines":["一根阳线改变信仰。\n昨天说卸载的人，今天第一个发图。是我。"]},
+    "2026-08-05": {"question":"昨天涨了五个多点。\n群里有人问，今天能不能接第二个红盘。","choices":["昨天拉得够硬，今天续红。","昨天已经拉够了，今天收绿。"],"lines":["昨收 3489，今天开在 3372。\n到收盘反而红了。我白写了半天「问题不大」。"]},
+    "2026-08-06": {"question":"昨天低开不少，最后还能收红。\n群里多了几个「稳了」。","choices":["昨天低开都接住了，今天红。","连红两天了，今天收个绿。"],"lines":["跌了半个点，群里说「良性回踩」。\n我想问问不良性的是什么样，字打好又删了。"]},
+    "2026-08-07": {"question":"昨天小跌，群里还在讲前面两根阳线的底子。","choices":["半个点洗完了，今天收红。","回踩还没完，今天继续绿。"],"lines":["盘中摸到 3600 上面，收盘差那一截。\n群里流传的截图刚好都截在上面。"]},
+    "2026-08-10": {"question":"上周五盘中上过 3600，收盘又落在下面。\n周一了。","choices":["周五试过一回了，今天红盘。","3600 还压着，今天绿盘收。"],"lines":["周末群里画了条 3600 的线。\n周一我一打开软件，第一眼看的是下面那条。"]},
+    "2026-08-11": {"question":"昨天回到 3537。\n群里有人把「突破」换成了「试盘」。","choices":["试过总得再试，今天收红。","昨天没站住，今天我押小绿。"],"lines":["红了 0.34%。\n我跟同事说今天还行，有多还行我没往下讲。"]},
+    "2026-08-12": {"question":"昨天又摸过 3600，收盘仍在下面。\n群里这几天就没换过这个数。","choices":["这回能撑到收盘，收红。","上次摸完就下来了，今天绿。"],"lines":["收在 3602。\n我把截图发到群里，只打了俩字「终于」。"]},
+    "2026-08-13": {"question":"昨天刚收上 3600。\n群里问，今天能不能再往上挪一格？","choices":["昨天那根阳线有劲，今天接着收红。","先把 3600 当压力位，今天我押绿。"],"lines":["高开的时候我还嫌自己截图太慢。\n三点一到，那张图倒是没发出去。"]},
+    "2026-08-14": {"question":"3600 昨天得而复失。\n你今天还盯着这根线吗？","choices":["今天来把线收回去，押红。","昨天冲过都站不稳，今天我押绿。"],"lines":["3600 收回来了。\n我刚说完自己的票绿也无所谓，转头就挨个看了一遍。"]},
+    "2026-08-17": {"question":"上周五站回 3600。\n周一群里已经有人把「修复」改成了「反转」。","choices":["周五那口气还在，今天看红。","周末把预期聊满了，开盘反而容易收绿。"],"lines":["收在全天最高。\n我等到三点才截，头一回不怕手慢。"]},
+    "2026-08-18": {"question":"昨天涨了三个多点。\n今天群里只剩一个问题，还接得上吗？","choices":["这种阳线有惯性，我看还能红。","昨天拉太满，今天得吐一点回去。"],"lines":["昨天没舍得删那张大阳线。\n今天我又去看它，一不小心把行情也刷新了。"]},
+    "2026-08-19": {"question":"昨天小跌，3700 还在。\n你在开盘前给群里回哪句？","choices":["3700 没丢，今天还能修回来。","昨天已经开始松了，今天继续绿。"],"lines":["跌了六个多点。\n我去撤回早上那句「低开有人接」，超过两分钟了。"]},
+    "2026-08-20": {"question":"昨天创业板指跌了 6.26%。\n早上群里有人只发了两个字「还在？」","choices":["这么砸完该给口喘气的，今天看红。","前一天跌成这样，我先押继续绿。"],"lines":["涨跌幅红了，日 K 却是绿的。\n群里各截各的，居然谁都没发错。"]},
+    "2026-08-21": {"question":"昨天只修了不到一个点。\n是先喘口气，还是今天能跟上？","choices":["昨天先止住，今天还有红盘可看。","那点反抽也够发图了，今天我押绿。"],"lines":["连续两天收红。\n群里有人打了句「修复」，等了半天，又补上「暂时」。"]},
+    "2026-08-24": {"question":"上周连红两天。\n周末复盘的人已经把涨幅算到今天了。","choices":["都红两天了，周一再接一根。","上周那是反抽，今天得还回去。"],"lines":["前两天攒的涨幅，一个周一就还了。\n群里还有人翻昨天的复盘，想看看自己哪句说得太满。"]},
+    "2026-08-25": {"question":"昨天跌了 3.21%，收在 3400 上方。\n你今天想先看哪边？","choices":["离 3400 还有点余地，今天看修复。","整数关口拿来看的，今天先押收绿。"],"lines":["关软件前又看了一眼，3397。\n设置了三个月的提醒，响完就剩我在那儿。"]},
+    "2026-08-26": {"question":"3400 昨天收丢了。\n群里有人问要不要把那条参考线删掉。","choices":["先别删，今天收红，说不定还能拿回来。","丢了就丢了，今天我看继续绿。"],"lines":["3400 回来了。\n我昨天才删掉的提醒，今天又给它加了回来。"]},
+    "2026-08-27": {"question":"昨天收红，但离上周大跌前还远。\n你今天还愿意给它一次机会吗？","choices":["红了一天还能接，我押继续涨。","反抽已经给过，今天还得绿。"],"lines":["收盘回到上周三收盘附近。\n截图我发了，左边那根大阴线我裁掉了。"]},
+    "2026-08-28": {"question":"昨天涨了 1.71%。\n群里已经有人问 3500 是不是快轮到了。","choices":["升上来的劲还没用完，今天收红。","冲是能冲，今天八成还得收绿。"],"lines":["盘中真过了 3500。\n我那张图截得很准，准到只反映了那一秒。"]},
+    "2026-08-31": {"question":"八月最后一个交易日。\n上周五那根回落，你还介意吗？","choices":["月末给个好看点的收盘，我押红。","周五刚回吐，今天我还押绿。"],"lines":["月末最后一根收在全天最高。\n我只截这根日 K，月 K 留给下个月的自己。"]},
+    "2026-09-01": {"question":"昨天收在全天最高。\n换了个日历，你会换个方向吗？","choices":["八月底有人接，九月开门我押红。","开门也得看昨天涨了多少，今天我押绿。"],"lines":["昨天刚写完八月复盘，九月第一天就想把那篇设成仅自己可见。"]},
+    "2026-09-02": {"question":"九月第一天又收在 3400 以下。\n群里有人问，今天给不给修复？","choices":["一根还不算确认，今天我押收红。","3400 这次没守住，今天还得绿。"],"lines":["盘中 3300 也破了一下。\n我去群里找截图，平时画线那几位都只发了收盘数。"]},
+    "2026-09-03": {"question":"昨天盘中破过 3300，收盘拉了回来。\n你今天还敢押它收红吗？","choices":["昨天尾盘留了口气，今天接个红盘。","守回去一次也不算稳，今天还得绿。"],"lines":["涨了 0.01%。\n我把右上角放大看了两次，生怕把加号看成减号。"]},
+    "2026-09-04": {"question":"昨天只涨 0.01%。\n群里已经争完了算不算反弹，今天你怎么看？","choices":["红就有得续，今天能再收红。","那点红还不够挡一根阴线，今天我押绿。"],"lines":["昨天还在争 0.01% 算不算红，今天刚收盘，群里就开始问周末吃什么了。"]},
+    "2026-09-07": {"question":"上周五收在 3300 以下。\n过完周末，你今天还等它修复吗？","choices":["都等到周一了，给一次红盘吧。","周末没改 K 线，今天我还是押绿。"],"lines":["3398.68。\n群里说四舍五入算站上 3400，这次我没抬杠。"]},
+    "2026-09-08": {"question":"昨天涨了 3.41%。\n群里说今天看的是能不能把 3400 守到三点。","choices":["昨天那根够长，今天还有红盘。","昨天冲得太快，今天我看收绿。"],"lines":["盘中又过了 3400。\n我拿着那张截图看收盘，总算知道「站上」和「站稳」差在哪儿。"]},
+    "2026-09-09": {"question":"昨天冲过 3400 又掉下来。\n你今天愿意信一次反包吗？","choices":["昨天吐过了，今天押回去一截。","3400 上面没站住，今天我押绿。"],"lines":["开盘就是全天最高。\n指数只跌 0.14%，我午休倒是一分钟没睡。"]},
+    "2026-09-10": {"question":"昨天跌得不多，盘中震得够呛。\n你今天开盘前站哪边？","choices":["前一天没砸下去，今天我看收红。","没跌几分不代表稳了，今天继续绿。"],"lines":["我把红色的日 K 发给朋友，跟他说这次别看右上角。\n他回了张涨跌幅的截图。"]},
+    "2026-09-11": {"question":"昨天那根 K 线红着，涨跌幅却是绿的。\n今天你先信哪个？","choices":["日 K 那边先试过了，今天能收红。","我先认昨收这条线，今天还在水下。"],"lines":["连续两天跌 0.49%。\n我以为软件没刷新，关掉重开还是这个数。"]},
+    "2026-09-14": {"question":"上周后半程连着收绿。\n周一早上，群里有人发了一条「活着没？」","choices":["跌这么多天，今天先看一个红盘。","周一容易再砸一下，今天还押绿。"],"lines":["前两天跌得像软件没更新。\n周一这一下，我倒不用再查是不是缓存。"]},
+    "2026-09-15": {"question":"昨天又跌了一个多点。\n群里的「今天总该红了吧」你还接吗？","choices":["接一下，连续砸了这么多天，今天押红。","这句已经说了好几天，今天我还押绿。"],"lines":["六天连绿。\n我盘后打开得最多的是日历，主要想看看什么时候能放几天假。"]},
+    "2026-09-16": {"question":"已经六个交易日没收红了。\n今天你还愿意等一个红盘吗？","choices":["红一天也行，今天我押修复。","都六天了，我先别抢着喊企稳，押绿。"],"lines":["真红了。\n我没敢问能涨几天，先把免打扰了六天的群开回来了。"]},
+    "2026-09-17": {"question":"昨天涨近两个点，收回 3300。\n今天能把这根阳线接住吗？","choices":["才修一天，今天接着红。","昨天好不容易回来，今天容易又掉下去。"],"lines":["3300 还差一点。\n我早上跟人说站稳了叫我，收盘他真没有叫我。"]},
+    "2026-09-18": {"question":"昨天冲高回落。\n有人在群里问，今天还有修复吗？","choices":["跌不动了，今天修复收红。","昨天没站住，今天还得绿。"],"lines":["群里好久没人发截图了。\n那天，是我先发的。","我刚在群里说完是反抽，转头就截了张图。"]},
+    "2026-09-21": {"question":"周五涨了 2.25%。\n周末没发言的人，周一都赶上开盘了。","choices":["周五那根没白等，今天再收个红。","周末讨论得这么热闹，今天我先押绿。"],"lines":["收在 3399.59。\n我跟朋友说「3400 附近」，这四个字打得比行情数字还认真。"]},
+    "2026-09-22": {"question":"昨天离 3400 只差 0.41 点。\n今天你还盯这条线吗？","choices":["就那么一点，今天能红着过。","差一点有时最折腾，今天我押绿。"],"lines":["盘中上过 3472，收盘离 3400 还差 0.07 点。\n我把早上那张图翻出来，认了半天是同一天。"]},
+    "2026-09-23": {"question":"昨天冲高回落，收盘只剩 +0.01%。\n今天你更想看哪边？","choices":["还没翻绿，今天能接一根真红的。","昨天冲那么高都回来了，今天还得绿。"],"lines":["开盘就是全天最高。\n我早上发的「3400 拿下」，收盘前就想撤回了。"]},
+    "2026-09-24": {"question":"昨天收绿，有人说节前再看一天就关软件。\n你今天打算怎么猜？","choices":["再给个红盘就放假，我押涨。","昨天没站住，今天我看继续绿。"],"lines":["收盘就是全天最低。\n我提前半小时退了软件，三点又从外卖付款页切回了行情。"]},
+    "2026-09-28": {"question":"四连阴了。\n今天能收一根红的吗？","choices":["四根了。今天总该收红。","四根也不是底，今天继续绿。"],"lines":["五连阴。第一根叫回踩。\n第五根，群里没人接话了。"]},
+    "2026-09-29": {"question":"昨天跌了 4.53%。\n群里有人问，今天给不给一个红盘当安慰？","choices":["昨天砸成那样，今天能修一点。","先让我看到三点，今天还是押绿。"],"lines":["我把 +0.09% 截了图。\n手机自动把它跟昨天那张排到一起，我看了一会儿又锁了屏。"]},
+    "2026-09-30": {"question":"节前最后一根日K。\n群里有人说，给九月留个体面。","choices":["留根红K，好过节。","先别封卷，收盘还得绿。"],"lines":["临放假，跌得也客气。\n就是那点红，直到收盘也没舍得给。"]},
+    "2026-10-08": {"question":"长假结束，创业板指从3135点接着走。\n节后第一天，你押哪边？","choices":["节后第一天，给个开门红。","别急着喊开门红，我看收绿。"],"lines":["放假时我关了通知。\n节后第一天，手机没响，我还是自己打开了。"]},
+    "2026-10-09": {"question":"昨天跌了3.15%，收在3000点上面一点。\n今天还有修复吗？","choices":["能拉回一点，押个红盘。","离3000点这么近，收盘还得绿。"],"lines":["盘中穿了3000，收回来才涨0.22%。\n群里那句「守住了」，发得比平时响。"]},
+    "2026-10-12": {"question":"上周五勉强收红。\n周一开盘前，群里又开始问3000点能不能守。","choices":["能守住，今天还能接着红。","周五那点修复不够，今天收绿。"],"lines":["收在2963点。\n群公告写的「3000见」还挂着，谁也没去改。"]},
+    "2026-10-13": {"question":"昨天收盘跌破3000点，今天你信不信有反抽？","choices":["该抽一下了，我猜能收红。","先看能不能摸到3000，我押收绿。"],"lines":["盘中摸到2999.76。\n就那0.24点，够我把截图放大看两遍。"]},
+    "2026-10-14": {"question":"昨天盘中摸到了3000点门口，最后还是小跌。\n今天怎么说？","choices":["昨天试过了，今天收红给我看。","门都没摸开，收盘还得绿。"],"lines":["收盘又跌3.10%。\n昨天还在聊差0.24点，今天连这零头都没人提了。"]},
+    "2026-10-15": {"question":"昨天一根跌掉3.10%。\n早上群里有人问，还能不能喘口气？","choices":["跌得够急了，今天能收红。","喘口气不等于收得红，我押绿。"],"lines":["开盘已经够低，三点收在开盘上面一点。\nK线红了，涨跌幅还是跌了2.92%。我盯着两种颜色看了半天。"]},
+    "2026-10-16": {"question":"这两天连着跌。\n今天周五，收盘能松一口气吗？","choices":["周五给点面子，押个红吧。","群里越盼周末，我越觉得要收绿。"],"lines":["高开那会儿，群里冒出来好几个早安。\n收盘跌0.39%，后来也没人道晚安。"]},
+    "2026-10-19": {"question":"上周五高开收绿。\n新的一周，你觉得今天能翻红吗？","choices":["周一能重新来，押收涨。","周五没修复完，今天还得绿。"],"lines":["全天最高点都没摸到昨收。\n我打开分时看了一眼，连「翻红失败」这句话都没用上。"]},
+    "2026-10-20": {"question":"昨天一整天都在昨收下方。\n今天能不能见一次红？","choices":["今天能抬头，收红一回。","盘中抬头没用，最后仍是绿的。"],"lines":["盘中翻过红，收盘只跌0.26%。\n谁能想到，一天里最想留住的是那一分钟的截图。"]},
+    "2026-10-21": {"question":"昨天翻红又收绿。\n群里有人把这叫「磨底」。你怎么看？","choices":["磨够了吧，今天收红。","磨不磨底先不说，今天我押收绿。"],"lines":["收在2694点。\n一路说「磨一下」，磨到自选里再也不用看3000的刻度了。"]},
+    "2026-10-22": {"question":"昨天收盘跌破2700点。\n「整数关口」四个字你还信吗？","choices":["今天该反抽了，押红盘。","就一个整数，扛不住，押绿盘。"],"lines":["跌4.37%，收在全天最低。\n下午群里最完整的一句话是「到家了」。"]},
+    "2026-10-23": {"question":"昨天以全天最低点收盘。\n今天群里又有人问，超跌反弹呢？","choices":["该有根阳线了，我押收红。","超跌还能再超跌，今天收绿。"],"lines":["盘中跌破2500，收盘涨4.16%。\n早上没敢问，下午把红盘截图发给了昨天一起沉默的人。","我把「反抽而已」打完又删了。\n今天涨4.16%，先让我高兴一会儿。"]},
+    "2026-10-26": {"question":"上周五从2500下方拉到收涨4.16%。\n周一，这口气还能续吗？","choices":["周五那根有劲，今天续红。","周五红归红，今天我押绿。"],"lines":["昨天还在回味那根大阳，今天的绿一出来，周末反复看的截图还没退出相册。"]},
+    "2026-10-27": {"question":"昨天小绿。\n今天还有修复的预期吗？","choices":["还有人接，今天收红。","承接太薄，今天继续绿。"],"lines":["又跳水了。\n我把今天第一张截图删了。那张还红着。"]},
+    "2026-10-28": {"question":"昨天高开低走，跌了3.41%。\n今天能卖给你几分希望？","choices":["能拉回一截，我押收红。","回一口气也得收绿，我押跌。"],"lines":["涨3.40%。\n昨天那条「稳」终于有人回了。他说，今天先别发这字。"]},
+    "2026-10-29": {"question":"昨天涨了3.40%。\n有人说昨天的红算修复，你觉得今天能接吗？","choices":["修复还有下半场，今天收红。","昨天那根留不住，今天收绿。"],"lines":["跌4.45%。\n昨天截图里写的「回来了」没舍得删，我只把它从置顶撤了。","我猜它会绿，真看见4.45%还是点进群，想听谁说自己看错了。"]},
+    "2026-10-30": {"question":"昨天把前一天的涨幅吐了回去。\n十月最后一天怎么收？","choices":["最后一天，给个红盘收官。","昨天没刹住，今天还得绿。"],"lines":["十月最后一天，跌4.13%，收在全天最低。\n我翻到月线时，手指往回划了一下。"]},
+    "2026-11-02": {"question":"十一月第一天。\n十月底已经收在2413点，群里都在问能不能换口气。","choices":["新月份给个红，今天能收涨。","日期换了，盘面未必换，我押绿。"],"lines":["涨了1.87%。\n我刚把十一月的表格建好，第一格终于可以涂红。"]},
+    "2026-11-03": {"question":"昨天收涨1.87%，月初开了个红头。\n你觉得这根接得上吗？","choices":["红头能续，今天押收涨。","昨天红得不够，从今天看还是绿。"],"lines":["收在2391点。\n昨天涂红的那一格还在，旁边新填的数字要比它大。"]},
+    "2026-11-04": {"question":"昨天又跌回去了。\n今天再信一次？","choices":["砸成这样，今天总得红吧。","昨天还在水下，今天收绿。"],"lines":["群里喊「站在光里」。\n我把免打扰关了。"]},
+    "2026-11-05": {"question":"昨天涨了6.40%。\n那张截图从昨晚聊到今早，今天还能红吗？","choices":["还有惯性，今天接着红。","昨天冲太猛，今天会收绿。"],"lines":["盘中又冲了一大截，收盘留下0.87%。\n这回我没急着截盘中那张，等了三点。"]},
+    "2026-11-06": {"question":"昨天又续了一点。\n今天还能接着红吗？","choices":["红了两天，今天还有人接。","该兑现了，今天要收绿。"],"lines":["前两天说站在光里。\n今天光站在这里。等收盘。"]},
+    "2026-11-09": {"question":"上周五跌了3.96%。\n周一的群聊，有人先问能不能回2500。","choices":["能补回来一点，今天收红。","整数关口又不是护身符，今天收绿。"],"lines":["盘中上过2500，收盘小跌0.27%。\n最便宜的安慰是：至少今天跌幅前面是个零。"]},
+    "2026-11-10": {"question":"昨天小跌，盘中一度摸上2500。\n今天你怎么看？","choices":["昨天只是试了一下，今天能收红。","2500试过也掉下来了，今天还绿。"],"lines":["高开，收涨1.46%。\n收盘又在2500下面。有人问「站稳了吗」，我只回了个「红的」。"]},
+    "2026-11-11": {"question":"昨天是红盘，差一点收上2500。\n今天你还信修复吗？","choices":["今天能接着红，过线给我看看。","昨天差那一点，今天又要收绿。"],"lines":["涨3.11%。\n早上群里在拼双十一凑单，下午有人把指数截图发到了优惠群。"]},
+    "2026-11-12": {"question":"连红两天，昨天涨了3.11%。\n今天是惯性还是分歧？","choices":["还有惯性，能红着收。","昨天那根涨太快，今天分歧收绿。"],"lines":["盘中看见2620。\n我那时还在算回本要几个这样的交易日，晚上把计算器关了。"]},
+    "2026-11-13": {"question":"昨天冲过2600，收盘跌了2.44%。\n又到周五，给不给修复？","choices":["有反抽，今天给个红周五。","昨天回落那样，今天还得收绿。"],"lines":["收盘跌3.32%。\n前两天还在问今晚吃什么，今天群里先问了一句「到家没」。"]},
+    "2026-11-16": {"question":"上周最后两天都收绿。\n周一，休息两天够不够换口气？","choices":["能喘一口，今天应该收红。","休息的是人，盘面今天还绿。"],"lines":["跌4.37%。\n周末设置的「免打扰」挺管用，消息没进来，我自己点进去看了。"]},
+    "2026-11-17": {"question":"三连阴，又破了前低。\n今天会止住吗？","choices":["三根跌透了，今天修复收红。","昨天才破位，今天继续绿。"],"lines":["四连阴。收盘又是这轮新低。\n创造了历史。我连截图都没截。"]},
+    "2026-11-18": {"question":"昨天盘中翻红，最后还是收绿。\n今天还敢押一次红吗？","choices":["敢，今天收红一次。","昨天也红过，我今天押收绿。"],"lines":["涨0.85%。\n这么小的一根红，居然还能让我走出地铁口时想重新看一眼。"]},
+    "2026-11-19": {"question":"昨天涨了0.85%，刚喘过一口气。\n今天能连红两天吗？","choices":["昨天那口气还有，今天接着红。","怕是红一天就够了，今天收绿。"],"lines":["今天收跌，K 线却是阳的。\n群里两个人争了半天，两个都没看错。"]},
+    "2026-11-20": {"question":"昨天尾盘抬了一下，最后还是绿的。\n今天这题，你押哪边？","choices":["再信一次，今天收红。","昨天那点拉升留不住，今天收绿。"],"lines":["三点零五，我又刷了一下。\n明知道收盘了。"]}
+  }</script>
+  <script>
+    const host = window.xb;
+    if (host) document.documentElement.classList.add('app-host');
+    const archive = JSON.parse(document.getElementById('market-data').textContent);
+    const days = archive.days;
+    const historyRows = archive.history;
+    const copyByDate = JSON.parse(document.getElementById('exam-copy').textContent);
+    const sampleDay = days.findIndex(day => day.date === '2026-09-18');
+    const finalDay = days.length - 1;
+    const phone = document.getElementById('phone');
+    const previewNav = document.querySelector('.preview-nav');
+    const examDisclaimer = document.getElementById('exam-disclaimer');
+    const shareDialog = document.getElementById('share-dialog');
+    const shareTitle = document.getElementById('share-title');
+    const shareDescription = document.getElementById('share-description');
+    const shareURL = document.getElementById('share-url');
+    const shareHint = document.getElementById('share-hint');
+    const sharePoster = document.getElementById('share-poster');
+    const savePoster = document.getElementById('save-poster');
+    const shareFallback = document.getElementById('share-fallback');
+    const copyButton = document.getElementById('copy-link');
+    const copyStatus = document.getElementById('copy-status');
+    const number = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const grade = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+    const dateLabel = date => date.replaceAll('-', '.');
+    const pct = value => `${value < 0 ? '−' : value > 0 ? '+' : ''}${Math.abs(value).toFixed(2)}%`;
+    const primary = (label, action) => `<button class="primary" type="button" data-action="${action}">${label}</button>`;
+    const correctChoice = day => day.change_pct > 0 ? 'up' : 'down';
+    const knownViews = ['intro', 'question', 'reveal', 'score'];
+    const storageKey = 'shoupan-biewen-exam-100';
+    const params = new URLSearchParams(location.search);
+    const previewView = params.get('screen');
+    const isDesignPreview = !host && knownViews.includes(previewView);
+    previewNav.hidden = !isDesignPreview;
+    previewNav.parentElement.classList.toggle('design-preview', isDesignPreview);
+    let state = { view: 'intro', mode: 'preview', index: 0, choice: '', answers: [] };
+    let savedExam = null;
+    let shareContent;
+    let hostSave = Promise.resolve();
+    let afterPanelBack = null;
+
+    function header(showExam = true) {
+      return `<header class="topbar">
+        <span class="brand"><span class="brand-mark" aria-hidden="true">
+          <i style="--offset:6px;--bar:7px"></i><i style="--offset:0px;--bar:12px"></i><i style="--offset:-8px;--bar:6px"></i>
+        </span>收盘别问</span>
+        ${showExam ? '<button type="button" data-action="home">考卷</button>' : ''}
+      </header>`;
+    }
+
+    function progress(index, complete) {
+      const position = index + 1;
+      return `<div class="exam-progress"><div class="progress-line">
+        <span>${state.mode === 'day' ? '同题挑战' : '考试进度'}</span><span>${String(position).padStart(2, '0')} / ${days.length}</span>
+      </div><progress max="${days.length}" value="${complete ? position : index}" aria-label="考试进度"></progress></div>`;
+    }
+
+    function chart(label, reveal = false) {
+      return `<figure class="chart"><figcaption>
+        <span><span class="chart-name">创业板指</span><span class="chart-code">399006</span></span>
+        <span class="chart-figure">${label}</span>
+      </figcaption><div class="chart-scroll" tabindex="0" aria-label="横滑查看历史 K 线">
+        <div class="chart-track"><canvas aria-label="创业板指${reveal ? '已揭晓' : '题面'}日 K 线" role="img"></canvas></div>
+      </div>
+      </figure>`;
+    }
+
+    function summarize(index, answers) {
+      const answered = answers.length;
+      const hits = answers.reduce((total, answer, position) => total + Number(answer === correctChoice(days[position])), 0);
+      return { answered, hits, score: grade.format(hits / answered * 100), change: (days[index].close / archive.baseline.close - 1) * 100 };
+    }
+
+    function render() {
+      const { view, index, choice, answers, mode } = state;
+      const day = days[index];
+      const content = copyByDate[day.date];
+      const isFinal = index === finalDay;
+      const correct = choice === correctChoice(day);
+      const line = content.lines[choice === 'down' ? 1 : 0] ?? content.lines[0];
+      let rows = [];
+      let chartState = '';
+      for (const button of previewNav.querySelectorAll('[data-view]')) {
+        button.setAttribute('aria-current', String(button.dataset.view === view));
+      }
+
+      switch (view) {
+        case 'intro':
+          phone.innerHTML = `${header(false)}<section class="page exam-intro">
+            <h1>收盘别问</h1><p class="intro">创业板指历史考卷</p>
+            <dl class="exam-rules">
+              <div><dt>行情区间</dt><dd>${dateLabel(days[0].date)} – ${dateLabel(days[finalDay].date)}</dd></div>
+              <div><dt>题量</dt><dd>${days.length} 个交易日 · ${days.length} 题</dd></div>
+              <div><dt>计分</dt><dd>按已答题的正确率换算</dd></div>
+            </dl>
+            <div class="actions">${primary(savedExam ? savedExam.view === 'score' ? '查看成绩' : '继续考试' : '开始考试', 'start')}</div>
+          </section>`;
+          break;
+
+        case 'question':
+          rows = [...historyRows, ...days.slice(0, index)];
+          chartState = 'question';
+          phone.innerHTML = `${header()}<section class="page question">
+            ${progress(index, false)}
+            <h1>今天怎么收？</h1><p class="question-copy">${content.question.replaceAll('\n', '<br>')}</p>
+            ${chart(`昨收 ${number.format(day.previous_close)}`)}
+            <div class="choices">${content.choices.map((text, i) => `<button type="button" class="choice" data-choice="${i ? 'down' : 'up'}">
+              <span class="choice-letter">${i ? 'B' : 'A'}</span><span class="choice-copy">${text}</span>
+              <span class="choice-direction">押收${i ? '跌' : '涨'}</span>
+            </button>`).join('')}</div>
+          </section>`;
+          break;
+
+        case 'reveal': {
+          rows = [...historyRows, ...days.slice(0, index + 1)];
+          chartState = 'reveal';
+          const nextLabel = mode === 'day' ? '进入百题考试' : isFinal ? '查看考试成绩' : '下一题';
+          const secondaryAction = mode === 'day' || isFinal
+            ? '<button class="secondary" type="button" data-action="share-result">分享结果</button>'
+            : '<button class="secondary" type="button" data-action="stop">收手吧</button>';
+          phone.innerHTML = `${header()}<section class="page reveal">
+            ${progress(index, true)}
+            <div class="result-mark" aria-live="polite">
+              <p class="result-date">${dateLabel(day.date)} · 15:00</p>
+              <h1 class="${day.change_pct >= 0 ? 'positive' : 'negative'}">${pct(day.change_pct)}</h1>
+              <div class="result-detail"><p class="result-status">创业板指${day.change_pct > 0 ? '收涨' : '收跌'}</p>
+                <p class="result-points${correct ? ' correct' : ''}">${correct ? '答对' : '答错'}</p></div>
+            </div>
+            ${chart(`收盘 ${number.format(day.close)}`, true)}
+            <blockquote class="reveal-copy"><p>${line.replaceAll('\n', '<br>')}</p></blockquote>
+            <div class="actions">
+              ${primary(nextLabel, 'next')}
+              ${secondaryAction}
+            </div>
+          </section>`;
+          break;
+        }
+
+        case 'score': {
+          const { answered, hits, score, change } = summarize(index, answers);
+          phone.innerHTML = `${header(false)}<section class="page score">
+            <h1>考试成绩</h1>
+            <p class="score-total" aria-label="${score} 分，满分 100 分"><strong>${score}</strong><span>/ 100 分</span></p>
+            <dl class="score-breakdown">
+              <div><dt>已答</dt><dd>${answered} / ${days.length} 题</dd></div>
+              <div><dt>答对</dt><dd>${hits} 题</dd></div>
+              <div><dt>答错</dt><dd>${answered - hits} 题</dd></div>
+              <div><dt>模拟盈亏</dt><dd class="score-return ${change >= 0 ? 'positive' : 'negative'}">${pct(change)}</dd></div>
+            </dl>
+            <p class="score-period">${dateLabel(archive.baseline.date)} 收盘至 ${dateLabel(day.date)} 收盘</p>
+            <p class="score-line">今日方知我是我</p>
+            <div class="actions">
+              ${primary('分享成绩', 'share-result')}
+              <button class="secondary" type="button" data-action="restart">再考一次</button>
+            </div>
+          </section>`;
+          break;
+        }
+      }
+
+      if (chartState) setupChart(rows, chartState, day);
+      avoidHostCapsule();
+    }
+
+    function avoidHostCapsule() {
+      const button = host && phone.querySelector('.topbar button');
+      if (!button) return;
+      button.style.removeProperty('margin-right');
+      const capsule = host.info?.capsule;
+      if (!capsule?.width || !capsule.height) return;
+      const left = innerWidth - capsule.right - capsule.width;
+      const bounds = button.getBoundingClientRect();
+      if (bounds.right > left - 8 && bounds.left < left + capsule.width + 8
+        && bounds.bottom > capsule.top - 8 && bounds.top < capsule.top + capsule.height + 8) {
+        button.style.marginRight = `${bounds.right - left + 3}px`;
+      }
+    }
+
+    function setupChart(rows, mode, day) {
+      const scroll = phone.querySelector('.chart-scroll');
+      const track = scroll.querySelector('.chart-track');
+      const canvas = track.querySelector('canvas');
+      const width = scroll.clientWidth;
+      const height = track.clientHeight;
+      const accent = getComputedStyle(canvas).getPropertyValue('--accent').trim();
+      const step = 34;
+      const awaiting = mode === 'question';
+      const count = rows.length + Number(awaiting);
+      const trackWidth = Math.max(width, count * step + 8);
+      track.style.width = `${trackWidth}px`;
+      canvas.style.width = `${width}px`;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const top = 14;
+      const bottom = height - 26;
+      scroll.scrollLeft = trackWidth - width;
+
+      function draw() {
+        const xAt = index => trackWidth - 4 - (count - index - .5) * step - scroll.scrollLeft;
+        const dayX = xAt(count - 1);
+        const dayVisible = dayX > 0 && dayX < width;
+        const visible = rows.map((row, index) => ({ row, x: xAt(index) })).filter(({ x }) => x > -step && x < width + step);
+        const values = visible.flatMap(({ row }) => [row.low, row.high]);
+        if (dayVisible || !values.length) values.push(day.previous_close);
+        const low = Math.min(...values);
+        const high = Math.max(...values);
+        const pad = Math.max(4, (high - low) * .15);
+        const y = value => top + (high + pad - value) / (high - low + 2 * pad) * (bottom - top);
+        ctx.clearRect(0, 0, width, height);
+        ctx.font = '9px ui-monospace, monospace';
+        ctx.textBaseline = 'middle';
+
+        for (const fraction of [0, .33, .66, 1]) {
+          const gridY = top + fraction * (bottom - top);
+          ctx.strokeStyle = '#29353d';
+          ctx.beginPath();
+          ctx.moveTo(0, gridY);
+          ctx.lineTo(width, gridY);
+          ctx.stroke();
+        }
+
+        if (dayVisible) {
+          const referenceY = y(day.previous_close);
+          ctx.strokeStyle = '#abb6bb90';
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(0, referenceY);
+          ctx.lineTo(width, referenceY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        visible.forEach(({ row, x }) => {
+          const color = row.close >= row.open ? '#ff8984' : '#77c2a9';
+          if (!awaiting && row.date === day.date) {
+            ctx.fillStyle = `${color}20`;
+            ctx.fillRect(x - step / 2 + 1, top, step - 2, bottom - top);
+          }
+          ctx.strokeStyle = color;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(x, y(row.high));
+          ctx.lineTo(x, y(row.low));
+          ctx.stroke();
+          const open = y(row.open);
+          const close = y(row.close);
+          ctx.fillRect(x - 6, Math.min(open, close), 12, Math.max(1.25, Math.abs(open - close)));
+          ctx.fillStyle = '#abb6bb';
+          ctx.textAlign = 'center';
+          if (x >= 14 && x <= width - 14) ctx.fillText(row.date.slice(5).replace('-', '/'), x, height - 11);
+        });
+
+        if (awaiting && dayVisible) {
+          const markerY = Math.max(top + 2, Math.min(bottom - 34, y(day.previous_close) - 16));
+          ctx.strokeStyle = accent;
+          ctx.setLineDash([2, 3]);
+          ctx.strokeRect(dayX - 10, markerY, 20, 32);
+          ctx.setLineDash([]);
+          ctx.fillStyle = accent;
+          ctx.textAlign = 'center';
+          ctx.fillText(day.date.slice(5).replace('-', '/'), dayX, height - 11);
+          ctx.font = '700 14px ui-monospace, monospace';
+          ctx.fillText('?', dayX, markerY + 16);
+        }
+      }
+
+      scroll.addEventListener('scroll', draw, { passive: true });
+      draw();
+    }
+
+    function update(nextState) {
+      state = { ...state, ...nextState };
+      if (state.mode === 'exam') {
+        savedExam = state;
+        try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* keep this attempt in memory */ }
+        if (host?.storage?.set) {
+          const record = state;
+          hostSave = hostSave.then(() => host.storage.set(storageKey, record)).catch(() => {});
+        }
+      }
+      render();
+    }
+
+    function showExample(view) {
+      const index = view === 'score' ? finalDay : sampleDay;
+      const answered = view === 'intro' ? 0 : index + Number(view !== 'question');
+      const targetHits = Math.round(answered * .68);
+      const answers = days.slice(0, answered).map((day, position) => {
+        const correct = correctChoice(day);
+        return position < targetHits ? correct : correct === 'up' ? 'down' : 'up';
+      });
+      if (view === 'reveal') answers[index] = 'up';
+      update({ view, index, choice: 'up', answers, mode: 'preview' });
+    }
+
+    function startExam(restart = false) {
+      const url = new URL(location.href);
+      const isPreviewLink = url.searchParams.has('date') || url.searchParams.has('screen');
+      if (isPreviewLink) {
+        url.searchParams.delete('date');
+        url.searchParams.delete('screen');
+        history.replaceState(null, '', url);
+      }
+      if (savedExam && !restart) {
+        state = savedExam;
+        render();
+      } else {
+        update({ view: 'question', index: 0, choice: '', answers: [], mode: 'exam' });
+      }
+    }
+
+    function requestExam(restart = false) {
+      if (savedExam && !restart) {
+        rememberAttempt();
+        startExam();
+      } else {
+        examDisclaimer.returnValue = '';
+        openPanel(examDisclaimer);
+      }
+    }
+
+    function rememberAttempt() {
+      if (host && history.state?.shoupanPage !== 'attempt') history.pushState({ shoupanPage: 'attempt' }, '');
+    }
+
+    function openPanel(panel) {
+      if (host) history.pushState({ ...history.state, shoupanPanel: panel.id }, '');
+      panel.showModal();
+    }
+
+    function finishPanel(panel, action) {
+      if (host && history.state?.shoupanPanel === panel.id) {
+        afterPanelBack = action ?? (() => {});
+        history.back();
+      } else action?.();
+    }
+
+    function next() {
+      const { index, mode } = state;
+      if (mode === 'day') requestExam();
+      else if (index === finalDay) update({ view: 'score' });
+      else update({ view: 'question', index: index + 1, choice: '' });
+    }
+
+    function assessmentLink() {
+      try {
+        const url = new URL(shareURL.value.trim());
+        return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
+      } catch { return null; }
+    }
+
+    function renderPoster(url) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 780;
+      canvas.height = 1040;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(2, 2);
+      ctx.textBaseline = 'middle';
+      const styles = getComputedStyle(phone);
+      const color = name => styles.getPropertyValue(name).trim();
+      const font = color('--body');
+      const drawText = (value, x, y, size, weight, paint, limit) => {
+        ctx.font = `${weight} ${size}px ${font}`;
+        ctx.fillStyle = color(paint);
+        ctx.fillText(value, x, y, limit ?? 342);
+      };
+
+      ctx.fillStyle = color('--screen');
+      ctx.fillRect(0, 0, 390, 520);
+      [12, 19, 10].forEach((height, i) => {
+        ctx.fillStyle = color('--accent');
+        ctx.fillRect(24 + i * 7, 38 - height / 2 - i * 3, 4, height);
+      });
+      drawText('收盘别问', 51, 34, 17, 700, '--ink');
+      drawText(shareContent.label, 24, 88, 14, 600, '--muted');
+      drawText(shareContent.headline, 24, 139, 57, 750, shareContent.headlineColor);
+      drawText(shareContent.details, 24, 183, 14, 600, '--ink');
+      drawText(shareContent.period, 24, 210, 12, 450, '--muted');
+      if (shareContent.returns) {
+        drawText(`模拟盈亏  ${shareContent.returns}`, 24, 241, 16, 650, shareContent.returnColor);
+      }
+
+      const notes = [];
+      ctx.font = `700 19px ${font}`;
+      for (const paragraph of shareContent.note.split('\n')) {
+        let line = '';
+        for (const character of paragraph) {
+          if (ctx.measureText(line + character).width > 342 && line) {
+            notes.push(line);
+            line = '';
+          }
+          line += character;
+        }
+        if (line) notes.push(line);
+      }
+      notes.slice(0, 3).forEach((line, i) => drawText(line, 24, 267 + i * 24, 19, 700, '--ink'));
+      ctx.fillStyle = color('--line');
+      ctx.fillRect(24, 59, 342, 1);
+      ctx.fillRect(24, 333, 342, 1);
+      drawText(shareContent.score ? '扫码参加测评' : '扫码猜这一天', 24, 415, 18, 700, '--ink');
+      drawText('创业板指 · 历史行情', 24, 442, 12, 450, '--muted');
+
+      const qr = qrcode(0, 'M');
+      qr.addData(url.href);
+      qr.make();
+      const modules = qr.getModuleCount();
+      const box = 146;
+      const step = Math.floor(box / (modules + 8));
+      if (!step) throw new Error('QR code is too dense');
+      const inset = Math.floor((box - modules * step) / 2);
+      const left = 220;
+      const top = 351;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(left, top, box, box);
+      ctx.fillStyle = '#111';
+      for (let row = 0; row < modules; row++) {
+        for (let col = 0; col < modules; col++) {
+          if (qr.isDark(row, col)) ctx.fillRect(left + inset + col * step, top + inset + row * step, step, step);
+        }
+      }
+      return canvas.toDataURL('image/png');
+    }
+
+    function updateSharePoster() {
+      const url = assessmentLink();
+      sharePoster.hidden = true;
+      shareDescription.hidden = false;
+      savePoster.disabled = true;
+      shareFallback.hidden = true;
+      copyStatus.hidden = true;
+      copyButton.textContent = url ? '复制链接' : '复制结果';
+      if (!url) {
+        shareHint.textContent = '填入测评网页地址后，生成带二维码的海报。';
+        return;
+      }
+      try {
+        sharePoster.src = renderPoster(url);
+        sharePoster.hidden = false;
+        shareDescription.hidden = true;
+        savePoster.disabled = false;
+        shareHint.textContent = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+          ? '当前是本机预览地址。可替换为发布后的链接。'
+          : '也可长按海报图片保存。';
+      } catch {
+        shareHint.textContent = '海报生成失败，请检查测评链接后重试。';
+      }
+    }
+
+    function showShare() {
+      const { index, view, answers } = state;
+      const day = days[index];
+      const score = view === 'score';
+      const actual = pct(day.change_pct);
+      shareContent = { score, label: '创业板指当日收盘', headline: actual,
+        headlineColor: day.change_pct >= 0 ? '--up' : '--down', details: dateLabel(day.date),
+        period: '创业板指 399006', note: phone.querySelector('.reveal-copy p')?.innerText ?? '' };
+      if (score) {
+        const result = summarize(index, answers);
+        shareContent = { score, label: '考试成绩', headline: `${result.score} / 100`, headlineColor: '--accent',
+          details: `已答 ${result.answered} 题 · 答对 ${result.hits} 题`,
+          period: `${dateLabel(archive.baseline.date)} 至 ${dateLabel(day.date)}`,
+          returns: pct(result.change), returnColor: result.change >= 0 ? '--up' : '--down', note: '今日方知我是我' };
+      }
+      shareTitle.textContent = score ? '分享成绩' : '分享结果';
+      shareDescription.textContent = score
+        ? `${shareContent.headline} 分 · ${shareContent.details} · 模拟盈亏 ${shareContent.returns}`
+        : `${dateLabel(day.date)} · 创业板指 ${actual}`;
+      if (host) {
+        const packageId = location.hostname.match(/^([1-9]\d*)\.app\.xiangban\.xyz$/)?.[1];
+        const launchedPack = document.referrer.match(/^https:\/\/chat\.xiangban\.xyz\/create\/run\/([1-9]\d*)\//)?.[1];
+        const id = packageId ?? launchedPack;
+        if (id) shareURL.value = `https://chat.xiangban.xyz/packs/${id}`;
+        else if (!shareURL.value) shareURL.value = `https://chat.xiangban.xyz/search?q=${encodeURIComponent(document.title)}`;
+      } else if (location.protocol === 'https:' || location.protocol === 'http:') {
+        const url = new URL(location.href);
+        url.search = '';
+        url.hash = '';
+        if (!score) url.searchParams.set('date', day.date);
+        shareURL.value = url.href;
+      }
+      updateSharePoster();
+      openPanel(shareDialog);
+    }
+
+    phone.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      if (button.dataset.choice && state.view === 'question') {
+        rememberAttempt();
+        const choice = button.dataset.choice;
+        const answers = state.mode === 'day' ? state.answers : [...state.answers, choice];
+        update({ view: 'reveal', choice, answers });
+      }
+      switch (button.dataset.action) {
+        case 'home':
+          if (host && history.state?.shoupanPage === 'attempt') history.back();
+          else showExample('intro');
+          break;
+        case 'start': requestExam(); break;
+        case 'restart': requestExam(true); break;
+        case 'next': next(); break;
+        case 'stop': update({ view: 'score' }); break;
+        case 'share-result': showShare(); break;
+      }
+    });
+
+    examDisclaimer.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (button) examDisclaimer.close(button.value);
+    });
+    examDisclaimer.addEventListener('close', () => {
+      finishPanel(examDisclaimer, examDisclaimer.returnValue === 'start' ? () => {
+        rememberAttempt();
+        startExam(true);
+      } : null);
+    });
+    shareDialog.querySelector('.share-close').addEventListener('click', () => shareDialog.close());
+    shareDialog.addEventListener('close', () => finishPanel(shareDialog));
+
+    previewNav.addEventListener('click', event => {
+      const view = event.target.closest('[data-view]')?.dataset.view;
+      if (view) showExample(view);
+    });
+
+    shareURL.addEventListener('input', updateSharePoster);
+
+    copyButton.addEventListener('click', async () => {
+      const url = assessmentLink();
+      const text = url?.href ?? [shareDescription.textContent, shareContent.note].join('\n');
+      try {
+        if (host?.can?.('clipboard') && host.clipboard?.writeText) await host.clipboard.writeText(text);
+        else await navigator.clipboard.writeText(text);
+        copyStatus.textContent = url ? '已复制链接' : '已复制结果';
+      } catch {
+        shareFallback.value = text;
+        shareFallback.hidden = false;
+        shareFallback.focus();
+        shareFallback.select();
+        copyStatus.textContent = '长按选中的内容复制';
+      }
+      copyStatus.hidden = false;
+    });
+
+    savePoster.addEventListener('click', async () => {
+      const name = '收盘别问.png';
+      const mime = 'image/png';
+      if ((host?.can?.('files') && host.files?.save) || navigator.canShare) {
+        const data = Uint8Array.from(atob(sharePoster.src.split(',')[1]), character => character.charCodeAt(0)).buffer;
+        const files = [new File([data], name, { type: mime })];
+        try {
+          if (host?.can?.('files') && host.files?.save) {
+            await host.files.save({ name, mime, data });
+            return;
+          }
+          if (navigator.canShare?.({ files })) {
+            await navigator.share({ files, title: document.title });
+            return;
+          }
+        } catch (error) {
+          if (error?.name === 'AbortError') return;
+        }
+      }
+      const download = document.createElement('a');
+      download.href = sharePoster.src;
+      download.download = name;
+      download.click();
+    });
+
+    window.addEventListener('resize', render);
+    function isSavedExam(saved) {
+      return saved?.mode === 'exam' && days[saved.index] && ['question', 'reveal', 'score'].includes(saved.view)
+        && Array.isArray(saved.answers) && saved.answers.length === saved.index + Number(saved.view !== 'question')
+        && saved.answers.every(answer => answer === 'up' || answer === 'down');
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey));
+      if (isSavedExam(saved)) savedExam = saved;
+    } catch { /* start a new exam */ }
+
+    if (host) {
+      history.replaceState({ shoupanPage: 'home' }, '');
+      host.on?.('safearea', render);
+      window.addEventListener('popstate', event => {
+        const open = [examDisclaimer, shareDialog].find(panel => panel.open);
+        if (open) {
+          open.close('cancel');
+        } else if (afterPanelBack) {
+          const action = afterPanelBack;
+          afterPanelBack = null;
+          action();
+        } else if (event.state?.shoupanPage === 'attempt' && savedExam) {
+          state = savedExam;
+          render();
+        } else {
+          showExample('intro');
+        }
+      });
+    }
+    const activeDate = host?.info?.query?.date ?? params.get('date');
+    const requestedDay = days.findIndex(day => day.date === activeDate);
+    if (requestedDay >= 0) {
+      update({ view: 'question', index: requestedDay, choice: '', mode: 'day' });
+    } else if (isDesignPreview) {
+      showExample(previewView);
+    } else if (savedExam && !host) {
+      startExam();
+    } else {
+      render();
+    }
+    if (host?.ready) {
+      const initialSave = savedExam;
+      requestAnimationFrame(() => {
+        Promise.resolve(host.ready()).then(() => host.storage?.get?.(storageKey)).then(record => {
+          if (!isSavedExam(record) || savedExam !== initialSave) return;
+          savedExam = record;
+          if (state.view === 'intro') render();
+        }).catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
