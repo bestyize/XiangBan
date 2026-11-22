@@ -545,9 +545,7 @@ internal fun AiChatPage(
         OverlayTransition(attach) { panel ->
             fun pick(label: String) {
                 attach = false
-                if (label == "生成图片") {
-                    openImage()
-                } else if (label == "相册" || label == "文件") {
+                if (label == "相册" || label == "文件") {
                     if (env.platform?.supportsChatAttachments != true) toast = "当前平台尚未接入附件选择"
                     else if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
                     else {
@@ -569,7 +567,6 @@ internal fun AiChatPage(
             AgentSheet("添加附件", { attach = false }, panel) {
                 AgentChoiceRow(false, "相册", null, { pick("相册") })
                 AgentChoiceRow(false, "文件", null, { pick("文件") })
-                if (cloud.officialAiEnabled) AgentChoiceRow(false, "生成图片", null, { pick("生成图片") })
             }
         }
         if (imageSheet && cloud.officialAiEnabled) {
