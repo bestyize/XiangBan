@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
@@ -82,7 +80,22 @@ import xyz.xiangban.xiaoban.business.communitynative.XiaobanTheme
 import xyz.xiangban.xiaoban.common.community.DesignTokens
 import kotlin.math.roundToInt
 
-/** The launcher, capsule, and menu from the app plaza's b7 and b8 runtime artboards. */
+internal data class RuntimeV2GameSession(
+    val inRound: Boolean = false,
+    val title: String = "",
+    val subtitle: String = "",
+    val saveBadge: String = "",
+    val exitHint: String = "",
+    val resumeLabel: String = "继续游戏",
+    val restartLabel: String = "重开本局",
+    val confirmRestart: Boolean = false,
+    val canSelectStage: Boolean = false,
+    val selectStageLabel: String = "选择关卡",
+    val soundEnabled: Boolean? = null,
+    val musicEnabled: Boolean? = null,
+)
+
+/** The launcher, adaptive micro-capsule, and Scheme A unified pause + host menu. */
 internal class RuntimeV2Chrome(
     activity: ComponentActivity,
     private val root: FrameLayout,
@@ -96,9 +109,10 @@ internal class RuntimeV2Chrome(
     private val onFavorite: (() -> Unit)?,
     private val onShare: (() -> Unit)?,
     private val onPinShortcut: (() -> Unit)?,
+    private val onGameAction: (String) -> Unit = {},
     private val onMenuChanged: (Boolean) -> Unit = {},
     private val landscapeLaunch: Boolean = false,
-    private val capsuleRightMarginDp: Float = 6f,
+    private val capsuleRightMarginDp: Float = 8f,
     private val capsuleTopGapDp: Float = 0f,
 ) {
     private sealed interface Overlay {
@@ -115,6 +129,7 @@ internal class RuntimeV2Chrome(
     private var menuHorizontalInset by mutableStateOf(0.dp)
     private var menuBottomPadding by mutableStateOf(30.dp)
     private var menuVerticalInset by mutableStateOf(0.dp)
+    private var confirmingRoundRestart by mutableStateOf(false)
     private val displayMetrics = activity.resources.displayMetrics
 
     var menuOpen by mutableStateOf(false)
@@ -126,8 +141,9 @@ internal class RuntimeV2Chrome(
     var shareBusy by mutableStateOf(false)
     var shortcutBusy by mutableStateOf(false)
     var capsuleOnDarkBackground by mutableStateOf(false)
+    var gameSession by mutableStateOf<RuntimeV2GameSession?>(null)
 
-    // Only the capsule's small view receives touches while the work is running.
+    // Only the capsule's 48x48dp view receives touches while the work is running.
     private val capsuleView = ComposeView(activity).apply {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         setContent { XiaobanTheme { Capsule() } }
@@ -180,8 +196,9 @@ internal class RuntimeV2Chrome(
         menuBottomPadding = maxOf(30.dp, (bottom / displayMetrics.density + 6).dp)
     }
 
-    private fun openMenu() {
+    fun openMenu() {
         if (overlay != null || consentOpen || menuOpen) return
+        confirmingRoundRestart = false
         menuOpen = true
         syncVisibility()
         onMenuChanged(true)
@@ -189,6 +206,7 @@ internal class RuntimeV2Chrome(
 
     fun closeMenu() {
         if (!menuOpen) return
+        confirmingRoundRestart = false
         menuOpen = false
         syncVisibility()
         onMenuChanged(false)
@@ -196,6 +214,7 @@ internal class RuntimeV2Chrome(
 
     fun loading() {
         overlay = Overlay.Loading
+        gameSession = null
         closeMenu()
         syncVisibility()
     }
@@ -245,19 +264,42 @@ internal class RuntimeV2Chrome(
 
     @Composable
     private fun Capsule() {
-        val ink = if (capsuleOnDarkBackground) Color.White else MaterialTheme.colorScheme.onSurface
-        val shadow = if (ink.luminance() < .5f) Color.White else Color.Black
+        val scheme = MaterialTheme.colorScheme
+        val isDarkSurface = scheme.surface.luminance() < .5f
+        val useGamePill = kindLabel == "游戏" || capsuleOnDarkBackground
+        val pillBg = when {
+            useGamePill -> Color(0xFF14161C).copy(alpha = .28f)
+            isDarkSurface -> Color(0xFF2C2C2E).copy(alpha = .82f)
+            else -> Color.White.copy(alpha = .78f)
+        }
+        val pillBorder = when {
+            useGamePill -> Color.White.copy(alpha = .34f)
+            isDarkSurface -> Color.White.copy(alpha = .14f)
+            else -> Color.Black.copy(alpha = .10f)
+        }
+        val ink = if (useGamePill) Color.White else scheme.onSurface
+        val inRound = gameSession?.inRound == true
+
         Box(
             Modifier.fillMaxSize().chromeClick(onClick = ::openMenu)
                 .semantics { if (usingMedia) stateDescription = "正在使用摄像头或麦克风" },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.offset(y = (-6).dp)) {
-                XIcon(XIcons.More, Modifier.offset(y = 1.dp).rotate(90f), tint = shadow.copy(alpha = .32f), size = 16.dp)
-                XIcon(XIcons.More, Modifier.rotate(90f), tint = ink, size = 16.dp, description = "应用菜单")
+            Box(
+                Modifier.size(32.dp)
+                    .clip(CircleShape)
+                    .background(pillBg)
+                    .border(0.5.dp, pillBorder, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (inRound) {
+                    XIcon(XIcons.Pause, tint = ink, size = 15.dp, description = "暂停与菜单")
+                } else {
+                    XIcon(XIcons.More, tint = ink, size = 16.dp, description = "应用菜单")
+                }
             }
             if (usingMedia) Box(
-                Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 8.dp)
+                Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp)
                     .size(6.dp).background(Color(DesignTokens.Danger), CircleShape),
             )
         }
@@ -287,6 +329,8 @@ internal class RuntimeV2Chrome(
     @Composable
     private fun RunMenu() {
         val scheme = MaterialTheme.colorScheme
+        val session = gameSession
+        val inRound = session?.inRound == true
         val scrim = remember { Animatable(0f) }
         val panelProgress = remember { Animatable(0f) }
         LaunchedEffect(Unit) { scrim.animateTo(.45f, tween(200)) }
@@ -295,7 +339,15 @@ internal class RuntimeV2Chrome(
             panelProgress.animateTo(1f, if (landscape) tween(200) else tween(260, easing = CubicBezierEasing(.3f, .7f, .2f, 1f)))
         }
         val panelShape = if (landscape) RoundedCornerShape(16.dp) else RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-        val panelWidth = if (landscape) Modifier.widthIn(max = 440.dp).fillMaxWidth() else Modifier.fillMaxWidth()
+        val panelWidth = if (landscape) Modifier.widthIn(max = 460.dp).fillMaxWidth() else Modifier.fillMaxWidth()
+        val badgeText = session?.saveBadge?.takeIf { it.isNotBlank() }
+            ?: if (kindLabel == "游戏") "进度已存盘" else "已自动保存"
+        val exitLabel = when {
+            inRound && !session?.exitHint.isNullOrBlank() -> "退出游戏（${session?.exitHint}）"
+            kindLabel == "游戏" -> "退出游戏（保留进度）"
+            else -> "退出"
+        }
+
         Box(Modifier.fillMaxSize()) {
             Box(
                 Modifier.fillMaxSize().graphicsLayer { alpha = scrim.value }
@@ -324,47 +376,213 @@ internal class RuntimeV2Chrome(
                             bottom = if (landscape) 16.dp else menuBottomPadding,
                         ),
                 ) {
-                    MenuHeader()
+                    MenuHeader(badgeText)
                     Box(Modifier.fillMaxWidth().height(.5.dp).background(scheme.outline))
+                    if (inRound && session != null) {
+                        InGamePauseCard(session)
+                    }
                     Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        MenuAction(XIcons.Refresh, "重新开始", Modifier.weight(1f), onRestart)
+                        if (!inRound) {
+                            MenuAction(XIcons.Refresh, "重新加载", Modifier.weight(1f), onRestart)
+                        }
                         onFavorite?.let {
-                            MenuAction(XIcons.Star, if (favorited) "取消收藏" else "收藏", Modifier.weight(1f), it,
+                            MenuAction(XIcons.Star, if (favorited) "已收藏" else "收藏", Modifier.weight(1f), it,
                                 enabled = !favoriteBusy, selected = favorited)
                         }
                         onShare?.let { MenuAction(XIcons.Share, "分享", Modifier.weight(1f), it, enabled = !shareBusy) }
                         onPinShortcut?.let { MenuAction(XIcons.Pin, "添加到桌面", Modifier.weight(1f), it, enabled = !shortcutBusy) }
+                        if (inRound) {
+                            MenuAction(XIcons.Refresh, "重新加载", Modifier.weight(1f), onRestart)
+                        }
                     }
-                    MenuPill("退出", onExit)
+                    MenuPill(exitLabel, onExit)
                 }
             }
         }
     }
 
     @Composable
-    private fun MenuHeader() {
+    private fun InGamePauseCard(session: RuntimeV2GameSession) {
         val scheme = MaterialTheme.colorScheme
+        val extra = LocalExtraColors.current
+        Column(
+            Modifier.padding(top = 12.dp).fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(extra.fill)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        session.title.ifBlank { "游戏已暂停" },
+                        style = XType.Body,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (session.subtitle.isNotBlank()) {
+                        Text(
+                            session.subtitle,
+                            Modifier.padding(top = 2.dp),
+                            style = XType.Caption,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    session.soundEnabled?.let { soundOn ->
+                        ToggleChip(
+                            label = if (soundOn) "音效 开" else "音效 关",
+                            active = soundOn,
+                            onClick = { onGameAction("toggle-sound") },
+                        )
+                    }
+                    session.musicEnabled?.let { musicOn ->
+                        ToggleChip(
+                            label = if (musicOn) "音乐 开" else "音乐 关",
+                            active = musicOn,
+                            onClick = { onGameAction("toggle-music") },
+                        )
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // 主操作：继续对局
+                Row(
+                    Modifier.weight(1.1f).height(40.dp)
+                        .clip(CircleShape)
+                        .background(extra.brandSoft)
+                        .chromeClick {
+                            closeMenu()
+                            onGameAction("resume")
+                        },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    XIcon(XIcons.Play, tint = extra.brandInk, size = 15.dp)
+                    Spacer(Modifier.width(5.dp))
+                    Text(session.resumeLabel, style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = extra.brandInk)
+                }
+
+                // 次操作1：重开本局 / 重开本幅（支持单次内联确认）
+                val restartBg = if (confirmingRoundRestart) DangerSoft else scheme.surface
+                val restartColor = if (confirmingRoundRestart) Danger else scheme.onSurface
+                val restartText = if (confirmingRoundRestart) "确认清空重开？" else session.restartLabel
+                Row(
+                    Modifier.weight(1f).height(40.dp)
+                        .clip(CircleShape)
+                        .background(restartBg)
+                        .border(0.5.dp, if (confirmingRoundRestart) Danger.copy(alpha = .35f) else scheme.outline, CircleShape)
+                        .chromeClick {
+                            if (session.confirmRestart && !confirmingRoundRestart) {
+                                confirmingRoundRestart = true
+                            } else {
+                                confirmingRoundRestart = false
+                                closeMenu()
+                                onGameAction("restart-round")
+                            }
+                        },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!confirmingRoundRestart) {
+                        XIcon(XIcons.Refresh, tint = restartColor, size = 14.dp)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(restartText, style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = restartColor, maxLines = 1)
+                }
+
+                // 次操作2：返回选关画卷（仅多关卡/有选关页的游戏显示）
+                if (session.canSelectStage) {
+                    Row(
+                        Modifier.weight(1f).height(40.dp)
+                            .clip(CircleShape)
+                            .background(scheme.surface)
+                            .border(0.5.dp, scheme.outline, CircleShape)
+                            .chromeClick {
+                                closeMenu()
+                                onGameAction("select-stage")
+                            },
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        XIcon(XIcons.Grid, tint = scheme.onSurface, size = 14.dp)
+                        Spacer(Modifier.width(4.dp))
+                        Text(session.selectStageLabel, style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = scheme.onSurface, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ToggleChip(label: String, active: Boolean, onClick: () -> Unit) {
+        val scheme = MaterialTheme.colorScheme
+        val bg = if (active) scheme.surface else Color.Transparent
+        val textColor = if (active) scheme.onSurface else scheme.onSurfaceVariant
+        Box(
+            Modifier.height(28.dp)
+                .clip(CircleShape)
+                .background(bg)
+                .border(0.5.dp, scheme.outline, CircleShape)
+                .chromeClick(onClick = onClick)
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(label, style = XType.Caption, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = textColor)
+        }
+    }
+
+    @Composable
+    private fun MenuHeader(saveBadge: String) {
+        val scheme = MaterialTheme.colorScheme
+        val isDark = scheme.surface.luminance() < .5f
+        val badgeBg = if (isDark) Color(0xFF1A3126) else Color(0xFFEAF6F0)
+        val badgeInk = if (isDark) Color(0xFF45BE83) else Color(0xFF2FA36B)
         Row(
             Modifier.fillMaxWidth().padding(bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            WorkIcon(44.dp, 12.dp)
-            Column {
-                Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(
-                    Modifier.padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (official) Text(
-                        "官方",
-                        Modifier.background(LocalExtraColors.current.fill, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
-                        style = XType.Caption, color = scheme.onSurfaceVariant,
-                    )
-                    Text(if (!official && !author.isNullOrBlank()) "$author · $kindLabel" else kindLabel,
-                        style = XType.Caption, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(
+                Modifier.weight(1f).padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                WorkIcon(44.dp, 12.dp)
+                Column {
+                    Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(
+                        Modifier.padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (official) Text(
+                            "官方",
+                            Modifier.background(LocalExtraColors.current.fill, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+                            style = XType.Caption, color = scheme.onSurfaceVariant,
+                        )
+                        Text(if (!official && !author.isNullOrBlank()) "$author · $kindLabel" else kindLabel,
+                            style = XType.Caption, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
+            }
+            Row(
+                Modifier.clip(CircleShape).background(badgeBg).padding(horizontal = 9.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.size(6.dp).background(badgeInk, CircleShape))
+                Text(saveBadge, style = XType.Caption, fontWeight = FontWeight.SemiBold, color = badgeInk)
             }
         }
     }
@@ -395,7 +613,7 @@ internal class RuntimeV2Chrome(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, style = XType.Body, color = MaterialTheme.colorScheme.onSurface)
+            Text(label, style = XType.Body, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 

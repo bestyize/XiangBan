@@ -80,6 +80,7 @@
       start: () => call('game.start'),
       progress: value => call('game.progress', value),
       result: value => call('game.result', value),
+      session: value => call('game.session', value),
     },
   };
 
@@ -96,7 +97,7 @@
       else pending.set(message.id, request);
       return;
     }
-    if (message.kind !== 'event' || !['show', 'hide', 'safearea', 'orientation', 'theme'].includes(message.name)) return;
+    if (message.kind !== 'event' || !['show', 'hide', 'safearea', 'orientation', 'theme', 'game.action'].includes(message.name)) return;
     const data = message.data;
     if (message.name === 'safearea' && data && typeof data === 'object') {
       if (data.safeArea) xb.info.safeArea = data.safeArea;

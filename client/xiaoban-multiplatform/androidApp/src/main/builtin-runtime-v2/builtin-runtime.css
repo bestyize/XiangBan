@@ -2,14 +2,107 @@ html.xb-builtin-runtime {
   --xb-builtin-capsule-end: calc(var(--xb-capsule-right, 0px) + var(--xb-capsule-width, 0px) + 8px);
 }
 
-/* The native capsule and system Back handle the top-left return actions. */
-html.xb-builtin-runtime body :is(#exitButton, #welcomeExit, #selectBack) {
-  display: none;
+/* Layer 0 root screens never show a top-left exit button; Layer 1 subpages (#selectBack) keep their top-left back button. */
+html.xb-builtin-runtime body :is(#exitButton, #welcomeExit) {
+  display: none !important;
 }
 
-/* MBTI owns its fixed header, local capsule clearance and scrolling views. */
+/* ─── Scheme A: 方块爆破 (block-puzzle) 单入口与自动续局横幅 ─── */
+html.xb-builtin-runtime body[data-game="block-puzzle"] :is(#settingsButton, #settingsOverlay, .footer) {
+  display: none !important;
+}
 
-/* Ink Blade's chapter picker has its own header, separate from the gameplay HUD. */
+html.xb-builtin-runtime body[data-game="block-puzzle"] .game > .topbar {
+  padding-inline-end: var(--xb-builtin-capsule-end);
+}
+
+.xb-bp-save-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(73, 37, 50, .28);
+  border: 0.5px solid rgba(255, 255, 255, .32);
+  color: rgba(255, 255, 255, .94);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.xb-bp-save-pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #65e8a3;
+  box-shadow: 0 0 6px rgba(101, 232, 163, .65);
+}
+
+.xb-bp-resume-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: rgba(73, 37, 50, .82);
+  border: 1px solid rgba(255, 255, 255, .3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff7f9;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 6px 18px rgba(73, 37, 50, .26);
+  animation: xb-pill-in .26s cubic-bezier(.2, .8, .2, 1);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.xb-bp-resume-banner.hiding {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+
+.xb-bp-resume-banner .xb-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5ce09b;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.xb-bp-resume-banner button {
+  flex: none;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 255, 255, .2);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.xb-bp-resume-banner button:active {
+  background: rgba(255, 255, 255, .34);
+}
+
+@keyframes xb-pill-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── Scheme A: 水墨剑客 (ink-blade) 单入口、大厅智能续玩与选关页 ─── */
+html.xb-ink-blade #hud .hud-actions,
+html.xb-ink-blade #pauseOverlay {
+  display: none !important;
+}
+
 html.xb-builtin-runtime #selectOverlay .select-head {
   flex-wrap: wrap;
   row-gap: 8px;
@@ -18,6 +111,76 @@ html.xb-builtin-runtime #selectOverlay .select-head {
 html.xb-builtin-runtime #selectOverlay .difficulty {
   max-width: 100%;
   margin-left: auto;
+}
+
+.xb-ink-save-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  margin: -4px 0 12px;
+  border-radius: 4px 10px 4px 10px;
+  background: rgba(251, 246, 234, .92);
+  box-shadow: inset 0 0 0 1.2px rgba(184, 50, 42, .45);
+  font-size: 12px;
+  color: #1b1b1d;
+}
+
+.xb-ink-save-banner .xb-ink-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: #b8322a;
+  color: #fbefe2;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: 12px;
+  line-height: 1;
+  transform: rotate(-4deg);
+}
+
+.xb-ink-save-banner b {
+  color: #b8322a;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: 13.5px;
+}
+
+.xb-ink-select-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 3px 14px 4px 12px;
+  background: #fbf6ea !important;
+  color: #1b1b1d !important;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .36), 0 4px 12px rgba(58, 44, 26, .1);
+  white-space: nowrap;
+}
+
+.xb-ink-select-btn:active {
+  transform: translateY(1px) scale(.98);
+}
+
+.xb-ink-stage-tag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: #b8322a;
+  color: #fbefe2;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 6px rgba(184, 50, 42, .3);
+  pointer-events: none;
 }
 
 /* The portrait HUD starts below the status bar, with only its top row inset locally. */

@@ -1,0 +1,2414 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 小游戏与小程序 暂停 / 存档 / 翻页退出 重设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p, figure, ul, ol { margin: 0; padding: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1560px; margin: 0 auto; padding: 22px 20px 60px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 18px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mode-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, .06);
+  gap: 3px;
+}
+body.studio-dark .mode-seg { background: rgba(255, 255, 255, .08); }
+.mode-seg button {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555860;
+  transition: background .15s, color .15s;
+}
+body.studio-dark .mode-seg button { color: #a5a8b2; }
+.mode-seg button.active {
+  background: #ffffff;
+  color: #18191c;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .09);
+}
+body.studio-dark .mode-seg button.active {
+  background: #2b2c32;
+  color: #f4f4f7;
+}
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .84);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+.pill-btn.back-sim {
+  background: #fff3f4;
+  color: #e3203c;
+  border-color: #f5c7cd;
+  font-weight: 600;
+}
+body.studio-dark .pill-btn.back-sim {
+  background: #361e22;
+  color: #ff6e75;
+  border-color: #5a2b33;
+}
+
+/* ─── Stage Grid ─── */
+.boards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 24px;
+}
+.board-col {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board:not(.landscape-board) { width: 360px; }
+.landscape-board { width: 720px; max-width: calc(100vw - 40px); }
+
+.board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 4px 10px;
+  min-height: 28px;
+  flex-wrap: wrap;
+}
+.board-head h2 { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.badge-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .06);
+  color: #555860;
+}
+body.studio-dark .badge-tag { background: rgba(255, 255, 255, .09); color: #b5b8c2; }
+
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .055); gap: 2px; flex-wrap: wrap; }
+body.studio-dark .board-mini-seg { background: rgba(255, 255, 255, .08); }
+.board-mini-seg button { height: 23px; padding: 0 8px; border-radius: 6px; font-size: 11px; color: #666; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+/* ─── Phone Tokens (docs/product/手机端设计规范.md) ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9a9a9a;
+  --hairline: #ededed;
+  --fill: #f2f2f2;
+  --fill-hover: #e9e9ec;
+  --line: #e4e4e4;
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --success: #2fa36b;
+  --success-soft: #eaf6f0;
+  --danger: #e3203c;
+  --danger-soft: #fff3f4;
+  --scrim: rgba(15, 16, 20, .45);
+  --sheet-shadow: 0 -6px 28px rgba(0, 0, 0, .12);
+
+  position: relative;
+  height: 780px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.landscape {
+  height: 382px;
+  border-radius: 34px;
+}
+.phone.dark {
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --ink: #ececec;
+  --ink2: #9a9aa0;
+  --ink3: #6e6e73;
+  --hairline: #2a2a2d;
+  --fill: #2c2c2e;
+  --fill-hover: #353538;
+  --line: #363639;
+  --success: #45be83;
+  --success-soft: #1a3126;
+  --danger: #ff6369;
+  --danger-soft: #361e22;
+  --scrim: rgba(0, 0, 0, .62);
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .56);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* ─── Status Bar & Gesture Bar ─── */
+.status-bar {
+  height: 32px;
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 650;
+  z-index: 15;
+  pointer-events: none;
+  flex: none;
+}
+.status-bar.light-ink { color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,.22); }
+.status-bar.dark-ink { color: #222222; }
+.phone.dark .status-bar.adaptive-ink { color: #ececec; }
+.gesture-bar {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, .22);
+  z-index: 40;
+  pointer-events: none;
+}
+.gesture-bar.light { background: rgba(255, 255, 255, .42); }
+
+/* ─── Host Capsule (右上角宿主容器入口 48x48dp 触控区) ─── */
+.host-capsule {
+  position: absolute;
+  top: 32px;
+  right: 8px;
+  width: 48px;
+  height: 48px;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+}
+.phone.landscape .host-capsule {
+  top: 8px;
+  right: 12px;
+}
+.host-capsule-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 22, 28, .22);
+  border: 0.5px solid rgba(255, 255, 255, .34);
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform .12s, background .15s;
+}
+.host-capsule-pill.on-light {
+  background: rgba(255, 255, 255, .72);
+  border: 0.5px solid rgba(0, 0, 0, .10);
+  color: #222222;
+}
+.phone.dark .host-capsule-pill.on-light {
+  background: rgba(44, 44, 46, .78);
+  border-color: rgba(255, 255, 255, .14);
+  color: #ececec;
+}
+/* 现行版裸三点（无底色，复杂背景易隐身） */
+body[data-scheme="legacy"] .host-capsule-pill {
+  background: transparent !important;
+  border-color: transparent !important;
+  backdrop-filter: none !important;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.32));
+}
+.host-capsule:active .host-capsule-pill { transform: scale(.91); }
+.host-capsule svg { width: 16px; height: 16px; }
+.host-capsule .touch-box {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(255, 255, 255, 0);
+  border-radius: 10px;
+  pointer-events: none;
+}
+body.show-safe .host-capsule .touch-box {
+  border-color: #e3203c;
+  background: rgba(227, 32, 60, .12);
+}
+
+/* ─── BOARD 1: 方块爆破 (竖屏 · 无大厅单页直开) ─── */
+.bp-stage {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 52% 12%, #f6b9c9 0%, #eda1b6 43%, #e68aa6 100%);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  padding: 34px 18px 22px;
+  user-select: none;
+}
+.bp-topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 46px; /* 自动避让右上角 48x48 宿主胶囊 */
+}
+body[data-scheme="legacy"] .bp-topbar {
+  padding-right: 42px;
+}
+.bp-left-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bp-pause-left {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .20);
+  border: 0.5px solid rgba(255, 255, 255, .36);
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.bp-best {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ffda25;
+  text-shadow: 0 2px 3px rgba(169, 78, 107, .55);
+}
+.bp-best span { font-size: 22px; }
+.bp-best strong { font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
+
+.bp-legacy-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bp-legacy-btn {
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: rgba(112, 64, 80, .38);
+  border: 1px solid rgba(255, 255, 255, .3);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* 自动恢复残局轻量横幅 */
+.bp-resume-pill {
+  position: absolute;
+  top: 84px;
+  left: 18px;
+  right: 18px;
+  z-index: 12;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  background: rgba(73, 37, 50, .82);
+  border: 1px solid rgba(255, 255, 255, .28);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #fff6f8;
+  box-shadow: 0 6px 18px rgba(86, 40, 58, .25);
+  animation: pill-drop .28s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes pill-drop {
+  from { opacity: 0; transform: translateY(-8px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.bp-resume-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5ce09b;
+  display: inline-block;
+  margin-right: 6px;
+}
+.bp-resume-pill button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .18);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 650;
+}
+.bp-resume-pill button:hover { background: rgba(255, 255, 255, .28); }
+
+.bp-score-zone {
+  min-height: 94px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-top: 2px;
+}
+.bp-score-num {
+  font-size: 62px;
+  line-height: 1.02;
+  font-weight: 850;
+  color: #ffffff;
+  text-shadow: 0 4px 2px rgba(142, 96, 124, .62), 0 1px 0 #fff;
+  font-variant-numeric: tabular-nums;
+}
+.bp-combo-tag {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #fff3b0;
+  text-shadow: 0 2px 4px #b4527e;
+}
+
+.bp-board-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 344px;
+  margin: 4px auto;
+  position: relative;
+}
+.bp-board {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 2.5px;
+  padding: 5px;
+  border: 5px solid #c87e96;
+  border-radius: 14px;
+  background: #704050;
+  box-shadow: inset 0 2px 5px rgba(73, 37, 50, .35), 0 5px 0 rgba(178, 106, 130, .65);
+}
+.bp-cell {
+  background: #83505f;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 2px rgba(93, 46, 64, .25);
+  position: relative;
+}
+.bp-cell.on, .bp-mini-cell {
+  border: 1px solid #ffb0cc;
+  border-radius: 2.5px;
+  background: linear-gradient(140deg, #ff94b8 0%, #f66e9e 19%, #ef508a 48%, #da3a76 82%, #bb2661 100%);
+  box-shadow: inset 2px 2px 0 rgba(255, 191, 215, .66), inset -3px -3px 0 rgba(169, 30, 88, .44), 0 1px 2px rgba(86, 48, 62, .36);
+}
+.bp-cell.gold {
+  border-color: #ffe39f;
+  background: linear-gradient(140deg, #ffd875 0%, #f6b93b 45%, #e58e26 100%);
+  box-shadow: inset 2px 2px 0 rgba(255, 241, 196, .75), inset -3px -3px 0 rgba(181, 98, 16, .45);
+}
+.bp-cell.mint {
+  border-color: #b8f5d8;
+  background: linear-gradient(140deg, #6de3b2 0%, #3dc18d 50%, #239669 100%);
+  box-shadow: inset 2px 2px 0 rgba(212, 255, 235, .7), inset -3px -3px 0 rgba(18, 110, 74, .45);
+}
+
+.bp-tray {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-top: 10px;
+}
+.bp-slot {
+  height: 82px;
+  border-radius: 14px;
+  background: rgba(112, 64, 80, .32);
+  border: 1px solid rgba(255, 255, 255, .24);
+  display: grid;
+  place-items: center;
+  transition: transform .12s, background .15s;
+}
+.bp-slot:active { transform: scale(.95); background: rgba(112, 64, 80, .48); }
+.bp-piece {
+  display: grid;
+  gap: 2px;
+}
+.bp-mini-cell { width: 14px; height: 14px; }
+
+.bp-legacy-footer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, .82);
+}
+.bp-legacy-footer button {
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, .22);
+  color: #fff;
+  font-size: 11px;
+}
+
+/* ─── BOARD 2: 水墨剑客 (横屏 · 有大厅 + 七卷选关 + 局内战斗) ─── */
+.ink-stage {
+  position: absolute;
+  inset: 0;
+  --ink-paper: #efe7d4;
+  --ink-paper2: #e6dcc5;
+  --ink-dark: #1b1b1d;
+  --ink-mid: #4a4843;
+  --ink-muted: #7a7366;
+  --cinnabar: #b8322a;
+  --brush: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif;
+  background: var(--ink-paper);
+  color: var(--ink-dark);
+  overflow: hidden;
+  user-select: none;
+}
+.ink-art-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ink-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 3px 5px 2px 4px;
+  background: var(--cinnabar);
+  color: #fbefe2;
+  font-family: var(--brush);
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1.5px #c9483d, inset 0 0 4px #7d1a14;
+  transform: rotate(-4deg);
+}
+.ink-seal.outline {
+  background: transparent;
+  color: rgba(27, 27, 29, .36);
+  box-shadow: inset 0 0 0 1.2px rgba(27, 27, 29, .32);
+}
+
+/* 水墨剑客 · 状态1：卷首大厅 (Root Layer 0) */
+.ink-lobby {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 24px 36px 24px 44px;
+  background: linear-gradient(90deg, rgba(239, 231, 212, .96) 0%, rgba(239, 231, 212, .86) 38%, rgba(239, 231, 212, .18) 68%, transparent 88%);
+}
+.ink-lobby-back-legacy {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f3ecdc;
+  box-shadow: inset 0 0 0 1.5px rgba(27,27,29,.25);
+  display: grid;
+  place-items: center;
+}
+.ink-lobby-card {
+  width: 340px;
+  position: relative;
+  z-index: 2;
+}
+.ink-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ink-title-row h1 {
+  font-family: var(--brush);
+  font-size: 46px;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: 4px;
+}
+.ink-title-row .big-seal {
+  width: 36px;
+  height: 50px;
+  font-size: 16px;
+  line-height: 1.15;
+  padding-top: 3px;
+  text-align: center;
+}
+.ink-desc {
+  margin: 8px 0 12px;
+  font-family: var(--brush);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink-mid);
+}
+.ink-save-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  margin-bottom: 12px;
+  border-radius: 4px 10px 4px 10px;
+  background: rgba(251, 246, 234, .92);
+  box-shadow: inset 0 0 0 1.2px rgba(184, 50, 42, .45);
+  font-size: 12px;
+  color: var(--ink-dark);
+}
+.ink-save-banner b { color: var(--cinnabar); font-family: var(--brush); font-size: 13.5px; }
+.ink-lobby-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ink-btn-primary {
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 3px 14px 4px 12px;
+  background: var(--ink-dark);
+  color: #fbf5e8;
+  font-family: var(--brush);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 5px 14px rgba(27, 27, 29, .22);
+}
+.ink-btn-secondary {
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 3px 14px 4px 12px;
+  background: #fbf6ea;
+  color: var(--ink-dark);
+  font-family: var(--brush);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .32);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 水墨剑客 · 状态2：七卷画轴选关页 (Layer 1 · 子页带左上角返回) */
+.ink-select {
+  position: absolute;
+  inset: 0;
+  padding: 12px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #efe7d4, #e6dcc5);
+}
+.ink-select-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 52px; /* 避让右上角宿主胶囊 */
+}
+.ink-back-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f6f0e2;
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .24);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ink-vol-tabs {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.ink-vol-tab {
+  flex: 1;
+  height: 36px;
+  border-radius: 3px 10px 4px 9px;
+  background: rgba(239, 231, 212, .7);
+  box-shadow: inset 0 0 0 1.2px rgba(27, 27, 29, .2);
+  font-family: var(--brush);
+  font-size: 13px;
+  color: var(--ink-mid);
+}
+.ink-vol-tab.active {
+  background: #fbf6ea;
+  box-shadow: inset 0 0 0 2px var(--ink-dark);
+  color: var(--ink-dark);
+  font-weight: 600;
+}
+.ink-select-meta {
+  font-size: 11px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.ink-level-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: auto 0;
+  padding: 8px 0;
+}
+.ink-level-card {
+  padding: 10px;
+  border-radius: 3px 12px 5px 10px;
+  background: #fbf6ea;
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .22), 0 4px 12px rgba(58, 44, 26, .08);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  position: relative;
+}
+.ink-level-card.current {
+  box-shadow: inset 0 0 0 2px var(--cinnabar), 0 6px 16px rgba(184, 50, 42, .16);
+}
+.ink-level-thumb {
+  height: 76px;
+  border-radius: 3px 7px 3px 6px;
+  background: linear-gradient(180deg, #e5dac3, #d3c4a6);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+}
+.ink-resume-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--cinnabar);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+.ink-level-sub { font-size: 10px; letter-spacing: 2px; color: var(--ink-muted); }
+.ink-level-name { font-family: var(--brush); font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+.ink-seals-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.ink-seals-mini { display: flex; gap: 4px; }
+.ink-seals-mini i {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  font-family: var(--brush);
+  font-style: normal;
+  font-size: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--cinnabar);
+  color: #fbefe2;
+}
+.ink-seals-mini i.off {
+  background: transparent;
+  color: rgba(27, 27, 29, .32);
+  box-shadow: inset 0 0 0 1px rgba(27, 27, 29, .28);
+}
+
+/* 水墨剑客 · 状态3：局内战斗 HUD (Layer 2) */
+.ink-hud {
+  position: absolute;
+  top: 10px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  z-index: 5;
+  pointer-events: none;
+}
+.ink-hud button { pointer-events: auto; }
+.ink-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ink-vitals-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ink-hp { display: flex; gap: 4px; }
+.ink-hp i {
+  width: 12px;
+  height: 16px;
+  background: var(--ink-dark);
+  border-radius: 50% 50% 45% 45%;
+  display: block;
+}
+.ink-hp i.empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .45);
+}
+.ink-meter {
+  width: 118px;
+  height: 10px;
+  border-radius: 3px 8px 3px 8px;
+  background: rgba(27, 27, 29, .12);
+  box-shadow: inset 0 0 0 1px rgba(27, 27, 29, .25);
+  overflow: hidden;
+}
+.ink-meter-fill {
+  width: 72%;
+  height: 100%;
+  background: linear-gradient(90deg, #1b1b1d, var(--cinnabar));
+}
+.ink-center-score {
+  text-align: center;
+  font-family: var(--brush);
+}
+.ink-center-score strong { font-size: 24px; display: block; line-height: 1; }
+.ink-center-score span { font-size: 11px; color: var(--ink-muted); letter-spacing: 2px; }
+.ink-boss-bar {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  text-align: center;
+  z-index: 4;
+}
+.ink-boss-bar b { font-family: var(--brush); font-size: 15px; letter-spacing: 4px; }
+.ink-boss-track {
+  margin-top: 3px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(27, 27, 29, .16);
+  overflow: hidden;
+}
+.ink-boss-track span { display: block; width: 64%; height: 100%; background: var(--ink-dark); }
+
+.ink-controls {
+  position: absolute;
+  inset: auto 18px 14px 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  z-index: 5;
+}
+.ink-joy {
+  width: 132px;
+  height: 50px;
+  border-radius: 25px;
+  background: rgba(239, 231, 212, .55);
+  box-shadow: inset 0 0 0 1.5px rgba(27, 27, 29, .28);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-size: 12px;
+  color: rgba(27, 27, 29, .5);
+  position: relative;
+}
+.ink-joy-knob {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #3a3a3d, #141416 70%);
+  box-shadow: 0 3px 8px rgba(0,0,0,.25);
+}
+.ink-actions-cluster {
+  position: relative;
+  width: 190px;
+  height: 135px;
+}
+.ink-act {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #3a3a3d, #121214 72%);
+  color: #fbf5e8;
+  font-family: var(--brush);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,.28), inset 0 0 0 1.5px rgba(239, 231, 212, .22);
+}
+.ink-act.slash { right: 0; bottom: 0; width: 72px; height: 72px; font-size: 26px; box-shadow: 0 5px 14px rgba(0,0,0,.35), 0 0 0 3px rgba(184, 50, 42, .25); }
+.ink-act.jump { right: 82px; bottom: 0; width: 54px; height: 54px; font-size: 18px; }
+.ink-act.dash { right: 66px; bottom: 64px; width: 48px; height: 48px; font-size: 16px; }
+.ink-act.ult { right: 4px; bottom: 82px; width: 50px; height: 50px; font-size: 14px; background: radial-gradient(circle at 38% 34%, #d14a3e, #8c1f18 72%); }
+
+/* ─── BOARD 3: 多页工具小程序 (竖屏 · 遥控器/MBTI 内页翻页栈) ─── */
+.app-stage {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  padding-top: 32px;
+  padding-bottom: 18px;
+}
+.app-navbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 56px 0 16px;
+  position: relative;
+  flex: none;
+}
+.app-back-btn {
+  width: 48px;
+  height: 48px;
+  margin-left: -12px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+}
+.app-nav-title {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-home-header {
+  padding: 12px 60px 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-home-header h2 { font-size: 22px; line-height: 30px; font-weight: 700; }
+.app-add-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+  border: 0.5px solid var(--hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-body {
+  flex: 1;
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.stack-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 12px;
+  color: var(--ink2);
+}
+.stack-breadcrumb b { color: var(--accent-ink); }
+.app-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.app-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.device-tile {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.device-tile strong { font-size: 15px; }
+.device-tile small { font-size: 12px; color: var(--ink3); }
+
+/* ─── Unified Overlays: 融合暂停/宿主弹层 & 独立暂停卡 ─── */
+.modal-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: fade-in .18s ease-out;
+}
+.modal-scrim.center {
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.bottom-sheet {
+  width: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px 26px;
+  box-shadow: var(--sheet-shadow);
+  animation: slide-up .22s cubic-bezier(.25, .8, .25, 1);
+}
+.center-sheet {
+  width: min(430px, 94%);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .28);
+}
+@keyframes slide-up { from { transform: translateY(24px); } to { transform: translateY(0); } }
+
+/* 头部：应用身份 + 实时存档状态定心丸 */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.sheet-app-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sheet-app-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex: none;
+}
+.sheet-app-title {
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet-app-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.official-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--fill);
+  font-size: 11px;
+  color: var(--ink2);
+}
+.save-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 11.5px;
+  font-weight: 600;
+  flex: none;
+}
+.save-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 局内暂停卡片区（仅游戏对局中显示） */
+.in-game-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.in-game-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.in-game-status strong { font-size: 14px; }
+.in-game-status span { font-size: 12px; color: var(--ink2); }
+.quick-toggles {
+  display: flex;
+  gap: 6px;
+}
+.toggle-chip {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0.5px solid var(--hairline);
+}
+.toggle-chip.off {
+  color: var(--ink3);
+  background: transparent;
+}
+.in-game-btns {
+  display: flex;
+  gap: 8px;
+}
+.btn-pill {
+  height: 42px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 0 14px;
+  transition: transform .1s, background .15s;
+}
+.btn-pill:active { transform: scale(.98); }
+.btn-pill.primary {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.btn-pill.secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 0.5px solid var(--hairline);
+}
+.btn-pill.neutral {
+  background: var(--fill);
+  color: var(--ink);
+}
+.btn-pill.warn-confirm {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* 宿主平台操作行（4列图标） */
+.host-actions-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 14px;
+}
+.host-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.host-action-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+}
+.host-action-item.active { color: var(--accent-ink); }
+.host-action-item.active .host-action-icon { background: var(--accent-soft); }
+
+.sheet-exit-btn {
+  margin-top: 14px;
+  width: 100%;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.sheet-exit-sub {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--ink2);
+}
+
+/* 水墨剑客 · 专属水墨风局内暂停卡（方案 B 或局内点暂停时） */
+.ink-pause-dialog {
+  width: 360px;
+  padding: 18px 22px 16px;
+  border-radius: 4px 18px 6px 16px;
+  background: #f4eddc;
+  color: #1b1b1d;
+  box-shadow: 0 24px 60px rgba(27, 18, 8, .35), inset 0 0 0 1.5px rgba(27, 27, 29, .18);
+  text-align: center;
+  position: relative;
+}
+.ink-pause-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ink-pause-title {
+  font-family: "Kaiti SC", "STKaiti", serif;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+.ink-pause-seals {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(27, 27, 29, .05);
+}
+.ink-pause-seal-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #4a4843;
+}
+.ink-pause-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ─── Toast Notice ─── */
+.sim-toast {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(24, 25, 28, .9);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .22);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.sim-toast.show { opacity: 1; }
+
+/* ─── Bottom Architecture Summary Table ─── */
+.arch-card {
+  margin: 28px auto 0;
+  max-width: 1520px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 22px;
+}
+body.studio-dark .arch-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.arch-card h3 { font-size: 15px; font-weight: 650; margin-bottom: 12px; }
+.arch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.arch-table th, .arch-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
+  vertical-align: top;
+}
+body.studio-dark .arch-table th, body.studio-dark .arch-table td {
+  border-bottom-color: rgba(255, 255, 255, .07);
+}
+.arch-table th {
+  font-weight: 650;
+  color: #555860;
+  background: rgba(0, 0, 0, .025);
+}
+body.studio-dark .arch-table th { color: #a5a8b2; background: rgba(255, 255, 255, .03); }
+.arch-table code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .06);
+}
+body.studio-dark .arch-table code { background: rgba(255, 255, 255, .1); }
+</style>
+</head>
+<body data-scheme="unified">
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 小游戏与小程序「暂停 / 进度保存 / 翻页与退出」统一交互稿</h1>
+      <p>覆盖三类作品模型：① 无大厅直开游戏（方块爆破） · ② 有大厅多层级游戏（水墨剑客） · ③ 多页翻页小程序（遥控器 / MBTI）</p>
+    </div>
+    <div class="controls">
+      <div class="mode-seg" role="tablist" aria-label="交互方案切换">
+        <button type="button" class="active" data-set-scheme="unified">方案 A · 右上角单入口融合（推荐）</button>
+        <button type="button" data-set-scheme="split">方案 B · 左局内暂停/返回 · 右宿主菜单</button>
+        <button type="button" data-set-scheme="legacy">现行版 · 痛点对照</button>
+      </div>
+      <button type="button" class="pill-btn back-sim" id="simBackBtn" title="模拟用户在手机屏幕边缘向内侧滑返回">
+        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M15 18l-6-6 6-6"/></svg>
+        模拟手机侧滑返回
+      </button>
+      <div class="swatches" aria-label="六套主题色">
+        <button type="button" class="swatch active" data-accent="red" style="background:#e3203c;color:#e3203c" title="小伴红"></button>
+        <button type="button" class="swatch" data-accent="mint" style="background:#1f9d73;color:#1f9d73" title="薄荷绿"></button>
+        <button type="button" class="swatch" data-accent="blue" style="background:#2f6fdb;color:#2f6fdb" title="海湾蓝"></button>
+        <button type="button" class="swatch" data-accent="purple" style="background:#7c4dff;color:#7c4dff" title="暮紫"></button>
+        <button type="button" class="swatch" data-accent="amber" style="background:#d97706;color:#d97706" title="琥珀"></button>
+        <button type="button" class="swatch" data-accent="graphite" style="background:#3a3d45;color:#3a3d45" title="石墨"></button>
+      </div>
+      <button type="button" class="pill-btn" id="toggleSafeBtn">触控安全区</button>
+      <button type="button" class="pill-btn" id="toggleWidthBtn">390px</button>
+      <button type="button" class="pill-btn" id="toggleDarkBtn">浅色 / 深色</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- ═══════════════ 画板 01：方块爆破（竖屏 · 无大厅单页直开型） ═══════════════ -->
+    <section class="board" id="board-bp">
+      <div class="board-head">
+        <h2>01 方块爆破 <span class="badge-tag">无大厅直开型 · 竖屏</span></h2>
+        <div class="board-mini-seg">
+          <button type="button" class="active" data-bp-state="resume">① 开局自动续局</button>
+          <button type="button" data-bp-state="play">② 纯净对局</button>
+          <button type="button" data-bp-state="pause">③ 暂停与存档菜单</button>
+          <button type="button" data-bp-state="result">④ 结算</button>
+        </div>
+      </div>
+
+      <div class="phone" id="phone-bp">
+        <div class="status-bar light-ink">
+          <span>09:41</span>
+          <span>5G · 100%</span>
+        </div>
+        <div class="sim-toast" id="toast-bp"></div>
+
+        <!-- 右上角唯一宿主容器入口 -->
+        <button type="button" class="host-capsule" id="bpHostBtn" aria-label="暂停与菜单">
+          <span class="touch-box"></span>
+          <span class="host-capsule-pill" id="bpCapsulePill">
+            <svg viewBox="0 0 24 24" id="bpCapsuleIcon"><circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/></svg>
+          </span>
+        </button>
+
+        <div class="bp-stage" id="bpStage"></div>
+        <div class="gesture-bar light"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ 画板 02 + 03 右侧纵列：水墨剑客（横屏） + 多页小程序（竖屏） ═══════════════ -->
+    <div class="board-col">
+      <!-- 画板 02：水墨剑客（横屏 · 有大厅 + 选关页 + 局内战斗） -->
+      <section class="board landscape-board" id="board-ink">
+        <div class="board-head">
+          <h2>02 水墨剑客 <span class="badge-tag">有大厅多层闯关型 · 横屏</span></h2>
+          <div class="board-mini-seg">
+            <button type="button" class="active" data-ink-state="lobby">① 卷首大厅 (第0层·智能续玩)</button>
+            <button type="button" data-ink-state="select">② 七卷选关 (第1层·内页翻页)</button>
+            <button type="button" data-ink-state="play">③ 局内战斗 (第2层)</button>
+            <button type="button" data-ink-state="pause">④ 局内暂停 (补齐选关/重开)</button>
+            <button type="button" data-ink-state="host">⑤ 宿主菜单</button>
+          </div>
+        </div>
+
+        <div class="phone landscape" id="phone-ink">
+          <div class="sim-toast" id="toast-ink"></div>
+
+          <!-- 右上角宿主容器入口 -->
+          <button type="button" class="host-capsule" id="inkHostBtn" aria-label="宿主菜单">
+            <span class="touch-box"></span>
+            <span class="host-capsule-pill on-light">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/></svg>
+            </span>
+          </button>
+
+          <div class="ink-stage" id="inkStage"></div>
+          <div class="gesture-bar"></div>
+        </div>
+      </section>
+
+      <!-- 画板 03：多页工具/测评小程序（以万能遥控器 / MBTI 多级翻页栈为例） -->
+      <section class="board landscape-board" id="board-app">
+        <div class="board-head">
+          <h2>03 多页小程序翻页栈与存档对照 <span class="badge-tag">内部翻页 · 左返回 ‹ / 右宿主 ⋯</span></h2>
+          <div class="board-mini-seg">
+            <button type="button" data-app-state="root">① 根页 (第0层 · 无左上角返回)</button>
+            <button type="button" class="active" data-app-state="sub1">② 子页翻页 (第1层 · 左上角 ‹ 后退)</button>
+            <button type="button" data-app-state="sub2">③ 深层答题/试码 (第2层 · 实时存盘)</button>
+            <button type="button" data-app-state="menu">④ 宿主菜单 (「重新加载」消歧)</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:stretch">
+          <div class="phone" id="phone-app" style="height:490px;border-radius:32px">
+            <div class="status-bar adaptive-ink">
+              <span>09:41</span>
+              <span>5G · 100%</span>
+            </div>
+            <div class="sim-toast" id="toast-app"></div>
+            <button type="button" class="host-capsule" id="appHostBtn" aria-label="应用菜单">
+              <span class="touch-box"></span>
+              <span class="host-capsule-pill on-light">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/></svg>
+              </span>
+            </button>
+            <div class="app-stage" id="appStage"></div>
+            <div class="gesture-bar"></div>
+          </div>
+
+          <!-- 右侧：页面栈与存档状态实时指示器 -->
+          <div class="arch-card" style="margin:0;display:flex;flex-direction:column;justify-content:space-between;padding:16px 18px">
+            <div>
+              <h3 style="margin-bottom:8px">当前三台样机的「页面栈 (History) · 返回键 · 存档」实时状态</h3>
+              <div id="liveStackInspector" style="display:flex;flex-direction:column;gap:10px;font-size:12.5px"></div>
+            </div>
+            <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(227,32,60,.06);font-size:12px;line-height:1.6">
+              <strong style="color:#e3203c">核心统一原则：</strong><br>
+              1. <b>根页（第 0 层）绝不画左上角返回/退出键</b>：无论是《方块爆破》棋盘、《水墨剑客》卷首大厅，还是《遥控器》首页，左上角都不放退出。<br>
+              2. <b>只要进入第 1..N 层子页，左上角必有 <code>‹</code> 且与手机侧滑返回等价</b>：层层退回上一页；游戏正在对局中按侧滑返回，<b>先触发暂停</b>而非直接杀进程。<br>
+              3. <b>存档恢复按“有无大厅”分流</b>：无大厅游戏<b>开局直恢复残局棋盘</b>（配顶部 `[新开一局]` 轻胶囊）；有大厅游戏<b>大厅主按钮直达上次卷幅</b>。
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ═══════════════ 底部全局规范对照表 ═══════════════ -->
+  <section class="arch-card">
+    <h3>三类作品「顶栏入口 · 暂停弹窗 · 进度存档 · 退出」规范矩阵</h3>
+    <table class="arch-table">
+      <thead>
+        <tr>
+          <th style="width:16%">作品形态</th>
+          <th style="width:21%">顶栏与右上角胶囊</th>
+          <th style="width:21%">进度保存与重开恢复（<code>xb.storage</code>）</th>
+          <th style="width:21%">暂停与菜单弹窗 UI</th>
+          <th style="width:21%">手机侧滑返回 &amp; 退出路径</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>① 无大厅单页游戏</b><br>例：《方块爆破》《2048》《俄罗斯方块》</td>
+          <td><b>根页即对局页</b>。删掉自绘的 <code>‹ 退出</code> 和底部 <code>重新开始</code>。<br>· <b>方案 A</b>：右上角唯一自适应微底板胶囊，点开即为「暂停 + 宿主」合一面板。<br>· <b>方案 B</b>：左上角放 <code>⏸</code>，右上角留给宿主 <code>⋯</code>，绝不在右上角并排两个按钮。</td>
+          <td>每放一块/得分变化及收到 <code>hide</code> 时立即写入 <code>xb.storage</code>。<br><b>下次打开直接恢复上次残局棋盘</b>（如 1,840 分），顶部浮出 3 秒轻胶囊 <code>已恢复上次对局 · [新开一局]</code>，彻底解决“默认空棋盘把残局覆盖”的痛点。</td>
+          <td>面板内集成：<br>1. <b>当前分数 + <code>● 进度已保存</code> 绿标</b> + 音效/音乐快捷开关<br>2. 主按钮 <b>「继续游戏」</b> + 次按钮 <b>「重开本局」</b>（有分时单次内联确认）<br>3. 宿主快捷行（收藏/分享/加桌面/重载）+ 底部 <b>「退出（保留本局）」</b>。</td>
+          <td>· 对局中侧滑返回 → <b>弹出暂停面板</b>（防手滑误退正在玩的一局）。<br>· 暂停面板中点「退出」或宿主菜单点「退出」→ 等待最后一次写盘完成后离开。</td>
+        </tr>
+        <tr>
+          <td><b>② 有大厅多层游戏</b><br>例：《水墨剑客》《名画冒险》《口袋精灵》</td>
+          <td>· <b>第 0 层（大厅）</b>：去掉左上角自绘的 <code>‹</code> 退出键，右上角宿主微底板胶囊。<br>· <b>第 1 层（选关画卷）</b>：左上角显示 <code>‹</code>（回大厅）。<br>· <b>第 2 层（局内战斗）</b>：去掉网页遗留的「全屏」按钮，右上角不堆叠双菜单。</td>
+          <td>除了通关结算写盘，<b>进入某幅或到达检查点、切后台 <code>hide</code> 时同步保存 <code>activeStage</code></b>。<br>下次打开进入大厅时，主按钮直接变为 <b>「继续 · 烽火卷 第四幅 →」</b>，选关画卷也在对应关卡标出「上次停在此幅」。</td>
+          <td>局内暂停必须包含完整层级跳转（修复现行版只能退回广场的缺陷）：<br>1. 当前卷幅名 + <b>三枚印章达成进度</b> + 声音开关<br>2. 主按钮 <b>「继续挥剑」</b><br>3. 双列次按钮：<b>「重开本幅」</b> ｜ <b>「返回画卷（选关）」</b><br>4. 底部弱操作：<b>「退出游戏」</b>。</td>
+          <td>严格接入浏览器 History 栈：<br><code>局内战斗</code> -(侧滑)→ <code>局内暂停</code> -(选返回画卷)→ <code>选关画卷</code> -(侧滑/左上角‹)→ <code>卷首大厅</code> -(侧滑)→ <code>退出游戏</code>。<br>宿主菜单点「退出」可跨层一键直退。</td>
+        </tr>
+        <tr>
+          <td><b>③ 多页工具 / 测评</b><br>例：《万能遥控器》《MBTI 测评》《轻启》</td>
+          <td>· <b>第 0 层（首页）</b>：无左上角返回，大标题靠左，右上角宿主竖三点。<br>· <b>第 1..N 层（子页）</b>：左上角 <code>48×48dp</code> 无底色 <code>‹</code> 返回，标题居中 <code>16px</code>，与右侧竖三点同高对称。</td>
+          <td>表单/答题进度（如 MBTI 当前第 15/48 题答案、已添加的遥控器）<b>每步实时存盘</b>。<br>中途退出后再次打开，首页顶部或答题入口直接提示「继续未完成的测评（15/48）」。</td>
+          <td>点右上角打开宿主底部弹层：<br>顶部应用信息 + <code>● 已自动保存</code>；<br>中间四宫格将易混淆的「重新开始」更名为 <b>「重新加载」</b>（连同收藏、分享、加桌面）；底部单列 <b>「退出」</b>。</td>
+          <td>· 子页点左上角 <code>‹</code> 或侧滑返回 → <code>history.back()</code> 逐层退回上一页。<br>· 退到第 0 层首页再侧滑，或任意层点宿主菜单「退出」→ 直接退出小程序。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+(() => {
+  const ACCENTS = {
+    red:      { accent: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c', darkSoft: '#391b20', darkInk: '#ff6e75' },
+    mint:     { accent: '#1f9d73', soft: '#eaf7f2', line: '#bce5d5', ink: '#18825e', darkSoft: '#173329', darkInk: '#5cd6ab' },
+    blue:     { accent: '#2f6fdb', soft: '#eef4ff', line: '#c5d9fb', ink: '#245bb8', darkSoft: '#1b2a44', darkInk: '#78a9ff' },
+    purple:   { accent: '#7c4dff', soft: '#f3efff', line: '#d4c6ff', ink: '#673ab7', darkSoft: '#281e42', darkInk: '#b194ff' },
+    amber:    { accent: '#d97706', soft: '#fef5e7', line: '#f8d8a5', ink: '#b45309', darkSoft: '#382510', darkInk: '#fbbf24' },
+    graphite: { accent: '#3a3d45', soft: '#f1f2f4', line: '#d5d7dc', ink: '#2c2f36', darkSoft: '#2c2e33', darkInk: '#d8dae0' },
+  };
+
+  const state = {
+    scheme: 'unified', // 'unified' | 'split' | 'legacy'
+    dark: false,
+    accent: 'red',
+    bp: {
+      view: 'resume', // 'resume' | 'play' | 'pause' | 'result'
+      score: 1840,
+      best: 3640,
+      sound: true,
+      music: true,
+      fav: true,
+      confirmRestart: false,
+      board: [
+        [1,1,0,0,0,2,2,0],
+        [1,0,0,0,0,0,2,0],
+        [0,0,3,3,3,0,0,0],
+        [0,0,0,3,0,0,1,1],
+        [2,0,0,0,0,0,1,1],
+        [2,2,0,0,1,0,0,0],
+        [0,0,0,1,1,1,0,0],
+        [0,0,0,0,0,0,0,0],
+      ],
+    },
+    ink: {
+      view: 'lobby', // 'lobby' | 'select' | 'play' | 'pause' | 'host'
+      vol: 3,
+      stageName: '第四幅 · 铁骑将军',
+      score: 1280,
+      sound: true,
+      fav: false,
+      confirmRestart: false,
+    },
+    app: {
+      view: 'sub1', // 'root' | 'sub1' | 'sub2' | 'menu'
+      questionIdx: 15,
+      fav: true,
+    }
+  };
+
+  function showToast(id, msg) {
+    const el = document.getElementById('toast-' + id);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function applyTheme() {
+    document.body.dataset.scheme = state.scheme;
+    document.body.classList.toggle('studio-dark', state.dark);
+    const tok = ACCENTS[state.accent];
+    for (const phone of document.querySelectorAll('.phone')) {
+      phone.classList.toggle('dark', state.dark);
+      phone.style.setProperty('--accent', tok.accent);
+      phone.style.setProperty('--accent-soft', state.dark ? tok.darkSoft : tok.soft);
+      phone.style.setProperty('--accent-soft-line', tok.line);
+      phone.style.setProperty('--accent-ink', state.dark ? tok.darkInk : tok.ink);
+    }
+  }
+
+  function svgIcon(name, size = 18) {
+    const paths = {
+      pause: '<path d="M9 6v12M15 6v12" stroke-width="2.2"/>',
+      play: '<path d="M8 6l10 6-10 6V6z" fill="currentColor" stroke="none"/>',
+      refresh: '<path d="M4 12a8 8 0 0 1 13.6-5.6L20 8.8M20 4v4.8h-4.8M20 12a8 8 0 0 1-13.6 5.6L4 15.2M4 20v-4.8h4.8"/>',
+      star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/>',
+      share: '<path d="M15 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm9 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
+      pin: '<path d="M12 17v5M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z"/>',
+      back: '<path d="m15 18-6-6 6-6"/>',
+      sound: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>',
+      mute: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16 9 5 6m0-6-5 6"/>',
+      map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6zm6-2v14m6-12v14"/>',
+    };
+    return `<svg viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${paths[name] || ''}</svg>`;
+  }
+
+  /* ─── 渲染画板 01：方块爆破 ─── */
+  function renderBp() {
+    const s = state.bp;
+    const isLegacy = state.scheme === 'legacy';
+    const isSplit = state.scheme === 'split';
+
+    document.querySelectorAll('[data-bp-state]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.bpState === s.view);
+    });
+
+    // 右上角胶囊图标：方案A对局中可显示暂停/菜单微胶囊
+    const capsuleIcon = document.getElementById('bpCapsuleIcon');
+    if (state.scheme === 'unified') {
+      capsuleIcon.innerHTML = '<path d="M9.5 7v10M14.5 7v10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>';
+    } else {
+      capsuleIcon.innerHTML = '<circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/>';
+    }
+
+    const displayScore = (isLegacy && s.view === 'resume') ? 0 : s.score;
+
+    let cellsHtml = '';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const v = (isLegacy && s.view === 'resume') ? 0 : s.board[r][c];
+        const cls = v === 1 ? 'on' : v === 2 ? 'on gold' : v === 3 ? 'on mint' : '';
+        cellsHtml += `<div class="bp-cell ${cls}" data-bp-cell="${r}-${c}"></div>`;
+      }
+    }
+
+    // 顶栏对比：现行版在右上角堆了 ⚙ 设置 + ‹ 退出 + 宿主 ⋮；方案B把暂停放左上角；方案A右上角单入口
+    let topbarHtml = '';
+    if (isLegacy) {
+      topbarHtml = `
+        <div class="bp-topbar">
+          <div class="bp-best"><span>👑</span><strong>${s.best}</strong></div>
+          <div class="bp-legacy-actions">
+            <button type="button" class="bp-legacy-btn" data-bp-act="open-pause">⚙ 设置</button>
+            <button type="button" class="bp-legacy-btn" data-bp-act="exit">‹ 退出</button>
+          </div>
+        </div>`;
+    } else if (isSplit) {
+      topbarHtml = `
+        <div class="bp-topbar">
+          <div class="bp-left-cluster">
+            <button type="button" class="bp-pause-left" data-bp-act="open-pause" aria-label="暂停游戏">${svgIcon('pause', 16)}</button>
+            <div class="bp-best"><span>👑</span><strong>${s.best.toLocaleString()}</strong></div>
+          </div>
+          <span style="font-size:11.5px;color:rgba(255,255,255,.88);font-weight:600">● 自动保存</span>
+        </div>`;
+    } else {
+      topbarHtml = `
+        <div class="bp-topbar">
+          <div class="bp-best"><span>👑</span><strong>${s.best.toLocaleString()}</strong></div>
+          <span style="font-size:11.5px;color:rgba(255,255,255,.88);font-weight:600">● 进度实时保存</span>
+        </div>`;
+    }
+
+    // 状态①：自动恢复残局提示条（对比现行版默认0分空棋盘）
+    let resumeBanner = '';
+    if (s.view === 'resume') {
+      if (isLegacy) {
+        resumeBanner = `
+          <div class="bp-resume-pill" style="background:rgba(180,32,55,.88)">
+            <span>⚠️ 现行版痛点：重开默认 0 分空棋盘（1,840 分残局藏在设置里，放一块即被覆盖）</span>
+          </div>`;
+      } else {
+        resumeBanner = `
+          <div class="bp-resume-pill">
+            <span><i class="dot"></i>已自动恢复上次残局（${s.score.toLocaleString()} 分）</span>
+            <button type="button" data-bp-act="fresh-board">新开一局</button>
+          </div>`;
+      }
+    }
+
+    // 状态③：暂停与存档弹层
+    let modalHtml = '';
+    if (s.view === 'pause') {
+      if (state.scheme === 'unified') {
+        // 方案 A：对局暂停 + 宿主快捷操作 一体化底部面板
+        modalHtml = `
+          <div class="modal-scrim" data-bp-act="resume">
+            <div class="bottom-sheet" data-stop>
+              <div class="sheet-header">
+                <div class="sheet-app-info">
+                  <div class="sheet-app-icon" style="background:linear-gradient(135deg,#ff8eb3,#d93870);color:#fff">块</div>
+                  <div>
+                    <div class="sheet-app-title">方块爆破</div>
+                    <div class="sheet-app-sub"><span class="official-tag">官方</span><span>益智游戏 · 最高 ${s.best.toLocaleString()} 分</span></div>
+                  </div>
+                </div>
+                <span class="save-badge"><i></i>本局已存盘</span>
+              </div>
+
+              <div class="in-game-box">
+                <div class="in-game-status">
+                  <div>
+                    <strong>当前对局 · ${s.score.toLocaleString()} 分</strong>
+                    <span style="display:block;margin-top:1px">随时退出下次打开自动接着玩</span>
+                  </div>
+                  <div class="quick-toggles">
+                    <button type="button" class="toggle-chip ${s.sound ? '' : 'off'}" data-bp-act="toggle-sound">${svgIcon(s.sound ? 'sound' : 'mute', 14)}音效</button>
+                    <button type="button" class="toggle-chip ${s.music ? '' : 'off'}" data-bp-act="toggle-music">♪ 音乐</button>
+                  </div>
+                </div>
+                <div class="in-game-btns">
+                  <button type="button" class="btn-pill primary" data-bp-act="resume">${svgIcon('play', 15)}继续游戏</button>
+                  ${s.confirmRestart
+                    ? `<button type="button" class="btn-pill warn-confirm" data-bp-act="confirm-fresh">确认清空重开？</button>`
+                    : `<button type="button" class="btn-pill secondary" data-bp-act="ask-fresh">${svgIcon('refresh', 15)}重开本局</button>`}
+                </div>
+              </div>
+
+              <div class="host-actions-row">
+                <button type="button" class="host-action-item ${s.fav ? 'active' : ''}" data-bp-act="toggle-fav">
+                  <span class="host-action-icon">${svgIcon('star', 20)}</span>
+                  <span>${s.fav ? '已收藏' : '收藏'}</span>
+                </button>
+                <button type="button" class="host-action-item" data-bp-act="share">
+                  <span class="host-action-icon">${svgIcon('share', 20)}</span>
+                  <span>分享</span>
+                </button>
+                <button type="button" class="host-action-item" data-bp-act="pin">
+                  <span class="host-action-icon">${svgIcon('pin', 20)}</span>
+                  <span>加到桌面</span>
+                </button>
+                <button type="button" class="host-action-item" data-bp-act="reload">
+                  <span class="host-action-icon">${svgIcon('refresh', 20)}</span>
+                  <span>重新加载</span>
+                </button>
+              </div>
+
+              <button type="button" class="sheet-exit-btn" data-bp-act="exit">
+                退出游戏 <span class="sheet-exit-sub">（保留 ${s.score.toLocaleString()} 分残局）</span>
+              </button>
+            </div>
+          </div>`;
+      } else {
+        // 方案 B / 现行版：居中游戏内设置卡
+        modalHtml = `
+          <div class="modal-scrim center" data-bp-act="resume">
+            <div class="center-sheet" data-stop style="text-align:center">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span class="save-badge"><i></i>残局已自动保存</span>
+                <span style="font-size:12px;color:var(--ink2)">最高分 ${s.best.toLocaleString()}</span>
+              </div>
+              <h3 style="font-size:18px;margin-bottom:4px">游戏已暂停</h3>
+              <p style="font-size:12.5px;color:var(--ink2);margin-bottom:14px">当前得分 ${s.score.toLocaleString()} 分，退出后下次打开直接恢复棋盘</p>
+              <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px">
+                <button type="button" class="toggle-chip ${s.sound ? '' : 'off'}" data-bp-act="toggle-sound">${svgIcon(s.sound ? 'sound' : 'mute', 14)}音效：${s.sound ? '开' : '关'}</button>
+                <button type="button" class="toggle-chip ${s.music ? '' : 'off'}" data-bp-act="toggle-music">♪ 音乐：${s.music ? '开' : '关'}</button>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button type="button" class="btn-pill primary" style="width:100%" data-bp-act="resume">继续这一局</button>
+                <button type="button" class="btn-pill neutral" style="width:100%" data-bp-act="confirm-fresh">新开一局（清空当前棋盘）</button>
+                <button type="button" class="btn-pill" style="width:100%;color:var(--ink2);font-size:13px" data-bp-act="exit">退出小游戏（保留进度）</button>
+              </div>
+            </div>
+          </div>`;
+      }
+    } else if (s.view === 'result') {
+      modalHtml = `
+        <div class="modal-scrim center">
+          <div class="center-sheet" style="text-align:center;background:#592e40;color:#fff;border:2px solid #f2a4be">
+            <div style="font-size:32px;margin-bottom:4px">👑</div>
+            <h3 style="font-size:20px;color:#ffe066">棋盘已满 · 本局结束</h3>
+            <p style="font-size:12px;color:#f5c6d6;margin-top:2px">最高纪录已同步存盘（${Math.max(s.best, s.score).toLocaleString()} 分）</p>
+            <div style="font-size:44px;font-weight:850;margin:8px 0">${s.score.toLocaleString()}</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button type="button" class="btn-pill" style="background:rgba(255,255,255,.16);color:#fff" data-bp-act="share">炫耀战绩</button>
+              <button type="button" class="btn-pill" style="background:linear-gradient(180deg,#63e089,#34b35c);color:#fff" data-bp-act="confirm-fresh">▶ 再玩一局</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('bpStage').innerHTML = `
+      ${topbarHtml}
+      ${resumeBanner}
+      <div class="bp-score-zone">
+        <div class="bp-score-num">${displayScore.toLocaleString()}</div>
+        <div class="bp-combo-tag">COMBO ×3 · WONDERFUL!</div>
+      </div>
+      <div class="bp-board-wrap">
+        <div class="bp-board">${cellsHtml}</div>
+      </div>
+      <div class="bp-tray">
+        <button type="button" class="bp-slot" data-bp-act="place-piece" title="点击模拟放置方块 (+40分并自动存档)">
+          <div class="bp-piece" style="grid-template-columns:repeat(3,14px)">
+            <span class="bp-mini-cell"></span><span class="bp-mini-cell"></span><span class="bp-mini-cell"></span>
+          </div>
+        </button>
+        <button type="button" class="bp-slot" data-bp-act="place-piece" title="点击模拟放置方块 (+40分并自动存档)">
+          <div class="bp-piece" style="grid-template-columns:repeat(2,14px)">
+            <span class="bp-mini-cell"></span><span class="bp-mini-cell"></span>
+            <span class="bp-mini-cell"></span><span class="bp-mini-cell"></span>
+          </div>
+        </button>
+        <button type="button" class="bp-slot" data-bp-act="place-piece" title="点击模拟放置方块 (+40分并自动存档)">
+          <div class="bp-piece" style="grid-template-columns:repeat(2,14px)">
+            <span class="bp-mini-cell"></span><span></span>
+            <span class="bp-mini-cell"></span><span class="bp-mini-cell"></span>
+          </div>
+        </button>
+      </div>
+      ${isLegacy ? `<div class="bp-legacy-footer"><span>⚠️ 底部还有第4个控制按钮 →</span><button type="button" data-bp-act="confirm-fresh">重新开始</button></div>` : `<div style="text-align:center;font-size:11px;color:rgba(255,255,255,.78);margin-top:6px">点下方方块可模拟走步并实时写入 xb.storage</div>`}
+      ${modalHtml}
+    `;
+  }
+
+  /* ─── 渲染画板 02：水墨剑客（横屏 · 有大厅 + 选关页 + 局内战斗） ─── */
+  function renderInk() {
+    const s = state.ink;
+    const isLegacy = state.scheme === 'legacy';
+
+    document.querySelectorAll('[data-ink-state]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.inkState === s.view);
+    });
+
+    // 背景水墨山水 SVG
+    const bgSvg = `
+      <svg class="ink-art-bg" viewBox="0 0 720 382" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c9bfa8" stop-opacity=".45"/>
+            <stop offset="100%" stop-color="#efe7d4" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <circle cx="565" cy="96" r="44" fill="#b8322a" opacity=".16"/>
+        <path d="M220 310 Q 340 140 450 250 T 680 175 L 720 220 L 720 382 L 220 382 Z" fill="url(#m1)"/>
+        <path d="M360 340 Q 480 185 585 265 T 720 215 L 720 382 L 360 382 Z" fill="#2b2a28" opacity=".13"/>
+        <!-- 侠客与敌将剪影 -->
+        <g transform="translate(455, 224)" stroke="#1b1b1d" stroke-width="2.4" fill="none">
+          <path d="M-25 58 L 195 58" stroke-opacity=".25"/>
+          <!-- 剑客 -->
+          <circle cx="16" cy="14" r="7" fill="#1b1b1d"/>
+          <path d="M6 12 L 28 8 M16 21 L 12 44 M12 44 L 4 58 M12 44 L 22 58 M15 28 L 34 22"/>
+          <path d="M34 22 L 72 8" stroke="#b8322a" stroke-width="2.6"/>
+          <!-- 铁骑将军 -->
+          <circle cx="128" cy="6" r="9" fill="#1b1b1d"/>
+          <path d="M114 2 L 142 2 M128 15 L 130 42 M130 42 L 118 58 M130 42 L 142 58 M126 24 L 94 18"/>
+          <path d="M94 18 L 62 14" stroke="#1b1b1d" stroke-width="2.8"/>
+        </g>
+      </svg>`;
+
+    let viewHtml = '';
+
+    if (s.view === 'lobby') {
+      // 状态①：卷首大厅 (第0层 Root)
+      viewHtml = `
+        <div class="ink-lobby">
+          ${isLegacy ? `<button type="button" class="ink-lobby-back-legacy" data-ink-act="exit" title="现行版痛点：根页左上角多画了一个返回键">${svgIcon('back', 18)}</button>` : ''}
+          <div class="ink-lobby-card">
+            <div class="ink-title-row">
+              <h1>水墨剑客</h1>
+              <span class="ink-seal big-seal">墨<br>侠</span>
+            </div>
+            <p class="ink-desc">一卷山水，一人一剑。<br>朱光一闪时出剑，斩断来势。</p>
+            ${isLegacy
+              ? `<p style="font-size:11px;color:#7a7366;margin-bottom:12px">⚠️ 现行版：只有「入卷」，中途退出不记当前卷幅</p>
+                 <div class="ink-lobby-actions">
+                   <button type="button" class="ink-btn-primary" data-ink-act="go-select">入卷 →</button>
+                 </div>`
+              : `<div class="ink-save-banner">
+                   <span class="ink-seal" style="width:20px;height:20px;font-size:12px">续</span>
+                   <span>上次停在 <b>卷三 烽火 · 第四幅「铁骑将军」</b>（已得 11/21 印）</span>
+                 </div>
+                 <div class="ink-lobby-actions">
+                   <button type="button" class="ink-btn-primary" data-ink-act="go-play">继续第四幅 →</button>
+                   <button type="button" class="ink-btn-secondary" data-ink-act="go-select">画卷选关</button>
+                 </div>`}
+          </div>
+        </div>`;
+    } else if (s.view === 'select') {
+      // 状态②：七卷选关页 (第1层 · 内页翻页，左上角带 ‹ 回卷首)
+      const vols = ['竹林卷', '雪江卷', '烽火卷', '怒涛卷', '灯市卷', '悬山卷', '归墨卷'];
+      const tabsHtml = vols.map((name, idx) =>
+        `<button type="button" class="ink-vol-tab ${idx + 1 === s.vol ? 'active' : ''}" data-ink-vol="${idx + 1}">${name}</button>`
+      ).join('');
+
+      const stages = [
+        { sub: '第一幅', name: '边城', best: '1,420 分 · 极', seals: [1, 1, 1], status: 'done' },
+        { sub: '第二幅', name: '狼烟', best: '1,680 分 · 极', seals: [1, 1, 0], status: 'done' },
+        { sub: '第三幅', name: '断桥', best: '1,510 分 · 甲', seals: [1, 0, 1], status: 'done' },
+        { sub: '第四幅 · 终幅', name: '铁骑将军', best: '上次进行中 · 1,280 分', seals: [1, 1, 0], status: 'current' },
+      ];
+
+      const cardsHtml = stages.map(st => `
+        <button type="button" class="ink-level-card ${st.status === 'current' ? 'current' : ''}" data-ink-act="go-play">
+          <div class="ink-level-thumb">
+            ${st.status === 'current' ? '<span class="ink-resume-tag">上次停在此幅</span>' : ''}
+            <span style="font-family:var(--brush);font-size:12px;color:#4a4843">${st.best}</span>
+          </div>
+          <span class="ink-level-sub">烽火卷 · ${st.sub}</span>
+          <strong class="ink-level-name">${st.name}</strong>
+          <div class="ink-seals-row">
+            <div class="ink-seals-mini">
+              <i class="${st.seals[0] ? '' : 'off'}">过</i>
+              <i class="${st.seals[1] ? '' : 'off'}">全</i>
+              <i class="${st.seals[2] ? '' : 'off'}">技</i>
+            </div>
+            <span style="font-size:11px;color:var(--cinnabar);font-weight:600">${st.status === 'current' ? '点此继续 →' : '重温'}</span>
+          </div>
+        </button>
+      `).join('');
+
+      viewHtml = `
+        <div class="ink-select">
+          <div class="ink-select-head">
+            <button type="button" class="ink-back-btn" data-ink-act="go-lobby" title="退回上一层（卷首大厅），与手机侧滑返回一致">${svgIcon('back', 18)}</button>
+            <div class="ink-vol-tabs">${tabsHtml}</div>
+            <span class="ink-select-meta">已得 11 / 21 印</span>
+          </div>
+          <div class="ink-level-strip">${cardsHtml}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink-muted)">
+            <span>左上角 <b>‹</b> 与手机侧滑返回同步：退回「卷首大厅」而非直接退出小游戏</span>
+            <span>每幅三枚印：<b style="color:var(--cinnabar)">过</b> 通关 · <b style="color:var(--cinnabar)">全</b> 少受伤 · <b style="color:var(--cinnabar)">技</b> 完成绝技</span>
+          </div>
+        </div>`;
+    } else {
+      // 状态③ / ④ / ⑤：局内战斗 + 局内暂停 + 宿主菜单
+      const showLegacyCluster = isLegacy;
+      const showLeftPause = state.scheme === 'split';
+
+      viewHtml = `
+        <div class="ink-hud">
+          <div class="ink-vitals">
+            <div class="ink-vitals-row">
+              ${showLeftPause ? `<button type="button" class="ink-back-btn" style="width:34px;height:34px" data-ink-act="open-pause" title="局内暂停">${svgIcon('pause', 15)}</button>` : ''}
+              <div class="ink-hp"><i></i><i></i><i></i><i></i><i class="empty"></i></div>
+              <span style="font-size:11px;color:var(--ink-muted)">● 自动存盘</span>
+            </div>
+            <div class="ink-meter"><div class="ink-meter-fill"></div></div>
+          </div>
+          <div class="ink-center-score">
+            <strong>${s.score.toLocaleString()}</strong>
+            <span>卷三 烽火 · ${s.stageName}</span>
+          </div>
+          <div style="width:120px;display:flex;justify-content:flex-end;gap:6px;padding-right:46px">
+            ${showLegacyCluster ? `
+              <button type="button" class="ink-back-btn" style="width:34px;height:34px" data-ink-act="toggle-sound" title="现行版右上角4个圆按钮+宿主三点挤在一起">${svgIcon('sound', 15)}</button>
+              <button type="button" class="ink-back-btn" style="width:34px;height:34px" data-ink-act="open-pause" title="现行版暂停键">${svgIcon('pause', 15)}</button>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="ink-boss-bar">
+          <b>铁骑将军 · 破阵</b>
+          <div class="ink-boss-track"><span></span></div>
+        </div>
+
+        <div class="ink-controls">
+          <div class="ink-joy"><span>◀</span><span class="ink-joy-knob"></span><span>▶</span></div>
+          <div class="ink-actions-cluster">
+            <button type="button" class="ink-act ult">一笔</button>
+            <button type="button" class="ink-act dash">闪</button>
+            <button type="button" class="ink-act jump">跳</button>
+            <button type="button" class="ink-act slash" data-ink-act="slash-hit" title="点击模拟挥剑得分并实时保存">斩</button>
+          </div>
+        </div>`;
+
+      if (s.view === 'pause') {
+        if (isLegacy) {
+          viewHtml += `
+            <div class="modal-scrim center" data-ink-act="resume">
+              <div class="ink-pause-dialog" data-stop>
+                <span class="ink-seal" style="width:34px;height:34px;font-size:18px">歇</span>
+                <h3 class="ink-pause-title" style="margin:8px 0 4px">收剑片刻</h3>
+                <p style="font-size:12px;color:#7a7366;margin-bottom:14px">⚠️ 现行版痛点：没有「重开本幅」和「返回画卷选关」，点下方按钮会直接退出整个小游戏！</p>
+                <button type="button" class="ink-btn-primary" style="width:100%" data-ink-act="resume">继续 →</button>
+                <button type="button" style="margin-top:10px;font-size:12px;color:#7a7366" data-ink-act="exit">返回游戏广场（直接退出了！）</button>
+              </div>
+            </div>`;
+        } else {
+          viewHtml += `
+            <div class="modal-scrim center" data-ink-act="resume">
+              <div class="ink-pause-dialog" data-stop>
+                <div class="ink-pause-top">
+                  <span class="save-badge" style="background:#e3efe7;color:#247a4d"><i></i>已存至本幅</span>
+                  <span style="font-size:11.5px;color:#7a7366">卷三 · 第四幅「铁骑将军」</span>
+                  <button type="button" class="toggle-chip" style="background:#fbf6ea;color:#1b1b1d;border-color:#d5cbb8;height:26px" data-ink-act="toggle-sound">${svgIcon(s.sound ? 'sound' : 'mute', 13)}声音 ${s.sound ? '开' : '关'}</button>
+                </div>
+                <h3 class="ink-pause-title">收剑片刻</h3>
+                <div class="ink-pause-seals">
+                  <div class="ink-pause-seal-item"><span class="ink-seal" style="width:18px;height:18px;font-size:11px">过</span>通关本幅</div>
+                  <div class="ink-pause-seal-item"><span class="ink-seal" style="width:18px;height:18px;font-size:11px">全</span>少受伤(达成)</div>
+                  <div class="ink-pause-seal-item"><span class="ink-seal outline" style="width:18px;height:18px;font-size:11px">技</span>弹反 2/3</div>
+                </div>
+                <button type="button" class="ink-btn-primary" style="width:100%;height:42px;font-size:16px" data-ink-act="resume">继续挥剑 →</button>
+                <div class="ink-pause-grid">
+                  <button type="button" class="ink-btn-secondary" style="height:38px;font-size:13.5px;justify-content:center" data-ink-act="restart-stage">${svgIcon('refresh', 14)}重开本幅</button>
+                  <button type="button" class="ink-btn-secondary" style="height:38px;font-size:13.5px;justify-content:center" data-ink-act="go-select">${svgIcon('map', 14)}返回画卷选关</button>
+                </div>
+                <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(27,27,29,.1);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#7a7366">
+                  <button type="button" data-ink-act="open-host">收藏 / 分享 / 更多 ⋯</button>
+                  <button type="button" style="color:#b8322a;font-weight:600" data-ink-act="exit">退出游戏（保留进度）</button>
+                </div>
+              </div>
+            </div>`;
+        }
+      } else if (s.view === 'host') {
+        viewHtml += `
+          <div class="modal-scrim center" data-ink-act="resume">
+            <div class="center-sheet" data-stop>
+              <div class="sheet-header">
+                <div class="sheet-app-info">
+                  <div class="sheet-app-icon" style="background:#efe7d4;color:#1b1b1d;border:1px solid #d5cbb8;font-family:serif">墨</div>
+                  <div>
+                    <div class="sheet-app-title">水墨剑客</div>
+                    <div class="sheet-app-sub"><span class="official-tag">官方</span><span>动作游戏 · 烽火卷第四幅</span></div>
+                  </div>
+                </div>
+                <span class="save-badge"><i></i>11/21 印已存盘</span>
+              </div>
+              <div class="host-actions-row">
+                <button type="button" class="host-action-item" data-ink-act="go-select">
+                  <span class="host-action-icon">${svgIcon('map', 20)}</span>
+                  <span>返回画卷</span>
+                </button>
+                <button type="button" class="host-action-item ${s.fav ? 'active' : ''}" data-ink-act="toggle-fav">
+                  <span class="host-action-icon">${svgIcon('star', 20)}</span>
+                  <span>${s.fav ? '已收藏' : '收藏'}</span>
+                </button>
+                <button type="button" class="host-action-item" data-ink-act="share">
+                  <span class="host-action-icon">${svgIcon('share', 20)}</span>
+                  <span>分享</span>
+                </button>
+                <button type="button" class="host-action-item" data-ink-act="reload">
+                  <span class="host-action-icon">${svgIcon('refresh', 20)}</span>
+                  <span>重新加载</span>
+                </button>
+              </div>
+              <button type="button" class="sheet-exit-btn" data-ink-act="exit">
+                退出游戏 <span class="sheet-exit-sub">（下次打开可继续第四幅）</span>
+              </button>
+            </div>
+          </div>`;
+      }
+    }
+
+    document.getElementById('inkStage').innerHTML = bgSvg + viewHtml;
+  }
+
+  /* ─── 渲染画板 03：多页翻页小程序（遥控器 / MBTI 页面栈） ─── */
+  function renderApp() {
+    const s = state.app;
+    document.querySelectorAll('[data-app-state]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.appState === s.view);
+    });
+
+    let html = '';
+    if (s.view === 'root') {
+      html = `
+        <div class="app-home-header">
+          <h2>万能遥控器</h2>
+          <button type="button" class="app-add-chip" data-app-act="go-sub1">＋ 添加遥控器</button>
+        </div>
+        <div class="app-body">
+          <div class="stack-breadcrumb">
+            <span>页面栈：<b>[0] 首页 (根页)</b> · 根页无左上角返回，侧滑返回直接退出</span>
+          </div>
+          <div class="app-card" style="background:var(--accent-soft);border-color:var(--accent-soft-line);flex-direction:row;align-items:center;justify-content:space-between">
+            <div>
+              <strong style="font-size:13.5px;color:var(--accent-ink)">上次未完成的配对：客厅格力空调</strong>
+              <p style="font-size:12px;color:var(--ink2);margin-top:2px">已试码至第 2 / 5 组，点击继续完成保存</p>
+            </div>
+            <button type="button" class="btn-pill primary" style="flex:none;height:34px;font-size:12.5px" data-app-act="go-sub2">继续配对</button>
+          </div>
+          <div class="app-grid-2">
+            <button type="button" class="device-tile" data-app-act="go-sub1">
+              <span style="font-size:20px">📺</span>
+              <strong>客厅小米电视</strong>
+              <small>已保存 · 点击进入子页</small>
+            </button>
+            <button type="button" class="device-tile" data-app-act="go-sub1">
+              <span style="font-size:20px">❄️</span>
+              <strong>主卧美的空调</strong>
+              <small>制冷 26° · 点击进入子页</small>
+            </button>
+          </div>
+        </div>`;
+    } else if (s.view === 'sub1') {
+      html = `
+        <div class="app-navbar">
+          <button type="button" class="app-back-btn" data-app-act="go-root" title="退回首页 (history.back)">${svgIcon('back', 20)}</button>
+          <span class="app-nav-title">选择空调品牌 (第 1 层子页)</span>
+        </div>
+        <div class="app-body">
+          <div class="stack-breadcrumb">
+            <span>页面栈：首页 → <b>[1] 选择品牌</b> · 左上角 <code>‹</code> 与侧滑返回均退回首页</span>
+          </div>
+          <div class="app-grid-2">
+            <button type="button" class="device-tile" data-app-act="go-sub2"><strong>美的 Midea</strong><small>进入第 2 层试码子页 →</small></button>
+            <button type="button" class="device-tile" data-app-act="go-sub2"><strong>格力 Gree</strong><small>进入第 2 层试码子页 →</small></button>
+            <button type="button" class="device-tile" data-app-act="go-sub2"><strong>海尔 Haier</strong><small>进入第 2 层试码子页 →</small></button>
+            <button type="button" class="device-tile" data-app-act="go-sub2"><strong>小米 Xiaomi</strong><small>进入第 2 层试码子页 →</small></button>
+          </div>
+        </div>`;
+    } else {
+      html = `
+        <div class="app-navbar">
+          <button type="button" class="app-back-btn" data-app-act="go-sub1" title="退回上一页 (history.back)">${svgIcon('back', 20)}</button>
+          <span class="app-nav-title">格力空调 · 试码 (${s.questionIdx}/48)</span>
+        </div>
+        <div class="app-body">
+          <div class="stack-breadcrumb">
+            <span>页面栈：首页 → 品牌 → <b>[2] 试码/答题</b> · 每步自动写入 <code>xb.storage</code></span>
+          </div>
+          <div class="app-card" style="text-align:center;padding:18px 14px">
+            <span class="save-badge" style="align-self:center;margin-bottom:4px"><i></i>第 ${s.questionIdx} 步进度已实时保存</span>
+            <strong style="font-size:17px">对准空调，点击发射电源键</strong>
+            <p style="font-size:12.5px;color:var(--ink2)">即使此时点右上角退出小程序，下次进来也能从第 ${s.questionIdx} 步接着测</p>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="btn-pill secondary" data-app-act="next-step">下一组码 (+1步存盘)</button>
+              <button type="button" class="btn-pill primary" data-app-act="go-root">有反应，保存回首页</button>
+            </div>
+          </div>
+        </div>`;
+
+      if (s.view === 'menu') {
+        html += `
+          <div class="modal-scrim" data-app-act="close-menu">
+            <div class="bottom-sheet" data-stop>
+              <div class="sheet-header">
+                <div class="sheet-app-info">
+                  <div class="sheet-app-icon" style="background:var(--fill);color:var(--ink)">控</div>
+                  <div>
+                    <div class="sheet-app-title">万能遥控器</div>
+                    <div class="sheet-app-sub"><span class="official-tag">官方</span><span>工具 · 当前在第 2 层子页</span></div>
+                  </div>
+                </div>
+                <span class="save-badge"><i></i>已自动保存</span>
+              </div>
+              <div class="host-actions-row">
+                <button type="button" class="host-action-item" data-app-act="reload">
+                  <span class="host-action-icon">${svgIcon('refresh', 20)}</span>
+                  <span>重新加载</span>
+                </button>
+                <button type="button" class="host-action-item ${s.fav ? 'active' : ''}" data-app-act="toggle-fav">
+                  <span class="host-action-icon">${svgIcon('star', 20)}</span>
+                  <span>${s.fav ? '已收藏' : '收藏'}</span>
+                </button>
+                <button type="button" class="host-action-item" data-app-act="share">
+                  <span class="host-action-icon">${svgIcon('share', 20)}</span>
+                  <span>分享</span>
+                </button>
+                <button type="button" class="host-action-item" data-app-act="pin">
+                  <span class="host-action-icon">${svgIcon('pin', 20)}</span>
+                  <span>加到桌面</span>
+                </button>
+              </div>
+              <button type="button" class="sheet-exit-btn" data-app-act="exit">
+                退出小程序 <span class="sheet-exit-sub">（跨层级直接退出，已存进度不丢失）</span>
+              </button>
+            </div>
+          </div>`;
+      }
+    }
+
+    document.getElementById('appStage').innerHTML = html;
+  }
+
+  /* ─── 更新右侧页面栈与返回键实时状态指示器 ─── */
+  function renderInspector() {
+    const bpStack = state.bp.view === 'pause'
+      ? '[0] 棋盘对局 → <b>[弹窗] 暂停与存档菜单</b>（此时侧滑返回 = 关闭菜单继续玩）'
+      : '<b>[0] 棋盘对局 (根页)</b>（此时侧滑返回 = <b>触发暂停保护</b>，防手滑误退丢局）';
+
+    const inkMap = {
+      lobby: '<b>[0] 卷首大厅 (根页)</b>（此时侧滑返回 = 退出《水墨剑客》）',
+      select: '[0] 卷首大厅 → <b>[1] 七卷画轴选关</b>（此时侧滑返回 = <code>history.back()</code> 退回卷首大厅）',
+      play: '[0] 大厅 → [1] 选关 → <b>[2] 局内战斗</b>（此时侧滑返回 = <b>弹出水墨暂停卡</b>）',
+      pause: '[0] 大厅 → [1] 选关 → [2] 战斗 → <b>[弹窗] 暂停卡</b>（可点「返回画卷」退回第1层）',
+      host: '[0] 大厅 → [1] 选关 → [2] 战斗 → <b>[宿主] 应用菜单</b>（点「退出」跨层直退）',
+    };
+
+    const appMap = {
+      root: '<b>[0] 遥控器首页 (根页)</b>（无左上角返回，侧滑返回 = 退出小程序）',
+      sub1: '[0] 首页 → <b>[1] 选择品牌子页</b>（左上角 <code>‹</code> 或侧滑 = 退回首页）',
+      sub2: '[0] 首页 → [1] 品牌 → <b>[2] 试码子页</b>（左上角 <code>‹</code> 或侧滑 = 退回第1层品牌页）',
+      menu: '[0] 首页 → [1] 品牌 → [2] 试码 → <b>[宿主] 底部菜单</b>（点「退出」直接退出小程序）',
+    };
+
+    document.getElementById('liveStackInspector').innerHTML = `
+      <div style="padding:9px 11px;border-radius:10px;background:rgba(0,0,0,.035)">
+        <div><b>01 方块爆破</b> · 存档：<code>score=${state.bp.score}, best=${state.bp.best}</code> (实时写盘)</div>
+        <div style="margin-top:3px;color:#666">当前栈与返回键行为：${bpStack}</div>
+      </div>
+      <div style="padding:9px 11px;border-radius:10px;background:rgba(0,0,0,.035)">
+        <div><b>02 水墨剑客</b> · 存档：<code>vol=3, stage=3-4, seals=11/21</code> (支持中途续玩)</div>
+        <div style="margin-top:3px;color:#666">当前栈与返回键行为：${inkMap[state.ink.view]}</div>
+      </div>
+      <div style="padding:9px 11px;border-radius:10px;background:rgba(0,0,0,.035)">
+        <div><b>03 多页小程序</b> · 存档：<code>step=${state.app.questionIdx}/48</code> (翻页实时保存)</div>
+        <div style="margin-top:3px;color:#666">当前栈与返回键行为：${appMap[state.app.view]}</div>
+      </div>
+    `;
+  }
+
+  function renderAll() {
+    applyTheme();
+    renderBp();
+    renderInk();
+    renderApp();
+    renderInspector();
+  }
+
+  /* ─── 事件绑定 ─── */
+  document.addEventListener('click', e => {
+    const schemeBtn = e.target.closest('[data-set-scheme]');
+    if (schemeBtn) {
+      state.scheme = schemeBtn.dataset.setScheme;
+      document.querySelectorAll('[data-set-scheme]').forEach(b => b.classList.toggle('active', b === schemeBtn));
+      renderAll();
+      return;
+    }
+
+    const swatch = e.target.closest('[data-accent]');
+    if (swatch) {
+      state.accent = swatch.dataset.accent;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s === swatch));
+      renderAll();
+      return;
+    }
+
+    const bpTab = e.target.closest('[data-bp-state]');
+    if (bpTab) {
+      state.bp.view = bpTab.dataset.bpState;
+      state.bp.confirmRestart = false;
+      renderAll();
+      return;
+    }
+
+    const inkTab = e.target.closest('[data-ink-state]');
+    if (inkTab) {
+      state.ink.view = inkTab.dataset.inkState;
+      renderAll();
+      return;
+    }
+
+    const appTab = e.target.closest('[data-app-state]');
+    if (appTab) {
+      state.app.view = appTab.dataset.appState;
+      renderAll();
+      return;
+    }
+
+    // 右上角宿主胶囊点击
+    if (e.target.closest('#bpHostBtn')) {
+      state.bp.view = state.bp.view === 'pause' ? 'play' : 'pause';
+      state.bp.confirmRestart = false;
+      renderAll();
+      return;
+    }
+    if (e.target.closest('#inkHostBtn')) {
+      if (state.scheme === 'unified' && state.ink.view === 'play') {
+        state.ink.view = 'pause';
+      } else {
+        state.ink.view = state.ink.view === 'host' ? 'play' : 'host';
+      }
+      renderAll();
+      return;
+    }
+    if (e.target.closest('#appHostBtn')) {
+      state.app.view = state.app.view === 'menu' ? 'sub2' : 'menu';
+      renderAll();
+      return;
+    }
+
+    if (e.target.closest('[data-stop]') && !e.target.closest('button')) return;
+
+    // 方块爆破内部动作
+    const bpAct = e.target.closest('[data-bp-act]')?.dataset.bpAct;
+    if (bpAct) {
+      const s = state.bp;
+      if (bpAct === 'open-pause') { s.view = 'pause'; s.confirmRestart = false; }
+      else if (bpAct === 'resume') { s.view = 'play'; s.confirmRestart = false; }
+      else if (bpAct === 'fresh-board' || bpAct === 'confirm-fresh') {
+        s.score = 0;
+        s.view = 'play';
+        s.confirmRestart = false;
+        showToast('bp', '已开启新棋盘，最高分 3,640 保留');
+      }
+      else if (bpAct === 'ask-fresh') { s.confirmRestart = true; }
+      else if (bpAct === 'place-piece') {
+        s.score += 40;
+        if (s.score > s.best) s.best = s.score;
+        s.view = 'play';
+        showToast('bp', `得分 +40 → 已实时写入 xb.storage (${s.score}分)`);
+      }
+      else if (bpAct === 'toggle-sound') { s.sound = !s.sound; }
+      else if (bpAct === 'toggle-music') { s.music = !s.music; }
+      else if (bpAct === 'toggle-fav') { s.fav = !s.fav; showToast('bp', s.fav ? '已收藏《方块爆破》' : '已取消收藏'); }
+      else if (bpAct === 'share') { showToast('bp', '已调起小伴分享面板'); }
+      else if (bpAct === 'pin') { showToast('bp', '已请求添加《方块爆破》桌面快捷方式'); }
+      else if (bpAct === 'reload') { s.view = 'resume'; showToast('bp', '重新加载容器 → 自动恢复 1,840 分残局'); }
+      else if (bpAct === 'exit') { s.view = 'resume'; showToast('bp', `已退出，${s.score} 分残局已落盘保存`); }
+      renderAll();
+      return;
+    }
+
+    // 水墨剑客内部动作
+    const inkVol = e.target.closest('[data-ink-vol]')?.dataset.inkVol;
+    if (inkVol) {
+      state.ink.vol = Number(inkVol);
+      renderAll();
+      return;
+    }
+    const inkAct = e.target.closest('[data-ink-act]')?.dataset.inkAct;
+    if (inkAct) {
+      const s = state.ink;
+      if (inkAct === 'go-select') { s.view = 'select'; showToast('ink', '进入第 1 层：七卷选关页 (pushState)'); }
+      else if (inkAct === 'go-lobby') { s.view = 'lobby'; showToast('ink', '退回第 0 层：卷首大厅 (history.back)'); }
+      else if (inkAct === 'go-play' || inkAct === 'resume') { s.view = 'play'; }
+      else if (inkAct === 'open-pause') { s.view = 'pause'; }
+      else if (inkAct === 'open-host') { s.view = 'host'; }
+      else if (inkAct === 'restart-stage') { s.score = 0; s.view = 'play'; showToast('ink', '已重开本幅「铁骑将军」（不退回大厅）'); }
+      else if (inkAct === 'slash-hit') { s.score += 120; showToast('ink', `斩击得分 +120 → 进度已保存`); }
+      else if (inkAct === 'toggle-sound') { s.sound = !s.sound; }
+      else if (inkAct === 'toggle-fav') { s.fav = !s.fav; showToast('ink', s.fav ? '已收藏《水墨剑客》' : '已取消收藏'); }
+      else if (inkAct === 'share') { showToast('ink', '已调起小伴分享面板'); }
+      else if (inkAct === 'reload') { s.view = 'lobby'; showToast('ink', '已重新加载容器'); }
+      else if (inkAct === 'exit') { s.view = 'lobby'; showToast('ink', '已退出《水墨剑客》，下次可继续第四幅'); }
+      renderAll();
+      return;
+    }
+
+    // 多页小程序内部动作
+    const appAct = e.target.closest('[data-app-act]')?.dataset.appAct;
+    if (appAct) {
+      const s = state.app;
+      if (appAct === 'go-root') { s.view = 'root'; showToast('app', '退回第 0 层首页'); }
+      else if (appAct === 'go-sub1') { s.view = 'sub1'; showToast('app', '进入第 1 层子页 (pushState)'); }
+      else if (appAct === 'go-sub2' || appAct === 'close-menu') { s.view = 'sub2'; }
+      else if (appAct === 'next-step') { s.questionIdx = Math.min(48, s.questionIdx + 1); showToast('app', `第 ${s.questionIdx} 步已自动写入 xb.storage`); }
+      else if (appAct === 'toggle-fav') { s.fav = !s.fav; }
+      else if (appAct === 'share') { showToast('app', '已调起分享面板'); }
+      else if (appAct === 'pin') { showToast('app', '已请求添加到手机桌面'); }
+      else if (appAct === 'reload') { s.view = 'root'; showToast('app', '已重新加载小程序'); }
+      else if (appAct === 'exit') { s.view = 'root'; showToast('app', `已退出小程序，第 ${s.questionIdx} 步进度已保存`); }
+      renderAll();
+      return;
+    }
+  });
+
+  // 模拟手机侧滑返回（同时演示三台样机在当前层级的返回键行为）
+  document.getElementById('simBackBtn').addEventListener('click', () => {
+    // 1. 方块爆破
+    if (state.bp.view === 'pause') {
+      state.bp.view = 'play';
+      showToast('bp', '侧滑返回 → 关闭暂停菜单，继续对局');
+    } else if (state.bp.view === 'play' || state.bp.view === 'resume') {
+      if (state.scheme === 'legacy') {
+        showToast('bp', '⚠️ 现行版侧滑返回 → 无暂停缓冲，直接退出游戏！');
+      } else {
+        state.bp.view = 'pause';
+        showToast('bp', '侧滑返回 → 自动触发暂停保护，防手滑误退');
+      }
+    } else {
+      state.bp.view = 'play';
+    }
+
+    // 2. 水墨剑客
+    if (state.ink.view === 'host' || state.ink.view === 'pause') {
+      state.ink.view = 'play';
+      showToast('ink', '侧滑返回 → 关闭弹窗，回到对局');
+    } else if (state.ink.view === 'play') {
+      state.ink.view = 'pause';
+      showToast('ink', '对局中侧滑返回 → 弹出水墨暂停卡');
+    } else if (state.ink.view === 'select') {
+      state.ink.view = 'lobby';
+      showToast('ink', '选关页侧滑返回 → history.back() 退回卷首大厅');
+    } else {
+      showToast('ink', '已在第 0 层卷首大厅，侧滑返回 → 退出《水墨剑客》');
+    }
+
+    // 3. 多页小程序
+    if (state.app.view === 'menu') {
+      state.app.view = 'sub2';
+      showToast('app', '侧滑返回 → 先关闭宿主菜单');
+    } else if (state.app.view === 'sub2') {
+      state.app.view = 'sub1';
+      showToast('app', '第 2 层侧滑返回 → 退回第 1 层品牌选择');
+    } else if (state.app.view === 'sub1') {
+      state.app.view = 'root';
+      showToast('app', '第 1 层侧滑返回 → 退回第 0 层首页');
+    } else {
+      showToast('app', '已在第 0 层首页，侧滑返回 → 退出小程序');
+    }
+
+    renderAll();
+  });
+
+  document.getElementById('toggleSafeBtn').addEventListener('click', e => {
+    const on = document.body.classList.toggle('show-safe');
+    e.currentTarget.textContent = on ? '隐藏触控区' : '触控安全区';
+  });
+
+  document.getElementById('toggleWidthBtn').addEventListener('click', e => {
+    const compact = document.body.classList.toggle('compact');
+    e.currentTarget.textContent = compact ? '360px' : '390px';
+  });
+
+  document.getElementById('toggleDarkBtn').addEventListener('click', () => {
+    state.dark = !state.dark;
+    renderAll();
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

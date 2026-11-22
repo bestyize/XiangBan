@@ -230,13 +230,14 @@ class RuntimeV2Activity : ComponentActivity() {
                     onFavorite = if (favoriteReceiver != null) ({ updateFavorite(toggle = true) }) else null,
                     onShare = if (!remoteEnabled) ({ shareWork(id, workspace) }) else null,
                     onPinShortcut = if (Build.VERSION.SDK_INT >= 26 && shortcut != null) ({ pinWork(shortcut, icon?.asAndroidBitmap()) }) else null,
+                    onGameAction = { action -> event("game.action", JSONObject().put("action", action)) },
                     onMenuChanged = { open ->
                         updateVisibility()
                         if (open) updateFavorite(toggle = false)
                     },
                     landscapeLaunch = pack.manifest.orientation == "landscape",
-                    capsuleRightMarginDp = if (blockPuzzleFullBleed) 16f else 6f,
-                    capsuleTopGapDp = if (blockPuzzleFullBleed) 8f else 0f,
+                    capsuleRightMarginDp = if (blockPuzzleFullBleed) 12f else 8f,
+                    capsuleTopGapDp = if (blockPuzzleFullBleed) 6f else 0f,
                 )
                 setContentView(container)
                 media.watch()
@@ -840,6 +841,26 @@ class RuntimeV2Activity : ComponentActivity() {
                     result()
                 }
             }
+            "game.session" -> {
+                if (!ready || reply !== document) { error("invalid"); return }
+                val soundVal = if (params.has("soundEnabled") && !params.isNull("soundEnabled")) params.optBoolean("soundEnabled") else null
+                val musicVal = if (params.has("musicEnabled") && !params.isNull("musicEnabled")) params.optBoolean("musicEnabled") else null
+                chrome.gameSession = RuntimeV2GameSession(
+                    inRound = params.optBoolean("inRound", false),
+                    title = params.optString("title").take(64),
+                    subtitle = params.optString("subtitle").take(96),
+                    saveBadge = params.optString("saveBadge").take(24),
+                    exitHint = params.optString("exitHint").take(32),
+                    resumeLabel = params.optString("resumeLabel", "继续游戏").take(16).ifBlank { "继续游戏" },
+                    restartLabel = params.optString("restartLabel", "重开本局").take(16).ifBlank { "重开本局" },
+                    confirmRestart = params.optBoolean("confirmRestart", false),
+                    canSelectStage = params.optBoolean("canSelectStage", false),
+                    selectStageLabel = params.optString("selectStageLabel", "选择关卡").take(16).ifBlank { "选择关卡" },
+                    soundEnabled = soundVal,
+                    musicEnabled = musicVal,
+                )
+                result()
+            }
             else -> error("unsupported")
         }
     }
@@ -894,6 +915,7 @@ class RuntimeV2Activity : ComponentActivity() {
         if (::chrome.isInitialized && chrome.consentOpen) { media.cancel(); return }
         if (!::chrome.isInitialized || !ready || failed) { exit(); return }
         if (chrome.menuOpen) { chrome.closeMenu(); return }
+        if (chrome.gameSession?.inRound == true) { chrome.openMenu(); return }
         val view = webView
         if (view != null && view.canGoBack()) view.goBack()
         else exit()
