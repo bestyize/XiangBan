@@ -19,6 +19,9 @@ interface MobileWorkspace {
         write(path, content.decodeToString(throwOnInvalidSequence = true))
     }
     suspend fun <T> gameTransaction(action: suspend () -> T): T = action()
+    /** Persistent workspaces install the complete directory together. */
+    suspend fun installGameFiles(id: String, files: List<MobileGameFile>): Boolean = false
+    suspend fun recoverGameFiles() {}
 }
 
 object MobileWorkspaceLimits {
@@ -49,6 +52,7 @@ object MobileWorkspaceLimits {
 /** Platform implementations must refuse symlinks before every filesystem operation. */
 abstract class ValidatedMobileWorkspace : MobileWorkspace {
     private val lock = Mutex()
+    protected suspend fun <T> withWorkspaceLock(action: suspend () -> T): T = lock.withLock { action() }
     protected abstract suspend fun entries(path: String, recursive: Boolean): List<WorkspaceEntry>
     protected abstract suspend fun readData(path: String, limit: Int): ByteArray
     protected abstract suspend fun writeData(path: String, content: ByteArray)
