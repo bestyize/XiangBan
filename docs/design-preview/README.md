@@ -36,6 +36,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [「我的」页与个人主页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mine-redesign.html) | 手机「我的」页定稿（方案 1 通栏精修）与个人主页（本人视角 + 社区他人视角）三屏联动稿（待确认）：「我的」页移除「屏蔽的用户」、重复的「创作」与「关注与粉丝」及外露积分，「模型与点数」改名「模型配置」，右上角换为齿轮图标，快捷三宫格为「我的收藏 / 我的作品 / 通知」，下方仅留 2 组 4 项线性图标列表；个人主页统一通栏风格，配 68px 头像与 ID、四列等宽数据条（帖子/回复/关注/粉丝）、图文混排帖子卡、带头像的关注/粉丝列表，他人页「屏蔽」收进右上角「···」菜单。支持场景、未登录、空态、已屏蔽、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/mine-redesign.html) |
 | [发帖页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) | 手机端发帖页重设计（01 初始写作全交互 + 02 富内容完整态 + 03 选板块/作品/投票/封面/键盘五态）及网页版对照：紧凑单行板块与封面入口、正文下内联话题胶囊、每帖限 1 个可运行作品（V2 ZIP / `.html`·`.htm` 转 V2 / 关联创作）与普通附件区分、固定 48px 单行底栏、高对比投票芯片与紧耦合文字封面编辑。支持 390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=mobile) |
 | [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 个人 Agent 连续主线三屏定稿（01 默认浏览态 + 02 键盘弹出态 + 03 点右上角「···」进入的个人 Agent 配置页）：极简顶栏 + 分离悬浮胶囊输入框 + 通栏白底配置列表，支持三态、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
 | [动态壁纸](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers.html) | Android 壁纸库、三种全屏预览和封面使用状态。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
