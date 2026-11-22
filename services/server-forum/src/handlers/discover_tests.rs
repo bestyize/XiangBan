@@ -616,6 +616,37 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
 }
 
 #[tokio::test]
+async fn topic_tags_commit_with_the_topic_and_scores_do_not_gate_creation() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let user = h.member().await?;
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug = 'casual-fun'").fetch_one(&h.pool).await?;
+    sqlx::raw_sql(
+        "CREATE FUNCTION reject_test_score() RETURNS trigger LANGUAGE plpgsql AS $$
+             BEGIN RAISE EXCEPTION 'test score update failure'; END; $$;
+         CREATE TRIGGER reject_test_score BEFORE UPDATE OF hot_score ON topics
+             FOR EACH ROW EXECUTE FUNCTION reject_test_score();",
+    ).execute(&h.pool).await?;
+    let draft = |title, tag| json!({"category_id": category, "title": title, "body": "用于本地测试的话题正文。", "tags": [tag]});
+    let (status, topic) = call(&h.app, "POST", "/api/topics", Some(&user), draft("初始帖子", "原标签")).await;
+    assert_eq!(status, StatusCode::OK, "{topic}");
+    let id = topic["id"].as_i64().unwrap();
+
+    sqlx::query("ALTER TABLE topic_tags ADD CONSTRAINT reject_test_tag CHECK (false) NOT VALID").execute(&h.pool).await?;
+    let (status, _) = call(&h.app, "POST", "/api/topics", Some(&user), draft("失败的发布", "新标签")).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM topics WHERE title = '失败的发布'").fetch_one(&h.pool).await?;
+    assert_eq!(count, 0);
+
+    let path = format!("/api/topics/{id}");
+    let (status, _) = call(&h.app, "PATCH", &path, Some(&user), draft("失败的编辑", "新标签")).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let (_, stored) = call(&h.app, "GET", &path, Some(&user), Value::Null).await;
+    assert_eq!(stored["title"], "初始帖子");
+    assert_eq!(stored["tags"], json!(["原标签"]));
+    h.finish().await
+}
+
+#[tokio::test]
 async fn topics_carry_images_polls_and_help_stats() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let app = &h.app;

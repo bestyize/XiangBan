@@ -240,19 +240,21 @@ pub(super) fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
     Ok(tags)
 }
 
-pub async fn save_tags(pool: &PgPool, topic_id: i64, tags: &[String]) -> AppResult<()> {
-    sqlx::query("DELETE FROM topic_tags WHERE topic_id = $1").bind(topic_id).execute(pool).await?;
+async fn save_tags(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, topic_id: i64, tags: &[String]) -> AppResult<()> {
+    sqlx::query("DELETE FROM topic_tags WHERE topic_id = $1").bind(topic_id).execute(&mut **tx).await?;
+    let mut tags: Vec<_> = tags.iter().collect();
+    tags.sort_unstable();
     for tag in tags {
         let (tag_id,): (i32,) = sqlx::query_as(
             "INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id",
         )
         .bind(tag)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await?;
         sqlx::query("INSERT INTO topic_tags (topic_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(topic_id)
             .bind(tag_id)
-            .execute(pool)
+            .execute(&mut **tx)
             .await?;
     }
     Ok(())
@@ -341,9 +343,9 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
         let note = Note { kind: n::MENTION, actor: Some(user.uid), topic_id: Some(id), post_id: None, pack_id: None, title: &title, excerpt: &excerpt };
         n::notify_mentions(&mut tx, &body, user.uid, &[], &note).await?;
     }
+    save_tags(&mut tx, id, &tags).await?;
+    // New topics have a zero score until the first interaction or scheduled refresh.
     tx.commit().await?;
-    save_tags(&state.pool, id, &tags).await?;
-    models::refresh_hot_scores(&state.pool, Some(id)).await?;
     Ok(Json(json!({ "id": id })))
 }
 
@@ -412,9 +414,9 @@ pub async fn update(
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "topic", id, &format!("命中复核词：{word}")).await?;
     }
+    save_tags(&mut tx, id, &tags).await?;
     tx.commit().await?;
     attachments::remove_files(&state.config.upload_dir, &removed).await;
-    save_tags(&state.pool, id, &tags).await?;
     Ok(Json(json!({ "id": id })))
 }
 
