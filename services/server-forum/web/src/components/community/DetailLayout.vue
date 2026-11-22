@@ -3,11 +3,12 @@ import { MOBILE_SITE_QUERY, useNarrow } from '@/lib/viewport'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { useToast } from '@/stores/toast'
+import type { ShareDeletion, SharePayload } from '@/lib/detailShare'
+import DetailShareDialog from './DetailShareDialog.vue'
 import DetailGallery from './DetailGallery.vue'
 import '@/styles/topic-detail.css'
 
-const props = defineProps<{
+defineProps<{
   ready: boolean
   title?: string
   author?: string
@@ -16,25 +17,11 @@ const props = defineProps<{
   images?: string[]
   fallbackCover?: string
   badge?: string
-  shareable?: boolean
-  shareUrl?: string
+  share?: SharePayload | null
+  shareDeletion?: ShareDeletion
 }>()
 defineEmits<{ back: [] }>()
 const mobile = useNarrow(MOBILE_SITE_QUERY)
-const toast = useToast()
-
-async function share() {
-  const url = props.shareUrl || location.href
-  try {
-    if (navigator.share) await navigator.share({ title: props.title, url })
-    else {
-      await navigator.clipboard.writeText(url)
-      toast.show('链接已复制')
-    }
-  } catch (error) {
-    if (!(error instanceof Error && error.name === 'AbortError')) toast.show('暂时无法分享，请复制地址栏中的链接')
-  }
-}
 </script>
 
 <template>
@@ -58,9 +45,7 @@ async function share() {
           </component>
           <div class="detail-author-actions">
             <slot name="actions" />
-            <button v-if="shareable" type="button" class="h5-icon-btn" aria-label="分享" @click="share">
-              <AppIcon name="share-up" :size="mobile ? 18 : 16" />
-            </button>
+            <DetailShareDialog v-if="share" :payload="share" :deletion="shareDeletion" trigger-class="h5-icon-btn" />
           </div>
         </div>
       </header>

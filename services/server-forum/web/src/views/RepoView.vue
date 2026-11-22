@@ -11,6 +11,7 @@ import RequestState from '@/components/community/RequestState.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { displayDate, repoGrowth } from '@/components/community/contract'
 import { useHead } from '@/lib/head'
+import { copyRepo, type SharePayload } from '@/lib/detailShare'
 import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import { repoAbout, reviewedProjectIcon } from '@/lib/githubProjectAbout'
 import '@/components/community/community.css'
@@ -30,6 +31,15 @@ const blocks = computed(() => (showZh.value ? d.value?.readme.zh_blocks : d.valu
 const long = computed(() => blocks.value.length > 14)
 const color = computed(() => (/^#[\da-f]{6}$/i.test(d.value?.language_color || '') ? d.value!.language_color : 'var(--ink-3)'))
 const github = computed(() => `https://github.com/${encodeURIComponent(owner.value)}/${encodeURIComponent(repo.value)}`)
+const share = computed<SharePayload | undefined>(() => d.value ? {
+  title: d.value.repo,
+  author: d.value.full_name,
+  badge: '开源项目',
+  excerpt: about.value.text,
+  thumbnail: icon.value.url,
+  url: new URL(route.path, location.origin).href,
+  extra: copyRepo(github.value),
+} : undefined)
 const bookmarks = useRepoBookmarks()
 const saved = computed(() => !!d.value && bookmarks.has(d.value.full_name))
 const saveError = bookmarks.error
@@ -42,7 +52,7 @@ function back() {
 useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项目详情', description: d.value ? about.value.text : '' }))
 </script>
 <template>
-  <DetailLayout :ready="!!d" :title="d?.repo" :author="d?.full_name" :author-image="icon.url" shareable @back="back">
+  <DetailLayout :ready="!!d" :title="d?.repo" :author="d?.full_name" :author-image="icon.url" :share="share" @back="back">
     <template #state>
       <RequestState :loading="detail.loading.value" :error="detail.error.value" @retry="detail.load" />
     </template>

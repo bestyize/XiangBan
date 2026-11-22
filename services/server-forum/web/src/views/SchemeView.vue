@@ -44,7 +44,8 @@ watch(() => route.params.id, load, { immediate: true })
 <template>
   <DetailLayout :ready="!!scheme" :title="scheme?.title" :author="scheme?.author.nickname || '社区作者'"
     :author-to="scheme ? '/u/' + encodeURIComponent(scheme.author.uid) : undefined"
-    shareable :share-url="link" @back="back">
+    :share="scheme ? { title: scheme.title, author: scheme.author.nickname, badge: '桌面方案', excerpt: scheme.summary, url: link } : undefined"
+    @back="back">
     <template #state>
       <p v-if="loading" class="state" role="status">正在读取方案…</p>
       <p v-else-if="missing" class="state">方案不存在或已下架。<RouterLink to="/schemes">查看其他方案</RouterLink></p>

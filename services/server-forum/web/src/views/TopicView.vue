@@ -3,7 +3,6 @@ import { categoryDestination, categoryLabel } from '@/lib/communityStructure'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AttachmentList from '@/components/AttachmentList.vue'
-import PosterDialog from '@/components/PosterDialog.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
 import DetailLayout from '@/components/community/DetailLayout.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -22,6 +21,7 @@ import { useToast } from '@/stores/toast'
 import { compactCount, formatDateTime, pinScopeLabel, readLevelBadge, tagLabel, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { inviteUrl } from '@/lib/invite'
+import { copyFull, type SharePayload, type ShareDeletion } from '@/lib/detailShare'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,12 +36,6 @@ const commentRestriction = computed(() => {
   if (topic.value?.locked) return '帖子已锁定，不能再回复。'
   if (topic.value && session.user && !topic.value.viewer.can_reply) return '当前账号暂不能参与评论。'
 })
-const posterOpen = ref(false)
-const posterInput = computed(() =>
-  topic.value
-    ? { tag: categoryLabel(topic.value.category), title: topic.value.title, summary: topic.value.excerpt || topic.value.title, url: `${window.location.origin}/t/${topic.value.id}`, seed: topic.value.id }
-    : null,
-)
 const pinScopeDraft = ref<Exclude<PinScope, 'none'>>('site')
 const pinBoard = computed(() => topic.value && meta.byId.get(topic.value.category.id))
 const pinActionLabel = computed(() => {
@@ -56,7 +50,6 @@ const comments = ref<InstanceType<typeof ThreadComments> | null>(null)
 const reportTarget = ref<{ type: 'topic'; id: number } | null>(null)
 const moreOpen = ref(false)
 function fromMore(action: () => unknown) { moreOpen.value = false; void action() }
-function openPoster() { posterOpen.value = true }
 function reportTopic() {
   if (topic.value && session.requireLogin()) reportTarget.value = { type: 'topic', id: topic.value.id }
 }
@@ -243,15 +236,40 @@ const shareUrl = computed(() =>
   session.user ? inviteUrl(session.user.uid, `/t/${id.value}`) : `${location.origin}/t/${id.value}`,
 )
 
-async function removeTopic() {
-  if (!topic.value || !confirm('删除这个帖子？删除后其他人将看不到它。')) return
-  try {
-    await api.deleteTopic(topic.value.id)
-    toast.show('帖子已删除')
-    router.replace('/')
-  } catch (e) {
-    toast.error(e)
+const share = computed<SharePayload | undefined>(() => {
+  const post = topic.value
+  if (!post || post.status !== 'normal') return
+  const linkOnly = post.min_read_level > 0
+  return {
+    title: linkOnly ? '社区帖子' : post.title || post.excerpt || '分享生活',
+    url: shareUrl.value,
+    badge: '社区帖子',
+    author: linkOnly ? undefined : post.author.nickname,
+    meta: linkOnly ? '需要阅读权限' : [post.author.nickname, timeAgo(post.created_at), categoryLabel(post.category)].filter(Boolean).join(' · '),
+    excerpt: linkOnly ? undefined : post.excerpt,
+    extra: !linkOnly && post.body_html ? copyFull(post.title, post.body_html) : undefined,
+    linkOnly,
   }
+})
+
+const shareDeletion = computed<ShareDeletion | undefined>(() => {
+  const post = topic.value
+  if (!post?.viewer.can_edit) return
+  return {
+    label: '删除帖子',
+    confirm: '删除这条帖子？',
+    async run() {
+      await api.deleteTopic(post.id)
+      toast.show('帖子已删除')
+      if (topic.value?.id === post.id) await router.replace('/')
+    },
+  }
+})
+
+async function removeTopic() {
+  const action = shareDeletion.value
+  if (!action || !confirm('删除这个帖子？删除后其他人将看不到它。')) return
+  try { await action.run() } catch (e) { toast.error(e) }
 }
 
 function changeReplyCount(delta: number) {
@@ -291,7 +309,7 @@ function breadcrumbDestination(slug: string) {
   <DetailLayout :key="id" :ready="!!topic" :title="topic?.title" :author="topic?.author.nickname"
     :author-image="topic?.author.avatar_url" :author-to="topic ? '/u/' + topic.author.uid : undefined"
     :images="content.gallery" :badge="topic ? categoryLabel(topic.category) : undefined"
-    shareable :share-url="shareUrl" @back="goBack">
+    :share="share" :share-deletion="shareDeletion" @back="goBack">
     <template #state>
       <div v-if="missing" class="panel missing">
         <h1>帖子不存在</h1>
@@ -378,7 +396,6 @@ function breadcrumbDestination(slug: string) {
     <template #dialogs>
       <ActionSheet v-if="topic" :open="moreOpen" label="更多操作" @close="moreOpen = false">
         <div class="topic-more-actions">
-          <button type="button" class="more-row" @click="fromMore(openPoster)">生成海报</button>
           <template v-if="topic.viewer.can_pin">
             <label class="more-row more-pin">
               <span>置顶范围</span>
@@ -400,7 +417,6 @@ function breadcrumbDestination(slug: string) {
       </ActionSheet>
 
       <ReportDialog :target="reportTarget" @close="reportTarget = null" />
-      <PosterDialog :open="posterOpen" :poster="posterInput" :name="topic?.title ?? ''" @close="posterOpen = false" />
     </template>
   </DetailLayout>
 </template>

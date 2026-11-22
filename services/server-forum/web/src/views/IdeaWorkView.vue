@@ -10,6 +10,7 @@ import DetailLayout from '@/components/community/DetailLayout.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import RequestState from '@/components/community/RequestState.vue'
 import { useHead } from '@/lib/head'
+import type { SharePayload } from '@/lib/detailShare'
 import { ideaCoverFallback, loadFeaturedIdeas } from '@/lib/ideaCatalog'
 import { ideaPlayerId, ideaRunLocation } from '@/lib/ideaPlayers'
 import { galleryTab } from '@/lib/microGallery'
@@ -38,6 +39,26 @@ const run = computed(() => {
   const id = ideaPlayerId(work.value?.player)
   return id ? ideaRunLocation(id) : undefined
 })
+const share = computed<SharePayload | undefined>(() => {
+  const item = work.value
+  if (!item) return
+  return {
+    title: item.title,
+    url: new URL(route.path, location.origin).href,
+    badge: '创意作品',
+    meta: [item.author, badge.value].filter(Boolean).join(' · '),
+    author: item.author,
+    excerpt: item.description || item.introduction,
+    cover: images.value[0] || ideaCoverFallback(item.id),
+    icon: 'image',
+    extra: run.value ? {
+      label: '新标签页体验',
+      description: '在独立标签页中全屏打开作品',
+      icon: 'external',
+      href: router.resolve(run.value).href,
+    } : undefined,
+  }
+})
 const comments = computed<CommentAdapter | undefined>(() => {
   const id = work.value?.id
   if (!id) return undefined
@@ -58,7 +79,7 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
 <template>
   <DetailLayout :key="String(route.params.slug)" :ready="!!work" :title="work?.title" :author="work?.author"
     :images="images" :badge="badge" :fallback-cover="work ? ideaCoverFallback(work.id) : undefined"
-    shareable @back="backToList">
+    :share="share" @back="backToList">
     <template #state>
       <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
       <p v-else class="missing" role="status">找不到这个作品。</p>

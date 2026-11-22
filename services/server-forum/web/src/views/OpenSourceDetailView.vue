@@ -11,6 +11,7 @@ import { useCommunityResource } from '@/components/community/resource'
 import { fetchProjectReadme, renderProjectReadme } from '@/lib/projectReadme'
 import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import { useHead } from '@/lib/head'
+import { copyRepo, type SharePayload } from '@/lib/detailShare'
 import { curatedProjectAbout } from '@/lib/githubProjectAbout'
 import RequestState from '@/components/community/RequestState.vue'
 import DetailLayout from '@/components/community/DetailLayout.vue'
@@ -104,6 +105,22 @@ const images = computed(() => {
   return cover ? [cover] : []
 })
 const stars = computed(() => snapshot.value?.stars ?? card.value?.stars ?? project.value?.stars)
+const share = computed<SharePayload | undefined>(() => {
+  if (!project.value) return
+  const repository = webLink(github.value)
+  return {
+    title: card.value?.name || project.value.name,
+    url: new URL(route.path, location.origin).href,
+    badge: '开源精选',
+    author: project.value.full_name,
+    meta: [typeof stars.value === 'number' ? stars.value.toLocaleString('zh-CN') + ' Stars' : '', category.value].filter(Boolean).join(' · '),
+    excerpt: summary.value,
+    cover: images.value[0],
+    thumbnail: webLink(icon.value),
+    icon: 'document',
+    extra: repository ? copyRepo(repository) : undefined,
+  }
+})
 const updated = computed(() => snapshot.value?.updatedAt || card.value?.code_updated_at || project.value?.last_pushed_at)
 const rendered = computed(() => readme.value ? renderProjectReadme(readme.value[language.value]) : '')
 const bookmarks = useRepoBookmarks()
@@ -148,7 +165,7 @@ async function articleClick(event: MouseEvent) {
 <template>
   <DetailLayout :key="route.path" :ready="!!project" :title="card?.name || project?.name"
     :author="project?.full_name" :author-image="icon" :images="images" :badge="category"
-    shareable @back="back">
+    :share="share" @back="back">
     <template #state>
       <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
       <section v-else class="os-empty"><h1>这个项目尚未收录</h1><RouterLink to="/open-source">返回精选</RouterLink></section>

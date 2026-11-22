@@ -2,7 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ContentShell from '@/components/ContentShell.vue'
-import PosterDialog from '@/components/PosterDialog.vue'
+import DetailShareDialog from '@/components/community/DetailShareDialog.vue'
+import type { SharePayload } from '@/lib/detailShare'
 import PackCard from '@/components/PackCard.vue'
 import { ApiError } from '@/api/forum'
 import { contentApi, type WeeklyDetail } from '@/api/content'
@@ -13,10 +14,15 @@ const route = useRoute()
 const toast = useToast()
 const issue = ref<WeeklyDetail | null>(null)
 const missing = ref(false)
-const posterOpen = ref(false)
-const posterInput = computed(() =>
-  issue.value ? { tag: `周刊 ${issue.value.week}`, title: issue.value.title, summary: issue.value.summary || '本周精选', url: `${window.location.origin}/weekly/${issue.value.week}`, seed: issue.value.week.length } : null,
-)
+const share = computed<SharePayload | undefined>(() => {
+  if (!issue.value) return
+  return {
+    badge: '社区周刊',
+    title: issue.value.title,
+    excerpt: issue.value.summary,
+    url: new URL('/weekly/' + issue.value.week, location.origin).href,
+  }
+})
 
 useHead(() => ({ title: issue.value ? `${issue.value.title}（${issue.value.week}）` : '周刊' }))
 
@@ -44,7 +50,7 @@ watch(
       <p class="week">{{ issue.week }}</p>
       <h1>{{ issue.title }}</h1>
       <p v-if="issue.summary" class="lead">{{ issue.summary }}</p>
-      <button class="btn btn-sm" type="button" @click="posterOpen = true">生成海报</button>
+      <DetailShareDialog v-if="share" :key="issue.week" :payload="share" />
       <section v-for="(it, i) in issue.items" :key="i" class="entry">
         <template v-if="it.type === 'pack'">
           <PackCard :pack="it" wide />
@@ -63,7 +69,6 @@ watch(
       </section>
     </article>
   </ContentShell>
-  <PosterDialog :open="posterOpen" :poster="posterInput" :name="issue?.week ?? ''" @close="posterOpen = false" />
 </template>
 
 <style scoped>

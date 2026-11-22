@@ -3,7 +3,6 @@ import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch 
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import DetailLayout from '@/components/community/DetailLayout.vue'
-import PosterDialog from '@/components/PosterDialog.vue'
 import { ApiError } from '@/api/forum'
 import ContentSocialActions from '@/components/ContentSocialActions.vue'
 import ClientCreationPrompt from '@/components/creation/ClientCreationPrompt.vue'
@@ -15,6 +14,7 @@ import { applyLink, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { formatDateTime, tagLabel, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { track } from '@/lib/analytics'
+import type { ShareDeletion, SharePayload } from '@/lib/detailShare'
 import { useSession } from '@/stores/session'
 import { usePackPublisher } from '@/stores/packPublisher'
 import { useToast } from '@/stores/toast'
@@ -28,7 +28,6 @@ const missing = ref(false)
 const loadError = ref('')
 const reload = ref(0)
 const busy = ref(false)
-const posterOpen = ref(false)
 const creationOpen = ref(false)
 const versionsOpen = ref(false)
 const actionsMenu = useTemplateRef<HTMLDetailsElement>('actionsMenu')
@@ -132,21 +131,48 @@ async function download() {
   }
 }
 
-const posterInput = computed(() =>
-  pack.value
-    ? { tag: kindLabel(pack.value.kind), title: pack.value.title, summary: pack.value.summary || (desktopResource.value ? '下载后导入小伴桌面' : '在小伴里一键应用'), cover: pack.value.cover_url, url: `${window.location.origin}/packs/${pack.value.id}`, seed: pack.value.id }
-    : null,
-)
-
-async function copyLink() {
-  track('share_copy_link', 'pack')
-  try {
-    await navigator.clipboard.writeText(window.location.href)
-    toast.show('链接已复制')
-  } catch {
-    toast.show('复制失败，请手动复制地址栏')
+const share = computed<SharePayload | undefined>(() => {
+  const work = pack.value
+  if (!work || work.status !== 'published') return
+  return {
+    title: work.title,
+    url: new URL('/packs/' + work.id, location.origin).href,
+    badge: kindLabel(work.kind),
+    author: work.author?.nickname,
+    excerpt: work.summary,
+    cover: postImage.value,
+    icon: 'image',
+    metric: 'pack',
+    verify: isAuthor.value ? async () => {
+      try { await contentApi.sharePack(work.id) }
+      catch (e) {
+        if (e instanceof ApiError && e.status === 404) throw new Error('这件作品暂未公开，无法分享')
+        throw e
+      }
+    } : undefined,
+    extra: runLocation.value ? {
+      label: '新标签页体验',
+      description: '在独立标签页中全屏打开作品',
+      icon: 'external',
+      href: router.resolve(runLocation.value).href,
+    } : undefined,
   }
-}
+})
+const shareDeletion = computed<ShareDeletion | undefined>(() => {
+  const work = pack.value
+  if (!isAuthor.value || work?.status !== 'published') return
+  return {
+    label: '下架作品',
+    confirm: '下架这个作品？',
+    description: '下架后分享链接将失效，已应用的用户仍可使用',
+    confirmLabel: '确认下架',
+    async run() {
+      await contentApi.removeOwn(work.id)
+      toast.show('作品已下架')
+      if (pack.value?.id === work.id) await router.replace('/me/works')
+    },
+  }
+})
 </script>
 
 <template>
@@ -154,7 +180,7 @@ async function copyLink() {
     :author="pack?.author?.nickname || '社区作品'"
     :author-to="pack?.author ? '/u/' + pack.author.uid : undefined"
     :images="postImage ? [postImage] : undefined" :badge="pack ? kindLabel(pack.kind) : undefined"
-    shareable @back="back">
+    :share="share" :share-deletion="shareDeletion" @back="back">
     <template #state>
       <p v-if="missing" class="state">这个内容不存在或已下架。</p>
       <p v-else-if="loadError" class="state" role="alert">{{ loadError }} <button class="btn" type="button" @click="reload++">重试</button></p>
@@ -177,9 +203,7 @@ async function copyLink() {
                 <button v-if="latest" class="action-item" type="button" :aria-expanded="versionsOpen" aria-controls="pack-versions" @click.stop="toggleVersions">
                   {{ versionsOpen ? '收起版本记录' : '版本记录' }}
                 </button>
-                <button class="action-item" type="button" @click="copyLink">复制链接</button>
                 <a v-if="postImage" class="action-item" :href="postImage" target="_blank" rel="noopener noreferrer">查看作品原图</a>
-                <button class="action-item" type="button" @click="posterOpen = true">生成海报</button>
                 <button class="action-item" type="button" @click="creationOpen = true">在客户端创作或修改</button>
                 <RouterLink v-if="pack.topic_id" class="action-item" :to="`/t/${pack.topic_id}`">查看关联帖子</RouterLink>
                 <button v-if="isAuthor" class="action-item" type="button" aria-haspopup="dialog" @click="publisher.open(pack.id)">发布新版本</button>
@@ -246,7 +270,6 @@ async function copyLink() {
     </template>
     <template #dialogs>
       <ClientCreationPrompt v-model:show="creationOpen" :kind="pack ? kindLabel(pack.kind) : undefined" />
-      <PosterDialog :open="posterOpen" :poster="posterInput" :name="pack?.title ?? ''" @close="posterOpen = false" />
     </template>
   </DetailLayout>
 </template>
