@@ -5,6 +5,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** 单项内容（详情页）的加载状态。 */
@@ -21,6 +22,12 @@ class Loader<T>(private val scope: CoroutineScope, private val fetch: suspend ()
     private val _state = MutableStateFlow<Load<T>>(Load.Loading)
     val state: StateFlow<Load<T>> = _state.asStateFlow()
     private var job: Job? = null
+
+    fun updateReady(transform: (T) -> T) {
+        _state.update { state ->
+            if (state is Load.Ready) Load.Ready(transform(state.value)) else state
+        }
+    }
 
     fun reload() {
         job?.cancel()

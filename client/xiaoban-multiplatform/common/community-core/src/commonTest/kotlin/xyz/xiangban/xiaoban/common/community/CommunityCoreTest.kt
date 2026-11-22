@@ -396,6 +396,21 @@ class ControllersTest {
         offline.reload()
         assertEquals("网络连接失败，请稍后再试", assertIs<Load.Failed>(offline.state.await { it !is Load.Loading }).message)
     }
+
+    @Test
+    fun `updating loaded content keeps it ready without another request`() = runTest {
+        var requests = 0
+        val loader = Loader(this) { ++requests }
+        loader.updateReady { it + 1 }
+        assertEquals(Load.Loading, loader.state.value)
+
+        loader.reload()
+        loader.state.first { it is Load.Ready }
+        loader.updateReady { it + 1 }
+
+        assertEquals(Load.Ready(2), loader.state.value)
+        assertEquals(1, requests)
+    }
 }
 
 class TextAndTokensTest {

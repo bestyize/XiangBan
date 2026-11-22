@@ -406,11 +406,27 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
         if (busy) return
         busy = true; error = null
         scope.launch {
-            try { block(); loader.reload() }
+            try { block() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = messageOf(e) }
             finally { busy = false }
         }
+    }
+
+    fun setFollowing(on: Boolean) = action {
+        val result = env.social.follow(uid, on)
+        loader.updateReady { profile ->
+            profile.copy(
+                following = result.following,
+                followingCount = result.followingCount,
+                followerCount = result.followerCount,
+            )
+        }
+    }
+
+    fun setBlocked(on: Boolean) = action {
+        env.social.block(uid, on)
+        loader.reload()
     }
 
     val readyProfile = (state as? Load.Ready)?.value
@@ -512,7 +528,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                             when {
                                 profile.blocked -> Box(
                                     Modifier.height(32.dp).clip(CircleShape).background(extra.fill)
-                                        .clickable(enabled = !busy) { action { env.social.block(uid, false) } }
+                                        .clickable(enabled = !busy) { setBlocked(false) }
                                         .padding(horizontal = 12.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -520,7 +536,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                                 }
                                 profile.following -> Box(
                                     Modifier.height(32.dp).clip(CircleShape).background(extra.fill)
-                                        .clickable(enabled = canFollow) { action { env.social.follow(uid, false) } }
+                                        .clickable(enabled = canFollow) { setFollowing(false) }
                                         .padding(horizontal = 12.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -529,7 +545,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                                 else -> Row(
                                     Modifier.height(32.dp).alpha(if (canFollow) 1f else 0.45f)
                                         .clip(CircleShape).background(extra.brandSoft)
-                                        .clickable(enabled = canFollow) { action { env.social.follow(uid, true) } }
+                                        .clickable(enabled = canFollow) { setFollowing(true) }
                                         .padding(horizontal = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -552,7 +568,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                             Text("已屏蔽对方，互相取消关注", Modifier.weight(1f), style = XType.Caption, color = Danger)
                             Box(
                                 Modifier.height(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
-                                    .clickable(enabled = !busy) { action { env.social.block(uid, false) } }
+                                    .clickable(enabled = !busy) { setBlocked(false) }
                                     .padding(horizontal = 10.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -593,12 +609,12 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                             title = "你已屏蔽该用户",
                             desc = "对方的帖子与回复已对你隐藏，取消屏蔽后即可恢复查看",
                             actionLabel = "取消屏蔽",
-                            onAction = { action { env.social.block(uid, false) } },
+                            onAction = { setBlocked(false) },
                         )
                     } else if (tab == "topics") {
                         ProfileTopics(env, uid, selfView, open)
                     } else {
-                        ProfileConnections(env, uid, tab == "followers", open)
+                        ProfileConnections(env, uid, tab == "followers", profile.following, open)
                     }
                 }
             }
@@ -615,7 +631,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
                 SheetMenuRow(XIcons.Block, if (readyProfile.blocked) "取消屏蔽该用户" else "屏蔽该用户", danger = !readyProfile.blocked) {
                     moreSheet = false
                     if (!session.loggedIn) open(Route.Login)
-                    else if (readyProfile.blocked) action { env.social.block(uid, false) }
+                    else if (readyProfile.blocked) setBlocked(false)
                     else blockConfirmation = true
                 }
                 SheetCancelFooter { moreSheet = false }
@@ -630,7 +646,7 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
         onDismissRequest = { if (!busy) blockConfirmation = false },
         title = { Text("屏蔽该用户？") },
         text = { Text("对方的帖子将从你的列表和搜索隐藏，回复会折叠，双方互相取消关注。对方不会收到屏蔽提示。") },
-        confirmButton = { PillButton("确认屏蔽", { blockConfirmation = false; action { env.social.block(uid, true) } }, enabled = !busy) },
+        confirmButton = { PillButton("确认屏蔽", { blockConfirmation = false; setBlocked(true) }, enabled = !busy) },
         dismissButton = { GhostPillButton("取消", { blockConfirmation = false }, enabled = !busy) },
     )
 }
@@ -747,9 +763,10 @@ private fun ProfileTopics(env: CommunityEnv, uid: String, isSelf: Boolean, open:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileConnections(env: CommunityEnv, uid: String, followers: Boolean, open: (Route) -> Unit) {
+private fun ProfileConnections(env: CommunityEnv, uid: String, followers: Boolean, viewerFollows: Boolean, open: (Route) -> Unit) {
     var page by rememberSaveable(uid, followers) { mutableStateOf(1) }
-    val loader = rememberLoader(env, "connections-$uid-$followers-$page") { env.social.connections(uid, followers, page) }
+    val viewerInList = followers && viewerFollows
+    val loader = rememberLoader(env, "connections-$uid-$followers-$page-$viewerInList") { env.social.connections(uid, followers, page) }
     val state by loader.state.collectAsState()
     val extra = LocalExtraColors.current
     val items = (state as? Load.Ready)?.value?.items.orEmpty()
