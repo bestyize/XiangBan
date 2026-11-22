@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.FeaturedIdea
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.isIdeaPlayerId
+import xyz.xiangban.xiaoban.common.share.ShareContent
+import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 
 @Composable
 internal fun IdeaWorkScreen(env: CommunityEnv, id: String, back: () -> Unit, open: (Route) -> Unit) = CommunityDetail {
@@ -59,8 +61,23 @@ internal fun IdeaWorkScreen(env: CommunityEnv, id: String, back: () -> Unit, ope
         }
     }
     OverlayTransition(sharing) { panel ->
-        ShareSheet(env, work.title, work.author, env.forum.imageUrl(work.href), onDismiss = { sharing = false },
-            onCopied = { discussion.toast = "链接已复制" }, panelModifier = panel)
+        DirectShareSheet(
+            env = env,
+            content = ShareContent(
+                title = work.title,
+                url = env.forum.imageUrl(work.href),
+                summary = work.introduction?.takeIf(String::isNotBlank) ?: work.description,
+                author = work.author,
+                dateLabel = work.date.take(10),
+                kindLabel = if (work.kind == "exhibit") "3D 模型" else work.label?.takeIf(String::isNotBlank) ?: "小伴创意",
+                badge = "可体验",
+                coverUrl = images.firstOrNull(),
+                thumbKind = if (images.isNotEmpty()) ShareThumbKind.Cover else ShareThumbKind.Text,
+            ),
+            onDismiss = { sharing = false },
+            onCopied = { discussion.toast = "链接已复制" },
+            panelModifier = panel,
+        )
     }
 }
 

@@ -34,6 +34,7 @@ plugins {
 include(":androidApp")
 include(":shell")
 include(":common:webview")
+include(":common:share")
 include(":common:community-core")
 include(":common:link-core")
 include(":business:xiaban")

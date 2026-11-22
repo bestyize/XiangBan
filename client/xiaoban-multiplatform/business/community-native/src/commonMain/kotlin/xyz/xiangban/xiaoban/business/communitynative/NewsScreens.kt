@@ -20,6 +20,10 @@ import xyz.xiangban.xiaoban.common.community.NewsItem
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.htmlToPlain
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.share.ShareContent
+import xyz.xiangban.xiaoban.common.share.ShareExtraAction
+import xyz.xiangban.xiaoban.common.share.ShareIconKey
+import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 
 /** 文章使用服务器净化的 HTML；按标题分段，正文中的图片仍由 RichBody 展示。 */
 @Composable
@@ -51,6 +55,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
     var article by remember(key, frontier) { mutableStateOf<NewsItem?>(null) }
     var error by remember(key, frontier) { mutableStateOf<String?>(null) }
     var loadingArticle by remember(key, frontier) { mutableStateOf(false) }
+    var sharing by remember(key, frontier) { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val discussion = rememberPlainComments(
         env, frontier to key, open,
@@ -72,8 +77,13 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
     }
     LaunchedEffect(key, frontier) { loadArticle() }
 
-    CommentScaffold(env, discussion, Modifier.background(MaterialTheme.colorScheme.surface)) {
-        ScreenBar(if (frontier) "小伴前沿" else "AI 日报", onBack = back)
+    Box(Modifier.fillMaxSize()) {
+        CommentScaffold(env, discussion, Modifier.background(MaterialTheme.colorScheme.surface)) {
+            ScreenBar(
+                if (frontier) "小伴前沿" else "AI 日报",
+                onBack = back,
+                trailing = if (article != null) ({ IconTap(XIcons.Share, "分享", { sharing = true }) }) else null,
+            )
         LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (article == null) item {
                 if (error != null) CenterMessage("文章加载失败：$error", "重试", ::loadArticle, Modifier.fillMaxWidth().padding(32.dp))
@@ -108,5 +118,43 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
                 CommentCountAction(discussion.total) { scope.launch { listState.animateScrollToItem(1) } }
             }
         }
+    }
+    OverlayTransition(sharing) { panel ->
+        val news = article
+        if (news != null) {
+            val shareUrl = news.url.takeIf(String::isNotBlank)
+                ?: env.forum.imageUrl(if (frontier) "/frontier/${news.key}" else "/daily/${news.key}")
+            val plainBody = remember(news) {
+                if (news.bodyHtml.isNotBlank()) htmlToPlain(news.bodyHtml).trim() else news.summary.trim()
+            }
+            val extras = remember(plainBody, env.platform) {
+                if (plainBody.isNotBlank() && env.platform != null) listOf(
+                    ShareExtraAction("copyFull", "复制全文", ShareIconKey.CopyText) {
+                        env.platform.copy(plainBody)
+                        discussion.toast = "已复制全文"
+                        "已复制完整正文"
+                    },
+                ) else emptyList()
+            }
+            DirectShareSheet(
+                env = env,
+                content = ShareContent(
+                    title = news.title,
+                    url = shareUrl,
+                    summary = news.summary,
+                    author = news.source.ifBlank { "小伴编辑部" },
+                    dateLabel = agoText(news.sourcePublishedAt ?: news.publishedAt),
+                    kindLabel = if (frontier) "小伴前沿" else "AI 日报",
+                    badge = if (frontier) "前沿" else "日报",
+                    coverUrl = news.coverUrl.takeIf(String::isNotBlank),
+                    thumbKind = ShareThumbKind.Daily,
+                ),
+                onDismiss = { sharing = false },
+                onCopied = { discussion.toast = "链接已复制" },
+                extraActions = extras,
+                panelModifier = panel,
+            )
+        }
+    }
     }
 }

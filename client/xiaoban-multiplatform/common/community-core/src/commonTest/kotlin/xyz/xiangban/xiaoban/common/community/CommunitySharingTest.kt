@@ -70,4 +70,17 @@ class CommunitySharingTest {
             assertEquals(400, assertFailsWith<ApiException> { api.publicInfo(target) }.status)
         assertTrue(server.requests.isEmpty()); server.client.close()
     }
+    @Test fun `author topic deletion sends authenticated delete and rejects invalid id`() = runTest {
+        val server = FakeServer()
+        server.on("/api/topics/42", body = """{"deleted":true}""")
+        val forum = ForumApi(server.client, sharingConfig) { "tok-123" }
+        assertEquals(400, assertFailsWith<ApiException> { forum.deleteTopic(0) }.status)
+        assertTrue(server.requests.isEmpty())
+        forum.deleteTopic(42)
+        val req = server.requests.single()
+        assertEquals("DELETE", req.method.value)
+        assertEquals("/api/topics/42", req.url.encodedPath)
+        assertEquals("Bearer tok-123", req.headers[HttpHeaders.Authorization])
+        server.client.close()
+    }
 }

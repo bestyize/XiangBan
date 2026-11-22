@@ -28,6 +28,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import xyz.xiangban.xiaoban.common.share.ShareContent
+import xyz.xiangban.xiaoban.common.share.ShareExtraAction
+import xyz.xiangban.xiaoban.common.share.ShareIconKey
+import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -283,6 +287,7 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
     }
 
     var downloadNotice by remember(project) { mutableStateOf<String?>(null) }
+    var sharing by rememberSaveable(project) { mutableStateOf(false) }
     CommentScaffold(env, discussion) {
         if ((state as? Load.Ready)?.value == null) ScreenBar("软件详情", back)
         downloadNotice?.let { Banner(it, warn = false) }
@@ -291,9 +296,7 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                 CenterMessage("软件未收录")
                 return@LoadBox
             }
-            DetailAuthorBar(entry.project, back, onShare = env.platform?.let { platform ->
-                { platform.share(entry.displayName, "https://github.com/${entry.project}") }
-            })
+            DetailAuthorBar(entry.project, back, onShare = { sharing = true })
             val (saved, setSaved) = rememberPrefFlag(env, "fav_repo:$project")
             val data = (releases as? Load.Ready)?.value
             val history = data?.history.orEmpty()
@@ -380,6 +383,39 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                     onClick = { setSaved(!saved) }, tint = if (saved) Amber else MaterialTheme.colorScheme.onSurface)
                 CommentCountAction(discussion.total, ::scrollToComments)
             }
+        }
+    }
+    OverlayTransition(sharing) { panel ->
+        val entry = (state as? Load.Ready)?.value
+        if (entry != null) {
+            val repoUrl = "https://github.com/${entry.project}"
+            val extras = remember(repoUrl, env.platform) {
+                if (env.platform != null) listOf(
+                    ShareExtraAction("copyRepo", "复制仓库", ShareIconKey.Code) {
+                        env.platform.copy(repoUrl)
+                        discussion.toast = "仓库地址已复制"
+                        "已复制 GitHub 仓库地址"
+                    },
+                ) else emptyList()
+            }
+            DirectShareSheet(
+                env = env,
+                content = ShareContent(
+                    title = entry.displayName,
+                    url = repoUrl,
+                    summary = entry.summary,
+                    author = entry.project.substringBefore('/'),
+                    dateLabel = entry.language,
+                    kindLabel = "开源软件",
+                    badge = "开源",
+                    thumbKind = ShareThumbKind.Repo,
+                    thumbMonogram = entry.displayName.firstOrNull()?.uppercaseChar()?.toString(),
+                ),
+                onDismiss = { sharing = false },
+                onCopied = { discussion.toast = "链接已复制" },
+                extraActions = extras,
+                panelModifier = panel,
+            )
         }
     }
 }

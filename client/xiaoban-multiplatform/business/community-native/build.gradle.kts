@@ -35,6 +35,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":common:community-core"))
             api(project(":common:link-core"))
+            api(project(":common:share"))
             implementation(project(":common:webview"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.components.resources)

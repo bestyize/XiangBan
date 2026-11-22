@@ -98,7 +98,18 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
             }
         }
     }
-    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享能力", null, { sharing = false }, {}, panel) }
+    OverlayTransition(sharing) { panel ->
+        CommunityShareSheet(
+            env = env,
+            url = env.forum.packUrl(pack.id),
+            heading = "分享能力",
+            onDismiss = { sharing = false },
+            panelModifier = panel,
+            author = pack.author?.nickname.orEmpty(),
+            dateLabel = pack.updatedAt.take(10),
+            coverUrl = pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl),
+        )
+    }
 }
 
 @Composable
@@ -134,7 +145,18 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
             }
         }
     }
-    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, "${env.config.forumBase.trimEnd('/')}/schemes/$id", "分享方案", null, { sharing = false }, {}, panel) }
+    OverlayTransition(sharing) { panel ->
+        val scheme = (state as? Load.Ready)?.value
+        CommunityShareSheet(
+            env = env,
+            url = "${env.config.forumBase.trimEnd('/')}/schemes/$id",
+            heading = "分享方案",
+            onDismiss = { sharing = false },
+            panelModifier = panel,
+            author = scheme?.author?.nickname.orEmpty(),
+            dateLabel = scheme?.createdAt.orEmpty().take(10),
+        )
+    }
 }
 
 /** 创作栏的“方案”读取 schemes，不把它作为压缩包 kind。 */

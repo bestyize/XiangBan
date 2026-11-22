@@ -28,6 +28,10 @@ import xyz.xiangban.xiaoban.common.community.ReadmeBlock
 import xyz.xiangban.xiaoban.common.community.RepoDetail
 import xyz.xiangban.xiaoban.common.community.RepoRank
 import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
+import xyz.xiangban.xiaoban.common.share.ShareContent
+import xyz.xiangban.xiaoban.common.share.ShareExtraAction
+import xyz.xiangban.xiaoban.common.share.ShareIconKey
+import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.parseMarkdown
 import xyz.xiangban.xiaoban.common.community.formatGain
@@ -109,6 +113,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
     var loadingDetail by remember(name) { mutableStateOf(false) }
     var zh by rememberSaveable(name) { mutableStateOf(true) }
     var expanded by rememberSaveable(name) { mutableStateOf(false) }
+    var sharing by rememberSaveable(name, curated) { mutableStateOf(false) }
     val discussion = rememberRepoComments(env, owner, repo, open)
     val listState = rememberLazyListState()
 
@@ -148,10 +153,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                 else Spinner(Modifier.fillMaxSize())
             }
         } else {
-            val shareUrl = env.forum.imageUrl(if (curated) "/open-source/$name" else "/repo/$name")
-            DetailAuthorBar(d.fullName.ifBlank { name }, back, onShare = env.platform?.let { platform ->
-                { platform.share(d.repo.ifBlank { repo }, shareUrl) }
-            })
+            DetailAuthorBar(d.fullName.ifBlank { name }, back, onShare = { sharing = true })
             val showZh = zh && d.hasZhReadme
             val blocks = (if (showZh) d.readme.zhBlocks else d.readme.blocks).orEmpty()
             val long = blocks.size > COLLAPSED_BLOCKS
@@ -248,6 +250,47 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     onClick = { setFav(!fav) }, tint = if (fav) Amber else MaterialTheme.colorScheme.onSurface)
                 CommentCountAction(discussion.total) { scope.launch { listState.animateScrollToItem(commentsIndex) } }
             }
+        }
+    }
+    OverlayTransition(sharing) { panel ->
+        val d = detail
+        if (d != null) {
+            val shareUrl = env.forum.imageUrl(if (curated) "/open-source/$name" else "/repo/$name")
+            val repoUrl = "https://github.com/$name"
+            val title = curatedProject?.name?.takeIf(String::isNotBlank) ?: d.repo.ifBlank { repo }
+            val summary = curatedProject?.summary?.takeIf(String::isNotBlank) ?: d.descriptionZh.ifBlank { d.description }
+            val starNum = curatedProject?.stars?.takeIf { it > 0 } ?: d.starTotal.takeIf { it > 0 }
+            val starsLabel = starNum?.let { n ->
+                if (n >= 1000) "${n / 1000}.${(n % 1000) / 100}k Stars" else "$n Stars"
+            }.orEmpty()
+            val extras = remember(repoUrl, env.platform) {
+                if (env.platform != null) listOf(
+                    ShareExtraAction("copyRepo", "复制仓库", ShareIconKey.Code) {
+                        env.platform.copy(repoUrl)
+                        discussion.toast = "仓库地址已复制"
+                        "已复制 GitHub 仓库地址"
+                    },
+                ) else emptyList()
+            }
+            DirectShareSheet(
+                env = env,
+                content = ShareContent(
+                    title = title,
+                    url = shareUrl,
+                    summary = summary,
+                    author = owner,
+                    dateLabel = starsLabel,
+                    kindLabel = if (curated) "开源精选" else "开源项目",
+                    meta = listOfNotNull(starsLabel.takeIf(String::isNotBlank), "GitHub 公开项目", "浏览器免登录可看").joinToString(" · "),
+                    badge = "开源",
+                    thumbKind = ShareThumbKind.Repo,
+                    thumbMonogram = title.firstOrNull()?.uppercaseChar()?.toString(),
+                ),
+                onDismiss = { sharing = false },
+                onCopied = { discussion.toast = "链接已复制" },
+                extraActions = extras,
+                panelModifier = panel,
+            )
         }
     }
 }

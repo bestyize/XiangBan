@@ -99,7 +99,18 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
         }
     }
     OverlayTransition(remix) { panel -> AppRemixSheet(env, chat, pack.title, pack.summary, { remix = false }, open, panel, kind = pack.kind) }
-    OverlayTransition(share) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享作品", null, { share = false }, {}, panel) }
+    OverlayTransition(share) { panel ->
+        CommunityShareSheet(
+            env = env,
+            url = env.forum.packUrl(pack.id),
+            heading = "分享作品",
+            onDismiss = { share = false },
+            panelModifier = panel,
+            author = pack.author?.nickname.orEmpty(),
+            dateLabel = pack.updatedAt.take(10),
+            coverUrl = pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl),
+        )
+    }
 }
 
 /** A descriptive reference is carried into the existing local creation chat; no source-copy/provenance claims. */

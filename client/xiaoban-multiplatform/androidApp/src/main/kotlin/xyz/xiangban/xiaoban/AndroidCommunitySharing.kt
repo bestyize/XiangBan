@@ -1,14 +1,16 @@
 package xyz.xiangban.xiaoban
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
+import android.graphics.DashPathEffect
 import android.graphics.Paint
-import android.graphics.Shader
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -37,6 +39,10 @@ import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.business.communitynative.CommunityPosterResult
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.common.community.CommunityShare
+import xyz.xiangban.xiaoban.common.share.ShareCardOptions
+import xyz.xiangban.xiaoban.common.share.ShareCardStyle
+import xyz.xiangban.xiaoban.common.share.ShareContent
+import xyz.xiangban.xiaoban.common.share.shareDisplayUrl
 import java.io.File
 import kotlin.coroutines.resume
 
@@ -53,6 +59,7 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
         }
     }
     override val communityPosterSupported = true
+    override val communityPosterCopySupported = true
     override val forumCoverSupported = true
     override suspend fun renderForumCover(spec: xyz.xiangban.xiaoban.business.communitynative.ForumCoverSpec, thumbnail: Boolean) = renderLocalForumCover(spec, thumbnail)
     override suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile) = previewLocalForumCover(file)
@@ -65,31 +72,174 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
         if (current?.isActive == true) current.resume(result.data?.data)
     }
 
-    /** Fully local, fixed-size PNG source: public text and a QR code for the canonical browser URL. */
-    override suspend fun createCommunityPoster(info: CommunityShare): ImageBitmap = withContext(Dispatchers.Default) {
-        val bitmap = Bitmap.createBitmap(750, 1180, Bitmap.Config.ARGB_8888)
+    override suspend fun encodeCommunityQr(text: String): List<BooleanArray>? = withContext(Dispatchers.Default) {
+        if (text.isBlank()) return@withContext null
+        runCatching {
+            val matrix = QRCodeWriter().encode(
+                text,
+                BarcodeFormat.QR_CODE,
+                0,
+                0,
+                mapOf(
+                    EncodeHintType.MARGIN to 0,
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                    EncodeHintType.CHARACTER_SET to "UTF-8",
+                ),
+            )
+            List(matrix.height) { y -> BooleanArray(matrix.width) { x -> matrix[x, y] } }
+        }.getOrNull()
+    }
+
+    /** 按分享卡片设计稿（极简白 / 暖纸笺 / 墨夜）本地绘制高清 PNG 卡片。 */
+    override suspend fun renderCommunityShareCard(content: ShareContent, options: ShareCardOptions): ImageBitmap = withContext(Dispatchers.Default) {
+        val width = 840
+        val padX = 64
+        val contentWidth = width - padX * 2
+
+        val bgColor: Int
+        val inkColor: Int
+        val mutedColor: Int
+        val softBgColor: Int
+        val lineColor: Int
+        val quoteBarColor: Int
+        val accentColor = Color.rgb(227, 32, 60)
+        when (options.style) {
+            ShareCardStyle.White -> {
+                bgColor = Color.WHITE
+                inkColor = Color.rgb(31, 32, 36)
+                mutedColor = Color.rgb(110, 112, 120)
+                softBgColor = Color.rgb(244, 244, 246)
+                lineColor = Color.rgb(236, 236, 239)
+                quoteBarColor = Color.rgb(245, 199, 205)
+            }
+            ShareCardStyle.Warm -> {
+                bgColor = Color.rgb(248, 244, 236)
+                inkColor = Color.rgb(43, 35, 28)
+                mutedColor = Color.rgb(124, 111, 98)
+                softBgColor = Color.rgb(239, 232, 220)
+                lineColor = Color.rgb(229, 220, 205)
+                quoteBarColor = Color.rgb(217, 195, 168)
+            }
+            ShareCardStyle.Ink -> {
+                bgColor = Color.rgb(28, 29, 34)
+                inkColor = Color.rgb(242, 242, 245)
+                mutedColor = Color.rgb(152, 154, 164)
+                softBgColor = Color.rgb(39, 40, 46)
+                lineColor = Color.rgb(45, 46, 53)
+                quoteBarColor = Color.argb(68, 255, 255, 255)
+            }
+        }
+
+        val titleLayout = buildTextLayout(content.title, contentWidth, 44f, inkColor, 3, bold = true, lineSpacing = 14f)
+        val cleanSummary = content.summary.replace(Regex("\\s+"), " ").trim()
+        val excerptLayout = if (options.showExcerpt && cleanSummary.isNotBlank()) {
+            buildTextLayout(cleanSummary, contentWidth - 28, 30f, mutedColor, 4, bold = false, lineSpacing = 12f)
+        } else null
+        val authorText = listOf(content.author, content.dateLabel).filter(String::isNotBlank).joinToString(" · ")
+        val headerHeight = 62
+        val titleTop = 64 + headerHeight + 36
+        val excerptTop = titleTop + titleLayout.height + 28
+        val authorTop = if (excerptLayout != null) excerptTop + excerptLayout.height + 32 else titleTop + titleLayout.height + 32
+        val dividerTop = if (authorText.isNotBlank()) authorTop + 52 + 34 else authorTop + 8
+        val footerHeight = if (options.showQr) 156 else 76
+        val totalHeight = (dividerTop + 36 + footerHeight + 60).coerceAtLeast(620)
+
+        val bitmap = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        canvas.drawColor(Color.WHITE)
+        canvas.drawColor(bgColor)
+
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.shader = LinearGradient(0f, 0f, 750f, 440f, Color.rgb(35, 37, 44), Color.rgb(95, 98, 112), Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, 750f, 360f, paint); paint.shader = null
-        paint.color = Color.argb(24, 255, 255, 255)
-        canvas.drawCircle(650f, 40f, 210f, paint); canvas.drawCircle(100f, 360f, 130f, paint)
-        drawText(canvas, "超级小伴 · 社区", 56, 70, 638, 30f, Color.WHITE, 1, true)
-        val tag = when (info.kind) { "pack" -> "社区作品"; "topic" -> "社区讨论"; "scheme" -> "社区方案"; "project" -> "开源项目"; else -> "社区周刊" }
-        drawText(canvas, tag, 56, 264, 638, 48f, Color.WHITE, 1, true)
-        drawText(canvas, info.title, 56, 410, 638, 42f, Color.rgb(30, 31, 35), 3, true)
-        drawText(canvas, info.summary.ifBlank { "打开公开页面查看完整内容" }, 56, 610, 638, 27f, Color.rgb(100, 103, 112), 5)
-        paint.color = Color.rgb(230, 231, 235); canvas.drawRect(56f, 918f, 694f, 920f, paint)
-        val qr = QRCodeWriter().encode(info.url, BarcodeFormat.QR_CODE, 190, 190,
-            mapOf(EncodeHintType.MARGIN to 4, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.CHARACTER_SET to "UTF-8"))
-        paint.color = Color.BLACK
-        for (y in 0 until qr.height) for (x in 0 until qr.width) if (qr[x, y]) canvas.drawRect((504 + x).toFloat(), (950 + y).toFloat(), (505 + x).toFloat(), (951 + y).toFloat(), paint)
-        drawText(canvas, "超级小伴", 56, 957, 420, 36f, Color.rgb(255, 36, 66), 1, true)
-        drawText(canvas, "扫码查看公开内容", 56, 1020, 420, 24f, Color.DKGRAY, 1)
-        drawText(canvas, Uri.parse(info.url).host.orEmpty(), 56, 1068, 420, 21f, Color.GRAY, 1)
-        drawText(canvas, info.url.substringAfter("://"), 56, 1110, 420, 18f, Color.GRAY, 2)
+
+        // 顶部品牌徽章与分类胶囊
+        paint.color = accentColor
+        canvas.drawRoundRect(RectF(padX.toFloat(), 66f, (padX + 48).toFloat(), 114f), 14f, 14f, paint)
+        drawText(canvas, "伴", padX + 11, 74, 30, 26f, Color.WHITE, 1, bold = true)
+        drawText(canvas, "小伴社区", padX + 64, 73, 320, 30f, inkColor, 1, bold = true)
+
+        if (content.kindLabel.isNotBlank()) {
+            val tagPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 24f
+                color = mutedColor
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            }
+            val tagW = tagPaint.measureText(content.kindLabel) + 40f
+            val tagRect = RectF(width - padX - tagW, 70f, (width - padX).toFloat(), 112f)
+            paint.color = softBgColor
+            canvas.drawRoundRect(tagRect, 21f, 21f, paint)
+            canvas.drawText(content.kindLabel, tagRect.left + 20f, tagRect.top + 29f, tagPaint)
+        }
+
+        // 标题
+        canvas.save(); canvas.translate(padX.toFloat(), titleTop.toFloat()); titleLayout.draw(canvas); canvas.restore()
+
+        // 可选正文摘录（左竖线）
+        if (excerptLayout != null) {
+            paint.color = quoteBarColor
+            canvas.drawRoundRect(RectF(padX.toFloat(), excerptTop.toFloat(), (padX + 6).toFloat(), (excerptTop + excerptLayout.height).toFloat()), 3f, 3f, paint)
+            canvas.save(); canvas.translate((padX + 26).toFloat(), excerptTop.toFloat()); excerptLayout.draw(canvas); canvas.restore()
+        }
+
+        // 作者与日期
+        if (authorText.isNotBlank()) {
+            paint.color = accentColor
+            canvas.drawCircle((padX + 20).toFloat(), (authorTop + 20).toFloat(), 20f, paint)
+            val initial = (content.author.firstOrNull() ?: content.title.firstOrNull() ?: '伴').uppercaseChar().toString()
+            drawText(canvas, initial, padX + 11, authorTop + 5, 24, 22f, Color.WHITE, 1, bold = true)
+            drawText(canvas, authorText, padX + 54, authorTop + 6, contentWidth - 54, 26f, mutedColor, 1)
+        }
+
+        // 虚线分隔
+        val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = lineColor
+            strokeWidth = 2.5f
+            style = Paint.Style.STROKE
+            pathEffect = DashPathEffect(floatArrayOf(14f, 10f), 0f)
+        }
+        canvas.drawLine(padX.toFloat(), dividerTop.toFloat(), (width - padX).toFloat(), dividerTop.toFloat(), dashPaint)
+
+        // 底部短链与可选二维码
+        val footY = dividerTop + 36
+        val copyWidth = if (options.showQr) contentWidth - 184 else contentWidth
+        drawText(canvas, if (options.showQr) "扫码在浏览器查看" else "来自小伴社区", padX, footY + 26, copyWidth, 28f, inkColor, 1, bold = true)
+        drawText(canvas, shareDisplayUrl(content.url), padX, footY + 72, copyWidth, 24f, mutedColor, 2)
+
+        if (options.showQr) {
+            val qrSize = 148
+            val qrBoxX = width - padX - qrSize
+            val qrBoxY = footY
+            paint.color = Color.WHITE
+            canvas.drawRoundRect(RectF(qrBoxX.toFloat(), qrBoxY.toFloat(), (qrBoxX + qrSize).toFloat(), (qrBoxY + qrSize).toFloat()), 18f, 18f, paint)
+            val qr = QRCodeWriter().encode(
+                content.url,
+                BarcodeFormat.QR_CODE,
+                qrSize - 24,
+                qrSize - 24,
+                mapOf(
+                    EncodeHintType.MARGIN to 0,
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                    EncodeHintType.CHARACTER_SET to "UTF-8",
+                ),
+            )
+            paint.color = if (options.style == ShareCardStyle.Warm) Color.rgb(43, 35, 28) else Color.rgb(27, 28, 32)
+            for (y in 0 until qr.height) {
+                for (x in 0 until qr.width) {
+                    if (qr[x, y]) {
+                        canvas.drawRect((qrBoxX + 12 + x).toFloat(), (qrBoxY + 12 + y).toFloat(), (qrBoxX + 13 + x).toFloat(), (qrBoxY + 13 + y).toFloat(), paint)
+                    }
+                }
+            }
+        }
+
         bitmap.asImageBitmap()
+    }
+
+    /** Fully local, fixed-size PNG source: public text and a QR code for the canonical browser URL. */
+    override suspend fun createCommunityPoster(info: CommunityShare): ImageBitmap {
+        val tag = when (info.kind) { "pack" -> "社区作品"; "topic" -> "社区讨论"; "scheme" -> "社区方案"; "project" -> "开源项目"; else -> "社区周刊" }
+        return renderCommunityShareCard(
+            ShareContent(title = info.title, url = info.url, summary = info.summary, kindLabel = tag),
+            ShareCardOptions(),
+        )
     }
 
     override val supportsChatImageSave = true
@@ -165,7 +315,7 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
         }
     }
 
-    override suspend fun shareCommunityPoster(image: ImageBitmap): CommunityPosterResult = try {
+    private suspend fun writeCachedPoster(image: ImageBitmap): Uri {
         val file = withContext(Dispatchers.IO) {
             val directory = File(activity.cacheDir, "community-posters").apply { mkdirs() }
             directory.listFiles()?.filter { it.name.startsWith("poster-") && it.lastModified() < System.currentTimeMillis() - 86_400_000 }?.forEach { it.delete() }
@@ -173,28 +323,48 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
                 outputStream().use { check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)) }
             }
         }
-        val uri = FileProvider.getUriForFile(activity, activity.packageName + ".community-posters", file)
+        return FileProvider.getUriForFile(activity, activity.packageName + ".community-posters", file)
+    }
+
+    override suspend fun shareCommunityPoster(image: ImageBitmap): CommunityPosterResult = try {
+        val uri = writeCachedPoster(image)
         withContext(Dispatchers.Main.immediate) {
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"; putExtra(Intent.EXTRA_STREAM, uri)
-                clipData = ClipData.newUri(activity.contentResolver, "社区海报", uri)
+                clipData = ClipData.newUri(activity.contentResolver, "社区分享卡片", uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(Intent.createChooser(send, "分享社区海报"))
+            activity.startActivity(Intent.createChooser(send, "发送分享卡片"))
         }
         CommunityPosterResult.ChooserOpened
     } catch (e: CancellationException) { throw e }
       catch (_: SecurityException) { CommunityPosterResult.PermissionDenied }
       catch (_: Exception) { CommunityPosterResult.Failed }
+
+    override suspend fun copyCommunityPoster(image: ImageBitmap): CommunityPosterResult = try {
+        val uri = writeCachedPoster(image)
+        withContext(Dispatchers.Main.immediate) {
+            val manager = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            manager.setPrimaryClip(ClipData.newUri(activity.contentResolver, "社区分享卡片", uri))
+        }
+        CommunityPosterResult.Saved
+    } catch (e: CancellationException) { throw e }
+      catch (_: SecurityException) { CommunityPosterResult.PermissionDenied }
+      catch (_: Exception) { CommunityPosterResult.Failed }
 }
 
-private fun drawText(canvas: Canvas, text: String, x: Int, y: Int, width: Int, size: Float, color: Int, lines: Int, bold: Boolean = false) {
+private fun buildTextLayout(text: String, width: Int, size: Float, color: Int, lines: Int, bold: Boolean = false, lineSpacing: Float = 7f): StaticLayout {
+    val clean = text.replace(Regex("\\s+"), " ").trim()
     val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = size; this.color = color
         typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
     }
-    val layout = StaticLayout.Builder.obtain(text.replace(Regex("\\s+"), " ").trim(), 0, text.replace(Regex("\\s+"), " ").trim().length, paint, width)
+    return StaticLayout.Builder.obtain(clean, 0, clean.length, paint, width)
         .setAlignment(Layout.Alignment.ALIGN_NORMAL).setIncludePad(false).setMaxLines(lines)
-        .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(7f, 1f).build()
+        .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(lineSpacing, 1f).build()
+}
+
+private fun drawText(canvas: Canvas, text: String, x: Int, y: Int, width: Int, size: Float, color: Int, lines: Int, bold: Boolean = false) {
+    val layout = buildTextLayout(text, width, size, color, lines, bold)
     canvas.save(); canvas.translate(x.toFloat(), y.toFloat()); layout.draw(canvas); canvas.restore()
 }

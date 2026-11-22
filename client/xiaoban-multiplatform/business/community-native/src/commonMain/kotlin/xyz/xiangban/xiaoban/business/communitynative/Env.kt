@@ -52,11 +52,18 @@ interface PlatformActions : VoicePlatform {
     fun consumeCommunityLink() {}
     val communitySystemShareSupported: Boolean get() = true
     val communityPosterSupported: Boolean get() = false
+    val communityPosterCopySupported: Boolean get() = false
     suspend fun createCommunityPoster(info: xyz.xiangban.xiaoban.common.community.CommunityShare): androidx.compose.ui.graphics.ImageBitmap? = null
+    suspend fun encodeCommunityQr(text: String): List<BooleanArray>? = null
+    suspend fun renderCommunityShareCard(
+        content: xyz.xiangban.xiaoban.common.share.ShareContent,
+        options: xyz.xiangban.xiaoban.common.share.ShareCardOptions,
+    ): androidx.compose.ui.graphics.ImageBitmap? = null
     val supportsChatImageSave: Boolean get() = false
     suspend fun saveChatImage(bytes: ByteArray, mime: String): CommunityPosterResult = CommunityPosterResult.Unsupported
     suspend fun saveCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     suspend fun shareCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
+    suspend fun copyCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     val supportsChatAttachments: Boolean get() = false
     /** 普通附件使用系统文件选择器。评论可单独支持系统相册。 */
     val forumFilePickerSupported: Boolean get() = false

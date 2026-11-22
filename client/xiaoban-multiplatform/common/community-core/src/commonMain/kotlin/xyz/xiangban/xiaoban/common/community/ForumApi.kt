@@ -261,6 +261,10 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun setTopicLiked(id: Long, liked: Boolean): LikeState =
         CommunityJson.decodeFromJsonElement(LikeState.serializer(), write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/like"))
     suspend fun setTopicBookmarked(id: Long, on: Boolean) { write(if (on) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/bookmark") }
+    suspend fun deleteTopic(id: Long) {
+        if (id <= 0) throw ApiException(400, "帖子编号无效")
+        write(HttpMethod.Delete, "/api/topics/$id")
+    }
 
     // ── 登录态 ──
     suspend fun uploadSession(): ForumUploadSession = http.send(HttpMethod.Post, "/api/session", serializer(), body = "{}", token = token())

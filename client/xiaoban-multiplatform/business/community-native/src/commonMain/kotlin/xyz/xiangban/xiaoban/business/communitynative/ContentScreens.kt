@@ -1,8 +1,13 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import xyz.xiangban.xiaoban.common.community.isCasual
+import xyz.xiangban.xiaoban.common.community.bodyPlainText
 import xyz.xiangban.xiaoban.common.community.cardTitle
 import xyz.xiangban.xiaoban.common.community.casualArticle
+import xyz.xiangban.xiaoban.common.share.ShareDeleteAction
+import xyz.xiangban.xiaoban.common.share.ShareExtraAction
+import xyz.xiangban.xiaoban.common.share.ShareIconKey
+import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -148,10 +153,44 @@ fun Toast(text: String?, onGone: () -> Unit) {
     }
 }
 
-/** 分享弹层：预览卡片加“系统分享”“复制链接”。手机上分享的是网页链接，对方在电脑上打开后再用小伴桌面版。 */
+/** 分享弹层：把必要展示数据与可选扩展动作交给 `:common:share` 统一渲染。 */
 @Composable
-internal fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
-    CommunityShareSheet(env, url, heading, hint, onDismiss, onCopied, panelModifier)
+internal fun ShareSheet(
+    env: CommunityEnv,
+    title: String,
+    sub: String,
+    url: String,
+    heading: String = "分享",
+    hint: String? = null,
+    onDismiss: () -> Unit,
+    onCopied: () -> Unit,
+    panelModifier: Modifier = Modifier,
+    author: String = "",
+    dateLabel: String = "",
+    coverUrl: String? = null,
+    badge: String? = null,
+    thumbKind: ShareThumbKind? = null,
+    extraActions: List<ShareExtraAction> = emptyList(),
+    deleteAction: ShareDeleteAction? = null,
+    onNotice: ((String) -> Unit)? = null,
+) {
+    CommunityShareSheet(
+        env = env,
+        url = url,
+        heading = heading,
+        hint = hint,
+        onDismiss = onDismiss,
+        onCopied = onCopied,
+        panelModifier = panelModifier,
+        author = author,
+        dateLabel = dateLabel,
+        coverUrl = coverUrl,
+        badge = badge,
+        thumbKind = thumbKind,
+        extraActions = extraActions,
+        deleteAction = deleteAction,
+        onNotice = onNotice,
+    )
 }
 
 @Composable
@@ -242,11 +281,17 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
             }
             OverlayTransition(share) { panel ->
                 ShareSheet(
-                    env, pack.title, kindLabel(pack.kind) + (pack.author?.nickname?.let { " · $it" } ?: ""), env.forum.packUrl(pack.id),
+                    env = env,
+                    title = pack.title,
+                    sub = kindLabel(pack.kind) + (pack.author?.nickname?.let { " · $it" } ?: ""),
+                    url = env.forum.packUrl(pack.id),
                     heading = "分享作品",
-                    hint = "分享作品链接，也可以在电脑上打开查看与使用。",
-                    onDismiss = { share = false }, onCopied = { toast = "链接已复制" },
+                    onDismiss = { share = false },
+                    onCopied = { toast = "链接已复制" },
                     panelModifier = panel,
+                    author = pack.author?.nickname.orEmpty(),
+                    dateLabel = pack.updatedAt.take(10),
+                    coverUrl = pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl),
                 )
             }
         }
@@ -585,8 +630,54 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
             }, parent = replyingTo, editingPost = editing)
         }
         OverlayTransition(share) { panel ->
-            val topic = (state as? Load.Ready)?.value?.topic
-            ShareSheet(env, topic?.cardTitle ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel)
+            val loaded = (state as? Load.Ready)?.value
+            val topic = loaded?.topic
+            val plainBody = remember(loaded) { loaded?.body?.blocks?.let(::bodyPlainText).orEmpty().trim() }
+            val extraActions = remember(plainBody, env.platform) {
+                if (plainBody.isNotBlank() && env.platform != null) {
+                    listOf(
+                        ShareExtraAction(
+                            id = "copyFull",
+                            label = "复制全文",
+                            icon = ShareIconKey.CopyText,
+                        ) {
+                            env.platform.copy(plainBody)
+                            toast = "已复制全文"
+                            "已复制完整正文"
+                        },
+                    )
+                } else emptyList()
+            }
+            val isAuthor = topic != null && session.loggedIn && topic.author.uid == session.accountId
+            val deleteAction = remember(topic?.id, isAuthor) {
+                if (isAuthor) {
+                    val topicId = topic.id
+                    ShareDeleteAction(
+                        label = "删除",
+                        confirmTitle = "删除这篇帖子？",
+                        confirmMessage = "删除后帖子及对应公开链接都将失效，无法恢复。",
+                        confirmButton = "确认删除",
+                    ) {
+                        env.forum.deleteTopic(topicId)
+                        back()
+                        "已删除帖子"
+                    }
+                } else null
+            }
+            ShareSheet(
+                env = env,
+                title = topic?.cardTitle ?: "帖子",
+                sub = topic?.category?.name.orEmpty(),
+                url = env.forum.topicUrl(id),
+                onDismiss = { share = false },
+                onCopied = { toast = "链接已复制" },
+                panelModifier = panel,
+                author = topic?.author?.nickname.orEmpty(),
+                dateLabel = topic?.createdAt?.let(::agoText).orEmpty(),
+                coverUrl = topic?.images?.firstOrNull()?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl),
+                extraActions = extraActions,
+                deleteAction = deleteAction,
+            )
         }
         Toast(toast) { toast = null }
     }
@@ -614,7 +705,20 @@ fun WeeklyDetailScreen(env: CommunityEnv, week: String, open: (Route) -> Unit, b
                         Hairline(Modifier.padding(start = 16.dp))
                     }
                 }
-                OverlayTransition(share) { panel -> ShareSheet(env, detail.title, detail.week, env.forum.weeklyUrl(detail.week), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel) }
+                OverlayTransition(share) { panel ->
+                    ShareSheet(
+                        env = env,
+                        title = detail.title,
+                        sub = detail.week,
+                        url = env.forum.weeklyUrl(detail.week),
+                        onDismiss = { share = false },
+                        onCopied = { toast = "链接已复制" },
+                        panelModifier = panel,
+                        author = "小伴社区",
+                        dateLabel = detail.week,
+                        thumbKind = ShareThumbKind.Daily,
+                    )
+                }
             }
         }
         Toast(toast) { toast = null }
@@ -662,7 +766,19 @@ fun ProjectDetailScreen(env: CommunityEnv, slug: String, back: () -> Unit) {
                     }
                     RichBody(env, project.bodyHtml, Modifier.padding(top = 16.dp))
                 }
-                OverlayTransition(share) { panel -> ShareSheet(env, project.name, "项目", env.forum.projectUrl(project.slug), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel) }
+                OverlayTransition(share) { panel ->
+                    ShareSheet(
+                        env = env,
+                        title = project.name,
+                        sub = "项目",
+                        url = env.forum.projectUrl(project.slug),
+                        onDismiss = { share = false },
+                        onCopied = { toast = "链接已复制" },
+                        panelModifier = panel,
+                        author = "小伴社区",
+                        thumbKind = ShareThumbKind.Repo,
+                    )
+                }
             }
         }
         Toast(toast) { toast = null }
