@@ -30,6 +30,9 @@ internal fun customPlainBody(chatBody: String, config: CustomModelConfig): Strin
     return if (config.protocol == "responses") buildJsonObject {
         put("model", config.model); put("stream", true); put("store", false)
         config.maxOutputTokens?.let { put("max_output_tokens", it) }
+        chat["reasoning_effort"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)?.let { effort ->
+            put("reasoning", buildJsonObject { put("effort", effort) })
+        }
         put("input", JsonArray(messages.map { m -> buildJsonObject {
             val obj = m.jsonObject
             put("role", obj["role"]!!); put("content", parts(obj["content"]!!, true))

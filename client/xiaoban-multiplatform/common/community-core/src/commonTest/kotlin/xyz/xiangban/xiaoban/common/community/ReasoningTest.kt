@@ -33,4 +33,33 @@ class ReasoningTest {
             assertFalse(bodies[1].containsKey("reasoning_effort"))
         } finally { client.close() }
     }
+
+    @Test
+    fun customModelDefaultsToFiveEffortsAndRespectsExplicitSelection() {
+        val defaultConfig = CustomModelConfig("https://api.deepseek.com/v1", "", "deepseek-chat", id = "p-1").validated()
+        assertEquals(listOf("low", "medium", "high", "xhigh", "max"), defaultConfig.effectiveReasoningEfforts())
+
+        val subset = defaultConfig.copy(reasoningEfforts = listOf("max", "low", "unknown")).validated()
+        assertEquals(listOf("low", "max"), subset.effectiveReasoningEfforts())
+
+        val disabled = defaultConfig.copy(reasoningEfforts = emptyList()).validated()
+        assertEquals(emptyList(), disabled.effectiveReasoningEfforts())
+
+        val managedFree = CustomModelConfig("https://api.example.com/v1", "", "free-1", id = "p-free", remoteId = "free", remoteType = "free").validated()
+        assertEquals(emptyList(), managedFree.effectiveReasoningEfforts())
+    }
+
+    @Test
+    fun responsesPlainBodyForwardsReasoningEffortWhenSet() {
+        val cfg = CustomModelConfig("https://api.openai.com/v1", "", "o3", protocol = "responses", id = "p-resp").validated()
+        val withEffort = Json.parseToJsonElement(
+            customPlainBody("""{"model":"o3","reasoning_effort":"xhigh","messages":[{"role":"user","content":"hi"}]}""", cfg),
+        ).jsonObject
+        assertEquals("xhigh", withEffort["reasoning"]?.jsonObject?.get("effort")?.jsonPrimitive?.content)
+
+        val withoutEffort = Json.parseToJsonElement(
+            customPlainBody("""{"model":"o3","messages":[{"role":"user","content":"hi"}]}""", cfg),
+        ).jsonObject
+        assertFalse(withoutEffort.containsKey("reasoning"))
+    }
 }

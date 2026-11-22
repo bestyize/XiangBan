@@ -8,6 +8,7 @@ import kotlin.uuid.Uuid
 
 const val CUSTOM_MODEL_TIER = "__xiaoban_custom_model__"
 private const val CUSTOM_MODEL_PREFIX = "$CUSTOM_MODEL_TIER:"
+val DEFAULT_CUSTOM_REASONING_EFFORTS = listOf("low", "medium", "high", "xhigh", "max")
 fun isCustomModelTier(tier: String) = tier == CUSTOM_MODEL_TIER || tier.startsWith(CUSTOM_MODEL_PREFIX)
 fun customModelTier(providerId: String, model: String): String = "$CUSTOM_MODEL_PREFIX$providerId:${Base64.UrlSafe.encode(model.encodeToByteArray()).trimEnd('=')}"
 @OptIn(ExperimentalUuidApi::class)
@@ -32,7 +33,14 @@ data class CustomModelConfig(
     val consoleUrl: String = "",
     val consoleText: String = "",
     val endpoints: Map<String, String> = emptyMap(),
+    val reasoningEfforts: List<String>? = null,
 ) {
+    /** 自定义/第三方服务默认支持五档思考等级；显式存空列表时表示不支持。 */
+    fun effectiveReasoningEfforts(): List<String> {
+        val raw = if (remoteType in setOf("free", "paid")) reasoningEfforts.orEmpty()
+        else (reasoningEfforts ?: DEFAULT_CUSTOM_REASONING_EFFORTS)
+        return DEFAULT_CUSTOM_REASONING_EFFORTS.filter { it in raw }
+    }
     fun validated(): CustomModelConfig {
         val address = baseUrl.trim().trimEnd('/')
         require(address.length <= 2000) { "API 地址过长" }
@@ -52,9 +60,11 @@ data class CustomModelConfig(
         require(contextTokens == null || contextTokens in 16_000..1_000_000) { "上下文窗口需在 16000–1000000 之间" }
         require(maxOutputTokens == null || maxOutputTokens in 1..1_000_000) { "单次输出上限需在 1–1000000 之间" }
         require(contextTokens == null || maxOutputTokens == null || maxOutputTokens < contextTokens) { "单次输出上限必须小于上下文窗口" }
+        val cleanEfforts = reasoningEfforts?.let { list -> DEFAULT_CUSTOM_REASONING_EFFORTS.filter { it in list } }
         return copy(baseUrl = address, apiKey = apiKey.trim(), model = model.trim(),
             name = name.trim().ifEmpty { url.host }, models = cleanModels,
-            legacyModel = if (id == "legacy" && legacyModel.isEmpty()) model.trim() else legacyModel)
+            legacyModel = if (id == "legacy" && legacyModel.isEmpty()) model.trim() else legacyModel,
+            reasoningEfforts = cleanEfforts)
     }
 
     fun chatUrl(): String {
@@ -82,8 +92,15 @@ data class CustomModelCatalog(
 )
 
 /** Safe for UI state: deliberately excludes API keys. */
-data class CustomProviderView(val id: String, val name: String, val models: List<String>, val defaultModel: String,
-    val available: Boolean = true, val remoteType: String = "")
+data class CustomProviderView(
+    val id: String,
+    val name: String,
+    val models: List<String>,
+    val defaultModel: String,
+    val available: Boolean = true,
+    val remoteType: String = "",
+    val reasoningEfforts: List<String> = emptyList(),
+)
 
 interface CustomModelStorage {
     fun load(): CustomModelConfig?

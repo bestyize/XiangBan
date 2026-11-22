@@ -70,6 +70,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -633,57 +634,109 @@ internal fun AiChatPage(
         PressOverlay(voiceInput)
         MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
+        var reasoningSheet by remember { mutableStateOf<Triple<String, String, List<String>>?>(null) }
         OverlayTransition(modelSheet) { panel ->
-            AgentSheet("选择对话模型", { modelSheet = false }, panel) {
-                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            val extra = LocalExtraColors.current
+            val scheme = MaterialTheme.colorScheme
+            BottomSheet({ modelSheet = false; reasoningSheet = null }, panel, flush = true, cornerRadius = 18.dp) {
+                SheetDragHandle()
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("选择对话模型", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    SheetCloseCircle { modelSheet = false; reasoningSheet = null }
+                }
+                Column(Modifier.weight(1f, fill = false).heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
                     cloud.customProviders.forEach { provider ->
-                        Text(provider.name, Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            provider.name,
+                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 5.dp),
+                            style = XType.Caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = extra.ink3,
+                        )
                         provider.models.forEach { model ->
                             val id = customModelTier(provider.id, model)
-                            val selected = cloud.selectedTier == id || (provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER && cloud.legacyCustomTier?.displayName == model)
-                            AgentChoiceRow(selected = selected, title = model, description = if (provider.available) null else "暂不可用", enabled = provider.available && !cloud.sending,
-                                onClick = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } })
+                            val legacyMatch = provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER && cloud.legacyCustomTier?.displayName == model
+                            val activeTierId = if (legacyMatch) CUSTOM_MODEL_TIER else id
+                            val selected = cloud.selectedTier == id || legacyMatch
+                            ChatModelPickerRow(
+                                title = model,
+                                description = if (provider.available) null else "暂不可用",
+                                badge = null,
+                                selected = selected,
+                                enabled = provider.available && !cloud.sending,
+                                reasoningLevels = if (provider.available) provider.reasoningEfforts else emptyList(),
+                                currentReasoning = cloud.reasoningByTier[activeTierId],
+                                onSelect = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } },
+                                onOpenReasoning = { reasoningSheet = Triple(activeTierId, model, provider.reasoningEfforts) },
+                            )
                         }
                     }
                     if (cloud.officialAiEnabled) {
-                        Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "小伴 AI · 官方",
+                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 5.dp),
+                            style = XType.Caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = extra.ink3,
+                        )
                         if (cloud.tiers.isEmpty()) {
-                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                            Text(
+                                if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"),
+                                Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                style = XType.Secondary,
+                                color = extra.ink3,
+                            )
                         }
                         cloud.tiers.forEach { tier ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                AgentChoiceRow(
-                                    selected = cloud.selectedTier == tier.tier,
-                                    title = tier.displayName,
-                                    description = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = tier.available && !cloud.sending,
-                                    onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
-                                )
-                                if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
-                                    ReasoningMenu(
-                                        modelName = tier.displayName,
-                                        levels = tier.reasoningEfforts,
-                                        selected = cloud.reasoningByTier[tier.tier],
-                                        enabled = !cloud.sending,
-                                        onSelect = { effort ->
-                                            chat.selectReasoning(tier.tier, effort)
-                                            modelSheet = false
-                                        },
-                                    )
-                                }
-                            }
+                            val desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description
+                            ChatModelPickerRow(
+                                title = tier.displayName,
+                                description = desc.takeIf(String::isNotBlank),
+                                badge = if (tier.isDefault) "推荐" else null,
+                                selected = cloud.selectedTier == tier.tier,
+                                enabled = tier.available && !cloud.sending,
+                                reasoningLevels = if (tier.available) tier.reasoningEfforts else emptyList(),
+                                currentReasoning = cloud.reasoningByTier[tier.tier],
+                                onSelect = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
+                                onOpenReasoning = { reasoningSheet = Triple(tier.tier, tier.displayName, tier.reasoningEfforts) },
+                            )
                         }
                     }
                 }
+                Hairline()
                 Row(
-                    Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { modelSheet = false; reasoningSheet = null; open(Route.Models) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (cloud.officialAiEnabled) "模型配置（余额、兑换）" else "模型配置", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                    XIcon(XIcons.ChevronRight, size = 16.dp)
+                    Text(
+                        if (cloud.officialAiEnabled) "模型配置（余额、兑换与第三方服务）" else "模型配置",
+                        Modifier.weight(1f),
+                        style = XType.Secondary,
+                        fontWeight = FontWeight.Medium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                    XIcon(XIcons.ChevronRight, size = 16.dp, tint = extra.ink3)
                 }
             }
+        }
+        reasoningSheet?.let { (tierId, modelName, levels) ->
+            ReasoningEffortBottomSheet(
+                modelName = modelName,
+                levels = levels,
+                selected = cloud.reasoningByTier[tierId],
+                onDismiss = { reasoningSheet = null },
+                onSelect = { effort ->
+                    chat.selectReasoning(tierId, effort)
+                    reasoningSheet = null
+                    modelSheet = false
+                },
+            )
         }
     }
 }
@@ -863,588 +916,75 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
     tool = tool, danger = danger,
 )
 
-// ───────────── 模型配置 ─────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
+/** 对话模型选择弹层内的单行项：名称严格左对齐，右侧等宽思考胶囊与固定对号列垂直对齐。 */
 @Composable
-fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, open: (Route) -> Unit) {
-    val session by env.session.state.collectAsState()
-    val cloud by chat.state.collectAsState()
-    var sheet by rememberSaveable { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val sheetScope = rememberCoroutineScope()
-    val dismissSheet: () -> Unit = {
-        sheetScope.launch {
-            sheetState.hide()
-            if (!sheetState.isVisible) sheet = false
-        }
-    }
-    var code by remember { mutableStateOf("") }
-    var editCustom by remember { mutableStateOf(false) }
-    var editingProvider by remember { mutableStateOf<String?>(null) }
-    var addingPreset by remember { mutableStateOf<String?>(null) }
-    var presetSheet by remember { mutableStateOf(false) }
-    var managedProvider by remember { mutableStateOf<String?>(null) }
-    var presetError by remember { mutableStateOf<String?>(null) }
+private fun ChatModelPickerRow(
+    title: String,
+    description: String?,
+    badge: String?,
+    selected: Boolean,
+    enabled: Boolean,
+    reasoningLevels: List<String>,
+    currentReasoning: String?,
+    onSelect: () -> Unit,
+    onOpenReasoning: () -> Unit,
+) {
     val extra = LocalExtraColors.current
-
-    LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
-    LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) sheet = false }
-
-    LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
-
-    val officialActive = cloud.officialAiEnabled && session.loggedIn && !isCustomModelTier(cloud.selectedTier) &&
-        (cloud.selectedTier.isBlank() || cloud.tiers.any { it.tier == cloud.selectedTier })
-    val quota = quotaText(cloud.balance)
-    val exhausted = cloud.balance != null && quota == "点数已用完"
-    val activeModelLabel = cloud.modelName()
-
-    fun isProviderActive(providerId: String): Boolean =
-        cloud.selectedTier.startsWith("$CUSTOM_MODEL_TIER:$providerId:") ||
-            (cloud.selectedTier == CUSTOM_MODEL_TIER && providerId == "legacy")
-
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenBar(
-                "模型配置",
-                onBack = back,
-                trailing = {
-                    IconTap(XIcons.Plus, "添加第三方模型服务", { presetError = null; presetSheet = true }, size = 20.dp)
-                },
-            )
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-                if (cloud.officialAiEnabled) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("官方服务", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.ink3)
-                        if (activeModelLabel.isNotBlank()) {
-                            Text(
-                                "当前：$activeModelLabel",
-                                style = XType.Caption,
-                                color = extra.ink3,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-
-                    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-                        if (!session.loggedIn) {
-                            Row(
-                                Modifier.fillMaxWidth().clickable { open(Route.Login) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) {
-                                    XIcon(XIcons.SparkleSmall, tint = Color.White, size = 21.dp)
-                                }
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text("小伴 AI", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                    Text("登录后查看额度与官方模型", style = XType.Caption, color = extra.ink3)
-                                }
-                                Box(
-                                    Modifier.height(30.dp).clip(CircleShape).background(extra.brandSoft)
-                                        .padding(horizontal = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text("登录", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = extra.brandInk)
-                                }
-                            }
-                        } else {
-                            Row(
-                                Modifier.fillMaxWidth().clickable { sheet = true; chat.clearRedeemFeedback() }
-                                    .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) {
-                                    XIcon(XIcons.SparkleSmall, tint = Color.White, size = 21.dp)
-                                }
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                        Text("小伴 AI", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                        if (officialActive) {
-                                            Box(
-                                                Modifier.height(20.dp).clip(CircleShape).background(extra.brandSoft).padding(horizontal = 7.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                Text("使用中", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.brandInk)
-                                            }
-                                        }
-                                    }
-                                    Text("跟着账号走，手机与电脑自动同步", style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                if (officialActive) {
-                                    Box(Modifier.size(22.dp).clip(CircleShape).background(extra.brandSoft), contentAlignment = Alignment.Center) {
-                                        XIcon(XIcons.Check, tint = extra.brandInk, size = 13.dp)
-                                    }
-                                } else {
-                                    Box(
-                                        Modifier.height(30.dp).alpha(if (!cloud.sending) 1f else 0.45f)
-                                            .clip(CircleShape).background(extra.fill)
-                                            .clickable(enabled = !cloud.sending) {
-                                                val target = cloud.tiers.firstOrNull { it.isDefault && it.available }
-                                                    ?: cloud.tiers.firstOrNull { it.available }
-                                                if (target != null) chat.selectTier(target.tier)
-                                                else { sheet = true; chat.clearRedeemFeedback() }
-                                            }
-                                            .padding(horizontal = 12.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text("使用", style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
-                            }
-
-                            Hairline(Modifier.padding(start = 16.dp))
-
-                            Row(
-                                Modifier.fillMaxWidth().heightIn(min = 46.dp)
-                                    .clickable { sheet = true; chat.clearRedeemFeedback() }
-                                    .padding(start = 16.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Box(Modifier.size(7.dp).clip(CircleShape).background(if (exhausted) Danger else Success))
-                                    val quotaLine = if (exhausted) "官方点数已用完"
-                                    else quota + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: "")
-                                    Text(
-                                        quotaLine,
-                                        style = XType.Secondary,
-                                        fontWeight = if (exhausted) FontWeight.Medium else FontWeight.Normal,
-                                        color = if (exhausted) Danger else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                Box(
-                                    Modifier.height(30.dp).clip(CircleShape)
-                                        .background(if (exhausted) extra.brandSoft else extra.fill)
-                                        .padding(horizontal = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        if (exhausted) "兑换点数" else "额度与模型",
-                                        style = XType.Caption,
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (exhausted) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("第三方模型服务", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.ink3)
-                    Text("仅本机保存", style = XType.Caption, color = extra.ink3)
-                }
-
-                cloud.customConfigError?.let {
-                    Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Danger, style = XType.Secondary)
-                }
-
-                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-                    cloud.customProviders.forEachIndexed { idx, provider ->
-                        val active = isProviderActive(provider.id)
-                        val openConfig = {
-                            if (provider.remoteType in listOf("free", "paid")) managedProvider = provider.id
-                            else { editingProvider = provider.id; addingPreset = null; editCustom = true }
-                        }
-                        if (idx > 0) Hairline(Modifier.padding(start = 68.dp))
-                        Row(
-                            Modifier.fillMaxWidth().clickable(onClick = openConfig)
-                                .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(
-                                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(if (active) extra.brandSoft else extra.fill),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    provider.name.trim().take(1).uppercase().ifBlank { "M" },
-                                    style = XType.Body,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (active) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Text(
-                                        provider.name,
-                                        Modifier.weight(1f, fill = false),
-                                        style = XType.Body,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    when {
-                                        active -> Box(
-                                            Modifier.height(20.dp).clip(CircleShape).background(extra.brandSoft).padding(horizontal = 7.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text("使用中", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.brandInk)
-                                        }
-                                        !provider.available -> Box(
-                                            Modifier.height(20.dp).clip(CircleShape).background(extra.fill).padding(horizontal = 7.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text("暂不可用", style = XType.Caption, color = extra.ink3)
-                                        }
-                                    }
-                                }
-                                Text(
-                                    "默认 ${provider.defaultModel} · 共 ${provider.models.size} 个模型",
-                                    style = XType.Caption,
-                                    color = extra.ink3,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            if (active) {
-                                Box(Modifier.size(22.dp).clip(CircleShape).background(extra.brandSoft), contentAlignment = Alignment.Center) {
-                                    XIcon(XIcons.Check, tint = extra.brandInk, size = 13.dp)
-                                }
-                            } else if (provider.available) {
-                                Box(
-                                    Modifier.height(30.dp).alpha(if (!cloud.sending) 1f else 0.45f)
-                                        .clip(CircleShape).background(extra.fill)
-                                        .clickable(enabled = !cloud.sending) {
-                                            chat.selectTier(customModelTier(provider.id, provider.defaultModel))
-                                        }
-                                        .padding(horizontal = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text("使用", style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
-                        }
-                    }
-
-                    if (cloud.customProviders.isNotEmpty()) Hairline(Modifier.padding(start = 16.dp))
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 52.dp)
-                            .alpha(if (cloud.customConfigError == null) 1f else 0.45f)
-                            .clickable(enabled = cloud.customConfigError == null) { presetError = null; presetSheet = true }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        XIcon(XIcons.Plus, tint = extra.brandInk, size = 18.dp)
-                        Text("添加第三方模型服务", style = XType.Body, fontWeight = FontWeight.Medium, color = extra.brandInk)
-                    }
-                }
-
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) extra.fill else Color.Transparent)
+            .alpha(if (enabled) 1f else 0.45f)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(enabled = enabled, role = Role.RadioButton, onClick = onSelect)
+                .padding(vertical = 1.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "第三方服务密钥仅保存在本机，不会上传到小伴账号；对话中也可以随时切换不同服务商的模型。",
-                    Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                    style = XType.Caption,
-                    color = extra.ink3,
+                    text = title,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = XType.Body,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = scheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-        if (editCustom) CustomModelDialog(chat, editingProvider, addingPreset, { env.platform?.openInBrowser(it) }, { editCustom = false })
-        managedProvider?.let { id -> cloud.customProviders.firstOrNull { it.id == id }?.let { provider -> ManagedModelDialog(chat, provider.id, provider.name, provider.models) { managedProvider = null } } }
-        OverlayTransition(presetSheet) { panel ->
-            BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-                BottomSheet({ presetSheet = false }, panel.heightIn(max = maxHeight * .8f)) {
-                    Text("添加第三方模型服务", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text("选择服务商，或手动填写自己的服务。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 12.dp)) {
-                        cloud.remotePresets.forEach { preset ->
-                            NavRow(preset.name, note = (preset.description + if (preset.added) " · 已添加" else "").trim()) {
-                                val existing = cloud.customProviders.firstOrNull { it.id == remoteProviderId(preset.id) }
-                                if (existing != null) {
-                                    presetSheet = false
-                                    if (preset.type == "third") { editingProvider = existing.id; addingPreset = null; editCustom = true } else managedProvider = existing.id
-                                } else if (preset.type == "third") {
-                                    presetSheet = false; editingProvider = null; addingPreset = preset.id; editCustom = true
-                                } else {
-                                    try { chat.addManagedPreset(preset.id); presetSheet = false }
-                                    catch (e: Exception) { presetError = e.message ?: "添加失败" }
-                                }
-                            }
-                        }
-                        if (cloud.catalogueLoading) Text("正在获取服务商…", Modifier.padding(vertical = 12.dp), style = XType.Secondary)
-                        (presetError ?: cloud.catalogueError)?.let { Text(it, Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = XType.Secondary) }
-                        if (cloud.catalogueError != null) GhostPillButton("重新获取", { sheetScope.launch { chat.refreshModelCatalogue(force = true) } }, Modifier.fillMaxWidth(), enabled = !cloud.catalogueLoading, height = 40.dp, fontSize = 14)
-                        NavRow("自定义模型服务", note = "手动填写 API 地址、密钥和模型") { presetSheet = false; editingProvider = null; addingPreset = null; editCustom = true }
-                    }
-                }
-            }
-        }
-        if (sheet && cloud.officialAiEnabled) {
-            BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-                val contentHeight = (maxHeight * 0.85f - 48.dp).coerceAtLeast(1.dp)
-                ModalBottomSheet(
-                    onDismissRequest = { sheet = false },
-                    sheetState = sheetState,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ) {
-                Column(Modifier.fillMaxWidth().heightIn(max = contentHeight).padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
-                    Column(Modifier.weight(1f)) {
-                        Text("小伴AI", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                        Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconTap(XIcons.Close, "关闭", dismissSheet)
-                }
-                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(cloud.balance?.let { formatAiCredits(it.total, it.quotaPerUnit) } ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        Text("剩余小伴点", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(expiryText(cloud.balance) ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        Text("到期时间", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                cloud.balance?.let { balance ->
+                if (!badge.isNullOrBlank()) {
                     Text(
-                        "其中付费点数 ${formatAiCredits(balance.paid, balance.quotaPerUnit)}",
-                        Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (balance.trial.available) {
-                        Text(
-                            "首次使用自动发放 ${formatAiCredits(balance.trial.quota, balance.quotaPerUnit)} 试用点数，${balance.trial.days} 天内有效。",
-                            Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    balance.buckets.forEach { bucket ->
-                        Text(
-                            "${bucketKindLabel(bucket.kind)} · ${formatAiCredits(bucket.remaining, balance.quotaPerUnit)} / ${formatAiCredits(bucket.total, balance.quotaPerUnit)}" +
-                                (bucket.expiresAt?.let { " · ${it.take(10)} 到期" } ?: " · 长期有效"),
-                            Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                GhostPillButton("获取 AI 额度", { env.platform?.openInBrowser(CONTACT_URL) }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
-                Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码", filled = true)
-                    PillButton(if (cloud.redeeming) "兑换中…" else "兑换", { chat.redeem(code) }, enabled = !cloud.redeeming && code.isNotBlank(), height = 48.dp)
-                }
-                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, fontWeight = FontWeight.Medium) }
-                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, color = Danger) }
-                Text("可用模型", Modifier.padding(top = 16.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                Text("选择聊天使用的模型，也可以在对话页切换。", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                cloud.tiers.forEach { tier ->
-                    RadioRow(
-                        selected = cloud.selectedTier == tier.tier,
-                        title = tier.displayName + if (tier.isDefault) "　推荐" else "",
-                        desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                        enabled = tier.available,
-                        onClick = { chat.selectTier(tier.tier) },
+                        badge,
+                        Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (selected) scheme.surface else extra.fill)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                        style = XType.Caption,
+                        color = scheme.onSurfaceVariant,
                     )
                 }
-                }
-                PillButton("完成", dismissSheet, Modifier.padding(top = 14.dp).fillMaxWidth())
-                }
             }
+            if (!description.isNullOrBlank()) {
+                Text(description, Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
             }
+        }
+        if (reasoningLevels.isNotEmpty()) {
+            ReasoningEffortChip(
+                modelName = title,
+                current = currentReasoning,
+                enabled = enabled,
+                selectedRow = selected,
+                onClick = onOpenReasoning,
+            )
+        }
+        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+            if (selected) XIcon(XIcons.Check, size = 17.dp, tint = extra.brandInk)
         }
     }
 }
-
-@Composable
-private fun ManagedModelDialog(chat: CloudChatController, providerId: String, providerName: String, models: List<String>, dismiss: () -> Unit) {
-    var confirming by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        BottomSheet(dismiss, Modifier.heightIn(max = maxHeight * .8f)) {
-            Text(providerName, style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("服务地址和模型由服务端管理。", Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 12.dp)) {
-                models.forEach { Text(it, Modifier.padding(vertical = 6.dp), style = XType.Secondary) }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = XType.Secondary) }
-                if (confirming) {
-                    Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("移除此服务？", Modifier.weight(1f), style = XType.Secondary)
-                        LinkText("取消", { confirming = false })
-                        LinkText("确认移除", { try { chat.deleteCustomProvider(providerId); dismiss() } catch (e: Exception) { error = e.message ?: "移除失败" } })
-                    }
-                } else Text("移除此服务", Modifier.padding(top = 16.dp).clickable { confirming = true }.padding(vertical = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.error)
-            }
-            GhostPillButton("完成", dismiss, Modifier.fillMaxWidth().padding(top = 16.dp))
-        }
-    }
-}
-
-@Composable
-private fun CustomModelDialog(chat: CloudChatController, providerId: String?, presetId: String?, openUrl: (String) -> Unit, dismiss: () -> Unit) {
-    val saved = remember(providerId) { providerId?.let(chat::customProvider) }
-    val initial = remember(providerId, presetId) { saved ?: presetId?.let(chat::presetDraft) }
-    val id = remember(providerId, presetId) { initial?.id ?: newCustomProviderId() }
-    var providerName by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var address by remember { mutableStateOf(initial?.baseUrl.orEmpty()) }
-    var key by remember { mutableStateOf(initial?.apiKey.orEmpty()) }
-    var models by remember { mutableStateOf(initial?.models.orEmpty()) }
-    var defaultModel by remember { mutableStateOf(initial?.model.orEmpty()) }
-    var modelDraft by remember { mutableStateOf("") }
-    var protocol by remember { mutableStateOf(initial?.protocol ?: "chat") }
-    var authMode by remember { mutableStateOf(saved?.authMode ?: "api-key") }
-    var context by remember { mutableStateOf(saved?.contextTokens?.toString().orEmpty()) }
-    var maxOutput by remember { mutableStateOf(saved?.maxOutputTokens?.toString().orEmpty()) }
-    var supportsTools by remember { mutableStateOf(saved?.supportsTools ?: true) }
-    var supportsVision by remember { mutableStateOf(saved?.supportsVision ?: true) }
-    var advanced by remember { mutableStateOf(saved?.contextTokens != null || saved?.maxOutputTokens != null || saved?.supportsTools == false || saved?.supportsVision == false) }
-    val scope = rememberCoroutineScope()
-    var fetching by remember { mutableStateOf(false) }
-    var fetchedModels by remember { mutableStateOf<List<String>>(emptyList()) }
-    var fetchNote by remember { mutableStateOf<String?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var revealKey by remember { mutableStateOf(false) }
-    var confirmingDelete by remember { mutableStateOf(false) }
-    fun addModel(value: String) {
-        val item = value.trim()
-        if (item.isEmpty()) return
-        if (item !in models) models = models + item
-        if (defaultModel.isEmpty()) defaultModel = item
-        modelDraft = ""; error = null
-    }
-    fun save() {
-        try {
-            fun number(value: String): Int? = if (value.isBlank()) null else value.toIntOrNull() ?: throw IllegalArgumentException("请填写有效的 token 数量")
-            val pending = modelDraft.trim()
-            val all = (models + listOfNotNull(pending.takeIf { it.isNotEmpty() })).distinct()
-            val selected = defaultModel.ifBlank { all.firstOrNull().orEmpty() }
-            val config = (initial ?: CustomModelConfig(address, key, selected, id = id)).copy(baseUrl = address, apiKey = key, model = selected,
-                protocol = protocol, contextTokens = number(context), maxOutputTokens = number(maxOutput), supportsTools = supportsTools,
-                supportsVision = supportsVision, authMode = authMode, name = providerName, models = all,
-                followRecommended = initial?.remoteId != null && selected == initial.recommendedDefault)
-            chat.saveCustomProvider(config)
-            dismiss()
-        } catch (e: Exception) { error = e.message ?: "保存失败" }
-    }
-    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        BottomSheet(onDismiss = dismiss, panelModifier = Modifier.heightIn(max = maxHeight * .92f)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-                    XIcon(XIcons.Globe, size = 22.dp)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(if (saved == null) "添加第三方模型服务" else "编辑模型服务", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text("连接自己的模型", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconTap(XIcons.Close, "关闭", dismiss, size = 20.dp)
-            }
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 20.dp)) {
-                Text("服务商名称", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                TextBox(providerName, { providerName = it; error = null }, Modifier.padding(top = 8.dp, bottom = 18.dp), placeholder = "例如 DeepSeek、公司模型", filled = true)
-                Text("接口协议", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.padding(top = 8.dp).fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("chat" to "Chat", "responses" to "Responses", "anthropic" to "Anthropic").forEach { (id, name) ->
-                        ChipPill(name, selected = protocol == id, onClick = {
-                            if (address == initial?.endpoints?.get(protocol) || address == initial?.baseUrl) initial?.endpoints?.get(id)?.let { address = it }
-                            protocol = id; error = null; fetchedModels = emptyList(); fetchNote = null
-                        })
-                    }
-                }
-                Text(when (protocol) { "responses" -> "OpenAI Responses"; "anthropic" -> "Anthropic Messages"; else -> "OpenAI Chat Completions" }, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("API 地址", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                TextBox(address, { address = it; error = null; fetchedModels = emptyList(); fetchNote = null }, Modifier.padding(top = 8.dp), placeholder = "https://api.example.com/v1", keyboardType = KeyboardType.Uri, filled = true)
-                Text(if (address.trim().startsWith("http://", true)) "HTTP 不加密，密钥和内容会明文传输，仅建议用于可信内网。" else "填写服务商提供的接口地址", Modifier.padding(top = 5.dp), style = XType.Caption, color = if (address.trim().startsWith("http://", true)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("API 密钥（可选）", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill), verticalAlignment = Alignment.CenterVertically) {
-                    TextBox(key, { key = it; error = null; fetchedModels = emptyList(); fetchNote = null }, Modifier.weight(1f), placeholder = "没有密钥可留空", password = !revealKey, filled = true)
-                    IconTap(XIcons.Eye, if (revealKey) "隐藏密钥" else "显示密钥", { revealKey = !revealKey }, size = 20.dp)
-                }
-                Text("密钥保存在本机应用私有存储中，未单独加密。", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                initial?.consoleUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    LinkText(initial.consoleText.ifBlank { "获取 API 密钥" }, { openUrl(url) })
-                }
-                if (protocol == "anthropic") {
-                    Text("密钥认证方式", Modifier.padding(top = 14.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold)
-                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ChipPill("x-api-key", selected = authMode == "api-key", onClick = { authMode = "api-key"; fetchedModels = emptyList(); fetchNote = null })
-                        ChipPill("Bearer", selected = authMode == "bearer", onClick = { authMode = "bearer"; fetchedModels = emptyList(); fetchNote = null })
-                    }
-                }
-                Text("模型 · ${models.size} 个", Modifier.padding(top = 18.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                if (models.isNotEmpty()) Text("点击模型设为默认", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                models.forEach { model ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        RadioRow(model == defaultModel, model, if (model == defaultModel) "默认" else null, { defaultModel = model }, Modifier.weight(1f))
-                        IconTap(XIcons.Trash, "移除模型 $model", { models = models - model; if (defaultModel == model) defaultModel = models.firstOrNull().orEmpty() }, size = 18.dp)
-                    }
-                }
-                Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextBox(modelDraft, { modelDraft = it; error = null }, Modifier.weight(1f), placeholder = "输入模型名称", filled = true)
-                    GhostPillButton("添加", { addModel(modelDraft) }, enabled = modelDraft.isNotBlank(), height = 40.dp, fontSize = 14)
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
-                    GhostPillButton(if (fetching) "正在连接…" else "获取可用模型", {
-                        val current = CustomModelConfig(address, key, defaultModel, protocol = protocol, authMode = authMode)
-                        fetching = true; fetchNote = null
-                        scope.launch {
-                            try {
-                                val result = chat.fetchCustomModels(current)
-                                if (address == current.baseUrl && key == current.apiKey && protocol == current.protocol && authMode == current.authMode) {
-                                    fetchedModels = result
-                                    fetchNote = if (result.isEmpty()) "未发现模型，请手动填写。" else "发现 ${result.size} 个模型，点击添加。"
-                                }
-                            } catch (e: CancellationException) { throw e }
-                            catch (e: Exception) { if (address == current.baseUrl && key == current.apiKey && protocol == current.protocol && authMode == current.authMode) fetchNote = e.message ?: "连接失败，请手动填写模型。" }
-                            finally { fetching = false }
-                        }
-                    }, enabled = !fetching && address.isNotBlank(), height = 36.dp, fontSize = 14)
-                }
-                fetchNote?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (fetchedModels.isNotEmpty()) Row(Modifier.padding(top = 8.dp).fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    fetchedModels.forEach { item -> ChipPill(item, selected = item in models, onClick = { addModel(item) }) }
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 18.dp).clickable { advanced = !advanced }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("高级设置", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                    XIcon(if (advanced) XIcons.ChevronUp else XIcons.ChevronDown, size = 18.dp)
-                }
-                if (advanced) {
-                    Text("上下文窗口（token）", Modifier.padding(top = 10.dp), style = XType.Secondary)
-                    TextBox(context, { context = it; error = null }, Modifier.padding(top = 6.dp), placeholder = "默认自动", keyboardType = KeyboardType.Number, filled = true)
-                    Text("单次输出上限（token）", Modifier.padding(top = 12.dp), style = XType.Secondary)
-                    TextBox(maxOutput, { maxOutput = it; error = null }, Modifier.padding(top = 6.dp), placeholder = "默认自动", keyboardType = KeyboardType.Number, filled = true)
-                    Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("支持工具调用", Modifier.weight(1f), style = XType.Secondary); Toggle(supportsTools, { supportsTools = it })
-                    }
-                    Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("支持图片输入", Modifier.weight(1f), style = XType.Secondary); Toggle(supportsVision, { supportsVision = it })
-                    }
-                }
-                error?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error, style = XType.Secondary) }
-                if (saved != null) {
-                    if (confirmingDelete) {
-                        Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("删除此模型服务？", Modifier.weight(1f), style = XType.Secondary)
-                            LinkText("取消", { confirmingDelete = false })
-                            LinkText("确认删除", { try { chat.deleteCustomProvider(saved.id); dismiss() } catch (e: Exception) { error = e.message ?: "删除失败" } })
-                        }
-                    } else {
-                        Text("删除此模型服务", Modifier.padding(top = 18.dp).clickable { confirmingDelete = true }.padding(vertical = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GhostPillButton("取消", dismiss, Modifier.weight(1f))
-                PillButton(if (saved == null) "保存并使用" else "保存", ::save, Modifier.weight(2f))
-            }
-        }
-    }
-}
-
-/** 取额度里最早到期的一项，只显示日期；没有到期时间返回 null。 */
-private fun expiryText(balance: AiBalance?): String? =
-    balance?.buckets?.filter { it.remaining > 0 }?.mapNotNull { it.expiresAt }?.minOrNull()?.take(10)
-

@@ -77,7 +77,8 @@ data class AiTier(
     @SerialName("_local_source") val localSource: String = "",
 )
 
-private fun CustomModelConfig.asTier(tier: String = customModelTier(id, model)) = AiTier(tier, model, contextWindowTokens = contextTokens,
+private fun CustomModelConfig.asTier(tier: String = customModelTier(id, model)) = AiTier(tier, model,
+    reasoningEfforts = effectiveReasoningEfforts(), contextWindowTokens = contextTokens,
     supportsTools = supportsTools, supportsVision = supportsVision, maxOutputTokens = maxOutputTokens,
     localProtocol = protocol, localSource = if (id == "legacy") "$baseUrl|$model" else "$id|$baseUrl|$model")
 
@@ -1412,8 +1413,14 @@ class CloudChatController(
     }
 
     fun selectReasoning(tier: String, effort: String?) {
-        if (!_state.value.officialAiEnabled) return
-        val found = _state.value.tiers.firstOrNull { it.tier == tier } ?: return
+        val custom = isCustomModelTier(tier)
+        if (!custom && !_state.value.officialAiEnabled) return
+        val found = if (custom) {
+            _state.value.customTiers.firstOrNull { it.tier == tier }
+                ?: _state.value.legacyCustomTier?.takeIf { it.tier == tier }
+        } else {
+            _state.value.tiers.firstOrNull { it.tier == tier }
+        } ?: return
         if (!found.available || _state.value.sending) return
         if (effort != null && effort !in found.reasoningEfforts) return
         val choices = _state.value.reasoningByTier - tier
@@ -1488,7 +1495,10 @@ class CloudChatController(
             val providers = catalog.providers
             val tiers = providers.flatMap { p -> p.models.map { p.copy(model = it).asTier().copy(available = api.providerAvailable(p)) } }
             val legacy = api.customForTier(CUSTOM_MODEL_TIER)?.let { it.asTier(CUSTOM_MODEL_TIER).copy(available = api.providerAvailable(it)) }
-            _state.value = _state.value.copy(customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType) }, customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), officialAiEnabled = catalog.officialAiEnabled, customConfigError = null)
+            _state.value = _state.value.copy(
+                customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType, it.effectiveReasoningEfforts()) },
+                customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), officialAiEnabled = catalog.officialAiEnabled, customConfigError = null,
+            )
         } catch (e: Exception) {
             _state.value = _state.value.copy(customProviders = emptyList(), customTiers = emptyList(), legacyCustomTier = null, officialAiEnabled = enabled, customConfigError = e.message ?: "模型服务配置无法读取")
         }
