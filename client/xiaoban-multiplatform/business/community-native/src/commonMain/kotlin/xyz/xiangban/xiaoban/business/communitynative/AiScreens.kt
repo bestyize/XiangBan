@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
@@ -678,7 +680,7 @@ internal fun AiChatPage(
                     Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (cloud.officialAiEnabled) "模型与点数（余额、兑换）" else "管理模型服务", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                    Text(if (cloud.officialAiEnabled) "模型配置（余额、兑换）" else "模型配置", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                     XIcon(XIcons.ChevronRight, size = 16.dp)
                 }
             }
@@ -861,7 +863,7 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
     tool = tool, danger = danger,
 )
 
-// ───────────── 模型与点数 ─────────────
+// ───────────── 模型配置 ─────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -884,49 +886,274 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
     var presetSheet by remember { mutableStateOf(false) }
     var managedProvider by remember { mutableStateOf<String?>(null) }
     var presetError by remember { mutableStateOf<String?>(null) }
+    val extra = LocalExtraColors.current
 
     LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
     LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) sheet = false }
 
     LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
 
+    val officialActive = cloud.officialAiEnabled && session.loggedIn && !isCustomModelTier(cloud.selectedTier) &&
+        (cloud.selectedTier.isBlank() || cloud.tiers.any { it.tier == cloud.selectedTier })
+    val quota = quotaText(cloud.balance)
+    val exhausted = cloud.balance != null && quota == "点数已用完"
+    val activeModelLabel = cloud.modelName()
+
+    fun isProviderActive(providerId: String): Boolean =
+        cloud.selectedTier.startsWith("$CUSTOM_MODEL_TIER:$providerId:") ||
+            (cloud.selectedTier == CUSTOM_MODEL_TIER && providerId == "legacy")
+
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            ScreenBar("模型与点数", onBack = back)
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-                if (cloud.officialAiEnabled && !session.loggedIn) {
-                    GroupLabel("小伴AI · 官方")
-                    GhostPillButton("登录后查看点数", { open(Route.Login) }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
-                } else if (cloud.officialAiEnabled) {
-                    GroupLabel("小伴AI · 官方")
-                    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
-                            Column(Modifier.weight(1f)) {
-                                Text("小伴AI", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                                Text("跟着账号走，换手机、换电脑自动同步", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ScreenBar(
+                "模型配置",
+                onBack = back,
+                trailing = {
+                    IconTap(XIcons.Plus, "添加第三方模型服务", { presetError = null; presetSheet = true }, size = 20.dp)
+                },
+            )
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
+                if (cloud.officialAiEnabled) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("官方服务", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.ink3)
+                        if (activeModelLabel.isNotBlank()) {
+                            Text(
+                                "当前：$activeModelLabel",
+                                style = XType.Caption,
+                                color = extra.ink3,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                        if (!session.loggedIn) {
+                            Row(
+                                Modifier.fillMaxWidth().clickable { open(Route.Login) }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) {
+                                    XIcon(XIcons.SparkleSmall, tint = Color.White, size = 21.dp)
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text("小伴 AI", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                    Text("登录后查看额度与官方模型", style = XType.Caption, color = extra.ink3)
+                                }
+                                Box(
+                                    Modifier.height(30.dp).clip(CircleShape).background(extra.brandSoft)
+                                        .padding(horizontal = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text("登录", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = extra.brandInk)
+                                }
+                            }
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().clickable { sheet = true; chat.clearRedeemFeedback() }
+                                    .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) {
+                                    XIcon(XIcons.SparkleSmall, tint = Color.White, size = 21.dp)
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        Text("小伴 AI", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                        if (officialActive) {
+                                            Box(
+                                                Modifier.height(20.dp).clip(CircleShape).background(extra.brandSoft).padding(horizontal = 7.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text("使用中", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.brandInk)
+                                            }
+                                        }
+                                    }
+                                    Text("跟着账号走，手机与电脑自动同步", style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                if (officialActive) {
+                                    Box(Modifier.size(22.dp).clip(CircleShape).background(extra.brandSoft), contentAlignment = Alignment.Center) {
+                                        XIcon(XIcons.Check, tint = extra.brandInk, size = 13.dp)
+                                    }
+                                } else {
+                                    Box(
+                                        Modifier.height(30.dp).alpha(if (!cloud.sending) 1f else 0.45f)
+                                            .clip(CircleShape).background(extra.fill)
+                                            .clickable(enabled = !cloud.sending) {
+                                                val target = cloud.tiers.firstOrNull { it.isDefault && it.available }
+                                                    ?: cloud.tiers.firstOrNull { it.available }
+                                                if (target != null) chat.selectTier(target.tier)
+                                                else { sheet = true; chat.clearRedeemFeedback() }
+                                            }
+                                            .padding(horizontal = 12.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text("使用", style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
+                            }
+
+                            Hairline(Modifier.padding(start = 16.dp))
+
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 46.dp)
+                                    .clickable { sheet = true; chat.clearRedeemFeedback() }
+                                    .padding(start = 16.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Box(Modifier.size(7.dp).clip(CircleShape).background(if (exhausted) Danger else Success))
+                                    val quotaLine = if (exhausted) "官方点数已用完"
+                                    else quota + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: "")
+                                    Text(
+                                        quotaLine,
+                                        style = XType.Secondary,
+                                        fontWeight = if (exhausted) FontWeight.Medium else FontWeight.Normal,
+                                        color = if (exhausted) Danger else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                Box(
+                                    Modifier.height(30.dp).clip(CircleShape)
+                                        .background(if (exhausted) extra.brandSoft else extra.fill)
+                                        .padding(horizontal = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        if (exhausted) "兑换点数" else "额度与模型",
+                                        style = XType.Caption,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (exhausted) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
-                        Text(
-                            "当前模型：${cloud.modelName()}\n${quotaText(cloud.balance)}" + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: ""),
-                            Modifier.padding(top = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        GhostPillButton("配置", { sheet = true; chat.clearRedeemFeedback() }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
                     }
                 }
-                    GroupLabel("自己的模型服务")
-                    cloud.customConfigError?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = XType.Secondary) }
-                    cloud.customProviders.forEach { provider ->
-                        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
-                            Text(provider.name, style = XType.Section, fontWeight = FontWeight.SemiBold)
-                            Text("${provider.models.size} 个模型 · 默认 ${provider.defaultModel}" + if (provider.available) "" else " · 暂不可用", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                GhostPillButton("配置", { if (provider.remoteType in listOf("free", "paid")) managedProvider = provider.id else { editingProvider = provider.id; addingPreset = null; editCustom = true } }, Modifier.weight(1f), height = 40.dp, fontSize = 14)
-                                GhostPillButton("使用默认模型", { chat.selectTier(customModelTier(provider.id, provider.defaultModel)) }, Modifier.weight(1f), enabled = provider.available && !cloud.sending, height = 40.dp, fontSize = 14)
+
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("第三方模型服务", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.ink3)
+                    Text("仅本机保存", style = XType.Caption, color = extra.ink3)
+                }
+
+                cloud.customConfigError?.let {
+                    Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Danger, style = XType.Secondary)
+                }
+
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                    cloud.customProviders.forEachIndexed { idx, provider ->
+                        val active = isProviderActive(provider.id)
+                        val openConfig = {
+                            if (provider.remoteType in listOf("free", "paid")) managedProvider = provider.id
+                            else { editingProvider = provider.id; addingPreset = null; editCustom = true }
+                        }
+                        if (idx > 0) Hairline(Modifier.padding(start = 68.dp))
+                        Row(
+                            Modifier.fillMaxWidth().clickable(onClick = openConfig)
+                                .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(
+                                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(if (active) extra.brandSoft else extra.fill),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    provider.name.trim().take(1).uppercase().ifBlank { "M" },
+                                    style = XType.Body,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (active) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Text(
+                                        provider.name,
+                                        Modifier.weight(1f, fill = false),
+                                        style = XType.Body,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    when {
+                                        active -> Box(
+                                            Modifier.height(20.dp).clip(CircleShape).background(extra.brandSoft).padding(horizontal = 7.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text("使用中", style = XType.Caption, fontWeight = FontWeight.Medium, color = extra.brandInk)
+                                        }
+                                        !provider.available -> Box(
+                                            Modifier.height(20.dp).clip(CircleShape).background(extra.fill).padding(horizontal = 7.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text("暂不可用", style = XType.Caption, color = extra.ink3)
+                                        }
+                                    }
+                                }
+                                Text(
+                                    "默认 ${provider.defaultModel} · 共 ${provider.models.size} 个模型",
+                                    style = XType.Caption,
+                                    color = extra.ink3,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (active) {
+                                Box(Modifier.size(22.dp).clip(CircleShape).background(extra.brandSoft), contentAlignment = Alignment.Center) {
+                                    XIcon(XIcons.Check, tint = extra.brandInk, size = 13.dp)
+                                }
+                            } else if (provider.available) {
+                                Box(
+                                    Modifier.height(30.dp).alpha(if (!cloud.sending) 1f else 0.45f)
+                                        .clip(CircleShape).background(extra.fill)
+                                        .clickable(enabled = !cloud.sending) {
+                                            chat.selectTier(customModelTier(provider.id, provider.defaultModel))
+                                        }
+                                        .padding(horizontal = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text("使用", style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
                         }
                     }
-                    GhostPillButton("添加第三方模型服务", { presetError = null; presetSheet = true }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), enabled = cloud.customConfigError == null, height = 40.dp, fontSize = 14)
+
+                    if (cloud.customProviders.isNotEmpty()) Hairline(Modifier.padding(start = 16.dp))
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                            .alpha(if (cloud.customConfigError == null) 1f else 0.45f)
+                            .clickable(enabled = cloud.customConfigError == null) { presetError = null; presetSheet = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        XIcon(XIcons.Plus, tint = extra.brandInk, size = 18.dp)
+                        Text("添加第三方模型服务", style = XType.Body, fontWeight = FontWeight.Medium, color = extra.brandInk)
+                    }
+                }
+
+                Text(
+                    "第三方服务密钥仅保存在本机，不会上传到小伴账号；对话中也可以随时切换不同服务商的模型。",
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                    style = XType.Caption,
+                    color = extra.ink3,
+                )
             }
         }
         if (editCustom) CustomModelDialog(chat, editingProvider, addingPreset, { env.platform?.openInBrowser(it) }, { editCustom = false })

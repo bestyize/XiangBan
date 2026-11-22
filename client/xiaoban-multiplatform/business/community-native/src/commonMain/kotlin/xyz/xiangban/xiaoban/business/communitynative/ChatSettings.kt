@@ -131,7 +131,7 @@ internal fun AgentConfiguration(
             }
             AgentConfigGroup("模型与额度") {
                 AgentConfigRow(AiHomeIcons.Cpu, "对话模型", "切换官方档位、思考等级或自有模型", model, onClick = onModel)
-                AgentConfigRow(AiHomeIcons.Star, "模型与点数", value = quota, valueTint = if (exhausted) Danger else colors.onSurfaceVariant,
+                AgentConfigRow(AiHomeIcons.Star, "模型配置", value = quota, valueTint = if (exhausted) Danger else colors.onSurfaceVariant,
                     divider = true, onClick = onQuota)
             }
             AgentConfigGroup("个人 Agent 能力") {

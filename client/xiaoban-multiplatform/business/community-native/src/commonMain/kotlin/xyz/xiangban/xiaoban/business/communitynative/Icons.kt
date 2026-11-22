@@ -17,6 +17,7 @@ object XIcons {
     val ArrowRight: ImageVector by lazy { strokeIcon("ArrowRight", "M5 12h13M13 6l6 6-6 6") }
     val ArrowUp: ImageVector by lazy { strokeIcon("ArrowUp", "M12 19V5M6 11l6-6 6 6") }
     val Bell: ImageVector by lazy { strokeIcon("Bell", "M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4") }
+    val Block: ImageVector by lazy { strokeIcon("Block", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM5.6 5.6L18.4 18.4") }
     val Bolt: ImageVector by lazy { strokeIcon("Bolt", "M13 3L5 14h6l-1 7 8-11h-6z") }
     val Book: ImageVector by lazy { strokeIcon("Book", "M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h10") }
     val Bookmark: ImageVector by lazy { strokeIcon("Bookmark", "M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z") }
@@ -89,6 +90,7 @@ object XIcons {
     val ZoomOut: ImageVector by lazy { strokeIcon("ZoomOut", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M20 20l-4-4") }
     val ZoomIn: ImageVector by lazy { strokeIcon("ZoomIn", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M11 8v6M20 20l-4-4") }
     val Search: ImageVector by lazy { strokeIcon("Search", "M4.5 11a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0zM16 16l4.5 4.5") }
+    val Settings: ImageVector by lazy { strokeIcon("Settings", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z") }
     val Share: ImageVector by lazy { strokeIcon("Share", "M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6") }
     val Shield: ImageVector by lazy { strokeIcon("Shield", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z") }
     val Sliders: ImageVector by lazy { strokeIcon("Sliders", "M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0zM6 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
@@ -104,6 +106,7 @@ object XIcons {
     val Tool: ImageVector by lazy { strokeIcon("Tool", "M14.5 6.5a4 4 0 00-5 5L4 17l3 3 5.5-5.5a4 4 0 005-5l-2.5 2.5-2.5-.5-.5-2.5z") }
     val Upload: ImageVector by lazy { strokeIcon("Upload", "M12 16V5M8 9l4-4 4 4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
     val User: ImageVector by lazy { strokeIcon("User", "M8.5 8.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5") }
+    val Users: ImageVector by lazy { strokeIcon("Users", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M5.5 7a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a3.5 3.5 0 0 1 0 6.74") }
     val Volume: ImageVector by lazy { strokeIcon("Volume", "M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 010 6") }
     val Warning: ImageVector by lazy { strokeIcon("Warning", "M12 4l9 16H3zM12 10v4M12 17v.5") }
     val Wave: ImageVector by lazy { strokeIcon("Wave", "M4 11v2M8 8v8M12 5v14M16 8v8M20 11v2") }
