@@ -111,7 +111,7 @@ fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id:
         let _lease = agent_kernel::supervisor::SessionLease::acquire(dirs.leases(), &session)?;
         let control=agent_kernel::RunControl::bounded(Duration::from_secs(10*60),200_000);
         let _watch=control.watch(cancel.clone());
-        let (config, key_source) = ai_gateway::prepare(app, config)?;
+        let (config, key_source) = ai_gateway::prepare_for_run(app, config, &cancel)?;
         let default = ai_config::default_workspace(app)?;
         let workspace = config.workspace_or(&default).to_path_buf();
         fs::create_dir_all(&workspace).map_err(|e| format!("无法创建工作目录：{e}"))?;

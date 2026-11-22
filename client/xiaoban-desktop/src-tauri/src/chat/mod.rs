@@ -453,7 +453,7 @@ fn provider_from_profile(protocol: &str, mut profile: ProviderProfile, key_sourc
         }
     }
     if let Some(source) = key_source {
-        profile = profile.with_api_key_source(source);
+        profile = profile.with_checked_api_key_source(source);
     }
     let made: Result<Arc<dyn ModelProvider>, agent_kernel::HarnessError> = match protocol {
         "responses" => OpenAiResponses::new(profile).map(|p| Arc::new(p) as Arc<dyn ModelProvider>),
@@ -472,7 +472,7 @@ pub(crate) fn companion_line(app: &tauri::AppHandle, config: AiConfig, key: &str
     profile.supports_tools = false;
     let thinking = profile.extra_body.get("thinking").and_then(|v| v.get("budget_tokens")).and_then(Value::as_u64).unwrap_or(0).min(u32::MAX as u64) as u32;
     profile.max_output_tokens = Some(thinking.saturating_add(256).max(1024));
-    if let Some(source) = source { profile = profile.with_api_key_source(source); }
+    if let Some(source) = source { profile = profile.with_checked_api_key_source(source); }
     let provider: Arc<dyn ModelProvider> = match config.protocol.as_str() {
         "responses" => Arc::new(OpenAiResponses::new(profile).map_err(|e| e.to_string())?),
         "anthropic" => Arc::new(AnthropicMessages::new(profile).map_err(|e| e.to_string())?),
@@ -1476,6 +1476,15 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
     let history_dir = Dirs::of(&app)?.sessions();
     let attachment_store = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let cancel = Arc::new(AtomicBool::new(false));
+    let owner = if ai_gateway::is_active(&config) {
+        let owner = match &queued {
+            Some(entry) => serde_json::from_value(entry.binding["officialAccount"].clone())
+                .map_err(|_| "队列消息缺少小伴账号，请确认后重试")?,
+            None => crate::account::official_owner(&app).map_err(|failure| failure.message)?,
+        };
+        crate::account::track_official_run(&app, &owner, &cancel).map_err(|failure| failure.message)?;
+        Some(owner)
+    } else { None };
     {
         let mut runs = lock(&state.runs);
         if runs.contains_key(&summary.id) { return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into()); }
@@ -1538,7 +1547,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
             }
         }
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
-        let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
+        let prepared = ai_gateway::prepare_for_owner(&handle, config_owned, owner).and_then(|(config, source)| {
             build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel, &control).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
@@ -1939,13 +1948,13 @@ fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<K
         .map_err(|error| if ai_gateway::is_active(config) { ai_gateway::readable_error(&error) } else { error })
 }
 
-fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Result<ContextInfo, String> {
+fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &Arc<AtomicBool>) -> Result<ContextInfo, String> {
     let config = session_config(app, id)?;
     crate::ai_catalogue::usable(app, &config)?;
     if !config.is_complete() {
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
     }
-    let (config, key_source) = ai_gateway::prepare(app, config)?;
+    let (config, key_source) = ai_gateway::prepare_for_run(app, config, cancel)?;
     write_summary(app, &config, key_source, id, cancel, None)?;
     let raw = JsonlStore::new(Dirs::of(app)?.sessions()).load(id).map_err(|e| e.to_string())?;
     context_of(app, &config, Some(id), &raw)

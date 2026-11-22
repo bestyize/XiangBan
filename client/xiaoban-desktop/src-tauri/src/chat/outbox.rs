@@ -236,6 +236,9 @@ impl Outbox {
     }
     pub fn resume(&mut self, session: &str, binding: Value) -> Result<(), String> {
         self.change(session, |s| {
+            for e in &s.entries {
+                check_retry_owner(&e.binding, &binding)?;
+            }
             s.paused = false;
             s.reason.clear();
             for e in &mut s.entries {
@@ -434,7 +437,10 @@ impl Outbox {
         self.change(session, |s| {
             let entry = s.entries.iter_mut().find(|e| e.id == id && !e.dispatching)
                 .ok_or("这条消息已被接收")?;
-            if let Some(binding) = binding { entry.binding = binding; }
+            if let Some(binding) = binding {
+                check_retry_owner(&entry.binding, &binding)?;
+                entry.binding = binding;
+            }
             s.send_next = Some(id.into());
             s.paused = true;
             s.reason = "其余排队消息已暂停".into();
@@ -450,9 +456,35 @@ impl Outbox {
     }
 }
 
+fn check_retry_owner(previous: &Value, next: &Value) -> Result<(), String> {
+    if let Some(uid) = previous.pointer("/officialAccount/uid").and_then(Value::as_str) {
+        if next.pointer("/officialAccount/uid").and_then(Value::as_str) != Some(uid) {
+            return Err("这条消息属于另一小伴账号，请切回原账号后重试".into());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn official_outbox_retry_and_resume_keep_the_original_account() {
+        let root = temp();
+        let mut queue = Outbox::new(root.clone());
+        let original = json!({"officialAccount":{"uid":"a","generation":1}});
+        let other = json!({"officialAccount":{"uid":"b","generation":2}});
+        let relogin = json!({"officialAccount":{"uid":"a","generation":3}});
+        let id = queue.enqueue("s1", Message::user_text("请继续"), Delivery::Queue,
+            original.clone(), json!([]), None).unwrap();
+        assert!(queue.retry("s1", &id, other.clone()).is_err());
+        assert!(queue.resume("s1", other).is_err());
+        assert_eq!(queue.get("s1", &id).unwrap().binding, original);
+        queue.retry("s1", &id, relogin.clone()).unwrap();
+        assert_eq!(queue.get("s1", &id).unwrap().binding, relogin);
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn delivery_adds_selections_to_legacy_entries_without_losing_message_metadata() {
         let entry: Entry = serde_json::from_value(json!({

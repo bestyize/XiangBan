@@ -619,7 +619,7 @@ mod client {
                 profile.max_output_tokens = Some(max_tokens);
                 fit_thinking_budget(&mut profile.extra_body, max_tokens)?;
                 let body = super::super::budget::encode(&profile, request, build_request_body)?;
-                let mut auth_header = auth::preferred(&profile.base_url, &profile.current_api_key());
+                let mut auth_header = auth::preferred(&profile.base_url, &profile.request_api_key()?);
                 let custom_auth = profile.extra_headers.iter().any(|(name, _)|
                     name.eq_ignore_ascii_case("authorization") || name.eq_ignore_ascii_case("x-api-key"));
                 let mut key_used = String::new();
@@ -627,7 +627,7 @@ mod client {
                 let emitted = std::cell::Cell::new(false);
                 let mut result = Err(HarnessError::Cancelled);
                 for auth_attempt in 0..2 {
-                    key_used = profile.current_api_key();
+                    key_used = profile.request_api_key()?;
                     let mut headers = vec![
                         ("Content-Type".to_string(), "application/json".to_string()),
                         ("Accept".to_string(), "text/event-stream".to_string()),
