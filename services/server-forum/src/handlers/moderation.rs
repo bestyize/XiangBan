@@ -81,13 +81,13 @@ async fn delete_word(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin,
 }
 
 async fn queue(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
-    type Row = (i64, String, i64, String, DateTime<Utc>, Option<String>, Option<String>, Option<String>, Option<i64>);
+    type Row = (i64, String, i64, String, DateTime<Utc>, Option<String>, Option<String>, Option<String>, Option<i64>, Option<i32>);
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT q.id, q.target_type, q.target_id, q.note, q.created_at,
                 COALESCE(p.title, t.title, left(po.body_md, 60), s.title) AS title,
                 p.kind,
                 COALESCE(pu.nickname, tu.nickname, pou.nickname, su.nickname) AS author,
-                COALESCE(po.topic_id, t.id) AS topic_id
+                COALESCE(po.topic_id, t.id) AS topic_id, p.current_version
          FROM moderation_queue q
          LEFT JOIN packs p ON q.target_type = 'pack' AND p.id = q.target_id
          LEFT JOIN users pu ON pu.uid = p.author_uid
@@ -103,10 +103,10 @@ async fn queue(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Js
     .await?;
     let items: Vec<Value> = rows
         .into_iter()
-        .map(|(id, target_type, target_id, note, created_at, title, kind, author, topic_id)| {
+        .map(|(id, target_type, target_id, note, created_at, title, kind, author, topic_id, version)| {
             // 帖子和回复要到帖子管理里隐藏（用 topic_id 链接过去）；这里只负责标记“已处理”。
             json!({ "id": id, "target_type": target_type, "target_id": target_id, "note": note, "created_at": created_at,
-                    "title": title, "kind": kind, "author": author, "topic_id": topic_id })
+                    "title": title, "kind": kind, "author": author, "topic_id": topic_id, "version": version })
         })
         .collect();
     Ok(Json(json!({ "items": items })))
@@ -116,6 +116,7 @@ async fn queue(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Js
 pub struct Resolve {
     /// `approve`：没问题；`reject`：下架（只对内容包和方案；帖子与回复请在帖子管理里隐藏，再标记已处理）。
     action: String,
+    version: Option<i32>,
     #[serde(default)]
     note: String,
 }
@@ -129,11 +130,19 @@ async fn resolve(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Pat
     }
     let mut tx = state.pool.begin().await?;
     let row: Option<(String, i64)> =
-        sqlx::query_as("SELECT target_type, target_id FROM moderation_queue WHERE id = $1 AND status = 'pending' FOR UPDATE")
+        sqlx::query_as("SELECT target_type, target_id FROM moderation_queue WHERE id = $1 AND status = 'pending'")
             .bind(id)
             .fetch_optional(&mut *tx)
             .await?;
     let (target_type, target_id) = row.ok_or_else(|| AppError::not_found("待审记录"))?;
+    if target_type == "pack" {
+        // Publishing and the pack admin page lock the pack before changing its queue entry.
+        let version: i32 = sqlx::query_scalar("SELECT current_version FROM packs WHERE id = $1 FOR UPDATE")
+            .bind(target_id).fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::not_found("内容包"))?;
+        super::content::check_review_version(version, input.version)?;
+    }
+    sqlx::query_scalar::<_, i64>("SELECT id FROM moderation_queue WHERE id = $1 AND status = 'pending' FOR UPDATE")
+        .bind(id).fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::not_found("待审记录"))?;
     if input.action == "reject" {
         let done = match target_type.as_str() {
             "pack" => sqlx::query("UPDATE packs SET status = 'rejected', updated_at = now() WHERE id = $1").bind(target_id).execute(&mut *tx).await?,

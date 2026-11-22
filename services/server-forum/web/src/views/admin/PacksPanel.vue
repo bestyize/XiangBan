@@ -12,11 +12,11 @@ const status = ref('')
 const kind = ref('')
 const list = usePagedList<AdminPack>((page, size) => adminApi.packs({ status: status.value, kind: kind.value, page, page_size: size }), 30)
 
-async function review(id: number, action: PackReviewAction, confirmText?: string) {
+async function review(pack: AdminPack, action: PackReviewAction, confirmText?: string) {
   if (confirmText && !window.confirm(confirmText)) return
   const note = action === 'reject' ? (window.prompt('拒绝原因（会记录在操作日志里）') ?? '') : ''
   if (action === 'reject' && !note.trim()) return
-  const ok = await perform(() => adminApi.reviewPack(id, action, note.trim()), '已处理')
+  const ok = await perform(() => adminApi.reviewPack(pack.id, action, pack.version, note.trim()), '已处理')
   if (ok) await list.load()
 }
 
@@ -159,9 +159,9 @@ onMounted(list.load)
           <td data-label="更新" class="shrink">{{ fmtTime(p.updated_at) }}</td>
           <td data-label="操作" class="adm-actions">
             <button v-if="p.status === 'published'" class="btn btn-sm" @click="setFeatured(p)">{{ p.featured ? '取消精选' : '设为精选' }}</button>
-            <button v-if="p.trust_level > 1 && p.status === 'published'" class="btn btn-sm" @click="review(p.id, 'approve')">通过审核</button>
-            <button v-if="p.status === 'published'" class="btn btn-sm" @click="review(p.id, 'remove', '确定下架这个内容包？')">下架</button>
-            <button v-else class="btn btn-sm" @click="review(p.id, 'restore')">恢复上架</button>
+            <button v-if="p.trust_level > 1 && p.status === 'published'" class="btn btn-sm" @click="review(p, 'approve')">通过审核</button>
+            <button v-if="p.status === 'published'" class="btn btn-sm" @click="review(p, 'remove', '确定下架这个内容包？')">下架</button>
+            <button v-else class="btn btn-sm" @click="review(p, 'restore')">恢复上架</button>
           </td>
         </tr>
       </tbody>

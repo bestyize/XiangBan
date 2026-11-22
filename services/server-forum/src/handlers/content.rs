@@ -1337,8 +1337,16 @@ async fn admin_create_pack(
 pub struct ReviewInput {
     /// `approve`（升为已审核）、`reject`（拒绝并下架）、`remove`（下架）、`restore`（恢复上架）。
     action: String,
+    version: Option<i32>,
     #[serde(default)]
     note: String,
+}
+
+pub(super) fn check_review_version(current: i32, reviewed: Option<i32>) -> AppResult<()> {
+    if reviewed != Some(current) {
+        return Err(AppError::Conflict("请刷新待审列表，确认当前作品版本后重新审核".into()));
+    }
+    Ok(())
 }
 
 /// 审核结果通知作者：通过或被拒（下架、恢复不通知）。
@@ -1364,7 +1372,7 @@ async fn admin_review_pack(
 ) -> AppResult<Json<Value>> {
     let note = clean_text(&input.note, "备注", 200, false)?;
     let mut tx = state.pool.begin().await?;
-    let (trust, status): (i16, String) = sqlx::query_as("SELECT trust_level, status FROM packs WHERE id = $1 FOR UPDATE")
+    let (trust, status, version): (i16, String, i32) = sqlx::query_as("SELECT trust_level, status, current_version FROM packs WHERE id = $1 FOR UPDATE")
         .bind(id)
         .fetch_optional(&mut *tx)
         .await?
@@ -1376,6 +1384,9 @@ async fn admin_review_pack(
         "restore" => (trust, "published", None),
         _ => return Err(AppError::BadRequest("action 只能是 approve、reject、remove 或 restore".into())),
     };
+    if queue.is_some() {
+        check_review_version(version, input.version)?;
+    }
     sqlx::query("UPDATE packs SET trust_level = $2, status = $3, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(new_trust)
