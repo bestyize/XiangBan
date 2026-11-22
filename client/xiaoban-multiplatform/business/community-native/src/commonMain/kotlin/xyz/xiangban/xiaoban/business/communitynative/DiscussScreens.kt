@@ -58,7 +58,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.DiscussController
 import xyz.xiangban.xiaoban.common.community.ForumCategories
-import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.LikeState
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
@@ -274,7 +273,7 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
     val activeBoard = activeTab?.category
     val tagFilter = activeTab?.topicTag
     val selected = if (tag.isNotBlank()) ActiveDiscussionTag else activeTab?.key ?: AllDiscussions
-    val category = activeBoard?.slug ?: catalog.boardsIn(ForumSection.Discuss)
+    val category = activeBoard?.slug ?: catalog.discussionFeedBoards
         .joinToString(",") { it.slug }.ifBlank { NoActiveBoard }
     val topicTag = tagFilter ?: tag.ifBlank { null }
     val loader = rememberLoader(env, listOf(category, topicTag, page, session.accountId)) {

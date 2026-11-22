@@ -10,8 +10,24 @@ data class ForumDiscussionTab(
 )
 
 private val discussionOrder = listOf(
-    "tag:design", "casual-games", "tag:3d", "learn", "casual-deals", "casual-travel", "casual-books",
+    "tag:design", "casual-games", "tag:3d", "learn", "casual-deals", "casual-travel",
     "casual-screen", "casual-feelings", "casual-food", "casual-work",
+)
+
+private val hiddenDiscussionBoards = setOf(
+    "casual-offwork", "casual-loss", "casual-dream", "casual-think", "casual-books", "casual-fun",
+)
+
+private val navigationLabels = mapOf(
+    "learn" to "教程",
+    "tech" to "教程",
+    "casual-screen" to "影视",
+    "casual-feelings" to "情感",
+    "casual-indie" to "副业",
+    "casual-gear" to "数码",
+    "casual-chat" to "闲聊",
+    "resource-help" to "求助",
+    "share-help" to "求助",
 )
 
 /** 分类接口提供板块名称、归属和发帖限制，浏览和编辑器使用同一份规则。 */
@@ -47,12 +63,19 @@ class ForumCategories(categories: List<Category>) {
 
     fun boardsIn(section: ForumSection): List<Category> = boards.filter { section(it) == section }
 
+    val discussionFeedBoards = boardsIn(ForumSection.Discuss).filterNot { it.slug in hiddenDiscussionBoards }
+
+    val resourceTabBoards = boardsIn(ForumSection.Resources).filterNot(Category::isUncategorized)
+
     val discussionTabs: List<ForumDiscussionTab> = run {
-        val primary = (activeIn(ForumSection.Discuss) + activeIn(ForumSection.Site)).filter { category ->
+        val primary = active.filter { category ->
+            val area = section(category)
             val parent = parent(category)
-            parent?.slug == "casual" || (parent == null && (category.slug != "casual" || category in boards))
+            val isDiscussion = area == ForumSection.Discuss || area == ForumSection.Site
+            val isTopLevel = parent == null && (category.slug != "casual" || category in boards)
+            isDiscussion && category.slug !in hiddenDiscussionBoards && (isTopLevel || parent?.slug == "casual")
         }
-        val tabs = primary.associate { it.slug to ForumDiscussionTab(it.slug, it.name, category = it) } + mapOf(
+        val tabs = primary.associate { it.slug to ForumDiscussionTab(it.slug, it.navigationLabel, category = it) } + mapOf(
             "tag:design" to ForumDiscussionTab("tag:design", "设计", topicTag = "设计"),
             "tag:3d" to ForumDiscussionTab("tag:3d", "3D", topicTag = "3d"),
         )
@@ -90,6 +113,9 @@ val Category.requiredPostLevel: Int
 
 val Category.isUncategorized: Boolean
     get() = kind == "uncategorized"
+
+val Category.navigationLabel: String
+    get() = navigationLabels[slug] ?: name
 
 val Category.isHelpBoard: Boolean
     get() = slug == "resource-help" || slug == "share-help"

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import xyz.xiangban.xiaoban.common.community.ForumCategories
 import xyz.xiangban.xiaoban.common.community.ForumSection
 import xyz.xiangban.xiaoban.common.community.Load
+import xyz.xiangban.xiaoban.common.community.navigationLabel
 
 private enum class CommunitySection(val label: String) { Home("首页"), Discuss("讨论"), Resources("资源") }
 
@@ -130,7 +131,9 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit, onPostDestination:
                 }
                 CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> {
-                    CommunityTabRow(listOf(SoftwareResourceTab to "开源软件") + resourceBoards.map { it.slug to it.name }, resourceTab) { resourceSub = it }
+                    val tabs = listOf(SoftwareResourceTab to "开源软件") +
+                        catalog?.resourceTabBoards.orEmpty().map { it.slug to it.navigationLabel }
+                    CommunityTabRow(tabs, resourceTab) { resourceSub = it }
                     Hairline()
                 }
             }
