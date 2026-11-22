@@ -336,6 +336,38 @@
 
   const DISCUSS_TOPICS = [
     {
+      id: 109,
+      title: 'kiro白嫖一个月pro，能用claude opus 5.5！',
+      excerpt: 'Free 账号第一次升级 Pro（原价 $20/月），当月剩下的天数直接 $0 免单，还额外多送 500 Trial Credits（一年有效），记得月初 1 号开最划算。',
+      category: '羊毛',
+      tabs: ['casual-deals'],
+      tone: 'deal',
+      tag: 'Kiro',
+      author: '小伴编辑',
+      avatarBg: '#A8640C',
+      time: '刚刚',
+      replies: 6,
+      likes: 18,
+      cover: './assets/deal-kiro-cover.jpg',
+      images: ['./assets/deal-kiro-cover.jpg', './assets/deal-kiro-real.jpg']
+    },
+    {
+      id: 110,
+      title: 'AWS Quick, 免绑卡白用30天opus5.5',
+      excerpt: '不用 AWS 云账号也不用绑信用卡，邮箱或 Google 登录就免费用 30 天 Plus，里面能直接选 Claude Opus 5.5；有亚马逊卖家主账号的年底前能领一年。',
+      category: '羊毛',
+      tabs: ['casual-deals'],
+      tone: 'deal',
+      tag: 'AWS',
+      author: '小伴编辑',
+      avatarBg: '#A8640C',
+      time: '5 分钟前',
+      replies: 4,
+      likes: 12,
+      cover: './assets/deal-aws-cover.jpg',
+      images: ['./assets/deal-aws-cover.jpg', './assets/deal-aws-real.jpg']
+    },
+    {
       id: 101,
       title: '做小伴桌面小组件时，先搭布局还是先调动画曲线？',
       excerpt: '这周尝试把番茄钟和天气卡片做成 2x2 小组件，发现桌面透明底色下阴影参数在深浅壁纸里表现差异很大，大家一般怎么定基准？',
@@ -361,7 +393,9 @@
       avatarBg: '#7152D8',
       time: '3 小时前',
       replies: 12,
-      likes: 27
+      likes: 27,
+      cover: './assets/micro-gallery.webp',
+      images: ['./assets/micro-gallery.webp']
     },
     {
       id: 103,
@@ -431,7 +465,9 @@
       avatarBg: '#2F6FDB',
       time: '3 天前',
       replies: 19,
-      likes: 38
+      likes: 38,
+      cover: './assets/blender-screen.webp',
+      images: ['./assets/blender-screen.webp']
     },
     {
       id: 108,
@@ -877,6 +913,7 @@
     { key: 'casual-games', label: '游戏', action: 'discuss-tab' },
     { key: '3d', label: '3D', action: 'discuss-tab' },
     { key: 'learn', label: '教程', action: 'discuss-tab' },
+    { key: 'casual-deals', label: '羊毛', action: 'discuss-tab' },
     { key: 'casual-travel', label: '旅行', action: 'discuss-tab' },
     { key: 'casual-screen', label: '影视', action: 'discuss-tab' },
     { key: 'casual-feelings', label: '情感', action: 'discuss-tab' },
@@ -1225,19 +1262,29 @@
 
     const currentLabel = DISCUSS_TABS.find(t => t.key === state.discussTab)?.label || '讨论';
     const rows = filtered.map(t => {
+      const liked = isLiked('topic-' + t.id);
+      const likes = likeDelta('topic-' + t.id, t.likes || 0);
       return `
         <article class="vb-topic-card" data-action="open-topic" data-id="${t.id}">
-          <button type="button" class="topic-title" data-action="open-topic" data-id="${t.id}">${esc(t.title)}</button>
-          <p class="vb-topic-excerpt">${esc(t.excerpt)}</p>
+          <div class="vb-topic-body">
+            <div class="vb-topic-main">
+              <button type="button" class="topic-title" data-action="open-topic" data-id="${t.id}">${esc(t.title)}</button>
+              <p class="vb-topic-excerpt">${esc(t.excerpt)}</p>
+            </div>
+            ${t.cover ? `<div class="vb-topic-cover" aria-hidden="true"><img src="${t.cover}" alt="" loading="lazy"></div>` : ''}
+          </div>
           <div class="topic-foot">
             <div class="topic-byline">
               <span class="cat-badge" data-tone="${t.tone}">${esc(t.category)}</span>
-              <span># ${esc(t.tag)}</span>
-              <span class="mini-avatar" style="background:${t.avatarBg}">${esc(t.author[0])}</span>
-              <span>${esc(t.author)} · ${esc(t.time)}</span>
+              <span class="topic-tag"># ${esc(t.tag)}</span>
+              <span class="topic-identity">
+                <span class="mini-avatar" style="background:${t.avatarBg}">${esc(t.author[0])}</span>
+                <span class="topic-author-text">${esc(t.author)} · ${esc(t.time)}</span>
+              </span>
             </div>
             <div class="topic-metrics">
               <button type="button" class="metric-btn" data-action="open-topic" data-id="${t.id}">${icon('chat', 13)} ${t.replies}</button>
+              <button type="button" class="metric-btn ${liked ? 'is-liked' : ''}" data-action="toggle-like" data-key="topic-${t.id}">${icon('heart', 13)}${likes ? `<span>${likes}</span>` : ''}</button>
             </div>
           </div>
         </article>
@@ -1532,8 +1579,8 @@
         avatarBg: t.avatarBg,
         date: t.time,
         region: '社区',
-        cover: '',
-        gallery: [],
+        cover: t.cover || '',
+        gallery: t.images || (t.cover ? [t.cover] : []),
         body: t.excerpt + '\n\n欢迎在下方留言区继续补充你的桌面实拍图或调试经验。',
         controls: '',
         actionLabel: '',

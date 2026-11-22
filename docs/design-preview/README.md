@@ -14,7 +14,7 @@
 
 [创意作品详情页](../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) 用「碎花垂耳兔」展示通栏详情、完整作品图和灰底的体验按钮。评论区沿用全站列表、入口和编辑弹层样式。预览沿用创意页作品卡片的服务。[电脑预览](http://127.0.0.1:1448/work-detail.html) · [手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile)
 
-[讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示双端单列布局：单行标题，底部左侧为标签、头像和发布时间，右侧为回复与点赞。支持明暗切换。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
+[讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示双端单列布局与带图定稿（方案 A 左文右图缩略图，无多图角标，底栏单行不换行并在窄屏自动隐藏标签；可切换方案 B 下方多图条与现行纯文字对照），混排「羊毛」带图帖与纯文字讨论帖，支持明暗切换。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
 
 [发帖页设计稿（PC + 移动 H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 采用写作优先无框结构：PC 820px 居中弹窗提供级联板块选择、编辑/预览切换、单作品入口（V2 ZIP / HTML·HTM 自动转 V2 容器 + 关联创作）、内联附件积分与上拉权限设置；H5 窄屏采用 16px 防缩放底部抽屉，支持深浅色与 6 套主题色。[网页版预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web)（与手机共用 1421 端口）。
 
