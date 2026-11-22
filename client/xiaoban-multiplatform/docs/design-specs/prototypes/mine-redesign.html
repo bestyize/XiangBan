@@ -1,0 +1,1738 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 「我的」页定稿 + 个人主页设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1320px; margin: 0 auto; padding: 22px 20px 48px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 20px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg { display: inline-flex; align-items: center; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .seg { background: rgba(255, 255, 255, .07); }
+.seg button { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: #5b5e66; transition: background .15s, color .15s; }
+body.studio-dark .seg button { color: #a3a6b0; }
+.seg button.active { background: #ffffff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+body.studio-dark .seg button.active { background: #27282d; color: #f3f3f6; }
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .84);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── 3-Board Stage ─── */
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px 26px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; display: inline-flex; align-items: center; gap: 6px; }
+.board-head .rec-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #fff3f4;
+  color: #e3203c;
+}
+body.studio-dark .board-head .rec-tag { background: #3a2225; color: #ff8c91; }
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0,0,0,.055); gap: 2px; }
+body.studio-dark .board-mini-seg { background: rgba(255,255,255,.08); }
+.board-mini-seg button { height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; color: #666; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+/* ─── Design Notes Card ─── */
+.diff-card {
+  margin: 34px auto 0;
+  max-width: 1222px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 20px;
+}
+body.studio-dark .diff-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.diff-card h3 { font-size: 14px; font-weight: 650; margin-bottom: 12px; }
+.diff-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.diff-item { padding: 12px 13px; border-radius: 12px; background: #f7f7f9; }
+body.studio-dark .diff-item { background: #1f2025; }
+.diff-item strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.diff-item p { font-size: 12px; line-height: 1.55; color: #666970; }
+body.studio-dark .diff-item p { color: #989ba4; }
+@media (max-width: 960px) { .diff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .diff-grid { grid-template-columns: 1fr; } }
+
+/* ─── Phone Tokens (docs/product/手机端设计规范.md) ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9a9a9a;
+  --hairline: #ededed;
+  --fill: #f2f2f2;
+  --line: #e4e4e4;
+  --avatar-ring: rgba(0, 0, 0, .07);
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --success: #2fa36b;
+  --danger: #e3203c;
+  --danger-soft: #fff3f4;
+  --sheet-shadow: 0 -8px 32px rgba(0, 0, 0, .12);
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+  transition: box-shadow .2s ease;
+}
+.phone.pulse {
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 2px var(--accent);
+}
+.phone.dark {
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --ink: #ececec;
+  --ink2: #9a9aa0;
+  --ink3: #6e6e73;
+  --hairline: #2a2a2d;
+  --fill: #2c2c2e;
+  --line: #363639;
+  --avatar-ring: rgba(255, 255, 255, .11);
+  --danger: #ff6369;
+  --danger-soft: #361e22;
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .58);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 36px;
+  flex: none;
+  padding: 10px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+}
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 78%; height: 100%; border-radius: 1.5px; background: var(--ink); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+/* Scrollable Main */
+.screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding-bottom: 18px;
+}
+.screen-body::-webkit-scrollbar { display: none; }
+
+/* ─── Shared Full-bleed Header & Controls (Scheme 1) ─── */
+.header-slab { background: var(--surface); }
+.appbar {
+  height: 46px;
+  padding: 0 10px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  flex: none;
+}
+.appbar.subpage { padding: 0 8px; }
+.appbar h3 { font-size: 18px; line-height: 24px; font-weight: 650; letter-spacing: -0.01em; }
+.appbar-actions { display: flex; align-items: center; gap: 2px; }
+.icon-tap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: background .15s ease;
+}
+.icon-tap:hover { background: var(--fill); }
+.icon-tap svg { width: 20px; height: 20px; stroke-width: 1.75; }
+
+/* Avatar & Identity Block */
+.profile-row {
+  padding: 6px 14px 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile-row.home-hero {
+  padding: 6px 16px 16px;
+}
+.avatar-btn {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex: none;
+  overflow: hidden;
+  background: var(--fill);
+  box-shadow: 0 0 0 1px var(--avatar-ring);
+  transition: transform .15s ease;
+}
+.avatar-btn.lg { width: 68px; height: 68px; }
+.avatar-btn:active { transform: scale(.97); }
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-btn.guest { display: grid; place-items: center; color: var(--ink3); }
+.avatar-btn.guest svg { width: 26px; height: 26px; stroke-width: 1.6; }
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-name-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.profile-name {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.level-tag {
+  flex: none;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.profile-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.id-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink3);
+  padding: 2px 0;
+  border-radius: 6px;
+  transition: color .15s;
+}
+.id-copy:hover { color: var(--ink2); }
+.id-copy svg { width: 12px; height: 12px; stroke-width: 1.8; opacity: .75; }
+.meta-sep { width: 1px; height: 10px; background: var(--line); flex: none; }
+.points-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--fill);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+.guest-sub { font-size: 13px; line-height: 18px; color: var(--ink3); }
+
+.home-entry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border-radius: 99px;
+  font-size: 13px;
+  color: var(--ink3);
+  transition: background .15s, color .15s;
+}
+.home-entry:hover { background: var(--fill); color: var(--ink2); }
+.home-entry svg { width: 15px; height: 15px; stroke-width: 1.8; }
+
+.pill-action {
+  flex: none;
+  height: 34px;
+  padding: 0 15px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: opacity .15s, background .15s;
+}
+.pill-action:active { opacity: .82; }
+.pill-action.primary { background: var(--accent-soft); color: var(--accent-ink); }
+.pill-action.secondary { background: var(--fill); color: var(--ink2); font-weight: 500; }
+.pill-action.sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.pill-action svg { width: 14px; height: 14px; stroke-width: 2; }
+
+.slab-divider { height: 0.5px; margin: 0 16px; background: var(--hairline); }
+
+/* Quick Actions Row (Board 01) */
+.a-quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 10px 16px;
+}
+.quick-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 2px;
+  border-radius: 12px;
+  transition: background .15s;
+}
+.quick-tile:hover { background: var(--paper); }
+.quick-ico-box {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--fill);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+}
+.quick-ico-box svg { width: 20px; height: 20px; stroke-width: 1.75; }
+.quick-label { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--ink2); }
+.badge-count {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4.5px;
+  border-radius: 99px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 10.5px;
+  line-height: 17px;
+  font-weight: 650;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full-bleed Grouped List (Board 01) */
+.a-group { margin-top: 10px; background: var(--surface); }
+.menu-row {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  position: relative;
+  transition: background .12s;
+}
+.menu-row:hover { background: var(--paper); }
+.menu-row + .menu-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 47px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.menu-row-ico { width: 19px; height: 19px; color: var(--ink2); stroke-width: 1.75; }
+.menu-row-title { flex: 1; min-width: 0; font-size: 15px; line-height: 22px; font-weight: 450; color: var(--ink); }
+.menu-row-val { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 18px; color: var(--ink3); white-space: nowrap; }
+.menu-row-val.online { color: var(--success); font-weight: 500; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex: none; }
+.chev { width: 15px; height: 15px; color: var(--ink3); opacity: .68; stroke-width: 1.8; }
+
+/* ─── Profile Homepage (Boards 02 & 03) ─── */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px 8px 14px;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  transition: background .14s;
+}
+.stat-cell.clickable:hover { background: var(--paper); }
+.stat-num {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink3);
+}
+
+/* Sticky Tabs */
+.profile-tabs {
+  margin-top: 8px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.p-tab {
+  position: relative;
+  height: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink2);
+  transition: color .15s;
+}
+.p-tab .cnt { font-size: 12px; color: var(--ink3); font-weight: 450; font-variant-numeric: tabular-nums; }
+.p-tab.active { color: var(--ink); font-weight: 650; }
+.p-tab.active .cnt { color: var(--ink2); }
+.p-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 2.5px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+/* Topic Feed List (Aligned with discussion-cards.html) */
+.feed-list { background: var(--surface); }
+.topic-item {
+  width: 100%;
+  padding: 14px 16px;
+  display: block;
+  text-align: left;
+  position: relative;
+  transition: background .12s;
+}
+.topic-item:hover { background: var(--paper); }
+.topic-item + .topic-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.topic-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.topic-copy { flex: 1; min-width: 0; }
+.topic-title {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.topic-excerpt {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--ink2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.topic-thumb {
+  width: 84px;
+  height: 62px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: none;
+  background: var(--fill);
+  box-shadow: inset 0 0 0 0.5px var(--avatar-ring);
+}
+.topic-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.topic-foot {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink3);
+}
+.topic-foot-left { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.cat-chip {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.topic-stats { display: inline-flex; align-items: center; gap: 12px; flex: none; font-variant-numeric: tabular-nums; }
+.topic-stats span { display: inline-flex; align-items: center; gap: 3px; }
+.topic-stats svg { width: 13px; height: 13px; stroke-width: 1.75; }
+
+/* Following / Followers List */
+.person-row {
+  width: 100%;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  position: relative;
+}
+.person-row + .person-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 68px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.person-av {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--avatar-ring);
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+.person-body { flex: 1; min-width: 0; text-align: left; }
+.person-name { font-size: 15px; line-height: 21px; font-weight: 500; color: var(--ink); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person-meta { font-size: 12px; line-height: 16px; color: var(--ink3); margin-top: 1px; display: block; }
+
+/* Blocked Banner & Empty State */
+.notice-banner {
+  margin: 10px 16px 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12.5px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.notice-banner button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.empty-box {
+  padding: 58px 24px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.empty-ico {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--fill);
+  color: var(--ink3);
+  display: grid;
+  place-items: center;
+}
+.empty-ico svg { width: 22px; height: 22px; stroke-width: 1.7; }
+.empty-box strong { font-size: 15px; font-weight: 600; color: var(--ink); }
+.empty-box p { font-size: 13px; color: var(--ink3); max-width: 230px; }
+
+.list-end {
+  padding: 18px 0 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+/* ─── Bottom Tab Bar (Spec 4.2) ─── */
+.tabbar {
+  flex: none;
+  height: 56px;
+  background: var(--surface);
+  border-top: 0.5px solid var(--hairline);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+.tab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--ink3);
+}
+.tab svg { width: 21px; height: 21px; stroke-width: 1.75; }
+.tab.active { color: var(--ink); font-weight: 650; }
+.tab.active svg { stroke-width: 2; }
+.tab-plus {
+  width: 44px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+.tab-plus svg { width: 20px; height: 20px; stroke-width: 2.2; }
+.home-bar {
+  flex: none;
+  height: 16px;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+}
+.home-bar.paper { background: var(--paper); }
+.home-bar::after {
+  content: "";
+  width: 112px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--ink);
+  opacity: .18;
+}
+
+/* ─── Toast & Action Sheet inside Phone ─── */
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 80px;
+  transform: translate(-50%, 8px);
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(24, 24, 28, .92);
+  color: #ffffff;
+  font-size: 12.5px;
+  line-height: 17px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 30;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+}
+.phone.dark .phone-toast { background: rgba(240, 240, 244, .94); color: #161618; }
+.phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.sheet-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .32);
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  animation: fadeIn .16s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 8px 0 22px;
+  box-shadow: var(--sheet-shadow);
+}
+.sheet-handle { width: 36px; height: 4px; border-radius: 99px; background: var(--line); margin: 0 auto 8px; }
+.sheet-title { padding: 6px 16px 8px; font-size: 13px; color: var(--ink3); }
+.sheet-btn {
+  width: 100%;
+  height: 50px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--ink);
+  text-align: left;
+  position: relative;
+}
+.sheet-btn:hover { background: var(--paper); }
+.sheet-btn.danger { color: var(--danger); }
+.sheet-btn.danger svg { color: var(--danger); }
+.sheet-btn + .sheet-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.sheet-btn svg { width: 19px; height: 19px; color: var(--ink2); }
+.sheet-cancel {
+  width: 100%;
+  height: 48px;
+  margin-top: 6px;
+  border-top: 8px solid var(--paper);
+  font-size: 15px;
+  color: var(--ink2);
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 440px) {
+  .studio { padding: 14px 10px 28px; }
+  .board { width: calc(100vw - 20px) !important; }
+  .phone { height: 760px; border-radius: 30px; border-width: 4px; }
+}
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 「我的」页定稿 + 个人主页设计稿</h1>
+      <p>统一通栏精修语言（方案 1） · 「我的」直达个人主页 · 覆盖本人视角与社区他人视角</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="设备与通知场景">
+        <button class="active" data-scene="offline">离线（同截图）</button>
+        <button data-scene="online">在线 + 未读</button>
+        <button data-scene="empty">无设备</button>
+      </div>
+      <div class="swatches" role="group" aria-label="主题色" id="swatches"></div>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- Board 01: Mine Screen (Scheme 1 Final) -->
+    <section class="board">
+      <div class="board-head">
+        <h2>01 · 「我的」页 <span class="rec-tag">方案 1 定稿</span></h2>
+        <div class="board-mini-seg" role="group" aria-label="我的页登录态">
+          <button class="active" data-mine-mode="in">已登录</button>
+          <button data-mine-mode="out">未登录</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-mine"></div>
+      <p class="board-caption">通栏白底一体化顶区（齿轮设置 + 极简头像名片 + 收藏/作品/通知三宫格），移除重复的「创作」「关注与粉丝」「屏蔽的用户」及外露积分，下方仅留 2 组 4 项核心入口。</p>
+    </section>
+
+    <!-- Board 02: Self Profile Homepage -->
+    <section class="board">
+      <div class="board-head">
+        <h2>02 · 个人主页 · 本人视角</h2>
+        <div class="board-mini-seg" role="group" aria-label="本人主页内容态">
+          <button class="active" data-self-mode="full">有内容</button>
+          <button data-self-mode="empty">空态</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-self"></div>
+      <p class="board-caption">从「我的 → 主页 ›」进入：极简名片（头像 + 昵称 + ID 一键复制 + 换头像）、四列等宽数据条（可点选直达对应 Tab）、吸顶「帖子 / 关注 / 粉丝」三栏，承接全部社交关系。</p>
+    </section>
+
+    <!-- Board 03: Other User Profile Homepage -->
+    <section class="board">
+      <div class="board-head">
+        <h2>03 · 个人主页 · 他人视角</h2>
+        <div class="board-mini-seg" role="group" aria-label="他人主页状态">
+          <button class="active" data-other-mode="normal">常规</button>
+          <button data-other-mode="blocked">已屏蔽</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-other"></div>
+      <p class="board-caption">社区点击任意作者头像进入：头部只放单个克制的「关注 / 已关注」药丸，把「屏蔽该用户」收入右上角「···」底部菜单，页面干净不具攻击性。</p>
+    </section>
+  </main>
+
+  <section class="diff-card" aria-label="设计说明">
+    <h3>「我的」与「个人主页」联动设计要点（画板内所有 Tab、按钮、头像与「···」菜单均可真实点击）</h3>
+    <div class="diff-grid">
+      <div class="diff-item">
+        <strong>1. 「我的」极致精简</strong>
+        <p>采用方案 1 通栏白底：名片区只留头像、昵称、可复制 ID 与「主页 ›」，不再外露积分；快捷三宫格收敛为 <strong>我的收藏 / 我的作品 / 通知</strong>。</p>
+      </div>
+      <div class="diff-item">
+        <strong>2. 列表去重，仅留 2 组</strong>
+        <p>去掉「屏蔽的用户」、重复的「创作」及已归入主页的「关注与粉丝」，列表仅留 <strong>模型配置 / 我的设备</strong> 与 <strong>帮助与反馈 / 交流群</strong> 两组 4 行。</p>
+      </div>
+      <div class="diff-item">
+        <strong>3. 个人主页承接社交</strong>
+        <p>展示 68px 头像与四列等宽 <strong>帖子 / 回复 / 关注 / 粉丝</strong> 指标；帖子升级为左文右图/纯文混排阅读卡，关注/粉丝补齐 40px 头像与快捷关注。</p>
+      </div>
+      <div class="diff-item">
+        <strong>4. 弱化屏蔽 · 突出关注</strong>
+        <p>他人主页头部只留「关注」浅品牌色药丸；屏蔽入口收进右上角「···」弹层，屏蔽后展示轻提示条并支持一键取消屏蔽。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red',      name: '小伴红', light: { btn: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c' }, dark: { btn: '#ee4b5f', soft: '#3a2225', line: '#5a2b33', ink: '#ff8c91' } },
+  { id: 'green',    name: '薄荷绿', light: { btn: '#2e8b5e', soft: '#e3f2e9', line: '#c4e3d0', ink: '#1e6a45' }, dark: { btn: '#34a36d', soft: '#1d3328', line: '#2d4f3d', ink: '#72d6a2' } },
+  { id: 'blue',     name: '海湾蓝', light: { btn: '#2f6fdb', soft: '#e6eefc', line: '#c5d8f8', ink: '#1d53ae' }, dark: { btn: '#3b7be8', soft: '#1e2a42', line: '#2f456b', ink: '#8db6ff' } },
+  { id: 'purple',   name: '暮紫',   light: { btn: '#7152d8', soft: '#ede8fc', line: '#d4c8f7', ink: '#5537b8' }, dark: { btn: '#8466e6', soft: '#2a2342', line: '#423669', ink: '#bba8ff' } },
+  { id: 'amber',    name: '琥珀',   light: { btn: '#a8640c', soft: '#faeedb', line: '#ecd4af', ink: '#87500a' }, dark: { btn: '#c27a1a', soft: '#3a2c17', line: '#5a4424', ink: '#f0b65a' } },
+  { id: 'graphite', name: '石墨',   light: { btn: '#2b2b30', soft: '#e9e9ec', line: '#d3d3d8', ink: '#2b2b30' }, dark: { btn: '#636368', soft: '#3a3a3d', line: '#505055', ink: '#e5e5ea' } },
+];
+
+const svgUri = (markup) => 'data:image/svg+xml;utf8,' + encodeURIComponent(markup.trim());
+
+/* User avatar: warm dusk pine forest cabin */
+const AVATAR_SELF = svgUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c9956b"/>
+      <stop offset="48%" stop-color="#dfba91"/>
+      <stop offset="100%" stop-color="#5d4d44"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="28%" r="46%">
+      <stop offset="0%" stop-color="#ffe5be" stop-opacity="0.72"/>
+      <stop offset="100%" stop-color="#c9956b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#sky)"/>
+  <rect width="128" height="128" fill="url(#glow)"/>
+  <g fill="#453d3b" opacity="0.72">
+    <polygon points="10,96 24,38 38,96"/>
+    <polygon points="30,96 46,28 62,96"/>
+    <polygon points="64,96 80,32 96,96"/>
+    <polygon points="88,96 104,42 120,96"/>
+  </g>
+  <g fill="#2b2626">
+    <polygon points="-4,114 14,44 32,114"/>
+    <polygon points="18,118 36,52 54,118"/>
+    <polygon points="74,118 92,46 110,118"/>
+    <polygon points="96,118 114,56 132,118"/>
+  </g>
+  <path d="M0 102 Q64 90 128 104 L128 128 L0 128 Z" fill="#dcd6d0" opacity="0.88"/>
+  <g transform="translate(36,80)">
+    <rect x="6" y="16" width="44" height="22" rx="1.5" fill="#4f3629"/>
+    <polygon points="0,18 28,0 56,18" fill="#3a2820"/>
+    <polygon points="3,17 28,2 53,17 48,17 28,5 8,17" fill="#efe6dd" opacity="0.85"/>
+    <rect x="23" y="23" width="10" height="15" rx="1" fill="#2e1d15"/>
+    <rect x="11" y="22" width="7" height="7" rx="1" fill="#f7c873"/>
+    <rect x="38" y="22" width="7" height="7" rx="1" fill="#f7c873"/>
+  </g>
+</svg>`);
+
+/* Other user avatar: serene misty teal mountain lake */
+const AVATAR_OTHER = svgUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="s2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#87b5ba"/>
+      <stop offset="55%" stop-color="#cfe0db"/>
+      <stop offset="100%" stop-color="#35555c"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#s2)"/>
+  <circle cx="88" cy="34" r="14" fill="#fff7e4" opacity="0.85"/>
+  <path d="M0 84 L34 46 L68 78 L96 52 L128 84 L128 128 L0 128 Z" fill="#4f757a"/>
+  <path d="M0 94 Q40 76 82 92 T128 90 L128 128 L0 128 Z" fill="#2e4a52"/>
+  <rect x="0" y="96" width="128" height="32" fill="#253e46" opacity="0.65"/>
+  <line x1="74" y1="106" x2="104" y2="106" stroke="#f5ebd4" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="80" y1="113" x2="98" y2="113" stroke="#f5ebd4" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>
+</svg>`);
+
+/* Sample topic thumbnails */
+const THUMB_GAME = svgUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 124">
+  <defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#283548"/><stop offset="100%" stop-color="#5c7696"/></linearGradient></defs>
+  <rect width="168" height="124" fill="url(#tg)"/>
+  <circle cx="128" cy="34" r="18" fill="#f7c59f" opacity="0.85"/>
+  <path d="M0 90 Q44 62 88 86 T168 82 L168 124 L0 124 Z" fill="#1d2736"/>
+  <polygon points="52,58 92,46 72,72" fill="#ffffff" opacity="0.92"/>
+  <polygon points="52,58 72,72 64,62" fill="#dbe6f2"/>
+</svg>`);
+
+const THUMB_UI = svgUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 124">
+  <rect width="168" height="124" fill="#f3ede6"/>
+  <rect x="18" y="18" width="132" height="88" rx="12" fill="#ffffff" stroke="#e4ddd4" stroke-width="2"/>
+  <rect x="30" y="32" width="44" height="60" rx="8" fill="#fcebef"/>
+  <circle cx="52" cy="54" r="10" fill="#e3203c" opacity="0.85"/>
+  <rect x="84" y="34" width="52" height="10" rx="5" fill="#e8e6e2"/>
+  <rect x="84" y="52" width="42" height="8" rx="4" fill="#f0eee9"/>
+  <rect x="84" y="68" width="52" height="22" rx="6" fill="#2e8b5e" opacity="0.18"/>
+</svg>`);
+
+const THUMB_SHADER = svgUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 124">
+  <defs><linearGradient id="ts" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#192338"/><stop offset="55%" stop-color="#3a4c7a"/><stop offset="100%" stop-color="#7c65a8"/></linearGradient></defs>
+  <rect width="168" height="124" fill="url(#ts)"/>
+  <circle cx="84" cy="62" r="32" fill="none" stroke="#a6c8ff" stroke-width="1.5" opacity="0.65"/>
+  <circle cx="84" cy="62" r="18" fill="#8bb8ff" opacity="0.35"/>
+  <circle cx="42" cy="30" r="2.2" fill="#fff" opacity="0.8"/>
+  <circle cx="132" cy="26" r="1.8" fill="#fff" opacity="0.7"/>
+  <circle cx="122" cy="94" r="2" fill="#fff" opacity="0.75"/>
+</svg>`);
+
+const ICONS = {
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  share: '<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>',
+  more: '<circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  folder: '<path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  sparkles: '<path d="M12 3l1.6 4.7L18.3 9.3l-4.7 1.6L12 15.6l-1.6-4.7-4.7-1.6 4.7-1.6z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/>',
+  bookmark: '<path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4.5L5 21V5a1 1 0 0 1 1-1z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.5"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a3.5 3.5 0 0 1 0 6.74"/>',
+  cpu: '<rect x="6" y="6" width="12" height="12" rx="2.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+  monitor: '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 1c0 1.6-2.5 2-2.5 3.3"/><circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none"/>',
+  chatGroup: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  comment: '<path d="M21 14a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+  heart: '<path d="M20.4 4.6a5.5 5.5 0 0 0-7.8 0L12 5.2l-.6-.6a5.5 5.5 0 0 0-7.8 7.8l.6.6L12 20.8l7.8-7.8.6-.6a5.5 5.5 0 0 0 0-7.8z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  block: '<circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+  /* Bottom nav */
+  navAi: '<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/>',
+  navApps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
+  navPlus: '<path d="M12 5v14M5 12h14"/>',
+  navComm: '<circle cx="12" cy="12" r="8.5"/><polygon points="15.8 8.2 13.7 13.7 8.2 15.8 10.3 10.3 15.8 8.2"/>',
+  navMe: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5.2 19.8c.9-3.4 3.4-5.3 6.8-5.3s5.9 1.9 6.8 5.3"/>',
+  wifi: '<path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.3" r=".9" fill="currentColor" stroke="none"/>',
+  signal: '<path d="M4 18v-2M8 18v-5M12 18v-8M16 18v-11"/>',
+};
+
+const icon = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
+const SELF_TOPICS = [
+  {
+    id: 1,
+    title: '用手机端小伴 Agent 做了个纸飞机滑翔小游戏，分享完整提示词',
+    excerpt: '从 0 到 1 迭代了三轮物理风场参数，补上了横屏安全区避让和本地存档，欢迎试玩提建议。',
+    cat: '创作',
+    time: '2 小时前',
+    replies: 18,
+    likes: 42,
+    thumb: THUMB_GAME,
+  },
+  {
+    id: 2,
+    title: '第三方模型接入踩坑记录：Anthropic 代理与上下文窗口配置',
+    excerpt: '实测几个常用中转站的响应速度和工具调用稳定性，附带我现在的默认参数配置清单。',
+    cat: '学习与教程',
+    time: '昨天',
+    replies: 9,
+    likes: 27,
+    thumb: null,
+  },
+  {
+    id: 3,
+    title: '给小伴「我的」页做了一版清爽改版思路，大家觉得怎样？',
+    excerpt: '把头像区信息重新排了节奏，去掉不常用的入口，也把个人主页一起统一成通栏风格。',
+    cat: '休闲',
+    time: '3 天前',
+    replies: 14,
+    likes: 31,
+    thumb: THUMB_UI,
+  },
+];
+
+const OTHER_TOPICS = [
+  {
+    id: 11,
+    title: '银河动态壁纸 Shader 参数调校：低功耗下保持 30 帧丝滑星轨',
+    excerpt: '降低片元着色器里的噪声采样层数后，手机发热明显下降，顺手做了深色锁屏适配。',
+    cat: '创作',
+    time: '5 小时前',
+    replies: 32,
+    likes: 108,
+    thumb: THUMB_SHADER,
+  },
+  {
+    id: 12,
+    title: '整理了 12 个适合新手拆解的 V2 协议小游戏开源范例',
+    excerpt: '涵盖三消、文字冒险和轻工具三类结构，目录清晰，下载 ZIP 就能直接导入改写。',
+    cat: '学习与教程',
+    time: '4 天前',
+    replies: 21,
+    likes: 85,
+    thumb: null,
+  },
+  {
+    id: 13,
+    title: '手机遥控电脑跑本地 Agent：外出时自动整理周报的工作流',
+    excerpt: '配置好桌面互联后在通勤路上发一条语音，回到工位就能直接验收生成的 Markdown。',
+    cat: '创作',
+    time: '1 周前',
+    replies: 15,
+    likes: 64,
+    thumb: null,
+  },
+];
+
+const PEOPLE_FOLLOWING = [
+  { uid: 'u1', name: '林深见鹿', init: '林', color: '#4d7a7f', note: '24 帖子 · 412 粉丝', followed: true },
+  { uid: 'u2', name: '阿南不熬夜', init: '南', color: '#7a6899', note: '11 帖子 · 98 粉丝', followed: true },
+  { uid: 'u3', name: '像素匠人', init: '像', color: '#b57452', note: '36 帖子 · 620 粉丝', followed: true },
+  { uid: 'u4', name: '青禾笔记', init: '青', color: '#4d8c68', note: '8 帖子 · 53 粉丝', followed: true },
+];
+
+const PEOPLE_FOLLOWERS = [
+  { uid: 'f1', name: '雾岛听风', init: '雾', color: '#5c7ea8', note: '6 帖子 · 29 粉丝', followed: false },
+  { uid: 'f2', name: '林深见鹿', init: '林', color: '#4d7a7f', note: '24 帖子 · 412 粉丝', followed: true },
+  { uid: 'f3', name: '周屿', init: '周', color: '#8f6b58', note: '3 帖子 · 14 粉丝', followed: false },
+  { uid: 'f4', name: '橘子汽水', init: '橘', color: '#c48447', note: '15 帖子 · 112 粉丝', followed: true },
+];
+
+const state = {
+  scene: 'offline', // 'offline' | 'online' | 'empty'
+  accent: 'red',
+  dark: false,
+  compact: false,
+  mineLoggedIn: true,
+  unreadCleared: false,
+  selfMode: 'full', // 'full' | 'empty'
+  selfTab: 'topics', // 'topics' | 'following' | 'followers'
+  otherTab: 'topics',
+  otherFollowing: false,
+  otherBlocked: false,
+  otherFollowersCount: 412,
+  sheet: null, // { board: 'mine'|'self'|'other', kind: 'avatar'|'other-more' }
+  followMap: Object.fromEntries([...PEOPLE_FOLLOWING, ...PEOPLE_FOLLOWERS].map(p => [p.uid, p.followed])),
+};
+
+function getSceneData() {
+  if (state.scene === 'online') {
+    return { unread: state.unreadCleared ? 0 : 3, modelVal: 'Auto · 官方', deviceText: 'MacBook Pro · 在线', deviceOnline: true };
+  }
+  if (state.scene === 'empty') {
+    return { unread: 0, modelVal: 'DeepSeek-V3', deviceText: '未发现设备', deviceOnline: false };
+  }
+  return { unread: 0, modelVal: '', deviceText: '2 台设备 · 离线', deviceOnline: false };
+}
+
+function statusBarHtml() {
+  return `
+    <div class="status-bar">
+      <span>19:31</span>
+      <div class="status-right">
+        ${icon('signal')}
+        ${icon('wifi')}
+        <span class="bat" aria-label="电量"></span>
+      </div>
+    </div>
+  `;
+}
+
+function tabBarHtml(boardKey) {
+  return `
+    <nav class="tabbar" aria-label="底部导航">
+      <button class="tab" data-toast="${boardKey}:切换至「小伴 AI」">${icon('navAi')}<span>小伴 AI</span></button>
+      <button class="tab" data-toast="${boardKey}:切换至「应用」">${icon('navApps')}<span>应用</span></button>
+      <button class="tab" aria-label="发布" data-toast="${boardKey}:打开发布菜单"><span class="tab-plus">${icon('navPlus')}</span></button>
+      <button class="tab" data-toast="${boardKey}:切换至「社区」">${icon('navComm')}<span>社区</span></button>
+      <button class="tab active" aria-current="page">${icon('navMe')}<span>我的</span></button>
+    </nav>
+    <div class="home-bar"></div>
+  `;
+}
+
+/* ─── Board 01: Mine (Scheme 1 Final) ─── */
+function renderMine() {
+  const d = getSceneData();
+  const loggedIn = state.mineLoggedIn;
+  const badgeHtml = loggedIn && d.unread > 0 ? `<span class="badge-count">${d.unread}</span>` : '';
+
+  const groups = [
+    [
+      { ico: 'cpu', title: '模型配置', val: d.modelVal, action: '打开「模型配置」' },
+      { ico: 'monitor', title: '我的设备', val: d.deviceText, online: d.deviceOnline, action: '打开「我的设备」' },
+    ],
+    [
+      { ico: 'help', title: '帮助与反馈', val: '', action: '打开帮助与反馈' },
+      { ico: 'chatGroup', title: '交流群', val: '', action: '打开官方交流群' },
+    ],
+  ];
+
+  const profileHtml = loggedIn
+    ? `
+      <div class="profile-row">
+        <button class="avatar-btn" aria-label="头像操作" data-open-sheet="mine:avatar">
+          <img src="${AVATAR_SELF}" alt="read 头像">
+        </button>
+        <div class="profile-info">
+          <div class="profile-name-row"><span class="profile-name">read</span></div>
+          <div class="profile-meta">
+            <button class="id-copy" data-toast="mine:已复制账号 ID 13589">
+              <span>ID 13589</span>${icon('copy')}
+            </button>
+          </div>
+        </div>
+        <button class="home-entry" data-jump-self="topics">
+          <span>主页</span>${icon('chev')}
+        </button>
+      </div>
+    `
+    : `
+      <div class="profile-row">
+        <button class="avatar-btn guest" aria-label="登录" data-toast="mine:打开登录弹窗">
+          ${icon('user')}
+        </button>
+        <div class="profile-info">
+          <div class="profile-name-row"><span class="profile-name">登录小伴</span></div>
+          <div class="guest-sub">同步作品、收藏与多端设备</div>
+        </div>
+        <button class="pill-action primary" data-toast="mine:打开登录弹窗">登录</button>
+      </div>
+    `;
+
+  return `
+    ${statusBarHtml()}
+    <div class="screen-body">
+      <div class="header-slab">
+        <div class="appbar">
+          <h3>我的</h3>
+          <button class="icon-tap" aria-label="设置" data-toast="mine:打开「设置」">
+            ${icon('gear')}
+          </button>
+        </div>
+        ${profileHtml}
+        <div class="slab-divider"></div>
+        <div class="a-quick">
+          <button class="quick-tile" data-toast="mine:${loggedIn ? '打开「我的收藏」' : '请先登录查看收藏'}">
+            <span class="quick-ico-box">${icon('bookmark')}</span>
+            <span class="quick-label">我的收藏</span>
+          </button>
+          <button class="quick-tile" data-toast="mine:${loggedIn ? '打开「我的作品」' : '请先登录查看作品'}">
+            <span class="quick-ico-box">${icon('folder')}</span>
+            <span class="quick-label">我的作品</span>
+          </button>
+          <button class="quick-tile" data-read-notif="mine">
+            <span class="quick-ico-box">${icon('bell')}${badgeHtml}</span>
+            <span class="quick-label">通知</span>
+          </button>
+        </div>
+      </div>
+
+      ${groups.map(g => `
+        <div class="a-group">
+          ${g.map(r => `
+            <button class="menu-row" data-toast="mine:${r.action}">
+              ${icon(r.ico, 'menu-row-ico')}
+              <span class="menu-row-title">${r.title}</span>
+              ${r.val ? `<span class="menu-row-val ${r.online ? 'online' : ''}">${r.online ? '<i class="status-dot"></i>' : ''}${r.val}</span>` : ''}
+              ${icon('chev', 'chev')}
+            </button>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+    ${tabBarHtml('mine')}
+    <div class="phone-toast" id="toast-mine"></div>
+    ${renderSheet('mine')}
+  `;
+}
+
+/* ─── Shared Topic & People Renderers ─── */
+function renderTopicsList(boardKey, topics, emptyInfo) {
+  if (!topics.length) {
+    return `
+      <div class="empty-box">
+        <span class="empty-ico">${icon('doc')}</span>
+        <strong>${emptyInfo.title}</strong>
+        <p>${emptyInfo.desc}</p>
+        ${emptyInfo.cta ? `<button class="pill-action primary" data-toast="${boardKey}:${emptyInfo.ctaToast}">${emptyInfo.cta}</button>` : ''}
+      </div>
+    `;
+  }
+  return `
+    <div class="feed-list">
+      ${topics.map(t => `
+        <button class="topic-item" data-toast="${boardKey}:打开帖子「${t.title.slice(0, 12)}…」">
+          <div class="topic-main">
+            <div class="topic-copy">
+              <div class="topic-title">${t.title}</div>
+              <div class="topic-excerpt">${t.excerpt}</div>
+            </div>
+            ${t.thumb ? `<div class="topic-thumb"><img src="${t.thumb}" alt="帖子配图"></div>` : ''}
+          </div>
+          <div class="topic-foot">
+            <span class="topic-foot-left">
+              <span class="cat-chip">${t.cat}</span>
+              <span>${t.time}</span>
+            </span>
+            <span class="topic-stats">
+              <span>${icon('comment')}${t.replies}</span>
+              <span>${icon('heart')}${t.likes}</span>
+            </span>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+    <div class="list-end">已显示全部帖子</div>
+  `;
+}
+
+function renderPeopleList(boardKey, list, emptyTitle) {
+  if (!list.length) {
+    return `
+      <div class="empty-box">
+        <span class="empty-ico">${icon('users')}</span>
+        <strong>${emptyTitle}</strong>
+        <p>去社区发现有趣的创作者和讨论吧</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="feed-list">
+      ${list.map(p => {
+        const isF = !!state.followMap[p.uid];
+        return `
+          <div class="person-row">
+            <span class="person-av" style="background:${p.color}">${p.init}</span>
+            <button class="person-body" data-toast="${boardKey}:查看 ${p.name} 的主页">
+              <span class="person-name">${p.name}</span>
+              <span class="person-meta">${p.note}</span>
+            </button>
+            <button class="pill-action sm ${isF ? 'secondary' : 'primary'}" data-toggle-person="${boardKey}:${p.uid}">
+              ${isF ? '已关注' : '关注'}
+            </button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <div class="list-end">已加载全部</div>
+  `;
+}
+
+/* ─── Board 02: Self Profile Homepage ─── */
+function renderSelfProfile() {
+  const isEmpty = state.selfMode === 'empty';
+  const topicCount = isEmpty ? 0 : 12;
+  const replyCount = isEmpty ? 0 : 48;
+  const followingCount = isEmpty ? 0 : 19;
+  const followerCount = isEmpty ? 0 : 86;
+
+  let tabBody = '';
+  if (state.selfTab === 'topics') {
+    tabBody = renderTopicsList('self', isEmpty ? [] : SELF_TOPICS, {
+      title: '还没有发布过帖子',
+      desc: '分享你的创作作品、使用技巧或问题讨论，都会展示在这里',
+      cta: '去发一篇',
+      ctaToast: '打开发帖编辑器',
+    });
+  } else if (state.selfTab === 'following') {
+    tabBody = renderPeopleList('self', isEmpty ? [] : PEOPLE_FOLLOWING, '还没有关注的人');
+  } else {
+    tabBody = renderPeopleList('self', isEmpty ? [] : PEOPLE_FOLLOWERS, '还没有粉丝');
+  }
+
+  return `
+    ${statusBarHtml()}
+    <div class="appbar subpage">
+      <button class="icon-tap" aria-label="返回" data-toast="self:返回「我的」">${icon('back')}</button>
+      <div class="appbar-actions">
+        <button class="icon-tap" aria-label="分享主页" data-toast="self:已复制个人主页链接">${icon('share')}</button>
+      </div>
+    </div>
+    <div class="screen-body">
+      <div class="header-slab">
+        <div class="profile-row home-hero">
+          <button class="avatar-btn lg" aria-label="更换头像" data-open-sheet="self:avatar">
+            <img src="${AVATAR_SELF}" alt="read 头像">
+          </button>
+          <div class="profile-info">
+            <div class="profile-name-row">
+              <span class="profile-name">read</span>
+            </div>
+            <div class="profile-meta">
+              <button class="id-copy" data-toast="self:已复制账号 ID 13589">
+                <span>ID 13589</span>${icon('copy')}
+              </button>
+            </div>
+          </div>
+          <button class="pill-action sm secondary" data-open-sheet="self:avatar">换头像</button>
+        </div>
+        <div class="slab-divider"></div>
+        <div class="stats-bar">
+          <button class="stat-cell clickable" data-set-tab="self:topics">
+            <span class="stat-num">${topicCount}</span>
+            <span class="stat-label">帖子</span>
+          </button>
+          <div class="stat-cell">
+            <span class="stat-num">${replyCount}</span>
+            <span class="stat-label">回复</span>
+          </div>
+          <button class="stat-cell clickable" data-set-tab="self:following">
+            <span class="stat-num">${followingCount}</span>
+            <span class="stat-label">关注</span>
+          </button>
+          <button class="stat-cell clickable" data-set-tab="self:followers">
+            <span class="stat-num">${followerCount}</span>
+            <span class="stat-label">粉丝</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="profile-tabs" role="tablist">
+        <button class="p-tab ${state.selfTab === 'topics' ? 'active' : ''}" data-set-tab="self:topics">帖子 <span class="cnt">${topicCount}</span></button>
+        <button class="p-tab ${state.selfTab === 'following' ? 'active' : ''}" data-set-tab="self:following">关注 <span class="cnt">${followingCount}</span></button>
+        <button class="p-tab ${state.selfTab === 'followers' ? 'active' : ''}" data-set-tab="self:followers">粉丝 <span class="cnt">${followerCount}</span></button>
+      </div>
+
+      ${tabBody}
+    </div>
+    <div class="home-bar paper"></div>
+    <div class="phone-toast" id="toast-self"></div>
+    ${renderSheet('self')}
+  `;
+}
+
+/* ─── Board 03: Other User Profile Homepage ─── */
+function renderOtherProfile() {
+  const blocked = state.otherBlocked;
+  const following = !blocked && state.otherFollowing;
+
+  const ctaHtml = blocked
+    ? `<button class="pill-action sm secondary" data-toggle-block="1">已屏蔽</button>`
+    : following
+      ? `<button class="pill-action sm secondary" data-toggle-other-follow="1">已关注</button>`
+      : `<button class="pill-action sm primary" data-toggle-other-follow="1">${icon('plus')}<span>关注</span></button>`;
+
+  let tabBody = '';
+  if (state.otherTab === 'topics') {
+    if (blocked) {
+      tabBody = `
+        <div class="empty-box">
+          <span class="empty-ico">${icon('block')}</span>
+          <strong>你已屏蔽该用户</strong>
+          <p>对方的帖子与回复已对你隐藏，取消屏蔽后即可恢复查看</p>
+          <button class="pill-action secondary" data-toggle-block="1">取消屏蔽</button>
+        </div>
+      `;
+    } else {
+      tabBody = renderTopicsList('other', OTHER_TOPICS, { title: '暂无可见帖子', desc: '' });
+    }
+  } else if (state.otherTab === 'following') {
+    tabBody = renderPeopleList('other', PEOPLE_FOLLOWING.slice(1), '还没有关注用户');
+  } else {
+    tabBody = renderPeopleList('other', PEOPLE_FOLLOWERS, '还没有粉丝');
+  }
+
+  return `
+    ${statusBarHtml()}
+    <div class="appbar subpage">
+      <button class="icon-tap" aria-label="返回" data-toast="other:返回上一页">${icon('back')}</button>
+      <div class="appbar-actions">
+        <button class="icon-tap" aria-label="更多操作" data-open-sheet="other:other-more">${icon('more')}</button>
+      </div>
+    </div>
+    <div class="screen-body">
+      <div class="header-slab">
+        <div class="profile-row home-hero">
+          <div class="avatar-btn lg">
+            <img src="${AVATAR_OTHER}" alt="林深见鹿 头像">
+          </div>
+          <div class="profile-info">
+            <div class="profile-name-row">
+              <span class="profile-name">林深见鹿</span>
+            </div>
+            <div class="profile-meta">
+              <span class="level-tag">活跃成员</span>
+            </div>
+          </div>
+          ${ctaHtml}
+        </div>
+        ${blocked ? `
+          <div class="notice-banner">
+            <span>已屏蔽对方，互相取消关注</span>
+            <button data-toggle-block="1">取消屏蔽</button>
+          </div>
+        ` : ''}
+        <div class="slab-divider" style="margin-top:${blocked ? '10px' : '0'}"></div>
+        <div class="stats-bar">
+          <button class="stat-cell clickable" data-set-tab="other:topics">
+            <span class="stat-num">24</span>
+            <span class="stat-label">帖子</span>
+          </button>
+          <div class="stat-cell">
+            <span class="stat-num">116</span>
+            <span class="stat-label">回复</span>
+          </div>
+          <button class="stat-cell clickable" data-set-tab="other:following">
+            <span class="stat-num">31</span>
+            <span class="stat-label">关注</span>
+          </button>
+          <button class="stat-cell clickable" data-set-tab="other:followers">
+            <span class="stat-num">${state.otherFollowersCount}</span>
+            <span class="stat-label">粉丝</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="profile-tabs" role="tablist">
+        <button class="p-tab ${state.otherTab === 'topics' ? 'active' : ''}" data-set-tab="other:topics">帖子 <span class="cnt">24</span></button>
+        <button class="p-tab ${state.otherTab === 'following' ? 'active' : ''}" data-set-tab="other:following">关注 <span class="cnt">31</span></button>
+        <button class="p-tab ${state.otherTab === 'followers' ? 'active' : ''}" data-set-tab="other:followers">粉丝 <span class="cnt">${state.otherFollowersCount}</span></button>
+      </div>
+
+      ${tabBody}
+    </div>
+    <div class="home-bar paper"></div>
+    <div class="phone-toast" id="toast-other"></div>
+    ${renderSheet('other')}
+  `;
+}
+
+function renderSheet(boardKey) {
+  if (!state.sheet || state.sheet.board !== boardKey) return '';
+  if (state.sheet.kind === 'avatar') {
+    return `
+      <div class="sheet-mask" data-close-sheet="1">
+        <div class="sheet" role="dialog" aria-label="头像与资料">
+          <div class="sheet-handle"></div>
+          <div class="sheet-title">read · ID 13589</div>
+          <button class="sheet-btn" data-sheet-toast="${boardKey}:打开头像裁剪与更换页">${icon('camera')}<span>更换头像</span></button>
+          ${boardKey === 'mine' ? `<button class="sheet-btn" data-sheet-jump-self="topics">${icon('user')}<span>查看个人主页</span></button>` : ''}
+          <button class="sheet-btn" data-sheet-toast="${boardKey}:已复制账号 ID 13589">${icon('copy')}<span>复制账号 ID</span></button>
+          <button class="sheet-cancel" data-close-sheet="1">取消</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="sheet-mask" data-close-sheet="1">
+      <div class="sheet" role="dialog" aria-label="更多操作">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">林深见鹿</div>
+        <button class="sheet-btn" data-sheet-toast="other:已复制该用户主页链接">${icon('share')}<span>分享主页</span></button>
+        <button class="sheet-btn ${state.otherBlocked ? '' : 'danger'}" data-toggle-block="1">
+          ${icon('block')}<span>${state.otherBlocked ? '取消屏蔽该用户' : '屏蔽该用户'}</span>
+        </button>
+        <button class="sheet-cancel" data-close-sheet="1">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+function applyAccent() {
+  const preset = ACCENTS.find(a => a.id === state.accent) || ACCENTS[0];
+  const palette = state.dark ? preset.dark : preset.light;
+  document.querySelectorAll('.phone').forEach(el => {
+    el.classList.toggle('dark', state.dark);
+    el.style.setProperty('--accent', palette.btn);
+    el.style.setProperty('--accent-soft', palette.soft);
+    el.style.setProperty('--accent-soft-line', palette.line);
+    el.style.setProperty('--accent-ink', palette.ink);
+  });
+}
+
+const toastTimers = {};
+function showToast(boardKey, text) {
+  const el = document.getElementById('toast-' + boardKey);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimers[boardKey]);
+  toastTimers[boardKey] = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function pulseSelfBoard() {
+  const el = document.getElementById('phone-self');
+  if (!el) return;
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 650);
+}
+
+function syncMiniSegs() {
+  document.querySelectorAll('[data-mine-mode]').forEach(b => b.classList.toggle('active', (b.dataset.mineMode === 'in') === state.mineLoggedIn));
+  document.querySelectorAll('[data-self-mode]').forEach(b => b.classList.toggle('active', b.dataset.selfMode === state.selfMode));
+  document.querySelectorAll('[data-other-mode]').forEach(b => b.classList.toggle('active', (b.dataset.otherMode === 'blocked') === state.otherBlocked));
+}
+
+function render() {
+  document.body.classList.toggle('studio-dark', state.dark);
+  document.body.classList.toggle('compact', state.compact);
+  document.getElementById('phone-mine').innerHTML = renderMine();
+  document.getElementById('phone-self').innerHTML = renderSelfProfile();
+  document.getElementById('phone-other').innerHTML = renderOtherProfile();
+  applyAccent();
+  syncMiniSegs();
+}
+
+/* Swatches */
+const swatchWrap = document.getElementById('swatches');
+ACCENTS.forEach(a => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (a.id === state.accent ? ' active' : '');
+  btn.style.background = a.light.btn;
+  btn.style.color = a.light.btn;
+  btn.title = a.name;
+  btn.setAttribute('aria-label', a.name);
+  btn.addEventListener('click', () => {
+    state.accent = a.id;
+    swatchWrap.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    applyAccent();
+  });
+  swatchWrap.appendChild(btn);
+});
+
+/* Top controls */
+document.querySelectorAll('[data-scene]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.scene = btn.dataset.scene;
+    state.unreadCleared = false;
+    document.querySelectorAll('[data-scene]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+
+document.querySelectorAll('[data-mine-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.mineLoggedIn = btn.dataset.mineMode === 'in';
+    render();
+  });
+});
+
+document.querySelectorAll('[data-self-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.selfMode = btn.dataset.selfMode;
+    render();
+  });
+});
+
+document.querySelectorAll('[data-other-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.otherBlocked = btn.dataset.otherMode === 'blocked';
+    if (state.otherBlocked && state.otherFollowing) {
+      state.otherFollowing = false;
+      state.otherFollowersCount -= 1;
+    }
+    render();
+  });
+});
+
+document.getElementById('toggle-width').addEventListener('click', (e) => {
+  state.compact = !state.compact;
+  e.currentTarget.textContent = state.compact ? '360 → 390' : '390 → 360';
+  document.body.classList.toggle('compact', state.compact);
+});
+
+document.getElementById('toggle-dark').addEventListener('click', (e) => {
+  state.dark = !state.dark;
+  e.currentTarget.textContent = state.dark ? '浅色模式' : '深色模式';
+  render();
+});
+
+/* Delegated phone interactions */
+document.addEventListener('click', (e) => {
+  const jumpBtn = e.target.closest('[data-jump-self], [data-sheet-jump-self]');
+  if (jumpBtn) {
+    const tab = jumpBtn.dataset.jumpSelf || jumpBtn.dataset.sheetJumpSelf;
+    state.sheet = null;
+    state.selfTab = tab;
+    render();
+    pulseSelfBoard();
+    showToast('self', tab === 'following' ? '已定位到「关注」列表' : '已进入个人主页');
+    return;
+  }
+
+  const tabBtn = e.target.closest('[data-set-tab]');
+  if (tabBtn) {
+    const [board, tab] = tabBtn.dataset.setTab.split(':');
+    if (board === 'self') state.selfTab = tab;
+    if (board === 'other') state.otherTab = tab;
+    render();
+    return;
+  }
+
+  const togglePerson = e.target.closest('[data-toggle-person]');
+  if (togglePerson) {
+    const [board, uid] = togglePerson.dataset.togglePerson.split(':');
+    state.followMap[uid] = !state.followMap[uid];
+    render();
+    showToast(board, state.followMap[uid] ? '已关注' : '已取消关注');
+    return;
+  }
+
+  if (e.target.closest('[data-toggle-other-follow]')) {
+    state.otherFollowing = !state.otherFollowing;
+    state.otherFollowersCount += state.otherFollowing ? 1 : -1;
+    render();
+    showToast('other', state.otherFollowing ? '已关注 林深见鹿' : '已取消关注');
+    return;
+  }
+
+  if (e.target.closest('[data-toggle-block]')) {
+    state.sheet = null;
+    state.otherBlocked = !state.otherBlocked;
+    if (state.otherBlocked && state.otherFollowing) {
+      state.otherFollowing = false;
+      state.otherFollowersCount -= 1;
+    }
+    render();
+    showToast('other', state.otherBlocked ? '已屏蔽该用户' : '已取消屏蔽');
+    return;
+  }
+
+  const openSheet = e.target.closest('[data-open-sheet]');
+  if (openSheet) {
+    const [board, kind] = openSheet.dataset.openSheet.split(':');
+    state.sheet = { board, kind };
+    render();
+    return;
+  }
+
+  const sheetToastBtn = e.target.closest('[data-sheet-toast]');
+  if (sheetToastBtn) {
+    const [board, msg] = sheetToastBtn.dataset.sheetToast.split(':');
+    state.sheet = null;
+    render();
+    showToast(board, msg);
+    return;
+  }
+
+  if (e.target.closest('[data-close-sheet]') && (e.target.classList.contains('sheet-mask') || e.target.classList.contains('sheet-cancel'))) {
+    state.sheet = null;
+    render();
+    return;
+  }
+
+  const notifBtn = e.target.closest('[data-read-notif]');
+  if (notifBtn) {
+    const key = notifBtn.dataset.readNotif;
+    if (state.scene === 'online' && !state.unreadCleared && state.mineLoggedIn) {
+      state.unreadCleared = true;
+      render();
+      showToast(key, '打开「通知」（已模拟标记 3 条未读为已读）');
+    } else {
+      showToast(key, state.mineLoggedIn ? '打开「通知」' : '请先登录查看通知');
+    }
+    return;
+  }
+
+  const toastBtn = e.target.closest('[data-toast]');
+  if (toastBtn) {
+    const [key, msg] = toastBtn.dataset.toast.split(':');
+    showToast(key, msg);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
