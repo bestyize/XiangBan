@@ -401,19 +401,33 @@ async fn avatar_images_survive_unused_image_purge() -> Result<(), Box<dyn std::e
     let Some(h) = harness().await? else { return Ok(()) };
     let upload_dir = std::env::temp_dir().join(format!("{}-avatar", h.schema));
     tokio::fs::create_dir_all(&upload_dir).await?;
-    let (uid, avatar, unused) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    let (uid, avatar, pending, unused) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
     sqlx::query("INSERT INTO users(uid,nickname,trust_level,avatar_url) VALUES($1,'换头像',0,$2)")
         .bind(uid).bind(format!("https://chat.xiangban.xyz/api/images/{avatar}")).execute(&h.pool).await?;
-    for id in [avatar, unused] {
+    for id in [avatar, pending, unused] {
         sqlx::query("INSERT INTO images(id,uploader_uid,mime,size,created_at) VALUES($1,$2,'image/jpeg',4,now()-interval '2 days')")
             .bind(id).bind(uid).execute(&h.pool).await?;
     }
+    let hold = format!("/api/images/{pending}/avatar-hold");
+    let other = h.member().await?;
+    assert_eq!(call(&h.app, "POST", &hold, Some(&other), Value::Null).await.0, StatusCode::NOT_FOUND);
+    let owner = (h.make_token)(uid);
+    for _ in 0..2 {
+        assert_eq!(call(&h.app, "POST", &hold, Some(&owner), Value::Null).await.0, StatusCode::OK);
+    }
     let left = |pool: sqlx::PgPool| async move {
-        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM images WHERE id = ANY($1)").bind(vec![avatar, unused]).fetch_all(&pool).await
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM images WHERE id = ANY($1)").bind(vec![avatar, pending, unused]).fetch_all(&pool).await
     };
     crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
-    assert_eq!(left(h.pool.clone()).await?, vec![(avatar,)], "正在用作头像的图片不能被清理");
-    sqlx::query("UPDATE users SET avatar_url=NULL WHERE uid=$1").bind(uid).execute(&h.pool).await?;
+    let retained = left(h.pool.clone()).await?;
+    assert_eq!(retained.len(), 2);
+    assert!(retained.contains(&avatar) && retained.contains(&pending));
+    let next = format!("https://res.xiangban.xyz/forum-content/images/{pending}");
+    crate::users::store_synced_profile(&h.pool, uid, "换头像", Some(next)).await?;
+    assert!(!sqlx::query_scalar::<_, bool>("SELECT avatar_pending FROM images WHERE id=$1").bind(pending).fetch_one(&h.pool).await?);
+    crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
+    assert_eq!(left(h.pool.clone()).await?, vec![pending]);
+    crate::users::store_synced_profile(&h.pool, uid, "换头像", None).await?;
     crate::handlers::images::purge_unused(&h.pool, &upload_dir).await?;
     assert!(left(h.pool.clone()).await?.is_empty(), "换掉头像后旧图按普通未引用图片清理");
     tokio::fs::remove_dir_all(upload_dir).await?;
@@ -612,6 +626,151 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
     let (s, _) = call(app, "GET", "/api/discover/repos?issue=99", None, Value::Null).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 
+    h.finish().await
+}
+
+#[tokio::test]
+async fn topic_tags_commit_with_the_topic_and_scores_do_not_gate_creation() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let user = h.member().await?;
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug = 'casual-fun'").fetch_one(&h.pool).await?;
+    sqlx::raw_sql(
+        "CREATE FUNCTION reject_test_score() RETURNS trigger LANGUAGE plpgsql AS $$
+             BEGIN RAISE EXCEPTION 'test score update failure'; END; $$;
+         CREATE TRIGGER reject_test_score BEFORE UPDATE OF hot_score ON topics
+             FOR EACH ROW EXECUTE FUNCTION reject_test_score();",
+    ).execute(&h.pool).await?;
+    let draft = |title, tag| json!({"category_id": category, "title": title, "body": "用于本地测试的话题正文。", "tags": [tag]});
+    let (status, topic) = call(&h.app, "POST", "/api/topics", Some(&user), draft("初始帖子", "原标签")).await;
+    assert_eq!(status, StatusCode::OK, "{topic}");
+    let id = topic["id"].as_i64().unwrap();
+
+    sqlx::query("ALTER TABLE topic_tags ADD CONSTRAINT reject_test_tag CHECK (false) NOT VALID").execute(&h.pool).await?;
+    let (status, _) = call(&h.app, "POST", "/api/topics", Some(&user), draft("失败的发布", "新标签")).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM topics WHERE title = '失败的发布'").fetch_one(&h.pool).await?;
+    assert_eq!(count, 0);
+
+    let path = format!("/api/topics/{id}");
+    let (status, _) = call(&h.app, "PATCH", &path, Some(&user), draft("失败的编辑", "新标签")).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let (_, stored) = call(&h.app, "GET", &path, Some(&user), Value::Null).await;
+    assert_eq!(stored["title"], "初始帖子");
+    assert_eq!(stored["tags"], json!(["原标签"]));
+    h.finish().await
+}
+
+#[tokio::test]
+async fn topic_publish_retry_returns_the_same_id_even_after_quota_is_used() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let (author, other) = (h.member().await?, h.member().await?);
+    let mut state = h.state.clone();
+    Arc::make_mut(&mut state.config).trust.daily_topics[1] = 1;
+    let app = crate::build_router(state);
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug='casual-fun'").fetch_one(&h.pool).await?;
+    let attempt = Uuid::new_v4();
+    let input = json!({"category_id":category,"title":"断网重试","body":"这是一篇用来校验发帖回执恢复的测试帖子。","request_id":attempt});
+    let ((first_status, first), (retry_status, retry)) = tokio::join!(
+        call(&app, "POST", "/api/topics", Some(&author), input.clone()),
+        call(&app, "POST", "/api/topics", Some(&author), input.clone()),
+    );
+    assert_eq!(first_status, StatusCode::OK, "{first}");
+    assert_eq!(retry_status, StatusCode::OK, "{retry}");
+    assert_eq!(first["id"], retry["id"]);
+    let (status, after_quota) = call(&app, "POST", "/api/topics", Some(&author), input.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(after_quota["id"], first["id"]);
+    let mut new_input = input.clone();
+    new_input["request_id"] = json!(Uuid::new_v4());
+    assert_eq!(call(&app, "POST", "/api/topics", Some(&author), new_input).await.0, StatusCode::TOO_MANY_REQUESTS);
+
+    let (status, other_post) = call(&app, "POST", "/api/topics", Some(&other), input).await;
+    assert_eq!(status, StatusCode::OK, "{other_post}");
+    assert_ne!(other_post["id"], first["id"]);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM topics WHERE publish_request_id=$1")
+        .bind(attempt).fetch_one(&h.pool).await?;
+    assert_eq!(count, 2);
+    h.finish().await
+}
+
+#[tokio::test]
+async fn restricted_discussion_images_follow_the_readers_permissions() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let author = Uuid::new_v4();
+    let reader = Uuid::new_v4();
+    for uid in [author, reader] {
+        sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'测试用户',1)")
+            .bind(uid).execute(&h.pool).await?;
+    }
+    let author_token = (h.make_token)(author);
+    let reader_token = (h.make_token)(reader);
+    let cover = Uuid::new_v4();
+    let reply = Uuid::new_v4();
+    let public = Uuid::new_v4();
+    for (image, owner) in [(cover, author), (reply, reader), (public, author)] {
+        sqlx::query("INSERT INTO images(id,uploader_uid,mime,size) VALUES($1,$2,'image/png',4)")
+            .bind(image).bind(owner).execute(&h.pool).await?;
+    }
+    let category: i32 = sqlx::query_scalar("SELECT id FROM categories WHERE slug='casual-fun'").fetch_one(&h.pool).await?;
+    let draft = |title, id, level| json!({"category_id":category,"title":title,
+        "body":format!("测试图片正文\n\n![图](/api/images/{id})"),"min_read_level":level});
+    let (status, created) = call(&h.app, "POST", "/api/topics", Some(&author_token), draft("受限图片测试", cover, 1)).await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let topic = created["id"].as_i64().unwrap();
+    let url = format!("/api/topics/{topic}");
+    let posts = format!("{url}/posts");
+    let (status, result) = call(&h.app, "POST", &posts, Some(&reader_token), json!({"body":format!("![回帖图](/api/images/{reply})")})).await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    let protected: i64 = sqlx::query_scalar("SELECT count(*) FROM images WHERE id=ANY($1) AND discussion_private")
+        .bind(vec![cover,reply]).fetch_one(&h.pool).await?;
+    assert_eq!(protected, 2);
+
+    // Simulate existing rows from before the migration.
+    sqlx::query("UPDATE images SET discussion_private=false WHERE id=ANY($1)").bind(vec![cover,reply]).execute(&h.pool).await?;
+    sqlx::query("DELETE FROM data_migrations WHERE name='restricted-discussion-images-v1'").execute(&h.pool).await?;
+    crate::discussion_images::init(&h.pool).await?;
+    assert_eq!(call(&h.app, "GET", &url, None, Value::Null).await.0, StatusCode::FORBIDDEN);
+    for id in [cover, reply] {
+        for method in ["GET", "HEAD"] {
+            assert_eq!(call(&h.app, method, &format!("/api/images/{id}"), None, Value::Null).await.0, StatusCode::NOT_FOUND);
+        }
+    }
+    assert_eq!(call(&h.app, "HEAD", &format!("/api/images/{public}"), None, Value::Null).await.0, StatusCode::OK);
+    let (_, detail) = call(&h.app, "GET", &url, Some(&reader_token), Value::Null).await;
+    let cover_view = detail["images"][0].as_str().unwrap();
+    assert!(detail["body_html"].as_str().unwrap().contains(cover_view));
+    assert!(!detail["body_md"].as_str().unwrap().contains("/view?"));
+    let mut local_state = h.state.clone();
+    let dir = std::env::temp_dir().join(format!("{}-restricted-image", h.schema));
+    tokio::fs::create_dir_all(&dir).await?;
+    tokio::fs::write(dir.join(format!("img-{cover}")), b"test").await?;
+    Arc::make_mut(&mut local_state.config).upload_dir = dir.clone();
+    let local = crate::build_router(local_state);
+    let image = local.oneshot(Request::builder().uri(cover_view).body(Body::empty())?).await?;
+    assert_eq!(image.status(), StatusCode::OK);
+    assert_eq!(image.headers()["cache-control"], "no-store");
+    assert_eq!(to_bytes(image.into_body(), 4).await?.as_ref(), b"test");
+    tokio::fs::remove_dir_all(dir).await?;
+    let (_, preview) = call(&h.app, "POST", "/api/markdown/preview", Some(&author_token),
+        json!({"body":format!("![受限](/api/images/{cover})\n\n![公开](/api/images/{public})")})).await;
+    let preview = preview["html"].as_str().unwrap();
+    assert!(preview.contains(&format!("/api/images/{cover}/view?key=")));
+    assert!(preview.contains(&format!("src=\"/api/images/{public}\"")));
+    let (_, list) = call(&h.app, "GET", "/api/topics", Some(&reader_token), Value::Null).await;
+    let item = list["items"].as_array().unwrap().iter().find(|v| v["id"] == topic).unwrap();
+    assert!(item["images"][0].as_str().unwrap().contains("/view?key="));
+    assert_eq!(call(&h.app, "HEAD", cover_view, None, Value::Null).await.0, StatusCode::OK);
+    let (_, discussion) = call(&h.app, "GET", &posts, Some(&author_token), Value::Null).await;
+    let html = discussion["items"][0]["body_html"].as_str().unwrap();
+    let reply_view = html.split("src=\"").nth(1).unwrap().split('"').next().unwrap();
+    assert!(reply_view.contains("/view?key="));
+    assert_eq!(call(&h.app, "HEAD", reply_view, None, Value::Null).await.0, StatusCode::OK);
+
+    sqlx::query("UPDATE users SET trust_level=0 WHERE uid=$1").bind(reader).execute(&h.pool).await?;
+    assert_eq!(call(&h.app, "HEAD", cover_view, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    let (status, _) = call(&h.app, "PATCH", &url, Some(&author_token), draft("受限图片改公开", cover, 0)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(call(&h.app, "HEAD", &format!("/api/images/{cover}"), None, Value::Null).await.0, StatusCode::OK);
     h.finish().await
 }
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     path::PathBuf,
-    sync::Mutex,
+    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc, Mutex, Weak},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
@@ -99,6 +99,50 @@ pub struct AccountState {
     /// 刷新令牌每次使用都会轮换，旧的再用会让整个会话作废，所以同一时刻只能有一个刷新请求。
     refreshing: tauri::async_runtime::Mutex<()>,
     activation_retry_at: Mutex<Option<Instant>>,
+    generation: AtomicU64,
+    official_runs: Mutex<Vec<Weak<AtomicBool>>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct AccountOwner {
+    uid: String,
+    generation: u64,
+}
+
+impl AccountState {
+    fn check_owner(&self, session: &AccountSession, owner: &AccountOwner) -> Result<(), AccountFailure> {
+        if session.user.uid == owner.uid && self.generation.load(Ordering::Relaxed) == owner.generation {
+            Ok(())
+        } else {
+            Err("小伴账号已切换，请重新发送任务".into())
+        }
+    }
+
+    // The caller holds the session lock so that a new run cannot register against the old login.
+    fn end_official_runs(&self) {
+        self.generation.fetch_add(1, Ordering::Relaxed);
+        for run in self.official_runs.lock().unwrap_or_else(|e| e.into_inner()).drain(..) {
+            if let Some(cancel) = run.upgrade() { cancel.store(true, Ordering::SeqCst); }
+        }
+    }
+}
+
+pub(crate) fn official_owner(app: &tauri::AppHandle) -> Result<AccountOwner, AccountFailure> {
+    let state = app.state::<AccountState>();
+    let slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
+    let session = slot.as_ref().ok_or_else(|| AccountFailure::from("请先登录小伴账号"))?;
+    Ok(AccountOwner { uid: session.user.uid.clone(), generation: state.generation.load(Ordering::Relaxed) })
+}
+
+pub(crate) fn track_official_run(app: &tauri::AppHandle, owner: &AccountOwner, cancel: &Arc<AtomicBool>) -> Result<(), AccountFailure> {
+    let state = app.state::<AccountState>();
+    let slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
+    let session = slot.as_ref().ok_or_else(|| AccountFailure::from("请先登录小伴账号"))?;
+    state.check_owner(session, owner)?;
+    let mut runs = state.official_runs.lock().unwrap_or_else(|e| e.into_inner());
+    runs.retain(|run| run.strong_count() > 0);
+    runs.push(Arc::downgrade(cancel));
+    Ok(())
 }
 
 /// 访问令牌剩余有效期低于这个值就先刷新，免得请求在路上过期。
@@ -265,8 +309,21 @@ pub fn activated(app: &tauri::AppHandle) {
 }
 
 pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, AccountFailure> {
+    access_token_for(app, None).await
+}
+
+pub(crate) async fn official_access_token(app: &tauri::AppHandle, owner: &AccountOwner) -> Result<String, AccountFailure> {
+    access_token_for(app, Some(owner)).await
+}
+
+async fn access_token_for(app: &tauri::AppHandle, owner: Option<&AccountOwner>) -> Result<String, AccountFailure> {
     let state = app.state::<AccountState>();
-    let signed_in = || state.session.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or_else(|| AccountFailure::from("请先登录小伴账号"));
+    let signed_in = || -> Result<AccountSession, AccountFailure> {
+        let slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
+        let session = slot.as_ref().ok_or_else(|| AccountFailure::from("请先登录小伴账号"))?;
+        if let Some(owner) = owner { state.check_owner(session, owner)?; }
+        Ok(session.clone())
+    };
     let current = signed_in()?;
     if is_fresh(&current, now_secs()) {
         return Ok(current.access_token);
@@ -276,7 +333,9 @@ pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, Accoun
     if is_fresh(&current, now_secs()) {
         return Ok(current.access_token);
     }
-    refresh_session(app, &current).await
+    let token = refresh_session(app, &current).await?;
+    if owner.is_some() { signed_in()?; }
+    Ok(token)
 }
 
 async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Result<String, AccountFailure> {
@@ -295,6 +354,7 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
                     let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
                     if same_session(&slot, current) {
                         *slot = None;
+                        state.end_official_runs();
                         let _ = clear_session(app);
                         true
                     } else { false }
@@ -359,6 +419,7 @@ fn remember(app: &tauri::AppHandle, result: &LoginResult) -> Result<(), AccountF
         let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         save_session(app, &result.session)?;
         *slot = Some(result.session.clone());
+        state.end_official_runs();
         *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
     crate::ai_catalogue::account_changed(app);
@@ -484,6 +545,7 @@ pub async fn logout_account(app: tauri::AppHandle) -> Result<(), String> {
         let state = app.state::<AccountState>();
         let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         let session = slot.take();
+        state.end_official_runs();
         let _ = clear_session(&app);
         *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
         session
@@ -515,6 +577,19 @@ pub async fn logout_account(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn account_identity_change_cancels_official_runs_and_rejects_previous_generation() {
+        let state = AccountState::default();
+        let session = parse_login(&login_body(), 1_000).unwrap().session;
+        let owner = AccountOwner { uid: session.user.uid.clone(), generation: 0 };
+        let cancel = Arc::new(AtomicBool::new(false));
+        state.official_runs.lock().unwrap().push(Arc::downgrade(&cancel));
+        assert!(state.check_owner(&session, &owner).is_ok());
+        state.end_official_runs();
+        assert!(cancel.load(Ordering::SeqCst));
+        assert!(state.check_owner(&session, &owner).is_err());
+    }
 
     fn login_body() -> Value {
         json!({

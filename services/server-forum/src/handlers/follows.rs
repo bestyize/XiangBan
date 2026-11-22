@@ -1,7 +1,7 @@
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models::{self, ListFilter, Page, Reader, TopicItem},
+    models::{ListFilter, Page, Reader, TopicItem},
     state::AppState,
     users::{self, PublicUser},
 };
@@ -120,7 +120,7 @@ pub async fn topics(
     f.reader = Reader::from_user(Some(&auth.user));
     f.followed_by = Some(auth.user.uid);
     f.sort = Some("new".into());
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
+    Ok(Json(crate::discussion_images::topic_page(&state, &f).await?))
 }
 
 #[cfg(test)]

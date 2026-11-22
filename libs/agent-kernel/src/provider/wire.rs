@@ -3,6 +3,8 @@ use crate::types::{Message, Part, Role};
 use serde_json::{json, Map, Value};
 use std::{fmt, sync::Arc};
 
+pub type CheckedApiKeySource = Arc<dyn Fn() -> Result<String, crate::HarnessError> + Send + Sync>;
+
 /// Per-provider inactivity budgets; never a total streaming request deadline.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -56,6 +58,8 @@ pub struct ProviderProfile {
     /// Asked for the key on every request, for credentials that expire while a long run is going.
     /// Empty means "use `api_key`".
     pub api_key_source: Option<Arc<dyn Fn() -> String + Send + Sync>>,
+    /// A credential source whose failure stops the request before transport.
+    pub checked_api_key_source: Option<CheckedApiKeySource>,
     /// Claude Messages only: mark the system prompt, the tool list and the newest message as cacheable
     /// (`cache_control`), so a long run re-sends its unchanged prefix at the cached rate. Off by default because
     /// some compatible gateways reject unknown fields.
@@ -79,6 +83,7 @@ impl ProviderProfile {
             max_output_tokens: None,
             max_request_bytes: None,
             api_key_source: None,
+            checked_api_key_source: None,
             prompt_cache: false,
         }
     }
@@ -92,6 +97,28 @@ impl ProviderProfile {
     pub fn current_api_key(&self) -> String {
         self.api_key_source.as_ref().map(|source| source()).filter(|key| !key.is_empty()).unwrap_or_else(|| self.api_key.clone())
     }
+
+    pub fn with_checked_api_key_source(mut self, source: CheckedApiKeySource) -> Self {
+        self.checked_api_key_source = Some(source);
+        self
+    }
+
+    pub(crate) fn request_api_key(&self) -> Result<String, crate::HarnessError> {
+        match &self.checked_api_key_source {
+            Some(source) => source(),
+            None => Ok(self.current_api_key()),
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn checked_api_key_failure_does_not_reuse_the_initial_credential() {
+    let profile = ProviderProfile::new("http://localhost", "initial", "test");
+    let profile = profile.with_api_key_source(Arc::new(String::new));
+    assert_eq!(profile.request_api_key().unwrap(), "initial");
+    let profile = profile.with_checked_api_key_source(Arc::new(|| Err(crate::HarnessError::Config("account changed".into()))));
+    assert!(matches!(profile.request_api_key(), Err(crate::HarnessError::Config(_))));
 }
 
 impl fmt::Debug for ProviderProfile {

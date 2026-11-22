@@ -294,12 +294,12 @@ export const adminApi = {
     request<AdminPage<AdminPack>>('GET', `/packs${qs(params)}`),
   createPack: (body: OfficialPackInput) => request<{ id: number; slug: string }>('POST', '/packs', body),
   setPackFeatured: (id: number, featured: boolean) => request<{ id: number; featured: boolean }>('POST', `/packs/${id}/featured`, { featured }),
-  reviewPack: (id: number, action: PackReviewAction, note = '') =>
-    request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, note }),
+  reviewPack: (id: number, action: PackReviewAction, version: number, note = '') =>
+    request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, version, note }),
   metrics: (days = 14) => request<Metrics>('GET', `/metrics${qs({ days })}`),
   moderationQueue: () => request<{ items: ModerationRow[] }>('GET', '/moderation'),
-  resolveModeration: (id: number, action: 'approve' | 'reject', note = '') =>
-    request<{ id: number; status: string }>('POST', `/moderation/${id}/resolve`, { action, note }),
+  resolveModeration: (id: number, action: 'approve' | 'reject', note = '', version?: number | null) =>
+    request<{ id: number; status: string }>('POST', `/moderation/${id}/resolve`, { action, version, note }),
   words: () => request<{ items: SensitiveWord[] }>('GET', '/words'),
   addWords: (words: string, action: 'block' | 'review') => request<{ added: number; submitted: number }>('POST', '/words', { words, action }),
   deleteWord: (id: number) => request<{ ok: boolean }>('DELETE', `/words/${id}`),
@@ -417,6 +417,7 @@ export interface ModerationRow {
   author: string | null
   /** 回复和帖子所在的帖子编号，后台用它跳到帖子页 */
   topic_id: number | null
+  version: number | null
 }
 
 export interface SensitiveWord {

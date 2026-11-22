@@ -25,6 +25,17 @@ class JvmMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         return file
     }
 
+    private val gameInstallation = LocalGameInstallation(this.root, ::checked)
+
+    override suspend fun installGameFiles(id: String, files: List<MobileGameFile>): Boolean = withContext(Dispatchers.IO) {
+        withWorkspaceLock { gameInstallation.install(id, files, entries("", true)) }
+        true
+    }
+
+    override suspend fun recoverGameFiles() = withContext(Dispatchers.IO) {
+        withWorkspaceLock { gameInstallation.recover() }
+    }
+
     override suspend fun entries(path: String, recursive: Boolean): List<WorkspaceEntry> = withContext(Dispatchers.IO) {
         val directory = checked(path)
         require(directory.isDirectory) { "目录不存在：$path" }

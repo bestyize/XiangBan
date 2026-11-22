@@ -16,7 +16,7 @@ const MAX_TIER_LEN: usize = 64;
 const GATEWAY_PROTOCOL: &str = "responses";
 
 /// 聊天每发一次模型请求就来取一次的密钥，让超过令牌有效期的长对话也能继续。
-pub type KeySource = Arc<dyn Fn() -> String + Send + Sync>;
+pub type KeySource = agent_kernel::provider::wire::CheckedApiKeySource;
 
 pub(crate) fn ai_base_url() -> String {
     std::env::var("XIAOBAN_AI_URL").unwrap_or_else(|_| DEFAULT_AI_URL.to_string()).trim_end_matches('/').to_string()
@@ -314,10 +314,33 @@ pub fn prepare(app: &tauri::AppHandle, config: AiConfig) -> Result<(AiConfig, Op
     if !is_active(&config) {
         return Ok((config, None));
     }
-    let token = tauri::async_runtime::block_on(account::fresh_access_token(app)).map_err(|f| f.message)?;
+    let owner = account::official_owner(app).map_err(|f| f.message)?;
+    prepare_for_owner(app, config, Some(owner))
+}
+
+pub(crate) fn prepare_for_run(
+    app: &tauri::AppHandle,
+    config: AiConfig,
+    cancel: &Arc<std::sync::atomic::AtomicBool>,
+) -> Result<(AiConfig, Option<KeySource>), String> {
+    if !is_active(&config) {
+        return Ok((config, None));
+    }
+    let owner = account::official_owner(app).map_err(|failure| failure.message)?;
+    account::track_official_run(app, &owner, cancel).map_err(|failure| failure.message)?;
+    prepare_for_owner(app, config, Some(owner))
+}
+
+pub(crate) fn prepare_for_owner(app: &tauri::AppHandle, config: AiConfig, owner: Option<account::AccountOwner>) -> Result<(AiConfig, Option<KeySource>), String> {
+    if !is_active(&config) {
+        return Ok((config, None));
+    }
+    let owner = owner.ok_or("小伴 AI 任务缺少账号，请重新发送")?;
+    let token = tauri::async_runtime::block_on(account::official_access_token(app, &owner)).map_err(|f| f.message)?;
     let config = resolve(config, &token, &format!("{}/v1", ai_base_url()))?;
     let handle = app.clone();
-    let source: KeySource = Arc::new(move || tauri::async_runtime::block_on(account::fresh_access_token(&handle)).unwrap_or_else(|_| token.clone()));
+    let source: KeySource = Arc::new(move || tauri::async_runtime::block_on(account::official_access_token(&handle, &owner))
+        .map_err(|failure| agent_kernel::HarnessError::Config(failure.message)));
     Ok((config, Some(source)))
 }
 

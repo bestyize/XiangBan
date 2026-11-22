@@ -131,8 +131,18 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::OK, "{p}");
     let id = p["id"].as_i64().unwrap();
     assert_eq!(p["trust_level"], 2);
-    let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), publish).await;
-    assert_eq!(s, StatusCode::CONFLICT, "文件不能重复使用");
+    // The first response can be lost after committing the pack. The same upload identifies the receipt.
+    let (s, replay) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(replay["id"], id);
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT count(*) FROM packs WHERE author_uid=$1")
+        .bind(author).fetch_one(&pool).await?, 1);
+    let path = format!("/api/packs/upload-status?file_key={file_key}");
+    let (s, status) = call(&app, "GET", &path, Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(status["published_pack_id"], id);
+    assert_eq!(call(&app, "GET", &path, Some(&other_t), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "POST", "/api/packs", Some(&other_t), publish).await.0, StatusCode::BAD_REQUEST);
 
     // 封面：只能用自己上传并确认过的图片，不能随便填键。
     let (s, _) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"cover","size":3*1024*1024,"sha256":sha})).await;
@@ -234,7 +244,15 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let admin_t = login["token"].as_str().unwrap().to_string();
     let (_, queue) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
     assert_eq!(queue["items"].as_array().unwrap().len(), 2, "两个内容包各一条，新版本不重复入队");
-    let (s, r) = call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"approve","note":"ok"})).await;
+    let queue_entry = queue["items"].as_array().unwrap().iter().find(|item| item["target_id"] == id).unwrap();
+    assert_eq!(queue_entry["version"], 2);
+    let review = format!("/api/admin/packs/{id}/review");
+    let resolve = format!("/api/admin/moderation/{}/resolve", queue_entry["id"]);
+    for path in [&review, &resolve] {
+        let (s, _) = call(&app, "POST", path, Some(&admin_t), json!({"action":"approve","version":1})).await;
+        assert_eq!(s, StatusCode::CONFLICT);
+    }
+    let (s, r) = call(&app, "POST", &review, Some(&admin_t), json!({"action":"approve","version":2,"note":"ok"})).await;
     assert_eq!(s, StatusCode::OK, "{r}");
     assert_eq!(r["trust_level"], 1);
     let (_, queue) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
@@ -521,7 +539,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
 
     // 审核结果通知内容包作者；下架不通知。
     call(&app, "POST", "/api/me/notifications/read", Some(&author_t), Value::Null).await;
-    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"approve"})).await;
+    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"approve","version":2})).await;
     call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"remove"})).await;
     let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&author_t), Value::Null).await;
     let items = list["items"].as_array().unwrap();

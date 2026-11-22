@@ -174,12 +174,25 @@ export const useSession = defineStore('session', () => {
   }
 
   /** 把已上传的头像地址写进账号中心，再同步论坛资料。失败时抛出，调用方显示原因并允许重试。 */
-  async function setAvatar(avatarUrl: string) {
+  async function setAvatar(imageId: string, avatarUrl: string, owner: string) {
     const generation = scope.capture()
     const token = await accessToken()
-    if (!token || !scope.current(generation)) throw new AccountError(401, '登录已过期，请重新登录后再试')
+    const checkOwner = () => {
+      if (!scope.current(generation) || user.value?.uid !== owner) throw new AccountError(401, '账号已切换，请重新选择图片')
+    }
+    if (!token) throw new AccountError(401, '登录已过期，请重新登录后再试')
+    checkOwner()
+    await api.holdAvatar(imageId)
+    checkOwner()
     await accountApi.updateAvatar(token, avatarUrl)
-    if (scope.current(generation)) await loadSession()
+    checkOwner()
+    const active = scope.profileRequest()
+    const synced = await api.session()
+    checkOwner()
+    if (synced.user.uid !== owner || synced.user.avatar_url !== avatarUrl) {
+      throw new Error('论坛头像尚未同步，请重试保存')
+    }
+    if (active()) info.value = synced
   }
 
   /** 需要登录的操作先调用它：未登录就弹出登录框并返回 false。 */

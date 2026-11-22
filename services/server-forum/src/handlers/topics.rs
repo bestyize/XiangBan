@@ -13,7 +13,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 pub async fn list(
@@ -22,7 +21,7 @@ pub async fn list(
     Query(mut f): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
     f.reader = Reader::from_user(user.as_ref());
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
+    Ok(Json(crate::discussion_images::topic_page(&state, &f).await?))
 }
 
 #[derive(Serialize)]
@@ -92,11 +91,19 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
         };
     }
     let attachments = attachments::list_for_topic(&state.pool, id, user.as_ref().map(|u| u.uid)).await?;
+    let uid = user.as_ref().map(|u| u.uid);
+    let body_html = match uid.filter(|_| topic.min_read_level > 0) {
+        Some(uid) => crate::discussion_images::ImageView::new(&state, id, uid).html(&body_html),
+        None => body_html,
+    };
+    crate::discussion_images::sign_topic(&state, &mut topic, uid);
     Ok(Json(TopicDetail { topic, body_html, body_md, attachments, viewer }))
 }
 
 #[derive(Deserialize)]
 pub struct TopicInput {
+    /// Optional identifier retained by the composer until the create response arrives.
+    pub request_id: Option<Uuid>,
     pub category_id: i32,
     #[serde(default)]
     pub title: String,
@@ -175,7 +182,7 @@ struct CategoryRules {
     posting_available: bool,
 }
 
-async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
+async fn category_rules<'e>(db: impl sqlx::PgExecutor<'e>, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
         "SELECT c.id, c.min_post_level, c.admin_only,
                 EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children,
@@ -185,7 +192,7 @@ async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
          ORDER BY (c.id = $1) DESC LIMIT 1",
     )
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(db)
     .await?
     .ok_or_else(|| AppError::BadRequest("分类不存在".into()))
 }
@@ -240,19 +247,21 @@ pub(super) fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
     Ok(tags)
 }
 
-pub async fn save_tags(pool: &PgPool, topic_id: i64, tags: &[String]) -> AppResult<()> {
-    sqlx::query("DELETE FROM topic_tags WHERE topic_id = $1").bind(topic_id).execute(pool).await?;
+async fn save_tags(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, topic_id: i64, tags: &[String]) -> AppResult<()> {
+    sqlx::query("DELETE FROM topic_tags WHERE topic_id = $1").bind(topic_id).execute(&mut **tx).await?;
+    let mut tags: Vec<_> = tags.iter().collect();
+    tags.sort_unstable();
     for tag in tags {
         let (tag_id,): (i32,) = sqlx::query_as(
             "INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id",
         )
         .bind(tag)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await?;
         sqlx::query("INSERT INTO topic_tags (topic_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(topic_id)
             .bind(tag_id)
-            .execute(pool)
+            .execute(&mut **tx)
             .await?;
     }
     Ok(())
@@ -279,8 +288,19 @@ fn clean_read_level(wanted: Option<i16>, user_level: i16, current: Option<i16>) 
 
 pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): Json<TopicInput>) -> AppResult<Json<Value>> {
     let user = &auth.user;
+    let mut tx = state.pool.begin().await?;
+    if let Some(request_id) = input.request_id {
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(format!("topic-publish:{}:{request_id}", user.uid)).execute(&mut *tx).await?;
+        let existing = sqlx::query_scalar::<_, i64>("SELECT id FROM topics WHERE author_uid=$1 AND publish_request_id=$2")
+            .bind(user.uid).bind(request_id).fetch_optional(&mut *tx).await?;
+        if let Some(id) = existing {
+            tx.commit().await?;
+            return Ok(Json(json!({ "id": id })));
+        }
+    }
     users::ensure_can_write(user)?;
-    let cat = category_rules(&state.pool, input.category_id).await?;
+    let cat = category_rules(&mut *tx, input.category_id).await?;
     if !cat.posting_available { return Err(AppError::Forbidden("该分类已停用或已关闭发帖".into())); }
     if cat.has_children {
         return Err(AppError::BadRequest("请选择具体的二级分类".into()));
@@ -289,23 +309,22 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     if user.trust_level < need {
         return Err(level_error(cat.admin_only, need));
     }
-    users::ensure_daily_quota(&state.pool, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
+    users::ensure_daily_quota(&mut *tx, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
 
     let title = clean_topic_title(&input.title, cat.casual)?;
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
-    let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
+    let review = crate::moderation::screen(&mut *tx, &[&title, &body]).await?;
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
     let excerpt = if cat.casual { markdown::article_excerpt(&body, 140) } else { markdown::excerpt(&body, 140) };
     let images = markdown::site_images(&body, 3);
     let poll = input.poll.as_ref().map(clean_poll).transpose()?;
 
-    let mut tx = state.pool.begin().await?;
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level, images)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level, images, publish_request_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
     )
     .bind(cat.id)
     .bind(user.uid)
@@ -315,6 +334,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .bind(&excerpt)
     .bind(read_level)
     .bind(&images)
+    .bind(input.request_id)
     .fetch_one(&mut *tx)
     .await?;
     if let Some((options, closes_at)) = &poll {
@@ -341,9 +361,9 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
         let note = Note { kind: n::MENTION, actor: Some(user.uid), topic_id: Some(id), post_id: None, pack_id: None, title: &title, excerpt: &excerpt };
         n::notify_mentions(&mut tx, &body, user.uid, &[], &note).await?;
     }
+    save_tags(&mut tx, id, &tags).await?;
+    // New topics have a zero score until the first interaction or scheduled refresh.
     tx.commit().await?;
-    save_tags(&state.pool, id, &tags).await?;
-    models::refresh_hot_scores(&state.pool, Some(id)).await?;
     Ok(Json(json!({ "id": id })))
 }
 
@@ -412,9 +432,9 @@ pub async fn update(
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "topic", id, &format!("命中复核词：{word}")).await?;
     }
+    save_tags(&mut tx, id, &tags).await?;
     tx.commit().await?;
     attachments::remove_files(&state.config.upload_dir, &removed).await;
-    save_tags(&state.pool, id, &tags).await?;
     Ok(Json(json!({ "id": id })))
 }
 
@@ -508,11 +528,14 @@ pub struct PreviewInput {
     pub body: String,
 }
 
-pub async fn preview(auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResult<Json<Value>> {
+pub async fn preview(State(state): State<AppState>, auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResult<Json<Value>> {
     if input.body.chars().count() > 20_000 {
         return Err(AppError::BadRequest("内容太长".into()));
     }
-    Ok(Json(json!({ "html": markdown::render(&input.body, auth.user.trust_level >= 1) })))
+    let html = markdown::render(&input.body, auth.user.trust_level >= 1);
+    // Preview can also render the author's own images from a previously restricted post.
+    let html = crate::discussion_images::ImageView::new(&state, 0, auth.user.uid).preview_html(html).await?;
+    Ok(Json(json!({ "html": html })))
 }
 
 #[cfg(test)]

@@ -32,6 +32,17 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         return file
     }
 
+    private val gameInstallation = LocalGameInstallation(this.root, ::checked)
+
+    override suspend fun installGameFiles(id: String, files: List<MobileGameFile>): Boolean = withContext(Dispatchers.IO) {
+        withWorkspaceLock { gameInstallation.install(id, files, entries("", true)) }
+        true
+    }
+
+    override suspend fun recoverGameFiles() = withContext(Dispatchers.IO) {
+        withWorkspaceLock { gameInstallation.recover() }
+    }
+
     override suspend fun <T> gameTransaction(action: suspend () -> T): T = gameGate.withLock {
         withContext(Dispatchers.IO) {
             // The runtime activity can share the same work from a separate Android process.

@@ -16,9 +16,12 @@ fn with_queue<T>(
 fn binding(app: &tauri::AppHandle, session: &str) -> Result<Value, String> {
     let saved = mutate(app, |index| index.get(session).cloned())?.ok_or("这个对话已经不存在")?;
     let s = serde_json::to_value(saved).map_err(|e| e.to_string())?;
-    Ok(
-        json!({"model":s["model"],"workspace":s["workspace"],"expert":s["expert"],"contextTokens":s["contextTokens"],"connectors":s["connectors"],"worktree":s["worktree"]}),
-    )
+    let mut binding = json!({"model":s["model"],"workspace":s["workspace"],"expert":s["expert"],"contextTokens":s["contextTokens"],"connectors":s["connectors"],"worktree":s["worktree"]});
+    if ai_gateway::is_active(&session_config(app, session)?) {
+        let owner = crate::account::official_owner(app).map_err(|failure| failure.message)?;
+        binding["officialAccount"] = json!(owner);
+    }
+    Ok(binding)
 }
 pub(super) fn snapshot(app: &tauri::AppHandle, session: &str) -> Result<Snapshot, String> {
     with_queue(app, |q| q.snapshot(session))

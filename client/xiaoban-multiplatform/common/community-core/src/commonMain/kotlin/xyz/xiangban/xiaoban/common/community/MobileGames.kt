@@ -214,7 +214,10 @@ class MobileGameStore(val workspace: MobileWorkspace) {
     val revision = changes.asStateFlow()
 
     private suspend fun <T> access(action: suspend () -> T): T = lock.withLock {
-        workspace.gameTransaction(action)
+        workspace.gameTransaction {
+            workspace.recoverGameFiles()
+            action()
+        }
     }
 
     private suspend fun exists(id: String): Boolean = workspace.list().any { it.path == "games" && it.directory } &&
@@ -222,20 +225,22 @@ class MobileGameStore(val workspace: MobileWorkspace) {
 
     suspend fun list(): List<MobileGame> = scan().games
 
-    suspend fun scan(): MobileGameScan {
-        val root = workspace.list().firstOrNull { it.path == "games" } ?: return MobileGameScan(emptyList(), emptyList())
-        if (!root.directory) return MobileGameScan(emptyList(), listOf("games 必须是目录"))
+    suspend fun scan(): MobileGameScan = access {
+        val root = workspace.list().firstOrNull { it.path == "games" } ?: return@access MobileGameScan(emptyList(), emptyList())
+        if (!root.directory) return@access MobileGameScan(emptyList(), listOf("games 必须是目录"))
         val games = mutableListOf<MobileGame>()
         val errors = mutableListOf<String>()
         for (entry in workspace.list("games").filter { it.directory }) {
-            try { games += validate(entry.path.substringAfterLast('/'))
+            try { games += validateInstalled(entry.path.substringAfterLast('/'))
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { errors += "${entry.path}：${e.message ?: "作品校验失败"}" }
         }
-        return MobileGameScan(games.sortedBy { it.name }, errors)
+        MobileGameScan(games.sortedBy { it.name }, errors)
     }
 
-    suspend fun read(id: String): MobileGame {
+    suspend fun read(id: String): MobileGame = access { readInstalled(id) }
+
+    private suspend fun readInstalled(id: String): MobileGame {
         MobileGameFormat.id(id)
         val text = workspace.read("games/$id/manifest.json")
         val game = readMobileGameManifest(text)
@@ -258,10 +263,12 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         }
     }
 
-    suspend fun validate(id: String): MobileGame = access {
-        val game = read(id)
+    suspend fun validate(id: String): MobileGame = access { validateInstalled(id) }
+
+    private suspend fun validateInstalled(id: String): MobileGame {
+        val game = readInstalled(id)
         MobileGameFormat.files(contentFiles("games/$id", installed = true), listOf("index.html", game.icon, game.cover))
-        game
+        return game
     }
 
     suspend fun readFile(id: String, path: String): String {
@@ -278,7 +285,7 @@ class MobileGameStore(val workspace: MobileWorkspace) {
 
     /** Snapshot includes the normalized resource manifest, ready to write at the ZIP root. */
     suspend fun exportFiles(id: String): List<MobileGameFile> = access {
-        val game = read(id)
+        val game = readInstalled(id)
         val files = contentFiles("games/$id", installed = true)
         MobileGameFormat.files(files, listOf("index.html", game.icon, game.cover))
         listOf(MobileGameFile("manifest.json", game.json().toString())) + files
@@ -325,6 +332,11 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         if (!hadOld) require(workspace.list().none { it.path == "games" } || workspace.list("games").count { it.directory } < MobileGameFormat.GAMES) {
             "最多保存 ${MobileGameFormat.GAMES} 件自创作品"
         }
+        val manifest = MobileGameFile("manifest.json", normalized.json().toString())
+        if (workspace.installGameFiles(normalized.id, files + manifest)) {
+            changes.value++
+            return normalized
+        }
         // Snapshot before any mutation, so invalid replacements and failed writes retain the original.
         val directory = "games/${game.id}"
         val previous = if (hadOld) workspace.list(directory, true).filterNot { it.directory }.map {
@@ -338,7 +350,7 @@ class MobileGameStore(val workspace: MobileWorkspace) {
                 else workspace.write(path, file.content)
             }
             // A directory is only discoverable as a valid work when its final manifest is present.
-            workspace.write("$directory/manifest.json", normalized.json().toString())
+            workspace.write("$directory/manifest.json", manifest.content)
         } catch (error: Exception) {
             withContext(NonCancellable) {
                 try {

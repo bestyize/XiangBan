@@ -8,6 +8,7 @@ mod content_social;
 mod content;
 mod db;
 mod discover;
+mod discussion_images;
 mod navigation_catalog;
 mod error;
 mod handlers;
@@ -99,6 +100,8 @@ pub fn build_router(state: AppState) -> Router {
             post(images::upload).layer(DefaultBodyLimit::max((state.config.upload_limit_image + 1024 * 1024) as usize)),
         )
         .route("/images/{id}", get(images::show).head(images::head))
+        .route("/images/{id}/view", get(images::show_view).head(images::head_view))
+        .route("/images/{id}/avatar-hold", post(images::hold_avatar))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .route("/resource-uploads/ticket", post(handlers::resource_uploads::ticket))

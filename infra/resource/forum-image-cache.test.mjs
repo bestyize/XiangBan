@@ -42,6 +42,30 @@ test('published images are stored by MD5, shared and checked on every request', 
   } finally { await close(app); await close(upstream); await rm(dir,{recursive:true,force:true}) }
 })
 
+test('restricted discussion images recheck access even when bytes are cached', async () => {
+  const dir = await mkdtemp(join(tmpdir(),'forum-restricted-image-test-'))
+  let authorized = true, gets = 0
+  const originPath = `/_resource-origin/api/images/${id}/view?key=test-view`
+  const upstream = createServer((req,res) => {
+    if (!authorized || req.url !== originPath) return res.writeHead(404).end()
+    res.setHeader('Content-Type','image/png'); res.setHeader('Content-Length',png.length)
+    if (req.method === 'GET') { gets++; res.end(png) } else res.end()
+  })
+  const origin = await listen(upstream), app = createForumImageServer({root:dir,origin,secret}), base = await listen(app)
+  const url = `${base}/forum-content/images/${id}`
+  try {
+    const allowed = await fetch(url+'?key=test-view')
+    assert.equal(allowed.headers.get('Cache-Control'),'no-store')
+    assert.deepEqual(Buffer.from(await allowed.arrayBuffer()),png)
+    assert.equal(gets,1)
+    assert.equal((await fetch(url)).status,404)
+    assert.equal((await fetch(url+'?key=test-view',{method:'HEAD'})).status,200)
+    authorized = false
+    assert.equal((await fetch(url+'?key=test-view')).status,404)
+    assert.equal(gets,1)
+  } finally { await close(app); await close(upstream); await rm(dir,{recursive:true,force:true}) }
+})
+
 test('contact QR images update by content hash and disappear when hidden', async () => {
   const dir = await mkdtemp(join(tmpdir(),'forum-contact-test-'))
   let current = png, visible = true, gets = 0

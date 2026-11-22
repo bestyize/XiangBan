@@ -18,6 +18,7 @@ import { kindLabel } from '@/lib/content'
 import { canonicalCategory, navigationSection } from '@/lib/communityStructure'
 import { postingSections, postingSelection, type PostingCategory, type PostingSectionKey } from '@/lib/postingStructure'
 import { uploadFile } from '@/lib/upload'
+import { readTopicDraft, topicDraftKey, writeTopicDraft, type TopicDraft, type UploadedTopicWork } from '@/lib/topicDraft'
 
 const meta = useMeta()
 const session = useSession()
@@ -46,7 +47,9 @@ const selectionTouched = ref(false)
 
 const attachments = ref<Attachment[]>([])
 const attachmentUploading = ref(false)
-const draftWork = shallowRef<DraftWebWork | null>(null)
+const draftWork = shallowRef<DraftWebWork | UploadedTopicWork | null>(null)
+const uploadedWork = shallowRef<{ file: File; key: string } | null>(null)
+const topicRequestId = ref<string | null>(null)
 const workPickerOpen = ref(false)
 const previewWork = ref(false)
 const previewWorkRev = ref(0)
@@ -206,11 +209,70 @@ function snapshot() {
       ? ['mine', draftWork.value.id]
       : draftWork.value?.source === 'upload'
         ? ['upload', draftWork.value.originalName, draftWork.value.prepared.file.size]
-        : null,
+        : draftWork.value?.source === 'uploaded' ? ['uploaded', draftWork.value.key] : null,
     poll: !editId.value && pollEnabled.value ? { options: pollOptions.value, days: pollDays.value } : null,
   })
 }
 const originalDraft = ref(snapshot())
+const draftKey = computed(() => composer.ready && session.user ? topicDraftKey(session.user.uid, editId.value) : null)
+let restoredKey: string | null = null
+let finishedDraft = false
+
+function uploadedDraft(work: Extract<DraftWebWork, { source: 'upload' }>, key: string): UploadedTopicWork {
+  const { prepared } = work
+  return {
+    source: 'uploaded', key, kind: prepared.kind,
+    title: (prepared.name || Array.from(form.title.trim()).slice(0, 60).join('') || '社区作品').trim(),
+    summary: (prepared.description || Array.from(form.body.trim()).slice(0, 500).join('')).trim(),
+    originalName: work.originalName, format: work.format, size: prepared.file.size, rightsAccepted: work.rightsAccepted,
+  }
+}
+
+function draftSnapshot(): TopicDraft {
+  const work = draftWork.value
+  const savedUpload = uploadedWork.value
+  return {
+    form: { ...form, tags: [...form.tags] }, tagInput: tagDraft.value, attachments: [...attachments.value],
+    work: work?.source === 'upload'
+      ? (savedUpload?.file === work.prepared.file ? uploadedDraft(work, savedUpload.key) : null)
+      : work,
+    poll: pollEnabled.value ? { options: [...pollOptions.value], days: pollDays.value } : null,
+    requestId: topicRequestId.value,
+  }
+}
+
+function saveLocalDraft() {
+  const key = draftKey.value
+  if (!key || restoredKey !== key || finishedDraft) return
+  const draft = draftSnapshot()
+  writeTopicDraft(key, snapshot() !== originalDraft.value || draft.requestId ? draft : null)
+}
+
+function clearLocalDraft() {
+  finishedDraft = true
+  if (restoredKey && restoredKey === draftKey.value) writeTopicDraft(restoredKey, null)
+}
+
+watch([draftKey, originalReady], ([key]) => {
+  if (!key || restoredKey === key || (editId.value && !originalReady.value)) return
+  const saved = readTopicDraft(key)
+  if (saved) {
+    Object.assign(form, saved.form)
+    selectionTouched.value = !!saved.form.boardKey
+    pickerSectionKey.value = form.sectionKey
+    tagDraft.value = saved.tagInput ?? ''
+    attachments.value = saved.attachments
+    draftWork.value = saved.work
+    pollEnabled.value = !!saved.poll
+    pollOptions.value = saved.poll?.options ?? ['', '']
+    pollDays.value = saved.poll?.days ?? 7
+    topicRequestId.value = saved.requestId
+  }
+  restoredKey = key
+}, { immediate: true })
+watch(draftSnapshot, saveLocalDraft, { deep: true })
+onMounted(() => window.addEventListener('pagehide', saveLocalDraft))
+onBeforeUnmount(() => window.removeEventListener('pagehide', saveLocalDraft))
 
 function requestClose() {
   if (busy.value || uploading.value) return
@@ -223,11 +285,13 @@ function requestClose() {
     confirmLeave.value = true
     return
   }
+  clearLocalDraft()
   composer.close()
 }
 
 function confirmDiscard() {
   confirmLeave.value = false
+  clearLocalDraft()
   composer.close()
 }
 
@@ -328,7 +392,7 @@ const pollError = computed(() => {
 })
 
 const workError = computed(() =>
-  draftWork.value?.source === 'upload' && !draftWork.value.rightsAccepted
+  draftWork.value && draftWork.value.source !== 'mine' && !draftWork.value.rightsAccepted
     ? '请确认上传作品的原创或授权声明'
     : '',
 )
@@ -348,16 +412,27 @@ function removePollOption(index: number) {
   if (pollOptions.value.length > 2) pollOptions.value.splice(index, 1)
 }
 
-function workBadgeText(work: DraftWebWork): string {
+function workBadgeText(work: DraftWebWork | UploadedTopicWork): string {
   if (work.source === 'mine') return '我的创作'
   if (work.format === 'html') return 'HTML → V2'
   if (work.format === 'htm') return 'HTM → V2'
   return 'V2 容器'
 }
-function workSubtitle(work: DraftWebWork): string {
+function workSubtitle(work: DraftWebWork | UploadedTopicWork): string {
   if (work.source === 'mine') return `${kindLabel(work.kind)} · v${work.version} · V2 容器`
+  if (work.source === 'uploaded') return `${work.originalName} · V2 作品包 · ${formatSize(work.size)}`
   if (work.prepared.converted) return `${work.originalName} · 已自动转为 V2 容器 · ${formatSize(work.prepared.file.size)}`
   return `${work.originalName} · ${work.prepared.protocol === 2 ? 'V2 作品包' : kindLabel(work.prepared.kind)} · ${formatSize(work.prepared.file.size)}`
+}
+
+function changeWork(work: DraftWebWork | null) {
+  draftWork.value = work
+  uploadedWork.value = null
+}
+
+function workRightsChanged(event: Event) {
+  const work = draftWork.value
+  if (work && work.source !== 'mine') draftWork.value = { ...work, rightsAccepted: (event.target as HTMLInputElement).checked }
 }
 
 async function submit() {
@@ -386,27 +461,37 @@ async function submit() {
   try {
     let linkedWorkId: number | null = draftWork.value?.source === 'mine' ? draftWork.value.id : null
     let linkedWorkTitle = draftWork.value?.source === 'mine' ? draftWork.value.title : ''
-    if (draftWork.value?.source === 'upload') {
-      const { prepared } = draftWork.value
-      submitStep.value = '上传作品…'
-      const fileKey = await uploadFile(prepared.kind, prepared.file, () => {})
-      if (composer.target !== target) return
-      const packTitle = (prepared.name || Array.from(form.title.trim()).slice(0, 60).join('') || '社区作品').trim()
-      const packSummary = (prepared.description || Array.from(form.body.trim()).slice(0, 500).join('')).trim()
+    const selectedWork = draftWork.value
+    if (selectedWork && selectedWork.source !== 'mine') {
+      let work: UploadedTopicWork
+      if (selectedWork.source === 'upload') {
+        const { prepared } = selectedWork
+        if (uploadedWork.value?.file !== prepared.file) {
+          submitStep.value = '上传作品…'
+          const key = await uploadFile(prepared.kind, prepared.file, () => {})
+          if (composer.target !== target) return
+          uploadedWork.value = { file: prepared.file, key }
+        }
+        work = uploadedDraft(selectedWork, uploadedWork.value.key)
+      } else {
+        work = selectedWork
+      }
+      saveLocalDraft()
       submitStep.value = '登记作品…'
       const published = await contentApi.publish({
-        kind: prepared.kind,
-        title: packTitle,
-        summary: packSummary,
+        kind: work.kind,
+        title: work.title,
+        summary: work.summary,
         tags: [...tags.value],
-        file_key: fileKey,
-        rights_ack: true,
+        file_key: work.key,
+        rights_ack: work.rightsAccepted,
       })
       if (composer.target !== target) return
       linkedWorkId = published.id
-      linkedWorkTitle = packTitle
+      linkedWorkTitle = work.title
       // 已发布即切换为已关联创作，防止后续失败重试时重复创建作品包。
-      draftWork.value = { source: 'mine', id: published.id, title: packTitle, kind: prepared.kind, version: 1 }
+      changeWork({ source: 'mine', id: published.id, title: work.title, kind: work.kind, version: 1 })
+      saveLocalDraft()
     }
 
     let finalBody = form.body.trim()
@@ -435,11 +520,14 @@ async function submit() {
         days: pollDays.value > 0 ? pollDays.value : undefined,
       }
     }
+    if (!target?.editId) input.request_id = topicRequestId.value ??= crypto.randomUUID()
+    saveLocalDraft()
     const res = target?.editId ? await api.updateTopic(target.editId, input) : await api.createTopic(input)
     if (composer.target !== target) return
     session.loadSession()
     toast.show(target?.editId ? '修改已保存' : '发布成功', 'info',
       target?.editId ? undefined : { label: '查看帖子', to: `/t/${res.id}` })
+    clearLocalDraft()
     composer.complete(res.id)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '发布失败'
@@ -728,13 +816,13 @@ const blocked = computed(() => {
                   <span>试玩</span>
                 </button>
                 <button v-if="mode === 'write'" type="button" class="work-btn" @click="workPickerOpen = true">更换</button>
-                <button v-if="mode === 'write'" type="button" class="mini-x" aria-label="移除作品" @click="draftWork = null">
+                <button v-if="mode === 'write'" type="button" class="mini-x" aria-label="移除作品" @click="changeWork(null)">
                   <AppIcon name="close" :size="14" />
                 </button>
               </div>
             </div>
-            <label v-if="draftWork.source === 'upload' && mode === 'write'" class="work-rights" :class="{ need: !draftWork.rightsAccepted }">
-              <input v-model="draftWork.rightsAccepted" type="checkbox" />
+            <label v-if="draftWork.source !== 'mine' && mode === 'write'" class="work-rights" :class="{ need: !draftWork.rightsAccepted }">
+              <input :checked="draftWork.rightsAccepted" type="checkbox" @change="workRightsChanged" />
               <span>我确认这是原创或已获授权，并同意按社区规则发布{{ draftWork.rightsAccepted ? '' : '（必选）' }}</span>
             </label>
           </section>
@@ -845,10 +933,10 @@ const blocked = computed(() => {
       <!-- Unified 2-Tab Work Picker -->
       <WorkAttachPicker
         :open="workPickerOpen"
-        :current="draftWork"
+        :current="draftWork?.source === 'uploaded' ? null : draftWork"
         :disabled="busy"
         @close="workPickerOpen = false"
-        @select="draftWork = $event"
+        @select="changeWork"
       />
 
       <!-- Local V2 Trial Preview Overlay -->

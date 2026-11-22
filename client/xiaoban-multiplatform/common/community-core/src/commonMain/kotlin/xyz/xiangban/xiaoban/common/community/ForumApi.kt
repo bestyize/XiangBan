@@ -208,10 +208,12 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         pollOptions: List<String> = emptyList(),
         pollDays: Int? = null,
         attachments: List<ForumAttachment> = emptyList(),
+        requestId: String? = null,
     ): Long {
         validateTopicAttachments(attachments)
         val resp = write(HttpMethod.Post, "/api/topics", buildJsonObject {
             put("category_id", categoryId); put("title", title); put("body", body)
+            if (requestId != null) put("request_id", requestId)
             if (tags.isNotEmpty()) put("tags", buildJsonArray { tags.forEach { add(JsonPrimitive(it)) } })
             if (bounty != null) put("help", buildJsonObject { put("bounty", bounty); put("days", bountyDays) })
             if (attachments.isNotEmpty()) {
@@ -316,6 +318,10 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         write(HttpMethod.Delete, "/api/attachments/$id")
     }
     suspend fun session(): SessionInfo = http.send(HttpMethod.Post, "/api/session", serializer(), body = "{}", token = token())
+    suspend fun holdAvatar(imageId: String) {
+        if (!ForumAssetId.matches(imageId)) throw ApiException(400, "图片编号无效")
+        write(HttpMethod.Post, "/api/images/$imageId/avatar-hold")
+    }
     suspend fun unreadCount(): Int = get<Unread>("/api/me/notifications/unread").unread
 
     // ── 分享 ──

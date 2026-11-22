@@ -105,7 +105,7 @@ watch(() => session.loggedIn, v => {
         <button class="btn btn-primary" type="submit">搜索</button>
       </form>
     </ModalDialog>
-    <TopicComposer v-if="composer.target" />
+    <TopicComposer v-if="composer.target" :key="composer.target.editId ?? 'new'" />
     <PackPublishDialog v-if="publisher.target" />
   </div>
   <LoginDialog /><ToastHost /><AppearanceDialog />

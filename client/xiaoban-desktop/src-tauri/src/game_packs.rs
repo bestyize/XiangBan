@@ -274,13 +274,18 @@ pub fn load_manifest(dir: &Path, folder: &str) -> Result<Value, String> {
 
 pub fn find_user_game(root: &Path, id: &str) -> Result<Value, String> {
     check_pack_id(id)?;
-    load_manifest(&packs_dir(root).join(id), id)
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let packs = packs_dir(root);
+    recover_game_backup(&packs, id)?;
+    load_manifest(&packs.join(id), id)
 }
 
 pub fn read_v2_pack(root: &Path, id: &str) -> Result<(Value, app_pack::Files), String> {
     check_pack_id(id)?;
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let dir = packs_dir(root).join(id);
+    let packs = packs_dir(root);
+    recover_game_backup(&packs, id)?;
+    let dir = packs.join(id);
     if !fs::symlink_metadata(&dir).is_ok_and(|metadata| metadata.is_dir()) {
         return Err(format!("未找到自创作品目录「{id}」"));
     }
@@ -318,9 +323,17 @@ pub struct Scan {
 
 /// Lists the user's games. A broken folder is skipped and reported, never fatal.
 pub fn scan(root: &Path) -> Scan {
-    let mut out = Scan::default();
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let directory = packs_dir(root);
-    let Ok(entries) = fs::read_dir(&directory) else { return out };
+    let errors = recover_game_backups(&directory, None);
+    let mut installed = scan_installed(&directory);
+    installed.errors.extend(errors);
+    installed
+}
+
+fn scan_installed(directory: &Path) -> Scan {
+    let mut out = Scan::default();
+    let Ok(entries) = fs::read_dir(directory) else { return out };
     let mut names: Vec<String> = entries.flatten().filter_map(|e| e.file_name().into_string().ok()).filter(|n| !n.starts_with('.')).collect();
     names.sort();
     for name in names {
@@ -596,10 +609,53 @@ fn random_tag() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// A backup is left only while a finished replacement is being moved into place.
+/// A missing target means that replacement never committed. This also recognizes
+/// backups left by earlier versions of the app.
+fn recover_game_backups(packs: &Path, only: Option<&str>) -> Vec<String> {
+    let mut errors = Vec::new();
+    if let Some(id) = only {
+        if fs::symlink_metadata(packs.join(id)).is_ok() { return errors; }
+    }
+    let Ok(entries) = fs::read_dir(packs) else { return errors; };
+    let mut backups: Vec<_> = entries.flatten()
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let (id, tag) = name.strip_prefix(".bak-")?.rsplit_once('-')?;
+            if !valid_id(id) || only.is_some_and(|wanted| wanted != id)
+                || tag.len() != 8 || !tag.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+            let modified = entry.metadata().ok().and_then(|metadata| metadata.modified().ok());
+            Some((modified, id.to_owned(), tag.to_owned(), entry.path()))
+        }).collect();
+    backups.sort_unstable_by(|a, b| b.0.cmp(&a.0).then_with(|| a.3.cmp(&b.3)));
+    for (_, id, tag, backup) in backups {
+        let target = packs.join(&id);
+        if fs::symlink_metadata(&target).is_ok() { continue; }
+        let restored = load_manifest(&backup, &id)
+            .and_then(|_| fs::rename(backup, target).map_err(|error| error.to_string()));
+        match restored {
+            Ok(()) => { let _ = fs::remove_dir_all(packs.join(format!(".tmp-{id}-{tag}"))); }
+            Err(error) => errors.push(format!("{id}：无法恢复旧版作品：{error}")),
+        }
+    }
+    errors
+}
+
+fn recover_game_backup(packs: &Path, id: &str) -> Result<(), String> {
+    let errors = recover_game_backups(packs, Some(id));
+    if fs::symlink_metadata(packs.join(id)).is_ok() { return Ok(()); }
+    errors.into_iter().next().map_or(Ok(()), Err)
+}
+
 /// Moves the finished folder into place. An old folder is set aside first and put back if the move fails.
 fn swap_in(temporary: &Path, target: &Path, backup: &Path, had_old: bool) -> Result<(), String> {
     if had_old {
         fs::rename(target, backup).map_err(|e| format!("无法替换旧游戏：{e}"))?;
+        #[cfg(test)]
+        if std::env::var_os("XIAOBAN_CRASH_GAME_SWAP").is_some_and(|path| target.parent() == Some(Path::new(&path))) {
+            std::process::exit(73);
+        }
     }
     if let Err(e) = fs::rename(temporary, target) {
         if had_old {
@@ -723,6 +779,7 @@ fn install_pack<'a>(
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let packs = packs_dir(root);
     fs::create_dir_all(&packs).map_err(|e| format!("无法创建作品文件夹：{e}"))?;
+    recover_game_backup(&packs, id)?;
     let target = packs.join(id);
     let exists = fs::symlink_metadata(&target).is_ok();
     if exists && !overwrite {
@@ -734,12 +791,13 @@ fn install_pack<'a>(
         return Err("这件作品使用 V2，请用 app_create 更新".into());
     }
     if !exists {
-        let count = scan(root).games.len();
+        let count = scan_installed(&packs).games.len();
         if count >= MAX_USER_GAMES {
             return Err(format!("自创游戏已满 {MAX_USER_GAMES} 个，请先删除一些"));
         }
     }
-    let temporary = packs.join(format!(".tmp-{id}-{}", random_tag()));
+    let tag = random_tag();
+    let temporary = packs.join(format!(".tmp-{id}-{tag}"));
     let build = || -> Result<Value, String> {
         fs::create_dir_all(&temporary).map_err(|e| format!("无法创建临时文件夹：{e}"))?;
         let mut count = 1;
@@ -763,7 +821,7 @@ fn install_pack<'a>(
             "save":entry["save"],"layer":entry["layer"],"replaced":exists}))
     };
     let result = build().inspect_err(|_| { let _ = fs::remove_dir_all(&temporary); })?;
-    let backup = packs.join(format!(".bak-{id}-{}", random_tag()));
+    let backup = packs.join(format!(".bak-{id}-{tag}"));
     if let Err(error) = swap_in(&temporary, &target, &backup, exists) {
         let _ = fs::remove_dir_all(&temporary);
         return Err(error);
@@ -1166,6 +1224,41 @@ mod tests {
         swap_in(&fresh, &target, &backup, true).unwrap();
         assert!(target.join("marker.txt").is_file() && !backup.exists() && !fresh.exists());
         let _ = fs::remove_dir_all(r);
+    }
+
+    #[test]
+    fn interrupted_overwrite_recovers_old_game_after_restart() {
+        const ROOT: &str = "XIAOBAN_GAME_RESTART_TEST_ROOT";
+        const PHASE: &str = "XIAOBAN_GAME_RESTART_TEST_PHASE";
+        if let Some(root) = std::env::var_os(ROOT).map(PathBuf::from) {
+            if std::env::var(PHASE).as_deref() == Ok("overwrite") {
+                create_pack(&root, "restart-game", "新版", "新版说明", &sample(), false, true).unwrap();
+                panic!("覆盖进程应在换入新版前结束");
+            }
+            let catalog = scan(&root);
+            assert!(catalog.errors.is_empty(), "{:?}", catalog.errors);
+            assert_eq!(catalog.games.len(), 1);
+            assert_eq!(catalog.games[0]["name"], "旧版");
+            assert_eq!(fs::read_to_string(packs_dir(&root).join("restart-game/old.js")).unwrap(), "old");
+            return;
+        }
+        let root = root("restart-restore");
+        let mut files = sample();
+        files.push(("old.js".into(), "old".into()));
+        create_pack(&root, "restart-game", "旧版", "旧版说明", &files, false, false).unwrap();
+        let child = |phase| {
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "game_packs::tests::interrupted_overwrite_recovers_old_game_after_restart"])
+                .env(ROOT, &root).env(PHASE, phase).env("XIAOBAN_CRASH_GAME_SWAP", packs_dir(&root))
+                .output().unwrap()
+        };
+        let crashed = child("overwrite");
+        assert_eq!(crashed.status.code(), Some(73), "{crashed:?}");
+        assert!(!packs_dir(&root).join("restart-game").exists());
+        let restarted = child("read");
+        assert!(restarted.status.success(), "{restarted:?}");
+        assert_eq!(fs::read_dir(packs_dir(&root)).unwrap().count(), 1);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

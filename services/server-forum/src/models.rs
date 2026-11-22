@@ -43,13 +43,18 @@ impl Reader {
 
 /// 读一个帖子的权限检查：帖子不存在报 404，等级不够报 403。
 pub async fn ensure_readable(pool: &PgPool, reader: &Reader, topic_id: i64) -> AppResult<()> {
+    readable_level(pool, reader, topic_id).await.map(|_| ())
+}
+
+pub async fn readable_level(pool: &PgPool, reader: &Reader, topic_id: i64) -> AppResult<i16> {
     crate::content_social::discussion::ensure_visible(pool, topic_id).await?;
     let row: Option<(i16, Uuid)> = sqlx::query_as("SELECT min_read_level, author_uid FROM topics WHERE id = $1")
         .bind(topic_id)
         .fetch_optional(pool)
         .await?;
     let (min, author) = row.ok_or_else(|| AppError::not_found("帖子"))?;
-    reader.check(min, author)
+    reader.check(min, author)?;
+    Ok(min)
 }
 
 /// 同上，入口是回复 id。

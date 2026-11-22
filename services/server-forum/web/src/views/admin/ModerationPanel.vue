@@ -24,7 +24,7 @@ async function resolve(r: ModerationRow, action: 'approve' | 'reject') {
     note = window.prompt('拒绝原因（会记录在操作日志里）') ?? ''
     if (!note.trim()) return
   }
-  if (await perform(() => adminApi.resolveModeration(r.id, action, note.trim()), '已处理')) await load()
+  if (await perform(() => adminApi.resolveModeration(r.id, action, note.trim(), r.version), '已处理')) await load()
 }
 
 /** 帖子和回复要在帖子管理里隐藏；这里只标记“已处理”。 */

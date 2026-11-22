@@ -537,7 +537,7 @@ fun PublishContentScreen(
                         }
                         check(accountGeneration == generation) { "账号已切换，请重新选择文件" }
                         step = "正在等待资源服务器校验…"
-                        if (!env.content.awaitVerified(fileKey)) {
+                        if (!env.content.awaitVerified(fileKey, recoverPublished = packId == null)) {
                             error = "文件校验尚未完成，已保留上传记录和表单，请稍后点继续。"
                             return@launch
                         }

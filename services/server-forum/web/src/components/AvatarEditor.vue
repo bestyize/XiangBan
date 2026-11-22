@@ -5,7 +5,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { useRoute, useRouter } from 'vue-router'
 import ModalDialog from './ModalDialog.vue'
 import UserAvatar from './UserAvatar.vue'
-import { uploadImage } from '@/api/forum'
+import { ApiError, uploadImage } from '@/api/forum'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 import { useNarrow } from '@/lib/viewport'
@@ -46,7 +46,7 @@ const diameterOf = (size: number) => (narrow.value ? Math.round((size * 300) / 3
 let cropper: AvatarCropper | null = null
 let cropDiameter = 300
 let srcId = 0
-let uploaded: { signature: string; url: string } | null = null
+let uploaded: { signature: string; id: string; url: string } | null = null
 let frame = 0
 
 const SIZE_LABEL: Record<number, string> = { 96: '主页', 48: '卡片', 32: '评论', 24: '列表' }
@@ -172,22 +172,23 @@ function cancelSheet() {
 
 async function save() {
   if (saving.value || !src.value || !crop.value) return
+  const owner = session.user?.uid
   status.value = 'saving'
   error.value = ''
   cropper?.lock(true)
   try {
     const sig = signature()
-    let url = uploaded?.signature === sig ? uploaded.url : ''
-    if (!url) {
+    if (!owner) throw new Error('登录已过期，请重新登录后再试')
+    if (uploaded?.signature !== sig) {
       const image = await uploadImage(await exportAvatar(src.value, crop.value, cropDiameter))
-      url = new URL(image.url, window.location.origin).href
-      uploaded = { signature: sig, url }
+      uploaded = { signature: sig, id: image.id, url: new URL(image.url, window.location.origin).href }
     }
-    await session.setAvatar(url)
+    await session.setAvatar(uploaded.id, uploaded.url, owner)
     clear()
     emit('update:open', false)
     toast.show('头像已更新')
   } catch (e) {
+    if (e instanceof ApiError && e.status === 404) uploaded = null
     status.value = 'failed'
     error.value = e instanceof Error && e.message ? e.message : '保存失败，请重试'
   } finally {

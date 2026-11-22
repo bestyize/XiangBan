@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import kotlin.math.roundToInt
+import xyz.xiangban.xiaoban.common.community.ForumImage
 import androidx.compose.ui.graphics.Canvas as BitmapCanvas
 
 /** 导出头像的边长（像素）。 */
@@ -160,7 +161,7 @@ internal class AvatarEditorState {
     var pending by mutableStateOf(false)
     private var imageVersion = 0
     /** 已上传的 (裁剪签名, 图片地址)：同一张图同一位置重试时不再上传。 */
-    var uploaded: Pair<String, String>? = null
+    var uploaded: Pair<String, ForumImage>? = null
 
     val saving: Boolean get() = status == AvatarStatus.Saving
     val failed: Boolean get() = status == AvatarStatus.Failed

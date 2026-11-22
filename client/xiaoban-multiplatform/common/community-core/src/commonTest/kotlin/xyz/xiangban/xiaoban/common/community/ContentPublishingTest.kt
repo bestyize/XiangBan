@@ -149,6 +149,18 @@ class ContentPublishingTest {
     }
 
     @Test
+    fun `an already published upload can recover the pack receipt on retry`() = runTest {
+        val server = FakeServer()
+        server.on("/api/packs", body = """{"id":27,"version":1}""")
+        server.on("/api/packs/upload-status", body = """{"file_key":"$CONTENT_KEY","verified":true,"used":true,"published_pack_id":27}""")
+        val api = ContentPublishingApi(server.client, CommunityConfig()) { "access" }
+        assertTrue(api.awaitVerified(CONTENT_KEY, recoverPublished = true))
+        assertEquals(27L, api.publish(PUBLISH_DRAFT, CONTENT_KEY).id)
+        assertEquals(listOf("GET", "POST"), server.requests.map { it.method.value })
+        server.client.close()
+    }
+
+    @Test
     fun `unavailable scheme references omit private metadata and scheme detail 404 is preserved`() = runTest {
         val server = FakeServer()
         server.on("/api/schemes/5", body = """{"id":5,"title":"方案","summary":"说明","author":{"uid":"u","nickname":"作者"},"items":[{"pack_id":7,"version":1,"available":false}]}""")
