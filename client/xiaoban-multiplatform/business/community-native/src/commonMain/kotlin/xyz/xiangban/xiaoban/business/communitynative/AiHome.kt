@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -279,37 +278,6 @@ internal fun AgentComposer(
                     sending -> XIcon(XIcons.Stop, description = "停止", size = 18.dp, tint = Color.White)
                     canSend -> XIcon(AiHomeIcons.ArrowUp, description = "发送", size = 18.dp, tint = Color.White)
                     else -> XIcon(AiHomeIcons.Wave, description = "实时语音通话", size = 18.dp, tint = extra.brandInk)
-                }
-            }
-        }
-    }
-}
-
-internal val AgentBottomNavHeight = 56.dp
-
-@Composable
-internal fun AgentBottomNav(onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val ink3 = LocalExtraColors.current.ink3
-    Column(modifier.fillMaxWidth().background(colors.surface).navigationBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
-        Row(Modifier.fillMaxWidth().height(AgentBottomNavHeight - 1.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
-            val tabs = listOf(Tab.Ai to AiHomeIcons.Spark, Tab.Games to AiHomeIcons.Grid, Tab.Community to AiHomeIcons.Compass, Tab.Mine to AiHomeIcons.User)
-            tabs.forEachIndexed { index, (tab, icon) ->
-                if (index == 2) {
-                    Box(Modifier.weight(1f).fillMaxHeight().clickable(role = Role.Button, onClick = onPublish), contentAlignment = Alignment.Center) {
-                        Box(Modifier.size(44.dp, 32.dp).background(Brand, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                            XIcon(AiHomeIcons.Plus, description = "发布", tint = Color.White, size = 20.dp)
-                        }
-                    }
-                }
-                val active = tab == Tab.Ai
-                Column(Modifier.weight(1f).fillMaxHeight().selectable(active, role = Role.Tab) { onSelect(tab) },
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
-                    val tint = if (active) colors.onBackground else ink3
-                    XIcon(icon, size = 21.dp, tint = tint)
-                    Text(when (tab) { Tab.Ai -> "小伴 AI"; Tab.Games -> "应用"; Tab.Community -> "社区"; Tab.Mine -> "我的" },
-                        style = XType.Nav, color = tint, fontWeight = if (active) FontWeight(650) else FontWeight.Normal)
                 }
             }
         }

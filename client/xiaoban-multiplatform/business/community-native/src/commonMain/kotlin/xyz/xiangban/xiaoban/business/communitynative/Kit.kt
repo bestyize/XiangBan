@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,7 +48,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -117,53 +117,38 @@ fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable
 
 // ───────────── 悬浮胶囊导航与发布弹层 ─────────────
 
-private data class NavSlot(val tab: Tab?, val icon: ImageVector, val label: String)
-
-private val NavSlots = listOf(
-    NavSlot(Tab.Ai, XIcons.NavSpark, Tab.Ai.label),
-    NavSlot(Tab.Games, XIcons.NavGrid, Tab.Games.label),
-    NavSlot(null, XIcons.Plus, "发布"),
-    NavSlot(Tab.Community, XIcons.NavCompass, Tab.Community.label),
-    NavSlot(Tab.Mine, XIcons.NavUser, Tab.Mine.label),
-)
+internal val MainBottomNavHeight = 56.dp
 
 /** 应用一级页面共用的五格底栏。 */
 @Composable
-fun FloatingNav(current: Tab, onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().background(communityBarSurface).navigationBarsPadding()) {
-        Hairline()
-        Row(Modifier.fillMaxWidth().height(55.dp).padding(horizontal = 4.dp).selectableGroup(),
-            verticalAlignment = Alignment.CenterVertically) {
-            NavSlots.forEach { slot ->
-                val target = slot.tab
-                if (target == null) {
-                    Box(Modifier.weight(1f).height(48.dp).clickable(
-                        indication = null, interactionSource = null, role = Role.Button, onClick = onPublish,
-                    ), contentAlignment = Alignment.Center) {
-                        val shape = RoundedCornerShape(14.dp)
-                        val brand = Brand
-                        val shadow = brand.copy(alpha = .55f)
-                        Box(
-                            Modifier.size(46.dp, 34.dp).shadow(6.dp, shape, clip = false, ambientColor = shadow, spotColor = shadow)
-                                .background(Brush.linearGradient(listOf(brand, Color(ThemeState.palette.hi))), shape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            XIcon(slot.icon, tint = Color.White, size = 19.dp, description = slot.label)
-                        }
-                    }
-                } else {
-                    val active = target == current
-                    Column(
-                        Modifier.weight(1f).height(48.dp)
-                            .selectable(active, interactionSource = null, indication = null, role = Role.Tab) { onSelect(target) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-                    ) {
-                        XIcon(slot.icon, tint = if (active) feedInk else feedMuted, size = 19.dp)
-                        CommunityNavLabel(slot.label, active, feedText(10.5, 15.75), FontWeight(650), showUnderline = false)
-                    }
+internal fun MainBottomNav(current: Tab, onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val ink3 = LocalExtraColors.current.ink3
+    Column(modifier.fillMaxWidth().background(colors.surface).navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+        Row(Modifier.fillMaxWidth().height(MainBottomNavHeight - 1.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
+            val tabs = listOf(Tab.Ai to AiHomeIcons.Spark, Tab.Games to AiHomeIcons.Grid, Tab.Community to AiHomeIcons.Compass, Tab.Mine to AiHomeIcons.User)
+            tabs.forEachIndexed { index, (tab, icon) ->
+                if (index == 2) BottomPublishButton(onPublish, Modifier.weight(1f))
+                val active = tab == current
+                Column(Modifier.weight(1f).fillMaxHeight()
+                        .selectable(active, interactionSource = null, indication = null, role = Role.Tab) { onSelect(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
+                    val tint = if (active) colors.onBackground else ink3
+                    XIcon(icon, size = 21.dp, tint = tint)
+                    Text(if (tab == Tab.Ai) "小伴 AI" else tab.label,
+                        style = XType.Nav, color = tint, fontWeight = if (active) FontWeight(650) else FontWeight.Normal)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BottomPublishButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxHeight().clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(44.dp, 32.dp).background(Brand, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+            XIcon(AiHomeIcons.Plus, description = "发布", tint = Color.White, size = 20.dp)
         }
     }
 }

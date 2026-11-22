@@ -216,7 +216,7 @@ internal fun AiChatPage(
     val density = LocalDensity.current
     val compact by remember(ime, navigationBars, density) {
         // The keyboard can briefly report the gesture area again after its closing animation.
-        val threshold = with(density) { AgentBottomNavHeight.roundToPx() }
+        val threshold = with(density) { MainBottomNavHeight.roundToPx() }
         derivedStateOf { ime.getBottom(density) - navigationBars.getBottom(density) >= threshold }
     }
     val aboveKeyboard = Modifier.revealAboveKeyboard(ime, navigationBars)
@@ -451,8 +451,12 @@ internal fun AiChatPage(
                     onSend = { sendPrompt(input) }, sending = cloud.sending, onStop = chat::stop,
                 )
             }
-            if (main) AgentBottomNav(onSelectTab, onPublish, aboveKeyboard)
-            else Spacer(Modifier.navigationBarsPadding())
+            if (main) {
+                MainBottomNav(Tab.Ai, onSelect = { target ->
+                    if (target != Tab.Ai) focus.clearFocus()
+                    onSelectTab(target)
+                }, onPublish = onPublish, modifier = aboveKeyboard)
+            } else Spacer(Modifier.navigationBarsPadding())
         }
         val pageMotion = tween<IntOffset>(PageMillis, easing = FastOutSlowInEasing)
         configTransition.AnimatedVisibility(
