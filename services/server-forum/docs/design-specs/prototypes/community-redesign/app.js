@@ -800,10 +800,18 @@
     back: ['m15 5-7 7 7 7'],
     arrow: ['m9 5 7 7-7 7'],
     external: ['M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'],
-    download: ['M12 3v12', 'm7 10 5 5 5-5', 'M4 17v3h16v-3']
+    download: ['M12 3v12', 'm7 10 5 5 5-5', 'M4 17v3h16v-3'],
+    trash: ['M3 6h18', 'M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6', 'M10 11v6', 'M14 11v6'],
+    pin: ['M12 17v5', 'M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z'],
+    flag: ['M4 22V4', 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1'],
+    link: ['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'],
+    eyeOff: ['M9.88 9.88a3 3 0 1 0 4.24 4.24', 'M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68', 'M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61', 'M2 2l20 20']
   };
 
   function icon(name, size = 18) {
+    if (name === 'more') {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="18.5" cy="12" r="1.75"/></svg>`;
+    }
     const paths = ICON_PATHS[name] || ICON_PATHS.spark;
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>`;
   }
@@ -842,6 +850,22 @@
   const VALID_THEMES = new Set(['light', 'dark']);
   const VALID_ACCENTS = new Set(['red', 'green', 'blue', 'purple', 'amber', 'graphite']);
   const VALID_PAGES = new Set(['ideas', 'news', 'opensource', 'rankings', 'nav', 'discuss', 'resources', 'apps', 'ai', 'me']);
+  const VALID_ROLES = new Set(['reader', 'author', 'admin']);
+
+  function parseDetailParam(raw) {
+    if (!raw) return null;
+    const idx = raw.indexOf(':');
+    if (idx <= 0) return null;
+    const type = raw.slice(0, idx);
+    const idRaw = raw.slice(idx + 1);
+    if (!idRaw) return null;
+    if (type === 'work' || type === 'project') return { type, id: idRaw };
+    if (type === 'topic') {
+      const num = Number(idRaw);
+      return Number.isFinite(num) ? { type, id: num } : null;
+    }
+    return null;
+  }
 
   const params = new URLSearchParams(window.location.search);
   const state = {
@@ -849,6 +873,7 @@
     theme: VALID_THEMES.has(params.get('theme')) ? params.get('theme') : 'light',
     accent: VALID_ACCENTS.has(params.get('accent')) ? params.get('accent') : 'red',
     page: VALID_PAGES.has(params.get('page')) ? params.get('page') : 'ideas',
+    role: VALID_ROLES.has(params.get('role')) ? params.get('role') : 'author',
     osCategory: '推荐',
     navCat: 'models',
     discussTab: 'all',
@@ -860,8 +885,12 @@
     softwareSort: 'stars',
     frontierIndex: 0,
     selectedModelId: 'deepseek-r1',
-    detail: null, // { type: 'work'|'topic'|'project', id: string|number }
+    detail: parseDetailParam(params.get('detail')), // { type: 'work'|'topic'|'project', id: string|number }
     detailSlide: 0,
+    pcMoreOpen: false,
+    h5MoreOpen: false,
+    deleteConfirm: null, // { device: 'desktop'|'mobile', target: 'post'|'comment', key, title, commentId? }
+    pinnedKeys: new Set(),
     likedIds: new Set(['whale-girl', 'topic-103']),
     savedIds: new Set(['excalidraw/excalidraw', 'toeverything/AFFiNE']),
     followedAuthors: new Set(),
@@ -881,6 +910,8 @@
     next.set('theme', state.theme);
     next.set('accent', state.accent);
     next.set('page', state.page);
+    next.set('role', state.role);
+    if (state.detail) next.set('detail', `${state.detail.type}:${state.detail.id}`);
     const url = `${window.location.pathname}?${next.toString()}`;
     window.history.replaceState(null, '', url);
   }
@@ -1632,7 +1663,61 @@
     return null;
   }
 
+  function getDetailMoreItems(item, device) {
+    const isPinned = state.pinnedKeys.has(item.key);
+    const includeShare = device === 'mobile' && state.role !== 'author';
+    const items = [];
+    if (includeShare) {
+      items.push({ icon: 'share', label: '分享给好友', action: 'detail-more-toast', msg: '已复制分享链接' });
+    }
+    if (state.role === 'author') {
+      items.push({ icon: 'edit', label: '编辑内容', action: 'detail-more-toast', msg: '演示打开：编辑当前内容' });
+      items.push({ icon: 'link', label: '复制链接', action: 'detail-more-toast', msg: '已复制内容链接' });
+      items.push({ divider: true });
+      items.push({ icon: 'trash', label: '删除内容', action: 'ask-delete-post', device, danger: true });
+    } else if (state.role === 'admin') {
+      items.push({ icon: 'pin', label: isPinned ? '取消置顶' : '置顶内容', action: 'toggle-pin-detail', key: item.key });
+      items.push({ icon: 'edit', label: '编辑内容', action: 'detail-more-toast', msg: '演示打开：管理员编辑内容' });
+      items.push({ icon: 'link', label: '复制链接', action: 'detail-more-toast', msg: '已复制内容链接' });
+      items.push({ divider: true });
+      items.push({ icon: 'trash', label: '删除内容', action: 'ask-delete-post', device, danger: true });
+    } else {
+      items.push({ icon: 'link', label: '复制链接', action: 'detail-more-toast', msg: '已复制内容链接' });
+      items.push({ icon: 'eyeOff', label: '不感兴趣', action: 'detail-more-toast', msg: '已减少此类内容推荐' });
+      items.push({ divider: true });
+      items.push({ icon: 'flag', label: '举报内容', action: 'detail-more-toast', msg: '已提交举报，感谢反馈', danger: true });
+    }
+    return items;
+  }
+
+  function renderDeleteConfirmDialog(device) {
+    const cfg = state.deleteConfirm;
+    if (!cfg || cfg.device !== device) return '';
+    const isComment = cfg.target === 'comment';
+    const title = isComment ? '确认删除这条评论？' : '确认删除这条内容？';
+    const desc = isComment
+      ? `删除后无法恢复：${cfg.title}`
+      : `删除「${cfg.title}」后将无法恢复，相关评论与互动数据也会一并移除。`;
+    const roleHint = !isComment && state.role === 'admin'
+      ? '<div class="xhs-confirm-note">管理员操作 · 删除后将自动通知作者</div>'
+      : '';
+    return `
+      <div class="xhs-confirm-backdrop ${device === 'mobile' ? 'is-mobile' : 'is-desktop'}" data-action="close-detail-popups">
+        <div class="xhs-confirm-dialog" role="alertdialog" aria-modal="true" aria-label="${esc(title)}">
+          <h3>${esc(title)}</h3>
+          <p>${esc(desc)}</p>
+          ${roleHint}
+          <div class="xhs-confirm-actions">
+            <button type="button" class="xhs-confirm-btn is-cancel" data-action="close-detail-popups">取消</button>
+            <button type="button" class="xhs-confirm-btn is-danger" data-action="confirm-delete">确认删除</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderDetailComments(item, comments, device) {
+    const canManageComments = state.role === 'author' || state.role === 'admin';
     return `
       <div class="xhs-comments-head">
         <span>共 ${comments.length} 条评论</span>
@@ -1662,6 +1747,9 @@
                 <div class="xhs-comment-foot">
                   <span class="xhs-comment-meta">${esc(c.time)} ${esc(c.region || '社区')}</span>
                   <button type="button" class="xhs-reply-btn" data-action="reply-comment" data-author="${esc(c.author)}">回复</button>
+                  ${canManageComments ? `
+                    <button type="button" class="xhs-comment-del-btn" data-action="ask-delete-comment" data-cid="${c.id}" data-device="${device}">删除</button>
+                  ` : ''}
                   <button type="button" class="xhs-comment-like ${cLiked ? 'is-liked' : ''}" data-action="toggle-comment-like" data-cid="${c.id}">
                     ${icon('heart', 14)}${cLikes ? `<span>${cLikes}</span>` : ''}
                   </button>
@@ -1710,6 +1798,9 @@
 
     if (device === 'desktop') {
       const replyPlaceholder = state.replyTo ? `回复 @${state.replyTo}…` : '说点什么…';
+      const isAuthor = state.role === 'author';
+      const isPinned = state.pinnedKeys.has(item.key);
+      const pcMenuItems = getDetailMoreItems(item, 'desktop');
       return `
         <div class="xhs-pc-wrap">
           <div class="xhs-pc-backbar">
@@ -1722,10 +1813,28 @@
               <div class="xhs-head-author">
                 <span class="mini-avatar" style="background:${item.avatarBg};width:34px;height:34px;font-size:13px">${esc(item.author[0].replace('@', '').toUpperCase())}</span>
                 <strong>${esc(item.author)}</strong>
+                ${isAuthor ? '<span class="xhs-role-pill">我</span>' : ''}
+                ${isPinned ? '<span class="xhs-pin-pill">置顶</span>' : ''}
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>
+              <div class="xhs-author-actions">
+                ${!isAuthor ? `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>` : ''}
                 <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
+                <div class="xhs-more-wrap">
+                  <button type="button" class="h5-icon-btn ${state.pcMoreOpen ? 'is-open' : ''}" aria-label="更多操作" aria-expanded="${state.pcMoreOpen}" data-action="toggle-pc-more">${icon('more', 17)}</button>
+                  ${state.pcMoreOpen ? `
+                    <div class="xhs-pc-menu" role="menu" aria-label="内容操作">
+                      ${pcMenuItems.map(entry => entry.divider ? '<div class="xhs-menu-divider" role="separator"></div>' : `
+                        <button type="button" class="xhs-menu-item ${entry.danger ? 'is-danger' : ''}" role="menuitem"
+                          data-action="${esc(entry.action)}"
+                          ${entry.msg ? `data-msg="${esc(entry.msg)}"` : ''}
+                          ${entry.key ? `data-key="${esc(entry.key)}"` : ''}
+                          ${entry.device ? `data-device="${esc(entry.device)}"` : ''}>
+                          ${icon(entry.icon, 15)}<span>${esc(entry.label)}</span>
+                        </button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
               </div>
             </div>
             ${activeImg ? `
@@ -1747,7 +1856,7 @@
               ${infoStripsHtml}
               <div class="xhs-meta-row">
                 <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
-                <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
+                ${state.role === 'reader' ? '<button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>' : ''}
               </div>
             </div>
             <div class="xhs-pc-dock">
@@ -1793,7 +1902,7 @@
           ${infoStripsHtml}
           <div class="xhs-meta-row">
             <span>编辑于 ${esc(item.date)} ${esc(item.region || '社区')}</span>
-            <button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>
+            ${state.role === 'reader' ? '<button type="button" class="xhs-dislike-pill" data-action="toast" data-msg="已减少此类内容推荐">不喜欢</button>' : ''}
           </div>
         </div>
         <div class="xhs-divider"></div>
@@ -1922,6 +2031,7 @@
             </div>
           </div>
         </div>
+        ${renderDeleteConfirmDialog('desktop')}
       </div>
     `;
   }
@@ -1935,6 +2045,8 @@
     let headerHtml = '';
     if (state.detail && detailItem) {
       const followed = state.followedAuthors.has(detailItem.author);
+      const isAuthor = state.role === 'author';
+      const isPinned = state.pinnedKeys.has(detailItem.key);
       headerHtml = `
         <header class="h5-header">
           <div class="h5-detail-head">
@@ -1942,9 +2054,13 @@
             <div class="xhs-head-author">
               <span class="mini-avatar" style="background:${detailItem.avatarBg};width:30px;height:30px;font-size:12px">${esc(detailItem.author[0].replace('@', '').toUpperCase())}</span>
               <strong>${esc(detailItem.author)}</strong>
+              ${isAuthor ? '<span class="xhs-role-pill">我</span>' : ''}
+              ${isPinned ? '<span class="xhs-pin-pill">置顶</span>' : ''}
             </div>
-            <button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>
-            <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('share', 18)}</button>
+            ${isAuthor
+              ? `<button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('share', 18)}</button>`
+              : `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>`}
+            <button type="button" class="h5-icon-btn ${state.h5MoreOpen ? 'is-open' : ''}" aria-label="更多操作" data-action="open-h5-more">${icon('more', 18)}</button>
           </div>
         </header>
       `;
@@ -2030,7 +2146,28 @@
             </div>
           </form>
         `;
+      } else if (state.h5MoreOpen) {
+        const h5MenuItems = getDetailMoreItems(detailItem, 'mobile');
+        sheetHtml = `
+          <div class="h5-sheet-backdrop" data-action="close-detail-popups"></div>
+          <div class="h5-action-sheet" role="dialog" aria-modal="true" aria-label="更多操作">
+            <div class="h5-sheet-handle" aria-hidden="true"></div>
+            <div class="h5-sheet-group">
+              ${h5MenuItems.map(entry => entry.divider ? '<div class="h5-sheet-divider" role="separator"></div>' : `
+                <button type="button" class="h5-sheet-row ${entry.danger ? 'is-danger' : ''}"
+                  data-action="${esc(entry.action)}"
+                  ${entry.msg ? `data-msg="${esc(entry.msg)}"` : ''}
+                  ${entry.key ? `data-key="${esc(entry.key)}"` : ''}
+                  ${entry.device ? `data-device="${esc(entry.device)}"` : ''}>
+                  ${icon(entry.icon, 17)}<span>${esc(entry.label)}</span>
+                </button>
+              `).join('')}
+            </div>
+            <button type="button" class="h5-sheet-cancel" data-action="close-detail-popups">取消</button>
+          </div>
+        `;
       }
+      sheetHtml += renderDeleteConfirmDialog('mobile');
     } else {
       bottomBarHtml = `
         <nav class="h5-tabbar" aria-label="移动底栏">
@@ -2126,6 +2263,9 @@
 
     document.querySelectorAll('[data-set-device]').forEach(btn => {
       btn.classList.toggle('is-active', btn.getAttribute('data-set-device') === state.device);
+    });
+    document.querySelectorAll('[data-set-role]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.getAttribute('data-set-role') === state.role);
     });
     document.querySelectorAll('[data-set-accent]').forEach(btn => {
       btn.classList.toggle('is-active', btn.getAttribute('data-set-accent') === state.accent);
@@ -2285,12 +2425,38 @@
      全局交互事件委托
      ========================================================================== */
   document.addEventListener('click', event => {
-    const btn = event.target.closest('[data-action], [data-set-device], [data-set-accent]');
+    if (state.pcMoreOpen && !event.target.closest('.xhs-more-wrap')) {
+      state.pcMoreOpen = false;
+      if (!event.target.closest('[data-action], [data-set-device], [data-set-accent], [data-set-role]')) {
+        render(false);
+        return;
+      }
+    }
+
+    const btn = event.target.closest('[data-action], [data-set-device], [data-set-accent], [data-set-role]');
     if (!btn) return;
 
     if (btn.hasAttribute('data-set-device')) {
       state.device = btn.getAttribute('data-set-device');
+      state.pcMoreOpen = false;
+      state.h5MoreOpen = false;
+      state.deleteConfirm = null;
       render(false);
+      return;
+    }
+    if (btn.hasAttribute('data-set-role')) {
+      const nextRole = btn.getAttribute('data-set-role');
+      if (VALID_ROLES.has(nextRole)) {
+        state.role = nextRole;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
+        render(false);
+        if (!state.detail) {
+          const labels = { reader: '读者视角', author: '作者视角', admin: '管理员视角' };
+          showToast(`已切换为「${labels[nextRole]}」，点开任意内容可查看详情页菜单`);
+        }
+      }
       return;
     }
     if (btn.hasAttribute('data-set-accent')) {
@@ -2304,6 +2470,9 @@
       case 'go-page':
         state.detail = null;
         state.detailSlide = 0;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
         state.h5ComposerOpen = false;
         state.replyTo = '';
         state.composerDraft = '';
@@ -2377,6 +2546,9 @@
       case 'open-work':
         state.detail = { type: 'work', id: btn.getAttribute('data-id') };
         state.detailSlide = 0;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
         state.h5ComposerOpen = false;
         state.replyTo = '';
         state.composerDraft = '';
@@ -2385,6 +2557,9 @@
       case 'open-topic':
         state.detail = { type: 'topic', id: Number(btn.getAttribute('data-id')) };
         state.detailSlide = 0;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
         state.h5ComposerOpen = false;
         state.replyTo = '';
         state.composerDraft = '';
@@ -2393,6 +2568,9 @@
       case 'open-os':
         state.detail = { type: 'project', id: btn.getAttribute('data-slug') };
         state.detailSlide = 0;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
         state.h5ComposerOpen = false;
         state.replyTo = '';
         state.composerDraft = '';
@@ -2401,11 +2579,108 @@
       case 'close-detail':
         state.detail = null;
         state.detailSlide = 0;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
         state.h5ComposerOpen = false;
         state.replyTo = '';
         state.composerDraft = '';
         render(true);
         break;
+      case 'toggle-pc-more':
+        state.pcMoreOpen = !state.pcMoreOpen;
+        state.deleteConfirm = null;
+        render(false);
+        break;
+      case 'open-h5-more':
+        state.h5MoreOpen = true;
+        state.h5ComposerOpen = false;
+        state.deleteConfirm = null;
+        render(false);
+        break;
+      case 'close-detail-popups':
+        if (btn.classList.contains('xhs-confirm-backdrop') && event.target !== btn) break;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = null;
+        render(false);
+        break;
+      case 'detail-more-toast':
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        render(false);
+        showToast(btn.getAttribute('data-msg') || '演示操作');
+        break;
+      case 'toggle-pin-detail': {
+        const key = btn.getAttribute('data-key');
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        if (key) {
+          if (state.pinnedKeys.has(key)) {
+            state.pinnedKeys.delete(key);
+            showToast('已取消置顶');
+          } else {
+            state.pinnedKeys.add(key);
+            showToast('已置顶当前内容');
+          }
+        }
+        render(false);
+        break;
+      }
+      case 'ask-delete-post': {
+        const item = getDetailModel();
+        if (!item) break;
+        const device = btn.getAttribute('data-device') || (btn.closest('[data-device="mobile"]') ? 'mobile' : 'desktop');
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = { device, target: 'post', key: item.key, title: item.title };
+        render(false);
+        break;
+      }
+      case 'ask-delete-comment': {
+        const item = getDetailModel();
+        if (!item) break;
+        const rawCid = btn.getAttribute('data-cid');
+        const cid = Number(rawCid) || rawCid;
+        const list = state.commentsByItem.get(item.key) || INITIAL_COMMENTS;
+        const target = list.find(c => String(c.id) === String(cid));
+        if (!target) break;
+        const device = btn.getAttribute('data-device') || (btn.closest('[data-device="mobile"]') ? 'mobile' : 'desktop');
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.deleteConfirm = {
+          device,
+          target: 'comment',
+          key: item.key,
+          commentId: cid,
+          title: `${target.author} 的评论「${target.text.slice(0, 22)}${target.text.length > 22 ? '…' : ''}」`
+        };
+        render(false);
+        break;
+      }
+      case 'confirm-delete': {
+        const cfg = state.deleteConfirm;
+        if (!cfg) break;
+        state.deleteConfirm = null;
+        if (cfg.target === 'comment') {
+          const list = [...(state.commentsByItem.get(cfg.key) || INITIAL_COMMENTS)];
+          const nextList = list.filter(c => String(c.id) !== String(cfg.commentId));
+          state.commentsByItem.set(cfg.key, nextList);
+          render(false);
+          showToast('已删除该条评论（演示）');
+        } else {
+          state.detail = null;
+          state.detailSlide = 0;
+          state.pcMoreOpen = false;
+          state.h5MoreOpen = false;
+          state.h5ComposerOpen = false;
+          state.replyTo = '';
+          state.composerDraft = '';
+          render(true);
+          showToast(`已删除「${cfg.title}」（设计稿演示，内容未真实删除）`);
+        }
+        break;
+      }
       case 'detail-slide':
         state.detailSlide = Number(btn.getAttribute('data-idx')) || 0;
         render(false);
@@ -2587,9 +2862,17 @@
       event.preventDefault();
       state.overlay = state.overlay === 'search' ? null : 'search';
       renderOverlay();
-    } else if (event.key === 'Escape' && state.overlay) {
-      state.overlay = null;
-      renderOverlay();
+    } else if (event.key === 'Escape') {
+      if (state.overlay) {
+        state.overlay = null;
+        renderOverlay();
+      } else if (state.deleteConfirm || state.pcMoreOpen || state.h5MoreOpen || state.h5ComposerOpen) {
+        state.deleteConfirm = null;
+        state.pcMoreOpen = false;
+        state.h5MoreOpen = false;
+        state.h5ComposerOpen = false;
+        render(false);
+      }
     }
   });
 
