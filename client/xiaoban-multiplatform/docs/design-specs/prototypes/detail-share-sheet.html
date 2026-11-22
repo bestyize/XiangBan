@@ -1,0 +1,1895 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 详情页分享面板 重设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p, figure { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1320px; margin: 0 auto; padding: 22px 20px 56px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 22px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .84);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── 3-Board Stage ─── */
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px 26px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; }
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .board-mini-seg { background: rgba(255, 255, 255, .08); }
+.board-mini-seg button { height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; color: #666; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+/* ─── Summary Card ─── */
+.diff-card {
+  margin: 34px auto 0;
+  max-width: 1222px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 20px;
+}
+body.studio-dark .diff-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.diff-card h3 { font-size: 14px; font-weight: 650; margin-bottom: 12px; }
+.diff-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.diff-item { padding: 12px 14px; border-radius: 12px; background: #f7f7f9; }
+body.studio-dark .diff-item { background: #1f2025; }
+.diff-item strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.diff-item p { font-size: 12px; line-height: 1.58; color: #666970; }
+body.studio-dark .diff-item p { color: #989ba4; }
+@media (max-width: 980px) { .diff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .diff-grid { grid-template-columns: 1fr; } }
+
+/* ─── Phone Tokens (docs/product/手机端设计规范.md) ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9a9a9a;
+  --hairline: #ededed;
+  --fill: #f2f2f2;
+  --fill-hover: #e9e9ec;
+  --line: #e4e4e4;
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --success: #2fa36b;
+  --success-soft: #eaf6f0;
+  --success-line: #bfe4d1;
+  --danger: #e3203c;
+  --danger-soft: #fff3f4;
+  --danger-line: #f5c7cd;
+  --scrim: rgba(15, 16, 20, .44);
+  --sheet-shadow: 0 -6px 28px rgba(0, 0, 0, .10);
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --ink: #ececec;
+  --ink2: #9a9aa0;
+  --ink3: #6e6e73;
+  --hairline: #2a2a2d;
+  --fill: #2c2c2e;
+  --fill-hover: #353538;
+  --line: #363639;
+  --success: #45be83;
+  --success-soft: #1a3126;
+  --success-line: #28523d;
+  --danger: #ff6369;
+  --danger-soft: #361e22;
+  --danger-line: #5a2b33;
+  --scrim: rgba(0, 0, 0, .62);
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .56);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 36px;
+  flex: none;
+  padding: 10px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  z-index: 2;
+}
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 78%; height: 100%; border-radius: 1.5px; background: var(--ink); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+/* Detail Page Backdrop */
+.detail-nav {
+  height: 48px;
+  flex: none;
+  padding: 0 10px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.detail-nav-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nav-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: background .15s;
+}
+.nav-btn:hover { background: var(--fill); }
+.nav-btn svg { width: 20px; height: 20px; }
+.nav-author { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.avatar-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+.avatar-photo {
+  background: linear-gradient(155deg, #2d3840 0%, #6d5543 55%, #b88a68 100%);
+  position: relative;
+}
+.avatar-photo::after {
+  content: "";
+  position: absolute;
+  inset: 14px 4px 2px;
+  border-radius: 50% 50% 0 0;
+  background: rgba(25, 20, 16, .65);
+}
+.nav-author-name { font-size: 15px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.author-self-tag {
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.detail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--surface);
+  padding: 6px 16px 24px;
+  scrollbar-width: none;
+}
+.detail-scroll::-webkit-scrollbar { display: none; }
+.detail-title { font-size: 20px; line-height: 29px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.pin-tag {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+.detail-body { margin-top: 10px; font-size: 15px; line-height: 25px; color: var(--ink); }
+.detail-tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.hash-tag { font-size: 13px; color: #3a6bc4; font-weight: 500; }
+.phone.dark .hash-tag { color: #7aa7ff; }
+.detail-meta { margin-top: 10px; font-size: 12px; line-height: 16px; color: var(--ink3); display: flex; align-items: center; gap: 6px; }
+.detail-divider { height: 0.5px; background: var(--hairline); margin: 18px 0 14px; }
+.comment-head { font-size: 14px; font-weight: 650; color: var(--ink); margin-bottom: 12px; }
+.comment-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.comment-av { width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: var(--ink2); display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-name { font-size: 12.5px; font-weight: 600; color: var(--ink2); }
+.comment-txt { margin-top: 3px; font-size: 14px; line-height: 21px; color: var(--ink); }
+.comment-time { margin-top: 4px; font-size: 11.5px; color: var(--ink3); }
+
+/* Detail bottom comment bar */
+.detail-foot {
+  flex: none;
+  height: 56px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-top: 0.5px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fake-input {
+  flex: 1;
+  height: 36px;
+  border-radius: 99px;
+  background: var(--fill);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--ink3);
+}
+.foot-icons { display: flex; align-items: center; gap: 14px; color: var(--ink2); }
+.foot-icon-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink2); }
+.foot-icon-btn svg { width: 19px; height: 19px; }
+
+/* Board 03 Hero Variants */
+.hero-cover {
+  margin: 0 -16px 14px;
+  height: 176px;
+  position: relative;
+  overflow: hidden;
+  background: var(--fill);
+}
+.hero-cover svg { width: 100%; height: 100%; stroke: none; }
+.repo-banner {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.repo-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #6965db;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  flex: none;
+}
+.repo-meta h4 { font-size: 16px; font-weight: 700; }
+.repo-meta p { margin-top: 2px; font-size: 12px; color: var(--ink2); }
+.daily-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ─── Scrim & New Single-Row Share Sheet ─── */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: var(--scrim);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: fadeIn .18s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheetUp { from { transform: translateY(20px); opacity: .7; } to { transform: translateY(0); opacity: 1; } }
+@keyframes cardPop { from { transform: translateY(14px) scale(.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+.share-sheet {
+  background: var(--surface);
+  border-radius: 18px 18px 0 0;
+  box-shadow: var(--sheet-shadow);
+  padding-top: 8px;
+  animation: sheetUp .2s cubic-bezier(.22, 1, .36, 1);
+  overflow: hidden;
+}
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--line);
+  margin: 0 auto 12px;
+}
+
+/* Compact Context Strip */
+.ctx-card {
+  margin: 0 16px 18px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ctx-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  flex: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.ctx-thumb.text-emblem {
+  background: linear-gradient(145deg, var(--accent-soft) 0%, var(--fill) 100%);
+  border: 1px solid var(--hairline);
+  color: var(--accent-ink);
+}
+.ctx-thumb.text-emblem svg { width: 19px; height: 19px; }
+.ctx-thumb.repo-emblem { background: #6965db; color: #fff; font-size: 17px; font-weight: 700; }
+.ctx-thumb.daily-emblem { background: linear-gradient(135deg, #1f2430 0%, #3a4258 100%); color: #fff; }
+.ctx-thumb.daily-emblem svg { width: 19px; height: 19px; }
+.ctx-thumb svg.cover-art { width: 100%; height: 100%; stroke: none; }
+
+.ctx-info { flex: 1; min-width: 0; }
+.ctx-title {
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ctx-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ctx-badge {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 500;
+}
+
+/* Single-Row Horizontal Scroll Rail */
+.rail-wrap {
+  position: relative;
+}
+.rail-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, var(--surface) 92%);
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+.phone.dark .rail-wrap::after {
+  background: linear-gradient(90deg, rgba(28, 28, 30, 0) 0%, var(--surface) 92%);
+}
+.rail-wrap.at-end::after { opacity: 0; }
+
+.action-rail {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 16px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  cursor: grab;
+  user-select: none;
+}
+.action-rail:active { cursor: grabbing; }
+.action-rail::-webkit-scrollbar { display: none; }
+
+.action-item {
+  flex: none;
+  width: 66px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+  color: var(--ink);
+  scroll-snap-align: start;
+  transition: transform .12s ease;
+}
+.action-item:active { transform: scale(.94); }
+.action-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--fill);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.action-item:hover .action-tile { background: var(--fill-hover); }
+.action-tile svg { width: 22px; height: 22px; stroke-width: 1.8; }
+.action-label {
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--ink2);
+  text-align: center;
+  white-space: nowrap;
+}
+.ai-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Primary soft-accent tile */
+.action-item.primary .action-tile {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-soft-line);
+  color: var(--accent-ink);
+}
+.action-item.primary .action-label { color: var(--ink); font-weight: 500; }
+
+/* Copied green feedback tile */
+.action-item.copied .action-tile {
+  background: var(--success-soft);
+  border: 1px solid var(--success-line);
+  color: var(--success);
+}
+.action-item.copied .action-label { color: var(--success); font-weight: 600; }
+
+/* Danger (Delete) tile — always at the end, fixed semantic red */
+.action-item.danger .action-tile {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.action-item.danger .action-label { color: var(--danger); font-weight: 500; }
+
+/* Inline Delete Confirmation inside Sheet (one-step confirm per spec) */
+.confirm-box {
+  margin: 2px 16px 16px;
+  padding: 18px 16px 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  text-align: center;
+}
+.confirm-box strong { display: block; font-size: 15.5px; font-weight: 650; color: var(--ink); }
+.confirm-box p { margin-top: 5px; font-size: 12.5px; color: var(--ink2); }
+.confirm-actions {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.confirm-cancel, .confirm-delete {
+  height: 40px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+.confirm-cancel { background: var(--surface); border: 1px solid var(--hairline); color: var(--ink2); }
+.confirm-delete { background: var(--danger-soft); color: var(--danger); }
+
+/* Unavailable / Error State inside Sheet */
+.sheet-error {
+  margin: 4px 16px 16px;
+  padding: 20px 16px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+.sheet-error-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  display: grid;
+  place-items: center;
+}
+.sheet-error-ico svg { width: 20px; height: 20px; }
+.sheet-error strong { font-size: 15px; font-weight: 600; color: var(--ink); }
+.sheet-error p { font-size: 12.5px; color: var(--ink2); max-width: 240px; }
+.sheet-retry-btn {
+  margin-top: 6px;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Flat Full-width Cancel Strip */
+.sheet-cancel-band {
+  margin-top: 14px;
+  border-top: 6px solid var(--paper);
+  background: var(--surface);
+}
+.sheet-cancel {
+  width: 100%;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink2);
+  transition: background .15s;
+}
+.sheet-cancel:hover { background: var(--paper); }
+.home-bar {
+  height: 18px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home-bar span { width: 108px; height: 4px; border-radius: 99px; background: var(--ink); opacity: .18; }
+
+/* ─── Legacy Sheet Recreation (Before Comparison) ─── */
+.legacy-sheet {
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  padding: 18px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  animation: sheetUp .2s ease;
+}
+.legacy-head { font-size: 18px; font-weight: 650; }
+.legacy-title { font-size: 16.5px; line-height: 23px; font-weight: 600; }
+.legacy-body { font-size: 13px; line-height: 20px; color: var(--ink2); }
+.legacy-hint { font-size: 12.5px; color: var(--ink2); }
+.legacy-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.legacy-pill {
+  height: 44px;
+  border-radius: 99px;
+  background: #eceef4;
+  color: #222;
+  font-size: 14.5px;
+  font-weight: 500;
+  display: grid;
+  place-items: center;
+}
+.phone.dark .legacy-pill { background: #2c2c30; color: #ececec; }
+.legacy-pill.solid-red { background: #c9333c; color: #fff; font-weight: 600; }
+
+/* ─── Immersive Share Card Studio (Redesigned Floating Footer) ─── */
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  background: linear-gradient(180deg, rgba(16, 17, 22, .74) 0%, rgba(12, 13, 17, .86) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  animation: fadeIn .18s ease;
+}
+.card-top {
+  padding: 44px 12px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, .92);
+}
+.card-top-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, .9);
+  transition: background .15s;
+}
+.card-top-icon:hover { background: rgba(255, 255, 255, .12); }
+.card-top-icon svg { width: 20px; height: 20px; }
+.card-top h4 { font-size: 15.5px; font-weight: 600; color: #fff; letter-spacing: .01em; }
+
+.card-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 8px 24px 6px;
+  overflow: hidden;
+}
+
+/* The Shareable Card itself */
+.share-card {
+  width: 100%;
+  max-width: 292px;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, .42);
+  animation: cardPop .22s cubic-bezier(.22, 1, .36, 1);
+  transition: background .22s ease, color .22s ease, border-color .22s ease;
+  display: flex;
+  flex-direction: column;
+}
+.share-card.theme-white {
+  background: #ffffff;
+  color: #1f2024;
+  border: 1px solid rgba(255, 255, 255, .5);
+  --sc-muted: #6e7078;
+  --sc-soft: #f4f4f6;
+  --sc-line: #ececef;
+  --sc-qr-bg: #ffffff;
+  --sc-qr-ink: #1f2024;
+}
+.share-card.theme-warm {
+  background: #f8f4ec;
+  color: #2b231c;
+  border: 1px solid rgba(255, 245, 230, .4);
+  --sc-muted: #7c6f62;
+  --sc-soft: #efe8dc;
+  --sc-line: #e5dccd;
+  --sc-qr-bg: #ffffff;
+  --sc-qr-ink: #2b231c;
+}
+.share-card.theme-ink {
+  background: #1c1d22;
+  color: #f2f2f5;
+  border: 1px solid rgba(255, 255, 255, .11);
+  --sc-muted: #989aa4;
+  --sc-soft: #27282e;
+  --sc-line: #2d2e35;
+  --sc-qr-bg: #ffffff;
+  --sc-qr-ink: #1b1c20;
+}
+
+.sc-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sc-brand-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.sc-brand-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.sc-brand-mark svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.sc-kind-tag {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--sc-soft);
+  color: var(--sc-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.sc-cover {
+  height: 110px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.sc-cover svg { width: 100%; height: 100%; stroke: none; }
+.sc-title {
+  font-size: 16.5px;
+  line-height: 23.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.sc-excerpt {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-soft-line);
+  font-size: 12.5px;
+  line-height: 19.5px;
+  color: var(--sc-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.share-card.theme-ink .sc-excerpt { border-left-color: rgba(255, 255, 255, .22); }
+.sc-author {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--sc-muted);
+}
+.sc-author .avatar-dot { width: 20px; height: 20px; font-size: 10px; }
+.sc-author strong { font-weight: 600; color: inherit; }
+
+.sc-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sc-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sc-foot-copy { min-width: 0; }
+.sc-foot-copy strong { display: block; font-size: 11.5px; font-weight: 600; }
+.sc-foot-copy span { display: block; margin-top: 2px; font-size: 10.5px; color: var(--sc-muted); }
+.sc-qr {
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--sc-qr-bg);
+  color: var(--sc-qr-ink);
+  flex: none;
+  border: 1px solid rgba(0, 0, 0, .06);
+}
+.sc-qr svg { width: 100%; height: 100%; stroke: none; fill: currentColor; }
+
+/* Floating Glass Style & Toggle Bar directly below the card */
+.card-customize {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+.tone-dots { display: inline-flex; align-items: center; gap: 9px; padding: 0 2px; }
+.tone-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  position: relative;
+  border: 1.5px solid rgba(255, 255, 255, .36);
+  transition: transform .15s ease;
+}
+.tone-dot:hover { transform: scale(1.1); }
+.tone-dot.active { border-color: #ffffff; box-shadow: 0 0 0 2.5px rgba(255, 255, 255, .28); }
+.tone-dot.t-white { background: #ffffff; }
+.tone-dot.t-warm  { background: #f3e8d5; }
+.tone-dot.t-ink   { background: #1d1e24; }
+
+.cust-sep { width: 1px; height: 14px; background: rgba(255, 255, 255, .18); }
+
+.glass-toggle {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .56);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background .15s, color .15s;
+}
+.glass-toggle.on {
+  background: rgba(255, 255, 255, .16);
+  color: #ffffff;
+}
+.glass-toggle .t-check {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .3);
+}
+.glass-toggle.on .t-check { background: #ffffff; }
+
+/* Sleek Floating Bottom Icon Action Dock (Zero heavy white box, zero mismatched wide pills!) */
+.card-actions {
+  padding: 12px 24px 8px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 34px;
+}
+.card-act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, .86);
+  transition: transform .12s ease;
+}
+.card-act:active { transform: scale(.93); }
+.card-act-ico {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .13);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  transition: background .16s ease;
+}
+.card-act:hover .card-act-ico { background: rgba(255, 255, 255, .20); }
+.card-act-ico svg { width: 22px; height: 22px; stroke-width: 1.85; }
+.card-act span.lbl { font-size: 12px; line-height: 16px; color: rgba(255, 255, 255, .82); font-weight: 500; }
+
+/* Primary floating action: pure elevated white tile with crisp accent/dark icon */
+.card-act.main .card-act-ico {
+  background: #ffffff;
+  border-color: transparent;
+  color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+}
+.card-act.main:hover .card-act-ico { background: #f4f4f6; }
+.card-act.main span.lbl { color: #ffffff; font-weight: 600; }
+
+.card-home-bar {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-home-bar span { width: 108px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, .36); }
+
+/* Toast inside phone */
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translate(-50%, -8px);
+  z-index: 30;
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(24, 25, 30, .92);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: calc(100% - 36px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .24);
+}
+.phone.dark .phone-toast { background: rgba(240, 240, 244, .94); color: #16171a; }
+.phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 440px) {
+  .studio { padding: 14px 10px 40px; }
+  .board { width: 100%; max-width: 390px; }
+  .phone { height: 760px; border-radius: 30px; border-width: 4px; }
+}
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 详情页分享面板 重设计稿</h1>
+      <p>单行可横滑图标轨 · 去掉举报 · 主态末尾放删除 · 沉浸式悬浮分享卡片与通透操作栏</p>
+    </div>
+    <div class="controls">
+      <div class="swatches" role="group" aria-label="主题色" id="swatches"></div>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- Board 01: Post Detail Share Sheet (Author / Visitor / Legacy) -->
+    <section class="board">
+      <div class="board-head">
+        <h2>01 · 帖子分享面板</h2>
+        <div class="board-mini-seg" role="group" aria-label="面板状态">
+          <button class="active" data-b1-mode="author">主态</button>
+          <button data-b1-mode="visitor">客态</button>
+          <button data-b1-mode="legacy">现行对比</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b1"></div>
+      <p class="board-caption">所有操作收进一条可横滑图标轨（支持触控板/鼠标拖动或滚轮横滑），去掉举报与第二排：右侧自然露出半格提示可滑动；主态末尾放「删除」，点击可体验单次内联确认。</p>
+    </section>
+
+    <!-- Board 02: Immersive Share Card Studio -->
+    <section class="board">
+      <div class="board-head">
+        <h2>02 · 精致分享卡片</h2>
+        <div class="board-mini-seg" role="group" aria-label="卡片风格">
+          <button class="active" data-b2-theme="white">极简白</button>
+          <button data-b2-theme="warm">暖纸笺</button>
+          <button data-b2-theme="ink">墨夜</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b2"></div>
+      <p class="board-caption">去掉生硬白底大盒子与难看的双大胶囊：纸色圆点与摘录/二维码开关悬浮在卡片正下方，最底部改为通透轻盈的三枚居中图标操作（保存图片 · 发送给好友 · 复制图片）。</p>
+    </section>
+
+    <!-- Board 03: Multi-Detail Adaptation -->
+    <section class="board">
+      <div class="board-head">
+        <h2>03 · 多详情页适配</h2>
+        <div class="board-mini-seg" role="group" aria-label="详情类型">
+          <button class="active" data-b3-kind="game">作品</button>
+          <button data-b3-kind="oss">开源</button>
+          <button data-b3-kind="daily">日报</button>
+          <button data-b3-kind="error">不可分享</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-b3"></div>
+      <p class="board-caption">作品、开源精选、AI 日报共用同一条单行可横滑图标轨：去掉举报，按场景挂载「发到电脑 / 复制仓库 / 复制全文」等快捷项，点「分享卡片」即可直达悬浮卡片预览。</p>
+    </section>
+  </main>
+
+  <section class="diff-card" aria-label="本版调整要点">
+    <h3>本版精简与视觉精修（对照旧版与上一轮反馈）</h3>
+    <div class="diff-grid">
+      <div class="diff-item">
+        <strong>1. 单行可横滑，轻薄无压力</strong>
+        <p>移除「举报」与第二排图标，全部动作收进一条等宽可横滑图标轨（每项保持舒适 52px 触控区，右侧自然露半格提示可滑），面板高度大幅收紧。</p>
+      </div>
+      <div class="diff-item">
+        <strong>2. 主态末尾放「删除」</strong>
+        <p>作者本人打开自己帖子的分享面板时，横滑轨最末端出现柔和危险色「删除」方标；点击在原弹层内完成单次确认，不弹多层模态框。</p>
+      </div>
+      <div class="diff-item">
+        <strong>3. 分享卡底部通透重构</strong>
+        <p>撤掉底部突兀的白底托盘和宽大描边药丸，将风格圆点与开关收为悬浮磨砂条，底部用「保存 / 发送 / 复制」三枚大间距图标承接。</p>
+      </div>
+      <div class="diff-item">
+        <strong>4. 全站详情一套骨架</strong>
+        <p>作品、开源项目与 AI 日报共用相同单行面板结构与悬浮卡片舞台，仅按内容类型替换缩略视觉和特色快捷项。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red',      name: '小伴红', light: { btn: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c' }, dark: { btn: '#ee4b5f', soft: '#3a2225', line: '#5a2b33', ink: '#ff8c91' } },
+  { id: 'green',    name: '薄荷绿', light: { btn: '#2e8b5e', soft: '#e3f2e9', line: '#c4e3d0', ink: '#1e6a45' }, dark: { btn: '#34a36d', soft: '#1d3328', line: '#2d4f3d', ink: '#72d6a2' } },
+  { id: 'blue',     name: '海湾蓝', light: { btn: '#2f6fdb', soft: '#e6eefc', line: '#c5d8f8', ink: '#1d53ae' }, dark: { btn: '#3b7be8', soft: '#1e2a42', line: '#2f456b', ink: '#8db6ff' } },
+  { id: 'purple',   name: '暮紫',   light: { btn: '#7152d8', soft: '#ede8fc', line: '#d4c8f7', ink: '#5537b8' }, dark: { btn: '#8466e6', soft: '#2a2342', line: '#423669', ink: '#bba8ff' } },
+  { id: 'amber',    name: '琥珀',   light: { btn: '#a8640c', soft: '#faeedb', line: '#ecd4af', ink: '#87500a' }, dark: { btn: '#c27a1a', soft: '#3a2c17', line: '#5a4424', ink: '#f0b65a' } },
+  { id: 'graphite', name: '石墨',   light: { btn: '#2b2b30', soft: '#e9e9ec', line: '#d3d3d8', ink: '#2b2b30' }, dark: { btn: '#636368', soft: '#3a3a3d', line: '#505055', ink: '#e5e5ea' } },
+];
+
+const ICONS = {
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  close: '<path d="M18 6L6 18M6 6l12 12"/>',
+  share: '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>',
+  shareNodes: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.9 5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.8 13.12a5 5 0 0 0 7.07 7.07L13.1 19"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  card: '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h5"/><circle cx="15" cy="15.5" r="1.4"/>',
+  sparkles: '<path d="M12 3l1.7 5.1L18.8 9.8l-5.1 1.7L12 16.6l-1.7-5.1-5.1-1.7 5.1-1.7z"/>',
+  copyText: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8"/><path d="M12 3a13.5 13.5 0 0 1 3.4 9 13.5 13.5 0 0 1-3.4 9 13.5 13.5 0 0 1-3.4-9A13.5 13.5 0 0 1 12 3z"/>',
+  trash: '<polyline points="4 7 20 7"/><path d="M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/><line x1="10" y1="11.5" x2="10" y2="17"/><line x1="14" y1="11.5" x2="14" y2="17"/>',
+  monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  bookmark: '<path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3.8L6 21z"/>',
+  code: '<polyline points="8 7 3 12 8 17"/><polyline points="16 7 21 12 16 17"/><line x1="14" y1="5" x2="10" y2="19"/>',
+  download: '<path d="M12 4v11M7.5 11.5L12 16l4.5-4.5"/><path d="M4.5 19.5h15"/>',
+  send: '<path d="M21 3L10 14"/><path d="M21 3l-6.5 18-3.8-7.7L3 9.5z"/>',
+  heart: '<path d="M12 20s-7.5-4.6-9.2-8.7C1.5 8 3.6 5 6.8 5c1.9 0 3.4 1 4.2 2.3C11.8 6 13.3 5 15.2 5c3.2 0 5.3 3 4 6.3C19.5 15.4 12 20 12 20z"/>',
+  msg: '<path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L4 20.5l1-4.3A8.5 8.5 0 1 1 21 12z"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16.2" r=".7" fill="currentColor" stroke="none"/>',
+  newspaper: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8 9h8M8 13h5M8 16.5h8"/>',
+  fileText: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><path d="M9 13h6M9 17h4"/>',
+  wifi: '<path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.3" r=".9" fill="currentColor" stroke="none"/>',
+  signal: '<path d="M4 18v-2M8 18v-5M12 18v-8M16 18v-11"/>',
+};
+const ico = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
+/* Stylized Gomoku ink-jade cover art */
+const GOMOKU_SVG = `
+<svg class="cover-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e9efe8"/>
+      <stop offset="100%" stop-color="#c9dac9"/>
+    </linearGradient>
+    <radialGradient id="bStone" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#555b60"/>
+      <stop offset="100%" stop-color="#17191c"/>
+    </radialGradient>
+    <radialGradient id="wStone" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d5ddd8"/>
+    </radialGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#gBg)"/>
+  <g stroke="#8ba38e" stroke-width="1" opacity="0.55">
+    <line x1="40" y1="30" x2="280" y2="30"/><line x1="40" y1="60" x2="280" y2="60"/>
+    <line x1="40" y1="90" x2="280" y2="90"/><line x1="40" y1="120" x2="280" y2="120"/>
+    <line x1="40" y1="150" x2="280" y2="150"/>
+    <line x1="70" y1="15" x2="70" y2="165"/><line x1="115" y1="15" x2="115" y2="165"/>
+    <line x1="160" y1="15" x2="160" y2="165"/><line x1="205" y1="15" x2="205" y2="165"/>
+    <line x1="250" y1="15" x2="250" y2="165"/>
+  </g>
+  <circle cx="115" cy="90" r="14" fill="url(#bStone)"/>
+  <circle cx="160" cy="90" r="14" fill="url(#bStone)"/>
+  <circle cx="205" cy="90" r="14" fill="url(#bStone)"/>
+  <circle cx="160" cy="60" r="14" fill="url(#wStone)"/>
+  <circle cx="115" cy="120" r="14" fill="url(#wStone)"/>
+  <circle cx="205" cy="120" r="14" fill="url(#wStone)"/>
+  <circle cx="205" cy="90" r="3" fill="#e3203c"/>
+</svg>`;
+
+const DAILY_SVG = `
+<svg class="cover-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="dBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b2234"/>
+      <stop offset="60%" stop-color="#28334e"/>
+      <stop offset="100%" stop-color="#3c2b3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#dBg)"/>
+  <circle cx="258" cy="46" r="64" fill="#e3203c" opacity="0.16"/>
+  <circle cx="80" cy="150" r="78" fill="#5282ff" opacity="0.14"/>
+  <rect x="26" y="34" width="74" height="20" rx="10" fill="rgba(255,255,255,0.12)"/>
+  <text x="41" y="48" fill="#ffffff" font-size="10.5" font-weight="600" font-family="sans-serif">AI 日报</text>
+  <text x="26" y="96" fill="#ffffff" font-size="22" font-weight="700" font-family="sans-serif">11 月 22 日</text>
+  <text x="26" y="122" fill="rgba(255,255,255,0.72)" font-size="12" font-family="sans-serif">开源端侧模型与桌面 Agent 新动态</text>
+</svg>`;
+
+const QR_SVG = `
+<svg viewBox="0 0 25 25" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M1 1h7v7H1V1zm1.5 1.5v4h4v-4h-4zM3.5 3.5h2v2h-2v-2zM17 1h7v7h-7V1zm1.5 1.5v4h4v-4h-4zM19.5 3.5h2v2h-2v-2zM1 17h7v7H1v-7zm1.5 1.5v4h4v-4h-4zM3.5 19.5h2v2h-2v-2z"/>
+  <rect x="10" y="1" width="2" height="2"/><rect x="13" y="2" width="2" height="2"/><rect x="10" y="5" width="3" height="2"/>
+  <rect x="1" y="10" width="2" height="2"/><rect x="4" y="10" width="3" height="2"/><rect x="1" y="13" width="4" height="2"/>
+  <rect x="9" y="9" width="2" height="3"/><rect x="12" y="9" width="3" height="2"/><rect x="11" y="12" width="2" height="3"/>
+  <rect x="15" y="10" width="2" height="4"/><rect x="18" y="10" width="3" height="2"/><rect x="22" y="10" width="2" height="3"/>
+  <rect x="18" y="14" width="2" height="2"/><rect x="21" y="14" width="3" height="2"/><rect x="10" y="17" width="3" height="2"/>
+  <rect x="14" y="16" width="2" height="3"/><rect x="17" y="18" width="2" height="3"/><rect x="20" y="18" width="4" height="2"/>
+  <rect x="10" y="21" width="2" height="3"/><rect x="13" y="21" width="3" height="3"/><rect x="21" y="21" width="3" height="3"/>
+</svg>`;
+
+const ITEMS = {
+  post: {
+    kind: 'post',
+    kindLabel: '社区讨论',
+    author: 'read',
+    date: '11 月 16 日',
+    title: '小伴社区刚刚起步，欢迎推荐给身边的亲朋好友！',
+    excerpt: '小伴社区刚刚起步，有免费无广告的休闲游戏，又有趣的测评，也有观赏度很高的 3D 模型，最新的开源项目等等，欢迎推荐给身边的亲朋好友！',
+    url: 'chat.xiangban.xyz/t/128',
+    meta: 'read · 公开链接 · 浏览器免登录可看',
+    badge: '网页直达',
+    thumbType: 'text',
+    extraActions: [{ id: 'copyFull', icon: 'copyText', label: '复制全文' }],
+  },
+  game: {
+    kind: 'game',
+    kindLabel: '创意游戏',
+    author: '小伴精选',
+    date: '协议 2 · 离线可玩',
+    title: '雅韵五子棋 · 水墨玉石对弈',
+    excerpt: '水墨玉石质感五子棋，支持人机对弈与双人同屏对局，免费无广告，打开即可试玩。',
+    url: 'chat.xiangban.xyz/works/jade-gomoku',
+    meta: '小伴精选 · 游戏 · 公开网页可试玩',
+    badge: '可试玩',
+    thumbType: 'game',
+    extraActions: [{ id: 'sendPc', icon: 'monitor', label: '发到电脑' }],
+  },
+  oss: {
+    kind: 'oss',
+    kindLabel: '开源精选',
+    author: 'Excalidraw',
+    date: '94.2k Stars',
+    title: 'Excalidraw · 手绘风开源白板工具',
+    excerpt: '极简手绘质感白板，支持架构图、流程图实时协作与本地优先存储，开箱即用。',
+    url: 'chat.xiangban.xyz/open-source/excalidraw',
+    meta: 'GitHub 94.2k Stars · 含中文导读',
+    badge: '开源',
+    thumbType: 'oss',
+    extraActions: [{ id: 'copyRepo', icon: 'code', label: '复制仓库' }],
+  },
+  daily: {
+    kind: 'daily',
+    kindLabel: 'AI 日报',
+    author: '小伴编辑部',
+    date: '11 月 22 日',
+    title: 'AI 前沿早报：端侧小模型与桌面 Agent 协作新范式',
+    excerpt: '精选今日 6 条最值得关注的开源模型、开发工具与社区实践，3 分钟读完核心脉络。',
+    url: 'chat.xiangban.xyz/daily/2026-11-22',
+    meta: '小伴编辑部 · 公开网页 · 免登录阅读',
+    badge: '日报',
+    thumbType: 'daily',
+    extraActions: [{ id: 'copyFull', icon: 'copyText', label: '复制全文' }],
+  },
+};
+
+const state = {
+  accent: 'red',
+  dark: false,
+  compact: false,
+  /* Board 01 */
+  b1Mode: 'author',    // 'author' | 'visitor' | 'legacy'
+  b1Layer: 'sheet',    // 'none' | 'sheet' | 'confirmDelete' | 'card'
+  b1Copied: false,
+  b1CardTheme: 'white',
+  b1ShowExcerpt: true,
+  b1ShowQr: true,
+  /* Board 02 */
+  b2Theme: 'white',    // 'white' | 'warm' | 'ink'
+  b2ShowExcerpt: true,
+  b2ShowQr: true,
+  b2Layer: 'card',     // 'card' | 'sheet' | 'none'
+  b2Copied: false,
+  /* Board 03 */
+  b3Kind: 'game',      // 'game' | 'oss' | 'daily' | 'error'
+  b3Layer: 'sheet',    // 'sheet' | 'card' | 'none'
+  b3Copied: false,
+  b3CardTheme: 'white',
+  b3ShowExcerpt: true,
+  b3ShowQr: true,
+};
+
+function renderStatusBar(time = '20:35') {
+  return `
+    <div class="status-bar">
+      <span>${time}</span>
+      <div class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></div>
+    </div>
+  `;
+}
+
+function renderPostBackdrop(boardKey, isAuthor = false) {
+  return `
+    ${renderStatusBar('20:35')}
+    <div class="detail-nav">
+      <div class="detail-nav-left">
+        <button class="nav-btn" data-toast="${boardKey}:返回社区列表" aria-label="返回">${ico('back')}</button>
+        <div class="nav-author">
+          <div class="avatar-dot avatar-photo"></div>
+          <span class="nav-author-name">read</span>
+          ${isAuthor ? `<span class="author-self-tag">作者</span>` : ''}
+        </div>
+      </div>
+      <button class="nav-btn" data-open-share="${boardKey}" aria-label="分享">${ico('share')}</button>
+    </div>
+    <div class="detail-scroll">
+      <h3 class="detail-title">小伴社区刚刚起步，欢迎推荐给身边的亲朋好友！</h3>
+      <span class="pin-tag">置顶</span>
+      <p class="detail-body">小伴社区刚刚起步，有免费无广告的休闲游戏，又有趣的测评，也有观赏度很高的 3D 模型，最新的开源项目等等，欢迎推荐给身边的亲朋好友！</p>
+      <div class="detail-tag-row">
+        <span class="hash-tag">#默认</span>
+      </div>
+      <div class="detail-meta">
+        <span>发布于 11 月 16 日</span><span>·</span><span>21 次浏览</span>
+      </div>
+      <div class="detail-divider"></div>
+      <div class="comment-head">全部回复 2</div>
+      <div class="comment-row">
+        <div class="comment-av">青</div>
+        <div class="comment-body">
+          <div class="comment-name">青柠</div>
+          <div class="comment-txt">已经安利给室友了，无广告五子棋和 3D 魔方都很耐玩！</div>
+          <div class="comment-time">11 月 17 日 · 广东</div>
+        </div>
+      </div>
+      <div class="comment-row">
+        <div class="comment-av">林</div>
+        <div class="comment-body">
+          <div class="comment-name">林深</div>
+          <div class="comment-txt">开源精选和 AI 日报整理得很干净，期待后续更新～</div>
+          <div class="comment-time">11 月 19 日 · 浙江</div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-foot">
+      <div class="fake-input">写下你的想法…</div>
+      <div class="foot-icons">
+        <span class="foot-icon-btn">${ico('heart')} 6</span>
+        <span class="foot-icon-btn">${ico('bookmark')} 3</span>
+        <span class="foot-icon-btn">${ico('msg')} 2</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderKindBackdrop(boardKey, kind) {
+  if (kind === 'oss') {
+    return `
+      ${renderStatusBar('20:35')}
+      <div class="detail-nav">
+        <div class="detail-nav-left">
+          <button class="nav-btn" data-toast="${boardKey}:返回开源精选" aria-label="返回">${ico('back')}</button>
+          <span class="nav-author-name">开源精选</span>
+        </div>
+        <button class="nav-btn" data-open-share="${boardKey}" aria-label="分享">${ico('share')}</button>
+      </div>
+      <div class="detail-scroll">
+        <div class="repo-banner">
+          <div class="repo-mark">E</div>
+          <div class="repo-meta">
+            <h4>Excalidraw</h4>
+            <p>excalidraw/excalidraw · ★ 94.2k · MIT</p>
+          </div>
+        </div>
+        <h3 class="detail-title">手绘风格开源白板工具，支持架构图与实时协作</h3>
+        <p class="detail-body">无需注册即可开始画图，支持端到端加密协作、SVG/PNG 导出及本地离线保存，非常适合技术方案与产品草图。</p>
+      </div>
+      <div class="detail-foot">
+        <div class="fake-input">聊聊你对这个项目的看法…</div>
+        <div class="foot-icons">
+          <span class="foot-icon-btn">${ico('bookmark')} 48</span>
+          <span class="foot-icon-btn">${ico('msg')} 12</span>
+        </div>
+      </div>
+    `;
+  }
+  if (kind === 'daily') {
+    return `
+      ${renderStatusBar('20:35')}
+      <div class="detail-nav">
+        <div class="detail-nav-left">
+          <button class="nav-btn" data-toast="${boardKey}:返回推荐" aria-label="返回">${ico('back')}</button>
+          <span class="nav-author-name">AI 日报</span>
+        </div>
+        <button class="nav-btn" data-open-share="${boardKey}" aria-label="分享">${ico('share')}</button>
+      </div>
+      <div class="detail-scroll">
+        <div class="hero-cover">${DAILY_SVG}</div>
+        <span class="daily-badge">第 48 期 · 小伴编辑部</span>
+        <h3 class="detail-title">端侧小模型与桌面 Agent 协作新范式</h3>
+        <p class="detail-body">今日聚焦 6 条高信噪比进展：更轻量的本地语音识别与推理管线、桌面工作区长任务编排，以及开源社区值得收藏的新工具。</p>
+      </div>
+      <div class="detail-foot">
+        <div class="fake-input">写条留言…</div>
+        <div class="foot-icons">
+          <span class="foot-icon-btn">${ico('heart')} 19</span>
+          <span class="foot-icon-btn">${ico('msg')} 5</span>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    ${renderStatusBar('20:35')}
+    <div class="detail-nav">
+      <div class="detail-nav-left">
+        <button class="nav-btn" data-toast="${boardKey}:返回创意" aria-label="返回">${ico('back')}</button>
+        <span class="nav-author-name">作品详情</span>
+      </div>
+      <button class="nav-btn" data-open-share="${boardKey}" aria-label="分享">${ico('share')}</button>
+    </div>
+    <div class="detail-scroll">
+      <div class="hero-cover">${GOMOKU_SVG}</div>
+      <h3 class="detail-title">雅韵五子棋 · 水墨玉石对弈</h3>
+      <div class="detail-meta"><span>小伴精选</span><span>·</span><span>休闲游戏</span><span>·</span><span>离线可玩</span></div>
+      <p class="detail-body">水墨玉石质感五子棋，支持人机对弈与双人同屏对局，免费无广告，点开即可直接试玩。</p>
+    </div>
+    <div class="detail-foot">
+      <div class="fake-input">评价一下这款作品…</div>
+      <div class="foot-icons">
+        <span class="foot-icon-btn">${ico('heart')} 34</span>
+        <span class="foot-icon-btn">${ico('bookmark')} 18</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderThumb(item) {
+  if (item.thumbType === 'game') return `<div class="ctx-thumb">${GOMOKU_SVG}</div>`;
+  if (item.thumbType === 'oss') return `<div class="ctx-thumb repo-emblem">E</div>`;
+  if (item.thumbType === 'daily') return `<div class="ctx-thumb daily-emblem">${ico('newspaper')}</div>`;
+  return `<div class="ctx-thumb text-emblem">${ico('fileText')}</div>`;
+}
+
+function renderNewShareSheet(boardKey, item, { copied = false, canDelete = false, confirmDelete = false, errorMode = false } = {}) {
+  if (errorMode) {
+    return `
+      <div class="scrim" data-dismiss="${boardKey}">
+        <div class="share-sheet" role="dialog" aria-label="无法分享">
+          <div class="sheet-handle"></div>
+          <div class="sheet-error">
+            <div class="sheet-error-ico">${ico('alert')}</div>
+            <strong>暂不支持分享此内容</strong>
+            <p>该内容可能未公开或已被作者下架，公开后即可生成分享链接与卡片。</p>
+            <button class="sheet-retry-btn" data-b3-retry="1">重新检查</button>
+          </div>
+          <div class="sheet-cancel-band">
+            <button class="sheet-cancel" data-dismiss="${boardKey}">取消</button>
+            <div class="home-bar"><span></span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (confirmDelete) {
+    return `
+      <div class="scrim" data-dismiss="${boardKey}">
+        <div class="share-sheet" role="dialog" aria-label="确认删除">
+          <div class="sheet-handle"></div>
+          <div class="confirm-box">
+            <strong>删除这篇帖子？</strong>
+            <p>删除后帖子及对应公开链接都将失效，无法恢复。</p>
+            <div class="confirm-actions">
+              <button class="confirm-cancel" data-cancel-delete="${boardKey}">返回</button>
+              <button class="confirm-delete" data-confirm-delete="${boardKey}">确认删除</button>
+            </div>
+          </div>
+          <div class="home-bar"><span></span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  const actions = [
+    { id: 'system',   icon: 'shareNodes', label: '系统分享', cls: 'primary' },
+    { id: 'copyLink', icon: copied ? 'check' : 'link', label: copied ? '已复制' : '复制链接', cls: copied ? 'copied' : '' },
+    { id: 'openCard', icon: 'card',       label: '分享卡片', cls: '' },
+    { id: 'askAi',    icon: 'sparkles',   label: '问问小伴', cls: '', aiDot: true },
+    ...(item.extraActions || []),
+    { id: 'browser',  icon: 'globe',      label: '浏览器打开', cls: '' },
+  ];
+  if (canDelete) {
+    actions.push({ id: 'delete', icon: 'trash', label: '删除', cls: 'danger' });
+  }
+
+  return `
+    <div class="scrim" data-dismiss="${boardKey}">
+      <div class="share-sheet" role="dialog" aria-label="分享面板">
+        <div class="sheet-handle"></div>
+
+        <div class="ctx-card">
+          ${renderThumb(item)}
+          <div class="ctx-info">
+            <div class="ctx-title">${item.title}</div>
+            <div class="ctx-sub">${item.meta}</div>
+          </div>
+          <span class="ctx-badge">${item.badge}</span>
+        </div>
+
+        <div class="rail-wrap" data-rail-wrap="${boardKey}">
+          <div class="action-rail" data-rail="${boardKey}" aria-label="分享与操作（可左右滑动）">
+            ${actions.map(a => `
+              <button class="action-item ${a.cls || ''}" data-act="${boardKey}:${a.id}">
+                <span class="action-tile">${ico(a.icon)}${a.aiDot ? '<i class="ai-dot" aria-hidden="true"></i>' : ''}</span>
+                <span class="action-label">${a.label}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="sheet-cancel-band">
+          <button class="sheet-cancel" data-dismiss="${boardKey}">取消</button>
+          <div class="home-bar"><span></span></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLegacyShareSheet(boardKey) {
+  return `
+    <div class="scrim" data-dismiss="${boardKey}">
+      <div class="legacy-sheet" role="dialog" aria-label="旧版分享面板">
+        <div class="legacy-head">分享</div>
+        <div class="legacy-title">小伴社区刚刚起步，欢迎推荐给身边的亲朋好友！</div>
+        <div class="legacy-body">小伴社区刚刚起步，有免费无广告的休闲游戏，又有趣的测评，也有观赏度很高的3D模型，最新的开源项目等等，欢迎推荐给身边的亲朋好友！</div>
+        <div class="legacy-hint">分享公开网页链接，未安装小伴也能在浏览器查看。</div>
+        <div class="legacy-row">
+          <button class="legacy-pill" data-toast="${boardKey}:旧版：复制链接">复制链接</button>
+          <button class="legacy-pill solid-red" data-toast="${boardKey}:旧版：实心大红系统分享按钮">系统分享</button>
+        </div>
+        <button class="legacy-pill" data-toast="${boardKey}:旧版：浏览器查看">浏览器查看</button>
+        <button class="legacy-pill" data-toast="${boardKey}:旧版：生成分享海报">生成分享海报</button>
+        <button class="legacy-pill" data-dismiss="${boardKey}">关闭</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCardStudio(boardKey, item, { cardTheme, showExcerpt, showQr }) {
+  const coverHtml = item.thumbType === 'game'
+    ? `<div class="sc-cover">${GOMOKU_SVG}</div>`
+    : item.thumbType === 'daily'
+    ? `<div class="sc-cover">${DAILY_SVG}</div>`
+    : '';
+
+  const avatarHtml = item.thumbType === 'oss'
+    ? `<div class="avatar-dot" style="background:#6965db">E</div>`
+    : item.thumbType === 'text'
+    ? `<div class="avatar-dot avatar-photo"></div>`
+    : `<div class="avatar-dot" style="background:var(--accent)">伴</div>`;
+
+  return `
+    <div class="card-overlay" role="dialog" aria-label="分享卡片预览">
+      <div class="card-top">
+        <button class="card-top-icon" data-card-back="${boardKey}" aria-label="返回">${ico('back')}</button>
+        <h4>分享卡片</h4>
+        <button class="card-top-icon" data-dismiss="${boardKey}" aria-label="关闭">${ico('close')}</button>
+      </div>
+
+      <div class="card-stage">
+        <article class="share-card theme-${cardTheme}">
+          <div class="sc-brand">
+            <span class="sc-brand-left">
+              <span class="sc-brand-mark">${ico('sparkles')}</span>
+              小伴社区
+            </span>
+            <span class="sc-kind-tag">${item.kindLabel}</span>
+          </div>
+          ${coverHtml}
+          <h3 class="sc-title">${item.title}</h3>
+          ${showExcerpt ? `<p class="sc-excerpt">${item.excerpt}</p>` : ''}
+          <div class="sc-author">
+            ${avatarHtml}
+            <strong>${item.author}</strong>
+            <span>·</span>
+            <span>${item.date}</span>
+          </div>
+          <div class="sc-footer">
+            <div class="sc-foot-copy">
+              <strong>${showQr ? '扫码在浏览器查看' : '来自小伴社区'}</strong>
+              <span>${item.url}</span>
+            </div>
+            ${showQr ? `<div class="sc-qr">${QR_SVG}</div>` : ''}
+          </div>
+        </article>
+
+        <div class="card-customize" aria-label="卡片样式设置">
+          <div class="tone-dots" role="group" aria-label="纸色">
+            <button class="tone-dot t-white ${cardTheme === 'white' ? 'active' : ''}" data-card-style="${boardKey}:white" title="极简白" aria-label="极简白"></button>
+            <button class="tone-dot t-warm ${cardTheme === 'warm' ? 'active' : ''}" data-card-style="${boardKey}:warm" title="暖纸笺" aria-label="暖纸笺"></button>
+            <button class="tone-dot t-ink ${cardTheme === 'ink' ? 'active' : ''}" data-card-style="${boardKey}:ink" title="墨夜" aria-label="墨夜"></button>
+          </div>
+          <span class="cust-sep" aria-hidden="true"></span>
+          <button class="glass-toggle ${showExcerpt ? 'on' : ''}" data-card-toggle="${boardKey}:excerpt"><span class="t-check"></span>摘录</button>
+          <button class="glass-toggle ${showQr ? 'on' : ''}" data-card-toggle="${boardKey}:qr"><span class="t-check"></span>二维码</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="card-actions" aria-label="保存与发送">
+          <button class="card-act" data-act="${boardKey}:saveCard">
+            <span class="card-act-ico">${ico('download')}</span>
+            <span class="lbl">保存图片</span>
+          </button>
+          <button class="card-act main" data-act="${boardKey}:sendCard">
+            <span class="card-act-ico">${ico('send')}</span>
+            <span class="lbl">发送给好友</span>
+          </button>
+          <button class="card-act" data-act="${boardKey}:copyCard">
+            <span class="card-act-ico">${ico('copyText')}</span>
+            <span class="lbl">复制图片</span>
+          </button>
+        </div>
+        <div class="card-home-bar"><span></span></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderB1() {
+  const isAuthor = state.b1Mode === 'author';
+  let overlay = '';
+  if (state.b1Layer === 'sheet') {
+    overlay = state.b1Mode === 'legacy'
+      ? renderLegacyShareSheet('b1')
+      : renderNewShareSheet('b1', ITEMS.post, { copied: state.b1Copied, canDelete: isAuthor });
+  } else if (state.b1Layer === 'confirmDelete') {
+    overlay = renderNewShareSheet('b1', ITEMS.post, { confirmDelete: true });
+  } else if (state.b1Layer === 'card') {
+    overlay = renderCardStudio('b1', ITEMS.post, {
+      cardTheme: state.b1CardTheme,
+      showExcerpt: state.b1ShowExcerpt,
+      showQr: state.b1ShowQr,
+    });
+  }
+  return renderPostBackdrop('b1', isAuthor) + overlay + `<div class="phone-toast" id="toast-b1"></div>`;
+}
+
+function renderB2() {
+  let overlay = '';
+  if (state.b2Layer === 'card') {
+    overlay = renderCardStudio('b2', ITEMS.post, {
+      cardTheme: state.b2Theme,
+      showExcerpt: state.b2ShowExcerpt,
+      showQr: state.b2ShowQr,
+    });
+  } else if (state.b2Layer === 'sheet') {
+    overlay = renderNewShareSheet('b2', ITEMS.post, { copied: state.b2Copied, canDelete: true });
+  }
+  return renderPostBackdrop('b2', true) + overlay + `<div class="phone-toast" id="toast-b2"></div>`;
+}
+
+function renderB3() {
+  const isError = state.b3Kind === 'error';
+  const item = ITEMS[isError ? 'game' : state.b3Kind];
+  let overlay = '';
+  if (state.b3Layer === 'sheet') {
+    overlay = renderNewShareSheet('b3', item, {
+      copied: state.b3Copied,
+      errorMode: isError,
+    });
+  } else if (state.b3Layer === 'card' && !isError) {
+    overlay = renderCardStudio('b3', item, {
+      cardTheme: state.b3CardTheme,
+      showExcerpt: state.b3ShowExcerpt,
+      showQr: state.b3ShowQr,
+    });
+  }
+  return renderKindBackdrop('b3', state.b3Kind) + overlay + `<div class="phone-toast" id="toast-b3"></div>`;
+}
+
+function applyAccent() {
+  const preset = ACCENTS.find(a => a.id === state.accent) || ACCENTS[0];
+  const palette = state.dark ? preset.dark : preset.light;
+  document.querySelectorAll('.phone').forEach(el => {
+    el.classList.toggle('dark', state.dark);
+    el.style.setProperty('--accent', palette.btn);
+    el.style.setProperty('--accent-soft', palette.soft);
+    el.style.setProperty('--accent-soft-line', palette.line);
+    el.style.setProperty('--accent-ink', palette.ink);
+  });
+}
+
+const toastTimers = {};
+function showToast(boardKey, text) {
+  const el = document.getElementById('toast-' + boardKey);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimers[boardKey]);
+  toastTimers[boardKey] = setTimeout(() => el.classList.remove('show'), 1900);
+}
+
+const railScrollPos = { b1: 0, b2: 0, b3: 0 };
+let railDragged = false;
+let activeDrag = null;
+
+window.addEventListener('pointermove', (e) => {
+  if (!activeDrag) return;
+  const dx = e.clientX - activeDrag.startX;
+  if (Math.abs(dx) > 5) railDragged = true;
+  if (railDragged) activeDrag.rail.scrollLeft = activeDrag.startLeft - dx;
+});
+window.addEventListener('pointerup', () => { activeDrag = null; });
+window.addEventListener('pointercancel', () => { activeDrag = null; });
+
+function initRails() {
+  document.querySelectorAll('.action-rail').forEach(rail => {
+    const key = rail.dataset.rail;
+    const wrap = rail.closest('.rail-wrap');
+    const syncFade = () => {
+      if (!wrap) return;
+      const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+      wrap.classList.toggle('at-end', atEnd);
+      railScrollPos[key] = rail.scrollLeft;
+    };
+    rail.scrollLeft = railScrollPos[key] || 0;
+    syncFade();
+    rail.addEventListener('scroll', syncFade, { passive: true });
+    rail.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        rail.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+    rail.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      railDragged = false;
+      activeDrag = { rail, startX: e.clientX, startLeft: rail.scrollLeft };
+    });
+  });
+}
+
+function render() {
+  document.body.classList.toggle('studio-dark', state.dark);
+  document.body.classList.toggle('compact', state.compact);
+  document.getElementById('phone-b1').innerHTML = renderB1();
+  document.getElementById('phone-b2').innerHTML = renderB2();
+  document.getElementById('phone-b3').innerHTML = renderB3();
+  applyAccent();
+  initRails();
+}
+
+/* Swatches */
+const swatchWrap = document.getElementById('swatches');
+ACCENTS.forEach(a => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (a.id === state.accent ? ' active' : '');
+  btn.style.background = a.light.btn;
+  btn.style.color = a.light.btn;
+  btn.title = a.name;
+  btn.setAttribute('aria-label', a.name);
+  btn.addEventListener('click', () => {
+    state.accent = a.id;
+    swatchWrap.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    applyAccent();
+  });
+  swatchWrap.appendChild(btn);
+});
+
+document.getElementById('toggle-width').addEventListener('click', (e) => {
+  state.compact = !state.compact;
+  e.currentTarget.textContent = state.compact ? '360 → 390' : '390 → 360';
+  document.body.classList.toggle('compact', state.compact);
+});
+document.getElementById('toggle-dark').addEventListener('click', (e) => {
+  state.dark = !state.dark;
+  e.currentTarget.textContent = state.dark ? '浅色模式' : '深色模式';
+  render();
+});
+
+/* Board Header Segmented Controls */
+document.querySelectorAll('[data-b1-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prev = state.b1Mode;
+    state.b1Mode = btn.dataset.b1Mode;
+    state.b1Layer = 'sheet';
+    document.querySelectorAll('[data-b1-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    if (state.b1Mode !== 'author') railScrollPos.b1 = 0;
+    render();
+    if (state.b1Mode === 'author' && prev !== 'author') {
+      const rail = document.querySelector('[data-rail="b1"]');
+      if (rail) rail.scrollTo({ left: rail.scrollWidth, behavior: 'smooth' });
+    }
+  });
+});
+
+document.querySelectorAll('[data-b2-theme]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.b2Theme = btn.dataset.b2Theme;
+    state.b2Layer = 'card';
+    document.querySelectorAll('[data-b2-theme]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+
+document.querySelectorAll('[data-b3-kind]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.b3Kind = btn.dataset.b3Kind;
+    state.b3Layer = 'sheet';
+    state.b3Copied = false;
+    document.querySelectorAll('[data-b3-kind]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+
+/* Delegated Interactive Handlers */
+const copyTimers = {};
+document.addEventListener('click', (e) => {
+  if (railDragged && e.target.closest('.action-rail')) {
+    railDragged = false;
+    return;
+  }
+  const openBtn = e.target.closest('[data-open-share]');
+  if (openBtn) {
+    const b = openBtn.dataset.openShare;
+    if (b === 'b1') state.b1Layer = 'sheet';
+    if (b === 'b2') state.b2Layer = 'sheet';
+    if (b === 'b3') state.b3Layer = 'sheet';
+    render();
+    return;
+  }
+
+  const dismissEl = e.target.closest('[data-dismiss]');
+  if (dismissEl && (e.target === dismissEl || dismissEl.tagName === 'BUTTON')) {
+    const b = dismissEl.dataset.dismiss;
+    if (b === 'b1') state.b1Layer = 'none';
+    if (b === 'b2') state.b2Layer = 'none';
+    if (b === 'b3') state.b3Layer = 'none';
+    render();
+    return;
+  }
+
+  const cancelDel = e.target.closest('[data-cancel-delete]');
+  if (cancelDel) {
+    if (cancelDel.dataset.cancelDelete === 'b1') state.b1Layer = 'sheet';
+    render();
+    return;
+  }
+
+  const confirmDel = e.target.closest('[data-confirm-delete]');
+  if (confirmDel) {
+    const b = confirmDel.dataset.confirmDelete;
+    if (b === 'b1') state.b1Layer = 'none';
+    render();
+    showToast(b, '已删除帖子并返回社区列表（演示）');
+    return;
+  }
+
+  const cardBack = e.target.closest('[data-card-back]');
+  if (cardBack) {
+    const b = cardBack.dataset.cardBack;
+    if (b === 'b1') state.b1Layer = 'sheet';
+    if (b === 'b2') state.b2Layer = 'sheet';
+    if (b === 'b3') state.b3Layer = 'sheet';
+    render();
+    return;
+  }
+
+  const cardStyle = e.target.closest('[data-card-style]');
+  if (cardStyle) {
+    const [b, theme] = cardStyle.dataset.cardStyle.split(':');
+    if (b === 'b1') state.b1CardTheme = theme;
+    if (b === 'b2') {
+      state.b2Theme = theme;
+      document.querySelectorAll('[data-b2-theme]').forEach(el => el.classList.toggle('active', el.dataset.b2Theme === theme));
+    }
+    if (b === 'b3') state.b3CardTheme = theme;
+    render();
+    return;
+  }
+
+  const cardToggle = e.target.closest('[data-card-toggle]');
+  if (cardToggle) {
+    const [b, field] = cardToggle.dataset.cardToggle.split(':');
+    if (b === 'b1') {
+      if (field === 'excerpt') state.b1ShowExcerpt = !state.b1ShowExcerpt;
+      if (field === 'qr') state.b1ShowQr = !state.b1ShowQr;
+    } else if (b === 'b2') {
+      if (field === 'excerpt') state.b2ShowExcerpt = !state.b2ShowExcerpt;
+      if (field === 'qr') state.b2ShowQr = !state.b2ShowQr;
+    } else if (b === 'b3') {
+      if (field === 'excerpt') state.b3ShowExcerpt = !state.b3ShowExcerpt;
+      if (field === 'qr') state.b3ShowQr = !state.b3ShowQr;
+    }
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-b3-retry]')) {
+    state.b3Kind = 'game';
+    document.querySelectorAll('[data-b3-kind]').forEach(el => el.classList.toggle('active', el.dataset.b3Kind === 'game'));
+    render();
+    showToast('b3', '已恢复公开分享状态');
+    return;
+  }
+
+  const actBtn = e.target.closest('[data-act]');
+  if (actBtn) {
+    const [b, act] = actBtn.dataset.act.split(':');
+    if (act === 'openCard') {
+      if (b === 'b1') state.b1Layer = 'card';
+      if (b === 'b2') state.b2Layer = 'card';
+      if (b === 'b3') state.b3Layer = 'card';
+      render();
+      return;
+    }
+    if (act === 'delete') {
+      if (b === 'b1') state.b1Layer = 'confirmDelete';
+      else showToast(b, '打开单次删除确认');
+      render();
+      return;
+    }
+    if (act === 'copyLink') {
+      if (b === 'b1') state.b1Copied = true;
+      if (b === 'b2') state.b2Copied = true;
+      if (b === 'b3') state.b3Copied = true;
+      render();
+      showToast(b, '公开网页链接已复制');
+      clearTimeout(copyTimers[b]);
+      copyTimers[b] = setTimeout(() => {
+        if (b === 'b1') state.b1Copied = false;
+        if (b === 'b2') state.b2Copied = false;
+        if (b === 'b3') state.b3Copied = false;
+        render();
+      }, 2000);
+      return;
+    }
+    const messages = {
+      system:   '已唤起系统分享 · 可发送至微信 / QQ / 隔空投送',
+      askAi:    '已带入小伴 AI，可总结要点或继续二创',
+      copyFull: '已复制完整正文',
+      copyRepo: '已复制 GitHub 仓库地址',
+      sendPc:   '已推送至在线电脑端「小伴桌面」',
+      browser:  '已在系统浏览器打开公开网页',
+      saveCard: '高清分享卡片已保存到系统相册',
+      sendCard: '已唤起系统分享发送卡片图片',
+      copyCard: '卡片图片已复制到剪贴板',
+    };
+    showToast(b, messages[act] || '已执行操作');
+    return;
+  }
+
+  const toastBtn = e.target.closest('[data-toast]');
+  if (toastBtn) {
+    const [b, msg] = toastBtn.dataset.toast.split(':');
+    showToast(b, msg);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
