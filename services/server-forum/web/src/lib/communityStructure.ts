@@ -15,7 +15,7 @@ export function sectionBoards(categories:Category[], section:CommunitySection) {
   return sectionCategories(categories,section).filter(c=>!categories.some(child=>child.parent_id===c.id))
 }
 const discussionOrder = [
-  'design', 'casual-games', '3d', 'learn', 'casual-travel',
+  'design', 'casual-games', '3d', 'learn', 'casual-deals', 'casual-travel',
   'casual-screen', 'casual-feelings', 'casual-food', 'casual-work',
 ]
 const hiddenDiscussionBoards = new Set([

@@ -10,7 +10,7 @@ data class ForumDiscussionTab(
 )
 
 private val discussionOrder = listOf(
-    "tag:design", "casual-games", "tag:3d", "learn", "casual-travel", "casual-books",
+    "tag:design", "casual-games", "tag:3d", "learn", "casual-deals", "casual-travel", "casual-books",
     "casual-screen", "casual-feelings", "casual-food", "casual-work",
 )
 

@@ -39,6 +39,13 @@
       "description": "交流学习经验和教程"
     },
     {
+      "id": "casual-deals",
+      "parent": null,
+      "section": "discuss",
+      "label": "羊毛",
+      "description": "分享免费额度、试用活动和限时优惠"
+    },
+    {
       "id": "site",
       "parent": null,
       "section": "site",

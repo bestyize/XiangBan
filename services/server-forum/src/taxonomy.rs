@@ -183,6 +183,23 @@ pub async fn flatten_community_boards(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
+/// Add a regular discussion board for sharing deals on new and existing databases.
+pub async fn add_deals_board(pool: &PgPool) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    let migration = sqlx::query(
+        "INSERT INTO data_migrations (name) VALUES ('community-casual-deals-v1') ON CONFLICT DO NOTHING",
+    ).execute(&mut *tx).await?;
+    if migration.rows_affected() == 0 { return Ok(()); }
+    sqlx::query(
+        "INSERT INTO categories (slug, name, description, section, sort_order, award_points)
+         VALUES ('casual-deals', '羊毛', '分享免费额度、试用活动和限时优惠', 'discuss',
+                 COALESCE((SELECT sort_order FROM categories WHERE slug = 'learn'), 0), false)
+         ON CONFLICT (slug) DO NOTHING",
+    ).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

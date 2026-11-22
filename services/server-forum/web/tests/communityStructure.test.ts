@@ -11,8 +11,9 @@ const help = category(7,'resource-help','resources',5,{name:'求助悬赏'})
 const rows=[learn,category(4,'casual-travel','discuss'),category(5,'resources','resources'),movies,help]
 test('mobile tabs keep their order and reflect the published boards and tags',()=>{
  const added=category(9,'writing-lab','discuss',null,{name:'写作实践'})
- const changed=[category(8,'casual-games','discuss',null,{name:'游戏'}),...rows,added,category(10,'old','discuss',null,{status:'archived'})]
- deepStrictEqual(discussionTabs(changed).map(c=>c.key),['all','design','casual-games','3d','learn','casual-travel','writing-lab'])
+ const deals=category(11,'casual-deals','discuss',null,{name:'羊毛'})
+ const changed=[category(8,'casual-games','discuss',null,{name:'游戏'}),...rows,added,deals,category(10,'old','discuss',null,{status:'archived'})]
+ deepStrictEqual(discussionTabs(changed).map(c=>c.key),['all','design','casual-games','3d','learn','casual-deals','casual-travel','writing-lab'])
  deepStrictEqual(discussionTabs(changed).slice(0,4).map(c=>c.label),['全部','设计','游戏','3D'])
  strictEqual(discussionCategory('design',changed),sectionScope(changed,'discuss'))
  strictEqual(discussionCategory('3d',changed),sectionScope(changed,'discuss'))
@@ -21,6 +22,8 @@ test('mobile tabs keep their order and reflect the published boards and tags',()
  strictEqual(discussionTopicTag('3d'),'3d')
  strictEqual(discussionTopicTag('casual-games'),undefined)
  strictEqual(categoryHref(added,changed),'/discuss?tab=writing-lab')
+ strictEqual(discussionCategory('casual-deals',changed),deals.slug)
+ strictEqual(categoryHref(deals,changed),'/discuss?tab=casual-deals')
  deepStrictEqual(resourceTabs(changed).map(c=>c.key),['software','resource-movies','resource-help'])
  strictEqual(sectionScope(changed,'discuss').includes('old'),false)
  strictEqual(categoryDestination(help,rows),'/resources?tab=resource-help')

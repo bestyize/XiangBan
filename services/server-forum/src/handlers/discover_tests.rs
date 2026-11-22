@@ -197,6 +197,43 @@ async fn uncategorized_topics_stay_in_their_own_boards() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn deals_board_accepts_regular_discussion_posts() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    crate::taxonomy::migrate(&h.pool).await?;
+    crate::taxonomy::migrate_sections(&h.pool).await?;
+    crate::taxonomy::add_app_channel(&h.pool).await?;
+    crate::taxonomy::retire_open_source_board(&h.pool).await?;
+    crate::taxonomy::add_uncategorized_boards(&h.pool).await?;
+    crate::taxonomy::flatten_community_boards(&h.pool).await?;
+    tokio::try_join!(crate::taxonomy::add_deals_board(&h.pool), crate::taxonomy::add_deals_board(&h.pool))?;
+
+    let (status, categories) = call(&h.app, "GET", "/api/categories", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let boards = categories.as_array().unwrap();
+    let deals = boards.iter().find(|board| board["slug"] == "casual-deals").unwrap();
+    assert_eq!(deals["name"], "羊毛");
+    assert_eq!(deals["section"], "discuss");
+    assert_eq!(deals["kind"], "normal");
+    assert!(deals["parent_id"].is_null());
+
+    let member = h.member().await?;
+    let (status, topic) = call(&h.app, "POST", "/api/topics", Some(&member), json!({
+        "category_id": deals["id"], "title": "分享一个软件的免费试用活动", "body": "这里介绍活动规则和官方入口。"
+    })).await;
+    assert_eq!(status, StatusCode::OK, "{topic}");
+    let (status, list) = call(&h.app, "GET", "/api/topics?category=casual-deals&active_only=true", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["id"], topic["id"]);
+
+    sqlx::query("UPDATE categories SET status='archived' WHERE slug='casual-deals'").execute(&h.pool).await?;
+    crate::taxonomy::add_deals_board(&h.pool).await?;
+    let board_status: String = sqlx::query_scalar("SELECT status FROM categories WHERE slug='casual-deals'").fetch_one(&h.pool).await?;
+    assert_eq!(board_status, "archived");
+    h.finish().await
+}
+
+#[tokio::test]
 async fn community_board_flattening_preserves_content_and_prevents_new_subcategories() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     crate::taxonomy::migrate(&h.pool).await?;
