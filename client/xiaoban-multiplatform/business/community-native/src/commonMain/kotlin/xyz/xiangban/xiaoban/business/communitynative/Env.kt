@@ -72,6 +72,10 @@ interface PlatformActions : VoicePlatform {
     val forumCoverSupported: Boolean get() = false
     suspend fun renderForumCover(spec: ForumCoverSpec, thumbnail: Boolean = false): ForumCoverImage? = null
     suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile): ForumCoverImage? = null
+    /** 更换头像：本机图片按 EXIF 摆正并限制边长后解码；裁好的 512 方图编码为 WebP。不支持时设置里的头像行打开网页。 */
+    val avatarEditorSupported: Boolean get() = false
+    suspend fun decodeAvatarImage(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile): androidx.compose.ui.graphics.ImageBitmap? = null
+    suspend fun encodeAvatarWebp(image: androidx.compose.ui.graphics.ImageBitmap): ByteArray? = null
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)

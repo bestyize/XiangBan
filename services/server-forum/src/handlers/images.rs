@@ -222,7 +222,8 @@ pub async fn attach_to_comment(
     Ok(())
 }
 
-/// 清掉上传超过一天且未关联帖子、评论或待发布稿的图片。
+/// 清掉上传超过一天且未关联帖子、评论、待发布稿或用户头像的图片。
+/// 头像存在账号中心，论坛 `users.avatar_url` 是登录时同步的副本，图片 id 出现在里面就保留。
 pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
     let rows: Vec<(Uuid,)> = sqlx::query_as(
         "DELETE FROM images i
@@ -231,6 +232,7 @@ pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
            AND NOT EXISTS (SELECT 1 FROM posts p WHERE position(i.id::text in p.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM editor_draft_assets a WHERE a.image_id = i.id)
            AND NOT EXISTS (SELECT 1 FROM discover_comment_images a WHERE a.image_id = i.id)
+           AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_url IS NOT NULL AND position(i.id::text in u.avatar_url) > 0)
          RETURNING i.id",
     )
     .fetch_all(pool)

@@ -8,6 +8,8 @@ import { useTopicList } from '@/lib/useList'
 import { TRUST_LABEL } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import AppearanceOptions from '@/components/AppearanceOptions.vue'
+import AvatarEditor from '@/components/AvatarEditor.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { analyticsEnabled, setAnalyticsEnabled } from '@/lib/analytics'
 
 useHead(() => ({ title: '收藏与设置' }))
@@ -34,6 +36,10 @@ async function unblock(uid: string) {
   await loadBlocks()
 }
 onMounted(loadBlocks)
+
+const avatarOpen = ref(false)
+const avatarPending = ref(false)
+const avatarEditor = ref<InstanceType<typeof AvatarEditor> | null>(null)
 </script>
 
 <template>
@@ -82,12 +88,36 @@ onMounted(loadBlocks)
     <section class="block" aria-labelledby="profile-title">
       <h2 id="profile-title">资料</h2>
       <div class="panel box">
-        <div class="field">
-          <span>用户名</span>
-          <strong class="username">{{ session.user?.nickname }}</strong>
-          <small>用户名是你的唯一账号，注册时设置，不能修改。头像属于相伴账号，在所有相伴产品里通用。</small>
+        <div class="profile">
+          <button type="button" class="avatar-btn" aria-label="更换头像" @click="avatarOpen = true">
+            <UserAvatar :name="session.user?.nickname ?? ''" :src="session.user?.avatar_url" :size="64" />
+            <span class="avatar-cover" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>更换
+            </span>
+            <span class="avatar-badge" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+            </span>
+          </button>
+          <div class="field">
+            <span>用户名</span>
+            <strong class="username">{{ session.user?.nickname }}</strong>
+            <small>用户名是你的唯一账号，注册时设置，不能修改。头像属于相伴账号，在所有相伴产品里通用。</small>
+          </div>
+          <button type="button" class="btn btn-sm" @click="avatarOpen = true">更换头像</button>
+        </div>
+        <div v-if="avatarPending" class="avatar-pending">
+          <span>新头像还没保存，裁剪位置已保留。</span>
+          <button type="button" class="btn btn-sm btn-ghost" @click="avatarEditor?.discard()">放弃</button>
+          <button type="button" class="btn btn-sm" @click="avatarOpen = true">继续编辑</button>
         </div>
       </div>
+      <AvatarEditor
+        ref="avatarEditor"
+        v-model:open="avatarOpen"
+        :name="session.user?.nickname ?? ''"
+        :current="session.user?.avatar_url ?? null"
+        @pending="avatarPending = $event"
+      />
     </section>
 
     <section v-if="session.info" class="block" aria-labelledby="level-title">
@@ -207,6 +237,86 @@ h2 {
   }
   .row .btn {
     margin-top: 0;
+  }
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.profile .field {
+  flex: 1;
+  min-width: 0;
+}
+.avatar-btn {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+}
+.avatar-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+.avatar-cover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  background: rgba(34, 34, 34, 0.46);
+  color: #fff;
+  font-size: var(--fs-xs);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.avatar-btn:hover .avatar-cover,
+.avatar-btn:focus-visible .avatar-cover {
+  opacity: 1;
+}
+.avatar-badge {
+  display: none;
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+@media (hover: none) {
+  .avatar-cover {
+    display: none;
+  }
+  .avatar-badge {
+    display: grid;
+  }
+}
+.avatar-pending {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--brand-fill) 10%, var(--surface));
+  color: var(--brand);
+  font-size: 13px;
+}
+.avatar-pending span {
+  margin-right: auto;
+}
+@media (max-width: 767px) {
+  .profile {
+    gap: 14px;
+    align-items: flex-start;
   }
 }
 .blocked-list {

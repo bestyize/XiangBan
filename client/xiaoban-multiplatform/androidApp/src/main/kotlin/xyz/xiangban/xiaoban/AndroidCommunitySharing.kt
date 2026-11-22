@@ -56,6 +56,9 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
     override val forumCoverSupported = true
     override suspend fun renderForumCover(spec: xyz.xiangban.xiaoban.business.communitynative.ForumCoverSpec, thumbnail: Boolean) = renderLocalForumCover(spec, thumbnail)
     override suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile) = previewLocalForumCover(file)
+    override val avatarEditorSupported: Boolean get() = forumPhotoPickerSupported
+    override suspend fun decodeAvatarImage(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile) = decodeLocalAvatar(file)
+    override suspend fun encodeAvatarWebp(image: ImageBitmap) = encodeLocalAvatar(image)
     private var waiting: CancellableContinuation<Uri?>? = null
     private val saveDocument = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val current = waiting; waiting = null

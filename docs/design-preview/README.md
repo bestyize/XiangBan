@@ -18,6 +18,8 @@
 
 [发帖页设计稿（PC + 移动 H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 采用写作优先无框结构：PC 820px 居中弹窗提供级联板块选择、编辑/预览切换、单作品入口（V2 ZIP / HTML·HTM 自动转 V2 容器 + 关联创作）、内联附件积分与上拉权限设置；H5 窄屏采用 16px 防缩放底部抽屉，支持深浅色与 6 套主题色。[网页版预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web)（与手机共用 1421 端口）。
 
+[更换头像设计稿（Android + 网页 PC / H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/avatar-editor.html) 只画更换头像弹窗：手机 App 与网页窄屏共用底部选图弹层和 390 方形裁剪页，网页 PC 用 820 居中弹窗并排预览四种尺寸；可模拟保存失败与重试，失败时旧头像不变、裁好的图保留。[本机预览](http://127.0.0.1:1421/prototypes/avatar-editor.html)（与手机共用 1421 端口）。
+
 ## 小伴桌面
 
 [倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。

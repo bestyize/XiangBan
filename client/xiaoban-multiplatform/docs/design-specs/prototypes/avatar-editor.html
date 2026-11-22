@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小伴社区 · 更换头像 设计稿</title>
+<style>
+/* ---------- 设计稿外壳 ---------- */
+:root{
+  --page-canvas:#EFEDEA;
+  --page-ink:#222; --page-ink2:#444; --page-ink3:#666; --page-ink4:#9A9A9A;
+  --page-line:#E2DFDB;
+  --page-red:#E3203C; --page-red-soft:#FFF3F4;
+  --page-ok:#2FA36B;
+  --page-font:'PingFang SC','HarmonyOS Sans SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans CJK SC',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --page-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page-canvas);color:var(--page-ink);font-family:var(--page-font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+img{display:block}
+[hidden]{display:none!important}
+
+.bar{position:sticky;top:0;z-index:50;background:rgba(239,237,234,.96);border-bottom:1px solid var(--page-line)}
+.bar-in{max-width:1240px;margin:0 auto;padding:12px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+.bar h1{margin:0;font-size:18px;font-weight:700;margin-right:auto}
+.bar h1 small{font-size:13px;font-weight:400;color:var(--page-ink3);margin-left:8px}
+.seg{display:inline-flex;background:#fff;border:1px solid var(--page-line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;height:30px;padding:0 14px;border-radius:999px;font-size:13px;color:var(--page-ink3)}
+.seg button[aria-pressed="true"]{background:var(--page-red-soft);color:var(--page-red);font-weight:600}
+.seg.fail button[data-v="fail"][aria-pressed="true"]{background:var(--page-red-soft);color:var(--page-red)}
+.seg.fail button[data-v="ok"][aria-pressed="true"]{background:#EAF6F0;color:#1F7A4D}
+.ctl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--page-ink3)}
+.ghost{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--page-line);background:#fff;font-size:13px;color:var(--page-ink2)}
+.ghost:hover{border-color:#cfcac4}
+
+.flow{max-width:1240px;margin:0 auto;padding:0 24px 12px;display:flex;gap:6px;list-style:none;flex-wrap:wrap}
+.flow li{font-size:12px;height:26px;line-height:24px;padding:0 10px;border-radius:999px;border:1px solid var(--page-line);color:var(--page-ink4);background:transparent}
+.flow li.done{color:var(--page-ink2);background:#fff}
+.flow li.on{color:var(--page-red);border-color:#F3C2CA;background:var(--page-red-soft);font-weight:600}
+.flow li.ok{color:#1F7A4D;border-color:#BFE3D0;background:#EAF6F0;font-weight:600}
+.flow li.bad{color:var(--page-red);border-color:#F3C2CA;background:var(--page-red-soft);font-weight:600}
+.flow .sep{border:0;padding:0;color:#c9c4be;width:auto}
+
+main.wrap{max-width:1240px;margin:0 auto;padding:20px 24px 64px}
+.platform{display:none}
+body[data-p="android"] .platform.android, body[data-p="web"] .platform.web{display:block}
+
+.android-grid{display:grid;grid-template-columns:412px minmax(0,1fr);gap:40px;align-items:start}
+.notes h2{font-size:20px;line-height:28px;margin:4px 0 16px;font-weight:700}
+.notes h3{font-size:13px;color:var(--page-ink3);font-weight:600;margin:24px 0 8px}
+.notes dl{margin:0;display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px 12px;font-size:14px}
+.notes dt{color:var(--page-ink4)}
+.notes dd{margin:0;color:var(--page-ink2)}
+.notes dd b{color:var(--page-ink);font-weight:600}
+.notes ol.q{margin:0;padding-left:1.2em;color:var(--page-ink2);display:grid;gap:4px}
+.states{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--page-line);border-radius:10px;overflow:hidden}
+.states th,.states td{padding:8px 10px;text-align:left;border-bottom:1px solid #EFECE8;vertical-align:top}
+.states thead th{font-weight:600;color:var(--page-ink3);background:#FAF9F7}
+.states tbody th{font-weight:500;color:var(--page-ink3);white-space:nowrap}
+.states td{color:var(--page-ink2)}
+.states tr:last-child th,.states tr:last-child td{border-bottom:0}
+.states .cur{background:var(--page-red-soft);color:var(--page-ink)}
+.states thead .cur{color:var(--page-red)}
+.states .new{color:var(--page-ok);font-weight:600}
+.web-notes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;margin-top:28px}
+.foot{font-size:12px;color:var(--page-ink4);margin-top:20px}
+
+/* ---------- Android ---------- */
+.phone{
+  --a-bg:#FAFAFA; --a-card:#fff; --a-line:#EDEDED; --a-fill:#F2F2F2;
+  --a-red:#E3203C; --a-red-soft:#FFF3F4; --a-ok:#2FA36B;
+  --a-ink:#222; --a-ink2:#444; --a-ink3:#666; --a-ink4:#9A9A9A;
+  width:412px;padding:11px;border-radius:52px;background:#DAD6D1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06),0 18px 40px -24px rgba(0,0,0,.35);
+}
+.screenbox{position:relative;width:390px;height:844px;border-radius:42px;overflow:hidden;background:var(--a-bg);color:var(--a-ink)}
+.sbar{position:absolute;top:0;left:0;right:0;height:36px;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 30px;font-size:14px;font-weight:600;background:transparent;pointer-events:none}
+.sbar .ic{display:flex;gap:6px;align-items:center}
+.gbar{position:absolute;bottom:8px;left:50%;width:120px;height:4px;margin-left:-60px;border-radius:2px;background:#222;opacity:.85;z-index:40}
+.scr{position:absolute;inset:0;padding-top:36px;display:flex;flex-direction:column;background:var(--a-bg);transition:transform .28s ease-out;will-change:transform}
+.scr.r{transform:translateX(100%)} .scr.l{transform:translateX(-28%)} .scr.on{transform:none}
+.scr .body{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:32px}
+.top{height:52px;flex:none;display:grid;grid-template-columns:48px 1fr 48px;align-items:center;padding:0 4px}
+.top h2{margin:0;text-align:center;font-size:18px;line-height:24px;font-weight:600}
+.iconbtn{width:48px;height:48px;border:0;background:transparent;display:grid;place-items:center;border-radius:12px;color:var(--a-ink)}
+.iconbtn:disabled{opacity:.35}
+.iconbtn:not(:disabled):active{background:var(--a-fill)}
+.glabel{font-size:13px;line-height:18px;color:var(--a-ink4);padding:16px 16px 8px}
+.list{background:var(--a-card)}
+.row{width:100%;border:0;background:transparent;min-height:52px;display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;text-align:left;font-size:15px;line-height:22px;position:relative}
+.row + .row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--a-line);height:0}
+.row .v{margin-left:auto;color:var(--a-ink4);font-size:15px;display:flex;align-items:center;gap:8px;min-width:0}
+.row .chev{color:#C2C2C2;flex:none}
+button.row:active{background:#F7F7F7}
+.row.tall{min-height:76px}
+.row.static{cursor:default}
+.av{border-radius:50%;object-fit:cover;background:var(--a-fill);flex:none}
+.danger-pill{display:block;margin:20px 16px 0;width:calc(100% - 32px);height:44px;border-radius:999px;border:1px solid var(--a-line);background:var(--a-card);color:var(--a-red);font-size:15px}
+.fnote{font-size:13px;line-height:18px;color:var(--a-ink4);padding:8px 16px 0}
+.post{background:var(--a-card);padding:12px 16px}
+.post .who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--a-ink3)}
+.post .who b{color:var(--a-ink);font-weight:600}
+.post p{margin:8px 0 0;font-size:15px;line-height:22px}
+.post .meta{margin-top:8px;font-size:12px;color:var(--a-ink4);display:flex;gap:16px}
+.pending{display:flex;align-items:center;gap:8px;background:var(--a-red-soft);color:var(--a-red);font-size:13px;line-height:18px;padding:10px 12px 10px 16px}
+.pending span{margin-right:auto}
+.pending button{border:0;background:transparent;height:32px;padding:0 10px;border-radius:999px;font-size:13px;color:var(--a-ink3)}
+.pending button.go{background:#fff;color:var(--a-red);font-weight:600}
+
+/* 裁剪页 */
+.banner{display:flex;align-items:center;gap:8px;margin:0 12px 8px;padding:10px 12px;border-radius:8px;background:var(--a-red-soft);color:var(--a-red);font-size:13px;line-height:18px}
+.stage-a{position:relative;width:390px;height:390px;flex:none;background:var(--a-fill)}
+.stage-a canvas,.stage-w canvas,.stage-m canvas{display:block;touch-action:none;cursor:grab}
+.stage-a canvas:active,.stage-w canvas:active,.stage-m canvas:active{cursor:grabbing}
+.locked canvas{cursor:progress!important}
+.tools{display:flex;align-items:center;gap:4px;padding:8px 8px 0}
+.zoom{flex:1;display:flex;align-items:center;gap:2px;min-width:0}
+input[type=range].rng{flex:1;min-width:0;height:24px;-webkit-appearance:none;appearance:none;background:transparent;margin:0 4px}
+input[type=range].rng::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--trk,#EDEDED)}
+input[type=range].rng::-moz-range-track{height:4px;border-radius:2px;background:var(--trk,#EDEDED)}
+input[type=range].rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid #DADADA;box-shadow:0 1px 4px rgba(0,0,0,.18);margin-top:-8px}
+input[type=range].rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid #DADADA;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+input[type=range].rng:disabled{opacity:.5}
+.hint{text-align:center;font-size:12px;line-height:16px;color:var(--a-ink4);padding:2px 16px 10px;min-height:28px}
+.hint.warn{color:#B26A00}
+.pv-a-box{background:var(--a-card);padding:12px 16px;display:flex;align-items:center;gap:16px}
+.cmp{display:flex;align-items:center;gap:8px;flex:none}
+.cmp figure{margin:0;display:grid;justify-items:center;gap:4px;font-size:12px;line-height:16px;color:var(--a-ink4)}
+.cmp figure.newone{color:var(--a-ink2)}
+.cmp .arrow{color:#C2C2C2;margin-top:-18px}
+canvas.pv{border-radius:50%;display:block;background:var(--a-fill)}
+.minipost{flex:1;min-width:0;border-left:.5px solid var(--a-line);padding-left:16px}
+.minipost .who{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--a-ink3)}
+.minipost .who b{color:var(--a-ink);font-weight:600;font-size:13px}
+.minipost p{margin:4px 0 0;font-size:13px;line-height:18px;color:var(--a-ink2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.actions{margin-top:auto;display:flex;gap:12px;padding:12px 16px 28px;background:var(--a-bg)}
+.pill{flex:1;height:48px;border-radius:999px;border:0;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.pill.sec{background:var(--a-fill);color:var(--a-ink2)}
+.pill.pri{background:var(--a-red-soft);color:var(--a-red)}
+.pill:disabled{opacity:.55}
+.pill.busy:disabled{opacity:1}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;display:none}
+.busy .spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cropbody{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* 底部弹层 */
+.sheet-bg{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .2s}
+.sheet-bg.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.08);padding:8px 0 32px;transform:translateY(100%);transition:transform .25s ease-out}
+.sheet-bg.on .sheet{transform:none}
+.grab{width:36px;height:4px;border-radius:2px;background:#E0E0E0;margin:0 auto 8px}
+.sheet h3{margin:0;padding:8px 16px 4px;font-size:18px;line-height:24px;font-weight:600}
+.sheet .sub{font-size:13px;color:var(--a-ink4);padding:8px 16px}
+.samples{display:flex;gap:10px;padding:0 16px 12px;overflow-x:auto}
+.samples button{flex:none;width:60px;height:60px;padding:0;border:0;border-radius:8px;overflow:hidden;background:var(--a-fill)}
+.samples button img{width:100%;height:100%;object-fit:cover}
+.samples button:active{outline:2px solid var(--a-red);outline-offset:2px}
+.sheet .row{cursor:pointer}
+.sheet .row svg{color:var(--a-ink2)}
+.sheet .cancel{display:block;width:100%;height:52px;border:0;border-top:8px solid var(--a-bg);background:#fff;color:var(--a-ink3);font-size:15px;margin-top:8px}
+.toast{position:absolute;left:50%;bottom:56px;z-index:35;transform:translate(-50%,12px);opacity:0;transition:opacity .2s,transform .2s;background:#fff;border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.14);padding:10px 16px;font-size:14px;display:flex;align-items:center;gap:8px;white-space:nowrap;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err .dot{background:var(--page-red)}
+.dot{width:18px;height:18px;border-radius:50%;background:var(--page-ok);display:grid;place-items:center;color:#fff;flex:none}
+input.file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* ---------- Web ---------- */
+.webvars{
+  --paper:#EDEDED; --surface:#fff; --surface-2:#F2F2F2; --ink:#222; --ink-2:#666; --ink-3:#737373;
+  --line:#EBEBEB; --line-strong:#D6D6D6; --brand:#B42A33; --brand-fill:#D93A44; --brand-soft:#FCEBEC; --ok:#2FA36B;
+  --r-sm:6px; --r-md:10px; color:var(--ink);
+}
+.browser{
+  border-radius:12px;overflow:hidden;background:var(--paper);box-shadow:0 0 0 1px rgba(0,0,0,.07),0 24px 48px -30px rgba(0,0,0,.4);
+  min-width:1040px;color:var(--ink)
+}
+.web-scroll{overflow-x:auto;padding-bottom:4px}
+.chrome{height:40px;background:#E4E1DD;display:flex;align-items:center;gap:8px;padding:0 14px}
+.chrome i{width:11px;height:11px;border-radius:50%;background:#CFCAC4;display:block}
+.url{margin-left:16px;flex:0 1 520px;height:26px;border-radius:7px;background:#F6F4F2;font-size:12px;color:#777;display:flex;align-items:center;padding:0 10px;gap:6px;font-family:var(--page-mono)}
+.site{position:relative;height:660px;overflow:hidden}
+.site-scroll{position:absolute;inset:0;overflow-y:auto}
+.w-head{height:56px;background:var(--surface);border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 24px}
+.w-head nav{display:flex;gap:28px;font-size:15px;color:var(--ink-2)}
+.w-head nav a{text-decoration:none;color:inherit;padding:16px 0;border-bottom:2px solid transparent}
+.w-head nav a.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.w-head .right{justify-self:end;display:flex;align-items:center;gap:14px;color:var(--ink-2)}
+.w-av{border-radius:50%;object-fit:cover;border:1px solid var(--line);background:var(--surface-2);flex:none}
+.w-settings{max-width:780px;margin:0 auto;background:var(--surface);padding:18px 22px 24px;min-height:calc(100% - 56px)}
+.w-settings h1{margin:0 0 18px;font-size:26px;font-weight:800;line-height:1.3}
+.w-block{margin-bottom:26px}
+.w-block h2{font-size:14px;margin:0 0 10px;font-weight:700}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.box{padding:16px 18px}
+.w-muted{color:var(--ink-3);font-size:14px;margin:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface);font-size:14px;font-weight:600;white-space:nowrap;transition:background-color .15s,border-color .15s}
+.btn:hover:not(:disabled){border-color:var(--ink-3)}
+.btn:disabled{opacity:.55}
+.btn-primary{background:var(--brand-fill);border-color:var(--brand-fill);color:#fff}
+.btn-primary:hover:not(:disabled){background:#C5333D;border-color:#C5333D}
+.btn-primary.busy:disabled{opacity:.85}
+.btn-sm{height:30px;padding:0 10px;font-size:12px}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-ghost:hover:not(:disabled){background:var(--surface-2);border-color:transparent}
+.w-profile{display:flex;gap:18px;align-items:center}
+.w-avbtn{position:relative;padding:0;border:0;background:transparent;border-radius:50%;flex:none}
+.w-avbtn .ov{position:absolute;inset:0;border-radius:50%;background:rgba(34,34,34,.46);color:#fff;font-size:12px;display:grid;place-items:center;align-content:center;gap:2px;opacity:0;transition:opacity .15s}
+.w-avbtn:hover .ov,.w-avbtn:focus-visible .ov{opacity:1}
+.w-avbtn:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.field{display:grid;gap:6px;flex:1;min-width:0}
+.field>span{font-size:14px;font-weight:600;color:var(--ink-2)}
+.field strong{font-size:16px}
+.field small{color:var(--ink-3);font-size:12px}
+.w-pending{margin-top:10px;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;border-radius:var(--r-sm);background:var(--brand-soft);color:var(--brand);font-size:13px}
+.w-pending span{margin-right:auto}
+.swatches{display:flex;gap:8px}
+.swatches i{width:22px;height:22px;border-radius:50%;display:block}
+
+.w-backdrop{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.42);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .18s}
+.w-backdrop.on{opacity:1;pointer-events:auto}
+.w-dialog{width:min(820px,calc(100% - 48px));background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px -20px rgba(0,0,0,.35);transform:translateY(8px);transition:transform .2s ease-out;overflow:hidden}
+.w-backdrop.on .w-dialog{transform:none}
+.w-dialog header{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 14px 22px;border-bottom:1px solid var(--line)}
+.w-dialog header h3{margin:0;font-size:17px;font-weight:700}
+.w-x{width:32px;height:32px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink-2);display:grid;place-items:center}
+.w-x:hover:not(:disabled){background:var(--surface-2)}
+.w-pick{padding:22px}
+.w-drop{display:grid;place-items:center;align-content:center;gap:10px;height:300px;border:1.5px dashed var(--line-strong);border-radius:var(--r-md);background:#FAFAFA;color:var(--ink-2);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.w-drop:hover,.w-drop.over{border-color:var(--brand-fill);background:#FFF8F8}
+.w-drop b{font-size:16px;color:var(--ink)}
+.w-drop .link{color:var(--brand);font-weight:600}
+.w-drop small{color:var(--ink-3);font-size:12px}
+.w-samples{margin-top:18px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--ink-3)}
+.w-samples button{width:56px;height:56px;padding:0;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:var(--surface-2)}
+.w-samples button:hover{border-color:var(--brand-fill)}
+.w-samples img{width:100%;height:100%;object-fit:cover}
+.w-edit{display:grid;grid-template-columns:392px minmax(0,1fr)}
+.w-left{padding:16px 16px 12px;border-right:1px solid var(--line)}
+.stage-w{width:360px;height:360px;border-radius:var(--r-sm);overflow:hidden;background:var(--surface-2);position:relative}
+.stage-w canvas:focus-visible{outline:2px solid var(--brand-fill);outline-offset:-2px}
+.stage-w.over::after{content:"松开替换图片";position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,248,248,.85);color:var(--brand);font-weight:600;border:1.5px dashed var(--brand-fill);border-radius:var(--r-sm)}
+.w-tools{display:flex;align-items:center;gap:4px;margin-top:10px}
+.w-tools .zoom{gap:0}
+.w-ib{width:32px;height:32px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink-2);display:grid;place-items:center}
+.w-ib:hover:not(:disabled){background:var(--surface-2)}
+.w-ib:disabled{opacity:.4}
+.w-tools .btn{margin-left:6px}
+.w-warn{font-size:12px;color:var(--ink-3);margin-top:6px;min-height:18px}
+.w-warn.warn{color:#9A5B00}
+.w-right{padding:16px 22px;display:grid;gap:18px;align-content:start}
+.w-cap{font-size:12px;color:var(--ink-3);margin:0 0 8px;font-weight:600}
+.w-cmp{display:flex;align-items:center;gap:14px}
+.w-cmp figure{margin:0;display:grid;justify-items:center;gap:4px;font-size:12px;color:var(--ink-3)}
+.w-cmp figure.newone{color:var(--ink)}
+.w-cmp .arrow{color:var(--line-strong);margin-top:-18px}
+.w-sizes{display:flex;align-items:flex-end;gap:18px}
+.w-sizes figure{margin:0;display:grid;justify-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
+canvas.pvw{border-radius:50%;display:block;background:var(--surface-2);border:1px solid var(--line)}
+.w-topic{border:1px solid var(--line);border-radius:var(--r-sm)}
+.w-topic .t{padding:10px 12px;display:grid;gap:4px}
+.w-topic .t + .t{border-top:1px solid var(--line)}
+.w-topic .ttl{font-size:14px;font-weight:600;line-height:1.45}
+.w-topic .by{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
+.w-topic .by b{color:var(--ink-2);font-weight:600}
+.w-topic .cm{display:flex;gap:8px;font-size:13px;line-height:1.5}
+.w-topic .cm b{font-size:13px}
+.w-err{display:flex;align-items:center;gap:8px;margin:0 22px;padding:9px 12px;border-radius:var(--r-sm);background:var(--brand-soft);color:var(--brand);font-size:13px}
+.w-dialog footer{display:flex;align-items:center;gap:10px;padding:12px 22px 16px}
+.w-dialog footer .hint{margin-right:auto;font-size:12px;color:var(--ink-3);text-align:left;padding:0;min-height:0}
+.w-dialog footer kbd{font-family:var(--page-mono);font-size:11px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--ink-2);background:#fff}
+.w-toast{position:absolute;top:70px;left:50%;z-index:30;transform:translate(-50%,-8px);opacity:0;transition:opacity .2s,transform .2s;background:#fff;border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);padding:8px 16px 8px 10px;font-size:14px;display:flex;align-items:center;gap:8px;pointer-events:none}
+.w-toast.on{opacity:1;transform:translate(-50%,0)}
+.w-toast.err .dot{background:var(--brand-fill)}
+.is-saving .w-left, .is-saving .stage-a{opacity:.7}
+
+
+/* Web 切换与布局 */
+body[data-p="android"] #ctl-v{display:none}
+body[data-v="pc"] .frame-m, body[data-v="m"] .frame-pc{display:none}
+body[data-v="m"] .web-layout{display:grid;grid-template-columns:412px minmax(0,1fr);gap:40px;align-items:start}
+body[data-v="m"] .web-notes{display:block;margin-top:0}
+body[data-v="m"] .web-notes > div + div{margin-top:8px}
+
+/* Web 手机浏览器 */
+.mweb{background:var(--paper)}
+.murl{position:absolute;top:36px;left:0;right:0;height:44px;z-index:5;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 12px 0 14px;color:#666}
+.murl .addr{flex:1;min-width:0;height:32px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;gap:6px;padding:0 12px;font-size:13px;color:#555;font-family:var(--page-mono);white-space:nowrap;overflow:hidden}
+.msite{position:absolute;top:80px;left:0;right:0;bottom:0;overflow:hidden}
+.msite .scr{padding-top:0}
+.msite .toast{bottom:32px}
+
+/* 弹窗关闭后的占位 */
+.stub{flex:1;display:grid;justify-items:center;align-content:center;gap:12px;text-align:center;font-size:12px;color:#9A9A9A;padding:24px}
+.stub.abs{position:absolute;inset:0}
+.stub-btn{height:36px;padding:0 16px;border-radius:999px;border:1px dashed #C9C4BE;background:#fff;color:#444;font-size:13px}
+.stub-btn:hover{border-color:#9A9A9A}
+.stub-pending{color:#E3203C;font-size:12px}
+.stub-pending button{border:0;background:none;color:#666;text-decoration:underline;font-size:12px;padding:0}
+#w-site{background:var(--paper)}
+
+@media (max-width:980px){
+  .android-grid,body[data-v="m"] .web-layout{grid-template-columns:1fr}
+  .web-notes{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  .scr,.sheet,.sheet-bg,.toast,.w-toast,.w-backdrop,.w-dialog{transition:none}
+  .busy .spin{animation-duration:2.4s}
+}
+</style>
+</head>
+<body data-p="android" data-v="pc">
+
+<div class="bar">
+  <div class="bar-in">
+    <h1>更换头像<small>小伴社区 · 交互设计稿 · 2026-11-22 定稿</small></h1>
+    <div class="seg" id="seg-p" role="group" aria-label="预览平台">
+      <button data-v="android" aria-pressed="true">Android 手机</button>
+      <button data-v="web" aria-pressed="false">Web 网页</button>
+    </div>
+    <div class="ctl" id="ctl-v">
+      <div class="seg" id="seg-v" role="group" aria-label="网页宽度">
+        <button data-v="pc" aria-pressed="true">PC 弹窗</button>
+        <button data-v="m" aria-pressed="false">手机浏览器</button>
+      </div>
+    </div>
+    <div class="ctl">下次保存
+      <div class="seg fail" id="seg-f" role="group" aria-label="模拟保存结果">
+        <button data-v="ok" aria-pressed="true">成功</button>
+        <button data-v="fail" aria-pressed="false">失败</button>
+      </div>
+    </div>
+    <button class="ghost" id="reset">重置演示</button>
+  </div>
+  <ol class="flow" id="flow" aria-label="当前状态">
+    <li data-k="pick">选图</li><li data-k="crop">裁剪</li><li data-k="preview">预览</li><li data-k="saving">保存中</li><li data-k="result">已保存 / 保存失败</li>
+  </ol>
+</div>
+
+<main class="wrap">
+
+<!-- ================= Android ================= -->
+<section class="platform android" aria-label="Android 手机端">
+<div class="android-grid">
+  <div class="phone">
+    <div class="screenbox" id="phone">
+      <div class="sbar"><span>9:41</span><span class="ic">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="#222"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round"><path d="M1 4a9 9 0 0 1 13 0M3.5 6.6a5.5 5.5 0 0 1 8 0"/><circle cx="7.5" cy="9.3" r="1" fill="#222" stroke="none"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12"><rect x=".5" y=".5" width="20" height="11" rx="3" fill="none" stroke="#222" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6" fill="#222"/><rect x="21.5" y="4" width="1.8" height="4" rx=".9" fill="#222" opacity=".45"/></svg>
+      </span></div>
+
+      <!-- 弹窗关闭后的占位 -->
+      <section class="scr on" data-s="profile" id="a-profile">
+        <div class="stub">
+          <img class="av" data-av="a" width="72" height="72" alt="当前头像">
+          <button class="stub-btn" id="a-open">打开「更换头像」</button>
+          <div class="stub-pending" id="a-pending" hidden>有一张裁好的头像还没保存 · <button id="a-discard">放弃</button></div>
+          <span class="stub-note">弹窗关闭后的占位；入口页面不在本稿范围</span>
+        </div>
+      </section>
+
+      <!-- 裁剪 -->
+      <section class="scr r" data-s="crop" id="a-crop">
+        <div class="top">
+          <button class="iconbtn" id="a-crop-back" aria-label="返回"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h2>裁剪头像</h2><span></span>
+        </div>
+        <div class="cropbody">
+          <div class="banner" id="a-banner" hidden role="alert">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+            保存失败，网络连接中断。头像没有改动。
+          </div>
+          <div class="stage-a" id="a-stage"><canvas id="a-canvas" aria-label="裁剪区域：拖动调整位置，双指缩放"></canvas></div>
+          <div class="tools">
+            <button class="iconbtn" id="a-rot" aria-label="旋转 90 度"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+            <div class="zoom">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg>
+              <input class="rng" id="a-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="缩放">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg>
+            </div>
+            <button class="iconbtn" id="a-resetc" aria-label="还原位置"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></button>
+          </div>
+          <div class="hint" id="a-hint">单指拖动 · 双指缩放 · 双击放大（电脑上用滚轮）</div>
+          <div class="pv-a-box">
+            <div class="cmp">
+              <figure><img class="av" data-av="a" width="48" height="48" alt=""><figcaption id="a-cur-cap">当前</figcaption></figure>
+              <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              <figure class="newone"><canvas class="pv" data-pv="a" data-size="56"></canvas><figcaption>新头像</figcaption></figure>
+            </div>
+            <div class="minipost">
+              <div class="who"><canvas class="pv" data-pv="a" data-size="24"></canvas><b>林小满</b>· 刚刚</div>
+              <p>周末做了个番茄钟小组件，到点让桌面伴侣提醒我起来走走。</p>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="pill sec" id="a-repick">重新选择</button>
+            <button class="pill pri" id="a-save"><span class="spin"></span><span class="lbl">保存</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 选图弹层 -->
+      <div class="sheet-bg" id="a-sheet-bg">
+        <div class="sheet" role="dialog" aria-label="更换头像">
+          <div class="grab"></div>
+          <h3>更换头像</h3>
+          <div class="sub">示例图片</div>
+          <div class="samples" id="a-samples"></div>
+          <div class="list">
+            <label class="row" for="a-file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>从相册选择<span class="v" style="font-size:13px">只在本机预览</span></label>
+          </div>
+          <input class="file" id="a-file" type="file" accept="image/*">
+          <button class="cancel" id="a-sheet-cancel">取消</button>
+        </div>
+      </div>
+
+      <div class="toast" id="a-toast"><span class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="msg">头像已更新</span></div>
+      <div class="gbar"></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h2>手机上一屏裁完，失败了也不用重选</h2>
+    <dl>
+      <dt>范围</dt><dd>本稿只画更换头像本身：<b>选图弹层 → 裁剪页</b>。入口（设置 → 个人资料 → 头像）不在本稿；那一行原来跳网页，改为 App 内完成。</dd>
+      <dt>选图</dt><dd>底部弹层：从相册选择 + 取消，选中即进裁剪，不加确认步骤。<b>不提供拍照。</b>稿里的示例图只为演示，正式版没有。</dd>
+      <dt>裁剪</dt><dd>390 宽的方形画面，中间 300 的圆。<b>单指拖动、双指缩放、双击放大/还原</b>；拖动时出现三分线。图片始终盖满圆，拖不出空白。圆外压成浅白，不用黑色遮罩。</dd>
+      <dt>预览</dt><dd>画面下方实时显示「当前 → 新头像」和帖子里的 24 小头像，不另开预览页。</dd>
+      <dt>保存</dt><dd>保存中锁住画面和按钮。<b>失败留在本页</b>：顶部浅红条说明，旧头像不变，裁剪位置保留，「保存」变「重试」。</dd>
+      <dt>离开</dt><dd>失败后返回，裁好的图保留，再打开直接回到裁剪页，也可以放弃；没保存过就返回则直接丢弃。</dd>
+      <dt>成功</dt><dd>裁剪页关闭，各处头像同时换新，底部提示「头像已更新」。</dd>
+      <dt>规格</dt><dd>导出 512×512 JPEG；本机图片 10 MB 以内；原图短边小于 256 时提示可能模糊。</dd>
+    </dl>
+    <h3>保存前后各处怎么变</h3>
+    <table class="states" id="a-table"></table>
+    <h3>已定</h3>
+    <ol class="q">
+      <li>不加拍照；示例图只在设计稿里，正式版只有本机图片。</li>
+      <li>本期不做头像审核和改回旧头像：保存成功即生效。</li>
+      <li>图片存论坛图片库（<code>/api/images/{id}</code>），账号中心只记地址；论坛清理未引用图片时跳过正在用作头像的。</li>
+    </ol>
+    <p class="foot">演示稿：本机图片只在浏览器里预览，不上传；保存是模拟的，结果由顶部「下次保存」决定。</p>
+  </div>
+</div>
+</section>
+
+<!-- ================= Web ================= -->
+<section class="platform web" aria-label="Web 端">
+<div class="web-layout">
+  <div class="frame-pc">
+  <div class="web-scroll">
+  <div class="browser webvars">
+    <div class="chrome"><i></i><i></i><i></i>
+      <div class="url"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>chat.xiangban.xyz/settings</div>
+    </div>
+    <div class="site" id="w-site">
+      <div class="stub abs">
+        <img class="w-av" data-av="w" width="72" height="72" alt="当前头像">
+        <button class="stub-btn" id="w-open">打开「更换头像」</button>
+        <div class="stub-pending" id="w-pending" hidden>有一张裁好的头像还没保存 · <button id="w-discard">放弃</button></div>
+        <span class="stub-note">弹窗关闭后的占位；入口页面不在本稿范围</span>
+      </div>
+
+      <!-- 弹窗 -->
+      <div class="w-backdrop" id="w-backdrop">
+        <div class="w-dialog" role="dialog" aria-modal="true" aria-labelledby="w-dlg-title" id="w-dialog">
+          <header><h3 id="w-dlg-title">更换头像</h3>
+            <button class="w-x" id="w-close" aria-label="关闭"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </header>
+
+          <div class="w-pick" id="w-pick">
+            <label class="w-drop" id="w-drop" for="w-file">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+              <b>把图片拖到这里</b>
+              <span>或 <span class="link">选择本机图片</span></span>
+              <small>JPG、PNG、WebP，10 MB 以内 · 只在本机预览，不上传</small>
+            </label>
+            <input class="file" id="w-file" type="file" accept="image/*">
+            <div class="w-samples" id="w-samples"><span>或用示例图片</span></div>
+          </div>
+
+          <div class="w-edit" id="w-edit" hidden>
+            <div class="w-left">
+              <div class="stage-w" id="w-stage"><canvas id="w-canvas" tabindex="0" aria-label="裁剪区域：拖动调整位置，滚轮缩放，方向键微调"></canvas></div>
+              <div class="w-tools">
+                <div class="zoom">
+                  <button class="w-ib" id="w-zout" aria-label="缩小"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+                  <input class="rng" id="w-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="缩放">
+                  <button class="w-ib" id="w-zin" aria-label="放大"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
+                </div>
+                <button class="w-ib" id="w-rot" aria-label="旋转 90 度" title="旋转 90°"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+                <button class="w-ib" id="w-resetc" aria-label="还原位置" title="还原"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></button>
+                <button class="btn btn-sm" id="w-repick">换一张</button>
+              </div>
+              <div class="w-warn" id="w-warn"></div>
+            </div>
+            <div class="w-right">
+              <div>
+                <p class="w-cap">当前 → 新</p>
+                <div class="w-cmp">
+                  <figure><img class="w-av" data-av="w" width="56" height="56" alt=""><figcaption id="w-cur-cap">当前</figcaption></figure>
+                  <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <figure class="newone"><canvas class="pvw" data-pv="w" data-size="56"></canvas><figcaption>新头像</figcaption></figure>
+                </div>
+              </div>
+              <div>
+                <p class="w-cap">实际尺寸</p>
+                <div class="w-sizes">
+                  <figure><canvas class="pvw" data-pv="w" data-size="96"></canvas><figcaption>主页 96</figcaption></figure>
+                  <figure><canvas class="pvw" data-pv="w" data-size="48"></canvas><figcaption>卡片 48</figcaption></figure>
+                  <figure><canvas class="pvw" data-pv="w" data-size="32"></canvas><figcaption>评论 32</figcaption></figure>
+                  <figure><canvas class="pvw" data-pv="w" data-size="24"></canvas><figcaption>列表 24</figcaption></figure>
+                </div>
+              </div>
+              <div>
+                <p class="w-cap">在帖子里</p>
+                <div class="w-topic">
+                  <div class="t">
+                    <div class="ttl">周末做了个番茄钟小组件，到点让桌面伴侣提醒我起来走走</div>
+                    <div class="by"><canvas class="pvw" data-pv="w" data-size="20"></canvas><b>林小满</b>· 创意 / 组件 · 刚刚</div>
+                  </div>
+                  <div class="t">
+                    <div class="cm"><canvas class="pvw" data-pv="w" data-size="32"></canvas><div><b>林小满</b><div>源码放在帖子附件里了，欢迎提意见。</div></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="w-err" id="w-err" hidden role="alert">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+            保存失败：网络连接中断。当前头像没有改变，裁剪已保留，可以直接重试。
+          </div>
+          <footer>
+            <span class="hint" id="w-hint">拖动调整位置 · 滚轮或滑块缩放 · <kbd>←</kbd><kbd>→</kbd> 微调 · <kbd>+</kbd><kbd>−</kbd> 缩放</span>
+            <button class="btn" id="w-back-edit" hidden>返回裁剪</button>
+            <button class="btn" id="w-cancel">取消</button>
+            <button class="btn btn-primary" id="w-save"><span class="spin"></span><span class="lbl">保存头像</span></button>
+          </footer>
+        </div>
+      </div>
+
+      <div class="w-toast" id="w-toast"><span class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="msg">头像已更新</span></div>
+    </div>
+  </div>
+  </div>
+  </div>
+
+  <div class="frame-m">
+  <div class="phone">
+    <div class="screenbox mweb webvars" id="mphone">
+      <div class="sbar"><span>9:41</span><span class="ic">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="#222"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round"><path d="M1 4a9 9 0 0 1 13 0M3.5 6.6a5.5 5.5 0 0 1 8 0"/><circle cx="7.5" cy="9.3" r="1" fill="#222" stroke="none"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12"><rect x=".5" y=".5" width="20" height="11" rx="3" fill="none" stroke="#222" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6" fill="#222"/><rect x="21.5" y="4" width="1.8" height="4" rx=".9" fill="#222" opacity=".45"/></svg>
+      </span></div>
+      <div class="murl">
+        <div class="addr"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>chat.xiangban.xyz/settings</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+      </div>
+      <div class="msite">
+        <!-- 弹窗关闭后的占位 -->
+        <section class="scr on" data-s="profile" id="m-profile">
+          <div class="stub">
+            <img class="av" data-av="w" width="72" height="72" alt="当前头像">
+            <button class="stub-btn" id="m-open">打开「更换头像」</button>
+            <div class="stub-pending" id="m-pending" hidden>有一张裁好的头像还没保存 · <button id="m-discard">放弃</button></div>
+            <span class="stub-note">弹窗关闭后的占位；入口页面不在本稿范围</span>
+          </div>
+        </section>
+
+        <!-- 裁剪 -->
+        <section class="scr r" data-s="crop" id="m-crop">
+          <div class="top">
+            <button class="iconbtn" id="m-crop-back" aria-label="返回"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <h2>裁剪头像</h2><span></span>
+          </div>
+          <div class="cropbody">
+            <div class="banner" id="m-banner" hidden role="alert">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+              保存失败，网络连接中断。头像没有改动。
+            </div>
+            <div class="stage-a" id="m-stage"><canvas id="m-canvas" aria-label="裁剪区域：拖动调整位置，双指缩放"></canvas></div>
+            <div class="tools">
+              <button class="iconbtn" id="m-rot" aria-label="旋转 90 度"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+              <div class="zoom">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg>
+                <input class="rng" id="m-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="缩放">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg>
+              </div>
+              <button class="iconbtn" id="m-resetc" aria-label="还原位置"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></button>
+            </div>
+            <div class="hint" id="m-hint">单指拖动 · 双指缩放 · 双击放大（电脑上用滚轮）</div>
+            <div class="pv-a-box">
+              <div class="cmp">
+                <figure><img class="av" data-av="w" width="48" height="48" alt=""><figcaption id="m-cur-cap">当前</figcaption></figure>
+                <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <figure class="newone"><canvas class="pv" data-pv="m" data-size="56"></canvas><figcaption>新头像</figcaption></figure>
+              </div>
+              <div class="minipost">
+                <div class="who"><canvas class="pv" data-pv="m" data-size="24"></canvas><b>林小满</b>· 刚刚</div>
+                <p>周末做了个番茄钟小组件，到点让桌面伴侣提醒我起来走走。</p>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="pill sec" id="m-repick">重新选择</button>
+              <button class="pill pri" id="m-save"><span class="spin"></span><span class="lbl">保存</span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 选图弹层 -->
+        <div class="sheet-bg" id="m-sheet-bg">
+          <div class="sheet" role="dialog" aria-label="更换头像">
+            <div class="grab"></div>
+            <h3>更换头像</h3>
+            <div class="sub">示例图片</div>
+            <div class="samples" id="m-samples"></div>
+            <div class="list">
+              <label class="row" for="m-file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>从相册选择<span class="v" style="font-size:13px">只在本机预览</span></label>
+            </div>
+            <input class="file" id="m-file" type="file" accept="image/*">
+            <button class="cancel" id="m-sheet-cancel">取消</button>
+          </div>
+        </div>
+
+        <div class="toast" id="m-toast"><span class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="msg">头像已更新</span></div>
+      </div>
+      <div class="gbar"></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="web-notes notes">
+    <div>
+      <h2>手机浏览器照搬 App：同一个选图弹层、同一个裁剪页</h2>
+      <dl>
+        <dt>范围</dt><dd>本稿只画弹窗本身。入口在「我的设置 → 资料」点当前头像，不在本稿。</dd>
+        <dt>断点</dt><dd>沿用站内 767px 断点：<b>≥ 768 用 PC 居中弹窗</b>；<b>&lt; 768 与 App 完全一致</b>，布局、尺寸、按钮、文案、失败与重试都相同。</dd>
+        <dt>手机</dt><dd>选图是底部弹层（示例图一行 + 从相册选择 + 取消）；选中后裁剪页铺满浏览器可视区，盖住站内顶栏和底部导航。390 方形画面、300 的圆，单指拖动、双指缩放、双击放大，底部「重新选择 · 保存」。配色也用 App 的：浅红底红字主按钮，不用站内实心红。</dd>
+        <dt>返回</dt><dd>手机上左上角 ‹ 和浏览器返回键都关闭裁剪页：打开时写一条浏览器历史，返回时关掉，不离开设置页。</dd>
+        <dt>PC 选图</dt><dd>拖入或选择本机图片，裁剪区也能直接拖入替换。示例图只为演示。</dd>
+        <dt>PC 裁剪</dt><dd>360 画面，拖动，滚轮或滑块缩放，方向键微调；右侧「当前 → 新」并排，加 96 / 48 / 32 / 24 四种尺寸和帖子、评论。</dd>
+        <dt>失败</dt><dd>PC 弹窗不关，按钮上方红字，「保存头像」变「重试」；手机同 App，顶部浅红条，「保存」变「重试」。关掉后裁好的图都保留，再打开直接回到裁剪。</dd>
+        <dt>成功</dt><dd>关闭弹窗或裁剪页，各处头像同时换新，提示「头像已更新」。</dd>
+      </dl>
+    </div>
+    <div>
+      <h3 style="margin-top:4px" id="w-table-cap">保存前后各处怎么变（PC）</h3>
+      <table class="states" id="w-table"></table>
+      <h3>已定</h3>
+      <ol class="q">
+        <li>不加拍照。手机浏览器的「从相册选择」用 <code>accept="image/*"</code>，系统选择器里若自带拍照不另行屏蔽。</li>
+        <li>头像审核、旧头像保留本期不做，与 Android 相同。</li>
+      </ol>
+      <p class="foot">演示稿：本机图片只在浏览器里预览，不上传；保存是模拟的。</p>
+    </div>
+  </div>
+</div>
+</section>
+
+</main>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const DPR=Math.min(window.devicePixelRatio||1,3);
+const MAX_BYTES=10*1024*1024;
+
+/* ---------- 示例图（内置 SVG，不联网） ---------- */
+const SAMPLES=[
+ {id:'cat',name:'橘猫',w:640,h:480,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="#F4E6D4"/><circle cx="110" cy="96" r="58" fill="#FAF1E6"/><rect y="392" width="640" height="88" fill="#E8D2B6"/><g transform="translate(392 252)"><path d="M-122 -36 L-104 -152 L-28 -96 Z" fill="#E48A3C"/><path d="M122 -36 L104 -152 L28 -96 Z" fill="#E48A3C"/><path d="M-98 -62 L-92 -124 L-50 -94 Z" fill="#F6C9A6"/><path d="M98 -62 L92 -124 L50 -94 Z" fill="#F6C9A6"/><ellipse rx="136" ry="116" fill="#EE9A4E"/><path d="M-26 -114 Q0 -86 26 -114 M-62 -100 Q-46 -78 -30 -98 M62 -100 Q46 -78 30 -98" stroke="#D27529" stroke-width="9" fill="none" stroke-linecap="round"/><ellipse cy="46" rx="72" ry="52" fill="#FBE4CE"/><ellipse cx="-48" cy="-10" rx="14" ry="20" fill="#3A2A22"/><ellipse cx="48" cy="-10" rx="14" ry="20" fill="#3A2A22"/><circle cx="-43" cy="-17" r="5" fill="#fff"/><circle cx="53" cy="-17" r="5" fill="#fff"/><path d="M-10 22 L10 22 L0 34 Z" fill="#E07A7A"/><path d="M0 34 Q-12 48 -24 42 M0 34 Q12 48 24 42" stroke="#3A2A22" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M-60 30 L-128 18 M-60 40 L-126 46 M60 30 L128 18 M60 40 L126 46" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/></g></svg>`},
+ {id:'hill',name:'远山',w:480,h:640,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6D3BD"/><stop offset="1" stop-color="#FBEFE6"/></linearGradient></defs><rect width="480" height="640" fill="url(#g)"/><circle cx="290" cy="258" r="72" fill="#F09A74"/><path d="M0 400 L120 300 L210 370 L320 262 L480 392 L480 640 L0 640Z" fill="#A9B8B0"/><path d="M0 470 L92 410 L200 470 L302 400 L480 482 L480 640 L0 640Z" fill="#7F978E"/><path d="M0 540 L140 490 L262 546 L380 500 L480 530 L480 640 L0 640Z" fill="#5C766E"/></svg>`},
+ {id:'plant',name:'多肉',w:600,h:480,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="480" viewBox="0 0 600 480"><rect width="600" height="480" fill="#E9F0E5"/><rect y="400" width="600" height="80" fill="#DCE5D6"/><path d="M180 300 L340 300 L322 420 L198 420 Z" fill="#D9825B"/><rect x="170" y="288" width="180" height="22" rx="6" fill="#C96F49"/><g transform="translate(260 236)"><g fill="#6E9C7B">${[0,45,90,135,180,225,270,315].map(a=>`<ellipse rx="26" ry="78" transform="rotate(${a}) translate(0 -46)"/>`).join('')}</g><g fill="#8DBB96">${[22,67,112,157,202,247,292,337].map(a=>`<ellipse rx="20" ry="56" transform="rotate(${a}) translate(0 -32)"/>`).join('')}</g><g fill="#B5D6B5">${[0,60,120,180,240,300].map(a=>`<ellipse rx="13" ry="32" transform="rotate(${a}) translate(0 -18)"/>`).join('')}</g><circle r="10" fill="#D7EAD3"/></g></svg>`},
+ {id:'sea',name:'海边',w:640,h:400,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#DCEAF3"/><circle cx="150" cy="104" r="48" fill="#FFF3DC"/><rect y="226" width="640" height="174" fill="#86B6D8"/><path d="M0 256 Q40 248 80 256 T160 256 T240 256 T320 256 T400 256 T480 256 T560 256 T640 256 M40 292 Q80 284 120 292 T200 292 T280 292 T360 292 T440 292 T520 292 T600 292" stroke="#fff" stroke-width="3" fill="none" opacity=".6"/><path d="M0 340 Q200 312 400 336 T640 326 L640 400 L0 400Z" fill="#F0DDBB"/><g transform="translate(470 156)"><path d="M0 0 L0 64 L-46 64 Z" fill="#fff"/><path d="M6 10 L6 64 L42 64 Z" fill="#F7E1D7"/><path d="M-56 70 L54 70 L40 88 L-44 88 Z" fill="#E3203C"/></g></svg>`},
+ {id:'spark',name:'小伴',w:480,h:480,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480"><rect width="480" height="480" fill="#FFF3F4"/><circle cx="240" cy="240" r="150" fill="#E3203C"/><path d="M240 150 C250 214 266 230 330 240 C266 250 250 266 240 330 C230 266 214 250 150 240 C214 230 230 214 240 150Z" fill="#fff"/><path d="M318 140 C321 160 326 165 346 168 C326 171 321 176 318 196 C315 176 310 171 290 168 C310 165 315 160 318 140Z" fill="#fff" opacity=".9"/></svg>`}
+];
+const svgUrl=s=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);
+const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src;});
+async function rasterize(sm){const img=await loadImg(svgUrl(sm.svg));const c=document.createElement('canvas');c.width=sm.w;c.height=sm.h;c.getContext('2d').drawImage(img,0,0,sm.w,sm.h);return c;}
+const SRC={};
+
+/* ---------- 裁剪器（两端共用） ---------- */
+class Cropper{
+  constructor(canvas,o){
+    this.c=canvas;this.S=o.size;this.D=o.diameter;this.bg=o.bg;this.mask=o.mask;this.onChange=o.onChange||(()=>{});
+    canvas.width=this.S*DPR;canvas.height=this.S*DPR;canvas.style.width=canvas.style.height=this.S+'px';
+    this.ctx=canvas.getContext('2d');this.src=null;this.zoom=1;this.tx=0;this.ty=0;this.locked=false;this.active=false;this.ptrs=new Map();this.lastTap=0;
+    this.bind(o.keyboard);this.draw();
+  }
+  get base(){return this.D/Math.min(this.iw,this.ih);}
+  get s(){return this.base*this.zoom;}
+  get srcPx(){return this.src?Math.min(this.iw,this.ih)/this.zoom:Infinity;}
+  setImage(src){this.src=src||null;if(src){this.iw=src.width;this.ih=src.height;}this.zoom=1;this.tx=0;this.ty=0;this.draw();this.onChange();}
+  clamp(){if(!this.src)return;const s=this.s,mx=Math.max(0,(this.iw*s-this.D)/2),my=Math.max(0,(this.ih*s-this.D)/2);this.tx=Math.min(mx,Math.max(-mx,this.tx));this.ty=Math.min(my,Math.max(-my,this.ty));}
+  zoomTo(z,px=0,py=0){if(!this.src)return;z=Math.min(4,Math.max(1,z));const k=z/this.zoom;this.tx=px-(px-this.tx)*k;this.ty=py-(py-this.ty)*k;this.zoom=z;this.clamp();this.draw();this.onChange();}
+  pan(dx,dy){if(!this.src)return;this.tx+=dx;this.ty+=dy;this.clamp();this.draw();this.onChange();}
+  reset(){if(!this.src)return;this.zoom=1;this.tx=0;this.ty=0;this.draw();this.onChange();}
+  rotate(){if(!this.src)return;const c=document.createElement('canvas');c.width=this.ih;c.height=this.iw;const x=c.getContext('2d');x.translate(this.ih,0);x.rotate(Math.PI/2);x.drawImage(this.src,0,0);const t=this.tx;this.tx=-this.ty;this.ty=t;this.src=c;this.iw=c.width;this.ih=c.height;this.clamp();this.draw();this.onChange();}
+  lock(b){this.locked=b;this.c.parentElement.classList.toggle('locked',b);this.draw();}
+  paint(ctx,size){
+    // 把圆形区域画到 size×size 的画布上
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,size,size);
+    if(!this.src){ctx.fillStyle='#F2F2F2';ctx.fillRect(0,0,size,size);return;}
+    const k=size/this.D,s=this.s,off=(this.S-this.D)/2;
+    const left=(this.S/2+this.tx-this.iw*s/2-off)*k,top=(this.S/2+this.ty-this.ih*s/2-off)*k;
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(this.src,left,top,this.iw*s*k,this.ih*s*k);
+  }
+  exportURL(size=512){const o=document.createElement('canvas');o.width=o.height=size;this.paint(o.getContext('2d'),size);try{return o.toDataURL('image/jpeg',0.9);}catch(e){return null;}}
+  draw(){
+    const {ctx,S,D}=this;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,S,S);ctx.fillStyle=this.bg;ctx.fillRect(0,0,S,S);
+    const cx=S/2,cy=S/2,r=D/2;
+    if(this.src){const s=this.s,w=this.iw*s,h=this.ih*s;ctx.imageSmoothingQuality='high';ctx.drawImage(this.src,cx+this.tx-w/2,cy+this.ty-h/2,w,h);}
+    else{ctx.fillStyle='#9A9A9A';ctx.font='13px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';ctx.fillText('还没有选择图片',cx,cy+4);}
+    ctx.beginPath();ctx.rect(0,0,S,S);ctx.arc(cx,cy,r,0,Math.PI*2,true);ctx.fillStyle=this.mask;ctx.fill('evenodd');
+    if(this.active&&this.src){ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1;const x0=cx-r;ctx.beginPath();for(const f of[1/3,2/3]){ctx.moveTo(x0+D*f,cy-r);ctx.lineTo(x0+D*f,cy+r);ctx.moveTo(cx-r,x0+D*f);ctx.lineTo(cx+r,x0+D*f);}ctx.stroke();ctx.restore();}
+    ctx.beginPath();ctx.arc(cx,cy,r+1.5,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,.10)';ctx.lineWidth=1;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=2;ctx.stroke();
+  }
+  k(){return this.S/this.c.getBoundingClientRect().width;}
+  local(e){const rc=this.c.getBoundingClientRect(),k=this.S/rc.width;return{x:(e.clientX-rc.left)*k-this.S/2,y:(e.clientY-rc.top)*k-this.S/2};}
+  bind(keyboard){
+    const c=this.c;
+    c.addEventListener('pointerdown',e=>{
+      if(this.locked||!this.src)return;try{c.setPointerCapture(e.pointerId);}catch(_){}this.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});this.active=true;this.draw();
+      const now=Date.now();if(this.ptrs.size===1&&now-this.lastTap<300){const p=this.local(e);this.zoomTo(this.zoom>1.4?1:2.2,p.x,p.y);this.lastTap=0;}else this.lastTap=now;
+    });
+    c.addEventListener('pointermove',e=>{
+      if(!this.ptrs.has(e.pointerId)||this.locked)return;
+      const k=this.k();
+      if(this.ptrs.size===1){const o=this.ptrs.get(e.pointerId);this.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});this.pan((e.clientX-o.x)*k,(e.clientY-o.y)*k);return;}
+      const p0=[...this.ptrs.values()];this.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});const p1=[...this.ptrs.values()];
+      const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),m=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+      const d0=d(p0[0],p0[1]),d1=d(p1[0],p1[1]),m0=m(p0[0],p0[1]),m1=m(p1[0],p1[1]);
+      this.tx+=(m1.x-m0.x)*k;this.ty+=(m1.y-m0.y)*k;
+      const lp=this.local({clientX:m1.x,clientY:m1.y});if(d0>0)this.zoomTo(this.zoom*d1/d0,lp.x,lp.y);
+    });
+    const up=e=>{this.ptrs.delete(e.pointerId);if(!this.ptrs.size){this.active=false;this.draw();}};
+    c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
+    c.addEventListener('wheel',e=>{if(this.locked||!this.src)return;e.preventDefault();const p=this.local(e);this.zoomTo(this.zoom*Math.exp(-e.deltaY*0.0015),p.x,p.y);},{passive:false});
+    if(keyboard)c.addEventListener('keydown',e=>{
+      if(this.locked||!this.src)return;const st=e.shiftKey?16:4;let h=true;
+      switch(e.key){case'ArrowLeft':this.pan(-st,0);break;case'ArrowRight':this.pan(st,0);break;case'ArrowUp':this.pan(0,-st);break;case'ArrowDown':this.pan(0,st);break;case'+':case'=':this.zoomTo(this.zoom*1.1);break;case'-':case'_':this.zoomTo(this.zoom/1.1);break;case'0':this.reset();break;default:h=false;}
+      if(h)e.preventDefault();
+    });
+  }
+}
+
+/* ---------- 预览画布 ---------- */
+$$('canvas[data-pv]').forEach(cv=>{const s=+cv.dataset.size;cv.width=cv.height=Math.round(s*DPR);cv.style.width=cv.style.height=s+'px';});
+const pending={};
+function schedulePreview(p,cropper){if(pending[p])return;pending[p]=requestAnimationFrame(()=>{pending[p]=0;$$(`canvas[data-pv="${p}"]`).forEach(cv=>cropper.paint(cv.getContext('2d'),cv.width));});}
+function syncRange(input,z){input.value=z;const pct=((z-1)/3)*100;input.style.setProperty('--trk',`linear-gradient(90deg,${input.dataset.c} ${pct}%,#EDEDED ${pct}%)`);}
+
+/* ---------- 状态 ---------- */
+let failNext=false, platform='android', view='pc', appOld=null, webOld=null, INITIAL=null;
+let AF=null, W=null, M=null;
+
+function syncAvatars(){$$('img[data-av="a"]').forEach(i=>{if(appOld)i.src=appOld;});$$('img[data-av="w"]').forEach(i=>{if(webOld)i.src=webOld;});}
+function toast(sel,msg,err){const t=$(sel);t.querySelector('.msg').textContent=msg;t.classList.toggle('err',!!err);t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200);}
+
+/* ---------- 顶部状态条与对照表 ---------- */
+const COLS=['编辑中','保存中','保存失败','已保存'];
+const ROWS={
+  a:[['各处头像','旧','旧','旧（未改变）','<span class="new">新</span>'],['裁剪画面','可拖动、缩放','锁定，略压淡','保留位置，可继续调','关闭'],['预览','当前 → 新，实时','同左','当前标「未改变」','—'],['底部按钮','重新选择 · 保存','保存中（都不可点）','重新选择 · 重试','—'],['提示','—','—','顶部浅红条','底部「头像已更新」'],['返回','丢弃裁剪','不可返回','保留，再打开回到裁剪','—']],
+  w:[['各处头像','旧','旧','旧（未改变）','<span class="new">新</span>'],['裁剪区','拖动、缩放','锁定，略压淡','保留位置，可继续调','关闭'],['预览','当前 → 新 + 四种尺寸','同左','当前标「未改变」','—'],['按钮','取消 · 保存头像','保存中…（不可关闭）','取消 · 重试','—'],['提示','—','—','按钮上方红字','顶部「头像已更新」'],['关闭弹窗','丢弃裁剪','不可关闭','保留，再打开回到裁剪','—']]
+};
+function colOf(st){return{cropping:0,saving:1,failed:2,saved:3}[st]??-1;}
+function renderTable(id,rows,st){
+  const c=colOf(st);
+  $(id).innerHTML='<thead><tr><th></th>'+COLS.map((h,i)=>`<th class="${i===c?'cur':''}">${h}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><th>'+r[0]+'</th>'+r.slice(1).map((v,i)=>`<td class="${i===c?'cur':''}">${v}</td>`).join('')+'</tr>').join('')+'</tbody>';
+}
+function appStatus(F){return F?(F.S.sheet?'picking':F.S.status):'idle';}
+function curStatus(){
+  if(platform==='android')return appStatus(AF);
+  if(view==='m')return appStatus(M);
+  if(!W)return'idle';
+  return W.S.open&&W.S.step==='pick'?'picking':W.S.status;
+}
+function renderFlow(){
+  const st=curStatus(),lis=$$('#flow li'),res=lis[4];
+  lis.forEach(l=>l.className='');
+  res.textContent='已保存 / 保存失败';
+  const idx={picking:0,cropping:1,saving:3,failed:4,saved:4}[st];
+  if(idx===undefined)return;
+  lis.forEach((l,i)=>{if(i<idx)l.classList.add('done');});
+  if(st==='picking')lis[0].classList.add('on');
+  if(st==='cropping'){lis[1].classList.add('on');lis[2].classList.add('on');}
+  if(st==='saving')lis[3].classList.add('on');
+  if(st==='failed'){res.textContent='保存失败';res.classList.add('bad');}
+  if(st==='saved'){res.textContent='已保存';res.classList.add('ok');}
+}
+function renderMeta(){
+  renderFlow();
+  const t=s=>s==='picking'?'':s;
+  renderTable('#a-table',ROWS.a,t(appStatus(AF)));
+  if(view==='m'){renderTable('#w-table',ROWS.a,t(appStatus(M)));$('#w-table-cap').textContent='保存前后各处怎么变（手机浏览器，与 App 相同）';}
+  else{renderTable('#w-table',ROWS.w,W?W.S.status:'idle');$('#w-table-cap').textContent='保存前后各处怎么变（PC）';}
+}
+
+/* ---------- 本机图片：只在浏览器内读取 ---------- */
+async function readLocal(file,errToast){
+  if(!file)return null;
+  if(!/^image\//.test(file.type)){toast(errToast,'请选择图片文件',true);return null;}
+  if(file.size>MAX_BYTES){toast(errToast,'图片超过 10 MB，换一张试试',true);return null;}
+  try{return await loadImg(URL.createObjectURL(file));}catch(e){toast(errToast,'这张图片打不开，换一张试试',true);return null;}
+}
+
+/* ---------- 手机：App 与手机浏览器共用同一套弹层和裁剪页 ---------- */
+function appFlow(k,cfg){
+  const E=id=>document.getElementById(k+'-'+id);
+  const S={status:'idle',sheet:false,pending:false,timer:0};
+  const F={k,S};
+  E('zoom').dataset.c='#E3203C';
+  const HINT='单指拖动 · 双指缩放 · 双击放大（电脑上用滚轮）';
+  const crop=new Cropper(E('canvas'),{size:390,diameter:300,bg:'#F2F2F2',mask:'rgba(250,250,250,.74)',onChange(){
+    syncRange(E('zoom'),crop.zoom);schedulePreview(k,crop);
+    const h=E('hint'),small=crop.src&&crop.srcPx<256;h.textContent=small?'图片较小，再放大可能会模糊':HINT;h.classList.toggle('warn',!!small);
+  }});
+  F.crop=crop;
+  const screens=[E('profile'),E('crop')];
+  const go=s=>{screens.forEach((el,i)=>{el.classList.remove('on','l','r');el.classList.add((s==='crop')===(i===1)?'on':i===0?'l':'r');});};
+  F.sheet=on=>{S.sheet=on;E('sheet-bg').classList.toggle('on',on);renderMeta();};
+  F.render=()=>{
+    const st=S.status,saving=st==='saving',failed=st==='failed';
+    E('banner').hidden=!failed;
+    const sv=E('save');sv.disabled=saving||!crop.src;sv.classList.toggle('busy',saving);sv.querySelector('.lbl').textContent=saving?'保存中':failed?'重试':'保存';
+    ['repick','zoom','rot','resetc','crop-back'].forEach(id=>E(id).disabled=saving);
+    E('crop').classList.toggle('is-saving',saving);crop.lock(saving);
+    E('cur-cap').textContent=failed?'当前 · 未改变':'当前';
+    E('pending').hidden=!S.pending;
+    E('open').textContent=S.pending?'继续编辑':'打开「更换头像」';
+    syncAvatars();renderMeta();
+  };
+  F.use=src=>{if(S.status==='saving')return;crop.setImage(src);S.status='cropping';S.pending=false;F.sheet(false);go('crop');F.render();};
+  F.open=()=>{if(S.pending){S.pending=false;go('crop');F.render();}else F.sheet(true);};
+  F.save=()=>{
+    if(S.status==='saving'||!crop.src)return;
+    S.status='saving';F.render();
+    S.timer=setTimeout(()=>{
+      if(failNext){S.status='failed';F.render();return;}
+      cfg.setOld(crop.exportURL());S.status='saved';S.pending=false;go('profile');F.render();cfg.after&&cfg.after();toast('#'+k+'-toast','头像已更新');
+    },1400);
+  };
+  F.reset=()=>{clearTimeout(S.timer);Object.assign(S,{status:'idle',sheet:false,pending:false});crop.setImage(null);E('sheet-bg').classList.remove('on');go('profile');F.render();};
+  E('open').onclick=F.open;
+  E('sheet-cancel').onclick=()=>F.sheet(false);
+  E('sheet-bg').addEventListener('click',e=>{if(e.target===E('sheet-bg'))F.sheet(false);});
+  E('repick').onclick=()=>F.sheet(true);
+  E('crop-back').onclick=()=>{
+    if(S.status==='saving')return;
+    if(S.status==='failed'){S.pending=true;}else{S.status='idle';crop.setImage(null);}
+    go('profile');F.render();
+  };
+  E('discard').onclick=()=>{S.pending=false;S.status='idle';crop.setImage(null);F.render();};
+  E('rot').onclick=()=>crop.rotate();
+  E('resetc').onclick=()=>crop.reset();
+  E('zoom').oninput=e=>crop.zoomTo(+e.target.value);
+  E('save').onclick=F.save;
+  E('file').onchange=async e=>{const img=await readLocal(e.target.files[0],'#'+k+'-toast');e.target.value='';if(img)F.use(img);else F.sheet(false);};
+  return F;
+}
+
+/* ---------- PC 弹窗 ---------- */
+function webFlow(k,cfg){
+  const E=id=>document.getElementById(k+'-'+id);
+  const on=(id,ev,fn)=>{const el=E(id);if(el)el.addEventListener(ev,fn);};
+  const S={status:'idle',open:false,step:'pick',pending:false,timer:0};
+  const F={k,S};
+  E('zoom').dataset.c='#D93A44';
+  const crop=new Cropper(E('canvas'),{size:cfg.size,diameter:cfg.d,bg:'#F2F2F2',mask:'rgba(255,255,255,.74)',keyboard:!!cfg.keyboard,onChange(){
+    syncRange(E('zoom'),crop.zoom);schedulePreview(k,crop);
+    const small=crop.src&&crop.srcPx<256,w=E('warn');w.textContent=small?'图片较小，再放大可能会模糊。':'';w.classList.toggle('warn',!!small);
+  }});
+  F.crop=crop;
+  F.render=()=>{
+    const st=S.status,saving=st==='saving',failed=st==='failed',edit=S.step==='edit';
+    E('backdrop').classList.toggle('on',S.open);
+    E('pick').hidden=edit;E('edit').hidden=!edit;
+    E('err').hidden=!(failed&&edit);
+    const sv=E('save');sv.hidden=!edit;sv.disabled=saving||!crop.src;sv.classList.toggle('busy',saving);sv.querySelector('.lbl').textContent=saving?'保存中…':failed?'重试':'保存头像';
+    E('back-edit').hidden=edit||!crop.src;
+    E('hint').style.visibility=edit?'visible':'hidden';
+    ['zoom','zin','zout','rot','resetc','repick','cancel','close','back-edit'].forEach(id=>{const el=E(id);if(el)el.disabled=saving;});
+    E('dialog').classList.toggle('is-saving',saving);crop.lock(saving);
+    E('cur-cap').textContent=failed?'当前 · 未改变':'当前';
+    E('pending').hidden=!S.pending;
+    E('open').textContent=S.pending?'继续编辑':'打开「更换头像」';
+    syncAvatars();renderMeta();
+  };
+  F.open=()=>{S.open=true;S.step=crop.src?'edit':'pick';S.pending=false;F.render();};
+  F.close=()=>{
+    if(S.status==='saving')return;
+    if(S.status==='failed'&&crop.src){S.pending=true;}else{S.status='idle';crop.setImage(null);}
+    S.open=false;F.render();
+  };
+  F.use=src=>{if(S.status==='saving')return;crop.setImage(src);S.status='cropping';S.step='edit';S.open=true;S.pending=false;F.render();};
+  F.replace=src=>{if(S.status==='saving')return;crop.setImage(src);S.status='cropping';F.render();};
+  F.save=()=>{
+    if(S.status==='saving'||!crop.src)return;
+    S.status='saving';F.render();
+    S.timer=setTimeout(()=>{
+      if(failNext){S.status='failed';F.render();return;}
+      webOld=crop.exportURL()||webOld;S.status='saved';S.open=false;S.pending=false;crop.setImage(null);
+      F.render();M&&M.render();toast(cfg.toast,'头像已更新');
+    },1400);
+  };
+  F.reset=()=>{clearTimeout(S.timer);Object.assign(S,{status:'idle',open:false,step:'pick',pending:false});crop.setImage(null);F.render();};
+  on('open','click',F.open);
+  on('discard','click',()=>{S.pending=false;S.status='idle';crop.setImage(null);F.render();});
+  on('close','click',F.close);on('cancel','click',F.close);
+  on('repick','click',()=>{if(S.status==='saving')return;S.step='pick';F.render();});
+  on('back-edit','click',()=>{S.step='edit';F.render();});
+  on('rot','click',()=>crop.rotate());on('resetc','click',()=>crop.reset());
+  on('zoom','input',e=>crop.zoomTo(+e.target.value));
+  on('zin','click',()=>crop.zoomTo(crop.zoom*1.2));on('zout','click',()=>crop.zoomTo(crop.zoom/1.2));
+  on('save','click',F.save);
+  on('file','change',async e=>{const img=await readLocal(e.target.files[0],cfg.toast);e.target.value='';if(img)F.use(img);});
+  return F;
+}
+
+AF=appFlow('a',{setOld:v=>{if(v)appOld=v;}});
+M=appFlow('m',{setOld:v=>{if(v)webOld=v;},after:()=>W&&W.render()});
+W=webFlow('w',{size:360,d:300,keyboard:true,toast:'#w-toast'});
+$('#w-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='w-backdrop')W.close();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&platform==='web'&&view==='pc'&&W.S.open)W.close();});
+
+function dropTarget(el,cls,onImg){
+  el.addEventListener('dragover',e=>{if(W.S.status==='saving')return;e.preventDefault();el.classList.add(cls);});
+  el.addEventListener('dragleave',()=>el.classList.remove(cls));
+  el.addEventListener('drop',async e=>{e.preventDefault();el.classList.remove(cls);if(W.S.status==='saving')return;const img=await readLocal(e.dataTransfer.files[0],'#w-toast');if(img)onImg(img);});
+}
+dropTarget($('#w-drop'),'over',img=>W.use(img));
+dropTarget($('#w-stage'),'over',img=>W.replace(img));
+
+/* ---------- 顶栏控制 ---------- */
+function seg(id,cb){$$(`#${id} button`).forEach(b=>b.onclick=()=>{$$(`#${id} button`).forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));cb(b.dataset.v);});}
+seg('seg-p',v=>{platform=v;document.body.dataset.p=v;renderMeta();});
+seg('seg-v',v=>{view=v;document.body.dataset.v=v;renderMeta();});
+seg('seg-f',v=>{failNext=v==='fail';});
+function openAll(){AF.sheet(true);M.sheet(true);W.open();}
+$('#reset').onclick=()=>{
+  appOld=webOld=INITIAL;
+  AF.reset();M.reset();W.reset();openAll();
+};
+
+/* ---------- 启动 ---------- */
+(async function init(){
+  for(const sm of SAMPLES){
+    SRC[sm.id]=await rasterize(sm);
+    for(const [box,use] of [['#a-samples',img=>AF.use(img)],['#m-samples',img=>M.use(img)],['#w-samples',img=>W.use(img)]]){
+      const b=document.createElement('button');b.type='button';b.title=sm.name;b.setAttribute('aria-label','示例图：'+sm.name);
+      const i=document.createElement('img');i.src=svgUrl(sm.svg);i.alt='';b.appendChild(i);b.onclick=()=>use(SRC[sm.id]);$(box).appendChild(b);
+    }
+  }
+  // 旧头像：「远山」居中裁成圆
+  const holder=document.createElement('div'),tc=document.createElement('canvas');holder.appendChild(tc);
+  const tmp=new Cropper(tc,{size:300,diameter:300,bg:'#fff',mask:'rgba(0,0,0,0)'});
+  tmp.setImage(SRC.hill);tmp.ty=40;tmp.clamp();
+  INITIAL=tmp.exportURL(256)||svgUrl(SAMPLES[1].svg);
+  appOld=webOld=INITIAL;
+  AF.render();M.render();W.render();openAll();
+})();
+})();
+</script>
+</body>
+</html>

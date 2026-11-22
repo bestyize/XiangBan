@@ -15,6 +15,7 @@
     "test:post-bundle": "node --experimental-strip-types --test tests/postBundle.test.ts",
     "test:poster": "node --experimental-strip-types --test tests/poster.test.ts",
     "test:direct-upload": "node --experimental-strip-types --test tests/directUpload.test.mjs",
+    "test:avatar-crop": "node --experimental-strip-types --test tests/avatarCrop.test.ts",
     "test:app-runtime": "node --experimental-strip-types --test tests/appRuntime.test.ts tests/appRuntimeBridge.test.ts tests/appRuntimeStorage.test.ts"
   },
   "dependencies": {

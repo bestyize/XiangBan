@@ -173,6 +173,15 @@ export const useSession = defineStore('session', () => {
     if (current) await accountApi.logout(current.refreshToken).catch(() => undefined)
   }
 
+  /** 把已上传的头像地址写进账号中心，再同步论坛资料。失败时抛出，调用方显示原因并允许重试。 */
+  async function setAvatar(avatarUrl: string) {
+    const generation = scope.capture()
+    const token = await accessToken()
+    if (!token || !scope.current(generation)) throw new AccountError(401, '登录已过期，请重新登录后再试')
+    await accountApi.updateAvatar(token, avatarUrl)
+    if (scope.current(generation)) await loadSession()
+  }
+
   /** 需要登录的操作先调用它：未登录就弹出登录框并返回 false。 */
   function requireLogin(): boolean {
     if (loggedIn.value) return true
@@ -199,5 +208,6 @@ export const useSession = defineStore('session', () => {
     register,
     logout,
     requireLogin,
+    setAvatar,
   }
 })

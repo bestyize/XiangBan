@@ -45,6 +45,9 @@ import xyz.xiangban.xiaoban.common.community.ApiException
 import xyz.xiangban.xiaoban.common.community.CodeLogin
 import xyz.xiangban.xiaoban.common.community.AccountSignupMethods
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.FORUM_IMAGE_MAX_BYTES
+import xyz.xiangban.xiaoban.common.community.ForumUploadFile
+import kotlinx.coroutines.CancellationException
 
 private enum class LoginMode(val label: String) { Code("验证码登录"), Password("密码登录") }
 internal const val CONTACT_URL = "https://chat.xiangban.xyz/contact"
@@ -200,9 +203,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 val name = nickname ?: session.user?.username
-                Box(Modifier.size(64.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
-                    Text(name?.take(1)?.uppercase() ?: "?", color = Color.White, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                }
+                AccountAvatar(session.user?.avatarUrl, name, 64.dp)
                 Column(Modifier.weight(1f)) {
                     if (session.loggedIn) {
                         Text(name ?: "已登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
@@ -252,18 +253,76 @@ private fun QuickTile(icon: ImageVector, label: String, modifier: Modifier = Mod
     }
 }
 
-/** 设置：账号资料在网页上改；这里放关于、协议和退出登录。 */
+/** 设置：头像在 App 内更换（平台不支持时打开网页）；其余账号资料在网页上改，这里还放关于、协议和退出登录。 */
 @Composable
 fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val site = env.config.forumBase.trimEnd('/')
+    val platform = env.platform
+    val avatar = remember(session.accountId) { AvatarEditorState() }
+    var toast by remember { mutableStateOf<String?>(null) }
+
+    fun pickAvatar() {
+        val actions = platform ?: return
+        if (avatar.picking || avatar.saving) return
+        avatar.picking = true
+        scope.launch {
+            try {
+                val file = actions.pickForumPhoto(AVATAR_MAX_BYTES) ?: return@launch
+                avatar.use(actions.decodeAvatarImage(file) ?: throw ApiException(400, "这张图片打不开，换一张试试"))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                toast = messageOf(e)
+            } finally {
+                avatar.picking = false
+            }
+        }
+    }
+
+    // 先把裁好的 512 WebP 传到论坛图片库，再把地址写进账号中心；上传过的同一裁剪重试时只重写账号中心。
+    fun saveAvatar() {
+        val actions = platform ?: return
+        val image = avatar.image ?: return
+        val crop = avatar.crop ?: return
+        if (avatar.saving) return
+        val owner = session.accountId
+        avatar.status = AvatarStatus.Saving
+        avatar.error = null
+        scope.launch {
+            try {
+                val signature = avatar.signature()
+                val url = avatar.uploaded?.takeIf { it.first == signature }?.second ?: run {
+                    val bytes = actions.encodeAvatarWebp(renderAvatar(image, crop, avatar.diameter)) ?: throw ApiException(0, "生成头像失败，请重试")
+                    val uploaded = env.forum.uploadImage(ForumUploadFile("avatar.webp", "image/webp", bytes), FORUM_IMAGE_MAX_BYTES)
+                    env.forum.imageUrl(uploaded.url).also { avatar.uploaded = signature to it }
+                }
+                if (env.session.state.value.accountId != owner) throw ApiException(401, "账号已切换，请重新选择图片")
+                env.session.setAvatar(url)
+                // 论坛登录时同步头像；这一步也让论坛记住这张图在用作头像，不被当成未引用图片清理。
+                runCatching { env.forum.session() }
+                avatar.clear()
+                toast = "头像已更新"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                avatar.status = AvatarStatus.Failed
+                avatar.error = (e as? ApiException)?.message ?: "网络连接中断"
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         ScreenBar("设置", onBack = back)
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             if (session.loggedIn) {
                 GroupLabel("账号")
-                NavRow("昵称与头像", session.user?.username, first = true) { env.platform?.openUrl("$site/settings") }
+                AvatarRow(session.user?.avatarUrl, session.user?.username) {
+                    if (platform?.avatarEditorSupported == true) avatar.open() else platform?.openUrl("$site/settings")
+                }
+                if (avatar.pending) AvatarPendingRow(onDiscard = avatar::clear, onResume = avatar::open)
                 NavRow("绑定手机 / 邮箱") { env.platform?.openUrl("$site/settings") }
             }
             GroupLabel("外观与声音")
@@ -291,5 +350,9 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 PillButton("登录", { open(Route.Login) }, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).fillMaxWidth())
             }
         }
+    }
+    if (avatar.cropOpen) AvatarCropPage(avatar, session.user?.username, session.user?.avatarUrl, onSave = ::saveAvatar)
+    if (avatar.sheet) AvatarPickSheet(avatar, onPick = ::pickAvatar)
+    Toast(toast) { toast = null }
     }
 }

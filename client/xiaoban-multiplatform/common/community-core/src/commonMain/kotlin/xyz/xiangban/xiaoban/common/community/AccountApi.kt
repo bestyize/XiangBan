@@ -60,6 +60,10 @@ class AccountApi(client: HttpClient, private val config: CommunityConfig) {
     suspend fun me(token: String): AccountUser =
         http.send(HttpMethod.Get, "/api/me", serializer(), token = token)
 
+    /** 只能改头像：传 https 地址，账号中心校验后返回最新资料。 */
+    suspend fun updateAvatar(token: String, avatarUrl: String): AccountUser =
+        http.send(HttpMethod.Patch, "/api/me", serializer(), obj { put("avatar_url", avatarUrl) }, token = token)
+
     suspend fun refresh(refreshToken: String): TokenPair =
         http.send(HttpMethod.Post, "/api/auth/refresh", serializer(), obj { put("refresh_token", refreshToken); put("client_id", config.clientId) })
 

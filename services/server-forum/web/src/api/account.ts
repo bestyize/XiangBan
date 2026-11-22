@@ -72,6 +72,8 @@ async function call<T>(method: string, path: string, body?: unknown, token?: str
 
 export const accountApi = {
   me: (token: string) => call<AccountUser>('GET', '/api/me', undefined, token),
+  /** 只能改头像：传 https 地址，账号中心校验后返回最新资料。 */
+  updateAvatar: (token: string, avatarUrl: string) => call<AccountUser>('PATCH', '/api/me', { avatar_url: avatarUrl }, token),
   redeemDesktopTicket: (ticket: string) =>
     call<TokenPair>('POST', '/api/auth/desktop-forum/redeem', { ticket }),
   sendCode: (identifier: string, purpose: 'login' | 'reset_password' = 'login') =>

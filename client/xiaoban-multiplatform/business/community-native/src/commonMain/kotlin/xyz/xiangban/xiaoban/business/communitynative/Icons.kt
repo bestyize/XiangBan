@@ -83,6 +83,11 @@ object XIcons {
     val Plus: ImageVector by lazy { strokeIcon("Plus", "M12 5v14M5 12h14") }
     val Question: ImageVector by lazy { strokeIcon("Question", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17v.5") }
     val Refresh: ImageVector by lazy { strokeIcon("Refresh", "M20 12a8 8 0 10-2.3 5.6M20 5v5h-5") }
+    // 更换头像的裁剪工具，取自 avatar-editor.html 设计稿。
+    val RotateCw: ImageVector by lazy { strokeIcon("RotateCw", "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7") }
+    val ResetCrop: ImageVector by lazy { strokeIcon("ResetCrop", "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4") }
+    val ZoomOut: ImageVector by lazy { strokeIcon("ZoomOut", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M20 20l-4-4") }
+    val ZoomIn: ImageVector by lazy { strokeIcon("ZoomIn", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M11 8v6M20 20l-4-4") }
     val Search: ImageVector by lazy { strokeIcon("Search", "M4.5 11a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0zM16 16l4.5 4.5") }
     val Share: ImageVector by lazy { strokeIcon("Share", "M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6") }
     val Shield: ImageVector by lazy { strokeIcon("Shield", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z") }
