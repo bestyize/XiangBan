@@ -1,84 +1,53 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontFamily
-import xyz.xiangban.xiaoban.common.community.ChatSummary
-import xyz.xiangban.xiaoban.common.community.CloudChatController
-import xyz.xiangban.xiaoban.common.community.CloudChatState
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
-import xiaoban.business.community_native.generated.resources.Res
-import xiaoban.business.community_native.generated.resources.home_companion
-import xiaoban.business.community_native.generated.resources.home_tool_computer
-import xiaoban.business.community_native.generated.resources.home_tool_decor
-import xiaoban.business.community_native.generated.resources.home_tool_game
-import xiaoban.business.community_native.generated.resources.home_tool_image
-import xyz.xiangban.xiaoban.common.community.isCustomModelTier
 import kotlin.time.Clock
-
-/** 首页用的几种点缀色，浅色和深色各一套；只用在图标和极浅的底上。 */
-private class Tint(private val light: Long, private val dark: Long) {
-    val color: Color get() = Color(if (ThemeState.dark) dark else light)
-}
-
-private val Ochre = Tint(0xFFB06A34L, 0xFFE0A274L)
-private val Pine = Tint(0xFF4C7D5FL, 0xFF8CC3A0L)
-private val Plum = Tint(0xFF7A5A8CL, 0xFFBFA2D0L)
-private val Indigo = Tint(0xFF3D6B8CL, 0xFF8DB4D2L)
-
-private class HomeFeature(val icon: DrawableResource, val title: String, val status: String? = null, val onClick: () -> Unit)
-
-private class HomeStarter(val icon: ImageVector, val label: String, val text: String, val tint: Tint)
-
-private val HomeStarters = listOf(
-    HomeStarter(XIcons.Target, "理清思路", StarterPrompts[0], Ochre),
-    HomeStarter(XIcons.Book, "理解概念", StarterPrompts[1], Indigo),
-    HomeStarter(XIcons.Pen, "润色文字", StarterPrompts[2], Pine),
-    HomeStarter(XIcons.Sparkles, "听个故事", "给我讲一个三分钟能读完的小故事", Plum),
-)
+import xyz.xiangban.xiaoban.common.community.ChatSummary
+import xyz.xiangban.xiaoban.common.community.ChatTaskStatus
+import xyz.xiangban.xiaoban.common.community.CloudChatState
 
 private class LocalClock(val month: Int, val day: Int, val weekday: Int, val hour: Int)
 
@@ -112,180 +81,451 @@ private fun greeting(hour: Int): Pair<String, String> = when (hour) {
 // ───────────── 小伴AI 首页 ─────────────
 
 /** 小伴AI 首页：问候、输入卡片（点一下进入对话页）、创作推荐、试试这样问我、继续对话。 */
+
+internal val AgentHairline: Color get() = Color(if (ThemeState.dark) 0xFF2A2A2D else 0xFFEDEDED)
+internal val AgentLine: Color get() = Color(if (ThemeState.dark) 0xFF363639 else 0xFFE4E4E4)
+private val AgentDangerSoft: Color get() = Color(if (ThemeState.dark) 0xFF361E22 else 0xFFFFF3F4)
+
+internal val AgentAccentLine: Color
+    get() = if (ThemeState.dark) Color.White.copy(alpha = .08f) else Color(when (ThemeState.accent.id) {
+        "green" -> 0xFFC4E3D0
+        "blue" -> 0xFFC5D8F8
+        "purple" -> 0xFFD4C8F7
+        "amber" -> 0xFFECD4AF
+        "graphite" -> 0xFFD3D3D8
+        else -> 0xFFF5C7CD
+    })
+
+@Composable
+internal fun AgentIconButton(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 40.dp, glyph: Dp = 20.dp, tint: Color = MaterialTheme.colorScheme.onBackground) {
+    Box(modifier.size(size).clip(RoundedCornerShape(12.dp))
+        .clickable(indication = null, interactionSource = null, role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        XIcon(icon, description = label, size = glyph, tint = tint)
+    }
+}
+
+@Composable
+internal fun AgentTopBar(model: String, exhausted: Boolean, waiting: Boolean, onTasks: () -> Unit, onConfig: () -> Unit, back: (() -> Unit)?) {
+    val ink3 = LocalExtraColors.current.ink3
+    Box(Modifier.fillMaxWidth().statusBarsPadding().height(48.dp).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.align(Alignment.CenterStart)) {
+            AgentIconButton(if (back == null) AiHomeIcons.Tasks else AiHomeIcons.Back,
+                if (back == null) "并行任务" else "返回", back ?: onTasks)
+            if (waiting && back == null) {
+                Box(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(11.dp)
+                    .background(MaterialTheme.colorScheme.background, CircleShape).padding(2.dp).background(Danger, CircleShape))
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("小伴 AI", style = XType.Title.copy(fontSize = 17.sp, lineHeight = 21.sp, letterSpacing = (-.17).sp), fontWeight = FontWeight.Bold)
+            Row(Modifier.padding(top = 1.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.size(5.dp).background(if (exhausted) Danger else Success, CircleShape))
+                Text(if (exhausted) "点数已用完" else model, style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 14.sp),
+                    color = if (exhausted) Danger else ink3, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 200.dp))
+            }
+        }
+        AgentIconButton(AiHomeIcons.More, "个人 Agent 配置", onConfig, Modifier.align(Alignment.CenterEnd))
+    }
+}
+
+@Composable
+internal fun AgentMascot(compact: Boolean = false) {
+    val extra = LocalExtraColors.current
+    val colors = MaterialTheme.colorScheme
+    val accent = Brand
+    val shape = RoundedCornerShape(if (compact) 14.dp else 18.dp)
+    Box(Modifier.size(if (compact) 44.dp else 56.dp).background(extra.brandSoft, shape)
+        .border(1.dp, AgentAccentLine, shape), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(if (compact) 28.dp else 36.dp)) {
+            scale(size.width / 48f, pivot = Offset.Zero) {
+                drawLine(accent, Offset(24f, 9f), Offset(24f, 15f), 2.6f, StrokeCap.Round)
+                drawCircle(accent, 3f, Offset(24f, 7.5f))
+                drawRoundRect(colors.surface, Offset(9f, 14.5f), Size(30f, 23f), CornerRadius(11.5f))
+                drawRoundRect(accent, Offset(9f, 14.5f), Size(30f, 23f), CornerRadius(11.5f), style = Stroke(2.4f))
+                drawRoundRect(colors.onBackground, Offset(14.5f, 20f), Size(19f, 12f), CornerRadius(6f))
+                drawCircle(colors.surface, 2.1f, Offset(20.5f, 26f))
+                drawCircle(colors.surface, 2.1f, Offset(27.5f, 26f))
+                drawCircle(accent.copy(alpha = .45f), 2f, Offset(7.2f, 26f))
+                drawCircle(accent.copy(alpha = .45f), 2f, Offset(40.8f, 26f))
+            }
+        }
+    }
+}
+
 @OptIn(kotlin.time.ExperimentalTime::class)
 @Composable
-fun AiHomeScreen(
-    env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOpenDrawer: () -> Unit,
-    onCreateImage: () -> Unit, onCreateWork: (kind: String) -> Unit,
-) {
-    val homeScroll = rememberScrollState()
-    val session by env.session.state.collectAsState()
-    val cloud by chat.state.collectAsState()
-    val remote by env.remoteChat.state.collectAsState()
-
-    LaunchedEffect(session.loggedIn) {
-        if (session.loggedIn) {
-            chat.loadMeta()
-            env.remoteChat.refreshPeers()
-        }
-    }
-    val clock = remember(env.utcOffsetMinutes) { localClock(Clock.System.now().toEpochMilliseconds(), env.utcOffsetMinutes) }
-    val (hello, line) = greeting(clock.hour)
-    fun signedIn(action: () -> Unit) { if (session.loggedIn) action() else open(Route.Login) }
-    fun chatReady(action: () -> Unit) { if (session.loggedIn && cloud.officialAiEnabled || cloud.customProviders.any { it.available }) action() else open(Route.Models) }
-
-    val peers = remote.peers
-    val computerDesc = when {
-        !session.loggedIn -> "登录后可用"
-        peers.isEmpty() -> "尚未连接"
-        peers.any { it.online } -> peers.first { it.online }.name + " 在线"
-        else -> "电脑离线"
-    }
-    val features = buildList {
-        if (cloud.officialAiEnabled) add(HomeFeature(Res.drawable.home_tool_image, "创作图片") { signedIn(onCreateImage) })
-        add(HomeFeature(Res.drawable.home_tool_game, "创作游戏") { onCreateWork("游戏") })
-        add(HomeFeature(Res.drawable.home_tool_decor, "桌面装扮") { onCreateWork("壁纸") })
-        add(HomeFeature(Res.drawable.home_tool_computer, "遥控电脑", computerDesc) { open(Route.Devices) })
-    }
-
-    val paper = if (ThemeState.dark) Color(0xFF211F20) else Color(0xFFFAF7F1)
-    Column(Modifier.fillMaxSize().background(paper).navigationBarsPadding().padding(bottom = 56.dp)) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().height(48.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
-            Text("小伴 AI", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.Bold)
-            IconTap(XIcons.NewChat, "新对话", { chatReady { chat.clearConversation(); open(Route.AiChat) } }, size = 21.dp)
-        }
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(homeScroll).padding(horizontal = 20.dp)) {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 126.dp).padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = LocalExtraColors.current.brandInk)
-                    Text(hello, Modifier.padding(vertical = 3.dp), style = XType.Headline.copy(fontSize = 32.sp, lineHeight = 40.sp),
-                        fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-                    Text(line, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Image(painterResource(Res.drawable.home_companion), null, Modifier.fillMaxWidth(0.38f).height(102.dp), contentScale = ContentScale.Fit)
+internal fun AgentWelcome(offsetMinutes: Int, compact: Boolean, onPrompt: (String) -> Unit) {
+    val clock = remember(offsetMinutes) { localClock(Clock.System.now().toEpochMilliseconds(), offsetMinutes) }
+    val (hello, subtitle) = greeting(clock.hour)
+    val colors = MaterialTheme.colorScheme
+    val ink3 = LocalExtraColors.current.ink3
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.Center) {
+        Column(Modifier.fillMaxWidth().padding(bottom = if (compact) 10.dp else 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            AgentMascot(compact)
+            Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
+            if (!compact) {
+                Text("${clock.month}月${clock.day}日 · ${Weekdays[clock.weekday]}", style = XType.Caption, color = ink3, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(3.dp))
             }
-            SectionTitle("快捷工具")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                features.forEach { FeatureShortcut(it, Modifier.weight(1f)) }
-            }
-
-            val recent = cloud.conversations.take(3)
-            if ((session.loggedIn || cloud.customModelName != null) && recent.isNotEmpty()) {
-                SectionTitle("继续对话")
-                Column(Modifier.fillMaxWidth().outlinedCard(16.dp)) {
-                    recent.forEachIndexed { i, item ->
-                        if (i > 0) Hairline(Modifier.padding(start = 60.dp))
-                        RecentRow(item, first = i == 0) { chat.openConversation(item.id); open(Route.AiChat) }
+            Text(hello, style = XType.Headline.copy(fontSize = if (compact) 21.sp else 25.sp, lineHeight = if (compact) 28.sp else 32.sp,
+                letterSpacing = (-.6).sp), fontWeight = FontWeight.Bold)
+            Text(subtitle, Modifier.padding(top = 4.dp), style = XType.Secondary, color = colors.onSurfaceVariant)
+        }
+        if (!compact) {
+            val shape = RoundedCornerShape(16.dp)
+            val icons = listOf(AiHomeIcons.Target, AiHomeIcons.Pen, AiHomeIcons.Book)
+            val tints = listOf(Color(0xFFC87332), Color(0xFF2E8B5E), Color(0xFF346EA8))
+            Column(Modifier.fillMaxWidth().clip(shape).background(colors.surface).border(1.dp, AgentHairline, shape)) {
+                Text("直接问小伴", Modifier.padding(start = 14.dp, top = 9.dp, bottom = 5.dp), style = XType.Caption, color = ink3, fontWeight = FontWeight.SemiBold)
+                listOf(StarterPrompts[0], StarterPrompts[2], StarterPrompts[1]).forEachIndexed { index, prompt ->
+                    if (index != 0) Box(Modifier.padding(start = 40.dp, end = 14.dp).fillMaxWidth().height(1.dp).background(AgentHairline))
+                    Row(Modifier.fillMaxWidth().clickable { onPrompt(prompt) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        XIcon(icons[index], size = 16.dp, tint = tints[index])
+                        Text(prompt, Modifier.weight(1f), style = XType.Body.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        XIcon(AiHomeIcons.ArrowUpRight, size = 14.dp, tint = ink3.copy(alpha = .6f))
                     }
                 }
-                if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            SectionTitle("从这里聊起")
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeStarters.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { starter ->
-                            StarterNote(starter, Modifier.weight(1f)) {
-                                chatReady { chat.clearConversation(); chat.send(starter.text); open(Route.AiChat) }
+        }
+    }
+}
+
+@Composable
+internal fun AgentCapabilities(imagesEnabled: Boolean, computerOnline: Boolean, onImage: () -> Unit, onGame: () -> Unit, onDecor: () -> Unit, onComputer: () -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (imagesEnabled) AgentCapability(AiHomeIcons.Image, "创作图片", onImage)
+        AgentCapability(AiHomeIcons.Game, "创作游戏", onGame)
+        AgentCapability(AiHomeIcons.Decor, "桌面装扮", onDecor)
+        AgentCapability(AiHomeIcons.Pc, "遥控电脑", onComputer, computerOnline)
+    }
+}
+
+@Composable
+private fun AgentCapability(icon: ImageVector, text: String, onClick: () -> Unit, online: Boolean = false) {
+    val colors = MaterialTheme.colorScheme
+    Row(Modifier.height(29.dp).clip(CircleShape).background(colors.surface).border(1.dp, AgentHairline, CircleShape)
+        .clickable(onClick = onClick).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        XIcon(icon, tint = colors.onSurfaceVariant, size = 13.dp)
+        Text(text, style = XType.Caption, fontWeight = FontWeight.Medium, color = colors.onSurfaceVariant, maxLines = 1)
+        if (online) Box(Modifier.size(6.dp).background(Success, CircleShape))
+    }
+}
+
+@Composable
+internal fun AgentQuotaBanner(onClick: () -> Unit) {
+    Row(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        .background(AgentDangerSoft).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        XIcon(AiHomeIcons.Alert, size = 14.dp, tint = Danger)
+        Text("官方点数已用完 · 点右上角「···」切换模型或兑换额度", Modifier.weight(1f), style = XType.Caption, color = Danger, fontWeight = FontWeight.Medium)
+        XIcon(AiHomeIcons.ChevRight, size = 14.dp, tint = Danger)
+    }
+}
+
+@Composable
+internal fun AgentComposer(
+    value: String, onValue: (String) -> Unit, placeholder: String, compact: Boolean, hasAttachments: Boolean,
+    voice: VoiceInputController, voiceMode: Boolean, onVoiceMode: (Boolean) -> Unit, onAttach: () -> Unit,
+    onLive: () -> Unit, onSend: () -> Unit, sending: Boolean, onStop: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    val elevated = if (ThemeState.dark) 6.dp else 4.dp
+    val shadow = Color.Black.copy(alpha = if (ThemeState.dark) .42f else .17f)
+    val border = if (ThemeState.dark) Color.White.copy(alpha = .08f) else Color.Black.copy(alpha = .06f)
+    val canSend = value.isNotBlank() || hasAttachments
+    val orb by animateColorAsState(if (canSend || sending) Brand else extra.brandSoft, label = "发送按钮颜色")
+    Row(Modifier.fillMaxWidth().padding(horizontal = if (compact) 10.dp else 12.dp)
+        .padding(top = if (compact) 6.dp else 4.dp, bottom = if (compact) 8.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(44.dp).shadow(elevated, CircleShape, ambientColor = shadow, spotColor = shadow)
+            .clip(CircleShape).background(colors.surface).border(.5.dp, border, CircleShape)
+            .clickable(indication = null, interactionSource = null, role = Role.Button, onClick = onAttach), contentAlignment = Alignment.Center) {
+            XIcon(AiHomeIcons.Plus, description = "添加附件", size = 20.dp, tint = colors.onSurfaceVariant)
+        }
+        val pill = RoundedCornerShape(24.dp)
+        Row(Modifier.weight(1f).heightIn(min = 46.dp).shadow(elevated, pill, ambientColor = shadow, spotColor = shadow)
+            .background(colors.surface, pill).border(.5.dp, border, pill)
+            .padding(start = 16.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box(Modifier.weight(1f)) {
+                if (voiceMode) {
+                    PressBar(voice, true, "按住 说话", onPressStart = { if (sending) onStop() })
+                } else {
+                    BasicTextField(value, onValue, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        textStyle = XType.Body.copy(color = colors.onBackground), cursorBrush = SolidColor(Brand),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { if (canSend && !sending) onSend() }),
+                        decorationBox = { field ->
+                            Box {
+                                if (value.isEmpty()) Text(placeholder, style = XType.Body, color = extra.ink3, maxLines = 1)
+                                field()
                             }
+                        })
+                }
+            }
+            AgentIconButton(if (voiceMode) XIcons.Keyboard else AiHomeIcons.Mic, if (voiceMode) "切回键盘输入" else "语音输入",
+                { onVoiceMode(!voiceMode) }, size = 34.dp, glyph = 19.dp, tint = colors.onSurfaceVariant)
+            Box(Modifier.size(36.dp).clip(CircleShape).background(orb)
+                .clickable(role = Role.Button, onClick = if (sending) onStop else if (canSend) onSend else onLive),
+                contentAlignment = Alignment.Center) {
+                when {
+                    sending -> XIcon(XIcons.Stop, description = "停止", size = 18.dp, tint = Color.White)
+                    canSend -> XIcon(AiHomeIcons.ArrowUp, description = "发送", size = 18.dp, tint = Color.White)
+                    else -> XIcon(AiHomeIcons.Wave, description = "实时语音通话", size = 18.dp, tint = extra.brandInk)
+                }
+            }
+        }
+    }
+}
+
+internal val AgentBottomNavHeight = 56.dp
+
+@Composable
+internal fun AgentBottomNav(onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val ink3 = LocalExtraColors.current.ink3
+    Column(modifier.fillMaxWidth().background(colors.surface).navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+        Row(Modifier.fillMaxWidth().height(AgentBottomNavHeight - 1.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
+            val tabs = listOf(Tab.Ai to AiHomeIcons.Spark, Tab.Games to AiHomeIcons.Grid, Tab.Community to AiHomeIcons.Compass, Tab.Mine to AiHomeIcons.User)
+            tabs.forEachIndexed { index, (tab, icon) ->
+                if (index == 2) {
+                    Box(Modifier.weight(1f).fillMaxHeight().clickable(role = Role.Button, onClick = onPublish), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(44.dp, 32.dp).background(Brand, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                            XIcon(AiHomeIcons.Plus, description = "发布", tint = Color.White, size = 20.dp)
                         }
                     }
                 }
+                val active = tab == Tab.Ai
+                Column(Modifier.weight(1f).fillMaxHeight().selectable(active, role = Role.Tab) { onSelect(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
+                    val tint = if (active) colors.onBackground else ink3
+                    XIcon(icon, size = 21.dp, tint = tint)
+                    Text(when (tab) { Tab.Ai -> "小伴 AI"; Tab.Games -> "应用"; Tab.Community -> "社区"; Tab.Mine -> "我的" },
+                        style = XType.Nav, color = tint, fontWeight = if (active) FontWeight(650) else FontWeight.Normal)
+                }
             }
-            Spacer(Modifier.height(14.dp))
-        }
-        HomeChatEntry(cloud, session.loggedIn || cloud.customModelName != null) { chatReady { open(Route.AiChat) } }
-    }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text, style = XType.Section, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f).height(1.dp).background(LocalExtraColors.current.line))
-    }
-}
-
-@Composable
-private fun StarterNote(starter: HomeStarter, modifier: Modifier, onClick: () -> Unit) {
-    val ink = starter.tint.color
-    Column(
-        modifier.clip(RoundedCornerShape(12.dp)).background(ink.copy(alpha = if (ThemeState.dark) 0.12f else 0.075f))
-            .clickable(onClick = onClick).heightIn(min = 96.dp).padding(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            XIcon(starter.icon, tint = ink, size = 15.dp)
-            Text(starter.label, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(starter.text, Modifier.padding(top = 7.dp), style = XType.Body, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun HomeChatEntry(cloud: CloudChatState, loggedIn: Boolean, onClick: () -> Unit) {
-    val modelStatus = when {
-        isCustomModelTier(cloud.selectedTier) -> "自己的模型服务"
-        !cloud.officialAiEnabled -> "添加或选择模型服务"
-        loggedIn -> quotaText(cloud.balance)
-        else -> "登录或添加模型服务"
-    }
-    val background = MaterialTheme.colorScheme.onSurface
-    val foreground = MaterialTheme.colorScheme.surface
-    Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
-            .background(background).clickable(onClick = onClick).heightIn(min = 62.dp).padding(horizontal = 16.dp, vertical = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text("和小伴聊聊", style = XType.Section, fontWeight = FontWeight.SemiBold, color = foreground)
-            Text("${cloud.modelName()} · $modelStatus", style = XType.Caption, color = foreground.copy(alpha = 0.78f))
-        }
-        Box(Modifier.size(34.dp).clip(CircleShape).background(foreground), contentAlignment = Alignment.Center) {
-            XIcon(XIcons.ArrowRight, tint = background, size = 18.dp)
         }
     }
 }
 
-@Composable
-private fun FeatureShortcut(feature: HomeFeature, modifier: Modifier) {
-    Column(
-        modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = feature.onClick).padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Image(
-            painterResource(feature.icon), contentDescription = null,
-            modifier = Modifier.size(50.dp),
-        )
-        Text(feature.title, Modifier.padding(top = 6.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-        feature.status?.let {
-            Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
+internal fun CloudChatState.parallelTasks(): List<ChatSummary> = conversations.filter { item ->
+    item.id != conversationId && (item.id in runningSessions || item.id in imageSessions || item.taskStatus == ChatTaskStatus.WaitingForPlan)
 }
 
 @Composable
-private fun RecentRow(item: ChatSummary, first: Boolean, onClick: () -> Unit) {
+internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, onClick: () -> Unit) {
+    val tasks = cloud.parallelTasks()
+    if (tasks.isEmpty()) return
+    val colors = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (first) extra.brandSoft else extra.fill),
-            contentAlignment = Alignment.Center,
-        ) {
-            XIcon(XIcons.Message, tint = if (first) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
+    val waiting = tasks.firstOrNull { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
+    val shape = RoundedCornerShape(if (compact) 11.dp else 14.dp)
+    val tint = if (waiting == null) Success else Danger
+    Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp).fillMaxWidth()
+        .then(if (waiting == null) Modifier.shadow(2.dp, shape, clip = false) else Modifier)
+        .clip(shape).background(if (waiting == null) colors.surface else AgentDangerSoft)
+        .then(if (waiting == null) Modifier.border(1.dp, AgentHairline, shape) else Modifier)
+        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = if (compact) 6.dp else 9.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Box(Modifier.size(13.dp).background(tint.copy(alpha = .18f), CircleShape).padding(3.dp).background(tint, CircleShape))
+        Column(Modifier.weight(1f)) {
+            val title = when (waiting?.taskStatus) {
+                ChatTaskStatus.WaitingForPlan -> "${waiting.title} · 方案已就绪"
+                else -> if (waiting != null) "${waiting.title} · 等待确认" else "${tasks.size} 个任务后台制作中"
+            }
+            Text(title, style = XType.Secondary.copy(fontSize = if (compact) 12.5.sp else 13.sp, lineHeight = 17.sp),
+                color = if (waiting == null) colors.onBackground else Danger, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!compact && (waiting == null || tasks.size > 1)) {
+                val detail = if (waiting == null) tasks.joinToString(" · ") { it.title }
+                    else "另 ${tasks.size - 1} 个任务进行中 · 不打断当前聊天"
+                Text(detail, style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 15.sp), color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Text(if (waiting == null) "查看" else "去确认",
+            Modifier.background(if (waiting == null) extra.fill else colors.surface, CircleShape)
+                .padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 2.dp else 4.dp),
+            style = XType.Caption, fontWeight = FontWeight.SemiBold, color = if (waiting == null) colors.onSurfaceVariant else Danger)
+    }
+}
+
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+internal fun AgentSheet(title: String, dismiss: () -> Unit, panel: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    androidx.compose.ui.backhandler.BackHandler(onBack = dismiss)
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f))
+        .clickable(indication = null, interactionSource = null, onClick = dismiss).imePadding(), contentAlignment = Alignment.BottomCenter) {
+        val shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+        Column(panel.fillMaxWidth().heightIn(max = maxHeight * .78f)
+            .clip(shape).background(MaterialTheme.colorScheme.surface)
+            .clickable(indication = null, interactionSource = null) {}.navigationBarsPadding()
+            .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 26.dp)) {
+            Box(Modifier.align(Alignment.CenterHorizontally).size(34.dp, 4.dp).background(AgentLine, CircleShape))
+            Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight(650))
+                AgentIconButton(AiHomeIcons.Close, "关闭", dismiss, size = 32.dp)
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+internal fun AgentChoiceRow(
+    selected: Boolean, title: String, description: String?, onClick: () -> Unit,
+    modifier: Modifier = Modifier, enabled: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    Row(modifier.padding(bottom = 4.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        .background(if (selected) extra.brandSoft else Color.Transparent).alpha(if (enabled) 1f else .5f)
+        .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+        .padding(horizontal = 10.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold,
+                color = if (selected) extra.brandInk else colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!description.isNullOrBlank()) Text(description, Modifier.padding(top = 2.dp), style = XType.Caption, color = colors.onSurfaceVariant)
+        }
+        if (selected) XIcon(AiHomeIcons.Check, tint = Brand, size = 20.dp)
+    }
+}
+
+@Composable
+internal fun AgentTasks(cloud: CloudChatState, close: () -> Unit, panel: Modifier, open: (String) -> Unit, confirm: (String) -> Unit) {
+    val active = cloud.parallelTasks()
+    val completed = cloud.conversations.filter { it.id != cloud.conversationId && it.taskStatus == ChatTaskStatus.Completed }.take(8)
+    AgentSheet("并行任务", close, panel) {
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            if (active.isEmpty() && completed.isEmpty()) {
+                Text("暂无并行任务", Modifier.padding(vertical = 10.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (active.isNotEmpty()) {
+                TaskGroupTitle("进行中")
+                active.forEach { item ->
+                    val plan = item.id !in cloud.runningSessions && item.taskStatus == ChatTaskStatus.WaitingForPlan
+                    val waiting = plan || item.id in cloud.waitingSessions
+                    val detail = when {
+                        plan -> "创作方案已就绪 · 等待确认"
+                        waiting -> "等待你确认或回答"
+                        item.id in cloud.imageSessions -> "生图进行中"
+                        item.taskStatus == ChatTaskStatus.Planning -> "正在拟定创作方案"
+                        else -> "制作中"
+                    }
+                    AgentTaskRow(item.title, detail, if (waiting) Danger else Success,
+                        onClick = { open(item.id) }, confirm = if (plan) ({ confirm(item.id) }) else null)
+                }
+            }
+            if (completed.isNotEmpty()) {
+                TaskGroupTitle("最近完成")
+                completed.forEach { item -> AgentTaskRow(item.title, relativeTime(item.updatedAtMs), null, onClick = { open(item.id) }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskGroupTitle(text: String) {
+    Text(text, Modifier.padding(start = 2.dp, top = 12.dp, bottom = 6.dp),
+        style = XType.Caption, color = LocalExtraColors.current.ink3, fontWeight = FontWeight.Medium)
+}
+
+@Composable
+private fun AgentTaskRow(title: String, detail: String, status: Color?, onClick: () -> Unit, confirm: (() -> Unit)? = null) {
+    val extra = LocalExtraColors.current
+    Row(Modifier.padding(bottom = 4.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
+        .padding(horizontal = 10.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (status != null) Box(Modifier.padding(horizontal = 3.dp).size(7.dp).background(status, CircleShape))
+        else XIcon(AiHomeIcons.Check, size = 17.dp, tint = extra.ink3)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(detail, Modifier.padding(top = 2.dp), style = XType.Caption, color = status ?: MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (confirm != null) Text("确认制作", Modifier.clip(CircleShape).background(extra.brandSoft).clickable(onClick = confirm)
+            .padding(horizontal = 10.dp, vertical = 5.dp), color = extra.brandInk, style = XType.Caption, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+internal fun AgentTopicDivider(epochMs: Long, offsetMinutes: Int) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.weight(1f).height(1.dp).background(AgentHairline))
+        Row(Modifier.background(LocalExtraColors.current.fill, CircleShape).padding(horizontal = 9.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            XIcon(AiHomeIcons.SparkleLine, size = 11.dp, tint = Brand)
+            val time = timeOfDay(epochMs, offsetMinutes)
+            Text("新话题 · $time（上下文已重置）", style = XType.Caption.copy(fontSize = 11.sp),
+                fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box(Modifier.weight(1f).height(1.dp).background(AgentHairline))
+    }
+}
+
+private fun timeOfDay(epochMs: Long, offsetMinutes: Int): String {
+    val minutes = (epochMs.floorDiv(60_000L) + offsetMinutes).mod(1440L)
+    return "${minutes / 60}:${(minutes % 60).toString().padStart(2, '0')}"
+}
+
+@OptIn(kotlin.time.ExperimentalTime::class)
+private fun dateAndTime(epochMs: Long, offsetMinutes: Int): String {
+    val millisPerDay = 86_400_000L
+    val offset = offsetMinutes * 60_000L
+    val today = (Clock.System.now().toEpochMilliseconds() + offset).floorDiv(millisPerDay)
+    val day = (epochMs + offset).floorDiv(millisPerDay)
+    val date = localClock(epochMs, offsetMinutes)
+    val label = if (today == day) "今天" else "${date.month}月${date.day}日"
+    return "$label ${timeOfDay(epochMs, offsetMinutes)}"
+}
+
+@Composable
+internal fun AgentTimestamp(epochMs: Long, offsetMinutes: Int) {
+    Text(dateAndTime(epochMs, offsetMinutes), Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        style = XType.Caption.copy(fontSize = 11.sp), textAlign = TextAlign.Center, color = LocalExtraColors.current.ink3)
+}
+
+@Composable
+internal fun AgentReminderResult(title: String, epochMs: Long, offsetMinutes: Int, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
+    Row(Modifier.fillMaxWidth().clip(shape).background(colors.surface).border(1.dp, AgentHairline, shape)
+        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(22.dp).background(Success, CircleShape), contentAlignment = Alignment.Center) {
+            XIcon(AiHomeIcons.Check, tint = Color.White, size = 12.dp)
         }
         Column(Modifier.weight(1f)) {
-            Text(item.title, style = XType.Body, fontWeight = if (first) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(relativeTime(item.updatedAtMs), Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("已设好提醒 · ${dateAndTime(epochMs, offsetMinutes)}", style = XType.Secondary, fontWeight = FontWeight.SemiBold)
+            Text("$title · 本机提醒", style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 15.sp), color = colors.onSurfaceVariant)
         }
-        XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 16.dp)
+    }
+}
+
+@Composable
+internal fun AgentUserMessage(text: String) {
+    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 4.dp, bottomStart = 18.dp)
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.fillMaxWidth(.82f), contentAlignment = Alignment.CenterEnd) {
+            Text(text, Modifier.background(LocalExtraColors.current.brandSoft, shape).border(1.dp, AgentAccentLine, shape)
+                .padding(horizontal = 14.dp, vertical = 9.dp), style = XType.Body)
+        }
+    }
+}
+
+@Composable
+internal fun AgentReply(content: @Composable ColumnScope.() -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 2.dp).size(26.dp).background(LocalExtraColors.current.brandSoft, RoundedCornerShape(9.dp)),
+            contentAlignment = Alignment.Center) {
+            XIcon(AiHomeIcons.Spark, size = 14.dp, tint = Brand)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp), content = content)
     }
 }
 
@@ -323,7 +563,7 @@ internal fun AiDrawer(
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
             (cloud.workspaces.map { it as String? } + listOf<String?>(null)).forEach { group ->
-                val chats = cloud.conversations.filter { it.workspace == group }
+                val chats = cloud.conversations.filter { it.workspace == group && it.mainTopic == null }
                 item(key = "group:${group ?: ""}") {
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))

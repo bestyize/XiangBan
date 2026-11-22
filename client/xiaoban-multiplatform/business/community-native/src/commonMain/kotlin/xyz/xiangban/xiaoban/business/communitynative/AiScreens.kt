@@ -1,7 +1,13 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,14 +26,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,8 +44,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +59,21 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
 import xyz.xiangban.xiaoban.common.community.ChatApproval
 import xyz.xiangban.xiaoban.common.community.CloudAssistant
@@ -69,13 +84,20 @@ import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.ChatAttachment
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
+import xyz.xiangban.xiaoban.common.community.CommunityJson
+import xyz.xiangban.xiaoban.common.community.ToolStatus
 import xyz.xiangban.xiaoban.common.community.ChatSummary
 import xyz.xiangban.xiaoban.common.community.ChatTurn
-import xyz.xiangban.xiaoban.common.community.chatTitle
+import xyz.xiangban.xiaoban.common.community.ChatTaskStatus
+import xyz.xiangban.xiaoban.common.community.StoredChat
+import xyz.xiangban.xiaoban.common.community.isCustomModelTier
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
 import xyz.xiangban.xiaoban.common.community.CustomModelConfig
@@ -101,17 +123,6 @@ internal fun quotaText(balance: AiBalance?): String = when {
 
 internal fun CloudChatState.modelName(): String = activeTier?.takeIf { officialAiEnabled || xyz.xiangban.xiaoban.common.community.isCustomModelTier(selectedTier) }?.displayName
     ?: if (officialAiEnabled) tiers.firstOrNull()?.displayName ?: "小伴AI" else "选择模型"
-
-private fun CloudChatState.title(): String = chatTitle(messages, creation)
-
-/** 没登录时的整页提示。 */
-@Composable
-private fun LoginPrompt(title: String, desc: String, onLogin: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        EmptyState(XIcons.Sparkle, title, desc)
-        PillButton("登录小伴账号", onLogin, Modifier.padding(top = 20.dp).fillMaxWidth())
-    }
-}
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -188,17 +199,58 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
 
 // ───────────── 对话页（云端小伴） ─────────────
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, open: (Route) -> Unit, openImageSheet: Boolean = false, onImageSheetOpened: () -> Unit = {}) {
+internal fun AiChatPage(
+    env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, back: (() -> Unit)? = null, visible: Boolean = true,
+    onSelectTab: (Tab) -> Unit = {}, onPublish: () -> Unit = {},
+) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     val conversation = cloud.conversationId
     val accountGeneration = session.generation
+    val main = back == null
+    val archived = !main && cloud.mainTopic != null
+    val ime = WindowInsets.ime
+    val navigationBars = WindowInsets.navigationBars
+    val density = LocalDensity.current
+    val compact by remember(ime, navigationBars, density) {
+        // The keyboard can briefly report the gesture area again after its closing animation.
+        val threshold = with(density) { AgentBottomNavHeight.roundToPx() }
+        derivedStateOf { ime.getBottom(density) - navigationBars.getBottom(density) >= threshold }
+    }
+    val aboveKeyboard = Modifier.revealAboveKeyboard(ime, navigationBars)
+        .semantics { if (compact) hideFromAccessibility() }
+    val focus = LocalFocusManager.current
+    val remote by env.remoteChat.state.collectAsState()
+    val onlineComputer = remote.peers.firstOrNull { it.online }?.name?.takeIf { session.loggedIn }
+    val canChat = session.loggedIn && cloud.officialAiEnabled || cloud.customModelName != null
+    val selectedCustom = isCustomModelTier(cloud.selectedTier)
+    val exhausted = session.loggedIn && cloud.officialAiEnabled && !selectedCustom && cloud.balance != null && quotaText(cloud.balance) == "点数已用完"
+    val model = cloud.activeTier?.displayName ?: if (canChat && cloud.officialAiEnabled) "Auto" else "选择模型"
+    val quota = when {
+        selectedCustom -> "自有服务"
+        !cloud.officialAiEnabled -> ""
+        !session.loggedIn -> "未登录"
+        else -> quotaText(cloud.balance)
+    }
+    var config by rememberSaveable { mutableStateOf(false) }
+    var tasksSheet by rememberSaveable { mutableStateOf(false) }
+    var historySheet by rememberSaveable { mutableStateOf(false) }
+    var clearHistory by remember { mutableStateOf(false) }
     fun stillInConversation() = chat.state.value.conversationId == conversation &&
         env.session.state.value.generation == accountGeneration
-    var attachments by remember(conversation, accountGeneration) { mutableStateOf(emptyList<ChatAttachment>()) }
-    val attachmentScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
-    var input by rememberSaveable(conversation, accountGeneration) { mutableStateOf("") }
+    var activeMainId by remember(accountGeneration) { mutableStateOf(conversation) }
+    if (main && visible && cloud.mainTopic != null) SideEffect { activeMainId = conversation }
+    val draftOwner = if (main) activeMainId else conversation
+    var attachments by remember(draftOwner, accountGeneration) { mutableStateOf(emptyList<ChatAttachment>()) }
+    val attachmentScope = key(draftOwner, accountGeneration) { rememberCoroutineScope() }
+    val archiveSummaries = if (main) cloud.conversations.filter { it.mainTopic != null && it.id != conversation }.sortedBy { it.mainTopic } else emptyList()
+    var archive by remember(accountGeneration) { mutableStateOf(emptyList<StoredChat>()) }
+    LaunchedEffect(archiveSummaries, accountGeneration) {
+        archive = archiveSummaries.mapNotNull { chat.readChatHistory(it.id) }
+    }
+    var input by rememberSaveable(draftOwner, accountGeneration) { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
     var permissionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var executionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
@@ -206,6 +258,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var attach by rememberSaveable { mutableStateOf(false) }
     var imageSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var preview by remember(conversation, accountGeneration) { mutableStateOf<ChatImagePreview?>(null) }
+    var archivePreview by remember(conversation, accountGeneration) { mutableStateOf<Pair<String, ChatImagePreview>?>(null) }
     val resolveImage = remember(chat, conversation, accountGeneration) {
         val resolve: suspend (String) -> String? = { value -> chat.resolveImage(conversation, value) }
         resolve
@@ -215,6 +268,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         resolve
     }
     var toast by remember { mutableStateOf<String?>(null) }
+    var workKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var workBrief by rememberSaveable { mutableStateOf("") }
+    var workForComputer by rememberSaveable { mutableStateOf<String?>(null) }
     // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
     val voiceInput = key(conversation, accountGeneration) {
         rememberVoiceInput(
@@ -230,59 +286,106 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val callHost = key(conversation, accountGeneration) { rememberVoiceCallHost(env) }
     val callScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
 
-    LaunchedEffect(session.loggedIn, session.accountId, accountGeneration) { if (session.loggedIn) chat.loadMeta() }
-    LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) imageSheet = false }
-    LaunchedEffect(openImageSheet) {
-        if (openImageSheet) {
-            onImageSheetOpened()
-            when {
-                !cloud.officialAiEnabled -> Unit
-                !session.loggedIn -> Unit
-                cloud.sending -> toast = "请先结束当前任务"
-                cloud.imageCapability?.available == false -> toast = "生图暂不可用，请检查登录和额度"
-                else -> imageSheet = true
+    fun requireChat(action: () -> Unit) {
+        when {
+            main && cloud.mainTopic == null -> Unit
+            canChat -> action()
+            cloud.officialAiEnabled -> open(Route.Login)
+            else -> open(Route.Models)
+        }
+    }
+    fun openConfig() {
+        focus.clearFocus()
+        config = true
+    }
+    fun openImage() {
+        when {
+            !session.loggedIn -> open(Route.Login)
+            cloud.sending && !main -> toast = "请先结束当前任务"
+            cloud.imageCapability?.available == false -> toast = "生图暂不可用，请检查登录和额度"
+            else -> imageSheet = true
+        }
+    }
+    fun openWork(kind: String) {
+        focus.clearFocus()
+        workBrief = ""
+        workKind = kind
+    }
+    fun sendPrompt(text: String) {
+        requireChat {
+            try {
+                if (chat.sendWithAttachments(text, attachments)) {
+                    input = ""
+                    attachments = emptyList()
+                }
+            } catch (e: Exception) {
+                toast = e.message ?: "附件无法发送"
             }
         }
     }
-    cloud.messages.lastOrNull().let { last -> AutoRead(env.reader, last?.id, last?.role, last?.text.orEmpty(), last?.streaming == true, paused = callHost.call != null) }
+    fun openConversation(id: String) {
+        focus.clearFocus()
+        chat.openConversation(id)
+        if (main) open(Route.AiChat)
+    }
+    LaunchedEffect(visible, session.loggedIn, session.accountId, accountGeneration) {
+        if (visible && session.loggedIn && main) {
+            chat.loadMeta()
+            env.remoteChat.refreshPeers()
+        }
+    }
+    LaunchedEffect(cloud.officialAiEnabled) { if (!cloud.officialAiEnabled) imageSheet = false }
+    if (visible && !archived) key(conversation) {
+        cloud.messages.lastOrNull().let { last ->
+            AutoRead(env.reader, last?.id, last?.role, last?.text.orEmpty(), last?.streaming == true,
+                paused = callHost.call != null, afterCompletion = true)
+        }
+    }
+    BackHandler(enabled = visible && config) { config = false }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().imePadding()) {
-            ScreenBar(
-                cloud.title(), onBack = back,
-                trailing = {
-                    Row {
-                        IconTap(XIcons.Sliders, "任务设置", { executionSheet = true }, size = 22.dp)
-                        IconTap(XIcons.NewChat, "新对话", { chat.clearConversation(); input = "" }, size = 22.dp)
-                        IconTap(XIcons.Menu, "对话列表", { drawer = true }, size = 22.dp)
-                    }
-                },
-            )
-            if (!session.loggedIn && cloud.customModelName == null) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    if (cloud.officialAiEnabled) {
-                        LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
-                    } else {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            EmptyState(XIcons.Sparkle, "添加模型服务", "添加第三方模型服务后即可开始对话。")
-                            PillButton("添加模型服务", { open(Route.Models) }, Modifier.padding(top = 20.dp).fillMaxWidth())
-                        }
+    val configTransition = updateTransition(config, label = "小伴配置")
+    val chatShift by configTransition.animateFloat(
+        transitionSpec = { tween(PageMillis, easing = FastOutSlowInEasing) },
+        label = "主线让位",
+    ) { if (it) 1f else 0f }
+    val sliding = configTransition.currentState != config || configTransition.isRunning
+    val blockTouches = if (sliding) Modifier.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
+    } else Modifier
+    Box(Modifier.fillMaxSize().clipToBounds().then(blockTouches)) {
+        Column(
+            Modifier.fillMaxSize()
+                .graphicsLayer { translationX = -size.width * chatShift }
+                .semantics { if (config) hideFromAccessibility() }
+                .imePadding(),
+        ) {
+            val hasWaitingTask = cloud.parallelTasks().any { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
+            AgentTopBar(model, exhausted, hasWaitingTask, { focus.clearFocus(); tasksSheet = true }, ::openConfig, back)
+            if (main) AgentTaskStrip(cloud, compact) { focus.clearFocus(); tasksSheet = true }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (cloud.messages.isEmpty() && archive.isEmpty()) {
+                    AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
+                } else {
+                    key(conversation) {
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
+                            onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send,
+                            onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob,
+                            onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } },
+                            waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null,
+                            showQuota = cloud.officialAiEnabled, archive = archive, offsetMinutes = env.utcOffsetMinutes,
+                            topicStarted = if (main && (cloud.mainTopic ?: 0) > 1L) {
+                                cloud.messages.firstOrNull()?.createdAtMs
+                                    ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
+                            } else null,
+                            readOnly = archived,
+                            onArchivedPreview = { id, image -> archivePreview = id to image },
+                            archivedThumbnail = { id, image -> chat.resolveArchivedImage(id, image, thumbnail = true) })
                     }
                 }
-            } else {
-                if (cloud.backgroundTaskCount + cloud.backgroundImageCount > 0) {
-                    val waiting = cloud.waitingSessions.count { it != cloud.conversationId }
-                    val status = if (waiting > 0) "，其中 $waiting 个等待你处理" else ""
-                    LinkText("${cloud.backgroundTaskCount + cloud.backgroundImageCount} 个任务在其他对话中进行$status · 查看对话", { drawer = true },
-                        Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    if (cloud.messages.isEmpty()) {
-                        ChatWelcome()
-                    } else {
-                        key(conversation) { CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onRecoverImage = chat::recoverImageJob, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null, showQuota = cloud.officialAiEnabled) }
-                    }
-                }
+            }
+            if (!archived) {
                 cloud.question?.let { question ->
                     AskCard(RemoteApprovalRequest(
                         approvalId = question.id, session = cloud.conversationId, title = "小伴想问你",
@@ -290,12 +393,14 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     ), { answer -> chat.answerQuestion(answer.takeUnless { it == "__dismiss__" }) }, Modifier.padding(horizontal = 12.dp))
                 }
                 cloud.approval?.let { pending -> ApprovalCard(pending.toRequest(), { chat.answerApproval(it) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) }
-                if (cloud.messages.isEmpty()) {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StarterPrompts.forEach { prompt -> ChipPill(prompt, onClick = { chat.send(prompt) }) }
+                if (main) {
+                    Column(aboveKeyboard) {
+                        AgentCapabilities(cloud.officialAiEnabled, onlineComputer != null, ::openImage,
+                            { openWork("游戏") }, { openWork("壁纸") }, { open(Route.Devices) })
+                        if (exhausted) AgentQuotaBanner(::openConfig)
                     }
                 }
-                Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                Column(Modifier.padding(horizontal = 12.dp)) {
                     if (cloud.planningCreation) {
                         Text(
                             when {
@@ -319,48 +424,110 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                             LinkText("重试保存", chat::retrySave)
                         }
                     }
-                    if (!cloud.nativeAgentAvailable) Text("当前仅支持云端对话，本机任务暂不可用", Modifier.padding(bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
                     if (attachments.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         attachments.forEachIndexed { index, item -> ChipPill("${item.name} ×", onClick = { attachments = attachments.filterIndexed { i, _ -> i != index } }) }
                     }
                     cloud.inputError?.let { Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 4.dp)) }
-                    ChatComposer(
-                        input, { input = it }, if (cloud.planningCreation) "补充需求或调整方案…" else "问点什么，或描述想要的装扮、游戏…",
-                        onModel = { modelSheet = true },
-                        onAttach = { attach = true },
-                        onPermission = if (cloud.nativeAgentAvailable && !cloud.planningCreation) ({ permissionSheet = true }) else null,
-                        fullTrust = cloud.permissionMode == "auto",
-                        voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
-                        onVoicePress = { if (cloud.sending) chat.stop() },
-                        onLive = {
-                            val platform = env.platform
-                            when {
-                                platform == null -> toast = "这个平台暂不支持语音通话"
-                                !session.loggedIn -> toast = "请先登录小伴账号"
-                                cloud.sending -> toast = "小伴正在回答，稍后再通话"
-                                voiceInput.busy -> toast = "先结束当前的录音"
-                                else -> callHost.request {
-                                    SpokenCall(callScope, platform, CloudAssistant(chat), env.recognizers(CloudRecognizer(env.ai)), env.synthesizers(), env.turnJudge())
-                                }
-                            }
-                        },
-                        onSend = {
-                            if (!cloud.sending && (input.isNotBlank() || attachments.isNotEmpty())) {
-                                try {
-                                    if (chat.sendWithAttachments(input, attachments)) { input = ""; attachments = emptyList() }
-                                }
-                                catch (e: Exception) { toast = e.message ?: "附件无法发送" }
-                            }
-                        },
-                        hasAttachments = attachments.isNotEmpty(),
-                        sending = cloud.sending, onStop = chat::stop,
-                    )
                 }
+                AgentComposer(
+                    input, { input = it }, if (cloud.messages.isEmpty() && archive.isEmpty()) "和小伴说点什么…" else "问点什么…",
+                    compact = compact, hasAttachments = attachments.isNotEmpty(),
+                    voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { focus.clearFocus(); voiceMode = it },
+                    onAttach = { focus.clearFocus(); attach = true },
+                    onLive = {
+                        focus.clearFocus()
+                        val platform = env.platform
+                        when {
+                            platform == null -> toast = "这个平台暂不支持语音通话"
+                            !session.loggedIn -> open(Route.Login)
+                            cloud.sending -> toast = "小伴正在回答，稍后再通话"
+                            voiceInput.busy -> toast = "先结束当前的录音"
+                            else -> callHost.request {
+                                SpokenCall(callScope, platform, CloudAssistant(chat), env.recognizers(CloudRecognizer(env.ai)), env.synthesizers(), env.turnJudge())
+                            }
+                        }
+                    },
+                    onSend = { sendPrompt(input) }, sending = cloud.sending, onStop = chat::stop,
+                )
+            }
+            if (main) AgentBottomNav(onSelectTab, onPublish, aboveKeyboard)
+            else Spacer(Modifier.navigationBarsPadding())
+        }
+        val pageMotion = tween<IntOffset>(PageMillis, easing = FastOutSlowInEasing)
+        configTransition.AnimatedVisibility(
+            visible = { it },
+            modifier = Modifier.fillMaxSize().semantics { if (!config) hideFromAccessibility() },
+            enter = slideInHorizontally(pageMotion) { it },
+            exit = slideOutHorizontally(pageMotion) { it },
+        ) {
+            AgentConfiguration(
+                cloud, model, quota, exhausted, session.loggedIn, onlineComputer,
+                back = { config = false },
+                onTopic = {
+                    if (main) chat.startMainTopic() else chat.clearConversation()
+                    config = false
+                },
+                onHistory = { historySheet = true },
+                onModel = { modelSheet = true },
+                onQuota = { open(Route.Models) },
+                onPermission = { if (cloud.nativeAgentAvailable) permissionSheet = true else toast = "本机操作当前不可用" },
+                onBudget = { executionSheet = true },
+                onDevices = { open(Route.Devices) },
+                onAutoRead = { on -> SpeechState.update { it.copy(autoRead = on) }; if (!on) env.reader.stop() },
+                onClear = { clearHistory = true },
+            )
+        }
+        workKind?.let { kind ->
+            MobileCreationSheet(env, chat, kind, workBrief, onKind = { workKind = it }, onIdea = { workBrief = it },
+                onDismiss = { workKind = null }, onStart = {
+                    val brief = workBrief.trim()
+                    if (kind in LocalCreationTypes) {
+                        requireChat {
+                            if (env.agent == null) {
+                                toast = "当前安装包不支持手机本地创作，可连接电脑创作。"
+                            } else {
+                                val type = if (kind == "小程序") "小程序（kind=app，category 取 tool 或 quiz）" else "离线小游戏（kind=game）"
+                                val title = xyz.xiangban.xiaoban.common.community.creationTitle(brief, kind)
+                                if (chat.startParallelCreation(title, brief, "制作支持手机触控和电脑键鼠的$type。需求：$brief")) {
+                                    workKind = null
+                                } else toast = "暂时无法发起创作，请检查当前对话模型。"
+                            }
+                        }
+                    } else if (!session.loggedIn) {
+                        open(Route.Login)
+                    } else {
+                        workKind = null
+                        workForComputer = "请在这台电脑上帮我创作小伴桌面的${kind}。我的想法：${brief}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。"
+                    }
+                })
+        }
+        workForComputer?.let { prompt ->
+            MobileCreationDeviceSheet(env, prompt, { workForComputer = null }, open)
+        }
+        OverlayTransition(tasksSheet) { panel ->
+            AgentTasks(cloud, { tasksSheet = false }, panel, open = { id ->
+                tasksSheet = false
+                openConversation(id)
+            }, confirm = { id -> chat.confirmParallelCreation(id) })
+        }
+        OverlayTransition(historySheet) { panel ->
+            AgentHistorySheet(chat, cloud.conversations, { historySheet = false }, panel,
+                onOpen = { id -> historySheet = false; config = false; openConversation(id) },
+                onAllConversations = { historySheet = false; drawer = true })
+        }
+        if (clearHistory) CenterDialog({ clearHistory = false }) {
+            Text("清空主线聊天记录？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            Text("将删除本机保存的主线记录，作品与已发布内容会保留。", Modifier.padding(vertical = 12.dp), style = XType.Secondary)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostPillButton("取消", { clearHistory = false }, Modifier.weight(1f))
+                PillButton("清空", { clearHistory = false; chat.clearMainHistory() }, Modifier.weight(1f))
             }
         }
         OverlayTransition(permissionSheet) { panel ->
-            BottomSheet({ permissionSheet = false }, panel) { CloudPermissionSettings(chat, cloud) { permissionSheet = false } }
+            AgentSheet("本机操作权限", { permissionSheet = false }, panel) {
+                CloudPermissionSettings(chat, cloud) { permissionSheet = false }
+            }
         }
         OverlayTransition(executionSheet) { panel ->
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -370,12 +537,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
             }
         }
         OverlayTransition(attach) { panel ->
-            AttachSheet({ attach = false }, { label ->
+            fun pick(label: String) {
                 attach = false
                 if (label == "生成图片") {
-                    if (cloud.sending) toast = "请先结束当前任务"
-                    else if (cloud.imageCapability?.available == false) toast = "生图暂不可用，请检查登录和额度"
-                    else imageSheet = true
+                    openImage()
                 } else if (label == "相册" || label == "文件") {
                     if (env.platform?.supportsChatAttachments != true) toast = "当前平台尚未接入附件选择"
                     else if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
@@ -393,8 +558,13 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                             catch (e: Exception) { toast = e.message ?: "无法读取附件" }
                         }
                     }
-                } else toast = "$label 尚未接入，请从相册或文件选择"
-            }, panel, showImageGeneration = cloud.officialAiEnabled)
+                }
+            }
+            AgentSheet("添加附件", { attach = false }, panel) {
+                AgentChoiceRow(false, "相册", null, { pick("相册") })
+                AgentChoiceRow(false, "文件", null, { pick("文件") })
+                if (cloud.officialAiEnabled) AgentChoiceRow(false, "生成图片", null, { pick("生成图片") })
+            }
         }
         if (imageSheet && cloud.officialAiEnabled) {
             ImageGenerationSheet(
@@ -405,8 +575,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 basePointsPerImage = cloud.imageCapability?.basePointsPerImage,
                 onDismiss = { imageSheet = false },
                 onGenerate = { prompt, count, size, format, frames, duration ->
-                    if (chat.generateImages(prompt, count, size, format, frames, duration)) {
-                        input = ""
+                    val started = if (main) chat.generateParallelImages(prompt, count, size, format, frames, duration)
+                        else chat.generateImages(prompt, count, size, format, frames, duration)
+                    if (started) {
+                        if (!main) input = ""
                         imageSheet = false
                     } else toast = "请先结束当前任务"
                 },
@@ -446,80 +618,127 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 onReview = if (image.generated) ({ reference(true) }) else null,
             ) { preview = null }
         }
-        AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
+        archivePreview?.let { (id, image) ->
+            ChatImageViewer(image, env.platform, { chat.resolveArchivedImage(id, it) }) { archivePreview = null }
+        }
+        AiDrawerOverlay(chat, drawer, { drawer = false }) { route ->
+            if (main || route != Route.AiChat) open(route)
+        }
         Toast(toast) { toast = null }
         PressOverlay(voiceInput)
         MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                BottomSheet({ modelSheet = false }, panel.heightIn(max = maxHeight * 0.8f)) {
-                    Text("选择模型", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text("选择模型，右侧可调整思考等级。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                        cloud.customProviders.forEach { provider ->
-                            Text(provider.name, Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            provider.models.forEach { model ->
-                                val id = customModelTier(provider.id, model)
-                                val selected = cloud.selectedTier == id || (provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER && cloud.legacyCustomTier?.displayName == model)
-                                RadioRow(selected = selected, title = model, desc = if (provider.available) null else "暂不可用", enabled = provider.available && !cloud.sending,
-                                    onClick = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } })
-                            }
+            AgentSheet("选择对话模型", { modelSheet = false }, panel) {
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    cloud.customProviders.forEach { provider ->
+                        Text(provider.name, Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        provider.models.forEach { model ->
+                            val id = customModelTier(provider.id, model)
+                            val selected = cloud.selectedTier == id || (provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER && cloud.legacyCustomTier?.displayName == model)
+                            AgentChoiceRow(selected = selected, title = model, description = if (provider.available) null else "暂不可用", enabled = provider.available && !cloud.sending,
+                                onClick = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } })
                         }
-                        if (cloud.officialAiEnabled) {
-                            Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (cloud.tiers.isEmpty()) {
-                                Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                            }
-                            cloud.tiers.forEach { tier ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    RadioRow(
-                                        selected = cloud.selectedTier == tier.tier,
-                                        title = tier.displayName,
-                                        desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                                        modifier = Modifier.weight(1f),
-                                        enabled = tier.available && !cloud.sending,
-                                        onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
+                    }
+                    if (cloud.officialAiEnabled) {
+                        Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (cloud.tiers.isEmpty()) {
+                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        }
+                        cloud.tiers.forEach { tier ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AgentChoiceRow(
+                                    selected = cloud.selectedTier == tier.tier,
+                                    title = tier.displayName,
+                                    description = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = tier.available && !cloud.sending,
+                                    onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
+                                )
+                                if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
+                                    ReasoningMenu(
+                                        modelName = tier.displayName,
+                                        levels = tier.reasoningEfforts,
+                                        selected = cloud.reasoningByTier[tier.tier],
+                                        enabled = !cloud.sending,
+                                        onSelect = { effort ->
+                                            chat.selectReasoning(tier.tier, effort)
+                                            modelSheet = false
+                                        },
                                     )
-                                    if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
-                                        ReasoningMenu(
-                                            modelName = tier.displayName,
-                                            levels = tier.reasoningEfforts,
-                                            selected = cloud.reasoningByTier[tier.tier],
-                                            enabled = !cloud.sending,
-                                            onSelect = { effort ->
-                                                chat.selectReasoning(tier.tier, effort)
-                                                modelSheet = false
-                                            },
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
-                    Row(
-                        Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(if (cloud.officialAiEnabled) "模型与点数（余额、兑换）" else "管理模型服务", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
-                        XIcon(XIcons.ChevronRight, size = 16.dp)
-                    }
-                    GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
+                }
+                Row(
+                    Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(if (cloud.officialAiEnabled) "模型与点数（余额、兑换）" else "管理模型服务", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                    XIcon(XIcons.ChevronRight, size = 16.dp)
                 }
             }
         }
     }
 }
 
+/** Within imePadding, reveal only the part of this row that fits above the moving keyboard. */
+private fun Modifier.revealAboveKeyboard(ime: WindowInsets, navigationBars: WindowInsets): Modifier =
+    clipToBounds().layout { measurable, constraints ->
+        val row = measurable.measure(constraints)
+        val keyboardHeight = (ime.getBottom(this) - navigationBars.getBottom(this)).coerceAtLeast(0)
+        val height = (row.height - keyboardHeight).coerceAtLeast(constraints.minHeight)
+        layout(row.width, height) { row.placeRelative(0, 0) }
+    }
+
 @Composable
-private fun ChatWelcome() {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.Bottom) {
-        AssistantRow { AssistantBubble("你好，我是小伴。当前是云端对话，不依赖电脑在线。你可以随时提问、整理待办或润色文字。") }
+private fun AgentHistorySheet(
+    chat: CloudChatController, history: List<ChatSummary>, onClose: () -> Unit, panel: Modifier,
+    onOpen: (String) -> Unit, onAllConversations: () -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val main = history.filter { it.mainTopic != null && it.title != "新对话" }
+    var found by remember { mutableStateOf<List<Pair<ChatSummary, String>>>(emptyList()) }
+    LaunchedEffect(query, main) {
+        found = emptyList()
+        val term = query.trim()
+        if (term.isNotEmpty()) {
+            delay(200)
+            found = main.mapNotNull { item ->
+                val text = chat.readChatHistory(item.id)?.messages?.firstOrNull { it.text.contains(term, ignoreCase = true) }?.text
+                if (text == null && !item.title.contains(term, ignoreCase = true)) null
+                else item to (text ?: item.title)
+            }
+        }
+    }
+    AgentSheet("查找聊天记录", onClose, panel) {
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
+            placeholder = { Text("搜索主线聊天记录", style = XType.Body) })
+        val matches = if (query.isBlank()) main.map { it to relativeTime(it.updatedAtMs) } else found
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            matches.forEach { (item, detail) ->
+                Column(Modifier.fillMaxWidth().clickable { onOpen(item.id) }.padding(vertical = 10.dp)) {
+                    Text(item.title, style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(detail, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (matches.isEmpty()) Text("暂无聊天记录", Modifier.padding(vertical = 10.dp), style = XType.Caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        LinkText("全部对话与工作空间", onAllConversations, Modifier.padding(top = 12.dp))
     }
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null, showQuota: Boolean = true) {
+private fun CloudMessages(
+    messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?,
+    onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit,
+    onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit,
+    waiting: String?, showQuota: Boolean, archive: List<StoredChat>, offsetMinutes: Int, topicStarted: Long?,
+    readOnly: Boolean, onArchivedPreview: (String, ChatImagePreview) -> Unit,
+    archivedThumbnail: suspend (String, String) -> String?,
+) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     var followLatest by remember { mutableStateOf(true) }
@@ -533,51 +752,96 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
             if (it) followLatest = true
         }
     }
-    LaunchedEffect(listState, messages.size) {
-        // 图片解码后可能撑高消息，即使这时消息数据已经没有变化。
-        snapshotFlow { followLatest && listState.canScrollForward && !listState.isScrollInProgress }.collect {
-            if (it && messages.isNotEmpty()) listState.requestScrollToItem(messages.size)
-        }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            if (followLatest && listState.canScrollForward && !listState.isScrollInProgress) listState.layoutInfo.totalItemsCount else 0
+        }.collect { count -> if (count > 0) listState.requestScrollToItem(count - 1) }
     }
-    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(messages, key = { it.id }) { turn ->
-            if (turn.role == "user") {
-                UserBubble((if (turn.imageGeneration) "生成图片 · " else "") + turn.text +
-                    turn.attachments.filter { it.imageDataUrl == null }.joinToString("") { "\n📎 ${it.name}" })
-                turn.attachments.forEach { attachment ->
-                    attachment.imageDataUrl?.let { data ->
-                        ChatImageThumbnail(ChatImagePreview(data, attachment.name), resolveImage, onPreview)
-                    }
-                }
-            } else {
-                AssistantRow {
-                    if (turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
-                        Text(turn.activity, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    turn.modelLabel?.let { model ->
-                        Text(model, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    AssistantTurnCards(
-                        text = turn.text, streaming = turn.streaming, error = if (turn.cancelled) "已取消" else turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
-                        waiting = if (turn.streaming) waiting else null, platform = platform, idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
-                        onRetry = if (turn.id == last?.id && turn.error != null && !sending && !turn.imageGeneration) onRetry else null,
-                        onRegenerate = if (turn.id == last?.id && !turn.streaming && !sending && !turn.imageGeneration) onRegenerate else null,
-                        extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), truncated = turn.truncated,
-                            onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
-                    )
-                    if (turn.generatedImages.isNotEmpty()) {
-                        val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" }?.text
-                        turn.generatedImages.forEachIndexed { index, data ->
-                            ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true, prompt = brief), resolveImage, onPreview)
-                        }
-                    }
-                    if (turn.imageJobRecoverable && !sending) LinkText("查回生图结果", { onRecoverImage(turn.id) })
-                    if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
-                    if (showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") }) LinkText("去兑换点数 ›", onQuota)
+    LazyColumn(Modifier.fillMaxSize(), state = listState,
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        archive.forEach { stored ->
+            stored.messages.firstOrNull()?.createdAtMs?.let { time ->
+                item(key = "${stored.id}:date") {
+                    if ((stored.options.mainTopic ?: 1) > 1) AgentTopicDivider(time, offsetMinutes)
+                    else AgentTimestamp(time, offsetMinutes)
                 }
             }
+            items(stored.messages, key = { "${stored.id}:${it.id}" }) { turn ->
+                AgentChatTurn(turn, stored.messages, platform, { archivedThumbnail(stored.id, it) },
+                    { onArchivedPreview(stored.id, it) }, offsetMinutes = offsetMinutes)
+            }
+        }
+        if (topicStarted != null) item(key = "current-topic") { AgentTopicDivider(topicStarted, offsetMinutes) }
+        else messages.firstOrNull()?.createdAtMs?.let { time ->
+            item(key = "current-date") { AgentTimestamp(time, offsetMinutes) }
+        }
+        items(messages, key = { it.id }) { turn ->
+            val latest = !readOnly && turn.id == last?.id && !sending
+            AgentChatTurn(turn, messages, platform, resolveImage, onPreview, offsetMinutes = offsetMinutes,
+                waiting = if (turn.streaming) waiting else null, onStop = onStop.takeUnless { readOnly }, onSend = onSend,
+                onRetry = onRetry.takeIf { latest && turn.error != null && !turn.imageGeneration },
+                onRegenerate = onRegenerate.takeIf { latest && !turn.streaming && !turn.imageGeneration },
+                onContinue = if (latest) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null,
+                onRecover = if (!readOnly && turn.imageJobRecoverable && !sending) ({ onRecoverImage(turn.id) }) else null,
+                onReviewed = onReviewed.takeIf { !turn.imageGeneration && latest && turn.error.orEmpty().contains("结果尚未确认") },
+                onQuota = onQuota.takeIf { showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") } })
         }
         item(key = "latest-edge") { Spacer(Modifier.height(1.dp)) }
+    }
+}
+
+@Composable
+private fun AgentChatTurn(
+    turn: ChatTurn, messages: List<ChatTurn>, platform: PlatformActions?, resolveImage: suspend (String) -> String?,
+    onPreview: (ChatImagePreview) -> Unit, offsetMinutes: Int, waiting: String? = null, onStop: (() -> Unit)? = null,
+    onSend: (String) -> Unit = {}, onRetry: (() -> Unit)? = null, onRegenerate: (() -> Unit)? = null,
+    onContinue: (() -> Unit)? = null, onRecover: (() -> Unit)? = null, onReviewed: (() -> Unit)? = null, onQuota: (() -> Unit)? = null,
+) {
+    if (turn.role == "user") {
+        AgentUserMessage((if (turn.imageGeneration) "生成图片 · " else "") + turn.text +
+            turn.attachments.filter { it.imageDataUrl == null }.joinToString("") { "\n📎 ${it.name}" })
+        turn.attachments.forEach { attachment ->
+            attachment.imageDataUrl?.let { ChatImageThumbnail(ChatImagePreview(it, attachment.name), resolveImage, onPreview) }
+        }
+    } else AgentReply {
+        if (turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
+            Text(turn.activity, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        val reminders = remember(turn.tools) {
+            turn.tools.filter { it.name == "set_reminder" && it.status == ToolStatus.Done }.mapNotNull { call ->
+                val data = runCatching { CommunityJson.parseToJsonElement(call.output) as? JsonObject }.getOrNull()
+                val reminder = data?.get("reminder") as? JsonObject ?: return@mapNotNull null
+                val status = (reminder["status"] as? JsonPrimitive)?.contentOrNull
+                val title = (reminder["title"] as? JsonPrimitive)?.contentOrNull
+                val time = (reminder["at_epoch_ms"] as? JsonPrimitive)?.longOrNull
+                if (status == "scheduled" && title != null && time != null) Triple(call, title, time) else null
+            }
+        }
+        reminders.forEach { (call, title, time) ->
+            var details by rememberSaveable(call.id) { mutableStateOf(false) }
+            AgentReminderResult(title, time, offsetMinutes) { details = !details }
+            if (details) ToolGroup(listOf(call), live = false)
+        }
+        AssistantTurnCards(
+            text = turn.text, streaming = turn.streaming, error = if (turn.cancelled) "已取消" else turn.error,
+            reasoning = turn.reasoning, tools = turn.tools.filterNot { tool -> reminders.any { it.first.id == tool.id } },
+            records = turn.records, waiting = waiting, platform = platform,
+            idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
+            onRetry = onRetry, onRegenerate = onRegenerate, flat = true,
+            extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                truncated = turn.truncated, onContinue = onContinue),
+        )
+        if (turn.generatedImages.isNotEmpty()) {
+            val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" }?.text
+            turn.generatedImages.forEachIndexed { index, data ->
+                ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}", generated = true, prompt = brief), resolveImage, onPreview)
+            }
+        }
+        if (onRecover != null) LinkText("查回生图结果", onRecover)
+        if (onReviewed != null) LinkText("已核对，继续", onReviewed)
+        if (onQuota != null) LinkText("去兑换点数 ›", onQuota)
     }
 }
 

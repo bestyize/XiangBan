@@ -193,7 +193,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     var input by rememberSaveable(peerId, initialDraft) { mutableStateOf(initialDraft) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
-    // 0 关着，1 选权限，2 确认开启完全信任
+    // 0 关着，1 选权限，2 确认开启自动模式
     var permissionStep by rememberSaveable { mutableStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
@@ -330,14 +330,14 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         OverlayTransition(permissionStep != 0) { panel ->
             BottomSheet({ permissionStep = 0 }, panel) {
                 if (permissionStep == 2) {
-                    Text("开启完全信任？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text("开启自动模式？", style = XType.Title, fontWeight = FontWeight.SemiBold)
                     Text(
                         "开启后，这个对话里小伴在“${peer?.name ?: "设备"}”上读写文件、运行命令都不再逐步问你，会直接执行。\n删除文件、危险命令这类高风险操作仍然每次都问你。\n只在你信任这次任务时开启，随时可以关掉。",
                         Modifier.padding(top = 10.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         GhostPillButton("取消", { permissionStep = 0 }, Modifier.weight(1f))
-                        PillButton("开启完全信任", { permissionStep = 0; env.remoteChat.setPermission("auto") }, Modifier.weight(1f))
+                        PillButton("开启自动模式", { permissionStep = 0; env.remoteChat.setPermission("auto") }, Modifier.weight(1f))
                     }
                 } else {
                     Text("这个对话的权限", style = XType.Title, fontWeight = FontWeight.SemiBold)
@@ -347,7 +347,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                         onClick = { permissionStep = 0; env.remoteChat.setPermission("ask") },
                     )
                     RadioRow(
-                        selected = remote.fullTrust, title = "完全信任", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
+                        selected = remote.fullTrust, title = "自动模式", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
                         onClick = { permissionStep = 0; env.remoteChat.setPermission("auto") },
                     )
                     GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())

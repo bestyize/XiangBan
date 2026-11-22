@@ -3,6 +3,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -594,7 +595,7 @@ fun ApprovalCard(pending: RemoteApprovalRequest, onDecision: (String) -> Unit, m
             }
             if (high) {
                 Text(
-                    "高风险操作" + (pending.danger?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "") + "。即使在“完全信任”下，这类操作也每次都要你确认。",
+                    "高风险操作" + (pending.danger?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "") + "。即使在“自动模式”下，这类操作也每次都要你确认。",
                     Modifier.padding(top = 6.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Danger,
                 )
             }
@@ -689,15 +690,23 @@ fun AssistantTurnCards(
     onRegenerate: (() -> Unit)? = null,
     onAdjust: (() -> Unit)? = null,
     extras: TurnExtras = TurnExtras(),
+    flat: Boolean = false,
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
+    var replyActionsOpen by rememberSaveable { mutableStateOf(false) }
     if (reasoning.isNotBlank()) ReasoningView(reasoning, live = streaming && text.isEmpty())
     val progress = remember(tools, streaming, waiting, stopped, failure) { taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure) }
     if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend, onAdjust = if (streaming) onAdjust else null)
     ToolGroup(tools, live = streaming)
     if (text.isNotEmpty()) {
-        MarkdownBubble(text, streaming, platform)
+        val actions = if (flat && !streaming && failure == null) {
+            Modifier.combinedClickable(
+                interactionSource = null, indication = null, onLongClickLabel = "回复操作",
+                onLongClick = { replyActionsOpen = !replyActionsOpen }, onClick = {},
+            )
+        } else Modifier
+        MarkdownBubble(text, streaming, platform, modifier = actions, flat = flat)
     } else if (streaming && tools.none { it.status == ToolStatus.Running } && reasoning.isBlank() && progress == null) {
         StatusLine(if (waiting != null) "等你确认后继续…" else idleText, alert = waiting != null)
     } else if (streaming && waiting != null) {
@@ -710,7 +719,9 @@ fun AssistantTurnCards(
     records.forEach { RecordRow(it) }
     if (!streaming && extras.truncated && extras.onContinue != null) HintLine("回答太长，被截断了。", alert = false, button = "继续", onButton = extras.onContinue)
     if (!streaming) extras.checkpoint?.let { cp -> if (extras.onUndo != null) CheckpointNotice(cp, extras.onUndo) }
-    if (!streaming && text.isNotEmpty() && failure == null) ReplyActions(text, platform, onRegenerate, extras)
+    if (!streaming && text.isNotEmpty() && failure == null && (!flat || replyActionsOpen)) {
+        ReplyActions(text, platform, onRegenerate, extras)
+    }
     if (stopped) HintLine("已停止", alert = false)
     if (failure != null) {
         Banner(failure, warn = true, actionText = if (onRetry != null) "重试" else null, onAction = onRetry)
@@ -835,11 +846,11 @@ private fun StatusLine(text: String, alert: Boolean) {
 
 /** 回答气泡：标题、列表、引用、代码块（带复制）、粗体、行内代码、链接。 */
 @Composable
-fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?, modifier: Modifier = Modifier) {
+fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?, modifier: Modifier = Modifier, flat: Boolean = false) {
     val blocks = remember(text, streaming) { parseMarkdown(if (streaming) "$text ▍" else text) }
     val onLink: (String) -> Unit = { url -> if (url.startsWith("https://") || url.startsWith("http://")) platform?.openUrl(url) }
     Column(
-        modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 9.dp),
+        if (flat) modifier else modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         blocks.forEach { block -> MarkdownContentBlock(block, platform, onLink) }

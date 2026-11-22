@@ -50,7 +50,17 @@ class InMemoryChatHistoryFiles : ChatHistoryFiles {
 
 /** 对话列表里的一条。 */
 @Serializable
-data class ChatSummary(val id: String, val title: String, val updatedAtMs: Long, val workspace: String? = null)
+data class ChatSummary(
+    val id: String,
+    val title: String,
+    val updatedAtMs: Long,
+    val workspace: String? = null,
+    val mainTopic: Long? = null,
+    val taskStatus: ChatTaskStatus? = null,
+)
+
+@Serializable
+enum class ChatTaskStatus { WaitingForPlan, Planning, Creating, GeneratingImage, Completed }
 
 @Serializable
 data class StoredChat(val id: String, val messages: List<ChatTurn>, val options: ChatOptions = ChatOptions())
@@ -64,6 +74,20 @@ fun chatTitle(messages: List<ChatTurn>, creation: CreationDraft? = null): String
     (creation?.title ?: legacyCreationTitle(messages))?.let { return it }
     val first = messages.firstOrNull { it.role == "user" }?.text?.trim().orEmpty()
     return if (first.isEmpty()) "新对话" else if (first.length > 14) first.take(14) + "…" else first
+}
+
+private fun chatTaskStatus(messages: List<ChatTurn>, creation: CreationDraft?): ChatTaskStatus? {
+    val last = messages.lastOrNull() ?: return null
+    return when {
+        creation?.approved == false && last.streaming -> ChatTaskStatus.Planning
+        creation?.approved == false && last.creationPlan && last.text.isNotBlank() &&
+            last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.WaitingForPlan
+        creation?.approved == true && last.streaming -> ChatTaskStatus.Creating
+        last.imageGeneration && last.streaming -> ChatTaskStatus.GeneratingImage
+        (creation?.approved == true || last.generatedImages.isNotEmpty()) &&
+            last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.Completed
+        else -> null
+    }
 }
 
 /**
@@ -287,8 +311,12 @@ class ChatHistory(
         options[id] = selected
         enqueue(Write(++revision, chatName(id), snapshot = StoredChat(id, kept, selected), media = mediaFor(id)))
         if (messages.none { it.streaming && !it.imageGeneration }) enqueue("$folder/$id.stream.json", null)
-        if (kept.none { it.role == "user" }) return index
-        index = listOf(ChatSummary(id, chatTitle(kept, selected.creation), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
+        if (kept.none { it.role == "user" } && selected.mainTopic == null) return index
+        val summary = ChatSummary(
+            id, chatTitle(kept, selected.creation), nowMs, index.firstOrNull { it.id == id }?.workspace,
+            selected.mainTopic, chatTaskStatus(messages, selected.creation),
+        )
+        index = listOf(summary) + index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         return index
     }

@@ -141,7 +141,7 @@ private class AutoReadTrack {
  * [paused]：正在实时对话，回答由通话自己念，这里什么都不做，也不能去停声音（会把通话正在播的那句掐掉）；通话里的回答之后也不补念。
  */
 @Composable
-fun AutoRead(reader: ReplyReader, turnId: Any?, role: String?, text: String, streaming: Boolean, paused: Boolean = false) {
+fun AutoRead(reader: ReplyReader, turnId: Any?, role: String?, text: String, streaming: Boolean, paused: Boolean = false, afterCompletion: Boolean = false) {
     val track = remember(reader) { AutoReadTrack() }
     val inCall by rememberUpdatedState(paused)
     DisposableEffect(reader) { onDispose { if (!inCall) reader.stop() } }
@@ -153,10 +153,10 @@ fun AutoRead(reader: ReplyReader, turnId: Any?, role: String?, text: String, str
             streaming && track.turn != turnId -> {
                 reader.stop()
                 track.turn = turnId; track.fed = 0; track.splitter = SpeechSplitter(); track.finished = false
-                feed(reader, track, text)
+                if (!afterCompletion) feed(reader, track, text)
             }
             track.turn == turnId && !track.finished -> {
-                feed(reader, track, text)
+                if (!afterCompletion || !streaming) feed(reader, track, text)
                 if (!streaming) { track.splitter.flush().forEach { reader.enqueue(it) }; track.finished = true }
             }
         }

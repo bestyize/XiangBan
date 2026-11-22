@@ -57,7 +57,7 @@ import xyz.xiangban.xiaoban.common.community.FeaturedToolsCache
 import xyz.xiangban.xiaoban.common.community.MobileGame
 import kotlin.time.Clock
 
-private val LocalCreationTypes = listOf("游戏", "小程序")
+internal val LocalCreationTypes = listOf("游戏", "小程序")
 private val CreationTypes = LocalCreationTypes + listOf("壁纸", "小组件", "特效", "伙伴")
 private enum class FeaturedPage { Games, Tools }
 private val DesktopCreationHints = mapOf(
@@ -75,8 +75,6 @@ internal fun GamesScreen(
     open: (Route) -> Unit,
     active: Boolean,
     onOverlayChanged: (Boolean) -> Unit,
-    createRequest: String?,
-    onCreateRequestHandled: () -> Unit,
 ) {
     var official by remember { mutableStateOf(emptyList<MobileGame>()) }
     var games by remember { mutableStateOf(emptyList<MobileGame>()) }
@@ -112,10 +110,7 @@ internal fun GamesScreen(
         featuredShortcuts = shortcuts
     }
     val featuredTools by key(featuredToolsLoader) { featuredToolsLoader.state.collectAsState() }
-    val cloud by chat.state.collectAsState()
-    val remote by env.remoteChat.state.collectAsState()
     val workRevision = env.games?.revision?.collectAsState()?.value
-    val creationTypes = if (env.games != null) CreationTypes else CreationTypes.filterNot { it == "小程序" }
     val context = LocalPlatformContext.current
     val imageLoader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
@@ -163,15 +158,6 @@ internal fun GamesScreen(
             createLocal(xyz.xiangban.xiaoban.common.community.creationTitle(brief, createKind), brief,
                 "制作支持手机触控和电脑键鼠的$work。需求：$brief")
         } else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
-    }
-    LaunchedEffect(active, createRequest) {
-        if (active && createRequest != null) {
-            detail = null
-            createKind = createRequest
-            idea = ""
-            creating = true
-            onCreateRequestHandled()
-        }
     }
     LaunchedEffect(env.games, workRevision, reload) {
         loading = true
@@ -244,82 +230,99 @@ internal fun GamesScreen(
             OfficialAppSheet(env, game, covers[game.id], imageLoader,
                 dismiss = ::close, remix = { detail = null; remixSource = game })
         }
-        if (creating) CreationSheet({ close() }, panelModifier = Modifier.imePadding()) {
-            val local = createKind in LocalCreationTypes
-            val blocked = local && !chat.canLeaveForCreation()
-            Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
-                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-                        IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
-                    }
-                    Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    CreationChips(creationTypes, createKind) { createKind = it }
-                    Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
-                        val placeholder = when (createKind) {
-                            "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
-                            "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
-                            else -> "描述你想要的${createKind}，小伴会在电脑上制作"
-                        }
-                        if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().semantics { contentDescription = "创作想法" }, minLines = 4, maxLines = 8, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
-                    }
-                    val hints = when (createKind) {
-                        "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
-                        "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
-                        else -> listOfNotNull(DesktopCreationHints[createKind])
-                    }
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
-                    }
-                    Text("${idea.length}/2000", Modifier.align(Alignment.End).padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                val hint = when {
-                    blocked -> "当前还有创作任务正在执行。可以先编辑需求。"
-                    local && cloud.sending -> "图片继续在原对话生成，可以同时开始新作品。"
-                    local -> "先查看并确认方案，再在这台手机上制作。"
-                    else -> "选择已连接电脑后进入对话，作品保存在电脑上。"
-                }
-                Text(hint, Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && !blocked)
-            }
-        }
+        if (creating) MobileCreationSheet(
+            env, chat, createKind, idea, onKind = { createKind = it }, onIdea = { idea = it },
+            onStart = ::startCreation, onDismiss = ::close,
+        )
         remixSource?.let { source ->
             AppRemixSheet(env, chat, source.name, source.description, { remixSource = null }, open, kind = source.kind)
         }
-        remotePrompt?.let { prompt ->
-            CreationSheet({ close() }) {
-                Text("选择电脑", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
-                    remote.peers.forEach { peer ->
-                        val enabled = peer.online && !remote.sending
-                        val alpha = if (enabled) 1f else .45f
-                        val secondary = MaterialTheme.colorScheme.onSurfaceVariant
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button) {
-                                env.remoteChat.selectPeer(peer.id)
-                                env.remoteChat.newSession()
-                                close()
-                                open(Route.RemoteChat(peer.id, prompt))
-                            }.padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            XIcon(XIcons.Monitor, size = 18.dp, tint = secondary.copy(alpha = alpha))
-                            Text(peer.name, Modifier.weight(1f), style = XType.Secondary,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
-                            Text(if (peer.online) "在线" else "离线", style = XType.Caption, color = secondary)
-                        }
-                    }
+        remotePrompt?.let { prompt -> MobileCreationDeviceSheet(env, prompt, ::close, open) }
+        Toast(message) { message = null }
+    }
+}
+
+@Composable
+internal fun MobileCreationSheet(
+    env: CommunityEnv, chat: CloudChatController, createKind: String, idea: String,
+    onKind: (String) -> Unit, onIdea: (String) -> Unit, onStart: () -> Unit, onDismiss: () -> Unit,
+) {
+    val cloud by chat.state.collectAsState()
+    val creationTypes = if (env.games != null) CreationTypes else CreationTypes.filterNot { it == "小程序" }
+    CreationSheet(onDismiss, panelModifier = Modifier.imePadding()) {
+        val local = createKind in LocalCreationTypes
+        val blocked = local && !chat.canLeaveForCreation()
+        Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    IconTap(XIcons.Close, "关闭创作", onDismiss, size = 18.dp)
                 }
-                if (remote.peers.isEmpty()) Text("还没有连接的电脑，请在电脑上登录同一小伴账号并开启手机遥控。", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (remote.sending) Text("电脑正在执行任务，请结束当前任务后再创建。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = XType.Caption)
-                Spacer(Modifier.height(12.dp))
-                GhostPillButton("管理我的电脑", { close(); open(Route.Devices) }, Modifier.fillMaxWidth())
+                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CreationChips(creationTypes, createKind, onKind)
+                Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
+                    val placeholder = when (createKind) {
+                        "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
+                        "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
+                        else -> "描述你想要的${createKind}，小伴会在电脑上制作"
+                    }
+                    if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    BasicTextField(idea, { onIdea(it.take(2000)) }, Modifier.fillMaxWidth().semantics { contentDescription = "创作想法" }, minLines = 4, maxLines = 8, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
+                }
+                val hints = when (createKind) {
+                    "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
+                    "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
+                    else -> listOfNotNull(DesktopCreationHints[createKind])
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onIdea(hint) }.padding(9.dp), style = XType.Caption) }
+                }
+                Text("${idea.length}/2000", Modifier.align(Alignment.End).padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val hint = when {
+                blocked -> "当前还有创作任务正在执行。可以先编辑需求。"
+                local && cloud.sending -> "图片继续在原对话生成，可以同时开始新作品。"
+                local -> "先查看并确认方案，再在这台手机上制作。"
+                else -> "选择已连接电脑后进入对话，作品保存在电脑上。"
+            }
+            Text(hint, Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", onStart, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && !blocked)
+        }
+    }
+}
+
+@Composable
+internal fun MobileCreationDeviceSheet(env: CommunityEnv, prompt: String, onDismiss: () -> Unit, open: (Route) -> Unit) {
+    val remote by env.remoteChat.state.collectAsState()
+    CreationSheet(onDismiss) {
+        Text("选择电脑", style = XType.Title, fontWeight = FontWeight.SemiBold)
+        Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+            remote.peers.forEach { peer ->
+                val enabled = peer.online && !remote.sending
+                val alpha = if (enabled) 1f else .45f
+                val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button) {
+                        env.remoteChat.selectPeer(peer.id)
+                        env.remoteChat.newSession()
+                        onDismiss()
+                        open(Route.RemoteChat(peer.id, prompt))
+                    }.padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    XIcon(XIcons.Monitor, size = 18.dp, tint = secondary.copy(alpha = alpha))
+                    Text(peer.name, Modifier.weight(1f), style = XType.Secondary,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                    Text(if (peer.online) "在线" else "离线", style = XType.Caption, color = secondary)
+                }
             }
         }
-        Toast(message) { message = null }
+        if (remote.peers.isEmpty()) Text("还没有连接的电脑，请在电脑上登录同一小伴账号并开启手机遥控。", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (remote.sending) Text("电脑正在执行任务，请结束当前任务后再创建。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = XType.Caption)
+        Spacer(Modifier.height(12.dp))
+        GhostPillButton("管理我的电脑", { onDismiss(); open(Route.Devices) }, Modifier.fillMaxWidth())
     }
 }
 

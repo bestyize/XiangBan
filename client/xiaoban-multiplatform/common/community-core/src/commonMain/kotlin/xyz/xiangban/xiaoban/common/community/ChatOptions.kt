@@ -34,6 +34,7 @@ data class ChatOptions(
     val grants: List<String> = emptyList(),
     val budget: AgentExecutionBudget = AgentExecutionBudget(),
     val creation: CreationDraft? = null,
+    val mainTopic: Long? = null,
 ) {
     fun validate() {
         require(contextTokens in 16_000..1_000_000) { "上下文大小须为 16000 到 1000000" }

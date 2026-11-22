@@ -561,7 +561,7 @@ fun ChatComposer(
             ToolbarIcon(modelIcon, "模型", onModel, enabled)
             if (modelPinned) Box(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(8.dp).clip(CircleShape).background(Danger))
         }
-        if (onPermission != null) ToolbarIcon(XIcons.Lock, if (fullTrust) "权限：完全信任" else "权限：默认权限", onPermission, enabled, tint = if (fullTrust) Danger else muted)
+        if (onPermission != null) ToolbarIcon(XIcons.Lock, if (fullTrust) "权限：自动模式" else "权限：默认权限", onPermission, enabled, tint = if (fullTrust) Danger else muted)
         Spacer(Modifier.weight(1f))
         if (!voiceMode) ToolbarIcon(XIcons.Mic, "语音输入", { onVoiceMode(true) }, true)
         if (onLive != null) ToolbarIcon(XIcons.Wave, "实时对话", onLive, enabled)

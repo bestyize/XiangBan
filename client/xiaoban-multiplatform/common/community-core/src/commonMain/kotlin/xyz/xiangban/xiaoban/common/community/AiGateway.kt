@@ -887,6 +887,7 @@ data class ChatTurn(
     val imageJobRecoverable: Boolean = false,
     val creationPlan: Boolean = false,
     val modelLabel: String? = null,
+    val createdAtMs: Long? = null,
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -936,6 +937,7 @@ data class CloudChatState(
     val workspaces: List<String> = emptyList(),
     val media: Map<String, AiMediaCapability> = emptyMap(),
     val creation: CreationDraft? = null,
+    val mainTopic: Long? = null,
     val imageSessions: Set<String> = emptySet(),
     val runningSessions: Set<String> = emptySet(),
     val waitingSessions: Set<String> = emptySet(),
@@ -1131,7 +1133,7 @@ class CloudChatController(
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
     fun openConversation(id: String) {
         openJob?.cancel()
-        if (id == agentSession && _state.value.messages.isNotEmpty()) return
+        if (id == agentSession) return
         val image = imageRuns[id]
         if (id in chatRuns || image != null) {
             showConversation(id, null, image)
@@ -1145,6 +1147,58 @@ class CloudChatController(
                 showConversation(id, saved, image)
             }
         } else showConversation(id, store.loadSnapshot(id), image)
+    }
+
+    fun openMainConversation() {
+        val current = _state.value
+        val latest = current.conversations.filter { it.mainTopic != null }.maxByOrNull { it.mainTopic ?: 0 }
+        if (latest != null) openConversation(latest.id)
+        else if (current.mainTopic == null) {
+            clearConversation()
+            applyOptions(options().copy(mainTopic = 1))
+            persist()
+        }
+    }
+
+    fun startMainTopic() {
+        val current = _state.value
+        val topic = current.mainTopic ?: return
+        if (current.messages.isEmpty()) return
+        val next = options().copy(creation = null, grants = emptyList(), mainTopic = topic + 1)
+        clearConversation()
+        applyOptions(next)
+        persist()
+    }
+
+    fun clearMainHistory() {
+        val current = _state.value
+        val next = options().copy(creation = null, grants = emptyList(), mainTopic = 1)
+        current.conversations.filter { it.mainTopic != null && it.id != current.conversationId }
+            .forEach { deleteConversation(it.id) }
+        if (current.mainTopic == null || _state.value.conversations.any { it.mainTopic != null && it.id != current.conversationId }) return
+        if (current.conversations.any { it.id == current.conversationId && it.mainTopic != null }) {
+            deleteConversation(current.conversationId)
+            if (_state.value.conversationId == current.conversationId) return
+        }
+        applyOptions(next)
+        persist()
+    }
+
+    suspend fun readChatHistory(id: String): StoredChat? {
+        val generation = accountGeneration
+        val saved = history?.loadInBackground(id) ?: volatileConversations[id]
+        return saved?.takeIf { generation == accountGeneration && history?.isDeleted(id) != true }
+    }
+
+    suspend fun resolveArchivedImage(conversation: String, value: String, thumbnail: Boolean = false): String? {
+        val generation = accountGeneration
+        if (_state.value.conversations.none { it.id == conversation && it.mainTopic != null }) return null
+        val source = try {
+            if (isChatMediaReference(value)) history?.mediaFor(conversation)?.resolve(value, thumbnail)
+            else value.takeIf { it.startsWith("data:image/") }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { null }
+        return source?.takeIf { generation == accountGeneration && history?.isDeleted(conversation) != true }
     }
 
     private fun showConversation(id: String, saved: StoredChat?, image: RunningImage?) {
@@ -1162,7 +1216,7 @@ class CloudChatController(
         }
         val settings = run?.options ?: image?.options ?: requireNotNull(saved).options
         nextId = (messages.maxOfOrNull { it.id } ?: 0L) + 1
-        applyOptions(settings.copy(creation = settings.creation ?: legacyCreation(messages)))
+        applyOptions(settings.copy(creation = settings.creation ?: legacyCreation(messages).takeIf { settings.mainTopic == null }))
         val conversations = history?.updateTitle(id, chatTitle(messages, _state.value.creation)) ?: _state.value.conversations
         _state.value = _state.value.copy(messages = messages, conversations = conversations,
             sending = run != null || id in imageRuns, approval = run?.approval, question = run?.question, inputError = modelInputError(emptyList()))
@@ -1280,12 +1334,12 @@ class CloudChatController(
     }
 
     private fun options(): ChatOptions = _state.value.let {
-        ChatOptions(it.selectedTier, it.reasoningByTier, it.contextTokens, it.permissionMode, it.grants, it.budget, it.creation)
+        ChatOptions(it.selectedTier, it.reasoningByTier, it.contextTokens, it.permissionMode, it.grants, it.budget, it.creation, it.mainTopic)
     }
 
     private fun applyOptions(value: ChatOptions) {
         _state.value = _state.value.copy(selectedTier = value.tier, reasoningByTier = value.reasoningByTier,
-            contextTokens = value.contextTokens, permissionMode = value.permissionMode, grants = value.grants, budget = value.budget, creation = value.creation)
+            contextTokens = value.contextTokens, permissionMode = value.permissionMode, grants = value.grants, budget = value.budget, creation = value.creation, mainTopic = value.mainTopic)
     }
 
     fun setPermission(mode: String) {
@@ -1507,6 +1561,19 @@ class CloudChatController(
         sendPrompt(CREATION_CONFIRMATION, "", confirmCreation = true)
     }
 
+    fun confirmParallelCreation(id: String) {
+        val generation = accountGeneration
+        scope.launch {
+            val task = readChatHistory(id) ?: return@launch
+            if (generation != accountGeneration || id in chatRuns || id in imageRuns || id == agentSession) return@launch
+            if (_state.value.conversations.none { it.id == id && it.taskStatus == ChatTaskStatus.WaitingForPlan }) return@launch
+            restoreActiveConversation {
+                showConversation(id, task, null)
+                confirmCreationPlan()
+            }
+        }
+    }
+
     fun send(rawPrompt: String) { sendPrompt(rawPrompt, "") }
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
@@ -1523,7 +1590,7 @@ class CloudChatController(
         if (format == "gif") require(current.imageCapability?.formats?.contains("gif") == true) { "当前图片服务尚未开放 GIF" }
         val parameters = api.imageParameters(prompt, count, size, format, frames, frameDurationMs)
         val receipt = if (current.imageCapability?.supportsJobs != false) ImageJobReceipt(Uuid.random().toString(), count, format) else null
-        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, imageGeneration = true)
+        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, imageGeneration = true, createdAtMs = clock())
         val reply = ChatTurn(nextId++, "assistant", "", streaming = true, imageGeneration = true,
             activity = "正在生成图片…", imageJob = receipt, imageJobRecoverable = receipt != null)
         val owner = agentSession
@@ -1534,6 +1601,32 @@ class CloudChatController(
             else api.awaitImageJob(receipt, parameters, onStatus = status)
         }
         return true
+    }
+
+    fun startParallelCreation(title: String, brief: String, request: String): Boolean =
+        restoreActiveConversation { startCreation(title, brief, request) }
+
+    fun generateParallelImages(prompt: String, count: Int, size: String?, format: String, frames: Int, duration: Int): Boolean {
+        if (!_state.value.officialAiEnabled) return false
+        return restoreActiveConversation {
+            clearConversation()
+            generateImages(prompt, count, size, format, frames, duration)
+        }
+    }
+
+    private inline fun <T> restoreActiveConversation(action: () -> T): T {
+        val state = _state.value
+        val current = StoredChat(agentSession, state.messages, options())
+        val savedNextId = nextId
+        return try {
+            action()
+        } finally {
+            if (agentSession != current.id) {
+                showConversation(current.id, current, imageRuns[current.id])
+                nextId = savedNextId
+                _state.value = _state.value.copy(inputError = state.inputError)
+            }
+        }
     }
 
     fun recoverImageJob(replyId: Long) {
@@ -1628,7 +1721,7 @@ class CloudChatController(
         }
         validateDraftAttachments(attachments)
         openJob?.cancel()
-        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments)
+        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments, createdAtMs = clock())
         val replyId = nextId++
         val draft = _state.value.creation
         val planning = draft?.approved == false && !confirmCreation

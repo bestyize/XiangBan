@@ -4,7 +4,7 @@
 
 | 设计稿 | 内容与预览 |
 | --- | --- |
-| [小伴 AI 首页](prototypes/ai-home.html) | 纸色首页与手绘小伴、单排彩色 App 风格快捷工具图标、双列提问卡，以及底栏上方的固定对话入口。静态预览展示未登录状态。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
+| [小伴 AI 首页](prototypes/ai-home.html) | 个人 Agent 连续主线 + 并行任务完整三屏定稿：01 默认浏览态（极简三段顶栏左并行任务/中标题/右三点 + 分离悬浮胶囊输入框，空态语音通话、打字变形发送）、02 键盘弹出态（自动隐藏底栏与能力条、顶部任务条收紧单行）、03 个人 Agent 配置页（点右上角「···」进入，通栏纯白分组列表收纳开启新话题、查找记录、对话模型、模型与点数、本机权限、上下文预算、已连接电脑与自动朗读）。支持主线/空态/点数用完、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
 | [动态壁纸](prototypes/live-wallpapers.html) | Android 壁纸库与全屏预览。封面显示已应用位置，支持纯壁纸、桌面和锁屏三种预览。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
 | [创意作品详情页](../../../../services/server-forum/docs/design-specs/prototypes/ideas-cards/work-detail.html) | 「碎花垂耳兔」使用通栏布局，完整作品图下显示介绍、作者、来源和灰底体验按钮。评论区采用全站统一的列表、底部入口和编辑弹层。与网页共用同一份设计稿。[手机预览](http://127.0.0.1:1448/work-detail.html?view=mobile) |
 | [讨论卡片](prototypes/discussion-cards.html) | 单列列表，每张卡片显示单行标题。底部左侧依次显示标签、头像、发布时间，右侧为回复与点赞。点击标题查看正文。支持双端和明暗切换。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile) |

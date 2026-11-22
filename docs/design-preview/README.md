@@ -32,7 +32,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
-| [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 纸色首页与手绘小伴、单排彩色 App 风格快捷工具图标、双列提问卡，以及底栏上方的固定对话入口。静态预览展示未登录状态。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
+| [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 个人 Agent 连续主线三屏定稿（01 默认浏览态 + 02 键盘弹出态 + 03 点右上角「···」进入的个人 Agent 配置页）：极简顶栏 + 分离悬浮胶囊输入框 + 通栏白底配置列表，支持三态、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
 | [动态壁纸](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers.html) | Android 壁纸库、三种全屏预览和封面使用状态。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
 | [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 键盘、表情与相册三种状态。点笑脸打开表情面板，选图后可预览和移除。支持单字或单表情发布、回复和深浅色预览，图稿使用小伴示例壁纸。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
 | [MBTI · 向内看](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mbti-native.html) | 原生 iOS 质感的首页、答题、结果交互提案（第四版：珊瑚橙红＋暖白＋墨灰、暖色首页插画、紧凑间距、加大正文）；支持三页总览、单页预览、6 题演示、六章报告、16 型切换、深浅色和分享卡。结果与历史记录为示例，保存分享为模拟；源文件与素材在仓库内，已应用到内置 MBTI 1.3.0（正式版使用真实作答与存档）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，启动方法见手机设计索引，后续沿用同一地址。 |

@@ -126,6 +126,47 @@ class ChatHistoryTest {
     }
 
     @Test
+    fun `main topics restart in order while the model sees only the current topic`() = runTest {
+        val files = AgentAwareFiles()
+        val bodies = mutableListOf<String>()
+        val api = gateway(bodies)
+        val chat = CloudChatController(api, scope(), history = ChatHistory(files, scope()), clock = { 1L })
+        chat.useAccount("owner")
+        chat.openMainConversation()
+        val first = chat.state.value.conversationId
+        chat.send("first topic")
+        chat.state.await { !it.sending && it.messages.size == 2 }
+
+        chat.startMainTopic()
+        val second = chat.state.value.conversationId
+        assertNotEquals(first, second)
+        assertEquals(2L, chat.state.value.mainTopic)
+        assertTrue(chat.state.value.messages.isEmpty())
+        chat.send("second topic")
+        chat.state.await { !it.sending && it.messages.size == 2 }
+        assertTrue(bodies.last().contains("second topic"))
+        assertTrue(!bodies.last().contains("first topic"))
+        assertEquals("first topic", chat.readChatHistory(first)?.messages?.first()?.text)
+
+        chat.clearConversation()
+        chat.send("separate conversation")
+        chat.state.await { !it.sending && it.messages.size == 2 }
+        eventually { files.texts["chats/owner/index.json"]?.contains("separate conve") == true }
+
+        val restarted = CloudChatController(api, scope(), history = ChatHistory(files, scope()))
+        restarted.useAccount("owner")
+        restarted.openMainConversation()
+        assertEquals(second, restarted.state.value.conversationId)
+        assertEquals("second topic", restarted.state.value.messages.first().text)
+        restarted.clearMainHistory()
+        assertEquals(1L, restarted.state.value.mainTopic)
+        assertTrue(restarted.state.value.messages.isEmpty())
+        assertNull(restarted.readChatHistory(first))
+        assertNull(restarted.readChatHistory(second))
+        assertTrue(restarted.state.value.conversations.any { it.mainTopic == null })
+    }
+
+    @Test
     fun `deletion waits for the agent and ignores late saves`() = runTest {
         val files = AgentAwareFiles()
         val stopped = CompletableDeferred<Unit>()

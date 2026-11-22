@@ -44,21 +44,23 @@ class ImageGenerationTest {
         val store = ChatHistory(InMemoryChatHistoryFiles(), this)
         val chat = CloudChatController(AiGatewayApi(client) { "token" }, this, history = store)
         try {
-            assertTrue(chat.generateImages("poster", 1, null))
+            chat.openMainConversation()
+            val main = chat.state.value.conversationId
+            assertTrue(chat.generateParallelImages("poster", 1, null, "png", 9, 200))
             withTimeout(5_000) { started.await() }
-            assertTrue(chat.canLeaveForCreation())
-            val imageChat = chat.state.value.conversationId
-            chat.clearConversation()
+            assertEquals(main, chat.state.value.conversationId)
             assertFalse(chat.state.value.sending)
             assertEquals(1, chat.state.value.backgroundImageCount)
+            val imageChat = chat.state.value.imageSessions.single()
             chat.openConversation(imageChat)
             assertTrue(chat.state.value.sending)
-            chat.clearConversation()
-            val newChat = chat.state.value.conversationId
+            assertTrue(chat.canLeaveForCreation())
+            chat.openMainConversation()
             finish.complete(Unit)
             withTimeout(5_000) { while (chat.state.value.backgroundImageCount > 0) delay(10) }
-            assertEquals(newChat, chat.state.value.conversationId)
+            assertEquals(main, chat.state.value.conversationId)
             assertTrue(chat.state.value.messages.isEmpty())
+            assertEquals(ChatTaskStatus.Completed, chat.state.value.conversations.first { it.id == imageChat }.taskStatus)
             chat.openConversation(imageChat)
             assertEquals(1, chat.state.value.messages.last().generatedImages.size)
         } finally {
