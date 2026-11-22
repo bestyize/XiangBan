@@ -309,6 +309,73 @@
     copy: { boss: '岳停云', bossSub: '守山剑师', win: '借一剑过万山', winLine: '岳停云收剑侧身。雁影掠过朱日，云上再无别的声息。', loseLine: '重剑落地时有一息空隙。接住来势，再从他身后出剑。', phase: '开山势 · 重剑横云', place: '悬山' },
   }
 
+  // 归墨卷 (终卷): walks back from 烽火卷's frontier to 竹林卷's mountain gate as colour drains to pure ink and paper.
+  // Opponents also parry (拆) frontal slashes and riposte; from 竹海 onward unexecuted shades reform once.
+  const RETURN_INK = {
+    id: 7, name: '归墨卷', length: 6120,
+    strictParry: true,
+    counterGuard: true,
+    fade: [[0, 0.35], [1300, 0.22], [2300, 0.10], [3300, 0]],
+    areas: [
+      { x: 0, name: '残烽', sub: '第一幅' },
+      { x: 1440, name: '断关', sub: '第二幅' },
+      { x: 2330, name: '荒驿', sub: '第三幅' },
+      { x: 3290, name: '竹海', sub: '第四幅' },
+      { x: 4230, name: '留白', sub: '第五幅' },
+      { x: 5230, name: '无名', sub: '终幅' },
+    ],
+    platforms: [
+      { x: 1700, y: 224, w: 150 },
+      { x: 2060, y: 236, w: 110 },
+      { x: 3020, y: 244, w: 110 },
+      { x: 4590, y: 238, w: 150 },
+      { x: 4900, y: 238, w: 120 },
+    ],
+    volley: { zone: [1340, 2330], cycle: [3.0, 1.2], first: 2.0, width: 280, dir: -1 },
+    ramparts: [{ x: 1560, h: 52 }, { x: 1980, h: 54 }],
+    reform: { zone: [3250, 6120] },
+    whiteout: { zone: [4230, 5230], radius: 170, lights: [4440, 4810, 5020] },
+    prompts: [
+      { x: 0, key: 'strict' },
+      { x: 3330, key: 'reform', local: true },
+      { x: 4250, key: 'whiteout', local: true },
+    ],
+    encounters: {
+      ashes: { id: 'ashes', trigger: 940, lock: [700, 1440], waves: [
+        [{ type: 'soldier', side: 1, mono: true }, { type: 'soldier', side: -1, delay: 0.4, mono: true }],
+        [{ type: 'shade', x: 1220 }],
+        [{ type: 'shade', side: 1 }, { type: 'soldier', side: -1, delay: 0.3, mono: true }, { type: 'soldier', side: 1, delay: 1.0, mono: true }],
+      ] },
+      ruined_pass: { id: 'ruined_pass', trigger: 1600, lock: [1380, 2100], waves: [
+        [{ type: 'shadeArcher', x: 1775, y: 224 }, { type: 'soldier', side: -1, delay: 0.4, mono: true }],
+        [{ type: 'shade', side: 1 }, { type: 'shadeArcher', x: 1775, y: 224, delay: 0.3 }, { type: 'shadeArcher', x: 1990, delay: 0.7 }],
+      ] },
+      posthouse: { id: 'posthouse', trigger: 2720, lock: [2400, 3140], waves: [
+        [{ type: 'shadeRider', side: 1 }, { type: 'soldier', side: -1, delay: 0.6, mono: true }],
+        [{ type: 'shadeRider', side: -1 }, { type: 'shade', side: 1, delay: 0.6 }],
+        [{ type: 'shadeRider', side: 1 }, { type: 'shadeRider', side: -1, delay: 2.4 }, { type: 'shadeArcher', x: 3055, y: 244, delay: 0.5 }],
+      ] },
+      bamboo_sea: { id: 'bamboo_sea', trigger: 3680, lock: [3360, 4120], waves: [
+        [{ type: 'shade', side: 1 }, { type: 'shade', side: -1, delay: 0.4 }],
+        [{ type: 'shield', side: 1, mono: true }, { type: 'shade', side: -1, delay: 0.3 }, { type: 'shade', side: 1, delay: 1.0 }, { type: 'crow', side: 1, delay: 0.6 }, { type: 'crow', side: -1, delay: 1.2 }],
+        [{ type: 'pavise', x: 3940, group: 'r1', mono: true }, { type: 'pavise', x: 3982, group: 'r1', delay: 0.15, mono: true }, { type: 'shade', side: -1, delay: 0.4 }, { type: 'shade', side: 1, delay: 1.2 }],
+      ] },
+      blank: { id: 'blank', trigger: 4580, lock: [4300, 5060], waves: [
+        [{ type: 'shade', side: 1 }, { type: 'shade', side: -1, delay: 0.4 }, { type: 'shadeArcher', x: 4665, y: 238, delay: 0.5 }],
+        [{ type: 'shadeRider', side: 1 }, { type: 'shade', side: -1, delay: 0.5 }, { type: 'crow', side: 1, delay: 0.8 }, { type: 'crow', side: -1, delay: 1.3 }],
+        [{ type: 'shadeRider', side: -1 }, { type: 'shade', side: 1, delay: 0.4 }, { type: 'shade', side: -1, delay: 1.1 }, { type: 'shadeArcher', x: 4950, y: 238, delay: 0.5 }],
+      ] },
+      nameless: { id: 'nameless', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'nameless', x: 5890 }]] },
+    },
+    copy: {
+      boss: '无名剑客', bossSub: '未落笔之影', win: '画者收笔，剑客归山',
+      winLine: '画者收笔，剑客归山。斗笠下是一张白纸，长卷终于回到山门。',
+      loseLine: '白纸未干。收住乱斩，接住他的回锋，再一剑破之。',
+      phase: '烽影再临 · 孤剑对锋', place: '归墨之路',
+      intro: '烽烟散尽，墨色将干。', outro: '画者收笔，剑客归山。',
+    },
+  }
+
   // Each 卷's boss and closing lines, read by the result screen and the boss bar.
   BAMBOO.copy = {
     boss: '无常', bossSub: '斗笠客', win: '一剑破无常', winLine: '斗笠客化作一池淡墨，竹林重归寂静。', loseLine: '无常仍立在月下。朱光一闪，便是出剑之时。',
@@ -408,6 +475,22 @@
     { id: '6-5', code: 605, volume: 6, name: '钟楼', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['belltower'], par: 120, hurt: 2, finesse: 5, challenge: { all: [{ stat: 'boltReturns', goal: 1, text: '还箭命中弩哨' }, { stat: 'bellInterrupts', goal: 1, text: '击钟打断石震起手' }] }, grades: [4650, 5750, 6900] },
     { id: '6-6', code: 606, volume: 6, name: '绝顶', sub: '终幅', range: [5190, 6120], start: 5335, encounters: ['summit'], par: 122, hurt: 2, finesse: 6, boss: true, challenge: { all: [{ stat: 'bossExecutions', goal: 2, text: '破势处决' }, { stat: 'yueBackHits', goal: 3, text: '借势背击' }] }, grades: [7800, 9700, 12000] },
     { id: '6-scroll', code: 600, volume: 6, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 590, encounters: ['rockgate', 'cliffwalk', 'windhall', 'pinecourt', 'belltower', 'summit'], par: 500, hurt: 5, scroll: true, finesse: 28, challenge: { stat: 'time', goal: 420, at: 'most', text: '7 分钟内踏上绝顶' }, grades: [23500, 28000, 32000] },
+    // 卷七 · 归墨卷（终卷）
+    { id: '7-1', code: 701, volume: 7, name: '残烽', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['ashes'],
+      par: 70, hurt: 1, finesse: 4, challenge: { stat: 'counterParries', goal: 2, text: '接住回锋 2 次' }, grades: [2500, 3300, 4100] },
+    { id: '7-2', code: 702, volume: 7, name: '断关', sub: '第二幅', range: [1340, 2330], start: 1460, encounters: ['ruined_pass'],
+      par: 100, hurt: 2, finesse: 5, challenge: { stat: 'doubleReturns', goal: 2, text: '以二返之箭射倒墨影弓手 2 次' }, grades: [2400, 3000, 3500] },
+    { id: '7-3', code: 703, volume: 7, name: '荒驿', sub: '第三幅', range: [2290, 3290], start: 2340, encounters: ['posthouse'],
+      par: 115, hurt: 2, finesse: 5, challenge: { stat: 'riderCounters', goal: 2, text: '接住落马回锋 2 次' }, grades: [3800, 5100, 6500] },
+    { id: '7-4', code: 704, volume: 7, name: '竹海', sub: '第四幅', range: [3250, 4230], start: 3300, encounters: ['bamboo_sea'],
+      par: 110, hurt: 2, finesse: 6, challenge: { stat: 'reformDenied', goal: 5, text: '不让墨影重聚，处决 5 名墨影' }, grades: [3900, 5200, 6700] },
+    { id: '7-5', code: 705, volume: 7, name: '留白', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['blank'],
+      par: 120, hurt: 2, finesse: 6, challenge: { stat: 'parries', goal: 8, text: '弹反 8 次' }, grades: [4200, 5400, 6600] },
+    { id: '7-6', code: 706, volume: 7, name: '无名', sub: '终幅', range: [5190, 6120], start: 5240, encounters: ['nameless'],
+      par: 170, hurt: 2, finesse: 6, boss: true, challenge: { stat: 'resonanceBreaks', goal: 2, text: '打出剑鸣大破 2 次' }, grades: [7000, 8800, 10500] },
+    { id: '7-scroll', code: 700, volume: 7, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
+      encounters: ['ashes', 'ruined_pass', 'posthouse', 'bamboo_sea', 'blank', 'nameless'], par: 520, hurt: 5, scroll: true, finesse: 28,
+      challenge: { stat: 'time', goal: 440, at: 'most', text: '7 分 20 秒内归墨' }, grades: [22000, 28500, 34000] },
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -415,7 +498,7 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA, LANTERN_CITY, HANGING_MOUNTAIN]
+  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON, STORM_SEA, LANTERN_CITY, HANGING_MOUNTAIN, RETURN_INK]
   function volume(id) { return VOLUMES.find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }

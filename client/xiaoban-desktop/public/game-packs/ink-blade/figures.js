@@ -136,6 +136,7 @@
     t.lean = 0.32; t.sw = 0.9; t.reach = 0.85; t.ou = 0.4; t.of = 0.1; t.crouch = 3
     const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
     if (KINDS[e.type]?.summit) return globalThis.XiabanInkMountainFigures.pose(e,t,anim,time,progress,speed)
+    if (KINDS[e.type]?.returnInk && globalThis.XiabanInkReturnFigures) return globalThis.XiabanInkReturnFigures.pose(e,t,anim,time,progress,speed)
     if (KINDS[e.type]?.city) return cityPose(e,t,anim,time,progress,speed)
     if (e.type === 'archer') { t.lean = 0.08; t.ou = 1.5; t.of = 1.52; t.sw = 0 }
     if (e.type === 'shield') { t.ou = 0.95; t.of = 1.45; t.lean = 0.22 }
@@ -1382,6 +1383,9 @@
       globalThis.XiabanInkLantern.costume(ctx,kind,s,pose,look,time,look.entity)
       if(kind==='judge')out.tip=[s.hand[0]+Math.cos(pose.sw)*(look.entity?.judgeStage===3?49:78),s.hand[1]+Math.sin(pose.sw)*(look.entity?.judgeStage===3?49:78)]
     }
+    if (spec.returnInk && globalThis.XiabanInkReturnFigures) {
+      globalThis.XiabanInkReturnFigures.overlay(ctx, kind, s, pose, look, time, look.entity)
+    }
     ctx.restore()
     const map = (p) => p && [x + p[0] * facing, y + p[1]]
     out.tip = map(out.tip)
@@ -1781,7 +1785,7 @@
     if (look.alpha !== undefined) ctx.globalAlpha *= look.alpha
     const st = {
       phase: r.gait, mode: r.mode || 'stand', w: r.w, rear: r.rear, paw: T.paw && r.w < 0.1, flow, nod: r.nod + (r.mode === 'gallop' ? Math.sin(r.gait * TAU) * 1.8 : 0), headDown: r.headDown,
-      cloth: gen ? '#5a4a36' : '#6b5a42',
+      cloth: kind === 'shadeRider' ? '#26272a' : gen ? '#5a4a36' : '#6b5a42',
       riderFn: (c, map, rein) => { res = paintRider(c, kind, r, look, time, seed, map, rein, flow); fnMap = map },
     }
     const P = paintHorse(ctx, st, look, time, seed)
@@ -1836,7 +1840,7 @@
     ctx.save()
     ctx.scale(facing, 1)
     ctx.translate(-x, -y)
-    ctx.fillStyle = CINNABAR
+    ctx.fillStyle = look.paperScarf ? '#f4eddc' : CINNABAR
     const left = [], right = []
     for (let i = 0; i < pts.length; i++) {
       const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]
@@ -1849,6 +1853,7 @@
     for (const p of left) ctx.lineTo(p[0], p[1])
     for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1])
     ctx.closePath(); ctx.fill()
+    if (look.paperScarf) { ctx.strokeStyle = '#18181b'; ctx.lineWidth = 0.85; ctx.stroke() }
     ctx.restore()
   }
 

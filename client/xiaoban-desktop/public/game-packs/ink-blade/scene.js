@@ -61,10 +61,19 @@
     { x: 4300, top: [76, 87, 97], middle: [156, 167, 170], low: [228, 234, 220], tint: [0, 0, 0, 0], blend: 475 },
     { x: 5310, top: [167, 151, 155], middle: [228, 197, 178], low: [249, 234, 211], tint: [0, 0, 0, 0], blend: 535 },
   ]
-  const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
+  // 归墨卷 (终卷): 浅绛 fades to pure monochrome ink, then blank paper.
+  const SKY_RETURN = [
+    { x: 0, top: [198, 194, 184], low: [238, 232, 218], tint: [242, 232, 212, 0.12], sun: 0.45, fade: 0.35, embers: 0.65, dust: 0.18 },
+    { x: 1300, top: [186, 184, 178], low: [234, 229, 218], tint: [230, 226, 218, 0.1], sun: 0.2, fade: 0.22, dust: 0.22, sand: 0.15 },
+    { x: 2300, top: [204, 200, 192], low: [238, 234, 224], tint: [236, 232, 224, 0.06], sun: 0.35, fade: 0.1, dust: 0.14, leaves: 0.25 },
+    { x: 3300, top: [190, 188, 184], low: [236, 232, 222], tint: [232, 230, 224, 0.04], sun: 0.3, fade: 0, bamboo: 1, leaves: 0.8 },
+    { x: 4200, top: [234, 228, 214], low: [244, 239, 226], tint: [242, 236, 222, 0], sun: 0, fade: 0, bamboo: 0.15 },
+    { x: 5200, top: [40, 40, 46], low: [204, 194, 178], tint: [196, 190, 202, 0.26], sun: 0, moon: 1, fade: 0, petals: 1 },
+  ]
+  const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night', 'fade', 'embers', 'blank']
 
   function environment(x, volumeId = 1) {
-    const sky = volumeId === 6 ? SKY_SUMMIT : volumeId === 5 ? SKY_CITY : volumeId === 4 ? SKY_SEA : volumeId === 3 ? SKY_BEACON : volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
+    const sky = volumeId === 7 ? SKY_RETURN : volumeId === 6 ? SKY_SUMMIT : volumeId === 5 ? SKY_CITY : volumeId === 4 ? SKY_SEA : volumeId === 3 ? SKY_BEACON : volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
     let a = sky[0], b = sky[0], t = 0
     for (let i = 0; i < sky.length - 1; i++) {
       const next = sky[i + 1]
@@ -169,7 +178,9 @@
     a.grain = art.paperGrain(256)
     a.vignette = art.vignette(o.width, o.height)
 
-    if (volumeId === 6) {
+    if (volumeId === 7 && globalThis.XiabanInkReturnArt) {
+      Object.assign(a, globalThis.XiabanInkReturnArt.build(r, span, world))
+    } else if (volumeId === 6) {
       a.mountain = globalThis.XiabanInkMountain.build(r, world)
     } else if (volumeId === 5) {
       Object.assign(a, globalThis.XiabanInkLantern.build(r,span))
@@ -260,6 +271,8 @@
         ? { p, s: art.seaPlatform(p, r(1), 70 + i) }
         : volumeId === 3
         ? { p, s: art.earthBlock(p.w, p.y, GROUND, 60 + i, r(1)) }
+        : volumeId === 7
+        ? { p, s: p.x < 3250 ? art.earthBlock(p.w, p.y, GROUND, 60 + i, r(1)) : art.rock(p.w, p.y, GROUND, 40 + i, r(1)) }
         : p.x >= WATER[0] && p.x < WATER[1]
         ? { p, s: art.bridge(p.w, p.y, GROUND, r(1), 30 + i) }
         : { p, s: art.rock(p.w, p.y, GROUND, 40 + i, r(1)) })
@@ -362,6 +375,7 @@
   }
 
   function drawBackground(ctx, a, cam, e, clock) {
+    if (a.volumeId === 7 && globalThis.XiabanInkReturnArt) { globalThis.XiabanInkReturnArt.background(ctx, a, cam, e, clock, layer, mist); return }
     if (a.volumeId === 4) { drawSeaBackground(ctx, a, cam, e, clock); return }
     if (a.volumeId === 6) { globalThis.XiabanInkMountain.background(ctx, a, cam, clock, e, layer); return }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -469,7 +483,9 @@
     layer(ctx, cam, 1)
     const left = cam.left - 60, right = cam.left + cam.viewW + 60
 
-    if (a.volumeId === 6) {
+    if (a.volumeId === 7 && globalThis.XiabanInkReturnArt) {
+      globalThis.XiabanInkReturnArt.ground(ctx, a, cam, e)
+    } else if (a.volumeId === 6) {
       globalThis.XiabanInkMountain.ground(ctx, a, cam)
     } else if (a.volumeId === 5) {
       globalThis.XiabanInkLantern.ground(ctx,a,cam,clock)
@@ -589,6 +605,7 @@
   }
 
   function drawForeground(ctx, a, cam, e, clock) {
+    if (a.volumeId === 7 && globalThis.XiabanInkReturnArt) return globalThis.XiabanInkReturnArt.foreground(ctx, a, cam, e, clock, layer)
     if (a.volumeId === 6) return globalThis.XiabanInkMountain.foreground(ctx, a, cam, layer)
     if (a.volumeId === 5) {
       layer(ctx,cam,1)

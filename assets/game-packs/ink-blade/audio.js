@@ -285,6 +285,16 @@
       src.connect(filter); filter.connect(gain); out(gain, 0.2)
       src.start(at, Math.random() * 0.5); src.stop(at + 1.25)
     },
+    // Volume 7 (归墨卷): counter click, rising duel chimes, resonance break, brush clash, stain sounds, opening guqin phrase.
+    counter: () => { bell(880, 0.06, 0.45); hiss({ dur: 0.05, vol: 0.1, freq: 3400, to: 1600, q: 1.4 }) },
+    duel1: () => { bell(587.33, 0.08, 0.9); hiss({ dur: 0.05, vol: 0.1, freq: 4400, to: 2600, type: 'highpass' }) },
+    duel2: () => { bell(739.99, 0.09, 1.0); hiss({ dur: 0.05, vol: 0.11, freq: 4800, to: 2800, type: 'highpass' }) },
+    duel3: () => { bell(880, 0.1, 1.2); bell(1174.66, 0.06, 1.4, 0.03) },
+    resonanceBreak: () => { drum(58, 0.42); bell(880, 0.09, 1.8); bell(1174.66, 0.07, 2.0, 0.04); hiss({ dur: 0.25, vol: 0.12, freq: 3600, to: 600, q: 0.7 }) },
+    brushClash: () => { drum(52, 0.46); bell(440, 0.09, 2.1); bell(659.25, 0.06, 1.9, 0.06); hiss({ dur: 0.45, vol: 0.15, freq: 400, to: 3200, q: 0.5, send: 0.45 }) },
+    stainGather: () => { hiss({ dur: 0.45, vol: 0.06, freq: 240, to: 1100, q: 1.8, send: 0.35 }) },
+    stainBreak: () => { hiss({ dur: 0.16, vol: 0.1, freq: 1800, to: 320, type: 'lowpass', send: 0.2 }); bell(987, 0.035, 0.5) },
+    returnOutro: () => { [146.83, 220, 293.66, 329.63].forEach((f, i) => pluck(f, 0.075, i * 0.38)) },
   }
 
   function play(name) {
@@ -296,18 +306,26 @@
   function update(mood) {
     if (!enabled || !ac || ac.state !== 'running') return
     const now = ac.currentTime
-    if (now >= nextNote) {
-      const scale = mood.volume === 3 ? FRONTIER : mood.volume === 6 ? MOUNTAIN : SCALE
+    const silentMelody = mood.volume === 7 && ((mood.x >= 4230 && mood.x < 5230) || mood.namelessStage === 3)
+    if (!silentMelody && now >= nextNote) {
+      const useFrontier = mood.volume === 3 || (mood.volume === 7 && mood.x < 2300)
+      const scale = useFrontier ? FRONTIER : mood.volume === 6 ? MOUNTAIN : SCALE
+      const fadeVol = mood.volume === 7 && mood.x < 3290 ? Math.max(0.25, 1 - mood.x / 3600) : 1
       lastNote = Math.max(0, Math.min(scale.length - 1, lastNote + Math.round((Math.random() - 0.5) * 4)))
-      pluck(scale[lastNote], mood.combat ? 0.035 : 0.045)
-      if (Math.random() < 0.3) pluck(scale[Math.max(0, lastNote - 3)] / 2, 0.03, 0.02)
-      if (mood.volume === 3 && now >= nextDrone) {
-        pluck(Math.random() < 0.5 ? 55 : 82.41, 0.04, 0.05)
+      pluck(scale[lastNote], (mood.combat ? 0.035 : 0.045) * fadeVol)
+      if (Math.random() < 0.3) pluck(scale[Math.max(0, lastNote - 3)] / 2, 0.03 * fadeVol, 0.02)
+      if (useFrontier && now >= nextDrone) {
+        pluck(Math.random() < 0.5 ? 55 : 82.41, 0.04 * fadeVol, 0.05)
         nextDrone = now + 6 + Math.random() * 6
       }
       nextNote = now + (mood.combat ? 0.55 + Math.random() * 0.7 : 1.3 + Math.random() * 1.8) * (mood.volume === 6 ? 1.2 : 1)
     }
-    if (mood.combat && mood.war && now >= nextDrum) {
+    if (mood.volume === 7 && mood.namelessStage === 3 && mood.combat && now >= nextDrum) {
+      // Stage 3: only a heartbeat-like low drum beneath the sword clashes.
+      drum(50, 0.16)
+      drum(46, 0.09, 0.24)
+      nextDrum = now + 1.05
+    } else if (mood.combat && (mood.war || (mood.volume === 7 && mood.namelessStage === 2)) && now >= nextDrum) {
       drum(mood.boss ? 56 : 64, mood.boss ? 0.17 : 0.1)
       drum(mood.boss ? 56 : 64, mood.boss ? 0.1 : 0.06, 0.2)
       if (mood.boss) drum(70, 0.08, 0.36)

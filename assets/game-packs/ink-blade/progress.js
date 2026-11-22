@@ -17,7 +17,7 @@
     if (raw.difficulty === 'easy') save.difficulty = 'easy'
     if (LV.volume(raw.volume)) save.volume = raw.volume
     if (Array.isArray(raw.prompts)) {
-      save.prompts = [...new Set(raw.prompts.filter((key) => typeof key === 'string' && /^[a-z]{1,16}$/.test(key)))].slice(0, 32)
+      save.prompts = [...new Set(raw.prompts.filter((key) => typeof key === 'string' && /^[a-z]{1,16}$/.test(key)))].slice(0, 48)
     }
     const levels = raw.levels && typeof raw.levels === 'object' && !Array.isArray(raw.levels) ? raw.levels : {}
     for (const level of LV.LEVELS) {
@@ -78,9 +78,16 @@
     return Boolean(LV.volume(volumeId))
   }
 
-  function rememberPrompt(save, key) {
-    return save.prompts.includes(key) ? save : { ...save, prompts: [...save.prompts, key].slice(0, 32) }
+  function grandScrollUnlocked(save) {
+    return LV.VOLUMES.every((vol) => {
+      const stages = LV.volumeLevels(vol.id).filter((entry) => !entry.scroll)
+      return stages.length > 0 && cleared(save, stages[stages.length - 1].id)
+    })
   }
 
-  globalThis.XiabanInkProgress = { VERSION, empty, normalize, record, cleared, unlocked, next, sealCount, maxSeals, volumeUnlocked, rememberPrompt, bits }
+  function rememberPrompt(save, key) {
+    return save.prompts.includes(key) ? save : { ...save, prompts: [...save.prompts, key].slice(0, 48) }
+  }
+
+  globalThis.XiabanInkProgress = { VERSION, empty, normalize, record, cleared, unlocked, next, sealCount, maxSeals, volumeUnlocked, grandScrollUnlocked, rememberPrompt, bits }
 })()

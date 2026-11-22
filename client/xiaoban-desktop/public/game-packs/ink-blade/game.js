@@ -48,6 +48,7 @@
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
   let lastFrame = 0, accumulator = 0, clock = 0, lastProgress = 0, leaving = false, wasFullscreen = false
   let toastTimer = 0, promptTimer = 0, dashImage = 0, phantomImage = 0, footClock = 0, coverMix = 0, darkOn = false
+  let whiteoutNode = null, whiteoutOn = false, blankMix = 0, returnIntroClock = 0, returnOutroClock = 0
   const shown = new Set()
   const stuck = [], horses = []
   const camera = { x: 400 }
@@ -386,6 +387,13 @@
     watchman: ['甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背', '甲卫架枪挡正面轻斩；迎枪弹反，破势后再斩处决，也可绕背'],
     writing: ['虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开', '虚笔是落墨范围：横笔起跳，竖笔侧避，囗字从左侧缺口离开'],
     rigging: ['斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下', '斩断系在甲板上的帆索，落下横桅砸敌；先把敌人引到桅下'],
+    counter: ['正面乱斩会被墨影拆开：看准它的回锋朱光，再出新的一剑弹反', '正面乱斩会被墨影拆开：看准它的回锋朱光，再按 J 弹反'],
+    riposte: ['墨影回锋将至：后仰结束后出新的一剑，即可弹反破势', '墨影回锋将至：后仰结束后按 J，即可弹反破势'],
+    doublereturn: ['墨影弓手拆回了箭！再斩回一次，二返之箭可一击射倒它', '墨影弓手拆回了箭！再按 J 斩回一次，二返之箭可一击射倒它'],
+    ridercounter: ['落马回锋：墨影骑跃起下劈，迎着朱光再弹一次即可令其落地失衡', '落马回锋：墨影骑跃起下劈，迎着朱光再按 J 即可令其落地失衡'],
+    reform: ['不斩不散：未被处决的墨影会从墨渍重聚；尽量处决，或在「聚」印时斩散墨渍', '不斩不散：未被处决的墨影会从墨渍重聚；尽量处决，或在「聚」印时按 J 斩散墨渍'],
+    whiteout: ['纸雾遮目：雾中只看得见敌人的朱眼与刃光，石灯周围才显墨色', '纸雾遮目：雾中只看得见敌人的朱眼与刃光，石灯周围才显墨色'],
+    duel: ['对剑：无名剑客会连番回锋，接住连续弹反即可打出剑鸣大破', '对剑：无名剑客会连番回锋，连续按 J 弹反即可打出剑鸣大破'],
   }
 
   function showPrompt(key) {
@@ -460,7 +468,7 @@
     const playing = name === 'playing'
     $('hud').hidden = name === 'welcome' || name === 'select'
     controls.hidden = !playing
-    controls.classList.toggle('combat-clearance', state.level.volume < 6)
+    controls.classList.toggle('combat-clearance', playing)
     if (fadedControls) {
       for (const node of [moveTrack, ...actionButtons]) node.classList.remove('fighter-overlap')
       fadedControls = 0
@@ -485,6 +493,8 @@
     globalThis.XiabanResultShare?.reset()
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
     resetInput(); FX.clear(fx); anims.clear(); stuck.length = 0; horses.length = 0
+    blankMix = 0; returnOutroClock = 0
+    returnIntroClock = vol === 7 && (currentLevel === '7-1' || currentLevel === '7-scroll') ? 3.2 : 0
     accumulator = 0; lastProgress = 0
     camera.x = cameraTarget()
     setOverlays('playing')
@@ -670,8 +680,9 @@
     $('resultTitle').textContent = result.cleared
       ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : copy.win) : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
       : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
+    const grandLine = result.cleared && level.id === '7-6' && PROGRESS.grandScrollUnlocked(save) ? ' 七卷皆通，「千里江山」已启。' : ''
     $('resultDescription').textContent = result.cleared
-      ? (level.boss || level.scroll ? copy.winLine : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
+      ? (level.boss || level.scroll ? copy.winLine + grandLine : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
       : p.guardBlocks >= 3 && result.parries < 2 ? '连斩被架刀格开了。收住剑，等朱光一闪再斩。'
       : level.boss ? copy.loseLine : '提剑再入，' + (area ? area.name : copy.place) + '还在等你。'
     $('resultScore').textContent = result.score
@@ -781,6 +792,8 @@
     yanhui:{a0:-2.3,a1:.8,r:49,width:12,color:'#273025'},
     shizhen:{a0:-2.5,a1:1,r:65,width:17,color:'#273025'},
     yue:[{a0:-2.5,a1:1}],
+    shade: { a0: -2.25, a1: 0.85, r: 44, width: 13, color: '#141518' },
+    nameless: [{ a0: -2.25, a1: 0.85, r: 48, width: 15, color: '#111214' }, { a0: 0.95, a1: -2.05, r: 48, width: 15, color: '#111214' }, { a0: -2.0, a1: 1.4, r: 52, width: 18, color: '#111214' }],
   }
   const MOUNTAIN_SWINGS = {
     cleave: { a0: -2.38, a1: 0.77, r: 79, width: 23 },
@@ -803,7 +816,7 @@
       if (kind === 'crow') fig.drawCrow(c, copy, copy.x, copy.y, look, clock)
       else if (kind === 'dummy') fig.drawDummy(c, copy, copy.x, copy.y, look, a || { wobble: 0 }, clock)
       else if (kind === 'dragon') fig.drawDragon(c, copy, copy.x, copy.y, copy.facing, look, clock)
-      else if ((kind === 'cavalry' || (kind === 'general' && enemy.mounted)) && fig.drawRider) fig.drawRider(c, kind, { ...copy, mounted: true, vx: 0 }, ghostAnim, copy.x, copy.y, copy.facing, look, clock, 0)
+      else if ((kind === 'cavalry' || kind === 'shadeRider' || (kind === 'general' && enemy.mounted)) && fig.drawRider) fig.drawRider(c, kind, { ...copy, mounted: true, vx: 0 }, ghostAnim, copy.x, copy.y, copy.facing, look, clock, 0)
       else if (!fig.KINDS[kind]) return
       else fig.drawHumanoid(c, kind, pose, copy.x, copy.y, copy.facing, look, clock, enemy.seed)
     }
@@ -932,17 +945,18 @@
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
-          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge' || e.kind === 'yue'
+          const big = e.kind === 'boss' || e.kind === 'general' || e.kind === 'dragon' || e.kind === 'judge' || e.kind === 'yue' || e.kind === 'nameless'
           const mountain = MOUNTAIN_SWINGS[e.move]
-          const spec = mountain ? { color: '#242924', ...mountain } : big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
+          const namelessSwing = e.kind === 'nameless'
+          const spec = mountain ? { color: '#242924', ...mountain } : namelessSwing ? ENEMY_SWINGS.nameless[e.step ?? 0] : big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
-          const lift = spec.lift ?? (e.mounted ? 70 : big ? 50 : 36)
+          const lift = spec.lift ?? (e.mounted ? 70 : namelessSwing ? 36 : big ? 50 : 36)
           FX.trail(fx, {
             x: enemy.x, y: enemy.y - lift, follow: () => [enemy.x, enemy.y - lift], followFor: 0.12,
             facing: e.facing, a0: spec.a0, a1: spec.a1, r: spec.r, width: spec.width, grow: 0.09, life: 0.3, color: spec.color,
-            edge: big || e.move === 'sweep' || e.move === 'slam' ? CINNABAR : null, hairs: big ? 14 : 9,
+            edge: big || e.move === 'sweep' || e.move === 'slam' || e.riposte ? CINNABAR : null, hairs: big ? 14 : 9,
           })
-          audio.play(big ? 'heavy' : 'slash')
+          audio.play(big && !namelessSwing ? 'heavy' : 'slash')
           break
         }
         case 'shoot':
@@ -1005,7 +1019,7 @@
           audio.play('ink')
           break
         case 'bossIntro': {
-          if (e.kind !== 'yue') FX.letterbox(fx, 2.2)
+          if (e.kind !== 'yue') FX.letterbox(fx, e.kind === 'nameless' ? 0.9 : 2.2)
           $('bossBar').hidden = false
           $('bossTitle').textContent = state.world.copy.boss
           $('bossSub').textContent = state.world.copy.bossSub
@@ -1024,7 +1038,12 @@
             FX.shake(fx, 9)
             FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
             FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-            toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
+            if (e.kind === 'nameless') {
+              $('bossSub').textContent = e.stage === 2 ? '烽影' : '无名'
+              toast(e.stage === 2 ? '烽影再临 · 昔日边关' : '归于留白 · 对剑破心', 2100)
+            } else {
+              toast(e.kind==='judge' ? (e.stage===3?'停笔拔剑 · 照见本心':'落笔成牢 · 寻隙破势') : state.world.copy.phase, 2000)
+            }
             audio.play('roar')
           }
           break
@@ -1040,7 +1059,75 @@
         case 'bossDown':
           FX.invert(fx, 1); FX.letterbox(fx, 3.5); FX.shake(fx, 10)
           FX.splat(fx, assets.redSplats, e.x, e.y, 90, { life: 1.2, alpha: 0.85 })
-          audio.play('execute')
+          if (e.kind === 'nameless') {
+            returnOutroClock = 4.6
+            audio.play('returnOutro')
+          } else {
+            audio.play('execute')
+          }
+          break
+        case 'counter':
+          FX.sparks(fx, e.x, e.y, 10, '#f4eddc', { len: 16, speed: 300 })
+          FX.ring(fx, e.x, e.y, 4, 34, 0.24, 'rgba(244,237,220,0.9)', 2.4)
+          FX.seal(fx, '拆', e.x, e.y - 26, 16, 0.7, '#4a4843')
+          FX.shake(fx, 2.5)
+          audio.play('counter')
+          break
+        case 'duelClash': {
+          const r = 42 + (e.step || 1) * 26
+          FX.ring(fx, e.x, e.y, 8, r, 0.36, 'rgba(20,20,24,0.85)', 3.2)
+          FX.ring(fx, e.x, e.y, 4, r * 0.72, 0.28, '#f4eddc', 2)
+          FX.sparks(fx, e.x, e.y, 14, CINNABAR, { len: 22, speed: 360 })
+          audio.play('duel' + Math.min(3, e.step || 1))
+          break
+        }
+        case 'resonanceBreak':
+          FX.invert(fx, 0.85)
+          FX.letterbox(fx, 0.85)
+          FX.ring(fx, e.x, e.y + 18, 10, 175, 0.55, 'rgba(20,20,24,0.82)', 6)
+          FX.ring(fx, e.x, e.y + 18, 8, 125, 0.48, CINNABAR, 2.8)
+          FX.seal(fx, '破', e.x, e.y - 22, 32, 1.3)
+          FX.shake(fx, 10)
+          audio.play('resonanceBreak')
+          break
+        case 'brushClash':
+          FX.invert(fx, 1)
+          FX.flash(fx, 0.35, '#f6f0e2')
+          FX.letterbox(fx, 0.9)
+          FX.splat(fx, assets.splats, e.x, e.y, 130, { life: 0.9 })
+          FX.drops(fx, e.x, e.y, 38, { speed: 440 })
+          FX.drops(fx, e.x, e.y, 24, { speed: 380, color: '#f4eddc', stain: false })
+          FX.ring(fx, e.x, e.y, 12, 200, 0.55, 'rgba(20,20,24,0.75)', 7)
+          FX.seal(fx, '破', e.x, e.y - 38, 30, 1.2)
+          FX.shake(fx, 12)
+          audio.play('brushClash')
+          break
+        case 'doubleReturn':
+          FX.seal(fx, '返', e.x, e.y - 20, 22, 1.0)
+          FX.sparks(fx, e.x, e.y, 14, CINNABAR, { len: 22, speed: 340 })
+          break
+        case 'stainPool':
+          FX.drops(fx, e.x, e.y - 4, 10, { speed: 120, size: 1.4 })
+          break
+        case 'stainGather':
+          FX.converge(fx, e.x, e.y - 24, 22, 56, 0.7)
+          audio.play('stainGather')
+          break
+        case 'stainBreak':
+          FX.seal(fx, '破', e.x, e.y - 18, 18, 0.8)
+          FX.drops(fx, e.x, e.y, 16, { speed: 260 })
+          audio.play('stainBreak')
+          break
+        case 'stainReform':
+          FX.converge(fx, e.x, e.y - 28, 28, 70, 0.5)
+          audio.play('spawn')
+          break
+        case 'blankTell':
+          audio.play('danger')
+          break
+        case 'blankStroke':
+          FX.shake(fx, 7)
+          audio.play('wave')
           break
         case 'leap':
           FX.puff(fx, e.x, e.y, 10, { speed: 80, size: 7, alpha: 0.3 })
@@ -1298,7 +1385,7 @@
   }
 
   function fighterBounds(fighter) {
-    const mounted = fighter.type === 'cavalry' || (fighter.type === 'general' && fighter.mounted)
+    const mounted = fighter.type === 'cavalry' || fighter.type === 'shadeRider' || (fighter.type === 'general' && fighter.mounted)
     const half = mounted ? 55 : fighter.type === 'dragon' ? 68 : fighter.w + 8
     const x = fighter.pullT > 0 ? fighter.x + (fighter.pullFrom - fighter.x) * (fighter.pullT / .22) ** 2 : fighter.x
     const head = mounted ? fighter.h + 48 : fighter.h + 10
@@ -1373,15 +1460,6 @@
       const [a, b] = state.lock
       x = b - a >= viewW ? Math.max(a + half, Math.min(b - half, x)) : (a + b) / 2
     }
-    // Leave room for the touch buttons when a duel reaches the edge of its arena.
-    if (state.world.borrowStep && state.lock && touchUI) {
-      const clearLeft = Math.min(half * .34, 112 / k)
-      const clearRight = Math.min(half * .55, 190 / k)
-      const leftEdge = Math.min(half, state.lock[0] + clearLeft - half)
-      const rightEdge = Math.max(WORLD.length - half, state.lock[1] + clearRight - half)
-      x = Math.max(p.x - half + clearRight, Math.min(p.x + half - clearLeft, x))
-      return Math.max(leftEdge, Math.min(rightEdge, x))
-    }
     return Math.max(half, Math.min(WORLD.length - half, x))
   }
 
@@ -1412,12 +1490,12 @@
     ctx.restore()
   }
 
-  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite', 'mountTell', 'ropeTell', 'bowTell'])
-  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeWrite'])
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell', 'dragonTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeTell', 'judgeWrite', 'mountTell', 'ropeTell', 'bowTell', 'riposteTele', 'airRiposteTele', 'arrowCounter', 'duelTell', 'duelThrustTell', 'blankTell'])
+  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell', 'dragonWaveTell', 'dragonDiveTell', 'judgeWrite', 'blankTell'])
 
   function teleProgress(enemy) {
     // A charging lance glints brighter as it closes in: the cue for the parry.
-    if ((enemy.type === 'cavalry' && enemy.state === 'attack') || (enemy.type === 'general' && enemy.state === 'charge')) {
+    if (((enemy.type === 'cavalry' || enemy.type === 'shadeRider') && enemy.state === 'attack') || (enemy.type === 'general' && enemy.state === 'charge')) {
       const dx = state.player.x - enemy.x
       if (enemy.hitDone || Math.sign(dx) !== Math.sign(enemy.vx)) return -1
       return Math.max(0, Math.min(1, 1 - (Math.abs(dx) - 40) / 230))
@@ -1438,9 +1516,19 @@
     const drawX = enemy.pullT > 0 ? enemy.x + (enemy.pullFrom - enemy.x) * Math.pow(enemy.pullT / 0.22, 2) : enemy.x
     const flash = enemy.flash > 0
     const progress = teleProgress(enemy)
-    const look = { entity: enemy, color: flash ? '#f4eedf' : undefined, flash, eyeGlow: progress >= 0 ? progress : enemy.state === 'attack' || enemy.state === 'dive' ? 1 : 0.15, halo: 0.22 }
-    if (enemy.state === 'spawn') look.alpha = Math.max(0, Math.min(1, 1 - enemy.t / (enemy.type === 'boss' ? 0.9 : 0.75)))
-    if (enemy.state === 'dying') { look.alpha = Math.max(0.15, enemy.t / 2.6); if (Math.random() < 0.6) FX.smoke(fx, enemy.x, enemy.y - 36, { alpha: 0.3 }) }
+    const look = {
+      entity: enemy,
+      color: flash ? '#f4eedf' : enemy.mono ? '#1a1b1e' : undefined,
+      flash,
+      paperScarf: enemy.type === 'nameless',
+      eyeGlow: progress >= 0 ? progress : enemy.state === 'attack' || enemy.state === 'dive' || enemy.state === 'riposteAttack' || enemy.state === 'duelAttack' ? 1 : 0.15,
+      halo: 0.22,
+    }
+    if (enemy.state === 'spawn') look.alpha = Math.max(0, Math.min(1, 1 - enemy.t / (enemy.type === 'boss' || enemy.type === 'nameless' ? 0.9 : 0.75)))
+    if (enemy.state === 'dying') {
+      look.alpha = enemy.type === 'nameless' ? Math.max(0.25, enemy.t / 3.2) : Math.max(0.15, enemy.t / 2.6)
+      if (Math.random() < 0.6) FX.smoke(fx, enemy.x, enemy.y - 36, { alpha: 0.3 })
+    }
     let out
     if (enemy.type === 'crow') {
       out = fig.drawCrow(ctx, enemy, enemy.x, enemy.y, look, clock)
@@ -1451,7 +1539,7 @@
     } else if (enemy.type === 'dragon') {
       shadow(enemy.x, enemy.y, 45)
       out = fig.drawDragon(ctx, enemy, enemy.x, enemy.y, enemy.facing, look, clock)
-    } else if ((enemy.type === 'cavalry' || (enemy.type === 'general' && enemy.mounted)) && fig.drawRider) {
+    } else if ((enemy.type === 'cavalry' || enemy.type === 'shadeRider' || (enemy.type === 'general' && enemy.mounted)) && fig.drawRider) {
       shadow(enemy.x, enemy.y, enemy.type === 'general' ? 40 : 34)
       if (enemy.state === 'attack' || enemy.state === 'charge') {
         if (Math.random() < dt * 22) FX.puff(fx, enemy.x - enemy.facing * 24, rules.GROUND - 2, 1, { speed: 50, size: 6, alpha: 0.32, ...dustPuff() })
@@ -1463,13 +1551,22 @@
     } else {
       const pose = fig.updatePose(enemy.type, enemy, a, dt, clock, rules)
       const isBoss = rules.isBoss(enemy)
-      shadow(enemy.x, enemy.y, isBoss ? 26 : 16)
-      if (isBoss && enemy.type !== 'yue' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
+      const extras = {}
+      if (enemy.type === 'nameless') {
+        const sk = fig.skeleton(fig.KINDS.nameless, pose)
+        const nx = enemy.x + sk.neck[0] * enemy.facing - enemy.facing * 2
+        const ny = enemy.y + sk.neck[1] + 1
+        const wind = enemy.state === 'dying' ? -90 : -enemy.vx * 0.9 - 30 * enemy.facing - 12
+        fig.updateScarf(a, nx, ny, enemy.facing, enemy.vx, dt, clock, wind)
+        extras.scarf = a.scarf
+      }
+      shadow(enemy.x, enemy.y, isBoss && enemy.type !== 'nameless' ? 26 : 16)
+      if (isBoss && enemy.type !== 'yue' && enemy.type !== 'nameless' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
       if (isBoss && (enemy.state === 'phantom' || enemy.state === 'rush') && phantomImage > 0) {
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
         FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
       }
-      out = fig.drawHumanoid(ctx, enemy.type, pose, drawX, enemy.y, enemy.facing, look, clock, enemy.seed)
+      out = fig.drawHumanoid(ctx, enemy.type, pose, drawX, enemy.y, enemy.facing, look, clock, enemy.seed, extras)
       if (!isBoss && Math.random() < dt * 1.8) FX.drops(fx, enemy.x + (Math.random() - 0.5) * 16, enemy.y - 20 - Math.random() * 20, 1, { speed: 20, size: 1.1 })
     }
     if (enemy.pullT > 0) {
@@ -1490,7 +1587,7 @@
     const glinting = progress >= 0 && out.tip && !enemy.sweep && !DANGER_TELLS.has(enemy.state)
     if (glinting) glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
     if (enemy.state === 'mountTell' && enemy.sweep && out.head) drawSeal('危', enemy.x, out.head[1] - 28, 16 + progress * 4)
-    if (darkOn && out.head && enemy.type !== 'dummy') eyeMarks.push({ head: out.head, facing: enemy.facing, glow: look.eyeGlow, tip: glinting ? out.tip : null, progress, boss: isBoss })
+    if ((darkOn || whiteoutOn) && out.head && enemy.type !== 'dummy') eyeMarks.push({ head: out.head, facing: enemy.facing, glow: look.eyeGlow, tip: glinting ? out.tip : null, progress, boss: isBoss })
     if (enemy.state === 'stagger' || enemy.state === 'broken' || enemy.state === 'umbrellaOpen') {
       const pulse = 1 + Math.sin(clock * 10) * 0.08
       const top = out.head ? out.head[1] - (isBoss ? 30 : 22) : enemy.y - 70
@@ -1525,6 +1622,10 @@
     if (footClock > 0) return
     footClock = 0.3
     if(volume===6){audio.play('stonestep');return}
+    if (volume === 7) {
+      audio.play(p.x < 2300 ? 'sandstep' : 'stonestep')
+      return
+    }
     if (volume === 3) {
       audio.play('sandstep')
       FX.puff(fx, p.x - p.facing * 5, rules.GROUND - 1, 1, { speed: 30, size: 4, alpha: 0.35, dust: true, angle: -Math.PI / 2 - p.facing * 0.7, spread: 1, life: 0.45 })
@@ -2037,7 +2138,7 @@
     if (!assets) return
     const fxDt = phase === 'paused' ? 0 : state.slow > 0 && phase === 'playing' ? dt * Math.max(0.35, state.slowScale) : dt
     let target = cameraTarget()
-    const combatFrame = touchUI && !controls.hidden && state.level.volume < 6 ? frameTouchCombat() : null
+    const combatFrame = touchUI && !controls.hidden ? frameTouchCombat() : null
     if (combatFrame) target = Math.max(combatFrame.safeMin, Math.min(combatFrame.safeMax, target))
     camera.x += (target - camera.x) * (1 - Math.exp(-dt * (phase === 'welcome' ? 1.2 : 5.5)))
     // Smooth the camera within the interval that keeps the framed fighters on screen.
@@ -2050,6 +2151,26 @@
     }
     if (combatFrame) clearControlsForFighters(cam)
     const env = scene.environment(camera.x, state.level ? state.level.volume : selectedVolume)
+    const nameless = currentVolume() === 7 ? state.enemies.find((en) => en.type === 'nameless' && (en.alive || en.state === 'dying')) : null
+    const namelessStage = nameless?.namelessStage || 0
+    if (currentVolume() === 7) {
+      const targetBlank = namelessStage === 3 ? 1 : 0
+      blankMix += (targetBlank - blankMix) * Math.min(1, dt * 1.6)
+      if (namelessStage === 2) {
+        env.top = [64, 60, 76]; env.low = [228, 196, 158]; env.tint = [236, 202, 162, 0.22]
+        env.sun = 0.75; env.moon = 0; env.petals = 0; env.fade = 0.22
+      } else if (blankMix > 0.01) {
+        const b = blankMix
+        env.top = env.top.map((v, i) => v + ([241, 235, 221][i] - v) * b)
+        env.low = env.low.map((v, i) => v + ([244, 239, 226][i] - v) * b)
+        env.tint = [0, 0, 0, 0]
+        env.moon = Math.max(0, (env.moon || 0) * (1 - b))
+        env.sun = Math.max(env.sun || 0, b * 0.95)
+        env.petals = (env.petals || 0) * (1 - b)
+        env.fade = 0
+        env.blank = b
+      }
+    }
     if (state.enemies.some((en) => en.type === 'angler' && en.alive && en.phase2)) env.blizzard = Math.max(env.blizzard || 0, 0.65)
     const wind = state.world.wind
     if (wind && camera.x >= wind.zone[0] - 200 && camera.x <= wind.zone[1] + 200) {
@@ -2062,16 +2183,23 @@
     gameNode.classList.toggle('ink-night-title', (currentVolume() === 4 || currentVolume() === 6) && night)
     gameNode.classList.toggle('mountain', currentVolume() === 6)
     darkOn = darknessAt(camera.x) > 0.02
+    whiteoutOn = currentVolume() === 7 && Boolean(globalThis.XiabanInkReturnArt) && globalThis.XiabanInkReturnArt.whiteoutAt(state.world, camera.x) > 0.02
     eyeMarks.length = 0
     scene.updateWeather(weather, cam, env, dt, clock)
     FX.update(fx, fxDt)
     phantomImage = Math.max(0, phantomImage - dt)
+    if (returnIntroClock > 0) returnIntroClock = Math.max(0, returnIntroClock - dt)
+    if (returnOutroClock > 0) returnOutroClock = Math.max(0, returnOutroClock - dt)
     scene.drawBase(ctx, assets, cam, env, currentVolume() === 6 && reducedMotion ? 0 : clock, state.level)
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     if (currentVolume() === 6) globalThis.XiabanInkMountain.moving(ctx, assets, cam, state, clock, reducedMotion)
     const burning = state.grass.length || state.fires.length ? drawGrassFire(cam) : 0
     FX.drawDecals(ctx, fx)
+    if (currentVolume() === 7 && globalThis.XiabanInkReturnArt) {
+      globalThis.XiabanInkReturnArt.drawStains(ctx, state, clock)
+      globalThis.XiabanInkReturnArt.drawBlankStroke(ctx, state, clock)
+    }
     drawStuckArrows(phase === 'paused' ? 0 : fxDt)
     drawVolleys()
     drawTide()
@@ -2097,6 +2225,11 @@
     drawHorses(simDt)
     drawPlayer(phase === 'welcome' ? dt : simDt)
     if (darkOn && drawDarkness(cam)) drawEyes()
+    if (whiteoutOn && globalThis.XiabanInkReturnArt) {
+      const res = globalThis.XiabanInkReturnArt.drawWhiteout(ctx, cam, state, clock, whiteoutNode, camera.x)
+      whiteoutNode = res.canvas
+      if (res.active) { scene.layer(ctx, cam, 1); drawEyes() }
+    }
     FX.drawFront(ctx, fx, assets)
     coverMix += ((state.player.hidden ? 1 : 0) - coverMix) * Math.min(1, dt * 9)
     if (coverMix > 0.05) {
@@ -2109,12 +2242,22 @@
     scene.drawWeather(ctx, assets, cam, weather, env)
     scene.drawPost(ctx, assets, cam, env, quality)
     FX.drawScreen(ctx, fx, cam)
+    if (currentVolume() === 7 && globalThis.XiabanInkReturnArt) {
+      if (returnIntroClock > 0) {
+        const a = returnIntroClock > 2.6 ? (3.2 - returnIntroClock) / 0.6 : Math.min(1, returnIntroClock / 0.9)
+        globalThis.XiabanInkReturnArt.drawCalligraphy(ctx, cam, state.world.copy.intro, a)
+      }
+      if (returnOutroClock > 0) {
+        const a = returnOutroClock > 3.6 ? (4.6 - returnOutroClock) / 1.0 : Math.min(1, returnOutroClock / 1.0)
+        globalThis.XiabanInkReturnArt.drawCalligraphy(ctx, cam, state.world.copy.outro, a)
+      }
+    }
     if (combatFrame && state.lock) drawOffscreenEnemies(cam)
     const volume = currentVolume()
     audio.update({
       combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale,
       fire: Math.min(1, burning / 6), sand: env.sand || 0, sea: volume === 4 ? 0.55 + (env.rain || 0) * 0.35 : 0,
-      mountain: volume === 6 ? 0.16 + (env.gust || 0) * 0.64 : 0, war: volume === 3, volume,
+      mountain: volume === 6 ? 0.16 + (env.gust || 0) * 0.64 : 0, war: volume === 3, volume, x: camera.x, namelessStage,
     })
   }
 

@@ -56,8 +56,15 @@
     yanhui:{hp:14,w:20,h:67,score:950,speed:108,reach:102,tele:.65,active:.16,recover:.9,lunge:270,damage:1},
     shizhen:{hp:18,w:25,h:76,score:1200,speed:62,reach:110,tele:.7,active:.18,recover:1.1,lunge:160,damage:1},
     yue: { hp: 46, w: 24, h: 80, score: 4000, speed: 118, reach: 132, tele: 0.8, active: 0.18, recover: 1.05, lunge: 240, damage: 1 },
+    // 归墨卷（终卷）
+    shade: { hp: 3, w: 14, h: 54, score: 180, speed: 115, reach: 84, tele: 0.5, active: 0.12, recover: 0.85, lunge: 320, damage: 1 },
+    shadeArcher: { hp: 2, w: 14, h: 54, score: 160 },
+    shadeRider: { hp: 6, w: 26, h: 76, score: 320, speed: 220, reach: 74, tele: 0.62, active: 1.5, recover: 0.95, lunge: 460, damage: 1 },
+    nameless: { hp: 60, w: 13, h: 54, score: 4000 },
   }
-  const BOSSES = new Set(['boss', 'angler', 'general', 'dragon', 'judge', 'yue'])
+  const BOSSES = new Set(['boss', 'angler', 'general', 'dragon', 'judge', 'yue', 'nameless'])
+  const SHADES = new Set(['shade', 'shadeArcher', 'shadeRider'])
+  const CLEAN_KILL = new Set(['execute', 'strike', 'doubleReturn', 'volley'])
   // Damage a raised shield cannot stop: the ink stroke and the terrain (falling ice, cracks, arrow rain, fire).
   const UNBLOCKED = new Set(['strike', 'icicle', 'crack', 'volley', 'fire'])
   const isBoss = (enemy) => BOSSES.has(enemy.type)
@@ -97,12 +104,13 @@
       bonus: null, victoryT: 0, events: [],
       icicles: (world.icicles || []).map((spec, index) => ({ id: index, x: spec.x, top: spec.y, len: spec.len || 24, y: spec.y + (spec.len || 24), state: 'hang', vy: 0, hits: [], hitPlayer: false })),
       cracks: [], nextCrack: 0, wind: { phase: 'calm', dir: 0, power: 0, cycle: -1 },
-      volleys: [], volleyClock: world.volley ? world.volley.cycle[0] + world.volley.cycle[1] - 1.8 : 0, fires: [], grass: grassCells(world),
+      volleys: [], volleyClock: world.volley ? world.volley.cycle[0] + world.volley.cycle[1] - (world.volley.first ?? 1.8) : 0, fires: [], grass: grassCells(world),
       tide: { phase: 'calm', t: world.tide?.cycle[0] || 0, zone: null, dir: 1, x: 0, hits: [] },
       rigging: (world.rigging || []).map((r, id) => ({ ...r, id, state: 'hang', t: 0, y: GROUND - 155 })),
       mirrors: [], reflection: null, writing: [], writingClock: 1.4, writingCount: 0,
       mountainFalls: [], bellWave: null,
       bell: world.bell ? { ...world.bell, ringAt: -20, dir: 1 } : null,
+      stains: [], blankStroke: null,
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
@@ -117,6 +125,7 @@
         borrowUntil: 0, borrowTarget: 0, borrowMark: null, borrowSteps: 0, backHits: 0,
         umbrellaExecutions: 0, ropeParries: 0, boltDeflects: 0, boltReturns: 0, bellInterrupts: 0, windParries: 0, monkCounters: 0,
         yanBackHits: 0, yueBackHits: 0, eliteExecutions: 0, bellRings: 0,
+        counterParries: 0, doubleReturns: 0, riderCounters: 0, shadeExecutions: 0, reforms: 0, reformDenied: 0, resonanceBreaks: 0, brushClashes: 0,
       },
     }
     state.random = mulberry(state.seed)
@@ -310,6 +319,25 @@
   function startStrike(state) {
     state.mirrors.length=0; state.reflection=null
     const player = state.player
+    const nameless = state.enemies.find((enemy) => enemy.type === 'nameless' && enemy.alive && (enemy.state === 'blankTell' || enemy.state === 'blankStroke'))
+    if (nameless) {
+      // 笔会: player's ink stroke meets Nameless's blank stroke; both cancel and stagger his posture.
+      player.ink = 0
+      player.inkBuffer = 0
+      player.strikes += 1
+      player.brushClashes += 1
+      interruptAction(state)
+      player.iframes = Math.max(player.iframes, 1.0)
+      state.blankStroke = null
+      nameless.state = 'recover'; nameless.t = 1.2; nameless.vx = 0
+      nameless.posture = Math.min(nameless.postureMax, nameless.posture + 30)
+      nameless.postureClock = state.clock
+      addCombo(state); addScore(state, 200)
+      state.hitstop = Math.max(state.hitstop, 0.14); state.slow = 0.5; state.slowScale = 0.28
+      emit(state, 'brushClash', { x: (player.x + nameless.x) / 2, y: GROUND - 40, facing: player.facing })
+      if (nameless.posture >= nameless.postureMax) breakBoss(state, nameless)
+      return
+    }
     player.ink = 0
     player.inkBuffer = 0
     player.strikes += 1
@@ -359,7 +387,7 @@
     let action = player.action
     if (action) action.t += dt
 
-    const canAct = player.hurt <= 0 && (!action ||
+    const canAct = player.hurt <= 0 && player.recoil <= 0 && (!action ||
       (action.type === 'slash' && action.t >= STAGES[action.stage].chain) ||
       (action.type === 'dash' && !action.borrow && action.t >= action.dur * 0.8))
     const landing = player.dashBuffer > 0 ? borrowLanding(state) : null
@@ -518,6 +546,13 @@
     for (const ice of state.icicles) {
       if (ice.state === 'hang' && overlaps(box, iceBox(ice))) dropIcicle(state, ice)
     }
+    for (const stain of state.stains) {
+      if (stain.dead || stain.phase !== 'gather' || action.hits.includes('s' + stain.id)) continue
+      if (overlaps(box, { x0: stain.x - 24, x1: stain.x + 24, y0: stain.y - 38, y1: stain.y + 6 })) {
+        action.hits.push('s' + stain.id)
+        disperseStain(state, stain)
+      }
+    }
     for (const shot of state.projectiles) {
       if (shot.owner !== 'enemy' || shot.dead || action.hits.includes('p' + shot.id)) continue
       const shotBox = shot.type === 'wave' || shot.type === 'seaWave'
@@ -555,16 +590,18 @@
       emit(state, 'deflect', { x: shot.x, y: shot.y, pot: true })
       return
     }
-    shot.vx = player.facing * Math.max(520, Math.abs(shot.vx) * 1.3)
+    const doubleReturn = shot.originType === 'shadeArcher' && (shot.bounces || 0) >= 1
+    if (shot.originType === 'shadeArcher') shot.bounces = doubleReturn ? 2 : 1
+    shot.vx = player.facing * (doubleReturn ? 620 : Math.max(520, Math.abs(shot.vx) * 1.3))
     shot.vy = -40
-    if (shot.originType === 'crossbow') {
+    if (shot.originType === 'crossbow' || shot.originType === 'shadeArcher') {
       const archer = state.enemies.find(enemy => enemy.id === shot.source && enemy.alive)
       if (archer && sign(archer.x - shot.x) === player.facing) {
         const time = Math.max(0.06, Math.abs(archer.x - shot.x) / Math.abs(shot.vx))
         shot.vy = (archer.y - archer.h * 0.58 - shot.y) / time - ARROW_GRAVITY * time / 2
       }
     }
-    emit(state, 'deflect', { x: shot.x, y: shot.y })
+    emit(state, 'deflect', { x: shot.x, y: shot.y, doubleReturn })
   }
 
   function hurtPlayer(state, damage, fromX) {
@@ -645,6 +682,47 @@
       return
     }
     if (attacker.type === 'crow') { kill(state, attacker, 'parry'); return }
+    if (attacker.type === 'nameless') {
+      const fromRiposte = attacker.state === 'riposteAttack' || attacker.state === 'duelAttack'
+      if (fromRiposte) player.counterParries += 1
+      const posture = fromRiposte ? 26 : 22
+      attacker.posture = Math.min(attacker.postureMax, attacker.posture + posture)
+      attacker.postureClock = state.clock
+      if (attacker.namelessStage === 3) {
+        attacker.duelChain = (attacker.duelChain || 0) + 1
+        const goal = state.difficulty === 'easy' ? 2 : 3
+        emit(state, 'duelClash', { id: attacker.id, x, y: player.y - 38, step: attacker.duelChain, goal })
+        if (attacker.duelChain >= goal) {
+          attacker.duelChain = 0
+          attacker.posture = attacker.postureMax
+          attacker.resonanceBroken = true
+          player.resonanceBreaks += 1
+          attacker.state = 'broken'
+          attacker.openedAt = state.clock
+          attacker.t = 3.0
+          attacker.vx = 0
+          attacker.combo = null
+          state.hitstop = Math.max(state.hitstop, 0.16)
+          state.slow = 0.7; state.slowScale = 0.25
+          emit(state, 'resonanceBreak', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h })
+          return
+        }
+        const tele = attacker.duelChain === 1 ? 0.48 : attacker.duelChain === 2 ? 0.40 : 0.34
+        attacker.facing = sign(player.x - attacker.x) || attacker.facing
+        attacker.state = 'duelTell'
+        attacker.t = tele * state.diff.tele
+        attacker.teleTotal = attacker.t
+        attacker.vx = 0
+        attacker.combo = null
+        emit(state, 'tell', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h, facing: attacker.facing })
+        return
+      }
+      if (fromRiposte) {
+        attacker.state = 'recover'; attacker.t = 0.9; attacker.vx = -attacker.facing * 80
+      }
+      if (attacker.posture >= attacker.postureMax) breakBoss(state, attacker)
+      return
+    }
     if (isBoss(attacker)||isElite(attacker)) {
       // Meeting the general's lance head-on reins the horse in: a long opening and a big posture blow.
       if (attacker.type === 'yue') {
@@ -668,6 +746,22 @@
     if (attacker.type === 'mirror') attacker.mirrorOpened=false
     if (attacker.type === 'watchman') { player.guardBreaks += 1; emit(state,'guardBreak',{id:attacker.id,x:attacker.x,y:attacker.y-40}) }
     if (attacker.type === 'cavalry') { unhorse(state, attacker); return }
+    if (attacker.type === 'shadeRider') { unhorseShadeRider(state, attacker); return }
+    if (attacker.type === 'shade' && attacker.state === 'airRiposteAttack') {
+      player.counterParries += 1
+      player.riderCounters += 1
+      attacker.y = GROUND; attacker.vy = 0; attacker.vx = 0
+      attacker.state = 'stagger'; attacker.openedAt = state.clock; attacker.t = 2.0
+      emit(state, 'stagger', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h })
+      return
+    }
+    if (attacker.type === 'shade' && attacker.state === 'riposteAttack') {
+      player.counterParries += 1
+      attacker.state = 'stagger'; attacker.openedAt = state.clock; attacker.t = 1.4
+      attacker.vx = sign(attacker.x - player.x) * 140
+      emit(state, 'stagger', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h })
+      return
+    }
     if (attacker.type === 'pavise') { breakFormation(state, attacker); return }
     if (attacker.type === 'hooker') {
       const [min, max] = state.lock || [0, state.world.length]
@@ -683,7 +777,7 @@
     }
     attacker.state = attacker.type==='umbrella'?'umbrellaOpen':'stagger'
     attacker.openedAt = state.clock
-    attacker.t = attacker.type === 'shield' ? 1.8 : attacker.type === 'watchman' ? 1.6 : attacker.type==='umbrella'?1.4:1.3
+    attacker.t = attacker.type === 'shield' ? 1.8 : attacker.type === 'watchman' ? 1.6 : attacker.type === 'umbrella' || attacker.type === 'shade' ? 1.4 : 1.3
     attacker.vx = state.world.id===6?0:sign(attacker.x - player.x) * 170
     emit(state, 'stagger', { id: attacker.id, x: attacker.x, y: attacker.y - attacker.h })
   }
@@ -739,8 +833,8 @@
   function hitEnemy(state, enemy, damage, source) {
     const player = state.player
     if (!enemy.alive || enemy.state === 'spawn' || enemy.state === 'dying') return
-    if ((enemy.type === 'judge' || enemy.type === 'yue' || isElite(enemy)) &&
-      (enemy.state === 'roar' || (enemy.state === 'intro' && enemy.type !== 'yue'))) return
+    if ((enemy.type === 'judge' || enemy.type === 'yue' || enemy.type === 'nameless' || isElite(enemy)) &&
+      (enemy.state === 'roar' || (enemy.state === 'intro' && enemy.type !== 'yue' && enemy.type !== 'nameless'))) return
     const fromFront = sign(player.x - enemy.x) === enemy.facing
     if ((enemy.type === 'shield' || enemy.type === 'pavise' || enemy.type === 'watchman') && enemy.state !== 'stagger' && fromFront && !UNBLOCKED.has(source)) {
       state.hitstop = Math.max(state.hitstop, 0.05)
@@ -749,6 +843,15 @@
       return
     }
     const melee = source === 'slash' || source === 'heavy'
+    // 拆与回锋 (归墨卷): shades and Nameless parry frontal slashes while idle, walking, or early in a telegraph.
+    if (state.world.counterGuard && melee && fromFront && (enemy.type === 'shade' || enemy.type === 'nameless') && (enemy.counterCd || 0) <= 0) {
+      const earlyTele = (enemy.state === 'tele' || (enemy.state === 'combo' && enemy.combo?.phase === 'tele') || enemy.state === 'waveTell') &&
+        enemy.teleTotal > 0 && enemy.t >= enemy.teleTotal * 0.55
+      if (enemy.state === 'idle' || enemy.state === 'walk' || earlyTele) {
+        counterPlayerSlash(state, enemy)
+        return
+      }
+    }
     if (melee && fromFront && enemy.guard && GUARD_STATES.has(enemy.state)) { guardBlock(state, enemy); return }
     if(enemy.type==='umbrella'&&fromFront&&melee&&enemy.state!=='hurt'){
       emit(state,'block',{x:enemy.x+enemy.facing*22,y:enemy.y-38});state.hitstop=Math.max(state.hitstop,.035);return
@@ -800,7 +903,9 @@
     const fresh = melee && player.slashStartClock > (enemy.openedAt ?? Infinity)
     if (isBoss(enemy)||isElite(enemy)) {
       if (enemy.state === 'broken' && fresh) {
-        enemy.hp -= enemy.type === 'yue' ? 14 : 10
+        const execDmg = enemy.type === 'yue' ? 14 : (enemy.type === 'nameless' && enemy.resonanceBroken) ? 12 : 10
+        enemy.resonanceBroken = false
+        enemy.hp -= execDmg
         enemy.posture = 0
         enemy.state = 'recover'; enemy.t = 1
         enemy.vx = sign(enemy.x - player.x) * 260
@@ -816,7 +921,7 @@
         if (enemy.type === 'yue' && enemy.hp <= 0) enemy.hp = 1
         enemy.posture = Math.min(enemy.postureMax, enemy.posture + (source === 'strike' ? 30 : barded ? (source === 'heavy' ? 2 : 1) : source === 'heavy' ? 6 : 3))
         // Pressing a guarded boss provokes a fast counter; the punish window is after its own attacks.
-        if (melee && (enemy.state === 'idle' || enemy.state === 'walk')) {
+        if (melee && enemy.type !== 'nameless' && (enemy.state === 'idle' || enemy.state === 'walk')) {
           enemy.pressure = (enemy.pressure || 0) + 1
           if (enemy.pressure >= 2 && enemy.hp > damage) {
             enemy.pressure = 0
@@ -839,13 +944,16 @@
       if (enemy.hp <= 0) {
         if(isElite(enemy)){kill(state,enemy,source);return}
         if(enemy.type==='judge'){state.mirrors.length=0;state.reflection=null;state.writing.length=0}
+        if(enemy.type==='nameless'){state.volleys.length=0;state.blankStroke=null;state.projectiles=state.projectiles.filter(s=>s.owner==='player')}
         enemy.hp = 0
-        enemy.state = 'dying'; enemy.t = 2.6; enemy.vx = 0
+        enemy.state = 'dying'; enemy.t = enemy.type === 'nameless' ? 3.2 : 2.6; enemy.vx = 0
         state.slow = 1.6; state.slowScale = 0.22
         killScore(state, enemy)
-        emit(state, 'bossDown', { id: enemy.id, x: enemy.x, y: enemy.y - 40 })
+        emit(state, 'bossDown', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y - 40 })
       } else if (enemy.type === 'judge') {
         judgeTransition(state,enemy)
+      } else if (enemy.type === 'nameless') {
+        namelessTransition(state, enemy)
       } else if (!isElite(enemy) && !enemy.phase2 && enemy.hp <= enemy.maxHp * 0.5) {
         enemy.phase2 = true
         enemy.state = 'roar'; enemy.t = 1.25; enemy.vx = 0; enemy.combo = null
@@ -864,6 +972,10 @@
     if ((enemy.state === 'stagger'||enemy.state==='umbrellaOpen') && fresh) {
       if(enemy.type==='umbrella'&&borrowed)player.umbrellaExecutions++
       if (enemy.mirrorOpened) player.mirrorExecutions += 1
+      if (SHADES.has(enemy.type)) {
+        player.shadeExecutions += 1
+        if (player.reforms === 0) player.reformDenied = player.shadeExecutions
+      }
       player.executions += 1
       state.hitstop = Math.max(state.hitstop, 0.13); state.slow = 0.45; state.slowScale = 0.3
       addCombo(state); addScore(state, 150); addInk(state, 15)
@@ -872,20 +984,20 @@
       return
     }
     // A mounted lancer takes one point from any single blow.
-    const mounted = enemy.type === 'cavalry' && source !== 'strike'
+    const mounted = (enemy.type === 'cavalry' || enemy.type === 'shadeRider') && source !== 'strike'
     enemy.hp -= source === 'strike' ? 4 : mounted ? 1 : damage
     enemy.flash = 0.12
     addCombo(state); addScore(state, 10 * damage); addInk(state, 6)
     state.hitstop = Math.max(state.hitstop, source === 'heavy' ? 0.085 : 0.05)
-    emit(state, 'hit', { id: enemy.id, x: enemy.x, y: enemy.type === 'crow' ? enemy.y : enemy.y - enemy.h / 2, dir: source === 'arrow' ? sign(enemy.x - player.x) || 1 : player.facing, heavy: source === 'heavy' })
+    emit(state, 'hit', { id: enemy.id, x: enemy.x, y: enemy.type === 'crow' ? enemy.y : enemy.y - enemy.h / 2, dir: source === 'arrow' || source === 'doubleReturn' ? sign(enemy.x - player.x) || 1 : player.facing, heavy: source === 'heavy' })
     if (enemy.hp <= 0) { kill(state, enemy, source); return }
     if (melee && enemy.state !== 'recover' && state.world.guard?.includes(enemy.type)) enemy.guard = true
     // Late in a telegraph the strike is committed: hits land but do not interrupt, so a slightly early
     // press still meets the blade inside the parry window.
-    const committed = (SUMMIT.has(enemy.type)&&['mountAttack','ropeDive','mountTell'].includes(enemy.state)) || enemy.state === 'attack' || (enemy.state === 'tele' && enemy.t < enemy.teleTotal * 0.55)
+    const committed = (SUMMIT.has(enemy.type)&&['mountAttack','ropeDive','mountTell'].includes(enemy.state)) || enemy.state === 'attack' || enemy.state === 'riposteAttack' || enemy.state === 'airRiposteAttack' || enemy.state === 'riposteTele' || enemy.state === 'airRiposteTele' || (enemy.state === 'tele' && enemy.t < enemy.teleTotal * 0.55)
     // A stagger is the opening for an execution, so an ordinary hit never cuts it short.
     if (enemy.type !== 'crow' && !committed && enemy.state !== 'stagger') {
-      const heavy = enemy.type === 'cavalry' || enemy.type === 'pavise'
+      const heavy = enemy.type === 'cavalry' || enemy.type === 'shadeRider' || enemy.type === 'pavise'
       enemy.state = 'hurt'
       enemy.t = enemy.type === 'shield' || heavy ? 0.22 : 0.3
       enemy.vx = (sign(enemy.x - player.x) || 1) * (source === 'heavy' ? 260 : 170) * (heavy ? 0.35 : 1)
@@ -895,7 +1007,8 @@
   function killScore(state, enemy) {
     const player = state.player
     player.kills += 1
-    addScore(state, ENEMY[enemy.type].score)
+    const base = enemy.reformed ? Math.round(ENEMY[enemy.type].score * 0.5) : ENEMY[enemy.type].score
+    addScore(state, base)
     addInk(state, 8)
   }
 
@@ -904,7 +1017,7 @@
     enemy.alive = false
     enemy.state = 'dead'
     killScore(state, enemy)
-    if (how === 'arrow') player.deflectKills += 1
+    if (how === 'arrow' || how === 'doubleReturn') player.deflectKills += 1
     else if (how === 'icicle') player.icicleKills += 1
     else if (how === 'crack') player.crackKills += 1
     else if (how === 'volley') player.volleyKills += 1
@@ -914,6 +1027,23 @@
     else if (how !== 'strike') {
       if (!player.onGround) player.airKills += 1
       else if (onIceZone(state, player.x) && Math.abs(player.vx) >= 70) player.slideKills += 1
+    }
+    if (state.world.reform && enemy.x >= state.world.reform.zone[0] && SHADES.has(enemy.type) && !enemy.reformed && !CLEAN_KILL.has(how)) {
+      const stain = {
+        id: state.nextId++,
+        type: enemy.type === 'shadeRider' ? 'shade' : enemy.type,
+        x: enemy.x,
+        y: enemy.onPlatform ? enemy.homeY : GROUND,
+        onPlatform: enemy.onPlatform,
+        facing: enemy.facing,
+        wait: state.difficulty === 'easy' ? 3.2 : 2.6,
+        gather: 0.8,
+        phase: 'pool',
+        t: 0,
+        dead: false,
+      }
+      state.stains.push(stain)
+      emit(state, 'stainPool', { id: stain.id, x: stain.x, y: stain.y })
     }
     emit(state, 'kill', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y, facing: enemy.facing, how })
   }
@@ -933,12 +1063,14 @@
       guardPost: spec.guardPost, facing: sign(state.player.x - x) || -1, hp: kind.hp, maxHp: kind.hp,
       state: 'spawn', t: BOSSES.has(spec.type) ? 0.9 : 0.75, cd: 0.4 + state.random() * 0.8, hopCd: 0, flash: 0,
       hitDone: false, side, seed: state.random() * 10, combo: null, move: null,
+      mono: Boolean(spec.mono), reformed: Boolean(spec.reformed), counterCd: 0,
     }
     if (BOSSES.has(spec.type)) {
-      enemy.hp = enemy.maxHp = spec.type === 'yue' ? (state.difficulty === 'easy' ? 38 : kind.hp) : spec.type === 'judge' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
+      enemy.hp = enemy.maxHp = spec.type === 'nameless' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'yue' ? (state.difficulty === 'easy' ? 38 : kind.hp) : spec.type === 'judge' ? (state.difficulty === 'easy' ? 44 : 60) : spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : spec.type === 'dragon' ? (state.difficulty === 'easy' ? 44 : 62) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
+    if (spec.type === 'nameless') { enemy.namelessStage = 1; enemy.duelChain = 0; enemy.resonanceBroken = false; enemy.pendingBlankStroke = false }
     if (isElite(enemy)) {
       enemy.posture = 0; enemy.postureMax = spec.type === 'yanhui' ? 64 : 72; enemy.postureClock = 0
       prompt(state, spec.type === 'shizhen' ? 'mountbell' : 'elite')
@@ -955,10 +1087,10 @@
     if (spec.type === 'watchman') prompt(state,'watchman')
     if (spec.type === 'judge') { enemy.judgeStage=1;enemy.mirrorCd=1;enemy.chain=0 }
     if (spec.type === 'quarrier') prompt(state, 'quarry')
-    if (spec.type === 'yue') { enemy.state = 'intro'; enemy.t = 0.8 }
+    if (spec.type === 'yue' || spec.type === 'nameless') { enemy.state = 'intro'; enemy.t = 0.8 }
     enemy.burnCd = 0
     state.enemies.push(enemy)
-    if (!enemy.delay) emit(state, spec.type === 'yue' ? 'bossIntro' : 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
+    if (!enemy.delay) emit(state, (spec.type === 'yue' || spec.type === 'nameless') ? 'bossIntro' : 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
     return enemy
   }
 
@@ -975,8 +1107,11 @@
     return count
   }
 
+  const RIPOSTE_STATES = new Set(['riposteTele', 'riposteAttack', 'airRiposteTele', 'airRiposteAttack', 'arrowCounter'])
+  const riposteBusy = (state) => state.enemies.some((enemy) => enemy.alive && RIPOSTE_STATES.has(enemy.state))
+
   /** Cover from 芦丛 stops new attacks, so ranged and waiting enemies lose the player until they are spotted. */
-  function mayAttack(state) { return !state.reflection && !state.writing.length && attackers(state) < state.diff.tokens && !state.player.hidden }
+  function mayAttack(state) { return !state.reflection && !state.writing.length && !state.blankStroke && !riposteBusy(state) && attackers(state) < state.diff.tokens && !state.player.hidden }
 
   const WIND_MASS = { hammer: 0.15, spearman: 0.4, shield: 0.3 }
 
@@ -1398,7 +1533,10 @@
 
   // ------------------------------------------------------------ 烽火卷 enemies
 
-  const inDark = (state, x) => Boolean(state.world.dark) && x >= state.world.dark.zone[0] && x <= state.world.dark.zone[1]
+  const inDark = (state, x) => {
+    const dark = state.world.dark || state.world.whiteout
+    return Boolean(dark) && x >= dark.zone[0] && x <= dark.zone[1]
+  }
 
   /** Fire-pot thrower: keeps its distance and lobs a clay pot of oil that bursts into flame where it lands. */
   function updateBomber(state, enemy, dt) {
@@ -1459,7 +1597,7 @@
   /** Mounted lancer: backs off for room, then charges straight through. Parrying the lance throws the rider from the saddle. */
   function updateCavalry(state, enemy, dt) {
     const player = state.player
-    const kind = ENEMY.cavalry
+    const kind = ENEMY[enemy.type]
     const dx = player.x - enemy.x
     const distance = Math.abs(dx)
     const [min, max] = state.lock || [0, state.world.length]
@@ -2695,6 +2833,495 @@
     }
   }
 
+  // ------------------------------------------------------- 归墨卷（终卷）: 拆、回锋、墨影、不斩不散、无名剑客
+
+  /** 拆: a shade or Nameless parries the player's frontal slash and immediately winds up a riposte. */
+  function counterPlayerSlash(state, enemy) {
+    const player = state.player
+    enemy.counterCd = 2.4
+    enemy.combo = null
+    player.action = null
+    player.slashEndClock = state.clock
+    player.slashBuffer = 0
+    player.recoil = 0.18
+    player.vx = -player.facing * 140
+    state.hitstop = Math.max(state.hitstop, 0.07)
+    const cx = (enemy.x + player.x) / 2
+    emit(state, 'counter', { id: enemy.id, x: cx, y: enemy.y - 36, facing: enemy.facing })
+    prompt(state, 'counter')
+    enemy.facing = sign(player.x - enemy.x) || enemy.facing
+    enemy.state = 'riposteTele'
+    enemy.t = 0.50 * state.diff.tele
+    enemy.teleTotal = enemy.t
+    enemy.vx = 0
+    emit(state, 'tell', { id: enemy.id, x: enemy.x, y: enemy.y - enemy.h, facing: enemy.facing, riposte: true })
+    prompt(state, 'riposte')
+  }
+
+  /** 落马回锋: parrying a shadeRider flips him airborne into a telegraphed plunging riposte. */
+  function unhorseShadeRider(state, rider) {
+    const player = state.player
+    const shade = ENEMY.shade
+    const [min, max] = state.lock || [0, state.world.length]
+    emit(state, 'unhorse', { id: rider.id, x: rider.x, y: rider.y, facing: rider.facing, boss: false, shade: true })
+    rider.type = 'shade'
+    rider.w = shade.w; rider.h = shade.h
+    rider.maxHp = shade.hp; rider.hp = Math.min(rider.hp, shade.hp)
+    rider.x = clamp(player.x + player.facing * 56, min + rider.w + 10, max - rider.w - 10)
+    rider.y = GROUND - 64; rider.vy = 0; rider.vx = 0
+    rider.aimX = clamp(player.x, min + rider.w + 8, max - rider.w - 8)
+    rider.facing = sign(player.x - rider.x) || -player.facing
+    rider.state = 'airRiposteTele'
+    rider.t = 0.50 * state.diff.tele
+    rider.teleTotal = rider.t
+    rider.counterCd = 1.6
+    player.unhorses += 1
+    addScore(state, 150)
+    emit(state, 'tell', { id: rider.id, x: rider.x, y: rider.y - rider.h, facing: rider.facing, riposte: true })
+    prompt(state, 'ridercounter')
+  }
+
+  function updateShade(state, enemy, dt) {
+    const player = state.player
+    const [min, max] = state.lock || [0, state.world.length]
+    if (enemy.state === 'riposteTele') {
+      enemy.vx *= Math.pow(0.001, dt)
+      enemy.facing = sign(player.x - enemy.x) || enemy.facing
+      if (enemy.t <= 0) {
+        enemy.state = 'riposteAttack'; enemy.t = 0.13; enemy.hitDone = false
+        enemy.vx = enemy.facing * 260
+        emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: 'shade', riposte: true })
+      }
+      moveGround(state, enemy, dt)
+      return
+    }
+    if (enemy.state === 'riposteAttack') {
+      if (!enemy.hitDone) {
+        const box = enemy.facing > 0
+          ? { x0: enemy.x - 6, x1: enemy.x + 90, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+          : { x0: enemy.x - 90, x1: enemy.x + 6, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+        if (overlaps(box, playerBox(player))) {
+          enemy.hitDone = true
+          if (enemyStrike(state, enemy, 1) === 'parry') return
+        }
+      }
+      enemy.vx *= Math.pow(0.02, dt)
+      if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = 0.85 }
+      moveGround(state, enemy, dt)
+      return
+    }
+    if (enemy.state === 'airRiposteTele') {
+      enemy.vx = 0; enemy.vy = 0
+      enemy.facing = sign(player.x - enemy.x) || enemy.facing
+      enemy.aimX = clamp(player.x, min + enemy.w + 8, max - enemy.w - 8)
+      if (enemy.t <= 0) {
+        enemy.state = 'airRiposteAttack'; enemy.t = 0.16; enemy.hitDone = false
+        enemy.vx = (enemy.aimX - enemy.x) / 0.16
+        enemy.vy = (GROUND - enemy.y) / 0.16
+        emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: 'shade', riposte: true })
+      }
+      return
+    }
+    if (enemy.state === 'airRiposteAttack') {
+      enemy.x = clamp(enemy.x + enemy.vx * dt, min + enemy.w, max - enemy.w)
+      enemy.y = Math.min(GROUND, enemy.y + enemy.vy * dt)
+      if (!enemy.hitDone) {
+        const box = { x0: enemy.x - 42, x1: enemy.x + 42, y0: enemy.y - enemy.h - 10, y1: enemy.y + 8 }
+        if (overlaps(box, playerBox(player))) {
+          enemy.hitDone = true
+          if (enemyStrike(state, enemy, 1) === 'parry') return
+        }
+      }
+      if (enemy.t <= 0 || enemy.y >= GROUND) {
+        enemy.y = GROUND; enemy.vy = 0; enemy.vx = 0
+        enemy.state = 'recover'; enemy.t = 0.75
+      }
+      return
+    }
+    updateMelee(state, enemy, dt)
+  }
+
+  function updateShadeArcher(state, enemy, dt) {
+    if (enemy.state === 'arrowCounter') {
+      enemy.vx = 0
+      enemy.facing = sign(state.player.x - enemy.x) || enemy.facing
+      if (enemy.t <= 0) {
+        const x = enemy.x + enemy.facing * 16, y = enemy.y - 36
+        const vx = enemy.facing * 560
+        const flight = Math.max(0.12, Math.abs(state.player.x - x) / 560)
+        const vy = clamp((state.player.y - 30 - y) / flight - 0.5 * ARROW_GRAVITY * flight, -320, 320)
+        state.projectiles.push({
+          id: state.nextId++, type: 'arrow', owner: 'enemy', x, y, vx, vy,
+          life: 2.4, source: enemy.id, originType: 'shadeArcher', bounces: 1, dead: false,
+        })
+        emit(state, 'shoot', { id: enemy.id, x, y, doubleReturn: true })
+        enemy.state = 'recover'; enemy.t = 0.7
+      }
+      moveGround(state, enemy, dt)
+      return
+    }
+    updateArcher(state, enemy, dt)
+  }
+
+  function disperseStain(state, stain) {
+    if (stain.dead) return
+    stain.dead = true
+    addCombo(state); addScore(state, 40); addInk(state, 8)
+    emit(state, 'stainBreak', { id: stain.id, x: stain.x, y: stain.y - 20 })
+  }
+
+  function updateStains(state, dt) {
+    if (!state.stains.length) return
+    for (const stain of state.stains) {
+      if (stain.dead) continue
+      stain.t += dt
+      if (stain.phase === 'pool' && stain.t >= stain.wait) {
+        stain.phase = 'gather'; stain.t = 0
+        emit(state, 'stainGather', { id: stain.id, x: stain.x, y: stain.y })
+        prompt(state, 'reform')
+      } else if (stain.phase === 'gather' && stain.t >= stain.gather) {
+        stain.dead = true
+        const reformed = spawnEnemy(state, {
+          type: stain.type, x: stain.x, y: stain.onPlatform ? stain.y : undefined, reformed: true,
+        })
+        reformed.hp = 2; reformed.maxHp = 2
+        reformed.state = 'idle'; reformed.t = 0; reformed.cd = 0.65
+        state.player.reforms += 1
+        state.player.reformDenied = 0
+        emit(state, 'stainReform', { id: reformed.id, x: stain.x, y: stain.y })
+      }
+    }
+    state.stains = state.stains.filter((stain) => !stain.dead)
+  }
+
+  function namelessTransition(state, boss) {
+    const stage = boss.namelessStage || 1
+    let next = stage
+    if (stage < 2 && boss.hp <= boss.maxHp * 0.66) next = 2
+    else if (stage < 3 && boss.hp <= boss.maxHp * 0.33) next = 3
+    if (next <= stage) return
+    // Keep enough health in stage 3 so two resonance-break executions (12 dmg each) remain achievable.
+    if (next === 2) boss.hp = Math.max(boss.hp, state.difficulty === 'easy' ? 26 : 36)
+    if (next === 3) boss.hp = Math.max(boss.hp, state.difficulty === 'easy' ? 14 : 18)
+    boss.namelessStage = next
+    boss.phase2 = next >= 2
+    boss.state = 'roar'; boss.t = 1.2; boss.vx = 0; boss.combo = null; boss.moves = 0; boss.duelChain = 0
+    boss.pendingBlankStroke = next === 3
+    state.volleys.length = 0
+    state.blankStroke = null
+    state.projectiles = state.projectiles.filter((shot) => shot.owner === 'player')
+    emit(state, 'bossPhase', { id: boss.id, kind: 'nameless', x: boss.x, y: boss.y - 36, stage: next })
+    if (next === 3) prompt(state, 'duel')
+  }
+
+  function startNamelessCombo(state, boss) {
+    const st = boss.namelessStage || 1
+    boss.state = 'combo'
+    boss.combo = { i: 0, phase: 'tele' }
+    const first = st === 1 ? 0.46 : st === 2 ? 0.38 : 0.44
+    boss.t = first * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startNamelessThrust(state, boss) {
+    boss.facing = sign(state.player.x - boss.x) || boss.facing
+    boss.state = 'duelThrustTell'
+    boss.t = 0.55 * state.diff.tele
+    boss.teleTotal = boss.t
+    boss.vx = 0
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startNamelessBlank(state, boss) {
+    const [min, max] = state.lock || [0, state.world.length]
+    boss.facing = sign(state.player.x - boss.x) || boss.facing
+    boss.state = 'blankTell'
+    boss.t = 1.1 * state.diff.tele
+    boss.teleTotal = boss.t
+    boss.vx = 0
+    state.blankStroke = { phase: 'tell', t: 0, tele: boss.t, dur: 0.22, dir: boss.facing, x0: min, x1: max, hit: false }
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+    emit(state, 'blankTell', { id: boss.id, x: boss.x, y: boss.y - 36, facing: boss.facing })
+  }
+
+  function updateBlankStroke(state, dt) {
+    const stroke = state.blankStroke
+    if (!stroke) return
+    stroke.t += dt
+    if (stroke.phase === 'active') {
+      const p = state.player
+      if (!stroke.hit && !p.dead && p.y > GROUND - 70 && p.iframes <= 0 && !state.strike) {
+        stroke.hit = true
+        hurtPlayer(state, 1, stroke.dir > 0 ? stroke.x0 : stroke.x1)
+      }
+      if (stroke.t >= stroke.dur) state.blankStroke = null
+    }
+  }
+
+  function chooseNamelessMove(state, boss) {
+    const player = state.player
+    const distance = Math.abs(player.x - boss.x)
+    const roll = state.random()
+    const st = boss.namelessStage || 1
+    boss.moves += 1
+    if (st === 1) {
+      if (distance > 230) {
+        if (roll < 0.42) return startWave(state, boss)
+        if (roll < 0.78) return startLeap(state, boss)
+        boss.state = 'walk'; boss.t = 1.1
+        return
+      }
+      if (roll < 0.62) return startNamelessCombo(state, boss)
+      if (roll < 0.82) return startLeap(state, boss)
+      boss.state = 'backstep'; boss.t = 0.35
+      boss.vx = -boss.facing * 400; boss.vy = -340
+      return
+    }
+    if (st === 2) {
+      if (boss.moves % 4 === 0) return startGeneralFlag(state, boss)
+      if (distance > 220) {
+        if (roll < 0.45) return startGeneralRush(state, boss)
+        if (roll < 0.75) return startGeneralFlag(state, boss)
+        boss.state = 'walk'; boss.t = 1.0
+        return
+      }
+      if (roll < 0.62) return startNamelessCombo(state, boss)
+      if (roll < 0.82) return startGeneralRush(state, boss)
+      boss.state = 'backstep'; boss.t = 0.35
+      boss.vx = -boss.facing * 390; boss.vy = -330
+      return
+    }
+    // Stage 3 (无名): no unblockable moves — pure blade exchange.
+    if (distance > 140) {
+      if (roll < 0.45) return startNamelessThrust(state, boss)
+      boss.state = 'walk'; boss.t = 0.9
+      return
+    }
+    if (roll < 0.8) return startNamelessCombo(state, boss)
+    return startNamelessThrust(state, boss)
+  }
+
+  function updateNameless(state, boss, dt) {
+    const player = state.player
+    const dx = player.x - boss.x
+    const [min, max] = state.lock || [0, state.world.length]
+    const st = boss.namelessStage || 1
+    if (boss.state !== 'broken' && state.clock - boss.postureClock > 2) boss.posture = Math.max(0, boss.posture - 7 * dt)
+    const facePlayer = () => { if (!player.dead) boss.facing = sign(dx) || boss.facing }
+    switch (boss.state) {
+      case 'intro':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.25 }
+        break
+      case 'roar':
+        boss.vx = 0
+        if (Math.abs(dx) < 150 && !player.dead && boss.t > 1.05) {
+          player.vx = sign(dx) * 340; player.vy = Math.min(player.vy, -190); player.onGround = false
+        }
+        if (boss.t <= 0) {
+          if (boss.pendingBlankStroke) { boss.pendingBlankStroke = false; startNamelessBlank(state, boss) }
+          else { boss.state = 'idle'; boss.t = 0.35 }
+        }
+        break
+      case 'blankTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'blankStroke'; boss.t = 0.22
+          if (state.blankStroke) { state.blankStroke.phase = 'active'; state.blankStroke.t = 0 }
+          emit(state, 'blankStroke', { id: boss.id, x: boss.x, y: boss.y - 34, facing: boss.facing })
+        }
+        break
+      case 'blankStroke':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.9 }
+        break
+      case 'idle':
+        facePlayer()
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0 && !player.dead) chooseNamelessMove(state, boss)
+        break
+      case 'walk':
+        facePlayer()
+        boss.vx += (boss.facing * 170 - boss.vx) * Math.min(1, dt * 7)
+        if (Math.abs(dx) < 110 || boss.t <= 0) startNamelessCombo(state, boss)
+        break
+      case 'backstep':
+        if (boss.t <= 0 && boss.y >= GROUND - 0.5) {
+          boss.vx = 0
+          if (st === 1) startWave(state, boss)
+          else startGeneralFlag(state, boss)
+        }
+        break
+      case 'combo': {
+        const combo = boss.combo
+        if (combo.phase === 'tele') {
+          boss.vx *= Math.pow(0.001, dt)
+          if (boss.t <= 0) {
+            combo.phase = 'active'; boss.t = 0.13; boss.hitDone = false
+            boss.vx = boss.facing * (st === 2 ? 290 : 300)
+            emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: combo.i })
+          }
+        } else if (combo.phase === 'active') {
+          if (!boss.hitDone && overlaps(bossReachBox(boss, 100), playerBox(player))) {
+            boss.hitDone = true
+            enemyStrike(state, boss, 1)
+            if (boss.state !== 'combo') break
+          }
+          boss.vx *= Math.pow(0.02, dt)
+          if (boss.t <= 0) {
+            combo.i += 1
+            if (combo.i >= 3) { boss.state = 'recover'; boss.t = st === 2 ? 0.75 : 0.8; boss.combo = null }
+            else {
+              combo.phase = 'tele'; facePlayer()
+              const times = st === 1 ? [0.46, 0.36, 0.50] : st === 2 ? [0.38, 0.30, 0.42] : [0.44, 0.34, 0.46]
+              boss.t = times[combo.i] * state.diff.tele
+              boss.teleTotal = boss.t
+              emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+            }
+          }
+        }
+        break
+      }
+      case 'riposteTele':
+        boss.vx *= Math.pow(0.001, dt)
+        facePlayer()
+        if (boss.t <= 0) {
+          boss.state = 'riposteAttack'; boss.t = 0.13; boss.hitDone = false
+          boss.vx = boss.facing * 260
+          emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: 1, riposte: true })
+        }
+        break
+      case 'riposteAttack':
+        if (!boss.hitDone && overlaps(bossReachBox(boss, 96), playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1)
+          if (boss.state !== 'riposteAttack') break
+        }
+        boss.vx *= Math.pow(0.02, dt)
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.85 }
+        break
+      case 'duelThrustTell':
+        boss.vx *= Math.pow(0.001, dt)
+        facePlayer()
+        if (boss.t <= 0) {
+          boss.state = 'duelThrustAttack'; boss.t = 0.15; boss.hitDone = false
+          boss.vx = boss.facing * 360
+          emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: 0 })
+        }
+        break
+      case 'duelThrustAttack':
+        if (!boss.hitDone && overlaps(bossReachBox(boss, 125), playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1)
+          if (boss.state !== 'duelThrustAttack') break
+        }
+        boss.vx *= Math.pow(0.02, dt)
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.8 }
+        break
+      case 'duelTell':
+        boss.vx *= Math.pow(0.001, dt)
+        facePlayer()
+        if (boss.t <= 0) {
+          boss.state = 'duelAttack'; boss.t = 0.15; boss.hitDone = false
+          boss.vx = boss.facing * (Math.abs(dx) > 76 ? 320 : 220)
+          emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'nameless', step: (boss.duelChain || 1) % 3, riposte: true })
+        }
+        break
+      case 'duelAttack':
+        if (!boss.hitDone && overlaps(bossReachBox(boss, 112), playerBox(player))) {
+          boss.hitDone = true
+          const outcome = enemyStrike(state, boss, 1)
+          if (outcome === 'parry') break
+          boss.duelChain = 0
+          if (outcome === 'hit') { boss.state = 'recover'; boss.t = 0.9 }
+          else { boss.state = 'idle'; boss.t = 0.3 }
+          break
+        }
+        boss.vx *= Math.pow(0.02, dt)
+        if (boss.t <= 0) {
+          // Player stepped or dashed out of range: breaks exchange without giving recover.
+          boss.duelChain = 0
+          boss.state = 'idle'; boss.t = 0.3
+        }
+        break
+      case 'crouch':
+        facePlayer(); boss.vx = 0
+        if (boss.t <= 0) {
+          const target = clamp(player.x, min + 50, max - 50)
+          boss.vx = (target - boss.x) / 0.72
+          boss.vy = -GRAVITY * 0.72 / 2
+          boss.state = 'leap'; boss.t = 0.72
+          emit(state, 'leap', { id: boss.id, x: boss.x, y: boss.y })
+        }
+        break
+      case 'leap':
+        if (boss.y >= GROUND - 0.5 && boss.vy >= 0 && boss.t < 0.5) {
+          boss.vx = 0
+          boss.state = 'recover'; boss.t = 0.85
+          emit(state, 'slam', { id: boss.id, x: boss.x, y: GROUND })
+          const slam = { x0: boss.x - 82, x1: boss.x + 82, y0: GROUND - 50, y1: GROUND + 4 }
+          if (overlaps(slam, playerBox(player))) enemyStrike(state, boss, 1, 'unblockable')
+          spawnWave(state, boss, -1, 360, 0.95)
+          spawnWave(state, boss, 1, 360, 0.95)
+        }
+        break
+      case 'waveTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          facePlayer()
+          spawnWave(state, boss, boss.facing, 430, 2.2)
+          emit(state, 'wave', { id: boss.id, x: boss.x, y: GROUND, facing: boss.facing })
+          boss.state = 'recover'; boss.t = 0.65
+        }
+        break
+      case 'flagTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          callVolley(state, player.x, 320, 1.05, true)
+          const side = player.x - min > max - player.x ? -1 : 1
+          callVolley(state, player.x + side * 300, 320, 1.5, true)
+          emit(state, 'flag', { id: boss.id, x: boss.x, y: boss.y - boss.h })
+          boss.state = 'recover'; boss.t = 0.7
+        }
+        break
+      case 'rushTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'rush'; boss.t = 0.9; boss.hitDone = false
+          boss.vx = boss.facing * 900
+          emit(state, 'phantom', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing })
+        }
+        break
+      case 'rush':
+        if (!boss.hitDone && overlaps({ x0: boss.x - 24, x1: boss.x + 24, y0: GROUND - 58, y1: GROUND }, playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1, 'unblockable')
+        }
+        if ((boss.facing > 0 && boss.x >= max - 62) || (boss.facing < 0 && boss.x <= min + 62) || boss.t <= 0) {
+          boss.vx = 0; boss.state = 'recover'; boss.t = 0.85
+        }
+        break
+      case 'broken':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.resonanceBroken = false; boss.state = 'recover'; boss.t = 0.35; boss.posture = 40 }
+        break
+      case 'recover':
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.42 + state.random() * 0.35) / state.diff.aggression }
+        break
+      case 'dying':
+        boss.vx = 0
+        break
+    }
+    boss.x = clamp(boss.x + boss.vx * dt, min + boss.w, max - boss.w)
+    if (boss.y < GROUND || boss.vy < 0) {
+      boss.vy = Math.min(1100, boss.vy + GRAVITY * dt)
+      boss.y = Math.min(GROUND, boss.y + boss.vy * dt)
+      if (boss.y >= GROUND) boss.vy = 0
+    }
+  }
+
   function updateEnemies(state, dt) {
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue
@@ -2702,12 +3329,14 @@
         enemy.delay -= dt
         if (enemy.delay <= 0) {
           enemy.delay = 0
-          emit(state, enemy.type === 'yue' ? 'bossIntro' : 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
+          emit(state, (enemy.type === 'yue' || enemy.type === 'nameless') ? 'bossIntro' : 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
         }
         continue
       }
       if ((state.reflection || state.writing.length) && !isBoss(enemy) && ['idle','walk','tele','attack'].includes(enemy.state)) { enemy.vx=0; continue }
+      if (riposteBusy(state) && !isBoss(enemy) && !RIPOSTE_STATES.has(enemy.state) && ['idle', 'walk', 'tele', 'attack'].includes(enemy.state)) { enemy.vx = 0; continue }
       enemy.mirrorCd=Math.max(0,(enemy.mirrorCd||0)-dt)
+      enemy.counterCd=Math.max(0,(enemy.counterCd||0)-dt)
       enemy.t -= dt
       enemy.cd -= dt
       enemy.flash = Math.max(0, enemy.flash - dt)
@@ -2733,6 +3362,10 @@
       else if (enemy.type === 'general') updateGeneral(state, enemy, dt)
       else if (enemy.type === 'dragon') updateDragon(state, enemy, dt)
       else if (enemy.type === 'judge') updateJudge(state, enemy, dt)
+      else if (enemy.type === 'nameless') updateNameless(state, enemy, dt)
+      else if (enemy.type === 'shade') updateShade(state, enemy, dt)
+      else if (enemy.type === 'shadeArcher') updateShadeArcher(state, enemy, dt)
+      else if (enemy.type === 'shadeRider') updateCavalry(state, enemy, dt)
       else if (enemy.type === 'mirror') updateMelee(state,enemy,dt)
       else if (enemy.type === 'cavalry') updateCavalry(state, enemy, dt)
       else if (enemy.type === 'pavise') updatePavise(state, enemy, dt)
@@ -2792,13 +3425,33 @@
           if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn') continue
           if (overlaps({ x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }, enemyBox(enemy))) {
             shot.dead = true
+            // 墨影弓手 bounces a first deflected arrow back once if not drawing its bow.
+            if (enemy.type === 'shadeArcher' && shot.type === 'arrow' && (shot.bounces || 0) < 2 && !['tele', 'stagger', 'hurt', 'arrowCounter'].includes(enemy.state)) {
+              enemy.facing = sign(player.x - enemy.x) || enemy.facing
+              enemy.state = 'arrowCounter'
+              enemy.t = 0.45 * state.diff.tele
+              enemy.teleTotal = enemy.t
+              enemy.vx = 0
+              emit(state, 'counter', { id: enemy.id, x: enemy.x + enemy.facing * 14, y: enemy.y - 36, facing: enemy.facing, arrow: true })
+              emit(state, 'tell', { id: enemy.id, x: enemy.x, y: enemy.y - enemy.h, facing: enemy.facing, riposte: true })
+              prompt(state, 'doublereturn')
+              break
+            }
+            const doubleReturn = shot.type === 'arrow' && (shot.bounces || 0) >= 2
             const previousHp = enemy.hp
-            hitEnemy(state, enemy, shot.originType === 'crossbow' ? 2 : 3, shot.type === 'pot' ? 'pot' : 'arrow')
+            hitEnemy(state, enemy, doubleReturn ? Math.max(enemy.hp, 4) : shot.originType === 'crossbow' ? 2 : 3, doubleReturn ? 'doubleReturn' : shot.type === 'pot' ? 'pot' : 'arrow')
             if (shot.originType === 'crossbow' && enemy.id === shot.source && enemy.hp < previousHp) {
               player.boltReturns++
               emit(state, 'boltReturn', { x: enemy.x, y: enemy.y - enemy.h })
             }
-            if (!enemy.alive) addScore(state, 80)
+            if (!enemy.alive) {
+              addScore(state, 80)
+              if (doubleReturn && enemy.type === 'shadeArcher') {
+                player.doubleReturns += 1
+                addScore(state, 60)
+                emit(state, 'doubleReturn', { x: enemy.x, y: enemy.y - enemy.h })
+              }
+            }
             if (shot.type === 'pot') burstPot(state, shot, enemy.x)
             break
           }
@@ -2820,6 +3473,7 @@
         hitEnemy(state, enemy, 4, 'strike')
       }
       for (const ice of state.icicles) if (ice.state === 'hang' && Math.abs(ice.x - player.x) <= 470) dropIcicle(state, ice)
+      for (const stain of state.stains) if (!stain.dead && Math.abs(stain.x - player.x) <= 470) disperseStain(state, stain)
       emit(state, 'strikeHit', { x: player.x, y: player.y })
     }
     if (strike.t >= 1.15) state.strike = null
@@ -2945,7 +3599,7 @@
           state.volleyClock = 0
           callVolley(state, player.x + (state.random() - 0.5) * 60, spec.width, tele)
         }
-      } else state.volleyClock = calm + tele - 1.8
+      } else state.volleyClock = calm + tele - (spec.first ?? 1.8)
     }
     for (const volley of state.volleys) {
       volley.t += dt
@@ -2955,7 +3609,7 @@
       emit(state, 'volleyHit', { id: volley.id, x: volley.x, w: volley.w })
       if (!player.dead && Math.abs(player.x - volley.x) <= half && !sheltered(state, player.x) && player.iframes <= 0 && !state.strike) hurtPlayer(state, 1, volley.x)
       for (const enemy of state.enemies) {
-        if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying' || enemy.type === 'general') continue
+        if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying' || enemy.type === 'general' || enemy.type === 'nameless') continue
         if (Math.abs(enemy.x - volley.x) > half || sheltered(state, enemy.x)) continue
         hitEnemy(state, enemy, 3, 'volley')
       }
@@ -3084,7 +3738,7 @@
       return
     }
     const encounter = state.plan[state.encounter]
-    if (!encounter || state.enemies.some((enemy) => enemy.alive)) return
+    if (!encounter || state.enemies.some((enemy) => enemy.alive) || state.stains.length > 0) return
     if (state.waveDelay > 0) {
       state.waveDelay -= dt
       if (state.waveDelay > 0) return
@@ -3108,7 +3762,7 @@
   /** 回墨: in a 卷 with respite, clearing a wave or executing its boss restores one 墨血. */
   function respite(state) {
     const player = state.player
-    if (!(state.world.respite || (state.world.borrowStep && state.difficulty === 'easy')) || player.dead || player.hp >= player.maxHp) return
+    if (!(state.world.respite || ((state.world.borrowStep || state.world.counterGuard) && state.difficulty === 'easy')) || player.dead || player.hp >= player.maxHp) return
     player.hp += 1
     player.heals += 1
     emit(state, 'heal', { x: player.x, y: player.y - 40, hp: player.hp })
@@ -3208,6 +3862,7 @@
     updateRigging(state, sdt)
     updateLanternWorld(state, sdt)
     if (state.world.borrowStep) updateMountainHazards(state, sdt)
+    if (state.world.counterGuard) { updateStains(state, sdt); updateBlankStroke(state, sdt) }
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)
@@ -3227,7 +3882,7 @@
 
   globalThis.XiabanInkBlade = {
     GROUND, GRAVITY, ARROW_GRAVITY, STAGES, ENEMY, DIFFICULTIES,
-    BOSSES, GRASS_CELL, VOLLEY_SHELTER,
+    BOSSES, SHADES, GRASS_CELL, VOLLEY_SHELTER,
     createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps, windSpeed, isBoss, isElite, ELITES, SUMMIT, sheltered, burningAt, callVolley, igniteAt,
     borrowLanding, summitReach, arrowLaunch,
   }

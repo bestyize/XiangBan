@@ -185,12 +185,12 @@ h1 { margin: 0; font-family: var(--brush); font-size: clamp(44px, 6.4vw, 78px); 
 }
 .volume-tabs {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
-  flex: 1 1 0; min-width: 0; max-width: 480px; gap: 6px;
+  flex: 1 1 0; min-width: 0; max-width: 550px; gap: 5px;
 }
 .volume-tab {
   min-width: 0; min-height: 44px; padding: 4px 2px; white-space: nowrap;
   border-radius: 3px 12px 4px 10px; background: #efe7d4aa; box-shadow: inset 0 0 0 1.2px #1b1b1d26;
-  font-family: var(--brush); font-size: clamp(12px, 2.55cqi, 17px); color: var(--ink-2);
+  font-family: var(--brush); font-size: clamp(11px, 2.2cqi, 16px); color: var(--ink-2);
   transition: background .12s, box-shadow .12s, color .12s;
 }
 .volume-tab.active { background: #fbf6ea; box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); font-weight: 600; }
