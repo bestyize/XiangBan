@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-const props = defineProps<{ open: boolean; title: string; width?: number; scrollable?: boolean; keepOnBackdrop?: boolean; closeDisabled?: boolean }>()
+const props = defineProps<{ open: boolean; title: string; width?: number; scrollable?: boolean; keepOnBackdrop?: boolean; closeDisabled?: boolean; hideHeader?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -38,7 +38,7 @@ function requestClose() { if (!props.closeDisabled) emit('close') }
     @click="onBackdrop"
   >
     <div class="body">
-      <header>
+      <header v-if="!hideHeader">
         <h2>{{ title }}</h2>
         <button type="button" class="close" aria-label="关闭" :disabled="closeDisabled" @click="requestClose">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" /></svg>

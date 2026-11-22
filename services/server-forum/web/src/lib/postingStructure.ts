@@ -47,7 +47,8 @@ export function postingSections(categories: Category[], level: number, editingCa
         return board && !parents.has(board.id) ? [option(board, key, label, tag)] : []
       })
       : sectionBoards(categories, key)
-        .filter(board => key !== 'ideas' || board.kind === 'uncategorized')
+        .filter(board => (key !== 'ideas' || board.kind === 'uncategorized')
+          && (key !== 'resources' || canonicalCategory(board.slug) !== 'resource-help'))
         .map(board => option(board))
     if (edited && navigationSection(edited) === key && !boards.some(board => board.key === edited.slug)) {
       boards.push(option(edited))
@@ -77,7 +78,7 @@ export function postingLocation(page: unknown, query: Record<string, unknown>, c
   } else if (page === 'resources') {
     section = 'resources'
     const tab = resourceTopicCategory(read('tab'))
-    if (tab !== 'software') slug = tab
+    if (tab !== 'software' && tab !== 'resource-help') slug = tab
   } else if (page === 'discuss') {
     const current = discussionTab(categories, read('tab'), read('filter'), read('board'))
     if (discussionTopicTag(current)) return { section, category: current }

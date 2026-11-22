@@ -179,6 +179,7 @@ data class Category(
     @SerialName("posting_enabled") val postingEnabled: Boolean = true,
     val kind: String = "normal",
     @SerialName("allow_short_title") val allowShortTitle: Boolean? = null,
+    @SerialName("preset_tags") val presetTags: List<String> = emptyList(),
 )
 
 @Serializable

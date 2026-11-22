@@ -214,6 +214,7 @@ export interface TopicInput {
   attachment_ids?: string[]
   attachment_prices?: { id: string; price: number }[]
   help?: { bounty: number; days: number }
+  poll?: { options: string[]; days?: number }
 }
 
 export interface SiteConfig {

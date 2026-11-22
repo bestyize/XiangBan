@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
@@ -15,8 +16,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -54,26 +57,73 @@ internal fun ForumCoverEditor(platform: PlatformActions, initial: ForumCoverSpec
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = e.message ?: "封面生成失败，请调整文字后重试" }
     }
+    val extra = LocalExtraColors.current
+    val canUse = valid && rendered?.first == spec && error == null
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).imePadding()) {
             ScreenBar("文字封面", onBack = onDismiss, trailing = {
-                PillButton("使用封面", { rendered?.takeIf { it.first == spec }?.let { onUse(spec, it.second) } },
-                    Modifier.padding(end = 12.dp), enabled = valid && rendered?.first == spec && error == null, height = 36.dp)
+                Box(
+                    Modifier.padding(end = 10.dp).height(34.dp).clip(CircleShape)
+                        .background(if (canUse) Brand else extra.fill)
+                        .clickable(enabled = canUse) { rendered?.takeIf { it.first == spec }?.let { onUse(spec, it.second) } }
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("使用封面", color = if (canUse) Color.White else extra.ink3, style = XType.Secondary, fontWeight = FontWeight.SemiBold)
+                }
             })
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.fillMaxWidth().height(232.dp).clip(RoundedCornerShape(16.dp)).background(extra.fill), contentAlignment = Alignment.Center) {
                     rendered?.second?.let { Image(it.preview, "封面预览", Modifier.padding(12.dp).fillMaxSize(), contentScale = ContentScale.Fit) }
                 }
                 CoverTemplates(platform, template) { template = it }
-                CoverChoices(listOf(true to "竖版 3:4", false to "方形 1:1"), portrait) { portrait = it }
-                Text("封面标题 · 可换行调整排版", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                AreaBox(title, { title = it }, placeholder = "一句话，让人想点进来", minHeight = 80.dp, filled = true)
-                Text("${title.length} / 80", style = XType.Caption, color = if (title.length > 80) Danger else LocalExtraColors.current.ink3)
-                AreaBox(highlight, { highlight = it }, placeholder = "重点词（选填，最多 16 字）", minHeight = 48.dp, filled = true)
-                Text("留空时自动强调最后一行", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                AreaBox(subtitle, { subtitle = it }, placeholder = "副标题（选填）", minHeight = 64.dp, filled = true)
-                Text("${subtitle.length} / 100", style = XType.Caption, color = if (subtitle.length > 100) Danger else LocalExtraColors.current.ink3)
+                CoverRatioSegment(portrait) { portrait = it }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("封面标题 · 可换行调整排版", Modifier.weight(1f), style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${title.length} / 80", style = XType.Caption, color = if (title.length > 80) Danger else extra.ink3)
+                    }
+                    AreaBox(title, { title = it }, placeholder = "一句话，让人想点进来", minHeight = 76.dp, filled = true)
+                }
+                val hlMissing = highlight.isNotEmpty() && !title.contains(highlight)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("重点词（选填，最多 16 字）", Modifier.weight(1f), style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (hlMissing) "须包含在标题内" else "留空自动强调末行", style = XType.Caption, color = if (hlMissing) Danger else extra.ink3)
+                    }
+                    AreaBox(highlight, { highlight = it }, placeholder = "例如：桌面新组件", minHeight = 46.dp, filled = true)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("副标题（选填）", Modifier.weight(1f), style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${subtitle.length} / 100", style = XType.Caption, color = if (subtitle.length > 100) Danger else extra.ink3)
+                    }
+                    AreaBox(subtitle, { subtitle = it }, placeholder = "补充时间、版本或看点", minHeight = 56.dp, filled = true)
+                }
                 error?.let { Banner(it, warn = true) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverRatioSegment(portrait: Boolean, onSelect: (Boolean) -> Unit) {
+    val extra = LocalExtraColors.current
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(extra.fill).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        listOf(true to "竖版 3:4", false to "方形 1:1").forEach { (isPortrait, label) ->
+            val on = portrait == isPortrait
+            Box(
+                Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(9.dp))
+                    .background(if (on) MaterialTheme.colorScheme.surface else Color.Transparent)
+                    .clickable { onSelect(isPortrait) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = XType.Secondary,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -92,13 +142,6 @@ internal fun ForumCoverEntry(cover: ForumCoverImage?, enabled: Boolean, onChoose
         }
         if (cover != null) IconTap(XIcons.Close, "移除封面", { if (enabled) onRemove() })
         else XIcon(XIcons.ChevronRight, size = 16.dp, tint = LocalExtraColors.current.ink3)
-    }
-}
-
-@Composable
-private fun <T> CoverChoices(items: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items.forEach { (id, name) -> PageChip(name, id == selected) { onSelect(id) } }
     }
 }
 

@@ -7,7 +7,7 @@ import { useToast } from '@/stores/toast'
 
 const MAX_FILES = 5
 
-const props = defineProps<{ modelValue: Attachment[]; maxBytes: number; disabled?: boolean }>()
+const props = defineProps<{ modelValue: Attachment[]; maxBytes: number; disabled?: boolean; frameless?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [Attachment[]]; uploading: [boolean] }>()
 
 const toast = useToast()
@@ -66,10 +66,14 @@ function priceChanged(att: Attachment, event: Event) {
   const price = Number((event.target as HTMLInputElement).value)
   emit('update:modelValue', props.modelValue.map(a => a.id === att.id ? { ...a, price } : a))
 }
+
+function pick() { input.value?.click() }
+defineExpose({ pick })
 </script>
 
 <template>
-  <div class="uploader">
+  <div class="uploader" :class="{ frameless }">
+    <input ref="input" class="picker" type="file" multiple tabindex="-1" aria-hidden="true" @change="onPick" />
     <ul v-if="modelValue.length || uploading.length" class="files">
       <li v-for="a in modelValue" :key="a.id" class="file">
         <span class="name" :title="a.name">{{ a.name }}</span>
@@ -83,8 +87,7 @@ function priceChanged(att: Attachment, event: Event) {
         <span class="bar" :style="{ width: `${u.ratio * 100}%` }" aria-hidden="true" />
       </li>
     </ul>
-    <div class="row">
-      <input ref="input" class="picker" type="file" multiple tabindex="-1" aria-hidden="true" @change="onPick" />
+    <div v-if="!frameless" class="row">
       <button
         type="button"
         class="btn btn-sm"
@@ -157,6 +160,17 @@ function priceChanged(att: Attachment, event: Event) {
 }
 .rm:hover {
   background: var(--line);
+}
+.uploader.frameless .files {
+  background: var(--surface-2);
+  border-radius: 16px;
+  padding: 12px 14px;
+  gap: 8px;
+}
+.uploader.frameless .file {
+  padding: 9px 10px 9px 12px;
+  border-radius: 12px;
+  background: var(--surface);
 }
 .busy .bar {
   position: absolute;

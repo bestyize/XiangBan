@@ -6,7 +6,7 @@ import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 
 const model = defineModel<string>({ required: true })
-const props = defineProps<{ placeholder?: string; rows?: number; label: string; id: string; compact?: boolean }>()
+const props = defineProps<{ placeholder?: string; rows?: number; label: string; id: string; compact?: boolean; frameless?: boolean }>()
 
 const mode = ref<'write' | 'preview'>('write')
 const html = ref('')
@@ -118,13 +118,14 @@ function focus() {
 
 /** 紧凑模式没有工具栏，由外面的按钮来选图。 */
 function pickImage() { picker.value?.click() }
+function showWrite() { mode.value = 'write' }
 
-defineExpose({ focus, pickImage, uploading })
+defineExpose({ focus, pickImage, uploading, wrap, showPreview, showWrite, mode })
 </script>
 
 <template>
-  <div class="editor" :class="{ compact }">
-    <div class="bar">
+  <div class="editor" :class="{ compact, frameless }">
+    <div v-if="!frameless" class="bar">
       <div class="modes" role="tablist" :aria-label="props.label">
         <button type="button" role="tab" :aria-selected="mode === 'write'" :class="{ on: mode === 'write' }" @click="mode = 'write'">
           编辑
@@ -165,7 +166,7 @@ defineExpose({ focus, pickImage, uploading })
       <p v-else-if="!html" class="muted">还没有内容。</p>
       <div v-else v-html="html" />
     </div>
-    <p class="hint">支持 Markdown，可以点「插图」、粘贴或拖入图片。</p>
+    <p v-if="!frameless" class="hint">支持 Markdown，可以点「插图」、粘贴或拖入图片。</p>
   </div>
 </template>
 
@@ -266,5 +267,32 @@ defineExpose({ focus, pickImage, uploading })
   background: var(--surface-2);
   font-size: 16px;
   resize: none;
+}
+.editor.frameless {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+.editor.frameless:focus-within {
+  box-shadow: none;
+}
+.editor.frameless .textarea {
+  padding: 0;
+  min-height: 170px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.75;
+  resize: vertical;
+}
+.editor.frameless .preview {
+  padding: 4px 0 12px;
+  min-height: 170px;
+}
+@media (max-width: 767px) {
+  .editor.frameless .textarea {
+    font-size: 16px;
+    min-height: 140px;
+  }
 }
 </style>

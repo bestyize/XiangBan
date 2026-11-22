@@ -1,7 +1,9 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,12 +40,22 @@ internal fun ForumUploadControls(
     trailing: (@Composable () -> Unit)? = null,
     requireCommentImages: Boolean = false,
     commentLayout: (@Composable (pickImage: (() -> Unit)?, addAttachment: (() -> Unit)?, details: @Composable () -> Unit) -> Unit)? = null,
+    composerLayout: (@Composable (
+        pickImage: (() -> Unit)?,
+        addAttachment: (() -> Unit)?,
+        removeAttachment: (ForumAttachment) -> Unit,
+        showLimits: Boolean,
+        toggleLimits: () -> Unit,
+        limitsSummary: String?,
+        errorBanner: (@Composable () -> Unit)?,
+        busyUploading: Boolean,
+    ) -> Unit)? = null,
 ) {
     var showLimits by remember { mutableStateOf(false) }
     val platform = env.platform
     val hasFiles = platform?.forumFilePickerSupported == true
     val hasImages = platform?.forumPhotoPickerSupported == true || (commentLayout == null && hasFiles)
-    if (commentLayout == null && !hasImages) {
+    if (commentLayout == null && composerLayout == null && !hasImages) {
         Text(if (attachments == null) "当前设备请在网页版回复中插图。" else "当前设备请到网页版插图或添加附件。",
             Modifier.padding(vertical = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         if (compact) trailing?.invoke()
@@ -55,8 +67,8 @@ internal fun ForumUploadControls(
     val loader = remember(env, session.accountId) {
         Loader(scope) { env.forum.uploadSession() }
     }
-    LaunchedEffect(loader, commentLayout == null) {
-        if (commentLayout == null) loader.reload()
+    LaunchedEffect(loader, commentLayout == null && (hasImages || hasFiles)) {
+        if (commentLayout == null && (hasImages || hasFiles)) loader.reload()
     }
     val limitsState by loader.state.collectAsState()
     val loadedLimits = (limitsState as? Load.Ready)?.value?.limits
@@ -104,6 +116,51 @@ internal fun ForumUploadControls(
             } finally { busy = false; onBusy(false) }
         }
     }
+    fun removeAttachment(attachment: ForumAttachment) {
+        val list = attachments ?: return
+        if (busy || !enabled) return
+        busy = true; onBusy(true); error = null
+        scope.launch {
+            try {
+                if (attachment.id !in retainedAttachmentIds) env.forum.deletePendingAttachment(attachment.id)
+                onAttachments(list.filterNot { it.id == attachment.id })
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = messageOf(e) }
+            finally { busy = false; onBusy(false) }
+        }
+    }
+    val uploadErrorBanner: (@Composable () -> Unit)? = if (error != null || retryFile != null || limitsState is Load.Failed) {
+        {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                (limitsState as? Load.Failed)?.let { failed ->
+                    Banner(failed.message, warn = true, actionText = "重试", onAction = loader::reload)
+                }
+                error?.let { Text(it, style = XType.Secondary, color = Danger) }
+                retryFile?.let { file ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GhostPillButton("重试上传", { start(retryImage, file) }, Modifier.weight(1f), enabled = enabled && !busy)
+                        GhostPillButton("取消上传", { retryFile = null; error = null }, Modifier.weight(1f), enabled = !busy)
+                    }
+                }
+            }
+        }
+    } else null
+    if (composerLayout != null) {
+        val pickImage = if (hasImages && enabled && !busy && (loadedLimits?.imageMaxBytes ?: 0) > 0) ({ start(true) }) else null
+        val addFile = if (hasFiles && attachments != null && enabled && !busy && loadedLimits != null && attachments.size < 5) ({ start(false) }) else null
+        val limitsSummary = when {
+            !hasImages && !hasFiles -> "当前设备请到网页版上传图片或附件；仍可直接发布文字、作品与投票"
+            loadedLimits != null -> buildString {
+                append(if (loadedLimits.imageMaxBytes <= 0) "图片暂不可用" else "图片 ≤ ${minOf(loadedLimits.imageMaxBytes, FORUM_IMAGE_MAX_BYTES) / 1024 / 1024} MB")
+                append(" · 作品限 1 个（V2 ZIP / HTML / HTM）")
+                if (hasFiles && attachments != null) append(" · 最多 5 个附件（≤ ${minOf(loadedLimits.uploadMaxBytes, FORUM_MEMORY_MAX_BYTES) / 1024 / 1024} MB）")
+            }
+            limitsState is Load.Loading -> "正在读取上传额度…"
+            else -> null
+        }
+        composerLayout(pickImage, addFile, ::removeAttachment, showLimits, { showLimits = !showLimits }, limitsSummary, uploadErrorBanner, busy)
+        return
+    }
     val details: @Composable () -> Unit = {
         attachments?.forEach { attachment ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -111,19 +168,7 @@ internal fun ForumUploadControls(
                     Text(attachment.name, style = XType.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${formatSize(attachment.size)} · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 }
-                GhostPillButton("移除", {
-                    if (!busy && enabled) {
-                        busy = true; onBusy(true); error = null
-                        scope.launch {
-                            try {
-                                if (attachment.id !in retainedAttachmentIds) env.forum.deletePendingAttachment(attachment.id)
-                                onAttachments(attachments.filterNot { it.id == attachment.id })
-                            } catch (e: CancellationException) { throw e }
-                            catch (e: Exception) { error = messageOf(e) }
-                            finally { busy = false; onBusy(false) }
-                        }
-                    }
-                }, enabled = !busy && enabled)
+                GhostPillButton("移除", { removeAttachment(attachment) }, enabled = !busy && enabled)
             }
         }
         error?.let { Text(it, style = XType.Secondary, color = Danger) }

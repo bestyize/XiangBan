@@ -9,18 +9,18 @@ const rows=[row(2,'create-game','ideas'),row(3,'learn','discuss'),row(6,'casual-
 const withIdeasDefault = [...rows, row(11, 'ideas-uncategorized', 'ideas', null, { kind: 'uncategorized', name: '默认' })]
 test('posting destinations follow current boards and keep restricted boards visible',()=>{
  const sections=postingSections(withIdeasDefault,1)
- deepStrictEqual(sections.map(s=>s.name),['创意','讨论','资源'])
+ deepStrictEqual(sections.map(s=>s.name),['创意','讨论'])
  deepStrictEqual(sections.find(s=>s.key==='discuss')!.boards.map(c=>c.id),[3,6,10])
- deepStrictEqual(sections.flatMap(s=>s.boards.map(c=>c.id)),[11,3,6,10,9])
+ deepStrictEqual(sections.flatMap(s=>s.boards.map(c=>c.id)),[11,3,6,10])
  strictEqual(sections.flatMap(s=>s.boards).find(c=>c.id===10)?.unavailableReason,'需守护者')
 })
 test('preselection follows the visible board, including old creative posting links',()=>{
  const sections=postingSections(withIdeasDefault,1)
  deepStrictEqual(postingSelection(sections,'learn-codex',withIdeasDefault),{sectionKey:'discuss',boardKey:'learn'})
- deepStrictEqual(postingSelection(sections,'resource-help',withIdeasDefault),{sectionKey:'resources',boardKey:'resource-help'})
+ deepStrictEqual(postingSelection(sections,'resource-help',withIdeasDefault),{sectionKey:'ideas',boardKey:''})
  deepStrictEqual(postingSelection(sections,'site-feedback',withIdeasDefault),{sectionKey:'discuss',boardKey:''})
  deepStrictEqual(postingSelection(sections,'create-game',withIdeasDefault),{sectionKey:'ideas',boardKey:'ideas-uncategorized'})
- deepStrictEqual(postingSelection(sections,'',withIdeasDefault,'resources'),{sectionKey:'resources',boardKey:''})
+ deepStrictEqual(postingSelection(sections,'',withIdeasDefault,'resources'),{sectionKey:'ideas',boardKey:''})
 })
 test('closed destinations and permission changes prevent selection and allow existing edits',()=>{
  const changed=rows.map(c=>c.id===3?{...c,posting_enabled:false}:c)
@@ -30,6 +30,8 @@ test('closed destinations and permission changes prevent selection and allow exi
  strictEqual(postingSections(rows.map(c=>c.id===7?{...c,status:'archived' as const}:c),1).some(s=>s.key==='resources'),false)
  const edited=postingSections(rows,0,3).flatMap(s=>s.boards).filter(c=>!c.unavailableReason)
  deepStrictEqual(edited.map(c=>c.id),[3])
+ const editedHelp=postingSections(rows,1,9).find(s=>s.key==='resources')?.boards
+ deepStrictEqual(editedHelp?.map(c=>c.id),[9])
  deepStrictEqual(postingSections(withIdeasDefault, 0, 2).find(s => s.key === 'ideas')!.boards.map(c => [c.id, c.unavailableReason]),
   [[11, '需成员'], [2, '']])
  strictEqual(postingSections(rows,3).flatMap(s=>s.boards).find(c=>c.id===10)?.unavailableReason,'')
@@ -42,7 +44,7 @@ test('the publish shortcut follows the current page and its active board', () =>
   deepStrictEqual(postingLocation('discuss', { tab: '3d' }, rows), { section: 'discuss', category: '3d' })
   deepStrictEqual(postingLocation('discuss', { tab: 'learn' }, []), { section: 'discuss', category: 'learn' })
   deepStrictEqual(postingLocation('resources', { tab: 'software' }, rows), { section: 'resources' })
-  deepStrictEqual(postingLocation('resources', { tab: 'help' }, rows), { section: 'resources', category: 'resource-help' })
+  deepStrictEqual(postingLocation('resources', { tab: 'help' }, rows), { section: 'resources' })
   deepStrictEqual(postingLocation('category', {}, rows, 'site-feedback'), { section: 'discuss', category: 'site' })
   deepStrictEqual(postingLocation('home', {}, rows), { section: 'ideas' })
   deepStrictEqual(postingLocation('home', { tab: 'gallery' }, rows), { section: 'ideas' })
