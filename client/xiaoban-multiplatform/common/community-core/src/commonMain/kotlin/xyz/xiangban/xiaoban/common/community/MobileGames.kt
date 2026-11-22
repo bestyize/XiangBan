@@ -184,7 +184,7 @@ private fun JsonObject.gameBoolean(key: String, default: Boolean = false): Boole
     this[key]?.let { (it as? JsonPrimitive)?.takeIf { p -> !p.isString }?.booleanOrNull ?: throw IllegalArgumentException("$key 必须是布尔值") } ?: default
 private fun JsonObject.gameInt(key: String): Int? = (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull
 
-private fun MobileGame.json(): JsonObject = buildJsonObject {
+internal fun MobileGame.json(): JsonObject = buildJsonObject {
     put("schemaVersion", 3); put("runtimeProtocol", 2); put("kind", kind); put("id", id); put("name", name); put("description", description)
     put("version", version); put("category", category); put("entry", "index.html"); put("icon", icon); put("cover", cover)
     put("orientation", orientation); put("input", JsonArray(input.map(::JsonPrimitive)))

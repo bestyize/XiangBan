@@ -186,18 +186,23 @@ suspend fun openCommunityWork(
 
 /** Links in the first post are resolved through public pack metadata, just like structured reply cards. */
 @Composable
-internal fun LinkedGameCards(env: CommunityEnv, html: String, open: ((Route) -> Unit)?, excluded: List<Long> = emptyList()) {
+internal fun LinkedWorkCards(env: CommunityEnv, html: String, open: ((Route) -> Unit)?, excluded: List<Long> = emptyList()) {
     val ids = remember(html, env.config.forumBase, excluded) { linkedCommunityPacks(html, env.config).filterNot { it in excluded } }
     ids.forEach { id ->
-        val loader = rememberLoader(env, "linked-game-$id") { env.forum.pack(id) }
+        val loader = rememberLoader(env, "linked-work-$id") { env.forum.pack(id) }
         val state by loader.state.collectAsState()
         val pack = (state as? Load.Ready)?.value
-        if (pack != null && pack.kind == "game" && pack.status == "published") WhiteCard(Modifier.padding(top = 10.dp), padding = 12.dp) {
+        if (pack != null && pack.status == "published") WhiteCard(Modifier.padding(top = 10.dp), padding = 12.dp) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Cover(pack.coverUrl, pack.id, Modifier.size(64.dp).clickable { open?.invoke(Route.Pack(id)) })
+                val showDetails = { if (open != null) open(Route.Pack(id)) else env.platform?.openUrl(env.forum.packUrl(id)) }
+                Cover(pack.coverUrl, pack.id, Modifier.size(64.dp).clickable { showDetails() })
                 Column(Modifier.weight(1f)) {
-                    Text(pack.title, Modifier.clickable { open?.invoke(Route.Pack(id)) }, style = XType.Body, fontWeight = FontWeight.Medium)
-                    GameTrialButton(env, id, open = open, modifier = Modifier.padding(top = 6.dp))
+                    Text(pack.title, Modifier.clickable { showDetails() }, style = XType.Body, fontWeight = FontWeight.Medium)
+                    if (pack.kind == "game" || pack.kind == "app") {
+                        GameTrialButton(env, id, open = open, modifier = Modifier.padding(top = 6.dp), label = if (pack.kind == "game") "试玩" else "体验")
+                    } else {
+                        LinkText("查看${kindLabel(pack.kind)}", { showDetails() }, Modifier.padding(top = 6.dp))
+                    }
                 }
             }
         }

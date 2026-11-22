@@ -202,9 +202,14 @@ fun MyContentScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) 
 }
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, open: (Route) -> Unit, localGameId: String? = null) {
+fun PublishContentScreen(
+    env: CommunityEnv, packId: Long?, back: () -> Unit, open: (Route) -> Unit, localGameId: String? = null,
+    onPublished: ((Long, String) -> Unit)? = null,
+) {
     val session by env.session.state.collectAsState()
+    val accountGeneration by rememberUpdatedState(session.generation)
     val scope = rememberCoroutineScope()
+    val forPost = onPublished != null
     var kind by rememberSaveable(packId, session.accountId) { mutableStateOf(if (localGameId != null) "game" else "effect") }
     var title by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
     var summary by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
@@ -213,6 +218,9 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
     var rights by rememberSaveable(packId, session.accountId) { mutableStateOf(false) }
     var fileKey by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
     var file by remember(packId, session.accountId) { mutableStateOf<ForumUploadFile?>(null) }
+    var selectedName by remember(session.accountId) { mutableStateOf("") }
+    var suggestedTitle by rememberSaveable(session.accountId) { mutableStateOf("") }
+    var suggestedSummary by rememberSaveable(session.accountId) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var step by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -230,10 +238,18 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
             finally { busy = false; step = "" }
         }
     }
-    BackHandler(enabled = busy) { /* 提交中避免退出导致状态不明；系统选择器仍可自行取消。 */ }
+    BackHandler(enabled = busy || forPost) { if (!busy) back() }
     Column(Modifier.fillMaxSize().imePadding()) {
-        ScreenBar(if (packId == null) "发布内容包" else "发布新版本", onBack = { if (!busy) back() })
+        val heading = if (forPost) "上传作品" else if (packId == null) "发布内容包" else "发布新版本"
+        ScreenBar(heading, onBack = { if (!busy) back() })
         if (!session.loggedIn) { CenterMessage("登录后发布作品", "登录", { open(Route.Login) }); return@Column }
+        val platform = env.platform
+        val canPick = platform != null && if (forPost) platform.forumWorkPickerSupported else platform.forumFilePickerSupported
+        val webPublisher = "${env.config.forumBase.trimEnd('/')}/publish${packId?.let { "?pack=$it" }.orEmpty()}"
+        if (forPost && !canPick) {
+            CenterMessage("在网页版发布后，回到发帖页从「作品」中选取。", "打开网页版", { platform?.openUrl(webPublisher) })
+            return@Column
+        }
         val existingLoader = rememberLoader(env, "publish-original-$packId-${session.accountId}") { packId?.let { env.forum.pack(it) } }
         val existingState by existingLoader.state.collectAsState()
         val existing = (existingState as? Load.Ready)?.value
@@ -244,11 +260,13 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
             return@Column
         }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (packId == null) {
+            if (forPost && (file != null || fileKey.isNotEmpty())) {
+                Text(kindLabel(actualKind), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+            } else if (packId == null && !forPost) {
                 Text("资源类型", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                 if (localGameId != null) Text("${kindLabel(actualKind)} · 本机作品", style = XType.Body, fontWeight = FontWeight.Medium)
                 else PageChipRow(ContentPackLimits.keys.map { it to kindLabel(it) }, actualKind, { if (!busy) { kind = it; fileKey = "" } })
-            } else {
+            } else if (packId != null) {
                 when (val state = existingState) {
                     Load.Loading -> Text("正在读取原作品…", style = XType.Body)
                     is Load.Failed -> Banner(state.message, warn = true, actionText = "重试", onAction = existingLoader::reload)
@@ -256,24 +274,53 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                 }
                 if (existing != null && !versionReady) Text("只有作者可以发布新版本", color = Danger, style = XType.Body)
             }
-            val platform = env.platform
-            if (platform?.forumFilePickerSupported != true) {
+            if (!canPick) {
                 Text("当前设备请在网页版发布内容包。", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                GhostPillButton("打开网页版", { platform?.openUrl("${env.config.forumBase.trimEnd('/')}/publish${packId?.let { "?pack=$it" }.orEmpty()}") }, enabled = platform != null)
+                GhostPillButton("打开网页版", { platform?.openUrl(webPublisher) }, enabled = platform != null)
             } else {
-                GhostPillButton(if (file == null) "选择内容包 .zip" else "更换内容包", {
+                val pickLabel = if (forPost) {
+                    if (file == null && fileKey.isEmpty()) "选择作品文件" else "更换作品文件"
+                } else if (file == null) "选择内容包 .zip" else "更换内容包"
+                GhostPillButton(pickLabel, {
                     if (busy) return@GhostPillButton
+                    val generation = session.generation
                     busy = true; error = null
                     scope.launch {
                         try {
-                            val selected = platform.pickForumFile(false, ContentPackLimits[actualKind] ?: 0)
-                            if (selected != null) { file = selected; fileKey = "" }
-                        } catch (e: CancellationException) { throw e } catch (e: Exception) { error = (e as? ApiException)?.message ?: "无法读取文件，请重新选择" }
+                            if (forPost) {
+                                val prepared = platform?.pickForumWork() ?: return@launch
+                                check(accountGeneration == generation) { "账号已切换，请重新选择" }
+                                kind = prepared.kind
+                                selectedName = prepared.originalName
+                                if (title.isBlank() || title == suggestedTitle) title = prepared.title
+                                if (summary.isBlank() || summary == suggestedSummary) summary = prepared.summary
+                                suggestedTitle = prepared.title
+                                suggestedSummary = prepared.summary
+                                file = prepared.file
+                            } else {
+                                val selected = platform?.pickForumFile(false, ContentPackLimits[actualKind] ?: 0) ?: return@launch
+                                check(accountGeneration == generation) { "账号已切换，请重新选择" }
+                                file = selected
+                            }
+                            fileKey = ""
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) {
+                            error = when (e) {
+                                is ApiException, is IllegalArgumentException -> e.message
+                                else -> null
+                            } ?: "无法读取文件，请重新选择"
+                        }
                         finally { busy = false }
                     }
                 }, Modifier.fillMaxWidth(), enabled = !busy && versionReady)
-                file?.let { Text("${it.name} · ${formatSize(it.bytes.size.toLong())}", style = XType.Secondary) }
-                Text("${kindLabel(actualKind)}上限 ${formatSize(ContentPackLimits[actualKind] ?: 0)}，ZIP 根目录需包含 manifest.json；由服务器检查内容清单。", style = XType.Caption, color = LocalExtraColors.current.ink3)
+                val chosenFile = file
+                if (chosenFile != null) {
+                    val name = selectedName.ifBlank { chosenFile.name }
+                    Text("$name · ${formatSize(chosenFile.bytes.size.toLong())}", style = XType.Secondary)
+                }
+                val formats = if (forPost) "支持 ZIP、HTML 和 HTM。ZIP 根目录需包含 manifest.json。"
+                    else "${kindLabel(actualKind)}上限 ${formatSize(ContentPackLimits[actualKind] ?: 0)}，ZIP 根目录需包含 manifest.json；由服务器检查内容清单。"
+                Text(formats, style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
             if (packId == null) {
                 TextBox(title, { title = it }, placeholder = "标题（最多 60 字）", enabled = !busy)
@@ -285,7 +332,8 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                 Text("我确认这是我的原创或已获授权，并同意按社区规则发布。", style = XType.Secondary)
             }
             if (fileKey.isNotEmpty()) Text("文件已上传，可继续校验与发布。", style = XType.Caption, color = LocalExtraColors.current.ink3)
-            Text("上传和导入不会执行内容。发布后会出现在社区作品里。", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text(if (forPost) "作品发布成功后会添加到当前帖子草稿。" else "上传和导入不会执行内容。发布后会出现在社区作品里。",
+                style = XType.Caption, color = LocalExtraColors.current.ink3)
             error?.let { Text(it, color = Danger, style = XType.Body) }
             if (busy) Text(step.ifEmpty { "正在选择文件…" }, style = XType.Secondary, color = LocalExtraColors.current.ink3)
             PillButton(if (busy) "处理中…" else if (fileKey.isEmpty()) "上传并提交发布" else "继续校验并发布", {
@@ -293,7 +341,11 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                 val draft = ContentPublishDraft(actualKind, title, summary, tags.split(Regex("[,，、\\s]+")).filter { it.isNotBlank() }, rights, changelog)
                 val problem = contentDraftError(draft, packId != null)
                 if (problem != null) { error = problem; return@PillButton }
-                if (fileKey.isEmpty() && file == null) { error = "请选择内容包 .zip"; return@PillButton }
+                if (fileKey.isEmpty() && file == null) {
+                    error = if (forPost) "请选择作品文件" else "请选择内容包 .zip"
+                    return@PillButton
+                }
+                val generation = session.generation
                 busy = true; error = null
                 scope.launch {
                     try {
@@ -301,19 +353,23 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                             step = "正在计算校验值并上传内容包…"
                             fileKey = env.content.upload(actualKind, file!!).fileKey
                         }
+                        check(accountGeneration == generation) { "账号已切换，请重新选择文件" }
                         step = "正在等待资源服务器校验…"
                         if (!env.content.awaitVerified(fileKey)) {
                             error = "文件校验尚未完成，已保留上传记录和表单，请稍后点继续。"
                             return@launch
                         }
                         step = "正在提交发布…"
-                        published = env.content.publish(draft, fileKey, packId).id
+                        check(accountGeneration == generation) { "账号已切换，请重新选择文件" }
+                        val result = env.content.publish(draft, fileKey, packId)
+                        check(accountGeneration == generation) { "账号已切换，请在我的作品核对发布结果" }
                         file = null
+                        if (onPublished != null) onPublished(result.id, draft.title.trim()) else published = result.id
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) { error = messageOf(e) }
                     finally { busy = false; step = "" }
                 }
-            }, Modifier.fillMaxWidth(), enabled = !busy && rights && versionReady && env.platform?.forumFilePickerSupported == true)
+            }, Modifier.fillMaxWidth(), enabled = !busy && rights && versionReady && canPick)
         }
     }
 }

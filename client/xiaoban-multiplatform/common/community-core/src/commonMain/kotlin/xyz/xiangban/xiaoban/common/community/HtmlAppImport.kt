@@ -18,8 +18,20 @@ private const val Icon = """<svg xmlns="http://www.w3.org/2000/svg" width="192" 
 </svg>"""
 
 /** Installs a local document using the same validation, storage and export path as a created work. */
-@OptIn(ExperimentalUuidApi::class)
 suspend fun MobileGameStore.importHtml(file: ForumUploadFile): MobileGame {
+    val (game, files) = prepareHtmlApp(file)
+    return create(game, files)
+}
+
+/** Prepares a protocol-2 archive without installing or executing the selected page. */
+fun forumHtmlWorkFiles(file: ForumUploadFile): Pair<MobileGame, List<MobileGameFile>> {
+    val (game, files) = prepareHtmlApp(file)
+    MobileGameFormat.files(files)
+    return game to (listOf(MobileGameFile("manifest.json", game.json().toString())) + files)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private fun prepareHtmlApp(file: ForumUploadFile): Pair<MobileGame, List<MobileGameFile>> {
     val filename = file.name.substringAfterLast('/').substringAfterLast('\\')
     require(filename.substringAfterLast('.', "").lowercase() in setOf("html", "htm")) { "请选择 .html 或 .htm 文件" }
     require(file.bytes.size <= MaxImportedHtmlBytes) { "单个 HTML 文件不能超过 1 MB" }
@@ -43,13 +55,11 @@ suspend fun MobileGameStore.importHtml(file: ForumUploadFile): MobileGame {
   <text x="320" y="265" fill="#fff" font-family="sans-serif" font-size="23" text-anchor="middle">$title</text>
 </svg>"""
     val offset = prologEnd(html)
-    return create(
-        MobileGame(id, name, "从 HTML 导入的作品", orientation = "any", kind = "app", category = "tool"),
-        listOf(
-            MobileGameFile("index.html", html.substring(0, offset) + ReadyScript + html.substring(offset)),
-            MobileGameFile("icon.svg", Icon),
-            MobileGameFile("cover.svg", cover),
-        ),
+    val game = MobileGameFormat.metadata(MobileGame(id, name, "从 HTML 导入的作品", orientation = "any", kind = "app", category = "tool"))
+    return game to listOf(
+        MobileGameFile("index.html", html.substring(0, offset) + ReadyScript + html.substring(offset)),
+        MobileGameFile("icon.svg", Icon),
+        MobileGameFile("cover.svg", cover),
     )
 }
 

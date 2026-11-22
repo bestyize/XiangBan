@@ -61,6 +61,8 @@ interface PlatformActions : VoicePlatform {
     /** 普通附件使用系统文件选择器。评论可单独支持系统相册。 */
     val forumFilePickerSupported: Boolean get() = false
     suspend fun pickForumFile(image: Boolean, maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
+    val forumWorkPickerSupported: Boolean get() = false
+    suspend fun pickForumWork(): xyz.xiangban.xiaoban.common.community.PreparedForumWork? = null
     suspend fun pickAppHtml(): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
     val forumPhotoPickerSupported: Boolean get() = false
     suspend fun pickForumPhoto(maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = pickForumFile(true, maxBytes)

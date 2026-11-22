@@ -30,7 +30,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
     private val launcher = activity.registerForActivityResult(ActivityResultContracts.OpenDocument(), ::finish)
     private val photoLauncher = activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia(), ::finish)
 
-    suspend fun pick(image: Boolean, maxBytes: Long, fromPhotos: Boolean = false, htmlOnly: Boolean = false): ForumUploadFile? {
+    suspend fun pick(image: Boolean, maxBytes: Long, fromPhotos: Boolean = false, htmlOnly: Boolean = false, workOnly: Boolean = false): ForumUploadFile? {
         val limit = minOf(maxBytes, FORUM_MEMORY_MAX_BYTES)
         if (limit <= 0) throw ApiException(400, "当前账号暂不能上传文件")
         val uri = withContext(Dispatchers.Main.immediate) {
@@ -48,6 +48,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                     } else {
                         val types = when {
                             htmlOnly -> arrayOf("text/html")
+                            workOnly -> arrayOf("application/zip", "application/x-zip", "application/x-zip-compressed", "application/octet-stream", "text/html", "text/plain")
                             image -> arrayOf("image/png", "image/jpeg", "image/gif", "image/webp")
                             else -> arrayOf("*/*")
                         }
@@ -86,7 +87,7 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
                 }
             } ?: throw ApiException(400, "无法读取这个文件，请重新选择")
             if (output.size() == 0) throw ApiException(400, "文件是空的")
-            ForumUploadFile(if (htmlOnly) name else forumUploadName(name), mime, output.toByteArray())
+            ForumUploadFile(if (htmlOnly || workOnly) name else forumUploadName(name), mime, output.toByteArray())
         }
     }
 
@@ -97,8 +98,12 @@ class AndroidForumPicker(private val activity: ComponentActivity) {
 /** 通过委托接文件选择能力，不改既有 AndroidPlatform 的语音和遥控能力。 */
 class ForumPickerPlatform(private val delegate: PlatformActions, private val picker: AndroidForumPicker) : PlatformActions by delegate {
     override val forumFilePickerSupported = true
+    override val forumWorkPickerSupported = true
     override val forumPhotoPickerSupported = true
     override suspend fun pickForumFile(image: Boolean, maxBytes: Long) = picker.pick(image, maxBytes)
     override suspend fun pickAppHtml() = picker.pick(image = false, maxBytes = MaxImportedHtmlBytes.toLong(), htmlOnly = true)
+    override suspend fun pickForumWork() = picker.pick(false, FORUM_MEMORY_MAX_BYTES, workOnly = true)?.let { file ->
+        withContext(Dispatchers.Default) { prepareForumWork(file) }
+    }
     override suspend fun pickForumPhoto(maxBytes: Long) = picker.pick(image = true, maxBytes = maxBytes, fromPhotos = true)
 }

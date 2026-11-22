@@ -7,7 +7,7 @@ val PackKinds: List<Pair<String, String>> = listOf(
     "skill" to "技能", "expert" to "专家", "workflow" to "工作流",
 )
 
-fun kindLabel(kind: String): String = PackKinds.firstOrNull { it.first == kind }?.second ?: kind
+fun kindLabel(kind: String): String = PackKinds.firstOrNull { it.first == kind }?.second ?: if (kind == "pet") "伙伴" else kind
 
 /** 视觉类内容用双列封面卡片，文字为主的能力类用单列。 */
 val VisualKinds = setOf("effect", "wallpaper", "widget", "game", "app")

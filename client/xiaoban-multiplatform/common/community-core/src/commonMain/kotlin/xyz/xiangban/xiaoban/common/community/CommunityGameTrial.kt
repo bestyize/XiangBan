@@ -54,10 +54,12 @@ object CommunityGameHistory {
     fun encode(games: List<RecentCommunityGame>) = Json.encodeToString(games)
 }
 
-/** Only public, exact same-site pack links become playable cards; ordinary links remain text. */
+const val MAX_LINKED_COMMUNITY_PACKS = 3
+
+/** Same-site pack URLs become cards after the public pack endpoint confirms availability. */
 fun linkedCommunityPacks(html: String, config: CommunityConfig): List<Long> =
     Regex("""<a\b[^>]*\bhref\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).findAll(html).mapNotNull { match ->
         val href = match.groupValues[1]
         val url = if (href.startsWith("/packs/")) config.forumBase.trimEnd('/') + href else href
         communityShareTarget(url, config)?.takeIf { it.kind == "pack" }?.id?.toLongOrNull()
-    }.distinct().take(3).toList()
+    }.distinct().take(MAX_LINKED_COMMUNITY_PACKS).toList()

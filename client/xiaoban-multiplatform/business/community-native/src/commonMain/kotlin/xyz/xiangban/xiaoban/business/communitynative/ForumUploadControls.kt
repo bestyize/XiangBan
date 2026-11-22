@@ -148,9 +148,9 @@ internal fun ForumUploadControls(
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             status()
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (compact) {
-                    EditorTool(XIcons.Image, if (busy) "上传中" else "图片", enabled && !busy && (loadedLimits?.imageMaxBytes ?: 0) > 0) { start(true) }
+                    EditorTool(XIcons.Image, "图片", enabled && !busy && (loadedLimits?.imageMaxBytes ?: 0) > 0) { start(true) }
                     if (hasFiles && attachments != null) EditorTool(XIcons.File, "附件", enabled && !busy && loadedLimits != null && attachments.size < 5) { start(false) }
                     trailing?.invoke()
                     Spacer(Modifier.weight(1f))
@@ -174,9 +174,9 @@ internal fun ForumUploadControls(
 @Composable
 internal fun EditorTool(icon: ImageVector, label: String, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
     val ink = if (selected) Brand else if (enabled) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3
-    Row(Modifier.clickable(enabled = enabled, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.clickable(enabled = enabled, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         XIcon(icon, size = 20.dp, tint = ink)
-        Text(label, style = XType.Secondary, color = ink)
+        Text(label, style = XType.Secondary, color = ink, maxLines = 1)
     }
 }

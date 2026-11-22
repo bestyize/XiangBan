@@ -383,7 +383,7 @@ private fun PostItem(
             val bodyStyle = if (LocalCommunityDetail.current) XType.DetailComment else XType.Body
             RichBody(env, post.bodyHtml, fontSize = bodyStyle.fontSize, lineHeight = bodyStyle.lineHeight)
             ReplyContentCards(env, post.workRefs, open)
-            LinkedGameCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
+            LinkedWorkCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
             ForumAttachments(env, post.attachments, open)
         }
         likeError?.let { Text(it, style = XType.Caption, color = Danger) }
@@ -488,7 +488,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             )
                             RichBody(env, topic.bodyHtml, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
                                 galleryImages = images, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
-                            LinkedGameCards(env, topic.bodyHtml, open)
+                            LinkedWorkCards(env, topic.bodyHtml, open)
                             ForumAttachments(env, topic.attachments, open)
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }

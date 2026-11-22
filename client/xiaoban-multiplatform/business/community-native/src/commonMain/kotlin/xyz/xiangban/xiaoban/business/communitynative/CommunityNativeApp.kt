@@ -157,14 +157,12 @@ fun CommunityNativeApp(env: CommunityEnv) {
             env.platform?.appUpdates?.let { AppUpdateDialog(it) }
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
-                    env,
                     onDismiss = { publishOpen = false },
                     onAiCreate = { publishOpen = false; chat.clearConversation(); push(Route.AiChat) },
                     onNewPost = {
                         publishOpen = false
                         push(if (tab == Tab.Community.name) communityPost else Route.NewPost())
                     },
-                    onPublishPack = { publishOpen = false; push(Route.PublishPack()) },
                     panelModifier = panel,
                 )
             }
@@ -231,14 +229,12 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
     }
 }
 
-/** 发布弹层：用 AI 创作走云端小伴；发布已有作品和发帖目前在网页上完成。 */
+/** 底栏提供 AI 创作和发帖入口；作品可从发帖页添加。 */
 @Composable
-private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, onPublishPack: () -> Unit, panelModifier: Modifier) {
-    val site = env.config.forumBase.trimEnd('/')
+private fun PublishSheet(onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, panelModifier: Modifier) {
     BottomSheet(onDismiss, panelModifier) {
         Text("发布", style = XType.Title, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
-        SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），发布到社区", onPublishPack)
         SheetAction(XIcons.Pen, "发帖", "发布到创意、讨论或资源板块", onNewPost)
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
     }

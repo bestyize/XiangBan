@@ -14,6 +14,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,9 +49,14 @@ import xyz.xiangban.xiaoban.common.community.FORUM_IMAGE_MAX_BYTES
 import xyz.xiangban.xiaoban.common.community.forumImageMarkdown
 import xyz.xiangban.xiaoban.common.community.ForumCategories
 import xyz.xiangban.xiaoban.common.community.ForumSection
+import xyz.xiangban.xiaoban.common.community.Load
+import xyz.xiangban.xiaoban.common.community.MAX_LINKED_COMMUNITY_PACKS
+import xyz.xiangban.xiaoban.common.community.Pack
+import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.isHelpBoard
 import xyz.xiangban.xiaoban.common.community.isUncategorized
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.ownedChallengePacks
 import xyz.xiangban.xiaoban.common.community.parsePollOptions
 import xyz.xiangban.xiaoban.common.community.pollDraftError
 import xyz.xiangban.xiaoban.common.community.requiredPostLevel
@@ -62,6 +71,24 @@ private fun ForumSection.postingSection(): PostingSection = when (this) {
 
 private val PostingSections = PostingSection.entries
 private val PostingLevels = listOf("新人", "成员", "老用户", "守护者")
+
+private data class DraftPostWork(val id: Long, val title: String) {
+    fun markdown(url: String): String {
+        val label = title.filter { !it.isISOControl() && it !in "[]\\<>`*_!" }.trim().ifBlank { "查看作品" }
+        return "[$label]($url)"
+    }
+}
+
+private val DraftPostWorksSaver = listSaver<List<DraftPostWork>, String>(
+    save = { works -> works.flatMap { listOf(it.id.toString(), it.title) } },
+    restore = { values ->
+        values.chunked(2).mapNotNull { pair ->
+            val id = pair.first().toLongOrNull()
+            val title = pair.getOrNull(1)
+            if (id == null || title == null) null else DraftPostWork(id, title)
+        }
+    },
+)
 
 /**
  * 发帖：选一个具体的分类，写标题和正文，发布。发成功后直接打开这个帖子。
@@ -103,6 +130,14 @@ fun NewPostScreen(
     val currentAccount by rememberUpdatedState(session.accountId)
     var attachmentsJson by rememberSaveable { mutableStateOf("[]") }
     val attachments = remember(attachmentsJson) { CommunityJson.decodeFromString<List<ForumAttachment>>(attachmentsJson) }
+    var works by rememberSaveable(session.accountId, stateSaver = DraftPostWorksSaver) { mutableStateOf(emptyList()) }
+    var choosingWork by rememberSaveable(session.accountId) { mutableStateOf(false) }
+    var uploadingWork by rememberSaveable(session.accountId) { mutableStateOf(false) }
+    fun addWork(id: Long, name: String) {
+        if (id > 0 && works.size < MAX_LINKED_COMMUNITY_PACKS && works.none { it.id == id }) {
+            works = works + DraftPostWork(id, name)
+        }
+    }
     fun cancelDraft() {
         if (leaving) return
         leaving = true
@@ -117,7 +152,7 @@ fun NewPostScreen(
     fun requestBack() {
         if (busy || uploading || leaving) return
         focus.clearFocus()
-        if (title.isNotBlank() || body.isNotBlank() || topicTags.isNotBlank() || attachments.isNotEmpty() || cover != null) confirmingLeave = true else cancelDraft()
+        if (title.isNotBlank() || body.isNotBlank() || topicTags.isNotBlank() || attachments.isNotEmpty() || works.isNotEmpty() || cover != null) confirmingLeave = true else cancelDraft()
     }
     BackHandler { requestBack() }
     var error by remember { mutableStateOf<String?>(null) }
@@ -191,8 +226,12 @@ fun NewPostScreen(
                     uploadedCover = env.forum.uploadImage(selectedCover.file, minOf(limits.imageMaxBytes, FORUM_IMAGE_MAX_BYTES))
                 }
                 check(currentAccount == account) { "账号已切换，请重新编辑" }
-                val postBody = uploadedCover?.let { forumImageMarkdown(it, "封面").trim() + "\n\n" + body.trim() } ?: body.trim()
-                require(postBody.count { !it.isLowSurrogate() } <= 20_000) { "加上封面后正文超过字数上限，请精简正文" }
+                val postBody = buildList {
+                    uploadedCover?.let { add(forumImageMarkdown(it, "封面").trim()) }
+                    works.forEach { add(it.markdown(env.forum.packUrl(it.id))) }
+                    add(body.trim())
+                }.joinToString("\n\n")
+                require(postBody.count { !it.isLowSurrogate() } <= 20_000) { "加上封面和作品链接后正文超过字数上限，请精简正文" }
                 val tags = topicTags.split(',', '，').map { it.trim().removePrefix("#").trim() }
                     .filter { it.isNotEmpty() }.map { it.take(20) }.distinctBy { it.lowercase() }.take(5)
                 val id = env.forum.createTopic(categoryId, title.trim(), postBody, tags = tags, bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
@@ -205,7 +244,7 @@ fun NewPostScreen(
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.fillMaxSize().imePadding().semantics { if (uploadingWork) hideFromAccessibility() }) {
             ScreenBar(if (help) "发求助" else "发帖", onBack = ::requestBack, trailing = {
                 if (session.loggedIn) PillButton(if (busy) "发布中" else "发布", ::publish,
                     Modifier.padding(end = 8.dp), enabled = canPost, height = 36.dp)
@@ -272,6 +311,18 @@ fun NewPostScreen(
                         }
                     }
                     if (chosen?.slug?.startsWith("share") == true) Text("请分享原创、开源或已获授权的资源。", Modifier.padding(top = 16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                    if (works.isNotEmpty()) {
+                        Text("作品", Modifier.padding(top = 16.dp), style = XType.Secondary, fontWeight = FontWeight.Medium)
+                        works.forEach { work ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                XIcon(XIcons.Grid, size = 18.dp)
+                                Text(work.title, Modifier.weight(1f), style = XType.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                if (!busy) IconTap(XIcons.Close, "移除作品 ${work.title}", {
+                                    works = works.filterNot { it.id == work.id }
+                                }, size = 16.dp)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(24.dp))
                 }
                 error?.let { Banner(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true) }
@@ -284,6 +335,9 @@ fun NewPostScreen(
                             if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
                             else env.scope.launch { next.filterNot { file -> attachments.any { it.id == file.id } }.forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } } }
                         }, trailing = {
+                            EditorTool(XIcons.Grid, "作品", enabled = !busy && !uploading && !leaving, selected = works.isNotEmpty()) {
+                                focus.clearFocus(); choosingWork = true
+                            }
                             EditorTool(XIcons.Poll, "投票", enabled = !busy && !uploading, selected = pollEnabled) { focus.clearFocus(); pollEnabled = !pollEnabled }
                         })
                     Text(when {
@@ -295,6 +349,19 @@ fun NewPostScreen(
                         else -> "$bodyLength 字"
                     }, Modifier.padding(top = 6.dp, bottom = 2.dp), style = XType.Caption, color = if (bodyLength > 20_000) Danger else LocalExtraColors.current.ink3)
                 }
+            }
+        }
+        OverlayTransition(choosingWork) { panel ->
+            PostWorksSheet(env, session.accountId, works.map { it.id }.toSet(), panel,
+                close = { choosingWork = false },
+                onUpload = { choosingWork = false; uploadingWork = true },
+                onSelect = { pack -> addWork(pack.id, pack.title); choosingWork = false })
+        }
+        if (uploadingWork) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
+                .clickable(indication = null, interactionSource = null) {}) {
+                PublishContentScreen(env, packId = null, back = { uploadingWork = false }, open = open,
+                    onPublished = { id, name -> addWork(id, name); uploadingWork = false })
             }
         }
         OverlayTransition(choosingCategory) { panel ->
@@ -361,6 +428,38 @@ fun NewPostScreen(
             Text("尚未发布的内容不会保留。", Modifier.padding(top = 8.dp, bottom = 20.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
             PillButton("继续编辑", { confirmingLeave = false }, Modifier.fillMaxWidth())
             GhostPillButton("放弃编辑", { confirmingLeave = false; cancelDraft() }, Modifier.fillMaxWidth().padding(top = 8.dp), textColor = Danger)
+        }
+    }
+}
+
+@Composable
+private fun PostWorksSheet(
+    env: CommunityEnv, accountId: String?, selected: Set<Long>, panel: Modifier,
+    close: () -> Unit, onUpload: () -> Unit, onSelect: (Pack) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        BottomSheet(close, panel.heightIn(max = maxHeight * 0.75f)) {
+            Text("作品", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            if (selected.size >= MAX_LINKED_COMMUNITY_PACKS) {
+                Text("每个帖子最多添加 $MAX_LINKED_COMMUNITY_PACKS 件作品。", Modifier.padding(top = 12.dp), style = XType.Secondary)
+                return@BottomSheet
+            }
+            SheetAction(XIcons.Upload, "上传作品", "支持 ZIP、HTML 和 HTM", onUpload)
+            Hairline(Modifier.padding(vertical = 8.dp))
+            Text("已发布的作品", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val loader = rememberLoader(env, "compose-works-$accountId") { env.content.myPacks() }
+            val state by loader.state.collectAsState()
+            when (val result = state) {
+                Load.Loading -> Spinner(Modifier.fillMaxWidth().height(60.dp))
+                is Load.Failed -> Banner(result.message, warn = true, actionText = "重试", onAction = loader::reload)
+                is Load.Ready -> {
+                    val available = ownedChallengePacks(result.value.items, accountId).filterNot { it.id in selected }
+                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        if (available.isEmpty()) Text("暂无可添加的已发布作品", Modifier.padding(vertical = 12.dp), style = XType.Secondary)
+                        available.forEach { pack -> SheetAction(XIcons.Grid, pack.title, kindLabel(pack.kind)) { onSelect(pack) } }
+                    }
+                }
+            }
         }
     }
 }
