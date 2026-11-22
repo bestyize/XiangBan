@@ -1,17 +1,22 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -176,94 +183,31 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
     }
 }
 
-/** “我的”：头像和名字、三个常用入口、几行设置入口。网页端的功能给出入口。 */
-@Composable
-fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
-    val session by env.session.state.collectAsState()
-    val remoteState by env.remoteChat.state.collectAsState()
-    var nickname by remember { mutableStateOf<String?>(null) }
-    var points by remember { mutableStateOf<Int?>(null) }
-    var unread by remember { mutableStateOf(0) }
-    val notificationRevision by env.social.notificationRevision.collectAsState()
-    val site = env.config.forumBase.trimEnd('/')
-
-    // 登录后向论坛确认一次身份，顺便取昵称、积分和未读数；失败不影响页面。
-    LaunchedEffect(session.loggedIn, session.accountId) {
-        if (!session.loggedIn) { nickname = null; points = null; unread = 0; return@LaunchedEffect }
-        runCatching { env.session.loadProfile() }
-        runCatching { env.forum.session().user }.onSuccess { nickname = it.nickname; points = it.points }
-        env.remoteChat.refreshPeers()
-    }
-    LaunchedEffect(session.loggedIn, session.accountId, notificationRevision) {
-        if (session.loggedIn) runCatching { env.forum.unreadCount() }.onSuccess { unread = it }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        HomeBar("我的", trailing = { IconTap(XIcons.Sliders, "设置", { open(Route.Settings) }) })
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                val name = nickname ?: session.user?.username
-                AccountAvatar(session.user?.avatarUrl, name, 64.dp)
-                Column(Modifier.weight(1f)) {
-                    if (session.loggedIn) {
-                        Text(name ?: "已登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        session.user?.publicAccountId?.takeIf { it.isNotBlank() }?.let {
-                            Text("账号 ID $it", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        points?.let { Text("$it 积分", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    } else {
-                        Text("未登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        Text("登录后同步你在社区的身份", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (!session.loggedIn) PillButton("登录", { open(Route.Login) }, height = 36.dp)
-            }
-
-            Row(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(vertical = 14.dp, horizontal = 4.dp)) {
-                QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
-                QuickTile(XIcons.Message, if (unread > 0) "通知 · $unread" else "通知", Modifier.weight(1f)) { open(if (session.loggedIn) Route.Notifications else Route.Login) }
-                QuickTile(XIcons.Monitor, "创作", Modifier.weight(1f)) { open(Route.AiChat) }
-            }
-
-            Column(Modifier.padding(top = 8.dp)) {
-                val peers = remoteState.peers
-                val computers = when {
-                    peers.isEmpty() -> "未发现设备"
-                    peers.any { it.online } -> peers.first { it.online }.name + " · 在线"
-                    else -> "${peers.size} 台设备 · 离线"
-                }
-                NavRow("我的收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
-                NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
-                NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
-                NavRow("模型与点数") { open(Route.Models) }
-                NavRow("我的设备", computers) { open(Route.Devices) }
-                NavRow("帮助与反馈") { env.platform?.openUrl("$site/discuss?tab=site") }
-                NavRow("交流群") { env.platform?.openInBrowser(CONTACT_URL) }
-            }
-            Spacer(Modifier.height(NavInset))
-        }
-    }
-}
+/** 头像更换流程：供「我的」、个人主页和设置页共用。 */
+internal class AvatarFlow(
+    val state: AvatarEditorState,
+    val start: () -> Unit,
+    val pick: () -> Unit,
+    val save: () -> Unit,
+)
 
 @Composable
-private fun QuickTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        IconBox(icon, 44.dp, 16.dp)
-        Text(label, style = XType.Caption)
-    }
-}
-
-/** 设置：头像在 App 内更换（平台不支持时打开网页）；其余账号资料在网页上改，这里还放关于、协议和退出登录。 */
-@Composable
-fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
+internal fun rememberAvatarFlow(
+    env: CommunityEnv,
+    onToast: (String) -> Unit,
+    onUpdated: () -> Unit = {},
+): AvatarFlow {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val site = env.config.forumBase.trimEnd('/')
     val platform = env.platform
     val avatar = remember(session.accountId) { AvatarEditorState() }
-    var toast by remember { mutableStateOf<String?>(null) }
 
-    fun pickAvatar() {
+    fun start() {
+        if (platform?.avatarEditorSupported == true) avatar.open() else platform?.openUrl("$site/settings")
+    }
+
+    fun pick() {
         val actions = platform ?: return
         if (avatar.picking || avatar.saving) return
         avatar.picking = true
@@ -274,7 +218,7 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                toast = messageOf(e)
+                onToast(messageOf(e))
             } finally {
                 avatar.picking = false
             }
@@ -282,7 +226,7 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     }
 
     // 先把裁好的 512 WebP 传到论坛图片库，再把地址写进账号中心；上传过的同一裁剪重试时只重写账号中心。
-    fun saveAvatar() {
+    fun save() {
         val actions = platform ?: return
         val image = avatar.image ?: return
         val crop = avatar.crop ?: return
@@ -303,7 +247,8 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 // 论坛登录时同步头像；这一步也让论坛记住这张图在用作头像，不被当成未引用图片清理。
                 runCatching { env.forum.session() }
                 avatar.clear()
-                toast = "头像已更新"
+                onUpdated()
+                onToast("头像已更新")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -313,16 +258,311 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
         }
     }
 
+    return remember(avatar, platform, site) { AvatarFlow(avatar, ::start, ::pick, ::save) }
+}
+
+@Composable
+internal fun AvatarFlowOverlays(flow: AvatarFlow, name: String?, avatarUrl: String?) {
+    if (flow.state.cropOpen) AvatarCropPage(flow.state, name, avatarUrl, onSave = flow.save)
+    if (flow.state.sheet) AvatarPickSheet(flow.state, onPick = flow.pick)
+}
+
+/** 底部菜单中的通栏单行操作（图标 + 文字）。 */
+@Composable
+internal fun SheetMenuRow(
+    icon: ImageVector,
+    label: String,
+    first: Boolean = false,
+    danger: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val tint = if (danger) Danger else MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = if (danger) Danger else MaterialTheme.colorScheme.onSurface
+    Column(Modifier.fillMaxWidth()) {
+        if (!first) Hairline(Modifier.padding(start = 16.dp))
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 50.dp).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            XIcon(icon, tint = tint, size = 19.dp)
+            Text(label, Modifier.weight(1f), style = XType.Body, color = textColor)
+        }
+    }
+}
+
+@Composable
+internal fun SheetCancelFooter(onDismiss: () -> Unit) {
+    Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.background))
+    Text(
+        "取消",
+        Modifier.fillMaxWidth().clickable(onClick = onDismiss).padding(vertical = 15.dp),
+        style = XType.Body,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+/** “我的”：通栏精修（一体化头部 + 收藏/作品/通知三宫格 + 两组核心入口）。 */
+@Composable
+fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
+    val session by env.session.state.collectAsState()
+    val remoteState by env.remoteChat.state.collectAsState()
+    var nickname by remember { mutableStateOf<String?>(null) }
+    var unread by remember { mutableStateOf(0) }
+    var avatarSheet by remember { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
+    val notificationRevision by env.social.notificationRevision.collectAsState()
+    val site = env.config.forumBase.trimEnd('/')
+    val extra = LocalExtraColors.current
+    val avatarFlow = rememberAvatarFlow(env, onToast = { toast = it })
+
+    // 登录后向论坛确认一次身份，取昵称和未读数；失败不影响页面。
+    LaunchedEffect(session.loggedIn, session.accountId) {
+        if (!session.loggedIn) { nickname = null; unread = 0; return@LaunchedEffect }
+        runCatching { env.session.loadProfile() }
+        runCatching { env.forum.session().user }.onSuccess { nickname = it.nickname }
+        env.remoteChat.refreshPeers()
+    }
+    LaunchedEffect(session.loggedIn, session.accountId, notificationRevision) {
+        if (session.loggedIn) runCatching { env.forum.unreadCount() }.onSuccess { unread = it }
+    }
+
+    val displayName = nickname ?: session.user?.username
+    val publicId = session.user?.publicAccountId?.takeIf { it.isNotBlank() }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            HomeBar("我的", trailing = { IconTap(XIcons.Settings, "设置", { open(Route.Settings) }, size = 20.dp) })
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                // 一体化白底头部：头像名片 + 三宫格快捷入口
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, top = 6.dp, bottom = 18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (session.loggedIn) {
+                            AccountAvatar(
+                                session.user?.avatarUrl,
+                                displayName,
+                                64.dp,
+                                Modifier.border(1.dp, extra.hairline, CircleShape).clickable { avatarSheet = true },
+                            )
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(displayName ?: "已登录", style = XType.Headline, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                publicId?.let { id ->
+                                    Row(
+                                        Modifier.clip(RoundedCornerShape(6.dp)).clickable {
+                                            env.platform?.copy(id)
+                                            toast = "已复制账号 ID $id"
+                                        }.padding(vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text("ID $id", style = XType.Caption, color = extra.ink3)
+                                        XIcon(XIcons.Copy, tint = extra.ink3, size = 12.dp)
+                                    }
+                                }
+                            }
+                            Row(
+                                Modifier.height(32.dp).clip(CircleShape)
+                                    .clickable { session.accountId?.let { open(Route.User(it, "topics")) } }
+                                    .padding(start = 8.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text("主页", style = XType.Secondary, color = extra.ink3)
+                                XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
+                            }
+                        } else {
+                            Box(
+                                Modifier.size(64.dp).clip(CircleShape).background(extra.fill)
+                                    .border(1.dp, extra.hairline, CircleShape).clickable { open(Route.Login) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                XIcon(XIcons.User, tint = extra.ink3, size = 26.dp)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("登录小伴", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                                Text("同步作品、收藏与多端设备", style = XType.Secondary, color = extra.ink3)
+                            }
+                            Box(
+                                Modifier.height(34.dp).clip(CircleShape).background(extra.brandSoft)
+                                    .clickable { open(Route.Login) }.padding(horizontal = 16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("登录", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = extra.brandInk)
+                            }
+                        }
+                    }
+
+                    Hairline(Modifier.padding(horizontal = 16.dp))
+
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp)) {
+                        QuickTile(XIcons.Bookmark, "我的收藏", Modifier.weight(1f)) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
+                        QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
+                        QuickTile(XIcons.Bell, "通知", Modifier.weight(1f), badge = if (session.loggedIn) unread else 0) {
+                            open(if (session.loggedIn) Route.Notifications else Route.Login)
+                        }
+                    }
+                }
+
+                // 组 1：AI 与设备
+                Column(Modifier.padding(top = 10.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                    val peers = remoteState.peers
+                    val onlinePeer = peers.firstOrNull { it.online }
+                    val computers = when {
+                        peers.isEmpty() -> "未发现设备"
+                        onlinePeer != null -> "${onlinePeer.name} · 在线"
+                        else -> "${peers.size} 台设备 · 离线"
+                    }
+                    MineMenuRow(XIcons.Cpu, "模型配置", first = true) { open(Route.Models) }
+                    MineMenuRow(XIcons.Monitor, "我的设备", value = computers, valueOnline = onlinePeer != null) { open(Route.Devices) }
+                }
+
+                // 组 2：帮助与社群
+                Column(Modifier.padding(top = 10.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                    MineMenuRow(XIcons.Question, "帮助与反馈", first = true) { env.platform?.openUrl("$site/discuss?tab=site") }
+                    MineMenuRow(XIcons.Message, "交流群") { env.platform?.openInBrowser(CONTACT_URL) }
+                }
+
+                Spacer(Modifier.height(NavInset))
+            }
+        }
+
+        if (avatarSheet && session.loggedIn) {
+            BottomSheet(onDismiss = { avatarSheet = false }, flush = true, cornerRadius = 20.dp) {
+                Text(
+                    (displayName ?: "账号") + (publicId?.let { " · ID $it" } ?: ""),
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    style = XType.Secondary,
+                    color = extra.ink3,
+                )
+                SheetMenuRow(XIcons.Camera, "更换头像", first = true) {
+                    avatarSheet = false
+                    avatarFlow.start()
+                }
+                session.accountId?.let { uid ->
+                    SheetMenuRow(XIcons.User, "查看个人主页") {
+                        avatarSheet = false
+                        open(Route.User(uid, "topics"))
+                    }
+                }
+                publicId?.let { id ->
+                    SheetMenuRow(XIcons.Copy, "复制账号 ID") {
+                        avatarSheet = false
+                        env.platform?.copy(id)
+                        toast = "已复制账号 ID $id"
+                    }
+                }
+                SheetCancelFooter { avatarSheet = false }
+            }
+        }
+
+        AvatarFlowOverlays(avatarFlow, session.user?.username, session.user?.avatarUrl)
+        Toast(toast) { toast = null }
+    }
+}
+
+@Composable
+private fun QuickTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, badge: Int = 0, onClick: () -> Unit) {
+    val extra = LocalExtraColors.current
+    Column(
+        modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Box {
+            Box(
+                Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(extra.fill),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(icon, size = 20.dp)
+            }
+            if (badge > 0) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-4).dp)
+                        .defaultMinSize(minWidth = 17.dp, minHeight = 17.dp)
+                        .clip(CircleShape)
+                        .background(Danger)
+                        .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                        .padding(horizontal = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (badge > 99) "99+" else "$badge",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+        Text(label, style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MineMenuRow(
+    icon: ImageVector,
+    title: String,
+    value: String? = null,
+    valueOnline: Boolean = false,
+    first: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val extra = LocalExtraColors.current
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        if (!first) Hairline(Modifier.padding(start = 47.dp))
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(onClick = onClick)
+                .padding(start = 16.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            XIcon(icon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 19.dp)
+            Text(title, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!value.isNullOrBlank()) {
+                Row(
+                    Modifier.widthIn(max = 170.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    if (valueOnline) Box(Modifier.size(6.dp).clip(CircleShape).background(Success))
+                    Text(
+                        value,
+                        style = XType.Secondary,
+                        color = if (valueOnline) Success else extra.ink3,
+                        fontWeight = if (valueOnline) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 15.dp)
+        }
+    }
+}
+
+/** 设置：头像在 App 内更换（平台不支持时打开网页）；其余账号资料在网页上改，这里还放关于、协议和退出登录。 */
+@Composable
+fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val session by env.session.state.collectAsState()
+    val site = env.config.forumBase.trimEnd('/')
+    var toast by remember { mutableStateOf<String?>(null) }
+    val avatarFlow = rememberAvatarFlow(env, onToast = { toast = it })
+
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         ScreenBar("设置", onBack = back)
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             if (session.loggedIn) {
                 GroupLabel("账号")
-                AvatarRow(session.user?.avatarUrl, session.user?.username) {
-                    if (platform?.avatarEditorSupported == true) avatar.open() else platform?.openUrl("$site/settings")
-                }
-                if (avatar.pending) AvatarPendingRow(onDiscard = avatar::clear, onResume = avatar::open)
+                AvatarRow(session.user?.avatarUrl, session.user?.username, onClick = avatarFlow.start)
+                if (avatarFlow.state.pending) AvatarPendingRow(onDiscard = avatarFlow.state::clear, onResume = avatarFlow.state::open)
                 NavRow("绑定手机 / 邮箱") { env.platform?.openUrl("$site/settings") }
             }
             GroupLabel("外观与声音")
@@ -351,8 +591,7 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             }
         }
     }
-    if (avatar.cropOpen) AvatarCropPage(avatar, session.user?.username, session.user?.avatarUrl, onSave = ::saveAvatar)
-    if (avatar.sheet) AvatarPickSheet(avatar, onPick = ::pickAvatar)
+    AvatarFlowOverlays(avatarFlow, session.user?.username, session.user?.avatarUrl)
     Toast(toast) { toast = null }
     }
 }

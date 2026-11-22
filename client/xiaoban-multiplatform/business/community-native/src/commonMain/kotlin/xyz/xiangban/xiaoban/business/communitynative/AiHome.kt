@@ -585,7 +585,7 @@ internal fun AiDrawer(
         }
         Hairline()
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
-            DrawerLink(XIcons.Star, "模型与点数", onModels, Modifier.weight(1f))
+            DrawerLink(XIcons.Star, "模型配置", onModels, Modifier.weight(1f))
             DrawerLink(XIcons.Sliders, "设置", onSettings, Modifier.weight(1f))
         }
     }

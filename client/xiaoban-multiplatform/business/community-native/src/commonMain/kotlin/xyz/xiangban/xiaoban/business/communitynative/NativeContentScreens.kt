@@ -7,17 +7,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
@@ -150,51 +158,203 @@ internal fun NativeSchemesFeed(env: CommunityEnv, open: (Route) -> Unit) {
     }
 }
 
+private fun packFilterKey(pack: Pack): String = when {
+    pack.status == "removed" -> "removed"
+    pack.status == "rejected" || pack.inReview -> "review"
+    else -> "live"
+}
+
+private fun packStatusBadge(pack: Pack, dark: Boolean, extra: ExtraColors): Triple<String, Color, Color> = when {
+    pack.status == "removed" -> Triple("已下架", extra.fill, extra.ink3)
+    pack.status == "rejected" -> Triple("未通过", DangerSoft, Danger)
+    pack.inReview -> Triple("审核中", if (dark) Color(0xFF362916) else Color(0xFFFDF3E3), if (dark) Color(0xFFF0B65A) else Color(0xFFB26A00))
+    pack.trustLevel == 0 -> Triple("官方", if (dark) Color(0xFF1A3126) else Color(0xFFEAF6F0), Success)
+    else -> Triple("已上线", if (dark) Color(0xFF1A3126) else Color(0xFFEAF6F0), Success)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyContentScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
-    Column(Modifier.fillMaxSize()) {
-        ScreenBar("我的作品", onBack = back, trailing = { IconTap(XIcons.Upload, "发布内容包", { open(Route.PublishPack()) }) })
-        if (!session.loggedIn) { CenterMessage("登录后查看自己的作品", "登录", { open(Route.Login) }); return@Column }
-        val loader = rememberLoader(env, "my-packs-${session.accountId}") { env.content.myPacks() }
-        val state by loader.state.collectAsState()
-        val scope = rememberCoroutineScope()
-        var removing by remember { mutableStateOf<Pack?>(null) }
-        var busy by remember { mutableStateOf(false) }
-        var error by remember { mutableStateOf<String?>(null) }
-        Box(Modifier.weight(1f)) {
-            LoadBox(state, loader::reload) { result ->
-                if (result.items.isEmpty()) CenterMessage("还没有发布过内容包", "发布内容包", { open(Route.PublishPack()) })
-                else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = ContentSpacing) {
-                    item { GhostPillButton("刷新作品状态", loader::reload, Modifier.fillMaxWidth()) }
-                    items(result.items, key = { it.id }) { pack -> WhiteCard(padding = 14.dp) {
-                        Text(pack.title, style = XType.Section, fontWeight = FontWeight.SemiBold)
-                        Text("${kindLabel(pack.kind)} · v${pack.version} · ${contentWorkState(pack)}", Modifier.padding(top = 6.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                        Text("更新于 ${pack.updatedAt.take(10)}", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            GhostPillButton("查看", { open(if (pack.kind in CapabilityPackKinds) Route.Ability(pack.id) else Route.Pack(pack.id)) }, Modifier.weight(1f))
-                            if (pack.status != "removed") GhostPillButton("新版本", { open(Route.PublishPack(pack.id)) }, Modifier.weight(1f))
-                            if (pack.status != "removed") GhostPillButton("下架", { removing = pack; error = null }, Modifier.weight(1f))
+    val extra = LocalExtraColors.current
+    val dark = ThemeState.dark
+
+    if (!session.loggedIn) {
+        Column(Modifier.fillMaxSize()) {
+            ScreenBar("我的作品", onBack = back)
+            RefinedEmptyState(XIcons.Folder, "登录后查看自己的作品", "在手机或电脑创作的小程序、游戏与桌面装扮，发布后都会在这里管理版本", "登录", { open(Route.Login) })
+        }
+        return
+    }
+
+    val loader = rememberLoader(env, "my-packs-${session.accountId}") { env.content.myPacks() }
+    val state by loader.state.collectAsState()
+    val scope = rememberCoroutineScope()
+    var filter by rememberSaveable(session.accountId) { mutableStateOf("all") }
+    var actionPack by remember { mutableStateOf<Pack?>(null) }
+    var removing by remember { mutableStateOf<Pack?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val allItems = (state as? Load.Ready)?.value?.items.orEmpty()
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            ScreenBar(
+                "我的作品",
+                onBack = back,
+                trailing = {
+                    Text(
+                        "发布",
+                        Modifier.clip(CircleShape)
+                            .clickable { open(Route.PublishPack()) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = XType.Secondary,
+                        fontWeight = FontWeight.SemiBold,
+                        color = extra.brandInk,
+                    )
+                },
+            )
+
+            if (allItems.isNotEmpty()) {
+                RefinedTabBar(
+                    listOf(
+                        RefinedTab("all", "全部", allItems.size.toLong()),
+                        RefinedTab("live", "已上线", allItems.count { packFilterKey(it) == "live" }.toLong()),
+                        RefinedTab("review", "审核中", allItems.count { packFilterKey(it) == "review" }.toLong()),
+                        RefinedTab("removed", "已下架", allItems.count { packFilterKey(it) == "removed" }.toLong()),
+                    ),
+                    filter,
+                ) { filter = it }
+            }
+
+            PullToRefreshBox(
+                isRefreshing = state is Load.Loading && allItems.isNotEmpty(),
+                onRefresh = loader::reload,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                LoadBox(state, loader::reload) { result ->
+                    val filtered = if (filter == "all") result.items else result.items.filter { packFilterKey(it) == filter }
+                    if (result.items.isEmpty()) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            RefinedEmptyState(
+                                icon = XIcons.Folder,
+                                title = "还没有发布过作品",
+                                desc = "在手机或电脑创作的小程序、游戏与桌面装扮，发布后都会在这里管理版本",
+                                actionLabel = "发布作品",
+                                onAction = { open(Route.PublishPack()) },
+                            )
                         }
-                    } }
+                    } else if (filtered.isEmpty()) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            RefinedEmptyState(
+                                icon = XIcons.Folder,
+                                title = "该分类下暂无作品",
+                                desc = "切换其他状态标签查看你的已发布作品",
+                            )
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
+                            itemsIndexed(filtered, key = { _, it -> it.id }) { idx, pack ->
+                                val (statusLabel, statusBg, statusTint) = packStatusBadge(pack, dark, extra)
+                                val (kindIcon, kindBg, kindTint) = when (pack.kind) {
+                                    "game" -> Triple(XIcons.Gamepad, if (dark) Color(0xFF36221B) else Color(0xFFFFF2ED), if (dark) Color(0xFFFF9C78) else Color(0xFFD95A2B))
+                                    "app", "tool" -> Triple(XIcons.Grid, if (dark) Color(0xFF1E2A42) else Color(0xFFEEF4FF), if (dark) Color(0xFF8DB6FF) else Color(0xFF2F6FDB))
+                                    else -> Triple(XIcons.SparkleSmall, if (dark) Color(0xFF2A2342) else Color(0xFFF2EEFC), if (dark) Color(0xFFBBA8FF) else Color(0xFF7152D8))
+                                }
+                                val openDetail = { open(if (pack.kind in CapabilityPackKinds) Route.Ability(pack.id) else Route.Pack(pack.id)) }
+                                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                                    if (idx > 0) Hairline(Modifier.padding(start = 76.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth().clickable(onClick = openDetail)
+                                            .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Box(
+                                            Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(kindBg),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            XIcon(kindIcon, tint = kindTint, size = 22.dp)
+                                        }
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                Text(
+                                                    pack.title,
+                                                    Modifier.weight(1f, fill = false),
+                                                    style = XType.Body,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Box(
+                                                    Modifier.height(20.dp).clip(CircleShape).background(statusBg).padding(horizontal = 7.dp),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    Text(statusLabel, style = XType.Caption, fontWeight = FontWeight.Medium, color = statusTint)
+                                                }
+                                            }
+                                            Text(
+                                                "${kindLabel(pack.kind)} · v${pack.version} · 更新于 ${pack.updatedAt.take(10)}",
+                                                style = XType.Caption,
+                                                color = extra.ink3,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        IconTap(XIcons.More, "更多操作", { actionPack = pack }, size = 18.dp, tint = extra.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            OverlayTransition(removing != null, direction = "center") {
-                CenterDialog({ if (!busy) removing = null }) {
-                    Text("下架「${removing?.title.orEmpty()}」？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text("下架后不再出现在公开入口，已经应用过的内容不受影响。", Modifier.padding(top = 10.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                    error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
-                    Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GhostPillButton("取消", { removing = null }, Modifier.weight(1f), enabled = !busy)
-                        PillButton(if (busy) "处理中…" else "确认下架", {
-                            if (busy) return@PillButton
-                            val id = removing?.id ?: return@PillButton
-                            busy = true
-                            scope.launch { try { env.content.removeOwn(id); removing = null; loader.reload() }
-                                catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
-                                finally { busy = false } }
-                        }, Modifier.weight(1f), enabled = !busy)
+        }
+
+        actionPack?.let { pack ->
+            val (statusLabel, _, _) = packStatusBadge(pack, dark, extra)
+            BottomSheet(onDismiss = { actionPack = null }, flush = true, cornerRadius = 20.dp) {
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
+                    Text(pack.title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${kindLabel(pack.kind)} · v${pack.version} · $statusLabel", Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
+                }
+                SheetMenuRow(XIcons.Eye, "查看作品详情", first = true) {
+                    actionPack = null
+                    open(if (pack.kind in CapabilityPackKinds) Route.Ability(pack.id) else Route.Pack(pack.id))
+                }
+                if (pack.status != "removed") {
+                    SheetMenuRow(XIcons.Upload, "发布新版本") {
+                        actionPack = null
+                        open(Route.PublishPack(pack.id))
                     }
+                    SheetMenuRow(XIcons.Trash, "下架作品", danger = true) {
+                        actionPack = null
+                        removing = pack
+                        error = null
+                    }
+                }
+                SheetCancelFooter { actionPack = null }
+            }
+        }
+
+        OverlayTransition(removing != null, direction = "center") {
+            CenterDialog({ if (!busy) removing = null }) {
+                Text("下架「${removing?.title.orEmpty()}」？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                Text("下架后不再出现在公开入口，已经应用过的内容不受影响。", Modifier.padding(top = 10.dp), style = XType.Secondary, color = extra.ink3)
+                error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
+                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GhostPillButton("取消", { removing = null }, Modifier.weight(1f), enabled = !busy)
+                    PillButton(if (busy) "处理中…" else "确认下架", {
+                        if (busy) return@PillButton
+                        val id = removing?.id ?: return@PillButton
+                        busy = true
+                        scope.launch {
+                            try { env.content.removeOwn(id); removing = null; loader.reload() }
+                            catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = messageOf(e) }
+                            finally { busy = false }
+                        }
+                    }, Modifier.weight(1f), enabled = !busy)
                 }
             }
         }
