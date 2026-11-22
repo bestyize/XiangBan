@@ -16,6 +16,8 @@
 
 [讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示双端单列布局：单行标题，底部左侧为标签、头像和发布时间，右侧为回复与点赞。支持明暗切换。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
 
+[发帖页设计稿（PC + 移动 H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 采用写作优先无框结构：PC 820px 居中弹窗提供级联板块选择、编辑/预览切换、单作品入口（V2 ZIP / HTML·HTM 自动转 V2 容器 + 关联创作）、内联附件积分与上拉权限设置；H5 窄屏采用 16px 防缩放底部抽屉，支持深浅色与 6 套主题色。[网页版预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web)（与手机共用 1421 端口）。
+
 ## 小伴桌面
 
 [倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。
@@ -32,6 +34,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [发帖页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) | 手机端发帖页重设计（01 初始写作全交互 + 02 富内容完整态 + 03 选板块/作品/投票/封面/键盘五态）及网页版对照：紧凑单行板块与封面入口、正文下内联话题胶囊、每帖限 1 个可运行作品（V2 ZIP / `.html`·`.htm` 转 V2 / 关联创作）与普通附件区分、固定 48px 单行底栏、高对比投票芯片与紧耦合文字封面编辑。支持 390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=mobile) |
 | [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 个人 Agent 连续主线三屏定稿（01 默认浏览态 + 02 键盘弹出态 + 03 点右上角「···」进入的个人 Agent 配置页）：极简顶栏 + 分离悬浮胶囊输入框 + 通栏白底配置列表，支持三态、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
 | [动态壁纸](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers.html) | Android 壁纸库、三种全屏预览和封面使用状态。原型模拟系统壁纸位置选择。[本机预览](http://127.0.0.1:1421/prototypes/live-wallpapers.html) |
 | [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 键盘、表情与相册三种状态。点笑脸打开表情面板，选图后可预览和移除。支持单字或单表情发布、回复和深浅色预览，图稿使用小伴示例壁纸。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |

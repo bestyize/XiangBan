@@ -16,6 +16,8 @@ python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/d
 
 ## 既有单页与卡片参考稿
 
+[发帖页设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 覆盖网页版 PC 820px 弹窗（级联板块菜单、编辑/预览切换、单作品入口支持 V2 ZIP / HTML·HTM 转 V2 与关联创作、内联附件定价、上拉阅读权限与弹窗内关闭确认）、H5 窄屏 16px 底部抽屉，以及手机端 3 画面交互稿，支持明暗模式与 6 套主题色。[网页预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web) · [手机预览](http://127.0.0.1:1421/prototypes/post-composer.html)。
+
 [讨论卡片设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 使用单列列表，标题单行。底部左侧依次显示标签、头像、发布时间，右侧为回复和点赞。可切换桌面、移动和深色预览。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
 
 [创意页作品卡片](prototypes/ideas-cards/index.html) 展示微观展厅、《小王子：星辰之旅》和「运输船：Saltline」。卡片使用 16:9 封面、右上角可选类型标签、标题、说明、作者及收录日期。示例日期用于展示。

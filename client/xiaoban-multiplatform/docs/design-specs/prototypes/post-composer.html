@@ -1,0 +1,3355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>发帖页 · 手机端 &amp; 网页版 UI 设计稿</title>
+<style>
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { color-scheme: dark; background: #0c0c0e; color: #ececef; }
+button, input, textarea { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--studio-accent, #e3203c); outline-offset: 2px; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1380px; margin: 0 auto; padding: 20px 24px 44px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 20px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg { display: inline-flex; align-items: center; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .seg { background: rgba(255, 255, 255, .07); }
+.seg button { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: #5b5e66; white-space: nowrap; }
+body.studio-dark .seg button { color: #a3a6b0; }
+.seg button.active { background: #ffffff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+body.studio-dark .seg button.active { background: #27282d; color: #f3f3f6; }
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .82);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+.pill-btn:hover { filter: brightness(.97); }
+
+/* Sub-nav for narrow screens */
+.board-tabs { display: none; margin-bottom: 14px; gap: 6px; flex-wrap: wrap; }
+.board-tabs button {
+  height: 34px; padding: 0 14px; border-radius: 99px; font-size: 12.5px; font-weight: 550;
+  color: #5b5e66; background: rgba(0, 0, 0, .055);
+}
+body.studio-dark .board-tabs button { color: #a3a6b0; background: rgba(255, 255, 255, .07); }
+.board-tabs button.active { background: #ffffff; color: #1c1d21; box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
+body.studio-dark .board-tabs button.active { background: #27282d; color: #f3f3f6; }
+
+/* ─── Mobile 3-Board Stage ─── */
+.mobile-boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px 26px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; }
+.board-head > span { font-size: 11px; color: #7c7f87; }
+body.studio-dark .board-head > span { color: #8f929b; }
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.55; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+.mini-seg { display: inline-flex; align-items: center; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .06); gap: 2px; }
+body.studio-dark .mini-seg { background: rgba(255, 255, 255, .08); }
+.mini-seg button { height: 22px; padding: 0 7px; border-radius: 6px; font-size: 11px; color: #5b5e66; white-space: nowrap; }
+body.studio-dark .mini-seg button { color: #a3a6b0; }
+.mini-seg button.active { background: #ffffff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+body.studio-dark .mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+/* ─── Phone Shell (DesignTokens.kt) ─── */
+.phone {
+  --paper: #FAFAFA;
+  --surface: #FFFFFF;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9A9A9A;
+  --hairline: #EDEDED;
+  --fill: #F2F2F2;
+  --line: #CFCFCF;
+  --accent: #E3203C;
+  --accent-hi: #F0506A;
+  --accent-soft: #FFF3F4;
+  --accent-soft-line: #F5C7CD;
+  --accent-ink: #E3203C;
+  --accent-on: #FFFFFF;
+  --success: #2FA36B;
+  --danger: #E3203C;
+  --danger-soft: #FFF3F4;
+  --sheet-shadow: 0 -8px 32px rgba(0, 0, 0, .12);
+  --kb-bg: #e7e8ec;
+  --kb-bar: #f1f2f5;
+  --kb-key: #ffffff;
+  --kb-key-alt: #d2d4dc;
+  --kb-ink: #1e1f22;
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  color-scheme: dark;
+  --paper: #111111;
+  --surface: #1C1C1E;
+  --ink: #ECECEC;
+  --ink2: #9A9AA0;
+  --ink3: #6E6E73;
+  --hairline: #2E2E30;
+  --fill: #2C2C2E;
+  --line: #3A3A3C;
+  --danger: #FF6369;
+  --danger-soft: #3A2225;
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .58);
+  --kb-bg: #1e1f22;
+  --kb-bar: #25262a;
+  --kb-key: #3a3b40;
+  --kb-key-alt: #2b2c30;
+  --kb-ink: #f1f1f4;
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+.status-bar { height: 34px; flex: none; padding: 9px 22px 0; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink); }
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 1.5px; background: var(--success); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+/* Mobile Topbar (No bottom divider line per spec §3) */
+.m-bar {
+  height: 48px; flex: none; padding: 0 10px;
+  display: grid; grid-template-columns: 72px 1fr 72px; align-items: center;
+}
+.m-bar-left { display: flex; align-items: center; }
+.m-bar-title { text-align: center; font-size: 16px; line-height: 22px; font-weight: 650; color: var(--ink); }
+.m-bar-right { display: flex; justify-content: flex-end; }
+.m-icon-tap { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
+.m-icon-tap:hover { background: var(--fill); }
+.m-icon-tap svg { width: 21px; height: 21px; }
+
+.m-pub-btn {
+  height: 34px; padding: 0 16px; border-radius: 99px;
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+  background: var(--accent); color: var(--accent-on);
+  transition: background .15s, color .15s, transform .1s;
+}
+.m-pub-btn:active:not(:disabled) { transform: scale(.96); }
+.m-pub-btn:disabled { background: var(--fill); color: var(--ink3); }
+
+/* Mobile Writing Area */
+.m-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 6px 18px 20px;
+  scrollbar-width: none; display: flex; flex-direction: column;
+}
+.m-scroll::-webkit-scrollbar { display: none; }
+
+.m-meta-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 14px; flex: none;
+}
+.m-board-pill {
+  height: 34px; max-width: calc(100% - 96px); padding: 0 12px; border-radius: 99px;
+  background: var(--fill); color: var(--ink);
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 550;
+}
+.m-board-pill:hover { filter: brightness(.97); }
+.m-board-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.m-board-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-board-pill svg { width: 14px; height: 14px; color: var(--ink3); flex: none; }
+
+.m-cover-pill {
+  height: 34px; padding: 0 12px; border-radius: 99px;
+  background: var(--fill); color: var(--ink2);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 500; flex: none;
+}
+.m-cover-pill.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.m-cover-pill svg { width: 15px; height: 15px; }
+
+/* Selected Cover Preview Card (Compact) */
+.m-cover-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; margin-bottom: 14px; border-radius: 14px;
+  background: var(--fill); flex: none;
+}
+.m-cover-thumb {
+  width: 48px; height: 64px; border-radius: 8px; overflow: hidden;
+  background: var(--surface); flex: none; cursor: pointer;
+}
+.m-cover-thumb.square { width: 56px; height: 56px; }
+.m-cover-thumb svg, .m-cover-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.m-cover-info { flex: 1; min-width: 0; }
+.m-cover-info strong { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.m-cover-info small { display: block; margin-top: 2px; font-size: 12px; color: var(--ink2); }
+.m-chip-act {
+  height: 28px; padding: 0 10px; border-radius: 99px;
+  background: var(--surface); color: var(--ink2); font-size: 12px; font-weight: 550;
+}
+.m-x-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink3); flex: none;
+}
+.m-x-btn:hover { background: var(--surface); color: var(--ink); }
+.m-x-btn svg { width: 15px; height: 15px; }
+
+/* Borderless Title + Hairline + Spacious Body */
+.m-title-wrap { display: flex; align-items: flex-start; gap: 8px; flex: none; }
+.m-title-input {
+  flex: 1; min-width: 0; font-size: 20px; line-height: 28px; font-weight: 650;
+  color: var(--ink); outline: none; background: transparent;
+  resize: none; overflow: hidden; display: block; width: 100%;
+}
+.m-title-input::placeholder { color: var(--ink3); font-weight: 600; }
+.m-title-count { font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; flex: none; margin-top: 6px; }
+.m-title-count.bad { color: var(--danger); font-weight: 600; }
+.m-hairline { height: 0.5px; background: var(--hairline); margin: 12px 0 14px; flex: none; }
+
+.m-body-input {
+  width: 100%; min-height: 170px; resize: none; outline: none;
+  font-size: 15px; line-height: 24px; color: var(--ink); background: transparent;
+}
+.m-body-input::placeholder { color: var(--ink3); }
+.m-body-input.short { min-height: 96px; }
+
+/* Inline Photos */
+.m-photo-strip {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; flex: none;
+}
+.m-photo-strip::-webkit-scrollbar { display: none; }
+.m-photo-item {
+  position: relative; width: 74px; height: 74px; border-radius: 10px;
+  overflow: hidden; background: var(--fill); flex: none;
+}
+.m-photo-item svg { width: 100%; height: 100%; display: block; }
+.m-photo-badge {
+  position: absolute; left: 5px; bottom: 5px; padding: 1px 6px; border-radius: 6px;
+  background: rgba(0, 0, 0, .58); color: #fff; font-size: 10px; font-weight: 600;
+}
+.m-photo-rm {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(17, 20, 26, .68); color: #fff; display: grid; place-items: center;
+}
+.m-photo-rm svg { width: 12px; height: 12px; }
+.m-photo-add {
+  width: 74px; height: 74px; border-radius: 10px; background: var(--fill); color: var(--ink2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  font-size: 11px; flex: none;
+}
+.m-photo-add svg { width: 18px; height: 18px; }
+
+/* Inline Topic Tags Row (Replaces OutlinedTextField) */
+.m-tags-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  margin-top: 14px; flex: none;
+}
+.m-tag-pill {
+  height: 30px; padding: 0 8px 0 11px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 550;
+}
+.m-tag-pill.req { padding-right: 11px; border: 1px solid var(--accent-soft-line); font-weight: 600; }
+.phone.dark .m-tag-pill.req { border-color: rgba(255, 255, 255, .14); }
+.m-tag-pill button {
+  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--accent-ink); opacity: .75;
+}
+.m-tag-pill button:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+.m-tag-pill svg { width: 12px; height: 12px; }
+.m-tag-add {
+  height: 30px; padding: 0 12px; border-radius: 99px;
+  background: var(--fill); color: var(--ink2);
+  display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500;
+}
+.m-tag-add:hover { color: var(--ink); }
+.m-tag-add svg { width: 13px; height: 13px; }
+
+/* Structured Fill Cards (Poll / Bounty / Work / Attachment) */
+.m-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; flex: none; }
+.m-card {
+  background: var(--fill); border-radius: 16px; padding: 13px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.m-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-card-title { font-size: 14px; font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+.m-card-title svg { width: 16px; height: 16px; color: var(--accent-ink); }
+.m-card-sub { font-size: 12px; color: var(--ink2); }
+.m-card-note { font-size: 12px; line-height: 17px; color: var(--ink2); }
+.m-card-note.bad { color: var(--danger); }
+
+.m-sublabel { font-size: 12px; color: var(--ink2); font-weight: 500; margin-top: 2px; }
+.m-chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.m-chip {
+  height: 32px; padding: 0 12px; border-radius: 10px;
+  background: var(--surface); color: var(--ink2); font-size: 13px; font-weight: 500;
+  border: 1px solid var(--hairline);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.m-chip.on {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: var(--accent-soft-line); font-weight: 600;
+}
+.phone.dark .m-chip.on { border-color: transparent; }
+
+.m-poll-opt {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border-radius: 10px; padding: 0 8px 0 12px; height: 40px;
+}
+.m-poll-opt input { flex: 1; min-width: 0; font-size: 14px; color: var(--ink); outline: none; }
+.m-poll-opt input::placeholder { color: var(--ink3); }
+.m-add-opt {
+  align-self: flex-start; height: 30px; padding: 0 11px; border-radius: 99px;
+  background: var(--surface); color: var(--ink2); font-size: 12.5px; font-weight: 550;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.m-add-opt svg { width: 13px; height: 13px; }
+
+.m-item-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 14px; background: var(--fill);
+}
+.m-item-ico {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--surface);
+  color: var(--accent-ink); display: grid; place-items: center; flex: none;
+}
+.m-item-ico svg { width: 18px; height: 18px; }
+.m-item-copy { flex: 1; min-width: 0; }
+.m-item-copy strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-item-copy small { display: block; font-size: 12px; color: var(--ink2); margin-top: 1px; }
+
+/* Single Playable V2 Work Card & 2-Tab Work Picker */
+.m-work-card {
+  background: var(--fill); border-radius: 16px; padding: 11px 12px;
+  display: flex; flex-direction: column; gap: 9px; flex: none;
+}
+.m-work-top { display: flex; align-items: center; gap: 10px; }
+.work-title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.work-title-line strong {
+  font-size: 13.5px; font-weight: 600; color: var(--w-ink, var(--ink));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.work-badge {
+  flex: none; padding: 1.5px 6px; border-radius: 5px;
+  font-size: 10.5px; font-weight: 650; line-height: 14px;
+  background: var(--w-accent-soft, var(--accent-soft));
+  color: var(--w-accent-ink, var(--accent-ink));
+}
+.work-acts { display: flex; align-items: center; gap: 4px; flex: none; }
+.work-act-btn {
+  height: 26px; padding: 0 8px; border-radius: 99px;
+  background: var(--w-surface, var(--surface)); color: var(--w-ink, var(--ink));
+  border: 1px solid var(--w-line, var(--hairline));
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.work-act-btn.primary { color: var(--w-accent-ink, var(--accent-ink)); }
+.work-act-btn:hover { filter: brightness(.97); }
+.work-act-btn svg { width: 10px; height: 10px; fill: currentColor; stroke: none; }
+.work-rights {
+  display: flex; align-items: center; gap: 7px; padding-top: 8px;
+  border-top: 0.5px solid var(--w-line, var(--hairline));
+  font-size: 11.5px; line-height: 16px; color: var(--w-ink2, var(--ink2)); cursor: pointer;
+}
+.work-rights input {
+  width: 14px; height: 14px; accent-color: var(--w-accent, var(--accent));
+  flex: none; cursor: pointer;
+}
+.work-rights.need { color: var(--w-danger, var(--danger)); font-weight: 550; }
+
+.work-picker-note { margin: 2px 0 8px; font-size: 12px; line-height: 16px; color: var(--ink3); }
+.work-dropzone {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 7px;
+  padding: 18px 14px; border-radius: 16px;
+  background: var(--fill); border: 1.5px dashed var(--line);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.work-dropzone:hover { border-color: var(--accent); }
+.work-drop-ico {
+  width: 40px; height: 40px; border-radius: 12px; background: var(--surface);
+  color: var(--accent-ink); display: grid; place-items: center;
+}
+.work-drop-ico svg { width: 20px; height: 20px; }
+.work-dropzone strong { font-size: 14px; font-weight: 650; color: var(--ink); }
+.work-dropzone small { font-size: 12px; line-height: 17px; color: var(--ink2); max-width: 320px; }
+.work-fmt-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 2px; }
+.work-fmt-pill {
+  padding: 2px 7px; border-radius: 99px; background: var(--surface);
+  border: 0.5px solid var(--hairline); font-size: 11px; font-weight: 600; color: var(--ink2);
+}
+.work-err {
+  margin-top: 10px; padding: 8px 11px; border-radius: 10px;
+  background: var(--danger-soft, rgba(227, 32, 60, .12)); color: var(--danger);
+  font-size: 12px; line-height: 17px; font-weight: 550;
+}
+.work-demo-label { margin-top: 14px; margin-bottom: 7px; font-size: 11.5px; font-weight: 600; color: var(--ink3); }
+.work-demo-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.m-notice-pill {
+  margin-top: 12px; padding: 8px 12px; border-radius: 12px;
+  background: var(--fill); color: var(--ink2); font-size: 12px; line-height: 17px;
+}
+
+/* Mobile Single-Row Sticky Bottom Toolbar (48px) */
+.m-toolbar {
+  flex: none; height: 48px; padding: 0 10px 0 8px;
+  border-top: 0.5px solid var(--hairline); background: var(--surface);
+  display: flex; align-items: center; gap: 2px;
+}
+.m-tool {
+  position: relative; width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink2); flex: none;
+}
+.m-tool:hover { background: var(--fill); color: var(--ink); }
+.m-tool.on { color: var(--accent-ink); }
+.m-tool svg { width: 20px; height: 20px; }
+.m-tool-badge {
+  position: absolute; top: 5px; right: 4px; min-width: 14px; height: 14px;
+  padding: 0 3.5px; border-radius: 99px; background: var(--accent); color: var(--accent-on);
+  font-size: 9.5px; font-weight: 700; line-height: 14px; text-align: center;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.m-tool-spacer { flex: 1; min-width: 4px; }
+.m-status-text {
+  font-size: 12px; color: var(--ink3); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 156px; margin-right: 2px;
+}
+.m-status-text.bad { color: var(--danger); font-weight: 500; }
+.m-info-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink3); flex: none;
+}
+.m-info-btn:hover, .m-info-btn.on { background: var(--fill); color: var(--ink); }
+.m-info-btn svg { width: 17px; height: 17px; }
+
+.home-bar { flex: none; height: 16px; display: grid; place-items: center; background: var(--surface); }
+.home-bar::after { content: ""; width: 94px; height: 4px; border-radius: 99px; background: var(--ink); opacity: .22; }
+.home-bar.kb { background: var(--kb-bg); }
+
+/* Soft Keyboard */
+.kb-wrap {
+  flex: none; background: var(--kb-bg); padding: 4px 5px 4px;
+  border-top: 0.5px solid var(--hairline);
+}
+.kb-suggest { display: grid; grid-template-columns: repeat(3, 1fr); height: 30px; margin-bottom: 4px; }
+.kb-suggest button { font-size: 12px; color: var(--kb-ink); opacity: .82; }
+.kb-suggest button + button { border-left: 1px solid rgba(128, 128, 128, .22); }
+.kb-row { display: flex; justify-content: center; gap: 4px; margin-bottom: 5px; }
+.kb-row:last-child { margin-bottom: 0; }
+.kb-key {
+  flex: 1; height: 35px; border-radius: 6px; background: var(--kb-key);
+  color: var(--kb-ink); font-size: 15px; font-weight: 450;
+  display: grid; place-items: center; box-shadow: 0 1px 0 rgba(0, 0, 0, .2);
+}
+.kb-key.alt { flex: 1.45; background: var(--kb-key-alt); font-size: 12px; font-weight: 550; }
+.kb-key.space { flex: 4.5; font-size: 12px; color: var(--ink2); }
+
+/* Mobile Overlays: BottomSheet & CenterDialog */
+.m-mask {
+  position: absolute; inset: 0; z-index: 10; background: rgba(0, 0, 0, .42);
+  display: flex; align-items: flex-end;
+}
+.m-mask.center { align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, .36); }
+.m-sheet {
+  width: 100%; max-height: 78%; background: var(--surface);
+  border-radius: 20px 20px 0 0; box-shadow: var(--sheet-shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+  padding: 0 16px 20px;
+}
+.m-handle { width: 32px; height: 4px; border-radius: 99px; background: var(--line); margin: 10px auto 6px; flex: none; }
+.m-sheet-head { display: flex; align-items: center; justify-content: space-between; min-height: 44px; flex: none; }
+.m-sheet-head h3 { font-size: 17px; font-weight: 650; }
+.m-sheet-scroll { overflow-y: auto; scrollbar-width: none; padding-top: 6px; }
+.m-sheet-scroll::-webkit-scrollbar { display: none; }
+
+/* Segmented Track inside Sheet / Cover Editor */
+.m-seg-track {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 3px; border-radius: 12px; background: var(--fill); gap: 3px; flex: none;
+}
+.m-seg-track button {
+  height: 32px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--ink2);
+}
+.m-seg-track button.on {
+  background: var(--surface); color: var(--ink); font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+.m-board-opt {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 13px 6px; text-align: left; border-radius: 12px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.m-board-opt:last-child { border-bottom: 0; }
+.m-board-opt:hover:not(:disabled) { background: var(--paper); }
+.m-board-opt-copy { flex: 1; min-width: 0; }
+.m-board-opt-copy strong { display: block; font-size: 15px; font-weight: 600; color: var(--ink); }
+.m-board-opt-copy small { display: block; font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.m-board-opt:disabled strong { color: var(--ink3); }
+.m-board-opt.on strong { color: var(--accent-ink); }
+.m-board-opt svg { width: 17px; height: 17px; }
+.m-board-opt-badge { font-size: 12px; color: var(--ink3); flex: none; }
+
+/* Compact 3-Column Board Grid (for real 14–16 boards) */
+.m-sec-cnt { font-size: 11px; opacity: .7; margin-left: 3px; font-weight: 500; }
+.m-board-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  padding: 2px 0 4px;
+}
+.m-board-tile {
+  height: 40px; padding: 0 6px; border-radius: 10px;
+  background: var(--fill); color: var(--ink);
+  border: 1px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 13px; font-weight: 550; min-width: 0;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.m-board-tile:hover:not(:disabled) { filter: brightness(.97); }
+.m-board-tile.on {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: var(--accent-soft-line); font-weight: 650;
+}
+.phone.dark .m-board-tile.on { border-color: rgba(255, 255, 255, .14); }
+.m-board-tile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-board-badge {
+  font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 4px;
+  background: var(--surface); color: var(--ink3); font-weight: 600; flex: none;
+}
+.m-board-tile.on .m-board-badge { background: rgba(255, 255, 255, .65); color: var(--accent-ink); }
+.phone.dark .m-board-tile.on .m-board-badge { background: rgba(0, 0, 0, .25); }
+.m-board-desc {
+  margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--fill);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex: none;
+}
+.m-board-desc-copy { flex: 1; min-width: 0; }
+.m-board-desc-copy strong { display: block; font-size: 13px; font-weight: 650; color: var(--ink); }
+.m-board-desc-copy small { display: block; margin-top: 2px; font-size: 12px; line-height: 17px; color: var(--ink2); }
+.m-board-rule {
+  flex: none; padding: 2px 7px; border-radius: 99px; background: var(--surface);
+  color: var(--accent-ink); font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+
+.m-sheet-act {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 11px 4px; text-align: left; border-radius: 12px;
+}
+.m-sheet-act:hover { background: var(--paper); }
+.m-act-box {
+  width: 44px; height: 44px; border-radius: 14px; background: var(--fill);
+  color: var(--ink); display: grid; place-items: center; flex: none; overflow: hidden;
+}
+.m-act-box svg { width: 21px; height: 21px; }
+.m-act-copy { flex: 1; min-width: 0; }
+.m-act-copy strong { display: block; font-size: 15px; font-weight: 600; color: var(--ink); }
+.m-act-copy small { display: block; font-size: 12px; color: var(--ink2); margin-top: 2px; }
+
+.m-sample-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.m-sample-tile {
+  aspect-ratio: 3/4; border-radius: 12px; overflow: hidden; position: relative;
+  border: 2px solid transparent;
+}
+.m-sample-tile:hover { border-color: var(--accent); }
+.m-sample-tile svg { width: 100%; height: 100%; display: block; }
+.m-sample-tile span {
+  position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 99px;
+  background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; font-weight: 500;
+}
+
+.m-tag-input-row {
+  display: flex; align-items: center; gap: 8px; margin: 6px 0 12px;
+}
+.m-tag-input-row input {
+  flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: 10px;
+  background: var(--fill); font-size: 14px; color: var(--ink); outline: none;
+}
+.m-tag-input-row button {
+  height: 40px; padding: 0 16px; border-radius: 99px;
+  background: var(--accent); color: var(--accent-on); font-size: 13.5px; font-weight: 600;
+}
+.m-tag-input-row button:disabled { background: var(--fill); color: var(--ink3); }
+
+/* Center Dialog */
+.m-dialog {
+  width: 100%; max-width: 310px; background: var(--surface); border-radius: 20px;
+  padding: 20px 18px 16px; box-shadow: 0 16px 44px rgba(0, 0, 0, .25);
+}
+.m-dialog h3 { font-size: 17px; font-weight: 650; }
+.m-dialog p { margin-top: 6px; font-size: 13.5px; line-height: 20px; color: var(--ink2); }
+.m-dialog-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.m-btn-primary {
+  height: 44px; border-radius: 99px; background: var(--accent); color: var(--accent-on);
+  font-size: 14.5px; font-weight: 600;
+}
+.m-btn-ghost {
+  height: 44px; border-radius: 99px; background: var(--fill); color: var(--ink);
+  font-size: 14.5px; font-weight: 550;
+}
+.m-btn-ghost.danger { color: var(--danger); }
+
+/* Full-screen Text Cover Editor */
+.m-cover-editor {
+  position: absolute; inset: 0; z-index: 12; background: var(--surface);
+  display: flex; flex-direction: column;
+}
+.m-ce-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 22px;
+  scrollbar-width: none; display: flex; flex-direction: column; gap: 16px;
+}
+.m-ce-scroll::-webkit-scrollbar { display: none; }
+.m-ce-stage {
+  height: 214px; border-radius: 16px; background: var(--fill);
+  display: grid; place-items: center; padding: 12px; flex: none;
+}
+.m-ce-preview { height: 100%; aspect-ratio: 3/4; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+.m-ce-preview.sq { aspect-ratio: 1/1; }
+.m-ce-preview svg { width: 100%; height: 100%; display: block; }
+.m-ce-tpls { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; flex: none; }
+.m-ce-tpls::-webkit-scrollbar { display: none; }
+.m-ce-tpl { width: 66px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.m-ce-tpl-thumb {
+  width: 66px; aspect-ratio: 3/4; border-radius: 9px; overflow: hidden;
+  border: 2px solid transparent; background: var(--fill);
+}
+.m-ce-tpl.on .m-ce-tpl-thumb { border-color: var(--accent); }
+.m-ce-tpl-thumb svg { width: 100%; height: 100%; display: block; }
+.m-ce-tpl span { font-size: 11px; color: var(--ink2); white-space: nowrap; }
+.m-ce-tpl.on span { color: var(--accent-ink); font-weight: 600; }
+
+/* Tightly Grouped Form Fields (Fixes counter detachment) */
+.m-field-group { display: flex; flex-direction: column; gap: 6px; }
+.m-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-field-head label { font-size: 13px; font-weight: 600; color: var(--ink2); }
+.m-field-head span { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.m-field-box {
+  width: 100%; border-radius: 10px; background: var(--fill);
+  padding: 10px 12px; font-size: 14.5px; line-height: 21px; color: var(--ink);
+  outline: none; resize: none;
+}
+.m-field-box::placeholder { color: var(--ink3); }
+
+/* Toast */
+.m-toast {
+  position: absolute; left: 50%; bottom: 68px; transform: translateX(-50%); z-index: 20;
+  padding: 8px 14px; border-radius: 99px; background: rgba(24, 26, 32, .88);
+  color: #fff; font-size: 12.5px; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+}
+
+/* ─── Web View (PC Modal + H5 Drawer) ─── */
+.web-boards {
+  display: grid; grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 24px; align-items: start;
+}
+.web-pc-board { min-width: 0; }
+.web-h5-board { width: 390px; }
+
+.web-scope {
+  --w-paper: #f2f5fa;
+  --w-surface: #ffffff;
+  --w-surface2: #ebeff7;
+  --w-fill: #f2f4f8;
+  --w-ink: #111827;
+  --w-ink2: #475569;
+  --w-ink3: #627187;
+  --w-line: rgba(15, 23, 42, .08);
+  --w-line-strong: rgba(15, 23, 42, .16);
+  --w-accent: #E3203C;
+  --w-accent-soft: #FFF3F4;
+  --w-accent-ink: #E3203C;
+  --w-accent-on: #FFFFFF;
+  --w-danger: #B42A33;
+  --w-shadow: 0 24px 60px -18px rgba(15, 23, 42, .22), 0 0 0 1px rgba(15, 23, 42, .06);
+  color: var(--w-ink);
+}
+.web-scope.dark {
+  color-scheme: dark;
+  --w-paper: #0f1219;
+  --w-surface: #191f2c;
+  --w-surface2: #232a3b;
+  --w-fill: #232a3b;
+  --w-ink: #f8fafc;
+  --w-ink2: #cbd5e1;
+  --w-ink3: #9aa8bc;
+  --w-line: rgba(255, 255, 255, .10);
+  --w-line-strong: rgba(255, 255, 255, .20);
+  --w-danger: #ff9da4;
+  --w-shadow: 0 28px 70px -18px rgba(0, 0, 0, .62), 0 0 0 1px rgba(255, 255, 255, .09);
+}
+
+/* Browser Stage Backdrop */
+.w-browser {
+  border-radius: 22px; overflow: hidden; background: var(--w-paper);
+  border: 1px solid var(--w-line-strong);
+  box-shadow: 0 20px 54px rgba(15, 18, 25, .12);
+}
+.w-chrome {
+  height: 36px; padding: 0 14px; background: var(--w-surface);
+  border-bottom: 1px solid var(--w-line);
+  display: flex; align-items: center; gap: 10px;
+}
+.w-dots { display: flex; gap: 6px; }
+.w-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--w-line-strong); display: block; }
+.w-url {
+  flex: 1; max-width: 320px; height: 22px; margin: 0 auto; border-radius: 99px;
+  background: var(--w-fill); color: var(--w-ink3); font-size: 11px;
+  display: grid; place-items: center;
+}
+.w-backdrop {
+  position: relative; padding: 24px 24px 28px; min-height: 752px;
+  background:
+    radial-gradient(64% 40% at 18% 0%, color-mix(in srgb, var(--w-accent) 10%, transparent), transparent 72%),
+    radial-gradient(52% 32% at 88% 4%, color-mix(in srgb, var(--w-accent) 7%, transparent), transparent 70%),
+    var(--w-paper);
+  display: flex; align-items: center; justify-content: center;
+}
+.w-backdrop::before {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(15, 23, 42, .22); pointer-events: none;
+}
+.web-scope.dark .w-backdrop::before { background: rgba(0, 0, 0, .48); }
+
+/* Web PC Modal */
+.w-modal {
+  position: relative; z-index: 1; width: 100%; max-width: 820px; height: 696px;
+  background: var(--w-surface); border-radius: 20px; box-shadow: var(--w-shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.w-m-head {
+  flex: none; height: 58px; padding: 0 18px 0 22px;
+  border-bottom: 1px solid var(--w-line);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.w-m-head-l { display: flex; align-items: center; gap: 10px; min-width: 0; position: relative; }
+.w-m-head-r { display: flex; align-items: center; gap: 10px; flex: none; }
+
+.w-board-btn {
+  height: 34px; padding: 0 13px; border-radius: 99px; background: var(--w-fill);
+  color: var(--w-ink); display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 600;
+}
+.w-board-btn:hover { filter: brightness(.97); }
+.w-board-btn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--w-accent); }
+.w-board-btn svg { width: 14px; height: 14px; color: var(--w-ink3); }
+
+.w-casual-badge {
+  height: 22px; padding: 0 8px; border-radius: 99px;
+  background: var(--w-accent-soft); color: var(--w-accent-ink);
+  font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;
+}
+
+.w-mode-seg {
+  display: inline-flex; padding: 3px; border-radius: 99px; background: var(--w-fill); gap: 2px;
+}
+.w-mode-seg button {
+  height: 26px; padding: 0 12px; border-radius: 99px; font-size: 12.5px;
+  font-weight: 550; color: var(--w-ink2);
+}
+.w-mode-seg button.on {
+  background: var(--w-surface); color: var(--w-ink); font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .09);
+}
+.w-close {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--w-ink2);
+}
+.w-close:hover:not(:disabled) { background: var(--w-fill); color: var(--w-ink); }
+.w-close:disabled { opacity: .45; }
+.w-close svg { width: 17px; height: 17px; }
+
+/* Cascading Board Popover */
+.w-popover {
+  position: absolute; z-index: 20; background: var(--w-surface);
+  border-radius: 16px; border: 1px solid var(--w-line-strong);
+  box-shadow: 0 18px 46px -10px rgba(0, 0, 0, .24);
+}
+.w-board-pop {
+  top: calc(100% + 8px); left: 0; width: 516px; max-width: calc(100vw - 48px);
+  display: grid; grid-template-columns: 120px minmax(0, 1fr); overflow: hidden;
+}
+.w-pop-secs {
+  background: var(--w-fill); padding: 8px; display: flex; flex-direction: column; gap: 4px;
+  border-right: 1px solid var(--w-line);
+}
+.w-pop-sec {
+  height: 36px; padding: 0 10px; border-radius: 10px; text-align: left;
+  font-size: 13px; font-weight: 550; color: var(--w-ink2); white-space: nowrap;
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+}
+.w-pop-sec-l { display: inline-flex; align-items: center; gap: 5px; }
+.w-pop-sec-cnt { font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
+.w-pop-sec svg { width: 14px; height: 14px; opacity: .6; }
+.w-pop-sec.on { background: var(--w-surface); color: var(--w-accent-ink); font-weight: 650; box-shadow: 0 1px 3px rgba(0, 0, 0, .07); }
+.w-pop-right { display: flex; flex-direction: column; min-width: 0; }
+.w-pop-boards {
+  padding: 10px; max-height: 256px; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px;
+  align-content: start;
+  scrollbar-width: thin; scrollbar-color: var(--w-line-strong) transparent;
+}
+.w-pop-tile {
+  height: 36px; padding: 0 8px; border-radius: 9px;
+  background: var(--w-fill); color: var(--w-ink);
+  border: 1px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 12.5px; font-weight: 550; min-width: 0;
+}
+.w-pop-tile:hover:not(:disabled) { filter: brightness(.97); }
+.w-pop-tile.on { background: var(--w-accent-soft); color: var(--w-accent-ink); font-weight: 650; }
+.w-pop-tile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-pop-badge {
+  font-size: 10px; padding: 0 4px; border-radius: 4px;
+  background: var(--w-surface); color: var(--w-ink3); font-weight: 600; flex: none;
+}
+.w-pop-tile.on .w-pop-badge { color: var(--w-accent-ink); }
+.w-pop-foot {
+  padding: 9px 12px; border-top: 1px solid var(--w-line);
+  background: color-mix(in srgb, var(--w-fill) 45%, var(--w-surface));
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.w-pop-foot small { font-size: 11.5px; color: var(--w-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-pop-foot .w-casual-badge { flex: none; }
+
+/* Slim Toolbar */
+.w-toolbar {
+  flex: none; padding: 7px 20px; border-bottom: 1px solid var(--w-line);
+  background: color-mix(in srgb, var(--w-fill) 55%, var(--w-surface));
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.w-tbtn {
+  height: 32px; padding: 0 9px; border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 550; color: var(--w-ink2); white-space: nowrap;
+}
+.w-tbtn:hover { background: var(--w-surface); color: var(--w-ink); }
+.w-tbtn.on { background: var(--w-accent-soft); color: var(--w-accent-ink); font-weight: 600; }
+.w-tbtn svg { width: 15px; height: 15px; }
+.w-tdiv { width: 1px; height: 18px; background: var(--w-line-strong); margin: 0 4px; flex: none; }
+
+/* Web Modal Body */
+.w-m-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 20px 26px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+  scrollbar-width: thin; scrollbar-color: var(--w-line-strong) transparent;
+}
+.w-m-body::-webkit-scrollbar, .w-pop-boards::-webkit-scrollbar { width: 6px; }
+.w-m-body::-webkit-scrollbar-track, .w-pop-boards::-webkit-scrollbar-track { background: transparent; }
+.w-m-body::-webkit-scrollbar-thumb, .w-pop-boards::-webkit-scrollbar-thumb {
+  background: var(--w-line-strong); border-radius: 99px;
+}
+.w-title-row { display: flex; align-items: flex-start; gap: 10px; flex: none; }
+.w-title-input {
+  flex: 1; min-width: 0; font-size: 22px; line-height: 30px; font-weight: 700;
+  color: var(--w-ink); outline: none; background: transparent;
+  resize: none; overflow: hidden; display: block; width: 100%;
+}
+.w-title-input::placeholder { color: var(--w-ink3); font-weight: 600; }
+.w-title-row .w-count { margin-top: 7px; }
+.w-count { font-size: 12px; color: var(--w-ink3); font-variant-numeric: tabular-nums; flex: none; }
+.w-count.bad { color: var(--w-danger); font-weight: 600; }
+.w-div { height: 1px; background: var(--w-line); flex: none; }
+
+.w-editor-input {
+  width: 100%; min-height: 140px; resize: none; outline: none;
+  font-size: 15px; line-height: 1.75; color: var(--w-ink); background: transparent;
+}
+.w-editor-input::placeholder { color: var(--w-ink3); }
+
+/* Web Tag Row */
+.w-tags-box { display: flex; flex-direction: column; gap: 8px; }
+.w-tags-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 12px; background: var(--w-fill);
+  border: 1.5px solid transparent; transition: border-color .15s, background .15s;
+}
+.w-tags-line:focus-within { border-color: var(--w-accent); background: var(--w-surface); }
+.w-tag-pill {
+  height: 26px; padding: 0 7px 0 10px; border-radius: 99px;
+  background: var(--w-accent-soft); color: var(--w-accent-ink);
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600;
+}
+.w-tag-pill.req { padding-right: 10px; }
+.w-tag-pill button { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; color: var(--w-accent-ink); }
+.w-tag-pill svg { width: 11px; height: 11px; }
+.w-tag-in { flex: 1; min-width: 150px; height: 26px; font-size: 13px; color: var(--w-ink); outline: none; }
+.w-tag-in::placeholder { color: var(--w-ink3); }
+.w-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.w-presets span { font-size: 12px; color: var(--w-ink3); margin-right: 2px; }
+.w-preset {
+  height: 26px; padding: 0 10px; border-radius: 99px; background: var(--w-fill);
+  color: var(--w-ink2); font-size: 12px; font-weight: 550;
+}
+.w-preset.on { background: var(--w-accent-soft); color: var(--w-accent-ink); }
+
+/* Web Structured Cards */
+.w-card {
+  background: var(--w-fill); border-radius: 16px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 11px;
+}
+.w-chip {
+  height: 30px; padding: 0 11px; border-radius: 9px;
+  background: var(--w-surface); border: 1px solid var(--w-line);
+  color: var(--w-ink2); font-size: 12.5px; font-weight: 550;
+}
+.w-chip.on {
+  background: var(--w-accent-soft); border-color: transparent;
+  color: var(--w-accent-ink); font-weight: 650;
+}
+.w-att-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 12px; background: var(--w-surface); border: 1px solid var(--w-line);
+}
+.w-att-copy { flex: 1; min-width: 0; }
+.w-att-copy strong { display: block; font-size: 13px; font-weight: 600; color: var(--w-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-att-copy small { display: block; font-size: 11.5px; color: var(--w-ink3); }
+.w-price-box {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--w-ink2); flex: none;
+}
+.w-price-box input {
+  width: 48px; height: 28px; padding: 0 6px; border-radius: 7px; text-align: center;
+  background: var(--w-fill); border: 1px solid var(--w-line-strong); font-size: 12.5px; color: var(--w-ink);
+}
+
+/* Web Preview Prose */
+.w-preview { display: flex; flex-direction: column; gap: 14px; }
+.w-preview h2 { font-size: 23px; line-height: 1.35; font-weight: 700; }
+.w-preview-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--w-ink3); }
+.w-preview-prose { font-size: 15px; line-height: 1.8; color: var(--w-ink); }
+.w-preview-prose p { margin: 0 0 12px; }
+.w-preview-prose pre {
+  margin: 0 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--w-fill);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; overflow-x: auto;
+}
+.w-preview-prose code {
+  padding: 2px 6px; border-radius: 5px; background: var(--w-fill);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+}
+.w-preview-prose pre code { padding: 0; background: none; }
+.w-preview-prose ul { margin: 0 0 12px; padding-left: 20px; }
+
+/* Web Footer + Upward Read-Level Popover */
+.w-m-foot {
+  flex: none; padding: 12px 22px; border-top: 1px solid var(--w-line);
+  background: var(--w-surface); display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.w-foot-l { display: flex; align-items: center; gap: 12px; position: relative; min-width: 0; }
+.w-foot-r { display: flex; align-items: center; gap: 10px; flex: none; }
+
+.w-vis-btn {
+  height: 34px; padding: 0 12px; border-radius: 99px; background: var(--w-fill);
+  color: var(--w-ink2); display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 550;
+}
+.w-vis-btn:hover { color: var(--w-ink); }
+.w-vis-btn svg { width: 14px; height: 14px; }
+.w-vis-pop {
+  bottom: calc(100% + 8px); left: 0; width: 256px; padding: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.w-vis-opt {
+  padding: 8px 10px; border-radius: 10px; text-align: left;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.w-vis-opt:hover:not(:disabled) { background: var(--w-fill); }
+.w-vis-opt.on { background: var(--w-accent-soft); }
+.w-vis-opt strong { display: block; font-size: 13px; font-weight: 600; color: var(--w-ink); }
+.w-vis-opt.on strong { color: var(--w-accent-ink); }
+.w-vis-opt small { display: block; font-size: 11px; color: var(--w-ink3); }
+
+.w-btn-ghost {
+  height: 38px; padding: 0 16px; border-radius: 99px;
+  font-size: 13.5px; font-weight: 550; color: var(--w-ink2);
+}
+.w-btn-ghost:hover { background: var(--w-fill); color: var(--w-ink); }
+.w-btn-primary {
+  height: 38px; padding: 0 22px; border-radius: 99px;
+  background: var(--w-accent); color: var(--w-accent-on);
+  font-size: 13.5px; font-weight: 600;
+}
+.w-btn-primary:disabled { background: var(--w-fill); color: var(--w-ink3); }
+
+/* In-modal Confirmation Overlay */
+.w-confirm-mask {
+  position: absolute; inset: 0; z-index: 30; background: rgba(0, 0, 0, .35);
+  display: grid; place-items: center; padding: 20px;
+}
+.w-confirm-box {
+  width: 100%; max-width: 340px; border-radius: 18px; background: var(--w-surface);
+  padding: 20px; box-shadow: var(--w-shadow);
+}
+.w-confirm-box h3 { font-size: 16px; font-weight: 700; }
+.w-confirm-box p { margin-top: 6px; font-size: 13px; color: var(--w-ink2); }
+.w-confirm-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+.w-work-card {
+  background: var(--w-fill); border-radius: 16px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 9px; flex: none;
+}
+.w-work-row { display: flex; align-items: center; gap: 10px; }
+.w-work-dialog {
+  width: 100%; max-width: 500px; border-radius: 20px; background: var(--w-surface);
+  padding: 18px 20px 20px; box-shadow: var(--w-shadow);
+  display: flex; flex-direction: column; max-height: 84%;
+  --surface: var(--w-surface); --paper: var(--w-paper); --fill: var(--w-fill);
+  --ink: var(--w-ink); --ink2: var(--w-ink2); --ink3: var(--w-ink3);
+  --hairline: var(--w-line); --line: var(--w-line-strong);
+  --accent: var(--w-accent); --accent-soft: var(--w-accent-soft);
+  --accent-ink: var(--w-accent-ink); --danger: var(--w-danger);
+  --danger-soft: color-mix(in srgb, var(--w-danger) 12%, transparent);
+}
+.w-work-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex: none; }
+.w-work-dialog-head h3 { font-size: 16px; font-weight: 700; color: var(--w-ink); }
+
+/* Web H5 Drawer Phone */
+.h5-stage {
+  flex: 1; min-height: 0; position: relative; background: var(--w-paper);
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.h5-bg-hint {
+  position: absolute; inset: 0; padding: 14px 16px; opacity: .45; pointer-events: none;
+}
+.h5-bg-card { height: 74px; border-radius: 14px; background: var(--w-surface); margin-bottom: 10px; }
+.h5-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .38); }
+.h5-drawer {
+  position: relative; z-index: 2; height: 93%; background: var(--w-surface);
+  border-radius: 20px 20px 0 0; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, .18);
+}
+.h5-head {
+  flex: none; padding: 10px 12px 10px 14px; border-bottom: 1px solid var(--w-line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.h5-tbar {
+  flex: none; padding: 6px 12px; border-bottom: 1px solid var(--w-line);
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+}
+.h5-tbar::-webkit-scrollbar { display: none; }
+.h5-tbtn {
+  height: 36px; padding: 0 11px; border-radius: 10px; background: var(--w-fill);
+  color: var(--w-ink2); display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 550; flex: none;
+}
+.h5-tbtn.on { background: var(--w-accent-soft); color: var(--w-accent-ink); font-weight: 600; }
+.h5-tbtn svg { width: 15px; height: 15px; }
+.h5-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 18px;
+  scrollbar-width: none; display: flex; flex-direction: column; gap: 12px;
+}
+.h5-body::-webkit-scrollbar { display: none; }
+.h5-input-16 { font-size: 16px !important; line-height: 24px !important; }
+.h5-foot {
+  flex: none; padding: 10px 14px 12px; border-top: 1px solid var(--w-line);
+  background: var(--w-surface); display: flex; flex-direction: column; gap: 9px;
+}
+.h5-foot-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: relative; }
+.h5-foot-btns { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+
+/* Notes Footer */
+.prototype-notes {
+  margin: 26px 0 4px; padding-top: 16px; border-top: 1px solid rgba(128, 128, 128, .22);
+  color: #6b6e75; font-size: 12px; line-height: 1.7;
+}
+body.studio-dark .prototype-notes { color: #9497a0; }
+.prototype-notes strong { color: inherit; font-weight: 650; }
+
+/* Responsive Collapsing */
+@media (max-width: 1280px) {
+  .mobile-boards .board { display: none; }
+  .mobile-boards .board.visible { display: block; }
+  .web-boards { grid-template-columns: 1fr; justify-items: center; }
+  .web-boards .web-pc-board, .web-boards .web-h5-board { display: none; width: 100%; max-width: 820px; }
+  .web-boards .web-h5-board { max-width: 390px; }
+  .web-boards .visible { display: block; }
+  .board-tabs { display: flex; justify-content: center; }
+}
+@media (max-width: 720px) {
+  .studio { padding: 14px 12px 32px; }
+  .w-backdrop { padding: 10px; min-height: 620px; }
+  .w-modal { height: 640px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>发帖页 · 手机端 &amp; 网页版 UI 设计稿</h1>
+      <p>写作优先层级 · 消灭白底隐身胶囊与输入框硬边框 · 统一附件/作品/投票卡片 · 支持双端明暗与 6 套主题色</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="平台切换">
+        <button type="button" data-platform="mobile" class="active">手机端</button>
+        <button type="button" data-platform="web">网页版</button>
+      </div>
+      <div class="seg" id="width-control" role="group" aria-label="手机宽度">
+        <button type="button" data-width="390" class="active">390px</button>
+        <button type="button" data-width="360">360px</button>
+      </div>
+      <div class="seg" role="group" aria-label="外观模式">
+        <button type="button" data-theme="light" class="active">浅色</button>
+        <button type="button" data-theme="dark">深色</button>
+      </div>
+      <div class="swatches" id="swatches" role="group" aria-label="主题色"></div>
+      <button type="button" class="pill-btn" id="reset-btn">重置</button>
+    </div>
+  </header>
+
+  <nav class="board-tabs" id="board-tabs" aria-label="画板切换"></nav>
+
+  <main id="stage"></main>
+
+  <footer class="prototype-notes">
+    <strong>真实板块来源与设计对照：</strong>
+    板块清单同步自 <code>services/server-forum/editorial/channels.json</code>、<code>communityStructure.ts</code>、<code>postingStructure.ts</code> 与 <code>ForumCategories.kt</code>（一级栏目：创意 / 讨论 / 资源）。
+    <strong>手机端</strong>（对应 <code>ComposeScreens.kt</code> / <code>ForumUploadControls.kt</code> / <code>ForumCoverEditor.kt</code>）：① 创意含 14 项细分板块、讨论含 16 项、资源含 2 项（默认、影视），采用「一级分段槽 + 3 列紧凑网格 + 底部规则说明」收纳；② 去除顶栏底线，禁用「发布」改用浅灰底配次要文字；③ 用单行元信息条替代堆叠 <code>OutlinedTextField</code>，话题胶囊收进正文下方；④ 统一「作品」为<strong>每帖限 1 个可运行 V2 作品</strong>（支持上传 V2 ZIP、上传 <code>.html/.htm</code> 自动转为 V2 容器，或关联我的创作，并与普通可下载附件卡片区隔），底栏收紧为固定 48px 单行图标条；⑤ 投票芯片置于 <code>--fill</code> 卡片内避免白底隐身。
+    <br>
+    <strong>网页版</strong>（对应 <code>TopicComposer.vue</code> / <code>MarkdownEditor.vue</code>）：① 按 <code>postingStructure.ts</code> 规则展示真实板块（创意「默认」、讨论 16 项含「设计 / 3D」自动附带必选话题、资源 2 项）；② 级联板块菜单采用左栏分节 + 右侧 3 列网格与规则条；③ 精简编辑器工具条并接入双标签「添加作品」弹窗/H5 抽屉（统一 <code>.zip</code> V2 / <code>.html/.htm</code> 自动转 V2 / 我的创作），H5 窄屏接入真实底部板块选择面板与 16px 防缩放字号。
+    <br>
+    <em>双端现状差异备注：当前线上代码中，网页端创意发帖只开放「默认」、讨论已隐藏 6 个旧休闲子栏并加入「设计 / 3D」话题虚拟板块，且新传作品包目前在「分享已有作品」弹窗（<code>PackPublishDialog.vue</code>）单独发起；本设计稿在发帖页内把「上传 V2 ZIP / HTML·HTM 转 V2 / 关联创作」合入同一单选「作品」入口，手机端 <code>ForumCategories.kt</code> 板块差异亦保留真实对照，后续落地代码时按此统一。</em>
+  </footer>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red', name: '小伴红', light: { btn: '#E3203C', hi: '#F0506A', soft: '#FFF3F4', line: '#F5C7CD', ink: '#E3203C', on: '#FFFFFF' }, dark: { btn: '#EE4B5F', hi: '#F76B7D', soft: '#3A2225', line: '#5A2B33', ink: '#FF8C91', on: '#FFFFFF' } },
+  { id: 'green', name: '薄荷绿', light: { btn: '#2E8B5E', hi: '#3FA172', soft: '#E3F2E9', line: '#B9DEC9', ink: '#1E6A45', on: '#FFFFFF' }, dark: { btn: '#34A36D', hi: '#48B981', soft: '#1D3328', line: '#2B4C3B', ink: '#72D6A2', on: '#FFFFFF' } },
+  { id: 'blue', name: '海湾蓝', light: { btn: '#2F6FDB', hi: '#4A84E6', soft: '#E6EEFC', line: '#C1D5F8', ink: '#1D53AE', on: '#FFFFFF' }, dark: { btn: '#3B7BE8', hi: '#5A92F0', soft: '#1E2A42', line: '#2E4066', ink: '#8DB6FF', on: '#FFFFFF' } },
+  { id: 'purple', name: '暮紫', light: { btn: '#7152D8', hi: '#8669E3', soft: '#EDE8FC', line: '#D1C4F7', ink: '#5537B8', on: '#FFFFFF' }, dark: { btn: '#8466E6', hi: '#9A80EE', soft: '#2A2342', line: '#3F3561', ink: '#BBA8FF', on: '#FFFFFF' } },
+  { id: 'amber', name: '琥珀', light: { btn: '#A8640C', hi: '#BD7A1C', soft: '#FAEEDB', line: '#EAD0A6', ink: '#87500A', on: '#FFFFFF' }, dark: { btn: '#C27A1A', hi: '#D69130', soft: '#3A2C17', line: '#564123', ink: '#F0B65A', on: '#FFFFFF' } },
+  { id: 'graphite', name: '石墨', light: { btn: '#2B2B30', hi: '#4A4A50', soft: '#E9E9EC', line: '#D0D0D5', ink: '#2B2B30', on: '#FFFFFF' }, dark: { btn: '#636368', hi: '#7C7C82', soft: '#3A3A3D', line: '#525256', ink: '#E5E5EA', on: '#FFFFFF' } },
+];
+
+const MOBILE_IDEAS_BOARDS = [
+  { key: 'ideas-uncategorized', name: '默认', desc: '未分类帖子', presets: ['创意想法', '原型交流'] },
+  { key: 'create-effect', name: '特效', desc: '分享特效的真实作品、使用方法和创作技巧', presets: ['粒子特效', '桌面特效', '参数调优'] },
+  { key: 'create-wallpaper', name: '壁纸', desc: '分享壁纸的真实作品、使用方法和创作技巧', presets: ['更新日志', '下载', '使用教程', '桌面版', '手机版', '动态壁纸', '桌宠'] },
+  { key: 'create-widget', name: '组件', desc: '分享组件的真实作品、使用方法和创作技巧', presets: ['桌面组件', '天气', '番茄钟', '自定义样式'] },
+  { key: 'create-game', name: '游戏', desc: '分享游戏的真实作品、使用方法和创作技巧', presets: ['更新日志', '新游戏', '玩法介绍', '攻略', '水墨剑客', '暮色滑翔'] },
+  { key: 'create-app', name: '应用', desc: '分享工具和测评应用的真实作品、使用方法和创作技巧', presets: ['小工具', '协议2', '应用推荐'] },
+  { key: 'create-reminder', name: '提醒', desc: '分享提醒的真实作品、使用方法和创作技巧', presets: ['日程提醒', '打卡'] },
+  { key: 'create-routine', name: '例行', desc: '分享例行的真实作品、使用方法和创作技巧', presets: ['每日例行', '自动化'] },
+  { key: 'create-task', name: '任务', desc: '分享任务的真实作品、使用方法和创作技巧', presets: ['任务清单', '习惯追踪'] },
+  { key: 'create-goal', name: '目标', desc: '分享目标的真实作品、使用方法和创作技巧', presets: ['目标管理', '复盘'] },
+  { key: 'create-skill', name: '技能', desc: '分享技能的真实作品、使用方法和创作技巧', presets: ['Skill', 'Agent技能'] },
+  { key: 'create-expert', name: '专家', desc: '分享专家的真实作品、使用方法和创作技巧', presets: ['专家角色', '提示词'] },
+  { key: 'create-workflow', name: '工作流', desc: '分享工作流的真实作品、使用方法和创作技巧', presets: ['工作流', '自动化'] },
+  { key: 'create-schemes', name: '方案', desc: '分享方案的真实作品、使用方法和创作技巧', presets: ['桌面方案', '全套搭配'] },
+];
+
+const WEB_IDEAS_BOARDS = [
+  { key: 'ideas-uncategorized', name: '默认', desc: '未分类帖子；具体作品包请通过「分享已有作品」上传', presets: ['创意想法', '小游戏', '壁纸', '桌面组件'] },
+];
+
+const DISCUSS_BOARDS = [
+  { key: 'discuss-uncategorized', name: '默认', desc: '未分类帖子', presets: ['日常交流', '小伴桌面', '经验分享'] },
+  { key: 'design', name: '设计', topicTag: '设计', desc: '发至默认板块并自动附带 #设计 话题', presets: ['UI原型', '设计规范', '图标', '配色'] },
+  { key: 'casual-games', name: '游戏', casual: true, desc: '聊游戏体验、攻略和联机约玩', presets: ['水墨剑客', '暮色滑翔', '独立游戏', '联机'] },
+  { key: '3d', name: '3D', topicTag: '3d', desc: '发至默认板块并自动附带 #3d 话题', presets: ['Three.js', '3D模型', '材质', '渲染'] },
+  { key: 'learn', name: '教程', desc: '交流学习经验和教程', presets: ['教程', 'Claude Code', '提示词', '工作流'] },
+  { key: 'casual-deals', name: '羊毛', desc: '分享免费额度、试用活动和限时优惠', presets: ['免费额度', '限时优惠', 'API福利'] },
+  { key: 'casual-travel', name: '旅行', casual: true, desc: '分享旅行路线、出行经验和旅途见闻', presets: ['出行攻略', '路线', '随手拍'] },
+  { key: 'casual-screen', name: '影视', casual: true, desc: '聊电影、剧集和动漫，分享观后感与推荐', presets: ['电影', '剧集', '动漫', '观后感'] },
+  { key: 'casual-feelings', name: '情感', casual: true, desc: '聊人际关系、情绪和个人成长', presets: ['成长', '心情', '人际关系'] },
+  { key: 'casual-food', name: '美食', casual: true, desc: '分享做饭、探店和日常饮食体验', presets: ['探店', '家常菜', '咖啡奶茶'] },
+  { key: 'casual-work', name: '职场', casual: true, desc: '围绕职场交流真实见闻与公开资料', presets: ['求职', '远程办公', '效率'] },
+  { key: 'site', name: '站务', desc: '查看站方公告和规则、提交建议反馈', presets: ['建议反馈', '规则讨论', '站点体验'] },
+  { key: 'casual-gear', name: '数码', casual: true, desc: '键盘、显示器、NAS', presets: ['键盘', '显示器', 'NAS', '桌搭'] },
+  { key: 'casual-indie', name: '副业', casual: true, desc: '围绕副业与独立开发交流真实见闻与公开资料', presets: ['独立开发', '小产品', '出海'] },
+  { key: 'casual-help', name: '互助', casual: true, desc: '日常的小事，互相帮个忙', presets: ['日常互助', '生活经验'] },
+  { key: 'casual-chat', name: '闲聊', casual: true, desc: '不进首页，不加积分', presets: ['摸鱼日常', '碎碎念'] },
+];
+
+const RESOURCES_BOARDS = [
+  { key: 'resources-uncategorized', name: '默认', desc: '未分类帖子', presets: ['资源整理', '工具合集'] },
+  { key: 'resource-movies', name: '影视', shareNotice: true, desc: '分享影视的合法来源、图文导读和使用方法', presets: ['片单推荐', '影评', '纪录片', '动画', '科幻', '悬疑', '喜剧', '经典老片', '公版', '授权', '4k', '美剧'] },
+];
+
+const MOBILE_SECTIONS = [
+  { key: 'ideas', name: '创意', boards: MOBILE_IDEAS_BOARDS },
+  { key: 'discuss', name: '讨论', boards: DISCUSS_BOARDS },
+  { key: 'resources', name: '资源', boards: RESOURCES_BOARDS },
+];
+
+const WEB_SECTIONS = [
+  { key: 'ideas', name: '创意', boards: WEB_IDEAS_BOARDS },
+  { key: 'discuss', name: '讨论', boards: DISCUSS_BOARDS },
+  { key: 'resources', name: '资源', boards: RESOURCES_BOARDS },
+];
+
+const WORKS_CATALOG = [
+  { id: 101, title: '极简番茄钟小组件', kind: '组件', version: 'v2.1', runtime: 'V2' },
+  { id: 102, title: '水墨剑客 · 试玩版', kind: '游戏', version: 'v1.4', runtime: 'V2' },
+  { id: 103, title: '柔软山丘动态壁纸', kind: '壁纸', version: 'v1.2', runtime: 'V2' },
+  { id: 104, title: '桌面毛玻璃天气卡片', kind: '组件', version: 'v1.0', runtime: 'V2' },
+];
+
+const WORK_UPLOAD_SAMPLES = [
+  { key: 'zip', label: '示例 V2 ZIP', source: 'upload', format: 'zip', converted: false, fileName: 'pomodoro-pet-v2.zip', title: '桌宠番茄钟 V2', kind: '组件', size: '1.2 MB', rightsAccepted: true },
+  { key: 'html', label: '示例 HTML → V2', source: 'upload', format: 'html', converted: true, fileName: 'pixel-piano.html', title: '像素电子琴', kind: '应用', size: '46 KB', rightsAccepted: true },
+  { key: 'htm', label: '示例 HTM → V2', source: 'upload', format: 'htm', converted: true, fileName: 'focus-timer.htm', title: '极简专注计时器', kind: '应用', size: '28 KB', rightsAccepted: true },
+];
+
+const READ_LEVELS = [
+  { level: 0, label: '所有人', desc: '游客与搜索引擎均可浏览' },
+  { level: 1, label: '成员以上', desc: '仅已升级成员及更高等级可见' },
+  { level: 2, label: '老用户以上', desc: '需要「老用户」及以上信任等级', disabled: true },
+  { level: 3, label: '守护者', desc: '仅守护者可见', disabled: true },
+];
+
+const COVER_TEMPLATES = [
+  { id: 'marker', label: '重点大字' },
+  { id: 'memo', label: '备忘便签' },
+  { id: 'notebook', label: '线圈手账' },
+  { id: 'pop', label: '醒目撞色' },
+  { id: 'collage', label: '拼贴纸条' },
+  { id: 'editorial', label: '杂志标题' },
+];
+
+const SAMPLE_PHOTOS = [
+  { id: 'desk', name: '桌面灵感光影.webp', bg1: '#233142', bg2: '#4f9da6', fg: '#f9ecec', label: '桌搭实拍' },
+  { id: 'harbor', name: '像素港口预览.webp', bg1: '#1b263b', bg2: '#e07a5f', fg: '#f4f1de', label: '像素场景' },
+  { id: 'hill', name: '柔软山丘壁纸.webp', bg1: '#2d6a4f', bg2: '#95d5b2', fg: '#ffffff', label: '壁纸预览' },
+];
+
+const SAMPLE_ATTACHMENTS = [
+  { id: 'a1', name: 'pomodoro-shaders-v2.zip', size: '1.4 MB', price: 0 },
+  { id: 'a2', name: 'ui-tokens-reference.json', size: '38 KB', price: 2 },
+  { id: 'a3', name: 'desk-lighting-preset.pack', size: '640 KB', price: 0 },
+];
+
+const ICONS = {
+  back: '<path d="M15 18l-6-6 6-6"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  chevDown: '<path d="M6 9l6 6 6-6"/>',
+  chevRight: '<path d="M9 18l6-6-6-6"/>',
+  check: '<path d="M5 13l4 4L19 7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M4 17l5-5 3.5 3.5L16 12l4 5"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/>',
+  poll: '<path d="M4 20h16"/><rect x="6" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15" y="13" width="3" height="4" rx="1"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  hash: '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>',
+  bold: '<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  code: '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>',
+  codeBlock: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 10l-2 2 2 2M15 10l2 2-2 2M13 9l-2 6"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  sparkle: '<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/>',
+  upload: '<path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  play: '<polygon points="7 5 19 12 7 19 7 5"/>',
+  wifi: '<path d="M2 8.82a15 15 0 0 1 20 0M5 12.86a10 10 0 0 1 14 0M8.5 16.43a5 5 0 0 1 7 0M12 20h.01"/>',
+  signal: '<path d="M3 18v-3M8 18v-6M13 18v-9M18 18V6"/>',
+};
+
+function ico(name, cls = '') {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"${cls ? ` class="${cls}"` : ''}>${ICONS[name]}</svg>`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function sectionsOf(scope = 'mobile') {
+  return scope === 'web' ? WEB_SECTIONS : MOBILE_SECTIONS;
+}
+
+function findBoard(key, scope = 'mobile') {
+  const list = sectionsOf(scope);
+  for (const sec of list) {
+    const b = sec.boards.find(x => x.key === key);
+    if (b) return { section: sec, board: b };
+  }
+  return { section: list[1], board: list[1].boards[0] };
+}
+
+function effectiveTags(d, board) {
+  if (!board.topicTag) return d.tags;
+  const req = board.topicTag;
+  const rest = d.tags.filter(t => t.toLowerCase() !== req.toLowerCase());
+  return [req, ...rest].slice(0, 5);
+}
+
+function boardRuleLabel(b) {
+  if (b.topicTag) return `必带 #${b.topicTag}`;
+  if (b.casual) return '可不写标题';
+  if (b.shareNotice) return '需合法授权';
+  return '';
+}
+
+function renderMobileBoardGridBody(sections, activeSec, selectedKey, secAttr, pickAttr) {
+  const shownBoard = activeSec.boards.find(b => b.key === selectedKey) || activeSec.boards[0];
+  const rule = boardRuleLabel(shownBoard);
+  return `
+    <div class="m-seg-track" style="margin:4px 0 10px">
+      ${sections.map(sec => `
+        <button type="button" class="${sec.key === activeSec.key ? 'on' : ''}" ${secAttr}="${sec.key}">${sec.name}<span class="m-sec-cnt">${sec.boards.length}</span></button>
+      `).join('')}
+    </div>
+    <div class="m-sheet-scroll">
+      <div class="m-board-grid">
+        ${activeSec.boards.map(b => {
+          const on = selectedKey === b.key;
+          const badge = b.topicTag ? '#' : '';
+          return `
+            <button type="button" class="m-board-tile ${on ? 'on' : ''}" ${pickAttr}="${b.key}">
+              <span>${esc(b.name)}</span>
+              ${badge ? `<i class="m-board-badge">${badge}</i>` : ''}
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <div class="m-board-desc">
+        <div class="m-board-desc-copy">
+          <strong>${esc(shownBoard.name)}</strong>
+          <small>${esc(shownBoard.desc)}</small>
+        </div>
+        ${rule ? `<span class="m-board-rule">${esc(rule)}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function workBadgeLabel(w) {
+  if (w.source === 'mine') return '我的创作';
+  if (w.format === 'html') return 'HTML → V2';
+  if (w.format === 'htm') return 'HTM → V2';
+  return 'V2 容器';
+}
+
+function workMetaText(w) {
+  if (w.source === 'mine') return `${w.kind} · ${w.version || 'v1.0'} · V2 容器`;
+  if (w.converted) return `${w.fileName} · 已自动转为 V2 容器 · ${w.size}`;
+  return `${w.fileName} · V2 作品包 · ${w.size}`;
+}
+
+function formatBytes(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function buildWorkFromFile(file) {
+  const m = /\.([a-z0-9]+)$/i.exec(file.name || '');
+  const ext = m ? m[1].toLowerCase() : '';
+  if (!['zip', 'html', 'htm'].includes(ext)) {
+    return { error: '请选择 .zip（V2 容器）、.html 或 .htm 文件' };
+  }
+  if (!file.size) {
+    return { error: '所选文件为空，请重新选择' };
+  }
+  if (file.size > 24 * 1024 * 1024) {
+    return { error: '作品文件超出 24 MB 上限，请精简素材后重试' };
+  }
+  const title = (file.name || '').replace(/\.(zip|html|htm)$/i, '').trim() || '未命名作品';
+  return {
+    work: {
+      id: `upload-${Date.now()}`,
+      source: 'upload',
+      format: ext,
+      converted: ext !== 'zip',
+      fileName: file.name,
+      title,
+      kind: ext === 'zip' ? 'V2 成品' : '应用',
+      size: formatBytes(file.size),
+      rightsAccepted: false,
+    },
+  };
+}
+
+function renderWorkCardHtml(scope, w, platform = 'mobile') {
+  const cls = platform === 'mobile' ? 'm-work-card' : 'w-work-card';
+  const topCls = platform === 'mobile' ? 'm-work-top' : 'w-work-row';
+  const padStyle = platform === 'h5' ? ' style="padding:10px 12px"' : '';
+  const icoHtml = platform === 'mobile'
+    ? `<div class="m-item-ico">${ico('grid')}</div>`
+    : `<span style="color:var(--w-accent-ink);display:inline-flex;flex:none">${ico('grid')}</span>`;
+  return `
+    <div class="${cls}"${padStyle}>
+      <div class="${topCls}">
+        ${icoHtml}
+        <div class="${platform === 'mobile' ? 'm-item-copy' : 'w-att-copy'}">
+          <div class="work-title-line">
+            <strong>${esc(w.title)}</strong>
+            <span class="work-badge">${workBadgeLabel(w)}</span>
+          </div>
+          <small>${esc(workMetaText(w))}</small>
+        </div>
+        <div class="work-acts">
+          <button type="button" class="work-act-btn primary" data-preview-work="${scope}">${ico('play')}<span>试玩</span></button>
+          <button type="button" class="work-act-btn" data-open-work="${scope}">更换</button>
+          <button type="button" class="m-x-btn" aria-label="移除作品" data-rm-work="${scope}">${ico('close')}</button>
+        </div>
+      </div>
+      ${w.source === 'upload' ? `
+        <label class="work-rights ${w.rightsAccepted ? '' : 'need'}">
+          <input type="checkbox" ${w.rightsAccepted ? 'checked' : ''} data-work-rights="${scope}">
+          <span>我确认这是原创或已获授权，并同意按社区规则发布${w.rightsAccepted ? '' : '（必选）'}</span>
+        </label>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderWorkPickerBody(scope, stateObj) {
+  const tab = stateObj.workTab === 'mine' ? 'mine' : 'upload';
+  const cur = stateObj.work;
+  const scrollPad = scope === 'webPc' ? ' style="padding:0"' : '';
+  return `
+    <div${scope === 'webPc' ? '' : ' style="padding:0 18px"'}>
+      <p class="work-picker-note">每篇帖子最多附带 1 个可运行作品（切换方式或重新选择将替换当前作品）</p>
+      <div class="m-seg-track" style="margin:4px 0 12px">
+        <button type="button" class="${tab === 'upload' ? 'on' : ''}" data-work-tab="${scope}:upload">上传成品</button>
+        <button type="button" class="${tab === 'mine' ? 'on' : ''}" data-work-tab="${scope}:mine">关联我的创作</button>
+      </div>
+    </div>
+    <div class="m-sheet-scroll"${scrollPad}>
+      ${tab === 'upload' ? `
+        <label class="work-dropzone">
+          <input type="file" hidden accept=".zip,.html,.htm" data-work-file="${scope}">
+          <span class="work-drop-ico">${ico('upload')}</span>
+          <strong>选择或拖入 .zip / .html / .htm 成品</strong>
+          <small>ZIP 需包含 V2 manifest.json；单个 HTML / HTM 上传后自动封装清单与握手，转为 V2 容器（≤ 24 MB）</small>
+          <div class="work-fmt-pills">
+            <span class="work-fmt-pill">.zip V2 容器</span>
+            <span class="work-fmt-pill">.html → 转 V2</span>
+            <span class="work-fmt-pill">.htm → 转 V2</span>
+          </div>
+        </label>
+        ${stateObj.workErr ? `<p class="work-err" role="alert">${esc(stateObj.workErr)}</p>` : ''}
+        <div class="work-demo-label">或快速体验示例成品</div>
+        <div class="work-demo-row">
+          ${WORK_UPLOAD_SAMPLES.map(s => {
+            const on = cur && cur.source === 'upload' && cur.fileName === s.fileName;
+            return `<button type="button" class="m-chip ${on ? 'on' : ''}" data-work-sample="${scope}:${s.key}">${esc(s.label)}</button>`;
+          }).join('')}
+        </div>
+      ` : `
+        ${WORKS_CATALOG.map(w => {
+          const on = cur && cur.source === 'mine' && cur.id === w.id;
+          return `
+            <button type="button" class="m-board-opt ${on ? 'on' : ''}" data-work-pick-mine="${scope}:${w.id}">
+              <div class="m-act-box" style="width:38px;height:38px;border-radius:11px">${ico('grid')}</div>
+              <div class="m-board-opt-copy">
+                <strong>${esc(w.title)}</strong>
+                <small>${esc(w.kind)} · ${esc(w.version)} · V2 容器</small>
+              </div>
+              ${on ? `<span style="color:var(--accent-ink)">${ico('check')}</span>` : ''}
+            </button>
+          `;
+        }).join('')}
+      `}
+    </div>
+  `;
+}
+
+function charLen(str) { return Array.from(str.trim()).length; }
+
+function renderPhotoSvg(photo) {
+  return `<svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs><linearGradient id="pg-${photo.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${photo.bg1}"/><stop offset="100%" stop-color="${photo.bg2}"/></linearGradient></defs>
+    <rect width="120" height="120" fill="url(#pg-${photo.id})"/>
+    <circle cx="88" cy="30" r="14" fill="${photo.fg}" opacity="0.22"/>
+    <path d="M0 90 Q35 64 68 82 T120 74 L120 120 L0 120 Z" fill="${photo.fg}" opacity="0.24"/>
+    <path d="M0 102 Q48 84 90 98 T120 92 L120 120 L0 120 Z" fill="#000" opacity="0.16"/>
+  </svg>`;
+}
+
+function renderCoverSvg(spec, accentHex, small = false) {
+  const title = (spec.title || '把你的想法\n变成作品').trim();
+  const lines = title.split('\n').slice(0, 3);
+  const sub = (spec.subtitle || '').trim();
+  const hl = (spec.highlight || '').trim();
+  const w = 180;
+  const h = spec.portrait === false ? 180 : 240;
+  const tpl = spec.template || 'marker';
+  const styles = {
+    marker: { bg: '#FFFDF8', fg: '#1F2024', sub: '#6A6D75', bar: accentHex, badge: '重点' },
+    memo: { bg: '#FFF8DE', fg: '#2C2618', sub: '#7C7052', bar: '#E0A100', badge: '便签' },
+    notebook: { bg: '#F7F8FA', fg: '#1D2430', sub: '#647084', bar: accentHex, badge: '手账' },
+    pop: { bg: accentHex, fg: '#FFFFFF', sub: 'rgba(255,255,255,0.82)', bar: '#FFE066', badge: '精选' },
+    collage: { bg: '#F1EFEA', fg: '#23201E', sub: '#6B645D', bar: accentHex, badge: '剪贴' },
+    editorial: { bg: '#1B1D22', fg: '#F7F7F9', sub: '#A3A8B3', bar: accentHex, badge: '特刊' },
+  };
+  const st = styles[tpl] || styles.marker;
+  const fs = small ? 18 : 20;
+  const startY = spec.portrait === false ? 72 : 96;
+  const lineHtml = lines.map((line, i) => {
+    const isHl = hl ? line.includes(hl) : i === lines.length - 1;
+    const fill = isHl && tpl !== 'pop' ? accentHex : isHl && tpl === 'pop' ? '#FFF2A6' : st.fg;
+    return `<text x="18" y="${startY + i * (fs + 8)}" fill="${fill}" font-size="${fs}" font-weight="750" font-family="PingFang SC,sans-serif">${esc(line.slice(0, 9))}</text>`;
+  }).join('');
+  const ring = tpl === 'notebook'
+    ? [24, 52, 80, 108, 136, 156].map(x => `<circle cx="${x}" cy="12" r="4" fill="#D4D8E0"/>`).join('')
+    : '';
+  const deco = tpl === 'memo'
+    ? `<rect x="0" y="0" width="${w}" height="10" fill="#F2D06B"/>`
+    : tpl === 'collage'
+      ? `<rect x="14" y="18" width="54" height="16" rx="4" fill="${accentHex}" opacity="0.18"/>`
+      : `<rect x="18" y="22" width="28" height="4" rx="2" fill="${st.bar}"/>`;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="${w}" height="${h}" fill="${st.bg}"/>
+    ${deco}${ring}
+    ${lineHtml}
+    ${sub && !small ? `<text x="18" y="${h - 24}" fill="${st.sub}" font-size="11.5" font-family="PingFang SC,sans-serif">${esc(sub.slice(0, 15))}</text>` : ''}
+  </svg>`;
+}
+
+function initialAppState() {
+  const qs = new URLSearchParams(window.location.search);
+  const initialView = qs.get('view') === 'web' ? 'web' : 'mobile';
+  return {
+    platform: initialView,
+    mobileTab: 0,
+    webTab: 0,
+    width: 390,
+    dark: false,
+    accentId: 'red',
+    b3Tab: 'board', // 'board' | 'work' | 'poll' | 'cover' | 'kb'
+    b3SectionKey: 'discuss',
+    b3BoardKey: 'design',
+    b3Work: { work: { ...WORK_UPLOAD_SAMPLES[0] }, workTab: 'upload', workErr: '' },
+    m1: {
+      boardKey: 'discuss-uncategorized',
+      title: '',
+      body: '',
+      touched: false,
+      tags: [],
+      photos: [],
+      cover: null,
+      work: null,
+      workTab: 'upload',
+      workErr: '',
+      attachments: [],
+      pollOn: false,
+      pollOptions: ['方案 A：轻量化卡片', '方案 B：保留全部设置项'],
+      pollDays: 7,
+      showLimits: false,
+      sheet: null, // null | 'board' | 'cover' | 'tag' | 'work' | 'leave'
+      sheetSection: 'discuss',
+      tagDraft: '',
+      coverEditorOpen: false,
+      coverDraft: { title: '', highlight: '', subtitle: '', template: 'marker', portrait: true },
+    },
+    m2: {
+      boardKey: 'create-widget',
+      title: '用三天做了一个桌宠番茄钟，分享材质与交互踩坑记录',
+      body: '这次把小组件拆成了「倒计时核心 + 低频刷新背景」两层，桌面端帧率稳住 60fps 之后电量消耗明显降下来了。\n\n整理了着色器参数和贴图压缩比例，源码打包在附件里，欢迎一起试试效果。',
+      touched: true,
+      tags: ['桌面组件', '番茄钟', '设计规范'],
+      photos: [SAMPLE_PHOTOS[0], SAMPLE_PHOTOS[1]],
+      cover: { type: 'text', spec: { title: '桌宠番茄钟\n材质与交互复盘', highlight: '复盘', subtitle: '三天踩坑实录 · 附 V2 源码', template: 'marker', portrait: true } },
+      work: { ...WORK_UPLOAD_SAMPLES[0] },
+      workTab: 'upload',
+      workErr: '',
+      attachments: [{ ...SAMPLE_ATTACHMENTS[0] }],
+      pollOn: false,
+      pollOptions: ['', ''],
+      pollDays: 7,
+      showLimits: false,
+      sheet: null,
+      sheetSection: 'ideas',
+      tagDraft: '',
+      coverEditorOpen: false,
+      coverDraft: { title: '', highlight: '', subtitle: '', template: 'marker', portrait: true },
+    },
+    m3Poll: {
+      boardKey: 'learn',
+      title: '桌面悬浮组件在深色壁纸下边缘发虚，哪种混合方案更稳？',
+      body: '开启高斯模糊后阴影边缘会有一圈灰边，试过把圆角描边降到 0.5dp 还是有一点，做了两版方案想听听大家实际偏好：',
+      work: null,
+      pollOn: true,
+      pollOptions: ['改用内描边 + 暗角遮罩', '降低 backdrop blur 半径到 12px'],
+      pollDays: 7,
+    },
+    m3CoverDraft: {
+      title: '把你的想法\n变成桌面新组件',
+      highlight: '桌面新组件',
+      subtitle: '周末 48 小时创作记录',
+      template: 'marker',
+      portrait: true,
+    },
+    m3Kb: {
+      boardKey: 'discuss-uncategorized',
+      title: '周末做了一套极简呼吸灯壁纸',
+      body: '先在草稿箱记录一下配光思路：背景压暗到 #111111 后，',
+    },
+    webPcPreset: 'rich',
+    webPc: {
+      boardKey: 'design',
+      mode: 'write',
+      boardOpen: false,
+      boardSec: 'discuss',
+      visOpen: false,
+      workOpen: false,
+      workTab: 'upload',
+      workErr: '',
+      readLevel: 0,
+      confirmLeave: false,
+      title: '用三天做了一个桌宠番茄钟，分享材质与交互踩坑记录',
+      body: '这次把小组件拆成了「倒计时核心 + 低频刷新背景」两层，桌面端帧率稳住 60fps 之后功耗降了不少。\n\n- 使用 `Canvas2D` 离屏缓存静帧\n- 附件里打包了完整 V2 工程包，欢迎交流反馈',
+      tags: ['桌面组件', '设计规范'],
+      tagDraft: '',
+      cover: { type: 'text', spec: { title: '桌宠番茄钟\n材质与交互复盘', highlight: '复盘', subtitle: '三天踩坑实录 · 附 V2 源码', template: 'marker', portrait: true } },
+      photos: [SAMPLE_PHOTOS[0]],
+      work: { ...WORK_UPLOAD_SAMPLES[1] },
+      attachments: [{ ...SAMPLE_ATTACHMENTS[0] }, { ...SAMPLE_ATTACHMENTS[1] }],
+      pollOn: false,
+      pollOptions: ['更喜欢毛玻璃卡片风', '更喜欢纯白极简风格'],
+      pollDays: 7,
+    },
+    webH5: {
+      boardKey: 'learn',
+      mode: 'write',
+      boardOpen: false,
+      boardSec: 'discuss',
+      visOpen: false,
+      workOpen: false,
+      workTab: 'upload',
+      workErr: '',
+      readLevel: 0,
+      title: '本地 MCP 工具端口偶发被占时的优雅重试方案汇总',
+      body: '在 macOS 上连续重启守护进程时偶尔遇到 EADDRINUSE，目前整理了端口探测 + 退避脚本，附在下方也顺便投个票。',
+      tags: ['MCP', '开发经验'],
+      tagDraft: '',
+      work: null,
+      attachments: [{ ...SAMPLE_ATTACHMENTS[1] }],
+      pollOn: true,
+      pollOptions: ['指数退避重连', '直接换随机空闲端口'],
+      pollDays: 7,
+    },
+  };
+}
+
+let app = initialAppState();
+
+function currentPalette() {
+  const a = ACCENTS.find(x => x.id === app.accentId) || ACCENTS[0];
+  return app.dark ? a.dark : a.light;
+}
+
+function validateMobilePost(d) {
+  const { board } = findBoard(d.boardKey, 'mobile');
+  const tLen = charLen(d.title);
+  const bLen = charLen(d.body);
+  const titleValid = board.casual ? tLen <= 80 : (tLen >= 4 && tLen <= 80);
+  const bodyValid = bLen >= 10 && bLen <= 20000;
+  let pollError = '';
+  if (d.pollOn) {
+    const clean = d.pollOptions.map(x => x.trim()).filter(Boolean);
+    if (clean.length < 2) pollError = '投票至少填写 2 个有效选项';
+    else if (new Set(clean.map(x => x.toLowerCase())).size !== clean.length) pollError = '投票选项不能重复';
+  }
+  const workError = (d.work && d.work.source === 'upload' && !d.work.rightsAccepted) ? '请确认作品原创或已获授权' : '';
+  const canPost = titleValid && bodyValid && !pollError && !workError;
+  let status = '';
+  let bad = false;
+  if (d.touched) {
+    if (tLen > 80) { status = '标题最多 80 字'; bad = true; }
+    else if (!board.casual && tLen < 4) { status = `标题还差 ${4 - tLen} 字`; }
+    else if (bLen < 10) { status = `正文还差 ${10 - bLen} 字`; }
+    else if (bLen > 20000) { status = '正文超过 20,000 字'; bad = true; }
+    else if (pollError) { status = pollError; bad = true; }
+    else if (workError) { status = workError; bad = true; }
+    else { status = `${bLen} 字`; }
+  }
+  return { board, tLen, bLen, titleValid, bodyValid, pollError, workError, canPost, status, bad };
+}
+
+function validateWebPost(d) {
+  const { board } = findBoard(d.boardKey, 'web');
+  const tLen = charLen(d.title);
+  const bLen = charLen(d.body);
+  const titleValid = board.casual ? tLen <= 80 : (tLen >= 4 && tLen <= 80);
+  const bodyValid = bLen >= 10 && bLen <= 20000;
+  let pollError = '';
+  if (d.pollOn) {
+    const clean = d.pollOptions.map(x => x.trim()).filter(Boolean);
+    if (clean.length < 2) pollError = '投票至少需要 2 个不重复选项';
+    else if (new Set(clean.map(x => x.toLowerCase())).size !== clean.length) pollError = '投票选项不能重复';
+  }
+  const workError = (d.work && d.work.source === 'upload' && !d.work.rightsAccepted) ? '请确认作品原创或已获授权' : '';
+  const canPost = titleValid && bodyValid && !pollError && !workError;
+  return { board, tLen, bLen, titleValid, bodyValid, pollError, workError, canPost };
+}
+
+function renderMobileComposer(id, d, interactive) {
+  const pal = currentPalette();
+  const { section, board } = findBoard(d.boardKey, 'mobile');
+  const v = validateMobilePost(d);
+  const allTags = effectiveTags(d, board);
+  const hasAttachments = d.attachments.length > 0;
+  const hasWork = !!d.work;
+  const hasPhotos = d.photos.length > 0;
+  const hasCover = !!d.cover;
+  const coverThumbHtml = hasCover
+    ? (d.cover.type === 'photo' ? renderPhotoSvg(d.cover.photo) : renderCoverSvg(d.cover.spec, pal.btn, true))
+    : '';
+
+  return `
+  <div class="status-bar">
+    <span>13:56</span>
+    <span class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></span>
+  </div>
+  <header class="m-bar">
+    <div class="m-bar-left">
+      <button type="button" class="m-icon-tap" aria-label="返回" data-m-back="${id}">${ico('back')}</button>
+    </div>
+    <h3 class="m-bar-title">发帖</h3>
+    <div class="m-bar-right">
+      <button type="button" class="m-pub-btn" data-m-publish="${id}" ${v.canPost ? '' : 'disabled'}>发布</button>
+    </div>
+  </header>
+
+  <div class="m-scroll">
+    <div class="m-meta-row">
+      <button type="button" class="m-board-pill" data-m-open-board="${id}">
+        <i class="m-board-dot"></i>
+        <span>${esc(section.name)} · ${esc(board.name)}</span>
+        ${ico('chevDown')}
+      </button>
+      <button type="button" class="m-cover-pill ${hasCover ? 'on' : ''}" data-m-open-cover="${id}">
+        ${ico('image')}
+        <span>${hasCover ? '已选封面' : '封面'}</span>
+      </button>
+    </div>
+
+    ${hasCover ? `
+      <div class="m-cover-card">
+        <div class="m-cover-thumb ${d.cover.type === 'text' && !d.cover.spec.portrait ? 'square' : ''}" data-m-edit-cover="${id}">
+          ${coverThumbHtml}
+        </div>
+        <div class="m-cover-info">
+          <strong>${d.cover.type === 'photo' ? esc(d.cover.photo.label) : esc(COVER_TEMPLATES.find(t => t.id === d.cover.spec.template)?.label || '文字封面')}</strong>
+          <small>${d.cover.type === 'photo' ? '相册图片 · 将作为首图展示' : (d.cover.spec.portrait ? '文字封面 · 竖版 3:4' : '文字封面 · 方形 1:1')}</small>
+        </div>
+        <button type="button" class="m-chip-act" data-m-open-cover="${id}">更换</button>
+        <button type="button" class="m-x-btn" aria-label="移除封面" data-m-rm-cover="${id}">${ico('close')}</button>
+      </div>
+    ` : ''}
+
+    <div class="m-title-wrap">
+      <textarea rows="1" class="m-title-input" data-auto-title data-m-title="${id}" maxlength="90"
+        placeholder="${board.casual ? '添加标题（可选）' : '添加标题'}">${esc(d.title)}</textarea>
+      ${v.tLen > 60 ? `<span class="m-title-count ${v.tLen > 80 ? 'bad' : ''}">${v.tLen}/80</span>` : ''}
+    </div>
+    <div class="m-hairline"></div>
+    <textarea class="m-body-input" style="${d.pollOn ? 'min-height:110px' : ''}" data-m-body="${id}"
+      placeholder="分享你的想法、经验或新发现…">${esc(d.body)}</textarea>
+
+    ${hasPhotos ? `
+      <div class="m-photo-strip">
+        ${d.photos.map((p, idx) => `
+          <div class="m-photo-item">
+            ${renderPhotoSvg(p)}
+            ${idx === 0 && !hasCover ? '<span class="m-photo-badge">首图</span>' : ''}
+            <button type="button" class="m-photo-rm" aria-label="移除图片" data-m-rm-photo="${id}:${idx}">${ico('close')}</button>
+          </div>
+        `).join('')}
+        ${d.photos.length < 4 ? `<button type="button" class="m-photo-add" data-m-add-photo="${id}">${ico('plus')}<span>加图</span></button>` : ''}
+      </div>
+    ` : ''}
+
+    <div class="m-tags-row">
+      ${allTags.map(t => {
+        const isReq = board.topicTag && t.toLowerCase() === board.topicTag.toLowerCase();
+        return isReq
+          ? `<span class="m-tag-pill req" title="该板块自动附带话题"># ${esc(t)}</span>`
+          : `<span class="m-tag-pill"># ${esc(t)}<button type="button" aria-label="移除话题 ${esc(t)}" data-m-rm-tag="${id}:${esc(t)}">${ico('close')}</button></span>`;
+      }).join('')}
+      <button type="button" class="m-tag-add" data-m-open-tag="${id}">
+        ${ico('hash')}
+        <span>${allTags.length ? '话题' : '添加话题'}</span>
+      </button>
+    </div>
+
+    ${(d.pollOn || hasWork || hasAttachments) ? `
+      <div class="m-cards">
+        ${d.pollOn ? `
+          <section class="m-card">
+            <div class="m-card-head">
+              <span class="m-card-title">${ico('poll')} 发起投票</span>
+              <button type="button" class="m-x-btn" aria-label="移除投票" data-m-toggle-poll="${id}">${ico('close')}</button>
+            </div>
+            ${d.pollOptions.map((opt, idx) => `
+              <div class="m-poll-opt">
+                <input type="text" data-m-poll-opt="${id}:${idx}" value="${esc(opt)}" placeholder="选项 ${idx + 1}">
+                ${d.pollOptions.length > 2 ? `<button type="button" class="m-x-btn" aria-label="删除选项" data-m-rm-poll-opt="${id}:${idx}">${ico('close')}</button>` : ''}
+              </div>
+            `).join('')}
+            ${d.pollOptions.length < 6 ? `<button type="button" class="m-add-opt" data-m-add-poll-opt="${id}">${ico('plus')} 添加选项</button>` : ''}
+            <span class="m-sublabel">截止时间</span>
+            <div class="m-chip-row">
+              ${[0, 1, 3, 7, 14, 30].map(day => `
+                <button type="button" class="m-chip ${d.pollDays === day ? 'on' : ''}" data-m-poll-day="${id}:${day}">${day === 0 ? '不限时' : day + ' 天'}</button>
+              `).join('')}
+            </div>
+            <p class="m-card-note ${v.pollError ? 'bad' : ''}">${v.pollError || '发布后不能修改投票选项'}</p>
+          </section>
+        ` : ''}
+
+        ${d.work ? renderWorkCardHtml(id, d.work, 'mobile') : ''}
+
+        ${d.attachments.map(a => `
+          <div class="m-item-row">
+            <div class="m-item-ico">${ico('file')}</div>
+            <div class="m-item-copy">
+              <strong>${esc(a.name)}</strong>
+              <small>${esc(a.size)} · ${a.price ? a.price + ' 积分' : '免费下载'}</small>
+            </div>
+            <button type="button" class="m-x-btn" aria-label="移除附件" data-m-rm-att="${id}:${a.id}">${ico('close')}</button>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${board.shareNotice ? '<p class="m-notice-pill">请分享原创、开源或已获授权的资源，禁止破解与盗版链接。</p>' : ''}
+  </div>
+
+  ${d.showLimits ? `
+    <div style="flex:none;padding:8px 16px;border-top:0.5px solid var(--hairline);background:var(--fill);font-size:12px;line-height:18px;color:var(--ink2);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span>图片 ≤ 5 MB；作品限 1 个（V2 ZIP / HTML / HTM ≤ 24 MB）；附件最多 5 个</span>
+      <button type="button" class="m-x-btn" data-m-toggle-limits="${id}">${ico('close')}</button>
+    </div>
+  ` : ''}
+
+  <div class="m-toolbar">
+    <button type="button" class="m-tool ${hasPhotos ? 'on' : ''}" aria-label="插入图片" data-m-add-photo="${id}">
+      ${ico('image')}${hasPhotos ? `<span class="m-tool-badge">${d.photos.length}</span>` : ''}
+    </button>
+    <button type="button" class="m-tool ${hasAttachments ? 'on' : ''}" aria-label="添加附件" data-m-add-att="${id}">
+      ${ico('file')}${hasAttachments ? `<span class="m-tool-badge">${d.attachments.length}</span>` : ''}
+    </button>
+    <button type="button" class="m-tool ${hasWork ? 'on' : ''}" aria-label="添加作品" data-open-work="${id}">
+      ${ico('grid')}${hasWork ? `<span class="m-tool-badge">1</span>` : ''}
+    </button>
+    <button type="button" class="m-tool ${d.pollOn ? 'on' : ''}" aria-label="发起投票" data-m-toggle-poll="${id}">
+      ${ico('poll')}
+    </button>
+    <div class="m-tool-spacer"></div>
+    ${v.status ? `<span class="m-status-text ${v.bad ? 'bad' : ''}">${esc(v.status)}</span>` : ''}
+    <button type="button" class="m-info-btn ${d.showLimits ? 'on' : ''}" aria-label="上传说明" data-m-toggle-limits="${id}">${ico('info')}</button>
+  </div>
+  <div class="home-bar"></div>
+  ${interactive ? renderMobileOverlays(id, d) : ''}
+  `;
+}
+
+function renderMobileOverlays(id, d) {
+  if (d.coverEditorOpen) return renderCoverEditorOverlay(id, d.coverDraft, false);
+  if (!d.sheet) return '';
+  if (d.sheet === 'leave') {
+    return `
+      <div class="m-mask center" data-m-mask-close="${id}">
+        <div class="m-dialog">
+          <h3>放弃这次编辑？</h3>
+          <p>尚未发布的内容不会保留，草稿图片和附件也会一并清理。</p>
+          <div class="m-dialog-btns">
+            <button type="button" class="m-btn-primary" data-m-close-sheet="${id}">继续编辑</button>
+            <button type="button" class="m-btn-ghost danger" data-m-discard="${id}">放弃编辑</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  if (d.sheet === 'board') {
+    const activeSec = MOBILE_SECTIONS.find(s => s.key === d.sheetSection) || MOBILE_SECTIONS[1];
+    return `
+      <div class="m-mask" data-m-mask-close="${id}">
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>选择发布板块</h3>
+            <button type="button" class="m-x-btn" data-m-close-sheet="${id}">${ico('close')}</button>
+          </div>
+          ${renderMobileBoardGridBody(MOBILE_SECTIONS, activeSec, d.boardKey, `data-m-sheet-sec-id="${id}" data-m-sheet-sec`, `data-m-pick-board-id="${id}" data-m-pick-board`)}
+        </div>
+      </div>
+    `;
+  }
+  if (d.sheet === 'cover') {
+    return `
+      <div class="m-mask" data-m-mask-close="${id}">
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>帖子封面</h3>
+            <button type="button" class="m-x-btn" data-m-close-sheet="${id}">${ico('close')}</button>
+          </div>
+          <div class="m-sheet-scroll">
+            <button type="button" class="m-sheet-act" data-m-open-ce="${id}">
+              <div class="m-act-box">${ico('sparkle')}</div>
+              <div class="m-act-copy">
+                <strong>文字封面</strong>
+                <small>选 6 套排版模板，用一句话生成清晰封面</small>
+              </div>
+              <span style="color:var(--ink3)">${ico('chevRight')}</span>
+            </button>
+            <div style="font-size:12px;color:var(--ink3);font-weight:600;margin:10px 4px 2px">从相册选择示例</div>
+            <div class="m-sample-grid">
+              ${SAMPLE_PHOTOS.map(p => `
+                <button type="button" class="m-sample-tile" data-m-pick-photo-cover="${id}:${p.id}">
+                  ${renderPhotoSvg(p)}
+                  <span>${esc(p.label)}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  if (d.sheet === 'tag') {
+    const { board } = findBoard(d.boardKey, 'mobile');
+    const allTags = effectiveTags(d, board);
+    return `
+      <div class="m-mask" data-m-mask-close="${id}">
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>添加话题（${allTags.length}/5）</h3>
+            <button type="button" class="m-x-btn" data-m-close-sheet="${id}">${ico('close')}</button>
+          </div>
+          <div class="m-tag-input-row">
+            <input type="text" data-m-tag-draft="${id}" value="${esc(d.tagDraft)}" placeholder="输入话题关键词，如 小伴桌面" maxlength="20" ${allTags.length >= 5 ? 'disabled' : ''}>
+            <button type="button" data-m-add-tag="${id}" ${!d.tagDraft.trim() || allTags.length >= 5 ? 'disabled' : ''}>添加</button>
+          </div>
+          <div class="m-sheet-scroll">
+            ${allTags.length ? `
+              <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">已选话题</div>
+              <div class="m-tags-row" style="margin:0 0 14px">
+                ${allTags.map(t => {
+                  const isReq = board.topicTag && t.toLowerCase() === board.topicTag.toLowerCase();
+                  return isReq
+                    ? `<span class="m-tag-pill req"># ${esc(t)}</span>`
+                    : `<span class="m-tag-pill"># ${esc(t)}<button type="button" data-m-rm-tag="${id}:${esc(t)}">${ico('close')}</button></span>`;
+                }).join('')}
+              </div>
+            ` : ''}
+            <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">板块常用话题</div>
+            <div class="m-chip-row">
+              ${board.presets.map(p => {
+                const on = allTags.includes(p);
+                return `<button type="button" class="m-chip" style="background:${on ? 'var(--accent-soft)' : 'var(--fill)'};color:${on ? 'var(--accent-ink)' : 'var(--ink2)'};border-color:transparent" data-m-toggle-preset-tag="${id}:${esc(p)}"># ${esc(p)}</button>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  if (d.sheet === 'work') {
+    return `
+      <div class="m-mask" data-m-mask-close="${id}">
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>添加作品</h3>
+            <button type="button" class="m-x-btn" data-m-close-sheet="${id}">${ico('close')}</button>
+          </div>
+          ${renderWorkPickerBody(id, d)}
+        </div>
+      </div>
+    `;
+  }
+  return '';
+}
+
+function renderCoverEditorOverlay(targetId, spec, isBoard3Static) {
+  const pal = currentPalette();
+  const tLen = Array.from(spec.title).length;
+  const sLen = Array.from(spec.subtitle).length;
+  const hlBad = spec.highlight.trim() && !spec.title.includes(spec.highlight.trim());
+  return `
+    <div class="m-cover-editor">
+      <div class="status-bar">
+        <span>13:56</span>
+        <span class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></span>
+      </div>
+      <header class="m-bar">
+        <div class="m-bar-left">
+          <button type="button" class="m-icon-tap" aria-label="返回" data-ce-close="${targetId}">${ico('back')}</button>
+        </div>
+        <h3 class="m-bar-title">文字封面</h3>
+        <div class="m-bar-right">
+          <button type="button" class="m-pub-btn" data-ce-use="${targetId}" ${(!spec.title.trim() || hlBad) ? 'disabled' : ''}>使用封面</button>
+        </div>
+      </header>
+      <div class="m-ce-scroll">
+        <div class="m-ce-stage">
+          <div class="m-ce-preview ${spec.portrait ? '' : 'sq'}">
+            ${renderCoverSvg(spec, pal.btn, false)}
+          </div>
+        </div>
+
+        <div class="m-ce-tpls">
+          ${COVER_TEMPLATES.map(t => `
+            <button type="button" class="m-ce-tpl ${spec.template === t.id ? 'on' : ''}" data-ce-tpl="${targetId}:${t.id}">
+              <div class="m-ce-tpl-thumb">${renderCoverSvg({ title: '把想法\n变成作品', template: t.id, portrait: true }, pal.btn, true)}</div>
+              <span>${t.label}</span>
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="m-seg-track">
+          <button type="button" class="${spec.portrait ? 'on' : ''}" data-ce-ratio="${targetId}:1">竖版 3:4</button>
+          <button type="button" class="${!spec.portrait ? 'on' : ''}" data-ce-ratio="${targetId}:0">方形 1:1</button>
+        </div>
+
+        <div class="m-field-group">
+          <div class="m-field-head">
+            <label>封面标题 · 可换行调整排版</label>
+            <span style="${tLen > 80 ? 'color:var(--danger)' : ''}">${tLen} / 80</span>
+          </div>
+          <textarea class="m-field-box" rows="2" data-ce-title="${targetId}" placeholder="一句话，让人想点进来">${esc(spec.title)}</textarea>
+        </div>
+
+        <div class="m-field-group">
+          <div class="m-field-head">
+            <label>重点词（选填）</label>
+            <span style="${hlBad ? 'color:var(--danger)' : ''}">${hlBad ? '须包含在标题内' : '留空自动强调末行'}</span>
+          </div>
+          <input type="text" class="m-field-box" data-ce-hl="${targetId}" value="${esc(spec.highlight)}" placeholder="例如：桌面新组件">
+        </div>
+
+        <div class="m-field-group">
+          <div class="m-field-head">
+            <label>副标题（选填）</label>
+            <span>${sLen} / 100</span>
+          </div>
+          <input type="text" class="m-field-box" data-ce-sub="${targetId}" value="${esc(spec.subtitle)}" placeholder="补充时间、版本或看点">
+        </div>
+      </div>
+      <div class="home-bar"></div>
+    </div>
+  `;
+}
+
+function renderBoard3Phone() {
+  const tab = app.b3Tab;
+  if (tab === 'poll') {
+    const d = {
+      ...app.m3Poll,
+      touched: true, tags: ['桌面组件', '着色器'], photos: [], cover: null, work: null, attachments: [], showLimits: false,
+    };
+    return renderMobileComposer('m3Poll', d, false);
+  }
+  if (tab === 'work') {
+    const base = renderMobileComposer('m3Poll', { ...app.m3Poll, touched: true, tags: ['桌面组件'], photos: [], cover: null, work: app.b3Work.work, attachments: [], showLimits: false }, false);
+    return base + `
+      <div class="m-mask" data-b3-mask-close>
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>添加作品</h3>
+            <button type="button" class="m-x-btn" data-b3-tab="poll">${ico('close')}</button>
+          </div>
+          ${renderWorkPickerBody('b3', app.b3Work)}
+        </div>
+      </div>
+    `;
+  }
+  if (tab === 'board') {
+    const base = renderMobileComposer('m3Poll', { ...app.m3Poll, touched: true, tags: ['桌面组件'], photos: [], cover: null, work: null, attachments: [], showLimits: false }, false);
+    const activeSec = MOBILE_SECTIONS.find(s => s.key === app.b3SectionKey) || MOBILE_SECTIONS[1];
+    return base + `
+      <div class="m-mask">
+        <div class="m-sheet">
+          <div class="m-handle"></div>
+          <div class="m-sheet-head">
+            <h3>选择发布板块</h3>
+            <button type="button" class="m-x-btn" data-b3-tab="poll">${ico('close')}</button>
+          </div>
+          ${renderMobileBoardGridBody(MOBILE_SECTIONS, activeSec, app.b3BoardKey, 'data-b3-sec', 'data-b3-pick-board')}
+        </div>
+      </div>
+    `;
+  }
+  if (tab === 'cover') {
+    return renderCoverEditorOverlay('m3Cover', app.m3CoverDraft, true);
+  }
+  // 'kb'
+  const k = app.m3Kb;
+  const rows = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['⇧','Z','X','C','V','B','N','M','⌫'],
+  ];
+  return `
+    <div class="status-bar">
+      <span>13:56</span>
+      <span class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></span>
+    </div>
+    <header class="m-bar">
+      <div class="m-bar-left"><button type="button" class="m-icon-tap" aria-label="返回">${ico('back')}</button></div>
+      <h3 class="m-bar-title">发帖</h3>
+      <div class="m-bar-right"><button type="button" class="m-pub-btn">发布</button></div>
+    </header>
+    <div class="m-scroll">
+      <div class="m-meta-row">
+        <button type="button" class="m-board-pill"><i class="m-board-dot"></i><span>讨论 · 默认</span>${ico('chevDown')}</button>
+        <button type="button" class="m-cover-pill">${ico('image')}<span>封面</span></button>
+      </div>
+      <textarea rows="1" class="m-title-input" data-auto-title readonly>${esc(k.title)}</textarea>
+      <div class="m-hairline"></div>
+      <textarea class="m-body-input short" data-b3-kb-input>${esc(k.body)}</textarea>
+      <div class="m-tags-row">
+        <span class="m-tag-pill"># 桌面壁纸<button type="button">${ico('close')}</button></span>
+        <button type="button" class="m-tag-add">${ico('hash')}<span>话题</span></button>
+      </div>
+    </div>
+    <div class="m-toolbar">
+      <button type="button" class="m-tool">${ico('image')}</button>
+      <button type="button" class="m-tool">${ico('file')}</button>
+      <button type="button" class="m-tool">${ico('grid')}</button>
+      <button type="button" class="m-tool">${ico('poll')}</button>
+      <div class="m-tool-spacer"></div>
+      <span class="m-status-text">${charLen(k.body)} 字</span>
+      <button type="button" class="m-info-btn">${ico('info')}</button>
+    </div>
+    <div class="kb-wrap">
+      <div class="kb-suggest">
+        <button type="button" data-kb-insert="整体观感很柔和">整体观感很柔和</button>
+        <button type="button" data-kb-insert="夜间也不刺眼。">夜间也不刺眼。</button>
+        <button type="button" data-kb-insert="安装包">安装包</button>
+      </div>
+      ${rows.map((r, ri) => `
+        <div class="kb-row" style="${ri === 1 ? 'padding:0 14px' : ''}">
+          ${r.map(key => {
+            const alt = key === '⇧' || key === '⌫';
+            const attr = key === '⌫' ? 'data-kb-del' : key === '⇧' ? '' : `data-kb-char="${key.toLowerCase()}"`;
+            return `<button type="button" class="kb-key ${alt ? 'alt' : ''}" ${attr}>${key}</button>`;
+          }).join('')}
+        </div>
+      `).join('')}
+      <div class="kb-row">
+        <button type="button" class="kb-key alt">123</button>
+        <button type="button" class="kb-key space" data-kb-char=" ">空格</button>
+        <button type="button" class="kb-key alt" data-kb-insert="\n">换行</button>
+      </div>
+    </div>
+    <div class="home-bar kb"></div>
+  `;
+}
+
+function renderMarkdownPreviewHtml(d, pal, scope = 'webPc') {
+  const { section, board } = findBoard(d.boardKey, 'web');
+  const allTags = effectiveTags(d, board);
+  const paras = (d.body || '').split(/\n{2,}/).filter(Boolean).map(block => {
+    if (block.trim().startsWith('- ')) {
+      const items = block.split('\n').map(l => `<li>${esc(l.replace(/^-\s*/, '')).replace(/`([^`]+)`/g, '<code>$1</code>')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    }
+    return `<p>${esc(block).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>')}</p>`;
+  }).join('') || '<p style="color:var(--w-ink3)">还没有输入正文内容。</p>';
+
+  return `
+    <div class="w-preview">
+      ${d.cover ? `
+        <div style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:14px;background:var(--w-fill)">
+          <div style="width:60px;height:80px;border-radius:9px;overflow:hidden;flex:none">${renderCoverSvg(d.cover.spec, pal.btn, true)}</div>
+          <div><strong style="font-size:14px">${esc(board.name)}封面图预览</strong><div style="font-size:12px;color:var(--w-ink3);margin-top:3px">将在社区瀑布流卡片作为首图呈现</div></div>
+        </div>
+      ` : ''}
+      <h2>${esc(d.title || '（无标题动态）')}</h2>
+      <div class="w-preview-meta">
+        <span>${esc(section.name)} · ${esc(board.name)}</span>
+        <span>·</span>
+        <span>${esc(READ_LEVELS.find(r => r.level === d.readLevel)?.label || '所有人')}可见</span>
+      </div>
+      <div class="w-preview-prose">${paras}</div>
+      ${d.work ? `
+        <div class="w-work-card">
+          <div class="w-work-row">
+            <span style="color:var(--w-accent-ink);display:inline-flex;flex:none">${ico('grid')}</span>
+            <div class="w-att-copy">
+              <div class="work-title-line"><strong>${esc(d.work.title)}</strong><span class="work-badge">${workBadgeLabel(d.work)}</span></div>
+              <small>${esc(workMetaText(d.work))}</small>
+            </div>
+            <button type="button" class="work-act-btn primary" data-preview-work="${scope}">${ico('play')}<span>试玩</span></button>
+          </div>
+        </div>
+      ` : ''}
+      ${allTags.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${allTags.map(t => `<span class="w-tag-pill req"># ${esc(t)}</span>`).join('')}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderWebPcBoard() {
+  const pal = currentPalette();
+  const d = app.webPc;
+  const { section, board } = findBoard(d.boardKey, 'web');
+  const allTags = effectiveTags(d, board);
+  const v = validateWebPost(d);
+  const vis = READ_LEVELS.find(r => r.level === d.readLevel) || READ_LEVELS[0];
+  const activeSec = WEB_SECTIONS.find(s => s.key === d.boardSec) || section;
+  const shownBoard = activeSec.boards.find(b => b.key === d.boardKey) || activeSec.boards[0] || board;
+  const shownRule = boardRuleLabel(shownBoard);
+
+  return `
+  <section class="web-pc-board ${app.webTab === 0 ? 'visible' : ''}">
+    <div class="board-head">
+      <h2>PC 端 · 820px 发帖弹窗</h2>
+      <div class="mini-seg" role="group" aria-label="网页弹窗示例预设">
+        <button type="button" class="${app.webPcPreset === 'empty' ? 'active' : ''}" data-w-preset="empty">初始空态</button>
+        <button type="button" class="${app.webPcPreset === 'rich' ? 'active' : ''}" data-w-preset="rich">富内容</button>
+        <button type="button" class="${app.webPcPreset === 'poll' ? 'active' : ''}" data-w-preset="poll">发起投票</button>
+      </div>
+    </div>
+    <div class="web-scope ${app.dark ? 'dark' : ''}" style="--w-accent:${pal.btn};--w-accent-soft:${pal.soft};--w-accent-ink:${pal.ink};--w-accent-on:${pal.on}">
+      <div class="w-browser">
+        <div class="w-chrome">
+          <div class="w-dots"><i></i><i></i><i></i></div>
+          <div class="w-url">chat.xiangban.xyz / discuss</div>
+        </div>
+        <div class="w-backdrop">
+          <div class="w-modal" role="dialog" aria-label="发帖">
+            <header class="w-m-head">
+              <div class="w-m-head-l">
+                <button type="button" class="w-board-btn" data-w-toggle-board>
+                  <span class="dot"></span>
+                  <span>${esc(section.name)} · ${esc(board.name)}</span>
+                  ${ico('chevDown')}
+                </button>
+                ${board.casual ? '<span class="w-casual-badge">标题可选</span>' : ''}
+                ${board.topicTag ? `<span class="w-casual-badge">必带 #${esc(board.topicTag)}</span>` : ''}
+                ${d.boardOpen ? `
+                  <div class="w-popover w-board-pop">
+                    <div class="w-pop-secs">
+                      ${WEB_SECTIONS.map(sec => `
+                        <button type="button" class="w-pop-sec ${sec.key === activeSec.key ? 'on' : ''}" data-w-sec="${sec.key}">
+                          <span class="w-pop-sec-l"><span>${sec.name}</span><span class="w-pop-sec-cnt">${sec.boards.length}</span></span>
+                          ${ico('chevRight')}
+                        </button>
+                      `).join('')}
+                    </div>
+                    <div class="w-pop-right">
+                      <div class="w-pop-boards">
+                        ${activeSec.boards.map(b => {
+                          const on = d.boardKey === b.key;
+                          const badge = b.topicTag ? '#' : '';
+                          return `
+                            <button type="button" class="w-pop-tile ${on ? 'on' : ''}" data-w-pick-board="${b.key}">
+                              <span>${esc(b.name)}</span>
+                              ${badge ? `<i class="w-pop-badge">${badge}</i>` : ''}
+                            </button>
+                          `;
+                        }).join('')}
+                      </div>
+                      <div class="w-pop-foot">
+                        <small>${esc(shownBoard.name)}：${esc(shownBoard.desc)}</small>
+                        ${shownRule ? `<span class="w-casual-badge">${esc(shownRule)}</span>` : ''}
+                      </div>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+              <div class="w-m-head-r">
+                <div class="w-mode-seg" role="tablist">
+                  <button type="button" class="${d.mode === 'write' ? 'on' : ''}" data-w-mode="write">编辑</button>
+                  <button type="button" class="${d.mode === 'preview' ? 'on' : ''}" data-w-mode="preview">预览</button>
+                </div>
+                <button type="button" class="w-close" aria-label="关闭" data-w-try-close>${ico('close')}</button>
+              </div>
+            </header>
+
+            ${d.mode === 'write' ? `
+              <div class="w-toolbar">
+                <button type="button" class="w-tbtn" data-w-wrap="bold" title="加粗">${ico('bold')}<span>加粗</span></button>
+                <button type="button" class="w-tbtn" data-w-wrap="link" title="链接">${ico('link')}<span>链接</span></button>
+                <button type="button" class="w-tbtn" data-w-wrap="code" title="行内代码">${ico('code')}<span>代码</span></button>
+                <button type="button" class="w-tbtn" data-w-wrap="codeblock" title="代码块">${ico('codeBlock')}<span>代码块</span></button>
+                <button type="button" class="w-tbtn" data-w-wrap="list" title="列表">${ico('list')}<span>列表</span></button>
+                <div class="w-tdiv"></div>
+                <button type="button" class="w-tbtn ${d.photos.length ? 'on' : ''}" data-w-add-photo>${ico('image')}<span>插图${d.photos.length ? ' · ' + d.photos.length : ''}</span></button>
+                <button type="button" class="w-tbtn ${d.cover ? 'on' : ''}" data-w-toggle-cover>${ico('sparkle')}<span>${d.cover ? '已加封面' : '封面'}</span></button>
+                <button type="button" class="w-tbtn ${d.work ? 'on' : ''}" data-open-work="webPc">${ico('grid')}<span>作品${d.work ? ' · 已添' : ''}</span></button>
+                <button type="button" class="w-tbtn ${d.pollOn ? 'on' : ''}" data-w-toggle-poll>${ico('poll')}<span>投票</span></button>
+                <button type="button" class="w-tbtn ${d.attachments.length ? 'on' : ''}" data-w-add-att>${ico('file')}<span>附件${d.attachments.length ? ' · ' + d.attachments.length : ''}</span></button>
+              </div>
+            ` : ''}
+
+            <div class="w-m-body">
+              ${d.mode === 'preview' ? renderMarkdownPreviewHtml(d, pal, 'webPc') : `
+                ${d.cover ? `
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--w-fill)">
+                    <div style="width:44px;height:58px;border-radius:8px;overflow:hidden;flex:none">${renderCoverSvg(d.cover.spec, pal.btn, true)}</div>
+                    <div style="flex:1;min-width:0">
+                      <strong style="font-size:13.5px;display:block">${esc(d.cover.spec.title.replace(/\n/g, ' '))}</strong>
+                      <small style="font-size:12px;color:var(--w-ink3)">封面图 · 在列表卡片优先显示</small>
+                    </div>
+                    <button type="button" class="m-x-btn" style="color:var(--w-ink3)" data-w-toggle-cover>${ico('close')}</button>
+                  </div>
+                ` : ''}
+
+                <div class="w-title-row">
+                  <textarea rows="1" class="w-title-input" data-auto-title data-w-title
+                    placeholder="${board.casual ? '添加标题（休闲板块可留空）' : '一句话说清楚你想讨论什么'}" maxlength="90">${esc(d.title)}</textarea>
+                  <span class="w-count ${v.tLen > 80 ? 'bad' : ''}">${v.tLen} / 80</span>
+                </div>
+                <div class="w-div"></div>
+                <textarea class="w-editor-input" data-w-body placeholder="输入正文，支持 Markdown、粘贴或拖入图片（至少 10 字）…">${esc(d.body)}</textarea>
+
+                ${d.photos.length ? `
+                  <div class="m-photo-strip" style="margin-top:0">
+                    ${d.photos.map((p, idx) => `
+                      <div class="m-photo-item" style="width:68px;height:68px">
+                        ${renderPhotoSvg(p)}
+                        <button type="button" class="m-photo-rm" data-w-rm-photo="${idx}">${ico('close')}</button>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                <div class="w-tags-box">
+                  <div class="w-tags-line">
+                    ${allTags.map(t => {
+                      const isReq = board.topicTag && t.toLowerCase() === board.topicTag.toLowerCase();
+                      return isReq
+                        ? `<span class="w-tag-pill req" title="该板块自动附带话题"># ${esc(t)}</span>`
+                        : `<span class="w-tag-pill"># ${esc(t)}<button type="button" data-w-rm-tag="${esc(t)}">${ico('close')}</button></span>`;
+                    }).join('')}
+                    <input type="text" class="w-tag-in" data-w-tag-in value="${esc(d.tagDraft)}"
+                      placeholder="${allTags.length >= 5 ? '已达 5 个标签上限' : '添加话题标签，回车或逗号确认（最多 5 个）'}"
+                      ${allTags.length >= 5 ? 'disabled' : ''}>
+                  </div>
+                  ${board.presets.length ? `
+                    <div class="w-presets">
+                      <span>常用标签</span>
+                      ${board.presets.map(p => `
+                        <button type="button" class="w-preset ${allTags.includes(p) ? 'on' : ''}" data-w-preset-tag="${esc(p)}">${esc(p)}</button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+
+                ${d.pollOn ? `
+                  <section class="w-card">
+                    <div class="m-card-head">
+                      <span class="m-card-title" style="color:var(--w-ink)">${ico('poll')} 发起投票</span>
+                      <button type="button" class="m-x-btn" data-w-toggle-poll>${ico('close')}</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                      ${d.pollOptions.map((opt, idx) => `
+                        <div class="m-poll-opt" style="background:var(--w-surface);border:1px solid var(--w-line)">
+                          <input type="text" data-w-poll-opt="${idx}" value="${esc(opt)}" placeholder="选项 ${idx + 1}">
+                          ${d.pollOptions.length > 2 ? `<button type="button" class="m-x-btn" data-w-rm-poll-opt="${idx}">${ico('close')}</button>` : ''}
+                        </div>
+                      `).join('')}
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        ${[0, 1, 3, 7, 14, 30].map(day => `
+                          <button type="button" class="w-chip ${d.pollDays === day ? 'on' : ''}" data-w-poll-day="${day}">${day === 0 ? '不限时' : day + ' 天'}</button>
+                        `).join('')}
+                      </div>
+                      ${d.pollOptions.length < 6 ? `<button type="button" class="w-chip" data-w-add-poll-opt>+ 添加选项</button>` : ''}
+                    </div>
+                  </section>
+                ` : ''}
+
+                ${d.work ? renderWorkCardHtml('webPc', d.work, 'pc') : ''}
+
+                ${d.attachments.length ? `
+                  <section class="w-card">
+                    ${d.attachments.map(a => `
+                      <div class="w-att-row">
+                        <span style="color:var(--w-ink3)">${ico('file')}</span>
+                        <div class="w-att-copy"><strong>${esc(a.name)}</strong><small>${esc(a.size)}</small></div>
+                        <label class="w-price-box">积分 <input type="number" min="0" max="10" value="${a.price}" data-w-att-price="${a.id}"></label>
+                        <button type="button" class="m-x-btn" data-w-rm-att="${a.id}">${ico('close')}</button>
+                      </div>
+                    `).join('')}
+                  </section>
+                ` : ''}
+              `}
+            </div>
+
+            <footer class="w-m-foot">
+              <div class="w-foot-l">
+                <button type="button" class="w-vis-btn" data-w-toggle-vis>
+                  ${ico('lock')}
+                  <span>${esc(vis.label)}可见</span>
+                  ${ico('chevDown')}
+                </button>
+                <span class="w-count ${v.bLen > 20000 ? 'bad' : ''}">${v.bLen} / 20,000 字</span>
+                ${d.visOpen ? `
+                  <div class="w-popover w-vis-pop">
+                    ${READ_LEVELS.map(r => `
+                      <button type="button" class="w-vis-opt ${d.readLevel === r.level ? 'on' : ''}" data-w-pick-vis="${r.level}" ${r.disabled ? 'disabled' : ''}>
+                        <div><strong>${esc(r.label)}</strong><small>${esc(r.desc)}</small></div>
+                        ${d.readLevel === r.level ? `<span style="color:var(--w-accent-ink)">${ico('check')}</span>` : ''}
+                      </button>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+              <div class="w-foot-r">
+                <button type="button" class="w-btn-ghost" data-w-try-close>取消</button>
+                <button type="button" class="w-btn-primary" data-w-publish ${v.canPost ? '' : 'disabled'} title="${v.workError ? esc(v.workError) : ''}">发布</button>
+              </div>
+            </footer>
+
+            ${d.workOpen ? `
+              <div class="w-confirm-mask" data-w-mask-close>
+                <div class="w-work-dialog">
+                  <div class="w-work-dialog-head">
+                    <h3>添加作品</h3>
+                    <button type="button" class="m-x-btn" data-w-close-work>${ico('close')}</button>
+                  </div>
+                  ${renderWorkPickerBody('webPc', d)}
+                </div>
+              </div>
+            ` : ''}
+
+            ${d.confirmLeave ? `
+              <div class="w-confirm-mask" data-w-mask-close>
+                <div class="w-confirm-box">
+                  <h3>放弃未保存的内容？</h3>
+                  <p>关闭后当前编辑的标题、正文与待关联附件不会保留（替代原生浏览器 confirm）。</p>
+                  <div class="w-confirm-acts">
+                    <button type="button" class="w-btn-ghost" data-w-cancel-close>继续编辑</button>
+                    <button type="button" class="w-btn-primary" data-w-confirm-close>确认放弃</button>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="board-caption">PC 端（820px 居中模态窗）：顶部「板块级联按钮 + 编辑/预览」双栏收整；单作品入口统一 V2 ZIP、HTML/HTM 自动转 V2 与关联创作，与普通付费附件区分。</p>
+  </section>
+  `;
+}
+
+function renderWebH5Board() {
+  const pal = currentPalette();
+  const d = app.webH5;
+  const { section, board } = findBoard(d.boardKey, 'web');
+  const allTags = effectiveTags(d, board);
+  const v = validateWebPost(d);
+  const vis = READ_LEVELS.find(r => r.level === d.readLevel) || READ_LEVELS[0];
+  const h5ActiveSec = WEB_SECTIONS.find(s => s.key === d.boardSec) || section;
+
+  return `
+  <section class="web-h5-board ${app.webTab === 1 ? 'visible' : ''}">
+    <div class="board-head">
+      <h2>H5 窄屏 · 底部抽屉</h2>
+      <span>390px · 16px 防放大</span>
+    </div>
+    <div class="phone ${app.dark ? 'dark' : ''}" id="phone-web-h5"
+      style="--accent:${pal.btn};--accent-soft:${pal.soft};--accent-ink:${pal.ink};--accent-on:${pal.on}">
+      <div class="status-bar">
+        <span>13:56</span>
+        <span class="status-right">${ico('signal')}${ico('wifi')}<span class="bat"></span></span>
+      </div>
+      <div class="web-scope ${app.dark ? 'dark' : ''} h5-stage" style="--w-accent:${pal.btn};--w-accent-soft:${pal.soft};--w-accent-ink:${pal.ink};--w-accent-on:${pal.on}">
+        <div class="h5-bg-hint"><div class="h5-bg-card"></div><div class="h5-bg-card"></div></div>
+        <div class="h5-scrim"></div>
+        <div class="h5-drawer">
+          <div class="h5-head">
+            <button type="button" class="w-board-btn" style="height:32px;font-size:12.5px" data-h5-open-board>
+              <span class="dot"></span>
+              <span>${esc(section.name)} · ${esc(board.name)}</span>
+              ${ico('chevDown')}
+            </button>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="w-mode-seg">
+                <button type="button" class="${d.mode === 'write' ? 'on' : ''}" data-h5-mode="write">编辑</button>
+                <button type="button" class="${d.mode === 'preview' ? 'on' : ''}" data-h5-mode="preview">预览</button>
+              </div>
+              <button type="button" class="w-close" style="width:32px;height:32px" data-h5-toast="关闭网页版发帖抽屉">${ico('close')}</button>
+            </div>
+          </div>
+
+          ${d.mode === 'write' ? `
+            <div class="h5-tbar">
+              <button type="button" class="h5-tbtn" data-h5-toast="已插入加粗语法">${ico('bold')}<span>加粗</span></button>
+              <button type="button" class="h5-tbtn" data-h5-toast="已插入链接语法">${ico('link')}<span>链接</span></button>
+              <button type="button" class="h5-tbtn" data-h5-toast="已插入示例图片">${ico('image')}<span>插图</span></button>
+              <button type="button" class="h5-tbtn ${d.work ? 'on' : ''}" data-open-work="webH5">${ico('grid')}<span>作品${d.work ? ' · 已添' : ''}</span></button>
+              <button type="button" class="h5-tbtn" data-h5-toast="已添加附件">${ico('file')}<span>附件</span></button>
+              <button type="button" class="h5-tbtn ${d.pollOn ? 'on' : ''}" data-h5-toggle-poll>${ico('poll')}<span>投票</span></button>
+            </div>
+          ` : ''}
+
+          <div class="h5-body">
+            ${d.mode === 'preview' ? renderMarkdownPreviewHtml(d, pal, 'webH5') : `
+              <textarea rows="1" class="w-title-input h5-input-16" style="flex:none;font-size:18px !important;line-height:25px !important;font-weight:700" data-auto-title data-h5-title placeholder="${board.casual ? '添加标题（可选）' : '添加标题'}">${esc(d.title)}</textarea>
+              <div class="w-div"></div>
+              <textarea class="w-editor-input h5-input-16" style="min-height:110px" data-h5-body placeholder="输入正文…">${esc(d.body)}</textarea>
+
+              <div class="w-tags-line" style="padding:5px 8px">
+                ${allTags.map(t => {
+                  const isReq = board.topicTag && t.toLowerCase() === board.topicTag.toLowerCase();
+                  return isReq
+                    ? `<span class="w-tag-pill req"># ${esc(t)}</span>`
+                    : `<span class="w-tag-pill"># ${esc(t)}<button type="button" data-h5-rm-tag="${esc(t)}">${ico('close')}</button></span>`;
+                }).join('')}
+                <input type="text" class="w-tag-in h5-input-16" style="min-width:110px" data-h5-tag-in value="${esc(d.tagDraft)}" placeholder="${allTags.length >= 5 ? '已达 5 个标签上限' : '添加标签…'}" ${allTags.length >= 5 ? 'disabled' : ''}>
+              </div>
+
+              ${d.pollOn ? `
+                <section class="w-card" style="padding:12px">
+                  <div class="m-card-head">
+                    <span class="m-card-title" style="color:var(--w-ink);font-size:13px">${ico('poll')} 投票选项</span>
+                    <button type="button" class="m-x-btn" data-h5-toggle-poll>${ico('close')}</button>
+                  </div>
+                  ${d.pollOptions.map((o, idx) => `
+                    <div class="m-poll-opt" style="background:var(--w-surface);border:1px solid var(--w-line);height:38px">
+                      <input type="text" class="h5-input-16" value="${esc(o)}" data-h5-poll-opt="${idx}" placeholder="选项 ${idx + 1}">
+                    </div>
+                  `).join('')}
+                </section>
+              ` : ''}
+
+              ${d.work ? renderWorkCardHtml('webH5', d.work, 'h5') : ''}
+
+              ${d.attachments.map(a => `
+                <div class="w-att-row">
+                  <span style="color:var(--w-ink3)">${ico('file')}</span>
+                  <div class="w-att-copy"><strong>${esc(a.name)}</strong><small>${esc(a.size)} · ${a.price} 分</small></div>
+                  <button type="button" class="m-x-btn" data-h5-rm-att="${a.id}">${ico('close')}</button>
+                </div>
+              `).join('')}
+            `}
+          </div>
+
+          <div class="h5-foot">
+            <div class="h5-foot-top">
+              <button type="button" class="w-vis-btn" style="height:32px" data-h5-cycle-vis>
+                ${ico('lock')}<span>${esc(vis.label)}可见</span>${ico('chevDown')}
+              </button>
+              <span class="w-count ${v.bLen > 20000 ? 'bad' : ''}">${v.bLen} / 20,000 字</span>
+            </div>
+            <div class="h5-foot-btns">
+              <button type="button" class="w-btn-ghost" style="height:42px;background:var(--w-fill)" data-h5-toast="已取消">取消</button>
+              <button type="button" class="w-btn-primary" style="height:42px" data-h5-publish ${v.canPost ? '' : 'disabled'} title="${v.workError ? esc(v.workError) : ''}">发布</button>
+            </div>
+          </div>
+        </div>
+        ${d.boardOpen ? `
+          <div class="m-mask" style="z-index:15" data-h5-mask-close>
+            <div class="m-sheet">
+              <div class="m-handle"></div>
+              <div class="m-sheet-head">
+                <h3>选择发布板块</h3>
+                <button type="button" class="m-x-btn" data-h5-close-board>${ico('close')}</button>
+              </div>
+              ${renderMobileBoardGridBody(WEB_SECTIONS, h5ActiveSec, d.boardKey, 'data-h5-sec', 'data-h5-pick-board')}
+            </div>
+          </div>
+        ` : ''}
+        ${d.workOpen ? `
+          <div class="m-mask" style="z-index:15" data-h5-mask-close>
+            <div class="m-sheet">
+              <div class="m-handle"></div>
+              <div class="m-sheet-head">
+                <h3>添加作品</h3>
+                <button type="button" class="m-x-btn" data-h5-close-work>${ico('close')}</button>
+              </div>
+              ${renderWorkPickerBody('webH5', d)}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <div class="home-bar"></div>
+    </div>
+    <p class="board-caption">H5 窄屏：全宽底部抽屉、16px 输入字号避免 iOS 缩放、横滑工具条接入单作品底部面板与底部安全区双排提交栏。</p>
+  </section>
+  `;
+}
+
+function applyStudioTheme() {
+  const pal = currentPalette();
+  document.body.classList.toggle('studio-dark', app.dark);
+  document.body.classList.toggle('compact', app.width === 360);
+  document.documentElement.style.setProperty('--studio-accent', pal.btn);
+  document.querySelectorAll('.phone').forEach(el => {
+    el.classList.toggle('dark', app.dark);
+    el.style.setProperty('--accent', pal.btn);
+    el.style.setProperty('--accent-hi', pal.hi);
+    el.style.setProperty('--accent-soft', pal.soft);
+    el.style.setProperty('--accent-soft-line', pal.line);
+    el.style.setProperty('--accent-ink', pal.ink);
+    el.style.setProperty('--accent-on', pal.on);
+  });
+}
+
+function renderTopControls() {
+  document.querySelectorAll('[data-platform]').forEach(b => b.classList.toggle('active', b.dataset.platform === app.platform));
+  document.querySelectorAll('[data-width]').forEach(b => b.classList.toggle('active', Number(b.dataset.width) === app.width));
+  document.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('active', (b.dataset.theme === 'dark') === app.dark));
+  document.getElementById('width-control').hidden = app.platform !== 'mobile';
+
+  const tabsEl = document.getElementById('board-tabs');
+  if (app.platform === 'mobile') {
+    const labels = ['01 初始写作（全交互）', '02 富内容完整态', '03 关键场景与弹层'];
+    tabsEl.innerHTML = labels.map((l, i) => `<button type="button" class="${app.mobileTab === i ? 'active' : ''}" data-m-tab="${i}">${l}</button>`).join('');
+  } else {
+    const labels = ['PC 端弹窗（820px）', 'H5 窄屏抽屉（390px）'];
+    tabsEl.innerHTML = labels.map((l, i) => `<button type="button" class="${app.webTab === i ? 'active' : ''}" data-w-tab="${i}">${l}</button>`).join('');
+  }
+}
+
+function autoSizeTitles() {
+  document.querySelectorAll('[data-auto-title]').forEach(el => {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  });
+}
+
+function renderStage() {
+  renderTopControls();
+  const stage = document.getElementById('stage');
+  if (app.platform === 'mobile') {
+    stage.innerHTML = `
+      <div class="mobile-boards">
+        <section class="board ${app.mobileTab === 0 ? 'visible' : ''}">
+          <div class="board-head">
+            <h2>01 初始写作态（全交互）</h2>
+            <span>对比用户原截图</span>
+          </div>
+          <div class="phone" id="phone-m1">${renderMobileComposer('m1', app.m1, true)}</div>
+          <p class="board-caption">去除顶栏线、废除 <code>OutlinedTextField</code> 与占屏封面灰卡；标题与正文直达首屏，点板块/封面/话题/底栏图标均可交互。</p>
+        </section>
+
+        <section class="board ${app.mobileTab === 1 ? 'visible' : ''}">
+          <div class="board-head">
+            <h2>02 富内容完整态</h2>
+            <span>封面 · 配图 · 作品 · 附件</span>
+          </div>
+          <div class="phone" id="phone-m2">${renderMobileComposer('m2', app.m2, true)}</div>
+          <p class="board-caption">V2 作品卡与普通附件区分：支持 V2 容器 <code>.zip</code> 或 <code>.html/.htm</code> 自动转 V2 试玩预览，与底栏 48px 单行计数统一。</p>
+        </section>
+
+        <section class="board ${app.mobileTab === 2 ? 'visible' : ''}">
+          <div class="board-head">
+            <h2>03 关键场景</h2>
+            <div class="mini-seg" role="group" aria-label="关键场景切换">
+              ${[['board', '选板块'], ['work', '作品'], ['poll', '投票'], ['cover', '封面'], ['kb', '键盘']].map(([k, l]) => `
+                <button type="button" class="${app.b3Tab === k ? 'active' : ''}" data-b3-tab="${k}">${l}</button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="phone" id="phone-m3">${renderBoard3Phone()}</div>
+          <p class="board-caption">板块分组采用分段槽；作品面板合入 V2 ZIP / HTML 转 V2 与关联创作（每帖限 1 件）；投票芯片置于 <code>--fill</code> 卡片内。</p>
+        </section>
+      </div>
+    `;
+  } else {
+    stage.innerHTML = `
+      <div class="web-boards">
+        ${renderWebPcBoard()}
+        ${renderWebH5Board()}
+      </div>
+    `;
+  }
+  applyStudioTheme();
+  autoSizeTitles();
+}
+
+function showToast(hostEl, msg) {
+  if (!hostEl) return;
+  hostEl.querySelector('.m-toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'm-toast';
+  el.textContent = msg;
+  hostEl.appendChild(el);
+  clearTimeout(hostEl._toastTimer);
+  hostEl._toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+function syncMobileMetaDom(id) {
+  const phone = document.getElementById(`phone-${id}`);
+  if (!phone) return;
+  const d = app[id];
+  const v = validateMobilePost(d);
+  const pubBtn = phone.querySelector(`[data-m-publish="${id}"]`);
+  if (pubBtn) pubBtn.disabled = !v.canPost;
+  const statusEl = phone.querySelector('.m-status-text');
+  if (statusEl) {
+    statusEl.textContent = v.status;
+    statusEl.classList.toggle('bad', v.bad);
+  } else if (v.status) {
+    const infoBtn = phone.querySelector('.m-info-btn');
+    if (infoBtn) {
+      const sp = document.createElement('span');
+      sp.className = `m-status-text ${v.bad ? 'bad' : ''}`;
+      sp.textContent = v.status;
+      infoBtn.before(sp);
+    }
+  }
+  const tWrap = phone.querySelector('.m-title-wrap');
+  if (tWrap) {
+    let cnt = tWrap.querySelector('.m-title-count');
+    if (v.tLen > 60) {
+      if (!cnt) { cnt = document.createElement('span'); tWrap.appendChild(cnt); }
+      cnt.className = `m-title-count ${v.tLen > 80 ? 'bad' : ''}`;
+      cnt.textContent = `${v.tLen}/80`;
+    } else if (cnt) cnt.remove();
+  }
+}
+
+function syncWebMetaDom() {
+  const modal = document.querySelector('.w-modal');
+  if (!modal) return;
+  const v = validateWebPost(app.webPc);
+  const pubBtn = modal.querySelector('[data-w-publish]');
+  if (pubBtn) pubBtn.disabled = !v.canPost;
+  const tCount = modal.querySelector('.w-title-row .w-count');
+  if (tCount) { tCount.textContent = `${v.tLen} / 80`; tCount.classList.toggle('bad', v.tLen > 80); }
+  const bCount = modal.querySelector('.w-m-foot .w-count');
+  if (bCount) { bCount.textContent = `${v.bLen} / 20,000 字`; bCount.classList.toggle('bad', v.bLen > 20000); }
+}
+
+function renderSwatches() {
+  document.getElementById('swatches').innerHTML = ACCENTS.map(a =>
+    `<button type="button" class="swatch ${a.id === app.accentId ? 'active' : ''}" data-accent="${a.id}" title="${a.name}" aria-label="${a.name}" style="background:${a.light.btn};color:${a.light.btn}"></button>`
+  ).join('');
+}
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.hasAttribute('data-auto-title')) autoSizeTitles();
+  if (t.dataset.mTitle) {
+    const id = t.dataset.mTitle; app[id].title = t.value; app[id].touched = true;
+    syncMobileMetaDom(id); return;
+  }
+  if (t.dataset.mBody) {
+    const id = t.dataset.mBody; app[id].body = t.value; app[id].touched = true;
+    syncMobileMetaDom(id); return;
+  }
+  if (t.dataset.mPollOpt) {
+    const [id, idx] = t.dataset.mPollOpt.split(':');
+    app[id].pollOptions[Number(idx)] = t.value; app[id].touched = true;
+    syncMobileMetaDom(id); return;
+  }
+  if (t.dataset.mTagDraft) {
+    const id = t.dataset.mTagDraft; app[id].tagDraft = t.value;
+    const btn = t.parentElement.querySelector(`[data-m-add-tag="${id}"]`);
+    if (btn) btn.disabled = !t.value.trim() || app[id].tags.length >= 5;
+    return;
+  }
+  if (t.dataset.ceTitle) {
+    const target = t.dataset.ceTitle === 'm3Cover' ? app.m3CoverDraft : app.m1.coverDraft;
+    target.title = t.value;
+    const host = t.closest('.m-cover-editor');
+    const pal = currentPalette();
+    host.querySelector('.m-ce-preview').innerHTML = renderCoverSvg(target, pal.btn, false);
+    host.querySelector('.m-pub-btn').disabled = !target.title.trim() || (target.highlight.trim() && !target.title.includes(target.highlight.trim()));
+    return;
+  }
+  if (t.dataset.ceHl) {
+    const target = t.dataset.ceHl === 'm3Cover' ? app.m3CoverDraft : app.m1.coverDraft;
+    target.highlight = t.value;
+    const host = t.closest('.m-cover-editor');
+    const pal = currentPalette();
+    host.querySelector('.m-ce-preview').innerHTML = renderCoverSvg(target, pal.btn, false);
+    host.querySelector('.m-pub-btn').disabled = !target.title.trim() || (target.highlight.trim() && !target.title.includes(target.highlight.trim()));
+    return;
+  }
+  if (t.dataset.ceSub) {
+    const target = t.dataset.ceSub === 'm3Cover' ? app.m3CoverDraft : app.m1.coverDraft;
+    target.subtitle = t.value;
+    const host = t.closest('.m-cover-editor');
+    const pal = currentPalette();
+    host.querySelector('.m-ce-preview').innerHTML = renderCoverSvg(target, pal.btn, false);
+    return;
+  }
+  if (t.dataset.b3KbInput !== undefined) { app.m3Kb.body = t.value; renderStage(); return; }
+  if (t.hasAttribute('data-w-title')) { app.webPc.title = t.value; syncWebMetaDom(); return; }
+  if (t.hasAttribute('data-w-body')) { app.webPc.body = t.value; syncWebMetaDom(); return; }
+  if (t.hasAttribute('data-w-tag-in')) { app.webPc.tagDraft = t.value; return; }
+  if (t.dataset.wPollOpt !== undefined) { app.webPc.pollOptions[Number(t.dataset.wPollOpt)] = t.value; syncWebMetaDom(); return; }
+  if (t.dataset.wAttPrice) {
+    const item = app.webPc.attachments.find(a => a.id === t.dataset.wAttPrice);
+    if (item) item.price = Math.max(0, Math.min(10, Number(t.value) || 0));
+    return;
+  }
+  if (t.hasAttribute('data-h5-title')) { app.webH5.title = t.value; return; }
+  if (t.hasAttribute('data-h5-body')) { app.webH5.body = t.value; return; }
+  if (t.hasAttribute('data-h5-tag-in')) { app.webH5.tagDraft = t.value; return; }
+  if (t.dataset.h5PollOpt !== undefined) { app.webH5.pollOptions[Number(t.dataset.h5PollOpt)] = t.value; return; }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.hasAttribute('data-auto-title')) {
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'Enter' && e.target.dataset.mTagDraft) {
+    e.preventDefault();
+    const id = e.target.dataset.mTagDraft;
+    const { board } = findBoard(app[id].boardKey, 'mobile');
+    const allTags = effectiveTags(app[id], board);
+    const val = app[id].tagDraft.trim().replace(/^#/, '').slice(0, 20);
+    if (val && allTags.length < 5 && !allTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+      app[id].tags.push(val);
+      app[id].tagDraft = '';
+      renderStage();
+    }
+  }
+  if ((e.key === 'Enter' || e.key === ',') && e.target.hasAttribute('data-w-tag-in')) {
+    e.preventDefault();
+    const { board } = findBoard(app.webPc.boardKey, 'web');
+    const allTags = effectiveTags(app.webPc, board);
+    const val = app.webPc.tagDraft.trim().replace(/^#/, '').slice(0, 20);
+    if (val && allTags.length < 5 && !allTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+      app.webPc.tags.push(val);
+      app.webPc.tagDraft = '';
+      renderStage();
+    }
+  }
+  if ((e.key === 'Enter' || e.key === ',') && e.target.hasAttribute('data-h5-tag-in')) {
+    e.preventDefault();
+    const { board } = findBoard(app.webH5.boardKey, 'web');
+    const allTags = effectiveTags(app.webH5, board);
+    const val = app.webH5.tagDraft.trim().replace(/^#/, '').slice(0, 20);
+    if (val && allTags.length < 5 && !allTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+      app.webH5.tags.push(val);
+      app.webH5.tagDraft = '';
+      renderStage();
+    }
+  }
+});
+
+function workTarget(scope) {
+  return scope === 'b3' ? app.b3Work : app[scope];
+}
+
+function workHostEl(scope) {
+  if (scope === 'webPc') return document.querySelector('.w-modal');
+  if (scope === 'webH5') return document.getElementById('phone-web-h5');
+  if (scope === 'b3') return document.getElementById('phone-m3');
+  return document.getElementById(`phone-${scope}`);
+}
+
+function closeWorkPicker(scope) {
+  if (scope === 'webPc' || scope === 'webH5') app[scope].workOpen = false;
+  else if (scope === 'm1' || scope === 'm2') app[scope].sheet = null;
+}
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.workFile) {
+    const scope = t.dataset.workFile;
+    const file = t.files && t.files[0];
+    t.value = '';
+    if (!file) return;
+    const target = workTarget(scope);
+    const res = buildWorkFromFile(file);
+    if (res.error) { target.workErr = res.error; renderStage(); return; }
+    target.work = res.work;
+    target.workErr = '';
+    closeWorkPicker(scope);
+    renderStage();
+    showToast(workHostEl(scope), res.work.converted ? `已转为 V2 容器：${res.work.title}` : `已校验 V2 作品包：${res.work.title}`);
+    return;
+  }
+  if (t.dataset.workRights) {
+    const target = workTarget(t.dataset.workRights);
+    if (target?.work) { target.work.rightsAccepted = t.checked; renderStage(); }
+  }
+});
+
+document.addEventListener('click', e => {
+  if (e.target.hasAttribute && e.target.hasAttribute('data-m-mask-close')) {
+    const mid = e.target.getAttribute('data-m-mask-close');
+    if (app[mid]?.sheet) { app[mid].sheet = null; renderStage(); }
+    return;
+  }
+  if (e.target.hasAttribute && e.target.hasAttribute('data-b3-mask-close')) {
+    app.b3Tab = 'poll';
+    renderStage();
+    return;
+  }
+  if (e.target.hasAttribute && e.target.hasAttribute('data-h5-mask-close')) {
+    app.webH5.boardOpen = false;
+    app.webH5.workOpen = false;
+    renderStage();
+    return;
+  }
+  if (e.target.hasAttribute && e.target.hasAttribute('data-w-mask-close')) {
+    app.webPc.confirmLeave = false;
+    app.webPc.workOpen = false;
+    renderStage();
+    return;
+  }
+  const btn = e.target.closest('button');
+  if (!btn) {
+    if (app.webPc.boardOpen && !e.target.closest('.w-m-head-l')) { app.webPc.boardOpen = false; renderStage(); }
+    if (app.webPc.visOpen && !e.target.closest('.w-foot-l')) { app.webPc.visOpen = false; renderStage(); }
+    return;
+  }
+  const ds = btn.dataset;
+
+  if (ds.platform) {
+    app.platform = ds.platform;
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', app.platform);
+    history.replaceState(null, '', url);
+    renderStage();
+    return;
+  }
+  if (ds.width) { app.width = Number(ds.width); renderStage(); return; }
+  if (ds.theme) { app.dark = ds.theme === 'dark'; renderStage(); return; }
+  if (ds.accent) { app.accentId = ds.accent; renderSwatches(); renderStage(); return; }
+  if (btn.id === 'reset-btn') {
+    const keepPlatform = app.platform;
+    const keepDark = app.dark;
+    const keepAccent = app.accentId;
+    const keepWidth = app.width;
+    app = initialAppState();
+    app.platform = keepPlatform;
+    app.dark = keepDark;
+    app.accentId = keepAccent;
+    app.width = keepWidth;
+    renderSwatches();
+    renderStage();
+    return;
+  }
+  if (ds.mTab !== undefined) { app.mobileTab = Number(ds.mTab); renderStage(); return; }
+  if (ds.wTab !== undefined) { app.webTab = Number(ds.wTab); renderStage(); return; }
+
+  // Mobile Board 3 tabs
+  if (ds.b3Tab) { app.b3Tab = ds.b3Tab; renderStage(); return; }
+  if (ds.b3Sec) {
+    app.b3SectionKey = ds.b3Sec;
+    const sec = MOBILE_SECTIONS.find(s => s.key === ds.b3Sec);
+    if (sec && !sec.boards.some(b => b.key === app.b3BoardKey)) app.b3BoardKey = sec.boards[0].key;
+    renderStage();
+    return;
+  }
+  if (ds.b3PickBoard) { app.b3BoardKey = ds.b3PickBoard; renderStage(); return; }
+  if (ds.kbChar) { app.m3Kb.body += ds.kbChar; renderStage(); return; }
+  if (ds.kbInsert) { app.m3Kb.body += ds.kbInsert; renderStage(); return; }
+  if (btn.hasAttribute('data-kb-del')) { app.m3Kb.body = app.m3Kb.body.slice(0, -1); renderStage(); return; }
+
+  // Mobile Board 1 & 2 interactive actions
+  if (ds.mOpenBoard) {
+    const id = ds.mOpenBoard;
+    app[id].sheetSection = findBoard(app[id].boardKey, 'mobile').section.key;
+    app[id].sheet = 'board';
+    renderStage();
+    return;
+  }
+  if (ds.mSheetSec) {
+    const id = ds.mSheetSecId || ds.mSheetSec.split(':')[0];
+    const sec = ds.mSheetSecId ? ds.mSheetSec : ds.mSheetSec.split(':')[1];
+    app[id].sheetSection = sec;
+    renderStage();
+    return;
+  }
+  if (ds.mPickBoard) {
+    const id = ds.mPickBoardId || ds.mPickBoard.split(':')[0];
+    const key = ds.mPickBoardId ? ds.mPickBoard : ds.mPickBoard.split(':')[1];
+    app[id].boardKey = key; app[id].sheet = null;
+    renderStage();
+    return;
+  }
+  if (ds.mOpenCover) { app[ds.mOpenCover].sheet = 'cover'; renderStage(); return; }
+  if (ds.mPickPhotoCover) {
+    const [id, pid] = ds.mPickPhotoCover.split(':');
+    const photo = SAMPLE_PHOTOS.find(x => x.id === pid) || SAMPLE_PHOTOS[0];
+    app[id].cover = { type: 'photo', photo };
+    app[id].sheet = null;
+    renderStage();
+    return;
+  }
+  if (ds.mRmCover) { app[ds.mRmCover].cover = null; renderStage(); return; }
+  if (ds.mOpenCe) {
+    const id = ds.mOpenCe;
+    app[id].sheet = null;
+    app[id].coverDraft = { title: app[id].title || '把你的想法\n变成作品', highlight: '', subtitle: '', template: 'marker', portrait: true };
+    app[id].coverEditorOpen = true;
+    renderStage();
+    return;
+  }
+  if (ds.mEditCover) {
+    const id = ds.mEditCover;
+    if (app[id].cover?.type === 'text') {
+      app[id].coverDraft = { ...app[id].cover.spec };
+      app[id].coverEditorOpen = true;
+      renderStage();
+    } else {
+      app[id].sheet = 'cover';
+      renderStage();
+    }
+    return;
+  }
+  if (ds.ceClose) {
+    if (ds.ceClose === 'm3Cover') app.b3Tab = 'poll';
+    else app[ds.ceClose].coverEditorOpen = false;
+    renderStage();
+    return;
+  }
+  if (ds.ceUse) {
+    if (ds.ceUse === 'm3Cover') {
+      app.b3Tab = 'poll';
+      renderStage();
+      showToast(document.getElementById('phone-m3'), '已生成文字封面（设计演示）');
+    } else {
+      const id = ds.ceUse;
+      app[id].cover = { type: 'text', spec: { ...app[id].coverDraft } };
+      app[id].coverEditorOpen = false;
+      renderStage();
+    }
+    return;
+  }
+  if (ds.ceTpl) {
+    const [tid, tpl] = ds.ceTpl.split(':');
+    const target = tid === 'm3Cover' ? app.m3CoverDraft : app[tid].coverDraft;
+    target.template = tpl;
+    renderStage();
+    return;
+  }
+  if (ds.ceRatio) {
+    const [tid, val] = ds.ceRatio.split(':');
+    const target = tid === 'm3Cover' ? app.m3CoverDraft : app[tid].coverDraft;
+    target.portrait = val === '1';
+    renderStage();
+    return;
+  }
+  if (ds.mOpenTag) { app[ds.mOpenTag].sheet = 'tag'; renderStage(); return; }
+  if (ds.mAddTag) {
+    const id = ds.mAddTag;
+    const { board } = findBoard(app[id].boardKey, 'mobile');
+    const allTags = effectiveTags(app[id], board);
+    const val = app[id].tagDraft.trim().replace(/^#/, '').slice(0, 20);
+    if (val && allTags.length < 5 && !allTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+      app[id].tags.push(val); app[id].tagDraft = '';
+    }
+    renderStage();
+    return;
+  }
+  if (ds.mTogglePresetTag) {
+    const [id, tag] = ds.mTogglePresetTag.split(':');
+    const { board } = findBoard(app[id].boardKey, 'mobile');
+    const allTags = effectiveTags(app[id], board);
+    if (board.topicTag && tag.toLowerCase() === board.topicTag.toLowerCase()) return;
+    const list = app[id].tags;
+    if (list.includes(tag)) app[id].tags = list.filter(x => x !== tag);
+    else if (allTags.length < 5) list.push(tag);
+    renderStage();
+    return;
+  }
+  if (ds.mRmTag) {
+    const [id, tag] = ds.mRmTag.split(':');
+    app[id].tags = app[id].tags.filter(x => x !== tag);
+    renderStage();
+    return;
+  }
+  if (ds.mAddPhoto) {
+    const id = ds.mAddPhoto;
+    if (app[id].photos.length < 4) {
+      app[id].photos.push(SAMPLE_PHOTOS[app[id].photos.length % SAMPLE_PHOTOS.length]);
+      renderStage();
+    } else showToast(document.getElementById(`phone-${id}`), '示例最多展示 4 张配图');
+    return;
+  }
+  if (ds.mRmPhoto) {
+    const [id, idx] = ds.mRmPhoto.split(':');
+    app[id].photos.splice(Number(idx), 1);
+    renderStage();
+    return;
+  }
+  if (ds.mAddAtt) {
+    const id = ds.mAddAtt;
+    if (app[id].attachments.length < 3) {
+      const next = SAMPLE_ATTACHMENTS.find(x => !app[id].attachments.some(a => a.id === x.id)) || SAMPLE_ATTACHMENTS[0];
+      app[id].attachments.push({ ...next, id: next.id + '-' + Date.now() });
+      renderStage();
+    } else showToast(document.getElementById(`phone-${id}`), '已添加 3 个示例附件');
+    return;
+  }
+  if (ds.mRmAtt) {
+    const [id, aid] = ds.mRmAtt.split(':');
+    app[id].attachments = app[id].attachments.filter(x => x.id !== aid);
+    renderStage();
+    return;
+  }
+  if (ds.openWork) {
+    const scope = ds.openWork;
+    const target = workTarget(scope);
+    target.workTab = target.work?.source === 'mine' ? 'mine' : 'upload';
+    target.workErr = '';
+    if (scope === 'webPc' || scope === 'webH5') {
+      target.workOpen = true;
+      target.boardOpen = false;
+      target.visOpen = false;
+    } else {
+      target.sheet = 'work';
+    }
+    renderStage();
+    return;
+  }
+  if (ds.workTab) {
+    const [scope, tab] = ds.workTab.split(':');
+    const target = workTarget(scope);
+    target.workTab = tab;
+    target.workErr = '';
+    renderStage();
+    return;
+  }
+  if (ds.workSample) {
+    const [scope, key] = ds.workSample.split(':');
+    const sample = WORK_UPLOAD_SAMPLES.find(x => x.key === key);
+    const target = workTarget(scope);
+    if (sample && target) {
+      target.work = { ...sample, rightsAccepted: false };
+      target.workErr = '';
+      closeWorkPicker(scope);
+      renderStage();
+      showToast(workHostEl(scope), sample.converted ? `已转为 V2 容器：${sample.title}` : `已校验 V2 作品包：${sample.title}`);
+    }
+    return;
+  }
+  if (ds.workPickMine) {
+    const [scope, wid] = ds.workPickMine.split(':');
+    const found = WORKS_CATALOG.find(x => x.id === Number(wid));
+    const target = workTarget(scope);
+    if (found && target) {
+      target.work = { source: 'mine', ...found };
+      target.workErr = '';
+      closeWorkPicker(scope);
+      renderStage();
+      showToast(workHostEl(scope), `已关联创作「${found.title}」`);
+    }
+    return;
+  }
+  if (ds.rmWork) {
+    const target = workTarget(ds.rmWork);
+    if (target) { target.work = null; renderStage(); }
+    return;
+  }
+  if (ds.previewWork) {
+    const target = workTarget(ds.previewWork);
+    if (target?.work) showToast(workHostEl(ds.previewWork), `正在 V2 容器中试玩「${target.work.title}」`);
+    return;
+  }
+  if (ds.mTogglePoll) {
+    const id = ds.mTogglePoll;
+    app[id].pollOn = !app[id].pollOn;
+    if (app[id].pollOn && app[id].pollOptions.every(x => !x.trim())) app[id].pollOptions = ['方案 A', '方案 B'];
+    renderStage();
+    return;
+  }
+  if (ds.mAddPollOpt) {
+    const id = ds.mAddPollOpt;
+    if (app[id].pollOptions.length < 6) { app[id].pollOptions.push(''); renderStage(); }
+    return;
+  }
+  if (ds.mRmPollOpt) {
+    const [id, idx] = ds.mRmPollOpt.split(':');
+    if (app[id].pollOptions.length > 2) { app[id].pollOptions.splice(Number(idx), 1); renderStage(); }
+    return;
+  }
+  if (ds.mPollDay) {
+    const [id, day] = ds.mPollDay.split(':');
+    app[id].pollDays = Number(day);
+    renderStage();
+    return;
+  }
+  if (ds.mToggleLimits) {
+    const id = ds.mToggleLimits;
+    app[id].showLimits = !app[id].showLimits;
+    renderStage();
+    return;
+  }
+  if (ds.mBack) {
+    const id = ds.mBack;
+    const d = app[id];
+    if (d.title.trim() || d.body.trim() || d.tags.length || d.photos.length || d.cover || d.work || d.attachments.length) {
+      d.sheet = 'leave';
+      renderStage();
+    } else showToast(document.getElementById(`phone-${id}`), '返回社区页');
+    return;
+  }
+  if (ds.mDiscard) {
+    const id = ds.mDiscard;
+    const fresh = initialAppState()[id];
+    app[id] = fresh;
+    renderStage();
+    showToast(document.getElementById(`phone-${id}`), '已放弃草稿并重置');
+    return;
+  }
+  if (ds.mPublish) {
+    showToast(document.getElementById(`phone-${ds.mPublish}`), '发布成功 · 已跳转至帖子详情');
+    return;
+  }
+  if (ds.mCloseSheet) {
+    const id = ds.mCloseSheet;
+    if (app[id]?.sheet) { app[id].sheet = null; renderStage(); }
+    return;
+  }
+
+  // Web PC actions
+  if (ds.wPreset) {
+    app.webPcPreset = ds.wPreset;
+    if (ds.wPreset === 'empty') {
+      Object.assign(app.webPc, {
+        boardKey: 'discuss-uncategorized', boardSec: 'discuss', mode: 'write', title: '', body: '',
+        tags: [], tagDraft: '', cover: null, photos: [], work: null, workOpen: false, workErr: '', attachments: [], pollOn: false,
+        boardOpen: false, visOpen: false, confirmLeave: false, readLevel: 0,
+      });
+    } else if (ds.wPreset === 'rich') {
+      app.webPc = initialAppState().webPc;
+    } else if (ds.wPreset === 'poll') {
+      Object.assign(app.webPc, {
+        boardKey: 'learn', boardSec: 'discuss', mode: 'write',
+        title: '桌面悬浮组件在深色壁纸下边缘发虚，哪种混合方案更稳？',
+        body: '开启高斯模糊后阴影边缘会有一圈灰边，试过把圆角描边降到 0.5dp 还是有一点，整理了两种视觉方案想听听大家偏好：',
+        tags: ['桌面组件', '着色器'], tagDraft: '', cover: null, photos: [], work: null, workOpen: false, workErr: '',
+        attachments: [{ ...SAMPLE_ATTACHMENTS[1] }], pollOn: true,
+        pollOptions: ['改用内描边 + 暗角遮罩', '降低模糊半径到 12px'], pollDays: 7,
+        boardOpen: false, visOpen: false, confirmLeave: false,
+      });
+    }
+    renderStage();
+    return;
+  }
+  if (btn.hasAttribute('data-w-toggle-board')) {
+    app.webPc.boardOpen = !app.webPc.boardOpen;
+    app.webPc.visOpen = false;
+    renderStage();
+    return;
+  }
+  if (ds.wSec) { app.webPc.boardSec = ds.wSec; renderStage(); return; }
+  if (ds.wPickBoard) { app.webPc.boardKey = ds.wPickBoard; app.webPc.boardOpen = false; renderStage(); return; }
+  if (ds.wMode) { app.webPc.mode = ds.wMode; renderStage(); return; }
+  if (ds.wWrap) {
+    const snippets = { bold: '**加粗内容**', link: '[参考链接](https://xiangban.xyz)', code: '`inlineCode()`', codeblock: '\n```\n// 通用代码块\n```\n', list: '\n- 要点一' };
+    app.webPc.body += (app.webPc.body ? ' ' : '') + snippets[ds.wWrap];
+    renderStage();
+    return;
+  }
+  if (btn.hasAttribute('data-w-add-photo')) {
+    if (app.webPc.photos.length < 3) { app.webPc.photos.push(SAMPLE_PHOTOS[app.webPc.photos.length % SAMPLE_PHOTOS.length]); renderStage(); }
+    return;
+  }
+  if (ds.wRmPhoto !== undefined) { app.webPc.photos.splice(Number(ds.wRmPhoto), 1); renderStage(); return; }
+  if (btn.hasAttribute('data-w-toggle-cover')) {
+    app.webPc.cover = app.webPc.cover ? null : { type: 'text', spec: { title: app.webPc.title || '社区创作分享', highlight: '分享', subtitle: '图文并茂清晰呈现', template: 'marker', portrait: true } };
+    renderStage();
+    return;
+  }
+  if (btn.hasAttribute('data-w-close-work')) { app.webPc.workOpen = false; renderStage(); return; }
+  if (btn.hasAttribute('data-w-toggle-poll')) { app.webPc.pollOn = !app.webPc.pollOn; renderStage(); return; }
+  if (btn.hasAttribute('data-w-add-poll-opt')) { if (app.webPc.pollOptions.length < 6) { app.webPc.pollOptions.push(''); renderStage(); } return; }
+  if (ds.wRmPollOpt !== undefined) { app.webPc.pollOptions.splice(Number(ds.wRmPollOpt), 1); renderStage(); return; }
+  if (ds.wPollDay !== undefined) { app.webPc.pollDays = Number(ds.wPollDay); renderStage(); return; }
+  if (btn.hasAttribute('data-w-add-att')) {
+    if (app.webPc.attachments.length < 4) {
+      const next = SAMPLE_ATTACHMENTS[app.webPc.attachments.length % SAMPLE_ATTACHMENTS.length];
+      app.webPc.attachments.push({ ...next, id: next.id + '-' + Date.now() });
+      renderStage();
+    }
+    return;
+  }
+  if (ds.wRmAtt) { app.webPc.attachments = app.webPc.attachments.filter(a => a.id !== ds.wRmAtt); renderStage(); return; }
+  if (ds.wRmTag) { app.webPc.tags = app.webPc.tags.filter(x => x !== ds.wRmTag); renderStage(); return; }
+  if (ds.wPresetTag) {
+    const tag = ds.wPresetTag;
+    const { board } = findBoard(app.webPc.boardKey, 'web');
+    const allTags = effectiveTags(app.webPc, board);
+    if (board.topicTag && tag.toLowerCase() === board.topicTag.toLowerCase()) return;
+    if (app.webPc.tags.includes(tag)) app.webPc.tags = app.webPc.tags.filter(x => x !== tag);
+    else if (allTags.length < 5) app.webPc.tags.push(tag);
+    renderStage();
+    return;
+  }
+  if (btn.hasAttribute('data-w-toggle-vis')) { app.webPc.visOpen = !app.webPc.visOpen; app.webPc.boardOpen = false; renderStage(); return; }
+  if (ds.wPickVis !== undefined) { app.webPc.readLevel = Number(ds.wPickVis); app.webPc.visOpen = false; renderStage(); return; }
+  if (btn.hasAttribute('data-w-try-close')) {
+    if (app.webPc.title.trim() || app.webPc.body.trim()) { app.webPc.confirmLeave = true; renderStage(); }
+    else showToast(document.querySelector('.w-modal'), '已关闭发帖弹窗');
+    return;
+  }
+  if (btn.hasAttribute('data-w-cancel-close')) { app.webPc.confirmLeave = false; renderStage(); return; }
+  if (btn.hasAttribute('data-w-confirm-close')) {
+    app.webPc.confirmLeave = false;
+    app.webPcPreset = 'empty';
+    Object.assign(app.webPc, { title: '', body: '', tags: [], cover: null, photos: [], work: null, workOpen: false, workErr: '', attachments: [], pollOn: false });
+    renderStage();
+    showToast(document.querySelector('.w-modal'), '已确认放弃并清空草稿');
+    return;
+  }
+  if (btn.hasAttribute('data-w-publish')) { showToast(document.querySelector('.w-modal'), '发布成功 · 正在跳转帖子详情'); return; }
+
+  // Web H5 actions
+  if (btn.hasAttribute('data-h5-open-board')) {
+    app.webH5.boardSec = findBoard(app.webH5.boardKey, 'web').section.key;
+    app.webH5.boardOpen = true;
+    app.webH5.workOpen = false;
+    renderStage();
+    return;
+  }
+  if (btn.hasAttribute('data-h5-close-board')) { app.webH5.boardOpen = false; renderStage(); return; }
+  if (btn.hasAttribute('data-h5-close-work')) { app.webH5.workOpen = false; renderStage(); return; }
+  if (ds.h5Sec) { app.webH5.boardSec = ds.h5Sec; renderStage(); return; }
+  if (ds.h5PickBoard) { app.webH5.boardKey = ds.h5PickBoard; app.webH5.boardOpen = false; renderStage(); return; }
+  if (ds.h5Mode) { app.webH5.mode = ds.h5Mode; renderStage(); return; }
+  if (btn.hasAttribute('data-h5-toggle-poll')) { app.webH5.pollOn = !app.webH5.pollOn; renderStage(); return; }
+  if (ds.h5RmTag) { app.webH5.tags = app.webH5.tags.filter(x => x !== ds.h5RmTag); renderStage(); return; }
+  if (ds.h5RmAtt) { app.webH5.attachments = app.webH5.attachments.filter(a => a.id !== ds.h5RmAtt); renderStage(); return; }
+  if (btn.hasAttribute('data-h5-cycle-vis')) { app.webH5.readLevel = app.webH5.readLevel === 0 ? 1 : 0; renderStage(); return; }
+  if (btn.hasAttribute('data-h5-publish')) { showToast(document.getElementById('phone-web-h5'), '发布成功 · 跳转到新帖'); return; }
+  if (ds.h5Toast) { showToast(document.getElementById('phone-web-h5'), ds.h5Toast); return; }
+});
+
+renderSwatches();
+renderStage();
+</script>
+</body>
+</html>
