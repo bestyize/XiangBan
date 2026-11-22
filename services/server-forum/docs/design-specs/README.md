@@ -14,6 +14,20 @@ python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/d
 
 ---
 
+## 我的 / 个人主页 / 我的作品 / 通知重设计稿（PC + 移动 H5）
+
+[个人中心四页套件重设计稿](prototypes/web-profile-suite.html) 对齐手机 App 方案 1 视觉语言与 `community-redesign` PC 端左导轨壳层，支持 **PC + 手机 H5 同屏对照** 切换查看四个页面：**我的**（隐藏外露积分、一键复制 ID、每日签到与收藏/作品/通知三宫格 + 服务社群入口）、**个人主页**（本人/他人视角、四列等宽数据条、帖子/回复/关注/粉丝四栏，他人屏蔽入口收进 `···` 菜单）、**我的作品**（内容包/方案切换 + 状态筛选 + 48px 图标块行与 `···` 操作菜单）与**通知**（顶栏右上角全部已读 + 全部/未读 Tab + 发送者头像与未读红点）。支持未登录、空态、已屏蔽、深浅色与 6 套主题色切换。
+
+从仓库根目录启动本机预览：
+
+```sh
+python3 -m http.server 1450 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs
+```
+
+- [PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-profile-suite.html) · [PC 端预览](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=desktop) · [手机 H5 预览](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=mobile)
+
+---
+
 ## 既有单页与卡片参考稿
 
 [发帖页设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 覆盖网页版 PC 820px 弹窗（级联板块菜单、编辑/预览切换、单作品入口支持 V2 ZIP / HTML·HTM 转 V2 与关联创作、内联附件定价、上拉阅读权限与弹窗内关闭确认）、H5 窄屏 16px 底部抽屉，以及手机端 3 画面交互稿，支持明暗模式与 6 套主题色。[网页预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web) · [手机预览](http://127.0.0.1:1421/prototypes/post-composer.html)。
