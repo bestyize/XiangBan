@@ -210,7 +210,9 @@ internal fun AiChatPage(
     val conversation = cloud.conversationId
     val accountGeneration = session.generation
     val main = back == null
-    val archived = !main && cloud.mainTopic != null
+    val currentMainTopic = cloud.mainTopic
+    val latestMainTopic = cloud.conversations.mapNotNull { it.mainTopic }.maxOrNull()
+    val archived = !main && currentMainTopic != null && latestMainTopic != null && currentMainTopic < latestMainTopic
     val ime = WindowInsets.ime
     val navigationBars = WindowInsets.navigationBars
     val density = LocalDensity.current

@@ -125,7 +125,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     )
                 }
                 RetainedTabPage(selected = selectedTab == Tab.Mine) {
-                    MineScreen(env, ::push)
+                    MineScreen(env, ::push, onCreate = { chat.clearConversation(); push(Route.AiChat) })
                 }
                 if (selectedTab != Tab.Ai && (!gameOverlayOpen || !gamesSelected)) {
                     MainBottomNav(selectedTab, onSelect = { tab = it.name }, onPublish = { publishOpen = true },

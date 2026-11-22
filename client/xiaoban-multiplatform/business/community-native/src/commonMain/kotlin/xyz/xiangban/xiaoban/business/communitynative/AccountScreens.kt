@@ -178,7 +178,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
 
 /** “我的”：头像和名字、三个常用入口、几行设置入口。网页端的功能给出入口。 */
 @Composable
-fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
+fun MineScreen(env: CommunityEnv, open: (Route) -> Unit, onCreate: () -> Unit = { open(Route.AiChat) }) {
     val session by env.session.state.collectAsState()
     val remoteState by env.remoteChat.state.collectAsState()
     var nickname by remember { mutableStateOf<String?>(null) }
@@ -222,7 +222,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(vertical = 14.dp, horizontal = 4.dp)) {
                 QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
                 QuickTile(XIcons.Message, if (unread > 0) "通知 · $unread" else "通知", Modifier.weight(1f)) { open(if (session.loggedIn) Route.Notifications else Route.Login) }
-                QuickTile(XIcons.Monitor, "创作", Modifier.weight(1f)) { open(Route.AiChat) }
+                QuickTile(XIcons.Monitor, "创作", Modifier.weight(1f), onCreate)
             }
 
             Column(Modifier.padding(top = 8.dp)) {
