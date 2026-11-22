@@ -3093,12 +3093,329 @@ body.wb-collapsed .app-shell[data-device="desktop"].is-unframed .pc-rail {
 .xhs-pc-nav.is-next { right: 12px; }
 
 .xhs-author-bar {
+  position: relative;
+  z-index: 15;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 14px 24px;
   border-bottom: 1px solid var(--bd);
+}
+
+.xhs-author-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.xhs-role-pill,
+.xhs-pin-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.xhs-role-pill {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+
+.xhs-pin-pill {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.app-shell[data-theme="dark"] .xhs-pin-pill {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.xhs-more-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.h5-icon-btn.is-open {
+  background: var(--bg-subtle);
+  color: var(--ink-1);
+}
+
+.xhs-pc-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 156px;
+  padding: 6px;
+  border-radius: 13px;
+  background: var(--bg-surface);
+  border: 1px solid var(--bd);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  display: grid;
+  gap: 2px;
+  z-index: 30;
+}
+
+.app-shell[data-theme="dark"] .xhs-pc-menu {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
+}
+
+.xhs-menu-item {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-1);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.xhs-menu-item:hover {
+  background: var(--bg-subtle);
+}
+
+.xhs-menu-item.is-danger {
+  color: #dc2626;
+}
+
+.xhs-menu-item.is-danger:hover {
+  background: rgba(220, 38, 38, 0.09);
+}
+
+.app-shell[data-theme="dark"] .xhs-menu-item.is-danger {
+  color: #f87171;
+}
+
+.app-shell[data-theme="dark"] .xhs-menu-item.is-danger:hover {
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.xhs-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--bd);
+}
+
+/* H5 底部操作面板（Action Sheet） */
+.h5-action-sheet {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 45;
+  background: var(--bg-canvas);
+  border-top: 1px solid var(--bd);
+  border-radius: 20px 20px 0 0;
+  padding: 8px 12px 14px;
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.18);
+  display: grid;
+  gap: 8px;
+}
+
+.h5-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bd-strong, rgba(148, 163, 184, 0.4));
+  margin: 0 auto 4px;
+}
+
+.h5-sheet-group {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--bd);
+}
+
+.h5-sheet-row {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-1);
+  font-size: 14.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+
+.h5-sheet-row:hover {
+  background: var(--bg-subtle);
+}
+
+.h5-sheet-row.is-danger {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.app-shell[data-theme="dark"] .h5-sheet-row.is-danger {
+  color: #f87171;
+}
+
+.h5-sheet-divider {
+  height: 1px;
+  background: var(--bd);
+  margin: 0 14px;
+}
+
+.h5-sheet-cancel {
+  width: 100%;
+  height: 46px;
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  color: var(--ink-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.h5-sheet-cancel:hover {
+  background: var(--bg-subtle);
+}
+
+/* 详情页删除二次确认弹窗 */
+.xhs-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.44);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.app-shell[data-device="desktop"].is-unframed .xhs-confirm-backdrop {
+  position: fixed;
+}
+
+.xhs-confirm-dialog {
+  width: min(100%, 340px);
+  background: var(--bg-surface);
+  color: var(--ink-1);
+  border: 1px solid var(--bd);
+  border-radius: 18px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
+}
+
+.xhs-confirm-backdrop.is-mobile .xhs-confirm-dialog {
+  width: min(100%, 310px);
+  padding: 18px 18px 15px;
+}
+
+.xhs-confirm-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.xhs-confirm-dialog p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.xhs-confirm-note {
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app-shell[data-theme="dark"] .xhs-confirm-note {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+.xhs-confirm-actions {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.xhs-confirm-btn {
+  height: 38px;
+  border-radius: 11px;
+  border: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.14s, background-color 0.14s;
+}
+
+.xhs-confirm-btn.is-cancel {
+  background: var(--bg-subtle);
+  color: var(--ink-1);
+}
+
+.xhs-confirm-btn.is-cancel:hover {
+  filter: brightness(0.96);
+}
+
+.xhs-confirm-btn.is-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.xhs-confirm-btn.is-danger:hover {
+  background: #b91c1c;
+}
+
+/* 评论行轻量删除入口 */
+.xhs-comment-del-btn {
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3, var(--ink-2));
+  cursor: pointer;
+  transition: color 0.14s, opacity 0.14s;
+}
+
+.xhs-comment-del-btn:hover {
+  color: #dc2626;
+}
+
+.app-shell[data-theme="dark"] .xhs-comment-del-btn:hover {
+  color: #f87171;
+}
+
+.app-shell[data-device="desktop"] .xhs-comment-del-btn {
+  opacity: 0;
+}
+
+.app-shell[data-device="desktop"] .xhs-comment-row:hover .xhs-comment-del-btn,
+.app-shell[data-device="desktop"] .xhs-comment-del-btn:focus-visible {
+  opacity: 1;
 }
 
 .xhs-pc-body {
