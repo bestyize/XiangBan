@@ -110,9 +110,9 @@ Android 提醒返回稳定 id；`list_reminders` 查询，`update_reminder` 修�
 
 ## 游戏中心 A 版（2026-10-31）
 
-手机版游戏页接入[轻量游戏库设计](docs/design-specs/prototypes/game-center.html)：双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 安装包保留 11 款官方作品的清单和缩略图，打开主界面后后台从资源机下载游戏包，按内置清单校验大小和 SHA-256 并缓存在应用私有目录；首次下载约 19 MB，也会使用移动网络。首次打开未缓存的游戏会等待下载，缓存后可离线运行；损坏的缓存会重新下载。手机和桌面共用游戏包，手机宿主在读取入口时加入自身适配；遥控器和轻启仍随应用打包。游戏不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。创作时需要的 Three.js 从已验证的魔方游戏缓存读取，未缓存时按需下载。官方排序优先暮色滑翔、水墨剑客、雅韵五子棋与 3D 全阶魔方。
+手机版游戏页接入[轻量游戏库设计](docs/design-specs/prototypes/game-center.html)：双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 安装包随包提供画框马里奥，并保留 9 款共用官方作品的清单和缩略图，打开主界面后后台从资源机下载游戏包，按内置清单校验大小和 SHA-256 并缓存在应用私有目录；首次下载约 6 MB，也会使用移动网络。首次打开未缓存的游戏会等待下载，缓存后可离线运行；损坏的缓存会重新下载。手机和桌面共用游戏包，手机宿主在读取入口时加入自身适配；遥控器和轻启仍随应用打包。游戏不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。创作时需要的 Three.js 从已验证的魔方游戏缓存读取，未缓存时按需下载。精选游戏按方块爆破、暮色滑翔、水墨剑客、画框马里奥开头排列。
 
-验证：在本目录执行 `XIAOBAN_BUILTIN_DISTRIBUTION="$PWD/../../assets/game-packs/distribution.json" ./gradlew :androidApp:testDebugUnitTest --tests '*BuiltinDistributionTest*' :androidApp:assembleDebug`，从资源机验证 11 个包、宿主适配、缓存复用与损坏后修复。正式安装包仍需按仓库规范手动构建发布。
+验证：在本目录执行 `XIAOBAN_BUILTIN_DISTRIBUTION="$PWD/../../assets/game-packs/distribution.json" ./gradlew :androidApp:testDebugUnitTest --tests '*BuiltinDistributionTest*' :androidApp:assembleDebug`，从资源机验证 9 个共用包、宿主适配、缓存复用与损坏后修复。正式安装包仍需按仓库规范手动构建发布。
 
 最近游玩只在沙箱收到有效 `game.ready` 后持久保存，读取失败或仅点击启动不会产生记录。自创游戏优先显示本地 `cover.svg`，缺少或解码失败时显示名称封面；试玩、修改、ZIP 导出沿用原平台能力。iOS 仍未接入游戏运行和本地创作，显示平台不可用状态。
 

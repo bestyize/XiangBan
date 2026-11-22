@@ -2,14 +2,6 @@
   "version": 1,
   "games": [
     {
-      "id": "falling-blocks",
-      "kind": "game",
-      "url": "https://res.xiangban.xyz/files/6a6fe97f98b2315cb05f83561d602145.zip",
-      "sha256": "cac9711f030b4bb5689cab1aa84fab879047bcbcc9b07d90a9766a147f53a250",
-      "bytes": 8905,
-      "sourceSha256": "7eff5b451eeb50e63a40ba40036980095c2c0806988ecd0a8e823f3a300277df"
-    },
-    {
       "id": "merge-2048",
       "kind": "game",
       "url": "https://res.xiangban.xyz/files/de201dc37dfe5981dae0cf807c410369.zip",
@@ -24,14 +16,6 @@
       "sha256": "6ff3040891489ba6094563a91feed5e6be0f822b83c50569b8562b2fcc2026b0",
       "bytes": 520583,
       "sourceSha256": "6f0c0d8642d98bc51b9905e2d4351d1a36982afa6ab48895603a7c529d3f0fc6"
-    },
-    {
-      "id": "pocket-sprites",
-      "kind": "game",
-      "url": "https://res.xiangban.xyz/files/38e3e8333cf603141925a3955f411923.zip",
-      "sha256": "586809cbda58a2148cbd3b9d0baa4466fcc27e347eca16b9491c1db28f6d1824",
-      "bytes": 13239292,
-      "sourceSha256": "b157424123097a835cc271557fb518975814e4ec3f82befc44b30deb5078b03f"
     },
     {
       "id": "water-sort",

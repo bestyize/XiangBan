@@ -154,7 +154,7 @@ const ALIASES: &[(&str, &str)] = &[
     ("effect", "特效 下雪 下雨 花瓣 粒子 飘雪 樱花"),
     ("widget", "组件 小组件 待办 纪念日 倒数日 今日日程 股票 时钟 天气组件 木鱼 月历 置顶 层级 最上面 贴桌面 贴在桌面 标记完成"),
     ("pet", "宠物 桌宠 伙伴 盆栽 换形象 表情"),
-    ("games", "游戏 小程序 小应用 作品包 贪吃蛇 俄罗斯方块 2048 消失高手 奶茶大师 水墨剑客 暮色滑翔 游玩 app_read_format app_create app_validate app_open"),
+    ("games", "游戏 小程序 小应用 作品包 贪吃蛇 2048 消失高手 奶茶大师 水墨剑客 暮色滑翔 游玩 app_read_format app_create app_validate app_open"),
     ("care", "提醒 闹钟 到点 叫我 定时 下班提醒 休息提醒"),
     ("windows", "移动 挪到 左上角 右上角 左下角 右下角 居中 收起 悬浮条 悬浮球 显示器"),
     ("settings-general", "开机启动 开机自启 暂停动画 恢复动画 动画 帧率 数据目录"),

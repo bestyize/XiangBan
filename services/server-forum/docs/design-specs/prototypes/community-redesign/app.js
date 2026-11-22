@@ -680,7 +680,6 @@
     { id: 'dusk-glider', title: '暮色滑翔', genre: '冒险', icon: './assets/app-dusk-glider.svg' },
     { id: 'ink-blade', title: '水墨剑客', genre: '冒险', icon: './assets/app-ink-blade.svg' },
     { id: 'block-puzzle', title: '方块爆破', genre: '益智', icon: './assets/app-block-puzzle.webp' },
-    { id: 'pocket-sprites', title: '口袋精灵', genre: '益智', icon: './assets/app-pocket-sprites.png' },
     { id: 'pro-cube', title: '魔方空间', genre: '益智', icon: './assets/app-pro-cube.webp' },
     { id: 'jade-gomoku', title: '青玉五子棋', genre: '棋牌', icon: './assets/app-jade-gomoku.webp' },
     { id: 'water-sort', title: '彩虹分水', genre: '益智', icon: './assets/app-water-sort.webp' },

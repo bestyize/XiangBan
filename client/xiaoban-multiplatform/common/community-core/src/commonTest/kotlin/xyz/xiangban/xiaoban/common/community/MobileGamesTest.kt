@@ -124,7 +124,7 @@ class MobileGamesTest {
 
     @Test
     fun `validation covers identifiers metadata paths and text limits`() {
-        for (id in listOf("a", "A-game", "-game", "game-", "a_game", "falling-blocks", "pro-cube", "jade-gomoku", "mbti")) {
+        for (id in listOf("a", "A-game", "-game", "game-", "a_game", "pro-cube", "jade-gomoku", "mbti")) {
             assertFailsWith<IllegalArgumentException>(id) { MobileGameFormat.metadata(game.copy(id = id)) }
         }
         for (path in listOf("../index.html", "/index.html", "a\\game.js", "a:b.js", "a/.hidden.js", "a/b/c/d/e/f/g.js", "assets/a.png", "a.exe", "__MACOSX/game.js", "manifest.json/game.js")) {

@@ -98,10 +98,6 @@ class RuntimeV2Activity : ComponentActivity() {
     private var blockPuzzleShowingResult = false
     private val blockPuzzleFullBleed: Boolean
         get() = ::pack.isInitialized && pack.host == "official-block-puzzle.app.xiangban.xyz"
-    private val pocketSprites: Boolean
-        get() = ::pack.isInitialized && pack.host == "official-pocket-sprites.app.xiangban.xyz"
-    private val pocketSpritesFullBleed: Boolean
-        get() = pocketSprites && ready && !failed
     private var reportedOpen = false
     private var networkDisabled = true
     private var legacySave: JSONObject? = null
@@ -437,7 +433,7 @@ class RuntimeV2Activity : ComponentActivity() {
             } else {
                 show(WindowInsetsCompat.Type.systemBars())
                 val useDarkIcons = when {
-                    pocketSpritesFullBleed || wallpaperPreviewing -> false
+                    wallpaperPreviewing -> false
                     blockPuzzleFullBleed -> !blockPuzzleShowingResult
                     else -> !dark
                 }
@@ -496,7 +492,7 @@ class RuntimeV2Activity : ComponentActivity() {
         playing = false
         blockPuzzleShowingResult = false
         if (wallpaperPreviewing) setWallpaperPreviewing(false)
-        if (blockPuzzleFullBleed || pocketSprites) updateSystemBars()
+        if (blockPuzzleFullBleed) updateSystemBars()
         acceptingStorage = true
         chrome.loading()
         startedAt = System.currentTimeMillis()
@@ -639,7 +635,6 @@ class RuntimeV2Activity : ComponentActivity() {
                     log?.add("game.ready", "readyMs" to System.currentTimeMillis() - startedAt)
                     handler.removeCallbacks(timeout)
                     chrome.loaded()
-                    if (pocketSprites) updateSystemBars()
                     reportOpen()
                 }
             }
@@ -892,7 +887,6 @@ class RuntimeV2Activity : ComponentActivity() {
         handler.removeCallbacks(timeout)
         updateVisibility()
         chrome.error(message) { leave(reopen = true) }
-        if (pocketSprites) updateSystemBars()
     }
 
     private fun handleBack() {

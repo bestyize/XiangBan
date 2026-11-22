@@ -1,7 +1,7 @@
 /** Strict offline v1 archive reader. Limits are checked while inflating, not only from ZIP metadata. */
 const ZIP_MAX = 5 * 1024 * 1024, FILE_MAX = 1024 * 1024, TOTAL_MAX = 4 * 1024 * 1024
 const allowed = /\.(html|js|css|json|svg|md|txt)$/i
-const builtin = new Set(['falling-blocks','merge-2048','block-puzzle','water-sort','snake-arena','ink-blade','dusk-glider','pro-cube','jade-gomoku'])
+const builtin = new Set(['merge-2048','block-puzzle','water-sort','snake-arena','ink-blade','dusk-glider','pro-cube','jade-gomoku'])
 export function sandboxUrl(value: string, forumOrigin: string): string {
   const url = new URL(value)
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.origin === forumOrigin || (url.protocol !== 'https:' && !['localhost','127.0.0.1','[::1]'].includes(url.hostname))) throw new Error('试玩宿主必须使用独立的 HTTPS 域名（本地可用不同端口）')

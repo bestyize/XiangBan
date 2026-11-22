@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { copyFile, readFile, readdir, rm } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { checkBuiltinDistribution } from './scripts/check-builtin-distribution.mjs'
 
@@ -26,11 +26,6 @@ export default defineConfig({
           }
         }
         await prune(resolve(root, id))
-        if (id === 'pocket-sprites') {
-          for (const name of ['icon.png', 'cover.png']) {
-            await copyFile(resolve('../../assets/game-packs/previews/pocket-sprites', name), resolve(root, id, 'assets', name))
-          }
-        }
       }
     },
   }],

@@ -34,13 +34,4 @@ html.xb-builtin-runtime #selectOverlay .difficulty {
   html.xb-builtin-runtime body.hosted .game .stats {
     grid-column: 1 / 3;
   }
-
-  /* Falling Blocks puts its pause control directly in the first grid row. */
-  html.xb-builtin-runtime .game:has(> .dashboard #next) {
-    --falling-menu-space: max(0px, calc(var(--xb-builtin-capsule-end) - (100vw - min(100vw, 480px)) / 2 - 12px));
-    grid-template-columns: minmax(0, 1fr) 64px 44px var(--falling-menu-space);
-  }
-  html.xb-builtin-runtime .game:has(> .dashboard #next) .stats { grid-column: 1; }
-  html.xb-builtin-runtime .game:has(> .dashboard #next) .next { grid-column: 2; }
-  html.xb-builtin-runtime .game:has(> .dashboard #next) #pauseButton { grid-column: 3; }
 }

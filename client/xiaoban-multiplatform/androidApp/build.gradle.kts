@@ -155,7 +155,6 @@ val mobileVoiceAssets = tasks.register<SyncMobileVoiceAssets>("syncMobileVoiceAs
 abstract class SyncMobileGameAssets : DefaultTask() {
     @get:InputDirectory abstract val sourceDirectory: org.gradle.api.file.DirectoryProperty
     @get:InputDirectory abstract val runtimeDirectory: org.gradle.api.file.DirectoryProperty
-    @get:InputDirectory abstract val previewDirectory: org.gradle.api.file.DirectoryProperty
     @get:InputFile abstract val distributionFile: org.gradle.api.file.RegularFileProperty
     @get:OutputDirectory abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
     @get:javax.inject.Inject abstract val files: org.gradle.api.file.FileSystemOperations
@@ -193,10 +192,8 @@ abstract class SyncMobileGameAssets : DefaultTask() {
                 val manifest = JsonSlurper().parse(source.resolve("$id/manifest.json")) as Map<*, *>
                 from(source.resolve(id)) {
                     include("manifest.json", manifest["icon"] as String, manifest["cover"] as String)
-                    if (id == "pocket-sprites") exclude(manifest["icon"] as String, manifest["cover"] as String)
                     into(target)
                 }
-                if (id == "pocket-sprites") from(previewDirectory) { into("$target/assets") }
             }
             from(listOf(runtime.resolve("builtin-runtime.js"), runtime.resolve("builtin-runtime.css"))) { into("builtin-runtime-v2") }
             from(distributionFile) { into("builtin-games") }
@@ -217,7 +214,6 @@ abstract class SyncMobileGameAssets : DefaultTask() {
 val mobileGameAssets = tasks.register<SyncMobileGameAssets>("syncMobileGameAssets") {
     sourceDirectory.set(rootProject.layout.projectDirectory.dir("../xiaoban-desktop/public/game-packs"))
     runtimeDirectory.set(layout.projectDirectory.dir("src/main/builtin-runtime-v2"))
-    previewDirectory.set(rootProject.layout.projectDirectory.dir("../../assets/game-packs/previews/pocket-sprites"))
     distributionFile.set(rootProject.layout.projectDirectory.file("../../assets/game-packs/distribution.json"))
     outputDirectory.set(layout.buildDirectory.dir("generated/mobile-games"))
 }

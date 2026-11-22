@@ -144,7 +144,7 @@ manifest 字段：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `id` | 是 | 2 到 40 个字符，小写字母、数字、`-`，以字母或数字开头。不能与内置游戏重名：`falling-blocks`、`merge-2048`、`block-puzzle`、`water-sort`、`snake-arena`、`ink-blade`、`dusk-glider` |
+| `id` | 是 | 2 到 40 个字符，小写字母、数字、`-`，以字母或数字开头。不能与内置游戏重名：`merge-2048`、`block-puzzle`、`water-sort`、`snake-arena`、`ink-blade`、`dusk-glider` |
 | `name` | 是 | 游戏名称，最多 24 个字 |
 | `description` | 是 | 一句话介绍，最多 80 个字 |
 | `save` | 否 | `true` 时启用本机存档，默认 `false` |

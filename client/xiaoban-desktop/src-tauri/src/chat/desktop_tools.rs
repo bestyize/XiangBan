@@ -1016,10 +1016,8 @@ pub fn resolve_game_id(input: &str) -> Option<&'static str> {
     }
     match lower.as_str() {
         "贪吃蛇" | "小伴贪吃蛇" | "蛇" | "snake" | "snake_arena" => Some("snake-arena"),
-        "俄罗斯方块" | "方块" | "tetris" | "falling_blocks" => Some("falling-blocks"),
         "2048" | "merge" | "merge_2048" => Some("merge-2048"),
         "消失高手" | "消消乐" | "block_puzzle" => Some("block-puzzle"),
-        "口袋精灵" | "三消" | "pocket_sprites" => Some("pocket-sprites"),
         "倒杯快乐" | "奶茶大师" | "倒水" | "分杯" | "奶茶" | "water_sort" => Some("water-sort"),
         "水墨剑客" | "剑客" | "水墨" | "ink_blade" => Some("ink-blade"),
         "暮色滑翔" | "滑翔" | "滑翔机" | "dusk_glider" => Some("dusk-glider"),
@@ -1072,7 +1070,7 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
                     Some(game) => game["id"].as_str().map(str::to_string),
                     None => {
                         let extra: String = mine.iter().filter_map(|g| g["id"].as_str().map(|id| format!("、{} ({id})", g["name"].as_str().unwrap_or(id)))).collect();
-                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、口袋精灵 (pocket-sprites)、倒杯快乐 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
+                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、2048 (merge-2048)、消失高手 (block-puzzle)、倒杯快乐 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube)、雅韵五子棋 (jade-gomoku)、MBTI性格测评 (mbti){extra}"));
                     }
                 }
             }
@@ -1517,7 +1515,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(),
             widget_remove,
         ),
-        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、倒杯快乐、水墨剑客、暮色滑翔、3D全阶魔方、雅韵五子棋，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
+        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、2048、消失高手、倒杯快乐、水墨剑客、暮色滑翔、3D全阶魔方、雅韵五子棋，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
         tool(
             &desktop,
             ToolSpec::new(
@@ -1814,7 +1812,6 @@ mod tests {
         fn games(&self) -> Result<Value, String> {
             Ok(json!({"active": false, "games": [
                 {"id": "snake-arena", "name": "小伴贪吃蛇", "description": "吃糖果长成大蛇"},
-                {"id": "falling-blocks", "name": "俄罗斯方块", "description": "单人下落方块"},
                 {"id": "star-catcher", "name": "接星星", "description": "接住落下的星星", "source": "user"},
                 {"id": "desk-pal", "name": "桌面伙伴", "description": "在窗口上走来走去", "source": "user", "layer": "desktop"},
             ], "errors": ["「broken」：缺少 manifest.json"]}))
@@ -2361,7 +2358,6 @@ mod tests {
         assert_eq!(resolve_game_id("贪吃蛇"), Some("snake-arena"));
         assert_eq!(resolve_game_id("小伴贪吃蛇"), Some("snake-arena"));
         assert_eq!(resolve_game_id("2048"), Some("merge-2048"));
-        assert_eq!(resolve_game_id("俄罗斯方块"), Some("falling-blocks"));
         assert_eq!(resolve_game_id("魔方"), Some("pro-cube"));
         assert_eq!(resolve_game_id("五子棋"), Some("jade-gomoku"));
         assert_eq!(resolve_game_id("MBTI"), Some("mbti"));

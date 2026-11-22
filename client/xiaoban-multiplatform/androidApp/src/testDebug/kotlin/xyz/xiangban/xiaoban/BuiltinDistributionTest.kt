@@ -21,7 +21,7 @@ class BuiltinDistributionTest {
         val repo = requireNotNull(File(manifestPath).absoluteFile.parentFile?.parentFile?.parentFile)
         val runtime = repo.resolve("client/xiaoban-multiplatform/androidApp/src/main/builtin-runtime-v2")
         val cache = temporary.newFolder("builtin-cache")
-        assertEquals(11, games.size)
+        assertEquals(9, games.size)
         for (value in games) {
             val entry = value.jsonObject
             fun text(key: String) = entry.getValue(key).jsonPrimitive.content
@@ -36,7 +36,7 @@ class BuiltinDistributionTest {
             assertTrue(html.contains("./builtin-runtime.css"))
             assertTrue(pack.open(pack.manifest.icon)!!.use { it.read() } >= 0)
             assertEquals(destination, AndroidBuiltinGames.ensureIn(cache, game.copy(url = "https://127.0.0.1:1/unavailable"), ::load))
-            if (id == "falling-blocks") {
+            if (id == "merge-2048") {
                 destination.resolve(pack.manifest.entry).appendText("<!-- corrupted -->")
                 val repaired = AndroidBuiltinGames.ensureIn(cache, game, ::load)
                 assertTrue(!repaired.resolve(pack.manifest.entry).readText().contains("<!-- corrupted -->"))

@@ -11,7 +11,7 @@ const errors = [];
 // (shared files and the share button are dropped, theme/host become local).
 const desktopOnlyFiles = new Set(['theme.css']);
 const freshThemePacks = new Set(['block-puzzle', 'merge-2048', 'water-sort']);
-const shareButtonRemovedPacks = new Set(['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort']);
+const shareButtonRemovedPacks = new Set(['merge-2048', 'block-puzzle', 'water-sort']);
 function desktopizeIndex(referenceText, id) {
   const lines = referenceText.split('\n').flatMap(line => {
     if (/\.\.\/result-share\.(?:css|js)/.test(line)) return [];
@@ -21,16 +21,6 @@ function desktopizeIndex(referenceText, id) {
   });
   return lines.join('\n');
 }
-const desktopPackageAdaptations = {
-  'falling-blocks/game.js': {
-    reason: 'move result focus to restart when the unavailable desktop share action is hidden',
-    normalize(text) {
-      const desktopFocus = ";(new URLSearchParams(location.search).get('desktop') === '1' ? document.getElementById('restartOverlay') : document.getElementById('shareResultButton'))?.focus({ preventScroll: true })";
-      const referenceFocus = "document.getElementById('shareResultButton')?.focus({ preventScroll: true })";
-      return text.includes(desktopFocus) ? text.replace(desktopFocus, referenceFocus) : null;
-    },
-  },
-};
 // Top-level CSS rules, whitespace-normalized, to prove theme.css loses nothing from reference fresh-theme.css.
 function cssRules(text) {
   const rules = [];
@@ -84,19 +74,12 @@ function walk(dir) {
 function filesUnder(dir) {
   return walk(dir).map(file => path.relative(dir, file).split(path.sep).join('/')).sort();
 }
-function normalizeWithAdaptation(text, adaptation, label) {
-  if (!adaptation) return text;
-  const normalized = adaptation.normalize(text);
-  if (normalized === null) errors.push(`${label}: 登记的桌面适配差异缺失或已改变（${adaptation.reason}）`);
-  return normalized;
-}
-
 for (const packRoot of [desktop, reference]) if (!fs.existsSync(packRoot)) errors.push(`游戏资源目录不存在：${packRoot}`);
 if (!errors.length) {
   const desktopCatalog = readJson(path.join(desktop, 'catalog.json'));
   const referenceCatalog = readJson(path.join(reference, 'catalog.json'));
   if (desktopCatalog.version !== referenceCatalog.version || JSON.stringify(desktopCatalog.games) !== JSON.stringify(referenceCatalog.games)) errors.push('桌面 catalog 与基准 catalog 不一致');
-  if (!Array.isArray(desktopCatalog.games) || desktopCatalog.games.length !== 11 || new Set(desktopCatalog.games).size !== 11) errors.push('catalog 必须列出十一个唯一游戏包');
+  if (!Array.isArray(desktopCatalog.games) || desktopCatalog.games.length !== 9 || new Set(desktopCatalog.games).size !== 9) errors.push('catalog 必须列出九个唯一游戏包');
   for (const id of desktopCatalog.games) {
     for (const [base, side] of [[desktop, '桌面'], [reference, '基准']]) {
       const dir = path.join(base, id);
@@ -139,9 +122,7 @@ if (!errors.length) {
       }
       // README describes how this copy is packaged, which differs from the reference copy.
       if (relative === 'README.md') continue;
-      const adaptation = desktopPackageAdaptations[`${id}/${relative}`];
-      const normalized = normalizeWithAdaptation(desktopText, adaptation, `${id}/${relative}`);
-      if (normalized !== sourceText(referenceFile)) errors.push(`${id}/${relative}: 桌面与基准资源存在未登记的内容差异`);
+      if (desktopText !== sourceText(referenceFile)) errors.push(`${id}/${relative}: 桌面与基准资源存在未登记的内容差异`);
     }
   }
   const referenceThemeRules = cssRules(sourceText(path.join(reference, 'fresh-theme.css')));
@@ -151,4 +132,4 @@ if (!errors.length) {
   for (const shared of ['desktop-host.js', 'fresh-theme.css', 'result-share.css', 'result-share.js']) if (exists(path.join(desktop, shared))) errors.push(`桌面 game-packs 根目录不应再有共享文件：${shared}`);
 }
 if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
-else console.log('✓ 桌面十一款 V2 游戏包、manifest (协议 2)、入口、图标、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');
+else console.log('✓ 桌面九款 V2 游戏包、manifest (协议 2)、入口、图标、封面、本地引用（自包含）及与基准版本的差异均通过只读校验。');

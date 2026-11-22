@@ -51,10 +51,10 @@ try {
   const result = JSON.parse(await readFile(report, 'utf8'))
   const game = result.games?.Ok
   assert.ok(game, JSON.stringify(result.games))
-  assert.deepEqual([...game.frontend.ready].sort(), ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider', 'pro-cube', 'jade-gomoku', 'mbti'].sort())
+  assert.deepEqual([...game.frontend.ready].sort(), ['merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider', 'pro-cube', 'jade-gomoku', 'mbti'].sort())
   assert.ok(Object.values(game.frontend.security).every(v => v === true))
   for (const key of ['backgroundSuspended', 'settingsPreserved', 'positionRestored', 'closed']) assert.equal(game[key], true, key)
-  assert.equal(game.frontend.directLaunch, 'falling-blocks')
+  assert.equal(game.frontend.directLaunch, 'merge-2048')
   assert.equal(game.frontend.fillWindow, true)
   assert.equal(game.frontend.saveRoundTrip, true)
   assert.equal(game.frontend.controlRejected, true)

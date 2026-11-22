@@ -12,7 +12,7 @@ test('playable games match mobile order and use the manifest icons', async () =>
   const mobile = await readFile(new URL('client/xiaoban-multiplatform/common/community-core/src/commonMain/kotlin/xyz/xiangban/xiaoban/common/community/GameLibrary.kt',root),'utf8')
   const list = mobile.match(/val ids = listOf\(([^\n]+)\)/)?.[1]
   assert.ok(list)
-  const androidGames = Array.from(list.matchAll(/"([^"]+)"/g), m => m[1]).filter(id => id !== MOBILE_ONLY_APPS.pocketSprites.id)
+  const androidGames = Array.from(list.matchAll(/"([^"]+)"/g), m => m[1])
   assert.deepEqual(BUILTIN_GAMES.map(game => game.id), androidGames)
   for (const game of BUILTIN_GAMES) {
     const dir = new URL(`${game.id}/`,publicDir)
@@ -26,12 +26,8 @@ test('playable games match mobile order and use the manifest icons', async () =>
   assert.equal(builtinGame('../game'),undefined)
 })
 
-test('the web plaza ships a WebP pocket sprites icon and reuses the other mobile artwork', async () => {
-  const pocketIcon = await readFile(asset(MOBILE_ONLY_APPS.pocketSprites.icon))
-  assert.equal(pocketIcon.toString('ascii', 0, 4), 'RIFF')
-  assert.equal(pocketIcon.toString('ascii', 8, 12), 'WEBP')
+test('the web plaza reuses mobile tool artwork', async () => {
   for (const app of Object.values(MOBILE_ONLY_APPS)) {
-    if (app.id === MOBILE_ONLY_APPS.pocketSprites.id) continue
     const dir = new URL(app.id + '/', mobilePacks)
     const manifest = JSON.parse(await readFile(new URL('manifest.json', dir), 'utf8'))
     assert.deepEqual(await readFile(asset(app.icon)), await readFile(new URL(manifest.icon, dir)))

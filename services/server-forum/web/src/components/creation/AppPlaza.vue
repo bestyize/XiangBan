@@ -12,12 +12,7 @@ import { ANDROID_DOWNLOAD_URL, BUILTIN_GAMES, builtinGame, MOBILE_ONLY_APPS, WAN
 import { appRunLocation, builtinRunLocation } from '@/lib/appRuntime'
 
 const route = useRoute(), router = useRouter()
-const playableGames = BUILTIN_GAMES.filter(game => game.id !== 'mbti')
-const games = [
-  ...playableGames.slice(0, 3).map(game => ({ ...game, playable: true })),
-  { ...MOBILE_ONLY_APPS.pocketSprites, playable: false },
-  ...playableGames.slice(3).map(game => ({ ...game, playable: true })),
-]
+const games = BUILTIN_GAMES.filter(game => game.id !== 'mbti')
 const mbti = builtinGame('mbti')!
 const wallpaperIcon = `${import.meta.env.BASE_URL}creation-previews/live-wallpapers.webp`
 const mobileTools = [
@@ -103,8 +98,8 @@ function go(page: number) {
     </header>
     <div ref="previewGrid" class="plaza-icon-grid" :class="{ 'plaza-icon-strip': !showAllGames }">
       <RouterLink v-for="game in visibleGames" :key="game.id"
-        class="plaza-icon-item" :aria-label="game.playable ? `试玩${game.name}` : `${game.name}（在手机 App 游玩）`"
-        :to="game.playable ? builtinRunLocation(game.id) : '/ai'">
+        class="plaza-icon-item" :aria-label="`试玩${game.name}`"
+        :to="builtinRunLocation(game.id)">
         <span class="plaza-app-icon"><img :src="game.icon" alt="" decoding="async" /></span>
         <span class="plaza-app-name">{{ game.name }}</span>
         <small class="plaza-app-sub">{{ game.genre }}</small>

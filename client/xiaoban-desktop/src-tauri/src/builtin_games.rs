@@ -270,7 +270,7 @@ mod tests {
             fs::copy(Path::new(&bundle_dir).join(filename), &archive).unwrap();
             let cached = ensure(&root, &game.id).unwrap();
             assert!(verify_cached(&cached, &game).unwrap());
-            if game.id == "falling-blocks" {
+            if game.id == "merge-2048" {
                 fs::write(cached.join("index.html"), b"corrupt").unwrap();
                 assert_eq!(ensure(&root, &game.id).unwrap(), cached);
                 assert!(verify_cached(&cached, &game).unwrap());
@@ -298,7 +298,7 @@ mod tests {
             assert!(!modern.body.is_empty());
             let legacy = crate::game_packs::serve_from(&root, &format!("/{id}/index.html"), None);
             assert_eq!(legacy.status, 200, "{id} legacy host");
-            if id == "falling-blocks" {
+            if id == "merge-2048" {
                 fs::write(cached.join("index.html"), b"corrupt").unwrap();
                 assert_eq!(ensure(&root, id).unwrap(), cached);
                 assert_eq!(crate::app_runtime::protocol::serve_for(&root, &format!("app-runtime-{id}"), &format!("/{id}/index.html"), None).body, modern.body);

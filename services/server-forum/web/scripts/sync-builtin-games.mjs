@@ -29,7 +29,7 @@ async function syncMbtiImages(dest) {
   }
 }
 
-const ids = ['dusk-glider','ink-blade','jade-gomoku','pro-cube','snake-arena','block-puzzle','merge-2048','water-sort','falling-blocks','mbti']
+const ids = ['dusk-glider','ink-blade','jade-gomoku','pro-cube','snake-arena','block-puzzle','merge-2048','water-sort','mbti']
 await rm(destination, {recursive:true, force:true}); await mkdir(destination, {recursive:true})
 for (const id of ids) {
   const src = path.join(source,id), dest = path.join(destination,id)
@@ -44,13 +44,13 @@ for (const id of ids) {
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; navigate-to 'none'">`
   await writeFile(entry,html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${csp}`))
 }
-for (const [packRoot, id] of [[source, 'pocket-sprites'], [mobilePacks, 'remote-control'], [mobilePacks, 'quick-launch']]) {
-  const { icon } = JSON.parse(await readFile(path.join(packRoot, id, 'manifest.json'), 'utf8'))
+for (const id of ['remote-control', 'quick-launch']) {
+  const { icon } = JSON.parse(await readFile(path.join(mobilePacks, id, 'manifest.json'), 'utf8'))
   const publicPath = `/builtin-games/${id}/${icon}`
   const converted = imageAliases[publicPath]
   const output = path.join(destination, (converted ?? publicPath).slice('/builtin-games/'.length))
   await mkdir(path.dirname(output), { recursive: true })
-  await cp(converted ? webImage(converted) : path.join(packRoot, id, icon), output)
+  await cp(converted ? webImage(converted) : path.join(mobilePacks, id, icon), output)
 }
 const wancisou = path.join(destination, 'wancisou')
 await mkdir(wancisou)

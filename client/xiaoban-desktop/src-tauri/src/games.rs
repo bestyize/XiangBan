@@ -3,11 +3,10 @@ use serde_json::{json, Value};
 use std::{fs, io::Write, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-const POCKET_SPRITES: &str = "pocket-sprites";
 pub const FEATURED_AQUARIUM: &str = "featured-aquarium";
 pub const FEATURED_WHALE_GIRL: &str = "featured-whale-girl";
 pub const FEATURED_PACK_IDS: [&str; 2] = [FEATURED_AQUARIUM, FEATURED_WHALE_GIRL];
-pub const IDS: [&str; 11] = ["falling-blocks", "merge-2048", "block-puzzle", POCKET_SPRITES, "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
+pub const IDS: [&str; 9] = ["merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider", "pro-cube", "jade-gomoku", "mbti"];
 #[derive(Default)]
 pub struct GameState {
     pub active: AtomicBool,
@@ -29,10 +28,8 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 /// The shipped games and apps, each tagged with where its files come from.
 pub fn builtin_catalog() -> Result<Vec<Value>, String> {
     let manifests = [
-        include_str!("../../public/game-packs/falling-blocks/manifest.json"),
         include_str!("../../public/game-packs/merge-2048/manifest.json"),
         include_str!("../../public/game-packs/block-puzzle/manifest.json"),
-        include_str!("../../public/game-packs/pocket-sprites/manifest.json"),
         include_str!("../../public/game-packs/water-sort/manifest.json"),
         include_str!("../../public/game-packs/snake-arena/manifest.json"),
         include_str!("../../public/game-packs/ink-blade/manifest.json"),
@@ -75,7 +72,7 @@ pub fn catalog(app: &tauri::AppHandle) -> Result<Catalog, String> { catalog_in(c
 pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> {
     authorize(&app, &host_token)?;
     // The legacy iframe host only serves games that implement its message protocol.
-    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop" && game["id"] != POCKET_SPRITES
+    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop"
         && (game["source"] != "builtin" || (game["featuredOnly"] != true && game["id"] != FEATURED_WHALE_GIRL))).map(|mut game| {
         if game["source"] == "builtin" {
             if let Some(id) = game["id"].as_str() { game["base"] = json!(crate::game_packs::base_url(id)); }
@@ -180,10 +177,6 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
         let known = catalog(app)?;
         let game = known.games.iter().find(|game| game["id"] == game_id.as_str()).ok_or("没有找到这款本地游戏")?;
         if game["layer"] == "desktop" { return crate::desk_game::open(app, &game_id).await; }
-        if game_id == POCKET_SPRITES {
-            crate::app_runtime::window::open_app(app, &game_id, game["name"].as_str().unwrap_or_default(), game["orientation"].as_str(), game["entry"].as_str()).await?;
-            return Ok(());
-        }
         game["orientation"] == "landscape"
     };
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
@@ -319,7 +312,7 @@ pub fn game_smoke_report(app:tauri::AppHandle,host_token:String,report:Value)->R
 pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let before=crate::settings(app);
     let position=app.get_webview_window("pet").and_then(|w|w.outer_position().ok());
-    open_selected(app, Some("falling-blocks".into())).await?;
+    open_selected(app, Some("merge-2048".into())).await?;
     if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || !crate::content::labels(app).is_empty(){return Err("游戏窗口未暂停背景".into());}
     let deadline=std::time::Instant::now()+std::time::Duration::from_secs(145);
     let report=loop {
@@ -383,7 +376,7 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
         let saves=root.join("games/saves");
         assert_eq!(save_file_in(&root,"ink-blade").unwrap(),saves.join("ink-blade.json"));
         assert_eq!(save_file_in(&root,"mbti").unwrap(),saves.join("mbti.json"));
-        for id in ["falling-blocks","snake-arena","dusk-glider"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }
+        for id in ["merge-2048","snake-arena","dusk-glider"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }
         assert_eq!(save_file_in(&root,"saves-yes").unwrap(),saves.join("user-saves-yes.json"));
         assert!(save_file_in(&root,"saves-no").is_err()); assert!(save_file_in(&root,"missing-game").is_err());
         for id in ["../ink-blade","..","user-saves-yes","","a/b"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }

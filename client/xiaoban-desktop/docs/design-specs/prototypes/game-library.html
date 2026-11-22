@@ -28,7 +28,7 @@ createApp({setup(){
  function notify(message){toast.value=message;clearTimeout(timer);timer=setTimeout(()=>toast.value='',3500)}
  const visible=computed(()=>tab.value==='builtin'?games:[{...games.find(g=>g.id==='dusk-glider'),id:'sample-glider',name:'我的滑翔冒险',sample:true},{...games.find(g=>g.id==='block-puzzle'),id:'sample-blocks',name:'周末方块',sample:true}]);
  // Artwork mattes match the shipped SVG canvas; UI chrome still uses theme tokens.
- const matte=g=>g.id==='falling-blocks'?'#e9f3e9':['merge-2048','block-puzzle','sample-blocks'].includes(g.id)?'#f2f8f5':undefined;
+ const matte=g=>['merge-2048','block-puzzle','sample-blocks'].includes(g.id)?'#f2f8f5':undefined;
  const asset=g=>coverUrl(g.sample?games.find(original=>original.id===(g.id==='sample-glider'?'dusk-glider':'block-puzzle')):g);
  const nav=[['小伴 AI',Sparkles],['新建任务',Plus],['AI 插件',Puzzle],['资料库',Folder],null,['装扮',Palette],['游玩',Gamepad2],['提醒',Bell],['社区',Globe]];
  return ()=>h('div',[

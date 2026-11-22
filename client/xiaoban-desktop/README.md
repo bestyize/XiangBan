@@ -160,9 +160,9 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 ## 设计规范与交互稿
 
-11 款内置游戏的源文件仍在 `public/game-packs/`，构建时核对基准资源和[分发清单](../../assets/game-packs/distribution.json)。安装包只保留游戏目录、清单和缩略图；启动后从资源机后台下载游戏包，校验大小和 SHA-256，再原子写入本地缓存。首次打开尚未缓存的游戏会等待下载；缓存后可离线运行，存档仍在原目录。启动或打开游戏时会核验缓存文件，损坏时优先用已缓存的压缩包修复。更新游戏须先重新生成并部署资源包，再发布客户端，见[资源部署说明](../../infra/resource/README.md)。
+9 款桌面和 Android 共用的内置作品源文件仍在 `public/game-packs/`，构建时核对基准资源和[分发清单](../../assets/game-packs/distribution.json)。安装包只保留游戏目录、清单和缩略图；启动后从资源机后台下载游戏包，校验大小和 SHA-256，再原子写入本地缓存。首次打开尚未缓存的游戏会等待下载；缓存后可离线运行，存档仍在原目录。启动或打开游戏时会核验缓存文件，损坏时优先用已缓存的压缩包修复。更新游戏须先重新生成并部署资源包，再发布客户端，见[资源部署说明](../../infra/resource/README.md)。
 
-验证：`XIAOBAN_BUILTIN_LIVE_TEST=1 cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop builtin_games::tests` 会从资源机下载并验证 11 包、两套运行协议和离线缓存；原生 V2 窗口还可使用隔离的 `XIAOBAN_BUILTIN_GAMES_SMOKE=1` 和 `--smoke-test` 检查逐款就绪。
+验证：`XIAOBAN_BUILTIN_LIVE_TEST=1 cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop builtin_games::tests` 会从资源机下载并验证 9 个共用包、两套运行协议和离线缓存；原生 V2 窗口还可使用隔离的 `XIAOBAN_BUILTIN_GAMES_SMOKE=1` 和 `--smoke-test` 检查逐款就绪。
 
 MBTI 1.3.0 已按确认的手机设计稿更新首页、答题和结果页：珊瑚橙红与暖白、轻量 WebP、选中后手动下一题、六章报告切换、四维解读展开及系统明暗主题。保留 48 题计分、旧存档与真实海报导出。验证：`npx vitest run src/games/mbti-report.test.ts src/games/pack-boundary.test.ts`、`node scripts/check-game-assets.mjs`，并完成浏览器 48 题流程；尚未重新打包或验收原生安装包。
 
@@ -306,7 +306,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 - **潮汐书房 · 鲸鱼娘**在「官方游戏」中以横向窗口打开。可以陪溟月散步、读书、写信，也可以翻看她的藏书与手记。首次下载并校验 V2 作品包，缓存后可离线打开。旧版可下载同一 ZIP，在「应用 → 导入作品」中打开。角色模型仅限非商业用途。
 
-- **游戏空间**：设置页和托盘/菜单栏的“玩一玩”打开游戏空间页；点任意游戏卡片会打开一个只运行这一款游戏的普通窗口（默认不全屏，可用系统标题栏切换全屏），退出即关闭窗口。离线展示七款本地游戏包。资源协议沿用网页发布包的 manifest 与 v1 消息格式；桌面使用自己的宿主，iframe 仅授予脚本权限并校验消息来源、nonce、游戏 ID 和回合状态。桌面不接账户分享；网页专属分享和钱包入口由本地 adapter 隐藏。内置游戏只有水墨剑客保存进度，位于用户数据目录 `games/saves/ink-blade.json`，上限 32 KiB；用户自创游戏（“文件夹即游戏”，放在 `games/packs/<id>/`，由 `game-pack:` 协议提供，聊天里的 `game_create`/`game_delete` 可创建与删除）在 manifest 声明 `save: true` 时存为 `games/saves/user-<id>.json`，同样上限；读取或保存失败会保留原文件并提示处理。Windows 原生 smoke 已验证七包 ready、存档往返、Esc、IPC 隔离和桌面状态恢复。桌面空白双击入口仅 Windows 可用，默认关闭；只读低级鼠标钩子将事件交给异步队列并判断 Explorer 桌面列表空白区域，不吞鼠标输入。Windows 真实图标交互尚待人工验收。macOS 暂无可靠桌面空白双击判断，使用显式入口。
+- **游戏空间**：设置页和托盘/菜单栏的“玩一玩”打开游戏空间页；点任意游戏卡片会打开一个只运行这一款游戏的普通窗口（默认不全屏，可用系统标题栏切换全屏），退出即关闭窗口。已缓存的官方游戏可离线打开。资源协议沿用网页发布包的 manifest 与 v1 消息格式；桌面使用自己的宿主，iframe 仅授予脚本权限并校验消息来源、nonce、游戏 ID 和回合状态。桌面不接账户分享；网页专属分享和钱包入口由本地 adapter 隐藏。内置游戏只有水墨剑客保存进度，位于用户数据目录 `games/saves/ink-blade.json`，上限 32 KiB；用户自创游戏（“文件夹即游戏”，放在 `games/packs/<id>/`，由 `game-pack:` 协议提供，聊天里的 `game_create`/`game_delete` 可创建与删除）在 manifest 声明 `save: true` 时存为 `games/saves/user-<id>.json`，同样上限；读取或保存失败会保留原文件并提示处理。Windows 原生 smoke 已验证七包 ready、存档往返、Esc、IPC 隔离和桌面状态恢复。桌面空白双击入口仅 Windows 可用，默认关闭；只读低级鼠标钩子将事件交给异步队列并判断 Explorer 桌面列表空白区域，不吞鼠标输入。Windows 真实图标交互尚待人工验收。macOS 暂无可靠桌面空白双击判断，使用显式入口。
 - **小伴显示**：小伴设置中可单独关闭角色显示，默认开启。关闭时仍可使用壁纸、图片特效与关怀提醒；提醒气泡独立显示在当前应用上方。
 - **天气来源与定位**：关怀提醒的天气来源默认是 Open-Meteo（可在“提醒偏好”里改成自己的来源或关闭）。新建天气提醒时按网络位置预先填好城市：这一步会把公网 IP 发送给 ipwho.is（失败时用 api.ip.sb），只用来判断所在城市，随时可以搜索改成别的城市；来源关闭后不再定位。
 - **应用图标**：红底圆角方块，叠放的图片卡片、爱心与白字“小伴”。源文件 `src-tauri/icons/icon-source.png`（1024×1024，四角透明，四周约 10% 留白），`icon.icns/.ico/.png` 由 `npx tauri icon src-tauri/icons/icon-source.png -o <临时目录>` 生成后只复制这三个文件，托盘用同一图标的 64×64 RGBA 原始像素 `icons/tray.rgba`（由生成的 `64x64.png` 解码得到）。原图只有 360×360，大尺寸图标是放大得到的，有更高分辨率的原图时应替换源文件后重新生成。

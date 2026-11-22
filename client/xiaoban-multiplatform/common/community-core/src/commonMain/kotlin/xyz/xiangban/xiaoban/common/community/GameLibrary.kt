@@ -8,7 +8,7 @@ object BuiltinMobileGames {
     const val REMOTE_CONTROL = "remote-control"
     const val QUICK_LAUNCH = "quick-launch"
     const val LIVE_WALLPAPERS = "live-wallpapers"
-    val ids = listOf(PAINTING_ADVENTURE, "dusk-glider", "ink-blade", "block-puzzle", "pocket-sprites", "pro-cube", "snake-arena", "jade-gomoku", "merge-2048", "water-sort", "falling-blocks", "mbti", REMOTE_CONTROL, QUICK_LAUNCH, LIVE_WALLPAPERS)
+    val ids = listOf("block-puzzle", "dusk-glider", "ink-blade", PAINTING_ADVENTURE, "pro-cube", "snake-arena", "jade-gomoku", "merge-2048", "water-sort", "mbti", REMOTE_CONTROL, QUICK_LAUNCH, LIVE_WALLPAPERS)
     /** Builtins shown under 精选工具 instead of 精选游戏. */
     val tools = setOf("mbti", REMOTE_CONTROL, QUICK_LAUNCH, LIVE_WALLPAPERS)
     /** Tools whose entry and resources are shipped in the APK. */

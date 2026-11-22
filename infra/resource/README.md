@@ -15,6 +15,6 @@
 
 网站内置游戏为保留相对引用，以目录路径提供；更新后运行 `index-public-assets.py --source /srv/xiangban-resource/builtin-games --objects /srv/xiangban-resource/public-objects --manifest /srv/xiangban-resource/builtin-games-manifest.json --url-prefix https://res.xiangban.xyz/builtin-games/`，以 MD5 硬链接保存内容，并在清单中记录 SHA-256 与原路径。两目录须在同一文件系统上；同名对象会校验 SHA-256，冲突则停止。
 
-桌面和 Android 的 11 款官方游戏共用另一组 ZIP 包。修改源文件后，在仓库根目录运行 `python3 infra/resource/build-builtin-game-bundles.py --output /path/to/staging`，生成 `/files/<md5>.zip` 和更新 [`distribution.json`](../../assets/game-packs/distribution.json)。先将 ZIP 同步到 `/var/www/res.xiangban.xyz/files/` 并逐个核对 SHA-256、HTTPS 下载，再发布包含新清单的客户端；构建时源文件与清单不符会报错。同步时使用 `rsync -a --no-perms --no-owner --no-group --ignore-existing`，不要让临时目录的权限覆盖公开目录；已存在的同名文件必须核对内容。
+桌面和 Android 的 9 款官方作品共用另一组 ZIP 包。修改源文件后，在仓库根目录运行 `python3 infra/resource/build-builtin-game-bundles.py --output /path/to/staging`，生成 `/files/<md5>.zip` 和更新 [`distribution.json`](../../assets/game-packs/distribution.json)。先将 ZIP 同步到 `/var/www/res.xiangban.xyz/files/` 并逐个核对 SHA-256、HTTPS 下载，再发布包含新清单的客户端；构建时源文件与清单不符会报错。同步时使用 `rsync -a --no-perms --no-owner --no-group --ignore-existing`，不要让临时目录的权限覆盖公开目录；已存在的同名文件必须核对内容。
 
 论坛公开网页资源更新后，同样对 `forum-web/` 运行索引脚本；不要对包含私有附件的 `forum-content/` 建立公开索引。更换网页产物时先同步资源机，再更新论坛的 HTML 并重启论坛，保留旧的带哈希文件以供已打开的页面使用。
