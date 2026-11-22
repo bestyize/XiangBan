@@ -37,7 +37,7 @@ const image = computed(() => (props.topic.images || []).map(webLink).find((v): v
 const discussionTag = computed(() => props.topic.tags?.find(tag => tag.trim() && tag !== props.topic.category.name))
 const discussionTitle = computed(() => props.topic.title.trim() || '未命名讨论')
 const discussionAccents = new Map<string, AccentId>([
-  ['learn', 'green'], ['casual-indie', 'blue'], ['casual-games', 'red'],
+  ['learn', 'green'], ['casual-deals', 'amber'], ['casual-indie', 'blue'], ['casual-games', 'red'],
 ])
 const discussionColors = computed(() => {
   if (props.mode !== 'discussion') return undefined
@@ -62,10 +62,17 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 </script>
 <template>
   <article v-if="mode === 'discussion'" class="discussion-card" :style="discussionColors">
-    <h2 class="discussion-card-title">
-      <RouterLink :to="`/t/${topic.id}`" :title="discussionTitle">{{ discussionTitle }}</RouterLink>
-    </h2>
-    <p v-if="topic.excerpt && topic.excerpt !== discussionTitle" class="discussion-card-excerpt">{{ topic.excerpt }}</p>
+    <div class="discussion-card-body">
+      <div class="discussion-card-main">
+        <h2 class="discussion-card-title">
+          <RouterLink :to="`/t/${topic.id}`" :title="discussionTitle">{{ discussionTitle }}</RouterLink>
+        </h2>
+        <p v-if="topic.excerpt && topic.excerpt !== discussionTitle" class="discussion-card-excerpt">{{ topic.excerpt }}</p>
+      </div>
+      <div v-if="image" class="discussion-card-cover" aria-hidden="true">
+        <img :src="image" alt="" loading="lazy" decoding="async" @error="broken.push(image!)">
+      </div>
+    </div>
     <footer class="discussion-card-footer">
       <div class="discussion-card-byline">
         <RouterLink class="discussion-card-category" :to="categoryHref(topic.category, meta.categories)"
@@ -117,18 +124,46 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 .discussion-card {
   position: relative;
   display: grid;
-  gap: 9px;
+  gap: 10px;
   min-width: 0;
-  padding: 16px 18px;
+  padding: 15px 18px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-card, var(--shadow));
 }
 .discussion-card:hover .discussion-card-title a { color: var(--brand); }
+.discussion-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+.discussion-card-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+.discussion-card-cover {
+  flex: none;
+  width: 96px;
+  height: 112px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.discussion-card-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .discussion-card-category, .discussion-card-tag {
   position: relative;
   z-index: 1;
+  flex: none;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -144,6 +179,10 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
   font-weight: 650;
   line-height: 1.45;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .discussion-card-title a::after { position: absolute; inset: 0; content: ''; }
 .discussion-card-excerpt {
@@ -161,9 +200,10 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
   display: flex;
   align-items: center;
 }
-.discussion-card-footer { justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; color: var(--ink-3); font-size: 12px; }
-.discussion-card-byline { flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; }
-.discussion-card-identity, .discussion-card-author { gap: 5px; min-width: 0; }
+.discussion-card-footer { justify-content: space-between; flex-wrap: nowrap; gap: 8px; min-width: 0; color: var(--ink-3); font-size: 12px; }
+.discussion-card-byline { flex: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; overflow: hidden; }
+.discussion-card-identity { flex: 0 1 auto; gap: 5px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.discussion-card-author { gap: 5px; min-width: 0; overflow: hidden; }
 .discussion-card-avatar { --surface-2: var(--discussion-avatar-bg, var(--brand-fill)); --ink-2: var(--discussion-avatar-ink, var(--brand-ink)); --line: transparent; }
 .discussion-card-author > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .discussion-card-byline time { flex: none; white-space: nowrap; }
@@ -189,9 +229,14 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 .discussion-card :is(.discussion-card-author, .discussion-card-category, .discussion-card-tag, .discussion-card-actions > *):hover { color: var(--brand); }
 .discussion-card-error { margin: 4px 0 0; color: var(--danger); font-size: 12px; }
 @media (width < 960px) {
-  .discussion-card { padding: 13px 14px; gap: 7px; }
+  .discussion-card { padding: 12px 13px; gap: 9px; }
+  .discussion-card-body { gap: 12px; }
+  .discussion-card-cover { width: 74px; height: 92px; border-radius: 6px; }
   .discussion-card-title { font-size: 14.5px; }
   .discussion-card-category { padding: 1.5px 6px; font-size: 10px; line-height: 1.35; }
+}
+@media (width < 640px) {
+  .discussion-card-tag { display: none; }
 }
 @media (pointer: coarse) {
   .discussion-card-actions > * { min-width: 44px; min-height: 44px; }

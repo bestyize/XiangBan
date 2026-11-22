@@ -143,7 +143,6 @@ internal fun VisualTopicCard(env: CommunityEnv, topic: Topic, noteCover: Boolean
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DiscussionPostCard(
     env: CommunityEnv,
@@ -167,50 +166,77 @@ internal fun DiscussionPostCard(
         else -> topic.category.name
     }
     val tag = topic.tags.firstOrNull { it.isNotBlank() && it != topic.category.name && it != categoryLabel }
+    var failed by remember(topic.id, topic.images) { mutableIntStateOf(0) }
+    val image = topic.images.distinct().getOrNull(failed)?.let(env.forum::imageUrl)
 
     Column(
-        Modifier.fillMaxWidth().communityFeedCard(16.dp)
+        Modifier.fillMaxWidth().communityFeedCard(8.dp)
             .clickable(role = Role.Button, onClickLabel = "打开帖子", onClick = onOpen)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+            .padding(horizontal = 13.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Text(topic.title.trim().ifEmpty { "未命名讨论" }, style = feedText(14.5, 21.025),
-            color = feedInk, fontWeight = FontWeight(650), maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (topic.excerpt.isNotBlank() && topic.excerpt != topic.cardTitle) {
-            Text(topic.excerpt, style = feedText(13, 20.8), color = feedSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        FlowRow(
+        Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (categoryLabel.isNotBlank()) {
-                    val (ink, fill) = when (topic.category.slug) {
-                        "design", "3d" -> feedCategoryColors(0xFF6D4AFF, 0xFFBDA8FF, 0xFF7152D8, .12f)
-                        "learn" -> feedCategoryColors(0xFF05964B, 0xFF7CE6A9, 0xFF07C160, .13f)
-                        "casual-indie", "casual-gear" -> feedCategoryColors(0xFF2F6FDB, 0xFF8DB6FF, 0xFF2F6FDB, .12f)
-                        "casual-games" -> feedCategoryColors(0xFFD93A44, 0xFFFF959B, 0xFFD93A44, .12f)
-                        else -> feedSecondary to feedFill
-                    }
-                    FeedTag(categoryLabel, Modifier.align(Alignment.CenterVertically).widthIn(max = 98.dp)
-                        .clip(CircleShape).clickable(role = Role.Button, onClick = onCategory), ink, fill)
-                }
-                if (tag != null) Text("# $tag",
-                    Modifier.align(Alignment.CenterVertically).widthIn(max = 88.dp).clickable(role = Role.Button) { onTag(tag) },
-                    style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    TopicAuthorAvatar(env, topic.author, 20.dp)
-                    val time = topic.createdAt.takeIf(String::isNotBlank)?.let(::agoText)
-                    Text(listOfNotNull(topic.author.nickname.takeIf(String::isNotBlank), time).joinToString(" · "),
-                        Modifier.widthIn(max = 150.dp), style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(topic.title.trim().ifEmpty { "未命名讨论" }, style = feedText(14.5, 21.025),
+                    color = feedInk, fontWeight = FontWeight(650), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (topic.excerpt.isNotBlank() && topic.excerpt != topic.cardTitle) {
+                    Text(topic.excerpt, style = feedText(12.5, 19.8), color = feedSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Row(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DiscussionCountButton(XIcons.DetailComment, "查看回复", topic.replyCount, onClick = onComments)
-                DiscussionCountButton(XIcons.Heart, if (liked) "取消点赞" else "点赞", likeCount,
-                    onClick = onLike, active = liked, enabled = !liking, showZero = false)
+            if (image != null) {
+                Box(Modifier.size(width = 74.dp, height = 92.dp).clip(RoundedCornerShape(6.dp)).background(feedFill)) {
+                    AsyncImage(image, null, imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(), onError = { failed++ })
+                }
+            }
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val showTag = maxWidth >= 420.dp
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    Modifier.weight(1f).padding(end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (categoryLabel.isNotBlank()) {
+                        val (ink, fill) = when (topic.category.slug) {
+                            "design", "3d" -> feedCategoryColors(0xFF6D4AFF, 0xFFBDA8FF, 0xFF7152D8, .12f)
+                            "learn" -> feedCategoryColors(0xFF05964B, 0xFF7CE6A9, 0xFF07C160, .13f)
+                            "casual-deals" -> feedCategoryColors(0xFFA8640C, 0xFFF0B65A, 0xFFA8640C, .12f)
+                            "casual-indie", "casual-gear" -> feedCategoryColors(0xFF2F6FDB, 0xFF8DB6FF, 0xFF2F6FDB, .12f)
+                            "casual-games" -> feedCategoryColors(0xFFD93A44, 0xFFFF959B, 0xFFD93A44, .12f)
+                            else -> feedSecondary to feedFill
+                        }
+                        FeedTag(categoryLabel, Modifier.widthIn(max = 98.dp)
+                            .clip(CircleShape).clickable(role = Role.Button, onClick = onCategory), ink, fill)
+                    }
+                    if (showTag && tag != null) Text("# $tag",
+                        Modifier.widthIn(max = 88.dp).clickable(role = Role.Button) { onTag(tag) },
+                        style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(
+                        Modifier.weight(1f, fill = false),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TopicAuthorAvatar(env, topic.author, 20.dp)
+                        val time = topic.createdAt.takeIf(String::isNotBlank)?.let(::agoText)
+                        Text(listOfNotNull(topic.author.nickname.takeIf(String::isNotBlank), time).joinToString(" · "),
+                            style = feedText(12), color = feedMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    DiscussionCountButton(XIcons.DetailComment, "查看回复", topic.replyCount, onClick = onComments)
+                    DiscussionCountButton(XIcons.Heart, if (liked) "取消点赞" else "点赞", likeCount,
+                        onClick = onLike, active = liked, enabled = !liking, showZero = false)
+                }
             }
         }
     }

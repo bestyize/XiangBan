@@ -338,7 +338,7 @@ internal fun DiscussTab(env: CommunityEnv, catalog: ForumCategories, sub: String
                     LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = CommunityFeedPadding,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (result.items.isEmpty()) item {
                             DiscussionEmpty(

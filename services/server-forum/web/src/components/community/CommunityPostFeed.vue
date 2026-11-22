@@ -180,7 +180,7 @@ function go(value:number) { navigate({page:String(value)}) }
 .discussion-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 8px;
   max-width: 880px;
 }
 .ideas-spotlight { margin-bottom: 8px; }
