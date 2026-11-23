@@ -23,7 +23,7 @@ const narrow = useNarrow(props.detail ? MOBILE_SITE_QUERY : undefined)
           :label="count == null ? '查看评论' : `查看评论，共 ${count} 条`"
           :text="count == null ? '评论' : compactCount(count)"
           @click="$emit('discuss')"
-        ><AppIcon name="message" :size="detail ? 18 : 20" /></DockButton>
+        ><AppIcon name="message" :size="detail ? 19 : 20" /></DockButton>
       </div>
     </div>
   </Teleport>

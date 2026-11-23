@@ -54,7 +54,7 @@ object XIcons {
     val Grid: ImageVector by lazy { strokeIcon("Grid", "M6 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM6 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z") }
     val Hash: ImageVector by lazy { strokeIcon("Hash", "M5 9h14M5 15h14M10 4L8 20M16 4l-2 16") }
     val Hangup: ImageVector by lazy { handsetIcon("Hangup") }
-    val Heart: ImageVector by lazy { strokeIcon("Heart", "M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z") }
+    val Heart: ImageVector by lazy { strokeIcon("Heart", "M12 20L5.9 14.3C4.2 12.7 3 11.1 3 8.9A4.9 4.9 0 0 1 7.9 4c1.6 0 3 .8 4.1 2.1C13.1 4.8 14.5 4 16.1 4A4.9 4.9 0 0 1 21 8.9c0 2.2-1.2 3.8-2.9 5.4Z") }
     val Image: ImageVector by lazy { strokeIcon("Image", "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM7.4 10a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM4 18l5-5 4 4 3-3 4 4") }
     val Keyboard: ImageVector by lazy { strokeIcon("Keyboard", "M5.5 6h13A2.5 2.5 0 0121 8.5v7a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 15.5v-7A2.5 2.5 0 015.5 6zM7 10h.01M11 10h.01M15 10h.01M7 14h10") }
     val Smile: ImageVector by lazy { strokeIcon("Smile", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0zM8 13.5c1.8 2.8 6.2 2.8 8 0M9 9.5h.01M15 9.5h.01") }
@@ -63,7 +63,7 @@ object XIcons {
     val Link: ImageVector by lazy { strokeIcon("Link", "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1") }
     val Lock: ImageVector by lazy { strokeIcon("Lock", "M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3") }
     val Menu: ImageVector by lazy { strokeIcon("Menu", "M4 7h16M4 12h16M4 17h10") }
-    val DetailComment: ImageVector by lazy { strokeIcon("DetailComment", "M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.6-4.3A8.5 8.5 0 1 1 21 11.5Z") }
+    val DetailComment: ImageVector by lazy { strokeIcon("DetailComment", "M20.8 12a8.8 8.8 0 0 1-8.8 8.8H3.4l1.7-3.4A8.8 8.8 0 1 1 20.8 12Z") }
     val DetailSort: ImageVector by lazy { strokeIcon("DetailSort", "M4 7h16M7 12h10M10 17h4") }
     val Message: ImageVector by lazy { strokeIcon("Message", "M5 6h14a1 1 0 011 1v9a1 1 0 01-1 1h-7l-4 3v-3H5a1 1 0 01-1-1V7a1 1 0 011-1z") }
     val Mic: ImageVector by lazy { strokeIcon("Mic", "M12 3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h-0a3 3 0 0 1 -3 -3v-5a3 3 0 0 1 3 -3zM5 11a7 7 0 0014 0M12 18v3") }
@@ -100,7 +100,7 @@ object XIcons {
     /** 小伴的品牌标志：一颗大闪光加一个小十字和一个小圆圈（和应用图标里的是同一个）。 */
     val Sparkles: ImageVector by lazy { strokeIcon("Sparkles", "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594zM20 2v4M22 4h-4M2 20a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
     val SparkleSmall: ImageVector by lazy { strokeIcon("SparkleSmall", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z") }
-    val Star: ImageVector by lazy { strokeIcon("Star", "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z") }
+    val Star: ImageVector by lazy { strokeIcon("Star", "M12 3.3l2.7 5.6 6.3.9-4.6 4.4 1.1 6.3-5.5-3-5.5 3 1.1-6.3L3 9.8l6.3-.9Z") }
     val Stop: ImageVector by lazy { strokeIcon("Stop", "M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z") }
     val Swap: ImageVector by lazy { strokeIcon("Swap", "M7 10l5-5 5 5M7 14l5 5 5-5") }
     val Target: ImageVector by lazy { strokeIcon("Target", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0zM12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5") }

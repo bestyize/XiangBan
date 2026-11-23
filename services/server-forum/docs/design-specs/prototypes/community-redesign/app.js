@@ -778,7 +778,7 @@
   const ICON_PATHS = {
     home: ['M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z'],
     compass: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'm16.2 7.8-2.1 6.3-6.3 2.1 2.1-6.3Z'],
-    chat: ['M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.6-4.3A8.5 8.5 0 1 1 21 11.5Z'],
+    chat: ['M20.8 12a8.8 8.8 0 0 1-8.8 8.8H3.4l1.7-3.4A8.8 8.8 0 1 1 20.8 12Z'],
     folder: ['M3 6h6l2 3h10v11H3Z'],
     grid: ['M4 4h6v6H4Z', 'M14 4h6v6h-6Z', 'M4 14h6v6H4Z', 'M14 14h6v6h-6Z'],
     spark: ['m12 3 2.2 6.3L20.5 11.5l-6.3 2.2L12 20l-2.2-6.3L3.5 11.5l6.3-2.2Z'],
@@ -788,8 +788,8 @@
     bell: ['M6 17v-6a6 6 0 0 1 12 0v6l2 2H4Z', 'M10 21h4'],
     sun: ['M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M12 2v2', 'M12 20v2', 'M2 12h2', 'M20 12h2', 'm4.9 4.9 1.4 1.4', 'm17.7 17.7 1.4 1.4', 'm4.9 19.1 1.4-1.4', 'm17.7 6.3 1.4-1.4'],
     moon: ['M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z'],
-    heart: ['M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z'],
-    star: ['m12 3.2 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z'],
+    heart: ['M12 20L5.9 14.3C4.2 12.7 3 11.1 3 8.9A4.9 4.9 0 0 1 7.9 4c1.6 0 3 .8 4.1 2.1C13.1 4.8 14.5 4 16.1 4A4.9 4.9 0 0 1 21 8.9c0 2.2-1.2 3.8-2.9 5.4Z'],
+    star: ['M12 3.3l2.7 5.6 6.3.9-4.6 4.4 1.1 6.3-5.5-3-5.5 3 1.1-6.3L3 9.8l6.3-.9Z'],
     share: ['M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7', 'm16 6-4-4-4 4', 'M12 2v13'],
     image: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 16 5-5 4 4 3-3 6 6'],
     smile: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2', 'M9 9.5h.01', 'M15 9.5h.01'],
@@ -1882,7 +1882,7 @@
                   ${icon('star', 19)}<span>${saveCount}</span>
                 </button>
                 <button type="button" class="h5-dock-stat" data-action="focus-pc-comment">
-                  ${icon('chat', 18)}<span>${comments.length}</span>
+                  ${icon('chat', 19)}<span>${comments.length}</span>
                 </button>
               </div>
             </div>
@@ -2129,7 +2129,7 @@
             ${icon('star', 19)}<span>${saveCount}</span>
           </button>
           <button type="button" class="h5-dock-stat" data-action="scroll-h5-comments">
-            ${icon('chat', 18)}<span>${comments.length}</span>
+            ${icon('chat', 19)}<span>${comments.length}</span>
           </button>
         </div>
       `;
