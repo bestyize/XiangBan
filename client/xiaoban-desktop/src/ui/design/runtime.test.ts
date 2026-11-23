@@ -16,6 +16,20 @@ async function preview(body:string,bundle?:{base?:string;files?:Record<string,st
 }
 afterEach(async()=>{for(const w of windows.splice(0))await w.happyDOM.close();});
 describe('independent DC runtime',()=>{
+ it('captures a disabled control during Play feedback without sending a prototype action',async()=>{
+  const {w,messages}=await preview('<x-dc><button id="publish" disabled onclick="publish()">发布</button></x-dc>');
+  expect(messages).toHaveBeenCalledWith(expect.objectContaining({type:'binding-warning',message:expect.stringContaining('publish')}),'*');
+  const control=w.document.getElementById('publish')!;
+  const activate=vi.fn();
+  control.addEventListener('click',activate);
+  Object.defineProperty(w.document,'elementFromPoint',{value:()=>control});
+  w.eval("dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'mode',editing:false,commenting:true}}))");
+  w.document.querySelector('[data-ocd-feedback]')!.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+  expect(messages).toHaveBeenCalledWith(expect.objectContaining({type:'play-feedback',tag:'BUTTON',quote:'发布',state:'禁用'}),'*');
+  expect(activate).not.toHaveBeenCalled();
+  w.eval("dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'mode',editing:false,commenting:false}}))");
+  expect(w.document.querySelector('[data-ocd-feedback]')).toBeNull();
+ });
  it('renders expressions, defaults, conditional and repeated content; selection does not execute actions',async()=>{
   const {w,messages}=await preview(`<x-dc><helmet><style>h1{color:red}</style></helmet><h1>{{tone}}</h1><sc-if value="{{visible}}"><p>显示</p></sc-if><sc-if value="{{count}}"><em>after</em></sc-if><sc-for list="{{items}}" as="item" index="idx"><span>{{idx}}:{{item}}</span></sc-for><button onclick="{{increment}}">{{count}}</button></x-dc><script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","default":"light"}}'>class Component extends DCLogic{state={count:0};renderVals(){return {tone:this.props.tone,visible:true,items:['A','B'],count:this.state.count,increment:()=>this.setState(s=>({count:s.count+1}))};}}</script>`);
   expect(w.document.querySelector('h1')?.textContent).toBe('light');expect(w.document.querySelectorAll('sc-if,sc-for')).toHaveLength(0);expect([...w.document.querySelectorAll('x-dc span')].map(n=>n.textContent)).toEqual(['0:A','1:B']);expect(w.document.head.querySelector('style')).not.toBeNull();expect(w.document.querySelector('em')).toBeNull();

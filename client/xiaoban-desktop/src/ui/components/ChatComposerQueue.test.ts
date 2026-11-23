@@ -5,6 +5,7 @@ import {describe,it,expect,vi} from 'vitest';
 import ChatComposer from './ChatComposer.vue';
 import {createChatStore} from '../chat/chat-store.ts';
 import {newView} from '../chat/view.ts';
+import ChatMessageQueue from './ChatMessageQueue.vue';
 const native = vi.hoisted(() => vi.fn(async(command:string):Promise<unknown> => command === 'chat_screenshot' ? 'data:image/png;base64,YQ==' : command === 'get_ai_config' ? {model:'test',providers:[]} : []));
 vi.mock('../../bridge.ts',async original=>({...await original<any>(),invoke:native}));
 function setup() {
@@ -16,6 +17,18 @@ function setup() {
   return{host,chat,wrapper};
 }
 describe('composing while a reply is running',()=>{
+  it('counts only messages still waiting and shows an in-flight message once',async()=>{
+    const h=setup();
+    const sending={id:'q1',text:'正在投递的正文',images:0,files:[],mode:'queue' as const,dispatching:true};
+    h.chat.queues.s1={revision:1,paused:false,reason:'',items:[sending]};
+    const queue=mount(ChatMessageQueue,{props:{chat:h.chat,running:true}});
+    expect(queue.get('[role=status]').text()).toContain('正在发送');
+    expect(queue.text()).not.toContain(sending.text);expect(queue.find('.queue-summary').exists()).toBe(false);
+    h.chat.queues.s1.items.push({...sending,id:'q2',text:'下一条反馈',dispatching:false});await flushPromises();
+    expect(queue.get('.queue-summary').text()).toContain('1 条');
+    expect(queue.findAll('li')).toHaveLength(1);expect(queue.get('li').text()).toContain('下一条反馈');
+    queue.unmount();h.wrapper.unmount();h.chat.dispose();
+  });
   it('accepts a screenshot and Enter queues it without stopping the active reply',async()=>{
     const h=setup();await flushPromises();expect(h.wrapper.get('[data-testid=shot]').attributes('disabled')).toBeUndefined();
     await h.wrapper.get('[data-testid=shot]').trigger('click');await flushPromises();expect(h.chat.draft.attachments).toHaveLength(1);

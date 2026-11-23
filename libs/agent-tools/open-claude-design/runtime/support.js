@@ -230,6 +230,16 @@
     entry.component=component;entry.props=props;
     node.replaceWith(entry.host);
   }
+  const reportedBindings = new Set();
+  function warnBinding(node, event, file, detail) {
+    const id = node.id || node.getAttribute('data-ocd-node');
+    const label = node.localName + (id ? '#'+id : '');
+    const message = (file+' · '+label+' 的 '+event+' 未绑定：'+detail).slice(0,500);
+    if (!reportedBindings.has(message)) {
+      reportedBindings.add(message);
+      send('binding-warning',{message});
+    }
+  }
   function expand(node, scope, ctx) {
     if (node.nodeType === Node.TEXT_NODE) { if(node.parentElement?.closest('[data-ocd-literal="true"]'))return; const value = expr(node.textContent || '', scope); if (Array.isArray(value) && value.every(n => n instanceof Node)) node.replaceWith(...value); else node.textContent = String(value ?? ''); return; }
     if (!(node instanceof Element)) return;
@@ -274,12 +284,16 @@
     for (const attr of [...node.attributes]) {
       if (attr.name.toLowerCase().startsWith('on')) {
         node.removeAttribute(attr.name);
-        const handler = expr(attr.value, scope);
+        let handler;
+        try { handler = expr(attr.value, scope); }
+        catch (error) { warnBinding(node,attr.name,ctx.file,error.message); continue; }
         if (typeof handler === 'function') {
           const eventName = attr.name.toLowerCase();
           const capture = eventName.endsWith('capture'), raw = eventName.slice(2).replace(/capture$/, '');
           const event = raw === 'doubleclick' ? 'dblclick' : raw === 'change' && (node.localName === 'textarea' || node.localName === 'input' && !['checkbox','radio','file'].includes(node.type)) ? 'input' : raw;
           node.addEventListener(event, e => { if (!editing) try { handler(e); } catch (error) { report(error); } }, capture);
+        } else if (handler !== null && handler !== false) {
+          warnBinding(node,attr.name,ctx.file,'请用 {{handler}} 返回函数');
         }
         continue;
       }
@@ -441,9 +455,38 @@
       const a = e.target.closest?.('a[href]');
       if (a) { e.preventDefault(); const href = a.getAttribute('href'); if (href.startsWith('#')) { document.getElementById(href.slice(1))?.scrollIntoView(); } else send('navigate', {file: href}); }
     }, true);
+    let feedbackLayer;
+    function setFeedbackMode(active) {
+      if (!active) { feedbackLayer?.remove(); feedbackLayer = null; return; }
+      if (feedbackLayer) return;
+      const layer = document.createElement('div');
+      layer.setAttribute('data-ocd-editor','');
+      layer.setAttribute('data-ocd-feedback','');
+      layer.style.cssText = 'position:fixed;inset:0;z-index:2147483647;cursor:crosshair;background:transparent';
+      layer.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        layer.style.pointerEvents = 'none';
+        const hit = document.elementFromPoint(event.clientX,event.clientY);
+        layer.style.pointerEvents = 'auto';
+        if (!hit) return;
+        const control = hit.closest('button,a,input,textarea,select,[role="button"],[role="tab"]') || hit;
+        const anchor = control.closest('[data-ocd-node]');
+        const state = [];
+        if (control.matches(':disabled,[aria-disabled="true"]')) state.push('禁用');
+        if (control.matches('input[type="checkbox"],input[type="radio"]')) state.push(control.checked?'已勾选':'未勾选');
+        if (control.hasAttribute('aria-pressed')) state.push('aria-pressed='+control.getAttribute('aria-pressed'));
+        if (control.matches('input,textarea') && control.type !== 'password') state.push('已输入 '+control.value.length+' 字');
+        send('play-feedback', {node:anchor?.getAttribute('data-ocd-node'),tag:control.tagName,
+          path:nodePath(control),quote:(control.getAttribute('aria-label') || control.getAttribute('placeholder') || control.textContent || '').trim().slice(0,160),
+          state:state.join('，') || '播放中'});
+      });
+      document.body.append(layer);
+      feedbackLayer = layer;
+    }
     addEventListener('message', e => {
       if (e.source !== parent || e.data?.channel !== 'open-claude-design') return;
-      if (e.data.type === 'mode') { editing = Boolean(e.data.editing); commenting = Boolean(e.data.commenting); renderPins(); }
+      if (e.data.type === 'mode') { editing = Boolean(e.data.editing); commenting = Boolean(e.data.commenting); setFeedbackMode(!editing && commenting); renderPins(); }
       if (e.data.type === 'props' && instance && e.data.props && typeof e.data.props === 'object') {
         instance.__previousProps=instance.props;instance.props = {...instance.props, ...e.data.props};
         try { render?.(); } catch (err) { report(err); }

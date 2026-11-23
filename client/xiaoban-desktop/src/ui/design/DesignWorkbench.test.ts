@@ -3,6 +3,7 @@ import {flushPromises,mount,type VueWrapper} from '@vue/test-utils';
 import {beforeEach,afterEach,describe,expect,it,vi} from 'vitest';
 import DesignWorkbench from './DesignWorkbench.vue';
 import BoardPreview from './BoardPreview.vue';
+import DesignPlayReview from './DesignPlayReview.vue';
 import type {Project} from './model.ts';
 const mocks=vi.hoisted(()=>({invoke:vi.fn(),listen:vi.fn()}));
 vi.mock('../../bridge.ts',()=>mocks);
@@ -13,6 +14,43 @@ async function click(title:string){await wrapper!.get(`[title="${title}"]`).trig
 beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('IntersectionObserver',undefined);mocks.listen.mockResolvedValue(()=>{});mocks.invoke.mockImplementation(async(command,args)=>{if(command==='design_read')return {project:fixture(),origin:'design-preview://localhost'};if(command==='design_save')return {project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'};});});
 afterEach(()=>{wrapper?.unmount();wrapper=undefined;vi.unstubAllGlobals();});
 describe('compact design workbench',()=>{
+ it('attaches Play feedback to its revision and control without rewriting the board',async()=>{
+  const w=await open();
+  await click('演示原型');await click('选择要反馈的控件');
+  const preview=w.findComponent(BoardPreview);
+  expect(preview.props()).toMatchObject({editing:false,commenting:true});
+  preview.vm.$emit('message',{type:'play-feedback',node:'n0',tag:'BUTTON',path:'button#publish',quote:'发布',state:'禁用'});
+  await flushPromises();
+  expect(w.get('form.dialog').text()).toContain('版本 1 · 禁用');
+  expect(preview.props('commenting')).toBe(false);
+  await w.get('.dialog textarea').setValue('空标题时给我提示');
+  await w.get('form.dialog').trigger('submit');await flushPromises();
+  const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];
+  expect(save.project.files).toEqual(fixture().files);
+  expect(save.project.canvas.xiaoban.comments[0]).toMatchObject({file:'Main.dc.html',path:'button#publish',quote:'发布',revision:1,playState:'禁用'});
+  const [prompt,session]=w.emitted('request')![0];
+  expect(prompt).toContain('空标题时给我提示');expect(prompt).toContain('Play 状态：禁用');expect(session).toBe('s1');
+ });
+ it('enables human checks in Play and drops passed marks when the design revision changes',async()=>{
+  const project=fixture();
+  project.canvas.xiaoban={playChecks:['点击赞后计数增加']};
+  let checked=false;
+  mocks.invoke.mockImplementation(async(command,args)=>{
+   if(command!=='design_play_review')return;
+   if(args.step===0)checked=args.passed;
+   return {revision:args.revision,passed:args.revision===1&&checked?[0]:[]};
+  });
+  const w=mount(DesignPlayReview,{props:{project,playing:false,writable:true}});wrapper=w;
+  await flushPromises();
+  expect(w.get('input[type=checkbox]').attributes('disabled')).toBeDefined();
+  await w.get('button.xb-menu-item').trigger('click');expect(w.emitted('play')).toHaveLength(1);
+  await w.setProps({playing:true});await w.get('input[type=checkbox]').trigger('click');await flushPromises();
+  expect(mocks.invoke).toHaveBeenCalledWith('design_play_review',{id:project.id,revision:1,step:0,passed:true});
+  expect(w.get('summary').text()).toContain('1/1');
+  await w.setProps({project:{...project,revision:2}});await flushPromises();
+  expect(w.get('summary').text()).toContain('0/1');
+  expect((w.get('input[type=checkbox]').element as HTMLInputElement).checked).toBe(false);
+ });
  it('shows import losses and exports the preserved original separately from editable sources',async()=>{
   const p=fixture();p.canvas.xiaoban={import:{format:'claude-bundled-html',originalFile:'official.html',notice:'官方导出没有原画布坐标',issues:['缺少页面目标']}};
   mocks.invoke.mockImplementation(async(command)=>command==='design_read'?{project:p,origin:'design-preview://localhost'}:null);

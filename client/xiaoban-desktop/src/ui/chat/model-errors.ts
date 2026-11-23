@@ -1,3 +1,6 @@
+export const isQuotaError = (message: string) =>
+  /insufficient[_ -](quota|balance)|余额不足|额度.*(不足|耗尽|用完)|quota.*exceed/i.test(message);
+
 export interface ModelFailure { message: string; refresh: boolean }
 /** Only explicit provider error content identifies a retired model; HTTP 404 alone does not. */
 export function modelFailure(raw: string): ModelFailure {
@@ -11,7 +14,7 @@ export function modelFailure(raw: string): ModelFailure {
   if (/invalid[_ -]api[_ -]key|authentication|unauthorized|认证失败|凭证.*失效|\b401\b/.test(value)) {
     return { message: '当前服务认证失败，请修改配置或切换模型。', refresh: true };
   }
-  if (/insufficient[_ -]quota|insufficient[_ -]balance|余额不足|额度.*(不足|耗尽)|quota.*exceed/.test(value)) {
+  if (isQuotaError(value)) {
     return { message: '当前服务额度不足，可以切换模型。', refresh: false };
   }
   if (/permission|forbidden|无.*权限|\b403\b/.test(value)) {

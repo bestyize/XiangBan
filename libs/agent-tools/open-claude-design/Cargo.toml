@@ -13,6 +13,7 @@ getrandom = "0.3"
 base64 = "0.22"
 
 regex = "1"
+html5ever = "0.39"
 zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }

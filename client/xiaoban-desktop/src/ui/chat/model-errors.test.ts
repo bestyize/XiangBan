@@ -7,6 +7,7 @@ describe('model failure recovery', () => {
     expect(modelFailure('model_not_found')).toMatchObject({ refresh: true });
     expect(modelFailure('HTTP 429 rate_limit')).toMatchObject({ refresh: false });
     expect(modelFailure('insufficient_quota').message).toContain('额度');
+    expect(modelFailure('额度已用完，请兑换额度后继续使用').message).toContain('当前服务额度不足');
     expect(modelFailure('invalid_api_key').message).toContain('认证');
   });
   it('offers original-message retry but stops offering it after output or a tool action', () => {

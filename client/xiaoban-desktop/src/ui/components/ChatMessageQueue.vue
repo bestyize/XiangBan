@@ -14,8 +14,10 @@ const removedImages = ref<number[]>([]);
 const removedFiles = ref<string[]>([]);
 const busy = ref(false);
 const dragging = ref<string | null>(null);
+const waiting = computed(() => queue.value?.items.filter(entry => !entry.dispatching) ?? []);
+const dispatching = computed(() => queue.value?.items.some(entry => entry.dispatching));
 const entries = computed(() => {
-  const items = queue.value?.items ?? [];
+  const items = waiting.value;
   return (expanded.value ? items : items.slice(0, 2)).map(entry => ({ ...entry, visibleText: legacyCommunityMessage(entry.text).text }));
 });
 watch(() => props.chat.currentId, () => { editing.value = null; expanded.value = false; });
@@ -68,15 +70,16 @@ function move(id: string, before: string) {
   void act('reorder', undefined, { order: ids });
 }
 function step(id: string, delta: number) {
-  const entries = queue.value?.items ?? [], index = entries.findIndex(e => e.id === id), other = entries[index + delta];
+  const entries = waiting.value, index = entries.findIndex(e => e.id === id), other = entries[index + delta];
   if (other) move(id, other.id);
 }
 </script>
 <template>
-  <section v-if="queue?.items.length" class="message-queue" aria-label="待发送消息" data-testid="chat-message-queue">
-    <div class="queue-head">
-      <button class="queue-summary" type="button" :aria-expanded="expanded" @click="expanded = !expanded"><Clock3 :size="13" /><span>{{ queue.paused ? '队列已暂停' : '已排队' }} · {{ queue.items.length }} 条</span><ChevronDown :size="13" :class="{ expanded }" /></button>
-      <span class="queue-hint">{{ queue.paused ? queue.reason : queue.items.some(e => e.mode === 'steer') ? '补充将在当前步骤结束后接收' : '当前任务结束后自动发送' }}</span>
+  <section v-if="queue && (waiting.length || dispatching)" class="message-queue" aria-label="待发送消息" data-testid="chat-message-queue">
+    <span v-if="dispatching" role="status">正在发送当前消息…</span>
+    <div v-if="waiting.length" class="queue-head">
+      <button class="queue-summary" type="button" :aria-expanded="expanded" @click="expanded = !expanded"><Clock3 :size="13" /><span>{{ queue.paused ? '队列已暂停' : '已排队' }} · {{ waiting.length }} 条</span><ChevronDown :size="13" :class="{ expanded }" /></button>
+      <span class="queue-hint">{{ queue.paused ? queue.reason : waiting.some(e => e.mode === 'steer') ? '补充将在当前步骤结束后接收' : '当前任务结束后自动发送' }}</span>
       <button class="queue-action" type="button" :disabled="busy" :title="queue.paused ? '继续发送队列' : '暂停队列'" :aria-label="queue.paused ? '继续发送队列' : '暂停队列'" data-testid="chat-queue-toggle" @click="act(queue.paused ? 'resume' : 'pause')"><Play v-if="queue.paused" :size="13" /><Pause v-else :size="13" /></button>
     </div>
     <ol>
@@ -95,10 +98,10 @@ function step(id: string, delta: number) {
         <template v-else>
           <span class="queue-number">{{ index + 1 }}</span>
           <img v-if="previews[previewKey(entry)]" class="queue-thumb" :src="previews[previewKey(entry)]" alt="排队图片预览" />
-          <div class="queue-content"><p :title="entry.visibleText">{{ entry.visibleText || '附件消息' }}</p><div class="queue-meta"><span v-if="entry.dispatching">正在发送…</span><span v-else-if="entry.mode === 'steer'">等待补充到当前任务</span><span v-if="entry.images"><Image :size="10" />{{ entry.images }} 张图片</span><span v-for="file in entry.files.filter(f => !f.mime?.startsWith('image/'))" :key="file.id"><FileText :size="10" />{{ file.name }}</span></div></div>
+          <div class="queue-content"><p :title="entry.visibleText">{{ entry.visibleText || '附件消息' }}</p><div class="queue-meta"><span v-if="entry.mode === 'steer'">等待补充到当前任务</span><span v-if="entry.images"><Image :size="10" />{{ entry.images }} 张图片</span><span v-for="file in entry.files.filter(f => !f.mime?.startsWith('image/'))" :key="file.id"><FileText :size="10" />{{ file.name }}</span></div></div>
           <div class="queue-actions">
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching || index === 0" aria-label="上移" @click="step(entry.id, -1)"><ArrowUp :size="12" /></button>
-            <button type="button" class="queue-action" :disabled="busy || entry.dispatching || index === queue.items.length - 1" aria-label="下移" @click="step(entry.id, 1)"><ArrowDown :size="12" /></button>
+            <button type="button" class="queue-action" :disabled="busy || entry.dispatching || index === waiting.length - 1" aria-label="下移" @click="step(entry.id, 1)"><ArrowDown :size="12" /></button>
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching" aria-label="编辑排队消息" title="暂停队列并编辑" @click="begin(entry)"><Pencil :size="12" /></button>
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching" :aria-label="running ? '停止并发送此条' : '立即发送此条'" :title="running ? '停止当前任务并发送此条，其余队列暂停' : '立即发送此条，其余队列暂停'" @click="act('send_now', entry.id)"><CornerDownLeft :size="13" /></button>
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching" aria-label="删除排队消息" @click="act('remove', entry.id)"><Trash2 :size="12" /></button>
@@ -106,7 +109,7 @@ function step(id: string, delta: number) {
         </template>
       </li>
     </ol>
-    <button v-if="!expanded && queue.items.length > 2" type="button" class="queue-more" @click="expanded = true">展开其余 {{ queue.items.length - 2 }} 条</button>
+    <button v-if="!expanded && waiting.length > 2" type="button" class="queue-more" @click="expanded = true">展开其余 {{ waiting.length - 2 }} 条</button>
   </section>
 </template>
 <style scoped>

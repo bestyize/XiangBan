@@ -33,7 +33,7 @@ import { attachmentImage } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatTokens, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
 import { describeCall } from '../chat/view.ts';
-import { silenceNotice } from '../chat/model-errors.ts';
+import { isQuotaError, silenceNotice } from '../chat/model-errors.ts';
 import { replyBlocks, type ReplyBlock, type ToolCall } from '../chat/replies.ts';
 import { taskProgress, type TaskProgress } from '../chat/task-progress.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../chat/types.ts';
@@ -644,7 +644,7 @@ async function openLink(href: string) {
                   <div v-else-if="item.kind === 'notice' && (item.text || item.details)" class="notice" :class="[item.tone, { 'outcome-details': item.taskStatus && !item.text }]" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                     <span v-if="item.text" class="notice-text">{{ item.text }}</span>
                     <details v-if="item.details"><summary :title="item.detailsLabel ?? '错误详情'" :aria-label="item.detailsLabel ?? '错误详情'"><ChevronRight :size="12" class="notice-chevron" aria-hidden="true" /><FileText :size="14" class="notice-compact-icon" aria-hidden="true" /><span class="notice-action-label">{{ item.detailsLabel ?? '错误详情' }}</span></summary><span class="notice-details">{{ item.details }}</span></details>
-                    <button v-if="item.canSwitchModel && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" @click="chooseModel(!!item.canRetry, item.id)">切换模型</button>
+                    <button v-if="item.canSwitchModel && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" @click="chooseModel(!!item.canRetry, item.id)">{{ item.canRetry && isQuotaError(item.details ?? '') ? '换模型并重试' : '切换模型' }}</button>
                     <button v-if="item.canRetry && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" data-testid="chat-retry" @click="chat.retry(item.id)">重试</button>
                     <button v-if="item.canContinue && !view.running && !view.hostBusy && chat.canRecover(item.id)" type="button" class="xb-link" data-testid="chat-continue" @click="continueAnswer(item.id)">继续</button>
                     <template v-if="item.undoRun && !view.running">

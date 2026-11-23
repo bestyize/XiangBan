@@ -6,16 +6,22 @@ export interface Comment {
   tag?:string;
   path?:string;
   quote?:string;
+  playState?:string;
   text:string;
   revision:number;
   status:'saved'|'sent'|'resolved';
 }
 export interface DsCard { name:string; path:string; group:string; subtitle:string; viewport:{width:number;height:number} }
 export type ProjectStatus = 'draft'|'generating'|'ready'|'failed';
-export const statusLabel = (status?:ProjectStatus) => ({draft:'草稿',generating:'生成中',ready:'已完成',failed:'待恢复'}[status??'ready']);
+export const statusLabel = (status?:ProjectStatus) => ({draft:'草稿',generating:'生成中',ready:'已生成',failed:'待恢复'}[status??'ready']);
 export interface Project { status?:ProjectStatus; id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; canvas:Record<string,any>; files:Record<string,string>; requestId?:string }
 export interface Summary { active?:boolean;detached?:boolean; status?:ProjectStatus; issues?:string[]; id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; artboards:number }
-export interface Payload { project:Project; origin:string; draft?:Project; draftError?:string }
+export interface Payload { project:Project; origin:string; bindingIssues?:string[]; draft?:Project; draftError?:string }
+
+export function playSteps(project:Project):string[]{
+  const list=project.canvas.xiaoban?.playChecks;
+  return Array.isArray(list)?[...new Set(list.filter((v):v is string=>typeof v==='string').map(v=>v.trim()).filter(Boolean))]:[];
+}
 
 export const DEVICE_PRESETS: { id:string; label:string; w:number; h:number }[] = [
   { id:'desktop', label:'桌面 1280×800', w:1280, h:800 },
@@ -111,14 +117,15 @@ export function formatCommentPrompt(project:Project,comments:Comment[]):string{
       c.node?`元素 ${c.node}`:'',
       c.path?`路径 ${c.path}`:'',
       c.quote?`选中文字「${c.quote}」`:'',
+      c.playState?`Play 状态：${c.playState}`:'',
     ].filter(Boolean).join('，');
-    return `请修改设计稿 ${project.id}，画板 ${c.file}${anchor?`，${anchor}`:''}（批注 ${c.id}，基于版本 ${c.revision}）。用户要求：\n${c.text}\n先读取最新版，保留其他改动，完成后在 canvas.xiaoban.comments 中将本批注标记为 resolved。`;
+    return `请修改设计稿 ${project.id}，画板 ${c.file}${anchor?`，${anchor}`:''}（批注 ${c.id}，基于版本 ${c.revision}）。用户要求：\n${c.text}\n先读取最新版，优先用 save.edits 局部替换，保留其他改动，完成后在 canvas.xiaoban.comments 中将本批注标记为 resolved。`;
   }
   const lines=comments.map((c,i)=>{
-    const loc=[c.file,c.node?`元素 ${c.node}`:'',c.path?`路径 ${c.path}`:'',c.quote?`文字「${c.quote}」`:''].filter(Boolean).join(' · ');
+    const loc=[c.file,c.node?`元素 ${c.node}`:'',c.path?`路径 ${c.path}`:'',c.quote?`文字「${c.quote}」`:'',c.playState?`Play 状态：${c.playState}（版本 ${c.revision}）`:''].filter(Boolean).join(' · ');
     return `${i+1}. [${c.id}] (${loc})：${c.text}`;
   }).join('\n');
-  return `请批量处理设计稿 ${project.id}（基于版本 ${project.revision}）的以下 ${comments.length} 条批注：\n${lines}\n先读取最新版，保留其他改动，完成后在 canvas.xiaoban.comments 中将这些批注全部标记为 resolved。`;
+  return `请批量处理设计稿 ${project.id}（基于版本 ${project.revision}）的以下 ${comments.length} 条批注：\n${lines}\n先读取最新版，优先用 save.edits 局部替换，保留其他改动，完成后在 canvas.xiaoban.comments 中将这些批注全部标记为 resolved。`;
 }
 export function toMarkdownSpec(project:Project):string{
   const bs=boardsOf(project.canvas),tokens=tokensOf(project.canvas),cards=dsCardsOf(project);

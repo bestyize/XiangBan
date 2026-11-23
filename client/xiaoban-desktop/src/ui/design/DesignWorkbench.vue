@@ -3,13 +3,14 @@ import {computed,onBeforeUnmount,onMounted,nextTick,ref,watch} from 'vue';
 import {Check,Copy,Download,Hand,ExternalLink,Pencil,Maximize2,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers,SlidersHorizontal} from 'lucide-vue-next';
 import {invoke} from '../../bridge.ts';
 import BoardPreview from './BoardPreview.vue';
+import DesignPlayReview from './DesignPlayReview.vue';
 import ElementToolbar from './ElementToolbar.vue';
 import ElementCode from './ElementCode.vue';
 import CanvasNoteView from './CanvasNote.vue';
 import {notesOf,addNote,patchNote,type CanvasNote} from './canvas-notes.ts';
 import {mutateElements,copyElements,layersOf,textFragment,fragmentNeedsContext,type ElementAction,type Fragment} from './element-commands.ts';
 import {
-  statusLabel,addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,previewUrl,propsOf,removeBoard,targetFile,
+  statusLabel,playSteps,addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,previewUrl,propsOf,removeBoard,targetFile,
   tokensOf,setToken,dsCardsOf,insertComponentImport,formatCommentPrompt,toMarkdownSpec,DEVICE_PRESETS,
   type Board,type Comment,type Project,type Summary,type DsCard
 } from './model.ts';
@@ -28,6 +29,16 @@ let commandSeq=0,preserveSelection=false,clipboard:Fragment|undefined;
 const node=ref<{readonly?:boolean;group?:boolean;id:string;text:string;tag:string;path?:string;quote?:string;styles?:Record<string,string>}|null>(null);
 const contrastRatio=computed(()=>contrast(node.value?.styles?.color??'',node.value?.styles?.['contrast-background']??node.value?.styles?.['background-color']??''));
 const nodeText=ref(''),commentText=ref(''),sendComment=ref(true),commentOpen=ref(false),sourceOpen=ref(false),source=ref(''),renderErrors=ref<Record<string,string>>({});
+const playAnchor=ref<{file:string;revision:number;state:string}|null>(null);
+const bindingWarnings=ref<string[]>([]);
+const issues=computed(()=>[...new Set([...ds.bindingIssues,...bindingWarnings.value])]);
+function addCheck(step:string){void edit(p=>{p.canvas.xiaoban??={};p.canvas.xiaoban.playChecks=[...playSteps(p),step];});}
+function toggleComment(){
+  playAnchor.value=null;
+  if(mode.value==='play'){commentTool.value=!commentTool.value;return;}
+  if(selectedIds.value.length)commentOpen.value=true;else commentTool.value=!commentTool.value;
+}
+watch(mode,()=>{commentTool.value=false;});
 const history=ref<Project[]>([]),future=ref<Project[]>([]),versions=ref<Summary[]>([]),versionsOpen=ref(false);
 const newTokenKey=ref(''),newTokenValue=ref('');
 let sourceRevision=0,remoteEpoch=0,viewReady=false;let viewTimer:ReturnType<typeof setTimeout>|undefined;
@@ -130,7 +141,7 @@ function boardPins(file:string){
 function close(){if(ds.busy){props.notify('正在保存，请稍候关闭','info');return;}emit('close');}
 function report(e:unknown){props.notify(e,'error');}
 async function open(id:string){
-  remoteEpoch++;viewReady=false;
+  remoteEpoch++;viewReady=false;bindingWarnings.value=[];playAnchor.value=null;commentTool.value=false;
   try{
     await ds.open(id);
     if(project.value?.id!==id)return;
@@ -159,7 +170,7 @@ async function handoff(){if(ds.busy||ds.dirty){props.notify('请先保存当前�
 function releaseSpace(){spaceHeld.value=false;cancelDrag();}
 onMounted(async()=>{offDeleted=await (await import('../../bridge.ts')).listen<{id:string}>('design-deleted',row=>{if(row.id===project.value?.id){ds.close();props.notify('设计稿已被删除','info');}});if(unmounted){offDeleted();return;}window.addEventListener('keyup',keyup);window.addEventListener('blur',releaseSpace);});
 onBeforeUnmount(()=>{unmounted=true;offDeleted?.();clearTimeout(viewTimer);void rememberView().catch(()=>{});ds.dispose();window.removeEventListener('keyup',keyup);window.removeEventListener('blur',releaseSpace);});
-watch(()=>project.value?.revision,()=>{if(!allBoards.value.some(b=>b.file===selected.value))selected.value=allBoards.value[0]?.file??'';renderErrors.value={};node.value=null;if(!preserveSelection)clearElements();});
+watch(()=>project.value?.revision,()=>{bindingWarnings.value=[];if(!allBoards.value.some(b=>b.file===selected.value))selected.value=allBoards.value[0]?.file??'';renderErrors.value={};node.value=null;if(!preserveSelection)clearElements();});
 
 async function copyProject(){
  if(!project.value||!canEdit.value)return;
@@ -245,6 +256,17 @@ async function elementCommand(command:string){
 }
 function onPreview(b:Board,data:Record<string,any>){
  if(data.revision!==undefined&&data.revision!==project.value?.revision)return;
+ if(data.type==='binding-warning'){
+   const message=String(data.message??'').slice(0,500);
+   if(message&&!bindingWarnings.value.includes(message))bindingWarnings.value.push(message);
+   return;
+ }
+ if(data.type==='play-feedback'&&mode.value==='play'&&commentTool.value&&project.value&&canEdit.value){
+   clearElements();selected.value=b.file;
+   node.value={id:String(data.node??''),tag:String(data.tag??''),path:String(data.path??'').slice(0,400),quote:String(data.quote??'').slice(0,160),text:''};
+   playAnchor.value={file:b.file,revision:project.value.revision,state:String(data.state??'播放中').slice(0,180)};
+   commentTool.value=false;commentOpen.value=true;return;
+ }
  if(data.type==='element-edit'){if(mode.value==='select'&&!commentTool.value)void elementEdit(data.action,b.file);return;}
  if(data.type==='editor-command'){if(mode.value==='select'){selected.value=b.file;if(data.command==='showProperties'){properties.value=true;activeTab.value='properties';context.value=null;}else void elementCommand(String(data.command));}return;}
  if(data.type==='editor-notice'){props.notify(String(data.message),'info');return;}
@@ -301,6 +323,10 @@ function propChange(key:string,c:any,event:Event){const input=event.target as HT
 
 async function postComment(){
   if(!current.value||!commentText.value.trim()||!project.value)return;
+  const capture=playAnchor.value;
+  if(capture&&(capture.revision!==project.value.revision||capture.file!==current.value.file)){
+    props.notify('画板已更新，请重新选择反馈控件','info');return;
+  }
   const c:Comment={
     id:crypto.randomUUID(),
     file:current.value.file,
@@ -308,16 +334,17 @@ async function postComment(){
     tag:node.value?.tag,
     path:node.value?.path,
     quote:node.value?.quote,
+    playState:capture?.state,
     text:commentText.value.trim(),
     revision:project.value.revision,
     status:sendComment.value?'sent':'saved'
   };
   const ok=await edit(p=>{
-    if(c.node)try{p.files[c.file]=patchNode(p.files[c.file],c.node,{});}catch{}
+    if(c.node&&!capture)try{p.files[c.file]=patchNode(p.files[c.file],c.node,{});}catch{}
     p.canvas.xiaoban??={};p.canvas.xiaoban.comments??=[];p.canvas.xiaoban.comments.push(c);
   });
   if(!ok)return;
-  commentOpen.value=false;commentText.value='';
+  commentOpen.value=false;playAnchor.value=null;commentText.value='';
   if(sendComment.value){
     const msg=formatCommentPrompt(project.value,[c]);
     emit('request',msg,project.value.sessionIds?.at(-1)??project.value.sessionId);
@@ -382,6 +409,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   <button :disabled="!canEdit" title="创建副本" @click="copyProject"><Copy :size="13"/></button>
   <span v-if="project" class="saved">{{statusLabel(project.status)}}</span>
   <span class="saved" :class="{error:ds.error}">{{ds.busy?'保存中…':ds.error?'未保存':ds.dirty?'有未保存修改':'已保存'}}</span>
+  <DesignPlayReview v-if="project" :project="project" :playing="mode==='play'" :writable="canEdit&&!ds.dirty" @play="mode='play'" @add="addCheck"/>
   <span class="spacer"/>
   <button :title="theme==='light'?'切换暗色预览':'切换亮色预览'" @click="theme=theme==='light'?'dark':'light'">
     <Moon v-if="theme==='light'" :size="14"/><Sun v-else :size="14"/>
@@ -416,7 +444,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   <button :disabled="!canEdit" title="新增画布便签" @click="newNote"><MessageSquare :size="14"/></button>
   <button :disabled="!current" title="画板源代码" @click="openSource">&lt;/&gt;</button>
   <button :disabled="!canEdit" title="新增画板" @click="add()"><Plus :size="14"/></button>
-  <button :disabled="!canEdit||!current" title="添加批注" :class="{on:commentTool}" @click="selectedIds.length?commentOpen=true:commentTool=!commentTool"><MessageSquare :size="14"/></button>
+  <button :disabled="!canEdit||!current"  :title="mode==='play'?'选择要反馈的控件':'添加批注'" :aria-pressed="commentTool" :class="{on:commentTool}" @click="toggleComment"><MessageSquare :size="14"/><template v-if="mode==='play'">{{commentTool?'点选控件…':'反馈此处'}}</template></button>
   <select :disabled="!canEdit" aria-label="插入元素" value="" @change="elementEdit({type:'insert',kind:($event.target as HTMLSelectElement).value as 'text'});($event.target as HTMLSelectElement).value=''">
     <option value="" disabled>插入</option><option value="text">文字</option><option value="rectangle">矩形</option><option value="ellipse">椭圆</option><option value="note">便签</option>
   </select>
@@ -450,6 +478,10 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
  <ul><li v-for="issue in project.canvas.xiaoban.import.issues" :key="issue">{{issue}}</li></ul>
 </details>
 <div v-if="rendering" class="export-progress" role="status"><span>{{renderProgress}}</span><button @click="cancelRendering">取消导出</button></div>
+<details v-if="issues.length" class="import-report">
+ <summary>事件绑定问题 · {{issues.length}}</summary>
+ <ul><li v-for="issue in issues" :key="issue">{{issue}}</li></ul>
+</details>
 <div v-if="ds.error" class="errorbar" role="alert">
   {{ds.error}}<small v-if="ds.dirty"> · 草稿未写入预览，可先导出保留</small>
   <button :disabled="ds.busy||ds.conflict" @click="ds.save()">重试保存</button>
@@ -617,13 +649,14 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
 <div v-if="renameOpen" class="overlay"><form class="dialog" @submit.prevent="saveTitle"><h3>重命名设计稿</h3><input v-model="projectTitle" required maxlength="120" aria-label="设计稿名称"/><div class="actions"><button type="button" @click="renameOpen=false">取消</button><button class="primary" :disabled="!canEdit||!projectTitle.trim()">保存</button></div></form></div>
 <div v-if="commentOpen" class="overlay">
   <form class="dialog" @submit.prevent="postComment">
-    <h3>添加批注</h3>
+    <h3>{{playAnchor?'反馈此处':'添加批注'}}</h3>
+    <p v-if="playAnchor">版本 {{playAnchor.revision}} · {{playAnchor.state}}</p>
     <p>{{current?.title}}<template v-if="node"> / {{node.tag.toLowerCase()}} {{node.id?`(#${node.id})`:''}}</template></p>
     <p v-if="node?.quote" class="quote">“{{node.quote}}”</p>
     <textarea v-model="commentText" required maxlength="4000" placeholder="描述想修改的内容…"/>
     <label class="check"><input v-model="sendComment" type="checkbox"/>交给小伴修改</label>
     <div class="actions">
-      <button type="button" @click="commentOpen=false">取消</button>
+      <button type="button" @click="commentOpen=false;playAnchor=null">取消</button>
       <button class="primary" :disabled="!canEdit||!commentText.trim()">保存批注</button>
     </div>
   </form>

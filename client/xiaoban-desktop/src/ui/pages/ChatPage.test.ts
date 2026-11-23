@@ -620,6 +620,15 @@ describe('talking', () => {
     expect(q('notice-error')!.textContent).toContain('HTTP 401');
   });
 
+  it('offers switching models and retrying the failed request on an explicit quota error', async () => {
+    const h = await open(startChat);
+    await type('修正首页点赞'); await click('chat-send');
+    await h.events('s1', { type: 'error', message: '当前模型额度已用完' });
+    const notice=q('notice-error')!;
+    expect(notice.textContent).toContain('额度不足');
+    expect([...notice.querySelectorAll('button')].some(button=>button.textContent==='换模型并重试')).toBe(true);
+  });
+
   it('hides recovery actions on historical errors after another user turn finishes', async () => {
     const h = await open(startChat);
     await type('任务 A'); await click('chat-send');

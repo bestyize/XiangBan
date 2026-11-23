@@ -11,7 +11,7 @@ pub fn saved(app:&tauri::AppHandle,p:&Project)->Result<(),String>{
     crate::data_library::upsert_design(app,p)?;
     let mut row=open_claude_design::summary(p);row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());let _=app.emit("design-changed",row);Ok(())
 }
-fn payload(p:Project)->Value{json!({"project":p,"origin":if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"}})}
+fn payload(p:Project)->Value{json!({"bindingIssues":open_claude_design::binding_issues(&p),"project":p,"origin":if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"}})}
 #[tauri::command]
 pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;let s=store(&app)?;let active=s.active(&session);Ok(s.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(|p|{let mut row=open_claude_design::summary(p);row["active"]=json!(active.as_deref()==Some(p.id.as_str()));row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());row}).collect())}
 #[tauri::command]
@@ -32,7 +32,10 @@ pub fn design_copy(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,se
 #[tauri::command]
 pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{crate::design_window::guard(&window,&id)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
     match s.draft(&id) {
-        Ok(Some(draft)) if draft.files!=p.files||draft.canvas!=p.canvas||draft.title!=p.title => result["draft"]=json!(draft),
+        Ok(Some(draft)) if draft.files!=p.files||draft.canvas!=p.canvas||draft.title!=p.title => {
+            result["bindingIssues"]=json!(open_claude_design::binding_issues(&draft));
+            result["draft"]=json!(draft);
+        }
         Err(e) => result["draftError"]=json!(format!("恢复草稿损坏，已打开最后保存版本：{e}")),
         _ => ()
     }
@@ -53,6 +56,20 @@ pub fn design_view_save(app:tauri::AppHandle,window:tauri::WebviewWindow,id:Stri
 #[tauri::command]
 pub fn design_view_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
     crate::design_window::guard(&window,&id)?;Ok(store(&app)?.read_view(&id,"view.json")?.unwrap_or(Value::Null))
+}
+#[tauri::command]
+pub fn design_play_review(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, revision: u64, step: Option<usize>, passed: Option<bool>) -> Result<open_claude_design::PlayReview, String> {
+    crate::design_window::guard(&window, &id)?;
+    let store = store(&app)?;
+    match (step, passed) {
+        (Some(step), Some(passed)) => {
+            let review = store.mark_play_step(&id, revision, step, passed)?;
+            let _ = app.emit("design-play-reviewed", &id);
+            Ok(review)
+        }
+        (None, None) => store.play_review(&store.load(&id)?),
+        _ => Err("验收操作缺少步骤或结果".into()),
+    }
 }
 #[tauri::command]
 pub fn design_history(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Vec<Value>,String>{crate::design_window::guard(&window,&id)?;Ok(store(&app)?.history(&id)?.iter().map(open_claude_design::summary).collect())}

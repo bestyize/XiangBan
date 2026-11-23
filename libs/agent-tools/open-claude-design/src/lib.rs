@@ -8,6 +8,10 @@ pub const NAME: &str = "open-claude-design";
 pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"),"\n",include_str!("../runtime/vendor/capture.js"));
 pub mod archive;
 pub mod html_import;
+mod interaction;
+mod play_review;
+pub use play_review::{play_steps, PlayReview};
+pub use interaction::binding_issues;
 pub mod rendered_export;
 pub mod assets;
 mod file_store;
@@ -351,10 +355,11 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "内置设计画板：创建和编辑多画板设计稿、界面原型。 Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax and the quality guide (craft). create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
+            "内置设计画板：创建和编辑多画板设计稿、界面原型。 Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax and the quality guide (craft). create allocates a durable id even with missing boards (draft). save accepts edits (unique before/after replacements in .dc.html) or merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
             json!({"type":"object","properties":{
                 "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy","delete"]},
                 "scope":{"type":"string","enum":["all","session"]},"query":{"type":"string"},"since_ms":{"type":"integer","minimum":0},"before_ms":{"type":"integer","minimum":0},"status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
+                "edits":{"type":"array","items":{"type":"object","properties":{"file":{"type":"string"},"before":{"type":"string","minLength":1},"after":{"type":"string"}},"required":["file","before","after"],"additionalProperties":false}},
                 "remove_boards":{"type":"array","items":{"type":"string"}},"canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
             },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved),removed:Arc::new(|_|Ok(())) }
     }
@@ -388,31 +393,45 @@ impl DesignTool {
                 // Opening a library project in a new conversation links the same source, never a copy.
                 (self.saved)(&p)?;
                 let file = args["file"].as_str().map(|name| p.files.get(name).map(|text| json!({"name":name,"text":text})).ok_or("设计文件不存在")).transpose()?;
-                Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file,"manifest":archive::ds_manifest(&p)}))
+                Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file,"bindingIssues":binding_issues(&p),"playChecks":play_steps(&p),"playReview":self.store.play_review(&p)?,"manifest":archive::ds_manifest(&p)}))
             }
             action @ ("create" | "save" | "complete") => {
                 let files: BTreeMap<String,String> = serde_json::from_value(args.get("files").cloned().unwrap_or(json!({}))).map_err(|_| "files 需要是文件名到内容的映射")?;
-                let p = if action == "create" {
+                let edits: Vec<interaction::SourceEdit> = serde_json::from_value(args.get("edits").cloned().unwrap_or(json!([]))).map_err(|_| "edits 需要 file、before 和 after")?;
+                if !edits.is_empty() && (action != "save" || !files.is_empty()) { return Err("局部修改请单独使用 save 的 edits 参数".into()); }
+                let (p, binding_issues) = if action == "create" {
                     let key=args["request_id"].as_str().filter(|k| !k.is_empty() && k.len()<=120).ok_or("create 需要稳定的 request_id，重试时沿用")?;
                     let _lock=CREATE_LOCK.lock().map_err(|_|"创建锁不可用")?;
-                    if let Some(existing)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key) { existing } else {
+                    let project = if let Some(existing)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key) { existing } else {
                         let p=Project{status:ProjectStatus::Draft,id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),session_ids:Vec::new(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
                         self.store.save(p,0)?
-                    }
+                    };
+                    let issues = binding_issues(&project);
+                    (project, issues)
                 } else {
                     let mut p = self.store.load(get_id()?)?;
+                    let expected = args["expected_revision"].as_u64().ok_or("必须传入读取到的 expected_revision")?;
+                    if expected != p.revision { return Err("设计稿版本已更新，请先读取最新版".into()); }
                     if let Some(title) = args["title"].as_str() { p.title = title.into(); }
                     if let Some(canvas) = args.get("canvas") { merge_canvas(&mut p.canvas,canvas); }
                     if let Some(remove)=args["remove_boards"].as_array(){for name in remove{let name=name.as_str().ok_or("remove_boards 必须是文件名数组")?;if let Some(map)=p.canvas["boards"].as_object_mut(){map.remove(name);}if let Some(order)=p.canvas["order"].as_array_mut(){order.retain(|v|v!=name);}if let Some(items)=p.canvas["artboards"].as_array_mut(){items.retain(|b|b["file"]!=name);}}}
                     p.files.extend(files);
+                    interaction::edit_sources(&mut p, edits)?;
                     p.status = if action == "complete" { ProjectStatus::Ready }
                         else if let Some(status) = args.get("status") { serde_json::from_value(status.clone()).map_err(|_|"无效的设计稿状态")? }
                         else if p.status == ProjectStatus::Ready { ProjectStatus::Ready } else { ProjectStatus::Generating };
-                    self.store.save(p, args["expected_revision"].as_u64().ok_or("必须传入读取到的 expected_revision")?)?
+                    let issues = binding_issues(&p);
+                    if !issues.is_empty() {
+                        if action == "complete" || args["status"] == "ready" {
+                            return Err(issues.iter().take(12).cloned().collect::<Vec<_>>().join("\n"));
+                        }
+                        if p.status == ProjectStatus::Ready { p.status = ProjectStatus::Generating; }
+                    }
+                    (self.store.save(p, expected)?, issues)
                 };
                 self.store.set_active(ctx.session(),&p.id)?;
                 (self.saved)(&p).map_err(|e| format!("设计 {} 已保存，但资料库索引更新失败：{e}。先 read 核对，不要重复创建。", p.id))?;
-                Ok(json!({"project":summary(&p),"issues":diagnostics(&p),"next":if p.status==ProjectStatus::Ready {"已完成"}else{"使用返回的 id 和 revision 分批 save 缺失或错误的源文件；最后 complete，不要再次 create"},"location":"资料库 → 我的文档"}))
+                Ok(json!({"project":summary(&p),"issues":diagnostics(&p),"bindingIssues":binding_issues,"playChecks":play_steps(&p),"playReview":self.store.play_review(&p)?,"next":if p.status==ProjectStatus::Ready {"源文件已生成。仅按本版本的实际 Play 验收记录汇报交互结果。"}else{"使用返回的 id 和 revision 分批 save 缺失或错误的源文件；最后 complete，不要再次 create"},"location":"资料库 → 我的文档"}))
             }
             _ => Err("不支持的设计操作".into())
         }
@@ -493,7 +512,7 @@ impl Middleware for DesignContext {
         let active=selected.or_else(||self.0.active(&turn.session));
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户要求使用设计画板时使用内置 open-claude-design；参数未加载时先用 tool_load 加载该名称。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。除非用户要求先确认设计方案，否则无需审批；create 前先按 format 返回的 craft 定好风格方向并写入 designSystems tokens，complete 前按其中的清单自查。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
+            "设计工作台：用户要求使用设计画板时使用内置 open-claude-design；参数未加载时先用 tool_load 加载该名称。先 action=format，交互原型把用户要求的操作及预期结果列入 canvas.xiaoban.playChecks。ready 仅代表源文件已生成，交互仅按当前版本 playReview 的实测记录汇报。修订原稿时优先用 save.edits 局部替换。create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。除非用户要求先确认设计方案，否则无需审批；create 前先按 format 返回的 craft 定好风格方向并写入 designSystems tokens，complete 前按其中的清单自查。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
         Ok(())
     }
     fn before_stop(&self,stop:&Stop<'_>)->StopDecision{
@@ -612,6 +631,52 @@ mod tests {
         let latest=store.load(&p.id).unwrap();assert_eq!(latest.files,p.files);assert_eq!(latest.canvas,p.canvas);
         tool.call(json!({"action":"read","id":p.id}),&ToolCtx::detached("new-session")).unwrap();assert_eq!(store.load(&p.id).unwrap().revision,2);
         let mut stale=p;stale.revision=2;let saved=store.save(stale,2).unwrap();assert!(saved.session_ids.contains(&"new-session".into()));fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn inline_handlers_are_reported_without_breaking_legacy_reads_and_edits_are_atomic() {
+        let (store,root)=fixture();
+        let ctx=ToolCtx::detached("s");
+        let tool=DesignTool::new(store.clone(), |_|Ok(()));
+        let source=r#"<script>const s='<b onclick="ignore()">'</script><!-- <i onclick="ignore()"> --><x-dc><button id="like" onclick='like()'>24</button><textarea>onclick="ignore()"</textarea></x-dc>"#;
+        let project=store.create("街坊手记".into(),"s",canvas(),[("Main.dc.html".into(),source.into())].into()).unwrap();
+        let issues=binding_issues(&store.load(&project.id).unwrap());
+        assert_eq!(issues.len(),1);
+        assert!(issues[0].contains("Main.dc.html") && issues[0].contains("button#like") && issues[0].contains("onclick"));
+        let mut typed=project.clone();
+        typed.files.insert("Main.dc.html".into(),r#"<x-dc><x-import from="local.jsx" once="yes"></x-import><textarea id="body" oninput="save()">ignore &lt;b onclick='ignore()'&gt;</textarea></x-dc>"#.into());
+        let typed_issues=binding_issues(&typed);
+        assert_eq!(typed_issues.len(),1);
+        assert!(typed_issues[0].contains("textarea#body") && typed_issues[0].contains("oninput"));
+        let complete=json!({"action":"complete","id":project.id,"expected_revision":project.revision});
+        assert!(tool.call(complete,&ctx).is_err());
+        let mut patch=json!({"action":"save","id":project.id,"expected_revision":project.revision,"edits":[
+            {"file":"Main.dc.html","before":"like()","after":"{{like}}"},
+            {"file":"Main.dc.html","before":"ignore()","after":""}]});
+        assert!(tool.call(patch.clone(),&ctx).is_err());
+        assert_eq!(store.load(&project.id).unwrap().files["Main.dc.html"],source);
+        patch["edits"].as_array_mut().unwrap().pop();
+        let saved=tool.call(patch,&ctx).unwrap();
+        assert_eq!(saved["bindingIssues"],json!([]));
+        assert!(store.load(&project.id).unwrap().files["Main.dc.html"].contains("onclick='{{like}}'"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn play_checks_persist_independently_and_stale_windows_cannot_verify_a_new_revision() {
+        let (store,root)=fixture();let mut canvas=canvas();
+        canvas["xiaoban"]=json!({"playChecks":["点赞计数变化","进入发布页"," 点赞计数变化 "]});
+        let p=store.create("demo".into(),"s",canvas,files()).unwrap();
+        assert_eq!(play_steps(&p),vec!["点赞计数变化","进入发布页"]);
+        store.mark_play_step(&p.id,p.revision,0,true).unwrap();
+        let other=Store::new(&root);
+        assert_eq!(other.mark_play_step(&p.id,p.revision,1,true).unwrap().passed.len(),2);
+        assert!(other.mark_play_step(&p.id,p.revision,2,true).is_err());
+        assert_eq!(other.mark_play_step(&p.id,p.revision,1,false).unwrap().passed.len(),1);
+        let updated=store.save(p.clone(),p.revision).unwrap();
+        assert!(store.play_review(&updated).unwrap().passed.is_empty());
+        assert!(store.mark_play_step(&p.id,p.revision,0,true).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test] fn progressive_creation_survives_restart_and_only_completes_when_all_sources_exist() {

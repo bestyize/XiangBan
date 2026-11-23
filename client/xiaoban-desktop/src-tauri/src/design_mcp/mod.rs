@@ -70,7 +70,7 @@ fn dispatch(service:&Service,client:&str,request:Value)->Option<Value>{
             }else if action=="read" {
                 let result=(||->Result<Value,String>{let p=service.store.load(args["id"].as_str().ok_or("缺少 id")?)?;
                     let file=args["file"].as_str().map(|f|p.files.get(f).map(|s|json!({"name":f,"text":s})).ok_or("设计文件不存在")).transpose()?;
-                    Ok(json!({"project":open_claude_design::summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file}))})();
+                    Ok(json!({"project":open_claude_design::summary(&p),"canvas":p.canvas,"bindingIssues":open_claude_design::binding_issues(&p),"playChecks":open_claude_design::play_steps(&p),"playReview":service.store.play_review(&p)?,"files":p.files.keys().collect::<Vec<_>>(),"file":file}))})();
                 match result{Ok(value)=>json!({"content":[{"type":"text","text":value.to_string()}],"structuredContent":value,"isError":false}),Err(e)=>json!({"content":[{"type":"text","text":e}],"isError":true})}
             }else{
                 let out=service.tool.execute_result(args,&ToolCtx::detached(&format!("mcp-{client}")));

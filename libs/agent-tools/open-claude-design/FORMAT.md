@@ -61,3 +61,9 @@ Additional compatibility:
 - `canvas.notes` preserves official notes and title1/title2 entries (`text`, `x`, `y`, `w`, `maxW`, `maxH`, `page`, `fill`) and unknown fields. Canvas notes can be edited, moved, duplicated and undone in the workbench.
 - Local image/font URLs resolve inside the sandbox. Standalone HTML shares its runtime and resource dictionary across boards. Native desktop capabilities and network fetch are still unavailable to design content.
 - Compatibility is an explicit test matrix, not a promise of every proprietary feature: see the repository compatibility report. PDF/PPTX/cloud sharing are not implemented.
+
+### Play acceptance and targeted feedback
+
+For an interactive prototype, put the user's concrete actions and expected results as strings in `canvas.xiaoban.playChecks` (for example, “Tap Like: 24 → 25; tap again: 25 → 24”). Keep static designs and existing projects without a checklist supported. `complete` verifies sources and static bindings. It does not execute a user journey. Report generated work separately from steps explicitly checked in Play on this revision. `read.playReview.passed` contains zero-based indices into the distinct, trimmed checks for that revision. A new revision requires a new review.
+
+Use real links for cross-board navigation and DC event bindings that return functions. An action that must explain an invalid form on click needs an enabled click target or separate visible validation. For a small correction use `save` with the latest `expected_revision` and `edits: [{"file":"Home.dc.html","before":"unique existing source","after":"replacement"}]`. All edits are applied in order and committed together. Read the referenced board if a match is missing or ambiguous.
