@@ -68,10 +68,6 @@ fun parseBody(html: String, siteBase: String): List<BodyBlock> {
     return blocks
 }
 
-/** 正文里的所有文字拼起来（复制全文用）；图片用「[图片]」占位。 */
-fun bodyPlainText(blocks: List<BodyBlock>): String =
-    blocks.joinToString("\n\n") { if (it is BodyBlock.Text) it.text else "[图片]" }
-
 fun formatSize(bytes: Long): String = when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> "${(bytes * 10 / 1024) / 10.0} KB"

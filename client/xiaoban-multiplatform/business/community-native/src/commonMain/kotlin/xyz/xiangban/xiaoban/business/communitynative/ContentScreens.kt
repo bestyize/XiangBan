@@ -1,12 +1,9 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import xyz.xiangban.xiaoban.common.community.isCasual
-import xyz.xiangban.xiaoban.common.community.bodyPlainText
 import xyz.xiangban.xiaoban.common.community.cardTitle
 import xyz.xiangban.xiaoban.common.community.casualArticle
 import xyz.xiangban.xiaoban.common.share.ShareDeleteAction
-import xyz.xiangban.xiaoban.common.share.ShareExtraAction
-import xyz.xiangban.xiaoban.common.share.ShareIconKey
 import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 
 import androidx.compose.foundation.background
@@ -153,7 +150,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
     }
 }
 
-/** 分享弹层：把必要展示数据与可选扩展动作交给 `:common:share` 统一渲染。 */
+/** 分享弹层：把必要展示数据交给 `:common:share` 统一渲染。 */
 @Composable
 internal fun ShareSheet(
     env: CommunityEnv,
@@ -170,7 +167,6 @@ internal fun ShareSheet(
     coverUrl: String? = null,
     badge: String? = null,
     thumbKind: ShareThumbKind? = null,
-    extraActions: List<ShareExtraAction> = emptyList(),
     deleteAction: ShareDeleteAction? = null,
     onNotice: ((String) -> Unit)? = null,
 ) {
@@ -187,7 +183,6 @@ internal fun ShareSheet(
         coverUrl = coverUrl,
         badge = badge,
         thumbKind = thumbKind,
-        extraActions = extraActions,
         deleteAction = deleteAction,
         onNotice = onNotice,
     )
@@ -267,7 +262,6 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                                 pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let(::formatSize),
                                 pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { "更新于 $it" },
                                 "纯数据".takeIf { pack.pureData }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "))
-                            if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
                             val changes = pack.versions.filter { it.changelog.isNotBlank() }
                             if (changes.isNotEmpty()) {
                                 Text("更新记录", Modifier.padding(top = 24.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
@@ -442,10 +436,7 @@ private fun PostItem(
         onReply = onReply.takeIf { visible },
         like = if (visible) ({ PostLikeAction(env, post, open) { likeError = it } }) else null,
         actions = {
-            if (visible) {
-                if (onEdit != null && !accepted) CommentTextAction("编辑", onEdit)
-                NativeReportAction(env, "post", post.id, open)
-            }
+            if (visible && onEdit != null && !accepted) CommentTextAction("编辑", onEdit)
         },
     ) {
         if (!visible) {
@@ -562,7 +553,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 },
                             )
                             RichBody(body.blocks, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
-                                galleryImages = images, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                                galleryImages = images)
                             LinkedWorkCards(env, body.linkedWorks, open)
                             ForumAttachments(env, topic.attachments, open)
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
@@ -571,7 +562,6 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             val stamp = topic.editedAt?.let { "编辑于 ${agoText(it)}" } ?: "发布于 ${agoText(topic.createdAt)}"
                             DetailMetadata(listOfNotNull(stamp, "${topic.viewCount} 次浏览", "已锁定".takeIf { topic.locked == true },
                                 "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 }).joinToString(" · "))
-                            NativeReportAction(env, "topic", topic.id, open)
                         }
                         val answers = topic.help?.let {
                             HelpAnswers(
@@ -632,24 +622,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
             }, parent = replyingTo, editingPost = editing)
         }
         OverlayTransition(share) { panel ->
-            val loaded = (state as? Load.Ready)?.value
-            val topic = loaded?.topic
-            val plainBody = remember(loaded) { loaded?.body?.blocks?.let(::bodyPlainText).orEmpty().trim() }
-            val extraActions = remember(plainBody, env.platform) {
-                if (plainBody.isNotBlank() && env.platform != null) {
-                    listOf(
-                        ShareExtraAction(
-                            id = "copyFull",
-                            label = "复制全文",
-                            icon = ShareIconKey.CopyText,
-                        ) {
-                            env.platform.copy(plainBody)
-                            toast = "已复制全文"
-                            "已复制完整正文"
-                        },
-                    )
-                } else emptyList()
-            }
+            val topic = (state as? Load.Ready)?.value?.topic
             val isAuthor = topic != null && session.loggedIn && topic.author.uid == session.accountId
             val deleteAction = remember(topic?.id, isAuthor) {
                 if (isAuthor) {
@@ -677,7 +650,6 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                 author = topic?.author?.nickname.orEmpty(),
                 dateLabel = topic?.createdAt?.let(::agoText).orEmpty(),
                 coverUrl = topic?.images?.firstOrNull()?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl),
-                extraActions = extraActions,
                 deleteAction = deleteAction,
             )
         }

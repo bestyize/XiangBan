@@ -1004,7 +1004,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
         </div>
       </div>
       <div class="phone" id="phone-b3"></div>
-      <p class="board-caption">作品、开源精选、AI 日报共用同一条单行可横滑图标轨：去掉举报，按场景挂载「发到电脑 / 复制仓库 / 复制全文」等快捷项，点「分享卡片」即可直达悬浮卡片预览。</p>
+      <p class="board-caption">作品、开源精选、AI 日报共用同一条单行可横滑图标轨。作品可「发到电脑」，开源项目可「复制仓库」，点「分享卡片」即可打开悬浮卡片预览。</p>
     </section>
   </main>
 
@@ -1145,7 +1145,6 @@ const ITEMS = {
     meta: 'read · 公开链接 · 浏览器免登录可看',
     badge: '网页直达',
     thumbType: 'text',
-    extraActions: [{ id: 'copyFull', icon: 'copyText', label: '复制全文' }],
   },
   game: {
     kind: 'game',
@@ -1184,7 +1183,6 @@ const ITEMS = {
     meta: '小伴编辑部 · 公开网页 · 免登录阅读',
     badge: '日报',
     thumbType: 'daily',
-    extraActions: [{ id: 'copyFull', icon: 'copyText', label: '复制全文' }],
   },
 };
 
@@ -1865,7 +1863,6 @@ document.addEventListener('click', (e) => {
     const messages = {
       system:   '已唤起系统分享 · 可发送至微信 / QQ / 隔空投送',
       askAi:    '已带入小伴 AI，可总结要点或继续二创',
-      copyFull: '已复制完整正文',
       copyRepo: '已复制 GitHub 仓库地址',
       sendPc:   '已推送至在线电脑端「小伴桌面」',
       browser:  '已在系统浏览器打开公开网页',

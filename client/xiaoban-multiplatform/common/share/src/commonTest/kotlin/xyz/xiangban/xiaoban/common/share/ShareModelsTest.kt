@@ -8,7 +8,7 @@ class ShareModelsTest {
     @Test
     fun railOrderingKeepsDeleteLastAndExcludesReport() {
         val extras = listOf(
-            ShareExtraAction("copyFull", "复制全文", ShareIconKey.CopyText) { "已复制" },
+            ShareExtraAction("copyRepo", "复制仓库", ShareIconKey.Code) { "已复制" },
         )
         val authorItems = buildShareRailItems(
             systemShareEnabled = true,
@@ -17,7 +17,7 @@ class ShareModelsTest {
             deleteAction = ShareDeleteAction { "已删除" },
         )
         assertEquals(
-            listOf("system", "copyLink", "openCard", "extra:copyFull", "browser", "delete"),
+            listOf("system", "copyLink", "openCard", "extra:copyRepo", "browser", "delete"),
             authorItems.map { it.id },
         )
         assertEquals(ShareTileTone.Primary, authorItems.first().tone)
@@ -31,7 +31,7 @@ class ShareModelsTest {
             deleteAction = null,
         )
         assertEquals(
-            listOf("system", "copyLink", "openCard", "extra:copyFull", "browser"),
+            listOf("system", "copyLink", "openCard", "extra:copyRepo", "browser"),
             visitorItems.map { it.id },
         )
         assertEquals("已复制", visitorItems[1].label)

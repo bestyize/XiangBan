@@ -23,7 +23,7 @@ internal fun contentCardRoute(kind: String, card: CommunityContentCard): Route =
 internal fun ContentSocialActions(env: CommunityEnv, kind: String, id: Long, open: ((Route) -> Unit)?) {
     val session by env.session.state.collectAsState()
     if (!session.loggedIn) {
-        GhostPillButton("登录后收藏或举报", { open?.invoke(Route.Login) }, Modifier.padding(top = 10.dp), enabled = open != null)
+        GhostPillButton("登录后收藏", { open?.invoke(Route.Login) }, Modifier.padding(top = 10.dp), enabled = open != null)
         return
     }
     val loader = rememberLoader(env, "content-social-$kind-$id-${session.accountId}") { env.contentSocial.state(kind, id) }
@@ -33,7 +33,7 @@ internal fun ContentSocialActions(env: CommunityEnv, kind: String, id: Long, ope
     var error by remember(session.accountId, kind, id) { mutableStateOf<String?>(null) }
     Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (val current = state) {
-            is Load.Ready -> Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            is Load.Ready -> {
                 GhostPillButton(if (current.value.bookmarked) "取消收藏" else "收藏", {
                     if (busy) return@GhostPillButton
                     busy = true; error = null
@@ -43,9 +43,8 @@ internal fun ContentSocialActions(env: CommunityEnv, kind: String, id: Long, ope
                         finally { busy = false }
                     }
                 }, enabled = !busy)
-                Box(Modifier.padding(top = 14.dp)) { NativeReportAction(env, kind, id, open) }
             }
-            is Load.Failed -> Banner(if (current.notFound) "内容已不可用，无法收藏或举报" else current.message, warn = true, actionText = "重试", onAction = loader::reload)
+            is Load.Failed -> Banner(if (current.notFound) "内容已不可用，无法收藏" else current.message, warn = true, actionText = "重试", onAction = loader::reload)
             else -> Text("正在读取收藏状态…", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         error?.let { Text(it, color = Danger, style = XType.Secondary) }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,48 +32,39 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.common.community.BodyBlock
-import xyz.xiangban.xiaoban.common.community.bodyPlainText
 import xyz.xiangban.xiaoban.common.community.parseBody
 
 /**
  * 帖子、回复、项目的正文：文字和图片按原来的顺序排。文字可以长按选中复制；图片撑满宽度、保持比例，点一下放大看。
- * [onCopy] 不为空时，底下多一个“复制全文”。
  */
 @Composable
-fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
+fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
     val site = env.config.forumBase
     key(html, site) {
         val blocks by produceState(emptyList<BodyBlock>()) {
             value = withContext(Dispatchers.Default) { parseBody(html, site) }
         }
-        RichBody(blocks, modifier, fontSize, lineHeight, onCopy, hideImages, galleryImages)
+        RichBody(blocks, modifier, fontSize, lineHeight, hideImages, galleryImages)
     }
 }
 
 @Composable
-internal fun RichBody(allBlocks: List<BodyBlock>, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
+internal fun RichBody(allBlocks: List<BodyBlock>, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, hideImages: Boolean = false, galleryImages: List<String> = emptyList()) {
     val blocks = remember(allBlocks, hideImages, galleryImages) {
         val gallery = galleryImages.toSet()
         allBlocks.filterNot { it is BodyBlock.Image && (hideImages || it.src in gallery) }
     }
     var zoom by remember { mutableStateOf<String?>(null) }
     if (blocks.isEmpty()) return
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SelectionContainer {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                blocks.forEach { block ->
-                    when (block) {
-                        is BodyBlock.Text -> Text(block.text, fontSize = fontSize, lineHeight = lineHeight)
-                        is BodyBlock.Image -> BodyImage(block) { zoom = block.src }
-                    }
+    SelectionContainer(modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            blocks.forEach { block ->
+                when (block) {
+                    is BodyBlock.Text -> Text(block.text, fontSize = fontSize, lineHeight = lineHeight)
+                    is BodyBlock.Image -> BodyImage(block) { zoom = block.src }
                 }
             }
         }
-        if (onCopy != null) Text(
-            "复制全文",
-            Modifier.clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill).clickable { onCopy(bodyPlainText(allBlocks)) }.padding(horizontal = 12.dp, vertical = 5.dp),
-            style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
     zoom?.let { ImageViewer(it) { zoom = null } }
 }

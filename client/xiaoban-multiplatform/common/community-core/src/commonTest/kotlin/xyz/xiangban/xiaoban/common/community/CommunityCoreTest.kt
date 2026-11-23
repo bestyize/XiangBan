@@ -713,10 +713,4 @@ class BodyBlocksTest {
         assertTrue(parseBody("", site).isEmpty())
         assertTrue(parseBody("<p> </p>", site).isEmpty())
     }
-
-    @Test
-    fun `plain text for copying uses a placeholder for images`() {
-        val blocks = parseBody("<p>前</p><img src=\"/api/images/a\"><p>后</p>", site)
-        assertEquals("前\n\n[图片]\n\n后", bodyPlainText(blocks))
-    }
 }

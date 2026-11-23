@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -20,8 +21,6 @@ import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.htmlToPlain
 import xyz.xiangban.xiaoban.common.community.messageOf
 import xyz.xiangban.xiaoban.common.share.ShareContent
-import xyz.xiangban.xiaoban.common.share.ShareExtraAction
-import xyz.xiangban.xiaoban.common.share.ShareIconKey
 import xyz.xiangban.xiaoban.common.share.ShareThumbKind
 
 /** 文章使用服务器净化的 HTML；按标题分段，正文中的图片仍由 RichBody 展示。 */
@@ -41,8 +40,11 @@ private fun EditorialBody(env: CommunityEnv, html: String) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         parts.forEach { (heading, content) ->
-            if (heading) Text(htmlToPlain(content), Modifier.padding(top = 8.dp), style = XType.Title, fontWeight = FontWeight.Bold)
-            else RichBody(env, content, fontSize = 16.sp, lineHeight = 29.sp)
+            if (heading) {
+                SelectionContainer {
+                    Text(htmlToPlain(content), Modifier.padding(top = 8.dp), style = XType.Title, fontWeight = FontWeight.Bold)
+                }
+            } else RichBody(env, content, fontSize = 16.sp, lineHeight = 29.sp)
         }
     }
 }
@@ -102,13 +104,15 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
                         DetailPrimaryCta("阅读来源原文", XIcons.ExternalLink, onClick = { env.platform?.openUrl(news.url) })
                     }
                     if (news.summary.isNotBlank()) {
-                        Text(
-                            news.summary,
-                            Modifier.padding(bottom = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(LocalExtraColors.current.fill).padding(horizontal = 14.dp, vertical = 12.dp),
-                            style = XType.DetailBody,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        SelectionContainer {
+                            Text(
+                                news.summary,
+                                Modifier.padding(bottom = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .background(LocalExtraColors.current.fill).padding(horizontal = 14.dp, vertical = 12.dp),
+                                style = XType.DetailBody,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     if (news.bodyHtml.isNotBlank()) EditorialBody(env, news.bodyHtml)
                     else Text("这篇内容暂未整理站内正文。", style = XType.Secondary, color = LocalExtraColors.current.ink3)
@@ -131,18 +135,6 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
     OverlayTransition(sharing) { panel ->
         val shareUrl = news.url.takeIf(String::isNotBlank)
             ?: env.forum.imageUrl(if (frontier) "/frontier/${news.key}" else "/daily/${news.key}")
-        val plainBody = remember(news) {
-            if (news.bodyHtml.isNotBlank()) htmlToPlain(news.bodyHtml).trim() else news.summary.trim()
-        }
-        val extras = remember(plainBody, env.platform) {
-            if (plainBody.isNotBlank() && env.platform != null) listOf(
-                ShareExtraAction("copyFull", "复制全文", ShareIconKey.CopyText) {
-                    env.platform.copy(plainBody)
-                    discussion.toast = "已复制全文"
-                    "已复制完整正文"
-                },
-            ) else emptyList()
-        }
         DirectShareSheet(
             env = env,
             content = ShareContent(
@@ -158,7 +150,6 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
             ),
             onDismiss = { sharing = false },
             onCopied = { discussion.toast = "链接已复制" },
-            extraActions = extras,
             panelModifier = panel,
         )
     }
