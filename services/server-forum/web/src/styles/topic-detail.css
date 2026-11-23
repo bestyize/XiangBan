@@ -584,10 +584,15 @@ html[data-theme="dark"] .xhs-primary-cta {
 }
 
 .xhs-comment-text {
+  margin: 0;
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--ink-1);
   overflow-wrap: anywhere;
+}
+
+p.xhs-comment-text {
+  white-space: pre-wrap;
 }
 
 .xhs-comment-foot {
@@ -739,7 +744,9 @@ html[data-theme="dark"] .xhs-primary-cta {
   cursor: pointer;
 }
 
-.h5-send-btn {
+.h5-send-btn,
+.xhs-send-btn {
+  flex: none;
   height: 32px;
   padding: 0 16px;
   border: 0;
@@ -752,7 +759,8 @@ html[data-theme="dark"] .xhs-primary-cta {
   transition: background-color 0.14s, opacity 0.14s;
 }
 
-.h5-send-btn.is-ready {
+.h5-send-btn.is-ready,
+.xhs-send-btn.is-ready {
   background: var(--brand-fill);
 }
 

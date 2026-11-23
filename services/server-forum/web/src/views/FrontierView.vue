@@ -2,8 +2,8 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { discoverApi } from '@/api/discover'
-import CommunityBack from '@/components/community/CommunityBack.vue'
-import DetailShareDialog from '@/components/community/DetailShareDialog.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import DetailLayout from '@/components/community/DetailLayout.vue'
 import { copyFull, type SharePayload } from '@/lib/detailShare'
 import NewsRow from '@/components/community/NewsRow.vue'
 import NewsComments from '@/components/community/NewsComments.vue'
@@ -19,36 +19,73 @@ const key = computed(() => String(route.params.key || ''))
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 const article = useCommunityResource(() => discoverApi.frontierArticle(key.value))
 const history = useCommunityResource(() => discoverApi.frontier(page.value))
+const item = computed(() => article.data.value)
+const cover = computed(() => webLink(item.value?.cover_url))
+const sourceUrl = computed(() => webLink(item.value?.url))
 const share = computed<SharePayload | undefined>(() => {
-  const item = article.data.value
-  if (!item) return
+  const current = item.value
+  if (!current) return
   return {
-    title: item.title,
+    title: current.title,
     url: new URL(route.path, location.origin).href,
     badge: '小伴前沿',
-    author: item.source,
-    meta: [item.source, displayDate(item.source_published_at || item.published_at)].filter(Boolean).join(' · '),
-    excerpt: item.summary,
-    cover: webLink(item.cover_url),
+    author: current.source,
+    meta: [current.source, displayDate(current.source_published_at || current.published_at)].filter(Boolean).join(' · '),
+    excerpt: current.summary,
+    cover: cover.value,
     icon: 'news',
-    extra: item.body_html ? copyFull(item.title, item.body_html) : undefined,
+    extra: current.body_html ? copyFull(current.title, current.body_html) : undefined,
   }
 })
-watch([key,page], () => { if (key.value) void article.load(); else void history.load() }, { immediate:true })
-function go(page:number) { void router.replace({ query:{ page } }) }
-useHead(() => ({ title:key.value ? article.data.value?.title || '小伴前沿' : '小伴前沿' }))
+watch([key, page], () => { if (key.value) void article.load(); else void history.load() }, { immediate: true })
+function go(page: number) { void router.replace({ query: { page } }) }
+function back() {
+  if (window.history.state?.back) router.back()
+  else void router.push('/frontier')
+}
+useHead(() => ({ title: key.value ? item.value?.title || '小伴前沿' : '小伴前沿' }))
 </script>
-<template><main class="community-page frontier-page"><template v-if="!key"><div class="community-detail"><RouterLink :to="newsHomePath" class="community-back">← 返回资讯</RouterLink><h1>小伴前沿</h1></div><RequestState :loading="history.loading.value" :error="history.error.value" :empty="!!history.data.value && !history.data.value.items.length" @retry="history.load" /><template v-if="history.data.value"><div class="daily-history adaptive-card-grid"><NewsRow v-for="item in history.data.value.items" :key="item.key" :item="item" frontier /></div><PagerNav :page="history.data.value.page" :page-size="history.data.value.page_size" :total="history.data.value.total" @go="go" /></template></template><template v-else><CommunityBack fallback="/frontier" label="小伴前沿" /><RequestState :loading="article.loading.value" :error="article.error.value" @retry="article.load" /><template v-if="article.data.value"><article class="community-detail daily-article"><span v-if="article.data.value.sample" class="community-sample">示例数据</span><div class="daily-heading"><h1>{{ article.data.value.title }}</h1><DetailShareDialog v-if="share" :key="key" :payload="share" /></div><p class="community-meta">{{ article.data.value.source }} · {{ displayDate(article.data.value.source_published_at || article.data.value.published_at) }}<span v-if="article.data.value.time_basis === 'collected'">（采集时间）</span></p><img v-if="webLink(article.data.value.cover_url)" class="daily-cover" :src="webLink(article.data.value.cover_url)" alt="" @error="($event.target as HTMLImageElement).style.display = 'none'"><p v-if="article.data.value.summary" class="daily-summary">{{ article.data.value.summary }}</p><div v-if="article.data.value.body_html" class="prose" v-html="article.data.value.body_html" /><p v-else class="daily-empty">这篇内容暂未整理站内正文。</p><a v-if="webLink(article.data.value.url)" :href="webLink(article.data.value.url)" class="community-button" target="_blank" rel="noopener noreferrer">阅读来源原文 ↗</a></article><NewsComments :key="key" :article-key="key" frontier /></template></template></main></template>
+<template>
+  <main v-if="!key" class="community-page frontier-page">
+    <div class="community-detail"><RouterLink :to="newsHomePath" class="community-back">← 返回资讯</RouterLink><h1>小伴前沿</h1></div>
+    <RequestState :loading="history.loading.value" :error="history.error.value" :empty="!!history.data.value && !history.data.value.items.length" @retry="history.load" />
+    <template v-if="history.data.value">
+      <div class="daily-history adaptive-card-grid"><NewsRow v-for="entry in history.data.value.items" :key="entry.key" :item="entry" frontier /></div>
+      <PagerNav :page="history.data.value.page" :page-size="history.data.value.page_size" :total="history.data.value.total" @go="go" />
+    </template>
+  </main>
+  <DetailLayout v-else :key="key" :ready="!!item" :title="item?.title" :author="item?.source || '小伴前沿'"
+    :images="cover ? [cover] : undefined" badge="小伴前沿" :share="share" @back="back">
+    <template #state>
+      <RequestState :loading="article.loading.value" :error="article.error.value" @retry="article.load" />
+    </template>
+    <template v-if="item && sourceUrl" #cta>
+      <a class="xhs-primary-cta" :href="sourceUrl" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-primary-cta-icon"><AppIcon name="external" :size="15" /></span>
+        <span class="xhs-primary-cta-label">阅读来源原文</span>
+      </a>
+    </template>
+    <template v-if="item" #default>
+      <span v-if="item.sample" class="community-sample daily-sample">示例数据</span>
+      <p v-if="item.summary" class="daily-summary">{{ item.summary }}</p>
+      <div v-if="item.body_html" class="xhs-prose prose daily-prose" v-html="item.body_html" />
+      <p v-else class="daily-empty">这篇内容暂未整理站内正文。</p>
+      <div class="xhs-meta-row">
+        <span>{{ item.source }} · {{ displayDate(item.source_published_at || item.published_at) }}<template v-if="item.time_basis === 'collected'">（采集时间）</template></span>
+      </div>
+    </template>
+    <template v-if="item" #comments>
+      <NewsComments :key="key" :article-key="key" frontier detail />
+    </template>
+  </DetailLayout>
+</template>
 
 <style scoped>
-.daily-history { display:grid; gap:16px; margin-top:12px; }
-@media(min-width:768px){.daily-history{grid-template-columns:repeat(var(--card-columns,2),minmax(0,1fr))}}
-.community-page .daily-article { max-width:760px; margin:0 auto; padding:24px 22px 28px; }
-.community-page .daily-article h1 { font-size:26px; line-height:1.4; font-weight:700; margin:0 0 14px; }
-.daily-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
-.daily-heading :deep(button) { flex:none; }
-.daily-cover { display:block; width:100%; max-height:320px; aspect-ratio:16 / 9; object-fit:cover; border-radius:8px; margin:22px 0 0; }
-.community-page .daily-summary { margin:24px 0; padding:16px; border-radius:12px; background:var(--surface-2); color:var(--ink-2); font-size:15px; line-height:1.7; white-space:pre-line; }
-.daily-article .prose { margin-top:24px; }.daily-empty { color:var(--ink-3); font-size:14px; }.daily-article .community-button { margin-top:24px; }
-@media(max-width:767px) { .community-page .daily-article { padding:20px 22px 28px; }.community-page .daily-article h1 { font-size:24px; } }
+.daily-history { display: grid; gap: 16px; margin-top: 12px; }
+@media (min-width: 768px) { .daily-history { grid-template-columns: repeat(var(--card-columns, 2), minmax(0, 1fr)); } }
+.daily-sample { margin-bottom: 10px; }
+.daily-summary { margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--bg-subtle); color: var(--ink-2); font-size: 14.5px; line-height: 1.65; white-space: pre-line; }
+.daily-prose :deep(img) { max-width: 100%; height: auto; border-radius: 8px; }
+.daily-prose :deep(pre), .daily-prose :deep(table) { max-width: 100%; overflow: auto; }
+.daily-empty { margin: 0; color: var(--ink-3); font-size: 14px; }
 </style>

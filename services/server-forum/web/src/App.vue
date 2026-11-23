@@ -28,7 +28,7 @@ watch([() => route.fullPath, () => session.user?.uid], () => {
   if (session.user) visitDay = day
 })
 const bare = computed(() => route.meta.bare === true)
-const detailLayout = computed(() => ['topic', 'idea-work', 'open-source-project', 'repo-detail', 'pack', 'scheme'].includes(String(route.name)))
+const detailLayout = computed(() => ['topic', 'idea-work', 'open-source-project', 'repo-detail', 'pack', 'scheme', 'daily-detail', 'frontier-detail'].includes(String(route.name)))
 const hasOwnHeader = computed(() => detailLayout.value || ['ai', 'create', 'app-works', 'me'].includes(String(route.name)))
 const hasCommentDock = computed(() => DOCK_PAGES.has(String(route.name)))
 const section = computed(() => sectionOf(route, meta.categories))

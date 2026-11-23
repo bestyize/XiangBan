@@ -1,7 +1,6 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,9 +48,8 @@ private fun EditorialBody(env: CommunityEnv, html: String) {
 }
 
 @Composable
-fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Route) -> Unit, frontier: Boolean = false) {
+fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Route) -> Unit, frontier: Boolean = false) = CommunityDetail {
     val scope = rememberCoroutineScope()
-    val session by env.session.state.collectAsState()
     var article by remember(key, frontier) { mutableStateOf<NewsItem?>(null) }
     var error by remember(key, frontier) { mutableStateOf<String?>(null) }
     var loadingArticle by remember(key, frontier) { mutableStateOf(false) }
@@ -77,84 +75,91 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
     }
     LaunchedEffect(key, frontier) { loadArticle() }
 
-    Box(Modifier.fillMaxSize()) {
-        CommentScaffold(env, discussion, Modifier.background(MaterialTheme.colorScheme.surface)) {
-            ScreenBar(
-                if (frontier) "小伴前沿" else "AI 日报",
-                onBack = back,
-                trailing = if (article != null) ({ IconTap(XIcons.Share, "分享", { sharing = true }) }) else null,
-            )
-        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
-            if (article == null) item {
-                if (error != null) CenterMessage("文章加载失败：$error", "重试", ::loadArticle, Modifier.fillMaxWidth().padding(32.dp))
-                else Spinner(Modifier.fillMaxWidth().height(120.dp))
-            }
-            article?.let { news ->
-                item {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp)) {
-                        Text(news.title, style = XType.Headline, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(14.dp))
-                        val whenText = agoText(news.sourcePublishedAt ?: news.publishedAt)
-                        Text(listOf(news.source, if (news.timeBasis == "collected") "采集于 $whenText" else whenText, if (news.sample) "示例" else "").filter { it.isNotBlank() }.joinToString(" · "), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                        if (news.coverUrl.isNotBlank()) {
-                            Spacer(Modifier.height(22.dp))
-                            Cover(news.coverUrl, news.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-                        }
-                        if (news.summary.isNotBlank()) {
-                            Spacer(Modifier.height(24.dp))
-                            Text(news.summary, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill).padding(16.dp), style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Spacer(Modifier.height(26.dp))
-                        if (news.bodyHtml.isNotBlank()) EditorialBody(env, news.bodyHtml)
-                        else Text("这篇内容暂未整理站内正文。", style = XType.Body, color = LocalExtraColors.current.ink3)
-                        if (news.url.isNotBlank()) Text("查看原始来源 ↗", Modifier.padding(top = 24.dp).clickable { env.platform?.openUrl(news.url) }.padding(vertical = 6.dp), color = Brand, style = XType.Secondary)
-                    }
-                }
-                plainCommentItems(env, discussion, open)
-            }
+    val news = article
+    if (news == null) {
+        Column(Modifier.fillMaxSize()) {
+            ScreenBar(if (frontier) "小伴前沿" else "AI 日报", onBack = back)
+            val body = Modifier.fillMaxWidth().weight(1f)
+            if (error != null) CenterMessage("文章加载失败：$error", "重试", ::loadArticle, body)
+            else Spinner(body)
         }
-        if (article != null) {
-            CommentBar(if (session.loggedIn) "写评论…" else "登录后评论", onWrite = { discussion.begin() }) {
-                CommentCountAction(discussion.total) { scope.launch { listState.animateScrollToItem(1) } }
+        return@CommunityDetail
+    }
+
+    val fallbackAuthor = if (frontier) "小伴前沿" else "AI 日报"
+    val images = remember(news.coverUrl) {
+        listOfNotNull(news.coverUrl.takeIf(String::isNotBlank)?.let(env.forum::imageUrl))
+    }
+
+    CommentScaffold(env, discussion) {
+        DetailAuthorBar(news.source.ifBlank { fallbackAuthor }, back, onShare = { sharing = true })
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
+            item(key = "gallery") { DetailGallery(images, news.title) }
+            item(key = "article") {
+                DetailBody {
+                    DetailHeading(news.title)
+                    if (news.url.isNotBlank()) {
+                        DetailPrimaryCta("阅读来源原文", XIcons.ExternalLink, onClick = { env.platform?.openUrl(news.url) })
+                    }
+                    if (news.summary.isNotBlank()) {
+                        Text(
+                            news.summary,
+                            Modifier.padding(bottom = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(LocalExtraColors.current.fill).padding(horizontal = 14.dp, vertical = 12.dp),
+                            style = XType.DetailBody,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (news.bodyHtml.isNotBlank()) EditorialBody(env, news.bodyHtml)
+                    else Text("这篇内容暂未整理站内正文。", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                    val whenText = agoText(news.sourcePublishedAt ?: news.publishedAt)
+                    DetailMetadata(
+                        listOf(
+                            news.source,
+                            if (news.timeBasis == "collected") "采集于 $whenText" else whenText,
+                            if (news.sample) "示例" else "",
+                        ).filter { it.isNotBlank() }.joinToString(" · ")
+                    )
+                }
             }
+            plainCommentItems(env, discussion, open)
+        }
+        CommentBar("说点什么…", onWrite = { discussion.begin() }) {
+            CommentCountAction(discussion.total) { scope.launch { listState.animateScrollToItem(2) } }
         }
     }
     OverlayTransition(sharing) { panel ->
-        val news = article
-        if (news != null) {
-            val shareUrl = news.url.takeIf(String::isNotBlank)
-                ?: env.forum.imageUrl(if (frontier) "/frontier/${news.key}" else "/daily/${news.key}")
-            val plainBody = remember(news) {
-                if (news.bodyHtml.isNotBlank()) htmlToPlain(news.bodyHtml).trim() else news.summary.trim()
-            }
-            val extras = remember(plainBody, env.platform) {
-                if (plainBody.isNotBlank() && env.platform != null) listOf(
-                    ShareExtraAction("copyFull", "复制全文", ShareIconKey.CopyText) {
-                        env.platform.copy(plainBody)
-                        discussion.toast = "已复制全文"
-                        "已复制完整正文"
-                    },
-                ) else emptyList()
-            }
-            DirectShareSheet(
-                env = env,
-                content = ShareContent(
-                    title = news.title,
-                    url = shareUrl,
-                    summary = news.summary,
-                    author = news.source.ifBlank { "小伴编辑部" },
-                    dateLabel = agoText(news.sourcePublishedAt ?: news.publishedAt),
-                    kindLabel = if (frontier) "小伴前沿" else "AI 日报",
-                    badge = if (frontier) "前沿" else "日报",
-                    coverUrl = news.coverUrl.takeIf(String::isNotBlank),
-                    thumbKind = ShareThumbKind.Daily,
-                ),
-                onDismiss = { sharing = false },
-                onCopied = { discussion.toast = "链接已复制" },
-                extraActions = extras,
-                panelModifier = panel,
-            )
+        val shareUrl = news.url.takeIf(String::isNotBlank)
+            ?: env.forum.imageUrl(if (frontier) "/frontier/${news.key}" else "/daily/${news.key}")
+        val plainBody = remember(news) {
+            if (news.bodyHtml.isNotBlank()) htmlToPlain(news.bodyHtml).trim() else news.summary.trim()
         }
-    }
+        val extras = remember(plainBody, env.platform) {
+            if (plainBody.isNotBlank() && env.platform != null) listOf(
+                ShareExtraAction("copyFull", "复制全文", ShareIconKey.CopyText) {
+                    env.platform.copy(plainBody)
+                    discussion.toast = "已复制全文"
+                    "已复制完整正文"
+                },
+            ) else emptyList()
+        }
+        DirectShareSheet(
+            env = env,
+            content = ShareContent(
+                title = news.title,
+                url = shareUrl,
+                summary = news.summary,
+                author = news.source.ifBlank { "小伴编辑部" },
+                dateLabel = agoText(news.sourcePublishedAt ?: news.publishedAt),
+                kindLabel = if (frontier) "小伴前沿" else "AI 日报",
+                badge = if (frontier) "前沿" else "日报",
+                coverUrl = news.coverUrl.takeIf(String::isNotBlank),
+                thumbKind = ShareThumbKind.Daily,
+            ),
+            onDismiss = { sharing = false },
+            onCopied = { discussion.toast = "链接已复制" },
+            extraActions = extras,
+            panelModifier = panel,
+        )
     }
 }

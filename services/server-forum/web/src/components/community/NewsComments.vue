@@ -4,7 +4,7 @@ import { discoverApi } from '@/api/discover'
 import CommentSection from '@/components/comments/CommentSection.vue'
 import type { CommentAdapter } from '@/components/comments/types'
 
-const props = defineProps<{ articleKey: string; frontier?: boolean }>()
+const props = defineProps<{ articleKey: string; frontier?: boolean; detail?: boolean }>()
 const adapter = computed<CommentAdapter>(() => {
   const key = props.articleKey
   return props.frontier
@@ -13,4 +13,4 @@ const adapter = computed<CommentAdapter>(() => {
 })
 </script>
 
-<template><CommentSection :scope="`${frontier ? 'frontier' : 'daily'}:${articleKey}`" :adapter="adapter" column /></template>
+<template><CommentSection :scope="`${frontier ? 'frontier' : 'daily'}:${articleKey}`" :adapter="adapter" :detail="detail" :column="!detail" /></template>

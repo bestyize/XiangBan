@@ -3975,7 +3975,9 @@ body.wb-collapsed .app-shell[data-device="desktop"].is-unframed .pc-rail {
   cursor: pointer;
 }
 
-.h5-send-btn {
+.h5-send-btn,
+.xhs-send-btn {
+  flex: none;
   height: 32px;
   padding: 0 16px;
   border: 0;
@@ -3988,7 +3990,8 @@ body.wb-collapsed .app-shell[data-device="desktop"].is-unframed .pc-rail {
   transition: background-color 0.14s, opacity 0.14s;
 }
 
-.h5-send-btn.is-ready {
+.h5-send-btn.is-ready,
+.xhs-send-btn.is-ready {
   background: var(--brand-fill);
 }
 
