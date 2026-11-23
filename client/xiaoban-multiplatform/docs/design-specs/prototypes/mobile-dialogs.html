@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>小伴手机版 · 统一弹层</title>
+<script>
+  document.documentElement.dataset.edition = new URLSearchParams(location.search).get('view') === 'previous' ? 'previous' : 'cards';
+</script>
+<link rel="stylesheet" href="mobile-dialog-cards.css">
 <style>
 :root {
   color-scheme: light;
@@ -14,14 +18,11 @@
   --ink: #1b1c1f;
   --muted: #5d6068;
   --line: #e9e9ec;
-  --scrim: rgba(12, 12, 14, .42);
+  --scrim: rgba(12, 12, 14, .34);
   --brand: #bd1930;
   --brand-fill: #fff0f2;
-  --action: #e3203c;
-  --on-action: #fff;
-  --card-radius: 24px;
-  --inset: 24px;
-  --action-height: 48px;
+  --card-radius: 16px;
+  --action-height: 44px;
   --width: 390px;
 }
 [data-theme="dark"] {
@@ -36,7 +37,6 @@
   --scrim: rgba(0, 0, 0, .6);
   --brand: #ff9ba8;
   --brand-fill: #472731;
-  --action: #e3203c;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -81,7 +81,7 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
 .theme button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
 .boards { display: grid; grid-template-columns: repeat(3, var(--width)); gap: 22px; justify-content: center; }
 .board { min-width: 0; }
-.board-head { display: flex; justify-content: space-between; align-items: center; column-gap: 8px; margin: 0 4px 10px; }
+.board-head { display: flex; justify-content: space-between; align-items: center; column-gap: 8px; min-height: 38px; margin: 0 4px 10px; }
 .board-head h2 { font-size: 16px; line-height: 22px; }
 .scenario {
   appearance: none;
@@ -149,81 +149,74 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
 .page-list > div:last-child { border-bottom: 0; }
 .page-list span:last-child { color: var(--muted); }
 .section-heading { margin: 16px 20px 10px; color: var(--muted); }
-.page-action { margin-top: 14px; min-height: 44px; padding: 0 16px; border-radius: 99px; background: var(--fill); }
-.page-dock { position: absolute; bottom: 30px; left: 16px; right: 16px; display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; color: var(--muted); }
-.page-dock .page-action { margin: 0; color: var(--ink); }
+.page-action { position: absolute; bottom: 30px; right: 16px; min-height: 48px; padding: 0 16px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
 .gesture { position: absolute; z-index: 5; pointer-events: none; width: 96px; height: 4px; border-radius: 5px; bottom: 9px; left: calc(50% - 48px); background: var(--ink); opacity: .45; }
 .overlay { position: absolute; z-index: 2; inset: 0; }
-.scrim { position: absolute; inset: 0; background: var(--scrim); backdrop-filter: blur(2px); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
 .dialog {
+  --dialog-width: 318px;
   position: absolute;
-  inset: 50% var(--inset) auto;
-  transform: translateY(-50%);
+  top: 50%;
+  left: 50%;
+  width: min(calc(100% - 48px), var(--dialog-width));
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   max-height: calc(100% - 96px);
   border-radius: var(--card-radius);
   background: var(--surface);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+  box-shadow: 0 16px 48px rgba(12, 12, 14, .18);
   overflow: hidden;
 }
-.inner { padding: 22px 18px 0; }
-.dialog-head { display: flex; align-items: center; gap: 14px; padding-right: 30px; }
-.dialog-head h3 { font-size: 17px; line-height: 24px; overflow-wrap: anywhere; }
-.dialog-head .description { margin-top: 5px; }
+.inner { padding: 24px 20px 0; }
+.dialog-head h3 { font-size: 18px; line-height: 24px; overflow-wrap: anywhere; }
 .tile { display: grid; place-items: center; width: 40px; height: 40px; flex: none; background: var(--fill); border-radius: 12px; color: var(--ink); }
-.dialog-head .tile { width: 52px; height: 52px; border-radius: 14px; }
-.dialog-head .tile .icon { width: 24px; height: 24px; }
-.tile.risk { background: #24292f; color: #fff; }
-.dismiss { position: absolute; z-index: 1; right: 5px; top: 5px; width: 44px; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 50%; }
-.dismiss .icon { background: var(--fill); border-radius: 50%; width: 32px; height: 32px; padding: 8px; }
-.dismiss:hover .icon { color: var(--ink); }
-.description { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 20px; }
+.description { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 21px; }
 .context {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  margin-top: 16px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: var(--fill);
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
-.context .icon { color: var(--muted); }
-.context span { min-width: 0; overflow-wrap: anywhere; }
-.context small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-.dialog-actions { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px 14px; }
+.dialog-actions {
+  --action-fill: var(--brand-fill);
+  --action-ink: var(--brand);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 20px 20px 16px;
+}
+.dialog-actions.neutral { --action-fill: var(--fill); --action-ink: var(--ink); }
+.dialog-actions.neutral button:focus-visible { outline-color: var(--muted); }
 .dialog-actions button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
-  min-height: 42px;
+  min-height: var(--action-height);
   padding: 8px;
-  border-radius: 24px;
+  border-radius: 22px;
   color: var(--muted);
-  transition: filter .15s;
 }
-.dialog-actions .primary { min-height: var(--action-height); background: var(--action); color: var(--on-action); font-size: 15px; }
-.dialog-actions .primary .icon { width: 17px; height: 17px; }
+.dialog-actions .primary { background: var(--action-fill); color: var(--action-ink); }
 .dialog-actions button:disabled { background: var(--fill); color: var(--muted); opacity: .66; }
-.dialog-actions button:hover:not(:disabled) { filter: brightness(.96); }
+.dialog-actions button:not(.primary):hover { background: var(--fill); }
+.dialog-actions .primary:hover:not(:disabled) { filter: brightness(.96); }
 .dialog-actions button:active:not(:disabled) { filter: brightness(.92); }
-.form .dialog-head { margin: 22px 18px 14px; }
-.form-body { padding: 0 18px 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line) transparent; }
-.options { display: grid; gap: 6px; }
-.option { position: relative; display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 10px; border-radius: 12px; background: var(--fill); color: var(--ink); cursor: pointer; }
-.compact .option span { text-wrap: balance; }
-.option:hover { filter: brightness(.97); }
-.option:has(:checked) { background: var(--brand-fill); color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.form { --dialog-width: 342px; }
+.form .dialog-head { padding: 24px 20px 12px; }
+.form-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line) transparent; }
+.options { border-block: 1px solid var(--line); }
+.option { position: relative; display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px; color: var(--ink); cursor: pointer; }
+.option + .option { border-top: 1px solid var(--line); }
+.option:hover:not(:has(:disabled)), .option:has(:checked) { background: var(--fill); }
 .option:has(:focus-visible) { outline: 2px solid var(--brand); outline-offset: -2px; }
 .option:has(:disabled) { color: var(--muted); cursor: default; }
 .option input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
-.option .icon { width: 16px; height: 16px; visibility: hidden; }
+.option .icon { width: 16px; height: 16px; color: var(--ink); visibility: hidden; }
 .option:has(:checked) .icon { visibility: visible; }
-.option small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-.form .dialog-actions { margin-top: 2px; }
+.option small { display: block; font-size: 12px; color: var(--muted); }
+.option .option-status { flex: none; }
+.form .dialog-actions { padding-top: 16px; }
 .menu-layer { position: absolute; z-index: 3; inset: 0; }
 .menu-card {
   position: absolute;
@@ -231,32 +224,27 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
   right: var(--anchor-right, 12px);
   min-width: 168px;
   padding: 4px;
-  border-radius: 16px;
+  border-radius: var(--card-radius);
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line), 0 6px 24px rgba(0, 0, 0, .14);
 }
 .menu-card button { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; text-align: left; white-space: nowrap; }
 .menu-card button:hover { background: var(--fill); }
-.menu-card button[aria-checked="true"] { color: var(--brand); background: var(--brand-fill); }
+.menu-card button[aria-checked="true"] { background: var(--fill); }
 .menu-card .end { margin-left: auto; }
 .menu-card .icon { width: 18px; height: 18px; }
 .sheet {
   position: absolute;
   inset: auto 0 0;
-  padding: 8px 18px 26px;
-  border-radius: 24px 24px 0 0;
+  padding: 16px 20px 26px;
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
   background: var(--surface);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, .12);
 }
-.sheet .handle { width: 30px; height: 4px; margin: 0 auto 18px; border-radius: 5px; background: var(--line); }
-.sheet-source { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
-.sheet-source .tile { width: 34px; height: 34px; border-radius: 10px; }
-.sheet-source .tile .icon { width: 17px; height: 17px; }
-.sheet-source small { display: block; color: var(--muted); font-size: 12px; }
-.sheet-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding-inline: 8px; border-radius: 12px; text-align: left; }
+.sheet-source { padding: 0 12px 12px; color: var(--muted); font-size: 13px; }
+.sheet-row { display: block; width: 100%; min-height: 48px; padding-inline: 12px; border-top: 1px solid var(--line); text-align: left; }
 .sheet-row:hover { background: var(--fill); }
-.sheet-row .icon { width: 18px; height: 18px; }
-.sheet-cancel { width: 100%; min-height: 44px; margin-top: 6px; border-radius: 22px; background: var(--fill); color: var(--muted); }
+.sheet-cancel { width: 100%; min-height: var(--action-height); margin-top: 8px; border-radius: 22px; background: var(--fill); color: var(--ink); }
 .sort-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .sort-trigger { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 22px; background: var(--fill); }
 .sort-trigger .icon { width: 16px; height: 16px; }
@@ -283,24 +271,38 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
   color: var(--ink);
   box-shadow: 0 5px 20px rgba(0, 0, 0, .14);
 }
-.board-note { margin: 12px 4px 0; font-size: 13px; color: var(--muted); }
-@media (max-width: 1260px) { .boards { grid-template-columns: repeat(2, var(--width)); } }
+@media (min-width: 1020px) and (max-width: 1279px) {
+  .boards { --board-scale: .8; grid-template-columns: repeat(3, calc(var(--width) * var(--board-scale))); gap: 16px; }
+  .board { width: var(--width); zoom: var(--board-scale); }
+}
+@media (max-width: 1019px) { .boards { grid-template-columns: repeat(2, var(--width)); } }
 @media (max-width: 859px) { .boards { grid-template-columns: minmax(0, var(--width)); gap: 28px; } }
 @media (max-width: 445px) {
   .studio { padding-inline: 12px; }
   .tools { margin-bottom: 16px; }
   .phone { border-radius: 24px; }
-  .inner, .form-body, .dialog-actions { padding-inline: 18px; }
-  .form .dialog-head { margin-inline: 18px; }
 }
 </style>
 </head>
 <body>
+<main id="card-review">
+  <header class="review-tools">
+    <h1><span class="app-mark" aria-hidden="true"></span><span class="product-name">小伴手机版</span><span class="title-divider">/</span>弹窗设计稿</h1>
+    <nav aria-label="设计稿工具">
+      <a href="?view=previous">上一版</a>
+      <a href="share-link-landing.html">分享回流参考</a>
+      <button type="button" class="appearance" aria-label="切换到深色"></button>
+    </nav>
+  </header>
+  <nav class="pair-nav" aria-label="弹窗场景"></nav>
+  <div class="review-pair" id="review-pair"></div>
+</main>
 <main class="studio">
   <header class="tools">
     <h1>小伴手机版 · 统一弹层</h1>
     <div class="controls">
-      <a class="reference" href="share-link-landing.html">分享回流定稿参考</a>
+      <a class="reference" href="mobile-dialogs.html">查看新版弹窗</a>
+      <a class="reference" href="share-link-landing.html">分享回流参考</a>
       <div class="theme" role="group" aria-label="外观">
         <button type="button" data-theme-button="light" aria-pressed="true">浅色</button>
         <button type="button" data-theme-button="dark" aria-pressed="false">深色</button>
@@ -312,24 +314,13 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
 <script>
 const shapes = {
   back: '<path d="m15 18-6-6 6-6"/>',
-  x: '<path d="m6 6 12 12M18 6 6 18"/>',
-  arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
   more: '<path d="M5 12h.01m7 0h.01m7 0h.01" stroke-width="3"/>',
-  trash: '<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',
-  message: '<path d="M20 5H4v12h4v3l4-3h8z"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1m2 3.7a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   file: '<path d="M13 3H6v18h12V8zm0 0v5h5M9 12h6m-6 4h6"/>',
-  lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
-  block: '<circle cx="12" cy="12" r="8"/><path d="m6 6 12 12"/>',
   box: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16m-10 4h4"/>',
-  download: '<path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/>',
-  phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/>',
-  external: '<path d="M13 4h7v7m0-7-9 9m6 0v7H4V7h7"/>',
-  share: '<path d="M12 15V3m-4 4 4-4 4 4M7 11H4v9h16v-9h-3"/>',
   code: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-2-13-4 16"/>',
-  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-5 5-5 13 0 18 5-5 5-13 0-18z"/>',
   signal: '<path d="M4 19v-4m5 4V11m5 8V8m5 11V4"/>',
   wifi: '<path d="M3 8a14 14 0 0 1 18 0M6 12a9 9 0 0 1 12 0m-9 4a4 4 0 0 1 6 0m-3 3h.01"/>',
   battery: '<rect x="2" y="6" width="17" height="12" rx="3"/><path d="M22 10v4"/><rect x="5" y="9" width="11" height="6" rx="1" fill="currentColor" stroke="none"/>',
@@ -340,48 +331,48 @@ function icon(name, className = '') {
 
 const confirmations = {
   comment: {
-    label: '删除评论', title: '删除评论？', description: '删除后这条评论将不再显示。', icon: 'trash', risk: true,
-    context: ['这个方案在手机上也能运行吗？', '我的评论', 'message'], primary: '删除评论', result: '评论已删除',
+    label: '删除评论', title: '删除评论？',
+    primary: '删除评论', result: '评论已删除', neutralActions: true,
     page: '帖子详情', background: 'discussion',
   },
   attachment: {
-    label: '购买附件', title: '购买附件', description: '需要 20 积分，重复下载免费。', icon: 'file',
-    context: ['离线阅读器示例.zip', '', 'file'], primary: '购买并下载', result: '已购买，开始下载',
+    label: '购买附件', title: '购买附件', description: '20 积分，重复下载免费。',
+    context: '离线阅读器示例.zip', primary: '购买并下载', result: '已购买，开始下载',
     page: '帖子详情', background: 'discussion',
   },
   help: {
-    label: '关闭求助', title: '关闭求助？', description: '尚未发放的悬赏积分将退还。', icon: 'lock', risk: true,
+    label: '关闭求助', title: '关闭求助？', description: '未发放的悬赏积分将退还。',
     primary: '关闭求助', result: '求助已关闭', page: '求助详情', background: 'discussion',
   },
   block: {
-    label: '屏蔽用户', title: '屏蔽该用户？', description: '对方的帖子将从你的列表和搜索隐藏，回复会折叠。你们将互相取消关注，对方不会收到通知。', icon: 'block', risk: true,
-    context: ['小林', '社区用户', 'message'], primary: '确认屏蔽', result: '已屏蔽该用户', page: '个人主页', background: 'profile',
+    label: '屏蔽用户', title: '屏蔽小林？', description: '你的列表和搜索会隐藏对方的帖子，回复会折叠。双方自动取关，对方不会收到通知。',
+    primary: '屏蔽', result: '已屏蔽小林', page: '个人主页', background: 'profile',
   },
   tools: {
-    label: '移除工具环境', title: '移除工具环境？', description: '已下载的运行时和其中安装的工具会被删除。', icon: 'box', risk: true,
+    label: '移除工具环境', title: '移除工具环境？', description: '将删除本地运行时和已安装的工具。',
     primary: '移除', result: '工具环境已移除', page: '工具环境', background: 'settings',
   },
   update: {
-    label: 'App 更新', title: '小伴 v3.2.0', description: '修复已知问题，优化社区详情页和评论体验。', icon: 'download',
+    label: 'App 更新', title: '小伴 v3.2.0', description: '优化社区详情页的评论操作。',
     primary: '安装更新', secondary: '稍后', result: '开始下载更新', page: '关于小伴', background: 'settings',
   },
   network: {
-    label: '移动网络下载', title: '使用移动网络下载？', description: '作品包大小为 28.4 MB。', icon: 'download',
+    label: '移动网络下载', title: '使用移动网络下载？', description: '作品包大小 28.4 MB。',
     primary: '下载', result: '开始下载', page: '作品详情', background: 'discussion',
   },
   shortcut: {
-    label: '桌面快捷方式失败', title: '尚未添加到桌面', description: '请在小伴的应用权限中允许「桌面快捷方式」，然后再试。', icon: 'phone',
+    label: '桌面快捷方式失败', title: '尚未添加到桌面', description: '请在应用权限中允许「桌面快捷方式」。',
     primary: '去设置', result: '将打开应用设置', page: '离线阅读器', background: 'settings',
   },
 };
 const forms = {
-  challenge: { label: '挑战投稿', title: '选择已上架的本人作品', intro: '每件作品只记录一次投稿。受限阅读、已下架或非本人作品不能投稿。', icon: 'box',
-    primary: '提交作品', result: '作品已投稿', page: '创作挑战', background: 'challenge',
+  challenge: { label: '挑战投稿', title: '选择作品',
+    primary: '投稿', result: '作品已投稿', page: '官方挑战', background: 'challenge',
     options: [
       { text: '随身阅读', caption: '工具 · v1.2.0' },
       { text: '一方小院', caption: '游戏 · v1.0.0' },
       { text: '窗边天气', caption: '工具 · v2.1.0' },
-      { text: '番茄钟', caption: '已提交当前挑战', disabled: true },
+      { text: '番茄钟', status: '已投稿', disabled: true },
     ] },
 };
 const menus = {
@@ -422,10 +413,10 @@ function contentPage(id, scenario, selected) {
   switch (scenario.background) {
     case 'discussion': return discussion(id);
     case 'profile': return '<div class="page-body"><div class="heading">小林</div><p class="page-copy">记录做工具的过程和日常发现。</p></div><p class="section-heading">发布</p><div class="page-list"><div><span>离线网页阅读器</span><span>帖子</span></div></div>';
-    case 'challenge': return '<div class="page-body"><div class="heading">把日常做成小工具</div><p class="page-copy">提交你的小伴作品，分享一个解决日常问题的办法。</p></div><p class="section-heading">我的投稿</p><div class="page-list"><div><span>番茄钟</span><span>已提交</span></div></div>';
+    case 'challenge': return '<div class="page-body"><div class="heading">把日常做成小工具</div></div><p class="section-heading">我的投稿</p><div class="page-list"><div><span>番茄钟</span><span>已提交</span></div></div>';
     case 'settings': {
       const rows = id === 'tools' ? [['工具环境', '已安装'], ['存储占用', '168 MB']] : id === 'update' ? [['当前版本', 'v3.1.8'], ['自动检查更新', '开启']] : [['应用', '随身阅读'], ['桌面快捷方式', '未添加']];
-      return `<p class="section-heading">${scenario.page}</p><div class="page-list">${rows.map(([name, value]) => `<div><span>${name}</span><span>${value}</span></div>`).join('')}</div>`;
+      return `<div class="page-list">${rows.map(([name, value]) => `<div><span>${name}</span><span>${value}</span></div>`).join('')}</div>`;
     }
     case 'software': {
       const orders = [[0, 1, 2, 3], [2, 0, 3, 1], [1, 3, 2, 0]];
@@ -438,42 +429,36 @@ function contentPage(id, scenario, selected) {
 }
 
 function actions(scenario, disabled = false) {
-  return `<footer class="dialog-actions">
-    <button type="button" class="primary" data-confirm${disabled ? ' disabled' : ''}>${scenario.primary}${['去设置', '购买并下载'].includes(scenario.primary) ? icon('arrow') : ''}</button>
+  return `<footer class="dialog-actions${scenario.neutralActions ? ' neutral' : ''}">
     <button type="button" data-close>${scenario.secondary || '取消'}</button>
+    <button type="button" class="primary" data-confirm${disabled ? ' disabled' : ''}>${scenario.primary}</button>
   </footer>`;
 }
 function dialog(scenario, id, content, withForm = false) {
-  const head = `<header class="dialog-head">
-    <span class="tile${scenario.risk ? ' risk' : ''}">${icon(scenario.icon)}</span>
-    <div><h3 id="${id}-title">${scenario.title}</h3>
-      <p class="description" id="${id}-desc">${scenario.description || scenario.intro}</p></div>
-  </header>`;
+  const description = scenario.description ? `<p class="description" id="${id}-desc">${scenario.description}</p>` : '';
+  const head = `<header class="dialog-head"><h3 id="${id}-title">${scenario.title}</h3>${description}</header>`;
   return `<div class="overlay"><div class="scrim" data-close></div>
-    <section class="dialog${withForm ? ' form' : ''}" role="dialog" aria-modal="true" aria-labelledby="${id}-title" aria-describedby="${id}-desc">
-      <button type="button" class="dismiss" data-close aria-label="关闭">${icon('x')}</button>
+    <section class="dialog${withForm ? ' form' : ''}" role="dialog" aria-modal="true" aria-labelledby="${id}-title"${description ? ` aria-describedby="${id}-desc"` : ''}>
       ${withForm ? head + `<div class="form-body">${content}</div>` : `<div class="inner">${head}${content}</div>`}
       ${actions(scenario, withForm)}
     </section></div>`;
 }
 function confirmation(scenario, id) {
-  if (!scenario.context) return dialog(scenario, id, '');
-  const [text, caption, symbol] = scenario.context;
-  return dialog(scenario, id, `<div class="context">${icon(symbol)}<span>${text}${caption ? `<small>${caption}</small>` : ''}</span></div>`);
+  return dialog(scenario, id, scenario.context ? `<p class="context">${scenario.context}</p>` : '');
 }
 function form(scenario, id) {
-  const options = scenario.options.map(({ text, caption, disabled }, index) =>
+  const options = scenario.options.map(({ text, caption, status, disabled }, index) =>
     `<label class="option"><input type="radio" name="${id}-choice" value="${index}" ${disabled ? 'disabled' : ''}>
-      <span>${text}${caption ? `<small>${caption}</small>` : ''}</span>${icon('check')}</label>`).join('');
+      <span>${text}${caption ? `<small>${caption}</small>` : ''}</span>
+      ${status ? `<small class="option-status">${status}</small>` : icon('check')}</label>`).join('');
   return dialog(scenario, id, `<div class="options" role="radiogroup" aria-label="本人作品">${options}</div>`, true);
 }
 function menu(id, selected) {
   if (id === 'web') return `<div class="overlay"><div class="scrim" data-close></div>
     <section class="sheet" id="web-menu" role="dialog" aria-modal="true" aria-label="网页更多操作">
-      <div class="handle" aria-hidden="true"></div>
-      <header class="sheet-source"><span class="tile">${icon('globe')}</span><div>随身阅读 · 使用说明<small>chat.xiangban.xyz</small></div></header>
-      <button type="button" class="sheet-row" data-result="将从浏览器打开">${icon('external')}从浏览器打开</button>
-      <button type="button" class="sheet-row" data-result="将打开系统分享">${icon('share')}分享</button>
+      <header class="sheet-source">chat.xiangban.xyz</header>
+      <button type="button" class="sheet-row" data-result="将从浏览器打开">在浏览器打开</button>
+      <button type="button" class="sheet-row" data-result="将打开系统分享">分享</button>
       <button type="button" class="sheet-cancel" data-close>取消</button>
     </section></div>`;
   const options = sortOptions.map((text, index) =>
@@ -482,35 +467,46 @@ function menu(id, selected) {
 }
 
 const boards = [
-  { title: '居中确认', scenarios: confirmations, default: 'comment', render: confirmation, note: '标题、后果、主操作。附件、评论等对象可附摘要。' },
-  { title: '居中表单', scenarios: forms, default: 'challenge', render: form, note: '同一张卡片加入可滚动区域，操作固定在底部。' },
-  { title: '操作菜单', scenarios: menus, default: 'web', render: (_, id, selected) => menu(id, selected), note: '网页更多操作从底部打开，排序紧贴触发按钮。' },
+  { title: '居中确认', scenarios: confirmations, default: 'comment', render: confirmation },
+  { title: '挑战投稿', scenarios: forms, default: 'challenge', render: form },
+  { title: '操作菜单', scenarios: menus, default: 'web', render: (_, id, selected) => menu(id, selected) },
 ];
 const studio = document.querySelector('#boards');
 
-for (const [index, board] of boards.entries()) {
+for (const [index, board] of (document.documentElement.dataset.edition === 'previous' ? boards : []).entries()) {
   const wrapper = document.createElement('section');
   wrapper.className = 'board';
   wrapper.innerHTML = `<header class="board-head">
     <h2 id="board-${index}">${board.title}</h2>
     <select class="scenario" aria-label="${board.title}场景">${Object.entries(board.scenarios).map(([id, scenario]) => `<option value="${id}">${scenario.label}</option>`).join('')}</select></header>
-    <div class="phone" role="group" aria-labelledby="board-${index}"></div><p class="board-note">${board.note}</p>`;
+    <div class="phone" role="group" aria-labelledby="board-${index}"></div>`;
   studio.append(wrapper);
 
   const phone = wrapper.querySelector('.phone');
   const picker = wrapper.querySelector('select');
+  picker.hidden = picker.options.length === 1;
   const isMenu = board.scenarios === menus;
   let selected = 0;
   let toastTimer;
   picker.value = board.default;
 
+  function positionMenu() {
+    const card = phone.querySelector('.menu-card');
+    if (!card) return;
+    const anchor = phone.querySelector('[data-open]').getBoundingClientRect();
+    const frame = phone.getBoundingClientRect();
+    const scale = frame.width / phone.offsetWidth;
+    card.style.setProperty('--anchor-right', Math.max(12, (frame.right - anchor.right) / scale) + 'px');
+    card.style.setProperty('--anchor-bottom', (anchor.bottom - frame.top) / scale + 6 + 'px');
+  }
+
   function render(open = true, status = '') {
     clearTimeout(toastTimer);
     const id = picker.value;
     const scenario = board.scenarios[id];
-    const launcher = isMenu ? '' : `<div class="page-dock"><span>${board.title === '居中表单' ? '社区' : scenario.page}</span><button type="button" class="page-action" data-open>${scenario.label}</button></div>`;
+    const launcher = isMenu ? '' : `<button type="button" class="page-action" data-open>${scenario.label}</button>`;
     phone.innerHTML = `<div class="screen">${header(scenario.page, id === 'web')}${contentPage(id, scenario, selected)}${launcher}</div>${open ? board.render(scenario, id, selected) : ''}
-      <div class="gesture"></div><div class="toast" role="status" ${status ? '' : 'hidden'}>${status ? '演示 · ' + status : ''}</div>`;
+      <div class="gesture"></div><div class="toast" role="status" ${status ? '' : 'hidden'}>${status}</div>`;
     const screen = phone.querySelector('.screen');
     const trigger = screen.querySelector('[data-open]');
     if (isMenu) {
@@ -520,11 +516,7 @@ for (const [index, board] of boards.entries()) {
         trigger.setAttribute('aria-haspopup', 'dialog');
         screen.inert = open;
       } else if (open) {
-        const anchor = trigger.getBoundingClientRect();
-        const frame = phone.getBoundingClientRect();
-        const card = phone.querySelector('.menu-card');
-        card.style.setProperty('--anchor-right', Math.max(12, frame.right - anchor.right) + 'px');
-        card.style.setProperty('--anchor-bottom', anchor.bottom - frame.top + 6 + 'px');
+        positionMenu();
       }
     } else if (open) {
       screen.inert = true;
@@ -577,14 +569,7 @@ for (const [index, board] of boards.entries()) {
       menuItems[next].focus();
     }
   });
-  const positionMenu = () => {
-    if (isMenu && phone.querySelector('.menu-card')) {
-      const trigger = phone.querySelector('[data-open]').getBoundingClientRect();
-      const frame = phone.getBoundingClientRect();
-      phone.querySelector('.menu-card').style.setProperty('--anchor-right', Math.max(12, frame.right - trigger.right) + 'px');
-    }
-  };
-  if (isMenu) new ResizeObserver(positionMenu).observe(phone);
+  if (isMenu) window.addEventListener('resize', positionMenu);
   render();
 }
 for (const button of document.querySelectorAll('[data-theme-button]')) {
@@ -596,5 +581,6 @@ for (const button of document.querySelectorAll('[data-theme-button]')) {
   });
 }
 </script>
+<script src="mobile-dialog-cards.js"></script>
 </body>
 </html>
