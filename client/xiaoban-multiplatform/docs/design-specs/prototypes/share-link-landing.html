@@ -69,18 +69,6 @@ body.compact .board { width: 360px; }
 .home .tabbar { position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: var(--surface); border-top: 1px solid var(--line); }
 .scrim { position: absolute; inset: 0; background: var(--scrim); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
 
-/* ── A: bottom sheet ── */
-.sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface);
-  border-radius: 26px 26px 0 0; padding: 8px 20px 26px; box-shadow: 0 -10px 40px rgba(0,0,0,.12);
-  animation: rise .32s cubic-bezier(.2,.9,.3,1);
-}
-@keyframes rise { from { transform: translateY(40px); opacity: 0; } }
-.grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 10px; filter: brightness(.7); }
-.dark .grab { filter: brightness(2); }
-.sheet-head { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: 12px; }
-.source { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
-.source svg { width: 15px; height: 15px; color: var(--accent); }
 .x { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--text-3); background: var(--surface-2); }
 .x svg { width: 15px; height: 15px; }
 
@@ -94,7 +82,7 @@ body.compact .board { width: 360px; }
 }
 .kind svg { width: 12px; height: 12px; stroke-width: 2.2; }
 .card-body { padding: 14px 16px 16px; }
-.card-body .kind.inline { background: var(--surface); color: var(--text-2); box-shadow: 0 0 0 1px var(--line); backdrop-filter: none; margin-bottom: 10px; }
+.kind.inline { background: var(--surface); color: var(--text-2); box-shadow: 0 0 0 1px var(--line); backdrop-filter: none; margin-bottom: 10px; }
 .title { font-size: 17px; font-weight: 700; line-height: 1.4; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .summary { margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .meta { margin-top: 10px; font-size: 11.5px; color: var(--text-3); display: flex; gap: 10px; }
@@ -136,7 +124,7 @@ body.compact .board { width: 360px; }
 .state h3 { font-size: 17px; font-weight: 700; }
 .state p { margin-top: 6px; font-size: 13px; color: var(--text-2); line-height: 1.6; }
 
-/* ── B: centered card ── */
+/* centered card */
 .dialog {
   position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%);
   background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.25);
@@ -179,10 +167,6 @@ body.compact .board { width: 360px; }
       <p>外部链接拉起 App 后的「打开社区内容」确认层。数据仅用 CommunityShare 已有字段：kind / title / summary / cover_url / pack_kind。</p>
     </div>
     <div class="controls">
-      <div class="seg" id="segStyle">
-        <button data-v="sheet" class="active">A 底部卡片</button>
-        <button data-v="dialog">B 居中卡片</button>
-      </div>
       <div class="seg" id="segTheme">
         <button data-v="light" class="active">浅色</button>
         <button data-v="dark">深色</button>
@@ -201,12 +185,12 @@ body.compact .board { width: 360px; }
     <table>
       <tr><th style="width:150px">问题（旧版）</th><th>新方案</th></tr>
       <tr><td>Material 默认 AlertDialog，淡紫底色与 App 不符</td><td>改用 App 自身 surface 色和 26px 大圆角，跟随深浅色与六套主题色</td></tr>
-      <tr><td>标题「打开社区内容」是废话，真正内容只是一行小字</td><td>去掉标题，内容本身当主角：封面 + 类型标签 + 17px 粗体标题 + 两行摘要。顶部一行小字「来自分享链接」说明来源</td></tr>
-      <tr><td>「取消 / 查看详情」两个红色文字按钮，主次不分</td><td>主按钮为通栏实心主题色「查看详情」，次按钮为灰色文字「暂不查看」，右上角另有关闭</td></tr>
+      <tr><td>标题「打开社区内容」是废话，真正内容只是一行小字</td><td>去掉标题，内容本身当主角：居中卡片顶部直接是封面 + 类型标签，下接 17px 粗体标题 + 两行摘要</td></tr>
+      <tr><td>「取消 / 查看详情」两个红色文字按钮，主次不分</td><td>主按钮为通栏实心主题色「查看详情」，次按钮为灰色文字「暂不查看」，卡片右上角另有关闭</td></tr>
       <tr><td>无封面、没有类型提示</td><td>有 cover_url 就显示 16:9 封面；没有就用按类型配色的图标块横排卡片（帖子 / 作品 / 方案 / 开源精选 / AI 日报）</td></tr>
       <tr><td>加载、失败、桌面内容提醒都只是换一行字</td><td>加载用骨架屏 + 按钮转圈；下架 / 网络失败用独立空态；电脑端内容用琥珀色提示条说明「只看详情，不会自动下载或应用」</td></tr>
     </table>
-    <p style="margin-top:12px;color:#888">推荐 A：底部卡片拇指可达、不挡首页，也与「详情页分享面板」的贴底语言一致。B 适合想更强调「这是一张分享卡片」的场景。</p>
+
   </div>
 </div>
 
@@ -238,7 +222,7 @@ const SCEN = [
   { id: "loading", name: "读取中", cap: "骨架屏保持最终布局不跳动，主按钮禁用并转圈，「暂不查看」始终可点。", loading: true },
   { id: "fail", name: "失败态", cap: "下架 / 未公开只给「知道了」；网络失败给「重试」主按钮 + 「取消」。右上角切换。", fail: true },
 ];
-let style = "sheet", failMode = "gone";
+let style = "dialog", failMode = "gone";
 
 function kindChip(k, inline) { return `<span class="kind${inline ? " inline" : ""}">${k[1]}${k[0]}</span>`; }
 function homeBg() {
@@ -278,11 +262,6 @@ function bodyContent(s, mode) {
 }
 function overlay(s) {
   const r = bodyContent(s, style);
-  if (style === "sheet") {
-    return `<div class="scrim"></div><div class="sheet"><div class="grab"></div>
-      <div class="sheet-head"><span class="source">${ico.link}来自分享链接</span><button class="x">${ico.x}</button></div>
-      ${r.card}${r.act}</div>`;
-  }
   const isPad = r.card.includes('class="pad');
   const inner = s.fail ? `<div class="pad top">${r.card}${r.act}</div>` : `${r.card}${r.act}${isPad ? "</div>" : ""}`;
   return `<div class="scrim"></div><div class="dialog"><button class="x${r.plain ? " plain" : ""}">${ico.x}</button>${inner}</div>`;
@@ -305,7 +284,6 @@ function seg(id, fn) {
   const el = document.getElementById(id);
   el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; el.querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b)); fn(b.dataset.v); });
 }
-seg("segStyle", v => { style = v; render(); });
 seg("segTheme", v => { document.body.classList.toggle("dark", v === "dark"); document.body.classList.toggle("studio-dark", v === "dark"); });
 seg("segWidth", v => document.body.classList.toggle("compact", v === "360"));
 const sw = document.getElementById("swatches");
