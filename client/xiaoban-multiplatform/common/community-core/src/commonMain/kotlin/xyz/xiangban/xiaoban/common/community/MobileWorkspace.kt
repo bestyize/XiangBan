@@ -202,7 +202,13 @@ fun mobileWorkspaceTools(workspace: MobileWorkspace): List<AgentTool> = listOf(
     },
     WorkspaceTool("write_file", "创建或覆盖工作区文本文件，自动创建目录。文本单文件最多 1 MB。", "write",
         workspaceProperties("path" to "string", "content" to "string"), listOf("path", "content")) { args ->
-        val path = args.workspaceWritablePath(); workspace.write(path, args.workspaceString("content"))
+        val path = args.workspaceWritablePath()
+        val content = args.workspaceString("content")
+        val recovering = kotlin.coroutines.coroutineContext[AgentToolContext]?.recovery
+        if (recovering != null && recovering.directories.any { path.startsWith("$it/") }) {
+            MobileWorkspaceLimits.text(content)
+            workspace.writeBytes(path, content.encodeToByteArray(), overwrite = false)
+        } else workspace.write(path, content)
         buildJsonObject { put("path", path); put("saved", true) }
     },
     WorkspaceTool("copy_file", "按原始字节把工作区的一个文件复制到草稿。source 和 path 都相对工作区；同名内容不同时请另选目标路径。", "write",

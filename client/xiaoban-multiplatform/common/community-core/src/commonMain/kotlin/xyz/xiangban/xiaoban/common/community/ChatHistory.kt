@@ -60,7 +60,7 @@ data class ChatSummary(
 )
 
 @Serializable
-enum class ChatTaskStatus { WaitingForPlan, Planning, Creating, GeneratingImage, Completed }
+enum class ChatTaskStatus { WaitingForPlan, Planning, Creating, Interrupted, GeneratingImage, Completed }
 
 @Serializable
 data class StoredChat(val id: String, val messages: List<ChatTurn>, val options: ChatOptions = ChatOptions())
@@ -83,6 +83,7 @@ private fun chatTaskStatus(messages: List<ChatTurn>, creation: CreationDraft?): 
         creation?.approved == false && last.creationPlan && last.text.isNotBlank() &&
             last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.WaitingForPlan
         creation?.approved == true && last.streaming -> ChatTaskStatus.Creating
+        creation?.approved == true && last.creationInterrupted() -> ChatTaskStatus.Interrupted
         last.imageGeneration && last.streaming -> ChatTaskStatus.GeneratingImage
         (creation?.approved == true || last.generatedImages.isNotEmpty()) &&
             last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.Completed
@@ -174,7 +175,8 @@ class ChatHistory(
             emptySet()
         }.filter(::validChatId).toSet()
         index = read(indexName())?.let { runCatching { CommunityJson.decodeFromString<List<ChatSummary>>(it) }.getOrNull() }.orEmpty()
-            .filterNot { it.id in deleted }.sortedByDescending { it.updatedAtMs }
+            .filterNot { it.id in deleted }.map { if (it.taskStatus == ChatTaskStatus.Creating) it.copy(taskStatus = ChatTaskStatus.Interrupted) else it }
+            .sortedByDescending { it.updatedAtMs }
         deleted.forEach { cleanDeleted(folder, it) }
         groups = read("$folder/workspaces.json")?.let {
             runCatching { CommunityJson.decodeFromString<List<String>>(it) }.getOrNull()
@@ -290,6 +292,7 @@ class ChatHistory(
     private fun interrupted(turn: ChatTurn): ChatTurn = turn.copy(
         streaming = false,
         activity = "回复已中断",
+        failureStage = turn.tools.lastOrNull { it.status == ToolStatus.Running }?.let { toolLabel(it.name) } ?: "会话中断",
         error = INTERRUPTED_REPLY,
         tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = ToolStatus.Error) else it },
     )

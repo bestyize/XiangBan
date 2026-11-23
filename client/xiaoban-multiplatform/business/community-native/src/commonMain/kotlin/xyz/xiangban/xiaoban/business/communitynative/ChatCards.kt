@@ -296,7 +296,7 @@ private fun TaskState.chip(): String? = when (this) {
 
 /** 任务计划（来自 `todo` 工具）：分段进度条加步骤列表。进行中带停止；暂停和受阻时给“继续完成”“让小伴修复”。 */
 @Composable
-fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}, onAdjust: (() -> Unit)? = null) {
+fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}, onAdjust: (() -> Unit)? = null, showRecovery: Boolean = true) {
     val extra = LocalExtraColors.current
     val state = progress.state
     val completed = state == TaskState.Completed
@@ -383,8 +383,8 @@ fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modi
                 when (state) {
                     TaskState.Approval -> HintLine("需要你确认下面这个操作", alert = true, modifier = Modifier.padding(top = 6.dp))
                     TaskState.Waiting -> HintLine("小伴有个问题要问你", alert = true, modifier = Modifier.padding(top = 6.dp))
-                    TaskState.Paused -> HintLine("已暂停", alert = false, modifier = Modifier.padding(top = 6.dp), button = "继续完成", onButton = { onSend(ContinueTask) })
-                    TaskState.Blocked -> {
+                    TaskState.Paused -> if (showRecovery) HintLine("已暂停", alert = false, modifier = Modifier.padding(top = 6.dp), button = "继续完成", onButton = { onSend(ContinueTask) })
+                    TaskState.Blocked -> if (showRecovery) {
                         Text(
                             progress.message.ifBlank { "有一步没有成功，已停下等你决定。" } + " 可以让小伴修复后继续。",
                             Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -691,13 +691,14 @@ fun AssistantTurnCards(
     onAdjust: (() -> Unit)? = null,
     extras: TurnExtras = TurnExtras(),
     flat: Boolean = false,
+    showTaskRecovery: Boolean = true,
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
     var replyActionsOpen by rememberSaveable { mutableStateOf(false) }
     if (reasoning.isNotBlank()) ReasoningView(reasoning, live = streaming && text.isEmpty())
     val progress = remember(tools, streaming, waiting, stopped, failure) { taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure) }
-    if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend, onAdjust = if (streaming) onAdjust else null)
+    if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend, onAdjust = if (streaming) onAdjust else null, showRecovery = showTaskRecovery)
     ToolGroup(tools, live = streaming)
     if (text.isNotEmpty()) {
         val actions = if (flat && !streaming && failure == null) {

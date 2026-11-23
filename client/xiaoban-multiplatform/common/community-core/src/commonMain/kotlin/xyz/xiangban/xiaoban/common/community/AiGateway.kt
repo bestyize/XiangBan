@@ -889,6 +889,7 @@ data class ChatTurn(
     val creationPlan: Boolean = false,
     val modelLabel: String? = null,
     val createdAtMs: Long? = null,
+    val failureStage: String? = null,
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -1026,6 +1027,7 @@ class CloudChatController(
     private val history: ChatHistory? = null,
     private val clock: () -> Long = ::systemNowMs,
     private val newSessionId: () -> String = { newChatId(clock()) },
+    private val creationStore: MobileGameStore? = null,
 ) {
     private val _state = MutableStateFlow(CloudChatState())
     val state: StateFlow<CloudChatState> = _state.asStateFlow()
@@ -1367,7 +1369,8 @@ class CloudChatController(
     fun acknowledgeOutcome() {
         check(!_state.value.sending)
         agent?.acknowledgeOutcome(agentSession)
-        send("我已核对上一轮操作的实际结果。请先读取当前状态，再继续未完成部分，避免重复操作。")
+        sendPrompt("我已核对上一轮操作的实际结果。请先读取当前状态，再继续未完成部分，避免重复操作。", "",
+            resumeCreation = _state.value.creation?.approved == true)
     }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
@@ -1571,17 +1574,13 @@ class CloudChatController(
         sendPrompt(CREATION_CONFIRMATION, "", confirmCreation = true)
     }
 
-    fun confirmParallelCreation(id: String) {
-        val generation = accountGeneration
-        scope.launch {
-            val task = readChatHistory(id) ?: return@launch
-            if (generation != accountGeneration || id in chatRuns || id in imageRuns || id == agentSession) return@launch
-            if (_state.value.conversations.none { it.id == id && it.taskStatus == ChatTaskStatus.WaitingForPlan }) return@launch
-            restoreActiveConversation {
-                showConversation(id, task, null)
-                confirmCreationPlan()
-            }
-        }
+
+    fun resumeCreation() {
+        val current = _state.value
+        val last = current.messages.lastOrNull() ?: return
+        if (agent == null || current.creation?.approved != true || !last.creationInterrupted() || current.sending ||
+            last.error.orEmpty().contains("结果尚未确认")) return
+        sendPrompt("继续制作", "", resumeCreation = true)
     }
 
     fun send(rawPrompt: String) { sendPrompt(rawPrompt, "") }
@@ -1722,7 +1721,7 @@ class CloudChatController(
         }
     }
 
-    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false, confirmCreation: Boolean = false): Boolean {
+    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false, confirmCreation: Boolean = false, resumeCreation: Boolean = false): Boolean {
         val prompt = rawPrompt.trim().ifEmpty { if (attachments.isNotEmpty()) "请查看附件。" else "" }
         if (prompt.isEmpty() || _state.value.sending) return false
         modelInputError(attachments)?.let { error ->
@@ -1745,7 +1744,7 @@ class CloudChatController(
         val history = buildList {
             if (systemPrompt.isNotBlank()) add(ChatMessage("system", systemPrompt))
             if (planning && draft != null) add(ChatMessage("system",
-                "当前是小伴作品的方案阶段。结合完整需求与用户补充，输出简短的制作方案和验收项，等用户点击宿主确认按钮再开始。不要声称已执行或安装。\n" +
+                "当前是小伴作品的方案阶段。用一屏说明作品名称、主要功能、数据存放位置和简短验收项，结合最新补充修改方案。等用户点击宿主确认按钮再开始。不要声称已执行或安装。\n" +
                     "作品需求：${draft.request}"))
             for (turn in _state.value.messages) {
                 if (turn.error == null && turn.text.isNotBlank()) {
@@ -1785,14 +1784,18 @@ class CloudChatController(
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     request.checkCurrent()
                     if (chatRuns[ownerSession] !== run) return@launch
+                    val recovery = if (resumeCreation) creationProgress(run.messages) else null
+                    val input = if (recovery != null && draft != null) recovery.resumeInput(creationStore, draft, plan) else modelInput
+                    request.checkCurrent()
+                    if (chatRuns[ownerSession] !== run) return@launch
                     val runId = agent.nextRunId()
                     run.nativeRun = runId
-                    agent.run(ownerSession, modelInput, runId, resolved, snapshot, tierSnapshot, retry = nativeRetry, account = request)
+                    agent.run(ownerSession, input, runId, resolved, snapshot, tierSnapshot, retry = nativeRetry, account = request, recovery = recovery)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     if (!request.isCurrent() || chatRuns[ownerSession] !== run) return@launch
-                    updateRun(run) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true) }
+                    updateRun(run) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true, failureStage = "启动任务") }
                     completeRun(run)
                 }
             }
@@ -2002,7 +2005,7 @@ class CloudChatController(
                 }
                 updateRun(run) {
                     val unstarted = rejectedBeforeRun && it.text.isEmpty() && it.reasoning.isEmpty() && it.tools.isEmpty() && it.records.isEmpty()
-                    it.copy(streaming = false, error = event.message, nativeNotStarted = it.nativeNotStarted || unstarted, tools = settleTools(it.tools, true))
+                    it.copy(streaming = false, error = event.message, failureStage = "执行引擎", nativeNotStarted = it.nativeNotStarted || unstarted, tools = settleTools(it.tools, true))
                 }
                 completeRun(run)
             }
@@ -2041,6 +2044,7 @@ class CloudChatController(
             is AgentEvent.ToolStart -> {
                 val call = ToolCallInfo(event.id, event.name, event.arguments, startedAtMs = nowMs())
                 updateRun(run) { it.copy(tools = it.tools + call, activity = "正在执行${toolLabel(event.name)}…") }
+                if (run.options.creation?.approved == true && call.name in creationTools) history?.checkpoint(run.session, run.messages.last())
             }
             is AgentEvent.ToolEnd -> {
                 updateRun(run) { turn ->
@@ -2049,6 +2053,10 @@ class CloudChatController(
                     }
                     val running = tools.lastOrNull { it.status == ToolStatus.Running }
                     turn.copy(tools = tools, activity = running?.let { "正在执行${toolLabel(it.name)}…" } ?: "正在请求下一步…")
+                }
+                val turn = run.messages.last()
+                if (run.options.creation?.approved == true && turn.tools.any { it.id == event.id && it.name in creationTools }) {
+                    history?.checkpoint(run.session, turn)
                 }
             }
             is AgentEvent.ToolImages -> {
@@ -2078,7 +2086,12 @@ class CloudChatController(
                 val failure = if (event.ok) null else friendlyAgentError(event.error)
                 updateRun(run) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
-                    turn.copy(streaming = false, activity = "", error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok), truncated = turn.truncated || event.finish == "length", promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
+                    val stage = when {
+                        event.ok -> null
+                        event.error.orEmpty().startsWith("provider error", ignoreCase = true) || failure.orEmpty().contains("连接小伴 AI 服务失败") -> "模型请求"
+                        else -> turn.tools.lastOrNull()?.takeIf { it.status != ToolStatus.Done }?.let { toolLabel(it.name) } ?: "任务执行"
+                    }
+                    turn.copy(streaming = false, activity = "", error = failure, failureStage = stage, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok), truncated = turn.truncated || event.finish == "length", promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
                 }
                 completeRun(run)
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()

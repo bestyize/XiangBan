@@ -15,6 +15,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -231,6 +233,7 @@ internal fun AgentQuotaBanner(onClick: () -> Unit) {
 internal fun AgentComposer(
     value: String, onValue: (String) -> Unit, placeholder: String, compact: Boolean, hasAttachments: Boolean,
     voice: VoiceInputController, voiceMode: Boolean, onVoiceMode: (Boolean) -> Unit, onAttach: () -> Unit,
+    inputFocus: FocusRequester,
     onLive: () -> Unit, onSend: () -> Unit, sending: Boolean, onStop: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -257,7 +260,7 @@ internal fun AgentComposer(
                 if (voiceMode) {
                     PressBar(voice, true, "按住 说话", onPressStart = { if (sending) onStop() })
                 } else {
-                    BasicTextField(value, onValue, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    BasicTextField(value, onValue, modifier = Modifier.fillMaxWidth().focusRequester(inputFocus), singleLine = true,
                         textStyle = XType.Body.copy(color = colors.onBackground), cursorBrush = SolidColor(Brand),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { if (canSend && !sending) onSend() }),
@@ -285,28 +288,31 @@ internal fun AgentComposer(
 }
 
 internal fun CloudChatState.parallelTasks(): List<ChatSummary> = conversations.filter { item ->
-    item.id != conversationId && (item.id in runningSessions || item.id in imageSessions || item.taskStatus == ChatTaskStatus.WaitingForPlan)
+    item.id != conversationId && (item.id in runningSessions || item.id in imageSessions ||
+        item.taskStatus == ChatTaskStatus.WaitingForPlan || item.taskStatus == ChatTaskStatus.Interrupted)
 }
 
 @Composable
-internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, onClick: () -> Unit) {
+internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, reviewPlan: (String) -> Unit, onClick: () -> Unit) {
     val tasks = cloud.parallelTasks()
     if (tasks.isEmpty()) return
     val colors = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
-    val waiting = tasks.firstOrNull { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
+    val waiting = tasks.firstOrNull { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan || it.taskStatus == ChatTaskStatus.Interrupted }
+    val plan = tasks.singleOrNull()?.takeIf { it.taskStatus == ChatTaskStatus.WaitingForPlan }
     val shape = RoundedCornerShape(if (compact) 11.dp else 14.dp)
     val tint = if (waiting == null) Success else Danger
     Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp).fillMaxWidth()
         .then(if (waiting == null) Modifier.shadow(2.dp, shape, clip = false) else Modifier)
         .clip(shape).background(if (waiting == null) colors.surface else AgentDangerSoft)
         .then(if (waiting == null) Modifier.border(1.dp, AgentHairline, shape) else Modifier)
-        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = if (compact) 6.dp else 9.dp),
+        .clickable { if (plan != null) reviewPlan(plan.id) else onClick() }.padding(horizontal = 12.dp, vertical = if (compact) 6.dp else 9.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Box(Modifier.size(13.dp).background(tint.copy(alpha = .18f), CircleShape).padding(3.dp).background(tint, CircleShape))
         Column(Modifier.weight(1f)) {
             val title = when (waiting?.taskStatus) {
                 ChatTaskStatus.WaitingForPlan -> "${waiting.title} · 方案已就绪"
+                ChatTaskStatus.Interrupted -> "${waiting.title} · 制作已暂停"
                 else -> if (waiting != null) "${waiting.title} · 等待确认" else "${tasks.size} 个任务后台制作中"
             }
             Text(title, style = XType.Secondary.copy(fontSize = if (compact) 12.5.sp else 13.sp, lineHeight = 17.sp),
@@ -317,7 +323,7 @@ internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, onClick: ()
                 Text(detail, style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 15.sp), color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Text(if (waiting == null) "查看" else "去确认",
+        Text(if (plan != null) "查看方案" else if (waiting?.id in cloud.waitingSessions) "去确认" else "查看",
             Modifier.background(if (waiting == null) extra.fill else colors.surface, CircleShape)
                 .padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 2.dp else 4.dp),
             style = XType.Caption, fontWeight = FontWeight.SemiBold, color = if (waiting == null) colors.onSurfaceVariant else Danger)
@@ -367,7 +373,7 @@ internal fun AgentChoiceRow(
 }
 
 @Composable
-internal fun AgentTasks(cloud: CloudChatState, close: () -> Unit, panel: Modifier, open: (String) -> Unit, confirm: (String) -> Unit) {
+internal fun AgentTasks(cloud: CloudChatState, close: () -> Unit, panel: Modifier, open: (String) -> Unit) {
     val active = cloud.parallelTasks()
     val completed = cloud.conversations.filter { it.id != cloud.conversationId && it.taskStatus == ChatTaskStatus.Completed }.take(8)
     AgentSheet("并行任务", close, panel) {
@@ -383,12 +389,13 @@ internal fun AgentTasks(cloud: CloudChatState, close: () -> Unit, panel: Modifie
                     val detail = when {
                         plan -> "创作方案已就绪 · 等待确认"
                         waiting -> "等待你确认或回答"
+                        item.taskStatus == ChatTaskStatus.Interrupted -> "制作已暂停 · 可查看已保存进度"
                         item.id in cloud.imageSessions -> "生图进行中"
                         item.taskStatus == ChatTaskStatus.Planning -> "正在拟定创作方案"
                         else -> "制作中"
                     }
                     AgentTaskRow(item.title, detail, if (waiting) Danger else Success,
-                        onClick = { open(item.id) }, confirm = if (plan) ({ confirm(item.id) }) else null)
+                        onClick = { open(item.id) }, action = if (plan) "查看方案" else null)
                 }
             }
             if (completed.isNotEmpty()) {
@@ -406,7 +413,7 @@ private fun TaskGroupTitle(text: String) {
 }
 
 @Composable
-private fun AgentTaskRow(title: String, detail: String, status: Color?, onClick: () -> Unit, confirm: (() -> Unit)? = null) {
+private fun AgentTaskRow(title: String, detail: String, status: Color?, onClick: () -> Unit, action: String? = null) {
     val extra = LocalExtraColors.current
     Row(Modifier.padding(bottom = 4.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
         .padding(horizontal = 10.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -416,7 +423,7 @@ private fun AgentTaskRow(title: String, detail: String, status: Color?, onClick:
             Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(detail, Modifier.padding(top = 2.dp), style = XType.Caption, color = status ?: MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (confirm != null) Text("确认制作", Modifier.clip(CircleShape).background(extra.brandSoft).clickable(onClick = confirm)
+        if (action != null) Text(action, Modifier.clip(CircleShape).background(extra.brandSoft)
             .padding(horizontal = 10.dp, vertical = 5.dp), color = extra.brandInk, style = XType.Caption, fontWeight = FontWeight.SemiBold)
     }
 }

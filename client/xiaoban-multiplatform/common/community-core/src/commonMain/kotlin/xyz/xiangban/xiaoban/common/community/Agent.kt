@@ -118,7 +118,7 @@ class AgentRuntime(
     private val mutationRequests = MutableStateFlow<Set<Pair<Long, String>>>(emptySet())
     private val requestRuns = MutableStateFlow<Map<Pair<Long, String>, String>>(emptyMap())
     private var nextRun = 0L
-    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions(), val account: AiAccountRequest? = null, val supportsVision: Boolean = true)
+    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions(), val account: AiAccountRequest? = null, val supportsVision: Boolean = true, val recovery: CreationProgress? = null)
     private val activeRuns = MutableStateFlow<Map<String, ActiveRun>>(emptyMap())
     private var conversationReader: AgentTool? = null
     private val availableTools: List<AgentTool> get() = tools + listOfNotNull(conversationReader)
@@ -176,12 +176,12 @@ class AgentRuntime(
     /** 在会话 [session] 里开始一轮；返回这一轮的编号，用来取消。 */
     fun nextRunId(): String = "r${++nextRun}"
 
-    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList(), options: ChatOptions? = null, tier: AiTier? = null, retry: Boolean = false, account: AiAccountRequest? = null): String {
+    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList(), options: ChatOptions? = null, tier: AiTier? = null, retry: Boolean = false, account: AiAccountRequest? = null, recovery: CreationProgress? = null): String {
         validateChatAttachments(attachments)
         check(!hasStoppingMutation()) { "上一项本机操作仍在停止，请稍后核对结果再继续" }
         val snapshot = options ?: ChatOptions(tier = currentModel, reasoningByTier = currentReasoning?.let { mapOf(currentModel to it) }.orEmpty())
         account?.checkCurrent()
-        val run = ActiveRun(id, generation, options = snapshot, account = account, supportsVision = tier?.supportsVision ?: true)
+        val run = ActiveRun(id, generation, options = snapshot, account = account, supportsVision = tier?.supportsVision ?: true, recovery = recovery)
         activeRuns.update {
             check(session !in it) { "上一轮仍在停止，请稍后重试" }
             it + (session to run)
@@ -407,7 +407,7 @@ class AgentRuntime(
                     val result = try {
                         currentCoroutineContext().ensureActive()
                         if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
-                        withContext((running.account ?: kotlin.coroutines.EmptyCoroutineContext) + AgentToolContext(session, id, running.supportsVision)) {
+                        withContext((running.account ?: kotlin.coroutines.EmptyCoroutineContext) + AgentToolContext(session, id, running.supportsVision, running.recovery)) {
                             running.account?.checkCurrent()
                             entered = true
                             tool?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")

@@ -82,7 +82,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
           LocalCommunityImageLoader provides rememberImageLoader(),
       ) {
         val appScope = rememberCoroutineScope()
-        val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent, history = ChatHistory(env.chatFiles, appScope) { env.agent?.awaitSessionIdle(it) }) }
+        val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent, history = ChatHistory(env.chatFiles, appScope) { env.agent?.awaitSessionIdle(it) }, creationStore = env.games) }
         // 登录、换号后读出这个账号存下的对话。
         val signedIn by env.session.state.collectAsState()
         LaunchedEffect(signedIn.loggedIn, signedIn.accountId, signedIn.generation) {

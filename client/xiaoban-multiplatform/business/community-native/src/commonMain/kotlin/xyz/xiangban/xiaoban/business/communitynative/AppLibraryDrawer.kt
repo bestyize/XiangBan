@@ -14,21 +14,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import xyz.xiangban.xiaoban.common.community.AppShortcut
-import xyz.xiangban.xiaoban.common.community.recentAppShortcuts
 
 @Composable
 internal fun AppLibraryDrawer(
-    env: CommunityEnv, available: List<AppShortcut>, loading: Boolean, errors: List<String>,
-    reload: () -> Unit, dismiss: () -> Unit, open: (Route) -> Unit,
+    env: CommunityEnv, recent: List<AppShortcut>, loading: Boolean, errors: List<String>,
+    reload: () -> Unit, dismiss: () -> Unit, choose: (AppShortcut) -> Unit,
 ) {
-    val recentIds = env.platform?.recentGames?.collectAsState()?.value.orEmpty()
-    val community = env.platform?.recentCommunityGames?.collectAsState()?.value.orEmpty()
-    val recent = recentAppShortcuts(recentIds, available, community)
-    var message by remember { mutableStateOf<String?>(null) }
-    fun choose(item: AppShortcut) {
-        if (item.source == "community") { dismiss(); open(Route.Pack(item.id.toLong())) }
-        else if (env.platform?.openGame(item.id) == true) dismiss() else message = "当前平台无法打开游戏"
-    }
     Column(Modifier.fillMaxSize().clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
         .background(MaterialTheme.colorScheme.surface).statusBarsPadding()
         .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
@@ -39,15 +30,14 @@ internal fun AppLibraryDrawer(
             }
             if (loading) Spinner(Modifier.fillMaxWidth().height(48.dp))
             else if (recent.isEmpty()) Text("还没有使用记录", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-            AppShortcutGrid(env, recent, choose = ::choose)
+            AppShortcutGrid(env, recent, choose = choose)
             if (errors.isNotEmpty()) Banner(errors.joinToString(" · "), warn = true, actionText = "重试", onAction = reload)
-            message?.let { Text(it, style = XType.Caption, color = Danger) }
         }
     }
 }
 
 @Composable
-private fun AppShortcutGrid(env: CommunityEnv, items: List<AppShortcut>, choose: (AppShortcut) -> Unit) {
+internal fun AppShortcutGrid(env: CommunityEnv, items: List<AppShortcut>, choose: (AppShortcut) -> Unit) {
     items.chunked(4).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         row.forEach { item -> key(item.key) {
             if (item.source == "community") {

@@ -112,6 +112,7 @@ interface PlatformActions : VoicePlatform {
     /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */
     suspend fun gamePackage(id: String): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
     suspend fun shareGamePackage(id: String): Boolean = false
+    fun rememberCreatedGame(id: String) {}
     fun forgetGame(id: String) {}
     suspend fun creationCover(id: String): ByteArray? = null
     suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?): Boolean = false
@@ -215,7 +216,9 @@ class CommunityEnv(
     @OptIn(ExperimentalTime::class)
     val agent: AgentRuntime? = if (agentBridge != null && agentDir != null) {
         val tools = reminders?.let { reminderTools(it) { Clock.System.now().toEpochMilliseconds() } }.orEmpty() +
-            workspace?.let(::mobileWorkspaceTools).orEmpty() + games?.let(::mobileGameTools).orEmpty() +
+            workspace?.let(::mobileWorkspaceTools).orEmpty() + games?.let { store ->
+                mobileGameTools(store) { id -> platform?.rememberCreatedGame(id) }
+            }.orEmpty() +
             mobileGameActionTools(games, workspace, platform) + gatewayWebTools(ai) +
             imageAgentTools(ai, chatFiles, { session.state.value.accountId }, workspace)
         AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope, utcOffsetMinutes = utcOffsetMinutes)

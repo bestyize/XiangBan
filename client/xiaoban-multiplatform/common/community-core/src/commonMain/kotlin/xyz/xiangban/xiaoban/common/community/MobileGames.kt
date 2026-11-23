@@ -394,7 +394,7 @@ private fun gameParameters(vararg fields: Pair<String, String>, required: List<S
     put("required", JsonArray(required.map(::JsonPrimitive))); put("additionalProperties", false)
 }
 
-fun mobileGameTools(store: MobileGameStore): List<AgentTool> = listOf(
+fun mobileGameTools(store: MobileGameStore, onInstalled: (String) -> Unit = {}): List<AgentTool> = listOf(
     MobileGameTool("app_read_format", "读取小伴应用规范（运行时协议 2）的完整创作规则，制作游戏或工具前先读取。", gameParameters()) {
         JsonPrimitive(MobileGameFormat.instructions)
     },
@@ -411,6 +411,8 @@ fun mobileGameTools(store: MobileGameStore): List<AgentTool> = listOf(
         "source_dir" to "string", "files" to "array", "overwrite" to "boolean",
         required = listOf("id", "name", "description"),
     ), "write") { args ->
+        val resumeId = kotlin.coroutines.coroutineContext[AgentToolContext]?.recovery?.resumeId
+        require(resumeId == null || args.gameString("id") == resumeId) { "继续制作时请沿用已有作品 ID：$resumeId" }
         val kind = args.gameString("kind", "game")
         val game = MobileGame(
             id = args.gameString("id"), name = args.gameString("name"), description = args.gameString("description"),
@@ -429,6 +431,7 @@ fun mobileGameTools(store: MobileGameStore): List<AgentTool> = listOf(
                 MobileGameFile(path, file.gameString("content"))
             }, args.gameBoolean("overwrite"))
         }
+        onInstalled(created.id)
         created.json()
     },
 )

@@ -50,6 +50,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.ApiException
 import xyz.xiangban.xiaoban.common.community.AppShortcut
+import xyz.xiangban.xiaoban.common.community.recentAppShortcuts
 import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CommunityJson
@@ -179,6 +180,15 @@ internal fun GamesScreen(
     val appCatalog = remember(official, games) {
         official.map { AppShortcut("builtin", it.id, it.name) } + games.map { AppShortcut("local", it.id, it.name) }
     }
+    val recentIds = env.platform?.recentGames?.collectAsState()?.value.orEmpty()
+    val communityRecent = env.platform?.recentCommunityGames?.collectAsState()?.value.orEmpty()
+    val recent = remember(recentIds, appCatalog, communityRecent) { recentAppShortcuts(recentIds, appCatalog, communityRecent) }
+    fun openRecent(item: AppShortcut): Boolean {
+        if (item.source == "community") { open(Route.Pack(item.id.toLong())); return true }
+        if (env.platform?.openGame(item.id) == true) return true
+        message = "当前无法打开这件作品"
+        return false
+    }
     // Ignore touches while a page is moving or leaving the active tab.
     val blockTouches = if (active && !featuredTransition.isRunning) Modifier else Modifier.pointerInput(Unit) {
         awaitPointerEventScope {
@@ -189,7 +199,7 @@ internal fun GamesScreen(
         AppLibraryPullDown(
             enabled = active && !featuredVisible && !overlay,
             onVisibilityChanged = { libraryVisible = it },
-            drawer = { dismiss -> AppLibraryDrawer(env, appCatalog, loading, errors, { reload++ }, dismiss, open) },
+            drawer = { dismiss -> AppLibraryDrawer(env, recent, loading, errors, { reload++ }, dismiss) { if (openRecent(it)) dismiss() } },
         ) { showLibrary, dragHandle ->
             val headerDrag = dragHandle.semantics {
                 customActions = listOf(CustomAccessibilityAction("打开最近用过") { showLibrary(); true })
@@ -201,7 +211,7 @@ internal fun GamesScreen(
                     .background(MaterialTheme.colorScheme.background),
             ) {
                 HomeBar("广场", modifier = headerDrag)
-                AppPlazaScreen(env, official, loading, errors, { reload++ },
+                AppPlazaScreen(env, official, loading, errors, { reload++ }, recent, showLibrary, { openRecent(it) },
                     featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
                     onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
                     onAllGames = { featuredPage = FeaturedPage.Games },

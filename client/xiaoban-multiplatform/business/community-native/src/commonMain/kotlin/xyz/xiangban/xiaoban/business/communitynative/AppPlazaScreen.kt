@@ -39,6 +39,7 @@ private val FeaturedGap = 8.dp
 @Composable
 internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>,
     loading: Boolean, errors: List<String>, reload: () -> Unit,
+    recent: List<AppShortcut>, showRecent: () -> Unit, openRecent: (AppShortcut) -> Unit,
     featuredShortcuts: List<AppShortcut>, featuredTools: Load<Unit>, retryFeaturedTools: () -> Unit,
     onOfficial: (MobileGame) -> Unit, onOfficialDetails: (MobileGame) -> Unit,
     onAllGames: () -> Unit, onAllTools: () -> Unit, open: (Route) -> Unit) {
@@ -69,6 +70,14 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>,
     }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { PlazaHeading("最近用过", "全部", showRecent) }
+            item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = FeaturedInset)) {
+                    if (recent.isNotEmpty()) AppShortcutGrid(env, recent.take(FeaturedColumns), openRecent)
+                    else if (loading) Spinner(Modifier.fillMaxWidth().height(44.dp))
+                    else Text("做好的作品和打开过的应用会出现在这里", style = XType.Caption, color = LocalExtraColors.current.ink3)
+                }
+            }
             item { PlazaHeading("精选游戏", "全部", onAllGames.takeIf { games.isNotEmpty() }) }
             if (loading && games.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(80.dp)) }
             if (!loading && games.isEmpty()) item { Text("当前平台暂无官方游戏", Modifier.padding(horizontal = 16.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3) }

@@ -69,6 +69,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import xyz.xiangban.xiaoban.common.community.creationInterrupted
+import xyz.xiangban.xiaoban.common.community.creationProgress
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -288,6 +292,12 @@ internal fun AiChatPage(
         )
     }
     var voiceMode by rememberSaveable { mutableStateOf(false) }
+    val inputFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var editingPlan by remember(conversation) { mutableStateOf(false) }
+    LaunchedEffect(editingPlan) {
+        if (editingPlan) { inputFocus.requestFocus(); keyboard?.show(); editingPlan = false }
+    }
     val callHost = key(conversation, accountGeneration) { rememberVoiceCallHost(env) }
     val callScope = key(conversation, accountGeneration) { rememberCoroutineScope() }
 
@@ -368,9 +378,17 @@ internal fun AiChatPage(
         ) {
             val hasWaitingTask = cloud.parallelTasks().any { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
             AgentTopBar(model, exhausted, hasWaitingTask, { focus.clearFocus(); tasksSheet = true }, ::openConfig, back)
-            if (main) AgentTaskStrip(cloud, compact) { focus.clearFocus(); tasksSheet = true }
+            if (main) AgentTaskStrip(cloud, compact, ::openConversation) { focus.clearFocus(); tasksSheet = true }
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (cloud.messages.isEmpty() && archive.isEmpty()) {
+                if (!archived && cloud.creationPlanReady) {
+                    val plan = cloud.messages.last()
+                    key(plan.id) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text("制作方案", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                            MarkdownBubble(plan.text, false, env.platform, Modifier.padding(top = 8.dp), flat = true)
+                        }
+                    }
+                } else if (cloud.messages.isEmpty() && archive.isEmpty()) {
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
                     key(conversation) {
@@ -384,7 +402,7 @@ internal fun AiChatPage(
                                 cloud.messages.firstOrNull()?.createdAtMs
                                     ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
                             } else null,
-                            readOnly = archived,
+                            readOnly = archived, creation = cloud.creation?.approved == true,
                             onArchivedPreview = { id, image -> archivePreview = id to image },
                             archivedThumbnail = { id, image -> chat.resolveArchivedImage(id, image, thumbnail = true) })
                     }
@@ -416,11 +434,29 @@ internal fun AiChatPage(
                             Modifier.padding(bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (!cloud.sending) {
-                            AppActionButton(
-                                if (cloud.creationPlanReady) "确认方案，开始制作" else "重新生成方案",
-                                if (cloud.creationPlanReady) chat::confirmCreationPlan else chat::requestCreationPlan,
-                                Modifier.fillMaxWidth().padding(bottom = 6.dp), primary = true,
-                            )
+                            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (cloud.creationPlanReady) AppActionButton("修改需求", { voiceMode = false; editingPlan = true }, Modifier.weight(1f))
+                                AppActionButton(if (cloud.creationPlanReady) "开始制作" else "重新生成方案",
+                                    if (cloud.creationPlanReady) chat::confirmCreationPlan else chat::requestCreationPlan,
+                                    Modifier.weight(1f), primary = true, enabled = input.isBlank() && attachments.isEmpty())
+                            }
+                        }
+                    }
+                    if (cloud.creation?.approved == true && !cloud.sending) {
+                        val last = cloud.messages.lastOrNull()
+                        val progress = remember(cloud.messages) { creationProgress(cloud.messages) }
+                        val work = progress.installed
+                        if (last?.creationInterrupted() == true) {
+                            Text(listOfNotNull(last.failureStage, progress.summary).joinToString(" · "), style = XType.Secondary)
+                            Text("待完成：${progress.nextStep}", style = XType.Caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (!last.error.orEmpty().contains("结果尚未确认")) {
+                                AppActionButton("继续制作", chat::resumeCreation, Modifier.fillMaxWidth(), primary = true)
+                            }
+                        } else if (work != null) {
+                            Text("下次可在「应用 → 最近用过」打开", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            AppActionButton("打开${work.name}", {
+                                if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
+                            }, Modifier.fillMaxWidth(), primary = true)
                         }
                     }
                     cloud.saveError?.let { message ->
@@ -436,7 +472,8 @@ internal fun AiChatPage(
                     cloud.inputError?.let { Text(it, style = XType.Caption, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 4.dp)) }
                 }
                 AgentComposer(
-                    input, { input = it }, if (cloud.messages.isEmpty() && archive.isEmpty()) "和小伴说点什么…" else "问点什么…",
+                    input, { input = it }, if (cloud.creationPlanReady) "想调整哪些功能？" else if (cloud.messages.isEmpty() && archive.isEmpty()) "和小伴说点什么…" else "问点什么…",
+                    inputFocus = inputFocus,
                     compact = compact, hasAttachments = attachments.isNotEmpty(),
                     voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { focus.clearFocus(); voiceMode = it },
                     onAttach = { focus.clearFocus(); attach = true },
@@ -518,7 +555,7 @@ internal fun AiChatPage(
             AgentTasks(cloud, { tasksSheet = false }, panel, open = { id ->
                 tasksSheet = false
                 openConversation(id)
-            }, confirm = { id -> chat.confirmParallelCreation(id) })
+            })
         }
         OverlayTransition(historySheet) { panel ->
             AgentHistorySheet(chat, cloud.conversations, { historySheet = false }, panel,
@@ -794,7 +831,7 @@ private fun CloudMessages(
     onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit,
     onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit,
     waiting: String?, showQuota: Boolean, archive: List<StoredChat>, offsetMinutes: Int, topicStarted: Long?,
-    readOnly: Boolean, onArchivedPreview: (String, ChatImagePreview) -> Unit,
+    readOnly: Boolean, creation: Boolean, onArchivedPreview: (String, ChatImagePreview) -> Unit,
     archivedThumbnail: suspend (String, String) -> String?,
 ) {
     val listState = rememberLazyListState()
@@ -838,9 +875,10 @@ private fun CloudMessages(
             val latest = !readOnly && turn.id == last?.id && !sending
             AgentChatTurn(turn, messages, platform, resolveImage, onPreview, offsetMinutes = offsetMinutes,
                 waiting = if (turn.streaming) waiting else null, onStop = onStop.takeUnless { readOnly }, onSend = onSend,
-                onRetry = onRetry.takeIf { latest && turn.error != null && !turn.imageGeneration },
-                onRegenerate = onRegenerate.takeIf { latest && !turn.streaming && !turn.imageGeneration },
-                onContinue = if (latest) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null,
+                creation = creation,
+                onRetry = onRetry.takeIf { latest && !creation && turn.error != null && !turn.imageGeneration },
+                onRegenerate = onRegenerate.takeIf { latest && !creation && !turn.streaming && !turn.imageGeneration },
+                onContinue = if (latest && !creation) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null,
                 onRecover = if (!readOnly && turn.imageJobRecoverable && !sending) ({ onRecoverImage(turn.id) }) else null,
                 onReviewed = onReviewed.takeIf { !turn.imageGeneration && latest && turn.error.orEmpty().contains("结果尚未确认") },
                 onQuota = onQuota.takeIf { showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") } })
@@ -855,6 +893,7 @@ private fun AgentChatTurn(
     onPreview: (ChatImagePreview) -> Unit, offsetMinutes: Int, waiting: String? = null, onStop: (() -> Unit)? = null,
     onSend: (String) -> Unit = {}, onRetry: (() -> Unit)? = null, onRegenerate: (() -> Unit)? = null,
     onContinue: (() -> Unit)? = null, onRecover: (() -> Unit)? = null, onReviewed: (() -> Unit)? = null, onQuota: (() -> Unit)? = null,
+    creation: Boolean = false,
 ) {
     if (turn.role == "user") {
         AgentUserMessage((if (turn.imageGeneration) "生成图片 · " else "") + turn.text +
@@ -887,6 +926,7 @@ private fun AgentChatTurn(
             records = turn.records, waiting = waiting, platform = platform,
             idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
             onRetry = onRetry, onRegenerate = onRegenerate, flat = true,
+            showTaskRecovery = !creation || !turn.creationInterrupted(),
             extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 truncated = turn.truncated, onContinue = onContinue),
