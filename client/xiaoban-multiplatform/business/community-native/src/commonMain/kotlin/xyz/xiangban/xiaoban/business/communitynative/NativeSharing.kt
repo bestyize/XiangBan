@@ -1,12 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.MutableStateFlow
 import xyz.xiangban.xiaoban.common.community.ApiException
@@ -231,48 +225,5 @@ internal fun DirectShareSheet(
         onNotice = onNotice,
         coverContent = { imageUrl -> ShareCoverImage(imageUrl) },
         panelModifier = panelModifier,
-    )
-}
-
-/** Every incoming link is checked, resolved anonymously, then confirmed. Never auto-apply a pack. */
-@Composable
-internal fun CommunityLinkConfirmation(env: CommunityEnv, open: (Route) -> Unit) {
-    val platform = env.platform ?: return
-    val raw by platform.communityLinks.collectAsState()
-    val pending = raw ?: return
-    val target = remember(pending, env.config) { communityShareTarget(pending, env.config) }
-    val api = remember(env) { CommunitySharingApi(env.client, env.config) }
-    val loader = rememberLoader(env, "incoming-$pending") { api.publicInfo(target ?: throw ApiException(400, "此链接不是可打开的公开社区内容")) }
-    val state by loader.state.collectAsState()
-    AlertDialog(
-        onDismissRequest = platform::consumeCommunityLink,
-        title = { Text("打开社区内容") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (val current = state) {
-                    is Load.Ready -> {
-                        Text(current.value.title)
-                        Text(if (target?.requestsApply == true) "此链接指向桌面内容。手机只查看详情，不会自动下载或应用。" else "确认后查看公开社区详情。")
-                    }
-                    is Load.Failed -> Text(if (current.notFound) "内容未公开或已下架。" else "无法读取此公开链接，可重试或取消。")
-                    else -> Text("正在检查公开内容…")
-                }
-            }
-        },
-        confirmButton = {
-            val info = (state as? Load.Ready)?.value
-            if (target != null && info != null) TextButton(onClick = {
-                platform.consumeCommunityLink()
-                open(when (target.kind) {
-                    "pack" -> if (info.packKind in CapabilityPackKinds) Route.Ability(target.id.toLong()) else Route.Pack(target.id.toLong())
-                    "topic" -> Route.Topic(target.id.toLong())
-                    "scheme" -> Route.Scheme(target.id.toLong())
-                    "project" -> Route.Project(target.id)
-                    else -> Route.Weekly(target.id)
-                })
-            }) { Text("查看详情") }
-            else if (target != null && state is Load.Failed) TextButton(onClick = loader::reload) { Text("重试") }
-        },
-        dismissButton = { TextButton(onClick = platform::consumeCommunityLink) { Text("取消") } },
     )
 }

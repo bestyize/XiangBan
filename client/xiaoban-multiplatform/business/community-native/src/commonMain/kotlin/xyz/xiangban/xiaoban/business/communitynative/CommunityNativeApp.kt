@@ -109,7 +109,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         // 回到最外面再按返回：由应用自己结束，用普通的关闭动画，不让系统播放“缩到右下角”的返回桌面动画。放在其它返回处理（弹层、侧栏）前面，优先级最低。
         BackHandler(enabled = env.platform != null && stack.isEmpty()) { env.platform?.exitApp() }
 
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CommunityLinkConfirmation(env, ::push, Modifier.background(MaterialTheme.colorScheme.background)) {
             val pages = stack.filter { it != Route.Login }
             val pageTransition = updateTransition(pages, label = "页面切换")
             val tabShift by pageTransition.animateFloat(
@@ -176,7 +176,6 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     }
                 }
             }
-            CommunityLinkConfirmation(env, ::push)
             env.platform?.appUpdates?.let { AppUpdateDialog(it) }
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(

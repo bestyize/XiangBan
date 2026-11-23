@@ -34,6 +34,7 @@ data class CommunityShareTarget(val kind: String, val id: String, val requestsAp
 private val ShareKinds = setOf("pack", "topic", "scheme", "project", "weekly")
 private val ApplyKinds = setOf("effect", "reminder", "routine", "task", "goal", "widget", "game", "wallpaper", "skill", "expert", "workflow")
 private val ShareSlug = Regex("[A-Za-z0-9][A-Za-z0-9_-]{0,99}")
+private val ShareCoverName = Regex("[A-Za-z0-9][A-Za-z0-9_.-]{0,159}")
 private fun validShareId(kind: String, id: String): Boolean = if (kind in setOf("pack", "topic", "scheme"))
     id.toLongOrNull()?.let { it > 0 && it.toString() == id } == true else ShareSlug.matches(id)
 
@@ -77,13 +78,24 @@ fun communityShareTarget(raw: String, config: CommunityConfig): CommunityShareTa
 class CommunitySharingApi(client: HttpClient, private val config: CommunityConfig) {
     private val http = JsonHttp(client, config.forumBase)
     /** Intentionally anonymous even when the app is signed in: private content must not leak to a poster. */
-    suspend fun publicInfo(target: CommunityShareTarget): CommunityShare {
+    suspend fun publicInfo(target: CommunityShareTarget, includeCover: Boolean = false): CommunityShare {
         if (target.kind !in ShareKinds || !validShareId(target.kind, target.id)) throw ApiException(400, "不支持分享此链接")
         val info: CommunityShare = http.send(HttpMethod.Get, "/api/share/${target.kind}/${target.id}", serializer())
         val resolved = communityShareTarget(info.url, config)
         if (info.kind != target.kind || resolved?.kind != target.kind || resolved.id != target.id || resolved.requestsApply || info.title.isBlank() || info.title.length > 500 || info.summary.length > 10000)
             throw ApiException(200, "分享信息暂不可用，请重试")
-        // Keep only canonical public addresses; optional app and cover addresses never reach platform actions.
-        return info.copy(url = target.webUrl(config), appLink = null, coverUrl = null)
+        return info.copy(
+            url = target.webUrl(config),
+            appLink = null,
+            coverUrl = if (includeCover) info.coverUrl?.let(::publicCoverUrl) else null,
+        )
+    }
+
+    private fun publicCoverUrl(url: String): String? {
+        val covers = "${config.resourceBase.trimEnd('/')}/covers/"
+        if (covers.startsWith("https://") && url.startsWith(covers) && ShareCoverName.matches(url.removePrefix(covers))) return url
+        val forum = config.forumBase.trimEnd('/')
+        val path = url.removePrefix(forum)
+        return if (forum.startsWith("https://") && forumImageId(path) != null) forum + path else null
     }
 }

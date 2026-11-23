@@ -56,6 +56,29 @@ class CommunitySharingTest {
         assertEquals("已恢复", api.publicInfo(CommunityShareTarget("topic", "1")).title)
         server.client.close()
     }
+    @Test fun `incoming previews retain only public cover paths`() = runTest {
+        val server = FakeServer()
+        val api = CommunitySharingApi(server.client, sharingConfig)
+        val target = CommunityShareTarget("pack", "17")
+        val image = "/api/images/7f15d943-48a0-4e2c-8220-439fde5af510"
+        val cover = "https://res.xiangban.xyz/covers/public-1.0.0.webp"
+        val cases = mapOf(
+            cover to cover,
+            image to "https://chat.xiangban.xyz$image",
+            "https://chat.xiangban.xyz$image" to "https://chat.xiangban.xyz$image",
+            "$cover?token=PRIVATE" to null,
+            "https://res.xiangban.xyz.example/covers/public.webp" to null,
+            "https://res.xiangban.xyz/covers/../private.webp" to null,
+            "https://other.example$image" to null,
+            "file:///cover.webp" to null,
+        )
+        for ((url, expected) in cases) {
+            server.on("/api/share/pack/17", body = """{"kind":"pack","title":"作品","url":"https://chat.xiangban.xyz/packs/17","cover_url":"$url"}""")
+            assertEquals(expected, api.publicInfo(target, includeCover = true).coverUrl, url)
+        }
+        assertTrue(server.requests.none { it.headers[HttpHeaders.Authorization] != null })
+        server.client.close()
+    }
     @Test fun `metadata cannot redirect sharing to an external private or mismatched target`() = runTest {
         val server = FakeServer(); val api = CommunitySharingApi(server.client, sharingConfig)
         for ((kind, url, title) in listOf(Triple("topic", "https://evil.example/t/1", "标题"), Triple("topic", "https://chat.xiangban.xyz/t/2", "标题"), Triple("scheme", "https://chat.xiangban.xyz/t/1", "标题"), Triple("topic", "https://chat.xiangban.xyz/t/1?token=SECRET", "标题"), Triple("topic", "https://chat.xiangban.xyz/t/1", " "))) {
