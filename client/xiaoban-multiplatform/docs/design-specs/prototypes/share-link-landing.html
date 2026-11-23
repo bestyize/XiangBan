@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 分享回流弹窗 重设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  margin: 0; background: #eff0f2; color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  transition: background .25s, color .25s;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button { border: 0; background: none; font: inherit; color: inherit; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+h1, h2, h3, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+:root { --accent: #e3203c; --accent-soft: rgba(227, 32, 60, .1); }
+
+/* studio */
+.studio { max-width: 1680px; margin: 0 auto; padding: 22px 20px 56px; }
+.topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; margin-bottom: 22px; }
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+.studio-dark .title-block p { color: #9698a0; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0,0,0,.055); gap: 2px; }
+.studio-dark .seg { background: rgba(255,255,255,.07); }
+.seg button { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; color: #666; }
+.studio-dark .seg button { color: #a3a6b0; }
+.seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.studio-dark .seg button.active { background: #2c2d33; color: #f3f3f6; }
+.swatches { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.055); }
+.studio-dark .swatches { background: rgba(255,255,255,.07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 26px; }
+.board { width: 390px; flex: none; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; }
+.tag-old { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,.06); color: #777; }
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+.studio-dark .board-caption { color: #9497a0; }
+
+/* phone */
+.phone {
+  --bg: #f6f6f7; --surface: #ffffff; --surface-2: #f2f2f4; --text: #1b1c1f; --text-2: #5d6068; --text-3: #94979e;
+  --line: rgba(0,0,0,.07); --scrim: rgba(12,12,14,.42); --amber: #a86a00; --amber-bg: #fff5e0;
+  position: relative; height: 800px; border-radius: 34px; overflow: hidden; background: var(--bg); color: var(--text);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 18px 50px rgba(0,0,0,.12);
+}
+.dark .phone {
+  --bg: #111113; --surface: #1c1c1f; --surface-2: #26262a; --text: #f1f1f3; --text-2: #a6a8b0; --text-3: #6f7178;
+  --line: rgba(255,255,255,.08); --scrim: rgba(0,0,0,.6); --amber: #f0b44c; --amber-bg: rgba(240,180,76,.12);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 18px 50px rgba(0,0,0,.5);
+}
+.status { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 13px; font-weight: 600; }
+.home { position: absolute; inset: 40px 0 0; display: flex; flex-direction: column; align-items: center; }
+.home .appbar { width: 100%; height: 52px; display: flex; align-items: center; justify-content: center; font-weight: 650; font-size: 16px; }
+.home .bot { margin-top: 150px; width: 56px; height: 56px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); display: grid; place-items: center; color: var(--accent); }
+.home .greet { margin-top: 14px; font-size: 26px; font-weight: 700; }
+.home .ghost { margin-top: 26px; width: 340px; height: 120px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.home .input { position: absolute; bottom: 72px; left: 16px; right: 16px; height: 46px; border-radius: 23px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.home .tabbar { position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: var(--surface); border-top: 1px solid var(--line); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+
+/* ── A: bottom sheet ── */
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface);
+  border-radius: 26px 26px 0 0; padding: 8px 20px 26px; box-shadow: 0 -10px 40px rgba(0,0,0,.12);
+  animation: rise .32s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes rise { from { transform: translateY(40px); opacity: 0; } }
+.grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 10px; filter: brightness(.7); }
+.dark .grab { filter: brightness(2); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: 12px; }
+.source { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+.source svg { width: 15px; height: 15px; color: var(--accent); }
+.x { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--text-3); background: var(--surface-2); }
+.x svg { width: 15px; height: 15px; }
+
+/* preview card */
+.card { border-radius: 18px; background: var(--surface-2); overflow: hidden; }
+.cover { position: relative; height: 172px; overflow: hidden; }
+.cover .kind { position: absolute; left: 10px; top: 10px; }
+.kind {
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px;
+  font-size: 11px; font-weight: 600; background: rgba(0,0,0,.5); color: #fff; backdrop-filter: blur(8px);
+}
+.kind svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.card-body { padding: 14px 16px 16px; }
+.card-body .kind.inline { background: var(--surface); color: var(--text-2); box-shadow: 0 0 0 1px var(--line); backdrop-filter: none; margin-bottom: 10px; }
+.title { font-size: 17px; font-weight: 700; line-height: 1.4; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.summary { margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.meta { margin-top: 10px; font-size: 11.5px; color: var(--text-3); display: flex; gap: 10px; }
+
+.row-card { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
+.row-card .icon-tile { width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; flex: none; color: #fff; }
+.row-card .icon-tile svg { width: 26px; height: 26px; }
+.row-card .txt { min-width: 0; flex: 1; }
+.row-card .kind.inline { margin-bottom: 6px; }
+.row-card .title { font-size: 15.5px; }
+.row-card .summary { font-size: 12.5px; margin-top: 4px; }
+
+.note { display: flex; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--amber-bg); color: var(--amber); font-size: 12.5px; line-height: 1.55; }
+.note svg { width: 16px; height: 16px; margin-top: 1.5px; }
+
+.actions { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; }
+.btn-primary {
+  height: 48px; border-radius: 24px; background: var(--accent); color: #fff; font-size: 15.5px; font-weight: 650;
+  display: flex; align-items: center; justify-content: center; gap: 6px; transition: transform .12s, opacity .2s;
+}
+.btn-primary:active { transform: scale(.98); }
+.btn-primary svg { width: 17px; height: 17px; stroke-width: 2.2; }
+.btn-primary[disabled] { opacity: .45; cursor: default; }
+.btn-text { height: 42px; border-radius: 21px; color: var(--text-2); font-size: 14px; }
+.actions.duo { flex-direction: row-reverse; gap: 10px; }
+.actions.duo > * { flex: 1; }
+.btn-tonal { height: 48px; border-radius: 24px; background: var(--surface-2); color: var(--text); font-size: 15px; font-weight: 600; }
+
+/* skeleton */
+.sk { background: linear-gradient(90deg, var(--line) 25%, rgba(127,127,127,.18) 50%, var(--line) 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite linear; border-radius: 8px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: sp .8s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* empty / fail */
+.state { text-align: center; padding: 14px 8px 4px; }
+.state .ill { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 14px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-3); }
+.state .ill svg { width: 28px; height: 28px; }
+.state h3 { font-size: 17px; font-weight: 700; }
+.state p { margin-top: 6px; font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+/* ── B: centered card ── */
+.dialog {
+  position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%);
+  background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  animation: pop .26s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pop { from { transform: translateY(-50%) scale(.94); opacity: 0; } }
+.dialog .cover { height: 168px; }
+.dialog .x { position: absolute; right: 10px; top: 10px; z-index: 2; background: rgba(0,0,0,.35); color: #fff; backdrop-filter: blur(8px); }
+.dialog .x.plain { background: var(--surface-2); color: var(--text-3); }
+.dialog .pad { padding: 16px 18px 18px; }
+.dialog .pad.top { padding-top: 22px; }
+.dialog .actions { margin-top: 16px; }
+
+/* old */
+.old-dialog { position: absolute; left: 40px; right: 40px; top: 350px; border-radius: 28px; background: #ece6f0; padding: 24px 24px 18px; color: #1d1b20; }
+.old-dialog h3 { font-size: 22px; font-weight: 400; margin-bottom: 16px; }
+.old-dialog p { font-size: 13.5px; color: #49454f; line-height: 1.55; }
+.old-dialog .ob { display: flex; justify-content: flex-end; gap: 30px; margin-top: 30px; padding-right: 10px; color: #e3203c; font-size: 14px; font-weight: 500; }
+
+/* poster mocks */
+.poster-prestige { background: radial-gradient(120% 90% at 70% 10%, #f4c56a 0%, #a3542a 32%, #2a1612 70%, #120a09 100%); }
+.poster-prestige::after { content: "THE PRESTIGE"; position: absolute; right: 16px; bottom: 14px; font: 700 20px/1 Georgia, serif; letter-spacing: .22em; color: rgba(255,236,200,.88); }
+.poster-prestige::before { content: ""; position: absolute; left: 50%; top: 22px; width: 70px; height: 110px; margin-left: -35px; border-radius: 35px 35px 4px 4px; background: linear-gradient(#ffe6a8, rgba(255,230,168,0)); opacity: .55; filter: blur(2px); }
+.poster-skin { background: linear-gradient(135deg, #2b3a67 0%, #6d5bd0 45%, #f39ac0 100%); }
+.poster-skin::after { content: ""; position: absolute; left: 50%; top: 50%; width: 180px; height: 108px; transform: translate(-50%,-50%); border-radius: 10px; background: rgba(255,255,255,.18); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5), 0 10px 30px rgba(0,0,0,.25); }
+
+.diff { max-width: 1222px; margin: 36px auto 0; background: #fff; border-radius: 16px; border: 1px solid rgba(0,0,0,.06); padding: 22px 26px; font-size: 13px; line-height: 1.75; }
+.studio-dark .diff { background: #18181b; border-color: rgba(255,255,255,.08); }
+.diff h3 { font-size: 15px; margin-bottom: 10px; }
+.diff table { width: 100%; border-collapse: collapse; }
+.diff th, .diff td { text-align: left; padding: 8px 10px; border-top: 1px solid rgba(127,127,127,.18); vertical-align: top; }
+.diff th { font-weight: 600; color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="studio">
+  <div class="topbar">
+    <div class="title-block">
+      <h1>分享回流弹窗 · 重设计稿（待确认）</h1>
+      <p>外部链接拉起 App 后的「打开社区内容」确认层。数据仅用 CommunityShare 已有字段：kind / title / summary / cover_url / pack_kind。</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="segStyle">
+        <button data-v="sheet" class="active">A 底部卡片</button>
+        <button data-v="dialog">B 居中卡片</button>
+      </div>
+      <div class="seg" id="segTheme">
+        <button data-v="light" class="active">浅色</button>
+        <button data-v="dark">深色</button>
+      </div>
+      <div class="seg" id="segWidth">
+        <button data-v="390" class="active">390</button>
+        <button data-v="360">360</button>
+      </div>
+      <div class="swatches" id="swatches"></div>
+    </div>
+  </div>
+  <div class="boards" id="boards"></div>
+
+  <div class="diff">
+    <h3>改了什么</h3>
+    <table>
+      <tr><th style="width:150px">问题（旧版）</th><th>新方案</th></tr>
+      <tr><td>Material 默认 AlertDialog，淡紫底色与 App 不符</td><td>改用 App 自身 surface 色和 26px 大圆角，跟随深浅色与六套主题色</td></tr>
+      <tr><td>标题「打开社区内容」是废话，真正内容只是一行小字</td><td>去掉标题，内容本身当主角：封面 + 类型标签 + 17px 粗体标题 + 两行摘要。顶部一行小字「来自分享链接」说明来源</td></tr>
+      <tr><td>「取消 / 查看详情」两个红色文字按钮，主次不分</td><td>主按钮为通栏实心主题色「查看详情」，次按钮为灰色文字「暂不查看」，右上角另有关闭</td></tr>
+      <tr><td>无封面、没有类型提示</td><td>有 cover_url 就显示 16:9 封面；没有就用按类型配色的图标块横排卡片（帖子 / 作品 / 方案 / 开源精选 / AI 日报）</td></tr>
+      <tr><td>加载、失败、桌面内容提醒都只是换一行字</td><td>加载用骨架屏 + 按钮转圈；下架 / 网络失败用独立空态；电脑端内容用琥珀色提示条说明「只看详情，不会自动下载或应用」</td></tr>
+    </table>
+    <p style="margin-top:12px;color:#888">推荐 A：底部卡片拇指可达、不挡首页，也与「详情页分享面板」的贴底语言一致。B 适合想更强调「这是一张分享卡片」的场景。</p>
+  </div>
+</div>
+
+<script>
+const THEMES = [["#e3203c","中国红"],["#1f6feb","海湾蓝"],["#13a36e","松绿"],["#8a5cf6","堇紫"],["#f08a24","暖橙"],["#202124","墨黑"]];
+const ico = {
+  link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  post: '<svg viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>',
+  pack: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  code: '<svg viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/></svg>',
+  news: '<svg viewBox="0 0 24 24"><path d="M5 4h11v16H6a1 1 0 0 1-1-1z"/><path d="M16 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h3"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>',
+  ghost: '<svg viewBox="0 0 24 24"><path d="M6 20V10a6 6 0 0 1 12 0v10l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z"/><path d="M10 10h.01M14 10h.01"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 5.2-2.8M19 12.9a10 10 0 0 0-2.3-1.6M2 9a15 15 0 0 1 4.2-2.7M22 9a15 15 0 0 0-9-3.9M12 20h.01"/></svg>',
+  robot: '<svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="4"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01"/></svg>',
+};
+const SCEN = [
+  { id: "cover", name: "有封面 · 社区帖子", cap: "最常见情况：豆瓣 Top 250 精选这类带封面的帖子。封面左上角标出类型。",
+    kind: ["帖子", ico.post], cover: "poster-prestige", title: "【豆瓣 Top 250 精选】第 085 期 ·《致命魔术》(2006)",
+    summary: "诺兰把电影本身做成了一场魔术：承诺、转折、致敬三幕结构，两位魔术师用一生较量，答案其实从第一分钟就摆在你眼前。" },
+  { id: "nocover", name: "无封面 · 开源精选 / AI 日报", cap: "没有 cover_url 时改用横排卡片，左侧按类型配色的图标块，高度更紧凑。",
+    kind: ["开源精选", ico.code], tile: ["#24292f", ico.code], title: "browser-use：让 AI 像人一样操作浏览器",
+    summary: "开源浏览器自动化 Agent 框架，支持多标签页、表单填写与视觉定位，Star 6.8 万。" },
+  { id: "desktop", name: "电脑端内容 · 桌面装扮", cap: "requestsApply 链接：琥珀色提示条说明手机只看详情，不会自动下载或应用。",
+    kind: ["桌面装扮", ico.pack], cover: "poster-skin", title: "极光玻璃 · 桌面装扮",
+    summary: "半透明磨砂面板配极光渐变壁纸，含 6 个组件布局。", desktop: true },
+  { id: "loading", name: "读取中", cap: "骨架屏保持最终布局不跳动，主按钮禁用并转圈，「暂不查看」始终可点。", loading: true },
+  { id: "fail", name: "失败态", cap: "下架 / 未公开只给「知道了」；网络失败给「重试」主按钮 + 「取消」。右上角切换。", fail: true },
+];
+let style = "sheet", failMode = "gone";
+
+function kindChip(k, inline) { return `<span class="kind${inline ? " inline" : ""}">${k[1]}${k[0]}</span>`; }
+function homeBg() {
+  return `<div class="status"><span>5:09</span><span>100</span></div>
+  <div class="home"><div class="appbar">小伴 AI</div><div class="bot">${ico.robot}</div><div class="greet">早上好</div><div class="ghost"></div><div class="input"></div><div class="tabbar"></div></div>`;
+}
+function primary(s) {
+  return s.loading ? `<button class="btn-primary" disabled><span class="spin"></span>正在读取</button>`
+    : `<button class="btn-primary">查看详情${ico.arrow}</button>`;
+}
+function bodyContent(s, mode) {
+  if (s.fail) {
+    const gone = failMode === "gone";
+    const st = `<div class="state"><div class="ill">${gone ? ico.ghost : ico.wifi}</div>
+      <h3>${gone ? "内容已下架或未公开" : "暂时打不开这个链接"}</h3>
+      <p>${gone ? "分享者可能已删除或设为私密" : "网络不太稳定，检查后再试一次"}</p></div>`;
+    const act = gone ? `<div class="actions"><button class="btn-tonal">知道了</button></div>`
+      : `<div class="actions duo"><button class="btn-primary">重试</button><button class="btn-tonal">取消</button></div>`;
+    return { card: st, act, plain: true };
+  }
+  let card;
+  if (s.loading) {
+    card = mode === "dialog"
+      ? `<div class="cover sk" style="border-radius:0"></div><div class="pad"><div class="sk" style="height:20px;width:60px;border-radius:10px"></div><div class="sk" style="height:18px;margin-top:12px"></div><div class="sk" style="height:18px;width:70%;margin-top:8px"></div><div class="sk" style="height:12px;margin-top:12px"></div>`
+      : `<div class="card"><div class="cover sk" style="border-radius:0"></div><div class="card-body"><div class="sk" style="height:18px"></div><div class="sk" style="height:18px;width:70%;margin-top:8px"></div><div class="sk" style="height:12px;margin-top:12px"></div><div class="sk" style="height:12px;width:50%;margin-top:6px"></div></div></div>`;
+  } else if (s.cover) {
+    const c = `<div class="cover ${s.cover}">${kindChip(s.kind)}</div>`;
+    const b = `<div class="title">${s.title}</div><div class="summary">${s.summary}</div>`;
+    card = mode === "dialog" ? `${c}<div class="pad">${b}` : `<div class="card">${c}<div class="card-body">${b}</div></div>`;
+  } else {
+    const r = `<div class="row-card"><div class="icon-tile" style="background:${s.tile[0]}">${s.tile[1]}</div><div class="txt">${kindChip(s.kind, true)}<div class="title">${s.title}</div><div class="summary">${s.summary}</div></div></div>`;
+    card = mode === "dialog" ? `<div class="pad top">${r.replace('row-card"', 'row-card" style="padding:0"')}` : `<div class="card">${r}</div>`;
+  }
+  const note = s.desktop ? `<div class="note">${ico.info}<span>这是电脑端内容，手机只能查看详情，不会自动下载或应用。</span></div>` : "";
+  const act = `<div class="actions">${primary(s)}<button class="btn-text">暂不查看</button></div>`;
+  return { card: card + note, act, plain: !s.cover && !s.loading };
+}
+function overlay(s) {
+  const r = bodyContent(s, style);
+  if (style === "sheet") {
+    return `<div class="scrim"></div><div class="sheet"><div class="grab"></div>
+      <div class="sheet-head"><span class="source">${ico.link}来自分享链接</span><button class="x">${ico.x}</button></div>
+      ${r.card}${r.act}</div>`;
+  }
+  const isPad = r.card.includes('class="pad');
+  const inner = s.fail ? `<div class="pad top">${r.card}${r.act}</div>` : `${r.card}${r.act}${isPad ? "</div>" : ""}`;
+  return `<div class="scrim"></div><div class="dialog"><button class="x${r.plain ? " plain" : ""}">${ico.x}</button>${inner}</div>`;
+}
+function oldBoard() {
+  return `<div class="board"><div class="board-head"><h2>现行版</h2><span class="tag-old">对照</span></div>
+  <div class="phone">${homeBg()}<div class="scrim"></div><div class="old-dialog"><h3>打开社区内容</h3>
+  <p>【豆瓣 Top 250 精选】第 085 期 ·《致命魔术》(2006)</p><p style="margin-top:12px">确认后查看公开社区详情。</p>
+  <div class="ob"><span>取消</span><span>查看详情</span></div></div></div>
+  <p class="board-caption">Material 默认淡紫对话框：标题空洞、内容挤在小字里、两个同色文字按钮无主次。</p></div>`;
+}
+function render() {
+  const boards = document.getElementById("boards");
+  boards.innerHTML = oldBoard() + SCEN.map(s => `<div class="board"><div class="board-head"><h2>${s.name}</h2>${s.fail ? `<div class="seg" id="segFail"><button data-v="gone" class="${failMode === "gone" ? "active" : ""}">已下架</button><button data-v="net" class="${failMode === "net" ? "active" : ""}">网络失败</button></div>` : ""}</div>
+    <div class="phone">${homeBg()}${overlay(s)}</div><p class="board-caption">${s.cap}</p></div>`).join("");
+  const sf = document.getElementById("segFail");
+  sf && sf.addEventListener("click", e => { const b = e.target.closest("button"); if (b) { failMode = b.dataset.v; render(); } });
+}
+function seg(id, fn) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; el.querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b)); fn(b.dataset.v); });
+}
+seg("segStyle", v => { style = v; render(); });
+seg("segTheme", v => { document.body.classList.toggle("dark", v === "dark"); document.body.classList.toggle("studio-dark", v === "dark"); });
+seg("segWidth", v => document.body.classList.toggle("compact", v === "360"));
+const sw = document.getElementById("swatches");
+sw.innerHTML = THEMES.map((t, i) => `<button class="swatch${i ? "" : " active"}" title="${t[1]}" style="background:${t[0]};color:${t[0]}" data-c="${t[0]}"></button>`).join("");
+sw.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; sw.querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b)); document.documentElement.style.setProperty("--accent", b.dataset.c); });
+render();
+</script>
+</body>
+</html>
