@@ -811,6 +811,9 @@
     if (name === 'more') {
       return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="18.5" cy="12" r="1.75"/></svg>`;
     }
+    if (name === 'play') {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z"/></svg>`;
+    }
     const paths = ICON_PATHS[name] || ICON_PATHS.spark;
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>`;
   }
@@ -1593,6 +1596,7 @@
         body: w.introduction,
         controls: w.controls,
         actionLabel: w.actionLabel,
+        actionKind: w.actionLabel && w.actionLabel.startsWith('前往') ? 'external' : 'play',
         likes: w.likes,
         saves: Math.max(12, Math.round((w.likes || 40) * 0.26))
       };
@@ -1614,6 +1618,7 @@
         body: t.excerpt + '\n\n欢迎在下方留言区继续补充你的桌面实拍图或调试经验。',
         controls: '',
         actionLabel: '',
+        actionKind: '',
         likes: t.likes,
         saves: Math.max(8, Math.round((t.likes || 20) * 0.26))
       };
@@ -1635,6 +1640,7 @@
           body: p.summary + ' 本条目用于社区精选导读，点击下方按钮可查看官方仓库发布页或保存收藏。',
           controls: '标签：' + p.tags.join(' · '),
           actionLabel: '访问官方仓库',
+          actionKind: 'external',
           likes: 92,
           saves: 34
         };
@@ -1655,6 +1661,7 @@
         body: `${sw.desc}\n\n支持平台：${sw.platforms.join(' / ')}。当前收录版本 ${sw.ver}，主要开发语言为 ${sw.lang}。`,
         controls: `平台支持：${sw.platforms.join(' · ')}`,
         actionLabel: `下载安装包 (${sw.ver})`,
+        actionKind: 'download',
         likes: 120,
         saves: 41
       };
@@ -1779,21 +1786,19 @@
       </div>
     ` : '';
     const tagsHtml = (item.tags || []).map(tag => `<span class="xhs-hashtag">#${esc(tag)}</span>`).join(' ');
-    const infoStripsHtml = `
-      ${item.actionLabel ? `
-        <button type="button" class="xhs-info-strip" data-action="toast" data-msg="演示打开：${esc(item.actionLabel)}">
-          <span class="xhs-strip-tag">${icon('spark', 12)} 体验</span>
-          <span class="xhs-strip-text">${esc(item.actionLabel)}</span>
-          ${icon('arrow', 13)}
-        </button>
-      ` : ''}
-      ${item.controls ? `
-        <div class="xhs-info-strip is-static">
-          <span class="xhs-strip-tag is-warm">说明</span>
-          <span class="xhs-strip-text">${esc(item.controls)}</span>
-        </div>
-      ` : ''}
-    `;
+    const actionIcon = item.actionKind === 'external' ? 'external' : item.actionKind === 'download' ? 'download' : 'play';
+    const primaryCtaHtml = item.actionLabel ? `
+      <button type="button" class="xhs-primary-cta" data-action="toast" data-msg="演示打开：${esc(item.actionLabel)}">
+        <span class="xhs-primary-cta-icon">${icon(actionIcon, actionIcon === 'play' ? 16 : 15)}</span>
+        <span class="xhs-primary-cta-label">${esc(item.actionLabel)}</span>
+      </button>
+    ` : '';
+    const infoStripsHtml = item.controls ? `
+      <div class="xhs-info-strip is-static">
+        <span class="xhs-strip-tag">说明</span>
+        <span class="xhs-strip-text">${esc(item.controls)}</span>
+      </div>
+    ` : '';
 
     if (device === 'desktop') {
       const replyPlaceholder = state.replyTo ? `回复 @${state.replyTo}…` : '说点什么…';
@@ -1849,7 +1854,10 @@
               ${dotsHtml(false)}
             ` : ''}
             <div class="xhs-pc-body ${gallery.length > 1 ? 'has-dots' : ''}">
-              <h1 class="xhs-title">${esc(item.title)}</h1>
+              <div class="xhs-pc-head">
+                <h1 class="xhs-title">${esc(item.title)}</h1>
+                ${primaryCtaHtml}
+              </div>
               <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
               <div class="xhs-hashtags">${tagsHtml}</div>
               ${infoStripsHtml}
@@ -1896,6 +1904,7 @@
         ` : ''}
         <div class="xhs-h5-body ${gallery.length > 1 ? 'has-dots' : ''}">
           <h1 class="xhs-title">${esc(item.title)}</h1>
+          ${primaryCtaHtml}
           <div class="xhs-prose">${esc(item.body).replace(/\n\n/g, '<br><br>')}</div>
           <div class="xhs-hashtags">${tagsHtml}</div>
           ${infoStripsHtml}
@@ -2307,6 +2316,7 @@
                 <tr><td>移动 H5 顶栏</td><td>Logo 居左、「首页 / 讨论 / 资源」严格居中、搜索与通知纯图标无背景底色收于右上角</td></tr>
                 <tr><td>创意首页</td><td>2:1 沉浸式视觉主推矩阵 + 4 列（H5 双列）统一 3:2 封面视觉卡片流与可点击小红心</td></tr>
                 <tr><td>讨论与资源</td><td>独立浮起圆角卡片（16px 圆角 + 柔和阴影）、彩色板块胶囊与两行正文摘要；开源精选按有图与紧凑项目分区排布</td></tr>
+                <tr><td>详情页体验入口</td><td>将核心体验/访问/下载操作从灰底信息条提升为品牌实心胶囊主按钮（PC 与标题同行居右 42px，H5 标题下通栏 46px 保证首屏可见），「说明」等辅助条回退为中性弱色避免视觉抢镜</td></tr>
                 <tr><td>主题与双模式</td><td>完整保留客户端 6 套主题色（小伴红 / 薄荷绿 / 海湾蓝 / 暮紫 / 琥珀 / 石墨）与高对比度日夜双模式</td></tr>
               </tbody>
             </table>

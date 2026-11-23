@@ -56,6 +56,12 @@ useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项�
     <template #state>
       <RequestState :loading="detail.loading.value" :error="detail.error.value" @retry="detail.load" />
     </template>
+    <template v-if="d" #cta>
+      <a :href="github" class="xhs-primary-cta" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-primary-cta-icon"><AppIcon name="external" :size="15" /></span>
+        <span class="xhs-primary-cta-label">访问 GitHub</span>
+      </a>
+    </template>
     <template v-if="d" #default>
       <p class="xhs-prose desc">{{ about.text }}</p>
       <div class="xhs-hashtags">
@@ -64,9 +70,6 @@ useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项�
       </div>
       <details v-if="about.original && about.text !== about.original" class="about-original"><summary>GitHub About 原文</summary><p>{{ about.original }}</p></details>
       <div class="stats"><div><b>{{ d.star_total.toLocaleString('zh-CN') }}</b><span>GitHub Star</span></div><div v-if="!baseline && d.star_gain != null"><b class="gain">{{ repoGrowth(d.star_gain) }}</b><span>本期新增 Star</span></div><div v-if="d.language"><b><i :style="{ background:color }" />{{ d.language }}</b><span>主要语言</span></div></div>
-      <a :href="github" class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
-        <span class="xhs-strip-tag">GitHub</span><span class="xhs-strip-text">{{ d.full_name }}</span><AppIcon name="arrow" :size="13" />
-      </a>
       <p class="meta">{{ d.source || 'GitHub' }} · {{ baseline ? 'Star 总量快照' : '本期榜单数据' }}<template v-if="d.as_of"> · 整理于 {{ displayDate(d.as_of) }}</template> · <button type="button" class="link" @click="jumpToComments">跳到评论</button></p>
       <p v-if="saveError" class="meta" role="status">{{ saveError }}</p>
     <section class="intro">

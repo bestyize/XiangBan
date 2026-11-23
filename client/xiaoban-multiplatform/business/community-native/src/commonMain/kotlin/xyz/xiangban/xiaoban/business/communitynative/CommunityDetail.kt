@@ -8,6 +8,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -251,6 +254,64 @@ internal fun DetailTags(tags: List<String>, onFirstTag: (() -> Unit)? = null) {
 }
 
 @Composable
+internal fun DetailPrimaryCta(
+    text: String,
+    icon: ImageVector? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    val palette = ThemeState.palette
+    val startColor = Color(palette.btn)
+    val endColor = Color(palette.hi)
+    val contentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (enabled) 1f else 0.72f)
+    val brush = Brush.linearGradient(
+        listOf(
+            startColor.copy(alpha = if (enabled) 1f else 0.56f),
+            endColor.copy(alpha = if (enabled) 1f else 0.56f),
+        )
+    )
+    val shadowAlpha = if (ThemeState.dark) 0.34f else 0.42f
+    Row(
+        modifier
+            .padding(top = 4.dp, bottom = 14.dp)
+            .fillMaxWidth()
+            .height(46.dp)
+            .shadow(
+                elevation = if (enabled) 6.dp else 0.dp,
+                shape = CircleShape,
+                ambientColor = startColor.copy(alpha = shadowAlpha),
+                spotColor = startColor.copy(alpha = shadowAlpha),
+            )
+            .clip(CircleShape)
+            .background(brush)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 22.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = contentColor,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            icon?.let { XIcon(it, tint = contentColor, size = if (it == XIcons.PlaySolid) 16.dp else 15.dp) }
+        }
+        Text(
+            text = text,
+            style = XType.Body,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 internal fun DetailInfoStrip(
     label: String,
     text: String,
@@ -258,19 +319,26 @@ internal fun DetailInfoStrip(
     onClick: (() -> Unit)? = null,
     expanded: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(12.dp)
+    val tagBg = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val tagColor = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         Modifier.padding(top = 10.dp).fillMaxWidth().clip(shape).background(LocalExtraColors.current.fill)
             .then(if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick))
-            .heightIn(min = 36.dp).padding(horizontal = 11.dp, vertical = 8.dp),
+            .heightIn(min = 38.dp).padding(horizontal = 12.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        icon?.let { XIcon(it, size = 12.dp) }
-        Text(label, style = XType.Secondary, fontWeight = FontWeight.Bold,
-            color = if (icon == null) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface)
+        Row(
+            Modifier.clip(RoundedCornerShape(6.dp)).background(tagBg).padding(horizontal = 7.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            icon?.let { XIcon(it, tint = tagColor, size = 12.dp) }
+            Text(label, style = XType.Caption, fontWeight = FontWeight.SemiBold, color = tagColor)
+        }
         Text(text, Modifier.weight(1f), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (onClick != null) XIcon(if (expanded) XIcons.ChevronDown else XIcons.ChevronRight, size = 13.dp)
+        if (onClick != null) XIcon(if (expanded) XIcons.ChevronDown else XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 13.dp)
     }
 }
 

@@ -22,7 +22,7 @@ import xyz.xiangban.xiaoban.common.community.*
 private const val CommunityWorkUnsupported = "当前平台暂不支持试玩，可在 Android 或电脑上打开"
 
 @Composable
-internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, open: ((Route) -> Unit)?, modifier: Modifier = Modifier, label: String = "试玩", appStyle: Boolean = false) {
+internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, open: ((Route) -> Unit)?, modifier: Modifier = Modifier, label: String = "试玩", appStyle: Boolean = false, detailPrimary: Boolean = false) {
     Column(modifier) {
         if (env.platform?.communityGamesSupported != true) {
             Text(CommunityWorkUnsupported, style = XType.Caption, color = LocalExtraColors.current.ink3)
@@ -30,7 +30,7 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
         }
         CommunityWorkLaunch(env, id, version) { loading, busy, error, launchGame ->
             val buttonLabel = if (loading) "正在准备试玩…" else label
-            if (LocalCommunityDetail.current) DetailInfoStrip("体验", buttonLabel, XIcons.Play, onClick = launchGame.takeUnless { busy })
+            if (detailPrimary) DetailPrimaryCta(buttonLabel, XIcons.PlaySolid, onClick = launchGame, enabled = !busy, loading = loading)
             else if (appStyle) AppActionButton(buttonLabel, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
             else PillButton(buttonLabel, launchGame, enabled = !busy)
             error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }

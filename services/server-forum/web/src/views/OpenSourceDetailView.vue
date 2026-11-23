@@ -170,20 +170,31 @@ async function articleClick(event: MouseEvent) {
       <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
       <section v-else class="os-empty"><h1>这个项目尚未收录</h1><RouterLink to="/open-source">返回精选</RouterLink></section>
     </template>
+    <template v-if="project" #cta>
+      <a v-if="download" href="#official-download" class="xhs-primary-cta" @click="jumpToSection($event, 'official-download')">
+        <span class="xhs-primary-cta-icon"><AppIcon name="download" :size="15" /></span>
+        <span class="xhs-primary-cta-label">下载官方安装包{{ version ? ' · ' + version : '' }}</span>
+      </a>
+      <a v-else-if="card?.primary_url && card.primary_url !== github" :href="card.primary_url"
+        class="xhs-primary-cta" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-primary-cta-icon"><AppIcon name="external" :size="15" /></span>
+        <span class="xhs-primary-cta-label">{{ card.primary_label || '访问项目官网' }}</span>
+      </a>
+      <a v-else :href="github" class="xhs-primary-cta" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-primary-cta-icon"><AppIcon name="external" :size="15" /></span>
+        <span class="xhs-primary-cta-label">访问官方仓库</span>
+      </a>
+    </template>
     <template v-if="project" #default>
       <p v-if="summary" class="xhs-prose project-summary">{{ summary }}</p>
       <div class="xhs-hashtags">
         <span>#{{ category }}</span><span v-for="tag in project.tags.filter(tag => tag !== category)" :key="tag">#{{ tag }}</span>
       </div>
-      <a v-if="download" href="#official-download" class="xhs-info-strip" @click="jumpToSection($event, 'official-download')">
-        <span class="xhs-strip-tag"><AppIcon name="download" :size="12" /> 下载</span>
-        <span class="xhs-strip-text">查看官方安装包{{ version ? ' · ' + version : '' }}</span><AppIcon name="arrow" :size="13" />
-      </a>
-      <a :href="github" class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
+      <a v-if="download || (card?.primary_url && card.primary_url !== github)" :href="github" class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
         <span class="xhs-strip-tag"><DiscoverGlyph name="github" :size="13" /> GitHub</span>
         <span class="xhs-strip-text">{{ project.full_name }}</span><AppIcon name="arrow" :size="13" />
       </a>
-      <a v-if="card?.primary_url && card.primary_url !== github" :href="card.primary_url"
+      <a v-if="download && card?.primary_url && card.primary_url !== github" :href="card.primary_url"
         class="xhs-info-strip" target="_blank" rel="noopener noreferrer">
         <span class="xhs-strip-tag"><AppIcon name="external" :size="13" /> {{ card.primary_label || '项目官网' }}</span>
         <span class="xhs-strip-text">{{ card.primary_url }}</span><AppIcon name="arrow" :size="13" />

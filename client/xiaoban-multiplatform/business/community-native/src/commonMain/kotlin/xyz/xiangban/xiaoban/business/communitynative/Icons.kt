@@ -29,6 +29,7 @@ object XIcons {
     val ChevronRight: ImageVector by lazy { strokeIcon("ChevronRight", "M9 5l7 7-7 7") }
     val Cube: ImageVector by lazy { strokeIcon("Cube", "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5") }
     val Play: ImageVector by lazy { strokeIcon("Play", "M8 5v14l11-7z") }
+    val PlaySolid: ImageVector by lazy { filledIcon("PlaySolid", "M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z") }
     val Code: ImageVector by lazy { strokeIcon("Code", "M8 8l-4 4 4 4M16 8l4 4-4 4") }
     val Terminal: ImageVector by lazy { strokeIcon("Terminal", "M4 5h16v14H4zM7 9l3 3-3 3M12 15h5") }
     val ChevronUp: ImageVector by lazy { strokeIcon("ChevronUp", "M6 15l6-6 6 6") }
@@ -121,6 +122,14 @@ private fun strokeIcon(name: String, path: String): ImageVector =
             strokeLineWidth = 1.8f,
             strokeLineCap = StrokeCap.Round,
             strokeLineJoin = StrokeJoin.Round,
+        )
+        .build()
+
+private fun filledIcon(name: String, path: String): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes(path),
+            fill = SolidColor(Color.Black),
         )
         .build()
 

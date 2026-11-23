@@ -84,21 +84,22 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
       <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
       <p v-else class="missing" role="status">找不到这个作品。</p>
     </template>
+    <template v-if="work && (run || site)" #cta>
+      <RouterLink v-if="run" class="xhs-primary-cta" :to="run">
+        <span class="xhs-primary-cta-icon"><AppIcon name="play-solid" :size="16" /></span>
+        <span class="xhs-primary-cta-label">{{ work.kind === 'exhibit' ? '体验 3D 模型' : '立即体验' }}</span>
+      </RouterLink>
+      <a v-else-if="site" class="xhs-primary-cta" :href="site" target="_blank" rel="noopener noreferrer">
+        <span class="xhs-primary-cta-icon"><AppIcon name="external" :size="15" /></span>
+        <span class="xhs-primary-cta-label">访问作品官网</span>
+      </a>
+    </template>
     <template v-if="work" #default>
       <div class="xhs-prose work-introduction">{{ work.introduction || work.description }}</div>
       <div class="xhs-hashtags"><span v-for="tag in tags" :key="tag">#{{ tag }}</span></div>
-      <RouterLink v-if="run" class="xhs-info-strip" :to="run">
-        <span class="xhs-strip-tag"><AppIcon name="ai" :size="12" /> 体验</span>
-        <span class="xhs-strip-text">{{ work.kind === 'exhibit' ? '体验 3D 模型' : '打开' + work.title }}</span>
-        <AppIcon name="arrow" :size="13" />
-      </RouterLink>
-      <a v-else-if="site" class="xhs-info-strip" :href="site">
-        <span class="xhs-strip-tag"><AppIcon name="ai" :size="12" /> 体验</span>
-        <span class="xhs-strip-text">访问作品官网</span><AppIcon name="arrow" :size="13" />
-      </a>
       <details v-if="work.kind === 'exhibit' || (site && run) || repository || desktopDownload" class="work-info">
         <summary class="xhs-info-strip">
-          <span class="xhs-strip-tag is-warm">说明</span>
+          <span class="xhs-strip-tag">说明</span>
           <span class="xhs-strip-text">{{ controls || '来源与下载' }}</span>
           <AppIcon name="arrow" :size="13" />
         </summary>
@@ -106,13 +107,13 @@ useHead(() => ({ title: work.value?.title ?? '创意作品' }))
           <div v-if="work.kind === 'exhibit'">
             <dt>来源</dt><dd><RouterLink :to="{ name: 'home', query: { tab: galleryTab.key } }">微观展厅</RouterLink></dd>
           </div>
-          <div v-else-if="site && run"><dt>来源</dt><dd><a :href="site">作品官网</a></dd></div>
-          <div v-if="repository"><dt>源码</dt><dd><a :href="repository">查看源码</a></dd></div>
+          <div v-else-if="site && run"><dt>来源</dt><dd><a :href="site" target="_blank" rel="noopener noreferrer">作品官网</a></dd></div>
+          <div v-if="repository"><dt>源码</dt><dd><a :href="repository" target="_blank" rel="noopener noreferrer">查看源码</a></dd></div>
           <div v-if="desktopDownload"><dt>桌面</dt><dd><a :href="desktopDownload">下载 V2 作品包</a></dd></div>
         </dl>
       </details>
       <div v-else-if="controls" class="xhs-info-strip is-static">
-        <span class="xhs-strip-tag is-warm">说明</span><span class="xhs-strip-text">{{ controls }}</span>
+        <span class="xhs-strip-tag">说明</span><span class="xhs-strip-text">{{ controls }}</span>
       </div>
       <div class="xhs-meta-row"><time :datetime="work.date">收录于 {{ work.date.slice(0, 10) }} 社区</time></div>
     </template>

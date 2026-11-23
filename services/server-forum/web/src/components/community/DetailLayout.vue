@@ -52,7 +52,14 @@ const mobile = useNarrow(MOBILE_SITE_QUERY)
       <DetailGallery v-if="images?.length" :images="images" :title="title" :badge="badge"
         :fallback-cover="fallbackCover" :mobile="mobile" />
       <div :class="[mobile ? 'xhs-h5-body' : 'xhs-pc-body', { 'has-dots': (images?.length ?? 0) > 1 }]">
-        <slot name="title"><h1 v-if="title" class="xhs-title">{{ title }}</h1></slot>
+        <div v-if="!mobile && $slots.cta" class="xhs-pc-head">
+          <slot name="title"><h1 v-if="title" class="xhs-title">{{ title }}</h1></slot>
+          <slot name="cta" />
+        </div>
+        <template v-else>
+          <slot name="title"><h1 v-if="title" class="xhs-title">{{ title }}</h1></slot>
+          <slot name="cta" />
+        </template>
         <slot />
       </div>
       <slot name="comments" />

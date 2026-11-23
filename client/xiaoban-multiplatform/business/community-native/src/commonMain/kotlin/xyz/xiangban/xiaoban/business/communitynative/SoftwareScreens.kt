@@ -319,9 +319,9 @@ internal fun SoftwareDetailScreen(env: CommunityEnv, project: String, back: () -
                 item {
                     DetailBody(horizontalPadding = 0.dp) {
                         DetailHeading(entry.displayName)
+                        DetailPrimaryCta("下载官方安装包", XIcons.Download, onClick = { scope.launch { listState.animateScrollToItem(1) } })
                         if (entry.summary.isNotBlank()) Text(entry.summary, style = XType.DetailBody)
                         DetailTags(listOf("开源软件", entry.language) + entry.platforms)
-                        DetailInfoStrip("下载", "查看官方安装包", XIcons.Download, onClick = { scope.launch { listState.animateScrollToItem(1) } })
                         webPageRoute("https://github.com/${entry.project}")?.let { github ->
                             DetailInfoStrip("GitHub", entry.project, XIcons.ExternalLink, onClick = { open(github) })
                         }

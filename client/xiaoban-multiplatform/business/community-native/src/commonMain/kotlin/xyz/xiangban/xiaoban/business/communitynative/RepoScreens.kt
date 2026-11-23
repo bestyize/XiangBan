@@ -186,14 +186,14 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     item(key = "hero") {
                         DetailBody {
                             DetailHeading(d.repo.ifBlank { repo })
+                            webPageRoute(d.url.ifBlank { "https://github.com/$name" })?.let { url ->
+                                DetailPrimaryCta("访问 GitHub", XIcons.ExternalLink, onClick = { open(url) })
+                            }
                             val summary = d.descriptionZh.ifBlank { d.description }
                             if (summary.isNotBlank()) Text(summary, style = XType.DetailBody)
                             DetailTags(listOf("开源热榜", d.language))
                             if (d.descriptionZh.isNotBlank() && d.description.isNotBlank() && d.descriptionZh != d.description) {
                                 Text("原文：${d.description}", Modifier.padding(top = 6.dp), style = XType.Caption, color = ink3)
-                            }
-                            webPageRoute(d.url.ifBlank { "https://github.com/$name" })?.let { url ->
-                                DetailInfoStrip("GitHub", d.fullName.ifBlank { name }, XIcons.ExternalLink, onClick = { open(url) })
                             }
                             DetailMetadata(listOfNotNull(
                                 if (d.isLatest) "本期第 ${d.rank} 名" else "最近上榜第 ${d.rank} 名",

@@ -248,12 +248,16 @@ private fun CuratedProjectCard(
     DetailGallery(listOfNotNull(project.coverUrl.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), name)
     DetailBody {
         DetailHeading(name)
+        val hasSeparatePrimary = primaryUrl.isNotBlank() && primaryUrl != github
+        DetailPrimaryCta(
+            text = if (hasSeparatePrimary) card?.primaryLabel.orEmpty().ifBlank { "访问项目官网" } else "访问官方仓库",
+            icon = XIcons.ExternalLink,
+            onClick = { follow(if (hasSeparatePrimary) primaryUrl else github) },
+        )
         if (summary.isNotBlank()) Text(summary, style = XType.DetailBody)
         DetailTags(listOf(catalog.categoryLabel(project.category)) + project.tags)
-        DetailInfoStrip("GitHub", project.fullName, XIcons.ExternalLink, onClick = { follow(github) })
-        if (primaryUrl.isNotBlank() && primaryUrl != github) {
-            DetailInfoStrip("官网", card?.primaryLabel.orEmpty().ifBlank { "查看项目官网" }, XIcons.ExternalLink,
-                onClick = { follow(primaryUrl) })
+        if (hasSeparatePrimary) {
+            DetailInfoStrip("GitHub", project.fullName, XIcons.ExternalLink, onClick = { follow(github) })
         }
         DetailMetadata(metadata.joinToString(" · "))
         if (card != null && (card.githubArchived || card.upstreamMaintenanceNotice.isNotBlank())) {

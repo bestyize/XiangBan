@@ -258,9 +258,11 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         DetailGallery(listOfNotNull(pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), pack.title)
                         DetailBody {
                             DetailHeading(pack.title)
+                            if (pack.kind in setOf("game", "app") && pack.status == "published") {
+                                GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (pack.kind == "game") "试玩游戏" else "打开应用", detailPrimary = true)
+                            }
                             if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.DetailBody)
                             DetailTags(pack.tags)
-                            if (pack.kind in setOf("game", "app") && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
                             DetailMetadata(listOfNotNull(kindLabel(pack.kind), "v${pack.version}",
                                 pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let(::formatSize),
                                 pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { "更新于 $it" },

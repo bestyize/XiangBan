@@ -85,12 +85,14 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
                 DetailGallery(listOfNotNull(pack.coverUrl?.takeIf(String::isNotBlank)?.let(env.forum::imageUrl)), pack.title)
                 DetailBody {
                     DetailHeading(pack.title)
+                    if (pack.status == "published") {
+                        GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (pack.kind == "game") "试玩游戏" else "打开应用", detailPrimary = true)
+                    } else Text("作品暂不可用", Modifier.padding(bottom = 8.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.DetailBody)
                     DetailTags(pack.tags)
                     if (pack.status == "published") {
-                        GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (pack.kind == "game") "试玩游戏" else "打开应用", appStyle = true)
                         DetailInfoStrip("创作", "做一个我的版本", XIcons.Pen, onClick = { remix = true })
-                    } else Text("作品暂不可用", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                    }
                     DetailMetadata(listOfNotNull(pack.updatedAt.take(10).takeIf { it.isNotBlank() }, if (pack.kind == "app") "工具" else "游戏",
                         when (orientation) { "landscape" -> "横屏"; "portrait" -> "竖屏"; else -> null }, "${pack.applyCount} 人玩过").joinToString(" · "))
                 }

@@ -57,5 +57,11 @@ const paths: Record<string, string[]> = {
   close: ['m6 6 12 12M18 6 6 18'],
   shield: ['m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z', 'm8 12 3 3 5-6'],
 }
+const filledPaths: Record<string, string[]> = {
+  'play-solid': ['M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z'],
+}
 </script>
-<template><svg :width="size" :height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d,i) in paths[name] || paths.community" :key="i" :d="d" /></svg></template>
+<template>
+  <svg v-if="filledPaths[name]" :width="size" :height="size" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path v-for="(d,i) in filledPaths[name]" :key="i" :d="d" /></svg>
+  <svg v-else :width="size" :height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d,i) in paths[name] || paths.community" :key="i" :d="d" /></svg>
+</template>

@@ -97,16 +97,17 @@ private fun IdeaWorkContent(env: CommunityEnv, work: FeaturedIdea, hasDots: Bool
 
     DetailBody(hasDots) {
         DetailHeading(work.title)
-        Text(work.introduction?.takeIf(String::isNotBlank) ?: work.description, style = XType.DetailBody)
-        DetailTags(listOfNotNull(if (exhibit) "3D 模型" else work.label, "小伴创意", "交互作品"))
         if (launch != null) {
             val label = when {
                 exhibit -> "体验 3D 模型"
-                runtime != null -> "打开${work.title}"
+                runtime != null -> "立即体验"
                 else -> "访问作品官网"
             }
-            DetailInfoStrip("体验", label, XIcons.SparkleSmall, onClick = { open(launch) })
+            val ctaIcon = if (runtime != null) XIcons.PlaySolid else XIcons.ExternalLink
+            DetailPrimaryCta(label, ctaIcon, onClick = { open(launch) })
         }
+        Text(work.introduction?.takeIf(String::isNotBlank) ?: work.description, style = XType.DetailBody)
+        DetailTags(listOfNotNull(if (exhibit) "3D 模型" else work.label, "小伴创意", "交互作品"))
         if (controls != null || hasCredits) {
             DetailInfoStrip("说明", controls ?: "作品来源", onClick = if (hasCredits) ({ showCredits = !showCredits }) else null,
                 expanded = showCredits)

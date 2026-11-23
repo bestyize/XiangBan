@@ -221,27 +221,30 @@ const shareDeletion = computed<ShareDeletion | undefined>(() => {
       </ContentSocialActions>
     </template>
 
+    <template v-if="pack" #cta>
+      <RouterLink v-if="runLocation" class="xhs-primary-cta" :to="runLocation">
+        <span class="xhs-primary-cta-icon"><AppIcon name="play-solid" :size="16" /></span>
+        <span class="xhs-primary-cta-label">{{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}</span>
+      </RouterLink>
+      <template v-else>
+        <a v-if="clientLink" class="xhs-primary-cta desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">
+          <span class="xhs-primary-cta-icon"><AppIcon name="monitor" :size="15" /></span>
+          <span class="xhs-primary-cta-label">在小伴中打开</span>
+        </a>
+        <button class="xhs-primary-cta" :class="{ 'mobile-only': clientLink }" type="button" :disabled="busy" @click="download">
+          <span class="xhs-primary-cta-icon"><AppIcon name="download" :size="15" /></span>
+          <span class="xhs-primary-cta-label">{{ busy ? '正在准备…' : '下载 ZIP' }}</span>
+        </button>
+      </template>
+    </template>
+
     <template v-if="pack" #default>
       <div v-if="pack.summary" class="xhs-prose summary">{{ pack.summary }}</div>
       <div v-if="pack.tags.length" class="xhs-hashtags">
         <RouterLink v-for="tag in pack.tags" :key="tag" :to="`/tag/${encodeURIComponent(tag)}`" class="tag">#{{ tagLabel(tag) }}</RouterLink>
       </div>
-      <RouterLink v-if="runLocation" class="xhs-info-strip" :to="runLocation">
-        <span class="xhs-strip-tag"><AppIcon name="play" :size="12" /> 体验</span>
-        <span class="xhs-strip-text">{{ pack.kind === 'game' ? '试玩游戏' : '打开应用' }}</span><AppIcon name="arrow" :size="13" />
-      </RouterLink>
-      <template v-else>
-        <a v-if="clientLink" class="xhs-info-strip desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">
-          <span class="xhs-strip-tag"><AppIcon name="monitor" :size="12" /> 打开</span>
-          <span class="xhs-strip-text">在小伴中打开</span><AppIcon name="arrow" :size="13" />
-        </a>
-        <button class="xhs-info-strip" :class="{ 'mobile-only': clientLink }" type="button" :disabled="busy" @click="download">
-          <span class="xhs-strip-tag"><AppIcon name="download" :size="12" /> 下载</span>
-          <span class="xhs-strip-text">{{ busy ? '正在准备…' : '下载 ZIP' }}</span><AppIcon name="arrow" :size="13" />
-        </button>
-      </template>
       <div v-if="usageNote" class="xhs-info-strip is-static pack-note">
-        <span class="xhs-strip-tag is-warm">说明</span><span class="xhs-strip-text">{{ usageNote }}</span>
+        <span class="xhs-strip-tag">说明</span><span class="xhs-strip-text">{{ usageNote }}</span>
       </div>
       <div class="xhs-meta-row pack-meta">
         <time :datetime="pack.created_at" :title="formatDateTime(pack.created_at)">{{ timeAgo(pack.created_at) }}发布</time>
@@ -377,9 +380,12 @@ summary::-webkit-details-marker { display: none; }
   margin: 4px 0 0;
   white-space: pre-line;
 }
-.mobile-only { display: none; }
+.mobile-only,
+.xhs-primary-cta.mobile-only { display: none; }
 @media (max-width: 767px) {
-  .desktop-only { display: none; }
-  .mobile-only { display: flex; }
+  .desktop-only,
+  .xhs-primary-cta.desktop-only { display: none; }
+  .mobile-only,
+  .xhs-primary-cta.mobile-only { display: flex; }
 }
 </style>
