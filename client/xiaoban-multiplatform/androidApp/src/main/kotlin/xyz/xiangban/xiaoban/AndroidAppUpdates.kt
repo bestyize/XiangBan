@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import xyz.xiangban.xiaoban.business.communitynative.AppUpdatePhase
 import xyz.xiangban.xiaoban.business.communitynative.AppUpdateState
 import xyz.xiangban.xiaoban.business.communitynative.AppUpdates
 import java.io.File
@@ -73,7 +74,7 @@ internal class AndroidAppUpdates(private val activity: MainActivity) : AppUpdate
         showAutomatically = automatic
         lastAttempt = SystemClock.elapsedRealtime()
         release = null
-        mutableState.update { it.copy(busy = true, version = null, notes = "", message = "正在检查更新…", percent = null) }
+        mutableState.update { it.copy(busy = true, phase = AppUpdatePhase.Checking, version = null, notes = "", message = "正在检查更新…", percent = null) }
         job = activity.lifecycleScope.launch {
             try {
                 val found = withContext(Dispatchers.IO) { fetchRelease() }
@@ -86,15 +87,16 @@ internal class AndroidAppUpdates(private val activity: MainActivity) : AppUpdate
                 mutableState.update {
                     it.copy(
                         visible = it.visible || show,
+                        phase = if (found == null) AppUpdatePhase.Latest else AppUpdatePhase.Available,
                         version = found?.version,
                         notes = found?.notes.orEmpty(),
-                        message = if (found == null) "当前已是最新版本" else "下载后由 Android 确认安装。更新会保留现有数据。",
+                        message = if (found == null) "当前已是最新版本" else "更新保留现有数据，下载后由系统确认安装。",
                     )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                mutableState.update { it.copy(message = "暂时无法检查更新，请稍后重试。") }
+                mutableState.update { it.copy(phase = AppUpdatePhase.CheckFailed, message = "暂时无法检查更新，请稍后重试。") }
             } finally {
                 mutableState.update { it.copy(busy = false) }
             }
@@ -104,7 +106,7 @@ internal class AndroidAppUpdates(private val activity: MainActivity) : AppUpdate
     override fun install() {
         val target = release ?: return
         if (job?.isActive == true) return
-        mutableState.update { it.copy(busy = true, message = "正在准备安装包…", percent = null) }
+        mutableState.update { it.copy(busy = true, phase = AppUpdatePhase.Downloading, message = "正在准备安装包…", percent = null) }
         job = activity.lifecycleScope.launch {
             try {
                 val apk = withTimeoutOrNull(DOWNLOAD_TIMEOUT) {
@@ -112,24 +114,24 @@ internal class AndroidAppUpdates(private val activity: MainActivity) : AppUpdate
                 } ?: throw UpdateException("下载更新超时，请重试。")
                 val canOpenInstaller = state.value.visible && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
                 if (!canOpenInstaller) {
-                    mutableState.update { it.copy(message = "下载完成，打开检查更新即可继续安装。") }
+                    mutableState.update { it.copy(phase = AppUpdatePhase.InstallPending, message = "下载完成，打开检查更新即可继续安装。") }
                 } else if (Build.VERSION.SDK_INT >= 26 && !activity.packageManager.canRequestPackageInstalls()) {
                     activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
-                    mutableState.update { it.copy(message = "允许小伴安装应用后，返回并再次点击「安装更新」。") }
+                    mutableState.update { it.copy(phase = AppUpdatePhase.InstallPending, message = "允许小伴安装应用后，返回并再次点击「安装更新」。") }
                 } else {
                     val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.app-updates", apk)
                     activity.startActivity(Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(uri, "application/vnd.android.package-archive")
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     })
-                    mutableState.update { it.copy(message = "请在系统安装界面确认更新。") }
+                    mutableState.update { it.copy(phase = AppUpdatePhase.InstallerOpened, message = "请在系统安装界面确认更新。") }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: UpdateException) {
-                mutableState.update { it.copy(message = e.message.orEmpty()) }
+                mutableState.update { it.copy(phase = AppUpdatePhase.InstallFailed, message = e.message.orEmpty()) }
             } catch (_: Exception) {
-                mutableState.update { it.copy(message = "下载或启动安装失败，请检查网络和剩余存储空间后重试。") }
+                mutableState.update { it.copy(phase = AppUpdatePhase.InstallFailed, message = "下载或启动安装失败，请检查网络和剩余存储空间后重试。") }
             } finally {
                 mutableState.update { it.copy(busy = false, percent = null) }
             }

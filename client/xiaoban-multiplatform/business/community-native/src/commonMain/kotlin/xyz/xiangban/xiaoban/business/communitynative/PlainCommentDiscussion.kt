@@ -1,12 +1,13 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -256,20 +257,21 @@ private fun PlainCommentOverlays(env: CommunityEnv, discussion: PlainCommentDisc
             env, discussion.composing, discussion.replyTo, discussion::dismissComposer, discussion::published, discussion.publish,
         )
     }
-    if (discussion.deleteTarget != null) {
-        AlertDialog(
-            onDismissRequest = discussion::cancelDelete,
-            title = { Text("删除评论？") },
-            text = { Text(discussion.deleteError ?: "删除后这条评论将不再显示。") },
-            confirmButton = {
-                TextButton(onClick = discussion::confirmDelete, enabled = !discussion.deleting) {
-                    Text(if (discussion.deleting) "删除中…" else "删除")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = discussion::cancelDelete, enabled = !discussion.deleting) { Text("取消") }
-            },
-        )
+    discussion.deleteTarget?.let { comment ->
+        CommunityCardDialog(
+            title = "删除这条评论？", icon = XIcons.Message,
+            confirmLabel = if (discussion.deleting) "删除中…" else "删除评论",
+            confirmEnabled = !discussion.deleting, dismissEnabled = !discussion.deleting,
+            onConfirm = discussion::confirmDelete, onDismiss = discussion::cancelDelete,
+        ) {
+            val excerpt = comment.body.ifBlank { if (comment.images.isNotEmpty()) "图片评论" else "评论 #${comment.id}" }
+            Text(excerpt, Modifier.fillMaxWidth().background(LocalExtraColors.current.fill, RoundedCornerShape(12.dp)).padding(12.dp),
+                style = XType.Secondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            discussion.deleteError?.let {
+                Spacer(Modifier.height(8.dp))
+                DialogNotice(it, error = true)
+            }
+        }
     }
     Toast(discussion.toast) { discussion.toast = null }
 }

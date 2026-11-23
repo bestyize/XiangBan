@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -642,13 +641,12 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
         Toast(toast) { toast = null }
     }
 
-    if (blockConfirmation) AlertDialog(
-        onDismissRequest = { if (!busy) blockConfirmation = false },
-        title = { Text("屏蔽该用户？") },
-        text = { Text("对方的帖子将从你的列表和搜索隐藏，回复会折叠，双方互相取消关注。对方不会收到屏蔽提示。") },
-        confirmButton = { PillButton("确认屏蔽", { blockConfirmation = false; setBlocked(true) }, enabled = !busy) },
-        dismissButton = { GhostPillButton("取消", { blockConfirmation = false }, enabled = !busy) },
-    )
+    if (blockConfirmation && readyProfile != null) CommunityCardDialog(
+        title = "屏蔽${readyProfile.nickname}？", description = "列表和搜索将隐藏对方的帖子，回复将折叠。",
+        icon = XIcons.Block, iconColor = Color(0xFF585973), confirmLabel = "确认屏蔽",
+        confirmEnabled = !busy, dismissEnabled = !busy,
+        onConfirm = { blockConfirmation = false; setBlocked(true) }, onDismiss = { blockConfirmation = false },
+    ) { DialogNotice("双方将取消关注，对方不会收到通知。") }
 }
 
 @Composable

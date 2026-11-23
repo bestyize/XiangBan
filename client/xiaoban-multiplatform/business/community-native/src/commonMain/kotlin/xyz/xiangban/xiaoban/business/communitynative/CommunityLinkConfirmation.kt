@@ -50,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -65,7 +64,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
@@ -79,7 +77,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -158,7 +155,6 @@ private fun LinkPreviewDialog(
     onOpen: (CommunityShare) -> Unit,
 ) {
     val colors = if (ThemeState.dark) DarkLink else LightLink
-    val shape = RoundedCornerShape(24.dp)
     val info = (state as? Load.Ready)?.value
     val loading = state is Load.Loading
     var coverFailed by remember(info?.coverUrl) { mutableStateOf(false) }
@@ -179,8 +175,7 @@ private fun LinkPreviewDialog(
             Box(
                 Modifier.widthIn(max = 342.dp).fillMaxWidth()
                     .graphicsLayer { alpha = enter.value.coerceIn(0f, 1f); scaleX = .94f + .06f * enter.value; scaleY = scaleX }
-                    .dropShadow(shape, Shadow(radius = 60.dp, color = Color.Black.copy(alpha = .25f), offset = DpOffset(0.dp, 20.dp)))
-                    .clip(shape).background(colors.surface).pointerInput(Unit) { detectTapGestures {} }
+                    .dialogCardSurface(colors.surface).pointerInput(Unit) { detectTapGestures {} }
                     .semantics { dialog() }.focusRequester(focus).focusable(),
             ) {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -223,15 +218,8 @@ private fun LinkPreviewDialog(
                         }
                     }
                 }
-                Box(
-                    Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp).size(44.dp).clip(CircleShape)
-                        .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.size(32.dp).clip(CircleShape).background(if (hasTopImage) Color.Black.copy(alpha = .35f) else colors.fill), contentAlignment = Alignment.Center) {
-                        XIcon(XIcons.Close, tint = if (hasTopImage) Color.White else colors.faint, size = 15.dp, description = "关闭")
-                    }
-                }
+                DialogCardClose(onDismiss, enabled = true, fill = if (hasTopImage) Color.Black.copy(alpha = .35f) else colors.fill,
+                    ink = if (hasTopImage) Color.White else colors.faint)
             }
         }
     }

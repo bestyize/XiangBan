@@ -39,7 +39,7 @@ if (document.documentElement.dataset.edition === 'cards') {
       states: { ready: '作品列表', empty: '暂无作品', loading: '加载中', loadError: '加载失败', stale: '挑战状态变更' } },
     block: { label: '屏蔽用户', page: '个人主页', background: 'profile', symbol: 'user', tile: '#585973', title: '屏蔽小林？',
       description: '列表和搜索将隐藏对方的帖子，回复将折叠。', action: '确认屏蔽', result: '已屏蔽小林' },
-    report: { label: '举报内容', page: '帖子详情', scope: '概念稿', background: 'discussion', symbol: 'flag', tile: '#695066', title: '举报这篇帖子',
+    report: { label: '举报内容', page: '帖子详情', background: 'discussion', symbol: 'flag', tile: '#695066', title: '举报这篇帖子',
       action: '提交举报', result: '举报已提交', states: { ready: '填写举报', login: '未登录', error: '提交失败' } },
     tools: { label: '移除工具环境', page: '环境配置', background: 'settings', symbol: 'terminal', tile: '#354e49', title: '移除工具环境？',
       description: '将删除本机运行时及其中安装的工具。', action: '移除环境', result: '工具环境已移除' },

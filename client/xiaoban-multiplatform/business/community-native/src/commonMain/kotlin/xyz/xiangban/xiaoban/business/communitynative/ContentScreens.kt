@@ -37,7 +37,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -262,6 +261,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                                 pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let(::formatSize),
                                 pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { "更新于 $it" },
                                 "纯数据".takeIf { pack.pureData }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "))
+                            if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
                             val changes = pack.versions.filter { it.changelog.isNotBlank() }
                             if (changes.isNotEmpty()) {
                                 Text("更新记录", Modifier.padding(top = 24.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
@@ -436,7 +436,10 @@ private fun PostItem(
         onReply = onReply.takeIf { visible },
         like = if (visible) ({ PostLikeAction(env, post, open) { likeError = it } }) else null,
         actions = {
-            if (visible && onEdit != null && !accepted) CommentTextAction("编辑", onEdit)
+            if (visible) {
+                if (onEdit != null && !accepted) CommentTextAction("编辑", onEdit)
+                NativeReportAction(env, "post", post.id, open)
+            }
         },
     ) {
         if (!visible) {
@@ -530,28 +533,25 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             if (topic.help?.status == "open" && topic.author.uid == session.accountId) {
                                 TextButton(onClick = { confirmClose = true }, enabled = !closingHelp) { Text("关闭求助") }
                             }
-                            if (confirmClose) AlertDialog(
-                                onDismissRequest = { if (!closingHelp) confirmClose = false },
-                                title = { Text("关闭求助？") },
-                                text = { Text("尚未发放的悬赏积分将退还。") },
-                                confirmButton = {
-                                    TextButton(enabled = !closingHelp, onClick = {
-                                        guarded {
-                                            closingHelp = true
-                                            try {
-                                                env.forum.closeHelp(topic.id)
-                                                confirmClose = false
-                                                loader.reload()
-                                            } finally {
-                                                closingHelp = false
-                                            }
+                            if (confirmClose) CommunityCardDialog(
+                                title = "关闭这条求助？", description = topic.title,
+                                icon = XIcons.Question, iconColor = Color(0xFF705842),
+                                confirmLabel = if (closingHelp) "关闭中…" else "关闭求助",
+                                confirmEnabled = !closingHelp, dismissEnabled = !closingHelp,
+                                onDismiss = { confirmClose = false },
+                                onConfirm = {
+                                    if (!closingHelp) guarded {
+                                        closingHelp = true
+                                        try {
+                                            env.forum.closeHelp(topic.id)
+                                            confirmClose = false
+                                            loader.reload()
+                                        } finally {
+                                            closingHelp = false
                                         }
-                                    }) { Text("关闭求助") }
+                                    }
                                 },
-                                dismissButton = {
-                                    TextButton(enabled = !closingHelp, onClick = { confirmClose = false }) { Text("取消") }
-                                },
-                            )
+                            ) { DialogNotice("尚未发放的悬赏积分将退还。") }
                             RichBody(body.blocks, fontSize = XType.DetailBody.fontSize, lineHeight = XType.DetailBody.lineHeight,
                                 galleryImages = images)
                             LinkedWorkCards(env, body.linkedWorks, open)
@@ -562,6 +562,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             val stamp = topic.editedAt?.let { "编辑于 ${agoText(it)}" } ?: "发布于 ${agoText(topic.createdAt)}"
                             DetailMetadata(listOfNotNull(stamp, "${topic.viewCount} 次浏览", "已锁定".takeIf { topic.locked == true },
                                 "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 }).joinToString(" · "))
+                            NativeReportAction(env, "topic", topic.id, open)
                         }
                         val answers = topic.help?.let {
                             HelpAnswers(
