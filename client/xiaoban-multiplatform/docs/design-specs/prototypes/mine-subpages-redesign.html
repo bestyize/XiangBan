@@ -178,6 +178,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
   grid-template-columns: 76px 1fr 76px;
   align-items: center;
 }
+.appbar.has-sep { border-bottom: 0.5px solid var(--hairline); }
 .appbar-left { display: flex; align-items: center; justify-content: flex-start; }
 .appbar-right { display: flex; align-items: center; justify-content: flex-end; }
 .appbar h3 {
@@ -261,6 +262,11 @@ body.studio-dark .diff-item p { color: #989ba4; }
   overflow-x: hidden;
   scrollbar-width: none;
   padding-bottom: 24px;
+}
+.screen-body.is-empty {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
 }
 .screen-body::-webkit-scrollbar { display: none; }
 
@@ -622,39 +628,62 @@ body.studio-dark .diff-item p { color: #989ba4; }
 
 /* Empty State */
 .empty-box {
-  padding: 86px 28px 40px;
+  flex: 1;
+  padding: 24px 32px 88px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
-  gap: 10px;
+  gap: 8px;
 }
 .empty-ico {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: var(--fill);
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 18px;
+  background: var(--surface);
   color: var(--ink3);
+  box-shadow: inset 0 0 0 0.5px var(--hairline), 0 2px 10px rgba(0, 0, 0, .03);
   display: grid;
   place-items: center;
 }
-.empty-ico svg { width: 23px; height: 23px; stroke-width: 1.7; }
-.empty-box strong { font-size: 15.5px; font-weight: 600; color: var(--ink); }
-.empty-box p { font-size: 13px; line-height: 19px; color: var(--ink3); max-width: 240px; }
+.phone.dark .empty-ico { box-shadow: inset 0 0 0 0.5px var(--hairline); }
+.empty-ico svg { width: 24px; height: 24px; stroke-width: 1.65; }
+.empty-box strong { font-size: 16px; line-height: 22px; font-weight: 650; color: var(--ink); }
+.empty-box p { font-size: 13px; line-height: 20px; color: var(--ink3); max-width: 248px; }
 
 .cta-pill {
-  margin-top: 6px;
-  height: 38px;
-  padding: 0 20px;
+  margin-top: 14px;
+  height: 42px;
+  padding: 0 24px;
   border-radius: 99px;
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  font-size: 14px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 14.5px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  transition: filter .15s;
 }
+.cta-pill:hover { filter: brightness(.94); }
+.cta-pill svg { width: 16px; height: 16px; stroke-width: 2.2; }
+
+.empty-sub-link {
+  margin-top: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink2);
+  display: inline-flex;
+  align-items: center;
+  transition: background .15s, color .15s;
+}
+.empty-sub-link:hover { background: var(--fill); color: var(--ink); }
 
 .home-bar {
   flex: none;
@@ -985,7 +1014,7 @@ function statusBarHtml() {
 
 /* ─── Board 01: My Works ─── */
 function renderWorks() {
-  const isEmpty = state.worksMode === 'empty';
+  const isEmpty = state.worksMode === 'empty' || state.works.length === 0;
   const list = isEmpty ? [] : state.works.filter(w => state.worksFilter === 'all' || w.status === state.worksFilter);
 
   const countOf = (k) => isEmpty ? 0 : (k === 'all' ? state.works.length : state.works.filter(w => w.status === k).length);
@@ -1003,7 +1032,10 @@ function renderWorks() {
         <span class="empty-ico">${icon('folder')}</span>
         <strong>${emptyTitle}</strong>
         <p>${emptyDesc}</p>
-        ${isEmpty ? `<button class="cta-pill" data-toast="works:前往小伴 AI 创作作品">${icon('plus')}<span>去创作</span></button>` : ''}
+        ${isEmpty ? `
+          <button class="cta-pill" data-toast="works:前往小伴 AI 创作作品">${icon('plus')}<span>去创作</span></button>
+          <button class="empty-sub-link" data-toast="works:打开发布内容包页">已有作品包？直接发布</button>
+        ` : ''}
       </div>
     `;
   } else {
@@ -1045,10 +1077,10 @@ function renderWorks() {
 
   return `
     ${statusBarHtml()}
-    <div class="appbar">
+    <div class="appbar ${isEmpty ? 'has-sep' : ''}">
       <div class="appbar-left"><button class="icon-tap" aria-label="返回" data-toast="works:返回「我的」">${icon('back')}</button></div>
       <h3>我的作品</h3>
-      <div class="appbar-right"><button class="bar-text-btn accent" data-toast="works:打开发布内容包页">发布</button></div>
+      <div class="appbar-right">${!isEmpty ? '<button class="bar-text-btn accent" data-toast="works:打开发布内容包页">发布</button>' : ''}</div>
     </div>
     ${!isEmpty ? `
       <div class="tabs-bar" role="tablist">
@@ -1059,7 +1091,7 @@ function renderWorks() {
         <button class="tab-btn ${state.worksFilter === 'removed' ? 'active' : ''}" data-works-filter="removed">已下架 <span class="cnt">${countOf('removed')}</span></button>
       </div>
     ` : ''}
-    <div class="screen-body">${bodyHtml}</div>
+    <div class="screen-body ${!list.length ? 'is-empty' : ''}">${bodyHtml}</div>
     <div class="home-bar"></div>
     <div class="phone-toast" id="toast-works"></div>
     ${renderSheet('works')}
@@ -1125,7 +1157,7 @@ function renderNotifs() {
       <button class="tab-btn ${state.notifTab === 'all' ? 'active' : ''}" data-notif-tab="all">全部</button>
       <button class="tab-btn ${state.notifTab === 'unread' ? 'active' : ''}" data-notif-tab="unread">未读 ${unreadCount > 0 ? `<span class="cnt">${unreadCount}</span>` : ''}</button>
     </div>
-    <div class="screen-body">${bodyHtml}</div>
+    <div class="screen-body ${!items.length ? 'is-empty' : ''}">${bodyHtml}</div>
     <div class="home-bar"></div>
     <div class="phone-toast" id="toast-notif"></div>
   `;
