@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>小伴手机 App · 我的作品 / 通知 / 模型配置 重设计稿</title>
+<title>小伴手机 App · 我的作品 / 通知 重设计稿</title>
 <style>
 * { box-sizing: border-box; }
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -74,7 +74,7 @@ body.studio-dark .board-caption { color: #9497a0; }
 /* ─── Summary Card ─── */
 .diff-card {
   margin: 34px auto 0;
-  max-width: 1222px;
+  max-width: 806px;
   background: #ffffff;
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, .06);
@@ -82,7 +82,7 @@ body.studio-dark .board-caption { color: #9497a0; }
 }
 body.studio-dark .diff-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
 .diff-card h3 { font-size: 14px; font-weight: 650; margin-bottom: 12px; }
-.diff-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.diff-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .diff-item { padding: 12px 14px; border-radius: 12px; background: #f7f7f9; }
 body.studio-dark .diff-item { background: #1f2025; }
 .diff-item strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
@@ -488,158 +488,6 @@ body.studio-dark .diff-item p { color: #989ba4; }
 }
 .notif-chev { width: 15px; height: 15px; color: var(--ink3); opacity: .6; margin-top: 12px; }
 
-/* ─── Screen 03: Model Configuration ─── */
-.model-row {
-  width: 100%;
-  padding: 14px 14px 14px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-  background: var(--surface);
-  transition: background .12s;
-}
-.model-row:hover { background: var(--paper); }
-.model-row + .model-row::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 68px;
-  right: 0;
-  height: 0.5px;
-  background: var(--hairline);
-}
-.brand-sq {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.brand-sq svg { width: 20px; height: 20px; stroke-width: 1.9; }
-.prov-sq {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--fill);
-  color: var(--ink2);
-  display: grid;
-  place-items: center;
-  flex: none;
-  font-size: 14px;
-  font-weight: 600;
-}
-.prov-sq svg { width: 19px; height: 19px; stroke-width: 1.8; }
-
-.model-body {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-.model-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.model-name { font-size: 15.5px; line-height: 22px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.model-sub { margin-top: 3px; font-size: 12.5px; line-height: 17px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.model-subrow {
-  width: 100%;
-  min-height: 46px;
-  padding: 10px 14px 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: var(--surface);
-  position: relative;
-}
-.model-subrow::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 16px;
-  right: 0;
-  height: 0.5px;
-  background: var(--hairline);
-}
-.quota-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--ink3);
-  min-width: 0;
-}
-.quota-text.empty { color: var(--ink2); font-weight: 500; }
-
-.mini-pill {
-  flex: none;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 99px;
-  font-size: 12.5px;
-  font-weight: 550;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: opacity .15s, background .15s;
-}
-.mini-pill.ghost { background: var(--fill); color: var(--ink2); }
-.mini-pill.ghost:hover { opacity: .82; }
-
-.text-action {
-  flex: none;
-  height: 30px;
-  padding: 0 4px 0 8px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink2);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  transition: background .15s, opacity .15s;
-}
-.text-action:hover { background: var(--fill); }
-.text-action.accent { color: var(--accent-ink); font-weight: 600; }
-.text-action svg { width: 14px; height: 14px; stroke-width: 2; opacity: .82; }
-
-.chev { width: 15px; height: 15px; color: var(--ink3); opacity: .68; flex: none; }
-
-.add-row {
-  width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--surface);
-  color: var(--ink2);
-  font-size: 14.5px;
-  font-weight: 500;
-  position: relative;
-  transition: background .12s, color .12s;
-}
-.add-row:hover { background: var(--paper); color: var(--ink); }
-.add-row.with-sep::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 16px;
-  right: 0;
-  height: 0.5px;
-  background: var(--hairline);
-}
-.add-row svg { width: 18px; height: 18px; stroke-width: 2.1; }
-
-.foot-hint {
-  padding: 10px 16px 0;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--ink3);
-}
-
 /* Empty State */
 .empty-box {
   flex: 1;
@@ -874,8 +722,8 @@ body.studio-dark .diff-item p { color: #989ba4; }
 <div class="studio">
   <header class="topbar">
     <div class="title-block">
-      <h1>小伴手机 App · 我的作品 / 通知 / 模型配置 重设计稿</h1>
-      <p>延续「我的」页方案 1 通栏精修语言 · 消灭冗余大灰按钮与直角孤岛块 · 支持真实点击与弹层交互</p>
+      <h1>小伴手机 App · 我的作品 / 通知 重设计稿</h1>
+      <p>延续「我的」页方案 1 通栏精修语言 · 消灭冗余大灰按钮与割裂卡片 · 模型配置主页已并入 <a href="model-config-redesign.html" style="color:inherit;text-decoration:underline;text-underline-offset:2px">模型配置全链路重设计稿</a></p>
     </div>
     <div class="controls">
       <div class="swatches" role="group" aria-label="主题色" id="swatches"></div>
@@ -910,23 +758,10 @@ body.studio-dark .diff-item p { color: #989ba4; }
       <div class="phone" id="phone-notif"></div>
       <p class="board-caption">移除 Tab 下占位的「刷新 + 全部已读」双灰条与重复刷新按钮：「全部已读」轻量化收进顶栏右上角；列表补齐发送者头像、小红点未读标记与轻引用摘要。</p>
     </section>
-
-    <!-- Board 03: Model Configuration -->
-    <section class="board">
-      <div class="board-head">
-        <h2>03 · 模型配置</h2>
-        <div class="board-mini-seg" role="group" aria-label="模型配置场景">
-          <button class="active" data-model-mode="exhausted">同截图态</button>
-          <button data-model-mode="normal">多服务商</button>
-        </div>
-      </div>
-      <div class="phone" id="phone-models"></div>
-      <p class="board-caption">更名「模型配置」，零浅色/次主题色底块：全页仅「小伴 AI」官方图标保留实心主题色底配白色星标，「兑换点数」采用无底色主题色文字链接，其余全部回归黑白灰层级，并用一颗 6px 绿点轻标「使用中」。</p>
-    </section>
   </main>
 
-  <section class="diff-card" aria-label="三页核心改动说明">
-    <h3>三页统一改造思路（对齐《手机端设计规范》通栏精修风格）</h3>
+  <section class="diff-card" aria-label="两页核心改动说明">
+    <h3>两页统一改造思路（对齐《手机端设计规范》通栏精修风格）</h3>
     <div class="diff-grid">
       <div class="diff-item">
         <strong>01 · 我的作品：草稿与删除全闭环</strong>
@@ -935,10 +770,6 @@ body.studio-dark .diff-item p { color: #989ba4; }
       <div class="diff-item">
         <strong>02 · 通知：去重复、强层级</strong>
         <p>移除顶栏下方双灰按钮，「全部已读」放顶栏右侧（无未读自动弱化）；空态改用铃铛图标并去掉重复「刷新」按钮；消息项补齐 40px 头像、未读红点与引用摘录。</p>
-      </div>
-      <div class="diff-item">
-        <strong>03 · 模型配置：克制用色、零次主题色底块</strong>
-        <p>撤掉所有浅红/浅黄/浅绿等次主题色背景：「小伴 AI」使用实心主题色底 + 白色图标作为品牌锚点，「兑换点数」用无底色主题色文字链接（带轻箭头），其余全部回归中性黑白灰，仅用 6px 绿点指示「使用中」。</p>
       </div>
     </div>
   </section>
@@ -1005,9 +836,6 @@ const state = {
     { id: 103, kind: 'approved', unread: false, actor: null, text: '内容包「纸飞机滑翔」v2 已通过审核并上线', quote: '', time: '昨天', tag: '审核通知' },
     { id: 104, kind: 'reply', unread: false, actor: '阿南不熬夜', init: '南', color: '#7a6899', text: '回复了你在「第三方模型接入踩坑记录」里的帖子', quote: '感谢整理，把上下文上限改成 128k 后确实稳了很多。', time: '3 天前', tag: '回复' },
   ],
-  /* Board 03 */
-  modelMode: 'exhausted', // 'exhausted' | 'normal'
-  activeProvider: 'free', // 'official' | 'free' | 'deepseek' | 'claude'
   /* Active Sheet & Confirm Dialog */
   sheet: null, // { board, kind, payload }
   dialog: null, // { board, action: 'delete' | 'remove', workId }
@@ -1177,93 +1005,6 @@ function renderNotifs() {
   `;
 }
 
-/* ─── Board 03: Model Configuration ─── */
-function renderModels() {
-  const exhausted = state.modelMode === 'exhausted';
-  const officialActive = state.activeProvider === 'official';
-  const providers = exhausted
-    ? [
-        { id: 'free', name: '免费模型', init: '免', model: 'kilo-auto/free', count: 1, tag: '内置' },
-      ]
-    : [
-        { id: 'free', name: '免费模型', init: '免', model: 'kilo-auto/free', count: 1, tag: '内置' },
-        { id: 'deepseek', name: 'DeepSeek', init: 'DS', model: 'deepseek-chat', count: 2, tag: '自定义' },
-        { id: 'claude', name: 'Anthropic 代理', init: 'CL', model: 'claude-sonnet-4', count: 3, tag: '自定义' },
-      ];
-
-  const activeObj = officialActive
-    ? { name: '小伴 AI', model: 'Auto（官方智能调度）' }
-    : (providers.find(p => p.id === state.activeProvider) || providers[0]);
-
-  return `
-    ${statusBarHtml()}
-    <div class="appbar has-sep">
-      <div class="appbar-left"><button class="icon-tap" aria-label="返回" data-toast="models:返回「我的」">${icon('back')}</button></div>
-      <h3>模型配置</h3>
-      <div class="appbar-right"><button class="icon-tap" aria-label="添加第三方模型服务" data-open-sheet="models:add-provider:0">${icon('plus')}</button></div>
-    </div>
-    <div class="screen-body">
-      <div class="sec-label">
-        <span>官方服务</span>
-        <span>当前：${activeObj.model}</span>
-      </div>
-      <div class="slab">
-        <div class="model-row">
-          <span class="brand-sq">${icon('sparkles')}</span>
-          <button class="model-body" data-open-sheet="models:official:0">
-            <div class="model-head">
-              <span class="model-name">小伴 AI</span>
-              ${officialActive ? '<span class="status-chip active-live">使用中</span>' : ''}
-            </div>
-            <div class="model-sub">跟着账号走，手机与电脑自动同步</div>
-          </button>
-          ${!officialActive ? `<button class="mini-pill ghost" data-use-provider="official">使用</button>` : ''}
-          <button class="icon-tap" style="width:28px;height:32px;color:var(--ink3)" aria-label="配置小伴 AI" data-open-sheet="models:official:0">${icon('chev', 'chev')}</button>
-        </div>
-        <div class="model-subrow">
-          <span class="quota-line">
-            <span class="quota-text ${exhausted ? 'empty' : ''}">${exhausted ? '官方点数已用完' : '剩余 1,240 点 · 到期 12-31'}</span>
-          </span>
-          <button class="text-action ${exhausted ? 'accent' : ''}" data-open-sheet="models:official:0"><span>${exhausted ? '兑换点数' : '额度与模型'}</span>${icon('chev')}</button>
-        </div>
-      </div>
-
-      <div class="sec-label">
-        <span>第三方模型服务</span>
-        <span>仅本机保存</span>
-      </div>
-      <div class="slab">
-        ${providers.map(p => {
-          const isAct = state.activeProvider === p.id;
-          return `
-            <div class="model-row">
-              <span class="prov-sq">${p.init}</span>
-              <button class="model-body" data-toast="models:进入「${p.name}」详细配置">
-                <div class="model-head">
-                  <span class="model-name">${p.name}</span>
-                  ${isAct ? '<span class="status-chip active-live">使用中</span>' : ''}
-                </div>
-                <div class="model-sub">默认 ${p.model} · 共 ${p.count} 个模型</div>
-              </button>
-              ${!isAct ? `<button class="mini-pill ghost" data-use-provider="${p.id}">使用</button>` : ''}
-              <button class="icon-tap" style="width:28px;height:32px;color:var(--ink3)" aria-label="配置 ${p.name}" data-toast="models:进入「${p.name}」详细配置">${icon('chev', 'chev')}</button>
-            </div>
-          `;
-        }).join('')}
-        <button class="add-row with-sep" data-open-sheet="models:add-provider:0">
-          ${icon('plus')}
-          <span>添加第三方模型服务</span>
-        </button>
-      </div>
-
-      <p class="foot-hint">第三方服务密钥仅保存在本机，不会上传到小伴账号；对话中也可以随时切换不同服务商的模型。</p>
-    </div>
-    <div class="home-bar"></div>
-    <div class="phone-toast" id="toast-models"></div>
-    ${renderSheet('models')}
-  `;
-}
-
 function renderSheet(boardKey) {
   if (!state.sheet || state.sheet.board !== boardKey) return '';
   if (state.sheet.kind === 'work-more') {
@@ -1296,34 +1037,6 @@ function renderSheet(boardKey) {
             <button class="sheet-btn" data-ask-dialog="remove:${w.id}">${icon('eyeOff')}<span>下架作品</span></button>
           ` : ''}
           <button class="sheet-btn danger" data-ask-dialog="delete:${w.id}">${icon('trash')}<span>删除作品</span></button>
-          <button class="sheet-cancel" data-close-sheet="1">取消</button>
-        </div>
-      </div>
-    `;
-  }
-  if (state.sheet.kind === 'official') {
-    return `
-      <div class="sheet-mask" data-close-sheet="1">
-        <div class="sheet" role="dialog" aria-label="小伴 AI 官方配置">
-          <div class="sheet-handle"></div>
-          <div class="sheet-head"><h4>小伴 AI · 官方配置</h4><p>选择官方档位、输入兑换码或获取 AI 额度</p></div>
-          <button class="sheet-btn" data-sheet-toast="models:切换官方默认档位为 Auto">${icon('sparkles')}<span class="sheet-btn-copy"><strong>官方模型档位</strong><small>Auto / 快速 / 深度思考</small></span></button>
-          <button class="sheet-btn" data-sheet-toast="models:打开兑换码输入框">${icon('key')}<span class="sheet-btn-copy"><strong>使用兑换码</strong><small>输入兑换码立即补充点数</small></span></button>
-          <button class="sheet-btn" data-sheet-toast="models:在浏览器打开获取额度页面">${icon('sliders')}<span class="sheet-btn-copy"><strong>获取 AI 额度</strong><small>前往小伴社区联系我们</small></span></button>
-          <button class="sheet-cancel" data-close-sheet="1">取消</button>
-        </div>
-      </div>
-    `;
-  }
-  if (state.sheet.kind === 'add-provider') {
-    return `
-      <div class="sheet-mask" data-close-sheet="1">
-        <div class="sheet" role="dialog" aria-label="添加第三方模型服务">
-          <div class="sheet-handle"></div>
-          <div class="sheet-head"><h4>添加第三方模型服务</h4><p>选择预置服务商，或手动填写 API 地址与密钥</p></div>
-          <button class="sheet-btn" data-sheet-toast="models:打开 DeepSeek 快速配置">${icon('cpu')}<span class="sheet-btn-copy"><strong>DeepSeek</strong><small>OpenAI 兼容接口 · 推荐 deepseek-chat</small></span></button>
-          <button class="sheet-btn" data-sheet-toast="models:打开 OpenRouter 快速配置">${icon('cpu')}<span class="sheet-btn-copy"><strong>OpenRouter</strong><small>聚合多家主流大模型</small></span></button>
-          <button class="sheet-btn" data-sheet-toast="models:打开自定义服务表单">${icon('plus')}<span class="sheet-btn-copy"><strong>自定义模型服务</strong><small>支持 OpenAI Chat / Responses / Anthropic</small></span></button>
           <button class="sheet-cancel" data-close-sheet="1">取消</button>
         </div>
       </div>
@@ -1391,7 +1104,6 @@ function render() {
   document.body.classList.toggle('compact', state.compact);
   document.getElementById('phone-works').innerHTML = renderWorks();
   document.getElementById('phone-notif').innerHTML = renderNotifs();
-  document.getElementById('phone-models').innerHTML = renderModels();
   applyAccent();
 }
 
@@ -1438,14 +1150,6 @@ document.querySelectorAll('[data-notif-mode]').forEach(btn => {
     render();
   });
 });
-document.querySelectorAll('[data-model-mode]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.modelMode = btn.dataset.modelMode;
-    state.activeProvider = state.modelMode === 'exhausted' ? 'free' : 'official';
-    document.querySelectorAll('[data-model-mode]').forEach(b => b.classList.toggle('active', b === btn));
-    render();
-  });
-});
 
 /* Delegated phone interactions */
 document.addEventListener('click', (e) => {
@@ -1471,15 +1175,6 @@ document.addEventListener('click', (e) => {
     state.notifs.forEach(n => n.unread = false);
     render();
     showToast('notif', '已全部标记为已读');
-    return;
-  }
-
-  const useProv = e.target.closest('[data-use-provider]');
-  if (useProv) {
-    const id = useProv.dataset.useProvider;
-    state.activeProvider = id;
-    render();
-    showToast('models', id === 'official' ? '已切换为「小伴 AI」官方模型' : '已切换为该服务商默认模型');
     return;
   }
 

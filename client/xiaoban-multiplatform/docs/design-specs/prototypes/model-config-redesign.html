@@ -125,7 +125,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
   position: relative;
   height: 800px;
   border-radius: 38px;
-  background: var(--paper);
+  background: var(--surface);
   color: var(--ink);
   display: flex;
   flex-direction: column;
@@ -182,6 +182,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
   flex: none;
   padding: 0 8px;
   background: var(--surface);
+  border-bottom: 0.5px solid var(--hairline);
   display: grid;
   grid-template-columns: 82px 1fr 82px;
   align-items: center;
@@ -231,15 +232,24 @@ body.studio-dark .diff-item p { color: #989ba4; }
 }
 .page-body::-webkit-scrollbar { display: none; }
 
-/* Section Header */
+/* Section Header (Full-bleed Unified Surface) */
 .sec-head {
-  padding: 16px 16px 7px;
+  padding: 18px 16px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  background: var(--surface);
 }
-.sec-title { font-size: 12px; font-weight: 500; color: var(--ink3); }
+.group + .sec-head,
+.quota-block + .sec-head,
+.effort-seg-wrap + .sec-head,
+.form-block + .sec-head {
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 0.5px solid var(--hairline);
+}
+.sec-title { font-size: 12.5px; font-weight: 550; color: var(--ink3); }
 .sec-meta { font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
 .sec-action {
   display: inline-flex;
@@ -261,17 +271,17 @@ body.studio-dark .diff-item p { color: #989ba4; }
 .sep.full { margin-left: 0; }
 
 /* Provider Rows (Board 01) */
-.prov-row {
+.prov-card-row {
   width: 100%;
-  min-height: 68px;
-  padding: 12px 16px;
+  padding: 14px 10px 14px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  text-align: left;
-  transition: background .15s;
+  position: relative;
+  background: var(--surface);
+  transition: background .12s;
 }
-.prov-row:hover { background: var(--paper); }
+.prov-card-row:hover { background: var(--paper); }
 
 .prov-ico {
   width: 40px;
@@ -281,81 +291,219 @@ body.studio-dark .diff-item p { color: #989ba4; }
   display: grid;
   place-items: center;
   background: var(--fill);
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 650;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
 }
-.prov-ico svg { width: 19px; height: 19px; }
+.prov-ico svg { width: 20px; height: 20px; stroke-width: 1.9; }
 .prov-ico.official {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  border: 1px solid var(--accent-soft-line);
+  background: var(--accent);
+  color: #ffffff;
 }
 
-.prov-main { flex: 1; min-width: 0; }
-.prov-top { display: flex; align-items: center; gap: 7px; }
-.prov-name { font-size: 15px; line-height: 21px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prov-sub { margin-top: 2px; font-size: 12.5px; line-height: 17px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prov-main { flex: 1; min-width: 0; text-align: left; }
+.prov-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.prov-name { font-size: 15.5px; line-height: 22px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prov-sub { margin-top: 3px; font-size: 12.5px; line-height: 17px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .status-active {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 99px;
-  background: var(--success-soft);
-  color: var(--success);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 600;
+  gap: 5px;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
   flex: none;
 }
-.status-active::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.status-active::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
 
-.prov-right { display: flex; align-items: center; gap: 6px; flex: none; color: var(--ink3); }
-.prov-right svg { width: 16px; height: 16px; }
-.balance-val { font-size: 13px; font-weight: 500; color: var(--ink2); font-variant-numeric: tabular-nums; }
-.balance-zero { font-size: 12px; font-weight: 500; color: var(--warn); background: var(--warn-soft); padding: 2px 8px; border-radius: 99px; }
+.mini-pill {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: opacity .15s, background .15s;
+}
+.mini-pill.ghost { background: var(--fill); color: var(--ink2); }
+.mini-pill.ghost:hover { opacity: .82; }
+
+.row-chev-btn {
+  width: 28px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--ink3);
+  opacity: .68;
+  flex: none;
+  transition: background .15s, opacity .15s;
+}
+.row-chev-btn:hover { background: var(--fill); opacity: 1; }
+.row-chev-btn svg { width: 15px; height: 15px; }
+
+.model-subrow {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 10px 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  position: relative;
+}
+.model-subrow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.quota-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink3);
+  min-width: 0;
+}
+.quota-text.empty { color: var(--ink2); font-weight: 500; }
+
+.text-action {
+  flex: none;
+  height: 30px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink2);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transition: background .15s, opacity .15s;
+}
+.text-action:hover { background: var(--fill); }
+.text-action.accent { color: var(--accent-ink); font-weight: 600; }
+.text-action svg { width: 14px; height: 14px; stroke-width: 2; opacity: .82; }
 
 .add-row {
   width: 100%;
-  height: 50px;
-  padding: 0 16px;
+  min-height: 52px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 14.5px;
   font-weight: 500;
   color: var(--ink2);
-  transition: background .15s, color .15s;
+  transition: background .12s, color .12s;
 }
 .add-row:hover { background: var(--paper); color: var(--ink); }
-.add-row svg { width: 18px; height: 18px; }
+.add-row svg { width: 18px; height: 18px; stroke-width: 2.1; }
 
 .page-note {
-  padding: 10px 16px 0;
+  margin-top: 4px;
+  padding: 12px 16px 0;
+  border-top: 0.5px solid var(--hairline);
   font-size: 12px;
   line-height: 18px;
   color: var(--ink3);
 }
 
 /* ─── Board 02: Official Xiaoban AI Subpage ─── */
-.quota-block { background: var(--surface); padding: 16px; }
-.quota-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.quota-block { background: var(--surface); padding: 18px 16px 16px; }
+.quota-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .quota-num { display: flex; align-items: baseline; gap: 5px; }
-.quota-num strong { font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.quota-num strong { font-size: 32px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .quota-num span { font-size: 13px; color: var(--ink2); font-weight: 500; }
-.quota-meta { margin-top: 6px; font-size: 12px; color: var(--ink3); display: flex; align-items: center; gap: 8px; }
-.quota-expire { font-size: 12px; color: var(--ink3); text-align: right; }
+.quota-expire { font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.quota-meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--ink3); display: flex; align-items: center; gap: 7px; }
 
-.redeem-row {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 0.5px solid var(--hairline);
+.redeem-bar {
+  margin-top: 16px;
+  height: 44px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 12px;
+  background: var(--fill);
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: box-shadow .15s;
 }
+.redeem-bar:focus-within { box-shadow: inset 0 0 0 1px var(--line); background: var(--paper); }
+.redeem-bar input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.redeem-bar input::placeholder { color: var(--ink3); }
+.redeem-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink3);
+  font-size: 13.5px;
+  font-weight: 600;
+  flex: none;
+  transition: background .15s, color .15s;
+}
+.redeem-btn.ready {
+  background: var(--accent);
+  color: #ffffff;
+}
+.redeem-btn.ready:hover { filter: brightness(.94); }
+
+/* Segmented Reasoning Control (Board 02) */
+.effort-seg-wrap { background: var(--surface); padding: 14px 16px; }
+.effort-seg-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.effort-seg-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.effort-seg-hint { font-size: 12px; color: var(--ink3); }
+.effort-seg {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--fill);
+  gap: 2px;
+}
+.effort-seg button {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink2);
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.effort-seg button:hover:not(.active) { color: var(--ink); }
+.effort-seg button.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .09);
+}
+.phone.dark .effort-seg button.active { background: #323236; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+.effort-unsup { font-size: 12.5px; color: var(--ink3); line-height: 18px; }
+
 .field-box {
   flex: none;
   width: 100%;
@@ -367,7 +515,6 @@ body.studio-dark .diff-item p { color: #989ba4; }
   align-items: center;
   gap: 8px;
 }
-.redeem-row .field-box,
 .add-model-bar .field-box {
   flex: 1;
   width: auto;
@@ -387,23 +534,24 @@ body.studio-dark .diff-item p { color: #989ba4; }
   transition: background .15s, color .15s;
 }
 .compact-btn.ready {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  border: 1px solid var(--accent-soft-line);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 /* Unified Flush-Left Model Row (Board 02 & Board 05 — ZERO awkward left gap!) */
 .model-row {
   width: 100%;
   min-height: 54px;
-  padding: 11px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   transition: background .15s;
 }
-.model-row.selected-tint { background: var(--fill); border-radius: 12px; padding: 11px 12px; }
+.model-row:hover { background: var(--paper); }
+.model-row.selected-tint { background: var(--paper); border-radius: 12px; padding: 11px 12px; }
+.phone.dark .model-row.selected-tint { background: rgba(255, 255, 255, .06); }
 .model-hit {
   flex: 1;
   min-width: 0;
@@ -429,30 +577,51 @@ body.studio-dark .diff-item p { color: #989ba4; }
 .check-mark { width: 18px; height: 18px; display: grid; place-items: center; color: var(--accent-ink); }
 .check-mark svg { width: 17px; height: 17px; stroke-width: 2.3; }
 
-/* Neutral Reasoning Effort Trigger Chip (fixed 2-char label width so all rows align cleanly!) */
-.effort-chip {
+/* Refined Reasoning Effort Trigger (Board 05 — 3-bar level meter + clean pill, no cluttered box!) */
+.effort-pill {
   height: 28px;
-  min-width: 72px;
-  padding: 0 8px;
-  border-radius: 8px;
-  background: var(--fill);
-  color: var(--ink2);
-  font-size: 11.5px;
+  padding: 0 8px 0 9px;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--ink3);
+  font-size: 12px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 3px;
+  gap: 5px;
   flex: none;
-  transition: background .15s, color .15s;
+  transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
 }
-.effort-chip span {
-  min-width: 24px;
-  text-align: center;
+.effort-pill:hover { background: var(--fill); color: var(--ink); }
+.model-row.selected-tint .effort-pill {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 550;
+  border: 0.5px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
 }
-.model-row.selected-tint .effort-chip { background: var(--surface); border: 1px solid var(--hairline); }
-.effort-chip:hover { color: var(--ink); }
-.effort-chip svg { width: 13px; height: 13px; }
+.phone.dark .model-row.selected-tint .effort-pill { background: #2c2c30; border-color: rgba(255, 255, 255, .1); }
+.effort-pill svg { width: 12px; height: 12px; opacity: .55; }
+
+.effort-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 10px;
+}
+.effort-bars i {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+  display: block;
+}
+.effort-bars i:nth-child(1) { height: 4px; }
+.effort-bars i:nth-child(2) { height: 7px; }
+.effort-bars i:nth-child(3) { height: 10px; }
+.effort-bars.lvl-1 i:nth-child(1) { background: currentColor; }
+.effort-bars.lvl-2 i:nth-child(-n+2) { background: currentColor; }
+.effort-bars.lvl-3 i { background: currentColor; }
+.model-row.selected-tint .effort-bars.lvl-3 i { background: var(--accent); }
 
 /* ─── Bottom Sheets (Unified Clean Sheet Language) ─── */
 .scrim {
@@ -718,15 +887,16 @@ body.studio-dark .diff-item p { color: #989ba4; }
   flex: 1;
   height: 44px;
   border-radius: 99px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-soft-line);
-  color: var(--accent-ink);
+  background: var(--accent);
+  color: #ffffff;
   font-size: 14.5px;
-  font-weight: 650;
+  font-weight: 600;
   display: grid;
   place-items: center;
   width: 100%;
+  transition: filter .15s;
 }
+.btn-soft-primary:hover { filter: brightness(.95); }
 
 /* ─── Board 05: Chat Model Picker (Flush-Left Aligned!) ─── */
 .chat-bg-head { padding: 12px 16px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; }
@@ -808,11 +978,11 @@ body.studio-dark .diff-item p { color: #989ba4; }
         <h2>01 · 模型配置主页</h2>
         <div class="board-mini-seg" role="group" aria-label="主页场景">
           <button class="active" data-b1="zero">0 点态</button>
-          <button data-b1="normal">有余额</button>
+          <button data-b1="normal">多服务商</button>
         </div>
       </div>
       <div class="phone" id="phone-b1"></div>
-      <p class="board-caption">消灭满屏红粉：第三方图标与添加入口全回归中性灰黑；「使用中」改用冷静绿点；「0 点」用克制琥珀胶囊并点整行直达兑换。</p>
+      <p class="board-caption">零浅色/次主题色底块：「小伴 AI」官方图标保留实心主题色底配白色星标，「兑换点数」用无底色主题色文字链接；其余回归黑白灰层级（中性「使用」胶囊、第三方灰图标与「+ 添加」），仅以 6px 绿点轻标「使用中」。</p>
     </section>
 
     <!-- Board 02: Official Xiaoban AI Subpage -->
@@ -822,11 +992,10 @@ body.studio-dark .diff-item p { color: #989ba4; }
         <div class="board-mini-seg" role="group" aria-label="官方配置态">
           <button class="active" data-b2="zero">0 点</button>
           <button data-b2="active">有余额</button>
-          <button data-b2="sheet">思考弹层</button>
         </div>
       </div>
       <div class="phone" id="phone-b2"></div>
-      <p class="board-caption">官方模型列表补齐右侧「思考等级」胶囊，点选即弹出底部 BottomSheet 切换思考档位；列表齐左无空档，去掉底部实心大红「完成」键。</p>
+      <p class="board-caption">精简余额区与一体化圆角兑换输入条（有输入时「兑换」亮实心主题色白字，零浅粉底）；默认模型列表彻底去掉每行右侧笨重方盒，思考强度独立为当前选中模型的圆润分段滑块，一键直切无需二次弹窗。</p>
     </section>
 
     <!-- Board 03: Add Provider Sheet -->
@@ -866,7 +1035,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
         </div>
       </div>
       <div class="phone" id="phone-b5"></div>
-      <p class="board-caption">修复 Auto 左侧多余留白：全部模型名与分组标题严格左对齐，对号统一放最右侧；点击右侧中性思考胶囊弹出贴底 BottomSheet（告别悬浮白框遮挡）。</p>
+      <p class="board-caption">修复 Auto 左侧多余留白：模型名严格左对齐；思考强度触发器去掉模糊大脑图标与厚重灰方盒，改用「3 格动态强度阶梯条 + 档位字」（未选中行无底轻文字、选中行纯白细描边圆胶囊），点击弹出贴底 BottomSheet。</p>
     </section>
   </main>
 
@@ -874,8 +1043,12 @@ body.studio-dark .diff-item p { color: #989ba4; }
     <h3>本轮细化与结构修正</h3>
     <div class="diff-grid">
       <div class="diff-item">
-        <strong>02 · 补齐官方思考等级</strong>
-        <p>小伴 AI 官方模型行右侧直接展示当前思考档位（如「默认 / 高」），点击从底部弹出思考等级选择器，与对话页完全一致。</p>
+        <strong>01 · 主页零浅色底块</strong>
+        <p>撤掉所有浅红/浅黄/浅绿次主题色底块：仅「小伴 AI」保留实心主题色底 + 白色星标，「兑换点数」改用无底色主题色文字链接，其余全部黑白灰层级，以无底 6px 绿点标示「使用中」。</p>
+      </div>
+      <div class="diff-item">
+        <strong>02 · 官方配置重构</strong>
+        <p>额度与兑换码收为一体化圆角输入条（输入后「兑换」变为实心主题色白字）；模型行彻底去杂，思考强度抽成独立圆润分段滑块，随当前选中模型实时切换档位。</p>
       </div>
       <div class="diff-item">
         <strong>04 · 协议独立选择 + 联动地址</strong>
@@ -890,8 +1063,8 @@ body.studio-dark .diff-item p { color: #989ba4; }
         <p>移除左侧占位勾选槽，所有模型名与分组标题一条直线左对齐；选中对号统一放在最右侧，视觉干净利落。</p>
       </div>
       <div class="diff-item">
-        <strong>05 · 统一贴底 BottomSheet</strong>
-        <p>思考等级统一改用贴底 BottomSheet（替代悬浮白弹窗与行内缩进条），五档选项行高一致，彻底告别遮挡与视觉割裂。</p>
+        <strong>05 · 轻量化思考强度按钮</strong>
+        <p>放弃糊掉的大脑图标与厚重灰方盒，改用「3 格动态强度阶梯条 + 档位」：未选中行透明轻态不抢戏，选中行升级为白底细描边圆胶囊，点开贴底 BottomSheet 五档统一切换。</p>
       </div>
     </div>
   </section>
@@ -1007,34 +1180,52 @@ function statusBar(time = '21:05') {
 
 function renderB1() {
   const zero = state.b1Mode === 'zero';
-  const curName = state.b1Active === 'official' ? 'Auto（自动）' : state.b1Active === 'deepseek' ? 'deepseek-flash' : 'kilo-auto/free';
+  const officialActive = state.b1Active === 'official';
+  const providers = zero
+    ? [
+        { id: 'free', name: '免费模型', init: '免', model: 'kilo-auto/free', count: 1 },
+      ]
+    : [
+        { id: 'free', name: '免费模型', init: '免', model: 'kilo-auto/free', count: 1 },
+        { id: 'deepseek', name: 'DeepSeek', init: 'DS', model: 'deepseek-chat', count: 2 },
+        { id: 'claude', name: 'Anthropic 代理', init: 'CL', model: 'claude-sonnet-4', count: 3 },
+      ];
+
+  const activeObj = officialActive
+    ? { name: '小伴 AI', model: 'Auto（官方智能调度）' }
+    : (providers.find(p => p.id === state.b1Active) || providers[0]);
+
   return `
     ${statusBar('21:05')}
     <div class="appbar">
-      <div class="appbar-left"><button class="icon-tap" data-toast="b1:返回上一页" aria-label="返回">${ico('back')}</button></div>
+      <div class="appbar-left"><button class="icon-tap" data-toast="b1:返回「我的」" aria-label="返回">${ico('back')}</button></div>
       <h3>模型配置</h3>
-      <div class="appbar-right"><button class="icon-tap" data-toast="b1:打开添加第三方服务弹层" aria-label="添加服务商">${ico('plus')}</button></div>
+      <div class="appbar-right"><button class="icon-tap" data-toast="b1:打开添加第三方服务弹层" aria-label="添加第三方模型服务">${ico('plus')}</button></div>
     </div>
     <div class="page-body">
       <div class="sec-head">
         <span class="sec-title">官方服务</span>
-        <span class="sec-meta">当前：${curName}</span>
+        <span class="sec-meta">当前：${activeObj.model}</span>
       </div>
       <div class="group">
-        <button class="prov-row" data-toast="b1:进入「小伴 AI」官方配置页">
-          <div class="prov-ico official">${ico('sparkles')}</div>
-          <div class="prov-main">
+        <div class="prov-card-row">
+          <span class="prov-ico official">${ico('sparkles')}</span>
+          <button class="prov-main" data-toast="b1:进入「小伴 AI」官方配置页">
             <div class="prov-top">
               <span class="prov-name">小伴 AI</span>
-              ${state.b1Active === 'official' ? '<span class="status-active">使用中</span>' : ''}
+              ${officialActive ? '<span class="status-active">使用中</span>' : ''}
             </div>
-            <div class="prov-sub">${zero ? '点数已用完，点击兑换或获取额度' : '随账号同步 · 默认 Auto（自动）'}</div>
-          </div>
-          <div class="prov-right">
-            ${zero ? '<span class="balance-zero">0 点 · 兑换</span>' : '<span class="balance-val">1,280 点</span>'}
-            ${ico('chev')}
-          </div>
-        </button>
+            <div class="prov-sub">跟着账号走，手机与电脑自动同步</div>
+          </button>
+          ${!officialActive ? `<button class="mini-pill ghost" data-b1-use="official">使用</button>` : ''}
+          <button class="row-chev-btn" aria-label="配置小伴 AI" data-toast="b1:进入「小伴 AI」官方配置页">${ico('chev')}</button>
+        </div>
+        <div class="model-subrow">
+          <span class="quota-line">
+            <span class="quota-text ${zero ? 'empty' : ''}">${zero ? '官方点数已用完' : '剩余 1,240 点 · 到期 12-31'}</span>
+          </span>
+          <button class="text-action ${zero ? 'accent' : ''}" data-toast="b1:${zero ? '进入官方配置页兑换点数' : '查看官方额度与模型'}"><span>${zero ? '兑换点数' : '额度与模型'}</span>${ico('chev')}</button>
+        </div>
       </div>
 
       <div class="sec-head">
@@ -1042,39 +1233,32 @@ function renderB1() {
         <span class="sec-meta">仅本机保存</span>
       </div>
       <div class="group">
-        <button class="prov-row" data-b1-pick="free">
-          <div class="prov-ico">免</div>
-          <div class="prov-main">
-            <div class="prov-top">
-              <span class="prov-name">免费模型</span>
-              ${state.b1Active === 'free' ? '<span class="status-active">使用中</span>' : ''}
+        ${providers.map((p, idx) => {
+          const isAct = state.b1Active === p.id;
+          return `
+            ${idx > 0 ? '<div class="sep inset"></div>' : ''}
+            <div class="prov-card-row">
+              <span class="prov-ico">${p.init}</span>
+              <button class="prov-main" data-toast="b1:进入「${p.name}」详细配置">
+                <div class="prov-top">
+                  <span class="prov-name">${p.name}</span>
+                  ${isAct ? '<span class="status-active">使用中</span>' : ''}
+                </div>
+                <div class="prov-sub">默认 ${p.model} · 共 ${p.count} 个模型</div>
+              </button>
+              ${!isAct ? `<button class="mini-pill ghost" data-b1-use="${p.id}">使用</button>` : ''}
+              <button class="row-chev-btn" aria-label="配置 ${p.name}" data-toast="b1:进入「${p.name}」详细配置">${ico('chev')}</button>
             </div>
-            <div class="prov-sub">默认 kilo-auto/free · 1 个模型</div>
-          </div>
-          <div class="prov-right">${ico('chev')}</div>
-        </button>
-        ${zero ? '' : `
-          <div class="sep inset"></div>
-          <button class="prov-row" data-b1-pick="deepseek">
-            <div class="prov-ico">D</div>
-            <div class="prov-main">
-              <div class="prov-top">
-                <span class="prov-name">DeepSeek</span>
-                ${state.b1Active === 'deepseek' ? '<span class="status-active">使用中</span>' : ''}
-              </div>
-              <div class="prov-sub">默认 deepseek-flash · 2 个模型</div>
-            </div>
-            <div class="prov-right">${ico('chev')}</div>
-          </button>
-        `}
+          `;
+        }).join('')}
         <div class="sep"></div>
-        <button class="add-row" data-toast="b1:打开添加第三方服务商弹层">
+        <button class="add-row" data-toast="b1:打开添加第三方服务弹层">
           ${ico('plus')}
-          <span>添加第三方服务</span>
+          <span>添加第三方模型服务</span>
         </button>
       </div>
 
-      <p class="page-note">第三方密钥仅保存在本机，不会上传到小伴账号；对话时也可随时切换不同服务商的模型。</p>
+      <p class="page-note">第三方服务密钥仅保存在本机，不会上传到小伴账号；对话中也可以随时切换不同服务商的模型。</p>
     </div>
     <div class="home-bar"><span></span></div>
     <div class="phone-toast" id="toast-b1"></div>
@@ -1119,15 +1303,23 @@ function renderSingleEffortSheet(boardKey, modelName, currentEffort, allowedIds)
   `;
 }
 
+function effortBarsHtml(eff) {
+  const lvl = eff === 'default' ? '' : eff === 'low' ? 'lvl-1' : eff === 'medium' ? 'lvl-2' : 'lvl-3';
+  return `<span class="effort-bars ${lvl}" aria-hidden="true"><i></i><i></i><i></i></span>`;
+}
+
 function renderB2() {
   const zero = state.b2Mode === 'zero';
   const models = [
-    { id: 'auto', name: 'Auto（自动）', tag: '推荐', desc: '自动匹配小伴默认模型，服务调整无需重选', efforts: ['low', 'medium', 'high'] },
+    { id: 'auto', name: 'Auto（自动）', tag: '推荐', desc: '自动匹配官方默认模型，服务升级无需重选', efforts: ['low', 'medium', 'high'] },
     { id: 'ds41', name: 'deepseek-v4.1-flash', tag: '', desc: '', efforts: ['low', 'medium', 'high'] },
     { id: 'g38',  name: 'gemini-3.8-flash', tag: '', desc: '', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
     { id: 'g4h',  name: 'gemini-4-hydrogen', tag: '', desc: '', efforts: [] },
   ];
-  const sheetModel = state.b2SheetFor ? models.find(m => m.id === state.b2SheetFor) : null;
+  const curModel = models.find(m => m.id === state.b2Model) || models[0];
+  const curEff = state.b2Efforts[curModel.id] || 'default';
+  const effOptions = curModel.efforts.length ? ['default', ...curModel.efforts] : [];
+
   return `
     ${statusBar('21:04')}
     <div class="appbar">
@@ -1137,66 +1329,70 @@ function renderB2() {
     </div>
     <div class="page-body">
       <div class="sec-head">
-        <span class="sec-title">额度与兑换</span>
+        <span class="sec-title">小伴点余额</span>
         <span class="sec-meta">随账号同步</span>
       </div>
       <div class="quota-block">
-        <div class="quota-top">
-          <div>
-            <div class="quota-num">
-              <strong>${zero ? '0' : '1,280'}</strong>
-              <span>小伴点</span>
-            </div>
-            <div class="quota-meta">
-              <span>付费点数 ${zero ? '0' : '1,000'} 点</span>
-              <span>·</span>
-              <span>赠送 ${zero ? '0' : '280'} 点</span>
-            </div>
+        <div class="quota-head">
+          <div class="quota-num">
+            <strong>${zero ? '0' : '1,280'}</strong>
+            <span>点</span>
           </div>
-          <div class="quota-expire">${zero ? '到期 —' : '2026-12-31 到期'}</div>
+          <span class="quota-expire">${zero ? '暂无有效期' : '2026-12-31 到期'}</span>
         </div>
-        <div class="redeem-row">
-          <div class="field-box">
-            <input type="text" placeholder="输入兑换码补充点数" value="${state.b2Code}" data-b2-code="1" aria-label="兑换码">
-          </div>
-          <button class="compact-btn ${state.b2Code.trim() ? 'ready' : ''}" data-b2-redeem="1">兑换</button>
+        <div class="quota-meta">
+          ${zero
+            ? '<span>兑换点数或获取额度后可使用官方模型</span>'
+            : '<span>付费 1,000 点</span><span>·</span><span>赠送 280 点</span>'
+          }
+        </div>
+        <div class="redeem-bar">
+          <input type="text" placeholder="输入兑换码补充点数" value="${state.b2Code}" data-b2-code="1" aria-label="兑换码">
+          <button class="redeem-btn ${state.b2Code.trim() ? 'ready' : ''}" data-b2-redeem="1">兑换</button>
         </div>
       </div>
 
       <div class="sec-head">
         <span class="sec-title">默认对话模型</span>
-        <span class="sec-meta">点选即刻生效</span>
+        <span class="sec-meta">点选即生效</span>
       </div>
       <div class="group">
         ${models.map((m, idx) => {
           const sel = state.b2Model === m.id;
-          const curEff = state.b2Efforts[m.id] || 'default';
           return `
             ${idx > 0 ? '<div class="sep"></div>' : ''}
-            <div class="model-row ${sel ? 'selected' : ''}">
-              <button class="model-hit" data-b2-model="${m.id}">
+            <button class="model-row ${sel ? 'selected' : ''}" data-b2-model="${m.id}">
+              <div class="model-hit">
                 <div class="model-row-top">
                   <span class="model-row-name">${m.name}</span>
                   ${m.tag ? `<span class="neutral-tag">${m.tag}</span>` : ''}
                 </div>
                 ${m.desc ? `<div class="model-row-desc">${m.desc}</div>` : ''}
-              </button>
-              <div class="model-row-right">
-                ${m.efforts.length ? `
-                  <button class="effort-chip" data-b2-effort-open="${m.id}">
-                    ${ico('brain')}<span>${EFFORT_LABEL[curEff]}</span>${ico('chevDown')}
-                  </button>
-                ` : ''}
-                <span class="check-mark">${sel ? ico('check') : ''}</span>
               </div>
-            </div>
+              <span class="check-mark">${sel ? ico('check') : ''}</span>
+            </button>
           `;
         }).join('')}
       </div>
-      <p class="page-note">点选模型或右侧思考档位立即生效，无需额外确认；对话页仍可随时切换。</p>
+
+      <div class="sec-head">
+        <span class="sec-title">思考强度</span>
+        <span class="sec-meta">${curModel.name}</span>
+      </div>
+      <div class="effort-seg-wrap">
+        ${effOptions.length ? `
+          <div class="effort-seg" role="radiogroup" aria-label="默认思考强度">
+            ${effOptions.map(id => `
+              <button class="${curEff === id ? 'active' : ''}" data-b2-effort-seg="${id}" role="radio" aria-checked="${curEff === id}">${EFFORT_LABEL[id]}</button>
+            `).join('')}
+          </div>
+        ` : `
+          <p class="effort-unsup">当前所选模型不支持调节思考强度</p>
+        `}
+      </div>
+      <p class="page-note">默认模型与思考强度实时生效；对话中也可以随时临时切换。</p>
     </div>
     <div class="home-bar"><span></span></div>
-    ${sheetModel ? renderSingleEffortSheet('b2', sheetModel.name, state.b2Efforts[sheetModel.id] || 'default', sheetModel.efforts) : ''}
     <div class="phone-toast" id="toast-b2"></div>
   `;
 }
@@ -1413,7 +1609,7 @@ function renderB4() {
         </div>
       </div>
 
-      <div style="height:12px"></div>
+      <div class="sep full" style="margin-top:8px"></div>
       <div class="group">
         <button class="collapse-row ${state.b4AdvOpen ? 'open' : ''}" data-b4-adv="1">
           <span>高级设置</span>
@@ -1524,8 +1720,8 @@ function renderB5() {
                     </button>
                     <div class="model-row-right">
                       ${item.efforts.length ? `
-                        <button class="effort-chip" data-b5-effort-open="${item.id}">
-                          ${ico('brain')}<span>${EFFORT_LABEL[curEffort]}</span>${ico('chevDown')}
+                        <button class="effort-pill" data-b5-effort-open="${item.id}" aria-label="调节 ${item.name} 思考强度">
+                          ${effortBarsHtml(curEffort)}<span>${EFFORT_LABEL[curEffort]}</span>${ico('chevDown')}
                         </button>
                       ` : ''}
                       <span class="check-mark">${sel ? ico('check') : ''}</span>
@@ -1720,11 +1916,12 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  const b1Pick = e.target.closest('[data-b1-pick]');
-  if (b1Pick) {
-    state.b1Active = b1Pick.dataset.b1Pick;
+  const b1Use = e.target.closest('[data-b1-use]');
+  if (b1Use) {
+    const id = b1Use.dataset.b1Use;
+    state.b1Active = id;
     render();
-    showToast('b1', '进入该服务商配置页');
+    showToast('b1', id === 'official' ? '已切换为「小伴 AI」官方模型' : '已切换为该服务商默认模型');
     return;
   }
 
@@ -1735,11 +1932,12 @@ document.addEventListener('click', (e) => {
     showToast('b2', '已切换默认模型，立即生效');
     return;
   }
-  const b2EffOpen = e.target.closest('[data-b2-effort-open]');
-  if (b2EffOpen) {
-    state.b2SheetFor = b2EffOpen.dataset.b2EffortOpen;
-    document.querySelectorAll('[data-b2]').forEach(el => el.classList.toggle('active', el.dataset.b2 === 'sheet'));
+  const b2EffSeg = e.target.closest('[data-b2-effort-seg]');
+  if (b2EffSeg) {
+    const eff = b2EffSeg.dataset.b2EffortSeg;
+    state.b2Efforts[state.b2Model] = eff;
     render();
+    showToast('b2', `默认思考强度已设为：${EFFORT_LABEL[eff]}`);
     return;
   }
   if (e.target.closest('[data-b2-redeem]')) {
