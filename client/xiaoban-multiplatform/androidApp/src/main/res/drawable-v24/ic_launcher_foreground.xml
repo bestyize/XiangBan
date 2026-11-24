@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 和桌面小伴同一个星星（Lucide Sparkles），白色描边；按自适应图标的安全区缩放到 108dp 画布中间。 -->
+<!-- 双星相伴（精修 A）纯白前景，按 Android 自适应图标安全区缩放到 108dp 画布居中。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,33 +8,31 @@
     <group
         android:pivotX="0"
         android:pivotY="0"
-        android:scaleX="2.4"
-        android:scaleY="2.4"
-        android:translateX="25.2"
-        android:translateY="25.2">
-        <path
-            android:pathData="M11.017,2.814a1,1 0,0 1,1.966 0l1.051,5.558a2,2 0,0 0,1.594 1.594l5.558,1.051a1,1 0,0 1,0 1.966l-5.558,1.051a2,2 0,0 0,-1.594 1.594l-1.051,5.558a1,1 0,0 1,-1.966 0l-1.051,-5.558a2,2 0,0 0,-1.594 -1.594l-5.558,-1.051a1,1 0,0 1,0 -1.966l5.558,-1.051a2,2 0,0 0,1.594 -1.594z"
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:pathData="M20,2v4"
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:pathData="M22,4h-4"
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:pathData="M2,20a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
+        android:scaleX="0.66"
+        android:scaleY="0.66"
+        android:translateX="14.4"
+        android:translateY="14.4">
+        <group
+            android:pivotX="0"
+            android:pivotY="0"
+            android:scaleX="0.96"
+            android:scaleY="0.96"
+            android:translateX="55.5"
+            android:translateY="62.5">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M -3.2,-30.2 Q 0,-34 3.2,-30.2 C 7.6,-15.6 15.6,-7.6 30.2,-3.2 Q 34,0 30.2,3.2 C 15.6,7.6 7.6,15.6 3.2,30.2 Q 0,34 -3.2,30.2 C -7.6,15.6 -15.6,7.6 -30.2,3.2 Q -34,0 -30.2,-3.2 C -15.6,-7.6 -7.6,-15.6 -3.2,-30.2 Z" />
+        </group>
+        <group
+            android:pivotX="0"
+            android:pivotY="0"
+            android:scaleX="0.47"
+            android:scaleY="0.47"
+            android:translateX="82.5"
+            android:translateY="35.5">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M -3.8,-29.8 Q 0,-34 3.8,-29.8 C 8.5,-15 15,-8.5 29.8,-3.8 Q 34,0 29.8,3.8 C 15,8.5 8.5,15 3.8,29.8 Q 0,34 -3.8,29.8 C -8.5,15 -15,8.5 -29.8,3.8 Q -34,0 -29.8,-3.8 C -15,-8.5 -8.5,-15 -3.8,-29.8 Z" />
+        </group>
     </group>
 </vector>

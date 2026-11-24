@@ -1,10 +1,6 @@
 # Xiaoban Desktop application icon
 
-The single editable source is **`icon-source.svg`**. It reproduces the Lucide
-`Sparkles` mark used immediately before **小伴 AI** in
-`src/ui/ControlShell.vue`, in white over the **default 小伴红** (`#D93A44`,
-`src/ui/appearance.ts`). The application icon is intentionally fixed to the
-brand's default red and does **not** follow the user's runtime accent selection.
+The single editable default source is **`icon-source.svg`**: **Twin Stars（双星相伴 · 精修 A）** in pure white (`#FFFFFF`) over the **Sunset Coral glaze** (`#FF6584` → `#F9744B`). The companion dark-mode source is **`icon-source-dark.svg`** (pure white over **Obsidian** `#262023` → `#121012`). Both share the same optical centering and cross-platform brand identity with 小伴社区 and 小伴手机 App.
 
 ## Regenerate native assets
 
@@ -29,6 +25,3 @@ tracked by git (its bytes change on every run); `tauri build`/`tauri dev` and
 `node scripts/generate-icon.mjs` first when using it any other way. Re-run the command before any direct Cargo
 build, or use the standard Tauri entry points, so the generated native icons
 cannot remain from an earlier design. Do not edit them independently.
-
-The source was updated to SVG because the previous `icon-source.png` was an old
-robot-face bitmap and the prior generator hardcoded a pixel-art approximation.

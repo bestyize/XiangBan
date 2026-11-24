@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 
 /**
- * The canonical icon is icons/icon-source.svg: exactly the Lucide Sparkles
- * used before "小伴 AI", in white over the default #D93A44 小伴红.
+ * The canonical icon is icons/icon-source.svg: Twin Stars (双星相伴 · 精修 A)
+ * in crisp white over the Sunset Coral glaze (#FF6584 -> #F9744B), with
+ * icons/icon-source-dark.svg providing the Obsidian dark-mode counterpart.
  * @tauri-apps/cli is an existing dev dependency, not a new image dependency.
  * Run before packaging; it creates .ico (Windows), .icns (macOS), .png (Linux)
  * and the raw .rgba that setup_tray includes without a runtime image decoder.

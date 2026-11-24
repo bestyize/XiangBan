@@ -1,11 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="小伴桌面应用图标">
-  <!-- The default 小伴红 accent is #D93A44 (src/ui/appearance.ts). -->
-  <rect width="1024" height="1024" rx="220" fill="#D93A44"/>
-  <!-- Lucide Sparkles: the same mark preceding 小伴 AI in ControlShell.vue. -->
-  <g transform="translate(182 182) scale(27.5)" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/>
-    <path d="M20 2v4"/>
-    <path d="M22 4h-4"/>
-    <circle cx="4" cy="20" r="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120" role="img" aria-label="小伴桌面应用图标">
+  <!-- 双星相伴（精修 A）· 日落珊瑚釉面 × 纯白标 -->
+  <defs>
+    <linearGradient id="bg" x1="12%" y1="6%" x2="88%" y2="96%">
+      <stop offset="0%" stop-color="#FF6584" />
+      <stop offset="100%" stop-color="#F9744B" />
+    </linearGradient>
+    <radialGradient id="aura" cx="50%" cy="44%" r="48%">
+      <stop offset="0%" stop-color="#FFE0A3" stop-opacity="0.24" />
+      <stop offset="100%" stop-color="#FFE0A3" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.16" />
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="120" height="120" rx="27" fill="url(#bg)" />
+  <rect x="0" y="0" width="120" height="120" rx="27" fill="url(#aura)" />
+  <rect x="0" y="0" width="120" height="120" rx="27" fill="url(#sheen)" />
+  <rect x="0.75" y="0.75" width="118.5" height="118.5" rx="26.25" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="1.5" />
+  <g transform="translate(55.5 62.5) scale(0.96)">
+    <path fill="#FFFFFF" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z" />
+  </g>
+  <g transform="translate(82.5 35.5) scale(0.47)">
+    <path fill="#FFFFFF" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z" />
   </g>
 </svg>

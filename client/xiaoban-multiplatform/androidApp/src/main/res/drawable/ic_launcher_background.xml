@@ -1,11 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 小伴红，和桌面小伴的应用图标一致（client/xiaoban-desktop/src-tauri/icons/icon-source.svg）。 -->
+<!-- 日落珊瑚釉面底色（#FF6584 -> #F9744B），与小伴桌面、小伴社区统一。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#D93A44"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="95.04"
+                android:endY="103.68"
+                android:startX="12.96"
+                android:startY="6.48"
+                android:type="linear">
+                <item
+                    android:color="#FFFF6584"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FFF9744B"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="47.52"
+                android:gradientRadius="51.84"
+                android:type="radial">
+                <item
+                    android:color="#3DFFE0A3"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00FFE0A3"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>
