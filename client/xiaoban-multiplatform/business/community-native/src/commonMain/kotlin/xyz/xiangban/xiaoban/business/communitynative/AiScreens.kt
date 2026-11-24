@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import xyz.xiangban.xiaoban.common.community.AiBalance
 import xyz.xiangban.xiaoban.common.community.ChatApproval
+import xyz.xiangban.xiaoban.common.community.MobileGame
 import xyz.xiangban.xiaoban.common.community.CloudAssistant
 import xyz.xiangban.xiaoban.common.community.CloudRecognizer
 import xyz.xiangban.xiaoban.common.community.SpokenCall
@@ -391,6 +392,9 @@ internal fun AiChatPage(
                 } else if (cloud.messages.isEmpty() && archive.isEmpty()) {
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
+                    val deliveredWork = if (!archived && cloud.creation?.approved == true && !cloud.sending && cloud.messages.lastOrNull()?.creationInterrupted() != true) {
+                        remember(cloud.messages) { creationProgress(cloud.messages) }.installed
+                    } else null
                     key(conversation) {
                         CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
                             onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send,
@@ -403,6 +407,10 @@ internal fun AiChatPage(
                                     ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
                             } else null,
                             readOnly = archived, creation = cloud.creation?.approved == true,
+                            deliveredWork = deliveredWork,
+                            onOpenWork = { work ->
+                                if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
+                            },
                             onArchivedPreview = { id, image -> archivePreview = id to image },
                             archivedThumbnail = { id, image -> chat.resolveArchivedImage(id, image, thumbnail = true) })
                     }
@@ -413,7 +421,7 @@ internal fun AiChatPage(
                     AskCard(RemoteApprovalRequest(
                         approvalId = question.id, session = cloud.conversationId, title = "小伴想问你",
                         kind = "question", question = question.question, choices = question.options, freeText = true,
-                    ), { answer -> chat.answerQuestion(answer.takeUnless { it == "__dismiss__" }) }, Modifier.padding(horizontal = 12.dp))
+                    ), { answer -> chat.answerQuestion(answer.takeUnless { it == "__dismiss__" }) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp))
                 }
                 cloud.approval?.let { pending -> ApprovalCard(pending.toRequest(), { chat.answerApproval(it) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) }
                 if (main) {
@@ -425,38 +433,27 @@ internal fun AiChatPage(
                 }
                 Column(Modifier.padding(horizontal = 12.dp)) {
                     if (cloud.planningCreation) {
-                        Text(
-                            when {
-                                cloud.sending -> "正在拟定方案 · 等你确认后才会制作"
-                                cloud.creationPlanReady -> "方案已就绪，可以继续补充需求"
-                                else -> "先生成方案并确认"
-                            },
-                            Modifier.padding(bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        AgentPlanConfirmCard(
+                            sending = cloud.sending,
+                            ready = cloud.creationPlanReady,
+                            canConfirm = input.isBlank() && attachments.isEmpty(),
+                            onEdit = { voiceMode = false; editingPlan = true },
+                            onPrimary = if (cloud.creationPlanReady) chat::confirmCreationPlan else chat::requestCreationPlan,
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
-                        if (!cloud.sending) {
-                            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (cloud.creationPlanReady) AppActionButton("修改需求", { voiceMode = false; editingPlan = true }, Modifier.weight(1f))
-                                AppActionButton(if (cloud.creationPlanReady) "开始制作" else "重新生成方案",
-                                    if (cloud.creationPlanReady) chat::confirmCreationPlan else chat::requestCreationPlan,
-                                    Modifier.weight(1f), primary = true, enabled = input.isBlank() && attachments.isEmpty())
-                            }
-                        }
                     }
                     if (cloud.creation?.approved == true && !cloud.sending) {
                         val last = cloud.messages.lastOrNull()
                         val progress = remember(cloud.messages) { creationProgress(cloud.messages) }
-                        val work = progress.installed
                         if (last?.creationInterrupted() == true) {
-                            Text(listOfNotNull(last.failureStage, progress.summary).joinToString(" · "), style = XType.Secondary)
-                            Text("待完成：${progress.nextStep}", style = XType.Caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            if (!last.error.orEmpty().contains("结果尚未确认")) {
-                                AppActionButton("继续制作", chat::resumeCreation, Modifier.fillMaxWidth(), primary = true)
-                            }
-                        } else if (work != null) {
-                            Text("下次可在「应用 → 最近用过」打开", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            AppActionButton("打开${work.name}", {
-                                if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
-                            }, Modifier.fillMaxWidth(), primary = true)
+                            AgentCreationResumeCard(
+                                stage = last.failureStage,
+                                summary = progress.summary,
+                                nextStep = progress.nextStep,
+                                canResume = !last.error.orEmpty().contains("结果尚未确认"),
+                                onResume = chat::resumeCreation,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
                         }
                     }
                     cloud.saveError?.let { message ->
@@ -831,7 +828,8 @@ private fun CloudMessages(
     onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit,
     onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit,
     waiting: String?, showQuota: Boolean, archive: List<StoredChat>, offsetMinutes: Int, topicStarted: Long?,
-    readOnly: Boolean, creation: Boolean, onArchivedPreview: (String, ChatImagePreview) -> Unit,
+    readOnly: Boolean, creation: Boolean, deliveredWork: MobileGame? = null, onOpenWork: (MobileGame) -> Unit = {},
+    onArchivedPreview: (String, ChatImagePreview) -> Unit,
     archivedThumbnail: suspend (String, String) -> String?,
 ) {
     val listState = rememberLazyListState()
@@ -853,8 +851,8 @@ private fun CloudMessages(
         }.collect { count -> if (count > 0) listState.requestScrollToItem(count - 1) }
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
         archive.forEach { stored ->
             stored.messages.firstOrNull()?.createdAtMs?.let { time ->
                 item(key = "${stored.id}:date") {
@@ -882,6 +880,11 @@ private fun CloudMessages(
                 onRecover = if (!readOnly && turn.imageJobRecoverable && !sending) ({ onRecoverImage(turn.id) }) else null,
                 onReviewed = onReviewed.takeIf { !turn.imageGeneration && latest && turn.error.orEmpty().contains("结果尚未确认") },
                 onQuota = onQuota.takeIf { showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") } })
+        }
+        if (deliveredWork != null) {
+            item(key = "delivered-work:${deliveredWork.id}") {
+                AgentDeliverableCard(deliveredWork, onOpen = { onOpenWork(deliveredWork) })
+            }
         }
         item(key = "latest-edge") { Spacer(Modifier.height(1.dp)) }
     }

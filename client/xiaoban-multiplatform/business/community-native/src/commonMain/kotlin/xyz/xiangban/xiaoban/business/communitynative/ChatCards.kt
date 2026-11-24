@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +18,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -57,6 +57,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.xiangban.xiaoban.common.community.ChangedFile
 import xyz.xiangban.xiaoban.common.community.ChatRecord
 import xyz.xiangban.xiaoban.common.community.MdBlock
 import xyz.xiangban.xiaoban.common.community.MdInline
@@ -64,14 +65,13 @@ import xyz.xiangban.xiaoban.common.community.TaskProgress
 import xyz.xiangban.xiaoban.common.community.TaskState
 import xyz.xiangban.xiaoban.common.community.ToolCallInfo
 import xyz.xiangban.xiaoban.common.community.ToolStatus
-import xyz.xiangban.xiaoban.common.community.ChangedFile
-import xyz.xiangban.xiaoban.common.community.formatTokens
-import xyz.xiangban.xiaoban.common.community.speechText
 import xyz.xiangban.xiaoban.common.community.activitySummary
 import xyz.xiangban.xiaoban.common.community.changedFiles
 import xyz.xiangban.xiaoban.common.community.describeCall
 import xyz.xiangban.xiaoban.common.community.formatDuration
+import xyz.xiangban.xiaoban.common.community.formatTokens
 import xyz.xiangban.xiaoban.common.community.parseMarkdown
+import xyz.xiangban.xiaoban.common.community.speechText
 import xyz.xiangban.xiaoban.common.community.taskProgress
 import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
@@ -79,200 +79,470 @@ import xyz.xiangban.xiaoban.common.link.RunCheckpoint
 import xyz.xiangban.xiaoban.common.link.TurnCancelled
 
 /*
- * 聊天里的状态卡片，按设计稿 45–51 号画板做：一律紧凑（行高 28–36，按钮高 28），不留大段空白。
- * 设备聊天和小伴AI 对话共用；数据在 community-core 的 ChatModels.kt。
+ * 聊天里的全卡片体系（按 ai-chat-ui.html 定稿实现）：
+ * 统一 14–18dp 圆角白底 + 1dp 发丝框，90% 中性灰阶；
+ * 成功态统一微信绿实心圆 + 白对勾，失败/高危统一语义红实心圆 + 白叉号，主题色仅落在星标与核心主按钮。
+ * 设备聊天和小伴 AI 对话共用；数据在 community-core 的 ChatModels.kt。
  */
 
 private val CardShape = RoundedCornerShape(16.dp)
+private val CompactCardShape = RoundedCornerShape(14.dp)
+private val DockCardShape = RoundedCornerShape(18.dp)
 private const val DismissChoice = "__dismiss__"
 private const val ContinueTask = "继续完成刚才的任务"
 private const val FixAndContinue = "请修复上面的问题，然后继续完成任务"
 
-// ───────────── 小部件 ─────────────
+internal val ChatSuccess: Color get() = Color(if (ThemeState.dark) 0xFF1EC76FL else 0xFF07C160L)
+internal val ChatSuccessSoft: Color get() = if (ThemeState.dark) Color(0x241EC76FL) else Color(0xFFEAF9F0L)
+internal val ChatFail: Color get() = Color(if (ThemeState.dark) 0xFFEF5B5FL else 0xFFE5484DL)
+internal val ChatFailSoft: Color get() = if (ThemeState.dark) Color(0x21EF5B5FL) else Color(0xFFFFF1F2L)
+internal val ChatFailLine: Color get() = if (ThemeState.dark) Color(0x47EF5B5FL) else Color(0xFFF5C6C9L)
+internal val ChatWarn: Color get() = Color(if (ThemeState.dark) 0xFFF0A83AL else 0xFFC77700L)
+internal val ChatWarnSoft: Color get() = if (ThemeState.dark) Color(0x1FF0A83AL) else Color(0xFFFFF6E6L)
+internal val ChatWarnLine: Color get() = if (ThemeState.dark) Color(0x47F0A83AL) else Color(0xFFF3DFB8L)
+
+// ───────────── 基础容器与小部件 ─────────────
 
 @Composable
-private fun Spinner(size: Dp = 12.dp) {
-    CircularProgressIndicator(Modifier.size(size), color = MaterialTheme.colorScheme.onSurface, strokeWidth = 2.dp)
+private fun Spinner(size: Dp = 13.dp, color: Color = Brand) {
+    CircularProgressIndicator(Modifier.size(size), color = color, strokeWidth = 1.8.dp)
 }
 
 @Composable
-private fun CardSurface(modifier: Modifier = Modifier, tint: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+internal fun ChatCardSurface(
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = CardShape,
+    tint: Color? = null,
+    borderColor: Color = AgentHairline,
+    elevated: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shadowMod = if (elevated) {
+        val shadowColor = Color.Black.copy(alpha = if (ThemeState.dark) .36f else .10f)
+        Modifier.shadow(if (ThemeState.dark) 6.dp else 4.dp, shape, ambientColor = shadowColor, spotColor = shadowColor)
+    } else Modifier
     Column(
-        modifier.fillMaxWidth().clip(CardShape).background(tint ?: MaterialTheme.colorScheme.surface),
+        modifier.fillMaxWidth().then(shadowMod).clip(shape)
+            .background(tint ?: MaterialTheme.colorScheme.surface)
+            .border(1.dp, borderColor, shape),
         content = content,
     )
 }
 
+@Composable
+private fun CardSurface(modifier: Modifier = Modifier, tint: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+    ChatCardSurface(modifier = modifier, shape = CardShape, tint = tint, content = content)
+}
+
 private enum class Mark { Done, Active, Approval, Paused, Blocked, Failed, Wait, Pending }
 
-/** 步骤前面 16dp 的小标记：完成是绿底白对号，等授权、受阻、等回答是红，失败是红底白叉，暂停是灰，没开始是空心圈。 */
+/** 展开步骤/清单前 15dp 状态点：微信绿实心圆+纯白对号，失败为语义红实心圆+纯白叉号。 */
 @Composable
 private fun StepMark(kind: Mark) {
     val extra = LocalExtraColors.current
     Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
         when (kind) {
-            Mark.Active -> Spinner(14.dp)
+            Mark.Active -> Spinner(13.dp, color = Brand)
             Mark.Pending -> Box(Modifier.size(14.dp).clip(CircleShape).border(1.5.dp, extra.line, CircleShape))
             else -> {
                 val (bg, icon) = when (kind) {
-                    Mark.Done -> Success to XIcons.CheckBold
-                    Mark.Approval -> Danger to XIcons.Shield
+                    Mark.Done -> ChatSuccess to XIcons.CheckBold
+                    Mark.Approval -> ChatFail to XIcons.Shield
                     Mark.Paused -> extra.ink3 to XIcons.Pause
-                    Mark.Failed -> Danger to XIcons.Close
-                    Mark.Blocked -> Danger to XIcons.Warning
-                    else -> Danger to XIcons.Question
+                    Mark.Failed -> ChatFail to XIcons.Close
+                    Mark.Blocked -> ChatFail to XIcons.Close
+                    else -> ChatWarn to XIcons.Question
                 }
-                Box(Modifier.size(16.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-                    XIcon(icon, tint = Color.White, size = 10.dp)
+                Box(Modifier.size(15.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
+                    XIcon(icon, tint = Color.White, size = 9.5.dp)
                 }
             }
         }
     }
 }
 
-/** 卡片里按钮的三级：主操作＝主题色浅底加主题色字，次要＝浅灰底，弱操作（拒绝、取消）＝无底色灰字；高风险卡片里的两个按钮用白底。 */
-private enum class BtnKind { Primary, Neutral, Quiet, OnAlertAllow, OnAlertDeny }
+private enum class BtnKind { Primary, DangerSolid, Neutral, Quiet }
 
-/** 卡片里的按钮：默认高 28（提示条里），授权和选择卡片里用 40 并撑满一行等宽排开。 */
 @Composable
-private fun SmallButton(text: String, kind: BtnKind, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 28.dp) {
+private fun SmallButton(
+    text: String,
+    kind: BtnKind,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 32.dp,
+    shape: RoundedCornerShape = RoundedCornerShape(10.dp),
+) {
     val extra = LocalExtraColors.current
-    val base = modifier.height(height).clip(CircleShape)
+    val base = modifier.height(height).clip(shape)
     val styled = when (kind) {
-        BtnKind.Primary -> base.background(extra.brandSoft)
+        BtnKind.Primary -> base.background(Brand)
+        BtnKind.DangerSolid -> base.background(ChatFail)
         BtnKind.Neutral -> base.background(extra.fill)
         BtnKind.Quiet -> base
-        BtnKind.OnAlertAllow, BtnKind.OnAlertDeny -> base.background(MaterialTheme.colorScheme.surface)
     }
     val color = when (kind) {
-        BtnKind.Primary -> extra.brandInk
+        BtnKind.Primary, BtnKind.DangerSolid -> Color.White
         BtnKind.Neutral -> MaterialTheme.colorScheme.onSurface
         BtnKind.Quiet -> MaterialTheme.colorScheme.onSurfaceVariant
-        BtnKind.OnAlertAllow -> Danger
-        BtnKind.OnAlertDeny -> MaterialTheme.colorScheme.onSurface
     }
     Box(styled.clickable(onClick = onClick).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = color, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text, color = color, style = XType.Secondary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun CodeSnippet(text: String, modifier: Modifier = Modifier, maxLines: Int = 6) {
+    val shape = RoundedCornerShape(10.dp)
     Text(
-        text, modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(horizontal = 8.dp, vertical = 5.dp),
-        style = XType.Caption, fontFamily = FontFamily.Monospace, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+        text,
+        modifier.fillMaxWidth().clip(shape)
+            .background(MaterialTheme.colorScheme.background)
+            .border(1.dp, AgentHairline, shape)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        style = XType.Caption.copy(fontSize = 11.5.sp, lineHeight = 17.sp),
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
-/** 提示灰底条：一行说明，右边可以有一个按钮。 */
+/** 统一提示/异常条：语义细框 + 极浅语义底 + 左侧状态圆点 + 右侧白底轻胶囊按钮。 */
+@Composable
+internal fun ChatNoticeBar(
+    title: String,
+    subtitle: String? = null,
+    tone: String = "neutral", // neutral | warn | fail
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val shape = CompactCardShape
+    val bg = when (tone) {
+        "fail" -> ChatFailSoft
+        "warn" -> ChatWarnSoft
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val border = when (tone) {
+        "fail" -> ChatFailLine
+        "warn" -> ChatWarnLine
+        else -> AgentHairline
+    }
+    Row(
+        modifier.fillMaxWidth().clip(shape).background(bg).border(1.dp, border, shape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (tone == "fail") {
+            Box(Modifier.size(16.dp).clip(CircleShape).background(ChatFail), contentAlignment = Alignment.Center) {
+                XIcon(XIcons.Close, tint = Color.White, size = 10.dp)
+            }
+        } else if (tone == "warn") {
+            Box(Modifier.size(16.dp).clip(CircleShape).background(ChatWarn), contentAlignment = Alignment.Center) {
+                Text("!", style = XType.Caption.copy(fontSize = 10.sp, lineHeight = 10.sp), color = Color.White, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = XType.Secondary.copy(fontSize = 12.5.sp, lineHeight = 17.sp), fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, Modifier.padding(top = 2.dp), style = XType.Caption.copy(fontSize = 11.5.sp, lineHeight = 15.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (actionText != null && onAction != null) {
+            Box(
+                Modifier.height(28.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, AgentHairline, CircleShape)
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 11.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(actionText, style = XType.Caption.copy(fontSize = 12.sp), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+            }
+        }
+    }
+}
+
 @Composable
 private fun HintLine(text: String, alert: Boolean, modifier: Modifier = Modifier, button: String? = null, onButton: () -> Unit = {}) {
-    val extra = LocalExtraColors.current
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        modifier.fillMaxWidth().clip(shape).background(if (alert) DangerSoft else extra.fill).padding(horizontal = 8.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(text, Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (button != null) SmallButton(button, BtnKind.Primary, onButton)
-    }
+    ChatNoticeBar(
+        title = text,
+        tone = if (alert) "fail" else "neutral",
+        actionText = button,
+        onAction = if (button != null) onButton else null,
+        modifier = modifier,
+    )
 }
 
-// ───────────── 思考 ─────────────
+// ───────────── 三合一过程摘要卡（思考 + 任务清单 + 工具执行） ─────────────
 
-/** 思考过程：回答还没开始时实时展示；结束后收成一行“思考 N 段”，点开看前几段。 */
+private enum class TraceTab { Steps, Todo, Think }
+
 @Composable
-fun ReasoningView(reasoning: String, live: Boolean, modifier: Modifier = Modifier) {
+private fun UnifiedTraceCard(
+    reasoning: String,
+    progress: TaskProgress?,
+    tools: List<ToolCallInfo>,
+    live: Boolean,
+    waiting: String?,
+    onStop: (() -> Unit)?,
+    onSend: (String) -> Unit,
+    onAdjust: (() -> Unit)?,
+    showRecovery: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val extra = LocalExtraColors.current
     val segments = remember(reasoning) { reasoning.split(Regex("\n\\s*\n")).map { it.trim() }.filter { it.isNotEmpty() } }
-    if (segments.isEmpty()) return
-    var open by rememberSaveable { mutableStateOf(false) }
-    if (live) {
-        Column(modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Row(Modifier.heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                XIcon(XIcons.SparkleSmall, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 14.dp)
-                Text("思考中…", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spinner(11.dp)
-            }
-            Text(segments.last(), style = XType.Caption, color = extra.ink3, maxLines = 6, overflow = TextOverflow.Ellipsis)
+    val stepCalls = remember(tools) { tools.filter { it.name != "todo" } }
+    val summary = remember(tools) { activitySummary(tools) }
+    val hasSteps = stepCalls.isNotEmpty()
+    val hasTodo = progress != null
+    val hasThink = segments.isNotEmpty()
+    if (!hasSteps && !hasTodo && !hasThink) return
+
+    val tabs = remember(hasSteps, hasTodo, hasThink) {
+        buildList {
+            if (hasSteps) add(TraceTab.Steps)
+            if (hasTodo) add(TraceTab.Todo)
+            if (hasThink) add(TraceTab.Think)
         }
-        return
     }
-    Column(modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 28.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).clickable { open = !open }.padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            XIcon(XIcons.SparkleSmall, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 14.dp)
-            Text("思考 ${segments.size} 段", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("已完成", Modifier.weight(1f), style = XType.Caption, color = extra.ink3)
-            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 14.dp, modifier = Modifier.rotated(open))
+    val completed = !live && (progress == null || progress.state == TaskState.Completed) && summary.errors == 0
+    val needsAttention = progress != null && (progress.state == TaskState.Blocked || progress.state == TaskState.Paused || progress.state == TaskState.Approval || progress.state == TaskState.Waiting)
+    var open by rememberSaveable(completed) { mutableStateOf(live || needsAttention) }
+    var activeTab by rememberSaveable(hasSteps, hasTodo, hasThink) {
+        mutableStateOf(
+            when {
+                hasSteps -> TraceTab.Steps
+                hasTodo -> TraceTab.Todo
+                else -> TraceTab.Think
+            },
+        )
+    }
+    if (activeTab !in tabs) activeTab = tabs.first()
+
+    val statusText = when {
+        waiting == "approval" || progress?.state == TaskState.Approval -> "等待授权"
+        waiting == "question" || progress?.state == TaskState.Waiting -> "等你回答"
+        live -> {
+            val runningTool = stepCalls.lastOrNull { it.status == ToolStatus.Running }
+            val currentStep = progress?.let { p -> p.plan.steps.getOrNull(p.current)?.content }
+            when {
+                currentStep != null -> currentStep
+                runningTool != null -> "正在${toolLabel(runningTool.name)}"
+                hasThink && !hasSteps && !hasTodo -> "思考中…"
+                else -> "执行中…"
+            }
         }
+        progress?.state == TaskState.Blocked -> "未完成"
+        progress?.state == TaskState.Paused -> "已暂停"
+        else -> "已完成"
+    }
+
+    val metaText = remember(summary, progress, segments.size) {
+        buildList {
+            if (summary.steps > 0) add("${summary.steps} 步")
+            else if (progress != null) add("${progress.completed}/${progress.total}")
+            if (segments.isNotEmpty()) add("思考 ${segments.size} 段")
+            if (summary.durationMs > 0) add(formatDuration(summary.durationMs))
+        }.joinToString(" · ")
+    }
+
+    val isAlert = waiting != null || progress?.state == TaskState.Blocked || progress?.state == TaskState.Approval || progress?.state == TaskState.Waiting
+    val borderColor = if (progress?.state == TaskState.Blocked) ChatFailLine else AgentHairline
+
+    ChatCardSurface(modifier = modifier, shape = CompactCardShape, borderColor = borderColor) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable { open = !open }.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // 无底色纯主题色星标（进行中或受阻按语义提示）
+            when {
+                live && waiting == null -> Spinner(14.dp, color = Brand)
+                progress?.state == TaskState.Blocked -> Box(Modifier.size(16.dp).clip(CircleShape).background(ChatFail), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.Close, tint = Color.White, size = 10.dp)
+                }
+                else -> XIcon(AiHomeIcons.Spark, tint = if (isAlert) ChatFail else extra.brandInk, size = 15.dp)
+            }
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    statusText,
+                    style = XType.Caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isAlert) ChatFail else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (metaText.isNotEmpty()) {
+                    Text(
+                        "· $metaText",
+                        style = XType.Caption.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                        color = extra.ink3,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (summary.errors > 0 && !live) {
+                    Text(
+                        "· ${summary.errors} 次异常",
+                        style = XType.Caption.copy(fontSize = 12.sp),
+                        color = ChatFail,
+                        maxLines = 1,
+                    )
+                }
+            }
+            if (live && progress?.state == TaskState.Running && onStop != null) {
+                Box(Modifier.size(26.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.Stop, size = 12.dp, tint = extra.ink3, description = "停止")
+                }
+            }
+            if (live && progress?.state == TaskState.Running && onAdjust != null) {
+                Box(Modifier.size(26.dp).clip(CircleShape).clickable(onClick = onAdjust), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.More, size = 14.dp, tint = extra.ink3, description = "调整计划")
+                }
+            }
+            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 15.dp, modifier = Modifier.rotated(open))
+        }
+
+        if (progress != null && progress.state != TaskState.Completed) {
+            SegmentBar(progress, Modifier.padding(start = 12.dp, end = 12.dp, bottom = if (open) 8.dp else 10.dp))
+        }
+
         if (open) {
-            Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                segments.take(3).forEach { Text(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 3.dp), style = XType.Caption, color = extra.ink3, maxLines = 6, overflow = TextOverflow.Ellipsis) }
-                if (segments.size > 3) Text("… 另 ${segments.size - 3} 段", Modifier.padding(start = 8.dp), style = XType.Caption, color = extra.ink3)
+            Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+            Column(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                if (tabs.size > 1) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        tabs.forEach { tab ->
+                            val selected = tab == activeTab
+                            val label = when (tab) {
+                                TraceTab.Steps -> "步骤 ${summary.steps}"
+                                TraceTab.Todo -> "清单 ${progress?.completed ?: 0}/${progress?.total ?: 0}"
+                                TraceTab.Think -> "思考 ${segments.size}"
+                            }
+                            val tabShape = RoundedCornerShape(6.dp)
+                            Box(
+                                Modifier.clip(tabShape)
+                                    .then(if (selected) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
+                                    .clickable { activeTab = tab }
+                                    .padding(horizontal = 9.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    label,
+                                    style = XType.Caption.copy(fontSize = 11.5.sp),
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                when (activeTab) {
+                    TraceTab.Steps -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            stepCalls.forEach { call -> ToolRow(call) }
+                        }
+                    }
+                    TraceTab.Todo -> if (progress != null) {
+                        TaskStepsList(progress, onSend = onSend, showRecovery = showRecovery)
+                    }
+                    TraceTab.Think -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val shown = if (live) listOf(segments.last()) else segments.take(4)
+                            shown.forEach { seg ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                    Box(Modifier.padding(top = 3.dp).width(2.dp).heightIn(min = 16.dp).background(extra.line))
+                                    Text(
+                                        seg,
+                                        Modifier.weight(1f),
+                                        style = XType.Caption.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 6,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            if (!live && segments.size > 4) {
+                                Text("… 另有 ${segments.size - 4} 段思考已折叠", style = XType.Caption, color = extra.ink3)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-// ───────────── 工具调用组 ─────────────
+// ───────────── 独立思考与工具调用组件（兼容单独调用） ─────────────
 
-/** 一轮里所有工具调用合成一张折叠卡：摘要“N 步 · 用时 · 异常”，进行中显示最新一步，展开后每步可再展开看内容和结果。 */
+@Composable
+fun ReasoningView(reasoning: String, live: Boolean, modifier: Modifier = Modifier) {
+    UnifiedTraceCard(
+        reasoning = reasoning, progress = null, tools = emptyList(), live = live, waiting = null,
+        onStop = null, onSend = {}, onAdjust = null, showRecovery = false, modifier = modifier,
+    )
+}
+
 @Composable
 fun ToolGroup(calls: List<ToolCallInfo>, live: Boolean, modifier: Modifier = Modifier) {
-    val rows = remember(calls) { calls.filter { it.name != "todo" } }
-    if (rows.isEmpty()) return
-    val extra = LocalExtraColors.current
-    val summary = remember(calls) { activitySummary(calls) }
-    var open by rememberSaveable { mutableStateOf(false) }
-    CardSurface(modifier) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 30.dp).clickable { open = !open }.padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (live) Spinner(12.dp)
-            Text("本轮执行过程", style = XType.Caption, fontWeight = FontWeight.SemiBold)
-            Text(
-                "· ${summary.steps} 步" + if (summary.durationMs > 0) " · 用时 ${formatDuration(summary.durationMs)}" else "",
-                style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (summary.errors > 0) Text("· ${summary.errors} 次异常", style = XType.Caption, color = Danger, maxLines = 1)
-            Spacer(Modifier.weight(1f))
-            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 14.dp, modifier = Modifier.rotated(open))
-        }
-        if (open) {
-            Column(Modifier.padding(horizontal = 10.dp)) { rows.forEach { call -> Hairline(); ToolRow(call) } }
-        } else if (live) {
-            val latest = rows.lastOrNull { it.status == ToolStatus.Running } ?: rows.last()
-            Hairline()
-            Box(Modifier.padding(horizontal = 10.dp)) { ToolRow(latest, expandable = false) }
-        }
-    }
+    UnifiedTraceCard(
+        reasoning = "", progress = null, tools = calls, live = live, waiting = null,
+        onStop = null, onSend = {}, onAdjust = null, showRecovery = false, modifier = modifier,
+    )
 }
 
 @Composable
 private fun ToolRow(call: ToolCallInfo, expandable: Boolean = true) {
     val extra = LocalExtraColors.current
     var open by rememberSaveable(call.id) { mutableStateOf(false) }
-    val mark = when (call.status) { ToolStatus.Running -> Mark.Active; ToolStatus.Done -> Mark.Done; ToolStatus.Error -> Mark.Failed }
+    val mark = when (call.status) {
+        ToolStatus.Running -> Mark.Active
+        ToolStatus.Done -> Mark.Done
+        ToolStatus.Error -> Mark.Failed
+    }
     val desc = remember(call.name, call.arguments) { describeCall(call.name, call.arguments) }
     Column(Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 28.dp).let { if (expandable) it.clickable { open = !open } else it },
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().heightIn(min = 26.dp).clip(RoundedCornerShape(8.dp))
+                .let { if (expandable) it.clickable { open = !open } else it }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             StepMark(mark)
-            Text(toolLabel(call.name), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = if (call.status == ToolStatus.Error) Danger else MaterialTheme.colorScheme.onSurface, maxLines = 1)
-            Text(desc, Modifier.weight(1f), style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (call.durationMs >= 1000) Text(formatDuration(call.durationMs), style = XType.Caption, color = extra.ink3, maxLines = 1)
+            Text(
+                toolLabel(call.name),
+                style = XType.Caption.copy(fontSize = 12.sp),
+                fontWeight = FontWeight.Medium,
+                color = if (call.status == ToolStatus.Error) ChatFail else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            if (desc.isNotBlank()) {
+                Text(desc, Modifier.weight(1f), style = XType.Caption.copy(fontSize = 12.sp), color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            if (call.durationMs >= 1000) {
+                Text(formatDuration(call.durationMs), style = XType.Caption.copy(fontSize = 11.sp), color = extra.ink3, maxLines = 1)
+            }
             if (expandable) XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 13.dp, modifier = Modifier.rotated(open))
         }
         if (open) {
-            Column(Modifier.padding(start = 22.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(start = 24.dp, top = 4.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (call.arguments.isNotBlank()) {
-                    Text("内容", style = XType.Caption, color = extra.ink3)
+                    Text("参数", style = XType.Caption, color = extra.ink3)
                     CodeSnippet(call.arguments.take(1200), maxLines = 8)
                 }
                 if (call.output.isNotBlank()) {
@@ -284,169 +554,134 @@ private fun ToolRow(call: ToolCallInfo, expandable: Boolean = true) {
     }
 }
 
-// ───────────── 任务执行卡 ─────────────
+// ───────────── 任务执行卡（独立兼容接口 + 清单复用） ─────────────
 
-private fun TaskState.chip(): String? = when (this) {
-    TaskState.Waiting -> "等你回答"
-    TaskState.Approval -> "等待授权"
-    TaskState.Blocked -> "未完成"
-    TaskState.Paused -> "已暂停"
-    else -> null
-}
-
-/** 任务计划（来自 `todo` 工具）：分段进度条加步骤列表。进行中带停止；暂停和受阻时给“继续完成”“让小伴修复”。 */
 @Composable
-fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}, onAdjust: (() -> Unit)? = null, showRecovery: Boolean = true) {
+private fun TaskStepsList(progress: TaskProgress, onSend: (String) -> Unit, showRecovery: Boolean) {
     val extra = LocalExtraColors.current
     val state = progress.state
-    val completed = state == TaskState.Completed
-    var open by rememberSaveable(completed) { mutableStateOf(!completed) }
-    val alert = state == TaskState.Waiting || state == TaskState.Approval || state == TaskState.Blocked
     val steps = progress.plan.steps
     val current = progress.current
-    CardSurface(modifier) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 36.dp).clickable { open = !open }.padding(start = 10.dp, end = 2.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            when (state) {
-                TaskState.Running -> Spinner(16.dp)
-                TaskState.Completed -> Box(Modifier.size(20.dp).clip(CircleShape).background(Success), contentAlignment = Alignment.Center) { XIcon(XIcons.CheckBold, tint = Color.White, size = 12.dp) }
-                TaskState.Paused -> XIcon(XIcons.Pause, tint = extra.ink3, size = 18.dp)
-                TaskState.Blocked -> XIcon(XIcons.Warning, tint = Danger, size = 18.dp)
-                TaskState.Approval -> XIcon(XIcons.Shield, tint = Danger, size = 18.dp)
-                TaskState.Waiting -> XIcon(XIcons.Question, tint = Danger, size = 18.dp)
-            }
-            Column(Modifier.weight(1f)) {
-                if (open || completed || current < 0) {
-                    Text(if (completed) "任务完成" else "任务执行", style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                } else {
-                    Text(steps[current].content, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("任务执行", style = XType.Caption, color = extra.ink3, maxLines = 1)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        steps.forEachIndexed { i, step ->
+            val isCurrent = i == current
+            val mark = when {
+                step.done -> Mark.Done
+                !isCurrent -> Mark.Pending
+                else -> when (state) {
+                    TaskState.Running -> Mark.Active
+                    TaskState.Waiting -> Mark.Wait
+                    TaskState.Approval -> Mark.Approval
+                    TaskState.Paused -> Mark.Paused
+                    TaskState.Blocked -> Mark.Failed
+                    TaskState.Completed -> Mark.Done
                 }
             }
-            state.chip()?.let { chip ->
+            val tail = when {
+                step.done -> step.evidence
+                isCurrent -> when (state) {
+                    TaskState.Waiting -> "等你回答"
+                    TaskState.Approval -> "等待授权"
+                    TaskState.Paused -> "已暂停"
+                    TaskState.Blocked -> progress.message
+                    else -> ""
+                }
+                else -> ""
+            }
+            Row(Modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StepMark(mark)
                 Text(
-                    chip, Modifier.clip(RoundedCornerShape(10.dp)).background(if (alert) DangerSoft else extra.fill).padding(horizontal = 8.dp, vertical = 2.dp),
-                    style = XType.Caption, fontWeight = FontWeight.SemiBold, color = if (alert) Danger else extra.ink3, maxLines = 1,
+                    step.content,
+                    Modifier.weight(1f),
+                    style = XType.Caption.copy(fontSize = 12.5.sp, lineHeight = 17.sp),
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (!step.done && !isCurrent) extra.ink3 else MaterialTheme.colorScheme.onSurface,
+                )
+                if (tail.isNotBlank()) {
+                    Text(tail, Modifier.widthIn(max = 110.dp), style = XType.Caption.copy(fontSize = 11.sp), color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        when (state) {
+            TaskState.Approval -> HintLine("需要你确认下方操作后继续", alert = true, modifier = Modifier.padding(top = 2.dp))
+            TaskState.Waiting -> HintLine("小伴有个问题需要你确认", alert = true, modifier = Modifier.padding(top = 2.dp))
+            TaskState.Paused -> if (showRecovery) HintLine("任务已暂停", alert = false, modifier = Modifier.padding(top = 2.dp), button = "继续完成", onButton = { onSend(ContinueTask) })
+            TaskState.Blocked -> if (showRecovery) {
+                ChatNoticeBar(
+                    title = progress.message.ifBlank { "执行遇到阻碍，已暂停等你决定" },
+                    tone = "fail",
+                    actionText = "让小伴修复",
+                    onAction = { onSend(FixAndContinue) },
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            if (completed && durationMs > 0) Text("用时 ${formatDuration(durationMs)}", style = XType.Caption, color = extra.ink3, maxLines = 1)
-            Text("${progress.completed}/${progress.total}", style = XType.Caption, color = extra.ink3, maxLines = 1)
-            if (state == TaskState.Running && onStop != null) {
-                Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) { XIcon(XIcons.Stop, size = 14.dp, description = "停止") }
-            }
-            if (state == TaskState.Running && onAdjust != null) {
-                Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onAdjust), contentAlignment = Alignment.Center) { XIcon(XIcons.More, tint = extra.ink3, size = 16.dp, description = "调整计划") }
-            }
-            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 16.dp, modifier = Modifier.padding(end = 8.dp).rotated(open))
-        }
-        if (!completed) SegmentBar(progress, Modifier.padding(start = 10.dp, end = 10.dp, bottom = 6.dp))
-        if (open) {
-            Hairline()
-            Column(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 6.dp)) {
-                steps.forEachIndexed { i, step ->
-                    val isCurrent = i == current
-                    val mark = when {
-                        step.done -> Mark.Done
-                        !isCurrent -> Mark.Pending
-                        else -> when (state) {
-                            TaskState.Running -> Mark.Active
-                            TaskState.Waiting -> Mark.Wait
-                            TaskState.Approval -> Mark.Approval
-                            TaskState.Paused -> Mark.Paused
-                            TaskState.Blocked -> Mark.Failed
-                            TaskState.Completed -> Mark.Done
-                        }
-                    }
-                    val tail = when {
-                        step.done -> step.evidence
-                        isCurrent -> when (state) {
-                            TaskState.Waiting -> "等你回答"
-                            TaskState.Approval -> "等待授权"
-                            TaskState.Paused -> "已暂停"
-                            TaskState.Blocked -> progress.message
-                            else -> ""
-                        }
-                        else -> ""
-                    }
-                    Row(Modifier.fillMaxWidth().heightIn(min = 28.dp).padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StepMark(mark)
-                        Text(
-                            step.content, Modifier.weight(1f), style = XType.Secondary,
-                            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (!step.done && !isCurrent) extra.ink3 else MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (tail.isNotBlank()) Text(tail, Modifier.widthIn(max = 120.dp), style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                when (state) {
-                    TaskState.Approval -> HintLine("需要你确认下面这个操作", alert = true, modifier = Modifier.padding(top = 6.dp))
-                    TaskState.Waiting -> HintLine("小伴有个问题要问你", alert = true, modifier = Modifier.padding(top = 6.dp))
-                    TaskState.Paused -> if (showRecovery) HintLine("已暂停", alert = false, modifier = Modifier.padding(top = 6.dp), button = "继续完成", onButton = { onSend(ContinueTask) })
-                    TaskState.Blocked -> if (showRecovery) {
-                        Text(
-                            progress.message.ifBlank { "有一步没有成功，已停下等你决定。" } + " 可以让小伴修复后继续。",
-                            Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallButton("让小伴修复", BtnKind.Primary, { onSend(FixAndContinue) })
-                        }
-                    }
-                    else -> {}
-                }
-            }
+            else -> {}
         }
     }
 }
 
-/** 分段进度条：每一步一小段，做完的深色，正在做的按状态上色。 */
+@Composable
+fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}, onAdjust: (() -> Unit)? = null, showRecovery: Boolean = true) {
+    UnifiedTraceCard(
+        reasoning = "", progress = progress, tools = emptyList(), live = progress.state == TaskState.Running,
+        waiting = when (progress.state) {
+            TaskState.Approval -> "approval"
+            TaskState.Waiting -> "question"
+            else -> null
+        },
+        onStop = onStop, onSend = onSend, onAdjust = onAdjust, showRecovery = showRecovery, modifier = modifier,
+    )
+}
+
 @Composable
 private fun SegmentBar(progress: TaskProgress, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
-    val ink = MaterialTheme.colorScheme.onSurface
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         progress.plan.steps.forEachIndexed { i, step ->
             val color = when {
-                step.done -> ink
+                step.done -> ChatSuccess
                 i != progress.current -> extra.line
-                progress.state == TaskState.Running -> ink.copy(alpha = 0.45f)
+                progress.state == TaskState.Running -> Brand.copy(alpha = 0.75f)
                 progress.state == TaskState.Paused -> extra.ink3
-                else -> Danger
+                else -> ChatFail
             }
-            Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(color))
+            Box(Modifier.weight(1f).height(2.5.dp).clip(RoundedCornerShape(2.dp)).background(color))
         }
     }
 }
 
-/** 任务卡滚出屏幕后吸在输入框上方的一行：当前步骤、进度、停止；点一下回到任务卡。 */
 @Composable
 fun TaskMiniBar(progress: TaskProgress, onClick: () -> Unit, onStop: () -> Unit, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
     val alert = progress.state == TaskState.Waiting || progress.state == TaskState.Approval
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Row(
-            Modifier.widthIn(max = 320.dp).fillMaxWidth().height(36.dp).shadow(4.dp, CircleShape).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+            Modifier.widthIn(max = 320.dp).fillMaxWidth().height(36.dp)
+                .shadow(4.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .12f))
+                .clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, if (alert) ChatFailLine else AgentHairline, CircleShape)
                 .clickable(onClick = onClick).padding(start = 14.dp, end = 3.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when (progress.state) {
-                TaskState.Waiting -> XIcon(XIcons.Question, tint = Danger, size = 16.dp)
-                TaskState.Approval -> XIcon(XIcons.Shield, tint = Danger, size = 16.dp)
-                else -> Spinner(14.dp)
+                TaskState.Waiting -> XIcon(XIcons.Question, tint = ChatFail, size = 15.dp)
+                TaskState.Approval -> XIcon(XIcons.Shield, tint = ChatFail, size = 15.dp)
+                else -> Spinner(13.dp)
             }
             val now = progress.plan.steps.getOrNull(progress.current)?.content ?: "任务执行"
             Text(
                 when (progress.state) { TaskState.Waiting -> "等你回答"; TaskState.Approval -> "等待授权"; else -> now },
-                Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, color = if (alert) Danger else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                Modifier.weight(1f), style = XType.Secondary, fontWeight = FontWeight.SemiBold,
+                color = if (alert) ChatFail else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text("${progress.completed}/${progress.total}", style = XType.Caption, color = extra.ink3, maxLines = 1)
-            Box(Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) { XIcon(XIcons.Stop, size = 14.dp, description = "停止") }
+            Box(Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) {
+                XIcon(XIcons.Stop, size = 13.dp, tint = extra.ink3, description = "停止")
+            }
         }
     }
 }
 
-/** 调整后续计划：已完成的步骤保留，后面的步骤可以改字、上移、删除、添加，再补一句想怎么改。提交后先停当前这一轮，再由小伴核对现场、调整并继续。 */
 @Composable
 fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (String) -> Unit, panelModifier: Modifier) {
     val extra = LocalExtraColors.current
@@ -465,12 +700,15 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
                         Modifier.size(28.dp).clip(CircleShape).clickable(enabled = i > 0) { steps = steps.toMutableList().also { list -> list.add(i - 1, list.removeAt(i)) } },
                         contentAlignment = Alignment.Center,
                     ) { if (i > 0) XIcon(XIcons.ArrowUp, tint = extra.ink3, size = 15.dp, description = "上移") }
-                    val shape = RoundedCornerShape(8.dp)
+                    val shape = RoundedCornerShape(10.dp)
                     BasicTextField(
-                        value = text, onValueChange = { v -> steps = steps.mapIndexed { j, old -> if (j == i) v else old } }, modifier = Modifier.weight(1f).heightIn(min = 32.dp).clip(shape).background(extra.fill).padding(horizontal = 10.dp, vertical = 6.dp),
+                        value = text, onValueChange = { v -> steps = steps.mapIndexed { j, old -> if (j == i) v else old } },
+                        modifier = Modifier.weight(1f).heightIn(min = 34.dp).clip(shape).background(extra.fill).padding(horizontal = 10.dp, vertical = 7.dp),
                         textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand),
                     )
-                    Box(Modifier.size(28.dp).clip(CircleShape).clickable { steps = steps.filterIndexed { j, _ -> j != i } }, contentAlignment = Alignment.Center) { XIcon(XIcons.Close, tint = extra.ink3, size = 16.dp, description = "删除这一步") }
+                    Box(Modifier.size(28.dp).clip(CircleShape).clickable { steps = steps.filterIndexed { j, _ -> j != i } }, contentAlignment = Alignment.Center) {
+                        XIcon(XIcons.Close, tint = extra.ink3, size = 16.dp, description = "删除这一步")
+                    }
                 }
             }
         }
@@ -481,9 +719,10 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
             XIcon(XIcons.Plus, size = 14.dp)
             Text("添加一步", style = XType.Body, fontWeight = FontWeight.SemiBold)
         }
-        val boxShape = RoundedCornerShape(8.dp)
+        val boxShape = RoundedCornerShape(10.dp)
         BasicTextField(
-            value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(boxShape).background(extra.fill).padding(horizontal = 10.dp, vertical = 8.dp),
+            value = note, onValueChange = { note = it },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(boxShape).background(extra.fill).padding(horizontal = 10.dp, vertical = 8.dp),
             textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand), maxLines = 4,
             decorationBox = { inner ->
                 Box { if (note.isEmpty()) Text("想怎么改？例如：汇报面向管理层，5 分钟内", style = XType.Secondary, color = extra.ink3); inner() }
@@ -510,55 +749,73 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
     }
 }
 
-// ───────────── 选择卡 ─────────────
+// ───────────── 贴底待办卡：小伴提问卡 ─────────────
 
-/** 小伴向你提问：问题、编号选项（整行可点）、自己输入回答、跳过。 */
 @Composable
 fun AskCard(pending: RemoteApprovalRequest, onAnswer: (String) -> Unit, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
     var own by remember(pending.approvalId) { mutableStateOf("") }
-    CardSurface(modifier) {
-        Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(18.dp).clip(CircleShape).background(Danger), contentAlignment = Alignment.Center) { XIcon(XIcons.Question, tint = Color.White, size = 11.dp) }
-                Text("小伴想问你", Modifier.weight(1f), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = extra.ink3)
-                Text("跳过", Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAnswer(DismissChoice) }.padding(horizontal = 6.dp, vertical = 3.dp), style = XType.Caption, color = extra.ink3)
+    ChatCardSurface(modifier = modifier, shape = DockCardShape, elevated = true) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                XIcon(XIcons.Question, tint = MaterialTheme.colorScheme.onSurface, size = 16.dp)
+                Text("小伴想问你", Modifier.weight(1f), style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold)
+                Text(
+                    "跳过",
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAnswer(DismissChoice) }.padding(horizontal = 6.dp, vertical = 3.dp),
+                    style = XType.Caption, color = extra.ink3,
+                )
             }
-            Text(pending.question.ifBlank { pending.title }, Modifier.padding(top = 4.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
+            Text(
+                pending.question.ifBlank { pending.title },
+                style = XType.Secondary.copy(fontSize = 13.sp, lineHeight = 19.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (pending.connectors) {
-                Text("这一步需要先连接服务，手机上不能完成。可以跳过，或到电脑上处理。", Modifier.padding(top = 4.dp), style = XType.Caption, color = extra.ink3)
+                Text("这一步需要先连接服务，手机上不能完成。可以跳过，或到电脑上处理。", style = XType.Caption, color = extra.ink3)
             } else {
-                pending.choices.forEachIndexed { i, choice ->
-                    Row(
-                        Modifier.padding(top = 6.dp).fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).clickable { onAnswer(choice) }.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(Modifier.size(20.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
-                            Text("${i + 1}", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = extra.ink3)
+                if (pending.choices.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        pending.choices.forEachIndexed { i, choice ->
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 34.dp).clip(RoundedCornerShape(10.dp))
+                                    .background(extra.fill).clickable { onAnswer(choice) }
+                                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Box(Modifier.size(18.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+                                    Text("${i + 1}", style = XType.Caption.copy(fontSize = 11.sp), fontWeight = FontWeight.SemiBold, color = extra.ink3)
+                                }
+                                Text(choice, Modifier.weight(1f), style = XType.Secondary.copy(fontSize = 13.sp), fontWeight = FontWeight.Medium)
+                            }
                         }
-                        Text(choice, Modifier.weight(1f), style = XType.Body)
                     }
                 }
                 if (pending.freeText || pending.choices.isEmpty()) {
-                    val shape = RoundedCornerShape(8.dp)
+                    val shape = RoundedCornerShape(10.dp)
                     val ready = own.isNotBlank()
                     Row(
-                        Modifier.padding(top = 6.dp).fillMaxWidth().heightIn(min = 34.dp).clip(shape).background(extra.fill).padding(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(shape)
+                            .background(MaterialTheme.colorScheme.background)
+                            .border(1.dp, AgentHairline, shape)
+                            .padding(start = 10.dp, end = 5.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        XIcon(XIcons.Pen, tint = extra.ink3, size = 15.dp)
+                        XIcon(XIcons.Pen, tint = extra.ink3, size = 14.dp)
                         BasicTextField(
                             value = own, onValueChange = { own = it }, modifier = Modifier.weight(1f),
-                            textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), maxLines = 3, cursorBrush = SolidColor(Brand),
+                            textStyle = XType.Secondary.copy(color = MaterialTheme.colorScheme.onSurface), maxLines = 3, cursorBrush = SolidColor(Brand),
                             decorationBox = { inner ->
                                 Box(contentAlignment = Alignment.CenterStart) {
-                                    if (own.isEmpty()) Text(if (pending.choices.isEmpty()) "输入你的回答，发送" else "其他想法，发送", color = extra.ink3, style = XType.Secondary, maxLines = 1)
+                                    if (own.isEmpty()) Text(if (pending.choices.isEmpty()) "输入你的回答，发送" else "其他想法，直接输入", color = extra.ink3, style = XType.Secondary, maxLines = 1)
                                     inner()
                                 }
                             },
                         )
                         Box(
-                            Modifier.size(26.dp).clip(CircleShape).background(if (ready) Brand else extra.line).clickable(enabled = ready) { onAnswer(own.trim()) },
+                            Modifier.size(28.dp).clip(CircleShape).background(if (ready) Brand else extra.line).clickable(enabled = ready) { onAnswer(own.trim()) },
                             contentAlignment = Alignment.Center,
                         ) { XIcon(XIcons.ArrowUp, tint = Color.White, size = 15.dp, description = "发送回答") }
                     }
@@ -568,7 +825,7 @@ fun AskCard(pending: RemoteApprovalRequest, onAnswer: (String) -> Unit, modifier
     }
 }
 
-// ───────────── 权限申请卡 ─────────────
+// ───────────── 贴底待办卡：权限申请卡 ─────────────
 
 private fun riskVerb(kind: String): String = when (kind) {
     "read" -> "读取文件"
@@ -578,46 +835,83 @@ private fun riskVerb(kind: String): String = when (kind) {
     else -> "执行操作"
 }
 
-/** 电脑上的小伴要做一件需要你点头的事：做什么、为什么要特别小心、预览，以及三个紧凑按钮。 */
 @Composable
 fun ApprovalCard(pending: RemoteApprovalRequest, onDecision: (String) -> Unit, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
     val high = pending.isHighRisk
     var full by rememberSaveable(pending.approvalId) { mutableStateOf(false) }
     val tool = if (pending.tool.isBlank()) pending.title else toolLabel(pending.tool)
-    CardSurface(modifier, tint = if (high) DangerSoft else null) {
-        Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                XIcon(XIcons.Shield, tint = if (high) Danger else MaterialTheme.colorScheme.onSurface, size = 16.dp)
+    ChatCardSurface(
+        modifier = modifier,
+        shape = DockCardShape,
+        borderColor = if (high) ChatFailLine else AgentHairline,
+        elevated = true,
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                XIcon(XIcons.Shield, tint = if (high) ChatFail else MaterialTheme.colorScheme.onSurface, size = 16.dp)
                 Text(
-                    "小伴想要${riskVerb(pending.riskKind)}：$tool", Modifier.weight(1f), style = XType.Body, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    "小伴想要${riskVerb(pending.riskKind)}：$tool",
+                    Modifier.weight(1f),
+                    style = XType.Body.copy(fontSize = 14.sp, lineHeight = 19.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (high) "高风险" else riskVerb(pending.riskKind),
+                    Modifier.clip(RoundedCornerShape(6.dp))
+                        .background(if (high) ChatFailSoft else extra.fill)
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                    style = XType.Caption.copy(fontSize = 11.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (high) ChatFail else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
             if (high) {
                 Text(
-                    "高风险操作" + (pending.danger?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "") + "。即使在“自动模式”下，这类操作也每次都要你确认。",
-                    Modifier.padding(top = 6.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Danger,
+                    (pending.danger?.takeIf { it.isNotBlank() } ?: "此操作不可撤销") + "。即使在自动模式下，也需要你逐次确认。",
+                    style = XType.Caption.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                    color = ChatFail,
                 )
             }
-            if (pending.externalPath) Note("要访问工作区之外的路径。只授权这次，不保存长期权限。")
-            if (pending.tainted) Note("这段对话读过网页等外部内容，其中可能夹带诱导，所以这次每一步都要你确认。")
+            if (pending.externalPath) Note("要访问工作区之外的路径，仅本次有效，不保存长期权限。")
+            if (pending.tainted) Note("这段对话读取过外部网页内容，为防夹带诱导，本次操作需逐次确认。")
             val preview = pending.summary.ifBlank { pending.title }
             if (preview.isNotBlank()) {
-                Column(Modifier.padding(top = 6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     CodeSnippet(preview, maxLines = if (full) 40 else 4)
                     if (preview.length > 120 || preview.count { it == '\n' } >= 3) {
-                        Text(if (full) "收起" else "查看全部", Modifier.clip(RoundedCornerShape(8.dp)).clickable { full = !full }.padding(vertical = 3.dp), style = XType.Caption, color = extra.ink3)
+                        Text(
+                            if (full) "收起" else "查看全部",
+                            Modifier.clip(RoundedCornerShape(6.dp)).clickable { full = !full }.padding(vertical = 2.dp),
+                            style = XType.Caption, color = extra.ink3,
+                        )
                     }
                 }
             }
             val allow = pending.options.filter { it.id != "deny" && it.id != DismissChoice }
             val deny = pending.options.firstOrNull { it.id == "deny" || it.id == DismissChoice }
-            Row(Modifier.padding(top = 10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                allow.forEachIndexed { i, opt ->
-                    val kind = if (high) BtnKind.OnAlertAllow else if (i == 0) BtnKind.Primary else BtnKind.Neutral
-                    SmallButton(opt.label, kind, { onDecision(opt.id) }, Modifier.weight(1f), height = 40.dp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (deny != null) {
+                    SmallButton(
+                        deny.label,
+                        if (high) BtnKind.Neutral else BtnKind.Quiet,
+                        { onDecision(deny.id) },
+                        if (high) Modifier.weight(1f) else Modifier,
+                        height = 36.dp,
+                    )
                 }
-                if (deny != null) SmallButton(deny.label, if (high) BtnKind.OnAlertDeny else BtnKind.Quiet, { onDecision(deny.id) }, Modifier.weight(1f), height = 40.dp)
+                allow.reversed().forEachIndexed { idx, opt ->
+                    val isPrimary = idx == allow.lastIndex
+                    val kind = when {
+                        high && isPrimary -> BtnKind.DangerSolid
+                        isPrimary -> BtnKind.Primary
+                        else -> BtnKind.Neutral
+                    }
+                    SmallButton(opt.label, kind, { onDecision(opt.id) }, Modifier.weight(1f), height = 36.dp)
+                }
             }
         }
     }
@@ -626,28 +920,43 @@ fun ApprovalCard(pending: RemoteApprovalRequest, onDecision: (String) -> Unit, m
 @Composable
 private fun Note(text: String) {
     val extra = LocalExtraColors.current
-    Text(text, Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+        text,
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 9.dp, vertical = 5.dp),
+        style = XType.Caption.copy(lineHeight = 16.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 // ───────────── 留在对话里的痕迹 ─────────────
 
-/** 回答过的问题、处理过的审批：收成一行。 */
 @Composable
 fun RecordRow(record: ChatRecord, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
     val answer = record.kind == "answer"
     val ok = record.result != null
     Row(
-        modifier.fillMaxWidth().heightIn(min = 28.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier.fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(10.dp))
+            .background(extra.fill).padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        // 成功是绿底白对号；拒绝是红底白叉；跳过一个问题只是灰色。
-        Box(Modifier.size(16.dp).clip(CircleShape).background(if (ok) Success else if (answer) extra.line else Danger), contentAlignment = Alignment.Center) {
-            XIcon(if (ok) XIcons.CheckBold else XIcons.Close, tint = if (ok || !answer) Color.White else extra.ink3, size = 10.dp)
+        Box(
+            Modifier.size(15.dp).clip(CircleShape).background(if (ok) ChatSuccess else if (answer) extra.line else ChatFail),
+            contentAlignment = Alignment.Center,
+        ) {
+            XIcon(if (ok) XIcons.CheckBold else XIcons.Close, tint = if (ok || !answer) Color.White else extra.ink3, size = 9.5.dp)
         }
         if (answer) {
             Text(record.title, Modifier.weight(1f, fill = false), style = XType.Caption, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (ok) "→ ${record.result}" else "已跳过", Modifier.weight(1f, fill = ok), style = XType.Caption, color = if (ok) MaterialTheme.colorScheme.onSurface else extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                if (ok) "→ ${record.result}" else "已跳过",
+                Modifier.weight(1f, fill = ok),
+                style = XType.Caption,
+                color = if (ok) MaterialTheme.colorScheme.onSurface else extra.ink3,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         } else {
             Text("${record.result ?: "已拒绝"} · ${record.title}", Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -656,7 +965,6 @@ fun RecordRow(record: ChatRecord, modifier: Modifier = Modifier) {
 
 // ───────────── 一条小伴回复 ─────────────
 
-/** 一条回复的附加信息和动作（设备聊天才有的：用量、被截断、可撤销、存资料库、切换模型）。 */
 class TurnExtras(
     val promptTokens: Int = 0,
     val completionTokens: Int = 0,
@@ -670,8 +978,7 @@ class TurnExtras(
 )
 
 /**
- * 一条小伴回复里的所有内容，按设计稿顺序：思考 → 任务执行卡 → 工具调用组 → 回答 → 留下的痕迹 → 提示。
- * [waiting] 只给正在进行的那一轮：`question` 或 `approval`。
+ * 一条小伴回复里的所有内容：三合一过程摘要卡 → 正文 → 文件变更 → 痕迹 → 检查点/异常与操作栏。
  */
 @Composable
 fun AssistantTurnCards(
@@ -696,10 +1003,20 @@ fun AssistantTurnCards(
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
     var replyActionsOpen by rememberSaveable { mutableStateOf(false) }
-    if (reasoning.isNotBlank()) ReasoningView(reasoning, live = streaming && text.isEmpty())
-    val progress = remember(tools, streaming, waiting, stopped, failure) { taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure) }
-    if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend, onAdjust = if (streaming) onAdjust else null, showRecovery = showTaskRecovery)
-    ToolGroup(tools, live = streaming)
+    val progress = remember(tools, streaming, waiting, stopped, failure) {
+        taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure)
+    }
+    UnifiedTraceCard(
+        reasoning = reasoning,
+        progress = progress,
+        tools = tools,
+        live = streaming,
+        waiting = waiting,
+        onStop = onStop,
+        onSend = onSend,
+        onAdjust = if (streaming) onAdjust else null,
+        showRecovery = showTaskRecovery,
+    )
     if (text.isNotEmpty()) {
         val actions = if (flat && !streaming && failure == null) {
             Modifier.combinedClickable(
@@ -718,47 +1035,79 @@ fun AssistantTurnCards(
         if (files.isNotEmpty()) FileChangesCard(files, delivered = progress?.state == TaskState.Completed)
     }
     records.forEach { RecordRow(it) }
-    if (!streaming && extras.truncated && extras.onContinue != null) HintLine("回答太长，被截断了。", alert = false, button = "继续", onButton = extras.onContinue)
+    if (!streaming && extras.truncated && extras.onContinue != null) {
+        ChatNoticeBar(title = "回答较长，已保留当前内容", subtitle = "可从断点继续生成", tone = "warn", actionText = "继续", onAction = extras.onContinue)
+    }
     if (!streaming) extras.checkpoint?.let { cp -> if (extras.onUndo != null) CheckpointNotice(cp, extras.onUndo) }
     if (!streaming && text.isNotEmpty() && failure == null && (!flat || replyActionsOpen)) {
         ReplyActions(text, platform, onRegenerate, extras)
     }
-    if (stopped) HintLine("已停止", alert = false)
+    if (stopped) ChatNoticeBar(title = "已停止生成", tone = "neutral")
     if (failure != null) {
-        Banner(failure, warn = true, actionText = if (onRetry != null) "重试" else null, onAction = onRetry)
+        ChatNoticeBar(
+            title = failure,
+            tone = "fail",
+            actionText = if (onRetry != null) "重试" else null,
+            onAction = onRetry,
+        )
         if (extras.onSwitchModel != null) LinkText("换个模型试试 ›", extras.onSwitchModel)
     }
 }
 
 // ───────────── 文件变更与回复操作 ─────────────
 
-/** 本轮写入、修改过的文件。任务完成时叫“交付文件”，否则叫“文件变更”。 */
 @Composable
 fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modifier = Modifier) {
     val extra = LocalExtraColors.current
     var open by rememberSaveable(files.size) { mutableStateOf(files.size <= 4) }
-    CardSurface(modifier) {
+    ChatCardSurface(modifier = modifier, shape = CardShape) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 30.dp).clickable { open = !open }.padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable { open = !open }.padding(horizontal = 13.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            XIcon(XIcons.File, size = 15.dp)
-            Text(if (delivered) "交付文件" else "文件变更", style = XType.Caption, fontWeight = FontWeight.SemiBold)
-            Text("${files.size}", Modifier.clip(RoundedCornerShape(9.dp)).background(extra.fill).padding(horizontal = 7.dp, vertical = 1.dp), style = XType.Caption, color = extra.ink3)
+            XIcon(XIcons.File, size = 15.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (delivered) "交付文件" else "已修改 ${files.size} 个文件",
+                style = XType.Secondary.copy(fontSize = 13.sp),
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (delivered) {
+                Text("${files.size}", Modifier.clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 7.dp, vertical = 1.dp), style = XType.Caption, color = extra.ink3)
+            }
             Spacer(Modifier.weight(1f))
-            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 14.dp, modifier = Modifier.rotated(open))
+            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 15.dp, modifier = Modifier.rotated(open))
         }
         if (open) {
-            Column(Modifier.padding(horizontal = 10.dp)) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+            Column(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(horizontal = 13.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
                 files.forEach { file ->
-                    Hairline()
-                    Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            Modifier.size(18.dp).clip(RoundedCornerShape(5.dp))
+                                .background(if (file.created) ChatSuccessSoft else ChatWarnSoft),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                if (file.created) "A" else "M",
+                                style = XType.Caption.copy(fontSize = 10.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = if (file.created) ChatSuccess else ChatWarn,
+                            )
+                        }
                         Text(
-                            file.extension.ifEmpty { "文件" }, Modifier.widthIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 4.dp, vertical = 2.dp),
-                            style = XType.Caption, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1,
+                            file.name,
+                            Modifier.weight(1f),
+                            style = XType.Caption.copy(fontSize = 12.sp),
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        Text(file.name, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (file.created) "已写入" else "已修改", style = XType.Caption, color = extra.ink3, maxLines = 1)
+                        Text(if (file.created) "新增" else "修改", style = XType.Caption.copy(fontSize = 11.sp), color = extra.ink3, maxLines = 1)
                     }
                 }
             }
@@ -766,7 +1115,6 @@ fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modi
     }
 }
 
-/** 回复下面一排小图标：复制、存到资料库、朗读、重新生成，右边是本轮用量。 */
 @Composable
 private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate: (() -> Unit)?, extras: TurnExtras) {
     val extra = LocalExtraColors.current
@@ -775,14 +1123,14 @@ private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate:
     var mine by remember(text) { mutableStateOf(false) }
     val speaking = mine && (reader == null || reader.speaking)
     if (platform == null && onRegenerate == null && extras.onSave == null) return
-    Row(Modifier.fillMaxWidth().padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         if (platform != null) {
             Row(
-                Modifier.heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(text); copied = true }.padding(horizontal = 8.dp),
+                Modifier.heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(text); copied = true }.padding(horizontal = 7.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                XIcon(if (copied) XIcons.Check else XIcons.Copy, tint = extra.ink3, size = 15.dp, description = "复制")
-                if (copied) Text("已复制", style = XType.Caption, color = extra.ink3)
+                XIcon(if (copied) XIcons.Check else XIcons.Copy, tint = if (copied) ChatSuccess else extra.ink3, size = 15.dp, description = "复制")
+                if (copied) Text("已复制", style = XType.Caption, color = ChatSuccess)
             }
         }
         extras.onSave?.let { save ->
@@ -810,26 +1158,42 @@ private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
     }
 }
 
-/** 这一轮改了文件：撤销这些改动（点了先二次确认），撤销之后留一行结果。 */
 @Composable
 private fun CheckpointNotice(cp: RunCheckpoint, onUndo: (String) -> Unit) {
     val extra = LocalExtraColors.current
     var confirm by remember(cp.runId) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 10.dp, vertical = 6.dp)) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(Modifier.fillMaxWidth().clip(shape).background(extra.fill).padding(horizontal = 12.dp, vertical = 8.dp)) {
         when {
-            cp.state == "undone" -> Text(cp.message.ifBlank { "已撤销这些改动" }, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            cp.state == "undoing" -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Spinner(12.dp); Text("正在撤销…", style = XType.Caption, color = extra.ink3) }
+            cp.state == "undone" -> Text(cp.message.ifBlank { "已撤销本轮文件改动" }, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            cp.state == "undoing" -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spinner(12.dp)
+                Text("正在撤销…", style = XType.Caption, color = extra.ink3)
+            }
             confirm -> {
-                Text("这些文件会回到这一轮回答之前的样子，之后对它们的修改也会被覆盖。", style = XType.Caption)
-                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallButton("确认撤销", BtnKind.Primary, { confirm = false; onUndo(cp.runId) })
-                    SmallButton("取消", BtnKind.Neutral, { confirm = false })
+                Text("确认将这 ${cp.count} 个文件还原到本轮之前的状态？后续修改也会被覆盖。", style = XType.Caption, color = MaterialTheme.colorScheme.onSurface)
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton("确认撤销", BtnKind.DangerSolid, { confirm = false; onUndo(cp.runId) }, height = 30.dp)
+                    SmallButton("取消", BtnKind.Neutral, { confirm = false }, height = 30.dp)
                 }
             }
             else -> {
-                Text("这一轮改了 ${cp.count} 个文件。", style = XType.Caption)
-                if (cp.state == "failed" && cp.message.isNotBlank()) Text(cp.message, style = XType.Caption, color = Danger)
-                Text("撤销这些改动", Modifier.clip(RoundedCornerShape(8.dp)).clickable { confirm = true }.padding(vertical = 4.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    XIcon(XIcons.Refresh, tint = extra.ink3, size = 14.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text("已保存检查点（修改 ${cp.count} 个文件）", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (cp.state == "failed" && cp.message.isNotBlank()) Text(cp.message, style = XType.Caption, color = ChatFail)
+                    }
+                    Box(
+                        Modifier.clip(RoundedCornerShape(7.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, AgentHairline, RoundedCornerShape(7.dp))
+                            .clickable { confirm = true }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text("撤销", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
             }
         }
     }
@@ -837,22 +1201,24 @@ private fun CheckpointNotice(cp: RunCheckpoint, onUndo: (String) -> Unit) {
 
 @Composable
 private fun StatusLine(text: String, alert: Boolean) {
-    Row(Modifier.padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (alert) XIcon(XIcons.Shield, tint = Danger, size = 14.dp) else Spinner(12.dp)
-        Text(text, style = XType.Caption, color = if (alert) Danger else LocalExtraColors.current.ink3)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        if (alert) XIcon(XIcons.Shield, tint = ChatFail, size = 14.dp) else Spinner(13.dp)
+        Text(text, style = XType.Caption.copy(fontSize = 12.5.sp), color = if (alert) ChatFail else LocalExtraColors.current.ink3)
     }
 }
 
-// ───────────── Markdown 回答 ─────────────
+// ───────────── Markdown 回答（通栏舒展排版） ─────────────
 
-/** 回答气泡：标题、列表、引用、代码块（带复制）、粗体、行内代码、链接。 */
+private val EditorialBodyStyle = TextStyle(fontSize = 15.sp, lineHeight = 25.sp, letterSpacing = 0.08.sp)
+
 @Composable
 fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?, modifier: Modifier = Modifier, flat: Boolean = false) {
     val blocks = remember(text, streaming) { parseMarkdown(if (streaming) "$text ▍" else text) }
     val onLink: (String) -> Unit = { url -> if (url.startsWith("https://") || url.startsWith("http://")) platform?.openUrl(url) }
     Column(
-        if (flat) modifier else modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        if (flat) modifier.fillMaxWidth() else modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, AgentHairline, AssistantBubbleShape).padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         blocks.forEach { block -> MarkdownContentBlock(block, platform, onLink) }
     }
@@ -863,11 +1229,24 @@ internal fun MarkdownContentBlock(block: MdBlock, platform: PlatformActions?, on
     val extra = LocalExtraColors.current
     val codeBg = extra.fill
     when (block) {
-        is MdBlock.Heading -> Text(inlineText(block.inlines, codeBg, onLink), fontSize = if (block.level <= 1) 17.sp else if (block.level == 2) 16.sp else 15.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-        is MdBlock.Paragraph -> Text(inlineText(block.inlines, codeBg, onLink), style = XType.Body)
-        is MdBlock.Bullets -> block.items.forEach { item -> ListItem("•", item, codeBg, onLink) }
-        is MdBlock.Numbered -> block.items.forEachIndexed { i, item -> ListItem("${block.start + i}.", item, codeBg, onLink) }
-        is MdBlock.Quote -> Text(inlineText(block.inlines, codeBg, onLink), Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        is MdBlock.Heading -> Text(
+            inlineText(block.inlines, codeBg, onLink),
+            Modifier.padding(top = 4.dp),
+            fontSize = if (block.level <= 1) 17.sp else if (block.level == 2) 16.sp else 14.5.sp,
+            lineHeight = 23.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        is MdBlock.Paragraph -> Text(inlineText(block.inlines, codeBg, onLink), style = EditorialBodyStyle)
+        is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            block.items.forEach { item -> ListItem("•", item, codeBg, onLink) }
+        }
+        is MdBlock.Numbered -> Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            block.items.forEachIndexed { i, item -> ListItem("${block.start + i}.", item, codeBg, onLink) }
+        }
+        is MdBlock.Quote -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.padding(top = 4.dp).width(2.5.dp).heightIn(min = 18.dp).background(extra.line))
+            Text(inlineText(block.inlines, codeBg, onLink), Modifier.weight(1f), style = XType.Secondary.copy(lineHeight = 22.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         is MdBlock.Code -> CodeBlock(block.language, block.text, platform)
         MdBlock.Rule -> Hairline()
     }
@@ -876,28 +1255,42 @@ internal fun MarkdownContentBlock(block: MdBlock, platform: PlatformActions?, on
 @Composable
 private fun ListItem(marker: String, inlines: List<MdInline>, codeBg: Color, onLink: (String) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(marker, Modifier.width(18.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
-        Text(inlineText(inlines, codeBg, onLink), Modifier.weight(1f), style = XType.Body)
+        Text(marker, Modifier.width(16.dp), style = EditorialBodyStyle, color = LocalExtraColors.current.ink3)
+        Text(inlineText(inlines, codeBg, onLink), Modifier.weight(1f), style = EditorialBodyStyle)
     }
 }
 
 @Composable
 private fun CodeBlock(language: String, code: String, platform: PlatformActions?) {
+    val extra = LocalExtraColors.current
     var copied by remember(code) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(if (ThemeState.dark) 0xFF0C0C0E else 0xFF1E1E1E))) {
-        Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(language.ifBlank { "代码" }, Modifier.weight(1f), style = XType.Caption, color = Color(0xFFBBBBBB), maxLines = 1)
+    ChatCardSurface(shape = CompactCardShape) {
+        Row(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+                .padding(start = 12.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(language.ifBlank { "代码" }, Modifier.weight(1f), style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1)
             if (platform != null) {
                 Row(
-                    Modifier.heightIn(min = 28.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(code); copied = true }.padding(horizontal = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    Modifier.heightIn(min = 26.dp).clip(RoundedCornerShape(6.dp))
+                        .clickable { platform.copy(code); copied = true }.padding(horizontal = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    XIcon(XIcons.Copy, tint = Color(0xFFBBBBBB), size = 12.dp)
-                    Text(if (copied) "已复制" else "复制", style = XType.Caption, color = Color(0xFFBBBBBB))
+                    XIcon(if (copied) XIcons.Check else XIcons.Copy, tint = if (copied) ChatSuccess else MaterialTheme.colorScheme.onSurfaceVariant, size = 12.dp)
+                    Text(if (copied) "已复制" else "复制", style = XType.Caption.copy(fontSize = 11.5.sp), color = if (copied) ChatSuccess else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        Text(code, Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp), style = XType.Caption, color = Color(0xFFE6E6E6), fontFamily = FontFamily.Monospace)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+        Text(
+            code,
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp),
+            style = XType.Caption.copy(fontSize = 12.sp, lineHeight = 19.sp),
+            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = FontFamily.Monospace,
+        )
     }
 }
 
@@ -905,9 +1298,9 @@ private fun inlineText(inlines: List<MdInline>, codeBg: Color, onLink: (String) 
     inlines.forEach { part ->
         when (part) {
             is MdInline.Text -> append(part.text)
-            is MdInline.Bold -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part.text) }
+            is MdInline.Bold -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(part.text) }
             is MdInline.Italic -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(part.text) }
-            is MdInline.Code -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg, fontSize = 14.sp)) { append(part.text) }
+            is MdInline.Code -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg, fontSize = 13.sp)) { append(" ${part.text} ") }
             is MdInline.Link -> withLink(
                 LinkAnnotation.Clickable(
                     tag = part.url,
@@ -919,5 +1312,4 @@ private fun inlineText(inlines: List<MdInline>, codeBg: Color, onLink: (String) 
     }
 }
 
-/** 展开箭头：展开时转 180°。 */
 private fun Modifier.rotated(open: Boolean): Modifier = this.rotate(if (open) 180f else 0f)

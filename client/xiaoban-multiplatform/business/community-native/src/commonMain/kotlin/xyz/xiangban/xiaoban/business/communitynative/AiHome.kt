@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -49,6 +50,7 @@ import kotlin.time.Clock
 import xyz.xiangban.xiaoban.common.community.ChatSummary
 import xyz.xiangban.xiaoban.common.community.ChatTaskStatus
 import xyz.xiangban.xiaoban.common.community.CloudChatState
+import xyz.xiangban.xiaoban.common.community.MobileGame
 
 private class LocalClock(val month: Int, val day: Int, val weekday: Int, val hour: Int)
 
@@ -118,12 +120,17 @@ internal fun AgentTopBar(model: String, exhausted: Boolean, waiting: Boolean, on
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("小伴 AI", style = XType.Title.copy(fontSize = 17.sp, lineHeight = 21.sp, letterSpacing = (-.17).sp), fontWeight = FontWeight.Bold)
-            Row(Modifier.padding(top = 1.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(Modifier.size(5.dp).background(if (exhausted) Danger else Success, CircleShape))
-                Text(if (exhausted) "点数已用完" else model, style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 14.sp),
-                    color = if (exhausted) Danger else ink3, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 200.dp))
+            Text("小伴 AI", style = XType.Title.copy(fontSize = 16.sp, lineHeight = 20.sp, letterSpacing = (-.15).sp), fontWeight = FontWeight.SemiBold)
+            Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (exhausted) Box(Modifier.size(5.dp).background(ChatWarn, CircleShape))
+                Text(
+                    if (exhausted) "点数已用完" else model,
+                    style = XType.Caption.copy(fontSize = 11.5.sp, lineHeight = 14.sp),
+                    color = if (exhausted) ChatWarn else ink3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 200.dp),
+                )
             }
         }
         AgentIconButton(AiHomeIcons.More, "个人 Agent 配置", onConfig, Modifier.align(Alignment.CenterEnd))
@@ -220,13 +227,14 @@ private fun AgentCapability(icon: ImageVector, text: String, onClick: () -> Unit
 
 @Composable
 internal fun AgentQuotaBanner(onClick: () -> Unit) {
-    Row(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-        .background(AgentDangerSoft).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        XIcon(AiHomeIcons.Alert, size = 14.dp, tint = Danger)
-        Text("官方点数已用完 · 点右上角「···」切换模型或兑换额度", Modifier.weight(1f), style = XType.Caption, color = Danger, fontWeight = FontWeight.Medium)
-        XIcon(AiHomeIcons.ChevRight, size = 14.dp, tint = Danger)
-    }
+    ChatNoticeBar(
+        title = "官方点数已用完",
+        subtitle = "可兑换额度或切换自定义模型",
+        tone = "warn",
+        actionText = "去配置",
+        onAction = onClick,
+        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+    )
 }
 
 @Composable
@@ -238,49 +246,76 @@ internal fun AgentComposer(
 ) {
     val colors = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
-    val elevated = if (ThemeState.dark) 6.dp else 4.dp
-    val shadow = Color.Black.copy(alpha = if (ThemeState.dark) .42f else .17f)
-    val border = if (ThemeState.dark) Color.White.copy(alpha = .08f) else Color.Black.copy(alpha = .06f)
+    val elevated = if (ThemeState.dark) 6.dp else 3.dp
+    val shadow = Color.Black.copy(alpha = if (ThemeState.dark) .38f else .10f)
+    val border = AgentHairline
     val canSend = value.isNotBlank() || hasAttachments
-    val orb by animateColorAsState(if (canSend || sending) Brand else extra.brandSoft, label = "发送按钮颜色")
-    Row(Modifier.fillMaxWidth().padding(horizontal = if (compact) 10.dp else 12.dp)
-        .padding(top = if (compact) 6.dp else 4.dp, bottom = if (compact) 8.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(44.dp).shadow(elevated, CircleShape, ambientColor = shadow, spotColor = shadow)
-            .clip(CircleShape).background(colors.surface).border(.5.dp, border, CircleShape)
-            .clickable(indication = null, interactionSource = null, role = Role.Button, onClick = onAttach), contentAlignment = Alignment.Center) {
-            XIcon(AiHomeIcons.Plus, description = "添加附件", size = 20.dp, tint = colors.onSurfaceVariant)
-        }
-        val pill = RoundedCornerShape(24.dp)
-        Row(Modifier.weight(1f).heightIn(min = 46.dp).shadow(elevated, pill, ambientColor = shadow, spotColor = shadow)
-            .background(colors.surface, pill).border(.5.dp, border, pill)
-            .padding(start = 16.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Box(Modifier.weight(1f)) {
-                if (voiceMode) {
-                    PressBar(voice, true, "按住 说话", onPressStart = { if (sending) onStop() })
-                } else {
-                    BasicTextField(value, onValue, modifier = Modifier.fillMaxWidth().focusRequester(inputFocus), singleLine = true,
-                        textStyle = XType.Body.copy(color = colors.onBackground), cursorBrush = SolidColor(Brand),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (canSend && !sending) onSend() }),
-                        decorationBox = { field ->
-                            Box {
-                                if (value.isEmpty()) Text(placeholder, style = XType.Body, color = extra.ink3, maxLines = 1)
-                                field()
-                            }
-                        })
-                }
+    val orb by animateColorAsState(
+        when {
+            sending -> colors.onBackground
+            canSend -> Brand
+            else -> extra.brandSoft
+        },
+        label = "发送按钮颜色",
+    )
+    Column(Modifier.fillMaxWidth().background(colors.background)) {
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(AgentHairline))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = if (compact) 10.dp else 12.dp)
+                .padding(top = if (compact) 7.dp else 9.dp, bottom = if (compact) 8.dp else 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier.size(42.dp).shadow(elevated, CircleShape, ambientColor = shadow, spotColor = shadow)
+                    .clip(CircleShape).background(colors.surface).border(1.dp, border, CircleShape)
+                    .clickable(indication = null, interactionSource = null, role = Role.Button, onClick = onAttach),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(AiHomeIcons.Plus, description = "添加附件", size = 19.dp, tint = colors.onSurface)
             }
-            AgentIconButton(if (voiceMode) XIcons.Keyboard else AiHomeIcons.Mic, if (voiceMode) "切回键盘输入" else "语音输入",
-                { onVoiceMode(!voiceMode) }, size = 34.dp, glyph = 19.dp, tint = colors.onSurfaceVariant)
-            Box(Modifier.size(36.dp).clip(CircleShape).background(orb)
-                .clickable(role = Role.Button, onClick = if (sending) onStop else if (canSend) onSend else onLive),
-                contentAlignment = Alignment.Center) {
-                when {
-                    sending -> XIcon(XIcons.Stop, description = "停止", size = 18.dp, tint = Color.White)
-                    canSend -> XIcon(AiHomeIcons.ArrowUp, description = "发送", size = 18.dp, tint = Color.White)
-                    else -> XIcon(AiHomeIcons.Wave, description = "实时语音通话", size = 18.dp, tint = extra.brandInk)
+            val pill = RoundedCornerShape(22.dp)
+            Row(
+                Modifier.weight(1f).heightIn(min = 44.dp).shadow(elevated, pill, ambientColor = shadow, spotColor = shadow)
+                    .background(colors.surface, pill).border(1.dp, border, pill)
+                    .padding(start = 15.dp, end = 5.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    if (voiceMode) {
+                        PressBar(voice, true, "按住 说话", onPressStart = { if (sending) onStop() })
+                    } else {
+                        BasicTextField(
+                            value, onValue, modifier = Modifier.fillMaxWidth().focusRequester(inputFocus), singleLine = true,
+                            textStyle = XType.Body.copy(color = colors.onBackground), cursorBrush = SolidColor(Brand),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { if (canSend && !sending) onSend() }),
+                            decorationBox = { field ->
+                                Box {
+                                    if (value.isEmpty()) Text(placeholder, style = XType.Body, color = extra.ink3, maxLines = 1)
+                                    field()
+                                }
+                            },
+                        )
+                    }
+                }
+                AgentIconButton(
+                    if (voiceMode) XIcons.Keyboard else AiHomeIcons.Mic,
+                    if (voiceMode) "切回键盘输入" else "语音输入",
+                    { onVoiceMode(!voiceMode) },
+                    size = 34.dp, glyph = 18.dp, tint = colors.onSurfaceVariant,
+                )
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(orb)
+                        .clickable(role = Role.Button, onClick = if (sending) onStop else if (canSend) onSend else onLive),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when {
+                        sending -> XIcon(XIcons.Stop, description = "停止", size = 16.dp, tint = colors.background)
+                        canSend -> XIcon(AiHomeIcons.ArrowUp, description = "发送", size = 17.dp, tint = Color.White)
+                        else -> XIcon(AiHomeIcons.Wave, description = "实时语音通话", size = 17.dp, tint = extra.brandInk)
+                    }
                 }
             }
         }
@@ -301,11 +336,10 @@ internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, reviewPlan:
     val waiting = tasks.firstOrNull { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan || it.taskStatus == ChatTaskStatus.Interrupted }
     val plan = tasks.singleOrNull()?.takeIf { it.taskStatus == ChatTaskStatus.WaitingForPlan }
     val shape = RoundedCornerShape(if (compact) 11.dp else 14.dp)
-    val tint = if (waiting == null) Success else Danger
+    val tint = if (waiting == null) ChatSuccess else ChatFail
     Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp).fillMaxWidth()
-        .then(if (waiting == null) Modifier.shadow(2.dp, shape, clip = false) else Modifier)
-        .clip(shape).background(if (waiting == null) colors.surface else AgentDangerSoft)
-        .then(if (waiting == null) Modifier.border(1.dp, AgentHairline, shape) else Modifier)
+        .clip(shape).background(if (waiting == null) colors.surface else ChatFailSoft)
+        .border(1.dp, if (waiting == null) AgentHairline else ChatFailLine, shape)
         .clickable { if (plan != null) reviewPlan(plan.id) else onClick() }.padding(horizontal = 12.dp, vertical = if (compact) 6.dp else 9.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Box(Modifier.size(13.dp).background(tint.copy(alpha = .18f), CircleShape).padding(3.dp).background(tint, CircleShape))
@@ -468,39 +502,259 @@ internal fun AgentTimestamp(epochMs: Long, offsetMinutes: Int) {
 @Composable
 internal fun AgentReminderResult(title: String, epochMs: Long, offsetMinutes: Int, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(14.dp)
-    Row(Modifier.fillMaxWidth().clip(shape).background(colors.surface).border(1.dp, AgentHairline, shape)
-        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Box(Modifier.size(22.dp).background(Success, CircleShape), contentAlignment = Alignment.Center) {
-            XIcon(AiHomeIcons.Check, tint = Color.White, size = 12.dp)
-        }
-        Column(Modifier.weight(1f)) {
-            Text("已设好提醒 · ${dateAndTime(epochMs, offsetMinutes)}", style = XType.Secondary, fontWeight = FontWeight.SemiBold)
-            Text("$title · 本机提醒", style = XType.Caption.copy(fontSize = 11.sp, lineHeight = 15.sp), color = colors.onSurfaceVariant)
+    val extra = LocalExtraColors.current
+    ChatCardSurface(shape = RoundedCornerShape(16.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(extra.fill),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(XIcons.Bell, tint = colors.onSurface, size = 18.dp)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${dateAndTime(epochMs, offsetMinutes)} · 已加入系统提醒", Modifier.padding(top = 2.dp), style = XType.Caption.copy(fontSize = 12.sp), color = colors.onSurfaceVariant)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.size(14.dp).clip(CircleShape).background(ChatSuccess), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.CheckBold, tint = Color.White, size = 9.dp)
+                }
+                Text("已设", style = XType.Caption.copy(fontSize = 11.5.sp), fontWeight = FontWeight.SemiBold, color = ChatSuccess)
+            }
         }
     }
 }
 
 @Composable
 internal fun AgentUserMessage(text: String) {
-    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 4.dp, bottomStart = 18.dp)
+    val extra = LocalExtraColors.current
+    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 6.dp, bottomStart = 18.dp)
+    var expanded by rememberSaveable(text) { mutableStateOf(false) }
+    var overflowed by remember(text) { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Box(Modifier.fillMaxWidth(.82f), contentAlignment = Alignment.CenterEnd) {
-            Text(text, Modifier.background(LocalExtraColors.current.brandSoft, shape).border(1.dp, AgentAccentLine, shape)
-                .padding(horizontal = 14.dp, vertical = 9.dp), style = XType.Body)
+        Column(
+            Modifier.widthIn(max = 316.dp).clip(shape).background(extra.fill)
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+        ) {
+            Text(
+                text,
+                style = XType.Body.copy(fontSize = 14.5.sp, lineHeight = 22.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = { result -> if (!expanded && result.hasVisualOverflow) overflowed = true },
+            )
+            if (overflowed || expanded) {
+                Row(
+                    Modifier.padding(top = 6.dp).clip(RoundedCornerShape(6.dp))
+                        .clickable { expanded = !expanded }.padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        if (expanded) "收起" else "展开全文",
+                        style = XType.Caption.copy(fontSize = 12.sp),
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    XIcon(
+                        if (expanded) XIcons.ArrowUp else XIcons.ChevronDown,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        size = 12.dp,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 internal fun AgentReply(content: @Composable ColumnScope.() -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.Top) {
-        Box(Modifier.padding(top = 2.dp).size(26.dp).background(LocalExtraColors.current.brandSoft, RoundedCornerShape(9.dp)),
-            contentAlignment = Alignment.Center) {
-            XIcon(AiHomeIcons.Spark, size = 14.dp, tint = Brand)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp), content = content)
+}
+
+/** 作品交付独立卡片：图标 + 作品名与形态 + 主色「打开」按钮 + 底部路径提示。 */
+@Composable
+internal fun AgentDeliverableCard(work: MobileGame, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    val kindLabel = if (work.kind == "app") "工具" else "小游戏"
+    val orientationLabel = when (work.orientation) {
+        "landscape" -> "横屏"
+        "auto" -> "自适应"
+        else -> "竖屏"
+    }
+    val iconBg = if (ThemeState.dark) Color(0xFF2F231A) else Color(0xFFFFEFE3)
+    val iconTint = if (ThemeState.dark) Color(0xFFF6AD55) else Color(0xFFC25E00)
+    ChatCardSurface(modifier = modifier, shape = RoundedCornerShape(16.dp), elevated = true) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(iconBg)
+                    .border(1.dp, iconTint.copy(alpha = 0.18f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(if (work.kind == "app") AiHomeIcons.Book else AiHomeIcons.Game, tint = iconTint, size = 22.dp)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(work.name, style = XType.Body.copy(fontSize = 15.sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "$kindLabel · $orientationLabel · 已安装到本机",
+                    Modifier.padding(top = 3.dp),
+                    style = XType.Caption.copy(fontSize = 12.sp),
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box(
+                Modifier.height(34.dp).clip(CircleShape).background(Brand).clickable(onClick = onOpen)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("打开", style = XType.Secondary.copy(fontSize = 13.sp), fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+            }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp), content = content)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(AgentHairline))
+        Row(
+            Modifier.fillMaxWidth().background(colors.background).padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("下次可在「应用 → 最近用过」打开", style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("协议 2", style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1)
+        }
+    }
+}
+
+/** 制作方案确认悬浮卡片。 */
+@Composable
+internal fun AgentPlanConfirmCard(
+    sending: Boolean,
+    ready: Boolean,
+    canConfirm: Boolean,
+    onEdit: () -> Unit,
+    onPrimary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val extra = LocalExtraColors.current
+    ChatCardSurface(modifier = modifier, shape = RoundedCornerShape(18.dp), elevated = true) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                XIcon(AiHomeIcons.Spark, tint = extra.brandInk, size = 16.dp)
+                Text(
+                    when {
+                        sending -> "正在拟定制作方案…"
+                        ready -> "制作方案已就绪"
+                        else -> "先生成制作方案"
+                    },
+                    Modifier.weight(1f),
+                    style = XType.Body.copy(fontSize = 14.sp),
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    if (sending) "生成中" else if (ready) "待确认" else "未开始",
+                    Modifier.clip(RoundedCornerShape(6.dp)).background(extra.fill).padding(horizontal = 7.dp, vertical = 2.dp),
+                    style = XType.Caption.copy(fontSize = 11.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                when {
+                    sending -> "方案完成后会等你确认，确认后才开始写入并安装到手机。"
+                    ready -> "可以继续补充修改需求，确认无误后点击开始制作。"
+                    else -> "生成方案确认无误后，再开始制作作品。"
+                },
+                style = XType.Caption.copy(fontSize = 12.5.sp, lineHeight = 18.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!sending) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (ready) {
+                        Box(
+                            Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp))
+                                .background(extra.fill).clickable(onClick = onEdit),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("修改需求", style = XType.Secondary.copy(fontSize = 13.sp), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                    Box(
+                        Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(10.dp))
+                            .background(if (canConfirm) Brand else extra.line)
+                            .clickable(enabled = canConfirm, onClick = onPrimary),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (ready) "开始制作" else "重新生成方案",
+                            style = XType.Secondary.copy(fontSize = 13.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 制作中断续作悬浮卡片。 */
+@Composable
+internal fun AgentCreationResumeCard(
+    stage: String?,
+    summary: String,
+    nextStep: String,
+    canResume: Boolean,
+    onResume: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ChatCardSurface(modifier = modifier, shape = RoundedCornerShape(18.dp), borderColor = ChatWarnLine, elevated = true) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(16.dp).clip(CircleShape).background(ChatWarn), contentAlignment = Alignment.Center) {
+                    Text("!", style = XType.Caption.copy(fontSize = 10.sp, lineHeight = 10.sp), color = Color.White, fontWeight = FontWeight.ExtraBold)
+                }
+                Text(
+                    if (!stage.isNullOrBlank()) "制作在「$stage」阶段中断" else "制作已中断",
+                    Modifier.weight(1f),
+                    style = XType.Body.copy(fontSize = 14.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "可续作",
+                    Modifier.clip(RoundedCornerShape(6.dp)).background(ChatWarnSoft).padding(horizontal = 7.dp, vertical = 2.dp),
+                    style = XType.Caption.copy(fontSize = 11.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = ChatWarn,
+                )
+            }
+            Text(
+                listOf(summary, "待完成：$nextStep").filter { it.isNotBlank() }.joinToString(" · "),
+                style = XType.Caption.copy(fontSize = 12.5.sp, lineHeight = 18.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (canResume) {
+                Box(
+                    Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(10.dp))
+                        .background(Brand).clickable(onClick = onResume),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("继续制作", style = XType.Secondary.copy(fontSize = 13.sp), fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
+            }
+        }
     }
 }
 

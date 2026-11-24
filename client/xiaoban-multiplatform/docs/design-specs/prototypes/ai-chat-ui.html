@@ -1,0 +1,1594 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴 AI · 手机聊天窗口与全卡片体系设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1320px; margin: 0 auto; padding: 22px 20px 56px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 22px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg { display: inline-flex; align-items: center; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .seg { background: rgba(255, 255, 255, .07); }
+.seg button { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: #5b5e66; }
+body.studio-dark .seg button { color: #a3a6b0; }
+.seg button.active { background: #ffffff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+body.studio-dark .seg button.active { background: #27282d; color: #f3f3f6; }
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .82);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── Boards Stage ─── */
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 26px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+body.mode-compare .board:not([data-board="redesign"]):not([data-board="legacy"]) { display: none; }
+body.mode-cards .board:not([data-board="cards-interact"]):not([data-board="cards-system"]) { display: none; }
+.board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 4px 10px; }
+.board-head h2 { font-size: 14px; font-weight: 650; }
+.board-head span { font-size: 11px; color: #7c7f87; }
+body.studio-dark .board-head span { color: #8f929b; }
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+/* ─── Phone Tokens ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #1e1f23;
+  --ink2: #62656e;
+  --ink3: #9699a2;
+  --hairline: #ececef;
+  --fill: #f2f2f5;
+  --fill-hover: #eaeaef;
+  --line: #e4e5ea;
+  --user-bg: #f1f2f5;
+  --code-bg: #eff0f3;
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --success: #07c160;
+  --success-soft: #eaf9f0;
+  --warn: #c77700;
+  --warn-soft: #fff6e6;
+  --warn-line: #f3dfb8;
+  --fail: #e5484d;
+  --fail-soft: #fff1f2;
+  --fail-line: #f5c6c9;
+  --float-shadow: 0 4px 20px rgba(0, 0, 0, .055), 0 0 0 0.5px rgba(0, 0, 0, .06);
+  --card-shadow: 0 2px 10px rgba(15, 18, 25, .04);
+
+  position: relative;
+  height: 820px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  --paper: #111113;
+  --surface: #1b1b1e;
+  --ink: #ececef;
+  --ink2: #9b9da6;
+  --ink3: #6c6e76;
+  --hairline: #27272c;
+  --fill: #242428;
+  --fill-hover: #2d2d32;
+  --line: #323238;
+  --user-bg: #242429;
+  --code-bg: #26262c;
+  --success: #1ec76f;
+  --success-soft: rgba(30, 199, 111, .14);
+  --warn: #f0a83a;
+  --warn-soft: rgba(240, 168, 58, .12);
+  --warn-line: rgba(240, 168, 58, .28);
+  --fail: #ef5b5f;
+  --fail-soft: rgba(239, 91, 95, .13);
+  --fail-line: rgba(239, 91, 95, .28);
+  --float-shadow: 0 6px 24px rgba(0, 0, 0, .42), 0 0 0 0.5px rgba(255, 255, 255, .08);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, .28);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status & Top Bar */
+.status-bar { height: 36px; flex: none; padding: 10px 22px 0; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink); }
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 1.5px; background: var(--success); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+.app-bar {
+  height: 48px;
+  flex: none;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.icon-tap { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
+.icon-tap:hover { background: var(--fill); }
+.icon-tap svg { width: 20px; height: 20px; }
+
+.bar-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 10px;
+}
+.bar-title:hover { background: var(--fill); }
+.bar-title strong { font-size: 15.5px; font-weight: 650; line-height: 1.2; letter-spacing: -0.01em; }
+.bar-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--ink3);
+  line-height: 1.1;
+}
+.bar-sub svg { width: 11px; height: 11px; stroke-width: 2; opacity: .75; }
+
+/* Sub-switcher inside showcase boards */
+.phone-subbar {
+  flex: none;
+  padding: 0 14px 8px;
+  display: flex;
+  gap: 6px;
+}
+.subchip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink2);
+  background: var(--fill);
+}
+.subchip.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Parallel Task Top Strip */
+.top-task-strip {
+  margin: 0 14px 6px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+  flex: none;
+}
+.top-task-strip strong { font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-task-strip span { font-size: 11.5px; color: var(--ink3); flex: none; }
+.top-task-strip .mini-link { font-size: 12px; font-weight: 600; color: var(--accent-ink); padding: 2px 6px; border-radius: 6px; flex: none; }
+.top-task-strip .mini-link:hover { background: var(--accent-soft); }
+
+/* ─── Redesign Chat Stream (Full-bleed editorial flow) ─── */
+.chat-stream {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: none;
+}
+.chat-stream::-webkit-scrollbar { display: none; }
+
+/* Topic Divider */
+.topic-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink3);
+  margin: 2px 0;
+}
+.topic-divider::before, .topic-divider::after {
+  content: "";
+  flex: 1;
+  height: 0.5px;
+  background: var(--hairline);
+}
+
+/* User Message Bubble: Neutral, borderless, restrained */
+.msg-user-wrap { display: flex; justify-content: flex-end; }
+.msg-user {
+  max-width: 84%;
+  background: var(--user-bg);
+  color: var(--ink);
+  border-radius: 18px 18px 6px 18px;
+  padding: 11px 14px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.msg-user.clamped .u-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.u-toggle {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+.u-toggle:hover { color: var(--ink); }
+.u-toggle svg { width: 12px; height: 12px; }
+
+/* AI Turn */
+.msg-ai { display: flex; flex-direction: column; gap: 11px; }
+
+/* Unified Card Base */
+.x-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+/* Unified Execution / Thinking Capsule */
+.trace-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.trace-head {
+  width: 100%;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.trace-head:hover { background: var(--fill); }
+.trace-ico {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: background .15s ease, width .15s ease, height .15s ease;
+}
+.trace-ico svg { width: 15px; height: 15px; stroke-width: 1.9; }
+body.icon-bg .trace-ico { width: 22px; height: 22px; background: var(--accent-soft); }
+body.icon-bg .trace-ico svg { width: 13px; height: 13px; stroke-width: 2; }
+.trace-ico.running { animation: pulse-soft 1.8s ease-in-out infinite; }
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .65; transform: scale(.94); }
+}
+
+.trace-summary {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+.trace-status { font-weight: 600; color: var(--ink); flex: none; }
+.trace-meta { color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trace-chev { color: var(--ink3); width: 15px; height: 15px; transition: transform .18s ease; }
+.trace-card.open .trace-chev { transform: rotate(180deg); }
+
+.trace-body { border-top: 1px solid var(--hairline); padding: 10px 12px 12px; background: var(--paper); }
+.trace-tabs { display: inline-flex; gap: 4px; margin-bottom: 10px; padding: 2px; border-radius: 8px; background: var(--fill); }
+.trace-tab { font-size: 11.5px; padding: 4px 9px; border-radius: 6px; color: var(--ink2); font-weight: 500; }
+.trace-tab.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+
+.trace-list { display: flex; flex-direction: column; gap: 8px; }
+.trace-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.45; color: var(--ink2); }
+.trace-row .dot { width: 15px; height: 15px; margin-top: 2px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.trace-row .dot svg { width: 9.5px; height: 9.5px; stroke-width: 2.8; }
+.trace-row .dot.done { background: var(--success); color: #ffffff; }
+.trace-row .dot.fail { background: var(--fail); color: #ffffff; }
+.trace-row .dot.run { border: 1.6px solid var(--accent); border-top-color: transparent; animation: spin .9s linear infinite; }
+.trace-row .dot.todo { border: 1.5px solid var(--line); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.trace-row strong { color: var(--ink); font-weight: 500; }
+.trace-row.is-fail strong { color: var(--fail); }
+.trace-row .time { margin-left: auto; font-size: 11px; color: var(--ink3); flex: none; font-variant-numeric: tabular-nums; }
+.trace-think-quote { font-size: 12px; line-height: 1.6; color: var(--ink2); border-left: 2px solid var(--line); padding-left: 10px; }
+
+/* AI Prose Typography */
+.ai-prose { font-size: 15px; line-height: 1.68; color: var(--ink); letter-spacing: 0.005em; }
+.ai-prose p + p { margin-top: 10px; }
+.ai-prose h4 { margin-top: 14px; margin-bottom: 6px; font-size: 14px; font-weight: 650; color: var(--ink); }
+.ai-prose ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.ai-prose li span.muted { color: var(--ink2); font-size: 13.5px; }
+.inline-code {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.3;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  color: var(--ink);
+}
+.cursor-blink { display: inline-block; width: 2px; height: 15px; background: var(--accent); vertical-align: -2px; margin-left: 3px; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { opacity: 0; } }
+
+/* ─── Card 1: Deliverable App Card ─── */
+.app-deliver-main { padding: 13px 14px; display: flex; align-items: center; gap: 12px; }
+.app-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fff1e6 0%, #ffe0cc 100%);
+  border: 1px solid rgba(217, 119, 6, .16);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #c25e00;
+}
+.phone.dark .app-icon { background: linear-gradient(135deg, #33251a 0%, #2b1e14 100%); border-color: rgba(251, 191, 36, .18); color: #f6ad55; }
+.app-icon svg { width: 22px; height: 22px; }
+.app-meta { flex: 1; min-width: 0; }
+.app-meta strong { display: block; font-size: 15px; font-weight: 650; color: var(--ink); line-height: 1.25; }
+.app-meta small { display: block; margin-top: 3px; font-size: 12px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-primary-sm {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  flex: none;
+}
+.btn-primary-sm:active { transform: scale(.97); }
+.card-foot-bar {
+  padding: 8px 14px;
+  border-top: 1px solid var(--hairline);
+  background: var(--paper);
+  font-size: 11.5px;
+  color: var(--ink3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ─── Card 2: Reminder Result Card ─── */
+.reminder-card {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  width: 100%;
+}
+.reminder-card:hover { background: var(--fill); }
+.reminder-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.reminder-ico svg { width: 18px; height: 18px; }
+.reminder-body { flex: 1; min-width: 0; }
+.reminder-body strong { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.reminder-body small { display: block; margin-top: 2px; font-size: 12px; color: var(--ink2); }
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--success);
+  flex: none;
+}
+.status-pill .mini-ok {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.status-pill .mini-ok svg { width: 9px; height: 9px; stroke-width: 2.8; }
+
+/* ─── Card 3: Code Block Card ─── */
+.code-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.code-head {
+  padding: 7px 12px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+.code-copy { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--ink2); padding: 2px 6px; border-radius: 6px; }
+.code-copy:hover { background: var(--fill); color: var(--ink); }
+.code-copy svg { width: 13px; height: 13px; }
+.code-pre {
+  margin: 0;
+  padding: 11px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+/* ─── Card 4: Generated Image Card ─── */
+.img-card {
+  width: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+.img-thumb {
+  height: 132px;
+  background: linear-gradient(135deg, #2d3448 0%, #4a4569 45%, #c9866b 100%);
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+}
+.img-thumb::before {
+  content: "";
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 224, 178, .75);
+  top: 22px;
+  right: 28px;
+  box-shadow: 0 0 28px rgba(255, 210, 150, .55);
+}
+.img-badge {
+  position: relative;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, .92);
+  background: rgba(0, 0, 0, .38);
+  backdrop-filter: blur(6px);
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+.img-foot {
+  padding: 8px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+
+/* ─── Card 5: File Changes & Checkpoint ─── */
+.files-head {
+  width: 100%;
+  padding: 11px 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.files-head:hover { background: var(--fill); }
+.files-head svg.f-ico { width: 16px; height: 16px; color: var(--ink2); }
+.files-head strong { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+.diff-stat { font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; display: inline-flex; gap: 5px; }
+.diff-add { color: var(--success); }
+.diff-del { color: var(--fail); }
+.files-list { border-top: 1px solid var(--hairline); background: var(--paper); padding: 6px 13px 10px; display: flex; flex-direction: column; gap: 7px; }
+.file-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.file-tag { width: 16px; height: 16px; border-radius: 4px; font-size: 10px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.file-tag.m { background: var(--warn-soft); color: var(--warn); }
+.file-tag.a { background: var(--success-soft); color: var(--success); }
+.file-name { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.checkpoint-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 12px;
+  color: var(--ink2);
+}
+.checkpoint-bar svg { width: 14px; height: 14px; color: var(--ink3); }
+.checkpoint-bar span { flex: 1; }
+.checkpoint-bar button { font-size: 12px; font-weight: 600; color: var(--ink); padding: 3px 9px; border-radius: 7px; background: var(--surface); border: 1px solid var(--hairline); }
+
+/* ─── Card 6: Status / Error / Quota Notice ─── */
+.notice-card {
+  padding: 11px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notice-card.warn { border-color: var(--warn-line); background: var(--warn-soft); }
+.notice-card.fail { border-color: var(--fail-line); background: var(--fail-soft); }
+.notice-ico { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.notice-ico.fail { background: var(--fail); color: #fff; }
+.notice-ico.fail svg { width: 10px; height: 10px; stroke-width: 2.8; }
+.notice-ico.warn { background: var(--warn); color: #fff; font-size: 10px; font-weight: 800; }
+.notice-text { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--ink); }
+.notice-text small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink2); }
+.notice-btn {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  flex: none;
+}
+
+/* ─── Docked Interactive Action Cards (Above Composer: Approval / Ask / Plan / Resume) ─── */
+.dock-slot {
+  flex: none;
+  padding: 0 12px 8px;
+}
+.action-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  box-shadow: var(--float-shadow);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.action-card.danger { border-color: var(--fail-line); }
+.ac-head { display: flex; align-items: center; gap: 8px; }
+.ac-head svg { width: 16px; height: 16px; color: var(--ink); }
+.ac-head.danger svg { color: var(--fail); }
+.ac-head strong { font-size: 14px; font-weight: 650; color: var(--ink); flex: 1; }
+.ac-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--ink2);
+}
+.ac-tag.danger { background: var(--fail-soft); color: var(--fail); }
+.ac-tag.warn { background: var(--warn-soft); color: var(--warn); }
+.ac-desc { font-size: 12.5px; line-height: 1.5; color: var(--ink2); }
+.ac-code {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  word-break: break-all;
+}
+.ac-choices { display: flex; flex-wrap: wrap; gap: 7px; }
+.choice-chip {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.choice-chip:hover { border-color: var(--line); }
+.choice-chip.selected { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-soft-line); font-weight: 600; }
+
+.ac-btns { display: flex; gap: 8px; }
+.ac-btn {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ac-btn.primary { background: var(--accent); color: #ffffff; }
+.ac-btn.danger { background: var(--fail); color: #ffffff; }
+.ac-btn.secondary { background: var(--fill); color: var(--ink); }
+.ac-btn.ghost { background: transparent; color: var(--ink2); flex: none; padding: 0 10px; }
+.ac-btn.ghost:hover { background: var(--fill); }
+
+/* Message subtle actions */
+.ai-actions { display: flex; align-items: center; gap: 2px; margin-top: -4px; }
+.ai-act-btn { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--ink3); }
+.ai-act-btn:hover { background: var(--fill); color: var(--ink2); }
+.ai-act-btn svg { width: 15px; height: 15px; }
+
+/* Bottom Composer */
+.composer-dock {
+  flex: none;
+  padding: 10px 12px 16px;
+  background: var(--paper);
+  border-top: 0.5px solid var(--hairline);
+}
+.composer-row { display: flex; align-items: center; gap: 8px; }
+.plus-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--card-shadow);
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  flex: none;
+}
+.plus-btn svg { width: 19px; height: 19px; }
+.input-pill {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 5px 0 14px;
+  border-radius: 22px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--card-shadow);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.input-pill input { flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink); }
+.input-pill input::placeholder { color: var(--ink3); }
+.mic-btn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--ink2); flex: none; }
+.mic-btn svg { width: 17px; height: 17px; }
+.voice-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.voice-btn.send { background: var(--accent); color: #ffffff; }
+.voice-btn.stop { background: var(--ink); color: var(--paper); }
+.voice-btn svg { width: 16px; height: 16px; }
+.home-indicator { width: 118px; height: 4px; border-radius: 99px; background: var(--ink); opacity: .16; margin: 10px auto 0; }
+
+/* ─── Legacy Board ─── */
+.legacy-stream { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 14px 10px; display: flex; flex-direction: column; gap: 10px; scrollbar-width: none; }
+.legacy-stream::-webkit-scrollbar { display: none; }
+.legacy-bar-sub { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #7e8a82; }
+.legacy-green-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; }
+.legacy-user-wrap { display: flex; justify-content: flex-end; }
+.legacy-user { width: 78%; background: #fdf3f4; border: 1px solid #eccfd3; border-radius: 16px; padding: 11px 13px; font-size: 13.5px; line-height: 1.5; color: #2b2223; }
+.phone.dark .legacy-user { background: #2c1e20; border-color: #5a3439; color: #f0e4e6; }
+.legacy-ai-row { display: flex; align-items: flex-start; gap: 10px; }
+.legacy-avatar { width: 26px; height: 26px; border-radius: 50%; background: #fdeef0; color: #d9384a; display: grid; place-items: center; flex: none; margin-top: 3px; }
+.phone.dark .legacy-avatar { background: #362024; }
+.legacy-avatar svg { width: 13px; height: 13px; }
+.legacy-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.legacy-bar1 { background: var(--fill); border-radius: 10px; padding: 8px 11px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink2); }
+.legacy-bar2 { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 9px 11px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.legacy-big-green { width: 20px; height: 20px; border-radius: 50%; background: #3aa362; color: #fff; display: grid; place-items: center; flex: none; }
+.legacy-big-green svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.legacy-bar3 { background: var(--surface); border-radius: 10px; padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink2); }
+.legacy-prose { font-size: 14px; line-height: 1.55; color: var(--ink); }
+.legacy-prose h4 { margin: 10px 0 4px; font-size: 14px; font-weight: 700; }
+.legacy-prose ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }
+.legacy-loose-cta { padding: 0 12px 4px; flex: none; }
+.legacy-loose-cta small { display: block; font-size: 11.5px; color: var(--ink2); margin-bottom: 6px; }
+.legacy-loose-btn { width: 100%; height: 42px; border-radius: 21px; background: #fbf0f1; color: #c93848; font-size: 14px; font-weight: 600; }
+.phone.dark .legacy-loose-btn { background: #331e21; color: #f0808c; }
+
+/* Toast */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(24, 24, 28, .9);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 30;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+}
+.phone.dark .toast { background: rgba(240, 240, 244, .92); color: #161618; }
+
+/* Grammar Summary */
+.diff-notes {
+  max-width: 1220px;
+  margin: 28px auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.diff-card {
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid rgba(0, 0, 0, .06);
+  border-radius: 14px;
+  padding: 13px 15px;
+}
+body.studio-dark .diff-card { background: #18181c; border-color: rgba(255, 255, 255, .07); }
+.diff-card strong { display: block; font-size: 13px; font-weight: 650; margin-bottom: 4px; }
+.diff-card p { font-size: 12px; line-height: 1.55; color: #666972; }
+body.studio-dark .diff-card p { color: #9598a2; }
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴 AI · 手机聊天窗口与全卡片体系</h1>
+      <p>统一 16px 白底细框卡片语法 · 通栏流式排版 · 三合一过程摘要卡 · 交付/提醒/生图/审批/提问/文件变更/方案与异常全覆盖</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="tablist" aria-label="视图切换">
+        <button class="active" data-mode="all">全部五屏</button>
+        <button data-mode="cards">全卡片新增</button>
+        <button data-mode="compare">新旧对比</button>
+      </div>
+      <div class="swatches" id="swatches" aria-label="主题色"></div>
+      <button class="pill-btn" id="toggle-icon-bg">星标：无底</button>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <section class="board" data-board="redesign">
+      <div class="board-head">
+        <h2>01 · 作品交付态</h2>
+        <span>同场景优化 · 可交互</span>
+      </div>
+      <div class="phone" id="phone-new"></div>
+      <p class="board-caption">通栏流式排版；长消息默认 4 行柔和折叠；三层过程条收敛为单行摘要卡；作品信息和「打开」收进独立交付卡。</p>
+    </section>
+
+    <section class="board" data-board="running">
+      <div class="board-head">
+        <h2>02 · 执行中与过程展开</h2>
+        <span>微信绿 / 失败红状态点</span>
+      </div>
+      <div class="phone" id="phone-run"></div>
+      <p class="board-caption">过程卡内部分页展示步骤、任务清单与思考摘要；15px 微信绿圆 + 白对勾与红圆 + 白叉号让成败一目了然。</p>
+    </section>
+
+    <section class="board" data-board="cards-interact">
+      <div class="board-head">
+        <h2>03 · 交互待办与内容卡</h2>
+        <span>提醒 · 生图 · 代码 · 审批 / 提问</span>
+      </div>
+      <div class="phone" id="phone-interact"></div>
+      <p class="board-caption">顶部可切底栏交互卡：「普通审批 / 高危审批 / 小伴提问」；消息流内置本机提醒卡、生图结果卡与代码块，全部采用同源白底细框。</p>
+    </section>
+
+    <section class="board" data-board="cards-system">
+      <div class="board-head">
+        <h2>04 · 变更、方案与异常态</h2>
+        <span>文件变更 · 撤销 · 方案确认 / 续作</span>
+      </div>
+      <div class="phone" id="phone-system"></div>
+      <p class="board-caption">覆盖顶部并行任务条、新话题分割线、可折叠文件变更卡、检查点撤销条、额度与截断异常条，以及底部「方案确认 / 中断续作」卡片。</p>
+    </section>
+
+    <section class="board" data-board="legacy">
+      <div class="board-head">
+        <h2>05 · 现行版对照</h2>
+        <span>截图还原 · 痛点参考</span>
+      </div>
+      <div class="phone" id="phone-old"></div>
+      <p class="board-caption">左侧小头像挤占宽度；浅粉+粉框气泡偏重；三层状态条叠罗汉；通栏淡粉按钮无卡片边界且紧贴输入框。</p>
+    </section>
+  </main>
+
+  <section class="diff-notes" aria-label="统一卡片设计语法">
+    <div class="diff-card">
+      <strong>统一容器语言</strong>
+      <p>所有消息内卡片与贴底交互卡共用白底 + 1px 发丝框 + 14~18px 圆角 + 轻阴影，告别“实心灰条 / 阴影白卡 / 淡粉通栏”各画各的。</p>
+    </div>
+    <div class="diff-card">
+      <strong>严格控色与语义分工</strong>
+      <p>90% 中性黑白灰；主题色只落每屏核心主按钮与无底星标；成功用微信绿圆 + 白对勾，警示用琥珀，失败与高危用语义红。</p>
+    </div>
+    <div class="diff-card">
+      <strong>贴底待办卡与输入区分层</strong>
+      <p>审批、提问、方案确认、中断续作全部收进独立悬浮卡片（18px 圆角 + 轻投影），不再把两颗裸按钮直接糊在输入框上面。</p>
+    </div>
+    <div class="diff-card">
+      <strong>信息折叠与节奏克制</strong>
+      <p>长用户指令默认 4 行可展开，思考/清单/步骤三合一，文件变更默认紧凑折叠，异常条单行带清晰主操作，把舞台还给对话正文。</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red',      name: '小伴红', light: { btn: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c' }, dark: { btn: '#ee4b5f', soft: '#3a2225', line: '#5a2b33', ink: '#ff8c91' } },
+  { id: 'green',    name: '薄荷绿', light: { btn: '#2e8b5e', soft: '#e3f2e9', line: '#c4e3d0', ink: '#1e6a45' }, dark: { btn: '#34a36d', soft: '#1d3328', line: '#2d4f3d', ink: '#72d6a2' } },
+  { id: 'blue',     name: '海湾蓝', light: { btn: '#2f6fdb', soft: '#e6eefc', line: '#c5d8f8', ink: '#1d53ae' }, dark: { btn: '#3b7be8', soft: '#1e2a42', line: '#2f456b', ink: '#8db6ff' } },
+  { id: 'purple',   name: '暮紫',   light: { btn: '#7152d8', soft: '#ede8fc', line: '#d4c8f7', ink: '#5537b8' }, dark: { btn: '#8466e6', soft: '#2a2342', line: '#423669', ink: '#bba8ff' } },
+  { id: 'amber',    name: '琥珀',   light: { btn: '#a8640c', soft: '#faeedb', line: '#ecd4af', ink: '#87500a' }, dark: { btn: '#c27a1a', soft: '#3a2c17', line: '#5a4424', ink: '#f0b65a' } },
+  { id: 'graphite', name: '石墨',   light: { btn: '#2b2b30', soft: '#e9e9ec', line: '#d3d3d8', ink: '#2b2b30' }, dark: { btn: '#636368', soft: '#3a3a3d', line: '#505055', ink: '#e5e5ea' } },
+];
+
+const state = {
+  dark: false,
+  accentId: 'red',
+  mode: 'all',
+  newUserExpanded: false,
+  newTraceOpen: false,
+  newTraceTab: 'steps',
+  newDraft: '',
+  extraMsgs: [],
+  runTraceOpen: true,
+  runTraceTab: 'steps',
+  interactDock: 'approval-normal', // approval-normal | approval-high | ask
+  askPicked: '深浅色自动跟随',
+  systemDock: 'plan',              // plan | resume
+  filesOpen: true,
+  checkpointUndone: false,
+};
+
+const ICONS = {
+  back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  chevDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  chevUp: '<svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>',
+  spark: '<svg viewBox="0 0 24 24"><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>',
+  cross: '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  wave: '<svg viewBox="0 0 24 24"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/></svg>',
+  send: '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  stop: '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  speak: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  book: '<svg viewBox="0 0 24 24"><path d="M6 4h11a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 9h7M8 13h5M4 18a2 2 0 0 1 2-2h13"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6l7-3z"/></svg>',
+  help: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.8-2.5 2.2-2.5 3.6"/><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none"/></svg>',
+  file: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+  undo: '<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/></svg>',
+  signal: '<svg viewBox="0 0 24 24"><path d="M4 18v-2M9 18v-5M14 18v-8M19 18v-11"/></svg>',
+};
+
+function statusBar() {
+  return `<div class="status-bar"><span>5:47</span><div class="status-right">${ICONS.signal}${ICONS.wifi}<span class="bat"></span></div></div>`;
+}
+
+function topBar(subtitle = 'Auto（自动）') {
+  return `
+    <div class="app-bar">
+      <button class="icon-tap" data-toast="返回上一页">${ICONS.back}</button>
+      <button class="bar-title" data-toast="切换对话模型">
+        <strong>小伴 AI</strong>
+        <span class="bar-sub">${subtitle}${ICONS.chevDown}</span>
+      </button>
+      <button class="icon-tap" data-toast="打开小伴配置">${ICONS.more}</button>
+    </div>`;
+}
+
+function dotIcon(st) {
+  if (st === 'done') return ICONS.check;
+  if (st === 'fail') return ICONS.cross;
+  return '';
+}
+
+function renderTraceBody(tab, isRunning) {
+  if (tab === 'steps') {
+    const rows = isRunning ? [
+      { st: 'done', label: '检查草稿目录与入口文件', t: '01:12' },
+      { st: 'fail', label: '首次校验发现缺少 cover.svg（已自动补齐）', t: '04:18' },
+      { st: 'done', label: '调用 app_create 安装「随记账本」', t: '07:55' },
+      { st: 'run',  label: '正在运行 app_validate 校验协议与资源…', t: '进行中' },
+    ] : [
+      { st: 'done', label: '核对草稿目录 drafts/suiji-zhangben-assisted-1123', t: '01:08' },
+      { st: 'fail', label: '首次校验图标尺寸超限（已自动压缩重试）', t: '03:12' },
+      { st: 'done', label: '确认应用列表无冲突，执行 app_create 安装', t: '09:20' },
+      { st: 'done', label: '完成 app_validate 校验并启动试玩验收', t: '11:58' },
+    ];
+    return `<div class="trace-list">${rows.map(r => `
+      <div class="trace-row ${r.st === 'fail' ? 'is-fail' : ''}">
+        <span class="dot ${r.st}">${dotIcon(r.st)}</span>
+        <span><strong>${r.label}</strong></span>
+        <span class="time">${r.t}</span>
+      </div>`).join('')}</div>`;
+  }
+  if (tab === 'todo') {
+    const rows = isRunning ? [
+      { st: 'done', label: '核对草稿文件与图标' },
+      { st: 'done', label: '检查源码完整性' },
+      { st: 'done', label: '检查是否重复安装' },
+      { st: 'done', label: '安装「随记账本」到手机应用库' },
+      { st: 'run',  label: '校验并打开作品试玩' },
+    ] : [
+      { st: 'done', label: '核对草稿文件与图标' },
+      { st: 'done', label: '检查源码完整性' },
+      { st: 'done', label: '检查是否重复安装' },
+      { st: 'done', label: '安装「随记账本」到手机应用库' },
+      { st: 'done', label: '校验并打开作品试玩' },
+    ];
+    return `<div class="trace-list">${rows.map(r => `
+      <div class="trace-row">
+        <span class="dot ${r.st}">${dotIcon(r.st)}</span>
+        <span>${r.label}</span>
+      </div>`).join('')}</div>`;
+  }
+  return `<div class="trace-think-quote">${isRunning
+    ? '已确认 index.html、图标和本地账本存储结构齐全，无未实现占位逻辑。接下来校验竖屏安全区与宿主返回行为，通过后即可打开交付。'
+    : '草稿目录结构与入口文件均已核对完成，源码非半成品且当前无同名安装记录。按指定 ID suiji-zhangben-1123 完成安装、协议校验与试玩验收。'
+  }</div>`;
+}
+
+function composerHtml(placeholder = '问点什么...', mode = 'idle') {
+  if (mode === 'running') {
+    return `
+      <div class="composer-dock">
+        <div class="composer-row">
+          <button class="plus-btn" data-toast="添加图片或文件">${ICONS.plus}</button>
+          <div class="input-pill">
+            <input type="text" placeholder="${placeholder}" readonly>
+            <button class="voice-btn stop" data-toast="已停止当前任务">${ICONS.stop}</button>
+          </div>
+        </div>
+        <div class="home-indicator"></div>
+      </div>`;
+  }
+  return `
+    <div class="composer-dock">
+      <div class="composer-row">
+        <button class="plus-btn" data-toast="添加图片、文件或创作">${ICONS.plus}</button>
+        <div class="input-pill">
+          <input type="text" placeholder="${placeholder}" readonly>
+          <button class="mic-btn" data-toast="按住说话">${ICONS.mic}</button>
+          <button class="voice-btn" data-toast="进入语音通话">${ICONS.wave}</button>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>`;
+}
+
+/* ─── Board 01: Redesign Completed ─── */
+function renderNewPhone() {
+  const promptText = 'The ready complete draft is drafts/suiji-zhangben-assisted-1123. Install it now with app_create using source_dir and id suiji-zhangben-1123 and the Chinese name from index.html. Set kind app category tool orientation portrait. Then app_validate and open it. No more file generation.';
+  const extraHtml = state.extraMsgs.map(m => `
+    <div class="msg-user-wrap"><div class="msg-user">${m.q}</div></div>
+    <div class="msg-ai"><div class="ai-prose"><p>${m.a}</p></div></div>
+  `).join('');
+
+  document.getElementById('phone-new').innerHTML = `
+    ${statusBar()}
+    ${topBar()}
+    <div class="chat-stream" id="stream-new">
+      <div class="msg-user-wrap">
+        <div class="msg-user ${state.newUserExpanded ? '' : 'clamped'}">
+          <div class="u-text">${promptText}</div>
+          <button class="u-toggle" data-toggle-user>
+            ${state.newUserExpanded ? `收起 ${ICONS.chevUp}` : `展开全文 ${ICONS.chevDown}`}
+          </button>
+        </div>
+      </div>
+
+      <div class="msg-ai">
+        <div class="trace-card ${state.newTraceOpen ? 'open' : ''}">
+          <button class="trace-head" data-toggle-trace="new">
+            <span class="trace-ico">${ICONS.spark}</span>
+            <div class="trace-summary">
+              <span class="trace-status">已完成</span>
+              <span class="trace-meta">· 14 步 · 思考 56 段 · 11分58秒</span>
+            </div>
+            <span class="trace-chev">${ICONS.chevDown}</span>
+          </button>
+          ${state.newTraceOpen ? `
+            <div class="trace-body">
+              <div class="trace-tabs">
+                <button class="trace-tab ${state.newTraceTab === 'steps' ? 'active' : ''}" data-trace-tab="new:steps">步骤 14</button>
+                <button class="trace-tab ${state.newTraceTab === 'todo' ? 'active' : ''}" data-trace-tab="new:todo">清单 5/5</button>
+                <button class="trace-tab ${state.newTraceTab === 'think' ? 'active' : ''}" data-trace-tab="new:think">思考 56</button>
+              </div>
+              ${renderTraceBody(state.newTraceTab, false)}
+            </div>` : ''}
+        </div>
+
+        <div class="ai-prose">
+          <p>「随记账本」已从草稿目录完成安装与协议校验，你已试玩验收通过，本次任务已收尾。</p>
+          <h4>作品信息</h4>
+          <ul>
+            <li>名称：随记账本 <span class="muted">（工具 · 竖屏 · 触控 / 键鼠）</span></li>
+            <li>应用编号：<span class="inline-code">suiji-zhangben-1123</span></li>
+          </ul>
+        </div>
+
+        <div class="x-card">
+          <div class="app-deliver-main">
+            <div class="app-icon">${ICONS.book}</div>
+            <div class="app-meta">
+              <strong>随记账本</strong>
+              <small>工具 · 竖屏 · 已安装到本机</small>
+            </div>
+            <button class="btn-primary-sm" data-toast="正在打开「随记账本」…">打开</button>
+          </div>
+          <div class="card-foot-bar">
+            <span>下次可在「应用 → 最近用过」打开</span>
+            <span>协议 2</span>
+          </div>
+        </div>
+
+        <div class="ai-actions">
+          <button class="ai-act-btn" title="复制" data-toast="已复制回复内容">${ICONS.copy}</button>
+          <button class="ai-act-btn" title="朗读" data-toast="开始朗读本条回复">${ICONS.speak}</button>
+        </div>
+      </div>
+      ${extraHtml}
+    </div>
+
+    <div class="composer-dock">
+      <div class="composer-row">
+        <button class="plus-btn" data-toast="添加图片、文件或创作">${ICONS.plus}</button>
+        <div class="input-pill">
+          <input id="draft-new" type="text" placeholder="问点什么..." value="${state.newDraft.replace(/"/g, '&quot;')}">
+          <button class="mic-btn" data-toast="按住说话">${ICONS.mic}</button>
+          <button class="voice-btn ${state.newDraft.trim() ? 'send' : ''}" data-send-new>
+            ${state.newDraft.trim() ? ICONS.send : ICONS.wave}
+          </button>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  `;
+}
+
+/* ─── Board 02: Running & Expanded Trace ─── */
+function renderRunPhone() {
+  document.getElementById('phone-run').innerHTML = `
+    ${statusBar()}
+    ${topBar()}
+    <div class="chat-stream">
+      <div class="msg-user-wrap">
+        <div class="msg-user">帮我把草稿里的「随记账本」安装好，校验通过后直接打开给我试玩。</div>
+      </div>
+      <div class="msg-ai">
+        <div class="trace-card ${state.runTraceOpen ? 'open' : ''}">
+          <button class="trace-head" data-toggle-trace="run">
+            <span class="trace-ico running">${ICONS.spark}</span>
+            <div class="trace-summary">
+              <span class="trace-status">正在校验作品</span>
+              <span class="trace-meta">· 11/14 步 · 08:42</span>
+            </div>
+            <span class="trace-chev">${ICONS.chevDown}</span>
+          </button>
+          ${state.runTraceOpen ? `
+            <div class="trace-body">
+              <div class="trace-tabs">
+                <button class="trace-tab ${state.runTraceTab === 'steps' ? 'active' : ''}" data-trace-tab="run:steps">步骤 11/14</button>
+                <button class="trace-tab ${state.runTraceTab === 'todo' ? 'active' : ''}" data-trace-tab="run:todo">清单 4/5</button>
+                <button class="trace-tab ${state.runTraceTab === 'think' ? 'active' : ''}" data-trace-tab="run:think">思考</button>
+              </div>
+              ${renderTraceBody(state.runTraceTab, true)}
+            </div>` : ''}
+        </div>
+
+        <div class="ai-prose">
+          <p>草稿文件已核对齐全，没有重复安装记录。我已经按指定编号 <span class="inline-code">suiji-zhangben-1123</span> 完成安装，正在做最后一步运行校验，马上为你打开试玩<span class="cursor-blink"></span></p>
+        </div>
+      </div>
+    </div>
+    ${composerHtml('执行中，可随时补充说明...', 'running')}
+  `;
+}
+
+/* ─── Board 03: Interactive Cards & Content Cards (Reminder / Image / Code / Approval / Ask) ─── */
+function renderInteractPhone() {
+  let dockHtml = '';
+  if (state.interactDock === 'approval-normal') {
+    dockHtml = `
+      <div class="dock-slot">
+        <div class="action-card">
+          <div class="ac-head">
+            ${ICONS.shield}
+            <strong>设置本机提醒</strong>
+            <span class="ac-tag">写入操作</span>
+          </div>
+          <div class="ac-desc">小伴希望写入一条系统日程提醒，允许后将添加到手机提醒列表。</div>
+          <div class="ac-code">每周五 20:00 · 核对随记账本本周支出</div>
+          <div class="ac-btns">
+            <button class="ac-btn ghost" data-toast="已拒绝本次操作">拒绝</button>
+            <button class="ac-btn secondary" data-toast="本对话后续同类操作自动允许">本对话允许</button>
+            <button class="ac-btn primary" data-toast="已允许一次 · 提醒创建中">允许一次</button>
+          </div>
+        </div>
+      </div>`;
+  } else if (state.interactDock === 'approval-high') {
+    dockHtml = `
+      <div class="dock-slot">
+        <div class="action-card danger">
+          <div class="ac-head danger">
+            ${ICONS.shield}
+            <strong>在电脑上执行清理命令</strong>
+            <span class="ac-tag danger">高风险</span>
+          </div>
+          <div class="ac-desc">将永久删除缓存目录中的临时构建文件，操作不可撤销。</div>
+          <div class="ac-code">rm -rf ~/Downloads/old-builds/*.tmp</div>
+          <div class="ac-btns">
+            <button class="ac-btn secondary" data-toast="已拒绝高风险命令">拒绝</button>
+            <button class="ac-btn danger" data-toast="已二次确认并允许执行">确认允许</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    const opts = ['深浅色自动跟随', '仅暖白手帐风', '极简纯黑夜色'];
+    dockHtml = `
+      <div class="dock-slot">
+        <div class="action-card">
+          <div class="ac-head">
+            ${ICONS.help}
+            <strong>小伴想问你</strong>
+            <span class="ac-tag">单选或输入</span>
+          </div>
+          <div class="ac-desc">随记账本默认使用哪套界面配色？也可以直接在下方输入其他想法。</div>
+          <div class="ac-choices">
+            ${opts.map(o => `<button class="choice-chip ${state.askPicked === o ? 'selected' : ''}" data-pick-ask="${o}">${o}</button>`).join('')}
+          </div>
+          <div class="ac-btns">
+            <button class="ac-btn ghost" data-toast="已跳过提问">稍后再说</button>
+            <button class="ac-btn primary" data-toast="已回复：${state.askPicked}">发送选择</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('phone-interact').innerHTML = `
+    ${statusBar()}
+    ${topBar('小伴 AI · 主线')}
+    <div class="phone-subbar">
+      <button class="subchip ${state.interactDock === 'approval-normal' ? 'active' : ''}" data-dock-i="approval-normal">普通审批</button>
+      <button class="subchip ${state.interactDock === 'approval-high' ? 'active' : ''}" data-dock-i="approval-high">高危审批</button>
+      <button class="subchip ${state.interactDock === 'ask' ? 'active' : ''}" data-dock-i="ask">小伴提问</button>
+    </div>
+
+    <div class="chat-stream">
+      <div class="msg-ai">
+        <!-- Reminder Result Card -->
+        <div class="x-card">
+          <button class="reminder-card" data-toast="展开本机提醒工具详情">
+            <span class="reminder-ico">${ICONS.bell}</span>
+            <div class="reminder-body">
+              <strong>周五晚间记账复盘</strong>
+              <small>明天 20:00 · 已加入系统提醒</small>
+            </div>
+            <span class="status-pill"><i class="mini-ok">${ICONS.check}</i>已设</span>
+          </button>
+        </div>
+
+        <!-- Generated Image Card -->
+        <div class="img-card" data-toast="全屏预览生成图片">
+          <div class="img-thumb"><span class="img-badge">AI 生图 · 4:3</span></div>
+          <div class="img-foot">
+            <span>雨夜窗台暖灯壁纸</span>
+            <span style="color:var(--accent-ink);font-weight:600">预览</span>
+          </div>
+        </div>
+
+        <!-- Code Block Card -->
+        <div class="code-card">
+          <div class="code-head">
+            <span>json · manifest</span>
+            <button class="code-copy" data-toast="已复制代码">${ICONS.copy}复制</button>
+          </div>
+          <pre class="code-pre">{
+  "id": "suiji-zhangben-1123",
+  "kind": "app",
+  "orientation": "portrait"
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    ${dockHtml}
+    ${composerHtml(state.interactDock === 'ask' ? '或直接输入你的回答...' : '问点什么...')}
+  `;
+}
+
+/* ─── Board 04: File Changes, Checkpoint, Plan Confirm / Resume & Error Notices ─── */
+function renderSystemPhone() {
+  const dockHtml = state.systemDock === 'plan' ? `
+    <div class="dock-slot">
+      <div class="action-card">
+        <div class="ac-head">
+          ${ICONS.layers}
+          <strong>制作方案已就绪</strong>
+          <span class="ac-tag">待确认</span>
+        </div>
+        <div class="ac-desc">包含记账分类、月度图表与离线存储，确认后开始编写并安装到手机。</div>
+        <div class="ac-btns">
+          <button class="ac-btn secondary" data-toast="打开输入框修改需求">修改需求</button>
+          <button class="ac-btn primary" data-toast="已确认方案，开始后台制作">开始制作</button>
+        </div>
+      </div>
+    </div>` : `
+    <div class="dock-slot">
+      <div class="action-card">
+        <div class="ac-head">
+          <span class="notice-ico warn">!</span>
+          <strong>制作在「安装校验」阶段中断</strong>
+          <span class="ac-tag warn">可续作</span>
+        </div>
+        <div class="ac-desc">已完成 4/5 步 · 待完成：运行 app_validate 校验入口与图标并打开试玩。</div>
+        <div class="ac-btns">
+          <button class="ac-btn primary" data-toast="从断点继续完成剩余步骤">继续制作</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('phone-system').innerHTML = `
+    ${statusBar()}
+    ${topBar('MacBook Pro · 遥控')}
+    <div class="phone-subbar">
+      <button class="subchip ${state.systemDock === 'plan' ? 'active' : ''}" data-dock-s="plan">方案确认卡</button>
+      <button class="subchip ${state.systemDock === 'resume' ? 'active' : ''}" data-dock-s="resume">中断续作卡</button>
+    </div>
+
+    <!-- Parallel Task Top Strip -->
+    <div class="top-task-strip">
+      <i class="pulse-dot"></i>
+      <strong>雨夜窗台动态壁纸 · 生图中 65%</strong>
+      <button class="mini-link" data-toast="切换到后台并行任务">查看</button>
+    </div>
+
+    <div class="chat-stream">
+      <div class="topic-divider">新话题 · 今天 17:42（上下文已重置）</div>
+
+      <div class="msg-ai">
+        <!-- File Changes Card -->
+        <div class="x-card">
+          <button class="files-head" data-toggle-files>
+            <svg class="f-ico" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+            <strong>已修改 3 个文件</strong>
+            <span class="diff-stat"><span class="diff-add">+128</span><span class="diff-del">-14</span></span>
+            <span class="trace-chev" style="transform:${state.filesOpen ? 'rotate(180deg)' : 'none'}">${ICONS.chevDown}</span>
+          </button>
+          ${state.filesOpen ? `
+            <div class="files-list">
+              <div class="file-row"><span class="file-tag m">M</span><span class="file-name">drafts/suiji/index.html</span><span class="diff-stat"><span class="diff-add">+64</span><span class="diff-del">-8</span></span></div>
+              <div class="file-row"><span class="file-tag m">M</span><span class="file-name">drafts/suiji/ledger.js</span><span class="diff-stat"><span class="diff-add">+52</span><span class="diff-del">-6</span></span></div>
+              <div class="file-row"><span class="file-tag a">A</span><span class="file-name">drafts/suiji/cover.svg</span><span class="diff-stat"><span class="diff-add">+12</span></span></div>
+            </div>` : ''}
+        </div>
+
+        <!-- Checkpoint Notice -->
+        <div class="checkpoint-bar">
+          ${ICONS.undo}
+          <span>${state.checkpointUndone ? '已撤销本轮 3 个文件的改动' : '已自动保存检查点，可随时还原'}</span>
+          <button data-toggle-undo>${state.checkpointUndone ? '重做' : '撤销'}</button>
+        </div>
+
+        <!-- Error / Truncated Notice -->
+        <div class="notice-card fail">
+          <span class="notice-ico fail">${ICONS.cross}</span>
+          <div class="notice-text">
+            <strong>回复因网络波动中断</strong>
+            <small>已保留当前已生成内容</small>
+          </div>
+          <button class="notice-btn" data-toast="正在从断点继续生成…">继续</button>
+        </div>
+
+        <!-- Quota Notice -->
+        <div class="notice-card warn">
+          <span class="notice-ico warn">!</span>
+          <div class="notice-text">
+            <strong>本月官方点数已用完</strong>
+            <small>可兑换额度或切换自定义模型</small>
+          </div>
+          <button class="notice-btn" data-toast="前往模型与点数配置">去配置</button>
+        </div>
+      </div>
+    </div>
+
+    ${dockHtml}
+    ${composerHtml('想调整哪些功能？')}
+  `;
+}
+
+/* ─── Board 05: Legacy Reference ─── */
+function renderOldPhone() {
+  document.getElementById('phone-old').innerHTML = `
+    ${statusBar()}
+    <div class="app-bar">
+      <button class="icon-tap">${ICONS.back}</button>
+      <div class="bar-title">
+        <strong>小伴 AI</strong>
+        <span class="legacy-bar-sub"><i class="legacy-green-dot"></i>Auto（自动）</span>
+      </div>
+      <button class="icon-tap">${ICONS.more}</button>
+    </div>
+
+    <div class="legacy-stream">
+      <div class="legacy-user-wrap">
+        <div class="legacy-user">
+          The ready complete draft is drafts/suiji-zhangben-assisted-1123. Install it now with app_create using source_dir and id suiji-zhangben-1123 and the Chinese name from index.html. Set kind app category tool orientation portrait. Then app_validate and open it. No more file generation.
+        </div>
+      </div>
+
+      <div class="legacy-ai-row">
+        <div class="legacy-avatar">${ICONS.spark}</div>
+        <div class="legacy-col">
+          <div class="legacy-bar1">
+            <span>✦ 思考 56 段 已完成</span>
+            <span style="width:14px;height:14px">${ICONS.chevDown}</span>
+          </div>
+          <div class="legacy-bar2">
+            <span class="legacy-big-green">${ICONS.check}</span>
+            <strong style="flex:1">任务完成</strong>
+            <span style="font-size:11.5px;color:var(--ink3)">用时 11 分 58 秒 5/5</span>
+          </div>
+          <div class="legacy-bar3">
+            <span><strong style="color:var(--ink)">本轮执行过程</strong> · 14 步 · 用时 11 分 58 秒</span>
+            <span style="width:14px;height:14px">${ICONS.chevDown}</span>
+          </div>
+          <div class="legacy-prose">
+            <p>我先检查这个草稿目录，核对文件是否齐全。草稿文件齐全。安装前我先实际检查代码，确认不是半成品。先确认是否已经安装过，以免重复创建。现在按用户的指定安装。「随记账本」已安装完成，你也已经验收通过，任务到此收尾。</p>
+            <h4>作品信息</h4>
+            <ul>
+              <li>名称：「随记账本」（kind=app, category=tool, orientation=portrait, 支持触控、鼠标、键盘）</li>
+              <li>应用编号：<span class="inline-code">suiji-zhangben-1123</span>（在应用列表里可查到）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legacy-loose-cta">
+      <small>下次可在「应用 → 最近用过」打开</small>
+      <button class="legacy-loose-btn" data-toast="现行版：无卡片边界、紧贴输入框">打开随记账本</button>
+    </div>
+
+    <div class="composer-dock" style="border-top:0;padding-top:6px">
+      <div class="composer-row">
+        <button class="plus-btn">${ICONS.plus}</button>
+        <div class="input-pill">
+          <input type="text" placeholder="问点什么..." readonly>
+          <button class="mic-btn">${ICONS.mic}</button>
+          <button class="voice-btn">${ICONS.wave}</button>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  `;
+}
+
+function applyTheme() {
+  const a = ACCENTS.find(x => x.id === state.accentId) || ACCENTS[0];
+  const palette = state.dark ? a.dark : a.light;
+  document.body.classList.toggle('studio-dark', state.dark);
+  document.querySelectorAll('.phone').forEach(p => {
+    p.classList.toggle('dark', state.dark);
+    p.style.setProperty('--accent', palette.btn);
+    p.style.setProperty('--accent-soft', palette.soft);
+    p.style.setProperty('--accent-soft-line', palette.line);
+    p.style.setProperty('--accent-ink', palette.ink);
+  });
+}
+
+function renderAll() {
+  renderNewPhone();
+  renderRunPhone();
+  renderInteractPhone();
+  renderSystemPhone();
+  renderOldPhone();
+  applyTheme();
+}
+
+function showToast(phone, text) {
+  if (!phone) return;
+  phone.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = text;
+  phone.appendChild(el);
+  clearTimeout(phone._t);
+  phone._t = setTimeout(() => el.remove(), 2000);
+}
+
+document.getElementById('swatches').innerHTML = ACCENTS.map(a =>
+  `<button class="swatch ${a.id === state.accentId ? 'active' : ''}" data-accent="${a.id}" title="${a.name}" style="background:${a.light.btn};color:${a.light.btn}"></button>`
+).join('');
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'draft-new') {
+    state.newDraft = e.target.value;
+    const btn = document.querySelector('[data-send-new]');
+    if (btn) {
+      const has = !!state.newDraft.trim();
+      btn.classList.toggle('send', has);
+      btn.innerHTML = has ? ICONS.send : ICONS.wave;
+    }
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'draft-new' && state.newDraft.trim()) {
+    e.preventDefault();
+    sendNewDemo();
+  }
+});
+
+function sendNewDemo() {
+  const q = state.newDraft.trim();
+  if (!q) return;
+  state.extraMsgs.push({ q, a: `收到，已按新版通栏排版为你回复「${q}」。需要继续调整账本样式或导出作品随时告诉我。` });
+  state.newDraft = '';
+  renderNewPhone();
+  applyTheme();
+  const stream = document.getElementById('stream-new');
+  if (stream) stream.scrollTop = stream.scrollHeight;
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button, .img-card');
+  if (!btn) return;
+
+  if (btn.dataset.mode) {
+    state.mode = btn.dataset.mode;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    document.body.classList.toggle('mode-compare', state.mode === 'compare');
+    document.body.classList.toggle('mode-cards', state.mode === 'cards');
+    return;
+  }
+  if (btn.dataset.accent) {
+    state.accentId = btn.dataset.accent;
+    document.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b === btn));
+    applyTheme();
+    return;
+  }
+  if (btn.id === 'toggle-icon-bg') {
+    const bg = document.body.classList.toggle('icon-bg');
+    btn.textContent = bg ? '星标：带底' : '星标：无底';
+    return;
+  }
+  if (btn.id === 'toggle-width') {
+    const c = document.body.classList.toggle('compact');
+    btn.textContent = c ? '360 → 390' : '390 → 360';
+    return;
+  }
+  if (btn.id === 'toggle-dark') {
+    state.dark = !state.dark;
+    btn.textContent = state.dark ? '浅色模式' : '深色模式';
+    applyTheme();
+    return;
+  }
+
+  const phone = btn.closest('.phone');
+  if (btn.hasAttribute('data-toggle-user')) { state.newUserExpanded = !state.newUserExpanded; renderNewPhone(); applyTheme(); return; }
+  if (btn.dataset.toggleTrace === 'new') { state.newTraceOpen = !state.newTraceOpen; renderNewPhone(); applyTheme(); return; }
+  if (btn.dataset.toggleTrace === 'run') { state.runTraceOpen = !state.runTraceOpen; renderRunPhone(); applyTheme(); return; }
+  if (btn.dataset.traceTab) {
+    const [which, tab] = btn.dataset.traceTab.split(':');
+    if (which === 'new') { state.newTraceTab = tab; renderNewPhone(); }
+    else { state.runTraceTab = tab; renderRunPhone(); }
+    applyTheme();
+    return;
+  }
+  if (btn.dataset.dockI) { state.interactDock = btn.dataset.dockI; renderInteractPhone(); applyTheme(); return; }
+  if (btn.dataset.pickAsk) { state.askPicked = btn.dataset.pickAsk; renderInteractPhone(); applyTheme(); return; }
+  if (btn.dataset.dockS) { state.systemDock = btn.dataset.dockS; renderSystemPhone(); applyTheme(); return; }
+  if (btn.hasAttribute('data-toggle-files')) { state.filesOpen = !state.filesOpen; renderSystemPhone(); applyTheme(); return; }
+  if (btn.hasAttribute('data-toggle-undo')) {
+    state.checkpointUndone = !state.checkpointUndone;
+    renderSystemPhone();
+    applyTheme();
+    showToast(document.getElementById('phone-system'), state.checkpointUndone ? '已撤销 3 个文件的修改' : '已重新应用修改');
+    return;
+  }
+  if (btn.hasAttribute('data-send-new')) {
+    if (state.newDraft.trim()) sendNewDemo();
+    else showToast(phone, '进入语音通话');
+    return;
+  }
+  if (btn.dataset.toast) {
+    showToast(phone, btn.dataset.toast);
+  }
+});
+
+renderAll();
+</script>
+</body>
+</html>

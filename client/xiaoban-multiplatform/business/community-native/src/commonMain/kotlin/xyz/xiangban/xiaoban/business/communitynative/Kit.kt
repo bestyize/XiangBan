@@ -427,14 +427,15 @@ fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifie
 
 // ───────────── 对话部件（云端小伴与遥控电脑共用） ─────────────
 
-private val UserBubbleShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
+private val UserBubbleShape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 6.dp, bottomStart = 18.dp)
 internal val AssistantBubbleShape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
 
 @Composable
 fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
     val ink = MaterialTheme.colorScheme.onSurface
+    val extra = LocalExtraColors.current
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Column(Modifier.widthIn(max = 280.dp).clip(UserBubbleShape).background(LocalExtraColors.current.brandSoft).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Column(Modifier.widthIn(max = 316.dp).clip(UserBubbleShape).background(extra.fill).padding(horizontal = 14.dp, vertical = 11.dp)) {
             if (images > 0) {
                 Row(Modifier.padding(bottom = if (text.isNotBlank()) 6.dp else 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     XIcon(XIcons.Image, tint = ink, size = 16.dp)
@@ -446,17 +447,10 @@ fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
     }
 }
 
-/** 小伴的回复：左侧红色圆形头像，右侧白色气泡；气泡里可放文字或自定义内容。 */
+/** 小伴的回复：通栏流式排版，不再用左侧常驻头像挤占阅读宽度。 */
 @Composable
-fun AssistantRow(modifier: Modifier = Modifier, avatar: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-        if (avatar) {
-            Box(Modifier.size(28.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 16.dp) }
-        } else {
-            Spacer(Modifier.width(28.dp))
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
-    }
+fun AssistantRow(modifier: Modifier = Modifier, avatar: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp), content = content)
 }
 
 @Composable

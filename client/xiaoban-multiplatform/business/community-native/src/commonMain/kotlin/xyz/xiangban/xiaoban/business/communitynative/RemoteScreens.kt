@@ -438,7 +438,7 @@ private fun RemoteMessages(
         return
     }
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(messages, key = { it.id }) { turn ->
                 if (turn.role == "user") {
                     UserBubble(turn.text, images = turn.images)
@@ -459,7 +459,7 @@ private fun RemoteMessages(
                             text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
                             waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
                             onRetry = if (failed) again else null, onRegenerate = again,
-                            onAdjust = if (isLast) onAdjust else null, extras = extras,
+                            onAdjust = if (isLast) onAdjust else null, extras = extras, flat = true,
                         )
                     }
                 }
