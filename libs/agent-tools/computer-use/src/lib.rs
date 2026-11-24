@@ -15,7 +15,7 @@ use std::{
 pub const SKILL_NAME: &str = "open-computer-use";
 pub const SKILL: &str = include_str!("../skills/open-computer-use/SKILL.md");
 pub const SKILL_ORIGIN_MARKER: &str = "iFurySt/open-codex-computer-use";
-pub const RUNTIME_VERSION: &str = "1.1.2";
+pub const RUNTIME_VERSION: &str = "1.1.5";
 
 fn runtime_target() -> String {
     let platform = match std::env::consts::OS {
@@ -322,17 +322,17 @@ mod tests {
         let root = std::env::var_os("XIAOBAN_COMPUTER_USE_RUNTIME")
             .expect("set XIAOBAN_COMPUTER_USE_RUNTIME to the prepared runtime directory");
         let client = spawn(Path::new(&root)).unwrap();
-        let names: Vec<_> = client
-            .tools()
-            .iter()
-            .map(|tool| tool.spec().name.clone())
-            .collect();
-        assert!(names.iter().any(|name| name == "list_apps"), "{names:?}");
-        assert!(
-            names.iter().any(|name| name == "get_app_state"),
-            "{names:?}"
-        );
-        assert!(names.iter().any(|name| name == "click"), "{names:?}");
+        let tools = client.tools();
+        let names: Vec<_> = tools.iter().map(|tool| tool.spec().name.as_str()).collect();
+        assert!(names.contains(&"list_apps") && names.contains(&"click"), "{names:?}");
+        let state = tools.iter().find(|tool| tool.spec().name == "get_app_state")
+            .expect("the native engine must offer window observation");
+        let properties = &state.spec().schema["properties"];
+        for option in ["include_ax", "include_screenshot"] {
+            assert_eq!(properties[option]["type"], "boolean", "{option}");
+        }
+        #[cfg(target_os = "macos")]
+        assert!(names.contains(&"query") && names.contains(&"select_text"), "{names:?}");
         println!("Real bundled MCP tools: {names:?}");
     }
 }

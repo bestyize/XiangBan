@@ -4,7 +4,7 @@
 
 ## 内置运行环境
 
-固定使用上游 `open-computer-use` **1.1.2**。`runtime-lock.json` 固定下载地址和 SHA-512；只在构建机下载并校验 npm 分发包，不执行 npm 安装脚本。用户电脑直接运行原生程序，无需 Node.js、npm、npx、Python 或首次联网下载。保留上游 MIT 许可和第三方声明。
+固定使用上游 `open-computer-use` **1.1.5**。`runtime-lock.json` 固定下载地址和 SHA-512；只在构建机下载并校验 npm 分发包，不执行 npm 安装脚本。用户电脑直接运行原生程序，无需 Node.js、npm、npx、Python 或首次联网下载。保留上游 MIT 许可和第三方声明。
 
 ```sh
 # 从仓库根准备某个平台的资源。省略 --target 时优先使用 TAURI_ENV_TARGET_TRIPLE，然后才是构建机平台。
@@ -51,4 +51,18 @@ XIAOBAN_COMPUTER_USE_RUNTIME=<已准备目录> cargo test --manifest-path libs/a
 XIAOBAN_COMPUTER_USE_RUNTIME=<已准备目录> cargo test --manifest-path libs/agent-tools/computer-use/Cargo.toml --locked real_bundled_engine_permission_diagnosis -- --ignored --nocapture
 ```
 
-普通测试不启动控制服务。最后一项使用真实原生程序完成 MCP 握手和工具发现，不执行桌面操作。macOS/Windows 安装、权限、点击及输入回读仍需对应平台实机验收。CI 仅手动触发；macOS 打包后还检查实际 App 内的资源、辅助程序架构及签名。
+普通测试不启动控制服务。上面两项显式运行的测试分别检查真实 MCP 工具及参数、真实权限及签名。CI 仅手动触发，macOS 打包后还检查 App 内的资源、辅助程序架构及签名。
+
+### 1.1.5 实机验证
+
+2026-11-23 在 Apple Silicon、macOS 27.2.1 上，通过小伴打包并签名的引擎测试。MCP 发现 11 项工具。引擎升级后，两项原有系统授权均有效。
+
+| 场景 | 独立回读结果 |
+| --- | --- |
+| 目标 AppKit 窗口被另一应用的测试窗口盖住 | 读到了目标控件树及截图。`set_value` 写入中文，`sky_key` 输入中文，`select_text` 选中子串后成功替换。遮挡窗口中的文字和计数均未改变，采样期间前台应用、鼠标位置及剪贴板变更计数均保持不变。 |
+| 遮挡下的原生按钮 | 对相同按钮，1.1.2 和 1.1.5 的 `sky_click` 都返回了窗口状态，按钮计数仍为 0。改用无障碍点击后，两版计数均变为 1。测试应用没有“编辑”菜单，后台 `Cmd+A` 后输入仍然追加；精确选区替换通过。 |
+| 同一应用有两个同名窗口 | 给定非默认窗口的实际 ID，用 `query(window_id)` 取得该窗口控件编号，写入文字并点击按钮。指定窗口的计数由 0 变为 1，另一窗口的文字和计数保持原样。此项验证从已知窗口 ID 定位控件，自动识别用户指哪份同名文档仍需单独验收。 |
+
+同机、同一简单窗口、同一持久 MCP 连接，每种模式预热后连续读取 5 次。完整状态读取中位数为 1.1.2 **46.2 ms**、1.1.5 **32.7 ms**。1.1.5 设置 `include_screenshot: false` 后为 **11.6 ms**，响应中没有图片。这些数字只计引擎调用，聊天中模型往返及宿主的逐步权限检查需单独计时。
+
+Windows x64 和 ARM64 的 1.1.5 产物均通过打包与架构校验，Windows 桌面交互尚待实机验证。

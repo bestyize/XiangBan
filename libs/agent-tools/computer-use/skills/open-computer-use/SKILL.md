@@ -12,7 +12,7 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 
 ## 工具
 
-所有平台都有这九个：`list_apps`、`get_app_state`、`click`、`perform_secondary_action`、`scroll`、`drag`、`type_text`、`press_key`、`set_value`。macOS 另有 `query`：按文字或角色直接查找控件，不需要截图，也不需要渲染整棵树。以工具列表里实际出现的为准，每个工具的参数说明以它自己的描述为准。
+所有平台提供 `list_apps`、`get_app_state`、`click`、`perform_secondary_action`、`scroll`、`drag`、`type_text`、`press_key`、`set_value`。macOS 另有 `query` 和 `select_text`，可以按文字或角色定位控件、在可编辑控件中选中指定文字。参数以本轮工具列表为准。
 
 ## 标准流程
 
@@ -23,6 +23,8 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 4. 只有控件树里找不到目标时，才改用坐标的 `click`、`scroll`、`drag`。
 5. 每次动作之后看返回的新状态，确认真的生效了再做下一步。
 
+只需读文字、查控件或核对字段时，`get_app_state` 传 `include_screenshot: false`。需要看画布、图标或按坐标操作时保留截图；只要画面时可传 `include_ax: false`。两项至少保留一项。
+
 ## 文字被截断、内容不全
 
 - 状态里的文字默认只保留 500 个字符，以 `...` 结尾就是被截断了，不是页面没内容。需要读聊天记录、邮件正文、文档段落时，调用 `get_app_state` 并带 `text_limit: 1000`，要完整内容用 `text_limit: "max"`。
@@ -32,6 +34,10 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 ## macOS 专用：query
 
 已知控件的文字或角色时，用 `query` 直接定位，比读整棵树快得多，也更不容易漏。结果里 `truncated` 为 false 时，空结果才代表“没有找到这样的控件”。查询编号只在同一次会话内保留约 120 秒，动作会重新校验位置，失败就重新 `query`。
+
+同一应用中有多个同名窗口时，已确认目标 `window_id` 就用它限定 `query`，再用返回的控件编号点击或写入。无法区分窗口时先让用户指明目标；按键和文本输入还依赖目标窗口中当前的焦点。
+
+修改字段里的一段文字时，可用 `select_text` 按当前控件编号和完整子串选中，再输入替换文字并回读整个字段。子串重复时用 `prefix` 或 `suffix` 消除歧义。整栏替换优先用 `set_value`；用全选快捷键后要核实选区，避免意外追加。
 
 ## 点击和键盘输入的方式
 
@@ -44,7 +50,7 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 
 ## 窗口被盖住、在别的桌面
 
-`get_app_state` 不会主动把离屏窗口提到前面。结果末尾提示窗口被盖住时，让用户把窗口切到可见位置再取一次。macOS 上也可以用 `window_placement: "agent_display"` 把窗口临时挪到一块用户看不见的虚拟显示器上操作，操作完必须用 `window_placement: "restore"` 还原；这期间窗口会从用户桌面上消失，所以只在确有必要时用，并把挪走、操作、还原放在同一轮里完成。
+`get_app_state` 不会主动把离屏窗口提到前面。窗口被遮挡时先读取控件并尝试无障碍操作。即使后台事件点击返回了新状态，也要核对目标控件是否生效。虚拟显示器默认关闭。仅在当前工具实际提供 `window_placement` 且用户需要临时移窗时使用 `agent_display`，并在本轮用 `restore` 还原。
 
 ## 拖拽
 
