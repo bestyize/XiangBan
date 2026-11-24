@@ -446,8 +446,9 @@ fn set_stage(app: &tauri::AppHandle, window: &WebviewWindow, stage: Stage) -> Re
         window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
         window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
         window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
-        // A borderless window should have no frame, but Windows can still keep one, and the page then loses that
-        // much at the bottom (the ball was cut in half). Measure where the page really is and allow for it.
+        // Windows can retain a non-client frame. On macOS the move is queued on
+        // the main thread, so an immediate read can still report the previous position.
+        #[cfg(windows)]
         if let Some(fixed) = page_area(window).and_then(|actual| allow_for_frame(r, actual)) {
             window.set_size(PhysicalSize::new(fixed.w as u32, fixed.h as u32)).map_err(|e| e.to_string())?;
             window.set_position(PhysicalPosition::new(fixed.x, fixed.y)).map_err(|e| e.to_string())?;
@@ -464,10 +465,12 @@ fn page_area(window: &WebviewWindow) -> Option<Area> {
     Some(Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 })
 }
 
-/// Asked for the page at `wanted`, it landed at `actual`: the frame's share is the difference. Returns the position
-/// and the size to ask for so the page lands on `wanted`, or None when it already does.
+/// A non-client frame can only inset the page within the requested rectangle.
+#[cfg(any(windows, test))]
 fn allow_for_frame(wanted: Area, actual: Area) -> Option<Area> {
-    (actual != wanted).then(|| Area {
+    let inset = actual != wanted && actual.x >= wanted.x && actual.y >= wanted.y
+        && actual.right() <= wanted.right() && actual.bottom() <= wanted.bottom();
+    inset.then(|| Area {
         x: wanted.x - (actual.x - wanted.x),
         y: wanted.y - (actual.y - wanted.y),
         w: (wanted.w + (wanted.w - actual.w)).max(1),
@@ -1067,6 +1070,13 @@ mod tests {
     fn only_the_assistant_can_request_a_screen_capture() {
         assert_eq!(permitted(LABEL, "assistant_screenshot"), Some(true));
         for label in ["control", "pet", "widget-example", "content"] { assert_eq!(permitted(label, "assistant_screenshot"), Some(false)); }
+    }
+
+    #[test]
+    fn a_pending_window_move_is_not_a_frame_inset() {
+        let target = Area { x: 2080, y: 742, w: 480, h: 600 };
+        let previous = Area { x: 1040, y: 208, ..target };
+        assert_eq!(allow_for_frame(target, previous), None);
     }
 
     #[test]
