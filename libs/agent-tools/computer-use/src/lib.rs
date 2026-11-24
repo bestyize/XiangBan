@@ -1,6 +1,9 @@
 //! Open Computer Use service integration. The host owns its switch, permissions and UI.
 //! The MCP transport and tool implementation stay in agent-kernel and the external server.
 pub mod permissions;
+mod click_path;
+mod history;
+pub use history::DesktopObservationHistory;
 use agent_kernel::{
     mcp::{McpClient, McpConfig},
     HarnessError, Risk,
@@ -137,13 +140,23 @@ pub fn spawn_cancellable(root:&Path,cancel:Arc<std::sync::atomic::AtomicBool>)->
 /// Keep the MCP connection alive while checking actual OS access before every desktop tool.
 /// Diagnosis/onboarding are supplied separately by the host and remain usable when access is denied.
 pub fn checked_tools(client: &Arc<McpClient>, root: &Path) -> Vec<Arc<dyn agent_kernel::Tool>> {
-    client.tools().into_iter().map(|inner| {
+    checked_tools_with_activity(client, root, None)
+}
+
+/// The host may display a verified target for the lifetime of a canvas action.
+/// Dropping the returned guard dismisses that action's indicator, including on error.
+pub type WindowActivity = Arc<dyn Fn(u32) -> Box<dyn Send> + Send + Sync>;
+
+pub fn checked_tools_with_activity(client: &Arc<McpClient>, root: &Path, activity: Option<WindowActivity>) -> Vec<Arc<dyn agent_kernel::Tool>> {
+    let mut tools: Vec<_> = client.tools().into_iter().map(|inner| {
         let mut spec = inner.spec().clone();
         if spec.name == "list_apps" {
             spec.description.push_str(" 最简调用参数为 {}，不得加入 schema 未声明的 reason 或 command。invalid arguments 表示未执行，应修正参数重试本工具，不要改用 Python/AppKit/AppleScript。");
         }
         Arc::new(PermissionCheckedTool { inner, spec, root: root.to_path_buf() }) as Arc<dyn agent_kernel::Tool>
-    }).collect()
+    }).collect();
+    click_path::install(&mut tools, activity);
+    tools
 }
 
 struct PermissionCheckedTool {

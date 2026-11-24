@@ -29,6 +29,10 @@ describe('what the cards say', () => {
     expect(approvalPreview({ tool: 'game_open', arguments: { id: 'snake-arena' } })).toBe('进入游戏空间并启动游戏：snake-arena');
     expect(approvalPreview({ tool: 'game_close', arguments: {} })).toBe('退出游戏空间，返回桌面');
     expect(approvalPreview({ tool: 'click', arguments: { app: 'TextEdit', target: '保存按钮' } })).toBe('点击：TextEdit 保存按钮');
+    expect(approvalPreview({ tool: 'click', arguments: { app: 'Freeform', window_id: 7, prepare_buttons: ['Insert Shape', 'Draw with Pen'], points: [{ x: 10, y: 20 }, { x: 40, y: 20, click_count: 2 }] } }))
+      .toBe('Freeform · 窗口 7 · 2 个落点\nInsert Shape → Draw with Pen → (10, 20) → (40, 20) 双击');
+    expect(approvalPreview({ tool: 'click', arguments: { app: 'com.apple.freeform', window_id: 7, freeform_new_stroke: true, prepare_buttons: ['Pen'], points: [{ x: 10, y: 20 }] } }))
+      .toContain('Escape → Pen → (10, 20) → Escape');
     expect(approvalPreview({ tool: 'type_text', arguments: { app: 'TextEdit', text: 'Hello' } })).toBe('在 TextEdit 中输入：Hello');
     expect(approvalPreview({ tool: 'press_key', arguments: { app: 'TextEdit', key: 'Return' } })).toBe('按键：TextEdit Return');
     expect(approvalPreview({ tool: 'widget_update', arguments: { id: 'wgt-1', scale: 1.2 } })).toBe('调整桌面组件 wgt-1');

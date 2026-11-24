@@ -89,6 +89,12 @@ export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'argumen
     case 'game_close':
       return '退出游戏空间，返回桌面';
     case 'click':
+      if (Array.isArray(args.points)) {
+        const points = args.points.map(p => `(${p?.x}, ${p?.y})${p?.click_count === 2 ? ' 双击' : ''}`);
+        const preparation = Array.isArray(args.prepare_buttons) ? `${args.prepare_buttons.map(str).join(' → ')} → ` : '';
+        const stroke = preparation + points.join(' → ');
+        return `${str(args.app)} · 窗口 ${args.window_id} · ${points.length} 个落点\n${args.freeform_new_stroke === true ? 'Escape → ' + stroke + ' → Escape' : stroke}`;
+      }
       return `点击：${str(args.app || '')} ${str(args.target || args.element || '')}`;
     case 'type_text':
       return `在 ${str(args.app || '')} 中输入：${str(args.text)}`;

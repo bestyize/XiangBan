@@ -16,12 +16,17 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 
 ## 标准流程
 
-0. 首次操作、权限错误或用户说“开关已经开了仍不能用”时，先调用 `computer_use_diagnose`。MCP 已连接不代表系统授权有效。macOS 看 `engine.permissions` 的真实布尔状态；缺权限先用 `request_accessibility_permission` 启动原生引导，用户授权后复查。`engine.authorizationMismatch.services` 有对应项，表示系统日志确认旧签名冲突；先说明影响，再用 `computer_use_repair_permissions(permission="accessibility" 或 "screenRecording")`，由应用逐次确认后仅清除引擎所选旧授权，并打开当前 App 和系统设置。系统最后的授权点击由用户完成。日志不可用或没匹配时不能声称已确认签名问题。诊断可在 MCP 未启动时使用。
-1. `list_apps` 看有哪些应用在运行，最简参数是 `{}`；不要加 schema 没声明的 `reason`、`command` 等字段。用它返回的应用名或 bundle id 作为 `app` 参数。目标应用不在列表里时，如实告诉用户，不要悄悄换成别的应用。
+0. 普通读取和动作会自动检查权限。权限错误或用户说“开关已经开了仍不能用”时，先调用 `computer_use_diagnose`。MCP 已连接不代表系统授权有效。macOS 看 `engine.permissions` 的真实布尔状态；缺权限先用 `request_accessibility_permission` 启动原生引导，用户授权后复查。`engine.authorizationMismatch.services` 有对应项，表示系统日志确认旧签名冲突；先说明影响，再用 `computer_use_repair_permissions(permission="accessibility" 或 "screenRecording")`，由应用逐次确认后仅清除引擎所选旧授权，并打开当前 App 和系统设置。系统最后的授权点击由用户完成。日志不可用或没匹配时不能声称已确认签名问题。诊断可在 MCP 未启动时使用。
+1. 已知应用名或 bundle id 可直接读取窗口；需要发现应用时用 `list_apps` 看有哪些应用在运行，最简参数是 `{}`；不要加 schema 没声明的 `reason`、`command` 等字段。用它返回的应用名或 bundle id 作为 `app` 参数。目标应用不在列表里时，如实告诉用户，不要悄悄换成别的应用。
 2. `get_app_state` 取目标应用当前的控件树。要用 `element_index` 的操作，都必须紧接在最近一次 `get_app_state` 之后；导航、弹窗出现、页面刷新、操作失败后都要重新取，不要凭记忆沿用旧编号，也不要跨对话猜编号。
 3. 优先用元素编号操作：可编辑的输入框、文本框先试 `set_value`，其次才是 `type_text`；按钮、菜单项用 `click` 带 `element_index`；右键菜单、展开等次要动作用 `perform_secondary_action`，并且只用状态结果里列出的动作。
 4. 只有控件树里找不到目标时，才改用坐标的 `click`、`scroll`、`drag`。
-5. 每次动作之后看返回的新状态，确认真的生效了再做下一步。
+5. 打开菜单、选择钢笔、出现弹窗等会改变界面，先看返回状态。已确定同一画布的一笔路径时，连续落点后一起验收。
+
+## 在 Mac 画布上连续落点
+
+查看一次带截图的 `get_app_state`，从返回末尾取 `window_id` 和截图像素尺寸。若当前 `click` 提供 `points`，把同一笔已确定的 1–32 个点放进一次调用。例如在已选好钢笔的无边记白板上，传 `{"app":"com.apple.freeform","window_id":42,"points":[{"x":555,"y":340},{"x":735,"y":340,"click_count":2}]}`，示例编号 42 和坐标均须换成当前窗口实际值。若需先选已知绘图工具，可在同一调用传 `prepare_buttons:["Insert Shape","Draw with Pen"]`，工具逐个匹配窗口中的唯一按钮并确认回到画布；按钮名不确定时先观察。无边记新画独立一笔时，把 `freeform_new_stroke:true` 与钢笔按钮名同传，按双击终点收笔。小伴会在选择工具前及落点后分别按 Escape。仅凭水平线出现无法判断是否仍在旧路径中；核对整笔及周围留白，钢笔尚在编辑时点击空白处可能增加斜线。已知各点时不要逐点请求模型。最后一张截图用于核对成形效果。
+窗口或尺寸变化、工具返回中途停止时，重新观察已留下的笔画，从尚未完成处继续。跨窗口操作、未知菜单及须单独确认的动作各自执行。
 
 只需读文字、查控件或核对字段时，`get_app_state` 传 `include_screenshot: false`。需要看画布、图标或按坐标操作时保留截图；只要画面时可传 `include_ax: false`。两项至少保留一项。
 

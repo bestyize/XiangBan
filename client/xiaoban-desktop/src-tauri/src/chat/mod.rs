@@ -730,6 +730,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         // `/技能名`：把用户点名的技能说明放到这条请求后面。
         .middleware(skill_invocation::SkillInvocation::new(skills.clone()).mentioning(mentions::skill_names(&mentions)))
         .middleware(community_context::CommunityContextMiddleware)
+        .middleware(agent_computer_use_tools::DesktopObservationHistory)
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         // Bounded transient-error recovery; cancellation and the shared run budget still apply.
@@ -761,8 +762,14 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         } else { builder.tool_arc(tool) };
     }
     if let Some(Ok(mcp_client)) = &computer_use {
-        for tool in agent_computer_use_tools::checked_tools(mcp_client, &desktop.computer_use_runtime_root()?) {
-            builder = builder.deferred_tool_arc(tool);
+        #[cfg(target_os = "macos")]
+        let activity: Option<agent_computer_use_tools::WindowActivity> = Some(Arc::new(crate::macos::computer_window_activity));
+        #[cfg(not(target_os = "macos"))]
+        let activity = None;
+        for tool in agent_computer_use_tools::checked_tools_with_activity(mcp_client, &desktop.computer_use_runtime_root()?, activity) {
+            builder = if matches!(tool.spec().name.as_str(), "get_app_state" | "click") {
+                builder.tool_arc(tool)
+            } else { builder.deferred_tool_arc(tool) };
         }
     }
     // Android packs have their own package-name namespace and learned patch layer.
@@ -919,7 +926,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     };
     if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}
     let connectors=connector_manager(app)?;
-    if let Err(e)=connectors.restore(cancel.clone()){if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}eprintln!("部分 MCP 能力暂不可用：{e}");}
+    if let Err(e)=connectors::restore_for_chat(&connectors, cancel){if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}eprintln!("部分 MCP 能力暂不可用：{e}");}
     let mut connector_tools=connectors.tools();
     if connectors.statuses().as_array().is_some_and(|a|!a.is_empty()){connector_tools.push(connectors.status_tool());}
     if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}
@@ -1126,6 +1133,7 @@ fn finish_run(app: &tauri::AppHandle, session: &str, success: Option<bool>) {
 pub fn chat_overview(app: tauri::AppHandle, window: tauri::Webview) -> Result<Value, String> {
     chat_window(&window)?;
     let config = ai_config::current(&app)?;
+    if config.open_computer_use { connectors::warm_connections(&app); }
     pin_session_defaults(&app, &config)?;
     let default = ai_config::default_workspace(&app)?;
     let state = app.state::<ChatState>();

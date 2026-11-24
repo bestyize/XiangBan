@@ -33,6 +33,7 @@ name = "agent-computer-use-tools"
 version = "0.1.0"
 dependencies = [
  "agent-kernel",
+ "base64 0.22.1",
  "serde_json",
 ]
 
@@ -6643,6 +6644,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "block2",
+ "cc",
  "chrono",
  "dirs 6.0.0",
  "getrandom 0.3.4",

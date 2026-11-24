@@ -16,6 +16,25 @@ use objc2_core_graphics::{
 use std::{sync::mpsc, time::Duration};
 use tauri::{Emitter, Manager};
 
+extern "C" {
+    fn xb_show_computer_indicator(window: u32, token: u64);
+    fn xb_hide_computer_indicator(token: u64);
+}
+
+pub fn computer_window_activity(window: u32) -> Box<dyn Send> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    struct Indicator(u64);
+    impl Drop for Indicator {
+        fn drop(&mut self) {
+            unsafe { xb_hide_computer_indicator(self.0) };
+        }
+    }
+    let token = NEXT.fetch_add(1, Ordering::Relaxed);
+    unsafe { xb_show_computer_indicator(window, token) };
+    Box::new(Indicator(token))
+}
+
 pub(crate) fn on_main<T: Send + 'static>(
     app: &tauri::AppHandle,
     operation: impl FnOnce(MainThreadMarker) -> Result<T, String> + Send + 'static,

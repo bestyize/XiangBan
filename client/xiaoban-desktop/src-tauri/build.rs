@@ -1,4 +1,13 @@
 fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo:rerun-if-changed=macos/computer-use-indicator.m");
+        cc::Build::new()
+            .file("macos/computer-use-indicator.m")
+            .flag("-fobjc-arc")
+            .compile("xiaoban_computer_use_indicator");
+        println!("cargo:rustc-link-lib=framework=AppKit");
+        println!("cargo:rustc-link-lib=framework=CoreGraphics");
+    }
     println!("cargo:rerun-if-changed=resources/computer-use");
     println!("cargo:rerun-if-changed=../../../libs/agent-tools/computer-use/runtime-lock.json");
     // A direct release cargo build must not silently use a stale/foreign runtime either.

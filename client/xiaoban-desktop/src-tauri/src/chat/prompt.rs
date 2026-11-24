@@ -106,11 +106,11 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 专家角色只改变专业方法与交付标准，不能增加本轮没有的工具、权限或记忆；相关技能与连接器是否可用，以实际安装、授权和工具列表为准。{ocu_section}",
         ocu_section = if env.open_computer_use {
             let permission_help = if env.os == "macos" {
-                "macOS 首次操作前先用 computer_use_diagnose 检查真实权限和签名。MCP 连接成功或开关开启不代表授权有效；缺权限先用 request_accessibility_permission 引导。authorizationMismatch.services 确认旧签名冲突，或用户明确要求清除对应旧记录时，说明影响后调用 computer_use_repair_permissions，由应用逐次确认，只重置所选引擎权限，然后等待用户在系统页面重新授权并复查。不要自行用 shell 清空 TCC，不修改权限数据库。无障碍由引擎负责，不要通过 System Events/AppleScript 额外申请主程序权限或绕过失败；独立授权条目以系统实际显示为准。只有本轮工具列表确实存在的工具才能调用；不要编造权限工具。"
+                "macOS 每个桌面操作会检查真实权限；遇到权限错误时用 computer_use_diagnose 检查权限和签名。MCP 连接成功或开关开启不代表授权有效；缺权限先用 request_accessibility_permission 引导。authorizationMismatch.services 确认旧签名冲突，或用户明确要求清除对应旧记录时，说明影响后调用 computer_use_repair_permissions，由应用逐次确认，只重置所选引擎权限，然后等待用户在系统页面重新授权并复查。不要自行用 shell 清空 TCC，不修改权限数据库。无障碍由引擎负责，不要通过 System Events/AppleScript 额外申请主程序权限或绕过失败；独立授权条目以系统实际显示为准。只有本轮工具列表确实存在的工具才能调用；不要编造权限工具。"
             } else {
                 "按具体工具返回的权限错误处理，不要在当前平台调用 macOS 权限工具或声称获得了 macOS 授权。"
             };
-            format!("\n- 你已启用电脑屏幕与应用控制（open-computer-use），对应工具以本轮工具列表为准。用户要求控制画图或其他应用时，先调用 load_skill 加载 open-computer-use；若工具参数尚未加载，先用 tool_search 检索 list_apps，按技能流程选择应用、读取窗口状态并操作。不要因为绘图工具搜索结果只有壁纸或代码工具，就擅自改成生成网页、壁纸或修改桌面；所需应用或控制能力不可用时说明实际障碍。list_apps 的最简参数是空对象 {{}}，不要添加 schema 未声明的 reason、command 等字段。invalid arguments / Additional properties are not allowed 表示本次没有执行工具，必须按错误和 schema 修正后重试原工具，不能把参数错误当成权限错误，不能改走 Python/AppKit/AppleScript 绕过。文字被截断或控件树不全时按技能说明处理，发送、删除、提交等操作遵循用户授权。{permission_help}")
+            format!("\n- 你已启用电脑屏幕与应用控制（open-computer-use），对应工具以本轮工具列表为准。用户要求控制画图或其他应用时，已知目标应用时直接用 get_app_state 读取它。读取后用 click 操作；遇到陌生控件、复杂流程或需要诊断时用 load_skill 加载 open-computer-use；需要发现应用时用 tool_search 检索 list_apps。读取目标截图后，若 click 提供 points，同一画布已知落点一次提交；已知的绘图工具按钮可用 prepare_buttons 一起选择，无边记画独立一笔时加 freeform_new_stroke:true，回图后核对笔画和周围留白。不要因为绘图工具搜索结果只有壁纸或代码工具，就擅自改成生成网页、壁纸或修改桌面；所需应用或控制能力不可用时说明实际障碍。list_apps 的最简参数是空对象 {{}}，不要添加 schema 未声明的 reason、command 等字段。invalid arguments / Additional properties are not allowed 表示本次没有执行工具，必须按错误和 schema 修正后重试原工具，不能把参数错误当成权限错误，不能改走 Python/AppKit/AppleScript 绕过。文字被截断或控件树不全时按技能说明处理，发送、删除、提交等操作遵循用户授权。{permission_help}")
         } else if let Some(error) = env.open_computer_use_error {
             format!("\n- 用户开启了电脑屏幕与应用控制（open-computer-use），但它这次没能启动：{error}。你现在没有操作其他应用的工具，不要假装能操作。先用 computer_use_diagnose 诊断内置引擎、系统权限和签名；如缺权限，用 request_accessibility_permission 打开真实引导，用户授权后重新检查。此能力使用随安装包附带的原生引擎，无需安装 Node.js 或 npx。请按错误原因处理安装完整性、系统版本或系统权限，不要静默换成 AppleScript。")
         } else {

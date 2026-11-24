@@ -5,15 +5,44 @@ use super::*;
 use agent_connector_tools::plugin::{AuthSpec, ConnectorPlugin, ServerSpec, Transport};
 use agent_skill_discovery::plugin;
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool as Flag;
+use std::sync::atomic::AtomicU8;
 
 pub mod baidu;
 
 /// 图标最大读取字节数；更大的不显示。
 const MAX_ICON_BYTES: u64 = 512 * 1024;
-/// 启动后第一次看连接器列表时，在后台把已启用的连接器恢复起来（可能要拉起本地命令或联网），只做一次。
-static RESTORE_STARTED: Flag = Flag::new(false);
-static RESTORE_RUNNING: Flag = Flag::new(false);
+const NOT_STARTED: u8 = 0;
+const RESTORING: u8 = 1;
+const READY: u8 = 2;
+static BACKGROUND_RESTORE: AtomicU8 = AtomicU8::new(NOT_STARTED);
+
+/// Overlap the existing restoration of enabled connectors with opening the chat.
+/// A send during initialization joins that pass so it still sees the discovered tools.
+pub(super) fn warm_connections(app: &tauri::AppHandle) {
+    if BACKGROUND_RESTORE.compare_exchange(NOT_STARTED, RESTORING, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let result = super::connector_manager(&app).and_then(|manager| manager.restore(Arc::new(AtomicBool::new(false))));
+        BACKGROUND_RESTORE.store(READY, Ordering::Release);
+        if let Err(error) = result {
+            eprintln!("部分连接器暂不可用：{error}");
+        }
+        let _ = app.emit("ai-store-changed", ());
+    });
+}
+
+pub(super) fn restore_for_chat(manager: &agent_connector_tools::ConnectorManager, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+    if BACKGROUND_RESTORE.load(Ordering::Acquire) != RESTORING {
+        return manager.restore(cancel.clone());
+    }
+    while BACKGROUND_RESTORE.load(Ordering::Acquire) == RESTORING {
+        if cancel.load(Ordering::Acquire) { return Err("任务已取消".into()); }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    Ok(())
+}
 
 fn icon_data_url(plugin: &ConnectorPlugin) -> Option<String> {
     use base64::Engine;
@@ -215,20 +244,8 @@ pub async fn ai_connector_installed(app: tauri::AppHandle, window: tauri::Webvie
         let manager = super::connector_manager(&app)?;
         let list = entries(&Dirs::of(&app)?.plugins());
         // 恢复在后台做；第一次列出时界面显示“连接中”，之后读到的是真实状态。
-        let start_restore = !list.is_empty() && !RESTORE_STARTED.swap(true, Ordering::SeqCst);
-        if start_restore {
-            RESTORE_RUNNING.store(true, Ordering::SeqCst);
-            let manager = manager.clone();
-            let app = app.clone();
-            std::thread::spawn(move || {
-                if let Err(error) = manager.restore(Arc::new(AtomicBool::new(false))) {
-                    eprintln!("部分连接器暂不可用：{error}");
-                }
-                RESTORE_RUNNING.store(false, Ordering::SeqCst);
-                let _ = app.emit("ai-store-changed", ());
-            });
-        }
-        let restoring = RESTORE_RUNNING.load(Ordering::SeqCst);
+        if !list.is_empty() { warm_connections(&app); }
+        let restoring = BACKGROUND_RESTORE.load(Ordering::Acquire) == RESTORING;
         let statuses = manager.statuses();
         Ok(Value::Array(list.iter().map(|e| entry_json(&manager, e, &statuses, restoring)).collect()))
     })
