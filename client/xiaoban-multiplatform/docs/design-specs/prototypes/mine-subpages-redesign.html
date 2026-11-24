@@ -365,6 +365,23 @@ body.studio-dark .diff-item p { color: #989ba4; }
 }
 .status-chip.draft { background: var(--paper); color: var(--ink2); border: 1px dashed var(--draft-line); line-height: 18px; }
 .status-chip.live { background: var(--success-soft); color: var(--success); }
+.status-chip.active-live {
+  background: transparent;
+  color: var(--ink2);
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-chip.active-live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+}
 .status-chip.review { background: var(--warn-soft); color: var(--warn); }
 .status-chip.removed { background: var(--fill); color: var(--ink3); }
 .status-chip.danger { background: var(--danger-soft); color: var(--danger); }
@@ -502,7 +519,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
   place-items: center;
   flex: none;
 }
-.brand-sq svg { width: 21px; height: 21px; stroke-width: 1.9; }
+.brand-sq svg { width: 20px; height: 20px; stroke-width: 1.9; }
 .prov-sq {
   width: 40px;
   height: 40px;
@@ -513,11 +530,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
   place-items: center;
   flex: none;
   font-size: 14px;
-  font-weight: 650;
-}
-.prov-sq.active {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  font-weight: 600;
 }
 .prov-sq svg { width: 19px; height: 19px; stroke-width: 1.8; }
 
@@ -553,15 +566,12 @@ body.studio-dark .diff-item p { color: #989ba4; }
 .quota-line {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-size: 13px;
-  color: var(--ink2);
+  color: var(--ink3);
   min-width: 0;
 }
-.quota-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.quota-dot.ok { background: var(--success); }
-.quota-dot.empty { background: var(--danger); }
-.quota-text.empty { color: var(--danger); font-weight: 500; }
+.quota-text.empty { color: var(--ink2); font-weight: 500; }
 
 .mini-pill {
   flex: none;
@@ -577,20 +587,24 @@ body.studio-dark .diff-item p { color: #989ba4; }
 }
 .mini-pill.ghost { background: var(--fill); color: var(--ink2); }
 .mini-pill.ghost:hover { opacity: .82; }
-.mini-pill.primary { background: var(--accent-soft); color: var(--accent-ink); }
-.mini-pill.primary:hover { opacity: .88; }
 
-.active-check {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  display: grid;
-  place-items: center;
+.text-action {
   flex: none;
+  height: 30px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink2);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transition: background .15s, opacity .15s;
 }
-.active-check svg { width: 13px; height: 13px; stroke-width: 2.4; }
+.text-action:hover { background: var(--fill); }
+.text-action.accent { color: var(--accent-ink); font-weight: 600; }
+.text-action svg { width: 14px; height: 14px; stroke-width: 2; opacity: .82; }
+
 .chev { width: 15px; height: 15px; color: var(--ink3); opacity: .68; flex: none; }
 
 .add-row {
@@ -601,13 +615,13 @@ body.studio-dark .diff-item p { color: #989ba4; }
   align-items: center;
   gap: 10px;
   background: var(--surface);
-  color: var(--accent-ink);
-  font-size: 15px;
-  font-weight: 550;
+  color: var(--ink2);
+  font-size: 14.5px;
+  font-weight: 500;
   position: relative;
-  transition: background .12s;
+  transition: background .12s, color .12s;
 }
-.add-row:hover { background: var(--accent-soft); }
+.add-row:hover { background: var(--paper); color: var(--ink); }
 .add-row.with-sep::before {
   content: "";
   position: absolute;
@@ -907,7 +921,7 @@ body.studio-dark .diff-item p { color: #989ba4; }
         </div>
       </div>
       <div class="phone" id="phone-models"></div>
-      <p class="board-caption">更名「模型配置」，彻底修复旧版「留左右边距又是直角」的块状割裂；清晰区分「使用中」服务商、官方额度状态与单行配置入口，整行点选配置、底部通栏添加服务商。</p>
+      <p class="board-caption">更名「模型配置」，零浅色/次主题色底块：全页仅「小伴 AI」官方图标保留实心主题色底配白色星标，「兑换点数」采用无底色主题色文字链接，其余全部回归黑白灰层级，并用一颗 6px 绿点轻标「使用中」。</p>
     </section>
   </main>
 
@@ -923,8 +937,8 @@ body.studio-dark .diff-item p { color: #989ba4; }
         <p>移除顶栏下方双灰按钮，「全部已读」放顶栏右侧（无未读自动弱化）；空态改用铃铛图标并去掉重复「刷新」按钮；消息项补齐 40px 头像、未读红点与引用摘录。</p>
       </div>
       <div class="diff-item">
-        <strong>03 · 模型配置：通栏分组、状态直观</strong>
-        <p>统一通栏白底分组，消除直角悬浮块与大块灰按钮堆砌；正在使用的模型行直接标明「使用中」，官方点数用完醒目红字提示并给「兑换」快捷入口，点服务商行直接配置、点「+ 添加」呼出服务商面板。</p>
+        <strong>03 · 模型配置：克制用色、零次主题色底块</strong>
+        <p>撤掉所有浅红/浅黄/浅绿等次主题色背景：「小伴 AI」使用实心主题色底 + 白色图标作为品牌锚点，「兑换点数」用无底色主题色文字链接（带轻箭头），其余全部回归中性黑白灰，仅用 6px 绿点指示「使用中」。</p>
       </div>
     </div>
   </section>
@@ -1183,7 +1197,7 @@ function renderModels() {
 
   return `
     ${statusBarHtml()}
-    <div class="appbar">
+    <div class="appbar has-sep">
       <div class="appbar-left"><button class="icon-tap" aria-label="返回" data-toast="models:返回「我的」">${icon('back')}</button></div>
       <h3>模型配置</h3>
       <div class="appbar-right"><button class="icon-tap" aria-label="添加第三方模型服务" data-open-sheet="models:add-provider:0">${icon('plus')}</button></div>
@@ -1199,22 +1213,18 @@ function renderModels() {
           <button class="model-body" data-open-sheet="models:official:0">
             <div class="model-head">
               <span class="model-name">小伴 AI</span>
-              ${officialActive ? '<span class="status-chip accent">使用中</span>' : ''}
+              ${officialActive ? '<span class="status-chip active-live">使用中</span>' : ''}
             </div>
             <div class="model-sub">跟着账号走，手机与电脑自动同步</div>
           </button>
-          ${officialActive
-            ? `<span class="active-check">${icon('check')}</span>`
-            : `<button class="mini-pill ghost" data-use-provider="official">使用</button>`
-          }
+          ${!officialActive ? `<button class="mini-pill ghost" data-use-provider="official">使用</button>` : ''}
           <button class="icon-tap" style="width:28px;height:32px;color:var(--ink3)" aria-label="配置小伴 AI" data-open-sheet="models:official:0">${icon('chev', 'chev')}</button>
         </div>
         <div class="model-subrow">
           <span class="quota-line">
-            <i class="quota-dot ${exhausted ? 'empty' : 'ok'}"></i>
             <span class="quota-text ${exhausted ? 'empty' : ''}">${exhausted ? '官方点数已用完' : '剩余 1,240 点 · 到期 12-31'}</span>
           </span>
-          <button class="mini-pill ${exhausted ? 'primary' : 'ghost'}" data-open-sheet="models:official:0">${exhausted ? '兑换点数' : '额度与模型'}</button>
+          <button class="text-action ${exhausted ? 'accent' : ''}" data-open-sheet="models:official:0"><span>${exhausted ? '兑换点数' : '额度与模型'}</span>${icon('chev')}</button>
         </div>
       </div>
 
@@ -1227,18 +1237,15 @@ function renderModels() {
           const isAct = state.activeProvider === p.id;
           return `
             <div class="model-row">
-              <span class="prov-sq ${isAct ? 'active' : ''}">${p.init}</span>
+              <span class="prov-sq">${p.init}</span>
               <button class="model-body" data-toast="models:进入「${p.name}」详细配置">
                 <div class="model-head">
                   <span class="model-name">${p.name}</span>
-                  ${isAct ? '<span class="status-chip accent">使用中</span>' : ''}
+                  ${isAct ? '<span class="status-chip active-live">使用中</span>' : ''}
                 </div>
                 <div class="model-sub">默认 ${p.model} · 共 ${p.count} 个模型</div>
               </button>
-              ${isAct
-                ? `<span class="active-check">${icon('check')}</span>`
-                : `<button class="mini-pill ghost" data-use-provider="${p.id}">使用</button>`
-              }
+              ${!isAct ? `<button class="mini-pill ghost" data-use-provider="${p.id}">使用</button>` : ''}
               <button class="icon-tap" style="width:28px;height:32px;color:var(--ink3)" aria-label="配置 ${p.name}" data-toast="models:进入「${p.name}」详细配置">${icon('chev', 'chev')}</button>
             </div>
           `;
