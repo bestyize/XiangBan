@@ -50,6 +50,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -214,7 +216,12 @@ internal fun AiChatPage(
     onSelectTab: (Tab) -> Unit = {}, onPublish: () -> Unit = {},
 ) {
     val session by env.session.state.collectAsState()
-    val cloud by chat.state.collectAsState()
+    // The main chat stays mounted under detail pages. Keep its last visible frame through the transition.
+    val cloud by key(chat, session.generation) {
+        produceState(chat.state.value, visible) {
+            if (visible) chat.state.collect { value = it }
+        }
+    }
     val conversation = cloud.conversationId
     val accountGeneration = session.generation
     val main = back == null
@@ -380,6 +387,9 @@ internal fun AiChatPage(
             val hasWaitingTask = cloud.parallelTasks().any { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
             AgentTopBar(model, exhausted, hasWaitingTask, { focus.clearFocus(); tasksSheet = true }, ::openConfig, back)
             if (main) AgentTaskStrip(cloud, compact, ::openConversation) { focus.clearFocus(); tasksSheet = true }
+            val progress = if (!archived && cloud.creation?.approved == true && !cloud.sending) {
+                remember(cloud.messages) { creationProgress(cloud.messages) }
+            } else null
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (!archived && cloud.creationPlanReady) {
                     val plan = cloud.messages.last()
@@ -392,9 +402,7 @@ internal fun AiChatPage(
                 } else if (cloud.messages.isEmpty() && archive.isEmpty()) {
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
-                    val deliveredWork = if (!archived && cloud.creation?.approved == true && !cloud.sending && cloud.messages.lastOrNull()?.creationInterrupted() != true) {
-                        remember(cloud.messages) { creationProgress(cloud.messages) }.installed
-                    } else null
+                    val deliveredWork = progress?.installed?.takeUnless { cloud.messages.lastOrNull()?.creationInterrupted() == true }
                     key(conversation) {
                         CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
                             onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send,
@@ -442,9 +450,8 @@ internal fun AiChatPage(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    if (cloud.creation?.approved == true && !cloud.sending) {
+                    if (progress != null) {
                         val last = cloud.messages.lastOrNull()
-                        val progress = remember(cloud.messages) { creationProgress(cloud.messages) }
                         if (last?.creationInterrupted() == true) {
                             AgentCreationResumeCard(
                                 stage = last.failureStage,
@@ -822,6 +829,8 @@ private fun AgentHistorySheet(
     }
 }
 
+private const val ChatTurnPageSize = 8
+
 @Composable
 private fun CloudMessages(
     messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, resolveImage: suspend (String) -> String?,
@@ -832,7 +841,27 @@ private fun CloudMessages(
     onArchivedPreview: (String, ChatImagePreview) -> Unit,
     archivedThumbnail: suspend (String, String) -> String?,
 ) {
-    val listState = rememberLazyListState()
+    // Register recent replies first. Stable row keys keep the reading position when earlier turns are prepended.
+    var firstTurn by rememberSaveable { mutableIntStateOf((messages.size - ChatTurnPageSize).coerceAtLeast(0)) }
+    val start = firstTurn.coerceAtMost(messages.size)
+    val parts = (start until messages.size).map { index ->
+        val turn = messages[index]
+        key(turn.id) {
+            remember(turn.role, turn.text, turn.streaming) {
+                if (turn.role == "user") emptyList() else chatMarkdownParts(turn.text, turn.streaming)
+            }
+        }
+    }
+    // Start at the bottom sentinel so the first measure fills the viewport backwards from the newest reply.
+    val initialBottom = remember {
+        val prefix = if (start > 0) 0 else {
+            val archiveRows = archive.sumOf { it.messages.size + if (it.messages.firstOrNull()?.createdAtMs != null) 1 else 0 }
+            archiveRows + if (topicStarted != null || messages.firstOrNull()?.createdAtMs != null) 1 else 0
+        }
+        prefix + parts.sumOf { it.size.coerceAtLeast(1) } + if (deliveredWork != null) 1 else 0
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialBottom)
+    var actionsForTurn by rememberSaveable { mutableStateOf<Long?>(null) }
     val last = messages.lastOrNull()
     var followLatest by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
@@ -852,41 +881,64 @@ private fun CloudMessages(
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        archive.forEach { stored ->
-            stored.messages.firstOrNull()?.createdAtMs?.let { time ->
-                item(key = "${stored.id}:date") {
-                    if ((stored.options.mainTopic ?: 1) > 1) AgentTopicDivider(time, offsetMinutes)
-                    else AgentTimestamp(time, offsetMinutes)
+    ) {
+        if (start == 0) {
+            archive.forEach { stored ->
+                stored.messages.firstOrNull()?.createdAtMs?.let { time ->
+                    item(key = "${stored.id}:date", contentType = "date") {
+                        if ((stored.options.mainTopic ?: 1) > 1) AgentTopicDivider(time, offsetMinutes)
+                        else AgentTimestamp(time, offsetMinutes)
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+                items(stored.messages, key = { "${stored.id}:${it.id}" }, contentType = { it.role }) { turn ->
+                    AgentChatTurn(turn, stored.messages, platform, { archivedThumbnail(stored.id, it) },
+                        { onArchivedPreview(stored.id, it) }, offsetMinutes = offsetMinutes)
+                    Spacer(Modifier.height(16.dp))
                 }
             }
-            items(stored.messages, key = { "${stored.id}:${it.id}" }) { turn ->
-                AgentChatTurn(turn, stored.messages, platform, { archivedThumbnail(stored.id, it) },
-                    { onArchivedPreview(stored.id, it) }, offsetMinutes = offsetMinutes)
+            val date = topicStarted ?: messages.firstOrNull()?.createdAtMs
+            if (date != null) item(key = "current-date", contentType = "date") {
+                if (topicStarted != null) AgentTopicDivider(date, offsetMinutes) else AgentTimestamp(date, offsetMinutes)
+                Spacer(Modifier.height(16.dp))
             }
         }
-        if (topicStarted != null) item(key = "current-topic") { AgentTopicDivider(topicStarted, offsetMinutes) }
-        else messages.firstOrNull()?.createdAtMs?.let { time ->
-            item(key = "current-date") { AgentTimestamp(time, offsetMinutes) }
-        }
-        items(messages, key = { it.id }) { turn ->
-            val latest = !readOnly && turn.id == last?.id && !sending
-            AgentChatTurn(turn, messages, platform, resolveImage, onPreview, offsetMinutes = offsetMinutes,
-                waiting = if (turn.streaming) waiting else null, onStop = onStop.takeUnless { readOnly }, onSend = onSend,
-                creation = creation,
-                onRetry = onRetry.takeIf { latest && !creation && turn.error != null && !turn.imageGeneration },
-                onRegenerate = onRegenerate.takeIf { latest && !creation && !turn.streaming && !turn.imageGeneration },
-                onContinue = if (latest && !creation) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null,
-                onRecover = if (!readOnly && turn.imageJobRecoverable && !sending) ({ onRecoverImage(turn.id) }) else null,
-                onReviewed = onReviewed.takeIf { !turn.imageGeneration && latest && turn.error.orEmpty().contains("结果尚未确认") },
-                onQuota = onQuota.takeIf { showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") } })
+        parts.forEachIndexed { offset, rows ->
+            val turn = messages[start + offset]
+            items(count = rows.size.coerceAtLeast(1),
+                key = { row -> if (row == 0) turn.id else "${turn.id}:body:$row" },
+                contentType = { row -> rows.getOrNull(row)?.block?.let { it::class } ?: turn.role },
+            ) { row ->
+                if (start > 0 && offset == 0 && row == 0) {
+                    LaunchedEffect(turn.id) { firstTurn = (start - ChatTurnPageSize).coerceAtLeast(0) }
+                }
+                val part = rows.getOrNull(row)
+                if (part != null && !part.first) Spacer(Modifier.height(if (part.listIndex > 0) 5.dp else 8.dp))
+                val toggleActions = { actionsForTurn = if (actionsForTurn == turn.id) null else turn.id }
+                if (part != null && !part.first && !part.last) {
+                    ChatMarkdownRow(part, platform, toggleActions.takeUnless { turn.streaming || turn.error != null })
+                } else {
+                    val latest = !readOnly && turn.id == last?.id && !sending
+                    AgentChatTurn(turn, messages, platform, resolveImage, onPreview, offsetMinutes = offsetMinutes,
+                        waiting = if (turn.streaming) waiting else null, onStop = onStop.takeUnless { readOnly }, onSend = onSend,
+                        creation = creation, part = part, actionsOpen = actionsForTurn == turn.id, toggleActions = toggleActions,
+                        onRetry = onRetry.takeIf { latest && !creation && turn.error != null && !turn.imageGeneration },
+                        onRegenerate = onRegenerate.takeIf { latest && !creation && !turn.streaming && !turn.imageGeneration },
+                        onContinue = if (latest && !creation) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null,
+                        onRecover = if (!readOnly && turn.imageJobRecoverable && !sending) ({ onRecoverImage(turn.id) }) else null,
+                        onReviewed = onReviewed.takeIf { !turn.imageGeneration && latest && turn.error.orEmpty().contains("结果尚未确认") },
+                        onQuota = onQuota.takeIf { showQuota && turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") } })
+                }
+                if (part == null || part.last) Spacer(Modifier.height(16.dp))
+            }
         }
         if (deliveredWork != null) {
-            item(key = "delivered-work:${deliveredWork.id}") {
+            item(key = "delivered-work:${deliveredWork.id}", contentType = "delivery") {
                 AgentDeliverableCard(deliveredWork, onOpen = { onOpenWork(deliveredWork) })
+                Spacer(Modifier.height(16.dp))
             }
         }
-        item(key = "latest-edge") { Spacer(Modifier.height(1.dp)) }
+        item(key = "latest-edge", contentType = "edge") { Spacer(Modifier.height(1.dp)) }
     }
 }
 
@@ -896,7 +948,7 @@ private fun AgentChatTurn(
     onPreview: (ChatImagePreview) -> Unit, offsetMinutes: Int, waiting: String? = null, onStop: (() -> Unit)? = null,
     onSend: (String) -> Unit = {}, onRetry: (() -> Unit)? = null, onRegenerate: (() -> Unit)? = null,
     onContinue: (() -> Unit)? = null, onRecover: (() -> Unit)? = null, onReviewed: (() -> Unit)? = null, onQuota: (() -> Unit)? = null,
-    creation: Boolean = false,
+    creation: Boolean = false, part: ChatMarkdownPart? = null, actionsOpen: Boolean = false, toggleActions: (() -> Unit)? = null,
 ) {
     if (turn.role == "user") {
         AgentUserMessage((if (turn.imageGeneration) "生成图片 · " else "") + turn.text +
@@ -905,7 +957,7 @@ private fun AgentChatTurn(
             attachment.imageDataUrl?.let { ChatImageThumbnail(ChatImagePreview(it, attachment.name), resolveImage, onPreview) }
         }
     } else AgentReply {
-        if (turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
+        if ((part == null || part.first) && turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
             Text(turn.activity, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val reminders = remember(turn.tools) {
@@ -918,7 +970,7 @@ private fun AgentChatTurn(
                 if (status == "scheduled" && title != null && time != null) Triple(call, title, time) else null
             }
         }
-        reminders.forEach { (call, title, time) ->
+        if (part == null || part.first) reminders.forEach { (call, title, time) ->
             var details by rememberSaveable(call.id) { mutableStateOf(false) }
             AgentReminderResult(title, time, offsetMinutes) { details = !details }
             if (details) ToolGroup(listOf(call), live = false)
@@ -928,12 +980,13 @@ private fun AgentChatTurn(
             reasoning = turn.reasoning, tools = turn.tools.filterNot { tool -> reminders.any { it.first.id == tool.id } },
             records = turn.records, waiting = waiting, platform = platform,
             idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
-            onRetry = onRetry, onRegenerate = onRegenerate, flat = true,
+            onRetry = onRetry, onRegenerate = onRegenerate, flat = true, part = part, actionsOpen = actionsOpen, toggleActions = toggleActions,
             showTaskRecovery = !creation || !turn.creationInterrupted(),
             extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 truncated = turn.truncated, onContinue = onContinue),
         )
+        if (part != null && !part.last) return@AgentReply
         if (turn.generatedImages.isNotEmpty()) {
             val brief = messages.takeWhile { it.id != turn.id }.lastOrNull { it.role == "user" }?.text
             turn.generatedImages.forEachIndexed { index, data ->

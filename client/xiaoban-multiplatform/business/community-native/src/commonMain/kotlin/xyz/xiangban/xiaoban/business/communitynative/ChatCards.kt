@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -977,11 +978,36 @@ class TurnExtras(
     val onSwitchModel: (() -> Unit)? = null,
 )
 
+internal data class ChatMarkdownPart(
+    val block: MdBlock,
+    val first: Boolean,
+    val last: Boolean,
+    val listIndex: Int,
+)
+
+internal fun chatMarkdownParts(text: String, streaming: Boolean): List<ChatMarkdownPart> {
+    if ('\n' !in text) return emptyList()
+    val blocks = parseMarkdown(if (streaming) "$text ▍" else text)
+    return buildList {
+        blocks.forEachIndexed { index, block ->
+            val count = when (block) {
+                is MdBlock.Bullets -> block.items.size
+                is MdBlock.Numbered -> block.items.size
+                else -> 1
+            }
+            for (line in 0 until count) {
+                add(ChatMarkdownPart(block, first = index == 0 && line == 0,
+                    last = index == blocks.lastIndex && line == count - 1, listIndex = line))
+            }
+        }
+    }
+}
+
 /**
  * 一条小伴回复里的所有内容：三合一过程摘要卡 → 正文 → 文件变更 → 痕迹 → 检查点/异常与操作栏。
  */
 @Composable
-fun AssistantTurnCards(
+internal fun AssistantTurnCards(
     text: String,
     streaming: Boolean,
     error: String?,
@@ -999,37 +1025,44 @@ fun AssistantTurnCards(
     extras: TurnExtras = TurnExtras(),
     flat: Boolean = false,
     showTaskRecovery: Boolean = true,
+    part: ChatMarkdownPart? = null,
+    actionsOpen: Boolean = false,
+    toggleActions: (() -> Unit)? = null,
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
     var replyActionsOpen by rememberSaveable { mutableStateOf(false) }
-    val progress = remember(tools, streaming, waiting, stopped, failure) {
+    val progress = if (part == null || part.first || part.last) remember(tools, streaming, waiting, stopped, failure) {
         taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure)
+    } else null
+    if (part == null || part.first) {
+        UnifiedTraceCard(
+            reasoning = reasoning,
+            progress = progress,
+            tools = tools,
+            live = streaming,
+            waiting = waiting,
+            onStop = onStop,
+            onSend = onSend,
+            onAdjust = if (streaming) onAdjust else null,
+            showRecovery = showTaskRecovery,
+        )
+        if (text.isEmpty()) {
+            if (streaming && tools.none { it.status == ToolStatus.Running } && reasoning.isBlank() && progress == null) {
+                StatusLine(if (waiting != null) "等你确认后继续…" else idleText, alert = waiting != null)
+            } else if (streaming && waiting != null) {
+                StatusLine("等你确认后继续…", alert = true)
+            }
+        }
     }
-    UnifiedTraceCard(
-        reasoning = reasoning,
-        progress = progress,
-        tools = tools,
-        live = streaming,
-        waiting = waiting,
-        onStop = onStop,
-        onSend = onSend,
-        onAdjust = if (streaming) onAdjust else null,
-        showRecovery = showTaskRecovery,
-    )
     if (text.isNotEmpty()) {
-        val actions = if (flat && !streaming && failure == null) {
-            Modifier.combinedClickable(
-                interactionSource = null, indication = null, onLongClickLabel = "回复操作",
-                onLongClick = { replyActionsOpen = !replyActionsOpen }, onClick = {},
-            )
-        } else Modifier
-        MarkdownBubble(text, streaming, platform, modifier = actions, flat = flat)
-    } else if (streaming && tools.none { it.status == ToolStatus.Running } && reasoning.isBlank() && progress == null) {
-        StatusLine(if (waiting != null) "等你确认后继续…" else idleText, alert = waiting != null)
-    } else if (streaming && waiting != null) {
-        StatusLine("等你确认后继续…", alert = true)
+        val onLongClick = if (flat && !streaming && failure == null) {
+            toggleActions ?: { replyActionsOpen = !replyActionsOpen }
+        } else null
+        if (part == null) MarkdownBubble(text, streaming, platform, Modifier.replyActions(onLongClick), flat)
+        else ChatMarkdownRow(part, platform, onLongClick)
     }
+    if (part != null && !part.last) return
     if (!streaming) {
         val files = remember(tools) { changedFiles(tools) }
         if (files.isNotEmpty()) FileChangesCard(files, delivered = progress?.state == TaskState.Completed)
@@ -1039,7 +1072,7 @@ fun AssistantTurnCards(
         ChatNoticeBar(title = "回答较长，已保留当前内容", subtitle = "可从断点继续生成", tone = "warn", actionText = "继续", onAction = extras.onContinue)
     }
     if (!streaming) extras.checkpoint?.let { cp -> if (extras.onUndo != null) CheckpointNotice(cp, extras.onUndo) }
-    if (!streaming && text.isNotEmpty() && failure == null && (!flat || replyActionsOpen)) {
+    if (!streaming && text.isNotEmpty() && failure == null && (!flat || actionsOpen || replyActionsOpen)) {
         ReplyActions(text, platform, onRegenerate, extras)
     }
     if (stopped) ChatNoticeBar(title = "已停止生成", tone = "neutral")
@@ -1211,10 +1244,45 @@ private fun StatusLine(text: String, alert: Boolean) {
 
 private val EditorialBodyStyle = TextStyle(fontSize = 15.sp, lineHeight = 25.sp, letterSpacing = 0.08.sp)
 
+private fun Modifier.replyActions(onLongClick: (() -> Unit)?): Modifier =
+    if (onLongClick == null) this else combinedClickable(
+        interactionSource = null, indication = null, onLongClickLabel = "回复操作", onLongClick = onLongClick, onClick = {},
+    )
+
+@Composable
+internal fun ChatMarkdownRow(part: ChatMarkdownPart, platform: PlatformActions?, onLongClick: (() -> Unit)?) {
+    val modifier = Modifier.fillMaxWidth().replyActions(onLongClick)
+    val onLink: (String) -> Unit = { url -> openMarkdownLink(platform, url) }
+    when (val block = part.block) {
+        is MdBlock.Bullets -> ChatListLine("•", block.items[part.listIndex], modifier, onLink)
+        is MdBlock.Numbered -> ChatListLine("${block.start + part.listIndex}.", block.items[part.listIndex], modifier, onLink)
+        else -> Box(modifier) { MarkdownContentBlock(block, platform, onLink) }
+    }
+}
+
+@Composable
+private fun ChatListLine(marker: String, inlines: List<MdInline>, modifier: Modifier, onLink: (String) -> Unit) {
+    // A hanging indent lets the marker and its text share one paragraph layout and one accessibility node.
+    val style = EditorialBodyStyle.copy(textIndent = TextIndent(restLine = 22.sp))
+    val plain = inlines.singleOrNull() as? MdInline.Text
+    if (plain != null) Text("$marker ${plain.text}", modifier, style = style)
+    else {
+        val fill = LocalExtraColors.current.fill
+        val text = remember(marker, inlines, fill, onLink) {
+            buildAnnotatedString { append("$marker "); append(inlineText(inlines, fill, onLink)) }
+        }
+        Text(text, modifier, style = style)
+    }
+}
+
+private fun openMarkdownLink(platform: PlatformActions?, url: String) {
+    if (url.startsWith("https://") || url.startsWith("http://")) platform?.openUrl(url)
+}
+
 @Composable
 fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?, modifier: Modifier = Modifier, flat: Boolean = false) {
     val blocks = remember(text, streaming) { parseMarkdown(if (streaming) "$text ▍" else text) }
-    val onLink: (String) -> Unit = { url -> if (url.startsWith("https://") || url.startsWith("http://")) platform?.openUrl(url) }
+    val onLink: (String) -> Unit = { url -> openMarkdownLink(platform, url) }
     Column(
         if (flat) modifier.fillMaxWidth() else modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface)
             .border(1.dp, AgentHairline, AssistantBubbleShape).padding(horizontal = 14.dp, vertical = 11.dp),
