@@ -15,4 +15,4 @@ description: 为小伴社区开源精选核实项目资料，整理中文 README
 - 每项交付原文、中文、英文、元数据、许可和审校记录；全量清单列出完成、阻塞和待处理，未完成不算完成。README 中的命令只展示，不执行。
 - 先检查当前接口能否承接双语全文。无法承接就保留文件成果并说明缺口，不压缩为摘要、不直接改库。后台草稿与发布按用户已授权范围操作，不把稿件整理视为发布指令。
 
-交互原型：`client/xiaoban-multiplatform/docs/design-specs/prototypes/open-source-detail.html`。代码与设计、内容整理和生产发布分别报告状态。
+网页详情见 `services/server-forum/web/src/views/OpenSourceDetailView.vue`。代码与设计、内容整理和生产发布分别报告状态。

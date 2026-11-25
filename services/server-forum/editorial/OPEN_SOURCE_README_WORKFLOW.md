@@ -1,6 +1,6 @@
 # 开源精选 README 采编规范
 
-状态：2026-11-03 确认的内容规范。交互原型已入库，正式网页已接入双语 README；当前已发布项目以静态索引为准。原生手机及后台编辑器的双语接入仍以各项目实现为准。
+状态：2026-11-03 确认的内容规范。正式网页已接入双语 README；当前已发布项目以静态索引为准。原生手机及后台编辑器的双语接入仍以各项目实现为准。
 
 ## 栏目定位与页面
 
@@ -11,7 +11,7 @@
 - 配图优先保留官方 README 的产品图、真实界面和实物图。确实没有可用配图，可截项目 GitHub 首页。禁止伪造界面、实测结果或采用作者头像冒充项目图标；缺少图标时用明确的项目名占位。
 - 不强制设计大字封面，不重复正文标题。目录、图片放大、命令复制遵循阅读需求。评论与底栏采用已确认的轻量社交样式；设计稿示例数不能进入正式数据。
 
-交互基准：[详情页 HTML](../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/open-source-detail.html)。[本机在线预览](http://127.0.0.1:1423/prototypes/open-source-detail.html)，在仓库根执行 `python3 -m http.server 1423 --bind 127.0.0.1 --directory client/xiaoban-multiplatform/docs/design-specs`。后续修改沿用此源文件和地址。
+网页详情交互参见 [OpenSourceDetailView.vue](../web/src/views/OpenSourceDetailView.vue)。
 
 ## 单项目采编
 

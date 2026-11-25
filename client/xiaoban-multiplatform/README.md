@@ -62,7 +62,7 @@
 | `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
 | `:common:community-core` | 社区、账号与 AI 网关的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`AiGatewayApi`（对接 `server-ai` 的档位、余额、兑换码与 `/v1/chat/completions` 流式对话）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`CloudChatController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
 | `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、`SharedPrefsLinkStorage`）：同账号自动发现电脑、经中转收发、会话快照与流式增量、待办审批卡片、断线重连；有对真实 server-link 与 Rust 桌面端的跨语言互通测试。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
-| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴 AI 主线、并行任务与配置（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（创意、资讯、精选、排行榜、导航，默认打开创意）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（私人资料库等）见 docs 里的进度说明。 |
+| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），包含悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴 AI 主线、并行任务与配置（模型选择、额度与兑换）；社区涵盖首页（创意、资讯、精选、排行榜、导航，默认打开创意）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（私人资料库等）见 docs 里的进度说明。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
 | `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `SharedPrefsLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
@@ -110,7 +110,7 @@ Android 提醒返回稳定 id；`list_reminders` 查询，`update_reminder` 修�
 
 ## 游戏中心 A 版（2026-10-31）
 
-手机版游戏页接入[轻量游戏库设计](docs/design-specs/prototypes/game-center.html)：双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 安装包随包提供画框马里奥，并保留 9 款共用官方作品的清单和缩略图，打开主界面后后台从资源机下载游戏包，按内置清单校验大小和 SHA-256 并缓存在应用私有目录；首次下载约 6 MB，也会使用移动网络。首次打开未缓存的游戏会等待下载，缓存后可离线运行；损坏的缓存会重新下载。手机和桌面共用游戏包，手机宿主在读取入口时加入自身适配；遥控器和轻启仍随应用打包。游戏不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。创作时需要的 Three.js 从已验证的魔方游戏缓存读取，未缓存时按需下载。精选游戏按方块爆破、暮色滑翔、水墨剑客、画框马里奥开头排列。
+当时的手机版游戏页采用轻量游戏库布局，包含双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 安装包随包提供画框马里奥，并保留 9 款共用官方作品的清单和缩略图，打开主界面后后台从资源机下载游戏包，按内置清单校验大小和 SHA-256 并缓存在应用私有目录；首次下载约 6 MB，也会使用移动网络。首次打开未缓存的游戏会等待下载，缓存后可离线运行；损坏的缓存会重新下载。手机和桌面共用游戏包，手机宿主在读取入口时加入自身适配；遥控器和轻启仍随应用打包。游戏不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。创作时需要的 Three.js 从已验证的魔方游戏缓存读取，未缓存时按需下载。精选游戏按方块爆破、暮色滑翔、水墨剑客、画框马里奥开头排列。
 
 验证：在本目录执行 `XIAOBAN_BUILTIN_DISTRIBUTION="$PWD/../../assets/game-packs/distribution.json" ./gradlew :androidApp:testDebugUnitTest --tests '*BuiltinDistributionTest*' :androidApp:assembleDebug`，从资源机验证 9 个共用包、宿主适配、缓存复用与损坏后修复。正式安装包仍需按仓库规范手动构建发布。
 
@@ -126,7 +126,7 @@ Android 提醒返回稳定 id；`list_reminders` 查询，`update_reminder` 修�
 
 桌面装扮参考图明确标记为创作灵感。选择同账号在线电脑后，将想法预填到新的遥控对话，由用户发送。电脑创作成果仍保存在电脑，手机「我的作品」目前列出本机的运行时协议 2 作品。iOS 尚无游戏打包、图片分享和本地创作能力。
 
-设计稿沿用 [创造中心](docs/design-specs/prototypes/create-center.html)。验证：Android `:androidApp:assembleDebug` 通过，已有游戏格式 / 官方目录 8 项 JVM 测试通过；小米 17 确认游戏优先、作品操作菜单、发布页预填真实 ZIP，以及 ZIP / PNG 系统分享面板。未提交社区发布或向外部接收方发送；电脑创作链路仅接入已有遥控对话，未替用户执行生成。导航草稿换行编码增加到 `RouteTest`，该 UI 模块当前只有 iOS 测试目标，本轮未运行。
+验证：Android `:androidApp:assembleDebug` 通过，已有游戏格式 / 官方目录 8 项 JVM 测试通过；小米 17 确认游戏优先、作品操作菜单、发布页预填真实 ZIP，以及 ZIP / PNG 系统分享面板。未提交社区发布或向外部接收方发送；电脑创作链路仅接入已有遥控对话，未替用户执行生成。导航草稿换行编码增加到 `RouteTest`，该 UI 模块当前只有 iOS 测试目标，本轮未运行。
 
 ## 聊天图片与 GIF 生成（本地实现，尚未部署）
 

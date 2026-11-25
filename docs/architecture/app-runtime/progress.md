@@ -156,7 +156,7 @@
   - 正常入口「应用 → 精选游戏 → 全部 → 协议 2 宿主测试 → 打开」。内置作品按清单的 `runtimeProtocol` 分流，字段缺失按协议 1 处理。协议 2 进入正式 `RuntimeV2Activity`，测试包资源只进入 Debug 构建；现有协议 1 继续走 `MobileGameActivity` 的离线 iframe。
   - 真机确认测试包源为 `https://local-runtime-v2-fixture.app.xiangban.xyz`，是安全上下文，首段页面脚本已能读到 `xb`。同源资源可读，外网请求被拦截。本步只加载内置资源，社区协议 2 下载与正式联网策略留待后续。
   - `xb.storage` 写入、读取、列键、删除和 4 MiB 字符串往返通过；进程强制停止后从广场重开仍能读回写入值。Home 切到后台再从任务切换器回来，收到 `hide` / `show`；展开和收起宿主菜单也收到对应事件。
-  - 对照[应用广场设计稿](../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/app-plaza.html)的 b7/b8 画板，核对竖屏胶囊与底部菜单、横屏胶囊与 440 dp 居中菜单。实机返回顺序为二级 → 一级 → 首页 → 展开菜单并提示「再返回一次也会退出」→ 退出；胶囊 ✕、菜单外点击收起和「重新开始」也通过。收藏、分享、反馈在测试菜单中保留设计稿位置，交互待接入。
+  - 对照当时的应用广场 b7/b8 画板，核对竖屏胶囊与底部菜单、横屏胶囊与 440 dp 居中菜单。实机返回顺序为二级 → 一级 → 首页 → 展开菜单并提示「再返回一次也会退出」→ 退出；胶囊 ✕、菜单外点击收起和「重新开始」也通过。收藏、分享、反馈在测试菜单中保留设计稿位置，交互待接入。
   - 协议 1 回归：MBTI 从精选工具打开并恢复已有答题进度；《墨渡》（56）从广场打开后完成一次有效蓄力跳跃；《茶签归位》（57）打开第 1 关、移动一签并撤销。三者均确认在原 `allow-scripts` iframe 内运行。
   - 本地验证：`:androidApp:assembleDebug` 和 `:androidApp:compileReleaseKotlin` 通过；协议 2 路径、清单及小样请求测试共 6 项通过；community-core 的 `GameLibraryTest`、`MobileGamesTest`、`CommunityGameTrialTest`、`AppPlazaTest` 共 22 项通过。系统权限弹窗、后台断网开关、局域网 WebSocket 和 100 MB 社区包仍待专项验证。
 - 2026-11-08：协议 2 媒体授权和网络策略通过小米 14 真机验证。
