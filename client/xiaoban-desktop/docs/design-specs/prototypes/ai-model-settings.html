@@ -50,13 +50,12 @@
     const { default: SettingsDialog } = await import('/src/ui/components/SettingsDialog.vue');
     const { default: WindowChrome } = await import('/src/ui/configuration/WindowChrome.vue');
     const { defaults } = await import('/src/bridge.ts');
-    const { default: MacPreview } = await import('./AiModelSettingsMacPreview.vue');
     const { applyUiTokens } = await import('/src/ui/design-tokens.ts');
     const { accent, isDark, followHost, followAccent } = await import('/src/ui/appearance.ts');
     const { configurationThemeFor } = await import('/src/ui/theme.ts');
     await import('/src/ui/control.css');
     const dark = ref(false), view = ref('models'), count = ref(24), width = ref(360), toast = ref(''), probeOutcome = ref('success');
-    watch(view, value => { width.value = value === 'models' ? 360 : value === 'macos' ? 680 : 900; });
+    watch(view, value => { width.value = value === 'models' ? 360 : 900; });
     const providerId = ref('deepseek');
     const frame = { maximized: false, fullscreen: false, focused: true };
     const config = ref({ activeProvider: 'xiaoban-ai', gatewayTier: 'premium', gatewayEnabled: true });
@@ -122,7 +121,7 @@
     createApp({ setup: () => () => h(NConfigProvider, { theme: dark.value ? darkTheme : null, themeOverrides: configurationThemeFor(dark.value, accent.value) }, { default: () => [
       h('div', { class: 'preview-tools' }, [
         h('strong', '设置与模型 · 设计预览'),
-        h('label', ['方案', h('select', { value: view.value, onChange: e => { view.value = e.target.value; applyTheme(dark.value); toast.value = ''; } }, [h('option', { value: 'macos' }, '初版参考'), h('option', { value: 'models' }, '小伴 AI · 新版'), h('option', { value: 'provider' }, '第三方模型 · 新版'), h('option', { value: 'settings' }, '设置 · 新版')])]),
+        h('label', ['页面', h('select', { value: view.value, onChange: e => { view.value = e.target.value; applyTheme(dark.value); toast.value = ''; } }, [h('option', { value: 'models' }, '小伴 AI'), h('option', { value: 'provider' }, '第三方模型'), h('option', { value: 'settings' }, '设置')])]),
         h('label', ['深色', h(NSwitch, { value: dark.value, 'onUpdate:value': applyTheme, 'aria-label': '深色预览', size: 'small' })]),
         h('details', { class: 'preview-options' }, [h('summary', '预览选项'), h('div', { class: 'preview-options-panel' }, [
           h('label', ['数量', h('select', { value: count.value, onChange: e => { count.value = Number(e.target.value); } }, [4, 24, 80].map(n => h('option', { value: n }, `${n} 个模型`)))]),
@@ -131,10 +130,8 @@
         ])]),
       ]),
       h('div', { class: 'preview-window', style: { width: `${width.value}px` } }, [
-        ...(['macos','models'].includes(view.value) ? [h(WindowChrome, { title: view.value === 'macos' ? '小伴 AI' : undefined, platform: 'macos' })] : []),
-        h('div', { class: 'preview-body', style: view.value === 'macos' && count.value <= 4 ? { height: '540px' } : undefined }, [view.value === 'macos'
-          ? h(MacPreview, { models: models.value, active: config.value.gatewayTier, creditPurchaseUrl: 'https://example.com/credits', probeOutcome: probeOutcome.value, onUse: tier => { config.value = { ...config.value, gatewayTier: tier }; }, onNotice: value => { toast.value = value; } })
-          : view.value === 'models'
+        ...(view.value === 'models' ? [h(WindowChrome, { platform: 'macos' })] : []),
+        h('div', { class: 'preview-body' }, [view.value === 'models'
           ? h(AiGatewayCard, { key: `models-${count.value}`, store, config: config.value, detached: true, onConfig: value => { config.value = value; } })
           : view.value === 'provider'
           ? h(AiConfigCard, { key: `provider-${providerId.value}-${count.value}`, store, detached: true, initialProvider: providerId.value })

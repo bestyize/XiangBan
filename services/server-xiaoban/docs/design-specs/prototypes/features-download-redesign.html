@@ -1810,6 +1810,13 @@
   });
 
   renderDownload();
+  (function applyQueryInit() {
+    const qs = new URLSearchParams(location.search);
+    const p = qs.get('page');
+    const d = qs.get('device');
+    if (p === 'download' || p === 'features') switchPage(p);
+    if (d === 'mobile' || d === 'desktop') switchDevice(d);
+  })();
 </script>
 </body>
 </html>

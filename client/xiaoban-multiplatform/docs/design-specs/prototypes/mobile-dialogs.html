@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>小伴手机版 · 统一弹层</title>
 <script>
-  document.documentElement.dataset.edition = new URLSearchParams(location.search).get('view') === 'previous' ? 'previous' : 'cards';
+  document.documentElement.dataset.edition = 'cards';
 </script>
 <link rel="stylesheet" href="mobile-dialog-cards.css">
 <style>
@@ -289,7 +289,6 @@ h1, h2, h3, p { margin: 0; font-weight: 400; }
   <header class="review-tools">
     <h1><span class="app-mark" aria-hidden="true"></span><span class="product-name">小伴手机版</span><span class="title-divider">/</span>弹窗设计稿</h1>
     <nav aria-label="设计稿工具">
-      <a href="?view=previous">上一版</a>
       <a href="share-link-landing.html">分享回流参考</a>
       <button type="button" class="appearance" aria-label="切换到深色"></button>
     </nav>

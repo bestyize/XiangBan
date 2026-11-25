@@ -329,10 +329,6 @@
   <div class="review-line">
     <div><h1>遥控器</h1><p>电视与空调 · 可点按原型 · 红外操作为模拟</p></div>
     <div class="review-actions" aria-label="预览设置">
-      <div class="review-group" role="group" aria-label="宿主控件">
-        <button data-chrome="compact" aria-pressed="true">竖三点</button>
-        <button data-chrome="standard" aria-pressed="false">旧版双按钮</button>
-      </div>
       <button data-demo="normal" aria-pressed="true">默认</button>
       <button data-demo="empty" aria-pressed="false">未添加</button>
       <button data-demo="unsupported" aria-pressed="false">无红外</button>
@@ -812,18 +808,7 @@
 
   document.querySelector('#review-icon').innerHTML = icon('ir');
   const previews = [...document.querySelectorAll('.phone')].map((phone, index) => mount(phone, index === 0));
-  const chromeButtons = document.querySelectorAll('[data-chrome]');
-  function updateChrome() {
-    const compact = location.hash !== '#standard';
-    document.documentElement.classList.toggle('compact', compact);
-    chromeButtons.forEach(button => button.setAttribute('aria-pressed', (button.dataset.chrome === 'compact') === compact));
-  }
-  chromeButtons.forEach(button => button.addEventListener('click', () => {
-    history.replaceState(history.state, '', '#' + button.dataset.chrome);
-    updateChrome();
-  }));
-  window.addEventListener('hashchange', updateChrome);
-  updateChrome();
+  document.documentElement.classList.add('compact');
   document.querySelectorAll('[data-demo]').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('[data-demo]').forEach(option => option.setAttribute('aria-pressed', option === button));
     previews.forEach(preview => preview(button.dataset.demo));

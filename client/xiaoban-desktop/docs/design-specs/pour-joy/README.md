@@ -60,4 +60,4 @@
 
 ## 文件与同步
 
-源文件为 `index.html`、`style.css`、`arcade.css`、`app.js`；`previews/game-v2.png` 为当前版本截图，其余 `*-mobile.png` 保留为 V1 评审参考。仓库文件是可编辑基准。发布时仅将四个前端文件复制到独立 Sites 源仓库的 `dist/`，复用项目 `appgprj_6af4b1fc27d48191acc9795f47149de2`，保留原访问范围并更新原链接；不要新建预览站。更新稿件时同时维护本说明与两个设计索引。
+源文件为 `index.html`、`style.css`、`arcade.css`、`app.js`；`previews/game-v2.png` 与 `previews/production-*.png` 为当前 V2 及正式版截图（正式 `water-sort` v2.1.0 已升级至 45 关 + 3 教学关）。仓库文件是可编辑基准。发布时仅将四个前端文件复制到独立 Sites 源仓库的 `dist/`，复用项目 `appgprj_6af4b1fc27d48191acc9795f47149de2`，保留原访问范围并更新原链接；不要新建预览站。更新稿件时同时维护本说明与两个设计索引。

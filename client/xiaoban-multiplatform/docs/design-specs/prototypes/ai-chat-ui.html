@@ -819,9 +819,8 @@ body.studio-dark .diff-card p { color: #9598a2; }
     </div>
     <div class="controls">
       <div class="seg" role="tablist" aria-label="视图切换">
-        <button class="active" data-mode="all">全部五屏</button>
+        <button class="active" data-mode="all">全部四屏</button>
         <button data-mode="cards">全卡片新增</button>
-        <button data-mode="compare">新旧对比</button>
       </div>
       <div class="swatches" id="swatches" aria-label="主题色"></div>
       <button class="pill-btn" id="toggle-icon-bg">星标：无底</button>
@@ -865,15 +864,6 @@ body.studio-dark .diff-card p { color: #9598a2; }
       </div>
       <div class="phone" id="phone-system"></div>
       <p class="board-caption">覆盖顶部并行任务条、新话题分割线、可折叠文件变更卡、检查点撤销条、额度与截断异常条，以及底部「方案确认 / 中断续作」卡片。</p>
-    </section>
-
-    <section class="board" data-board="legacy">
-      <div class="board-head">
-        <h2>05 · 现行版对照</h2>
-        <span>截图还原 · 痛点参考</span>
-      </div>
-      <div class="phone" id="phone-old"></div>
-      <p class="board-caption">左侧小头像挤占宽度；浅粉+粉框气泡偏重；三层状态条叠罗汉；通栏淡粉按钮无卡片边界且紧贴输入框。</p>
     </section>
   </main>
 
@@ -1473,7 +1463,6 @@ function renderAll() {
   renderRunPhone();
   renderInteractPhone();
   renderSystemPhone();
-  renderOldPhone();
   applyTheme();
 }
 

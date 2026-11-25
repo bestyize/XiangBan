@@ -29,16 +29,32 @@ figcaption small{color:var(--mu)}
 </head>
 <body>
 <header><h1 id="title">设计稿总览</h1><span id="count"></span>
-<label>缩放 <select id="zoom"><option value="0.25">25%</option><option value="0.4">40%</option><option value="0.6">60%</option><option value="1">100%</option></select></label></header>
+<label style="margin-left:auto"><input type="checkbox" id="showArchived"> 显示已替代 / 历史对比画板</label>
+<label style="margin-left:12px">缩放 <select id="zoom"><option value="0.25">25%</option><option value="0.4">40%</option><option value="0.6">60%</option><option value="1">100%</option></select></label></header>
 <main id="main"></main>
 <script>
 // 读取 canvas.json，按画布上的标题便签分组，逐个用 iframe 渲染画板
 (async function () {
+  var ARCHIVED = {
+    'WB-Settings.dc.html': '已由独立窗口设置稿替代',
+    'WB-Settings-Look.dc.html': '已由独立窗口设置稿替代',
+    'WB-Settings-AI.dc.html': '已由独立窗口模型配置稿替代',
+    'WB-Settings-Assistant.dc.html': '已由独立窗口设置稿替代',
+    'WB-Provider.dc.html': '已由独立窗口模型配置稿替代',
+    'WB-Provider-Custom.dc.html': '已由独立窗口模型配置稿替代',
+    'WB-Effects.dc.html': '已由特效页专项稿替代',
+    'WB-Widgets.dc.html': '已由组件与伙伴专项稿替代',
+    'WB-Pets.dc.html': '已由组件与伙伴专项稿替代',
+    'WB-Task-Card.dc.html': '历史新旧对比（新版已合入）',
+    'WB-Ask-Card.dc.html': '历史新旧对比（新版已合入）',
+    'WB-Perm-Menu.dc.html': '历史新旧对比（新版已合入）'
+  };
   var c = await (await fetch('canvas.json')).json();
-  var main = document.getElementById('main'), zoom = document.getElementById('zoom');
+  var main = document.getElementById('main'), zoom = document.getElementById('zoom'), showArchived = document.getElementById('showArchived');
+  var qs = new URLSearchParams(location.search);
+  if (qs.get('all') === '1') showArchived.checked = true;
   document.title = c.title; document.getElementById('title').textContent = c.title;
   var boards = c.order.map(function (k) { return Object.assign({ file: k }, c.boards[k]); });
-  document.getElementById('count').textContent = boards.length + ' 个画板 · 点画板名称单独打开';
   var maxW = Math.max.apply(null, boards.map(function (b) { return b.w; }));
   zoom.value = maxW > 800 ? '0.4' : '0.6';
   var notes = Object.values(c.notes || {});
@@ -51,9 +67,14 @@ figcaption small{color:var(--mu)}
   boards.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }).forEach(function (b) { groupOf(b.y).boards.push(b); });
   stickies.forEach(function (n) { groupOf(n.y).notes.push(n); });
   function render() {
-    var s = +zoom.value; main.innerHTML = '';
+    var s = +zoom.value, includeArchived = showArchived.checked;
+    var visibleCount = boards.filter(function (b) { return includeArchived || !ARCHIVED[b.file]; }).length;
+    var archivedCount = boards.length - boards.filter(function (b) { return !ARCHIVED[b.file]; }).length;
+    document.getElementById('count').textContent = visibleCount + ' 个有效画板' + (includeArchived ? '（含 ' + archivedCount + ' 个已替代/历史对比）' : ' · 已隐藏 ' + archivedCount + ' 个已替代/历史对比画板') + ' · 点画板名称单独打开';
+    main.innerHTML = '';
     groups.forEach(function (g) {
-      if (!g.boards.length && !g.notes.length) return;
+      var list = g.boards.filter(function (b) { return includeArchived || !ARCHIVED[b.file]; });
+      if (!list.length) return;
       var sec = document.createElement('section'), h = document.createElement('h2');
       h.textContent = g.t.text; sec.appendChild(h);
       if (g.notes.length) {
@@ -62,20 +83,21 @@ figcaption small{color:var(--mu)}
         sec.appendChild(ns);
       }
       var row = document.createElement('div'); row.className = 'row';
-      g.boards.forEach(function (b) {
+      list.forEach(function (b) {
         var f = document.createElement('figure'), fr = document.createElement('div'), ifr = document.createElement('iframe');
         fr.className = 'frame'; fr.style.width = b.w * s + 'px'; fr.style.height = b.h * s + 'px';
         ifr.src = b.file; ifr.loading = 'lazy'; ifr.title = b.title || b.file;
         ifr.width = b.w; ifr.height = b.h; ifr.style.transform = 'scale(' + s + ')';
         fr.appendChild(ifr); f.appendChild(fr);
         var cap = document.createElement('figcaption'), a = document.createElement('a'), sm = document.createElement('small');
-        a.href = b.file; a.target = '_blank'; a.textContent = b.title || b.file; sm.textContent = b.w + '×' + b.h;
+        a.href = b.file; a.target = '_blank'; a.textContent = b.title || b.file;
+        sm.textContent = b.w + '×' + b.h + (ARCHIVED[b.file] ? ' · ' + ARCHIVED[b.file] : '');
         cap.appendChild(a); cap.appendChild(sm); f.appendChild(cap); row.appendChild(f);
       });
       sec.appendChild(row); main.appendChild(sec);
     });
   }
-  zoom.onchange = render; render();
+  zoom.onchange = render; showArchived.onchange = render; render();
 })();
 </script>
 </body>

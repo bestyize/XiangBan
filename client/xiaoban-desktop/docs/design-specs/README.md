@@ -8,24 +8,27 @@
 | --- | --- |
 | [界面约定](ui-conventions.md) | 菜单、弹窗、卡片的尺寸与写法：一项一行、说明放提示、复用 `xb-menu`、颜色走主题变量 |
 
+## 总体导航
+
+全端统一浏览入口见[小伴设计稿总导航](../../../../docs/design-preview/index.html)（仓库根运行 `python3 docs/design-preview/serve.py --open`）。
+
 ## 整体设计稿
 
-[倒杯快乐 · 奶茶大师升级设计稿](pour-joy/README.md)：街角小店、可试玩调饮台、风味手帐和分享小票；3 道可解样题，支持倒入、撤销、提示、贴纸解锁与 PNG 导出。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，沿用此链接更新）。设计已接入正式游戏源码（36 关与双端适配），尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。
+[倒杯快乐 · 奶茶大师升级设计稿](pour-joy/README.md)：街角小店、可试玩调饮台、风味手帐和分享小票；3 道可解样题，支持倒入、撤销、提示、贴纸解锁与 PNG 导出。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，沿用此链接更新）。V2 视觉已接入正式 `water-sort` v2.1.0（45 关 + 3 教学关、双端适配）。
 
 | 文件 | 用途 |
 | --- | --- |
-| [小伴桌面 UI 升级设计稿](ui-upgrade/README.md) | 主界面、设置、超级小伴、资料库、实时对话、AI 插件接入小伴市场、输入框技能 / 专家 / 连接器，以及任务卡 / 选择卡 / 权限菜单的现状与优化对比；Claude Design 画布导出，需本地起静态服务预览 |
+| [小伴桌面 UI 升级设计稿](ui-upgrade/README.md) | 主界面、超级小伴、资料库、实时对话、AI 插件接入小伴市场与输入框技能 / 专家 / 连接器；Claude Design 画布导出（本地总览页默认展示 27 张有效画板，12 张已替代与历史对比画板可勾选展开） |
 
 ## 超级小伴
 
 | 文件 | 用途 |
 | --- | --- |
-| [超级小伴设计规范](super-assistant.md) | 小球 / 胶囊 / 卡片三种形态、截图工具的交互约定与代码位置 |
+| [超级小伴设计规范](super-assistant.md) | 小球 / 胶囊 / 卡片三种形态、截图工具的交互约定与代码位置（视觉以 `ui-upgrade/WB-Assistant-*.dc.html` 为准） |
 | [语音引擎方案](voice-engine.md) | 级联与全双工两条语音路线、模块结构、云端能力经小伴 AI 网关、分期计划 |
-| [对话框与停止按钮设计稿](prototypes/assistant-conversation.html) | 月白 / 夜银配色、彩虹球、可打断回复的最终视觉参考 |
-| [截图工具 HTML 设计稿](prototypes/assistant-capture-overlay.html) | 压暗蒙层、框选与调整、标注工具栏、完成后回填演示 |
+| [截图工具 HTML 设计稿](prototypes/assistant-capture-overlay.html) | 压暗蒙层、框选与调整、标注工具栏、完成后回填演示（已合入 `src/capture/`） |
 
-以上 HTML 均自包含，可下载或在本地直接用浏览器打开，无需安装依赖、启动开发服务或授权屏幕录制。稿中的桌面与模型回答为模拟内容。截图的最终交互以截图工具稿为准。
+以上 HTML 自包含，可下载或在本地直接用浏览器打开，无需安装依赖、启动开发服务或授权屏幕录制。稿中的桌面与模型回答为模拟内容。截图的最终交互以截图工具稿为准。
 
 ## 聊天
 
@@ -50,9 +53,7 @@
 
 ## 其他模块
 
-[社区讨论卡片](../../../xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 是社区桌面浏览与手机 App 共享的设计稿。单列列表，每张卡片显示单行标题和一行底部信息。[本机在线预览](http://127.0.0.1:1421/prototypes/discussion-cards.html)。
-
-模型配置专项预览：[小伴 AI · 多模型配置](prototypes/ai-model-settings.html)。默认展示 macOS 白与浅灰轻毛玻璃视觉提案：原生窗口轮廓、统一白色内容面、轻薄标题栏、单页额度概览与模型布局、无逐行分隔线的紧凑列表、灰阶选中态、无边框输入框、按钮与品牌色确认操作；取消搜索框和页签切换，上方紧凑展示账户、额度明细与兑换，在“兑换”右侧提供“获取额度”，下方提供模型滚动浏览、键盘选择、确认与取消、4 / 24 / 80 个演示模型、明暗及窄窗口。可切换“现行界面”对照实际组件，或查看已移除重复“使用模式”模块的设置概览。在桌面项目运行 `npm run dev`，打开[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，沿用原链接。提案源码在 [AiModelSettingsMacPreview.vue](prototypes/AiModelSettingsMacPreview.vue)，作为设计参考；正式独立窗口已接入同款布局与自绘窗口控件，不保留系统顶部标题栏；左右分栏窗口将控件收在左栏顶部。此稿需要 Vite 编译组件，不支持直接双击或纯静态服务；不调用真实账户、兑换或模型服务，不修改既有在线画布。
+模型配置与设置专项预览：[小伴 AI · 多模型配置与设置](prototypes/ai-model-settings.html)。直接挂载桌面独立窗口组件（360px 小伴 AI 单页额度与逐模型 `hi` 检测、第三方服务商分栏配置与完整设置页，左栏顶部自绘窗口控件、无系统顶部标题栏；已移除淘汰的初版提案）。在桌面项目运行 `npm run dev`，打开[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)。此稿需要 Vite 编译组件，不支持纯静态直开，所有账户、兑换与模型检测均为本地模拟。
 
 | 规范 | 范围 |
 | --- | --- |
@@ -95,4 +96,4 @@
 
 特效页优化设计稿（待确认）：[设计稿源码](prototypes/effects-library.html)，保留三列特效库与右侧参数面板；采样代表性静帧、悬停播放，区分查看与启用，顶部关闭特效，参数在预览中调整后手动应用。支持明暗、窄窗口与模拟启停；所有交互仅修改页面内演示状态，不修改真实桌面。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/effects-library.html)。正式页面未改动。
 
-组件与伙伴卡片设计稿（待确认）：[源码](prototypes/decor-library.html)，组件默认四列，放大真实组件预览，保留添加层级选择；伙伴采用无外框卡片、轻量实例数量、固定位置的管理/添加操作，主题导出收进更多菜单。支持页签、明暗、窄窗口、模拟添加与实例管理，均不改变真实桌面。[组件预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=widgets) / [伙伴预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=pets)。正式页面未修改。
+组件与伙伴卡片设计稿（已合入 `WidgetsPage.vue` / `CompanionPage.vue`）：[源码](prototypes/decor-library.html)，组件默认四列，放大真实组件预览，保留添加层级选择；伙伴采用无外框卡片、轻量实例数量、固定位置的管理/添加操作，主题导出收进更多菜单。支持页签、明暗、窄窗口、模拟添加与实例管理，均不改变真实桌面。[组件预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=widgets) / [伙伴预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=pets)。

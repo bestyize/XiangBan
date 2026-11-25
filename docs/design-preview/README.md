@@ -2,78 +2,84 @@
 
 状态：设计参考，静态文件用于讨论外观交互，不是客户端运行入口，不参与生产 Docker 构建。
 
-实现设计时修改对应 client 工程并验证；不要直接用预览覆盖已有应用、鉴权或平台接入逻辑。
+实现设计时修改对应 client / services 工程并验证；不要直接用预览覆盖已有应用、鉴权或平台接入逻辑。
 
-## 小伴桌面官网（wallpaper.xiangban.xyz）
+## 总体设计稿导航网页（推荐入口）
 
-[功能页 & 下载页 UI 重设计稿（PC + 移动 H5）](../../services/server-xiaoban/docs/design-specs/prototypes/features-download-redesign.html) 去除原浅绿色系，默认采用极简暖白 · 墨黑主题（顶部支持一键切换暖纸 · 珊瑚红 / 晴白 · 冰川蓝），同步最新「双星相伴 · 日落珊瑚」AppIcon、小伴桌面 v3.1.8 实时渲染截图（新建任务 / 壁纸 / 14 种特效 / 桌面伙伴 / 精选应用广场）与小伴手机 App 最新三联实机画廊（连续对话 / 实时语音通话 / 作品交付卡）；重设计 `/features` 与 `/download`（消除双大标题重复、桌面/手机联动推荐主卡、实体下载按钮、更新日志弹窗、SHA-256 复制与加载/异常态），附新旧痛点对照（仓库根运行 `python3 -m http.server 1452 --bind 127.0.0.1 --directory services/server-xiaoban`；详见[官网设计索引](../../services/server-xiaoban/docs/design-specs/README.md)）。[功能页 PC](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=features&device=desktop) · [下载页 PC](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=download&device=desktop) · [移动 H5](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=download&device=mobile) · [新旧对照](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=compare)
+[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 30 份有效交互设计稿（已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已合入功能的旧版老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
 
-## 超级小伴社区网页版
+在仓库根目录一键启动统一预览服务（自动映射桌面 UI 升级画布的 `/_blob/` 图片资源）：
 
-[详情页分享面板重设计稿（PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) 覆盖社区帖子、创意作品、开源精选与 AI 日报，分享面板纯黑白灰中性配色、仅分享图内保留品牌主题色：手机 H5 1:1 对齐手机 App（单行预览条 + 单行可横滑图标轨 + 沉浸式磨砂分享卡片）；PC 端采用 716px 居中双栏弹窗，左栏所见即所得卡片预览（纯白 / 暖纸笺 / 墨夜 + 摘录/二维码开关），右栏集中提供复制链接、复制图片直贴微信/飞书、保存 PNG、复制推荐语/全文、问问小伴与主态内联删除确认（与个人中心共用 1450 端口）。[PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-detail-share.html) · [PC 端](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=desktop) · [手机 H5](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=mobile)
+```sh
+python3 docs/design-preview/serve.py --open
+```
 
-[个人中心四页重设计稿（我的 / 个人主页 / 我的作品 / 通知 · PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/web-profile-suite.html) 对齐手机 App 方案 1 视觉规范与 `community-redesign` PC 端左导轨壳层，支持 PC + H5 同屏预览四页交互、本人/他人主页视角、内容包与方案筛选（含草稿虚线轻描边、全状态删除与 PC/H5 居中二次确认弹窗区分下架与永久删除、精修空态）、未登录/空态、深浅色与 6 套主题色（仓库根运行 `python3 -m http.server 1450 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs`）。[PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-profile-suite.html) · [PC 端](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=desktop) · [手机 H5](http://127.0.0.1:1450/prototypes/web-profile-suite.html?device=mobile)
+访问 [http://127.0.0.1:1455/](http://127.0.0.1:1455/) 即可浏览全部设计稿。若需预览 4 份依赖桌面真实 Vue/TS 组件的 Vite 设计稿（`ai-model-settings.html`、`decor-library.html`、`game-library.html`、`effects-library.html`），另开终端运行：
 
-[社区全站 UI 重设计稿（活力社区风 · PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) 采用现代活力视觉社区风，覆盖 PC 端网页（左导轨 + 精简顶栏）与移动端 H5（390px 交互样机，右上角纯图标搜索与提醒不带背景，创意页卡片统一 `3:2` 封面），包含创意、资讯、精选、排行榜、导航、讨论、资源及作品详情评论，详情页核心体验/访问/下载入口提升为品牌实心胶囊主按钮（PC 标题同行居右、H5 标题下通栏首屏可见），支持日夜切换与 6 套客户端主题色（仓库根运行 `python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs/prototypes/community-redesign`）。[PC + H5 同屏预览](http://127.0.0.1:1449/) · [PC 端网页](http://127.0.0.1:1449/?device=desktop) · [移动端 H5](http://127.0.0.1:1449/?device=mobile) · [作品详情页](http://127.0.0.1:1449/?detail=work:whale-girl)
+```sh
+npm --prefix client/xiaoban-desktop run dev
+```
 
-[讨论卡片设计稿](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/discussion-cards.html) 展示双端单列布局与带图定稿（方案 A 左文右图缩略图，无多图角标，底栏单行不换行并在窄屏自动隐藏标签；可切换方案 B 下方多图条与现行纯文字对照），混排「羊毛」带图帖与纯文字讨论帖，支持明暗切换。[桌面预览](http://127.0.0.1:1421/prototypes/discussion-cards.html) · [移动预览](http://127.0.0.1:1421/prototypes/discussion-cards.html?view=mobile)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
+---
 
-[发帖页设计稿（PC + 移动 H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) 采用写作优先无框结构：PC 820px 居中弹窗提供级联板块选择、编辑/预览切换、单作品入口（V2 ZIP / HTML·HTM 自动转 V2 容器 + 关联创作）、内联附件积分与上拉权限设置；H5 窄屏采用 16px 防缩放底部抽屉，支持深浅色与 6 套主题色。[网页版预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web)（与手机共用 1421 端口）。
+## 一、小伴手机 App（手机版）
 
-[更换头像设计稿（Android + 网页 PC / H5）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/avatar-editor.html) 只画更换头像弹窗：手机 App 与网页窄屏共用底部选图弹层和 390 方形裁剪页，网页 PC 用 820 居中弹窗并排预览四种尺寸；可模拟保存失败与重试，失败时旧头像不变、裁好的图保留。[本机预览](http://127.0.0.1:1421/prototypes/avatar-editor.html)（与手机共用 1421 端口）。
+完整说明见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。
 
-## 小伴桌面
+| 设计稿 | 模块 | 状态 | 内容 |
+| --- | --- | --- | --- |
+| [实时语音通话页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/voice-call-redesign.html) | 核心 AI 与对话 | 已合入 | 同步「双星相伴 · 日落珊瑚」AppIcon，88dp 同心呼吸光球（回答态上收至 64dp 释放 224dp 渐隐歌词区），思考/聆听/回答三态与六套主题色 |
+| [小伴 AI 聊天窗口与全卡片体系](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-chat-ui.html) | 核心 AI 与对话 | 已合入 | 通栏流式排版、无底星标、思考/完成/过程三合一摘要卡，统一 16px 白底细框卡片语法覆盖交付/提醒/生图/代码块/文件变更与贴底审批/提问/方案确认卡 |
+| [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 核心 AI 与对话 | 已合入 | 个人 Agent 连续主线 + 并行任务三屏定稿（默认态、键盘态、个人 Agent 配置页），极简顶栏与分离悬浮胶囊输入框 |
+| [「我的」页与个人主页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mine-redesign.html) | 个人与账号 | 已合入 | 「我的」页方案 1 通栏精修与个人主页（本人 / 他人视角）三屏联动，三宫格快捷入口与四列数据条 |
+| [我的作品 / 通知](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mine-subpages-redesign.html) | 个人与账号 | 已合入 | 统一收口本机草稿与社区已发布（草稿虚线轻描边、全状态删除二次确认区分下架与永久删除）；通知顶栏右上角收口「全部已读」 |
+| [模型配置全链路](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/model-config-redesign.html) | 设置与模型 | 已合入 | 主页、小伴 AI 官方配置、添加第三方服务、第三方服务商配置与对话模型+思考等级五屏重设计，贴底思考等级 BottomSheet |
+| [详情页分享面板](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/detail-share-sheet.html) | 社区与互动 | 已合入 | 全站详情页统一分享面板：单行预览条 + 可横滑图标轨（主态末尾删除单次内联确认）+ 沉浸式磨砂分享卡片舞台 |
+| [分享回流弹窗](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/share-link-landing.html) | 社区与互动 | 已合入 | 外部分享链接拉起 App 后的居中预览确认卡，覆盖有封面/无封面、骨架屏加载、电脑端内容琥珀提示及已下架/网络失败态 |
+| [统一弹层](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-dialogs.html) | 系统与弹层 | 已合入 | 八个手机高频场景统一 24px 圆角居中卡片弹层（评论删除、附件购买、求助关闭、作品投稿、屏蔽、举报、工具环境移除、App 更新） |
+| [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 社区与互动 | 已合入 | 评论列表、吸底入口与键盘/表情/相册三态输入面板，支持单字/单表情发布、回复与图片预览 |
+| [发帖页（手机 + 网页双端）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) | 社区与互动 | 已合入 | 写作优先无框结构：手机端三态 + 网页 PC 820px 级联弹窗与 H5 16px 抽屉，每帖限 1 个可运行作品（V2 ZIP / HTML 自动转 V2 / 关联创作） |
+| [更换头像（手机 + 网页双端）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/avatar-editor.html) | 个人与账号 | 已合入 | 手机 App 与网页窄屏共用底部选图弹层 + 390 方形裁剪页；网页 PC 采用 820px 居中弹窗并排预览 96/48/32/24 四尺寸 |
 
-[倒杯快乐 · 奶茶大师升级设计稿](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md)：小店、可试玩调饮、风味手帐、通关分享小票；三道固定样题、灵感提示、可保存 PNG 与同题链接。[在线预览](https://pour-joy-design.bestyize.chatgpt.site)（私有，后续原址更新）。源文件已入仓库目录，正式游戏源码已升级为 36 关双端版，尚未重新打包安装。 V2：精简说明文案、高饱和液体、玻璃高光与立体彩色按钮，沿用原预览。
+---
 
-| 设计稿 | 内容 |
-| --- | --- |
-| [对话资产](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.html) | 右上角单图标入口，包含设计稿、生成图片、交付文件 / 文件夹；轻量浮层与常驻侧栏两版，可搜索、预览图片、展开目录、定位消息与导入资产。支持明暗、主题色、空状态和文件失效预览，稿中系统操作均为模拟。正式聊天页已接入轻量浮层、固定侧栏与本机文件 / 文件夹 / 设计源文件导入，普通导入保留原件；尚未重新打包。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)，需在桌面项目运行 `npm run dev`；[可编辑源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.fragment.html) |
-| [小伴 AI · 多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | macOS 白与浅灰轻毛玻璃视觉提案：统一白色内容面、轻量额度概览、细条兑换区、无搜索框的灰阶列表与无边框兑换码输入框、无边框按钮与品牌色确认操作，“兑换”右侧新增可配置链接的“获取额度”入口，每行模型支持发送 `hi` 的检测交互演示；可对照现行界面，支持 4 / 24 / 80 个模型、明暗与窄窗口。已应用到产品独立窗口，支持真实模型检测与后台下发额度链接；同一预览加入第三方模型配置、完整设置页及左栏顶部自绘窗口控件，移除系统顶部标题栏；Windows 原生效果尚未实机验收。[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)沿用原链接，需在桌面项目运行 `npm run dev`，不连接真实账户或模型服务 |
-| [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 39 个画板：主界面、设置、超级小伴、资料库、实时对话、小伴市场接入、输入框与各类状态卡片；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
-| [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 标题、正文与工作区检索；限高滚动结果；项目和项目内会话默认各展示 6 项；点击结果自动展开并定位会话 |
-| [长期目标弹窗](../../client/xiaoban-desktop/docs/design-specs/prototypes/long-term-goal.html) | 新建、执行中与待验收状态；折叠设置；浅色、深色及窄屏预览。遮罩仅用于演示内容，桌面端窗口形式按独立窗口规范 |
+## 二、网页版（小伴官网 & 超级小伴社区）
 
-## 小伴手机 App
+完整说明见[官网设计索引](../../services/server-xiaoban/docs/design-specs/README.md)与[社区设计索引](../../services/server-forum/docs/design-specs/README.md)。上方「发帖页」「更换头像」亦覆盖社区网页端。
 
-| 设计稿 | 内容 |
-| --- | --- |
-| [实时语音通话页重设计](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/voice-call-redesign.html) | 手机实时语音通话页重设计稿（已合入 Compose）：同步最新「双星相伴 · 日落珊瑚」AppIcon（日落珊瑚釉面渐变 + 暖桃金内辉 + 纯白双星标），移除背景错位同心圆与杂乱贴片，光晕与 88dp 立体主球严格同心；思考态加入 3.6s 大小脉动 + 大小双星无缝 90° 反向缓转 + 呼吸流光弧环，聆听态加入 4.2s 潮汐慢呼吸 + 错拍扩散涟漪与星芒闪烁；回答态球体轻盈上收至 64dp 释放 224dp 带上下渐隐遮罩的歌词字幕区；规范顶栏对称与底栏三键语义，支持全三态总览、新旧并排对照（可开关痛点标注）、390/360px 与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/voice-call-redesign.html) |
-| [小伴 AI 聊天窗口视觉优化](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-chat-ui.html) | 手机聊天窗口与全卡片体系重设计稿（已合入 Compose）：取消左侧常驻头像沟采用通栏流式排版与无底星标；「思考 / 任务完成 / 执行过程」三合一为可展开摘要卡（微信绿圆白勾 / 红圆白叉状态点）；统一白底细框卡片语法，覆盖作品交付、本机提醒、生图结果、代码块、文件变更与检查点撤销、异常/额度提示，以及贴底悬浮的普通/高危审批、小伴提问、方案确认与中断续作卡。含全部五屏与现行版对照，支持 390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/ai-chat-ui.html) |
-| [统一弹层](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-dialogs.html) | 参照分享回流弹窗重设计的八个手机场景，含评论删除、附件购买、求助关闭、作品投稿、屏蔽、举报、工具环境移除和 App 更新。支持浅色、深色和模拟操作。[八场景总览](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-dialog-cards-preview.png) · [本机在线预览](http://127.0.0.1:1432/prototypes/mobile-dialogs.html) · [上一版](http://127.0.0.1:1432/prototypes/mobile-dialogs.html?view=previous)。启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。 |
-| [收盘别问](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/shoupan-biewen.html) | 390 × 800 手机 H5 单页。100 个真实创业板交易日与逐日股友台词，包含可横滑 K 线、收手结算、模拟盈亏和带测评二维码的 PNG 海报。[本机在线预览](http://127.0.0.1:1426/prototypes/shoupan-biewen.html)，启动方式见[手机设计索引](../../client/xiaoban-multiplatform/docs/design-specs/README.md)。 |
-| [小游戏与小程序 暂停 / 存档 / 翻页退出](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/game-pause-save-exit.html) | 三类协议 2 作品（无大厅直开《方块爆破》 / 有大厅多层《水墨剑客》 / 多页翻页小程序）的暂停、实时存档恢复、页面栈翻页与退出统一设计稿（待确认）：右上角改用 32px 自适应微底板胶囊解决花哨背景隐身与双按钮打架；《方块爆破》开局直接恢复残局棋盘并配顶部「新开一局」轻胶囊，支持「暂停 + 宿主」单入口融合面板与左暂停/右宿主分离双方案对比；《水墨剑客》大厅主按钮直达上次停留卷幅，局内暂停补齐「重开本幅」与「返回画卷选关」；多页小程序统一根页无返回、子页左上角 `‹` 与侧滑逐层回退，宿主菜单「重新开始」更名「重新加载」。支持模拟手机侧滑返回、现行版对照、390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/game-pause-save-exit.html) |
-| [模型配置全链路](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/model-config-redesign.html) | 模型配置主页、小伴 AI 官方配置、添加第三方服务、第三方服务商配置与对话模型+思考等级五屏重设计稿（待确认）：01 主页已承接零浅色底块定稿（仅小伴 AI 保留实心主题色底配白色星标、兑换点数用无底色主题色文字链接、无底 6px 绿点标示使用中、其余黑白灰层级）；02 官方模型补齐思考等级胶囊与贴底弹层；04 协议改为独立选择行并自动联动预置 API 地址，高级设置新增「支持的思考等级」底部多选弹层（默认 低/中/高/极高/最高）；05 模型名严格左对齐，思考等级统一贴底 BottomSheet。支持 390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/model-config-redesign.html) |
-| [详情页分享面板](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/detail-share-sheet.html) | 全站详情页（帖子 / 作品 / 开源 / 日报）统一分享面板重设计稿（待确认）：删掉大段重复正文、堆砌大胶囊与「举报」，改用单行预览条 + 单行可横滑图标轨（系统分享、复制链接、分享卡片、问问小伴、发到电脑/复制仓库、浏览器打开，主态末尾放「删除」并支持单次内联确认）+ 通栏「取消」；「分享卡片」采用沉浸式磨砂舞台，卡片下悬浮纸色圆点与摘录/二维码开关，底部改为通透三图标操作栏（保存图片 / 发送给好友 / 复制图片）。支持现行对照、异常态、390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/detail-share-sheet.html) |
-| [分享回流弹窗](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/share-link-landing.html) | 外部分享链接拉起 App 后的「打开社区内容」确认层重设计稿（待确认）：去掉 Material 默认淡紫对话框与空洞标题，改为内容主角的预览卡（封面 + 类型标签 + 粗体标题 + 两行摘要，无封面时用类型图标块横排卡）居中展示，通栏主题色「查看详情」+ 灰色「暂不查看」；覆盖读取中骨架屏、电脑端内容琥珀提示、已下架 / 网络失败空态。采用居中卡片，支持现行版对照、390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/share-link-landing.html) |
-| [我的作品 / 通知](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mine-subpages-redesign.html) | 「我的」二级页通栏精修稿（待确认，原模型配置主页已并入上方模型配置全链路稿）：我的作品统一收口「本机草稿 + 社区已发布」（全部/草稿/已上线/审核中/已下架，草稿虚线轻描边与专属试玩/继续修改/发布弹层），全状态支持删除与 24px 居中二次确认并区分下架与永久删除，去掉顶部刷新条与卡片按钮堆砌；通知移除 Tab 下双大灰按钮与重复刷新，将「全部已读」收进顶栏右上角并补齐头像与未读红点。支持弹层交互、空态切换、390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/mine-subpages-redesign.html) |
-| [「我的」页与个人主页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mine-redesign.html) | 手机「我的」页定稿（方案 1 通栏精修）与个人主页（本人视角 + 社区他人视角）三屏联动稿（待确认）：「我的」页移除「屏蔽的用户」、重复的「创作」与「关注与粉丝」及外露积分，「模型与点数」改名「模型配置」，右上角换为齿轮图标，快捷三宫格为「我的收藏 / 我的作品 / 通知」，下方仅留 2 组 4 项线性图标列表；个人主页统一通栏风格，配 68px 头像与 ID、四列等宽数据条（帖子/回复/关注/粉丝）、图文混排帖子卡、带头像的关注/粉丝列表，他人页「屏蔽」收进右上角「···」菜单。支持场景、未登录、空态、已屏蔽、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/mine-redesign.html) |
-| [发帖页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) | 手机端发帖页重设计（01 初始写作全交互 + 02 富内容完整态 + 03 选板块/作品/投票/封面/键盘五态）及网页版对照：紧凑单行板块与封面入口、正文下内联话题胶囊、每帖限 1 个可运行作品（V2 ZIP / `.html`·`.htm` 转 V2 / 关联创作）与普通附件区分、固定 48px 单行底栏、高对比投票芯片与紧耦合文字封面编辑。支持 390/360px、深浅色与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=mobile) |
-| [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 个人 Agent 连续主线三屏定稿（01 默认浏览态 + 02 键盘弹出态 + 03 点右上角「···」进入的个人 Agent 配置页）：极简顶栏 + 分离悬浮胶囊输入框 + 通栏白底配置列表，支持三态、390/360px、深浅色与六套主题色切换。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
-| [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 键盘、表情与相册三种状态。点笑脸打开表情面板，选图后可预览和移除。支持单字或单表情发布、回复和深浅色预览，图稿使用小伴示例壁纸。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
-| [MBTI · 向内看](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mbti-native.html) | 原生 iOS 质感的首页、答题、结果交互提案（第四版：珊瑚橙红＋暖白＋墨灰、暖色首页插画、紧凑间距、加大正文）；支持三页总览、单页预览、6 题演示、六章报告、16 型切换、深浅色和分享卡。结果与历史记录为示例，保存分享为模拟；源文件与素材在仓库内，已应用到内置 MBTI 1.3.0（正式版使用真实作答与存档）。[本机在线预览](http://127.0.0.1:1424/prototypes/mbti-native.html)，启动方法见手机设计索引，后续沿用同一地址。 |
-| [轻启](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/quick-launch.html) | Android 桌面快捷方式设计稿：收录中国区 App Store 免费榜前 100 的应用及常用应用，使用 256 × 256 WebP 图标；搜索筛选、Scheme 测试和添加到桌面均为模拟，候选 Scheme 待真机验证。[本机在线预览](http://127.0.0.1:1421/prototypes/quick-launch.html)。 |
-| [遥控器](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/universal-remote.html) | 电视与空调小程序的可点按设计稿。包含我的遥控器、添加与试码、电视圆形四点方向键、双段音量与独立返回键，以及空调大字温度、风速和风向状态与四行全宽按键。品牌选择列出 19 个电视品牌和 21 个空调品牌，按 2026 年 9 月中国市场的公开份额排序，电视按整机出货、空调按全渠道零售额，其余单列。首页「添加」与标题同行靠右，使用 28px 高的白底、黑字和轻阴影。已保存的遥控器可点卡片右上角的铅笔修改备注名。子页标题为 16px，与两侧的返回箭头、竖三点同高。使用海湾蓝，支持深浅色及无红外演示。默认使用贴近右上角的无圆底竖三点，点击打开与 Android 宿主布局对齐的底部菜单，可切回旧版双按钮对照。[在线预览（本机）](http://127.0.0.1:1421/prototypes/universal-remote.html)，启动方法见手机设计索引。 |
-| [万磁搜](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/torrent-search.html) | 小伴协议 2 的独立工具应用设计稿：跨站搜索、来源筛选、磁力获取及失败状态；视觉参考 search.xiangban.xyz，使用示例数据和模拟交互。手机画板使用通用竖三点宿主样式。[在线预览（本机）](http://127.0.0.1:1421/prototypes/torrent-search.html)，启动方法见手机设计索引。 |
+| 设计稿 | 站点 | 状态 | 内容 |
+| --- | --- | --- | --- |
+| [小伴桌面官网 · 功能页 & 下载页](../../services/server-xiaoban/docs/design-specs/prototypes/features-download-redesign.html) | wallpaper.xiangban.xyz | 已合入 | v2.3 重设计：极简暖白 · 墨黑与日落珊瑚点缀，首屏 8 场景双端实机展台、电脑与手机核心能力 Bento、当前设备推荐下载卡与更新日志弹窗 |
+| [超级小伴社区全站 UI（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 部分合入 | 现代活力社区风完整交互稿，覆盖 PC 左导轨与 390px 移动 H5，包含首页五栏目、讨论、资源、应用、小伴 AI、个人中心四页（我的/个人主页/我的作品/通知）及作品详情与 PC 双栏 / H5 分享面板（我的作品草稿与居中删除确认待补齐） |
 
-小伴桌面的 Claude Design 画布由多个 `*.dc.html` 画板组成，需在画布目录运行 `python3 -m http.server` 后打开 `index.html` 总览；其余 HTML 设计稿可直接用浏览器打开，展示数据为模拟内容。设计稿源文件保留在对应项目的设计目录，避免多份副本产生差异。
+---
 
-完整设计规范与其他设计稿见[小伴桌面设计资源索引](../../client/xiaoban-desktop/docs/design-specs/README.md)。
+## 三、小伴桌面（桌面版）
 
-设置页重设计（2026-10-31）：三组单色导航、底部账号、白色内容面与浅灰设置组，窗口控件固定在左栏顶部；深色模式增强正文、辅助文字和控件对比度。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，默认展示新版设置，支持所有分类与明暗切换；前端代码已更新，本轮未重新打包原生应用。
+完整规范见[小伴桌面设计资源索引](../../client/xiaoban-desktop/docs/design-specs/README.md)。
 
-设置侧栏细化：浅色背景跟随主页面的 `--ui-tint` 次要主题色；一级菜单使用无底色线性图标。账号区仅展示状态，不跳转、不响应点击；无头像时显示主题色 Sparkles 图标，替代猫脸占位图。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)。
+| 设计稿 | 模块 | 状态 | 内容 |
+| --- | --- | --- | --- |
+| [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 整体界面画布 | 已合入 | Claude Design 39 画板导出，总览页默认展示 27 张有效画板（已替代与历史对比画板可勾选展开）；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
+| [设置页 & 小伴 AI / 第三方多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | 设置与模型 | 已合入 | 直接挂载真实桌面独立窗口组件（360px 小伴 AI 额度与逐模型 `hi` 检测、第三方服务商配置、完整设置页）；需运行桌面 Vite `npm run dev` |
+| [对话资产](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.html) | 核心 AI 与对话 | 已合入 | 右上角单图标收纳设计稿、生成图片、交付文件与文件夹，支持轻量浮层与固定侧栏切换；[可编辑源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.fragment.html) |
+| [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 核心 AI 与对话 | 已合入 | 标题、正文与工作区检索，项目与项目内会话默认各折叠展示 6 项，点击结果自动展开定位 |
+| [长期目标弹窗](../../client/xiaoban-desktop/docs/design-specs/prototypes/long-term-goal.html) | 核心 AI 与对话 | 已合入 | 聊天页长期目标的新建、执行中与待验收三态及折叠设置预览 |
+| [超级小伴 · 区域截图工具](../../client/xiaoban-desktop/docs/design-specs/prototypes/assistant-capture-overlay.html) | 超级小伴 | 已合入 | 压暗蒙层、框选微调、标注工具栏与回填对话交互基准 |
+| [组件与伙伴卡片](../../client/xiaoban-desktop/docs/design-specs/prototypes/decor-library.html) | 装扮与桌面空间 | 已合入 | 组件默认四列放大真实预览，伙伴无外框卡片与轻量实例计数；需运行桌面 Vite `npm run dev` |
+| [游戏库卡片重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/game-library.html) | 装扮与桌面空间 | 待合入 | 3–4 列统一方形封面无外框卡片、悬停展开「开始游戏」；正式游戏页尚未改造；需运行桌面 Vite `npm run dev` |
+| [特效页优化设计稿](../../client/xiaoban-desktop/docs/design-specs/prototypes/effects-library.html) | 装扮与桌面空间 | 待合入 | 三列特效库与右侧参数面板，静帧采样、悬停播放、预览调参后手动应用；正式特效页尚未改造；需运行桌面 Vite `npm run dev` |
 
-模型配置 UI 升级：协议菜单保持单行，模型展开设置采用平整布局，蓝色选中态仅作用于标题行；第三方配置采用主题色连接侧栏、25px 标题、浅灰模型列表与主题色默认行；小伴 AI 统一标题、额度明细、兑换条和模型选择样式，保持同页布局及逐模型检测。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，切换「小伴 AI · 新版 / 第三方模型 · 新版」查看，初版提案另保留为参考；代码已更新，尚未重新打包。
+---
 
-模型页精修：统一紧凑标题、添加入口和展开设置对齐，移除“思考摘要”控件；沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)中的「第三方模型 · 新版」。
+## 四、小游戏与小程序（协议 2 与应用广场）
 
-参考风格调整与小伴 AI 结构重排（2026-10-31）：配置页统一为轻主题色画布与白色分组卡片，设置页收小分类标题并移除侧栏重复标题。小伴 AI 将账户身份放在页头，余额、额度明细、兑换与获取额度合并为一张卡片，模型另设独立滚动列表，确认操作固定在底部。保留无描边控件、单页布局、模型检测与键盘选择；深色使用独立高对比表面。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，默认查看「小伴 AI · 新版」。本轮更新了实际组件代码，通过类型检查及 63 项相关测试，核对了 360px 窄窗口、明暗与长列表；尚未重新打包原生应用。
-
-小伴 AI 配置窗口默认宽度与最小宽度调整为 360px，高度仍为 620px；窗口尺寸单独记忆，避免继承第三方配置页的宽度。[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)同步默认显示 360px，仍可手动调整尺寸。
-
-游戏库卡片重设计（待确认）：[设计稿源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/game-library.html)，最少三列（宽窗口四列）、统一方形封面、无外框卡片、单行标题、低调横竖屏与存档图标，悬停/键盘聚焦展开“开始游戏”。支持明暗、主题色、窄窗口与自定义游戏示意，全部操作仅本地提示，不启动或删除真实游戏。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/game-library.html)。正式游戏页尚未修改。
-
-特效页优化设计稿（待确认）：[设计稿源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/effects-library.html)，保留三列特效库与右侧参数面板；采样代表性静帧、悬停播放，区分查看与启用，顶部关闭特效，参数在预览中调整后手动应用。支持明暗、窄窗口与模拟启停；所有交互仅修改页面内演示状态，不修改真实桌面。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/effects-library.html)。正式页面未改动。
-
-组件与伙伴卡片设计稿（待确认）：[源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/decor-library.html)，组件默认四列，放大真实组件预览，保留添加层级选择；伙伴采用无外框卡片、轻量实例数量、固定位置的管理/添加操作，主题导出收进更多菜单。支持页签、明暗、窄窗口、模拟添加与实例管理，均不改变真实桌面。[组件预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=widgets) / [伙伴预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=pets)。正式页面未修改。
+| 设计稿 | 模块 | 状态 | 内容 |
+| --- | --- | --- | --- |
+| [暂停 / 存档 / 翻页退出统一规范](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/game-pause-save-exit.html) | 宿主运行规范 | 已合入 | 覆盖无大厅直开《方块爆破》、有大厅多层《水墨剑客》与多页翻页小程序：32px 自适应单入口宿主胶囊、残局恢复与侧滑逐层回退 |
+| [倒杯快乐 · 奶茶大师升级 V2](../../client/xiaoban-desktop/docs/design-specs/pour-joy/README.md) | 休闲小游戏 | 已合入 | 小店、可试玩调饮台、风味手帐与通关分享小票（正式版 `water-sort` v2.1.0 已升级至 45 关 + 3 教学关）；[在线预览](https://pour-joy-design.bestyize.chatgpt.site) |
+| [MBTI · 向内看](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mbti-native.html) | 实用小程序 | 已合入 | 原生 iOS 质感第四版（珊瑚橙红 + 暖白 + 墨灰），首页、6 题缩略流程、六章报告、16 型角色与分享卡（已合入内置 MBTI 1.3.0） |
+| [轻启](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/quick-launch.html) | 实用小程序 | 已合入 | Android 桌面快捷方式工具原型，256×256 WebP 图标网格、搜索筛选与添加到桌面交互 |
+| [遥控器](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/universal-remote.html) | 实用小程序 | 已合入 | 协议 2 电视与空调红外工具，按市场份额排序的 19 电视 / 21 空调品牌搜索试码、四点方向盘、大字温控与无圆底竖三点宿主菜单 |
+| [万磁搜](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/torrent-search.html) | 实用小程序 | 已合入 | 协议 2 独立搜索工具设计稿，覆盖首屏、跨站搜索结果、来源筛选、失败态与磁力操作弹层（已合入 `wancisou` v1.0.2） |
+| [收盘别问](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/shoupan-biewen.html) | 休闲小游戏 | 概念试玩 | 390×800 竖屏 H5 单页，100 个真实创业板交易日、可横滑 K 线、提前收手结算与带二维码的 PNG 成绩海报（尚未合入内置应用包） |

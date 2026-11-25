@@ -971,7 +971,6 @@ body.studio-dark .diff-item p { color: #989ba4; }
         <div class="board-mini-seg" role="group" aria-label="面板状态">
           <button class="active" data-b1-mode="author">主态</button>
           <button data-b1-mode="visitor">客态</button>
-          <button data-b1-mode="legacy">现行对比</button>
         </div>
       </div>
       <div class="phone" id="phone-b1"></div>
@@ -1008,8 +1007,8 @@ body.studio-dark .diff-item p { color: #989ba4; }
     </section>
   </main>
 
-  <section class="diff-card" aria-label="本版调整要点">
-    <h3>本版精简与视觉精修（对照旧版与上一轮反馈）</h3>
+  <section class="diff-card" aria-label="设计要点">
+    <h3>本版设计要点与交互规范</h3>
     <div class="diff-grid">
       <div class="diff-item">
         <strong>1. 单行可横滑，轻薄无压力</strong>
@@ -1554,9 +1553,7 @@ function renderB1() {
   const isAuthor = state.b1Mode === 'author';
   let overlay = '';
   if (state.b1Layer === 'sheet') {
-    overlay = state.b1Mode === 'legacy'
-      ? renderLegacyShareSheet('b1')
-      : renderNewShareSheet('b1', ITEMS.post, { copied: state.b1Copied, canDelete: isAuthor });
+    overlay = renderNewShareSheet('b1', ITEMS.post, { copied: state.b1Copied, canDelete: isAuthor });
   } else if (state.b1Layer === 'confirmDelete') {
     overlay = renderNewShareSheet('b1', ITEMS.post, { confirmDelete: true });
   } else if (state.b1Layer === 'card') {
