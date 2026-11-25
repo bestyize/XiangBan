@@ -30,7 +30,11 @@ data class MobileGameFile(val path: String, val bytes: ByteArray) {
     override fun equals(other: Any?): Boolean = other is MobileGameFile && path == other.path && bytes.contentEquals(other.bytes)
     override fun hashCode(): Int = 31 * path.hashCode() + bytes.contentHashCode()
 }
-data class MobileGameScan(val games: List<MobileGame>, val errors: List<String>)
+data class MobileGameScan(
+    val games: List<MobileGame>,
+    val errors: List<String>,
+    val editedAtMillis: Map<String, Long> = emptyMap(),
+)
 
 object MobileGameFormat {
     const val FILES = 100
@@ -230,12 +234,18 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         if (!root.directory) return@access MobileGameScan(emptyList(), listOf("games 必须是目录"))
         val games = mutableListOf<MobileGame>()
         val errors = mutableListOf<String>()
+        val editedAtMillis = mutableMapOf<String, Long>()
         for (entry in workspace.list("games").filter { it.directory }) {
-            try { games += validateInstalled(entry.path.substringAfterLast('/'))
+            try {
+                val entries = workspace.list(entry.path, recursive = true)
+                val game = validateInstalled(entry.path.substringAfterLast('/'), entries)
+                games += game
+                entries.filterNot { it.directory }.mapNotNull { it.modifiedAtMillis }.maxOrNull()
+                    ?.let { editedAtMillis[game.id] = it }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { errors += "${entry.path}：${e.message ?: "作品校验失败"}" }
         }
-        MobileGameScan(games.sortedBy { it.name }, errors)
+        MobileGameScan(games.sortedBy { it.name }, errors, editedAtMillis)
     }
 
     suspend fun read(id: String): MobileGame = access { readInstalled(id) }
@@ -248,8 +258,8 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         return game
     }
 
-    private suspend fun contentFiles(directory: String, installed: Boolean): List<MobileGameFile> {
-        val entries = workspace.list(directory, recursive = true)
+    private suspend fun contentFiles(directory: String, installed: Boolean, listed: List<WorkspaceEntry>? = null): List<MobileGameFile> {
+        val entries = listed ?: workspace.list(directory, recursive = true)
         require(entries.size <= MobileGameFormat.FILES * 4 + 1) { "作品目录条目过多" }
         val files = entries.filterNot { it.directory || (installed && it.path == "$directory/manifest.json") }
         require(files.size in 1..MobileGameFormat.FILES && files.sumOf { it.size } <= MobileGameFormat.TOTAL_BYTES) {
@@ -265,9 +275,9 @@ class MobileGameStore(val workspace: MobileWorkspace) {
 
     suspend fun validate(id: String): MobileGame = access { validateInstalled(id) }
 
-    private suspend fun validateInstalled(id: String): MobileGame {
+    private suspend fun validateInstalled(id: String, listed: List<WorkspaceEntry>? = null): MobileGame {
         val game = readInstalled(id)
-        MobileGameFormat.files(contentFiles("games/$id", installed = true), listOf("index.html", game.icon, game.cover))
+        MobileGameFormat.files(contentFiles("games/$id", installed = true, listed = listed), listOf("index.html", game.icon, game.cover))
         return game
     }
 

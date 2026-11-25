@@ -7,6 +7,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,9 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -41,24 +47,27 @@ internal data class RefinedTab(val id: String, val label: String, val count: Lon
 
 /** 统一精修吸顶 Tab 条：通栏白底 + 底部细线 + 20dp 圆角主题色指示条。 */
 @Composable
-internal fun RefinedTabBar(tabs: List<RefinedTab>, selected: String, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
+internal fun RefinedTabBar(
+    tabs: List<RefinedTab>, selected: String, modifier: Modifier = Modifier, compact: Boolean = false, onSelect: (String) -> Unit,
+) {
     val extra = LocalExtraColors.current
     Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp).selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             tabs.forEach { tab ->
                 val active = tab.id == selected
                 Box(
-                    Modifier.height(44.dp).clickable { onSelect(tab.id) }.padding(horizontal = 12.dp),
+                    Modifier.height(if (compact) 42.dp else 44.dp).selectable(active, role = Role.Tab) { onSelect(tab.id) }
+                        .padding(horizontal = if (compact) 10.dp else 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 5.dp)) {
                         Text(
                             tab.label,
-                            style = XType.Body,
+                            style = if (compact) XType.Body.copy(fontSize = 14.sp) else XType.Body,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -73,13 +82,64 @@ internal fun RefinedTabBar(tabs: List<RefinedTab>, selected: String, modifier: M
                     if (active) {
                         Box(
                             Modifier.align(Alignment.BottomCenter).width(20.dp).height(2.5.dp)
-                                .clip(CircleShape).background(Brand),
+                                .clip(CircleShape).background(if (compact) MaterialTheme.colorScheme.onSurface else Brand),
                         )
                     }
                 }
             }
         }
         Hairline()
+    }
+}
+
+@Composable
+internal fun MineSubpageEmptyState(icon: ImageVector, title: String, description: String, actions: @Composable ColumnScope.() -> Unit = {}) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = viewportHeight)
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 88.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+        ) {
+            val shape = RoundedCornerShape(18.dp)
+            Box(
+                Modifier.padding(bottom = 6.dp).size(56.dp).background(colors.surface, shape).border(0.5.dp, extra.hairline, shape),
+                contentAlignment = Alignment.Center,
+            ) {
+                XIcon(icon, tint = extra.ink3, size = 24.dp)
+            }
+            Text(title, style = XType.Section, fontWeight = FontWeight(650), textAlign = TextAlign.Center)
+            Text(description, Modifier.widthIn(max = 248.dp), style = XType.Secondary.copy(lineHeight = 20.sp),
+                color = extra.ink3, textAlign = TextAlign.Center)
+            actions()
+        }
+    }
+}
+
+@Composable
+internal fun MineEmptyAction(label: String, onClick: () -> Unit, icon: ImageVector? = null) {
+    Row(
+        Modifier.padding(top = 6.dp).heightIn(min = 42.dp).clip(CircleShape).background(Brand)
+            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon?.let { XIcon(it, tint = Color.White, size = 16.dp) }
+        Text(label, style = XType.Body.copy(fontSize = 14.5.sp), fontWeight = FontWeight.SemiBold, color = Color.White)
+    }
+}
+
+@Composable
+internal fun MineInlineRetry(message: String, label: String, onRetry: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(message, Modifier.weight(1f), style = XType.Secondary, color = Danger)
+        RefinedBarAction(label, onRetry)
     }
 }
 
@@ -136,8 +196,9 @@ private fun SocialPager(page: Int, hasMore: Boolean, select: (Int) -> Unit) {
     }
 }
 
-private fun notificationTag(kind: String): String = when (kind) {
-    "reply", "reply_to" -> "回复"
+private fun notificationTag(note: CommunityNotification): String = when (note.kind) {
+    "reply" -> if (note.packId != null) "评论" else "回复"
+    "reply_to" -> "回复"
     "work_like" -> "点赞"
     "mention" -> "提及"
     "accepted" -> "采纳"
@@ -152,41 +213,75 @@ private fun trustLevelLabel(level: Int): String? = when {
     else -> null
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeNotificationsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
+    key(session.generation) {
+        if (session.loggedIn) {
+            NotificationsPage(env, back, open)
+        } else {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                RefinedScreenBar("通知", back) { RefinedBarAction("全部已读", {}, enabled = false) }
+                MineSubpageEmptyState(XIcons.Bell, "登录后查看通知", "帖子的回复、作品点赞与审核结果都会出现在这里") {
+                    MineEmptyAction("登录", { open(Route.Login) })
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationsPage(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     var unread by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(1) }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var retryReadIds by remember { mutableStateOf<List<Long>?>(emptyList()) }
-    var retryReadReload by remember { mutableStateOf(false) }
+    var retry by remember { mutableStateOf<(() -> Unit)?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
-    val extra = LocalExtraColors.current
+    var allUnread by remember { mutableStateOf<Int?>(null) }
+    var refreshCount by remember { mutableStateOf(0) }
 
-    if (!session.loggedIn) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenBar("通知", onBack = back)
-            RefinedEmptyState(XIcons.Bell, "登录后查看通知", "帖子的回复、作品点赞与审核结果都会出现在这里", "登录", { open(Route.Login) })
-        }
-        return
+    val loader = rememberLoader(env, "notifications-$page-$unread") { env.social.notifications(page, unread) }
+    val state by loader.state.collectAsState()
+    val loaded = (state as? Load.Ready)?.value
+    var lastPage by remember(loader) { mutableStateOf<Page<CommunityNotification>?>(null) }
+    LaunchedEffect(loaded) { if (loaded != null) lastPage = loaded }
+    val result = loaded ?: lastPage
+    val entries = result?.items.orEmpty()
+    val pageUnread = if (unread) result?.total ?: 0 else entries.count { !it.read }
+    val unreadCount = maxOf(allUnread ?: 0, pageUnread)
+    val revision by env.social.notificationRevision.collectAsState()
+    LaunchedEffect(refreshCount, revision) {
+        try { allUnread = env.forum.unreadCount() }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { /* The current page still shows its unread messages. */ }
     }
 
-    val loader = rememberLoader(env, "notifications-$page-$unread-${session.accountId}") { env.social.notifications(page, unread) }
-    val state by loader.state.collectAsState()
-    val entries = (state as? Load.Ready)?.value?.items.orEmpty()
-    val unreadIds = entries.filterNot { it.read }.map { it.id }
-
-    fun mark(ids: List<Long>?, reload: Boolean, showDone: Boolean = false) {
-        if (busy) return
-        busy = true; error = null; retryReadIds = ids; retryReadReload = reload
+    fun mark(id: Long?, next: Route? = null) {
+        if (busy || (state == Load.Loading && result != null)) return
+        busy = true
+        error = null
+        retry = { mark(id, next) }
         scope.launch {
             try {
-                env.social.markRead(ids)
-                if (reload) loader.reload()
-                if (showDone) toast = "已全部标记为已读"
+                val marked = env.social.markRead(id?.let(::listOf))
+                if (id == null) allUnread = 0
+                else allUnread = allUnread?.let { (it - marked.toInt()).coerceAtLeast(0) }
+                loader.updateReady { current ->
+                    val updated = current.items.map { if (id == null || it.id == id) it.copy(read = true) else it }
+                    if (unread) current.copy(items = updated.filterNot { it.read }, total = (current.total - marked.toInt()).coerceAtLeast(0))
+                    else current.copy(items = updated)
+                }
+                if (id == null) {
+                    toast = "已全部标记为已读"
+                    if (unread) page = 1
+                } else if (next != null) {
+                    open(next)
+                } else if (unread) {
+                    loader.reload()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -196,153 +291,128 @@ fun NativeNotificationsScreen(env: CommunityEnv, back: () -> Unit, open: (Route)
             }
         }
     }
-    LaunchedEffect(loader, unreadIds) { if (unreadIds.isNotEmpty()) mark(unreadIds, false) }
-
-    val canMarkAll = !busy && (unreadIds.isNotEmpty() || entries.isNotEmpty())
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenBar(
-                "通知",
-                onBack = back,
-                trailing = {
-                    Text(
-                        "全部已读",
-                        Modifier.clip(CircleShape)
-                            .alpha(if (canMarkAll) 1f else 0.38f)
-                            .clickable(enabled = canMarkAll) { mark(null, reload = true, showDone = true) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        style = XType.Secondary,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-            )
-            RefinedTabBar(
-                listOf(
-                    RefinedTab("all", "全部"),
-                    RefinedTab("unread", "未读", unreadIds.size.toLong().takeIf { it > 0 }),
-                ),
-                if (unread) "unread" else "all",
-            ) { unread = it == "unread"; page = 1 }
-
-            error?.let {
-                Banner(it, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), warn = true, actionText = "重试已读", onAction = { mark(retryReadIds, retryReadReload) })
+        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+            RefinedScreenBar("通知", back, divider = false) {
+                RefinedBarAction("全部已读", { mark(null) }, enabled = !busy && state != Load.Loading && unreadCount > 0)
             }
-
+            RefinedTabBar(
+                listOf(RefinedTab("all", "全部"), RefinedTab("unread", "未读", unreadCount.toLong().takeIf { it > 0 })),
+                if (unread) "unread" else "all", compact = true,
+            ) {
+                if (!busy) {
+                    unread = it == "unread"
+                    page = 1
+                    error = null
+                }
+            }
+            error?.let { MineInlineRetry(it, "重试已读") { retry?.invoke() } }
+            if (state is Load.Failed && result != null) {
+                MineInlineRetry((state as Load.Failed).message, "重试") { if (!busy) { loader.reload(); refreshCount++ } }
+            }
             PullToRefreshBox(
-                isRefreshing = state is Load.Loading && entries.isNotEmpty(),
-                onRefresh = loader::reload,
+                isRefreshing = state == Load.Loading && result != null,
+                onRefresh = { if (!busy) { loader.reload(); refreshCount++ } },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
-                LoadBox(state, loader::reload) { result ->
-                    if (result.items.isEmpty()) {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            RefinedEmptyState(
-                                icon = XIcons.Bell,
-                                title = when {
-                                    page > 1 -> "这一页没有通知"
-                                    unread -> "已全部读完"
-                                    else -> "还没有收到通知"
-                                },
-                                desc = if (unread) "所有消息都已处理，下拉可检查最新动态" else "帖子的回复、作品点赞与审核结果都会出现在这里",
-                                actionLabel = if (page > 1) "上一页" else null,
-                                onAction = if (page > 1) ({ page-- }) else null,
-                            )
-                        }
-                    } else {
-                        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp)) {
-                            itemsIndexed(result.items, key = { _, it -> it.id }) { idx, note ->
-                                val clickable = note.kind == "content_removed" || note.packId != null || note.topicId != null
-                                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-                                    if (idx > 0) Hairline(Modifier.padding(start = 68.dp))
-                                    Row(
-                                        Modifier.fillMaxWidth()
-                                            .clickable(enabled = clickable) {
-                                                if (!note.read) mark(listOf(note.id), false)
-                                                if (note.kind == "content_removed") open(Route.MyWorks)
-                                                else note.packId?.let { open(Route.Pack(it)) } ?: note.topicId?.let { open(Route.Topic(it)) }
-                                            }
-                                            .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        verticalAlignment = Alignment.Top,
-                                    ) {
-                                        Box(Modifier.padding(top = 1.dp)) {
-                                            val actor = note.actor
-                                            if (actor != null) {
-                                                TopicAuthorAvatar(env, PublicUser(actor.uid, actor.nickname ?: "用户", actor.avatarUrl), 40.dp)
-                                            } else {
-                                                val approved = note.kind == "pack_approved"
-                                                val removed = note.kind == "content_removed" || note.kind == "pack_rejected"
-                                                val bg = when {
-                                                    approved -> if (ThemeState.dark) Color(0xFF1A3126) else Color(0xFFEAF6F0)
-                                                    removed -> DangerSoft
-                                                    else -> extra.fill
-                                                }
-                                                val tint = when {
-                                                    approved -> Success
-                                                    removed -> Danger
-                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                }
-                                                val ico = when {
-                                                    approved -> XIcons.Check
-                                                    removed -> XIcons.Warning
-                                                    else -> XIcons.Bell
-                                                }
-                                                Box(Modifier.size(40.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-                                                    XIcon(ico, tint = tint, size = 19.dp)
-                                                }
-                                            }
-                                            if (!note.read) {
-                                                Box(
-                                                    Modifier.align(Alignment.TopEnd).offset(x = 1.dp, y = (-1).dp)
-                                                        .size(9.dp).clip(CircleShape).background(Danger)
-                                                        .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                                                )
-                                            }
-                                        }
-                                        Column(Modifier.weight(1f)) {
-                                            Text(
-                                                notificationHeadline(note),
-                                                style = XType.Body,
-                                                fontWeight = if (note.read) FontWeight.Normal else FontWeight.SemiBold,
-                                                color = if (note.read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                                            )
-                                            if (note.kind != "content_removed" && note.excerpt.isNotBlank()) {
-                                                Text(
-                                                    note.excerpt,
-                                                    Modifier.padding(top = 6.dp).fillMaxWidth()
-                                                        .clip(RoundedCornerShape(8.dp))
-                                                        .background(MaterialTheme.colorScheme.background)
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                    style = XType.Secondary,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
-                                            Text(
-                                                "${agoText(note.createdAt)} · ${notificationTag(note.kind)}",
-                                                Modifier.padding(top = 6.dp),
-                                                style = XType.Caption,
-                                                color = extra.ink3,
-                                            )
-                                        }
-                                        if (clickable) {
-                                            XIcon(XIcons.ChevronRight, Modifier.padding(top = 11.dp), tint = extra.ink3, size = 15.dp)
-                                        }
-                                    }
+                when {
+                    result == null -> LoadBox(state, { loader.reload(); refreshCount++ }) { }
+                    entries.isEmpty() -> MineSubpageEmptyState(
+                        XIcons.Bell,
+                        when {
+                            page > 1 -> "这一页没有通知"
+                            unread -> "已全部读完"
+                            else -> "还没有收到通知"
+                        },
+                        if (unread) "所有消息都已处理，下拉可检查最新动态" else "帖子的回复、作品点赞与审核结果都会出现在这里",
+                    ) {
+                        if (page > 1) MineEmptyAction("上一页", { if (!busy) page-- })
+                    }
+                    else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
+                        itemsIndexed(entries, key = { _, note -> note.id }) { index, note ->
+                            val route = if (note.kind == "content_removed") Route.MyWorks
+                                else note.packId?.let { Route.Pack(it) } ?: note.topicId?.let { Route.Topic(it) }
+                            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                                if (index > 0) Hairline(Modifier.padding(start = 68.dp))
+                                NotificationRow(env, note, route != null, !busy && (note.read && route != null || !note.read && state != Load.Loading)) {
+                                    if (!note.read) mark(note.id, route)
+                                    else route?.let(open)
                                 }
                             }
-                            if (page > 1 || result.hasMore) {
-                                item { SocialPager(page, result.hasMore) { page = it } }
-                            }
                         }
+                        if (page > 1 || result.hasMore) item { SocialPager(page, result.hasMore) { if (!busy) page = it } }
                     }
                 }
             }
         }
         Toast(toast) { toast = null }
+    }
+}
+
+@Composable
+private fun NotificationRow(env: CommunityEnv, note: CommunityNotification, hasDestination: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.padding(top = 1.dp)) {
+            val actor = note.actor
+            if (actor != null) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(colors.onSurfaceVariant), contentAlignment = Alignment.Center) {
+                    Text(actor.nickname?.take(1) ?: "用", style = XType.Body, fontWeight = FontWeight.SemiBold, color = colors.surface)
+                    actor.avatarUrl?.takeIf(String::isNotBlank)?.let { url ->
+                        AsyncImage(env.forum.imageUrl(url), null, imageLoader = rememberImageLoader(),
+                            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
+                }
+            } else {
+                val icon = when (note.kind) {
+                    "pack_approved" -> XIcons.Check
+                    "pack_rejected", "content_removed" -> XIcons.Warning
+                    else -> XIcons.Bell
+                }
+                val tint = when (note.kind) {
+                    "pack_approved" -> Color(if (ThemeState.dark) 0xFF45BE83 else 0xFF2FA36B)
+                    "pack_rejected", "content_removed" -> Danger
+                    else -> colors.onSurfaceVariant
+                }
+                Box(Modifier.size(40.dp).background(extra.fill, CircleShape), contentAlignment = Alignment.Center) {
+                    XIcon(icon, tint = tint, size = 19.dp)
+                }
+            }
+            if (!note.read) {
+                Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp).size(13.dp)
+                    .background(colors.surface, CircleShape).padding(2.dp).background(Danger, CircleShape))
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            val headline = notificationHeadline(note)
+            val actorName = note.actor?.let { it.nickname ?: "有人" }
+            val emphasize = SpanStyle(color = colors.onSurface, fontWeight = FontWeight.SemiBold)
+            Text(buildAnnotatedString {
+                if (actorName != null && headline.startsWith(actorName)) {
+                    withStyle(emphasize) { append(actorName) }
+                    append(headline.removePrefix(actorName))
+                } else if (note.actor == null) {
+                    withStyle(emphasize) { append(headline) }
+                } else append(headline)
+            }, style = XType.Body.copy(fontSize = 14.5.sp, lineHeight = 21.sp),
+                color = if (note.read) colors.onSurfaceVariant else colors.onSurface)
+            if (note.excerpt.isNotBlank()) {
+                Text(note.excerpt,
+                    Modifier.padding(top = 6.dp).fillMaxWidth().background(colors.background, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = XType.Secondary, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Text("${agoText(note.createdAt)} · ${notificationTag(note)}", Modifier.padding(top = 6.dp),
+                style = XType.Caption, color = extra.ink3)
+        }
+        if (hasDestination) XIcon(XIcons.ChevronRight, Modifier.padding(top = 12.dp), tint = extra.ink3.copy(alpha = .6f), size = 15.dp)
     }
 }
 

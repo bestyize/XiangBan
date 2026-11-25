@@ -369,6 +369,12 @@ class AiGatewayApi(
         if (catalog.preferredTier != tier) customModels.saveCatalog(catalog.copy(preferredTier = tier))
     }
 
+    internal fun rememberOfficialDefaults(tier: String, reasoning: Map<String, String>) {
+        val catalog = customCatalog()
+        val updated = catalog.copy(preferredTier = tier, preferredOfficialTier = tier, officialReasoningByTier = reasoning)
+        if (catalog != updated) customModels.saveCatalog(updated)
+    }
+
     suspend fun fetchCustomModels(config: CustomModelConfig): List<String> {
         val custom = config.copy(model = config.model.ifBlank { "model-list" }, models = emptyList()).validated()
         val target = ChatTarget(custom.modelsUrl(), custom.apiKey, "", true, custom.protocol, custom.authMode)
@@ -943,7 +949,13 @@ data class CloudChatState(
     val imageSessions: Set<String> = emptySet(),
     val runningSessions: Set<String> = emptySet(),
     val waitingSessions: Set<String> = emptySet(),
+    val preferredOfficialTier: String? = null,
+    val officialReasoningByTier: Map<String, String> = emptyMap(),
 ) {
+    val defaultOfficialModel: AiTier? get() {
+        val tier = pickAiTier(tiers, preferredOfficialTier ?: selectedTier)
+        return tiers.firstOrNull { it.tier == tier }
+    }
     val backgroundImageCount: Int get() = imageSessions.count { it != conversationId }
     val backgroundTaskCount: Int get() = runningSessions.count { it != conversationId }
     val planningCreation: Boolean get() = creation?.approved == false
@@ -1130,7 +1142,7 @@ class CloudChatController(
         refreshCustomModels()
         val list = history?.useAccount(account) ?: emptyList()
         val preferred = runCatching { api.preferredTier()?.takeIf { isCustomModelTier(it) && api.customForTier(it) != null } }.getOrNull()
-        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = preferred ?: if (account == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "", reasoningByTier = _state.value.officialReasoningByTier, loadingMeta = false, metaError = null, redeeming = false, redeemMessage = null, redeemError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -1399,7 +1411,9 @@ class CloudChatController(
                     _state.value = current.copy(
                         tiers = nextTiers,
                         media = tiersRes.getOrNull()?.media ?: current.media,
-                        selectedTier = current.selectedTier.ifBlank { pickAiTier(nextTiers, runCatching { api.preferredTier() }.getOrNull().orEmpty()) },
+                        selectedTier = current.selectedTier.ifBlank {
+                            pickAiTier(nextTiers, current.preferredOfficialTier ?: runCatching { api.preferredTier() }.getOrNull().orEmpty())
+                        },
                         balance = nextBalance,
                         loadingMeta = false,
                         metaError = if (balanceRes.isFailure && tiersRes.isFailure && err != null) messageOf(err) else null,
@@ -1441,6 +1455,32 @@ class CloudChatController(
         if (found != null && !found.available) return
         _state.value = _state.value.copy(selectedTier = tier, inputError = null)
         rememberPreferred(tier)
+        persist()
+    }
+
+    /** Changes the device default and applies it immediately to the current conversation. */
+    fun configureOfficialModel(tier: String, effort: String? = _state.value.officialReasoningByTier[tier]) {
+        val state = _state.value
+        if (state.sending || !state.officialAiEnabled) return
+        val model = state.tiers.firstOrNull { it.tier == tier && it.available } ?: return
+        val supported = effort?.takeIf { it in model.reasoningEfforts }
+        val remaining = state.officialReasoningByTier - tier
+        val choices = if (supported == null) remaining else remaining + (tier to supported)
+        try {
+            api.rememberOfficialDefaults(tier, choices)
+        } catch (e: Exception) {
+            _state.value = state.copy(customConfigError = e.message ?: "模型服务配置无法保存")
+            return
+        }
+        val current = state.reasoningByTier - tier
+        _state.value = state.copy(
+            selectedTier = tier,
+            preferredOfficialTier = tier,
+            officialReasoningByTier = choices,
+            reasoningByTier = if (supported == null) current else current + (tier to supported),
+            inputError = null,
+            customConfigError = null,
+        )
         persist()
     }
 
@@ -1501,6 +1541,7 @@ class CloudChatController(
             _state.value = _state.value.copy(
                 customProviders = providers.map { CustomProviderView(it.id, it.name, it.models, it.model, api.providerAvailable(it), it.remoteType, it.effectiveReasoningEfforts()) },
                 customTiers = tiers, legacyCustomTier = legacy, remotePresets = api.presetViews(), officialAiEnabled = catalog.officialAiEnabled, customConfigError = null,
+                preferredOfficialTier = catalog.preferredOfficialTier, officialReasoningByTier = catalog.officialReasoningByTier,
             )
         } catch (e: Exception) {
             _state.value = _state.value.copy(customProviders = emptyList(), customTiers = emptyList(), legacyCustomTier = null, officialAiEnabled = enabled, customConfigError = e.message ?: "模型服务配置无法读取")
@@ -1512,14 +1553,14 @@ class CloudChatController(
         catch (e: Exception) { _state.value = _state.value.copy(customConfigError = e.message ?: "模型服务配置无法读取") }
     }
 
-    fun saveCustomProvider(config: CustomModelConfig) {
+    fun saveCustomProvider(config: CustomModelConfig, activate: Boolean = false) {
         check(!_state.value.sending) { "请先停止当前任务再修改模型服务" }
         val old = api.customProvider(config.id)
         val previous = api.customForTier(_state.value.selectedTier)
         api.saveCustomProvider(config)
         refreshCustomModels()
         val selection = when {
-            old == null -> customModelTier(config.id, config.model.trim())
+            activate || old == null -> customModelTier(config.id, config.model.trim())
             previous?.id == config.id && previous.model !in config.models -> customModelTier(config.id, config.model.trim())
             else -> _state.value.selectedTier
         }
@@ -1935,13 +1976,14 @@ class CloudChatController(
     }
 
     fun clearConversation() {
-        val previous = _state.value.selectedTier
+        val state = _state.value
+        val previous = state.selectedTier
         openJob?.cancel()
         leaveConversation()
         agentSession = newSessionId()
         val selection = if (isCustomModelTier(previous) && runCatching { api.customForTier(previous) }.getOrNull() != null) previous
-            else (if (_state.value.officialAiEnabled) pickAiTier(_state.value.tiers, previous) else "").ifBlank { if (accountId == null || !_state.value.officialAiEnabled) _state.value.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "" }
-        applyOptions(ChatOptions(tier = selection))
+            else (if (state.officialAiEnabled) pickAiTier(state.tiers, state.preferredOfficialTier ?: previous) else "").ifBlank { if (accountId == null || !state.officialAiEnabled) state.customTiers.firstOrNull { it.available }?.tier.orEmpty() else "" }
+        applyOptions(ChatOptions(tier = selection, reasoningByTier = state.officialReasoningByTier))
         _state.value = _state.value.copy(messages = emptyList(), sending = false, approval = null, question = null, inputError = null)
     }
 

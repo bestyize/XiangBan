@@ -62,6 +62,7 @@ sealed interface Route {
     data object ToolEnvironment : Route
     /** 云端小伴的对话页。 */
     data object AiChat : Route
+    data class AiCreate(val localGameId: String? = null) : Route
     data object Devices : Route
     /** 某台设备上的聊天页：左侧栏是这台设备的项目和对话，具体打开哪个对话由遥控控制器记着。 */
     data class RemoteChat(val peer: String, val draft: String = "") : Route
@@ -112,6 +113,7 @@ sealed interface Route {
         Voice -> "voice"
         ToolEnvironment -> "tool-environment"
         AiChat -> "aichat"
+        is AiCreate -> localGameId?.let { "aicreate:$it" } ?: "aicreate"
         Devices -> "devices"
         is RemoteChat -> "rchat:$peer" + if (draft.isNotBlank()) ":${draft.encodeURLParameter()}" else ""
     }
@@ -179,6 +181,8 @@ sealed interface Route {
                 "voice" -> Voice
                 "tool-environment" -> ToolEnvironment
                 "aichat" -> AiChat
+                "aicreate" -> if (value.isEmpty()) AiCreate()
+                    else value.takeIf { it.matches(Regex("[a-z0-9][a-z0-9-]{1,39}")) }?.let(::AiCreate)
                 "devices" -> Devices
                 "rchat" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { peer -> runCatching { RemoteChat(peer, value.substringAfter(':', "").decodeURLPart()) }.getOrNull() }
                 else -> null

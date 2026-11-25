@@ -89,6 +89,8 @@ data class CustomModelCatalog(
     val presets: List<RemoteModelProvider> = emptyList(), val catalogueReceived: Boolean = false,
     val refreshAfterSeconds: Long = 21600,
     val officialAiEnabled: Boolean = true,
+    val preferredOfficialTier: String? = null,
+    val officialReasoningByTier: Map<String, String> = emptyMap(),
 )
 
 /** Safe for UI state: deliberately excludes API keys. */

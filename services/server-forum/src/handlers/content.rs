@@ -29,7 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/packs", get(list_packs).post(create_pack))
         .route("/packs/upload-ticket", post(upload_ticket))
         .route("/packs/upload-status", get(upload_status))
-        .route("/packs/{id}", get(get_pack))
+        .route("/packs/{id}", get(get_pack).delete(delete_own_pack))
         .route("/packs/{id}/download", get(download))
         .route("/packs/{id}/applied", post(applied))
         .route("/packs/{id}/versions", post(add_version))
@@ -876,6 +876,29 @@ async fn remove_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id)
         return Err(AppError::not_found("内容包"));
     }
     Ok(Json(json!({ "id": id, "status": "removed" })))
+}
+
+/// Permanently removes the publication. Resource objects may be shared by other packs.
+async fn delete_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let mut tx = state.pool.begin().await?;
+    let removed = sqlx::query("DELETE FROM packs WHERE id = $1 AND author_uid = $2")
+        .bind(id)
+        .bind(auth.user.uid)
+        .execute(&mut *tx)
+        .await?;
+    if removed.rows_affected() == 0 {
+        return Err(AppError::not_found("内容包"));
+    }
+    sqlx::query("DELETE FROM moderation_queue WHERE target_type = 'pack' AND target_id = $1")
+        .bind(id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM content_bookmarks WHERE kind = 'pack' AND target_id = $1")
+        .bind(id).execute(&mut *tx).await?;
+    // Keep managed threads linked to the missing work so their direct URLs remain private.
+    // A separately authored forum topic can continue to stand on its own.
+    sqlx::query("DELETE FROM content_discussions WHERE kind = 'pack' AND target_id = $1 AND NOT managed")
+        .bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "deleted": true })))
 }
 
 // ───────────────────────── 方案 ─────────────────────────

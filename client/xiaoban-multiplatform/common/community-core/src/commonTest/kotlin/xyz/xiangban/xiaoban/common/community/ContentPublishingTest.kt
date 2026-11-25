@@ -177,11 +177,19 @@ class ContentPublishingTest {
         val server = FakeServer(); val anonymous = ContentPublishingApi(server.client, CommunityConfig()) { null }
         assertEquals(401, assertFailsWith<ApiException> { anonymous.myPacks() }.status)
         assertEquals(401, assertFailsWith<ApiException> { anonymous.removeOwn(7) }.status)
+        assertEquals(401, assertFailsWith<ApiException> { anonymous.deleteOwn(7) }.status)
         assertEquals(0, server.requests.size)
         server.on("/api/packs/7/remove", HttpStatusCode.NotFound, """{"message":"内容包不存在"}""")
         val api = ContentPublishingApi(server.client, CommunityConfig()) { "access" }
         assertEquals(404, assertFailsWith<ApiException> { api.removeOwn(7) }.status)
         assertEquals("Bearer access", server.requests.single().headers[HttpHeaders.Authorization])
+        server.on("/api/packs/7", body = """{"id":7,"deleted":true}""")
+        api.deleteOwn(7)
+        val deletion = server.requests.last()
+        assertEquals("DELETE", deletion.method.value)
+        assertEquals("Bearer access", deletion.headers[HttpHeaders.Authorization])
+        server.on("/api/packs/7", HttpStatusCode.NotFound, """{"message":"内容包不存在"}""")
+        assertEquals(404, assertFailsWith<ApiException> { api.deleteOwn(7) }.status)
         server.client.close()
     }
 

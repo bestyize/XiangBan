@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -104,6 +105,49 @@ fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifie
     }
 }
 
+@Composable
+internal fun RefinedScreenBar(
+    title: String,
+    onBack: () -> Unit,
+    divider: Boolean = true,
+    titleSize: Float = 17f,
+    trailing: @Composable BoxScope.() -> Unit = {},
+) {
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp)) {
+            Text(
+                title,
+                Modifier.align(Alignment.Center).padding(horizontal = 82.dp),
+                style = XType.Section.copy(fontSize = titleSize.sp),
+                fontWeight = FontWeight(650),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            IconTap(XIcons.ChevronLeft, "返回", onBack, Modifier.align(Alignment.CenterStart), size = 20.dp)
+            Box(Modifier.align(Alignment.CenterEnd), content = trailing)
+        }
+        if (divider) Hairline()
+    }
+}
+
+@Composable
+internal fun RefinedBarAction(label: String, onClick: () -> Unit, accent: Boolean = false, enabled: Boolean = true) {
+    val tint = if (accent) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        Modifier.height(32.dp).clip(CircleShape).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = XType.Secondary.copy(fontSize = 13.5.sp),
+            fontWeight = if (accent) FontWeight.SemiBold else FontWeight.Medium,
+            color = tint.copy(alpha = if (enabled) 1f else .38f),
+            maxLines = 1,
+        )
+    }
+}
+
 /** 一级页面顶栏：标题靠左，右侧操作。 */
 @Composable
 fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
@@ -176,17 +220,19 @@ fun BottomSheet(
     flush: Boolean = false,
     cornerRadius: Dp = 20.dp,
     onBack: () -> Unit = onDismiss,
+    topPadding: Dp = if (flush) 16.dp else 20.dp,
+    scrim: Color = Color.Black.copy(alpha = 0.45f),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
+        Modifier.fillMaxSize().background(scrim).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
             panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)).background(MaterialTheme.colorScheme.surface)
                 .clickable(indication = null, interactionSource = null) {}
-                .navigationBarsPadding().let { if (flush) it.padding(top = 16.dp) else it.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp) },
+                .navigationBarsPadding().let { if (flush) it.padding(top = topPadding) else it.padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = 24.dp) },
             content = content,
         )
     }

@@ -256,6 +256,7 @@ internal fun GamesScreen(
 internal fun MobileCreationSheet(
     env: CommunityEnv, chat: CloudChatController, createKind: String, idea: String,
     onKind: (String) -> Unit, onIdea: (String) -> Unit, onStart: () -> Unit, onDismiss: () -> Unit,
+    workToEdit: MobileGame? = null,
 ) {
     val cloud by chat.state.collectAsState()
     val creationTypes = if (env.games != null) CreationTypes else CreationTypes.filterNot { it == "小程序" }
@@ -265,13 +266,13 @@ internal fun MobileCreationSheet(
         Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text(if (workToEdit == null) "让想法开始发生" else "继续修改", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
                     IconTap(XIcons.Close, "关闭创作", onDismiss, size = 18.dp)
                 }
-                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CreationChips(creationTypes, createKind, onKind)
+                Text(workToEdit?.name ?: "告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = if (workToEdit == null) 16.dp else 0.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (workToEdit == null) CreationChips(creationTypes, createKind, onKind)
                 Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
-                    val placeholder = when (createKind) {
+                    val placeholder = if (workToEdit != null) "告诉小伴你想修改哪些地方" else when (createKind) {
                         "游戏" -> "例如：做一个小猫跳跃收集星星的游戏"
                         "小程序" -> "例如：做一个可以设置专注时长的番茄钟"
                         else -> "描述你想要的${createKind}，小伴会在电脑上制作"
@@ -279,12 +280,12 @@ internal fun MobileCreationSheet(
                     if (idea.isEmpty()) Text(placeholder, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     BasicTextField(idea, { onIdea(it.take(2000)) }, Modifier.fillMaxWidth().semantics { contentDescription = "创作想法" }, minLines = 4, maxLines = 8, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
                 }
-                val hints = when (createKind) {
+                val hints = if (workToEdit != null) emptyList() else when (createKind) {
                     "游戏" -> listOf("星星跳跃游戏", "像素小冒险", "治愈系消除")
                     "小程序" -> listOf("专注番茄钟", "旅行清单", "性格小测")
                     else -> listOfNotNull(DesktopCreationHints[createKind])
                 }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                if (hints.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onIdea(hint) }.padding(9.dp), style = XType.Caption) }
                 }
                 Text("${idea.length}/2000", Modifier.align(Alignment.End).padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,7 +297,7 @@ internal fun MobileCreationSheet(
                 else -> "选择已连接电脑后进入对话，作品保存在电脑上。"
             }
             Text(hint, Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            AppActionButton(if (local) "和小伴一起创作" else "选择电脑继续创作", onStart, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && !blocked)
+            AppActionButton(if (workToEdit != null) "继续修改" else if (local) "和小伴一起创作" else "选择电脑继续创作", onStart, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank() && !blocked)
         }
     }
 }

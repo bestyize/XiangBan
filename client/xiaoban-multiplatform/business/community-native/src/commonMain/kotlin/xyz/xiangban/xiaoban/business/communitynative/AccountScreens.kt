@@ -411,7 +411,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
 
                     Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp)) {
                         QuickTile(XIcons.Bookmark, "我的收藏", Modifier.weight(1f)) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
-                        QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
+                        QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(Route.MyWorks) }
                         QuickTile(XIcons.Bell, "通知", Modifier.weight(1f), badge = if (session.loggedIn) unread else 0) {
                             open(if (session.loggedIn) Route.Notifications else Route.Login)
                         }

@@ -35,6 +35,7 @@ object XIcons {
     val ChevronUp: ImageVector by lazy { strokeIcon("ChevronUp", "M6 15l6-6 6 6") }
     val Download: ImageVector by lazy { strokeIcon("Download", "M12 4v11M8 11l4 4 4-4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
     val Eye: ImageVector by lazy { strokeIcon("Eye", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM9.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0z") }
+    val EyeOff: ImageVector by lazy { strokeIcon("EyeOff", "M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.2 0-10-7-10-7a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c6.2 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M3 3l18 18") }
     val ExternalLink: ImageVector by lazy { strokeIcon("ExternalLink", "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5") }
     val Fullscreen: ImageVector by lazy { strokeIcon("Fullscreen", "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5") }
     val Expand: ImageVector by lazy { strokeIcon("Expand", "M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6") }

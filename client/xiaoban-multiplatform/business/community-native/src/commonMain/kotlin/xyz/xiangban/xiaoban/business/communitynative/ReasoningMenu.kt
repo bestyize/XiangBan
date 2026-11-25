@@ -5,6 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -15,13 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,10 +63,6 @@ internal fun summarizeReasoningLevels(levels: List<String>): String {
     return if (ordered.isEmpty()) "不支持" else ordered.joinToString(" / ", transform = ::effortTitle)
 }
 
-/**
- * 中性思考等级触发胶囊：文字区固定占两字宽度（居中对齐），整体等宽，
- * 无论显示「低 / 中 / 高」还是「默认 / 极高 / 最高」，多行纵向边缘严格对齐。
- */
 @Composable
 internal fun ReasoningEffortChip(
     modelName: String,
@@ -75,38 +73,46 @@ internal fun ReasoningEffortChip(
 ) {
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(8.dp)
-    val bg = if (selectedRow) scheme.surface else extra.fill
+    val tint = if (selectedRow) scheme.onSurface else extra.ink3
+    val selectedFill = if (ThemeState.dark) Color(0xFF2C2C30) else scheme.surface
+    val level = when (current) {
+        "low" -> 1
+        "medium" -> 2
+        "high", "xhigh", "max" -> 3
+        else -> 0
+    }
     Row(
         modifier = Modifier
-            .height(28.dp)
-            .widthIn(min = 74.dp)
+            .heightIn(min = 28.dp)
             .alpha(if (enabled) 1f else 0.45f)
-            .clip(shape)
-            .background(bg)
-            .then(if (selectedRow) Modifier.border(0.8.dp, extra.hairline, shape) else Modifier)
+            .then(if (selectedRow) Modifier.shadow(1.dp, CircleShape).background(selectedFill, CircleShape)
+                .border(0.5.dp, extra.line, CircleShape) else Modifier)
+            .clip(CircleShape)
             .semantics { contentDescription = "$modelName，思考等级：${effortTitle(current)}" }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(start = 9.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        XIcon(XIcons.Brain, size = 13.dp, tint = scheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp), verticalAlignment = Alignment.Bottom) {
+            val filled = if (selectedRow && level == 3) Brand else tint
+            listOf(4.dp, 7.dp, 10.dp).forEachIndexed { index, height ->
+                Box(Modifier.size(2.dp, height).background(if (index < level) filled else extra.line, RoundedCornerShape(1.dp)))
+            }
+        }
         Text(
             text = effortTitle(current),
-            modifier = Modifier.widthIn(min = 26.dp),
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = scheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            fontWeight = if (selectedRow) FontWeight(550) else FontWeight.Medium,
+            color = tint,
             maxLines = 1,
         )
-        XIcon(XIcons.ChevronDown, size = 12.dp, tint = scheme.onSurfaceVariant)
+        XIcon(XIcons.ChevronDown, size = 12.dp, tint = tint.copy(alpha = .55f))
     }
 }
 
-/** 贴底思考等级单选 BottomSheet：用于小伴 AI 官方配置页与对话模型选择弹层。 */
+/** 对话模型选择中的思考等级单选弹层。 */
 @Composable
 internal fun ReasoningEffortBottomSheet(
     modelName: String,
@@ -121,7 +127,7 @@ internal fun ReasoningEffortBottomSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, cornerRadius = 18.dp) {
+    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
         SheetDragHandle()
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
@@ -141,7 +147,7 @@ internal fun ReasoningEffortBottomSheet(
             }
             SheetCloseCircle(onDismiss)
         }
-        Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp).verticalScroll(rememberScrollState()).selectableGroup()) {
             val allOptions: List<String?> = listOf(null) + ordered
             allOptions.forEachIndexed { idx, effort ->
                 if (idx > 0) Hairline(Modifier.padding(start = 16.dp))
@@ -150,8 +156,7 @@ internal fun ReasoningEffortBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp)
-                        .semantics { this.selected = isSelected }
-                        .clickable(role = Role.RadioButton) { onSelect(effort) }
+                        .selectable(isSelected, role = Role.RadioButton) { onSelect(effort) }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -175,9 +180,7 @@ internal fun ReasoningEffortBottomSheet(
                     } else {
                         Spacer(Modifier.weight(1f))
                     }
-                    Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                        if (isSelected) XIcon(XIcons.Check, size = 17.dp, tint = extra.brandInk)
-                    }
+                    ModelCheck(isSelected)
                 }
             }
         }
@@ -197,7 +200,7 @@ internal fun CustomReasoningMultiSheet(
     val scheme = MaterialTheme.colorScheme
     val allSelected = ReasoningOptionSpecs.all { it.id in selected }
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, cornerRadius = 18.dp) {
+    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
         SheetDragHandle()
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
@@ -227,7 +230,7 @@ internal fun CustomReasoningMultiSheet(
             )
             SheetCloseCircle(onDismiss)
         }
-        Column(Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
             ReasoningOptionSpecs.forEachIndexed { idx, spec ->
                 if (idx > 0) Hairline(Modifier.padding(start = 16.dp))
                 val checked = spec.id in selected
@@ -235,8 +238,8 @@ internal fun CustomReasoningMultiSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp)
-                        .clickable(role = Role.Checkbox) {
-                            val next = if (checked) selected - spec.id else orderedReasoningLevels(selected + spec.id)
+                        .toggleable(checked, role = Role.Checkbox) { on ->
+                            val next = if (on) orderedReasoningLevels(selected + spec.id) else selected - spec.id
                             onChange(next)
                         }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -273,7 +276,7 @@ internal fun CustomReasoningMultiSheet(
         }
         Hairline()
         Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp)) {
-            SoftAccentPillButton(
+            ModelPrimaryButton(
                 label = "确定（已选 ${selected.size} 档）",
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
@@ -299,30 +302,25 @@ internal fun SheetCloseCircle(onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        XIcon(XIcons.Close, size = 15.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        XIcon(XIcons.Close, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant, description = "关闭")
     }
 }
 
 @Composable
-internal fun SoftAccentPillButton(
+internal fun ModelPrimaryButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
 ) {
-    val extra = LocalExtraColors.current
-    val lineColor = Brand.copy(alpha = if (ThemeState.dark) 0.36f else 0.24f)
     Box(
         modifier = modifier
-            .height(44.dp)
-            .alpha(if (enabled) 1f else 0.45f)
+            .heightIn(min = 44.dp)
             .clip(CircleShape)
-            .background(extra.brandSoft)
-            .border(1.dp, lineColor, CircleShape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .background(Brand)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = XType.Body, fontWeight = FontWeight.SemiBold, color = extra.brandInk)
+        Text(label, style = XType.Body.copy(fontSize = 14.5.sp), fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }

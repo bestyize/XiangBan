@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import xyz.xiangban.xiaoban.common.community.ChatHistory
 import xyz.xiangban.xiaoban.common.community.CloudChatController
+import xyz.xiangban.xiaoban.common.community.Load
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -167,9 +169,13 @@ fun CommunityNativeApp(env: CommunityEnv) {
                         }
                     }
                     // 子页面盖住一级页，并吃掉点击，免得穿透到下面。
+                    val pageInsets = when (route) {
+                        Route.Models, Route.MyWorks, Route.Notifications -> Modifier
+                        else -> Modifier.navigationBarsPadding()
+                    }
                     Box(
                         Modifier.fillMaxSize().graphicsLayer { translationX = size.width * pageOffset }
-                            .background(MaterialTheme.colorScheme.background).navigationBarsPadding()
+                            .background(MaterialTheme.colorScheme.background).then(pageInsets)
                             .clickable(indication = null, interactionSource = null) {},
                     ) {
                         RouteScreen(env, chat, route, ::push, ::pop)
@@ -203,7 +209,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
         Route.SchemeBackups -> NativeSchemeBackupsScreen(env, pop, push)
-        Route.MyWorks -> MyContentScreen(env, pop, push)
+        Route.MyWorks -> MyContentScreen(env, chat, pop, push)
         Route.Notifications -> NativeNotificationsScreen(env, pop, push)
         Route.Challenges -> NativeChallengesScreen(env, pop, push)
         is Route.Challenge -> NativeChallengeDetailScreen(env, route.key, pop, push)
@@ -246,6 +252,21 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Voice -> VoiceSettingsScreen(env, back = pop)
         Route.ToolEnvironment -> ToolEnvironmentScreen(env.platform?.toolEnvironment, back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
+        is Route.AiCreate -> if (route.localGameId == null) {
+            AiChatPage(env, chat, back = pop, open = push, openCreation = true)
+        } else {
+            val loader = rememberLoader(env, route) {
+                checkNotNull(env.games) { "当前设备无法读取本机作品" }.read(route.localGameId)
+            }
+            val work by loader.state.collectAsState()
+            when (val loaded = work) {
+                is Load.Ready -> AiChatPage(env, chat, back = pop, open = push, openCreation = true, workToEdit = loaded.value)
+                else -> Column(Modifier.fillMaxSize()) {
+                    ScreenBar("继续修改", pop)
+                    LoadBox(loaded, loader::reload) {}
+                }
+            }
+        }
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
         is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push, initialDraft = route.draft)
     }

@@ -112,6 +112,9 @@ class ContentPublishingApi(private val client: HttpClient, private val config: C
     suspend fun scheme(id: Long): Scheme = http.send(HttpMethod.Get, "/api/schemes/$id", serializer(), token = token())
     suspend fun myPacks(): MyContentPacks = http.send(HttpMethod.Get, "/api/me/packs", serializer(), token = access())
     suspend fun removeOwn(id: Long) { http.send(HttpMethod.Post, "/api/packs/$id/remove", serializer<JsonObject>(), body = "{}", token = access()) }
+    suspend fun deleteOwn(id: Long) {
+        http.send(HttpMethod.Delete, "/api/packs/$id", serializer<JsonObject>(), token = access())
+    }
     suspend fun uploadStatus(fileKey: String): ContentUploadStatus = http.send(HttpMethod.Get,
         "/api/packs/upload-status?file_key=${fileKey.encodeURLParameter()}", serializer(), token = access())
 

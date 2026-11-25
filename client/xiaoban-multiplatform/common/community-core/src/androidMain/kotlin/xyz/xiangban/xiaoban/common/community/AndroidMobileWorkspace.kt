@@ -70,7 +70,7 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
                 val safe = checked(relative)
                 require(safe.isFile || safe.isDirectory) { "工作区只允许普通文件和目录" }
                 require(result.size < MobileWorkspaceLimits.ENTRIES) { "工作区条目数量超过上限" }
-                result += WorkspaceEntry(relative, safe.isDirectory, if (safe.isFile) safe.length() else 0)
+                result += WorkspaceEntry(relative, safe.isDirectory, if (safe.isFile) safe.length() else 0, safe.lastModified().takeIf { it > 0 })
                 if (recursive && safe.isDirectory) visit(safe, relative, depth + 1)
             }
         }

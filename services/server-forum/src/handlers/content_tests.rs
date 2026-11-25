@@ -578,6 +578,42 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(m["retention"][0]["devices"], 2);
     assert_eq!(m["retention"][0]["returned"], 1);
 
+    // Permanent deletion and unlisting have different lifecycles.
+    let path = format!("/api/packs/{id}");
+    assert_eq!(call(&app, "DELETE", &path, None, Value::Null).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(call(&app, "DELETE", &path, Some(&other_t), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "GET", &path, Some(&author_t), Value::Null).await.0, StatusCode::OK);
+    let (s, deleted) = call(&app, "DELETE", &path, Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{deleted}");
+    assert_eq!(deleted, json!({"id":id,"deleted":true}));
+    assert_eq!(call(&app, "DELETE", &path, Some(&author_t), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "GET", &path, Some(&author_t), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&app, "GET", &format!("{path}/download"), Some(&author_t), Value::Null).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT count(*) FROM pack_versions WHERE pack_id=$1")
+        .bind(id).fetch_one(&pool).await?, 0);
+    let (_, status) = call(&app, "GET", &format!("/api/packs/upload-status?file_key={file_key}"), Some(&author_t), Value::Null).await;
+    assert_eq!(status["used"], true);
+    assert!(status["published_pack_id"].is_null());
+    let old_publish = json!({"kind":"effect","title":"夕阳特效","file_key":file_key,"rights_ack":true});
+    assert_eq!(call(&app, "POST", "/api/packs", Some(&author_t), old_publish).await.0, StatusCode::CONFLICT);
+
+    // The same owner route covers a visible work, an in-review work, and a rejected submission.
+    for status in ["published", "pending", "rejected"] {
+        let pack_id: i64 = sqlx::query_scalar("INSERT INTO packs(kind,slug,title,author_uid,status) VALUES('effect',$1,'待删除作品',$2,$3) RETURNING id")
+            .bind(format!("delete-{status}")).bind(author).bind(status).fetch_one(&pool).await?;
+        sqlx::query("INSERT INTO moderation_queue(target_type,target_id,note) VALUES('pack',$1,'测试审核记录')")
+            .bind(pack_id).execute(&pool).await?;
+        sqlx::query("INSERT INTO content_bookmarks(uid,kind,target_id) VALUES($1,'pack',$2)")
+            .bind(other).bind(pack_id).execute(&pool).await?;
+        assert_eq!(call(&app, "DELETE", &format!("/api/packs/{pack_id}"), Some(&author_t), Value::Null).await.0, StatusCode::OK);
+        assert_eq!(sqlx::query_scalar::<_, i64>("SELECT count(*) FROM moderation_queue WHERE target_type='pack' AND target_id=$1")
+            .bind(pack_id).fetch_one(&pool).await?, 0);
+        assert_eq!(sqlx::query_scalar::<_, i64>("SELECT count(*) FROM content_bookmarks WHERE kind='pack' AND target_id=$1")
+            .bind(pack_id).fetch_one(&pool).await?, 0);
+    }
+    let (_, mine) = call(&app, "GET", "/api/me/packs", Some(&author_t), Value::Null).await;
+    assert_eq!(mine["items"].as_array().unwrap().iter().map(|item| item["id"].as_i64().unwrap()).collect::<Vec<_>>(), vec![dawn_id]);
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }

@@ -6,7 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
 
 /** Paths are relative to the app's private workspace, never paths in the phone's shared storage. */
-data class WorkspaceEntry(val path: String, val directory: Boolean, val size: Long = 0)
+data class WorkspaceEntry(val path: String, val directory: Boolean, val size: Long = 0, val modifiedAtMillis: Long? = null)
 
 interface MobileWorkspace {
     suspend fun list(path: String = "", recursive: Boolean = false): List<WorkspaceEntry>

@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -83,6 +84,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
 import xyz.xiangban.xiaoban.common.community.ChatApproval
 import xyz.xiangban.xiaoban.common.community.MobileGame
@@ -110,6 +112,7 @@ import xyz.xiangban.xiaoban.common.community.StoredChat
 import xyz.xiangban.xiaoban.common.community.isCustomModelTier
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
+import xyz.xiangban.xiaoban.common.community.CustomProviderView
 import xyz.xiangban.xiaoban.common.community.CustomModelConfig
 import xyz.xiangban.xiaoban.common.community.CUSTOM_MODEL_TIER
 import xyz.xiangban.xiaoban.common.community.customModelTier
@@ -214,6 +217,7 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
 internal fun AiChatPage(
     env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, back: (() -> Unit)? = null, visible: Boolean = true,
     onSelectTab: (Tab) -> Unit = {}, onPublish: () -> Unit = {},
+    openCreation: Boolean = false, workToEdit: MobileGame? = null,
 ) {
     val session by env.session.state.collectAsState()
     // The main chat stays mounted under detail pages. Keep its last visible frame through the transition.
@@ -285,7 +289,10 @@ internal fun AiChatPage(
         resolve
     }
     var toast by remember { mutableStateOf<String?>(null) }
-    var workKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingWork by rememberSaveable(workToEdit?.id) { mutableStateOf(workToEdit != null) }
+    var workKind by rememberSaveable(openCreation, workToEdit?.id) {
+        mutableStateOf(if (openCreation) (if (workToEdit?.kind == "app") "小程序" else "游戏") else null)
+    }
     var workBrief by rememberSaveable { mutableStateOf("") }
     var workForComputer by rememberSaveable { mutableStateOf<String?>(null) }
     // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
@@ -331,6 +338,7 @@ internal fun AiChatPage(
     }
     fun openWork(kind: String) {
         focus.clearFocus()
+        editingWork = false
         workBrief = ""
         workKind = kind
     }
@@ -529,8 +537,9 @@ internal fun AiChatPage(
             )
         }
         workKind?.let { kind ->
+            val draft = workToEdit.takeIf { editingWork }
             MobileCreationSheet(env, chat, kind, workBrief, onKind = { workKind = it }, onIdea = { workBrief = it },
-                onDismiss = { workKind = null }, onStart = {
+                onDismiss = { workKind = null; editingWork = false }, workToEdit = draft, onStart = {
                     val brief = workBrief.trim()
                     if (kind in LocalCreationTypes) {
                         requireChat {
@@ -538,9 +547,14 @@ internal fun AiChatPage(
                                 toast = "当前安装包不支持手机本地创作，可连接电脑创作。"
                             } else {
                                 val type = if (kind == "小程序") "小程序（kind=app，category 取 tool 或 quiz）" else "离线小游戏（kind=game）"
-                                val title = xyz.xiangban.xiaoban.common.community.creationTitle(brief, kind)
-                                if (chat.startParallelCreation(title, brief, "制作支持手机触控和电脑键鼠的$type。需求：$brief")) {
+                                val title = draft?.let { "修改${it.name}" } ?: xyz.xiangban.xiaoban.common.community.creationTitle(brief, kind)
+                                val request = if (draft == null) "制作支持手机触控和电脑键鼠的$type。需求：$brief"
+                                    else "继续修改本机已安装的作品 ${draft.id}。先读取 games/${draft.id} 下的清单与现有文件。方案确认后保留作品 ID，按需修改并更新原作品。需求：$brief"
+                                val started = if (openCreation) chat.startCreation(title, brief, request)
+                                    else chat.startParallelCreation(title, brief, request)
+                                if (started) {
                                     workKind = null
+                                    editingWork = false
                                 } else toast = "暂时无法发起创作，请检查当前对话模型。"
                             }
                         }
@@ -676,108 +690,28 @@ internal fun AiChatPage(
         MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         var reasoningSheet by remember { mutableStateOf<Triple<String, String, List<String>>?>(null) }
-        OverlayTransition(modelSheet) { panel ->
-            val extra = LocalExtraColors.current
-            val scheme = MaterialTheme.colorScheme
-            BottomSheet({ modelSheet = false; reasoningSheet = null }, panel, flush = true, cornerRadius = 18.dp) {
-                SheetDragHandle()
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("选择对话模型", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
-                    SheetCloseCircle { modelSheet = false; reasoningSheet = null }
-                }
-                Column(Modifier.weight(1f, fill = false).heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
-                    cloud.customProviders.forEach { provider ->
-                        Text(
-                            provider.name,
-                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 5.dp),
-                            style = XType.Caption,
-                            fontWeight = FontWeight.SemiBold,
-                            color = extra.ink3,
-                        )
-                        provider.models.forEach { model ->
-                            val id = customModelTier(provider.id, model)
-                            val legacyMatch = provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER && cloud.legacyCustomTier?.displayName == model
-                            val activeTierId = if (legacyMatch) CUSTOM_MODEL_TIER else id
-                            val selected = cloud.selectedTier == id || legacyMatch
-                            ChatModelPickerRow(
-                                title = model,
-                                description = if (provider.available) null else "暂不可用",
-                                badge = null,
-                                selected = selected,
-                                enabled = provider.available && !cloud.sending,
-                                reasoningLevels = if (provider.available) provider.reasoningEfforts else emptyList(),
-                                currentReasoning = cloud.reasoningByTier[activeTierId],
-                                onSelect = { if (provider.available && !cloud.sending) { chat.selectTier(id); modelSheet = false } },
-                                onOpenReasoning = { reasoningSheet = Triple(activeTierId, model, provider.reasoningEfforts) },
-                            )
-                        }
-                    }
-                    if (cloud.officialAiEnabled) {
-                        Text(
-                            "小伴 AI · 官方",
-                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 5.dp),
-                            style = XType.Caption,
-                            fontWeight = FontWeight.SemiBold,
-                            color = extra.ink3,
-                        )
-                        if (cloud.tiers.isEmpty()) {
-                            Text(
-                                if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"),
-                                Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                style = XType.Secondary,
-                                color = extra.ink3,
-                            )
-                        }
-                        cloud.tiers.forEach { tier ->
-                            val desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description
-                            ChatModelPickerRow(
-                                title = tier.displayName,
-                                description = desc.takeIf(String::isNotBlank),
-                                badge = if (tier.isDefault) "推荐" else null,
-                                selected = cloud.selectedTier == tier.tier,
-                                enabled = tier.available && !cloud.sending,
-                                reasoningLevels = if (tier.available) tier.reasoningEfforts else emptyList(),
-                                currentReasoning = cloud.reasoningByTier[tier.tier],
-                                onSelect = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
-                                onOpenReasoning = { reasoningSheet = Triple(tier.tier, tier.displayName, tier.reasoningEfforts) },
-                            )
-                        }
-                    }
-                }
-                Hairline()
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { modelSheet = false; reasoningSheet = null; open(Route.Models) }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (cloud.officialAiEnabled) "模型配置（余额、兑换与第三方服务）" else "模型配置",
-                        Modifier.weight(1f),
-                        style = XType.Secondary,
-                        fontWeight = FontWeight.Medium,
-                        color = scheme.onSurfaceVariant,
-                    )
-                    XIcon(XIcons.ChevronRight, size = 16.dp, tint = extra.ink3)
-                }
+        ModelConfigTheme {
+            OverlayTransition(modelSheet) { panel ->
+                ChatModelPickerSheet(
+                    cloud, panel,
+                    onDismiss = { modelSheet = false; reasoningSheet = null },
+                    onConfig = { modelSheet = false; reasoningSheet = null; open(Route.Models) },
+                    onSelect = chat::selectTier,
+                    onReasoning = { tier, name, levels -> reasoningSheet = Triple(tier, name, levels) },
+                )
             }
-        }
-        reasoningSheet?.let { (tierId, modelName, levels) ->
-            ReasoningEffortBottomSheet(
-                modelName = modelName,
-                levels = levels,
-                selected = cloud.reasoningByTier[tierId],
-                onDismiss = { reasoningSheet = null },
-                onSelect = { effort ->
-                    chat.selectReasoning(tierId, effort)
-                    reasoningSheet = null
-                    modelSheet = false
-                },
-            )
+            reasoningSheet?.let { (tierId, modelName, levels) ->
+                ReasoningEffortBottomSheet(
+                    modelName = modelName,
+                    levels = levels,
+                    selected = cloud.reasoningByTier[tierId],
+                    onDismiss = { reasoningSheet = null },
+                    onSelect = { effort ->
+                        chat.selectReasoning(tierId, effort)
+                        reasoningSheet = null
+                    },
+                )
+            }
         }
     }
 }
@@ -1012,7 +946,91 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
     tool = tool, danger = danger,
 )
 
-/** 对话模型选择弹层内的单行项：名称严格左对齐，右侧等宽思考胶囊与固定对号列垂直对齐。 */
+@Composable
+private fun ChatModelPickerSheet(
+    cloud: CloudChatState,
+    panel: Modifier,
+    onDismiss: () -> Unit,
+    onConfig: () -> Unit,
+    onSelect: (String) -> Unit,
+    onReasoning: (String, String, List<String>) -> Unit,
+) {
+    val extra = LocalExtraColors.current
+    val scheme = MaterialTheme.colorScheme
+    BottomSheet(onDismiss, panel, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
+        SheetDragHandle()
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("选择对话模型", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight(650))
+            SheetCloseCircle(onDismiss)
+        }
+        Column(Modifier.weight(1f, fill = false).heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
+            val (free, other) = cloud.customProviders.partition { it.remoteType == "free" }
+            val groups = free + listOf<CustomProviderView?>(null) + other
+            groups.forEach { provider ->
+                if (provider != null) {
+                    val title = if (provider.remoteType in listOf("free", "paid")) provider.name else "${provider.name} · 自定义"
+                    ChatModelGroupTitle(title)
+                    provider.models.forEach { model ->
+                        val id = customModelTier(provider.id, model)
+                        val legacyMatch = provider.id == "legacy" && cloud.selectedTier == CUSTOM_MODEL_TIER &&
+                            cloud.legacyCustomTier?.displayName == model
+                        val tier = if (legacyMatch) CUSTOM_MODEL_TIER else id
+                        ChatModelPickerRow(
+                            title = model,
+                            description = if (provider.available) null else "暂不可用",
+                            badge = null,
+                            selected = cloud.selectedTier == tier,
+                            enabled = provider.available && !cloud.sending,
+                            reasoningLevels = if (provider.available) provider.reasoningEfforts else emptyList(),
+                            currentReasoning = cloud.reasoningByTier[tier],
+                            onSelect = { onSelect(id) },
+                            onOpenReasoning = { onReasoning(tier, model, provider.reasoningEfforts) },
+                        )
+                    }
+                } else if (cloud.officialAiEnabled) {
+                    ChatModelGroupTitle("小伴 AI · 官方")
+                    if (cloud.tiers.isEmpty()) Text(
+                        if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"),
+                        Modifier.padding(horizontal = 16.dp, vertical = 12.dp), style = XType.Secondary, color = extra.ink3,
+                    )
+                    cloud.tiers.forEach { tier ->
+                        val description = if (!tier.available && tier.requiresPaid) "需要充值后使用" else tier.description
+                        ChatModelPickerRow(
+                            title = tier.displayName,
+                            description = description.takeIf(String::isNotBlank),
+                            badge = if (tier.isDefault) "推荐" else null,
+                            selected = cloud.selectedTier == tier.tier,
+                            enabled = tier.available && !cloud.sending,
+                            reasoningLevels = if (tier.available) tier.reasoningEfforts else emptyList(),
+                            currentReasoning = cloud.reasoningByTier[tier.tier],
+                            onSelect = { onSelect(tier.tier) },
+                            onOpenReasoning = { onReasoning(tier.tier, tier.displayName, tier.reasoningEfforts) },
+                        )
+                    }
+                }
+            }
+        }
+        Hairline()
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onConfig)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (cloud.officialAiEnabled) "模型配置（余额、兑换与第三方服务）" else "模型配置",
+                Modifier.weight(1f), style = XType.Secondary.copy(fontSize = 13.5.sp), color = scheme.onSurfaceVariant,
+            )
+            XIcon(XIcons.ChevronRight, size = 16.dp, tint = extra.ink3)
+        }
+    }
+}
+
+@Composable
+private fun ChatModelGroupTitle(title: String) {
+    Text(title, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 5.dp),
+        style = XType.Caption.copy(fontSize = 11.5.sp), fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3)
+}
+
 @Composable
 private fun ChatModelPickerRow(
     title: String,
@@ -1027,60 +1045,28 @@ private fun ChatModelPickerRow(
 ) {
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
+    val selectedFill = if (ThemeState.dark) Color.White.copy(alpha = .06f) else scheme.background
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) extra.fill else Color.Transparent)
-            .alpha(if (enabled) 1f else 0.45f)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) selectedFill else Color.Transparent)
+            .alpha(if (enabled || selected) 1f else .45f).padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(enabled = enabled, role = Role.RadioButton, onClick = onSelect)
-                .padding(vertical = 1.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = title,
-                    modifier = Modifier.weight(1f, fill = false),
-                    style = XType.Body,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = scheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!badge.isNullOrBlank()) {
-                    Text(
-                        badge,
-                        Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (selected) scheme.surface else extra.fill)
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
-                        style = XType.Caption,
-                        color = scheme.onSurfaceVariant,
-                    )
-                }
+        Column(Modifier.weight(1f).selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(title, Modifier.weight(1f, fill = false), style = XType.Body.copy(fontSize = 14.5.sp, lineHeight = 20.sp),
+                    fontWeight = if (selected) FontWeight(650) else FontWeight.Medium, color = scheme.onSurface,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!badge.isNullOrBlank()) ModelNeutralTag(badge, selected)
             }
             if (!description.isNullOrBlank()) {
-                Text(description, Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
+                Text(description, Modifier.padding(top = 2.dp), style = XType.Caption.copy(lineHeight = 17.sp), color = extra.ink3)
             }
         }
         if (reasoningLevels.isNotEmpty()) {
-            ReasoningEffortChip(
-                modelName = title,
-                current = currentReasoning,
-                enabled = enabled,
-                selectedRow = selected,
-                onClick = onOpenReasoning,
-            )
+            ReasoningEffortChip(title, currentReasoning?.takeIf { it in reasoningLevels }, enabled, selected, onOpenReasoning)
         }
-        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-            if (selected) XIcon(XIcons.Check, size = 17.dp, tint = extra.brandInk)
-        }
+        ModelCheck(selected)
     }
 }
