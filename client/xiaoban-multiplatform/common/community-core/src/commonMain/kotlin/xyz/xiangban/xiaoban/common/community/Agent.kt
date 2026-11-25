@@ -363,32 +363,38 @@ class AgentRuntime(
         when (obj["type"].str()) {
             "model_request" -> {
                 val id = obj["id"].str() ?: return
-                val running = pendingRun(obj["session"].str().orEmpty(), epoch)
+                val session = obj["session"].str().orEmpty()
+                val running = pendingRun(session, epoch)
                 val body = withReasoningEffort(obj["body"].str() ?: return, if (running != null) running.options.let { it.reasoningByTier[it.tier] } else currentReasoning)
                 val affected = activeRuns.value.values.map { it.id }.toSet()
                 request(id, epoch, requestScope, running?.id) {
                     val result = try {
-                        if (running == null || pendingRun(obj["session"].str().orEmpty(), epoch)?.id != running.id) throw CancellationException("run cancelled")
+                        if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
                         withContext(running.account ?: kotlin.coroutines.EmptyCoroutineContext) {
                             running.account?.checkCurrent()
                             model(body) { l -> sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) }) }
                         }
                     } catch (e: CancellationException) {
-                        throw e
+                        if (running == null || pendingRun(session, epoch)?.id != running.id) throw e
+                        ModelResult(0, error = "模型请求已中断，请重试")
                     } catch (e: ApiException) {
                         ModelResult(e.status, error = e.message)
                     } catch (e: Exception) {
                         ModelResult(0, error = e.message ?: "请求失败")
                     }
-                    try {
-                        sendFor(h, epoch, line {
-                            put("type", "model_end"); put("id", id); put("status", result.status)
-                            result.error?.let { put("error", it) }
-                            result.body?.let { put("body", it) }
-                            put("verified_tool_terminal", result.verifiedToolTerminal)
-                        })
-                    } catch (e: Exception) {
-                        if (handle == h && generation == epoch) _events.emit(AgentEvent.Failure(e.message ?: "向智能体发送模型结果失败", affected))
+                    withContext(NonCancellable) {
+                        // The transport can cancel independently while the native run is still waiting.
+                        if (running == null || pendingRun(session, epoch)?.id != running.id) return@withContext
+                        try {
+                            sendFor(h, epoch, line {
+                                put("type", "model_end"); put("id", id); put("status", result.status)
+                                result.error?.let { put("error", it) }
+                                result.body?.let { put("body", it) }
+                                put("verified_tool_terminal", result.verifiedToolTerminal)
+                            })
+                        } catch (e: Exception) {
+                            if (handle == h && generation == epoch) _events.emit(AgentEvent.Failure(e.message ?: "向智能体发送模型结果失败", affected))
+                        }
                     }
                 }
             }

@@ -411,6 +411,7 @@ internal fun AiChatPage(
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
                     val deliveredWork = progress?.takeIf { it.validated }?.installed
+                    val creationReply = progress != null && !progress.validated && progress.lastActionTurnId == cloud.messages.lastOrNull()?.id
                     key(conversation) {
                         CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
                             onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send,
@@ -422,7 +423,7 @@ internal fun AiChatPage(
                                 cloud.messages.firstOrNull()?.createdAtMs
                                     ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
                             } else null,
-                            readOnly = archived, creation = cloud.creation?.approved == true || progress?.validated == false,
+                            readOnly = archived, creation = cloud.creation?.approved == true || creationReply,
                             deliveredWork = deliveredWork,
                             onOpenWork = { work ->
                                 if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
@@ -460,8 +461,9 @@ internal fun AiChatPage(
                     }
                     if (progress != null && !progress.validated) {
                         val last = cloud.messages.last()
+                        val taskReply = cloud.messages.lastOrNull { it.id == progress.lastActionTurnId } ?: last
                         AgentCreationResumeCard(
-                            stage = last.failureStage,
+                            stage = taskReply.failureStage,
                             summary = progress.summary,
                             nextStep = progress.nextStep,
                             canResume = !last.error.orEmpty().contains("结果尚未确认"),

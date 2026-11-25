@@ -11,6 +11,27 @@ import java.nio.file.Files
 import kotlin.test.*
 
 class CreationRecoveryTest {
+    private suspend fun MemoryMobileWorkspace.prepareDraft(id: String) {
+        write("drafts/$id/index.html", "original")
+        write("drafts/$id/icon.svg", "<svg/>")
+        write("drafts/$id/cover.svg", "<svg/>")
+    }
+
+    private fun installationArgs(id: String, source: String = id, overwrite: Boolean = false) = buildJsonObject {
+        put("id", id)
+        put("kind", "app")
+        put("name", id)
+        put("description", "测试作品")
+        put("source_dir", "drafts/$source")
+        put("overwrite", overwrite)
+    }
+
+    private suspend fun AgentTool.receipt(arguments: JsonObject): ToolCallInfo {
+        val result = run(arguments)
+        assertTrue(result.ok, result.output)
+        return ToolCallInfo(name, name, arguments.toString(), result.output, ToolStatus.Done)
+    }
+
     @Test
     fun onlyConfirmedWritesSurviveFailedCallsAndDeletion() {
         fun write(name: String, receipt: String, status: ToolStatus) =
@@ -58,6 +79,87 @@ class CreationRecoveryTest {
         }
         assertEquals("original", workspace.read(page))
         assertEquals(listOf("book"), store.list().map { it.id })
+    }
+
+    @Test
+    fun anEditedDraftNeedsReinstallationEvenIfTheOldVersionStillValidates() = runBlocking {
+        val workspace = MemoryMobileWorkspace()
+        workspace.prepareDraft("book")
+        val store = MobileGameStore(workspace)
+        val tools = (mobileWorkspaceTools(workspace) + mobileGameTools(store)).associateBy { it.name }
+        val validateArgs = buildJsonObject { put("id", "book") }
+        val original = ChatTurn(2, "assistant", "初版完成", tools = listOf(
+            tools.getValue("app_create").receipt(installationArgs("book")),
+            tools.getValue("app_validate").receipt(validateArgs),
+        ))
+        val edition = ChatTurn(4, "assistant", "草稿已更新", cancelled = true, tools = listOf(
+            tools.getValue("edit_file").receipt(buildJsonObject {
+                put("path", "drafts/book/index.html"); put("old_text", "original"); put("new_text", "updated")
+            }),
+        ))
+        val state = CloudChatState(nativeAgentAvailable = true, creation = CreationDraft("账本", "记账", true),
+            messages = listOf(ChatTurn(1, "user", "做一个账本"), original, ChatTurn(3, "user", "更新首页"), edition))
+        val pending = assertNotNull(state.creationDeliveryProgress())
+        assertTrue(pending.draftChangedSinceInstall)
+        assertFalse(pending.validated)
+        assertNull(pending.installed)
+        assertEquals("book", pending.resumeId)
+        assertTrue(pending.resumeInput(store, state.creation, null).contains("草稿更新前的版本"))
+        assertEquals("original", store.readFile("book", "index.html"))
+
+        val oldValidation = ChatTurn(5, "assistant", "旧版通过校验", tools = listOf(tools.getValue("app_validate").receipt(validateArgs)))
+        val checked = state.copy(messages = state.messages + oldValidation)
+        assertFalse(assertNotNull(checked.creationDeliveryProgress()).validated)
+
+        val reinstalled = ChatTurn(6, "assistant", "已安装更新版", tools = listOf(
+            tools.getValue("app_create").receipt(installationArgs("book", overwrite = true)),
+        ))
+        val replacement = checked.copy(messages = checked.messages + reinstalled)
+        assertFalse(assertNotNull(replacement.creationDeliveryProgress()).validated)
+        val newValidation = ChatTurn(7, "assistant", "更新版通过校验", tools = listOf(tools.getValue("app_validate").receipt(validateArgs)))
+        val delivered = assertNotNull(replacement.copy(messages = replacement.messages + newValidation).creationDeliveryProgress())
+        assertEquals("book", delivered.installed?.id)
+        assertTrue(delivered.validated)
+        assertEquals("updated", store.readFile("book", "index.html"))
+    }
+
+    @Test
+    fun resumingTheSecondDraftKeepsItsOwnDirectoryAndCanUseItsOwnId() = runBlocking {
+        val workspace = MemoryMobileWorkspace()
+        workspace.prepareDraft("book")
+        workspace.prepareDraft("calc")
+        val store = MobileGameStore(workspace)
+        val create = mobileGameTools(store).single { it.name == "app_create" }
+        val first = ChatTurn(2, "assistant", "账本待校验", cancelled = true, tools = listOf(create.receipt(installationArgs("book"))))
+        val second = ChatTurn(4, "assistant", "计算器草稿已保存", cancelled = true, tools = listOf(
+            mobileWorkspaceTools(workspace).single { it.name == "write_file" }.receipt(buildJsonObject {
+                put("path", "drafts/calc/index.html"); put("content", "calculator")
+            }),
+        ))
+        val validate = mobileGameTools(store).single { it.name == "app_validate" }.receipt(buildJsonObject { put("id", "book") })
+        val state = CloudChatState(nativeAgentAvailable = true, messages = listOf(
+            ChatTurn(1, "user", "做一个账本"), first, ChatTurn(3, "user", "换一个任务，做计算器"), second,
+            ChatTurn(5, "user", "检查一下账本"), ChatTurn(6, "assistant", "账本校验通过", tools = listOf(validate)),
+        ))
+        val pending = assertNotNull(state.creationDeliveryProgress())
+        assertEquals(setOf("drafts/calc"), pending.directories)
+        assertEquals(setOf("drafts/calc/index.html"), pending.files)
+        assertNull(pending.resumeId)
+        val firstPlan = ChatTurn(0, "assistant", "账本创作方案", creationPlan = true)
+        val confirmedFirst = CreationDraft("账本", "第一件作品是记账工具", true)
+        val fromApprovedChat = assertNotNull(state.copy(creation = confirmedFirst).creationDeliveryProgress())
+        val input = fromApprovedChat.resumeInput(store, confirmedFirst, firstPlan)
+        assertTrue(input.contains("本次续作的草稿目录是 drafts/calc"))
+        assertFalse(input.contains(confirmedFirst.request))
+        assertFalse(input.contains("conversation_read(message_id="))
+        withContext(AgentToolContext("test", "call", recovery = pending)) {
+            val wrongDraft = create.run(installationArgs("calc", source = "book"))
+            assertFalse(wrongDraft.ok)
+            assertTrue(wrongDraft.output.contains("草稿目录"), wrongDraft.output)
+            create.receipt(installationArgs("calc"))
+        }
+        assertEquals("calculator", store.readFile("calc", "index.html"))
+        assertEquals("original", store.readFile("book", "index.html"))
     }
 
     @Test

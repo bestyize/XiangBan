@@ -129,7 +129,7 @@ class MobileConversationIsolationTest {
         }
     }
 
-    @Test fun mainChatResumesAnInterruptedDraftAfterAnUnsuccessfulFollowup() = runBlocking {
+    @Test fun mainChatKeepsDraftThroughStatusRepliesAndValidatesAnEarlierInstallation() = runBlocking {
         val workspace = MemoryMobileWorkspace()
         val path = "drafts/ledger/index.html"
         workspace.write(path, "<h1>账本</h1>")
@@ -162,9 +162,18 @@ class MobileConversationIsolationTest {
             eventually { !chat.state.value.sending }
             assertEquals(setOf(path), chat.state.value.creationDeliveryProgress()?.files)
 
-            chat.resumeCreation()
-            chat.resumeCreation()
+            chat.send("做好了吗")
             eventually { bridge.messages("run").size == 3 }
+            val statusRun = runId(session)
+            bridge.emit("""{"type":"run_end","run":"$statusRun","ok":true,"text":"草稿已保存，作品尚未安装。","finish":"stop"}""")
+            eventually { !chat.state.value.sending }
+            chat.clearConversation()
+            chat.openConversation(session)
+            assertEquals(setOf(path), chat.state.value.creationDeliveryProgress()?.files)
+
+            chat.resumeCreation()
+            chat.resumeCreation()
+            eventually { bridge.messages("run").size == 4 }
             val resume = bridge.run(session)!!
             assertTrue(resume.getValue("input").jsonPrimitive.content.contains("drafts/ledger 当前文件"))
             val run = resume.getValue("id").jsonPrimitive.content
@@ -174,12 +183,21 @@ class MobileConversationIsolationTest {
             assertTrue(install.ok, install.output)
             toolStart(run, "install", "app_create", installArgs)
             toolEnd(run, "install", install.output)
+            bridge.emit("""{"type":"run_end","run":"$run","ok":true,"text":"作品已安装，等待校验。","finish":"stop"}""")
+            eventually { !chat.state.value.sending }
+            val pending = assertNotNull(chat.state.value.creationDeliveryProgress())
+            assertEquals("ledger", pending.installed?.id)
+            assertFalse(pending.validated)
+
+            chat.resumeCreation()
+            eventually { bridge.messages("run").size == 5 }
+            val validationRun = runId(session)
             val validateArgs = """{"id":"ledger"}"""
             val validate = tools.getValue("app_validate").run(CommunityJson.parseToJsonElement(validateArgs).jsonObject)
             assertTrue(validate.ok, validate.output)
-            toolStart(run, "validate", "app_validate", validateArgs)
-            toolEnd(run, "validate", validate.output)
-            bridge.emit("""{"type":"run_end","run":"$run","ok":true,"text":"制作完成","finish":"stop"}""")
+            toolStart(validationRun, "validate", "app_validate", validateArgs)
+            toolEnd(validationRun, "validate", validate.output)
+            bridge.emit("""{"type":"run_end","run":"$validationRun","ok":true,"text":"制作完成","finish":"stop"}""")
             eventually { !chat.state.value.sending }
             val delivery = assertNotNull(chat.state.value.creationDeliveryProgress())
             assertTrue(delivery.validated)

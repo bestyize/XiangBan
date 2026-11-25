@@ -421,7 +421,8 @@ fun mobileGameTools(store: MobileGameStore, onInstalled: (String) -> Unit = {}):
         "source_dir" to "string", "files" to "array", "overwrite" to "boolean",
         required = listOf("id", "name", "description"),
     ), "write") { args ->
-        val resumeId = kotlin.coroutines.coroutineContext[AgentToolContext]?.recovery?.resumeId
+        val recovery = kotlin.coroutines.coroutineContext[AgentToolContext]?.recovery
+        val resumeId = recovery?.resumeId
         require(resumeId == null || args.gameString("id") == resumeId) { "继续制作时请沿用已有作品 ID：$resumeId" }
         val kind = args.gameString("kind", "game")
         val game = MobileGame(
@@ -432,7 +433,14 @@ fun mobileGameTools(store: MobileGameStore, onInstalled: (String) -> Unit = {}):
             version = args.gameString("version", "1.0.0"), icon = args.gameString("icon", "icon.svg"), cover = args.gameString("cover", "cover.svg"),
         )
         require(("source_dir" in args) != ("files" in args)) { "source_dir 和 files 必须二选一" }
-        val created = if ("source_dir" in args) store.createFromDirectory(game, args.gameString("source_dir"), args.gameBoolean("overwrite")) else {
+        val created = if ("source_dir" in args) {
+            val directory = args.gameString("source_dir")
+            val drafts = recovery?.directories.orEmpty()
+            require(drafts.isEmpty() || drafts.any { directory == it || directory.startsWith("$it/") }) {
+                "继续制作时请沿用本作品的草稿目录：${drafts.joinToString("、")}"
+            }
+            store.createFromDirectory(game, directory, args.gameBoolean("overwrite"))
+        } else {
             val array = args["files"] as? JsonArray ?: throw IllegalArgumentException("files 必须是数组")
             store.create(game, array.map { value ->
                 val file = value as? JsonObject ?: throw IllegalArgumentException("files 的每项需要 path 与 content")
