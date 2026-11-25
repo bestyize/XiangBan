@@ -901,7 +901,7 @@ private fun SpeakingEqBars(wave: Float) {
     }
 }
 
-private fun buildMainStarPath(): Path = Path().apply {
+internal fun buildMainStarPath(): Path = Path().apply {
     moveTo(-3.2f, -30.2f)
     quadraticTo(0f, -34f, 3.2f, -30.2f)
     cubicTo(7.6f, -15.6f, 15.6f, -7.6f, 30.2f, -3.2f)
@@ -914,7 +914,7 @@ private fun buildMainStarPath(): Path = Path().apply {
     close()
 }
 
-private fun buildSubStarPath(): Path = Path().apply {
+internal fun buildSubStarPath(): Path = Path().apply {
     moveTo(-3.8f, -29.8f)
     quadraticTo(0f, -34f, 3.8f, -29.8f)
     cubicTo(8.5f, -15f, 15f, -8.5f, 29.8f, -3.8f)

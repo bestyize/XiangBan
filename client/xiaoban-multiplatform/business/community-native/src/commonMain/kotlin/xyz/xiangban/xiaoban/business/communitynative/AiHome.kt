@@ -33,11 +33,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -96,16 +96,6 @@ internal val AgentHairline: Color get() = Color(if (ThemeState.dark) 0xFF2A2A2D 
 internal val AgentLine: Color get() = Color(if (ThemeState.dark) 0xFF363639 else 0xFFE4E4E4)
 private val AgentDangerSoft: Color get() = Color(if (ThemeState.dark) 0xFF361E22 else 0xFFFFF3F4)
 
-internal val AgentAccentLine: Color
-    get() = if (ThemeState.dark) Color.White.copy(alpha = .08f) else Color(when (ThemeState.accent.id) {
-        "green" -> 0xFFC4E3D0
-        "blue" -> 0xFFC5D8F8
-        "purple" -> 0xFFD4C8F7
-        "amber" -> 0xFFECD4AF
-        "graphite" -> 0xFFD3D3D8
-        else -> 0xFFF5C7CD
-    })
-
 @Composable
 internal fun AgentIconButton(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 40.dp, glyph: Dp = 20.dp, tint: Color = MaterialTheme.colorScheme.onBackground) {
     Box(modifier.size(size).clip(RoundedCornerShape(12.dp))
@@ -146,24 +136,68 @@ internal fun AgentTopBar(model: String, exhausted: Boolean, waiting: Boolean, on
 
 @Composable
 internal fun AgentMascot(compact: Boolean = false) {
-    val extra = LocalExtraColors.current
-    val colors = MaterialTheme.colorScheme
-    val accent = Brand
-    val shape = RoundedCornerShape(if (compact) 14.dp else 18.dp)
-    Box(Modifier.size(if (compact) 44.dp else 56.dp).background(extra.brandSoft, shape)
-        .border(1.dp, AgentAccentLine, shape), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(if (compact) 28.dp else 36.dp)) {
-            scale(size.width / 48f, pivot = Offset.Zero) {
-                drawLine(accent, Offset(24f, 9f), Offset(24f, 15f), 2.6f, StrokeCap.Round)
-                drawCircle(accent, 3f, Offset(24f, 7.5f))
-                drawRoundRect(colors.surface, Offset(9f, 14.5f), Size(30f, 23f), CornerRadius(11.5f))
-                drawRoundRect(accent, Offset(9f, 14.5f), Size(30f, 23f), CornerRadius(11.5f), style = Stroke(2.4f))
-                drawRoundRect(colors.onBackground, Offset(14.5f, 20f), Size(19f, 12f), CornerRadius(6f))
-                drawCircle(colors.surface, 2.1f, Offset(20.5f, 26f))
-                drawCircle(colors.surface, 2.1f, Offset(27.5f, 26f))
-                drawCircle(accent.copy(alpha = .45f), 2f, Offset(7.2f, 26f))
-                drawCircle(accent.copy(alpha = .45f), 2f, Offset(40.8f, 26f))
-            }
+    val dark = ThemeState.dark
+    val mainPath = remember { buildMainStarPath() }
+    val subPath = remember { buildSubStarPath() }
+    // 与桌面/Android/iOS 官方应用图标「双星相伴（精修 A）」保持一致
+    Canvas(Modifier.size(if (compact) 44.dp else 56.dp)) {
+        val w = size.width
+        val h = size.height
+        val unit = size.minDimension / 120f
+        val corner = CornerRadius(27f * unit, 27f * unit)
+        val bgColors = if (dark) {
+            listOf(Color(0xFF262023), Color(0xFF121012))
+        } else {
+            listOf(Color(0xFFFF6584), Color(0xFFF9744B))
+        }
+        val auraColor = if (dark) Color.White else Color(0xFFFFE0A3)
+        val auraAlpha = if (dark) 0.09f else 0.24f
+        val sheenAlpha = if (dark) 0.13f else 0.16f
+        val borderAlpha = if (dark) 0.13f else 0.28f
+
+        drawRoundRect(
+            brush = Brush.linearGradient(
+                colors = bgColors,
+                start = Offset(w * 0.12f, h * 0.06f),
+                end = Offset(w * 0.88f, h * 0.96f),
+            ),
+            cornerRadius = corner,
+        )
+        drawRoundRect(
+            brush = Brush.radialGradient(
+                colors = listOf(auraColor.copy(alpha = auraAlpha), auraColor.copy(alpha = 0f)),
+                center = Offset(w * 0.50f, h * 0.44f),
+                radius = size.minDimension * 0.48f,
+            ),
+            cornerRadius = corner,
+        )
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                0f to Color.White.copy(alpha = sheenAlpha),
+                0.45f to Color.Transparent,
+                startY = 0f,
+                endY = h,
+            ),
+            cornerRadius = corner,
+        )
+        drawRoundRect(
+            color = Color.White.copy(alpha = borderAlpha),
+            topLeft = Offset(0.75f * unit, 0.75f * unit),
+            size = Size(118.5f * unit, 118.5f * unit),
+            cornerRadius = CornerRadius(26.25f * unit, 26.25f * unit),
+            style = Stroke(1.5f * unit),
+        )
+        withTransform({
+            translate(55.5f * unit, 62.5f * unit)
+            scale(0.96f * unit, 0.96f * unit, pivot = Offset.Zero)
+        }) {
+            drawPath(mainPath, Color.White)
+        }
+        withTransform({
+            translate(82.5f * unit, 35.5f * unit)
+            scale(0.47f * unit, 0.47f * unit, pivot = Offset.Zero)
+        }) {
+            drawPath(subPath, Color.White)
         }
     }
 }
