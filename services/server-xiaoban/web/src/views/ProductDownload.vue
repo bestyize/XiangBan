@@ -3,6 +3,26 @@ import { ref } from 'vue'
 import ProductDownloads from '@/components/ProductDownloads.vue'
 
 const latest = ref<{ version: string; publishedAt: string } | null>(null)
+const openFaq = ref<number | null>(0)
+
+const faqs = [
+  {
+    q: 'macOS 首次打开提示“无法验证开发者”怎么办？',
+    a: '目前 macOS 安装包使用固定自签名证书（尚未公证）。把应用拖入「应用程序」后，首次启动请在访达中右键点击「小伴桌面」图标 → 选择「打开」，确认一次后之后就可以正常双击启动。',
+  },
+  {
+    q: 'Windows 安装需要管理员权限吗？支持控电脑与控手机吗？',
+    a: '不需要管理员权限。Windows 64 位 NSIS 安装包默认装在当前用户目录，卸载干净无残留，支持 Windows 10 / 11（需 WebView2，Win11 自带）。内置原生 Computer Use 控屏引擎与 ADB 控手机工具，免额外配置 Node 环境即可按需启用。',
+  },
+  {
+    q: 'Android 手机版不登录或没开电脑也能独立使用吗？',
+    a: '完全可以。手机版内置原生端侧 Agent 与离线语音管线，即使不开电脑也能独立在手机上造 3D 游戏、发语音通话、用离线红外万能遥控器控电视空调、使用 104 应用「轻启」或免登录接入自有第三方模型。登录同一账号后，还可自动发现并远程遥控电脑端。',
+  },
+]
+
+function toggleFaq(index: number) {
+  openFaq.value = openFaq.value === index ? null : index
+}
 
 function formatDate(iso?: string): string {
   if (!iso) return ''
@@ -15,92 +35,77 @@ function formatDate(iso?: string): string {
 <template>
   <main class="dl-page">
     <div class="wrap">
-      <!-- Single Unified Hero -->
-      <section class="dl-hero">
-        <div>
-          <span class="kicker"><span class="kicker-dot" /> DOWNLOAD XIAOBAN</span>
-          <h1>把小伴带到<br><em>你的设备上。</em></h1>
-          <p class="dl-hero-sub">
-            已为你匹配当前系统的推荐安装包，也可以直接选择其他平台版本。桌面端与手机端均为官方原包分发，支持应用内更新检测。
-          </p>
-        </div>
-        <div v-if="latest" class="ver-badge-box">
-          <span class="kicker-dot" aria-hidden="true" />
+      <!-- Centered Iconic Hero -->
+      <section class="dl-center-hero">
+        <img src="/desktop/app-icon-new.webp" alt="小伴双星图标" class="app-icon-hero" width="68" height="68">
+        <h1>把小伴装进<span class="grad-text">你的设备</span></h1>
+        <p>
+          电脑端负责深度工作、控电脑/控手机、画布直出 PPTX/Figma 与 3D 龙鱼活桌面；Android 手机端内置本地造 3D 游戏、端侧语音通话、远程审批电脑与万能红外遥控器。
+        </p>
+        <div v-if="latest" class="latest-chip">
+          <span class="latest-dot" aria-hidden="true" />
           <span>当前最新 <strong>v{{ latest.version }}</strong> · {{ formatDate(latest.publishedAt) }} 发布</span>
         </div>
       </section>
 
-      <!-- Standalone Recommended Spotlight + All Platforms + Announcements -->
+      <!-- Interactive OS Switcher + Main Download Stage + All-Platform Quick Strip + Announcements -->
       <ProductDownloads standalone @loaded="latest = $event" />
 
-      <!-- Structured Before You Start Guide -->
-      <section class="guide-section" aria-labelledby="dl-guide-title">
-        <div class="guide-head">
-          <h2 id="dl-guide-title">安装与使用前了解</h2>
-          <p>各平台特性、首次安装提示与 AI 模型说明</p>
+      <!-- 3-Step First-Run Journey + Compact FAQ -->
+      <section class="journey-sec" aria-labelledby="journey-title">
+        <div class="sec-title-center">
+          <span>GETTING STARTED</span>
+          <h2 id="journey-title">装好之后，3 步释放双端全部能力</h2>
         </div>
 
-        <div class="guide-grid">
-          <article class="guide-card">
-            <span class="guide-card-ico" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></svg>
-            </span>
-            <h3>不同设备，体验各有侧重</h3>
-            <p>桌面端聚焦深度工作流与个性桌面，手机端聚焦随时对话、社区互动与跨端互联。</p>
-            <ul class="guide-list">
-              <li><strong>Windows / macOS</strong>：完整 AI 任务工作区、壁纸特效、桌宠与插件</li>
-              <li><strong>Android</strong>：原生社区、小伴 AI 语音/文字对话与手机桌面互联</li>
-            </ul>
+        <div class="steps-3">
+          <article class="step-card">
+            <span class="step-num">01</span>
+            <h3>登录即用，或免登录接自有模型</h3>
+            <p>登录相伴统一账号即可在双端共享小伴 AI 额度；如果你有 OpenAI / Anthropic / DeepSeek 等第三方 API，在桌面独立设置窗或手机模型配置里直接添加，密钥仅存本机。</p>
           </article>
-
-          <article class="guide-card">
-            <span class="guide-card-ico" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z" /></svg>
-            </span>
-            <h3>关于小伴 AI 与模型服务</h3>
-            <p>灵活适配个人习惯，既可开箱即用，也支持完全自管模型接口。</p>
-            <ul class="guide-list">
-              <li>使用小伴 AI 需登录相伴账号并有可用额度</li>
-              <li>也可按应用内引导配置第三方或本地模型服务</li>
-            </ul>
+          <article class="step-card">
+            <span class="step-num">02</span>
+            <h3>电脑开启控屏、画布与活桌面</h3>
+            <p>在工作区派发自主任务、按全局快捷键用超级小伴截图标注、在设计画布导出 .pptx / .fig，再把 3D 龙鱼特效、实时股票组件和 7 只桌宠请上屏幕。</p>
           </article>
+          <article class="step-card">
+            <span class="step-num">03</span>
+            <h3>装上 Android 版，随身造作品与遥控电脑</h3>
+            <p>出门用端侧离线语音通话聊灵感、在手机本地造 3D 游戏或遥控家里电视空调；电脑上跑着长任务时，还能在手机实时看进度并远程审批权限。</p>
+          </article>
+        </div>
 
-          <article class="guide-card">
-            <span class="guide-card-ico" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-            </span>
-            <h3>首次安装与社区支持</h3>
-            <p>Windows 默认安装至当前用户目录，无需管理员权限；macOS 首次打开如遇安全提示，右键选择「打开」即可。</p>
-            <div class="guide-links">
-              <RouterLink to="/guide" class="text-link">玩法指南 ↗</RouterLink>
-              <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer" class="text-link">小伴社区 ↗</a>
-              <a href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer" class="text-link">联系我们 ↗</a>
+        <div class="faq-list">
+          <div
+            v-for="(item, idx) in faqs"
+            :key="item.q"
+            class="faq-row"
+            :class="{ open: openFaq === idx }"
+          >
+            <button type="button" class="faq-q" :aria-expanded="openFaq === idx" @click="toggleFaq(idx)">
+              <span>{{ item.q }}</span>
+              <svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <div v-show="openFaq === idx" class="faq-a">
+              {{ item.a }}
             </div>
-          </article>
-        </div>
-
-        <div class="req-strip">
-          <div class="req-items">
-            <span><strong>Windows</strong>：Win 10/11 64 位 · 需 WebView2</span>
-            <span><strong>macOS</strong>：macOS 12+ · Apple 芯片</span>
-            <span><strong>Android</strong>：Android 10 及以上 · arm64</span>
           </div>
-          <span class="req-note">官方原包分发 · 支持应用内更新检测</span>
         </div>
       </section>
 
       <footer class="site-footer">
         <div class="footer-brand">
           <strong>小伴桌面</strong>
-          <p>你的 AI 工作与创作助手</p>
+          <p>端云一体、双端接力的个人 AI 伙伴 · wallpaper.xiangban.xyz</p>
         </div>
         <div class="footer-links">
           <RouterLink to="/features">功能介绍</RouterLink>
           <RouterLink to="/download">下载安装</RouterLink>
           <RouterLink to="/guide">玩法指南</RouterLink>
-          <RouterLink to="/images">壁纸</RouterLink>
-          <a href="https://chat.xiangban.xyz/contact">联系我们</a>
-          <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">社区 ↗</a>
+          <RouterLink to="/images">壁纸库</RouterLink>
+          <a href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer">联系我们</a>
+          <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">超级小伴社区 ↗</a>
         </div>
       </footer>
     </div>
@@ -109,272 +114,197 @@ function formatDate(iso?: string): string {
 
 <style scoped>
 .dl-page {
-  --bg: #fafaf9;
+  --canvas: #fcfaf7;
   --surface: #ffffff;
-  --surface-soft: #f4f3f0;
-  --ink: #141416;
-  --ink-2: #52525b;
-  --ink-3: #71717a;
-  --brand: #18181b;
-  --line: rgba(24, 24, 27, 0.08);
-  background: var(--bg);
-  color: var(--ink);
+  --ink: #19171a;
+  --ink-2: #524d54;
+  --ink-3: #837d86;
+  --coral: #ee4f6d;
+  --coral-grad: linear-gradient(135deg, #ff5b7d 0%, #f9744b 100%);
+  --line: rgba(28, 22, 28, 0.075);
+  --shadow-sm: 0 2px 10px rgba(26, 18, 24, 0.04);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
   min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(62% 520px at 50% -110px, rgba(255, 114, 134, 0.16), transparent 68%),
+    radial-gradient(42% 380px at 84% 120px, rgba(249, 146, 86, 0.13), transparent 66%),
+    radial-gradient(40% 340px at 14% 200px, rgba(124, 178, 255, 0.10), transparent 66%),
+    var(--canvas);
 }
 
 .wrap {
-  width: min(1220px, calc(100% - 64px));
+  width: min(1180px, calc(100% - 64px));
   margin: 0 auto;
 }
 
-.kicker {
+.grad-text {
+  background: var(--coral-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dl-center-hero {
+  padding: 54px 0 26px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.app-icon-hero {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(249, 102, 96, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  margin-bottom: 20px;
+}
+.dl-center-hero h1 {
+  font-size: clamp(36px, 4.6vw, 56px);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+  font-weight: 760;
+  color: var(--ink);
+}
+.dl-center-hero p {
+  margin-top: 14px;
+  font-size: 15.5px;
+  color: var(--ink-2);
+  max-width: 660px;
+  line-height: 1.75;
+}
+.latest-chip {
+  margin-top: 16px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(242, 92, 114, 0.22);
+  font-size: 12.5px;
   color: var(--ink-2);
-  text-transform: uppercase;
 }
-
-.kicker-dot {
+.latest-chip strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+.latest-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--brand);
-  box-shadow: 0 0 0 4px rgba(24, 24, 27, 0.12);
+  background: var(--coral-grad);
 }
 
-.dl-hero {
-  padding: 60px 0 36px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
+.journey-sec {
+  padding: 60px 0 28px;
+}
+.sec-title-center {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.sec-title-center span {
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  color: var(--coral);
+  text-transform: uppercase;
+}
+.sec-title-center h2 {
+  margin-top: 8px;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.03em;
+  font-weight: 750;
 }
 
-.dl-hero h1 {
-  font-size: clamp(40px, 4.8vw, 62px);
-  line-height: 1.15;
-  letter-spacing: -0.045em;
-  font-weight: 700;
-  margin: 18px 0 14px;
-}
-
-.dl-hero h1 em {
-  font-style: normal;
-  color: #52525b;
-}
-
-.dl-hero-sub {
-  font-size: 15.5px;
-  color: var(--ink-2);
-  max-width: 540px;
-  line-height: 1.8;
-}
-
-.ver-badge-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 2px 10px rgba(15, 15, 20, 0.04);
-  font-size: 13px;
-  color: var(--ink-2);
-  flex-shrink: 0;
-}
-
-.ver-badge-box strong {
-  color: var(--brand);
-  font-weight: 700;
-}
-
-.guide-section {
-  padding: 52px 0 68px;
-}
-
-.guide-head {
-  margin-bottom: 22px;
-}
-
-.guide-head h2 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.guide-head p {
-  font-size: 13.5px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-
-.guide-grid {
+.steps-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
-
-.guide-card {
+.step-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+  border-radius: 22px;
+  padding: 26px;
+  box-shadow: var(--shadow-sm);
 }
-
-.guide-card-ico {
+.step-num {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background: var(--surface-soft);
-  color: var(--brand);
+  border-radius: 11px;
   display: grid;
   place-items: center;
+  font-size: 13px;
+  font-weight: 800;
   margin-bottom: 16px;
 }
+.step-card:nth-child(1) .step-num { background: #fff0f2; color: #e24666; }
+.step-card:nth-child(2) .step-num { background: #fff5e5; color: #d97706; }
+.step-card:nth-child(3) .step-num { background: #eaf9f0; color: #158f4d; }
+.step-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.step-card p { font-size: 13.5px; color: var(--ink-2); line-height: 1.72; }
 
-.guide-card h3 {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 10px;
+.faq-list {
+  margin-top: 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
 }
-
-.guide-card p {
+.faq-row { border-bottom: 1px solid var(--line); }
+.faq-row:last-child { border-bottom: 0; }
+.faq-q {
+  width: 100%;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14.5px;
+  font-weight: 650;
+  text-align: left;
+  color: var(--ink);
+}
+.faq-q:hover { background: #fdfbf9; }
+.faq-a {
+  padding: 0 24px 18px;
   font-size: 13.5px;
   color: var(--ink-2);
   line-height: 1.75;
 }
-
-.guide-list {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 13px;
-  color: var(--ink-2);
-  list-style: none;
-}
-
-.guide-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.guide-list li::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #52525b;
-  margin-top: 8px;
+.faq-chevron {
+  color: var(--ink-3);
+  transition: transform 0.2s var(--ease);
   flex-shrink: 0;
 }
-
-.guide-links {
-  margin-top: auto;
-  padding-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  font-size: 13.5px;
-}
-
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 650;
-  color: var(--brand);
-}
-.text-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-.req-strip {
-  margin-top: 16px;
-  border-radius: 14px;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  padding: 16px 22px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  font-size: 12.5px;
-  color: var(--ink-2);
-}
-
-.req-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-}
-
-.req-items strong {
-  color: var(--ink);
-  font-weight: 650;
-}
-
-.req-note {
-  color: var(--ink-3);
-}
+.faq-row.open .faq-chevron { transform: rotate(180deg); }
 
 .site-footer {
   border-top: 1px solid var(--line);
-  padding: 36px 0 calc(var(--tabbar-h) + var(--safe-bottom) + 40px);
+  padding: 34px 0 calc(var(--tabbar-h, 58px) + var(--safe-bottom, 0px) + 38px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
 }
-
 @media (min-width: 769px) {
-  .site-footer {
-    padding-bottom: 64px;
-  }
+  .site-footer { padding-bottom: 60px; }
 }
-
-.footer-brand strong {
-  font-size: 18px;
-  font-weight: 700;
-  display: block;
-}
-
-.footer-brand p {
-  font-size: 12.5px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-
-.footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  font-size: 13.5px;
-  color: var(--ink-2);
-}
-
-.footer-links a:hover {
-  color: var(--brand);
-  text-decoration: underline;
-}
+.footer-brand strong { font-size: 17px; font-weight: 720; display: block; }
+.footer-brand p { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 22px; font-size: 13.5px; color: var(--ink-2); }
+.footer-links a:hover { color: var(--coral); }
 
 @media (max-width: 960px) {
-  .guide-grid { grid-template-columns: 1fr; }
+  .steps-3 { grid-template-columns: 1fr; }
 }
-
 @media (max-width: 768px) {
   .wrap { width: calc(100% - 32px); }
-  .dl-hero { flex-direction: column; align-items: flex-start; padding: 32px 0 24px; gap: 16px; }
+  .dl-center-hero { padding: 30px 0 20px; }
+  .app-icon-hero { width: 54px; height: 54px; border-radius: 15px; margin-bottom: 14px; }
+  .dl-center-hero p { font-size: 14px; }
   .site-footer { flex-direction: column; align-items: flex-start; }
 }
 </style>

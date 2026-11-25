@@ -1,520 +1,513 @@
 <script setup lang="ts">
-import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 
-type WorkKey = 'home' | 'plan'
-type SpaceKey = 'wallpapers' | 'effects' | 'companion'
+type SceneKey = 'agent' | 'collab' | 'plugins' | 'dragon' | 'widgets' | 'mcreate' | 'mvoice' | 'mtools'
+type WorkKey = 'dusk' | 'ink' | 'mbti'
+type NightKey = 'dragon' | 'widgets' | 'wallpapers' | 'companion'
+type MobilePillarKey = 'create' | 'voice' | 'phonelink' | 'tools' | 'community'
 
-const activeSection = ref('work')
-const workTab = ref<WorkKey>('home')
-const spaceTab = ref<SpaceKey>('wallpapers')
-
-const workShots: Record<WorkKey, { src: string; alt: string; title: string; pill: string; cap: string; w: number; h: number }> = {
-  home: {
-    src: '/desktop/desktop-home.webp',
-    alt: '小伴桌面 v3.1.8 新建任务工作台界面',
-    title: '✳ 小伴桌面 · 新建任务工作台',
-    pill: '最新实机界面',
-    cap: '办公 / 学习 / 生活 / 创作快捷入口，随时开启任务',
-    w: 1280,
-    h: 800,
-  },
-  plan: {
-    src: '/desktop/task-plan.webp',
-    alt: '小伴为咖啡店活动页面列出的任务执行步骤',
-    title: '✳ 小伴桌面 · 任务拆解与执行过程',
-    pill: '步骤 2 / 5',
-    cap: '自动拆解任务步骤，并可展开查看实时思考摘要',
-    w: 849,
-    h: 440,
-  },
+interface SceneItem {
+  key: SceneKey
+  label: string
+  plat: '电脑' | '手机'
+  title: string
+  desc: string
+  tag: string
+  img?: string
+  imgs?: [string, string]
 }
 
-const spaceShots: Record<SpaceKey, { src: string; alt: string; title: string; pill: string }> = {
-  wallpapers: {
-    src: '/desktop/desktop-wallpapers.webp',
-    alt: '小伴桌面 v3.1.8 壁纸库与装扮界面',
-    title: '小伴桌面 · 装扮 / 壁纸',
-    pill: '精选动静壁纸',
+const scenes: SceneItem[] = [
+  {
+    key: 'agent',
+    label: '控电脑 & 多模型',
+    plat: '电脑',
+    img: '/desktop/desktop-config-ai.webp',
+    title: '独立多模型窗口 + 原生 Computer Use 控电脑屏幕与 ADB 控手机',
+    desc: '官方小伴 AI 之外内置 DeepSeek、智谱、Kimi、MiniMax 与任意 OpenAI 兼容模型；开启电脑屏幕与应用控制后，直接看屏点击、输入并自动化操作。',
+    tag: '电脑端最新 · v3.1.8 实机',
   },
-  effects: {
-    src: '/desktop/desktop-effects.webp',
-    alt: '小伴桌面 v3.1.8 桌面特效与灯火阑珊参数面板',
-    title: '小伴桌面 · 装扮 / 桌面特效（灯火阑珊）',
-    pill: '14 种轻量特效',
+  {
+    key: 'collab',
+    label: '外部 Agent & 语音 MCP',
+    plat: '电脑',
+    img: '/desktop/desktop-config-agent.webp',
+    title: '外部 Agent 协作中枢：连 Claude Code / Codex 改画布，开放本机语音 MCP',
+    desc: '一键接入 Codex、ChatGPT 桌面与 Claude Code 协同读写本机设计稿，安装 Hooks 监听终端任务，还能把本地 SenseVoice 识别与 Edge 朗读开放为回环语音 MCP。',
+    tag: '电脑端最新 · 外部 Agent',
   },
-  companion: {
-    src: '/desktop/desktop-companion.webp',
-    alt: '小伴桌面 v3.1.8 花朵心语与多肉点点桌面伙伴',
-    title: '小伴桌面 · 装扮 / 桌面伙伴',
-    pill: '花朵心语 & 多肉点点',
+  {
+    key: 'plugins',
+    label: '专家市场 & 技能',
+    plat: '电脑',
+    img: '/desktop/desktop-plugins-v318.webp',
+    title: '小伴市场 & SkillHub：54+ 行业专家、技能与 OAuth MCP 连接器',
+    desc: '按需安装自动化测试、产品原型设计、腾讯文档/百度网盘、3D 游戏工坊与代码审查专家，来源透明、版本可控。',
+    tag: '电脑端最新 · AI 插件',
   },
+  {
+    key: 'dragon',
+    label: '3D 龙鱼 & 14 特效',
+    plat: '电脑',
+    img: '/desktop/desktop-dragon.webp',
+    title: '14 种顶层透明特效：3D 朱红龙鱼 & 锦鲤巡游，光照鱼群实时调',
+    desc: '朱红龙鱼、锦鲤、灯火阑珊、星汉灿烂、庄周梦蝶……叠加在任意动静壁纸之上，还能让 AI 现做专属特效包。',
+    tag: '电脑端最新 · 3D 特效',
+  },
+  {
+    key: 'widgets',
+    label: '8 款实时桌面组件',
+    plat: '电脑',
+    img: '/desktop/desktop-widgets.webp',
+    title: '8 款多屏实时桌面组件：股票行情、电子木鱼、2026 农历休/班月历',
+    desc: '桌面时钟、城市天气、待办事项、今日日程、实时股票行情、电子木鱼、法定节假日月历与纪念日，多显示器自由摆放。',
+    tag: '电脑端最新 · 实时组件',
+  },
+  {
+    key: 'mcreate',
+    label: '手机本地造作品',
+    plat: '手机',
+    imgs: ['/desktop/mobile-chat-build.webp', '/desktop/mobile-my-works.webp'],
+    title: '手机本地原生 Agent 造作品与 3D 游戏：实时校验、草稿续作、一键发布',
+    desc: '内置 Rust 原生 Agent 与 Three.js，实时展示步骤清单并自动补齐缺失资源；中断自动保留草稿，支持本机沙箱试玩或导出至电脑桌面。',
+    tag: '手机端最新 · 本地创作',
+  },
+  {
+    key: 'mvoice',
+    label: '端侧语音 & 控电脑',
+    plat: '手机',
+    imgs: ['/desktop/mobile-voice-call.webp', '/desktop/mobile-chat-remote.webp'],
+    title: '端侧离线实时语音通话 + 远程遥控 MacBook Pro 查进度与改文件',
+    desc: '本地 Silero VAD + Smart Turn + SenseVoice 低延迟开口打断；出门随时切换至电脑会话，查看文件修改 Diff、生图进度与方案确认卡。',
+    tag: '手机端最新 · 语音 & 遥控',
+  },
+  {
+    key: 'mtools',
+    label: '原生社区 & 自由模型',
+    plat: '手机',
+    imgs: ['/desktop/mobile-community-new.webp', '/desktop/mobile-model-deepseek.webp'],
+    title: '全新原生超级小伴社区 + 免登录自由接入 DeepSeek / OpenAI / Anthropic',
+    desc: '一站发现《潮汐书房·鲸鱼娘》《江山时序》《龙鱼水族箱》等社区作品与排行榜；第三方 API 密钥仅保存在本机私有存储，同时内置离线红外万能遥控器。',
+    tag: '手机端最新 · 社区 & 模型自由',
+  },
+]
+
+const workTabs: Record<WorkKey, { label: string; src: string; alt: string }> = {
+  dusk: { label: '暮色滑翔 3D', src: '/desktop/work-dusk-glider.webp', alt: '暮色滑翔 · 3D 低多边形滑翔互动作品' },
+  ink: { label: '水墨剑客', src: '/desktop/work-ink-blade.webp', alt: '水墨剑客 · 国风水墨横版动作作品' },
+  mbti: { label: '向内看 MBTI', src: '/desktop/work-mbti.webp', alt: '向内看 · MBTI 原生质感互动测评作品' },
 }
 
-const sectionIds = ['work', 'create', 'space', 'plugins', 'mobile']
-
-function jumpTo(id: string) {
-  const el = document.getElementById(id)
-  if (!el) return
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  activeSection.value = id === 'play' ? 'plugins' : id
+const nightTabs: Record<NightKey, { label: string; src: string; alt: string }> = {
+  dragon: { label: '3D 龙鱼巡游', src: '/desktop/desktop-dragon.webp', alt: '小伴桌面 3D 朱红龙鱼巡游特效与参数调节' },
+  widgets: { label: '8 款实时组件', src: '/desktop/desktop-widgets.webp', alt: '小伴桌面 8 款实时桌面组件（股票行情、电子木鱼、月历等）' },
+  wallpapers: { label: '动静壁纸库', src: '/desktop/desktop-wallpapers.webp', alt: '小伴桌面动静壁纸库' },
+  companion: { label: '7 只感知桌宠', src: '/desktop/desktop-companion.webp', alt: '小伴桌面花朵心语与多肉点点 7 只桌宠' },
 }
 
-function handleScroll() {
-  let current = sectionIds[0]
-  for (const id of sectionIds) {
-    const el = document.getElementById(id)
-    if (!el) continue
-    if (el.getBoundingClientRect().top <= 220) current = id
-  }
-  activeSection.value = current
-}
+const mobilePillars: {
+  key: MobilePillarKey
+  num: string
+  title: string
+  body: string
+  imgs: [string, string]
+  capTitle: string
+  capDesc: string
+}[] = [
+  {
+    key: 'create',
+    num: '01',
+    title: '手机本地原生 Agent，直接造 3D 游戏 & 小程序',
+    body: '内置 Rust 原生 Agent 与 Three.js，可导入相册图片/音频/3D 模型，在本机沙箱试玩、导出电脑兼容包或发布社区；也支持 AI 绘图/GIF 与真实系统闹钟提醒。',
+    imgs: ['/desktop/mobile-chat-build.webp', '/desktop/mobile-my-works.webp'],
+    capTitle: '端侧原生 Agent 造作品 · 实时步骤校验 & 草稿续作',
+    capDesc: '支持本机沙箱试玩、中断自动保存草稿与一键发布，还能同步到电脑桌面使用。',
+  },
+  {
+    key: 'voice',
+    num: '02',
+    title: '端侧离线级联语音通话，低延迟随时打断',
+    body: '本地运行 Silero VAD + Smart Turn + SenseVoice 识别，不依赖云端卡顿；对着日落珊瑚双星光球自然对话，开口即打断追问。',
+    imgs: ['/desktop/mobile-voice-call.webp', '/desktop/mobile-ai-home.webp'],
+    capTitle: '端侧离线级联语音 · 日落珊瑚双星实时通话',
+    capDesc: '本地 Silero VAD + Smart Turn + SenseVoice 管线，反应极快，随时开口打断追问。',
+  },
+  {
+    key: 'phonelink',
+    num: '03',
+    title: '手机桌面互联：看电脑进度、手机审批高危权限',
+    body: '自动发现同账号电脑，出门在外实时查看桌面 Agent 执行流，高危工具或命令卡片直接在手机点批准/拒绝，灵感也能一键推给电脑深度干活。',
+    imgs: ['/desktop/mobile-chat-remote.webp', '/desktop/mobile-chat-approve.webp'],
+    capTitle: '手机远程控电脑 · 文件 Diff、后台生图与权限审批',
+    capDesc: '一键切到电脑遥控会话，查看改动明细与检查点，高危写入操作手机直接批准或拒绝。',
+  },
+  {
+    key: 'tools',
+    num: '04',
+    title: '离线万能红外遥控器 + 动态壁纸 + 轻启直达',
+    body: '内置离线电视与空调红外码库（含美的 SmartIR 精准控温），附带 30fps 系统动态壁纸、104 款应用「轻启」快捷方式与共享游戏广场。',
+    imgs: ['/desktop/mobile-ai-home.webp', '/desktop/mobile-chat-approve.webp'],
+    capTitle: '真系统闹钟提醒 + AI 生图/GIF + 离线万能红外遥控器',
+    capDesc: '一句话写入手机系统日程提醒、生成 4:3 壁纸，并内置电视空调红外码库、动态壁纸与 104 应用「轻启」。',
+  },
+  {
+    key: 'community',
+    num: '05',
+    title: '原生超级小伴社区 + 免登录自定义多模型',
+    body: '一站刷创意作品、AI 日报、开源精选与大模型性价比天梯；官方小伴 AI 跨端同步，也可免登录添加 OpenAI / Anthropic 第三方模型，密钥仅存本机。',
+    imgs: ['/desktop/mobile-community-new.webp', '/desktop/mobile-model-deepseek.webp'],
+    capTitle: '全新原生超级小伴社区 + 免登录自定义多模型',
+    capDesc: '发现 3D 互动与创意作品、AI 资讯与排行榜；第三方 API 密钥仅保存在本机，不上传云端。',
+  },
+]
 
-onMounted(() => window.addEventListener('scroll', handleScroll, { passive: true }))
-onUnmounted(() => window.removeEventListener('scroll', handleScroll))
-onActivated(() => window.addEventListener('scroll', handleScroll, { passive: true }))
-onDeactivated(() => window.removeEventListener('scroll', handleScroll))
+const desktopMatrix = [
+  { title: '全能自主 Agent', sub: '工作区读写、Shell 与 Git Worktree 并发' },
+  { title: '控电脑 & 控手机', sub: '原生 Computer Use + ADB Phone Use' },
+  { title: '专业无限设计画布', sub: '批注改稿、直出 .pptx / .fig 与 Design MCP' },
+  { title: '超级小伴悬浮胶囊', sub: '全局快捷键跨应用区域截图标注即问' },
+  { title: '外部 Agent 与语音 MCP', sub: '连 Claude Code/Codex、Hooks 与本地语音接口' },
+  { title: '云文档库 & 图/GIF 生成', sub: '直连腾讯文档/百度网盘，自动归档素材' },
+  { title: '3D 龙鱼 & 8 款组件', sub: '14 种特效、实时股票/木鱼/月历/桌宠' },
+  { title: '插件市场 & 模型自由', sub: 'SkillHub、OAuth MCP、独立多模型测速窗' },
+]
+
+const mobileMatrix = [
+  { title: '手机本地造 3D 游戏', sub: '原生 Agent + Three.js，沙箱试玩与导出' },
+  { title: '端侧离线实时语音', sub: '本地 Silero + SenseVoice，开口即打断' },
+  { title: '手机远程控电脑', sub: '实时看电脑进度，手机审批高危工具权限' },
+  { title: '万能红外遥控器', sub: '离线码库直控电视空调，支持美的精准控温' },
+  { title: 'AI 绘图/GIF & 真闹钟', sub: '对话文生图与动图，真实创建系统闹钟提醒' },
+  { title: '系统动态壁纸 & 轻启', sub: '30fps 桌面/锁屏动态壁纸 + 104 应用快捷入口' },
+  { title: '原生超级小伴社区', sub: '创意作品、AI 日报、开源精选与模型天梯' },
+  { title: '免登录自定义多模型', sub: 'OpenAI / Anthropic 自由接入，密钥仅存本机' },
+]
+
+const activeSceneKey = ref<SceneKey>('agent')
+const activeWorkKey = ref<WorkKey>('dusk')
+const activeNightKey = ref<NightKey>('dragon')
+const activeMobileKey = ref<MobilePillarKey>('create')
+
+const currentScene = computed(() => scenes.find(s => s.key === activeSceneKey.value) ?? scenes[0])
+const currentWork = computed(() => workTabs[activeWorkKey.value])
+const currentNight = computed(() => nightTabs[activeNightKey.value])
+const currentMobile = computed(() => mobilePillars.find(m => m.key === activeMobileKey.value) ?? mobilePillars[0])
+
+function scrollToId(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <template>
   <main class="feat-page">
-    <!-- Hero + 6-Capability Bento -->
-    <section class="wrap feat-hero">
-      <div>
-        <span class="kicker"><span class="kicker-dot" /> WHAT YOU CAN DO</span>
-        <h1>想做的事，<br><em>从对话到桌面都顺手。</em></h1>
-        <p class="hero-desc">
-          把 AI 工作助手、创意作品工坊、动态桌面装扮、插件扩展、精选应用与手机端协同收进同一个轻盈空间——用自然对话推进任务，也把每天面对的屏幕打理成喜欢的样子。
-        </p>
-        <div class="hero-actions">
-          <RouterLink class="btn btn-primary" to="/download">
-            下载小伴
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
-          </RouterLink>
-          <button type="button" class="btn btn-secondary" @click="jumpTo('work')">
-            逐项浏览功能
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="cap-overview">
-        <div class="cap-overview-head">
-          <strong><span>✳</span> 核心能力一览 · 桌面 &amp; 手机</strong>
-          <span>点击直达章节</span>
-        </div>
-        <div class="cap-grid">
-          <button type="button" class="cap-tile" @click="jumpTo('work')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">01 / WORK</span>
-              <h3>AI 工作助手</h3>
-              <p>拆解步骤、调用工具与透明确认</p>
-            </span>
-          </button>
-
-          <button type="button" class="cap-tile" @click="jumpTo('create')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3l1.9 5.8L20 10.5l-5 3.6L16.8 20 12 16.5 7.2 20 9 14.1 4 10.5l6.1-1.7z" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">02 / CREATE</span>
-              <h3>创作与作品</h3>
-              <p>设计稿、网页与小游戏实时预览打磨</p>
-            </span>
-          </button>
-
-          <button type="button" class="cap-tile" @click="jumpTo('space')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">03 / SPACE</span>
-              <h3>个性桌面</h3>
-              <p>动态壁纸、14 种特效、皮肤与桌宠</p>
-            </span>
-          </button>
-
-          <button type="button" class="cap-tile" @click="jumpTo('plugins')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">04 / EXTEND</span>
-              <h3>AI 插件与市场</h3>
-              <p>专家角色、技能库与 MCP 连接器</p>
-            </span>
-          </button>
-
-          <button type="button" class="cap-tile" @click="jumpTo('play')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="4" /><path d="M7 12h4" /><path d="M9 10v4" /><circle cx="15.5" cy="11" r="1" /><circle cx="17.5" cy="13" r="1" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">05 / APPS</span>
-              <h3>精选应用与游戏</h3>
-              <p>内置轻游戏、实用工具与自制作品</p>
-            </span>
-          </button>
-
-          <button type="button" class="cap-tile" @click="jumpTo('mobile')">
-            <span class="cap-ico" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></svg>
-            </span>
-            <span class="cap-meta">
-              <span class="cap-num">06 / MOBILE</span>
-              <h3>手机版 &amp; 互联</h3>
-              <p>随时语音通话、遥控电脑与社区</p>
-            </span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Sticky 6-Section Anchor Bar -->
-    <div class="subnav-bar">
-      <div class="subnav-inner">
-        <nav class="subnav-links hide-scrollbar" aria-label="功能导航">
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'work' }" @click="jumpTo('work')"><em>01</em> AI 工作助手</button>
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'create' }" @click="jumpTo('create')"><em>02</em> 创作与作品</button>
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'space' }" @click="jumpTo('space')"><em>03</em> 个性桌面</button>
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'plugins' }" @click="jumpTo('plugins')"><em>04</em> AI 插件</button>
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'plugins' }" @click="jumpTo('play')"><em>05</em> 精选应用</button>
-          <button type="button" class="subnav-pill" :class="{ active: activeSection === 'mobile' }" @click="jumpTo('mobile')"><em>06</em> 手机版小伴</button>
-        </nav>
-        <span class="subnav-note">Windows · macOS · Android</span>
-      </div>
-    </div>
-
     <div class="wrap">
-      <!-- 01 / WORK -->
-      <section id="work" class="feat-section">
-        <div class="sec-header">
-          <span class="sec-num">01 / WORK</span>
-          <span class="sec-tag">任务拆解 · 透明执行 · 模型自选</span>
+      <!-- Centered Commanding Hero -->
+      <section class="feat-hero">
+        <div class="hero-badge">
+          <img src="/desktop/app-icon-new.webp" alt="" width="22" height="22">
+          <span>小伴 3.1 · 电脑端 &amp; Android 手机端</span>
         </div>
-        <div class="feat-split">
-          <div class="feat-copy">
-            <h2>不止是对话，<br>还能一起把事情办成。</h2>
-            <p>
-              说出目标，小伴会自动拆解计划、检索资料或整理工作区文件。每一步执行过程都能展开查看，涉及敏感操作时按应用设置等你确认。
-            </p>
-            <div class="feat-points">
-              <div class="feat-point">
-                <span class="feat-point-ico" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4" /></svg>
-                </span>
-                <div>
-                  <strong>任务自动拆解与进度跟踪</strong>
-                  <span>复杂需求拆成清晰步骤，实时看到每一步耗时与产出。</span>
-                </div>
-              </div>
-              <div class="feat-point">
-                <span class="feat-point-ico" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-                </span>
-                <div>
-                  <strong>权限清晰，关键动作人工确认</strong>
-                  <span>读写文件、执行命令按工作区与安全规则把关，安心放手。</span>
-                </div>
-              </div>
-              <div class="feat-point">
-                <span class="feat-point-ico" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4" /></svg>
-                </span>
-                <div>
-                  <strong>小伴 AI 与自有模型自由切换</strong>
-                  <span>登录即用官方多档位模型，也可按需配置你自己的模型服务。</span>
-                </div>
-              </div>
-            </div>
-            <RouterLink to="/guide" class="text-link">查看玩法指南 <span aria-hidden="true">↗</span></RouterLink>
-          </div>
+        <h1>不止聊天与装扮，<br><span class="grad-text">真正会动手的全能 AI 伙伴。</span></h1>
+        <p>
+          在电脑上替你写代码、直接控屏幕与 Android 手机、在无限画布直出可编辑 PPTX 与 Figma、养一屏 3D 龙鱼与实时股票组件；出门切手机，端侧离线实时语音通话、本地造 3D 游戏、远程审批电脑权限，还内置万能红外遥控器。
+        </p>
+        <div class="hero-cta-row">
+          <RouterLink to="/download" class="cta-coral">
+            <span>免费下载小伴（电脑 / 手机）</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
+          </RouterLink>
+          <button type="button" class="cta-soft" @click="scrollToId('mobileFlagship')">
+            直达手机版硬核能力 ↓
+          </button>
+        </div>
+      </section>
 
-          <div class="visual-stage s1">
-            <div class="view-tabs" role="tablist" aria-label="工作助手界面视角">
-              <button type="button" role="tab" :aria-selected="workTab === 'home'" :class="{ active: workTab === 'home' }" @click="workTab = 'home'">新建任务工作台</button>
-              <button type="button" role="tab" :aria-selected="workTab === 'plan'" :class="{ active: workTab === 'plan' }" @click="workTab = 'plan'">任务拆解执行</button>
+      <!-- Interactive First-Screen 8-Scene Flagship Showcase -->
+      <section class="live-stage-wrap" aria-label="双端核心能力实机体验">
+        <div class="scene-dock" role="tablist">
+          <button
+            v-for="s in scenes"
+            :key="s.key"
+            type="button"
+            role="tab"
+            class="scene-chip"
+            :class="{ active: activeSceneKey === s.key }"
+            :aria-selected="activeSceneKey === s.key"
+            @click="activeSceneKey = s.key"
+          >
+            <span>✦ {{ s.label }}</span>
+            <span class="chip-plat">{{ s.plat }}</span>
+          </button>
+        </div>
+
+        <div class="showcase-frame">
+          <div class="showcase-inner">
+            <div class="showcase-media" :class="{ 'phone-mode': Boolean(currentScene.imgs) }">
+              <template v-if="currentScene.imgs">
+                <div v-for="(src, idx) in currentScene.imgs" :key="src" class="phone-demo">
+                  <img :src="src" :alt="`${currentScene.title} 预览 ${idx + 1}`" loading="lazy">
+                </div>
+              </template>
+              <img v-else :src="currentScene.img" :alt="currentScene.title" class="desk-img">
             </div>
-            <div class="window-frame">
-              <div class="window-bar">
-                <div class="window-dots" aria-hidden="true"><i /><i /><i /></div>
-                <span class="window-title">{{ workShots[workTab].title }}</span>
-                <span class="window-pill">{{ workShots[workTab].pill }}</span>
-              </div>
-              <div class="window-body">
-                <img :src="workShots[workTab].src" :alt="workShots[workTab].alt" :width="workShots[workTab].w" :height="workShots[workTab].h">
-              </div>
+          </div>
+          <div class="showcase-caption">
+            <div>
+              <h3>{{ currentScene.title }}</h3>
+              <p>{{ currentScene.desc }}</p>
             </div>
-            <div class="stage-caption">
-              <span>{{ workShots[workTab].cap }}</span>
-              <small>点击上方页签切换视角</small>
-            </div>
+            <span class="showcase-pill">{{ currentScene.tag }}</span>
           </div>
         </div>
       </section>
 
-      <!-- 02 / CREATE -->
-      <section id="create" class="feat-section">
-        <div class="sec-header">
-          <span class="sec-num">02 / CREATE</span>
-          <span class="sec-tag">对话生成 · 实时预览 · 持续打磨</span>
-        </div>
-        <div class="feat-split reverse">
-          <div class="feat-copy">
-            <h2>让灵感变成<br>可以继续打磨的作品。</h2>
-            <p>
-              从设计稿、网页到游戏或桌面内容，通过对话探索创意、查看成果并继续修改。桌面端提供作品预览、设计画布与完整导出等能力。
-            </p>
-            <div class="feat-points">
-              <div class="feat-point">
-                <span class="feat-point-ico" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /></svg>
-                </span>
-                <div>
-                  <strong>边聊边改，成果同屏呈现</strong>
-                  <span>不满意的配色、版式和交互，直接用自然语言继续调整。</span>
-                </div>
-              </div>
-              <div class="feat-point">
-                <span class="feat-point-ico" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                </span>
-                <div>
-                  <strong>设计画布与完整作品导出</strong>
-                  <span>支持独立网页、资源包与设计稿沉淀，方便直接交付或分享社区。</span>
-                </div>
-              </div>
-            </div>
-            <RouterLink to="/guide" class="text-link">寻找创作灵感 <span aria-hidden="true">↗</span></RouterLink>
-          </div>
-
-          <div class="visual-stage s2">
-            <div class="creative-prompt-bar">
-              <span class="chip-mini">示例需求</span>
-              <span>“帮春野咖啡做一个奶油色 + 自然绿的春日限定活动单页，适配手机”</span>
-            </div>
-            <div class="window-frame">
-              <div class="window-bar">
-                <div class="window-dots" aria-hidden="true"><i /><i /><i /></div>
-                <span class="window-title">作品预览 · 春野咖啡春日限定页</span>
-                <span class="window-pill">可交互 HTML</span>
-              </div>
-              <div class="window-body">
-                <img src="/desktop/task-result.webp" alt="小伴根据示例需求生成的咖啡店活动页面" width="535" height="387" loading="lazy">
-              </div>
-            </div>
-            <div class="stage-caption">
-              <span>图中为真实任务生成的示例活动页面</span>
-              <small>支持继续对话改稿与导出</small>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 03 / YOUR SPACE -->
-      <section id="space" class="feat-section">
-        <div class="sec-header">
-          <span class="sec-num">03 / YOUR SPACE</span>
-          <span class="sec-tag">壁纸 · 特效 · 组件 · 桌面伙伴</span>
-        </div>
-        <div class="pano-head">
-          <h2>把每天面对的桌面，<br>装扮成自己喜欢的样子。</h2>
-          <p>从精选静态与动态视频壁纸，到十四个轻量桌面特效、实用小组件和会陪伴互动的桌面伙伴，让工作空间拥有自己的节奏。</p>
+      <!-- SECTION 1: DESKTOP FLAGSHIP CAPABILITIES -->
+      <section id="work" class="bento-sec">
+        <div class="sec-title-center">
+          <span>DESKTOP FLAGSHIP · WINDOWS &amp; MACOS</span>
+          <h2>电脑端：你的全能 AI 工作台与活桌面</h2>
+          <p>从底层自主操控系统与手机、专业多画板设计，到 3D 龙鱼巡游与实时股票桌面组件——把深度生产力与桌面松弛感合二为一。</p>
         </div>
 
-        <div class="pano-stage">
-          <div class="pano-bar">
-            <div class="view-tabs" style="margin-bottom:0" role="tablist" aria-label="个性桌面界面切换">
-              <button type="button" role="tab" :aria-selected="spaceTab === 'wallpapers'" :class="{ active: spaceTab === 'wallpapers' }" @click="spaceTab = 'wallpapers'">动态壁纸</button>
-              <button type="button" role="tab" :aria-selected="spaceTab === 'effects'" :class="{ active: spaceTab === 'effects' }" @click="spaceTab = 'effects'">14 种桌面特效</button>
-              <button type="button" role="tab" :aria-selected="spaceTab === 'companion'" :class="{ active: spaceTab === 'companion' }" @click="spaceTab = 'companion'">桌面伙伴</button>
-            </div>
-            <span class="pano-hint">点击页签或下方卡片切换实机界面</span>
-          </div>
-
-          <div class="window-frame">
-            <div class="window-bar">
-              <div class="window-dots" aria-hidden="true"><i /><i /><i /></div>
-              <span class="window-title">{{ spaceShots[spaceTab].title }}</span>
-              <span class="window-pill">{{ spaceShots[spaceTab].pill }}</span>
-            </div>
-            <div class="window-body">
-              <img :src="spaceShots[spaceTab].src" :alt="spaceShots[spaceTab].alt" width="1280" height="800" loading="lazy">
-            </div>
-          </div>
-
-          <div class="pano-grid">
-            <button type="button" class="pano-card" :class="{ 'is-active': spaceTab === 'wallpapers' }" @click="spaceTab = 'wallpapers'">
-              <div class="pano-card-head">
-                <span class="pano-card-ico" aria-hidden="true">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
-                </span>
-                <h3>图片与动态视频壁纸</h3>
+        <div class="bento-grid">
+          <!-- Card 1 (8 cols): Autonomous Agent + Computer Use + Phone Use -->
+          <article class="bento-card span-8">
+            <span class="bento-kicker">AUTONOMOUS AGENT · 全能自主执行</span>
+            <h3>不止给建议：替你操作工作区、控电脑、控手机</h3>
+            <p>复杂任务自动拆解并透明展示每一步工具调用与思考摘要；执行中可随时补充指令排队，更支持设定验收命令的「长期目标」，重启断点也能自动续跑。</p>
+            <div class="agent-pillars">
+              <div class="ap-box">
+                <strong>原生 Computer Use 控电脑</strong>
+                <span>直接看懂屏幕、点击与输入，免额外环境替你操作桌面应用</span>
               </div>
-              <p>内置山水客厅、雨林黑水、清绿水草、浮光与一池心灯等动静壁纸，也可直连在线图库或导入自定义资源包。</p>
-            </button>
-
-            <button type="button" class="pano-card" :class="{ 'is-active': spaceTab === 'effects' }" @click="spaceTab = 'effects'">
-              <div class="pano-card-head">
-                <span class="pano-card-ico" aria-hidden="true">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" /></svg>
-                </span>
-                <h3>14 种桌面特效与组件</h3>
+              <div class="ap-box">
+                <strong>ADB Phone Use 控手机</strong>
+                <span>USB / 无线连接 Android 手机，在电脑对话里自动完成手机流程</span>
               </div>
-              <p>龙鱼巡游、灯火阑珊、星汉灿烂、庄周梦蝶等轻量特效可叠在任意壁纸之上，支持实时调节数量、速度与大小。</p>
-            </button>
-
-            <button type="button" class="pano-card" :class="{ 'is-active': spaceTab === 'companion' }" @click="spaceTab = 'companion'">
-              <div class="pano-card-head">
-                <span class="pano-card-ico" aria-hidden="true">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
-                </span>
-                <h3>主题制桌面伙伴与皮肤</h3>
-              </div>
-              <p>「花朵心语」「多肉点点」7 只萌宠可同时养在桌面上，搭配春江花月夜、江南烟雨等应用皮肤与关怀提醒。</p>
-            </button>
-          </div>
-
-          <div class="pano-foot">
-            <span>想看动态壁纸实机演示与互动桌宠？</span>
-            <RouterLink to="/desktop-experience" class="text-link">探索桌面体验专页 <span aria-hidden="true">↗</span></RouterLink>
-          </div>
-        </div>
-      </section>
-
-      <!-- 04 / EXTEND + 05 / APPS -->
-      <section id="plugins" class="feat-section">
-        <div class="sec-header">
-          <span class="sec-num">04 &amp; 05 / EXTEND &amp; APPS</span>
-          <span class="sec-tag">按需扩展能力 · 随时轻松片刻</span>
-        </div>
-
-        <div class="twin-grid">
-          <article class="twin-card">
-            <div class="twin-media s4">
-              <div class="window-frame">
-                <div class="window-bar">
-                  <div class="window-dots" aria-hidden="true"><i /><i /><i /></div>
-                  <span class="window-title">AI 插件 · 专家 / 技能 / 连接器</span>
-                </div>
-                <img src="/desktop/current-plugins.webp" alt="小伴桌面 AI 插件专家列表" width="849" height="670" loading="lazy">
+              <div class="ap-box">
+                <strong>Git Worktree 并发隔离</strong>
+                <span>多会话各自在独立副本改代码、跑测试，互不干扰也支持一键回溯</span>
               </div>
             </div>
-            <div class="twin-body">
-              <span class="sec-num">04 / EXTEND</span>
-              <h3>为不同任务，装上合适的能力。</h3>
-              <p>
-                按场景挑选专业领域的专家角色、SkillHub 技能包与 MCP 连接器，让小伴顺手衔接更多工具；安装和使用前可查看来源与权限说明。
-              </p>
-              <div class="tag-row">
-                <span class="tag-pill">场景化专家</span>
-                <span class="tag-pill">SkillHub 技能</span>
-                <span class="tag-pill">MCP 连接器</span>
-              </div>
-              <RouterLink to="/plugins" class="text-link">探索 AI 插件 <span aria-hidden="true">↗</span></RouterLink>
+            <div class="bento-media">
+              <img src="/desktop/desktop-config-ai.webp" alt="小伴桌面 v3.1.8 电脑屏幕控制、多模型独立设置窗" loading="lazy">
             </div>
           </article>
 
-          <article id="play" class="twin-card">
-            <div class="twin-media s1">
-              <div class="window-frame">
-                <div class="window-bar">
-                  <div class="window-dots" aria-hidden="true"><i /><i /><i /></div>
-                  <span class="window-title">精选应用 · 游戏 / 工具 / 测评</span>
-                </div>
-                <img src="/desktop/desktop-apps.webp" alt="小伴桌面精选应用与官方游戏列表" width="1280" height="800" loading="lazy">
-              </div>
+          <!-- Card 2 (4 cols Warm Peach): Design Canvas PPTX/Figma + 3D Works -->
+          <article id="create" class="bento-card span-4 warm-peach">
+            <span class="bento-kicker">DESIGN CANVAS &amp; STUDIO · 画布与创作</span>
+            <h3>无限画布直出 PPTX / Figma，也能造 3D 作品</h3>
+            <p>内置专业多画板设计画布，支持点击画板直接批注改稿、本机 Design MCP 与 Claude Code / Codex 协同，并一键导出可编辑 .pptx 与原生 Figma .fig；同时支持边聊边打磨 3D 与互动作品。</p>
+            <div class="bento-tags">
+              <span class="hi">导出可编辑 PPTX</span>
+              <span class="hi">导出原生 .fig</span>
+              <span>本机 Design MCP</span>
             </div>
-            <div class="twin-body">
-              <span class="sec-num">05 / APPS &amp; PLAY</span>
-              <h3>工作间隙，也有顺手的轻应用与游戏。</h3>
-              <p>
-                精选应用覆盖 2048、方块爆破、倒杯快乐、水墨剑客、3D 全阶魔方、MBTI 性格测评与潮汐书房，全部本机存档；也可随时对话定制你的专属作品。
-              </p>
-              <div class="tag-row">
-                <span class="tag-pill">11 款精选作品</span>
-                <span class="tag-pill">本机存档</span>
-                <span class="tag-pill">一句话共创</span>
-              </div>
-              <RouterLink to="/desktop-experience" class="text-link">了解更多桌面功能 <span aria-hidden="true">↗</span></RouterLink>
+            <div class="warm-tabs" role="tablist">
+              <button
+                v-for="(item, key) in workTabs"
+                :key="key"
+                type="button"
+                role="tab"
+                :class="{ active: activeWorkKey === key }"
+                :aria-selected="activeWorkKey === key"
+                @click="activeWorkKey = key as WorkKey"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+            <div class="bento-media" style="margin-top:14px">
+              <img :src="currentWork.src" :alt="currentWork.alt" loading="lazy">
+            </div>
+          </article>
+
+          <!-- Card 3 (5 cols Sky Mist): External Agent Collaboration + Local Voice MCP -->
+          <article class="bento-card span-5 sky-mist">
+            <span class="bento-kicker">EXTERNAL AGENT &amp; VOICE MCP · 跨工具协作中枢</span>
+            <h3>连 Claude Code / Codex 协同改画布，开放本机语音 MCP</h3>
+            <p>一键把本机设计画板接入 Codex、ChatGPT 桌面与 Claude Code，安装 Hooks 观察终端任务完成提醒；还能将本地 SenseVoice 识别与 Edge 朗读开放为回环 OpenAI / MCP 语音服务。</p>
+            <div class="bento-tags">
+              <span class="hi">Codex / Claude Code 协作</span>
+              <span class="hi">本机语音 MCP (127.0.0.1)</span>
+              <span>超级小伴截图标注</span>
+            </div>
+            <div class="bento-media" style="margin-top:auto">
+              <img src="/desktop/desktop-config-agent.webp" alt="小伴桌面 v3.1.8 外部 Agent 协作、Hooks 观察层与本机语音 MCP" loading="lazy">
+            </div>
+          </article>
+
+          <!-- Card 4 (7 cols Night Peak): 3D Dragon Fish + 8 Live Widgets + Wallpapers + 7 Pets -->
+          <article class="bento-card span-7 night-peak">
+            <span class="bento-kicker">LIVING DESKTOP · 有生命力的活桌面</span>
+            <h3>3D 龙鱼巡游、8 款实时组件与感知作息的桌宠</h3>
+            <p>14 种顶层透明特效含 3D 朱红龙鱼/锦鲤巡游，实时调光照与鱼群；8 款多屏组件涵盖股票行情、电子木鱼与 2026 休/班农历月历；搭配动态壁纸、国风皮肤与 7 只迎你回家的萌宠。</p>
+            <div class="night-tabs" role="tablist">
+              <button
+                v-for="(item, key) in nightTabs"
+                :key="key"
+                type="button"
+                role="tab"
+                :class="{ active: activeNightKey === key }"
+                :aria-selected="activeNightKey === key"
+                @click="activeNightKey = key as NightKey"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+            <div class="bento-media">
+              <img :src="currentNight.src" :alt="currentNight.alt" loading="lazy">
+            </div>
+          </article>
+
+          <!-- Card 5 (5 cols): AI Plugins, MCP & Cloud Docs -->
+          <article class="bento-card span-5">
+            <span class="bento-kicker">PLUGINS, MCP &amp; CLOUD DOCS · 专家市场与云资料</span>
+            <h3>小伴市场、SkillHub 与腾讯文档 / 百度网盘直连</h3>
+            <p>在最新版 AI 插件页按需安装行业专家、技能包与 OAuth MCP 连接器；本地资料库更直连腾讯文档与百度网盘，对话还能文生图与生成 GIF 动图自动归档。</p>
+            <div class="bento-tags">
+              <span>小伴市场 &amp; SkillHub</span>
+              <span>腾讯文档 / 百度网盘</span>
+              <span>OAuth MCP 连接器</span>
+            </div>
+            <div class="bento-media" style="margin-top:auto">
+              <img src="/desktop/desktop-plugins-v318.webp" alt="小伴桌面 v3.1.8 AI 插件专家与技能目录" loading="lazy">
+            </div>
+          </article>
+
+          <!-- Card 6 (7 cols): Shared Apps & Games Plaza -->
+          <article class="bento-card span-7 warm-ivory">
+            <span class="bento-kicker">APPS &amp; GAMES · 精选应用广场</span>
+            <h3>内置 11 款开箱即玩作品，双端互通本地存档</h3>
+            <p>工作间隙直接开一局《水墨剑客》《暮色滑翔》《3D 全阶魔方》或打开《水族箱》《潮汐书房》《向内看 MBTI》；同一套协议 2 作品在电脑和 Android 手机上完全互通，有灵感还能让小伴现做一款。</p>
+            <div class="bento-tags">
+              <span>水墨剑客</span>
+              <span>暮色滑翔 3D</span>
+              <span>3D 全阶魔方</span>
+              <span>水族箱</span>
+              <span>潮汐书房 · 鲸鱼娘</span>
+            </div>
+            <div class="bento-media" style="margin-top:auto">
+              <img src="/desktop/desktop-apps.webp" alt="小伴桌面精选应用与小游戏广场" loading="lazy">
             </div>
           </article>
         </div>
       </section>
 
-      <!-- 06 / MOBILE -->
-      <section id="mobile" class="feat-section">
-        <div class="sec-header">
-          <span class="sec-num">06 / MOBILE</span>
-          <span class="sec-tag">小伴手机 App · 随身 AI 与跨端互联</span>
-        </div>
-        <div class="pano-head">
-          <h2>离开电脑，<br>小伴也在手机上陪着你。</h2>
-          <p>原生打造的 Android 手机版带来连续对话主线、实时语音通话、随身作品试玩，并支持与同账号小伴桌面互联，出门也能远程发任务。</p>
+      <!-- SECTION 2: MOBILE FLAGSHIP CAPABILITIES -->
+      <section id="mobileFlagship" class="mobile-flagship-sec">
+        <div class="sec-title-center">
+          <span>MOBILE FLAGSHIP · ANDROID 原生打造</span>
+          <h2>手机版：不是桌面配角，装进兜里的端侧 AI 超级应用</h2>
+          <p>内置原生端侧 Agent 与离线语音管线，既能随时在手机上造 3D 游戏、离线遥控家里电视空调，也能无缝接管与审批电脑端的 AI 任务。</p>
         </div>
 
-        <div class="mobile-stage">
-          <div class="phone-trio">
-            <div class="phone-shot-card">
-              <div class="phone-bezel">
-                <img src="/desktop/mobile-ai-home.webp" alt="小伴手机版 AI 首页连续对话与遥控电脑" width="540" height="1108" loading="lazy">
+        <div class="mobile-hero-box">
+          <div>
+            <span class="bento-kicker and-kicker">5 BIG MOBILE POWERS · 点击切换最新实机 UI</span>
+            <h3 class="mobile-box-title">随身创作、端侧语音、<br>遥控电脑与离线工具箱</h3>
+
+            <div class="mobile-pillars-list" role="tablist">
+              <button
+                v-for="m in mobilePillars"
+                :key="m.key"
+                type="button"
+                role="tab"
+                class="mp-card"
+                :class="{ active: activeMobileKey === m.key }"
+                :aria-selected="activeMobileKey === m.key"
+                @click="activeMobileKey = m.key"
+              >
+                <span class="mp-num">{{ m.num }}</span>
+                <div>
+                  <strong>{{ m.title }}</strong>
+                  <span>{{ m.body }}</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="mobile-stage-right">
+            <div class="mobile-dual-stage">
+              <div class="m-device focus">
+                <img :src="currentMobile.imgs[0]" :alt="`${currentMobile.capTitle} 预览 1`" loading="lazy">
               </div>
-              <div class="phone-shot-meta">
-                <strong>连续主线 · 随手交代任务</strong>
-                <span>提醒卡、创作入口与遥控电脑一屏直达</span>
+              <div class="m-device">
+                <img :src="currentMobile.imgs[1]" :alt="`${currentMobile.capTitle} 预览 2`" loading="lazy">
               </div>
             </div>
-
-            <div class="phone-shot-card featured">
-              <div class="phone-bezel">
-                <img src="/desktop/mobile-voice-call.webp" alt="小伴手机版实时语音通话" width="540" height="1108" loading="lazy">
+            <div class="mobile-stage-caption">
+              <div>
+                <strong>{{ currentMobile.capTitle }}</strong>
+                <span>{{ currentMobile.capDesc }}</span>
               </div>
-              <div class="phone-shot-meta">
-                <strong>双星相伴 · 实时语音通话</strong>
-                <span>日落珊瑚光球响应，开口即问、随时打断</span>
-              </div>
-            </div>
-
-            <div class="phone-shot-card">
-              <div class="phone-bezel">
-                <img src="/desktop/mobile-ai-chat.webp" alt="小伴手机版对话任务摘要与作品交付卡片" width="540" height="1135" loading="lazy">
-              </div>
-              <div class="phone-shot-meta">
-                <strong>任务过程与作品交付卡</strong>
-                <span>可展开步骤摘要，生成的工具一键安装打开</span>
-              </div>
+              <span class="showcase-pill and-pill">最新 Android UI</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Closing Banner -->
-      <section class="closing-banner">
-        <div>
-          <span class="kicker">READY WHEN YOU ARE</span>
-          <h2>下一步，从小伴开始。</h2>
-          <p>支持 Windows、macOS 与 Android，下载安装包即可开启体验。</p>
+      <!-- SECTION 3: COMPLETE 8x2 CAPABILITY MATRIX -->
+      <section class="matrix-sec">
+        <div class="sec-title-center">
+          <span>COMPLETE CAPABILITY MATRIX</span>
+          <h2>桌面端与手机端，完整核心能力一览</h2>
         </div>
-        <div class="closing-actions">
-          <RouterLink class="btn btn-primary" to="/download">下载小伴 <span aria-hidden="true">↗</span></RouterLink>
-          <RouterLink class="btn btn-secondary" to="/guide">玩法指南</RouterLink>
+
+        <div class="matrix-grid">
+          <div class="matrix-card">
+            <div class="matrix-head">
+              <h3>Windows &amp; macOS 桌面端</h3>
+              <span class="matrix-badge desk">深度生产力 &amp; 活桌面</span>
+            </div>
+            <ul class="matrix-list">
+              <li v-for="item in desktopMatrix" :key="item.title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                <div>{{ item.title }}<small>{{ item.sub }}</small></div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="matrix-card and-card">
+            <div class="matrix-head">
+              <h3>Android 手机版</h3>
+              <span class="matrix-badge and">端侧智能 &amp; 跨端接力</span>
+            </div>
+            <ul class="matrix-list">
+              <li v-for="item in mobileMatrix" :key="item.title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                <div>{{ item.title }}<small>{{ item.sub }}</small></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final CTA -->
+      <section class="final-cta">
+        <h2>电脑与手机装齐，体验完整小伴</h2>
+        <p>下载对应设备的官方原包，同一账号自动同步额度、对话、作品与跨端遥控。</p>
+        <div class="hero-cta-row">
+          <RouterLink to="/download" class="cta-coral">
+            <span>前往下载小伴</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
+          </RouterLink>
+          <RouterLink to="/guide" class="cta-soft">看看玩法指南</RouterLink>
         </div>
       </section>
 
       <footer class="site-footer">
         <div class="footer-brand">
           <strong>小伴桌面</strong>
-          <p>你的 AI 工作与创作助手</p>
+          <p>端云一体、双端接力的个人 AI 伙伴 · wallpaper.xiangban.xyz</p>
         </div>
         <div class="footer-links">
           <RouterLink to="/features">功能介绍</RouterLink>
           <RouterLink to="/download">下载安装</RouterLink>
           <RouterLink to="/guide">玩法指南</RouterLink>
-          <RouterLink to="/images">壁纸</RouterLink>
-          <a href="https://chat.xiangban.xyz/contact">联系我们</a>
-          <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">社区 ↗</a>
+          <RouterLink to="/images">壁纸库</RouterLink>
+          <a href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer">联系我们</a>
+          <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">超级小伴社区 ↗</a>
         </div>
       </footer>
     </div>
@@ -523,911 +516,753 @@ onDeactivated(() => window.removeEventListener('scroll', handleScroll))
 
 <style scoped>
 .feat-page {
-  --bg: #fafaf9;
+  --canvas: #fcfaf7;
+  --canvas-soft: #f6f2ec;
   --surface: #ffffff;
-  --surface-soft: #f4f3f0;
-  --s1: #f2f1ed;
-  --s2: #f4f2ee;
-  --s3: #efeeeb;
-  --s4: #f1f2f4;
-  --ink: #141416;
-  --ink-2: #52525b;
-  --ink-3: #71717a;
-  --brand: #18181b;
-  --brand-hover: #2f2f35;
-  --brand-soft: #ededf0;
-  --line: rgba(24, 24, 27, 0.08);
-  --line-strong: rgba(24, 24, 27, 0.16);
-  background: var(--bg);
-  color: var(--ink);
+  --ink: #19171a;
+  --ink-2: #524d54;
+  --ink-3: #837d86;
+  --coral: #ee4f6d;
+  --coral-grad: linear-gradient(135deg, #ff5b7d 0%, #f9744b 100%);
+  --coral-soft: #fff0f2;
+  --coral-border: rgba(242, 92, 114, 0.24);
+  --coral-shadow: 0 14px 34px rgba(247, 102, 94, 0.28);
+  --and-ink: #158f4d;
+  --line: rgba(28, 22, 28, 0.075);
+  --line-strong: rgba(28, 22, 28, 0.14);
+  --shadow-sm: 0 2px 10px rgba(26, 18, 24, 0.04);
+  --shadow-md: 0 16px 42px rgba(26, 18, 24, 0.07);
+  --shadow-lg: 0 28px 72px rgba(26, 18, 24, 0.11);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
   min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(66% 520px at 50% -100px, rgba(255, 110, 134, 0.14), transparent 68%),
+    radial-gradient(45% 400px at 12% 160px, rgba(249, 152, 92, 0.10), transparent 65%),
+    radial-gradient(42% 380px at 90% 180px, rgba(130, 178, 255, 0.08), transparent 65%),
+    var(--canvas);
 }
 
 .wrap {
-  width: min(1220px, calc(100% - 64px));
+  width: min(1180px, calc(100% - 64px));
   margin: 0 auto;
 }
 
-.kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  font-weight: 700;
-  color: var(--ink-2);
-  text-transform: uppercase;
+.grad-text {
+  background: var(--coral-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-.kicker-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--brand);
-  box-shadow: 0 0 0 4px rgba(24, 24, 27, 0.12);
-}
-
-.btn {
+.cta-coral {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  height: 46px;
-  padding: 0 22px;
-  border-radius: 10px;
-  font-size: 14.5px;
-  font-weight: 650;
-  transition: transform 0.15s var(--ease), background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  height: 50px;
+  padding: 0 28px;
+  border-radius: 14px;
+  background: var(--coral-grad);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: var(--coral-shadow);
+  transition: transform 0.16s var(--ease), filter 0.18s, box-shadow 0.2s;
   white-space: nowrap;
 }
-
-.btn:active { transform: scale(0.98); }
-
-.btn-primary {
-  background: var(--brand);
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(15, 15, 20, 0.14);
-}
-.btn-primary:hover {
-  background: var(--brand-hover);
-  box-shadow: 0 10px 24px rgba(15, 15, 20, 0.18);
+.cta-coral:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(247, 102, 94, 0.36);
 }
 
-.btn-secondary {
+.cta-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 22px;
+  border-radius: 14px;
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line-strong);
-}
-.btn-secondary:hover {
-  border-color: var(--ink-3);
-  background: var(--surface-soft);
-}
-
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 650;
-  color: var(--brand);
-  transition: gap 0.2s var(--ease);
+  transition: background 0.18s, border-color 0.18s;
+  white-space: nowrap;
 }
-.text-link:hover {
-  gap: 12px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+.cta-soft:hover {
+  background: var(--canvas-soft);
+  border-color: rgba(28, 22, 28, 0.24);
 }
 
 /* Hero */
 .feat-hero {
-  padding: 64px 0 56px;
-  display: grid;
-  grid-template-columns: 1.02fr 0.98fr;
-  gap: 48px;
+  padding: 60px 0 26px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
   align-items: center;
 }
-
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--coral-border);
+  box-shadow: 0 4px 16px rgba(242, 92, 114, 0.09);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #d6405e;
+}
+.hero-badge img {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
 .feat-hero h1 {
-  font-size: clamp(40px, 4.6vw, 64px);
-  line-height: 1.15;
+  margin-top: 20px;
+  font-size: clamp(34px, 4.9vw, 60px);
+  line-height: 1.13;
   letter-spacing: -0.045em;
-  font-weight: 700;
-  margin: 22px 0 20px;
+  font-weight: 760;
+  max-width: 880px;
 }
-
-.feat-hero h1 em {
-  font-style: normal;
-  color: #52525b;
-}
-
-.hero-desc {
+.feat-hero p {
+  margin-top: 16px;
   font-size: 16px;
-  line-height: 1.85;
   color: var(--ink-2);
-  max-width: 470px;
+  max-width: 680px;
+  line-height: 1.78;
 }
-
-.hero-actions {
+.hero-cta-row {
+  margin-top: 26px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 12px;
-  margin-top: 30px;
 }
 
-.cap-overview {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  padding: 18px;
-  box-shadow: 0 14px 36px rgba(15, 15, 20, 0.06);
+/* Interactive 8-Scene Stage */
+.live-stage-wrap {
+  padding: 12px 0 70px;
 }
-
-.cap-overview-head {
+.scene-dock {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px 14px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 14px;
-  font-size: 12px;
-  color: var(--ink-3);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
 }
-
-.cap-overview-head strong {
-  color: var(--ink);
-  font-weight: 650;
+.scene-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.cap-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.cap-tile {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 13px;
-  background: var(--bg);
-  border: 1px solid transparent;
-  text-align: left;
-  transition: background 0.2s, border-color 0.2s, transform 0.2s var(--ease);
-}
-
-.cap-tile:hover {
-  background: var(--surface-soft);
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
-}
-
-.cap-ico {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--surface);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
   border: 1px solid var(--line);
-  color: var(--brand);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s var(--ease);
 }
-
-.cap-meta {
-  min-width: 0;
-  flex: 1;
+.scene-chip:hover {
+  border-color: var(--coral-border);
+  color: var(--ink);
+  transform: translateY(-1px);
 }
-
-.cap-num {
+.scene-chip.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 8px 22px rgba(25, 23, 26, 0.16);
+}
+.chip-plat {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(28, 22, 28, 0.06);
   color: var(--ink-3);
+}
+.scene-chip.active .chip-plat {
+  background: rgba(255, 118, 138, 0.28);
+  color: #ffd4dc;
+}
+
+.showcase-frame {
+  border-radius: 30px;
+  padding: 22px 22px 18px;
+  background:
+    radial-gradient(60% 70% at 88% 12%, rgba(255, 114, 134, 0.16), transparent 62%),
+    radial-gradient(50% 60% at 12% 92%, rgba(249, 152, 92, 0.14), transparent 60%),
+    #f4efe9;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-lg);
+}
+.showcase-inner {
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(28, 22, 28, 0.08);
+  box-shadow: 0 18px 46px rgba(26, 18, 24, 0.10);
+}
+.showcase-media {
+  background: #fafafa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 440px;
+  max-height: 620px;
+  overflow: hidden;
+}
+.showcase-media .desk-img {
+  width: 100%;
+  height: auto;
   display: block;
-  margin-bottom: 2px;
+}
+.showcase-media.phone-mode {
+  background:
+    radial-gradient(55% 80% at 50% 50%, rgba(255, 101, 132, 0.22), transparent 70%),
+    linear-gradient(135deg, #19161b 0%, #241b22 100%);
+  padding: 28px 24px;
+  gap: 28px;
+}
+.phone-demo {
+  width: 244px;
+  padding: 6px;
+  border-radius: 30px;
+  background: #0f0e11;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.phone-demo img {
+  width: 100%;
+  border-radius: 24px;
+  display: block;
 }
 
-.cap-tile h3 {
-  font-size: 14.5px;
-  font-weight: 650;
+.showcase-caption {
+  margin-top: 15px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.showcase-caption h3 {
+  font-size: 16px;
+  font-weight: 720;
   color: var(--ink);
-  margin-bottom: 3px;
+}
+.showcase-caption p {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.showcase-pill {
+  font-size: 12px;
+  font-weight: 650;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #d6405e;
+  border: 1px solid var(--coral-border);
+  white-space: nowrap;
+}
+.showcase-pill.and-pill {
+  color: var(--and-ink);
+  border-color: rgba(21, 143, 77, 0.25);
+  background: #f3fbf6;
 }
 
-.cap-tile p {
-  font-size: 12.5px;
+/* Section Headers */
+.sec-title-center {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.sec-title-center span {
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  color: var(--coral);
+  text-transform: uppercase;
+}
+.sec-title-center h2 {
+  margin-top: 8px;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.03em;
+  font-weight: 750;
+}
+.sec-title-center p {
+  margin: 10px auto 0;
+  max-width: 620px;
+  font-size: 14.5px;
+  color: var(--ink-2);
+}
+
+/* Bento Grid */
+.bento-sec {
+  padding: 20px 0 76px;
+  scroll-margin-top: 90px;
+}
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 18px;
+}
+.bento-card {
+  border-radius: 26px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease);
+}
+.bento-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+.span-8 { grid-column: span 8; }
+.span-7 { grid-column: span 7; }
+.span-5 { grid-column: span 5; }
+.span-4 { grid-column: span 4; }
+
+.bento-kicker {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  color: var(--coral);
+  text-transform: uppercase;
+}
+.bento-kicker.and-kicker {
+  color: var(--and-ink);
+}
+.bento-card h3 {
+  margin-top: 8px;
+  font-size: 23px;
+  line-height: 1.26;
+  letter-spacing: -0.025em;
+  font-weight: 740;
+}
+.bento-card > p {
+  margin-top: 10px;
+  font-size: 13.8px;
+  color: var(--ink-2);
+  line-height: 1.72;
+}
+.bento-media {
+  margin-top: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #fafafa;
+  box-shadow: 0 12px 28px rgba(26, 18, 24, 0.07);
+}
+.bento-media img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.bento-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 15px;
+}
+.bento-tags span {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--canvas-soft);
+  color: var(--ink-2);
+}
+.bento-tags span.hi {
+  background: var(--coral-soft);
+  color: #d63d5b;
+}
+
+.agent-pillars {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ap-box {
+  padding: 12px 13px;
+  border-radius: 14px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.ap-box strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.ap-box span {
+  display: block;
+  font-size: 12px;
   color: var(--ink-3);
+  margin-top: 3px;
   line-height: 1.5;
 }
 
-/* Sticky Sub-nav */
-.subnav-bar {
-  position: sticky;
-  top: var(--header-h);
-  z-index: 30;
-  background: rgba(250, 250, 249, 0.9);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.subnav-inner {
-  width: min(1220px, calc(100% - 64px));
-  margin: 0 auto;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.subnav-links {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-}
-
-.subnav-pill {
+.warm-tabs {
+  margin-top: 14px;
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 13px;
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--ink-2);
-  white-space: nowrap;
-  transition: background 0.18s, color 0.18s;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(242, 96, 114, 0.16);
+  align-self: flex-start;
 }
-
-.subnav-pill em {
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 700;
-  opacity: 0.6;
-}
-
-.subnav-pill:hover {
-  background: var(--surface-soft);
-  color: var(--ink);
-}
-
-.subnav-pill.active {
-  background: var(--brand);
-  color: #fff;
-  font-weight: 600;
-}
-
-.subnav-pill.active em { opacity: 0.8; }
-
-.subnav-note {
+.warm-tabs button {
+  height: 27px;
+  padding: 0 10px;
+  border-radius: 7px;
   font-size: 12px;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
-/* Feature Sections */
-.feat-section {
-  padding: 88px 0;
-  scroll-margin-top: 124px;
-  border-bottom: 1px solid var(--line);
-}
-
-.feat-section:last-of-type {
-  border-bottom: 0;
-}
-
-.sec-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 36px;
-}
-
-.sec-num {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-weight: 600;
   color: var(--ink-2);
+  transition: 0.16s;
+}
+.warm-tabs button.active {
+  background: var(--coral-grad);
+  color: #fff;
 }
 
-.sec-tag {
-  font-size: 12.5px;
-  color: var(--ink-3);
+.bento-card.warm-peach {
+  background: linear-gradient(160deg, #fff5f1 0%, #fffaf7 55%, #ffffff 100%);
+  border-color: rgba(242, 108, 92, 0.16);
+}
+.bento-card.warm-ivory {
+  background: linear-gradient(155deg, #ffffff 0%, #fbf7f2 100%);
+}
+.bento-card.sky-mist {
+  background: linear-gradient(160deg, #f1f6ff 0%, #f9fbff 60%, #ffffff 100%);
+  border-color: rgba(59, 130, 246, 0.14);
+}
+.bento-card.sky-mist .bento-kicker { color: #2563eb; }
+.bento-card.sky-mist .bento-tags span.hi { background: #e8f1ff; color: #1d4ed8; }
+
+.bento-card.night-peak {
+  background:
+    radial-gradient(65% 85% at 88% 8%, rgba(255, 114, 134, 0.28), transparent 62%),
+    radial-gradient(60% 70% at 10% 95%, rgba(249, 152, 75, 0.24), transparent 60%),
+    linear-gradient(145deg, #171419 0%, #231a21 60%, #1c1822 100%);
+  border-color: rgba(255, 188, 196, 0.16);
+  color: #fff8f7;
+}
+.bento-card.night-peak .bento-kicker { color: #ff9aab; }
+.bento-card.night-peak > p { color: rgba(255, 244, 244, 0.8); }
+.bento-card.night-peak .bento-media {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
 }
 
-.feat-split {
+.night-tabs {
+  margin-top: 15px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  align-self: flex-start;
+}
+.night-tabs button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.2px;
+  font-weight: 600;
+  color: rgba(255, 244, 244, 0.78);
+  transition: 0.18s;
+}
+.night-tabs button.active {
+  background: var(--coral-grad);
+  color: #fff;
+}
+
+/* Mobile Flagship Showcase */
+.mobile-flagship-sec {
+  padding: 8px 0 80px;
+  scroll-margin-top: 90px;
+}
+.mobile-hero-box {
+  border-radius: 32px;
+  padding: 44px 40px;
+  background:
+    radial-gradient(58% 82% at 88% 12%, rgba(255, 108, 134, 0.18), transparent 64%),
+    radial-gradient(50% 72% at 12% 92%, rgba(44, 196, 126, 0.14), transparent 62%),
+    #f6f2ed;
+  border: 1px solid rgba(28, 22, 28, 0.08);
+  box-shadow: var(--shadow-md);
   display: grid;
-  grid-template-columns: 0.88fr 1.12fr;
-  gap: 56px;
+  grid-template-columns: 0.98fr 1.02fr;
+  gap: 36px;
   align-items: center;
 }
-
-.feat-split.reverse {
-  grid-template-columns: 1.12fr 0.88fr;
+.mobile-box-title {
+  margin-top: 8px;
+  font-size: clamp(24px, 2.8vw, 32px);
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  font-weight: 750;
 }
-
-.feat-split.reverse .feat-copy {
-  order: 2;
-}
-
-.feat-copy h2 {
-  font-size: clamp(28px, 3.2vw, 42px);
-  line-height: 1.24;
-  letter-spacing: -0.035em;
-  font-weight: 700;
-  margin-bottom: 18px;
-}
-
-.feat-copy > p {
-  font-size: 15.5px;
-  line-height: 1.85;
-  color: var(--ink-2);
-  max-width: 450px;
-}
-
-.feat-points {
-  margin: 26px 0 30px;
+.mobile-pillars-list {
+  margin-top: 22px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
-.feat-point {
+.mp-card {
+  text-align: left;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(28, 22, 28, 0.07);
+  transition: all 0.2s var(--ease);
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  gap: 13px;
 }
-
-.feat-point-ico {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--brand-soft);
-  color: var(--brand);
+.mp-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--coral-border);
+}
+.mp-card.active {
+  background: #fff;
+  border-color: var(--coral);
+  box-shadow: 0 12px 30px rgba(242, 92, 114, 0.12);
+  transform: translateX(4px);
+}
+.mp-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--canvas-soft);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 800;
   display: grid;
   place-items: center;
   flex-shrink: 0;
   margin-top: 1px;
+  transition: 0.18s;
 }
-
-.feat-point strong {
+.mp-card.active .mp-num {
+  background: var(--coral-grad);
+  color: #fff;
+}
+.mp-card strong {
   display: block;
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-
-.feat-point span {
-  display: block;
-  font-size: 13px;
-  color: var(--ink-3);
-  line-height: 1.5;
-}
-
-/* Visual Stage */
-.visual-stage {
-  border-radius: 22px;
-  padding: 28px 28px 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.s1 { background: var(--s1); }
-.s2 { background: var(--s2); }
-.s4 { background: var(--s4); }
-
-.view-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--line);
-  margin-bottom: 14px;
-}
-
-.view-tabs button {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 550;
-  color: var(--ink-2);
-  transition: background 0.18s, color 0.18s;
-}
-
-.view-tabs button:hover { color: var(--ink); }
-
-.view-tabs button.active {
-  background: var(--brand);
-  color: #fff;
-  font-weight: 650;
-  box-shadow: 0 2px 8px rgba(15, 15, 20, 0.12);
-}
-
-.window-frame {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  box-shadow: 0 20px 44px rgba(15, 15, 20, 0.09);
-  overflow: hidden;
-}
-
-.window-bar {
-  height: 34px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fbfbfb;
-  border-bottom: 1px solid var(--line);
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-
-.window-dots {
-  display: inline-flex;
-  gap: 5px;
-}
-
-.window-dots i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #d4d4d8;
-}
-
-.window-title {
-  font-weight: 600;
-  color: var(--ink-2);
-}
-
-.window-pill {
-  font-size: 10.5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.window-body {
-  background: #fafafa;
-}
-
-.window-body img {
-  width: 100%;
-  height: auto;
-}
-
-.stage-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 15px;
-  font-size: 12px;
-  color: var(--ink-2);
-  padding: 0 4px;
-}
-
-.stage-caption small {
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-
-.creative-prompt-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid var(--line);
-  font-size: 12.5px;
-  color: var(--ink-2);
-}
-
-.creative-prompt-bar .chip-mini {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 650;
-  flex-shrink: 0;
-}
-
-/* Panoramic Bento (03) */
-.pano-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
-  margin-bottom: 32px;
-}
-
-.pano-head h2 {
-  font-size: clamp(28px, 3.2vw, 42px);
-  line-height: 1.24;
-  letter-spacing: -0.035em;
-  font-weight: 700;
-  max-width: 520px;
-}
-
-.pano-head p {
-  font-size: 15px;
-  color: var(--ink-2);
-  max-width: 420px;
-  line-height: 1.8;
-}
-
-.pano-stage {
-  padding: 32px 32px 22px;
-  border-radius: 22px;
-  background: var(--s3);
-}
-
-.pano-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.pano-hint {
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-.pano-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.pano-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  padding: 20px 22px;
-  text-align: left;
-  transition: border-color 0.2s, transform 0.2s var(--ease), box-shadow 0.2s;
-}
-
-.pano-card:hover {
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
-}
-
-.pano-card.is-active {
-  border-color: var(--brand);
-  box-shadow: 0 14px 36px rgba(15, 15, 20, 0.06);
-}
-
-.pano-card-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.pano-card-ico {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--surface-soft);
-  color: var(--brand);
-  display: grid;
-  place-items: center;
-}
-
-.pano-card.is-active .pano-card-ico {
-  background: var(--brand);
-  color: #fff;
-}
-
-.pano-card h3 {
-  font-size: 15.5px;
-  font-weight: 650;
-}
-
-.pano-card p {
-  font-size: 13.5px;
-  color: var(--ink-2);
-  line-height: 1.7;
-}
-
-.pano-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--ink-2);
-}
-
-/* Twin Cards (04 & 05) */
-.twin-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-.twin-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 2px 10px rgba(15, 15, 20, 0.04);
-  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
-  scroll-margin-top: 124px;
-}
-
-.twin-card:hover {
-  box-shadow: 0 14px 36px rgba(15, 15, 20, 0.06);
-  transform: translateY(-3px);
-}
-
-.twin-media {
-  padding: 22px 22px 0;
-}
-
-.twin-media .window-frame {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom: 0;
-  box-shadow: 0 12px 30px rgba(15, 15, 20, 0.08);
-}
-
-.twin-media img {
-  aspect-ratio: 16 / 10.6;
-  width: 100%;
-  object-fit: cover;
-  object-position: top;
-}
-
-.twin-body {
-  padding: 28px 28px 30px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.twin-body h3 {
-  font-size: 24px;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
-  font-weight: 700;
-  margin: 10px 0 12px;
-}
-
-.twin-body > p {
   font-size: 14.5px;
+  font-weight: 720;
+  color: var(--ink);
+}
+.mp-card span {
+  display: block;
+  font-size: 12.8px;
   color: var(--ink-2);
-  line-height: 1.78;
+  margin-top: 3px;
+  line-height: 1.58;
 }
 
-.tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 20px 0 24px;
-}
-
-.tag-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  font-size: 12.5px;
-  color: var(--ink-2);
-  font-weight: 500;
-}
-
-.twin-body .text-link {
-  margin-top: auto;
-}
-
-/* Mobile Showcase (06) */
-.mobile-stage {
-  border-radius: 24px;
-  background: var(--s1);
-  border: 1px solid var(--line);
-  padding: 40px 36px 32px;
-  overflow: hidden;
-}
-
-.phone-trio {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  align-items: end;
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.phone-shot-card {
+.mobile-stage-right {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
-
-.phone-bezel {
+.mobile-dual-stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: center;
   width: 100%;
-  max-width: 268px;
+  max-width: 490px;
+}
+.m-device {
   padding: 7px;
   border-radius: 30px;
-  background: #18181b;
-  box-shadow: 0 22px 48px rgba(15, 15, 20, 0.18);
-  transition: transform 0.25s var(--ease);
+  background: #18161a;
+  box-shadow: 0 26px 56px rgba(26, 16, 22, 0.24);
+  transition: transform 0.28s var(--ease);
 }
-
-.phone-shot-card.featured .phone-bezel {
-  max-width: 290px;
-  transform: translateY(-10px);
-  box-shadow: 0 28px 64px rgba(15, 15, 20, 0.26);
+.m-device.focus {
+  transform: translateY(-10px) scale(1.03);
+  box-shadow: 0 32px 68px rgba(26, 16, 22, 0.30);
 }
-
-.phone-bezel:hover { transform: translateY(-6px); }
-.phone-shot-card.featured .phone-bezel:hover { transform: translateY(-14px); }
-
-.phone-bezel img {
+.m-device img {
   width: 100%;
-  height: auto;
-  border-radius: 24px;
-}
-
-.phone-shot-meta {
-  text-align: center;
-}
-
-.phone-shot-meta strong {
+  border-radius: 23px;
   display: block;
-  font-size: 14.5px;
-  font-weight: 650;
+}
+.mobile-stage-caption {
+  width: 100%;
+  max-width: 490px;
+  padding: 13px 16px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.8px;
+  color: var(--ink-2);
+}
+.mobile-stage-caption strong {
   color: var(--ink);
+  font-weight: 700;
+  display: block;
+  font-size: 13.5px;
 }
 
-.phone-shot-meta span {
+/* Matrix */
+.matrix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 52px;
+}
+.matrix-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+.matrix-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.matrix-head h3 {
+  font-size: 20px;
+  font-weight: 740;
+}
+.matrix-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+.matrix-badge.desk { color: #d83f5d; background: #fff0f2; }
+.matrix-badge.and { color: var(--and-ink); background: #eaf9f0; }
+
+.matrix-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  list-style: none;
+}
+.matrix-list li {
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: var(--canvas);
+  border: 1px solid rgba(28, 22, 28, 0.045);
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.45;
+}
+.matrix-list li small {
   display: block;
-  font-size: 12.5px;
+  font-size: 11.5px;
+  font-weight: 450;
   color: var(--ink-3);
   margin-top: 2px;
 }
-
-/* Closing & Footer */
-.closing-banner {
-  margin: 28px 0 64px;
-  padding: 64px 56px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #f3f2ef 0%, #f7f6f4 60%, #efeee9 100%);
-  border: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-}
-
-.closing-banner h2 {
-  font-size: clamp(28px, 3vw, 40px);
-  line-height: 1.25;
-  letter-spacing: -0.035em;
-  font-weight: 700;
-  margin: 12px 0 10px;
-}
-
-.closing-banner p {
-  font-size: 15px;
-  color: var(--ink-2);
-}
-
-.closing-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.matrix-list svg {
+  color: var(--coral);
   flex-shrink: 0;
+  margin-top: 2px;
+}
+.matrix-card.and-card .matrix-list svg {
+  color: var(--and-ink);
+}
+
+/* Final CTA & Footer */
+.final-cta {
+  text-align: center;
+  padding: 62px 28px;
+  border-radius: 30px;
+  background:
+    radial-gradient(60% 90% at 50% 0%, rgba(255, 114, 134, 0.20), transparent 70%),
+    linear-gradient(180deg, #fff7f5 0%, #fcfaf7 100%);
+  border: 1px solid rgba(242, 96, 114, 0.16);
+  margin-bottom: 56px;
+}
+.final-cta h2 {
+  font-size: clamp(26px, 3.6vw, 42px);
+  letter-spacing: -0.035em;
+  font-weight: 750;
+}
+.final-cta p {
+  margin: 12px auto 26px;
+  font-size: 15.5px;
+  color: var(--ink-2);
+  max-width: 500px;
 }
 
 .site-footer {
   border-top: 1px solid var(--line);
-  padding: 36px 0 calc(var(--tabbar-h) + var(--safe-bottom) + 40px);
+  padding: 34px 0 calc(var(--tabbar-h, 58px) + var(--safe-bottom, 0px) + 38px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
 }
-
 @media (min-width: 769px) {
-  .site-footer {
-    padding-bottom: 64px;
-  }
+  .site-footer { padding-bottom: 60px; }
 }
-
-.footer-brand strong {
-  font-size: 18px;
-  font-weight: 700;
-  display: block;
-}
-
-.footer-brand p {
-  font-size: 12.5px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-
-.footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  font-size: 13.5px;
-  color: var(--ink-2);
-}
-
-.footer-links a:hover {
-  color: var(--brand);
-  text-decoration: underline;
-}
+.footer-brand strong { font-size: 17px; font-weight: 720; display: block; }
+.footer-brand p { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 22px; font-size: 13.5px; color: var(--ink-2); }
+.footer-links a:hover { color: var(--coral); }
 
 @media (max-width: 960px) {
-  .feat-hero,
-  .feat-split,
-  .feat-split.reverse,
-  .pano-grid,
-  .twin-grid,
-  .phone-trio {
-    grid-template-columns: 1fr;
-  }
-  .feat-split.reverse .feat-copy { order: 0; }
-  .pano-head { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .closing-banner { flex-direction: column; align-items: flex-start; padding: 36px 28px; }
-  .phone-shot-card.featured .phone-bezel { transform: none; max-width: 268px; }
+  .bento-grid, .mobile-hero-box, .matrix-grid, .agent-pillars { grid-template-columns: 1fr; }
+  .span-8, .span-7, .span-5, .span-4 { grid-column: auto; }
 }
 
 @media (max-width: 768px) {
-  .wrap,
-  .subnav-inner {
-    width: calc(100% - 32px);
-  }
-  .subnav-bar { top: 0; }
-  .subnav-note { display: none; }
-  .feat-hero { padding: 32px 0 36px; gap: 28px; }
-  .cap-grid { grid-template-columns: 1fr; }
-  .feat-section { padding: 52px 0; scroll-margin-top: 64px; }
-  .visual-stage,
-  .pano-stage { padding: 16px 16px 14px; border-radius: 16px; }
-  .mobile-stage { padding: 24px 16px; }
-  .window-pill { display: none; }
-  .stage-caption,
-  .pano-foot,
+  .wrap { width: calc(100% - 32px); }
+  .feat-hero { padding: 32px 0 20px; }
+  .feat-hero p { font-size: 14px; }
+  .showcase-frame { padding: 12px; border-radius: 20px; }
+  .showcase-media { min-height: 210px; }
+  .showcase-media.phone-mode { flex-direction: column; padding: 20px; }
+  .phone-demo { width: 216px; }
+  .showcase-caption { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .bento-card { padding: 20px; border-radius: 20px; }
+  .mobile-hero-box { padding: 24px 18px; border-radius: 22px; gap: 24px; }
+  .m-device.focus { transform: none; }
+  .matrix-list { grid-template-columns: 1fr; }
   .site-footer { flex-direction: column; align-items: flex-start; }
-  .closing-actions { width: 100%; }
-  .closing-actions .btn { flex: 1; }
 }
 </style>
