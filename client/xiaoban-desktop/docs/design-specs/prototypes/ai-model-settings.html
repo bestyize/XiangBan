@@ -54,7 +54,9 @@
     const { accent, isDark, followHost, followAccent } = await import('/src/ui/appearance.ts');
     const { configurationThemeFor } = await import('/src/ui/theme.ts');
     await import('/src/ui/control.css');
-    const dark = ref(false), view = ref('models'), count = ref(24), width = ref(360), toast = ref(''), probeOutcome = ref('success');
+    const qsView = new URLSearchParams(location.search).get('view');
+    const initView = ['models', 'provider', 'settings'].includes(qsView) ? qsView : 'models';
+    const dark = ref(false), view = ref(initView), count = ref(24), width = ref(initView === 'models' ? 360 : 900), toast = ref(''), probeOutcome = ref('success');
     watch(view, value => { width.value = value === 'models' ? 360 : 900; });
     const providerId = ref('deepseek');
     const frame = { maximized: false, fullscreen: false, focused: true };

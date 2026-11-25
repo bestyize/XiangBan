@@ -6,7 +6,7 @@
 
 ## 总体设计稿导航网页（推荐入口）
 
-[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 30 份有效交互设计稿（已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已合入功能的旧版老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
+[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 39 个设计稿模块/状态入口（32 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
 
 在仓库根目录一键启动统一预览服务（自动映射桌面 UI 升级画布的 `/_blob/` 图片资源）：
 
@@ -50,7 +50,10 @@ npm --prefix client/xiaoban-desktop run dev
 | 设计稿 | 站点 | 状态 | 内容 |
 | --- | --- | --- | --- |
 | [小伴桌面官网 · 功能页 & 下载页](../../services/server-xiaoban/docs/design-specs/prototypes/features-download-redesign.html) | wallpaper.xiangban.xyz | 已合入 | v2.3 重设计：极简暖白 · 墨黑与日落珊瑚点缀，首屏 8 场景双端实机展台、电脑与手机核心能力 Bento、当前设备推荐下载卡与更新日志弹窗 |
-| [超级小伴社区全站 UI（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 部分合入 | 现代活力社区风完整交互稿，覆盖 PC 左导轨与 390px 移动 H5，包含首页五栏目、讨论、资源、应用、小伴 AI、个人中心四页（我的/个人主页/我的作品/通知）及作品详情与 PC 双栏 / H5 分享面板（我的作品草稿与居中删除确认待补齐） |
+| [超级小伴社区 · 主站浏览（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 已合入 | 现代活力社区风主站，覆盖 PC 左导轨壳层与 390px 移动 H5，包含首页五栏目、讨论、资源、应用与小伴 AI |
+| [社区详情页（作品 / 帖子 / 开源三态 · PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 已合入 | 总导航按三类详情与身份视角拆出独立入口：创意作品（作者视角）、讨论帖子（读者视角）、开源精选（管理员视角） |
+| [社区个人中心四页套件（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-profile-suite.html) | chat.xiangban.xyz | 部分合入 | 1:1 对齐手机 App 方案 1 通栏精修，独立覆盖「我的 / 个人主页 / 我的作品 / 通知」四页（我的/通知已合入，我的作品草稿与居中删除确认待补齐） |
+| [社区详情页分享面板（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) | chat.xiangban.xyz | 已合入 | 纯黑白灰中性配色、仅分享图保留品牌主题色：H5 1:1 对齐手机 App，PC 端 716px 居中双栏弹窗与内联删除确认 |
 
 ---
 
@@ -60,7 +63,7 @@ npm --prefix client/xiaoban-desktop run dev
 
 | 设计稿 | 模块 | 状态 | 内容 |
 | --- | --- | --- | --- |
-| [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 整体界面画布 | 已合入 | Claude Design 39 画板导出，总览页默认展示 27 张有效画板（已替代与历史对比画板可勾选展开）；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
+| [小伴桌面 UI 升级画布（5 模块拆达）](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 主界面 / 超级小伴 / 资料库 / 市场 / 输入框 | 已合入 | Claude Design 39 画板导出，总览页默认隐藏 12 张已替代/历史对比画板，总导航按 5 个独立模块（8+4+4+8+3 = 27 张有效画板）直达；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
 | [设置页 & 小伴 AI / 第三方多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | 设置与模型 | 已合入 | 直接挂载真实桌面独立窗口组件（360px 小伴 AI 额度与逐模型 `hi` 检测、第三方服务商配置、完整设置页）；需运行桌面 Vite `npm run dev` |
 | [对话资产](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.html) | 核心 AI 与对话 | 已合入 | 右上角单图标收纳设计稿、生成图片、交付文件与文件夹，支持轻量浮层与固定侧栏切换；[可编辑源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.fragment.html) |
 | [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 核心 AI 与对话 | 已合入 | 标题、正文与工作区检索，项目与项目内会话默认各折叠展示 6 项，点击结果自动展开定位 |

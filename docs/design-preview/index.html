@@ -679,7 +679,7 @@
           </svg>
         </span>
         <span class="brand-text">
-          <span class="brand-title">小伴设计稿总导航 <span class="brand-count" id="totalCount">30 份</span></span>
+          <span class="brand-title">小伴设计稿总导航 <span class="brand-count" id="totalCount">39 份</span></span>
           <span class="brand-sub">手机版 · 网页版 · 桌面版 · 小游戏与小程序</span>
         </span>
       </a>
@@ -847,7 +847,7 @@
     </div>
     <div class="modal-sec">
       <h4>1. 一键启动统一预览服务（推荐）</h4>
-      <p>在仓库根目录运行下方命令，即可在 <code>http://127.0.0.1:1455/</code> 浏览全部 26 份静态设计稿，并自动映射桌面 UI 升级画布的 <code>/_blob/</code> 图片资源：</p>
+      <p>在仓库根目录运行下方命令，即可在 <code>http://127.0.0.1:1455/</code> 浏览全部静态设计稿与桌面画布模块，并自动映射桌面 UI 升级画布的 <code>/_blob/</code> 图片资源：</p>
       <div class="cmd-box">
         <code>python3 docs/design-preview/serve.py --open</code>
         <button type="button" class="cmd-copy" data-copy="python3 docs/design-preview/serve.py --open">复制</button>
@@ -1083,40 +1083,188 @@
     },
     {
       id: 'community-redesign',
-      title: '超级小伴社区全站 UI（PC + H5）',
+      title: '超级小伴社区 · 主站浏览（PC + H5）',
       domains: ['web'],
       subcat: '超级小伴社区',
-      status: 'partial',
-      statusNote: '全站主壳层、详情分享与我的/通知已合入；我的作品草稿与居中删除确认待补齐',
+      status: 'merged',
+      statusNote: '已合入 services/server-forum/web',
       runtime: 'static',
       path: 'services/server-forum/docs/design-specs/prototypes/community-redesign/index.html',
-      summary: 'chat.xiangban.xyz 完整交互设计稿：覆盖 PC 左导轨壳层与 390px 移动 H5，包含首页五栏目、讨论、资源、应用、小伴 AI、个人中心四页（我的/个人主页/我的作品/通知）及作品详情与 PC 双栏 / H5 分享面板。',
+      summary: 'chat.xiangban.xyz 现代活力社区风主站浏览：PC 左导轨与 390px 移动 H5 样机，涵盖首页五栏目（创意/资讯/精选/排行榜/导航）、讨论、资源、应用广场与小伴 AI。',
       presets: [
         { label: 'PC + H5 同屏', query: '' },
         { label: 'PC 端网页', query: '?device=desktop' },
         { label: '移动 H5', query: '?device=mobile' },
-        { label: '个人中心', query: '?page=me' },
+      ]
+    },
+    {
+      id: 'web-detail-work',
+      title: '详情页 · 创意作品（作者视角）',
+      domains: ['web'],
+      subcat: '社区详情页',
+      status: 'merged',
+      statusNote: '已合入 IdeaWorkView.vue',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/community-redesign/index.html',
+      summary: '3D 互动作品《潮汐书房 · 鲸鱼娘》详情页（作者视角）：品牌实心体验主按钮（PC 标题同行居右 / H5 首屏通栏）、多图画廊切换、评论管理与作者编辑/删除菜单。',
+      presets: [
+        { label: 'PC + H5 同屏', query: '?detail=work:whale-girl&role=author' },
+        { label: 'PC 端', query: '?detail=work:whale-girl&role=author&device=desktop' },
+        { label: '移动 H5', query: '?detail=work:whale-girl&role=author&device=mobile' },
+        { label: '切读者视角', query: '?detail=work:whale-girl&role=reader' },
+      ]
+    },
+    {
+      id: 'web-detail-topic',
+      title: '详情页 · 讨论帖子（读者视角）',
+      domains: ['web'],
+      subcat: '社区详情页',
+      status: 'merged',
+      statusNote: '已合入 TopicView.vue',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/community-redesign/index.html',
+      summary: '社区讨论带图帖详情页（读者视角）：图文正文排版、关注作者按钮、不感兴趣与举报菜单、底部悬浮评论输入栏与回复互动流。',
+      presets: [
+        { label: 'PC + H5 同屏', query: '?detail=topic:109&role=reader' },
+        { label: 'PC 端', query: '?detail=topic:109&role=reader&device=desktop' },
+        { label: '移动 H5', query: '?detail=topic:109&role=reader&device=mobile' },
+        { label: '切作者视角', query: '?detail=topic:109&role=author' },
+      ]
+    },
+    {
+      id: 'web-detail-project',
+      title: '详情页 · 开源精选（管理员视角）',
+      domains: ['web'],
+      subcat: '社区详情页',
+      status: 'merged',
+      statusNote: '已合入开源精选详情页',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/community-redesign/index.html',
+      summary: '开源项目《Excalidraw》详情页（管理员视角）：外链访问主按钮、项目标签与星标信息、管理员置顶/取消置顶与带通知提示的删帖确认流程。',
+      presets: [
+        { label: 'PC + H5 同屏', query: '?detail=project:excalidraw/excalidraw&role=admin' },
+        { label: 'PC 端', query: '?detail=project:excalidraw/excalidraw&role=admin&device=desktop' },
+        { label: '移动 H5', query: '?detail=project:excalidraw/excalidraw&role=admin&device=mobile' },
+      ]
+    },
+    {
+      id: 'web-profile-suite',
+      title: '社区个人中心四页套件（PC + H5）',
+      domains: ['web'],
+      subcat: '超级小伴社区',
+      status: 'partial',
+      statusNote: '我的/通知已合入；我的作品草稿与居中删除确认待补齐',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/web-profile-suite.html',
+      summary: '1:1 对齐手机 App 方案 1 通栏精修与社区 PC 左导轨壳层，独立覆盖「我的 / 个人主页 / 我的作品 / 通知」四页，含草稿虚线轻描边、全状态删除二次确认、本人/他人视角与未登录/空态。',
+      presets: [
+        { label: '我的', query: '?page=me' },
+        { label: '个人主页', query: '?page=profile' },
         { label: '我的作品', query: '?page=works' },
-        { label: '详情与分享', query: '?detail=work:whale-girl&share=1' },
+        { label: '通知', query: '?page=notifications' },
+      ]
+    },
+    {
+      id: 'web-detail-share',
+      title: '社区详情页分享面板（PC + H5）',
+      domains: ['web'],
+      subcat: '超级小伴社区',
+      status: 'merged',
+      statusNote: '已合入 DetailShareDialog.vue',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/web-detail-share.html',
+      summary: '纯黑白灰中性配色、仅分享图保留品牌主题色：H5 1:1 对齐手机 App（单行横滑图标轨 + 磨砂卡片舞台）；PC 端 716px 居中双栏弹窗，覆盖帖子 / 作品 / 开源 / 日报四场景与内联删除确认。',
+      presets: [
+        { label: 'PC + H5 同屏', query: '' },
+        { label: 'PC 端', query: '?device=desktop' },
+        { label: '移动 H5', query: '?device=mobile' },
       ]
     },
 
     // ==================== 3. 桌面版（小伴桌面客户端） ====================
     {
-      id: 'desktop-ui-upgrade',
-      title: '小伴桌面 UI 升级画布',
+      id: 'desktop-main-shell',
+      title: '桌面主界面与会话画布',
       domains: ['desktop'],
-      subcat: '整体界面画布',
+      subcat: '主界面与对话',
       status: 'merged',
-      statusNote: '27 张有效画板已合入（默认隐藏 12 张已替代/历史对比画板）',
+      statusNote: '已合入 ControlShell / NewTaskPage / ChatPage / StudioPage / CarePage',
       runtime: 'canvas',
-      badgeExtra: '27 有效画板',
+      badgeExtra: '8 画板',
       externalUrl: 'https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg',
       path: 'client/xiaoban-desktop/docs/design-specs/ui-upgrade/index.html',
-      summary: 'Claude Design 多画板导出总览：覆盖桌面主界面（新建任务、AI 插件、会话、装扮、提醒）、超级小伴四形态、资料库四分区、实时对话、小伴市场接入与输入框技能/专家/连接器规范。',
+      summary: 'Claude Design 画布拆出：桌面主骨架、新建任务、会话与头像菜单、模型与思考强度选择、任务执行卡片、会话实时对话、装扮主页、伙伴设置弹窗与关怀提醒。',
       presets: [
-        { label: '有效画板 (27)', query: '' },
-        { label: '全部画板 (39)', query: '?all=1' },
+        { label: '主界面 (8 画板)', query: '?group=main' },
+        { label: '全部有效画板 (27)', query: '' },
+      ]
+    },
+    {
+      id: 'desktop-super-assistant',
+      title: '超级小伴 · 悬浮四形态',
+      domains: ['desktop'],
+      subcat: '超级小伴',
+      status: 'merged',
+      statusNote: '已合入 AssistantApp.vue / Orb.vue / live-talk.ts',
+      runtime: 'canvas',
+      badgeExtra: '4 画板',
+      externalUrl: 'https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg',
+      path: 'client/xiaoban-desktop/docs/design-specs/ui-upgrade/index.html',
+      summary: '超级小伴方案 4 最终视觉基准：主题色双星小球状态与菜单 → 胶囊快问 → 卡片多轮对话 → 悬浮实时语音对话四形态流转。',
+      presets: [
+        { label: '悬浮四形态 (4 画板)', query: '?group=assistant' },
+        { label: '全部有效画板 (27)', query: '' },
+      ]
+    },
+    {
+      id: 'desktop-library',
+      title: '资料库（四分区）',
+      domains: ['desktop'],
+      subcat: '资料库',
+      status: 'merged',
+      statusNote: '已合入 LibraryPage.vue 及四分区子页',
+      runtime: 'canvas',
+      badgeExtra: '4 画板',
+      externalUrl: 'https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg',
+      path: 'client/xiaoban-desktop/docs/design-specs/ui-upgrade/index.html',
+      summary: '桌面资料库顶部四分区交互与布局：我的文档（含设计稿/生图/本地文件）、云文档（腾讯文档与百度网盘）、收藏与记忆。',
+      presets: [
+        { label: '资料库 (4 画板)', query: '?group=library' },
+        { label: '全部有效画板 (27)', query: '' },
+      ]
+    },
+    {
+      id: 'desktop-market',
+      title: 'AI 插件与小伴市场',
+      domains: ['desktop'],
+      subcat: 'AI 插件与市场',
+      status: 'merged',
+      statusNote: '已合入 AiStorePage.vue 与 src/ui/ai-store/',
+      runtime: 'canvas',
+      badgeExtra: '8 画板',
+      externalUrl: 'https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg',
+      path: 'client/xiaoban-desktop/docs/design-specs/ui-upgrade/index.html',
+      summary: 'AI 插件页接入小伴市场全流程：市场浏览与来源切换、技能安装安全审查（文件清单与 SHA-256）、网页 DeepLink 唤起确认、专家团安装、已安装与更新、连接器连接及来源设置。',
+      presets: [
+        { label: '插件与市场 (8 画板)', query: '?group=market' },
+        { label: '全部有效画板 (27)', query: '' },
+      ]
+    },
+    {
+      id: 'desktop-composer-plugins',
+      title: '输入框：技能 / 专家 / 连接器',
+      domains: ['desktop'],
+      subcat: '主界面与对话',
+      status: 'merged',
+      statusNote: '已合入 ChatComposer / ChatSlashMenu / ChatExpertChip / ChatConnectorCluster',
+      runtime: 'canvas',
+      badgeExtra: '3 画板',
+      externalUrl: 'https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg',
+      path: 'client/xiaoban-desktop/docs/design-specs/ui-upgrade/index.html',
+      summary: '新建任务与会话输入框扩展能力规范：一次性技能 chip（最多 3 个）、会话级专家/专家团单选、多选连接器图标簇与内置工具选择器构成规范。',
+      presets: [
+        { label: '输入框规范 (3 画板)', query: '?group=composer' },
+        { label: '全部有效画板 (27)', query: '' },
       ]
     },
     {
@@ -1129,13 +1277,18 @@
       runtime: 'vite',
       path: 'client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html',
       vitePath: '/docs/design-specs/prototypes/ai-model-settings.html',
-      summary: '直接挂载真实桌面独立窗口组件：360px 小伴 AI 单页额度与逐模型 hi 检测、第三方服务商分栏配置、完整设置页三组单色导航与左栏顶部自绘窗口控件，支持 4/24/80 模型与深浅色。'
+      summary: '直接挂载真实桌面独立窗口组件：360px 小伴 AI 单页额度与逐模型 hi 检测、第三方服务商分栏配置、完整设置页三组单色导航与左栏顶部自绘窗口控件，支持 4/24/80 模型与深浅色。',
+      presets: [
+        { label: '小伴 AI', query: '?view=models' },
+        { label: '第三方模型', query: '?view=provider' },
+        { label: '完整设置页', query: '?view=settings' },
+      ]
     },
     {
       id: 'conversation-assets',
       title: '对话资产（轻量浮层 & 常驻侧栏）',
       domains: ['desktop'],
-      subcat: '核心 AI 与对话',
+      subcat: '主界面与对话',
       status: 'merged',
       statusNote: '已合入 ChatAssets.vue / assets.rs',
       runtime: 'static',
@@ -1146,7 +1299,7 @@
       id: 'workspace-search',
       title: '工作空间检索与列表折叠',
       domains: ['desktop'],
-      subcat: '核心 AI 与对话',
+      subcat: '主界面与对话',
       status: 'merged',
       statusNote: '已合入 WorkspaceSearchDialog.vue / ControlShell.vue',
       runtime: 'static',
@@ -1162,7 +1315,7 @@
       id: 'long-term-goal',
       title: '长期目标配置与验收状态',
       domains: ['desktop'],
-      subcat: '核心 AI 与对话',
+      subcat: '主界面与对话',
       status: 'merged',
       statusNote: '已合入 ChatGoalPanel.vue',
       runtime: 'static',

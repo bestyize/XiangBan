@@ -851,9 +851,8 @@
   const VALID_DEVICES = new Set(['desktop', 'mobile', 'both']);
   const VALID_THEMES = new Set(['light', 'dark']);
   const VALID_ACCENTS = new Set(['red', 'green', 'blue', 'purple', 'amber', 'graphite']);
-  const VALID_PAGES = new Set(['ideas', 'news', 'opensource', 'rankings', 'nav', 'discuss', 'resources', 'apps', 'ai', 'me', 'profile', 'works', 'notifications']);
+  const VALID_PAGES = new Set(['ideas', 'news', 'opensource', 'rankings', 'nav', 'discuss', 'resources', 'apps', 'ai', 'me']);
   const VALID_ROLES = new Set(['reader', 'author', 'admin']);
-  const PS = window.CommunityProfileAndShare;
 
   function parseDetailParam(raw) {
     if (!raw) return null;
@@ -906,9 +905,6 @@
     searchQuery: '',
     collapsed: false
   };
-  if (PS && state.detail && params.get('share') === '1') {
-    PS.openShareOnInit(state.device === 'both' ? 'both' : state.device);
-  }
 
   function syncUrl() {
     const next = new URLSearchParams();
@@ -981,7 +977,6 @@
     if (HOME_TABS.some(t => t.key === page)) return 'home';
     if (page === 'discuss') return 'discuss';
     if (page === 'resources') return 'resources';
-    if (['me', 'profile', 'works', 'notifications'].includes(page)) return 'me';
     return page;
   }
 
@@ -1679,7 +1674,7 @@
     const includeShare = device === 'mobile' && state.role !== 'author';
     const items = [];
     if (includeShare) {
-      items.push({ icon: 'share', label: '分享给好友', action: 'open-share', device: 'mobile' });
+      items.push({ icon: 'share', label: '分享给好友', action: 'detail-more-toast', msg: '已复制分享链接' });
     }
     if (state.role === 'author') {
       items.push({ icon: 'edit', label: '编辑内容', action: 'detail-more-toast', msg: '演示打开：编辑当前内容' });
@@ -1827,7 +1822,7 @@
               </div>
               <div class="xhs-author-actions">
                 ${!isAuthor ? `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>` : ''}
-                <button type="button" class="h5-icon-btn" aria-label="分享" data-action="open-share" data-device="desktop">${icon('share', 16)}</button>
+                <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
                 <div class="xhs-more-wrap">
                   <button type="button" class="h5-icon-btn ${state.pcMoreOpen ? 'is-open' : ''}" aria-label="更多操作" aria-expanded="${state.pcMoreOpen}" data-action="toggle-pc-more">${icon('more', 17)}</button>
                   ${state.pcMoreOpen ? `
@@ -1938,10 +1933,7 @@
       case 'resources': return renderResourcesPage();
       case 'apps': return renderAppsPage();
       case 'ai': return renderAiPage();
-      case 'me': return PS ? PS.renderMePage(device, { savedCount: state.savedIds.size }) : renderMePage();
-      case 'profile': return PS ? PS.renderProfilePage(device) : renderMePage();
-      case 'works': return PS ? PS.renderWorksPage(device) : renderMePage();
-      case 'notifications': return PS ? PS.renderNotificationsPage(device) : renderMePage();
+      case 'me': return renderMePage();
       default: return renderIdeasPage();
     }
   }
@@ -2014,31 +2006,18 @@
                 <span class="rail-icon">${icon('spark', 15)}</span><span>小伴 AI</span>
               </button>
               <button type="button" class="rail-link ${sec === 'me' ? 'is-active' : ''}" data-action="go-page" data-page="me">
-                <span class="rail-icon">${icon('me', 15)}</span><span>我的</span><span class="rail-chevron">${icon('arrow', 13)}</span>
+                <span class="rail-icon">${icon('me', 15)}</span><span>我的</span>
               </button>
-              ${sec === 'me' ? `
-                <div class="rail-sub">
-                  ${[
-                    ['me', '我的'],
-                    ['profile', '个人主页'],
-                    ['works', '我的作品'],
-                    ['notifications', '通知'],
-                  ].map(([k, lbl]) => `
-                    <button type="button" class="rail-sub-link ${state.page === k && !state.detail ? 'is-active' : ''}"
-                      data-action="go-page" data-page="${k}">${lbl}</button>
-                  `).join('')}
-                </div>
-              ` : ''}
             </div>
           </div>
           <div class="rail-bottom">
             <div class="rail-user-bar">
               <button type="button" class="rail-user-btn" data-action="go-page" data-page="me">
                 <span class="user-avatar">伴</span>
-                <span class="rail-user-meta"><strong>阿伴创作者</strong><small>ID 100482</small></span>
+                <span class="rail-user-meta"><strong>阿伴</strong><small>240 积分</small></span>
               </button>
-              <button type="button" class="rail-bell-btn" aria-label="通知" data-action="go-page" data-page="notifications">
-                ${icon('bell', 15)}${(PS ? PS.unreadCount() : 1) > 0 ? '<i class="unread-dot"></i>' : ''}
+              <button type="button" class="rail-bell-btn" aria-label="通知" data-action="toast" data-msg="暂无新的未读回复">
+                ${icon('bell', 15)}<i class="unread-dot"></i>
               </button>
             </div>
             <div class="rail-util-row">
@@ -2061,8 +2040,6 @@
           </div>
         </div>
         ${renderDeleteConfirmDialog('desktop')}
-        ${PS ? PS.renderProfileModals('desktop') : ''}
-        ${PS ? PS.renderShareOverlay('desktop', getDetailModel(), state.role) : ''}
       </div>
     `;
   }
@@ -2089,8 +2066,8 @@
               ${isPinned ? '<span class="xhs-pin-pill">置顶</span>' : ''}
             </div>
             ${isAuthor
-              ? `<button type="button" class="h5-icon-btn" aria-label="分享" data-action="open-share" data-device="mobile">${icon('share', 18)}</button>`
-              : `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button><button type="button" class="h5-icon-btn" aria-label="分享" data-action="open-share" data-device="mobile">${icon('share', 18)}</button>`}
+              ? `<button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('share', 18)}</button>`
+              : `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>`}
             <button type="button" class="h5-icon-btn ${state.h5MoreOpen ? 'is-open' : ''}" aria-label="更多操作" data-action="open-h5-more">${icon('more', 18)}</button>
           </div>
         </header>
@@ -2107,7 +2084,7 @@
             </div>
             <div class="h5-top-actions">
               <button type="button" class="h5-icon-btn" aria-label="搜索" data-action="open-search">${icon('search', 17)}</button>
-              <button type="button" class="h5-icon-btn" aria-label="通知" data-action="go-page" data-page="notifications">${icon('bell', 17)}${(PS ? PS.unreadCount() : 1) > 0 ? '<i class="unread-dot"></i>' : ''}</button>
+              <button type="button" class="h5-icon-btn" aria-label="通知" data-action="toast" data-msg="有 2 条新回复">${icon('bell', 17)}<i class="unread-dot"></i></button>
             </div>
           </div>
           ${subTabs ? `
@@ -2121,19 +2098,12 @@
         </header>
       `;
     } else {
-      const titles = { apps: '应用', ai: '小伴 AI', me: '我的', profile: '个人主页', works: '我的作品', notifications: '通知' };
-      const simpleTitle = titles[state.page] || '我的';
-      const isProfileSub = ['profile', 'works', 'notifications'].includes(state.page);
+      const simpleTitle = sec === 'apps' ? '应用' : sec === 'ai' ? '小伴 AI' : '我的';
       headerHtml = `
         <header class="h5-header">
           <div class="h5-simple-head">
-            ${isProfileSub ? `<button type="button" class="h5-icon-btn" aria-label="返回" data-action="go-page" data-page="me">${icon('back', 19)}</button>` : ''}
-            <strong style="${isProfileSub ? 'flex:1;text-align:center;margin-right:36px' : ''}">${simpleTitle}</strong>
-            ${state.page === 'me' ? `
-              <button type="button" class="h5-icon-btn" aria-label="设置" data-action="toast" data-msg="打开设置">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              </button>
-            ` : ''}
+            <strong>${simpleTitle}</strong>
+            ${sec === 'me' ? `<button type="button" class="h5-icon-btn" aria-label="切换浅深色" data-action="toggle-theme">${icon(state.theme === 'dark' ? 'sun' : 'moon', 17)}</button>` : ''}
           </div>
         </header>
       `;
@@ -2218,19 +2188,16 @@
       `;
     }
 
-    const isPsPage = !state.detail && ['me', 'profile', 'works', 'notifications'].includes(state.page);
     return `
       <div class="app-shell is-framed ${state.detail && detailItem ? 'is-detail' : ''}" data-scheme="vibrant" data-device="mobile" data-theme="${state.theme}" data-accent="${state.accent}">
         ${headerHtml}
         <div class="h5-scroll" data-scroll-key="h5">
-          <div class="content-wrap ${isPsPage ? 'is-ps-page' : ''}">
+          <div class="content-wrap">
             ${renderActiveContent('mobile')}
           </div>
         </div>
         ${bottomBarHtml}
         ${sheetHtml}
-        ${PS ? PS.renderProfileModals('mobile') : ''}
-        ${PS ? PS.renderShareOverlay('mobile', detailItem, state.role) : ''}
       </div>
     `;
   }
@@ -2508,17 +2475,8 @@
     }
 
     const action = btn.getAttribute('data-action');
-    if (PS && PS.handleAction(action, btn, event, {
-      render,
-      showToast,
-      closeDetailMenus: () => { state.pcMoreOpen = false; state.h5MoreOpen = false; },
-      closeDetail: () => { state.detail = null; state.pcMoreOpen = false; state.h5MoreOpen = false; render(true); },
-    })) {
-      return;
-    }
     switch (action) {
       case 'go-page':
-        if (PS) PS.closeShare();
         state.detail = null;
         state.detailSlide = 0;
         state.pcMoreOpen = false;
@@ -2628,7 +2586,6 @@
         render(true);
         break;
       case 'close-detail':
-        if (PS) PS.closeShare();
         state.detail = null;
         state.detailSlide = 0;
         state.pcMoreOpen = false;

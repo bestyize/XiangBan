@@ -9,13 +9,15 @@
 @media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1F1F22;--ink:#F2F2F4;--mu:#A1A1A8;--line:rgba(255,255,255,.1);--note:#2E2A1E}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-header{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--line)}
-h1{margin:0;font-size:18px;font-weight:600}
-header span{font-size:13px;color:var(--mu)}
-header label{margin-left:auto;font-size:13px;color:var(--mu);display:flex;align-items:center;gap:6px}
+header{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:17px;font-weight:650}
+header span{font-size:12.5px;color:var(--mu)}
+header .tools{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+header label{font-size:12.5px;color:var(--mu);display:inline-flex;align-items:center;gap:6px}
+header select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:4px 8px}
 main{padding:8px 20px 60px}
-section{margin-top:28px}
-h2{margin:0 0 12px;font-size:16px;font-weight:600}
+section{margin-top:26px}
+h2{margin:0 0 12px;font-size:15.5px;font-weight:650}
 .notes{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
 .note{max-width:560px;padding:10px 12px;border-radius:10px;background:var(--note);font-size:13px;line-height:1.6;white-space:pre-line}
 .row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
@@ -28,12 +30,34 @@ figcaption small{color:var(--mu)}
 </style>
 </head>
 <body>
-<header><h1 id="title">设计稿总览</h1><span id="count"></span>
-<label style="margin-left:auto"><input type="checkbox" id="showArchived"> 显示已替代 / 历史对比画板</label>
-<label style="margin-left:12px">缩放 <select id="zoom"><option value="0.25">25%</option><option value="0.4">40%</option><option value="0.6">60%</option><option value="1">100%</option></select></label></header>
+<header>
+  <h1 id="title">小伴桌面 UI 升级设计稿</h1>
+  <span id="count"></span>
+  <div class="tools">
+    <label>模块
+      <select id="groupFilter">
+        <option value="all">全部有效画板 (27)</option>
+        <option value="main">桌面主界面与会话 (8)</option>
+        <option value="assistant">超级小伴 · 悬浮四形态 (4)</option>
+        <option value="library">资料库 · 四分区 (4)</option>
+        <option value="market">AI 插件与小伴市场 (8)</option>
+        <option value="composer">输入框 · 技能/专家/连接器 (3)</option>
+      </select>
+    </label>
+    <label id="archivedWrap"><input type="checkbox" id="showArchived"> 含已替代/对比画板</label>
+    <label>缩放
+      <select id="zoom">
+        <option value="0.25">25%</option>
+        <option value="0.4">40%</option>
+        <option value="0.6">60%</option>
+        <option value="1">100%</option>
+      </select>
+    </label>
+  </div>
+</header>
 <main id="main"></main>
 <script>
-// 读取 canvas.json，按画布上的标题便签分组，逐个用 iframe 渲染画板
+// 读取 canvas.json，按模块或画布标题分组，逐个用 iframe 渲染画板（*.dc.html 与 canvas.json 保持原样）
 (async function () {
   var ARCHIVED = {
     'WB-Settings.dc.html': '已由独立窗口设置稿替代',
@@ -49,55 +73,130 @@ figcaption small{color:var(--mu)}
     'WB-Ask-Card.dc.html': '历史新旧对比（新版已合入）',
     'WB-Perm-Menu.dc.html': '历史新旧对比（新版已合入）'
   };
+  var MODULES = {
+    main: {
+      title: '桌面主界面与会话',
+      files: ['WB-New.dc.html', 'WB-Chat.dc.html', 'WB-Chat-Model.dc.html', 'WB-Chat-Task.dc.html', 'WB-Chat-Voice.dc.html', 'WB-Studio.dc.html', 'WB-Pets-Dialog.dc.html', 'WB-Remind.dc.html']
+    },
+    assistant: {
+      title: '超级小伴 · 悬浮四形态（小球 → 胶囊 → 卡片 → 实时对话）',
+      files: ['WB-Assistant-Ball.dc.html', 'WB-Assistant-Capsule.dc.html', 'WB-Assistant-Card.dc.html', 'WB-Assistant-Voice.dc.html']
+    },
+    library: {
+      title: '资料库 · 我的文档 / 云文档 / 收藏 / 记忆',
+      files: ['WB-Library-Docs.dc.html', 'WB-Library-Cloud.dc.html', 'WB-Library-Saved.dc.html', 'WB-Library-Memory.dc.html']
+    },
+    market: {
+      title: 'AI 插件与小伴市场（浏览 / 审查 / 唤起 / 专家团 / 更新 / 连接器）',
+      files: ['WB-Plugins.dc.html', 'Market.dc.html', 'WB-Market-Review.dc.html', 'WB-Market-DeepLink.dc.html', 'WB-Market-Team.dc.html', 'WB-Market-Updates.dc.html', 'WB-Market-Connector.dc.html', 'WB-Market-Settings.dc.html']
+    },
+    composer: {
+      title: '输入框 · 技能 / 专家 / 连接器（新建任务 · 会话 · 规范）',
+      files: ['WB-New-Plugins.dc.html', 'WB-Chat-Plugins.dc.html', 'WB-Compose-Spec.dc.html']
+    }
+  };
+
   var c = await (await fetch('canvas.json')).json();
-  var main = document.getElementById('main'), zoom = document.getElementById('zoom'), showArchived = document.getElementById('showArchived');
+  var main = document.getElementById('main');
+  var zoom = document.getElementById('zoom');
+  var groupFilter = document.getElementById('groupFilter');
+  var showArchived = document.getElementById('showArchived');
+  var archivedWrap = document.getElementById('archivedWrap');
+
   var qs = new URLSearchParams(location.search);
+  var initGroup = qs.get('group');
+  if (initGroup && MODULES[initGroup]) groupFilter.value = initGroup;
   if (qs.get('all') === '1') showArchived.checked = true;
-  document.title = c.title; document.getElementById('title').textContent = c.title;
+
   var boards = c.order.map(function (k) { return Object.assign({ file: k }, c.boards[k]); });
+  var byFile = Object.fromEntries(boards.map(function (b) { return [b.file, b]; }));
   var maxW = Math.max.apply(null, boards.map(function (b) { return b.w; }));
   zoom.value = maxW > 800 ? '0.4' : '0.6';
+
   var notes = Object.values(c.notes || {});
   var titles = notes.filter(function (n) { return n.kind === 'title1'; }).sort(function (a, b) { return a.y - b.y; });
   var stickies = notes.filter(function (n) { return !n.kind; });
-  // 每个画板归到它上方最近的标题
   var groups = titles.map(function (t) { return { t: t, boards: [], notes: [] }; });
   if (!groups.length || boards.some(function (b) { return b.y < titles[0].y; })) groups.unshift({ t: { text: '未分组', y: -Infinity }, boards: [], notes: [] });
   function groupOf(y) { var g = groups[0]; groups.forEach(function (x) { if (x.t.y <= y) g = x; }); return g; }
   boards.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }).forEach(function (b) { groupOf(b.y).boards.push(b); });
   stickies.forEach(function (n) { groupOf(n.y).notes.push(n); });
+
+  function renderBoardsSection(secTitle, list, secNotes, s) {
+    var sec = document.createElement('section');
+    var h = document.createElement('h2');
+    h.textContent = secTitle;
+    sec.appendChild(h);
+    if (secNotes && secNotes.length) {
+      var ns = document.createElement('div');
+      ns.className = 'notes';
+      secNotes.forEach(function (n) {
+        var d = document.createElement('div');
+        d.className = 'note';
+        d.textContent = n.text;
+        ns.appendChild(d);
+      });
+      sec.appendChild(ns);
+    }
+    var row = document.createElement('div');
+    row.className = 'row';
+    list.forEach(function (b) {
+      var f = document.createElement('figure'), fr = document.createElement('div'), ifr = document.createElement('iframe');
+      fr.className = 'frame'; fr.style.width = b.w * s + 'px'; fr.style.height = b.h * s + 'px';
+      ifr.src = b.file; ifr.loading = 'lazy'; ifr.title = b.title || b.file;
+      ifr.width = b.w; ifr.height = b.h; ifr.style.transform = 'scale(' + s + ')';
+      fr.appendChild(ifr); f.appendChild(fr);
+      var cap = document.createElement('figcaption'), a = document.createElement('a'), sm = document.createElement('small');
+      a.href = b.file; a.target = '_blank'; a.textContent = b.title || b.file;
+      sm.textContent = b.w + '×' + b.h + (ARCHIVED[b.file] ? ' · ' + ARCHIVED[b.file] : '');
+      cap.appendChild(a); cap.appendChild(sm); f.appendChild(cap); row.appendChild(f);
+    });
+    sec.appendChild(row);
+    main.appendChild(sec);
+  }
+
   function render() {
-    var s = +zoom.value, includeArchived = showArchived.checked;
+    var s = +zoom.value;
+    var gKey = groupFilter.value;
+    main.innerHTML = '';
+
+    if (gKey !== 'all' && MODULES[gKey]) {
+      var mod = MODULES[gKey];
+      var list = mod.files.map(function (f) { return byFile[f]; }).filter(Boolean);
+      archivedWrap.style.display = 'none';
+      document.title = mod.title + ' · 小伴桌面设计稿';
+      document.getElementById('title').textContent = mod.title;
+      document.getElementById('count').textContent = list.length + ' 张画板 · 点画板名称单独打开';
+      // 匹配本模块相关的便签
+      var modNotes = [];
+      groups.forEach(function (g) {
+        if (g.boards.some(function (b) { return mod.files.indexOf(b.file) >= 0; })) {
+          g.notes.forEach(function (n) { if (modNotes.indexOf(n) < 0) modNotes.push(n); });
+        }
+      });
+      renderBoardsSection(mod.title, list, modNotes, s);
+      return;
+    }
+
+    archivedWrap.style.display = '';
+    var includeArchived = showArchived.checked;
     var visibleCount = boards.filter(function (b) { return includeArchived || !ARCHIVED[b.file]; }).length;
     var archivedCount = boards.length - boards.filter(function (b) { return !ARCHIVED[b.file]; }).length;
+    document.title = c.title;
+    document.getElementById('title').textContent = c.title;
     document.getElementById('count').textContent = visibleCount + ' 个有效画板' + (includeArchived ? '（含 ' + archivedCount + ' 个已替代/历史对比）' : ' · 已隐藏 ' + archivedCount + ' 个已替代/历史对比画板') + ' · 点画板名称单独打开';
-    main.innerHTML = '';
+
     groups.forEach(function (g) {
       var list = g.boards.filter(function (b) { return includeArchived || !ARCHIVED[b.file]; });
       if (!list.length) return;
-      var sec = document.createElement('section'), h = document.createElement('h2');
-      h.textContent = g.t.text; sec.appendChild(h);
-      if (g.notes.length) {
-        var ns = document.createElement('div'); ns.className = 'notes';
-        g.notes.forEach(function (n) { var d = document.createElement('div'); d.className = 'note'; d.textContent = n.text; ns.appendChild(d); });
-        sec.appendChild(ns);
-      }
-      var row = document.createElement('div'); row.className = 'row';
-      list.forEach(function (b) {
-        var f = document.createElement('figure'), fr = document.createElement('div'), ifr = document.createElement('iframe');
-        fr.className = 'frame'; fr.style.width = b.w * s + 'px'; fr.style.height = b.h * s + 'px';
-        ifr.src = b.file; ifr.loading = 'lazy'; ifr.title = b.title || b.file;
-        ifr.width = b.w; ifr.height = b.h; ifr.style.transform = 'scale(' + s + ')';
-        fr.appendChild(ifr); f.appendChild(fr);
-        var cap = document.createElement('figcaption'), a = document.createElement('a'), sm = document.createElement('small');
-        a.href = b.file; a.target = '_blank'; a.textContent = b.title || b.file;
-        sm.textContent = b.w + '×' + b.h + (ARCHIVED[b.file] ? ' · ' + ARCHIVED[b.file] : '');
-        cap.appendChild(a); cap.appendChild(sm); f.appendChild(cap); row.appendChild(f);
-      });
-      sec.appendChild(row); main.appendChild(sec);
+      renderBoardsSection(g.t.text, list, g.notes, s);
     });
   }
-  zoom.onchange = render; showArchived.onchange = render; render();
+
+  zoom.onchange = render;
+  showArchived.onchange = render;
+  groupFilter.onchange = render;
+  render();
 })();
 </script>
 </body>
