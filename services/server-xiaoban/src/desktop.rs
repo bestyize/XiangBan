@@ -333,7 +333,28 @@ pub async fn product(
 ) -> Result<Json<Value>, AppError> {
     let config = load_config(state.admin.store()?).await?;
     let origin = crate::app_packages::origin(&headers, &config.site_url);
-    let downloads: BTreeMap<_,_> = TARGETS.iter().filter_map(|target| config.latest(Some(target), false).map(|r| {let platforms=crate::app_packages::public_platforms(r,&origin);(*target, json!({"version":r.version,"notes":r.notes,"publishedAt":r.published_at,"url":platforms[*target].url}))})).collect();
+    let downloads: BTreeMap<_, _> = TARGETS
+        .iter()
+        .filter_map(|target| {
+            config.latest(Some(target), false).map(|r| {
+                let platforms = crate::app_packages::public_platforms(r, &origin);
+                let pkg = &platforms[*target];
+                let mut item = json!({
+                    "version": r.version,
+                    "notes": r.notes,
+                    "publishedAt": r.published_at,
+                    "url": pkg.url,
+                });
+                if let Some(sha) = &pkg.sha256 {
+                    item["sha256"] = json!(sha);
+                }
+                if let Some(bytes) = pkg.bytes {
+                    item["bytes"] = json!(bytes);
+                }
+                (*target, item)
+            })
+        })
+        .collect();
     Ok(Json(
         json!({"schemaVersion":1,"introduction":config.introduction,"downloads":downloads,"announcements":config.notices("website")}),
     ))

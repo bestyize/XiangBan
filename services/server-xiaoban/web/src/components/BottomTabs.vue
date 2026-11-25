@@ -35,7 +35,7 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
 </template>
 
 <style scoped>
-.home-mark { width: 28px; height: 24px; object-fit: contain; }
+.home-mark { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
 
 .tabs {
   display: none;

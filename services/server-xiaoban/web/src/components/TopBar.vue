@@ -94,7 +94,7 @@ const links = [
   line-height: 1;
 }
 
-.brand img { width: 42px; height: 37px; object-fit: contain; }
+.brand img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; box-shadow: 0 2px 8px rgba(249, 116, 75, 0.22); }
 
 .links {
   display: flex;

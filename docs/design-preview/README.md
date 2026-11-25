@@ -4,6 +4,10 @@
 
 实现设计时修改对应 client 工程并验证；不要直接用预览覆盖已有应用、鉴权或平台接入逻辑。
 
+## 小伴桌面官网（wallpaper.xiangban.xyz）
+
+[功能页 & 下载页 UI 重设计稿（PC + 移动 H5）](../../services/server-xiaoban/docs/design-specs/prototypes/features-download-redesign.html) 去除原浅绿色系，默认采用极简暖白 · 墨黑主题（顶部支持一键切换暖纸 · 珊瑚红 / 晴白 · 冰川蓝），同步最新「双星相伴 · 日落珊瑚」AppIcon、小伴桌面 v3.1.8 实时渲染截图（新建任务 / 壁纸 / 14 种特效 / 桌面伙伴 / 精选应用广场）与小伴手机 App 最新三联实机画廊（连续对话 / 实时语音通话 / 作品交付卡）；重设计 `/features` 与 `/download`（消除双大标题重复、桌面/手机联动推荐主卡、实体下载按钮、更新日志弹窗、SHA-256 复制与加载/异常态），附新旧痛点对照（仓库根运行 `python3 -m http.server 1452 --bind 127.0.0.1 --directory services/server-xiaoban`；详见[官网设计索引](../../services/server-xiaoban/docs/design-specs/README.md)）。[功能页 PC](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=features&device=desktop) · [下载页 PC](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=download&device=desktop) · [移动 H5](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=download&device=mobile) · [新旧对照](http://127.0.0.1:1452/docs/design-specs/prototypes/features-download-redesign.html?page=compare)
+
 ## 超级小伴社区网页版
 
 [详情页分享面板重设计稿（PC + 移动 H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) 覆盖社区帖子、创意作品、开源精选与 AI 日报，分享面板纯黑白灰中性配色、仅分享图内保留品牌主题色：手机 H5 1:1 对齐手机 App（单行预览条 + 单行可横滑图标轨 + 沉浸式磨砂分享卡片）；PC 端采用 716px 居中双栏弹窗，左栏所见即所得卡片预览（纯白 / 暖纸笺 / 墨夜 + 摘录/二维码开关），右栏集中提供复制链接、复制图片直贴微信/飞书、保存 PNG、复制推荐语/全文、问问小伴与主态内联删除确认（与个人中心共用 1450 端口）。[PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-detail-share.html) · [PC 端](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=desktop) · [手机 H5](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=mobile)

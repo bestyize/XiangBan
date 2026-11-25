@@ -42,13 +42,18 @@ export interface PublicNotice {
   body: string;
   revision: string;
 }
+export interface DesktopProductDownload {
+  version: string;
+  notes: string;
+  publishedAt: string;
+  url: string;
+  sha256?: string;
+  bytes?: number;
+}
 export interface DesktopProduct {
   schemaVersion: number;
   introduction: string;
-  downloads: Record<
-    string,
-    { version: string; notes: string; publishedAt: string; url: string }
-  >;
+  downloads: Record<string, DesktopProductDownload>;
   announcements: PublicNotice[];
 }
 export async function getDesktopProduct(): Promise<DesktopProduct> {
