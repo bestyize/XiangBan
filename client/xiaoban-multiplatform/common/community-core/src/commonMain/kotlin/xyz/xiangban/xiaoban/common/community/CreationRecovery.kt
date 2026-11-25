@@ -25,6 +25,7 @@ data class CreationProgress(
 }
 
 internal val creationTools = setOf("write_file", "edit_file", "copy_file", "delete_file", "asset_import", "lib_add", "app_create", "app_validate")
+internal const val CREATION_RESUME = "继续制作"
 
 private fun String.jsonObject() = runCatching { CommunityJson.parseToJsonElement(this) as? JsonObject }.getOrNull()
 private fun JsonObject?.field(name: String) = (this?.get(name) as? JsonPrimitive)?.contentOrNull
@@ -84,9 +85,26 @@ fun creationProgress(messages: List<ChatTurn>): CreationProgress {
 fun ChatTurn.creationInterrupted(): Boolean = role == "assistant" && !streaming && !imageGeneration &&
     (error != null || cancelled || truncated || tools.any { it.status == ToolStatus.Error } && unresolvedCalls(tools).isNotEmpty())
 
+fun CloudChatState.creationDeliveryProgress(): CreationProgress? {
+    val last = messages.lastOrNull()?.takeIf { it.role == "assistant" && !it.streaming && !it.imageGeneration } ?: return null
+    if (sending || !nativeAgentAvailable || planningCreation) return null
+    if (creation?.approved == true) return creationProgress(messages)
+
+    val resumed = messages.getOrNull(messages.lastIndex - 1)?.text == CREATION_RESUME
+    val usedAppTools = last.tools.any { it.name == "app_read_format" || it.name == "app_create" || it.name == "app_validate" }
+    if (!last.creationInterrupted() && !resumed && !usedAppTools) return null
+    // A failed follow-up can still refer to the same interrupted draft in the main chat.
+    val previousAttempts = messages.asReversed().asSequence().drop(1)
+        .filter { it.role == "assistant" }
+        .takeWhile { it.creationInterrupted() }
+        .toList().asReversed()
+    return creationProgress(previousAttempts + last).takeIf { it.targetId != null || it.directories.isNotEmpty() }
+}
+
 /** Inspect the referenced drafts again at the time of the click, including writes whose result was interrupted. */
-internal suspend fun CreationProgress.resumeInput(store: MobileGameStore?, draft: CreationDraft, plan: ChatTurn?): String = buildString {
-    appendLine("从同一作品的已保存进度继续，只补缺失或失败的步骤。已确认的需求：${draft.request}")
+internal suspend fun CreationProgress.resumeInput(store: MobileGameStore?, draft: CreationDraft?, plan: ChatTurn?): String = buildString {
+    appendLine("结合本会话原需求，从同一作品的已保存进度继续，只补缺失或失败的步骤。")
+    draft?.let { appendLine("已确认的需求：${it.request}") }
     plan?.let { appendLine("原方案见 conversation_read(message_id=${it.id})。") }
     appendLine("本会话的操作回执：$summary。尚待完成：$nextStep。")
     for (root in directories) {
@@ -99,8 +117,9 @@ internal suspend fun CreationProgress.resumeInput(store: MobileGameStore?, draft
     if (id != null) {
         appendLine("沿用原作品 ID $id，不创建新的 ID。")
         val work = try { store?.validate(id) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
-        if (work != null) appendLine("手机上现有《${work.name}》版本 ${work.version} 已通过文件校验。核对是否本次目标，已完成安装的直接打开验收；仅在需要更新时按原有授权流程更新。")
+        if (work != null) appendLine("手机上现有《${work.name}》版本 ${work.version} 已通过文件校验。核对是否本次目标，复用已完成的安装；仅在需要更新时按原有授权流程更新。")
         else appendLine("尚未核实已安装版本，先检查安装状态。")
     }
     append("保留已有源码和数据，使用同一草稿。需要调整已保存的文件时，用 edit_file 做局部修改。中断的大文件分成可独立保存的小步。")
+    append("按需求完成并安装作品，调用 app_validate 校验已安装的作品，再报告可打开的结果。")
 }

@@ -75,7 +75,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import xyz.xiangban.xiaoban.common.community.creationInterrupted
-import xyz.xiangban.xiaoban.common.community.creationProgress
+import xyz.xiangban.xiaoban.common.community.creationDeliveryProgress
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -395,8 +395,8 @@ internal fun AiChatPage(
             val hasWaitingTask = cloud.parallelTasks().any { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
             AgentTopBar(model, exhausted, hasWaitingTask, { focus.clearFocus(); tasksSheet = true }, ::openConfig, back)
             if (main) AgentTaskStrip(cloud, compact, ::openConversation) { focus.clearFocus(); tasksSheet = true }
-            val progress = if (!archived && cloud.creation?.approved == true && !cloud.sending) {
-                remember(cloud.messages) { creationProgress(cloud.messages) }
+            val progress = if (!archived && !cloud.sending) {
+                remember(cloud.messages, cloud.creation, cloud.nativeAgentAvailable) { cloud.creationDeliveryProgress() }
             } else null
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (!archived && cloud.creationPlanReady) {
@@ -410,7 +410,7 @@ internal fun AiChatPage(
                 } else if (cloud.messages.isEmpty() && archive.isEmpty()) {
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
-                    val deliveredWork = progress?.installed?.takeUnless { cloud.messages.lastOrNull()?.creationInterrupted() == true }
+                    val deliveredWork = progress?.takeIf { it.validated }?.installed
                     key(conversation) {
                         CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
                             onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send,
@@ -422,7 +422,7 @@ internal fun AiChatPage(
                                 cloud.messages.firstOrNull()?.createdAtMs
                                     ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
                             } else null,
-                            readOnly = archived, creation = cloud.creation?.approved == true,
+                            readOnly = archived, creation = cloud.creation?.approved == true || progress?.validated == false,
                             deliveredWork = deliveredWork,
                             onOpenWork = { work ->
                                 if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
@@ -458,18 +458,16 @@ internal fun AiChatPage(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    if (progress != null) {
-                        val last = cloud.messages.lastOrNull()
-                        if (last?.creationInterrupted() == true) {
-                            AgentCreationResumeCard(
-                                stage = last.failureStage,
-                                summary = progress.summary,
-                                nextStep = progress.nextStep,
-                                canResume = !last.error.orEmpty().contains("结果尚未确认"),
-                                onResume = chat::resumeCreation,
-                                modifier = Modifier.padding(bottom = 8.dp),
-                            )
-                        }
+                    if (progress != null && !progress.validated) {
+                        val last = cloud.messages.last()
+                        AgentCreationResumeCard(
+                            stage = last.failureStage,
+                            summary = progress.summary,
+                            nextStep = progress.nextStep,
+                            canResume = !last.error.orEmpty().contains("结果尚未确认"),
+                            onResume = chat::resumeCreation,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
                     }
                     cloud.saveError?.let { message ->
                         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

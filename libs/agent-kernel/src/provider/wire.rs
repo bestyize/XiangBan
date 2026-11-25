@@ -213,6 +213,12 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
         let mut scoped = message.clone();
         if matching_state(message, profile, "chat").is_none() { scoped.provider_state = None; }
         let wire = message_to_wire(&scoped);
+        // A cancelled stream can leave a local assistant record with only reasoning.
+        // Chat Completions needs content or a tool call for an assistant message.
+        if message.role == Role::Assistant && wire["content"].is_null()
+            && wire["tool_calls"].is_null() && wire["refusal"].is_null() {
+            continue;
+        }
         messages.push(wire);
         for part in &message.parts {
             if let (Role::Tool, Part::Image { url }) = (message.role, part) {

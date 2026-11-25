@@ -723,19 +723,12 @@ internal fun AgentCreationResumeCard(
                     Text("!", style = XType.Caption.copy(fontSize = 10.sp, lineHeight = 10.sp), color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
                 Text(
-                    if (!stage.isNullOrBlank()) "制作在「$stage」阶段中断" else "制作已中断",
+                    if (!stage.isNullOrBlank()) "制作在「$stage」阶段中断" else "作品尚未交付",
                     Modifier.weight(1f),
                     style = XType.Body.copy(fontSize = 14.sp),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "可续作",
-                    Modifier.clip(RoundedCornerShape(6.dp)).background(ChatWarnSoft).padding(horizontal = 7.dp, vertical = 2.dp),
-                    style = XType.Caption.copy(fontSize = 11.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = ChatWarn,
                 )
             }
             Text(

@@ -1382,7 +1382,7 @@ class CloudChatController(
         check(!_state.value.sending)
         agent?.acknowledgeOutcome(agentSession)
         sendPrompt("我已核对上一轮操作的实际结果。请先读取当前状态，再继续未完成部分，避免重复操作。", "",
-            resumeCreation = _state.value.creation?.approved == true)
+            recovery = _state.value.creationDeliveryProgress())
     }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
@@ -1618,10 +1618,13 @@ class CloudChatController(
 
     fun resumeCreation() {
         val current = _state.value
-        val last = current.messages.lastOrNull() ?: return
-        if (agent == null || current.creation?.approved != true || !last.creationInterrupted() || current.sending ||
-            last.error.orEmpty().contains("结果尚未确认")) return
-        sendPrompt("继续制作", "", resumeCreation = true)
+        val progress = current.creationDeliveryProgress()?.takeUnless { it.validated } ?: return
+        if (current.messages.last().error.orEmpty().contains("结果尚未确认")) return
+        if (current.activeTier?.supportsTools == false) {
+            _state.value = current.copy(inputError = "请选择支持工具调用的模型后继续制作。")
+            return
+        }
+        sendPrompt(CREATION_RESUME, "", recovery = progress)
     }
 
     fun send(rawPrompt: String) { sendPrompt(rawPrompt, "") }
@@ -1762,7 +1765,7 @@ class CloudChatController(
         }
     }
 
-    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false, confirmCreation: Boolean = false, resumeCreation: Boolean = false): Boolean {
+    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false, confirmCreation: Boolean = false, recovery: CreationProgress? = null): Boolean {
         val prompt = rawPrompt.trim().ifEmpty { if (attachments.isNotEmpty()) "请查看附件。" else "" }
         if (prompt.isEmpty() || _state.value.sending) return false
         modelInputError(attachments)?.let { error ->
@@ -1821,12 +1824,14 @@ class CloudChatController(
                 try {
                     val resolved = resolveInput(attachments, media)
                     agent.ensureStarted(tier ?: "", reasoning)
+                    if (stoppingRuns.values.any { it.session == ownerSession }) {
+                        check(withTimeoutOrNull(10_000) { agent.awaitSessionIdle(ownerSession) } != null) { "上一轮仍在停止，请稍后重试" }
+                    }
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     request.checkCurrent()
                     if (chatRuns[ownerSession] !== run) return@launch
-                    val recovery = if (resumeCreation) creationProgress(run.messages) else null
-                    val input = if (recovery != null && draft != null) recovery.resumeInput(creationStore, draft, plan) else modelInput
+                    val input = recovery?.resumeInput(creationStore, draft, plan) ?: modelInput
                     request.checkCurrent()
                     if (chatRuns[ownerSession] !== run) return@launch
                     val runId = agent.nextRunId()
@@ -2086,7 +2091,7 @@ class CloudChatController(
             is AgentEvent.ToolStart -> {
                 val call = ToolCallInfo(event.id, event.name, event.arguments, startedAtMs = nowMs())
                 updateRun(run) { it.copy(tools = it.tools + call, activity = "正在执行${toolLabel(event.name)}…") }
-                if (run.options.creation?.approved == true && call.name in creationTools) history?.checkpoint(run.session, run.messages.last())
+                if (call.name in creationTools) history?.checkpoint(run.session, run.messages.last())
             }
             is AgentEvent.ToolEnd -> {
                 updateRun(run) { turn ->
@@ -2097,7 +2102,7 @@ class CloudChatController(
                     turn.copy(tools = tools, activity = running?.let { "正在执行${toolLabel(it.name)}…" } ?: "正在请求下一步…")
                 }
                 val turn = run.messages.last()
-                if (run.options.creation?.approved == true && turn.tools.any { it.id == event.id && it.name in creationTools }) {
+                if (turn.tools.any { it.id == event.id && it.name in creationTools }) {
                     history?.checkpoint(run.session, turn)
                 }
             }

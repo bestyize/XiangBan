@@ -45,12 +45,12 @@ class MobileConversationIsolationTest {
         fun messages(type: String) = sent.filter { it["type"]?.jsonPrimitive?.content == type }
     }
 
-    private class Harness(context: CoroutineContext, tools: List<AgentTool>, val client: HttpClient) {
+    private class Harness(context: CoroutineContext, tools: List<AgentTool>, val client: HttpClient, creationStore: MobileGameStore?) {
         val scope = CoroutineScope(SupervisorJob() + context.minusKey(Job))
         val bridge = Bridge()
         val runtime = AgentRuntime(bridge, { _, _ -> ModelResult(200) }, tools, "", "", scope)
         val store = ChatHistory(InMemoryChatHistoryFiles(), scope)
-        val chat = CloudChatController(AiGatewayApi(client) { "token" }, scope, agent = runtime, history = store)
+        val chat = CloudChatController(AiGatewayApi(client) { "token" }, scope, agent = runtime, history = store, creationStore = creationStore)
         suspend fun runId(session: String): String {
             eventually { bridge.run(session) != null }
             return bridge.run(session)!!.getValue("id").jsonPrimitive.content
@@ -60,9 +60,10 @@ class MobileConversationIsolationTest {
     private suspend fun withChat(
         tools: List<AgentTool> = emptyList(),
         client: HttpClient = HttpClient(MockEngine { respond("{}") }),
+        creationStore: MobileGameStore? = null,
         test: suspend Harness.() -> Unit,
     ) {
-        val harness = Harness(currentCoroutineContext(), tools, client)
+        val harness = Harness(currentCoroutineContext(), tools, client, creationStore)
         try { harness.test() }
         finally {
             harness.chat.reset()
@@ -111,10 +112,12 @@ class MobileConversationIsolationTest {
             assertEquals(setOf(a), chat.state.value.runningSessions)
             // A user may type again before the native stop settles; a late result must not erase that new turn.
             chat.send("B的新请求")
-            eventually { !chat.state.value.sending }
+            assertTrue(chat.state.value.sending)
+            assertEquals(br, bridge.run(b)?.get("id")?.jsonPrimitive?.content)
             bridge.emit("""{"type":"event","run":"$br","event":{"type":"tool_end","id":"tb","output":"实际已写入","is_error":false}}""")
             bridge.emit("""{"type":"run_end","run":"$br","ok":false,"error":"tool_outcome_needs_review"}""")
             eventually { chat.state.value.messages.first { it.id == stoppedReply }.error.orEmpty().contains("结果尚未确认") }
+            eventually { bridge.run(b)?.get("id")?.jsonPrimitive?.content != br }
             assertTrue(chat.state.value.messages.any { it.text == "B的新请求" })
             assertEquals("实际已写入", chat.state.value.messages.first { it.id == stoppedReply }.tools.single().output)
             chat.openConversation(a)
@@ -123,6 +126,65 @@ class MobileConversationIsolationTest {
             eventually { !chat.state.value.sending }
             assertEquals("A的回复", store.loadSnapshot(a)!!.messages.last().text)
             assertTrue(store.loadSnapshot(b)!!.messages.any { it.text == "B的新请求" })
+        }
+    }
+
+    @Test fun mainChatResumesAnInterruptedDraftAfterAnUnsuccessfulFollowup() = runBlocking {
+        val workspace = MemoryMobileWorkspace()
+        val path = "drafts/ledger/index.html"
+        workspace.write(path, "<h1>账本</h1>")
+        workspace.write("drafts/ledger/icon.svg", "<svg/>")
+        workspace.write("drafts/ledger/cover.svg", "<svg/>")
+        val games = MobileGameStore(workspace)
+        withChat(creationStore = games) {
+            fun toolEvent(run: String, event: JsonObject) = bridge.emit(buildJsonObject {
+                put("type", "event"); put("run", run); put("event", event)
+            }.toString())
+            fun toolStart(run: String, id: String, name: String, args: String) = toolEvent(run, buildJsonObject {
+                put("type", "tool_start"); put("id", id); put("name", name); put("arguments", args)
+            })
+            fun toolEnd(run: String, id: String, output: String) = toolEvent(run, buildJsonObject {
+                put("type", "tool_end"); put("id", id); put("output", output); put("is_error", false)
+            })
+            chat.send("做一个记账小程序")
+            val session = chat.state.value.conversationId
+            val draftRun = runId(session)
+            toolStart(draftRun, "write", "write_file", """{"path":"$path"}""")
+            toolEnd(draftRun, "write", """{"path":"$path","saved":true}""")
+            eventually { chat.state.value.messages.last().tools.singleOrNull()?.status == ToolStatus.Done }
+            chat.stop()
+            assertEquals(setOf(path), chat.state.value.creationDeliveryProgress()?.files)
+            chat.send("做好了吗")
+            bridge.emit("""{"type":"run_end","run":"$draftRun","ok":false,"error":"cancelled"}""")
+            eventually { bridge.messages("run").size == 2 }
+            val followup = runId(session)
+            bridge.emit("""{"type":"run_end","run":"$followup","ok":false,"error":"provider error: HTTP 400: 请求参数与模型不兼容"}""")
+            eventually { !chat.state.value.sending }
+            assertEquals(setOf(path), chat.state.value.creationDeliveryProgress()?.files)
+
+            chat.resumeCreation()
+            chat.resumeCreation()
+            eventually { bridge.messages("run").size == 3 }
+            val resume = bridge.run(session)!!
+            assertTrue(resume.getValue("input").jsonPrimitive.content.contains("drafts/ledger 当前文件"))
+            val run = resume.getValue("id").jsonPrimitive.content
+            val installArgs = """{"id":"ledger","kind":"app","name":"账本","description":"记账","source_dir":"drafts/ledger"}"""
+            val tools = mobileGameTools(games).associateBy { it.name }
+            val install = tools.getValue("app_create").run(CommunityJson.parseToJsonElement(installArgs).jsonObject)
+            assertTrue(install.ok, install.output)
+            toolStart(run, "install", "app_create", installArgs)
+            toolEnd(run, "install", install.output)
+            val validateArgs = """{"id":"ledger"}"""
+            val validate = tools.getValue("app_validate").run(CommunityJson.parseToJsonElement(validateArgs).jsonObject)
+            assertTrue(validate.ok, validate.output)
+            toolStart(run, "validate", "app_validate", validateArgs)
+            toolEnd(run, "validate", validate.output)
+            bridge.emit("""{"type":"run_end","run":"$run","ok":true,"text":"制作完成","finish":"stop"}""")
+            eventually { !chat.state.value.sending }
+            val delivery = assertNotNull(chat.state.value.creationDeliveryProgress())
+            assertTrue(delivery.validated)
+            assertEquals("ledger", delivery.installed?.id)
+            assertEquals("<h1>账本</h1>", games.readFile("ledger", "index.html"))
         }
     }
 

@@ -247,6 +247,37 @@ fn cancelling_a_run_stops_the_model_request() {
 }
 
 #[test]
+fn a_followup_after_cancelling_reasoning_keeps_the_completed_tool_exchange() {
+    let dir = temp_dir("cancel-reasoning");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "做一个记账小程序" }).to_string()).unwrap();
+    let first = next_of(&engine, "model_request");
+    ask_tool(&engine, &first, "time_now", json!({}), "time");
+    let second = next_of(&engine, "model_request");
+    let reasoning = data(json!({ "choices": [{ "index": 0, "delta": { "reasoning_content": "继续制作。" } }] }));
+    for line in reasoning {
+        engine.send(&json!({ "type": "model_line", "id": second["id"], "line": line }).to_string()).unwrap();
+    }
+    assert_eq!(next_of(&engine, "event")["event"]["type"], "reasoning_delta");
+    engine.send(&json!({ "type": "cancel", "id": "r1" }).to_string()).unwrap();
+    assert_eq!(next_of(&engine, "run_end")["ok"], false);
+
+    let stored = std::fs::read_to_string(std::path::Path::new(&dir).join("s-s1.jsonl")).unwrap();
+    assert!(stored.contains("继续制作。"));
+    engine.send(&json!({ "type": "run", "id": "r2", "session": "s1", "input": "做好了吗" }).to_string()).unwrap();
+    let followup = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(followup["body"].as_str().unwrap()).unwrap();
+    let messages = body["messages"].as_array().unwrap();
+    let call = messages.iter().position(|message| message["tool_calls"][0]["id"] == "time").unwrap();
+    assert_eq!(messages[call + 1]["tool_call_id"], "time");
+    assert_eq!(messages[call + 2], json!({ "role": "user", "content": "做好了吗" }));
+    assert_eq!(messages.len(), call + 3);
+    answer_text(&engine, &followup, "草稿已保留，接下来安装和校验。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
 fn bad_config_and_bad_lines_are_refused_without_crashing() {
     assert!(Engine::start("not json").is_err());
     assert!(Engine::start(&json!({ "model": "m", "sessions_dir": "x", "tools": [{ "name": "t", "description": "d", "parameters": {}, "risk": "wild" }] }).to_string()).is_err());

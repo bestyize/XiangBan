@@ -83,9 +83,9 @@ private fun chatTaskStatus(messages: List<ChatTurn>, creation: CreationDraft?): 
         creation?.approved == false && last.creationPlan && last.text.isNotBlank() &&
             last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.WaitingForPlan
         creation?.approved == true && last.streaming -> ChatTaskStatus.Creating
-        creation?.approved == true && last.creationInterrupted() -> ChatTaskStatus.Interrupted
+        creation?.approved == true -> if (creationProgress(messages).validated) ChatTaskStatus.Completed else ChatTaskStatus.Interrupted
         last.imageGeneration && last.streaming -> ChatTaskStatus.GeneratingImage
-        (creation?.approved == true || last.generatedImages.isNotEmpty()) &&
+        last.generatedImages.isNotEmpty() &&
             last.error == null && !last.cancelled && !last.truncated -> ChatTaskStatus.Completed
         else -> null
     }
