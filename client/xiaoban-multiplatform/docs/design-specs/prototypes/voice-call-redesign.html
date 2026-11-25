@@ -1,0 +1,1739 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>小伴 AI · 实时语音通话页重设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #0b0d11;
+  color: #eceef2;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-light { background: #eff1f5; color: #1d1f24; }
+button { border: 0; background: none; font: inherit; color: inherit; padding: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid var(--ui-accent, #ff6584); outline-offset: 2px; }
+h1, h2, h3, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1340px; margin: 0 auto; padding: 24px 20px 56px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  margin-bottom: 24px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 4px; font-size: 12.5px; color: #8c92a0; }
+body.studio-light .title-block p { color: #636976; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .07);
+  gap: 2px;
+}
+body.studio-light .seg { background: rgba(0, 0, 0, .06); }
+.seg button {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: #9ba1b0;
+  transition: background .16s ease, color .16s ease;
+}
+body.studio-light .seg button { color: #5b6170; }
+.seg button.active {
+  background: #252932;
+  color: #f4f6fa;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+body.studio-light .seg button.active {
+  background: #ffffff;
+  color: #181a1f;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .09);
+}
+
+.swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .07);
+}
+body.studio-light .swatches { background: rgba(0, 0, 0, .06); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.15); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+/* ─── Summary Strip ─── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+@media (max-width: 960px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .summary-grid { grid-template-columns: 1fr; } }
+.summary-card {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .07);
+}
+body.studio-light .summary-card {
+  background: rgba(255, 255, 255, .86);
+  border-color: rgba(0, 0, 0, .06);
+}
+.summary-card b { display: block; font-size: 12.5px; font-weight: 650; margin-bottom: 3px; }
+.summary-card span { display: block; font-size: 11.5px; line-height: 1.5; color: #9298a6; }
+body.studio-light .summary-card span { color: #636875; }
+
+/* ─── Boards Stage ─── */
+.boards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 26px 26px;
+}
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board.hidden { display: none; }
+
+.board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 4px 10px;
+  min-height: 26px;
+}
+.board-head h2 { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 7px; }
+.board-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .08);
+  color: #aeb5c4;
+}
+body.studio-light .board-tag { background: rgba(0, 0, 0, .07); color: #545b69; }
+.board-tag.new { background: rgba(255, 101, 132, .18); color: #ff9ab0; }
+body.studio-light .board-tag.new { background: rgba(249, 116, 75, .13); color: #d84354; }
+.mini-tabs {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .07);
+  gap: 2px;
+}
+body.studio-light .mini-tabs { background: rgba(0, 0, 0, .06); }
+.mini-tabs button {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #9ba1b0;
+}
+body.studio-light .mini-tabs button { color: #5b6170; }
+.mini-tabs button.active { background: #262b35; color: #f4f6fa; font-weight: 600; }
+body.studio-light .mini-tabs button.active { background: #fff; color: #191c22; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+.board-caption {
+  margin: 10px 6px 0;
+  font-size: 12px;
+  line-height: 1.58;
+  color: #8c92a0;
+}
+body.studio-light .board-caption { color: #636875; }
+
+/* ─── Phone Frame ─── */
+.phone {
+  /* Twin Stars · Sunset Coral Glaze defaults */
+  --brand: #ff6584;
+  --brand-end: #f9744b;
+  --brand-rgb: 255, 107, 114;
+  --brand-aura: rgba(255, 224, 163, .30);
+  --call-bg: #0c0f15;
+  --call-bg-bottom: #080a0e;
+  --fg: #f4f2ed;
+  --fg2: rgba(244, 242, 237, .70);
+  --fg3: rgba(244, 242, 237, .42);
+  --glass: rgba(255, 255, 255, .08);
+  --glass-hover: rgba(255, 255, 255, .13);
+  --line: rgba(255, 255, 255, .13);
+  --hang: #dc4248;
+  --warn: #f0a854;
+
+  position: relative;
+  height: 800px;
+  border-radius: 40px;
+  background: linear-gradient(180deg, var(--call-bg) 0%, #0b0e14 64%, var(--call-bg-bottom) 100%);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #1e2128;
+  box-shadow: 0 28px 68px rgba(0, 0, 0, .58), 0 0 0 1px rgba(255, 255, 255, .08);
+  isolation: isolate;
+  user-select: none;
+}
+body.studio-light .phone {
+  border-color: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 20, 32, .16), 0 0 0 1px rgba(0, 0, 0, .07);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 38px;
+  flex: none;
+  padding: 12px 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(244, 242, 237, .92);
+  position: relative;
+  z-index: 5;
+}
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat {
+  display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px;
+  border: 1.2px solid rgba(255,255,255,.8); border-radius: 3px; position: relative;
+}
+.bat::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 1.5px; background: #4cd98b; }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: rgba(255,255,255,.55); }
+
+/* ─── NEW DESIGN: Voice Call Screen ─── */
+.call-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Top Bar: Symmetric 3-column */
+.call-header {
+  height: 56px;
+  flex: none;
+  padding: 6px 16px 0;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  position: relative;
+  z-index: 4;
+}
+.header-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .07);
+  border: 0.5px solid rgba(255, 255, 255, .10);
+  display: grid;
+  place-items: center;
+  color: rgba(244, 242, 237, .82);
+  transition: background .15s, transform .12s;
+}
+.header-btn:hover { background: rgba(255, 255, 255, .13); }
+.header-btn:active { transform: scale(.94); }
+.header-btn svg { width: 20px; height: 20px; }
+
+.header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  line-height: 1.25;
+}
+.header-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--fg2);
+  line-height: 1;
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #42d68a;
+  box-shadow: 0 0 8px rgba(66, 214, 138, .65);
+  animation: dotPulse 2.4s ease-in-out infinite;
+}
+.live-dot.muted { background: #f0a854; box-shadow: 0 0 8px rgba(240, 168, 84, .55); animation: none; }
+
+/* Main Stage */
+.call-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 26px;
+  position: relative;
+  z-index: 2;
+  transition: justify-content .3s ease;
+}
+.call-stage.compact-orb {
+  justify-content: flex-start;
+  padding-top: 18px;
+}
+
+/* ─── Orb + Strictly Concentric Breathing System ─── */
+.orb-anchor {
+  position: relative;
+  width: 214px;
+  height: 214px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  transition: width .32s ease, height .32s ease;
+}
+.call-stage.compact-orb .orb-anchor {
+  width: 132px;
+  height: 132px;
+}
+
+/* Outer + Inner Dual Ambient Glows: ALWAYS locked to orb center */
+.orb-ambient {
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--brand-rgb), .29) 0%,
+    rgba(var(--brand-rgb), .13) 28%,
+    rgba(var(--brand-rgb), .04) 52%,
+    transparent 72%
+  );
+  will-change: transform, opacity;
+}
+.orb-ambient-core {
+  position: absolute;
+  width: 188px;
+  height: 188px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    var(--brand-aura) 0%,
+    rgba(var(--brand-rgb), .24) 44%,
+    transparent 74%
+  );
+  filter: blur(10px);
+  will-change: transform, opacity;
+}
+
+/* Breathing Halo Rings (soft, organic, phased) */
+.orb-breath-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.orb-breath-ring.b1 {
+  width: 118px;
+  height: 118px;
+  border: 1.2px solid rgba(var(--brand-rgb), .32);
+  box-shadow: 0 0 18px rgba(var(--brand-rgb), .16);
+}
+.orb-breath-ring.b2 {
+  width: 156px;
+  height: 156px;
+  border: 1px solid rgba(255, 255, 255, .075);
+}
+.orb-breath-ring.b3 {
+  width: 196px;
+  height: 196px;
+  border: 1px solid rgba(var(--brand-rgb), .11);
+}
+.call-stage.compact-orb .orb-breath-ring.b1 { width: 88px; height: 88px; }
+.call-stage.compact-orb .orb-breath-ring.b2 { width: 116px; height: 116px; opacity: .5; }
+.call-stage.compact-orb .orb-breath-ring.b3 { display: none; }
+
+/* Thinking Soft Breathing Sweep Arc */
+.orb-sweep-wrap {
+  position: absolute;
+  width: 122px;
+  height: 122px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s ease;
+  will-change: transform, opacity;
+}
+.orb-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 190deg,
+    rgba(var(--brand-rgb), .42) 275deg,
+    rgba(255, 235, 200, .92) 348deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.4px), #000 calc(100% - 1.6px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.4px), #000 calc(100% - 1.6px));
+}
+.orb-sweep-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .09);
+}
+
+/* Hearing / Listening Ripples */
+.orb-ripple {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--brand-rgb), .48);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* ── Phase: THINKING (Organic Deep Breath + Contrapuntal Twin Stars + Breathing Sweep) ── */
+.orb-anchor.phase-thinking .orb-ambient {
+  animation: thinkAmbientBreath 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .orb-ambient-core {
+  animation: thinkCoreGlow 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .orb-breath-ring.b1 {
+  animation: thinkRing1 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .orb-breath-ring.b2 {
+  animation: thinkRing2 3.8s cubic-bezier(.42, 0, .28, 1) .45s infinite;
+}
+.orb-anchor.phase-thinking .orb-breath-ring.b3 {
+  animation: thinkRing3 3.8s cubic-bezier(.42, 0, .28, 1) .9s infinite;
+}
+.orb-anchor.phase-thinking .orb-sweep-wrap {
+  opacity: 1;
+  animation: thinkSweepBreath 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .orb-sweep {
+  animation: spin 2.8s linear infinite;
+}
+.orb-anchor.phase-thinking .orb-core {
+  animation: thinkOrbBreath 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .star-main {
+  animation: thinkStarMain 3.8s cubic-bezier(.42, 0, .28, 1) infinite;
+}
+.orb-anchor.phase-thinking .star-sub {
+  animation: thinkStarSub 3.8s cubic-bezier(.42, 0, .28, 1) .42s infinite;
+}
+
+/* ── Phase: LISTENING (Calm 4.4s Tidal Breath + Soft Ripples + Gentle Companion Twinkle) ── */
+.orb-anchor.phase-listening .orb-ambient {
+  animation: listenAmbientBreath 4.4s cubic-bezier(.45, 0, .35, 1) infinite;
+}
+.orb-anchor.phase-listening .orb-ambient-core {
+  animation: listenCoreGlow 4.4s cubic-bezier(.45, 0, .35, 1) infinite;
+}
+.orb-anchor.phase-listening .orb-breath-ring.b1 {
+  animation: listenRing1 4.4s cubic-bezier(.45, 0, .35, 1) infinite;
+}
+.orb-anchor.phase-listening .orb-breath-ring.b2 {
+  animation: listenRing2 4.4s cubic-bezier(.45, 0, .35, 1) .6s infinite;
+}
+.orb-anchor.phase-listening .orb-breath-ring.b3 {
+  animation: listenRing3 4.4s cubic-bezier(.45, 0, .35, 1) 1.2s infinite;
+}
+.orb-anchor.phase-listening .orb-ripple.r1 {
+  border-color: rgba(var(--brand-rgb), .32);
+  animation: listenRipple 4.4s cubic-bezier(.22, .61, .36, 1) infinite;
+}
+.orb-anchor.phase-listening .orb-ripple.r2 {
+  border-color: rgba(255, 224, 163, .22);
+  animation: listenRipple 4.4s cubic-bezier(.22, .61, .36, 1) 2.2s infinite;
+}
+.orb-anchor.phase-listening .orb-core {
+  animation: listenOrbBreath 4.4s cubic-bezier(.45, 0, .35, 1) infinite;
+}
+.orb-anchor.phase-listening .star-main {
+  animation: listenStarMain 4.4s cubic-bezier(.45, 0, .35, 1) infinite;
+}
+.orb-anchor.phase-listening .star-sub {
+  animation: listenStarSub 4.4s cubic-bezier(.45, 0, .35, 1) .55s infinite;
+}
+
+/* ── Phase: HEARING (Lively Voice Ripples) ── */
+.orb-anchor.phase-hearing .orb-ambient {
+  animation: hearAmbient 1.25s ease-in-out infinite;
+}
+.orb-anchor.phase-hearing .orb-ambient-core {
+  animation: hearAmbient 1.25s ease-in-out infinite;
+}
+.orb-anchor.phase-hearing .orb-ripple.r1 { animation: rippleOut 1.65s cubic-bezier(.16,.84,.44,1) infinite; }
+.orb-anchor.phase-hearing .orb-ripple.r2 { animation: rippleOut 1.65s cubic-bezier(.16,.84,.44,1) .82s infinite; }
+.orb-anchor.phase-hearing .orb-core { animation: orbHear .9s ease-in-out infinite; }
+.orb-anchor.phase-hearing .star-main { animation: hearStar .9s ease-in-out infinite; }
+.orb-anchor.phase-hearing .star-sub { animation: hearStar .9s ease-in-out .18s infinite; }
+
+/* ── Phase: SPEAKING ── */
+.orb-anchor.phase-speaking .orb-ambient {
+  width: 360px;
+  height: 360px;
+  animation: speakAmbient 1.7s ease-in-out infinite;
+}
+.orb-anchor.phase-speaking .orb-ripple.r1 {
+  width: 72px;
+  height: 72px;
+  border-color: rgba(var(--brand-rgb), .42);
+  animation: rippleSpeak 1.9s ease-out infinite;
+}
+.orb-anchor.phase-speaking .orb-core { animation: orbSpeak .9s ease-in-out infinite; }
+
+/* Core Luminous Twin-Stars Orb (Sunset Coral Glaze · 88dp normal, 64dp compact) */
+.orb-core {
+  position: relative;
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 44%, var(--brand-aura) 0%, transparent 56%),
+    linear-gradient(180deg, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, 0) 46%),
+    linear-gradient(138deg, var(--brand) 0%, var(--brand-end) 100%);
+  box-shadow:
+    inset 0 1.2px 1.8px rgba(255, 255, 255, .44),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    0 14px 36px rgba(var(--brand-rgb), .42),
+    0 0 0 1px rgba(255, 255, 255, .18);
+  transition: width .32s ease, height .32s ease;
+  will-change: transform;
+}
+.call-stage.compact-orb .orb-core { width: 64px; height: 64px; }
+
+/* Twin Stars Mark inside Orb */
+.twin-stars-svg {
+  width: 56px;
+  height: 56px;
+  overflow: visible;
+  filter: drop-shadow(0 2px 8px rgba(120, 22, 34, .22));
+  transition: width .3s, height .3s;
+}
+.call-stage.compact-orb .twin-stars-svg { width: 42px; height: 42px; }
+.star-main, .star-sub {
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+
+/* Speaking EQ bars inside orb when speaking */
+.eq-bars {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+  height: 22px;
+}
+.eq-bars span {
+  width: 3px;
+  border-radius: 99px;
+  background: #ffffff;
+  animation: eqWave .9s ease-in-out infinite;
+}
+.eq-bars span:nth-child(1) { height: 8px; animation-delay: 0s; }
+.eq-bars span:nth-child(2) { height: 18px; animation-delay: .15s; }
+.eq-bars span:nth-child(3) { height: 13px; animation-delay: .3s; }
+.eq-bars span:nth-child(4) { height: 20px; animation-delay: .1s; }
+.eq-bars span:nth-child(5) { height: 9px; animation-delay: .25s; }
+
+/* Status & Transcript Area */
+.text-zone {
+  width: 100%;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 150px;
+}
+.call-stage.compact-orb .text-zone {
+  margin-top: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.status-heading {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--fg);
+  line-height: 1.35;
+}
+.status-heading.breathing-text {
+  animation: textBreath 3.8s ease-in-out infinite;
+}
+.status-sub {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg2);
+}
+
+/* User Quote Pill */
+.user-quote {
+  margin-top: 16px;
+  max-width: 100%;
+  padding: 8px 15px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .055);
+  border: 0.5px solid rgba(255, 255, 255, .09);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: rgba(244, 242, 237, .76);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.user-quote em {
+  font-style: normal;
+  color: rgba(244, 242, 237, .46);
+  margin-right: 4px;
+}
+
+/* Step Progress Chip */
+.step-chip {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .065);
+  border: 0.5px solid rgba(255, 255, 255, .11);
+  font-size: 12px;
+  color: rgba(244, 242, 237, .76);
+}
+.spinner {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.8px solid rgba(255, 255, 255, .24);
+  border-top-color: var(--fg);
+  animation: spin .95s linear infinite;
+}
+
+/* Live Partial Speech */
+.partial-text {
+  margin-top: 16px;
+  font-size: 20px;
+  font-weight: 450;
+  line-height: 1.55;
+  color: var(--fg);
+  max-width: 100%;
+}
+.cursor-bar {
+  display: inline-block;
+  width: 2px;
+  height: 19px;
+  background: var(--brand);
+  vertical-align: -3px;
+  margin-left: 3px;
+  border-radius: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+
+/* Lyrics-Style Reply Window with Vertical Fading Edge */
+.reply-user-mini {
+  font-size: 12.5px;
+  color: rgba(244, 242, 237, .52);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .045);
+}
+.lyrics-wrap {
+  position: relative;
+  width: 100%;
+  height: 224px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
+  padding: 36px 4px 48px;
+}
+.lyrics-wrap::-webkit-scrollbar { display: none; }
+.lyric-line {
+  font-size: 16.5px;
+  line-height: 1.65;
+  color: rgba(244, 242, 237, .34);
+  margin: 0 0 12px;
+  transition: color .32s ease, transform .32s ease, font-size .32s ease;
+  cursor: pointer;
+}
+.lyric-line.active {
+  font-size: 18.5px;
+  font-weight: 500;
+  color: #f6f4ef;
+}
+.lyrics-wrap.all-lit .lyric-line {
+  font-size: 17px;
+  font-weight: 400;
+  color: rgba(244, 242, 237, .88);
+}
+
+/* Call Prompt Card */
+.prompt-card {
+  width: 100%;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .075);
+  border: 0.5px solid rgba(255, 255, 255, .14);
+  backdrop-filter: blur(14px);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prompt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(240, 168, 84, .16);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+}
+.prompt-title { font-size: 15px; font-weight: 600; color: var(--fg); line-height: 1.45; }
+.prompt-detail {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(244, 242, 237, .58);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .25);
+}
+.prompt-actions { display: flex; gap: 10px; margin-top: 2px; }
+.prompt-btn {
+  flex: 1;
+  height: 42px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  transition: opacity .15s, transform .12s;
+}
+.prompt-btn:active { transform: scale(.97); }
+.prompt-btn.allow { background: var(--fg); color: #101318; }
+.prompt-btn.deny { background: rgba(255, 255, 255, .09); color: var(--fg2); border: 0.5px solid rgba(255, 255, 255, .12); }
+
+/* Bottom Hint & Controls Dock */
+.call-footer {
+  flex: none;
+  padding: 8px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+  z-index: 4;
+}
+.barge-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .055);
+  border: 0.5px solid rgba(255, 255, 255, .09);
+  font-size: 12px;
+  color: rgba(244, 242, 237, .64);
+  transition: background .15s, color .15s;
+}
+.barge-hint.clickable:hover { background: rgba(255, 255, 255, .11); color: var(--fg); }
+.barge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+
+.dock {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 32px;
+}
+body.compact .dock { gap: 26px; }
+.ctrl-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  width: 68px;
+}
+.ctrl-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--glass);
+  border: 0.5px solid var(--line);
+  color: var(--fg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09);
+  transition: transform .14s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.ctrl-btn:hover { background: var(--glass-hover); }
+.ctrl-btn:active { transform: scale(.93); }
+.ctrl-btn svg { width: 25px; height: 25px; }
+.ctrl-btn.active-state {
+  background: var(--fg);
+  color: #101318;
+  border-color: transparent;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .35);
+}
+.ctrl-btn.hangup {
+  background: var(--hang);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, .14);
+  box-shadow: 0 10px 26px rgba(220, 66, 72, .34), inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+.ctrl-btn.hangup:hover { background: #e64d53; }
+.ctrl-label {
+  font-size: 12px;
+  color: var(--fg2);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.home-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .24);
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Minimized Overlay inside Board 1 */
+.mini-chat-bg {
+  position: absolute;
+  inset: 0;
+  background: #111318;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease;
+}
+.phone.is-minimized .mini-chat-bg { opacity: 1; pointer-events: auto; }
+.capsule-bar {
+  margin: 46px 16px 0;
+  height: 46px;
+  border-radius: 99px;
+  background: rgba(24, 28, 36, .94);
+  border: 0.5px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .42);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 5px 0 16px;
+  cursor: pointer;
+}
+.cap-eq { display: flex; align-items: center; gap: 2.5px; height: 16px; }
+.cap-eq span { width: 2.5px; border-radius: 99px; background: var(--brand); animation: eqWave 1s ease-in-out infinite; }
+.cap-eq span:nth-child(1) { height: 7px; }
+.cap-eq span:nth-child(2) { height: 15px; animation-delay: .18s; }
+.cap-eq span:nth-child(3) { height: 10px; animation-delay: .36s; }
+.cap-eq span:nth-child(4) { height: 13px; animation-delay: .12s; }
+.cap-text { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.cap-time { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--fg2); }
+.cap-hang { width: 36px; height: 36px; border-radius: 50%; background: var(--hang); color: #fff; display: grid; place-items: center; }
+.cap-hang svg { width: 17px; height: 17px; }
+.mock-chat-body {
+  flex: 1;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: .55;
+}
+.mock-msg-u { align-self: flex-end; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: rgba(255,255,255,.1); font-size: 13.5px; }
+.mock-msg-a { align-self: flex-start; font-size: 13.5px; line-height: 1.6; color: #d6dae4; }
+.mini-tip { margin: auto auto 46px; font-size: 12px; color: #8d95a6; padding: 6px 12px; border-radius: 99px; background: rgba(255,255,255,.06); }
+
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  top: 106px;
+  transform: translateX(-50%) translateY(-6px);
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: rgba(24, 28, 36, .92);
+  border: 0.5px solid rgba(255, 255, 255, .14);
+  font-size: 12px;
+  color: var(--fg);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity .2s, transform .2s;
+  white-space: nowrap;
+}
+.phone-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── OLD / CURRENT DESIGN (1:1 Faithful Recreation for Comparison) ─── */
+.phone.legacy { background: #0f141b; }
+.legacy-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.legacy-header { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; padding-top: 18px; }
+.legacy-back { position: absolute; left: 4px; top: 4px; width: 44px; height: 44px; display: grid; place-items: center; color: rgba(243, 241, 236, .68); }
+.legacy-title { font-size: 16px; font-weight: 600; color: #f3f1ec; }
+.legacy-clock { margin-top: 5px; font-family: ui-monospace, monospace; font-size: 12px; letter-spacing: 1px; color: rgba(243, 241, 236, .68); }
+.legacy-body { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; z-index: 3; }
+.legacy-spacer-top { flex: 0.8; }
+.legacy-spacer-bot { flex: 1.2; }
+.legacy-avatar-box { width: 160px; height: 160px; display: grid; place-items: center; position: relative; }
+.legacy-dash-ring {
+  position: absolute; width: 80px; height: 80px; border-radius: 50%;
+  border: 1.5px dashed rgba(243, 241, 236, .46); animation: spin 4.2s linear infinite;
+}
+.legacy-dash-ring::before {
+  content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: #f3f1ec; left: 50%; top: -4px; transform: translateX(-50%);
+}
+.legacy-dash-ring::after {
+  content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(243, 241, 236, .68); right: 7px; bottom: 8px;
+}
+.legacy-avatar { width: 54px; height: 54px; border-radius: 50%; background: #d93a44; display: grid; place-items: center; color: #fff; }
+.legacy-avatar svg { width: 30px; height: 30px; }
+.legacy-text { height: 190px; display: flex; flex-direction: column; align-items: center; padding: 0 28px; text-align: center; }
+.legacy-status { font-size: 24px; font-weight: 300; letter-spacing: 3px; color: #f3f1ec; }
+.legacy-user { margin-top: 18px; font-size: 15px; color: rgba(243, 241, 236, .46); }
+.legacy-dock { display: flex; gap: 30px; padding: 20px 0 26px; position: relative; z-index: 3; }
+.legacy-ctrl { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.legacy-btn {
+  width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(255,255,255,.07); border: 0.5px solid rgba(255,255,255,.12); color: #f3f1ec;
+}
+.legacy-btn.hang { background: #d64545; border: 0; color: #fff; }
+.legacy-btn svg { width: 28px; height: 28px; }
+.legacy-lbl { font-size: 12px; color: rgba(243, 241, 236, .68); }
+
+.callout-layer { position: absolute; inset: 0; pointer-events: none; z-index: 12; display: none; }
+.phone.show-issues .callout-layer { display: block; }
+.issue-tag {
+  position: absolute;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(240, 168, 84, .92);
+  color: #16120b;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+  white-space: nowrap;
+}
+
+/* ─── Breathing & Organic Keyframes ─── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.86); } }
+@keyframes textBreath { 0%, 100% { opacity: .98; } 50% { opacity: .74; } }
+
+/* Thinking: 3.6s rhythmic deep inhale + seamless 90° counter-rotating twin stars */
+@keyframes thinkOrbBreath {
+  0%, 100% { transform: scale(.94); }
+  45%      { transform: scale(1.085); }
+  56%      { transform: scale(1.07); }
+}
+@keyframes thinkAmbientBreath {
+  0%, 100% { transform: scale(.90); opacity: .64; }
+  46%      { transform: scale(1.16); opacity: 1; }
+}
+@keyframes thinkCoreGlow {
+  0%, 100% { transform: scale(.86); opacity: .48; }
+  46%      { transform: scale(1.24); opacity: 1; }
+}
+@keyframes thinkRing1 {
+  0%, 100% { transform: scale(.93); opacity: .34; }
+  46%      { transform: scale(1.14); opacity: .90; }
+}
+@keyframes thinkRing2 {
+  0%, 100% { transform: scale(.94); opacity: .18; }
+  46%      { transform: scale(1.12); opacity: .62; }
+}
+@keyframes thinkRing3 {
+  0%, 100% { transform: scale(.95); opacity: .08; }
+  46%      { transform: scale(1.09); opacity: .42; }
+}
+@keyframes thinkSweepBreath {
+  0%, 100% { transform: scale(.94); opacity: .76; }
+  46%      { transform: scale(1.10); opacity: 1; }
+}
+@keyframes thinkStarMain {
+  0%   { transform: scale(.90) rotate(0deg); opacity: .90; }
+  46%  { transform: scale(1.11) rotate(64deg); opacity: 1; }
+  80%  { transform: scale(.94) rotate(90deg); opacity: .93; }
+  100% { transform: scale(.90) rotate(90deg); opacity: .90; }
+}
+@keyframes thinkStarSub {
+  0%   { transform: translate(0, 1px) scale(.76) rotate(0deg); opacity: .68; }
+  46%  { transform: translate(2.6px, -3px) scale(1.22) rotate(-66deg); opacity: 1; }
+  82%  { transform: translate(.4px, 0) scale(.82) rotate(-90deg); opacity: .74; }
+  100% { transform: translate(0, 1px) scale(.76) rotate(-90deg); opacity: .68; }
+}
+
+/* Listening: 4.2s calm tidal breath + gentle star pulse & twinkle turn */
+@keyframes listenOrbBreath {
+  0%, 100% { transform: scale(.95); }
+  48%      { transform: scale(1.075); }
+}
+@keyframes listenAmbientBreath {
+  0%, 100% { transform: scale(.92); opacity: .64; }
+  48%      { transform: scale(1.18); opacity: 1; }
+}
+@keyframes listenCoreGlow {
+  0%, 100% { transform: scale(.88); opacity: .44; }
+  48%      { transform: scale(1.24); opacity: .96; }
+}
+@keyframes listenRing1 {
+  0%, 100% { transform: scale(.94); opacity: .32; }
+  48%      { transform: scale(1.16); opacity: .82; }
+}
+@keyframes listenRing2 {
+  0%, 100% { transform: scale(.95); opacity: .16; }
+  48%      { transform: scale(1.14); opacity: .54; }
+}
+@keyframes listenRing3 {
+  0%, 100% { transform: scale(.95); opacity: .08; }
+  48%      { transform: scale(1.11); opacity: .34; }
+}
+@keyframes listenRipple {
+  0%   { transform: scale(.95); opacity: .56; }
+  75%  { opacity: .14; }
+  100% { transform: scale(2.12); opacity: 0; }
+}
+@keyframes listenStarMain {
+  0%, 100% { transform: scale(.91) rotate(-9deg); opacity: .90; }
+  48%      { transform: scale(1.10) rotate(9deg); opacity: 1; }
+}
+@keyframes listenStarSub {
+  0%   { transform: translate(0, 1.5px) scale(.78) rotate(0deg); opacity: .68; }
+  48%  { transform: translate(2px, -2.5px) scale(1.18) rotate(68deg); opacity: 1; }
+  85%  { transform: translate(.3px, .8px) scale(.82) rotate(90deg); opacity: .72; }
+  100% { transform: translate(0, 1.5px) scale(.78) rotate(90deg); opacity: .68; }
+}
+
+/* Hearing & Speaking */
+@keyframes hearAmbient { 0%, 100% { transform: scale(.98); opacity: .82; } 50% { transform: scale(1.18); opacity: 1; } }
+@keyframes orbHear { 0%, 100% { transform: scale(.99); } 50% { transform: scale(1.09); } }
+@keyframes hearStar { 0%, 100% { transform: scale(.98); } 50% { transform: scale(1.09); } }
+@keyframes speakAmbient { 0%, 100% { transform: scale(.96); opacity: .78; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes orbSpeak { 0%, 100% { transform: scale(.99); } 50% { transform: scale(1.055); } }
+@keyframes rippleOut { 0% { transform: scale(.96); opacity: .68; } 100% { transform: scale(1.96); opacity: 0; } }
+@keyframes rippleSpeak { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.78); opacity: 0; } }
+@keyframes eqWave { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴 AI · 实时语音通话页重设计稿</h1>
+      <p>全新「双星相伴 · 日落珊瑚」AppIcon · 思考 / 聆听有机呼吸动效 · 同心氛围光 · 渐隐歌词字幕</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="viewMode">
+        <button data-mode="all" class="active">全三态总览</button>
+        <button data-mode="compare">新旧并排对照</button>
+      </div>
+      <div class="seg" id="widthMode">
+        <button data-w="390" class="active">390px</button>
+        <button data-w="360">360px</button>
+      </div>
+      <div class="seg" id="studioTheme">
+        <button data-st="dark" class="active">暗台面</button>
+        <button data-st="light">浅台面</button>
+      </div>
+      <div class="swatches" id="swatches" role="group" aria-label="主题色"></div>
+    </div>
+  </header>
+
+  <section class="summary-grid" aria-label="核心优化摘要">
+    <div class="summary-card">
+      <b>1. 同步最新「双星相伴」AppIcon</b>
+      <span>核心球体采用官方日落珊瑚釉面渐变（#FF6584 → #F9744B + 暖桃金内辉）与纯白一大一小双星标，不再与挂断红撞色。</span>
+    </div>
+    <div class="summary-card">
+      <b>2. 思考态 · 错拍双星 + 深呼吸聚焦</b>
+      <span>3.8s 胸腔式呼吸引导球体、三层光环与渐隐流光弧同步吐纳，主星与陪伴小星带 0.42s 相位差温柔浮沉闪烁。</span>
+    </div>
+    <div class="summary-card">
+      <b>3. 聆听态 · 4.4s 潮汐慢呼吸</b>
+      <span>柔和舒缓的吐纳节奏配合两道错拍扩散涟漪与暖金微光，传递「安静专注、随时等你开口」的陪伴感。</span>
+    </div>
+    <div class="summary-card">
+      <b>4. 结构精修 · 同心光晕 + 渐隐字幕</b>
+      <span>彻底清空杂乱几何贴片，光晕锁定球心；回答态球体上收至 64dp，释放 224dp 渐隐歌词区与对称顶底栏。</span>
+    </div>
+  </section>
+
+  <main class="boards" id="boards">
+
+    <!-- ═══ LEGACY BOARD ═══ -->
+    <section class="board" id="board-legacy">
+      <div class="board-head">
+        <h2>现行原版 <span class="board-tag">截图对照</span></h2>
+        <div class="mini-tabs">
+          <button id="toggleIssues" class="active">显示问题标注</button>
+        </div>
+      </div>
+      <div class="phone legacy show-issues" id="phone-legacy">
+        <div class="status-bar">
+          <span>10:07</span>
+          <div class="status-right">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <span class="bat"></span>
+          </div>
+        </div>
+        <svg class="legacy-bg" viewBox="0 0 390 800" preserveAspectRatio="none">
+          <defs>
+            <radialGradient id="legGlow" cx="50%" cy="31%" r="48%">
+              <stop offset="0%" stop-color="#d93a44" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="#d93a44" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="195" cy="248" r="310" fill="url(#legGlow)" stroke="none"/>
+          <circle cx="195" cy="248" r="120" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
+          <circle cx="195" cy="248" r="190" stroke="rgba(255,255,255,.075)" stroke-width="1"/>
+          <circle cx="195" cy="248" r="270" stroke="rgba(255,255,255,.055)" stroke-width="1"/>
+          <rect x="38" y="160" width="64" height="64" rx="18" transform="rotate(18 70 192)" stroke="rgba(255,255,255,.12)" stroke-width="1.2"/>
+          <rect x="288" y="490" width="92" height="92" rx="26" transform="rotate(-16 334 536)" fill="#d93a44" fill-opacity=".12" stroke="none"/>
+          <rect x="268" y="204" width="78" height="24" rx="12" transform="rotate(-32 307 216)" fill="rgba(255,255,255,.06)" stroke="none"/>
+          <rect x="-18" y="426" width="86" height="28" rx="14" transform="rotate(24 25 440)" stroke="#d93a44" stroke-opacity=".24" stroke-width="1.2"/>
+          <circle cx="351" cy="336" r="15" fill="#d93a44" fill-opacity=".14" stroke="none"/>
+          <circle cx="43" cy="320" r="8" fill="rgba(255,255,255,.10)" stroke="none"/>
+          <circle cx="234" cy="88" r="7" stroke="#d93a44" stroke-opacity=".30" stroke-width="1.4"/>
+          <circle cx="62" cy="680" r="12" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>
+          <g stroke="#d93a44" stroke-opacity=".34" stroke-width="1.6">
+            <path d="M98 113v14M91 120h14"/>
+            <path d="M31 473v14M24 480h14"/>
+            <path d="M172 601v14M165 608h14"/>
+          </g>
+          <path d="M342 110l7 21 21 7-21 7-7 21-7-21-21-7 21-7Z" stroke="#d93a44" stroke-opacity=".18" stroke-width="2.5"/>
+        </svg>
+
+        <div class="legacy-header">
+          <div class="legacy-back"><svg width="24" height="24" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="legacy-title">小伴 AI</div>
+          <div class="legacy-clock">00:31</div>
+        </div>
+
+        <div class="legacy-body">
+          <div class="legacy-spacer-top"></div>
+          <div class="legacy-avatar-box">
+            <div class="legacy-dash-ring"></div>
+            <div class="legacy-avatar">
+              <svg viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+            </div>
+          </div>
+          <div class="legacy-text">
+            <div class="legacy-status">小伴在想…</div>
+            <div class="legacy-user">你：你好你好。</div>
+          </div>
+          <div class="legacy-spacer-bot"></div>
+          <div class="legacy-dock">
+            <div class="legacy-ctrl">
+              <div class="legacy-btn"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+              <span class="legacy-lbl">静音</span>
+            </div>
+            <div class="legacy-ctrl">
+              <div class="legacy-btn"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg></div>
+              <span class="legacy-lbl">关闭朗读</span>
+            </div>
+            <div class="legacy-ctrl">
+              <div class="legacy-btn hang"><svg viewBox="0 0 24 24"><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.3" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg></div>
+              <span class="legacy-lbl">挂断</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout-layer">
+          <span class="issue-tag" style="left:12px;top:94px;">① 贴边且不对齐</span>
+          <span class="issue-tag" style="right:14px;top:174px;">② 背景圆心偏高、贴片杂乱</span>
+          <span class="issue-tag" style="right:14px;top:292px;">③ 旧版星标 · 54dp 偏小且静止</span>
+          <span class="issue-tag" style="left:16px;top:436px;">④ 字细对比低 · 下半屏空荡</span>
+          <span class="issue-tag" style="left:18px;bottom:112px;">⑤ 68dp 反压主体 · 文案易混淆</span>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+      <p class="board-caption">按现行 <code>VoiceCallScreen.kt</code> 1:1 还原：旧版线框星标静止不动、同心圆偏高错位、几何贴片杂乱且底栏压过主体。</p>
+    </section>
+
+    <!-- ═══ NEW BOARD 01: THINKING (Interactive + Breathing) ═══ -->
+    <section class="board" id="board-think">
+      <div class="board-head">
+        <h2>01 思考态 <span class="board-tag new">双星呼吸</span></h2>
+        <div class="mini-tabs" data-group="thinkSub">
+          <button data-val="simple" class="active">日常对话</button>
+          <button data-val="tool">执行步骤</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-think">
+        <div class="status-bar">
+          <span>10:07</span>
+          <div class="status-right">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <span class="bat"></span>
+          </div>
+        </div>
+
+        <div class="call-screen">
+          <div class="call-header">
+            <button class="header-btn" data-action="minimize" title="收起成顶部胶囊" aria-label="收起">
+              <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="header-center">
+              <div class="header-title">小伴 AI</div>
+              <div class="header-timer"><span class="live-dot"></span><span class="js-clock">00:31</span></div>
+            </div>
+            <div></div>
+          </div>
+
+          <div class="call-stage">
+            <div class="orb-anchor phase-thinking">
+              <div class="orb-ambient"></div>
+              <div class="orb-ambient-core"></div>
+              <div class="orb-breath-ring b3"></div>
+              <div class="orb-breath-ring b2"></div>
+              <div class="orb-breath-ring b1"></div>
+              <div class="orb-sweep-wrap">
+                <div class="orb-sweep-track"></div>
+                <div class="orb-sweep"></div>
+              </div>
+              <div class="orb-core">
+                <!-- Twin Stars Official AppIcon Mark -->
+                <svg class="twin-stars-svg" viewBox="0 0 120 120" stroke="none">
+                  <g transform="translate(55.5 62.5) scale(0.96)">
+                    <path class="star-main" fill="#FFFFFF" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z" />
+                  </g>
+                  <g transform="translate(82.5 35.5) scale(0.47)">
+                    <path class="star-sub" fill="#FFFFFF" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z" />
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            <div class="text-zone">
+              <div class="status-heading breathing-text">小伴在想…</div>
+              <div class="user-quote" id="think-quote"><em>你</em>你好你好。</div>
+              <div class="step-chip" id="think-step" style="display:none;">
+                <span class="spinner"></span>
+                <span>正在检索最近日程 · 3 项</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="call-footer">
+            <button class="barge-hint clickable" data-action="interrupt">
+              <span class="barge-dot"></span>
+              <span>直接开口或轻点此处打断</span>
+            </button>
+            <div class="dock">
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-mute" aria-label="静音">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                </button>
+                <span class="ctrl-label js-mute-lbl">静音</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-silent" aria-label="朗读开关">
+                  <svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+                </button>
+                <span class="ctrl-label js-silent-lbl">朗读中</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn hangup js-hangup" aria-label="挂断">
+                  <svg viewBox="0 0 24 24"><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.3" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg>
+                </button>
+                <span class="ctrl-label">挂断</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-chat-bg">
+          <div class="capsule-bar" data-action="expand">
+            <div class="cap-eq"><span></span><span></span><span></span><span></span></div>
+            <div class="cap-text">通话中 · 小伴在想</div>
+            <div class="cap-time js-clock">00:31</div>
+            <button class="cap-hang" data-action="expand-hang" aria-label="挂断">
+              <svg viewBox="0 0 24 24"><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.3" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg>
+            </button>
+          </div>
+          <div class="mock-chat-body">
+            <div class="mock-msg-u">你好你好。</div>
+            <div class="mock-msg-a">正在语音通话中，你可以一边浏览聊天记录一边听小伴回答…</div>
+            <div class="mini-tip">点击顶部胶囊可回到全屏通话</div>
+          </div>
+        </div>
+
+        <div class="phone-toast"></div>
+        <div class="home-bar"></div>
+      </div>
+      <p class="board-caption">思考态：双星交错呼吸（小星延后 0.42s 轻盈浮沉）+ 球体与三层光晕 3.8s 胸腔式吐纳 + 呼吸流光弧环；可点左上角体验收起胶囊。</p>
+    </section>
+
+    <!-- ═══ NEW BOARD 02: LISTENING & HEARING ═══ -->
+    <section class="board" id="board-listen">
+      <div class="board-head">
+        <h2>02 聆听与拾音态 <span class="board-tag new">潮汐呼吸</span></h2>
+        <div class="mini-tabs" data-group="listenSub">
+          <button data-val="listening" class="active">等待说话</button>
+          <button data-val="hearing">正在说话</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-listen">
+        <div class="status-bar">
+          <span>10:07</span>
+          <div class="status-right">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <span class="bat"></span>
+          </div>
+        </div>
+
+        <div class="call-screen">
+          <div class="call-header">
+            <button class="header-btn" aria-label="收起"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="header-center">
+              <div class="header-title">小伴 AI</div>
+              <div class="header-timer"><span class="live-dot"></span><span class="js-clock">00:31</span></div>
+            </div>
+            <div></div>
+          </div>
+
+          <div class="call-stage">
+            <div class="orb-anchor phase-listening" id="listen-orb">
+              <div class="orb-ambient"></div>
+              <div class="orb-ambient-core"></div>
+              <div class="orb-breath-ring b3"></div>
+              <div class="orb-breath-ring b2"></div>
+              <div class="orb-breath-ring b1"></div>
+              <div class="orb-ripple r1"></div>
+              <div class="orb-ripple r2"></div>
+              <div class="orb-core">
+                <svg class="twin-stars-svg" viewBox="0 0 120 120" stroke="none">
+                  <g transform="translate(55.5 62.5) scale(0.96)">
+                    <path class="star-main" fill="#FFFFFF" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z" />
+                  </g>
+                  <g transform="translate(82.5 35.5) scale(0.47)">
+                    <path class="star-sub" fill="#FFFFFF" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z" />
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            <div class="text-zone" id="listen-zone-idle">
+              <div class="status-heading">请说话，我在听</div>
+              <div class="status-sub">说完停一下，我就会回答</div>
+            </div>
+
+            <div class="text-zone" id="listen-zone-hear" style="display:none;">
+              <div class="status-heading" style="font-size:15px;color:var(--fg2);font-weight:500;">听到了…</div>
+              <div class="partial-text">帮我看看今天下午三点以后还有没有空余时间<span class="cursor-bar"></span></div>
+            </div>
+          </div>
+
+          <div class="call-footer">
+            <div class="barge-hint" id="listen-hint">
+              <span class="barge-dot" style="background:#42d68a;"></span>
+              <span>麦克风收音正常 · 自动判停</span>
+            </div>
+            <div class="dock">
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-mute" aria-label="静音">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                </button>
+                <span class="ctrl-label js-mute-lbl">静音</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-silent" aria-label="朗读开关">
+                  <svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+                </button>
+                <span class="ctrl-label js-silent-lbl">朗读中</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn hangup js-hangup" aria-label="挂断">
+                  <svg viewBox="0 0 24 24"><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.3" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg>
+                </button>
+                <span class="ctrl-label">挂断</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-toast"></div>
+        <div class="home-bar"></div>
+      </div>
+      <p class="board-caption">聆听态采用 4.4s 静谧潮汐慢呼吸 + 两道错拍柔和扩散光圈；切到「正在说话」可预览高灵敏声波涟漪与实时转写。</p>
+    </section>
+
+    <!-- ═══ NEW BOARD 03: SPEAKING / SILENT / PROMPT ═══ -->
+    <section class="board" id="board-speak">
+      <div class="board-head">
+        <h2>03 回答与确认态</h2>
+        <div class="mini-tabs" data-group="speakSub">
+          <button data-val="speaking" class="active">朗读字幕</button>
+          <button data-val="silent">仅看文字</button>
+          <button data-val="prompt">确认操作</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-speak">
+        <div class="status-bar">
+          <span>10:07</span>
+          <div class="status-right">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <span class="bat"></span>
+          </div>
+        </div>
+
+        <div class="call-screen">
+          <div class="call-header">
+            <button class="header-btn" aria-label="收起"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="header-center">
+              <div class="header-title">小伴 AI</div>
+              <div class="header-timer"><span class="live-dot"></span><span class="js-clock">00:31</span></div>
+            </div>
+            <div></div>
+          </div>
+
+          <div class="call-stage compact-orb">
+            <div class="orb-anchor phase-speaking" id="speak-orb">
+              <div class="orb-ambient"></div>
+              <div class="orb-ambient-core"></div>
+              <div class="orb-breath-ring b2"></div>
+              <div class="orb-breath-ring b1"></div>
+              <div class="orb-ripple r1"></div>
+              <div class="orb-core">
+                <div class="eq-bars" id="speak-eq"><span></span><span></span><span></span><span></span><span></span></div>
+                <svg class="twin-stars-svg" id="speak-spark" style="display:none;" viewBox="0 0 120 120" stroke="none">
+                  <g transform="translate(55.5 62.5) scale(0.96)">
+                    <path class="star-main" fill="#FFFFFF" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z" />
+                  </g>
+                  <g transform="translate(82.5 35.5) scale(0.47)">
+                    <path class="star-sub" fill="#FFFFFF" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z" />
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            <div class="text-zone" id="speak-zone-lyrics">
+              <div class="reply-user-mini">你：帮我看看今天下午三点以后还有没有空余时间</div>
+              <div class="lyrics-wrap" id="lyrics-wrap">
+                <p class="lyric-line" data-idx="0">你好！我刚帮你看了一眼今天的日程安排。</p>
+                <p class="lyric-line active" data-idx="1">三点到四点半有一场产品评审会，之后的时间目前都是空着的。</p>
+                <p class="lyric-line" data-idx="2">如果你想安排专注工作或者约人聊一下，四点半以后会比较合适。</p>
+                <p class="lyric-line" data-idx="3">需要我直接帮你把五点到六点预留成专注时段，并设个提醒吗？</p>
+              </div>
+            </div>
+
+            <div class="text-zone" id="speak-zone-prompt" style="display:none;">
+              <div class="status-heading" style="font-size:19px;">等你确认</div>
+              <div class="prompt-card">
+                <span class="prompt-badge">需确认操作</span>
+                <div class="prompt-title">创建本机日程提醒「下午专注时段」</div>
+                <div class="prompt-detail">今日 17:00 – 18:00 · 提前 10 分钟提醒</div>
+                <div class="prompt-actions">
+                  <button class="prompt-btn deny" data-action="prompt-deny">先不用</button>
+                  <button class="prompt-btn allow" data-action="prompt-allow">确认创建</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="call-footer">
+            <button class="barge-hint clickable" id="speak-barge" data-action="interrupt">
+              <span class="barge-dot"></span>
+              <span>点击字幕可切换高亮 · 开口即可打断</span>
+            </button>
+            <div class="dock">
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-mute" aria-label="静音">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                </button>
+                <span class="ctrl-label js-mute-lbl">静音</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn js-silent" id="speak-silent-btn" aria-label="朗读开关">
+                  <svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+                </button>
+                <span class="ctrl-label js-silent-lbl" id="speak-silent-lbl">朗读中</span>
+              </div>
+              <div class="ctrl-item">
+                <button class="ctrl-btn hangup js-hangup" aria-label="挂断">
+                  <svg viewBox="0 0 24 24"><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.3" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg>
+                </button>
+                <span class="ctrl-label">挂断</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-toast"></div>
+        <div class="home-bar"></div>
+      </div>
+      <p class="board-caption">回答态球体轻盈上收至 64dp 并展示动态声纹，释放 224dp 渐隐歌词区；「仅看文字」态恢复双星慢呼吸。</p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'red',      name: '日落珊瑚', hex: '#ff6584', end: '#f9744b', rgb: '255, 107, 114', aura: 'rgba(255, 224, 163, .30)' },
+  { id: 'green',    name: '薄荷绿',   hex: '#3cc586', end: '#219a66', rgb: '52, 185, 124',  aura: 'rgba(180, 255, 222, .26)' },
+  { id: 'blue',     name: '海湾蓝',   hex: '#4f91ff', end: '#2d68db', rgb: '68, 134, 245',  aura: 'rgba(188, 222, 255, .28)' },
+  { id: 'purple',   name: '暮紫',     hex: '#9a7cf5', end: '#6c4cd6', rgb: '142, 108, 236', aura: 'rgba(222, 206, 255, .28)' },
+  { id: 'amber',    name: '琥珀',     hex: '#f0a63a', end: '#c96d18', rgb: '232, 146, 44',  aura: 'rgba(255, 234, 180, .30)' },
+  { id: 'graphite', name: '曜石',     hex: '#464a54', end: '#22242a', rgb: '132, 138, 154', aura: 'rgba(255, 255, 255, .18)' },
+];
+
+const MIC_ON = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const MIC_OFF = '<svg viewBox="0 0 24 24"><path d="M9 9v2a3 3 0 0 0 5.12 2.12M15 9.34V6a3 3 0 0 0-5.94-.6M17 16.95A7 7 0 0 1 5 11m14 0a7 7 0 0 1-.11 1.23M12 18v3M3 3l18 18"/></svg>';
+const VOL_ON = '<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
+const VOL_OFF = '<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 9.5l5 5M21.5 9.5l-5 5"/></svg>';
+
+let activeAccent = ACCENTS[0];
+let callSeconds = 31;
+
+const swatchesEl = document.getElementById('swatches');
+swatchesEl.innerHTML = ACCENTS.map(a =>
+  `<button class="swatch ${a.id === activeAccent.id ? 'active' : ''}" data-accent="${a.id}" title="${a.name}" aria-label="${a.name}" style="background:linear-gradient(135deg,${a.hex},${a.end});color:${a.hex}"></button>`
+).join('');
+
+function applyAccent(acc) {
+  activeAccent = acc;
+  document.documentElement.style.setProperty('--ui-accent', acc.hex);
+  document.querySelectorAll('.phone:not(.legacy)').forEach(p => {
+    p.style.setProperty('--brand', acc.hex);
+    p.style.setProperty('--brand-end', acc.end);
+    p.style.setProperty('--brand-rgb', acc.rgb);
+    p.style.setProperty('--brand-aura', acc.aura);
+  });
+  swatchesEl.querySelectorAll('.swatch').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.accent === acc.id);
+  });
+}
+swatchesEl.addEventListener('click', e => {
+  const btn = e.target.closest('.swatch');
+  if (!btn) return;
+  const acc = ACCENTS.find(a => a.id === btn.dataset.accent);
+  if (acc) applyAccent(acc);
+});
+
+function setViewMode(mode) {
+  document.querySelectorAll('#viewMode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('board-legacy').classList.toggle('hidden', mode !== 'compare');
+  document.getElementById('board-listen').classList.toggle('hidden', mode === 'compare');
+  document.getElementById('board-speak').classList.toggle('hidden', mode === 'compare');
+}
+document.getElementById('viewMode').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) setViewMode(b.dataset.mode);
+});
+setViewMode('all');
+
+document.getElementById('widthMode').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#widthMode button').forEach(x => x.classList.toggle('active', x === b));
+  document.body.classList.toggle('compact', b.dataset.w === '360');
+});
+
+document.getElementById('studioTheme').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#studioTheme button').forEach(x => x.classList.toggle('active', x === b));
+  document.body.classList.toggle('studio-light', b.dataset.st === 'light');
+});
+
+document.getElementById('toggleIssues').addEventListener('click', function() {
+  const active = this.classList.toggle('active');
+  document.getElementById('phone-legacy').classList.toggle('show-issues', active);
+});
+
+function showToast(phoneEl, msg) {
+  const t = phoneEl.querySelector('.phone-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+document.querySelector('[data-group="thinkSub"]').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.currentTarget.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  const isTool = b.dataset.val === 'tool';
+  document.getElementById('think-quote').innerHTML = isTool
+    ? '<em>你</em>帮我查一下今天下午还有什么会议安排'
+    : '<em>你</em>你好你好。';
+  document.getElementById('think-step').style.display = isTool ? 'inline-flex' : 'none';
+});
+
+document.querySelector('[data-group="listenSub"]').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.currentTarget.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  const hear = b.dataset.val === 'hearing';
+  const orb = document.getElementById('listen-orb');
+  orb.classList.toggle('phase-hearing', hear);
+  orb.classList.toggle('phase-listening', !hear);
+  document.getElementById('listen-zone-idle').style.display = hear ? 'none' : 'flex';
+  document.getElementById('listen-zone-hear').style.display = hear ? 'flex' : 'none';
+  document.getElementById('listen-hint').innerHTML = hear
+    ? '<span class="barge-dot"></span><span>正在拾音 · 说完停顿自动发送</span>'
+    : '<span class="barge-dot" style="background:#42d68a;"></span><span>麦克风收音正常 · 自动判停</span>';
+});
+
+function setSpeakSub(val) {
+  const group = document.querySelector('[data-group="speakSub"]');
+  group.querySelectorAll('button').forEach(x => x.classList.toggle('active', x.dataset.val === val));
+  const orb = document.getElementById('speak-orb');
+  const eq = document.getElementById('speak-eq');
+  const spark = document.getElementById('speak-spark');
+  const lyricsZone = document.getElementById('speak-zone-lyrics');
+  const promptZone = document.getElementById('speak-zone-prompt');
+  const lyricsWrap = document.getElementById('lyrics-wrap');
+  const silentBtn = document.getElementById('speak-silent-btn');
+  const silentLbl = document.getElementById('speak-silent-lbl');
+  const barge = document.getElementById('speak-barge');
+
+  if (val === 'prompt') {
+    lyricsZone.style.display = 'none';
+    promptZone.style.display = 'flex';
+    eq.style.display = 'none';
+    spark.style.display = 'block';
+    orb.className = 'orb-anchor phase-listening';
+    barge.style.opacity = '0';
+    barge.style.pointerEvents = 'none';
+  } else {
+    lyricsZone.style.display = 'flex';
+    promptZone.style.display = 'none';
+    barge.style.opacity = '1';
+    barge.style.pointerEvents = 'auto';
+    const isSilent = val === 'silent';
+    lyricsWrap.classList.toggle('all-lit', isSilent);
+    eq.style.display = isSilent ? 'none' : 'flex';
+    spark.style.display = isSilent ? 'block' : 'none';
+    orb.className = isSilent ? 'orb-anchor phase-listening' : 'orb-anchor phase-speaking';
+    silentBtn.classList.toggle('active-state', isSilent);
+    silentBtn.innerHTML = isSilent ? VOL_OFF : VOL_ON;
+    silentLbl.textContent = isSilent ? '仅看文字' : '朗读中';
+    barge.innerHTML = isSilent
+      ? '<span class="barge-dot" style="background:#42d68a;"></span><span>仅看文字 · 可随时继续开口提问</span>'
+      : '<span class="barge-dot"></span><span>点击字幕可切换高亮 · 开口即可打断</span>';
+  }
+}
+document.querySelector('[data-group="speakSub"]').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) setSpeakSub(b.dataset.val);
+});
+
+document.getElementById('lyrics-wrap').addEventListener('click', e => {
+  const line = e.target.closest('.lyric-line');
+  if (!line) return;
+  document.querySelectorAll('#lyrics-wrap .lyric-line').forEach(l => l.classList.remove('active'));
+  line.classList.add('active');
+  line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+document.querySelectorAll('.phone:not(.legacy)').forEach(phone => {
+  phone.addEventListener('click', e => {
+    const muteBtn = e.target.closest('.js-mute');
+    if (muteBtn) {
+      const on = muteBtn.classList.toggle('active-state');
+      muteBtn.innerHTML = on ? MIC_OFF : MIC_ON;
+      muteBtn.nextElementSibling.textContent = on ? '已静音' : '静音';
+      const dot = phone.querySelector('.live-dot');
+      if (dot) dot.classList.toggle('muted', on);
+      showToast(phone, on ? '麦克风已静音' : '已取消静音');
+      return;
+    }
+    const silentBtn = e.target.closest('.js-silent');
+    if (silentBtn) {
+      if (phone.id === 'phone-speak') {
+        const nextSilent = !silentBtn.classList.contains('active-state');
+        setSpeakSub(nextSilent ? 'silent' : 'speaking');
+        showToast(phone, nextSilent ? '已切为仅看文字' : '已恢复语音朗读');
+        return;
+      }
+      const on = silentBtn.classList.toggle('active-state');
+      silentBtn.innerHTML = on ? VOL_OFF : VOL_ON;
+      silentBtn.nextElementSibling.textContent = on ? '仅看文字' : '朗读中';
+      showToast(phone, on ? '已关闭朗读，仅显示文字' : '已打开语音朗读');
+      return;
+    }
+    if (e.target.closest('.js-hangup')) { showToast(phone, '模拟：已结束本次通话'); return; }
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    const act = actionEl.dataset.action;
+    if (act === 'minimize') phone.classList.add('is-minimized');
+    if (act === 'expand') phone.classList.remove('is-minimized');
+    if (act === 'expand-hang') { e.stopPropagation(); phone.classList.remove('is-minimized'); showToast(phone, '模拟：已从胶囊挂断通话'); }
+    if (act === 'interrupt') showToast(phone, '已打断，正在听你说话…');
+    if (act === 'prompt-allow') showToast(phone, '已确认，小伴继续执行');
+    if (act === 'prompt-deny') showToast(phone, '已取消该操作');
+  });
+});
+
+function fmtClock(sec) {
+  return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+}
+setInterval(() => {
+  callSeconds++;
+  const str = fmtClock(callSeconds);
+  document.querySelectorAll('.js-clock').forEach(el => { el.textContent = str; });
+}, 1000);
+</script>
+</body>
+</html>
