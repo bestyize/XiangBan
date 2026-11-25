@@ -1,17 +1,38 @@
 package xyz.xiangban.xiaoban.common.community
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /** Replay only host receipts from this conversation. A streamed tool argument is not a saved file. */
+data class CreationInstallRef(val turnId: Long, val toolId: String)
+
+@Serializable
+enum class CreationPlaytestResult { Passed, KnownIssue, NeedsChanges }
+
+@Serializable
+data class CreationPlaytest(val toolId: String, val result: CreationPlaytestResult, val note: String = "")
+
+@Serializable
+data class CreationTiming(
+    val firstModelDataAtMs: Long? = null,
+    val approvalWaitMs: Long = 0,
+    val retries: Int = 0,
+    val retryReason: String? = null,
+)
+
 data class CreationProgress(
     val files: Set<String>, val directories: Set<String>, val targetId: String?,
     val installed: MobileGame?, val validated: Boolean, val pendingStep: String?,
     val draftChangedSinceInstall: Boolean = false,
     val lastActionTurnId: Long? = null,
     val useCreationPlan: Boolean = true,
+    val installRef: CreationInstallRef? = null,
+    val playtest: CreationPlaytest? = null,
+    val firstSavedAtMs: Long? = null,
+    val firstValidatedAtMs: Long? = null,
 ) {
     val resumeId: String? get() = installed?.id ?: targetId
     val nextStep: String get() = when {
@@ -41,7 +62,21 @@ private fun String?.draftRoot(): String? {
     return path.split('/', limit = 3).take(2).joinToString("/")
 }
 
-private class CreationInstallation(val game: MobileGame, val draftRevision: Int, var validated: Boolean = false)
+const val ALLOW_CREATION_DRAFT = "creation_draft"
+
+internal fun creationDraftForWrite(tool: String, arguments: JsonObject): String? {
+    if (tool !in setOf("write_file", "edit_file")) return null
+    val path = (arguments["path"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+    return path.draftRoot()?.takeIf { it != path }
+}
+
+internal fun ToolCallInfo.openedCreation(game: MobileGame): Boolean =
+    name == "app_open" && status == ToolStatus.Done && arguments.jsonObject().field("id") == game.id
+
+private class CreationInstallation(
+    val game: MobileGame, val draftRevision: Int, val ref: CreationInstallRef,
+    val playtest: CreationPlaytest?, var validated: Boolean = false,
+)
 
 private class CreationTask(val directory: String? = null) {
     val files = linkedSetOf<String>()
@@ -50,11 +85,14 @@ private class CreationTask(val directory: String? = null) {
     var targetId: String? = null
     var lastActionTurnId: Long? = null
     var pendingStep: String? = null
+    var firstSavedAtMs: Long? = null
+    var firstValidatedAtMs: Long? = null
 
     fun progress(useCreationPlan: Boolean): CreationProgress {
         val current = installation?.takeIf { it.draftRevision == draftRevision }
         return CreationProgress(files, setOfNotNull(directory), targetId, current?.game,
-            current?.validated == true, pendingStep, installation != null && current == null, lastActionTurnId, useCreationPlan)
+            current?.validated == true, pendingStep, installation != null && current == null, lastActionTurnId, useCreationPlan,
+            current?.ref, current?.playtest, firstSavedAtMs, firstValidatedAtMs)
     }
 }
 
@@ -98,7 +136,8 @@ fun creationProgress(messages: List<ChatTurn>, approved: Boolean = true): Creati
                     val previous = installedWorks.put(game.id, task)
                     if (previous != null && previous !== task) previous.installation = null
                     task.targetId = game.id
-                    task.installation = CreationInstallation(game, task.draftRevision)
+                    task.installation = CreationInstallation(game, task.draftRevision, CreationInstallRef(turn.id, call.id),
+                        turn.creationPlaytest?.takeIf { it.toolId == call.id })
                     activate(task)
                 }
                 "app_validate" -> {
@@ -107,6 +146,7 @@ fun creationProgress(messages: List<ChatTurn>, approved: Boolean = true): Creati
                     val installation = task.installation ?: continue
                     val game = receipt?.let { runCatching { readMobileGameManifest(call.output) }.getOrNull() }
                     installation.validated = installation.draftRevision == task.draftRevision && game == installation.game
+                    if (installation.validated && task.firstValidatedAtMs == null && call.endedAtMs > 0) task.firstValidatedAtMs = call.endedAtMs
                     if (active === task) activate(task)
                 }
                 else -> {
@@ -128,7 +168,10 @@ fun creationProgress(messages: List<ChatTurn>, approved: Boolean = true): Creati
                     }
                     if (changed) {
                         if (call.name == "delete_file") task.files.removeAll { it == path || it.startsWith("$path/") }
-                        else task.files += path
+                        else {
+                            task.files += path
+                            if (task.firstSavedAtMs == null && call.endedAtMs > 0) task.firstSavedAtMs = call.endedAtMs
+                        }
                         task.draftRevision++
                     }
                     if ((creationTurn || task.lastActionTurnId != null) && (changed || active == null || active === task)) {

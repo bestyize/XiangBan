@@ -167,12 +167,12 @@ object MobileGameFormat {
            canvas 按 devicePixelRatio 绘制；监听 resize 和 xb.on('safearea', ...) 后用最新的 xb.info.safeArea、xb.info.capsule 更新布局和命中范围。按钮至少 44×44 像素。Android 游戏运行页不另设左上角返回按钮，退出由宿主管理。
         7. SDK：宿主已注入全局对象 xb，不要自己打包，也不要自己写 postMessage。第一屏画好后调用 xb.ready()（10 秒内必须调用，否则宿主判定启动失败）。xb.on('hide', fn) 暂停并停掉声音，xb.on('show', fn) 恢复。作品里有多个界面时用 history.pushState 记录、在 popstate 里切回上一个界面，系统返回键会逐层退回；不要拦截系统返回。xb.exit() 退出作品。xb.info 里有 safeArea、capsule、orientation、theme。
         8. 存档：重要数据用 await xb.storage.set(key, value) 和 await xb.storage.get(key)，值是 JSON，单个作品合计最多 10 MB；数据一变就存，不要等退出时才存，手机随时可能挂起作品。
-        9. 游戏成绩（可选）：开始一局调 xb.game.start()，过程中 xb.game.progress({score})，结束时 xb.game.result({score})，score 是非负整数。
+        9. 游戏成绩（可选）：先画出可交互首屏，再 await xb.ready()，开始一局时 await xb.game.start()。获得开局回执后才能上报 xb.game.progress({score}) 或在结算时 await xb.game.result({score})，score 是非负整数。首局与重开都沿用这个顺序。处理 Promise 拒绝并保留原因。
         10. 系统能力：capabilities 里写 camera、microphone 后，用标准的 navigator.mediaDevices.getUserMedia 使用，宿主会请用户授权；使用前先 if (xb.can('camera'))，不支持就隐藏对应按钮，作品照样可用。其余能力（haptics、share、clipboard、screen、notify、profile、contacts、files）手机宿主暂未开放，不要依赖。
         11. 声音和操作：用户第一次点击时调用 AudioContext.resume()，收到 show 后再调用一次，并提供静音开关。同时支持触控和键鼠；游戏里的运动都乘以帧间隔 dt，dt 最多取 1/30 秒。
         12. 内容：不卖东西、不引导外部付款，不收集手机号等隐私，不做色情、赌博、血腥内容，不在后台偷偷上传用户数据。
         13. 质量：游戏要有开始、进行、暂停、结算和重开的完整流程，随机局面保证有解，难度先低后高；工具和测评打开就能用；主要操作都有动画或震动之类的反馈；配色 4 到 6 种，主角、目标、危险物一眼能分清。
-        14. 安装后用 app_validate 校验，请用户用 app_open 试玩，再用 app_runtime_read 检查加载、脚本报错和 xb.ready 的记录。有实际试玩记录才能声称测试通过。修改已安装作品时，用 copy_file 将 games/<id>/ 的源码和素材复制进新草稿，保留路径并跳过 manifest.json。修改后用 app_create 安装新版。导出或分享的 ZIP 将 manifest.json 放在最外层。
+        14. 先完成能打开并实现核心玩法的版本，再补充可选细节。安装后用 app_validate 核对作品包。需要检查已打开的作品时，用 app_runtime_read 核对本版本的就绪及错误事件。启用了成绩上报的游戏还要核对首局 game.start、game.result 与结算分数。用户在作品卡片记录试玩结论。修改已安装作品时，用 copy_file 将 games/<id>/ 的源码和素材复制进新草稿，保留路径并跳过 manifest.json。修改后用 app_create 安装新版。导出或分享的 ZIP 将 manifest.json 放在最外层。
     """.trimIndent()
 }
 

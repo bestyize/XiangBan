@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,10 +48,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.time.Clock
+import kotlinx.coroutines.delay
 import xyz.xiangban.xiaoban.common.community.ChatSummary
 import xyz.xiangban.xiaoban.common.community.ChatTaskStatus
 import xyz.xiangban.xiaoban.common.community.CloudChatState
+import xyz.xiangban.xiaoban.common.community.CreationPlaytest
+import xyz.xiangban.xiaoban.common.community.CreationPlaytestResult
+import xyz.xiangban.xiaoban.common.community.CreationProgress
 import xyz.xiangban.xiaoban.common.community.MobileGame
+import xyz.xiangban.xiaoban.common.community.chatTitle
+import xyz.xiangban.xiaoban.common.community.formatDuration
 
 private class LocalClock(val month: Int, val day: Int, val weekday: Int, val hour: Int)
 
@@ -579,9 +586,69 @@ internal fun AgentReply(content: @Composable ColumnScope.() -> Unit) {
 
 /** 作品交付独立卡片：图标 + 作品名与形态 + 主色「打开」按钮 + 底部路径提示。 */
 @Composable
-internal fun AgentDeliverableCard(work: MobileGame, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+internal fun AgentCreationProgressStrip(cloud: CloudChatState, progress: CreationProgress) {
+    val reply = cloud.messages.lastOrNull()
+    val timing = reply?.creationTiming
+    val startedAt = reply?.createdAtMs ?: cloud.creation?.startedAtMs
+    val title = cloud.conversations.firstOrNull { it.id == cloud.conversationId }?.title ?: chatTitle(cloud.messages, cloud.creation)
+    val colors = MaterialTheme.colorScheme
+    var now by remember(startedAt) { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
+    var details by rememberSaveable(reply?.id) { mutableStateOf(false) }
+    LaunchedEffect(startedAt) {
+        if (startedAt != null) while (true) {
+            now = Clock.System.now().toEpochMilliseconds()
+            delay(1000)
+        }
+    }
+    val stage = when {
+        cloud.approval?.tool == "app_create" -> "等待确认安装"
+        cloud.approval != null -> "等待操作授权"
+        cloud.question != null -> "等待你的答复"
+        reply?.activity?.startsWith("正在重试") == true -> "正在重试模型"
+        progress.validated && progress.lastActionTurnId != reply?.id -> "正在处理本轮请求"
+        progress.validated -> "作品已校验，正在收尾"
+        progress.installed != null -> "正在校验作品"
+        progress.files.isNotEmpty() -> "正在制作 · 已保存 ${progress.files.size} 个文件"
+        else -> "正在制作首版"
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, Modifier.weight(1f),
+                style = XType.Secondary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (timing != null) LinkText(if (details) "收起耗时" else "耗时明细", { details = !details })
+        }
+        val elapsed = startedAt?.let { " · 已用 ${formatDuration(now - it)}" }.orEmpty()
+        Text(stage + elapsed, style = XType.Caption, color = colors.onSurfaceVariant)
+        if (details && startedAt != null && timing != null) {
+            val metrics = buildList {
+                timing.firstModelDataAtMs?.let { add("首段模型数据 ${formatDuration(it - startedAt)}") }
+                progress.firstSavedAtMs?.takeIf { it >= startedAt }?.let { add("首次保存 ${formatDuration(it - startedAt)}") }
+                progress.firstValidatedAtMs?.takeIf { it >= startedAt }?.let { add("首次校验 ${formatDuration(it - startedAt)}") }
+                if (timing.approvalWaitMs > 0) add("授权等待 ${formatDuration(timing.approvalWaitMs)}")
+                if (timing.retries > 0) add("已重试 ${timing.retries} 次 · ${timing.retryReason.orEmpty()}")
+            }
+            Text(metrics.joinToString("\n").ifBlank { "正在等待本轮记录" },
+                Modifier.padding(top = 5.dp), style = XType.Caption, color = colors.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+internal fun AgentDeliverableCard(
+    work: MobileGame, onOpen: () -> Unit, modifier: Modifier = Modifier,
+    playtest: CreationPlaytest? = null, onPlaytest: ((CreationPlaytestResult, String) -> Unit)? = null,
+) {
     val colors = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
+    var reviewing by rememberSaveable(work.id, work.version) { mutableStateOf(false) }
+    var reporting by rememberSaveable(work.id, work.version) { mutableStateOf(false) }
+    var note by rememberSaveable(work.id, work.version) { mutableStateOf(playtest?.note.orEmpty()) }
+    val reviewLabel = when (playtest?.result) {
+        CreationPlaytestResult.Passed -> "试玩通过"
+        CreationPlaytestResult.KnownIssue -> "已记录问题"
+        CreationPlaytestResult.NeedsChanges -> "需要修改"
+        null -> "待试玩"
+    }
     val kindLabel = if (work.kind == "app") "工具" else "小游戏"
     val orientationLabel = when (work.orientation) {
         "landscape" -> "横屏"
@@ -629,7 +696,44 @@ internal fun AgentDeliverableCard(work: MobileGame, onOpen: () -> Unit, modifier
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("下次可在「应用 → 最近用过」打开", style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("协议 2", style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1)
+            if (onPlaytest == null) Text("协议 2", style = XType.Caption.copy(fontSize = 11.5.sp), color = extra.ink3, maxLines = 1)
+        }
+        if (onPlaytest != null) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("v${work.version} · $reviewLabel", Modifier.weight(1f),
+                        style = XType.Caption, color = colors.onSurfaceVariant)
+                    LinkText(if (reviewing) "收起" else "记录试玩", { reviewing = !reviewing })
+                }
+                if (!reviewing && !playtest?.note.isNullOrBlank()) {
+                    Text(playtest?.note.orEmpty(), style = XType.Caption, color = colors.onSurfaceVariant)
+                }
+                if (reviewing && !reporting) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        LinkText("试玩通过", {
+                            onPlaytest(CreationPlaytestResult.Passed, "")
+                            reviewing = false
+                        })
+                        LinkText("有问题", { reporting = true })
+                    }
+                }
+                if (reviewing && reporting) {
+                    OutlinedTextField(note, { note = it.take(600) }, Modifier.fillMaxWidth(),
+                        placeholder = { Text("描述试玩中遇到的问题") }, maxLines = 3)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AppActionButton("只记录", {
+                            onPlaytest(CreationPlaytestResult.KnownIssue, note)
+                            reviewing = false
+                            reporting = false
+                        }, Modifier.weight(1f), enabled = note.isNotBlank())
+                        AppActionButton("请小伴修改", {
+                            onPlaytest(CreationPlaytestResult.NeedsChanges, note)
+                            reviewing = false
+                            reporting = false
+                        }, Modifier.weight(1f), primary = true, enabled = note.isNotBlank())
+                    }
+                }
+            }
         }
     }
 }

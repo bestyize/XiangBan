@@ -71,7 +71,11 @@ fun newChatId(nowMs: Long, random: Random = Random.Default): String =
 
 /** 对话的标题：第一句提问，太长就截断。 */
 fun chatTitle(messages: List<ChatTurn>, creation: CreationDraft? = null): String {
-    (creation?.title ?: legacyCreationTitle(messages))?.let { return it }
+    if (creation != null) {
+        val plan = messages.lastOrNull { it.creationPlan && !it.streaming && it.error == null && !it.cancelled && !it.truncated }
+        return plan?.text?.let(::creationPlanTitle) ?: creation.title
+    }
+    legacyCreationTitle(messages)?.let { return it }
     val first = messages.firstOrNull { it.role == "user" }?.text?.trim().orEmpty()
     return if (first.isEmpty()) "新对话" else if (first.length > 14) first.take(14) + "…" else first
 }

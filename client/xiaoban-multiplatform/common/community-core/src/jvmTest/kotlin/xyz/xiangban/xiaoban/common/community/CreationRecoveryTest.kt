@@ -33,6 +33,45 @@ class CreationRecoveryTest {
     }
 
     @Test
+    fun playtestBelongsToTheInstallationReceiptEvenWhenTheVersionIsReused() = runBlocking {
+        val workspace = MemoryMobileWorkspace()
+        workspace.prepareDraft("book")
+        val tools = mobileGameTools(MobileGameStore(workspace)).associateBy { it.name }
+        val install = tools.getValue("app_create").receipt(installationArgs("book"))
+        val validate = tools.getValue("app_validate").receipt(buildJsonObject { put("id", "book") })
+        val first = ChatTurn(1, "assistant", "", tools = listOf(install, validate),
+            creationPlaytest = CreationPlaytest(install.id, CreationPlaytestResult.Passed))
+        assertEquals(CreationPlaytestResult.Passed, creationProgress(listOf(first)).playtest?.result)
+
+        val updated = tools.getValue("app_create").receipt(installationArgs("book", overwrite = true))
+        val second = ChatTurn(2, "assistant", "", tools = listOf(updated, validate))
+        val current = creationProgress(listOf(first, second))
+        assertTrue(current.validated)
+        assertEquals(CreationInstallRef(second.id, updated.id), current.installRef)
+        assertNull(current.playtest)
+    }
+
+    @Test
+    fun startupEvidenceAndFirstRoundScoreAreSeparateAndBelongToThisVersion() {
+        val work = MobileGame("fruit", "水果消消乐", "水果三消", version = "1.0.2")
+        val open = """{"type":"host.open","gameId":"fruit","version":"1.0.2"}"""
+        val ready = """{"type":"game.ready","readyMs":74}"""
+        val start = """{"type":"game.start"}"""
+        val result = """{"type":"game.result","score":810}"""
+        fun report(vararg lines: String) = mobileGameRuntimeReport(work, lines.joinToString("\n"))
+
+        val loading = report(open, ready)
+        assertEquals("ready", loading["startup"]?.jsonPrimitive?.content)
+        assertEquals("no_start_recorded", loading["first_round"]?.jsonPrimitive?.content)
+        assertEquals(0, loading["errors"]?.jsonPrimitive?.int)
+        assertEquals(810, report(open, ready, start, result)["first_round_score"]?.jsonPrimitive?.int)
+        assertEquals("no_result_recorded", report(open, ready, start, start, result)["first_round"]?.jsonPrimitive?.content)
+        val stale = report(open, ready, start, result, open.replace("1.0.2", "1.0.1"), ready, start, result)
+        assertEquals("not_opened", stale["startup"]?.jsonPrimitive?.content)
+        assertNull(stale["first_round_score"])
+    }
+
+    @Test
     fun onlyConfirmedWritesSurviveFailedCallsAndDeletion() {
         fun write(name: String, receipt: String, status: ToolStatus) =
             ToolCallInfo(name, "write_file", """{"path":"drafts/book/$name"}""", receipt, status)

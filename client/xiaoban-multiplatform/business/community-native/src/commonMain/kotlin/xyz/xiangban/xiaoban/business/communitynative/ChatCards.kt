@@ -292,6 +292,7 @@ private fun UnifiedTraceCard(
     onAdjust: (() -> Unit)?,
     showRecovery: Boolean,
     modifier: Modifier = Modifier,
+    creationDetails: Boolean = false,
 ) {
     val extra = LocalExtraColors.current
     val segments = remember(reasoning) { reasoning.split(Regex("\n\\s*\n")).map { it.trim() }.filter { it.isNotEmpty() } }
@@ -311,7 +312,7 @@ private fun UnifiedTraceCard(
     }
     val completed = !live && (progress == null || progress.state == TaskState.Completed) && summary.errors == 0
     val needsAttention = progress != null && (progress.state == TaskState.Blocked || progress.state == TaskState.Paused || progress.state == TaskState.Approval || progress.state == TaskState.Waiting)
-    var open by rememberSaveable(completed) { mutableStateOf(live || needsAttention) }
+    var open by rememberSaveable(completed) { mutableStateOf(!creationDetails && (live || needsAttention)) }
     var activeTab by rememberSaveable(hasSteps, hasTodo, hasThink) {
         mutableStateOf(
             when {
@@ -346,7 +347,7 @@ private fun UnifiedTraceCard(
             if (summary.steps > 0) add("${summary.steps} 步")
             else if (progress != null) add("${progress.completed}/${progress.total}")
             if (segments.isNotEmpty()) add("思考 ${segments.size} 段")
-            if (summary.durationMs > 0) add(formatDuration(summary.durationMs))
+            if (!creationDetails && summary.durationMs > 0) add(formatDuration(summary.durationMs))
         }.joinToString(" · ")
     }
 
@@ -369,7 +370,7 @@ private fun UnifiedTraceCard(
             }
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
-                    statusText,
+                    if (creationDetails && !open) "制作过程" else statusText,
                     style = XType.Caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp),
                     fontWeight = FontWeight.SemiBold,
                     color = if (isAlert) ChatFail else MaterialTheme.colorScheme.onSurface,
@@ -377,7 +378,7 @@ private fun UnifiedTraceCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (metaText.isNotEmpty()) {
+                if (metaText.isNotEmpty() && (!creationDetails || open)) {
                     Text(
                         "· $metaText",
                         style = XType.Caption.copy(fontSize = 12.sp, lineHeight = 16.sp),
@@ -1025,6 +1026,7 @@ internal fun AssistantTurnCards(
     extras: TurnExtras = TurnExtras(),
     flat: Boolean = false,
     showTaskRecovery: Boolean = true,
+    creationDetails: Boolean = false,
     part: ChatMarkdownPart? = null,
     actionsOpen: Boolean = false,
     toggleActions: (() -> Unit)? = null,
@@ -1046,9 +1048,10 @@ internal fun AssistantTurnCards(
             onSend = onSend,
             onAdjust = if (streaming) onAdjust else null,
             showRecovery = showTaskRecovery,
+            creationDetails = creationDetails,
         )
         if (text.isEmpty()) {
-            if (streaming && tools.none { it.status == ToolStatus.Running } && reasoning.isBlank() && progress == null) {
+            if (!creationDetails && streaming && tools.none { it.status == ToolStatus.Running } && reasoning.isBlank() && progress == null) {
                 StatusLine(if (waiting != null) "等你确认后继续…" else idleText, alert = waiting != null)
             } else if (streaming && waiting != null) {
                 StatusLine("等你确认后继续…", alert = true)

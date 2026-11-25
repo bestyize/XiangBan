@@ -76,6 +76,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import xyz.xiangban.xiaoban.common.community.creationInterrupted
 import xyz.xiangban.xiaoban.common.community.creationDeliveryProgress
+import xyz.xiangban.xiaoban.common.community.creationProgress
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -86,7 +87,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
+import xyz.xiangban.xiaoban.common.community.ALLOW_CREATION_DRAFT
 import xyz.xiangban.xiaoban.common.community.ChatApproval
+import xyz.xiangban.xiaoban.common.community.CreationPlaytestResult
+import xyz.xiangban.xiaoban.common.community.CreationProgress
 import xyz.xiangban.xiaoban.common.community.MobileGame
 import xyz.xiangban.xiaoban.common.community.CloudAssistant
 import xyz.xiangban.xiaoban.common.community.CloudRecognizer
@@ -395,6 +399,11 @@ internal fun AiChatPage(
             val hasWaitingTask = cloud.parallelTasks().any { it.id in cloud.waitingSessions || it.taskStatus == ChatTaskStatus.WaitingForPlan }
             AgentTopBar(model, exhausted, hasWaitingTask, { focus.clearFocus(); tasksSheet = true }, ::openConfig, back)
             if (main) AgentTaskStrip(cloud, compact, ::openConversation) { focus.clearFocus(); tasksSheet = true }
+            if (!archived && cloud.sending && cloud.creation?.approved == true) {
+                val reply = cloud.messages.lastOrNull()
+                val liveProgress = remember(cloud.conversationId, reply?.id, reply?.tools) { creationProgress(cloud.messages) }
+                AgentCreationProgressStrip(cloud, liveProgress)
+            }
             val progress = if (!archived && !cloud.sending) {
                 remember(cloud.messages, cloud.creation, cloud.nativeAgentAvailable) { cloud.creationDeliveryProgress() }
             } else null
@@ -410,7 +419,7 @@ internal fun AiChatPage(
                 } else if (cloud.messages.isEmpty() && archive.isEmpty()) {
                     AgentWelcome(env.utcOffsetMinutes, compact) { sendPrompt(it) }
                 } else {
-                    val deliveredWork = progress?.takeIf { it.validated }?.installed
+                    val delivery = progress?.takeIf { it.validated }
                     val creationReply = progress != null && !progress.validated && progress.lastActionTurnId == cloud.messages.lastOrNull()?.id
                     key(conversation) {
                         CloudMessages(cloud.messages, cloud.sending, env.platform, resolveThumbnail, onPreview = { preview = it },
@@ -424,9 +433,21 @@ internal fun AiChatPage(
                                     ?: cloud.conversations.firstOrNull { it.id == conversation }?.updatedAtMs
                             } else null,
                             readOnly = archived, creation = cloud.creation?.approved == true || creationReply,
-                            deliveredWork = deliveredWork,
+                            delivery = delivery,
                             onOpenWork = { work ->
                                 if (env.platform?.openGame(work.id) != true) toast = "当前无法打开这件作品"
+                            },
+                            onPlaytest = { result, note ->
+                                callScope.launch {
+                                    val ref = delivery?.installRef
+                                    if (ref == null || !chat.recordCreationPlaytest(ref, result, note)) {
+                                        toast = "作品已更新，请确认当前版本"
+                                    } else if (result == CreationPlaytestResult.NeedsChanges) {
+                                        delivery.installed?.let { work ->
+                                            chat.send("请修订《${work.name}》${work.version}。试玩发现的问题：$note")
+                                        }
+                                    }
+                                }
                             },
                             onArchivedPreview = { id, image -> archivePreview = id to image },
                             archivedThumbnail = { id, image -> chat.resolveArchivedImage(id, image, thumbnail = true) })
@@ -771,10 +792,12 @@ private fun CloudMessages(
     onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit,
     onSend: (String) -> Unit, onQuota: () -> Unit, onRecoverImage: (Long) -> Unit, onReviewed: () -> Unit,
     waiting: String?, showQuota: Boolean, archive: List<StoredChat>, offsetMinutes: Int, topicStarted: Long?,
-    readOnly: Boolean, creation: Boolean, deliveredWork: MobileGame? = null, onOpenWork: (MobileGame) -> Unit = {},
+    readOnly: Boolean, creation: Boolean, delivery: CreationProgress? = null, onOpenWork: (MobileGame) -> Unit = {},
+    onPlaytest: (CreationPlaytestResult, String) -> Unit,
     onArchivedPreview: (String, ChatImagePreview) -> Unit,
     archivedThumbnail: suspend (String, String) -> String?,
 ) {
+    val deliveredWork = delivery?.installed
     // Register recent replies first. Stable row keys keep the reading position when earlier turns are prepended.
     var firstTurn by rememberSaveable { mutableIntStateOf((messages.size - ChatTurnPageSize).coerceAtLeast(0)) }
     val start = firstTurn.coerceAtMost(messages.size)
@@ -867,8 +890,9 @@ private fun CloudMessages(
             }
         }
         if (deliveredWork != null) {
-            item(key = "delivered-work:${deliveredWork.id}", contentType = "delivery") {
-                AgentDeliverableCard(deliveredWork, onOpen = { onOpenWork(deliveredWork) })
+            item(key = "delivered-work:${deliveredWork.id}:${delivery?.installRef?.toolId}", contentType = "delivery") {
+                AgentDeliverableCard(deliveredWork, onOpen = { onOpenWork(deliveredWork) },
+                    playtest = delivery?.playtest, onPlaytest = onPlaytest.takeIf { delivery?.installRef != null })
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -891,7 +915,7 @@ private fun AgentChatTurn(
             attachment.imageDataUrl?.let { ChatImageThumbnail(ChatImagePreview(it, attachment.name), resolveImage, onPreview) }
         }
     } else AgentReply {
-        if ((part == null || part.first) && turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
+        if (!creation && (part == null || part.first) && turn.streaming && turn.activity.isNotBlank() && (turn.text.isNotBlank() || turn.tools.isNotEmpty())) {
             Text(turn.activity, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val reminders = remember(turn.tools) {
@@ -916,6 +940,7 @@ private fun AgentChatTurn(
             idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
             onRetry = onRetry, onRegenerate = onRegenerate, flat = true, part = part, actionsOpen = actionsOpen, toggleActions = toggleActions,
             showTaskRecovery = !creation || !turn.creationInterrupted(),
+            creationDetails = creation,
             extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                 truncated = turn.truncated, onContinue = onContinue),
@@ -936,11 +961,14 @@ private fun AgentChatTurn(
 /** 手机内核要的授权，画成和设备聊天同一张紧凑授权卡。 */
 private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequest(
     approvalId = id, session = "", title = toolLabel(tool),
-    detail = JsonObject(mapOf("detail" to JsonPrimitive(detail))),
+    detail = JsonObject(mapOf("detail" to JsonPrimitive(draftDirectory?.let {
+        "$detail\n允许此草稿后，本轮可写入和修改 $it。"
+    } ?: detail))),
     risk = if (danger != null) "high" else "low",
     options = buildList {
         add(RemoteApprovalOption("once", "允许一次"))
-        if (canRemember) add(RemoteApprovalOption("always", "本对话都允许"))
+        if (draftDirectory != null) add(RemoteApprovalOption(ALLOW_CREATION_DRAFT, "允许此草稿"))
+        else if (canRemember) add(RemoteApprovalOption("always", "本对话都允许"))
         add(RemoteApprovalOption("deny", "拒绝"))
     },
     tool = tool, danger = danger,

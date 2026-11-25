@@ -720,7 +720,12 @@ class AiGatewayApi(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ModelResult(0, error = if (target.custom) "连接第三方模型服务失败，请检查地址和网络" else "连接小伴 AI 服务失败，请检查网络后重试")
+            val issue = when (e::class.simpleName) {
+                "ConnectTimeoutException" -> "连接模型服务超时"
+                "SocketTimeoutException", "HttpRequestTimeoutException" -> "等待模型数据超时"
+                else -> "模型连接或读流中断"
+            }
+            ModelResult(0, error = if (target.custom) "连接第三方模型服务失败，请检查地址和网络" else "连接小伴 AI 服务失败，请检查网络后重试", transportIssue = issue)
         }
     }
 
@@ -812,7 +817,10 @@ class AiGatewayApi(
 }
 
 /** 一次模型请求的结果：HTTP 状态，失败时的响应文本，或连接层面的错误。 */
-data class ModelResult(val status: Int, val body: String? = null, val error: String? = null, val verifiedToolTerminal: Boolean = true)
+data class ModelResult(
+    val status: Int, val body: String? = null, val error: String? = null,
+    val verifiedToolTerminal: Boolean = true, val transportIssue: String? = null,
+)
 
 /**
  * 把内核按会话协议组好的流式请求体发给所选服务，响应的每一行原样交给 [onLine]。
@@ -896,6 +904,8 @@ data class ChatTurn(
     val modelLabel: String? = null,
     val createdAtMs: Long? = null,
     val failureStage: String? = null,
+    val creationPlaytest: CreationPlaytest? = null,
+    val creationTiming: CreationTiming? = null,
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -905,6 +915,7 @@ data class ChatApproval(
     val detail: String = "",
     val danger: String? = null,
     val canRemember: Boolean = true,
+    val draftDirectory: String? = null,
 )
 
 data class ChatQuestion(val id: String, val question: String, val options: List<String>)
@@ -1069,6 +1080,10 @@ class CloudChatController(
         var nativeRun: String? = null
         var approval: ChatApproval? = null
         var question: ChatQuestion? = null
+        var draftGrant: String? = null
+        var approvalStartedAtMs: Long? = null
+        var lastModelIssue: String? = null
+        var handedOffPlaytest = false
     }
     private val chatRuns = mutableMapOf<String, RunningChat>()
     private val stoppingRuns = mutableMapOf<String, RunningChat>()
@@ -1627,6 +1642,33 @@ class CloudChatController(
         sendPrompt(CREATION_RESUME, "", recovery = progress)
     }
 
+    suspend fun recordCreationPlaytest(ref: CreationInstallRef, result: CreationPlaytestResult, note: String = ""): Boolean {
+        val owner = agentSession
+        val account = accountRequest()
+        val progress = _state.value.creationDeliveryProgress()?.takeIf { it.validated && it.installRef == ref } ?: return false
+        val work = progress.installed ?: return false
+        if (creationStore != null) {
+            try {
+                if (creationStore.validate(work.id) != work) return false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return false
+            }
+        }
+        val current = _state.value
+        if (!account.isCurrent() || owner != agentSession ||
+            current.creationDeliveryProgress()?.let { it.validated && it.installRef == ref } != true) return false
+        val detail = note.trim().take(600)
+        if (result != CreationPlaytestResult.Passed && detail.isEmpty()) return false
+        val review = CreationPlaytest(ref.toolId, result, detail)
+        _state.value = current.copy(messages = current.messages.map { turn ->
+            if (turn.id == ref.turnId) turn.copy(creationPlaytest = review) else turn
+        })
+        persist()
+        return true
+    }
+
     fun send(rawPrompt: String) { sendPrompt(rawPrompt, "") }
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
@@ -1782,13 +1824,15 @@ class CloudChatController(
         val modelInput = if (draft != null && (confirmCreation || draft.approved && prompt == CREATION_CONFIRMATION) && plan != null) {
             creationExecutionInput(draft, _state.value.messages, plan)
         } else note + prompt
+        val making = confirmCreation || draft?.approved == true || recovery != null
         val assistantTurn = ChatTurn(id = replyId, role = "assistant", text = "", streaming = true,
             activity = if (planning) "正在拟定方案…" else "正在请求模型…",
-            creationPlan = planning, modelLabel = _state.value.activeTier?.displayName ?: _state.value.selectedTier.takeIf { it.isNotBlank() })
+            creationPlan = planning, modelLabel = _state.value.activeTier?.displayName ?: _state.value.selectedTier.takeIf { it.isNotBlank() },
+            createdAtMs = userTurn.createdAtMs.takeIf { making }, creationTiming = if (making) CreationTiming() else null)
         val history = buildList {
             if (systemPrompt.isNotBlank()) add(ChatMessage("system", systemPrompt))
             if (planning && draft != null) add(ChatMessage("system",
-                "当前是小伴作品的方案阶段。用一屏说明作品名称、主要功能、数据存放位置和简短验收项，结合最新补充修改方案。等用户点击宿主确认按钮再开始。不要声称已执行或安装。\n" +
+                "当前是小伴作品的方案阶段。第一行用「作品名称：」注明名称，再用一屏说明主要功能、数据存放位置和简短验收项，结合最新补充修改方案。等用户点击宿主确认按钮再开始。不要声称已执行或安装。\n" +
                     "作品需求：${draft.request}"))
             for (turn in _state.value.messages) {
                 if (turn.error == null && turn.text.isNotBlank()) {
@@ -1811,7 +1855,7 @@ class CloudChatController(
             inputError = null,
             approval = null,
             question = null,
-            creation = if (confirmCreation) draft?.copy(approved = true) else draft,
+            creation = if (confirmCreation) draft?.copy(approved = true, startedAtMs = userTurn.createdAtMs) else draft,
         )
         val run = RunningChat(ownerSession, replyId, request, options(), _state.value.messages)
         chatRuns[ownerSession] = run
@@ -1997,15 +2041,23 @@ class CloudChatController(
         val run = chatRuns[agentSession] ?: return
         val pending = run.approval ?: return
         if (!run.account.isCurrent()) return
+        if (decision == ALLOW_CREATION_DRAFT) run.draftGrant = pending.draftDirectory ?: return
+        val waitedMs = run.approvalStartedAtMs?.let { (clock() - it).coerceAtLeast(0) } ?: 0
+        run.approvalStartedAtMs = null
         run.approval = null
         run.question = null
         _state.value = _state.value.copy(approval = null, question = null)
-        agent?.answerApproval(pending.id, decision)
+        agent?.answerApproval(pending.id, if (decision == ALLOW_CREATION_DRAFT) "once" else decision)
         if (decision == "always" && pending.canRemember && pending.tool !in _state.value.grants) {
             _state.value = _state.value.copy(grants = _state.value.grants + pending.tool)
         }
-        val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
-        updateRun(run) { it.copy(records = it.records + record) }
+        val record = ChatRecord("approval", toolLabel(pending.tool), when (decision) {
+            "deny" -> null
+            ALLOW_CREATION_DRAFT -> "已允许修改 ${pending.draftDirectory}"
+            else -> "已允许"
+        })
+        updateRun(run) { turn -> turn.copy(records = turn.records + record,
+            creationTiming = turn.creationTiming?.let { it.copy(approvalWaitMs = it.approvalWaitMs + waitedMs) }) }
         publishRuns()
         persist()
     }
@@ -2120,33 +2172,67 @@ class CloudChatController(
                 }
             }
             is AgentEvent.Approval -> if (event.session.isEmpty() || event.session == run.session) {
-                run.approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger, event.canRemember)
-                if (run.session == agentSession) _state.value = _state.value.copy(approval = run.approval)
-                publishRuns()
+                val directory = if (run.options.creation?.approved == true && event.risk == "write" && event.canRemember && event.danger == null) {
+                    creationDraftForWrite(event.tool, event.arguments)
+                } else null
+                if (directory != null && directory == run.draftGrant) {
+                    agent?.answerApproval(event.id, "once")
+                } else {
+                    run.approvalStartedAtMs = clock()
+                    run.approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()),
+                        event.danger, event.canRemember, directory)
+                    if (run.session == agentSession) _state.value = _state.value.copy(approval = run.approval)
+                    publishRuns()
+                }
             }
             is AgentEvent.Question -> if (event.session == run.session) {
-                run.question = ChatQuestion(event.id, event.question, event.options)
-                if (run.session == agentSession) _state.value = _state.value.copy(question = run.question)
-                publishRuns()
+                val turn = run.messages.lastOrNull()
+                val delivery = if (run.options.creation?.approved == true && turn?.tools?.lastOrNull()?.let {
+                        it.name == "ask_user" && it.status == ToolStatus.Running
+                    } == true) creationProgress(run.messages).takeIf { it.validated && it.lastActionTurnId == run.replyId } else null
+                val opened = delivery?.installed?.let { work -> turn?.tools?.any { it.openedCreation(work) } } == true
+                if (opened) {
+                    // A validated, opened work is available in the delivery card. Keeping a native
+                    // question open here would keep the model running after the user finishes playing.
+                    run.handedOffPlaytest = true
+                    updateRun(run) { it.copy(tools = it.tools.dropLast(1), activity = "正在结束制作…") }
+                    agent?.cancel(event.run)
+                } else {
+                    run.question = ChatQuestion(event.id, event.question, event.options)
+                    if (run.session == agentSession) _state.value = _state.value.copy(question = run.question)
+                    publishRuns()
+                }
             }
             is AgentEvent.RunEnd -> {
-                val failure = if (event.ok) null else friendlyAgentError(event.error)
+                val handedOff = run.handedOffPlaytest && (event.ok || event.error.orEmpty().contains("cancelled", ignoreCase = true))
+                val failure = if (event.ok || handedOff) null else friendlyAgentError(event.error)
                 updateRun(run) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
                     val stage = when {
-                        event.ok -> null
+                        failure == null -> null
                         event.error.orEmpty().startsWith("provider error", ignoreCase = true) || failure.orEmpty().contains("连接小伴 AI 服务失败") -> "模型请求"
                         else -> turn.tools.lastOrNull()?.takeIf { it.status != ToolStatus.Done }?.let { toolLabel(it.name) } ?: "任务执行"
                     }
-                    turn.copy(streaming = false, activity = "", error = failure, failureStage = stage, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok), truncated = turn.truncated || event.finish == "length", promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
+                    turn.copy(streaming = false, activity = "", error = failure, failureStage = stage,
+                        text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text,
+                        tools = settleTools(turn.tools, failure != null), truncated = turn.truncated || event.finish == "length",
+                        promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
                 }
                 completeRun(run)
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
                 else if (event.ok) refreshBalanceQuietly()
             }
             is AgentEvent.Progress -> {
+                if (event.kind == "model_request_failed") {
+                    run.lastModelIssue = event.detail["cause"].asStr()
+                    return
+                }
+                if (event.kind == "model_first_data") run.lastModelIssue = null
                 if (event.kind == "approval_resolved" && run.approval?.id == event.detail["id"].asStr()) {
                     run.approval = null
+                    val waitedMs = run.approvalStartedAtMs?.let { (clock() - it).coerceAtLeast(0) } ?: 0
+                    run.approvalStartedAtMs = null
+                    updateRun(run) { turn -> turn.copy(creationTiming = turn.creationTiming?.let { it.copy(approvalWaitMs = it.approvalWaitMs + waitedMs) }) }
                     if (run.session == agentSession) _state.value = _state.value.copy(approval = null)
                     publishRuns()
                 }
@@ -2156,7 +2242,21 @@ class CloudChatController(
                 when (event.kind) {
                     "reasoning_delta" -> turn.copy(reasoning = turn.reasoning + str("text"))
                     "usage" -> turn.copy(promptTokens = turn.promptTokens + num("prompt_tokens"), completionTokens = turn.completionTokens + num("completion_tokens"))
-                    "retrying" -> turn.copy(reasoning = "", activity = "正在重试（${str("attempt")}）")
+                    "model_first_data" -> turn.copy(creationTiming = turn.creationTiming?.let {
+                        if (it.firstModelDataAtMs == null) it.copy(firstModelDataAtMs = clock()) else it
+                    })
+                    "retrying" -> {
+                        val timing = turn.creationTiming?.let {
+                            val reason = when {
+                                str("message").startsWith("请求体积过大") -> "请求体积过大"
+                                str("message").startsWith("模型上下文超限") -> "模型上下文超限"
+                                else -> run.lastModelIssue ?: "模型响应未完成"
+                            }
+                            it.copy(retries = it.retries + 1, retryReason = reason)
+                        }
+                        run.lastModelIssue = null
+                        turn.copy(reasoning = "", creationTiming = timing, activity = "正在重试（${timing?.retries ?: str("attempt")}）")
+                    }
                     "continuing" -> turn.copy(activity = if (str("reason") == "no_progress_warning") "发现重复操作，正在寻找下一步…" else "正在继续未完成任务")
                     "truncated" -> turn.copy(truncated = true)
                     "tool_waiting" -> turn.copy(activity = if (str("waiting") == "true") "正在等待资源" else "")

@@ -372,7 +372,23 @@ class AgentRuntime(
                         if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
                         withContext(running.account ?: kotlin.coroutines.EmptyCoroutineContext) {
                             running.account?.checkCurrent()
-                            model(body) { l -> sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) }) }
+                            val collectTiming = running.options.creation?.approved == true
+                            var receivedData = false
+                            suspend fun receivedFirstData() {
+                                if (collectTiming && !receivedData) {
+                                    receivedData = true
+                                    _events.emit(AgentEvent.Progress(running.id, "model_first_data", JsonObject(emptyMap())))
+                                }
+                            }
+                            model(body) { l ->
+                                if (!receivedData && collectTiming && l.startsWith("data:")) {
+                                    val data = l.removePrefix("data:").trim()
+                                    if (data.isNotEmpty() && data != "[DONE]") receivedFirstData()
+                                }
+                                sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) })
+                            }.also { reply ->
+                                if (reply.status in 200..299 && reply.body != null) receivedFirstData()
+                            }
                         }
                     } catch (e: CancellationException) {
                         if (running == null || pendingRun(session, epoch)?.id != running.id) throw e
@@ -386,6 +402,10 @@ class AgentRuntime(
                         // The transport can cancel independently while the native run is still waiting.
                         if (running == null || pendingRun(session, epoch)?.id != running.id) return@withContext
                         try {
+                            if (running.options.creation?.approved == true && result.status !in 200..299) {
+                                val cause = result.transportIssue ?: if (result.status > 0) "模型服务 HTTP ${result.status}" else "模型请求中断"
+                                _events.emit(AgentEvent.Progress(running.id, "model_request_failed", buildJsonObject { put("cause", cause) }))
+                            }
                             sendFor(h, epoch, line {
                                 put("type", "model_end"); put("id", id); put("status", result.status)
                                 result.error?.let { put("error", it) }

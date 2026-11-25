@@ -327,6 +327,109 @@ class MobileConversationIsolationTest {
         }
     }
 
+    @Test fun deliveredCreationHandsOffPlaytestAndRecordsFeedbackWithoutRunningTheModelAgain() = runBlocking {
+        val workspace = MemoryMobileWorkspace()
+        workspace.write("drafts/fruit/index.html", "<h1>水果消消乐</h1>")
+        workspace.write("drafts/fruit/icon.svg", "<svg/>")
+        workspace.write("drafts/fruit/cover.svg", "<svg/>")
+        val games = MobileGameStore(workspace)
+        withChat(client = creationPlanner(), creationStore = games) {
+            assertTrue(chat.startCreation("游戏 · Design and build", "做水果消消乐", "20 步"))
+            eventually { chat.state.value.creationPlanReady }
+            val session = chat.state.value.conversationId
+            assertEquals("水果消消乐", chat.state.value.conversations.single().title)
+            chat.confirmCreationPlan()
+            val run = runId(session)
+            assertNotNull(chat.state.value.creation?.startedAtMs)
+
+            fun event(kind: String, id: String, field: String, value: String, args: String? = null) {
+                bridge.emit(buildJsonObject {
+                    put("type", "event"); put("run", run)
+                    put("event", buildJsonObject {
+                        put("type", kind); put("id", id); put(field, value)
+                        args?.let { put("arguments", it) }
+                    })
+                }.toString())
+            }
+            fun start(id: String, name: String, args: String) = event("tool_start", id, "name", name, args)
+            fun end(id: String, output: String) = event("tool_end", id, "output", output)
+            val install = """{"id":"fruit","name":"水果消消乐","description":"水果三消","version":"1.0.2","source_dir":"drafts/fruit"}"""
+            val work = mobileGameTools(games).first { it.name == "app_create" }.run(CommunityJson.parseToJsonElement(install).jsonObject)
+            assertTrue(work.ok, work.output)
+            start("install", "app_create", install)
+            end("install", work.output)
+            start("validate", "app_validate", """{"id":"fruit"}""")
+            end("validate", work.output)
+            start("open", "app_open", """{"id":"fruit"}""")
+            end("open", "已请求打开作品")
+            start("ask", "ask_user", """{"question":"试玩一局，情况如何？"}""")
+            bridge.emit("""{"type":"question","id":"playtest","session":"$session","question":"试玩一局，情况如何？","options":[]}""")
+            eventually { bridge.messages("cancel").size == 1 }
+            assertNull(chat.state.value.question)
+            bridge.emit("""{"type":"run_end","run":"$run","ok":false,"error":"cancelled"}""")
+            eventually { !chat.state.value.sending }
+            assertNull(chat.state.value.messages.last().error)
+            val delivery = assertNotNull(chat.state.value.creationDeliveryProgress())
+            val ref = assertNotNull(delivery.installRef)
+            assertNull(delivery.playtest)
+            assertTrue(chat.recordCreationPlaytest(ref, CreationPlaytestResult.KnownIssue, "首局上报待完善"))
+            assertFalse(chat.recordCreationPlaytest(ref.copy(toolId = "another-version"), CreationPlaytestResult.Passed))
+            assertEquals(1, bridge.messages("run").size)
+            chat.clearConversation()
+            chat.openConversation(session)
+            assertEquals("首局上报待完善", chat.state.value.creationDeliveryProgress()?.playtest?.note)
+        }
+    }
+
+    @Test fun draftGrantOnlyAppliesToWritesAndEditsUnderTheApprovedDirectoryInThisRun() = runBlocking {
+        withChat(client = creationPlanner()) {
+            assertTrue(chat.startCreation("游戏", "做水果消消乐", "20 步"))
+            eventually { chat.state.value.creationPlanReady }
+            chat.confirmCreationPlan()
+            val session = chat.state.value.conversationId
+            val run = runId(session)
+            fun request(id: String, tool: String, path: String) {
+                bridge.emit("""{"type":"approval_request","id":"$id","session":"$session","tool":"$tool","risk":"write","arguments":{"path":"$path"},"can_remember":true}""")
+            }
+            request("first", "write_file", "drafts/fruit/index.html")
+            eventually { chat.state.value.approval?.draftDirectory == "drafts/fruit" }
+            chat.answerApproval(ALLOW_CREATION_DRAFT)
+            eventually { bridge.messages("approval").size == 1 }
+            request("edit", "edit_file", "drafts/fruit/style.css")
+            eventually { bridge.messages("approval").size == 2 }
+            assertTrue(bridge.messages("approval").all { it["decision"]?.jsonPrimitive?.content == "once" })
+            assertTrue(chat.state.value.grants.isEmpty())
+
+            request("other", "write_file", "drafts/fruit-old/index.html")
+            eventually { chat.state.value.approval?.draftDirectory == "drafts/fruit-old" }
+            chat.answerApproval("deny")
+            request("delete", "delete_file", "drafts/fruit/index.html")
+            eventually { chat.state.value.approval?.tool == "delete_file" }
+            assertNull(chat.state.value.approval?.draftDirectory)
+            chat.answerApproval("deny")
+
+            bridge.emit("""{"type":"event","run":"$run","event":{"type":"retrying","attempt":1,"message":"模型上下文超限"}}""")
+            bridge.emit("""{"type":"event","run":"$run","event":{"type":"retrying","attempt":1}}""")
+            eventually { chat.state.value.messages.last().creationTiming?.retries == 2 }
+            assertEquals("正在重试（2）", chat.state.value.messages.last().activity)
+
+            bridge.emit("""{"type":"run_end","run":"$run","ok":true}""")
+            eventually { !chat.state.value.sending }
+            chat.send("接着写")
+            eventually { bridge.messages("run").size == 2 }
+            request("new-run", "write_file", "drafts/fruit/index.html")
+            eventually { chat.state.value.approval?.draftDirectory == "drafts/fruit" }
+            assertEquals(4, bridge.messages("approval").size)
+        }
+    }
+
+    private fun creationPlanner() = HttpClient(MockEngine { request ->
+        if (request.url.encodedPath == "/v1/chat/completions") {
+            respond("""{"choices":[{"message":{"content":"作品名称：水果消消乐"},"finish_reason":"stop"}]}""",
+                headers = headersOf(HttpHeaders.ContentType, "application/json"))
+        } else respond("{}")
+    })
+
     companion object {
         private suspend fun eventually(condition: () -> Boolean) = withTimeout(5000) { while (!condition()) delay(5) }
     }

@@ -7,6 +7,9 @@
   const listeners = new Map();
   let nextId = 0;
   let ready = false;
+  let readyAck;
+  let startWhenReady;
+  let startingRound;
 
   function applyCss() {
     const root = document.documentElement;
@@ -36,6 +39,31 @@
     });
   }
 
+  // A work may open its first round while it draws the first screen. Send the
+  // start to the host only after the host has acknowledged that screen.
+  function startGame() {
+    if (startWhenReady) return startingRound;
+    const start = readyAck ? readyAck.then(() => call('game.start')) : new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        startWhenReady = undefined;
+        reject(Object.assign(new Error('Call xb.ready() before starting the round'), { code: 'invalid' }));
+      }, 10000);
+      startWhenReady = ack => {
+        clearTimeout(timer);
+        startWhenReady = undefined;
+        ack.then(() => call('game.start')).then(resolve, reject);
+      };
+    });
+    startingRound = start;
+    const clear = () => { if (startingRound === start) startingRound = undefined; };
+    start.then(clear, clear);
+    return start;
+  }
+
+  function reportGame(method, params) {
+    return startingRound ? startingRound.then(() => call(method, params)) : call(method, params);
+  }
+
   function emit(name, data) {
     for (const listener of [...(listeners.get(name) || [])]) {
       try { listener(data); } catch (error) { console.error(error); }
@@ -44,7 +72,12 @@
 
   const xb = window.xb = {
     info: initialInfo,
-    ready() { ready = true; return call('ready'); },
+    ready() {
+      ready = true;
+      readyAck = call('ready');
+      startWhenReady?.(readyAck);
+      return readyAck;
+    },
     on(name, fn) {
       if (typeof fn !== 'function') return;
       if (!listeners.has(name)) listeners.set(name, new Set());
@@ -77,9 +110,9 @@
       keys: () => call('storage.keys'),
     },
     game: {
-      start: () => call('game.start'),
-      progress: value => call('game.progress', value),
-      result: value => call('game.result', value),
+      start: startGame,
+      progress: value => reportGame('game.progress', value),
+      result: value => reportGame('game.result', value),
       session: value => call('game.session', value),
     },
   };

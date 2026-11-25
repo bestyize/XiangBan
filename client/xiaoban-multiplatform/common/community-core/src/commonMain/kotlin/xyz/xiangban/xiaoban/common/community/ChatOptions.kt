@@ -18,7 +18,21 @@ data class AgentExecutionBudget(
 }
 
 @Serializable
-data class CreationDraft(val title: String, val request: String, val approved: Boolean = false)
+data class CreationDraft(
+    val title: String, val request: String, val approved: Boolean = false,
+    val startedAtMs: Long? = null,
+)
+
+internal fun creationPlanTitle(text: String): String? = text.lineSequence().take(8).mapNotNull { line ->
+    val heading = line.trim().trimStart('#', '*', '-', ' ').replace("**", "")
+    val name = when {
+        heading.startsWith("作品名称：") -> heading.substringAfter('：')
+        heading.startsWith("作品名称:") -> heading.substringAfter(':')
+        heading.startsWith("作品方案 · ") -> heading.removePrefix("作品方案 · ")
+        else -> return@mapNotNull null
+    }.trim()
+    name.removeSurrounding("《", "》").trim().take(24).takeIf { it.isNotBlank() }
+}.firstOrNull()
 
 fun creationTitle(brief: String, kind: String): String =
     Regex("《([^》]+)》").find(brief)?.groupValues?.get(1)?.take(24)

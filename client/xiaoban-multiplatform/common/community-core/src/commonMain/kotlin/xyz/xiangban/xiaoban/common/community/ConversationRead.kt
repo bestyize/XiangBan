@@ -69,8 +69,9 @@ internal fun creationExecutionInput(draft: CreationDraft, messages: List<ChatTur
         if (plan.text.length > 24_000) append("[方案未完整内联；必须用 conversation_read(message_id=${plan.id}, offset=24000) 继续读取。]\n")
         append("\n附件内容没有内联。制作前用 conversation_read 的 message_id 和 attachment_index 读取相关附件；")
         append("文字按 next_offset 继续读取，图片以工具返回的多模态内容为准。不要用方案摘要替代用户原文。\n")
-        append("先读取 app_read_format，再按确认方案制作。先完成可运行的包并安装，只有文件变更或有新证据时才重读相同目录。")
-        append("检查实际运行日志，需等待用户验收时用 ask_user 明确交还，区分静态检查和实测。\n")
+        append("先读取 app_read_format，再按确认方案制作。先保存能独立运行的核心玩法，分小步写入文件，最后补充可选细节。只有文件变更或有新证据时才重读相同目录。")
+        append("安装、校验后报告已交付版本。用户要求立即打开时先调用 app_open。包校验和试玩是独立结果。")
+        append("用户在宿主作品卡片试玩和记录结论。交付后结束制作待办，将试玩交给作品卡片。\n")
     }
 }
 

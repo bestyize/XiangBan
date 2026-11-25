@@ -612,7 +612,12 @@ class RuntimeV2Activity : ComponentActivity() {
         val method = call.optString("method")
         val params = call.optJSONObject("params") ?: JSONObject()
         fun result(value: Any = JSONObject.NULL) = post(reply, envelope("result").put("id", id).put("ok", true).put("value", value))
-        fun error(code: String) = post(reply, envelope("result").put("id", id).put("ok", false).put("error", JSONObject().put("code", code)))
+        fun error(code: String, message: String? = null) = post(reply, envelope("result").put("id", id)
+            .put("ok", false).put("error", JSONObject().put("code", code).put("message", message)))
+        fun gameError(message: String) {
+            log?.add("game.error", "method" to method, "message" to message)
+            error("invalid", message)
+        }
         when (method) {
             "document.connect" -> {
                 if (document !== reply) {
@@ -815,7 +820,8 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
             }
             "game.start" -> {
-                if (!ready || pack.manifest.kind != "game") error("invalid")
+                if (!ready) gameError("等待 xb.ready() 成功后再开始一局")
+                else if (pack.manifest.kind != "game") gameError("游戏成绩接口仅供游戏作品使用")
                 else {
                     playing = true
                     if (blockPuzzleFullBleed && blockPuzzleShowingResult) {
@@ -828,7 +834,8 @@ class RuntimeV2Activity : ComponentActivity() {
             }
             "game.progress", "game.result" -> {
                 val score = params.opt("score")
-                if (!playing || score !is Number || !score.isNonNegativeInteger()) error("invalid")
+                if (!playing) gameError("等待 xb.game.start() 成功后再上报成绩")
+                else if (score !is Number || !score.isNonNegativeInteger()) gameError("成绩必须为非负整数")
                 else {
                     if (method == "game.result") {
                         playing = false
