@@ -14,8 +14,8 @@
       "id": "whale-girl",
       "kind": "work",
       "title": "潮汐书房 · 鲸鱼娘",
-      "description": "拜访月湾书房的溟月，看她读书、写信，从书页间发现藏品。",
-      "introduction": "月升时，溟月会坐在窗边读书，也会在贝壳灯下写信。可以陪她在书房散步，请她从书架取一本书，翻看夹页里的藏品，听听它的来历。作品免费体验，角色模型采用 CC BY-NC-SA 4.0 许可。",
+      "description": "在月湾书房陪溟月听潮、翻书，点亮贝壳灯给末班船打招呼。",
+      "introduction": "陪溟月翻书找藏品，坐在窗边听潮。点亮贝壳灯，等末班船一长一短地回灯，也可以选个话题和她聊几句。切换「自由」镜头可绕着她看一整圈。作品免费体验，角色模型采用 CC BY-NC-SA 4.0 许可。",
       "controls": {
         "desktop": "点击地板散步，拖动环顾，滚轮缩放",
         "mobile": "轻触地板散步，拖动环顾，双指缩放"
@@ -26,8 +26,8 @@
       "date": "2026-11-19",
       "href": "/ideas/works/whale-girl",
       "player": "whale-girl",
-      "repository": "https://github.com/bestyize/RealWorldBuilder/tree/ebc9919e183f62eac0b24ad816982ec1e0fea66a/games/whale-girl",
-      "desktop_download": "https://res.xiangban.xyz/files/6aca8cbf69de76a12a10982b9aef86c9.zip"
+      "repository": "https://github.com/bestyize/RealWorldBuilder/tree/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl",
+      "desktop_download": "https://res.xiangban.xyz/files/1fcc99324a997593dbdf15c93a9dd1e8.zip"
     },
     {
       "id": "jiangshan-map",

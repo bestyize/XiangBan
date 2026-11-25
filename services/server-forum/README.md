@@ -85,7 +85,7 @@ node scripts/stage-idea-runtime-packs.mjs --out /path/to/staging /path/to/releas
 
 将 `jiangshan-map/` 部署到资源机的 `idea-players-v1/`，应用 `nginx-ideas.conf` 中对应的资源规则，再发布 ZIP 和 `jiangshan-map.json`。先核对网页入口、ZIP 和封面可以访问，再发布带新条目的精选目录。桌面可以从「我的作品」导入同一 ZIP。
 
-《潮汐书房 · 鲸鱼娘》使用 RealWorldBuilder 固定提交 `ebc9919e183f62eac0b24ad816982ec1e0fea66a` 的 `games/whale-girl/`。模型保留 CC BY-NC-SA 4.0 和原作者署名，作为免费、非商业展品分发。在 `web/` 目录构建：
+《潮汐书房 · 鲸鱼娘》1.1.0 使用 RealWorldBuilder 固定提交 `037ef10fbe6c368eb931c0c958b6283d25ef0fa2` 的 `games/whale-girl/`。新版包含窗边听潮、末班船回灯、自由镜头和故事话题。自由输入由上游本地 AI 服务提供，小伴分发包使用可离线体验的故事模式。模型保留 CC BY-NC-SA 4.0 和原作者署名，作为免费、非商业展品分发。在 `web/` 目录构建：
 
 ```sh
 node scripts/build-whale-girl-pack.mjs --source /path/to/RealWorldBuilder/games/whale-girl \

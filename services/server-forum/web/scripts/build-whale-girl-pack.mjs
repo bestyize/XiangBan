@@ -11,7 +11,7 @@ if (!values.source || !values.cover || !values.icon || !values.out) {
   throw new Error('用法：node scripts/build-whale-girl-pack.mjs --source <鲸鱼娘目录> --cover <WebP 封面> --icon <WebP 图标> --out <输出目录>')
 }
 
-const upstream = 'https://github.com/bestyize/RealWorldBuilder/tree/ebc9919e183f62eac0b24ad816982ec1e0fea66a/games/whale-girl'
+const upstream = 'https://github.com/bestyize/RealWorldBuilder/tree/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl'
 const runtime = new URL('../runtime-v2/', import.meta.url)
 const [source, license, threeLicense, bridge, css, adapter, cover, icon] = await Promise.all([
   readFile(join(values.source, 'preview.html')),
@@ -24,13 +24,15 @@ const [source, license, threeLicense, bridge, css, adapter, cover, icon] = await
   readFile(values.icon),
 ])
 const blob = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
-if (blob(source) !== '3d8f04d14d7d078fdd94ce32e59f6ac85996320d' ||
+if (blob(source) !== '534771c6f666bdc000105b6894d1c1aa19a22df2' ||
     blob(license) !== 'cbe5ad1670406e4402217edfb82d2c56af7e8631') {
   throw new Error(`作品预览或模型许可与固定版本不一致：${upstream}`)
 }
 
 // The Android offline CSP permits blob images but blocks ImageBitmapLoader's fetch(blob:).
 const bitmapLoaderChoice = /typeof createImageBitmap>"u"\|\|[^?]{1,60}(?=\?\(this\.textureLoader=new )/
+// The published player uses the upstream story topics without the local AI server.
+const localChatProbe = 'await fetch("./chat-status",{cache:"no-store",signal:AbortSignal.timeout(5e3)})'
 const bootstrap = `<script>
 document.currentScript.dataset.parentOrigin = location.hostname === 'res.xiangban.xyz' ? 'https://chat.xiangban.xyz' : location.origin;
 if (!window.xb) {
@@ -40,14 +42,15 @@ ${adapter}
 </script>`
 const html = source.toString('utf8')
   .replace(bitmapLoaderChoice, 'true')
+  .replace(localChatProbe, '{ok:false}')
   .replaceAll(/env\(safe-area-inset-(top|right|bottom|left)\)/g, 'var(--study-safe-$1)')
   .replace('</head>', () => `<!--\n${threeLicense}-->\n<style>\n${css}</style>\n${bootstrap}\n</head>`)
   .replace('<h2 id="credit-title">作品署名</h2>', '$&\n    <p>书房由 RealWorldBuilder 创作。小伴版适配了 V2 宿主，围裙上的 DeepSeek 标志归相应权利人所有。</p>')
 
 const manifest = {
   schemaVersion: 3, runtimeProtocol: 2, kind: 'game', id: 'whale-girl', name: '潮汐书房 · 鲸鱼娘',
-  description: '拜访月湾书房的溟月，看她读书、写信，从书页间发现藏品。',
-  version: '1.0.1', category: 'casual', entry: 'index.html', icon: 'icon.webp', cover: 'cover.webp',
+  description: '在月湾书房陪溟月听潮、翻书，点亮贝壳灯给末班船打招呼。',
+  version: '1.1.0', category: 'casual', entry: 'index.html', icon: 'icon.webp', cover: 'cover.webp',
   orientation: 'landscape', input: ['touch', 'mouse', 'keyboard'],
 }
 const files = {

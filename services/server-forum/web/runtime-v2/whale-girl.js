@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   for (const dialog of document.querySelectorAll('dialog')) {
     const button = dialog.querySelector('form[method="dialog"] button');
-    button.type = 'button';
-    button.addEventListener('click', () => dialog.close());
+    if (button) {
+      button.type = 'button';
+      button.addEventListener('click', () => dialog.close());
+    }
     dialog.addEventListener('close', () => {
       if (dialog !== activeDialog) return;
       activeDialog = null;

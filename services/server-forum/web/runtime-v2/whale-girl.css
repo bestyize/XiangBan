@@ -27,6 +27,11 @@
   padding-bottom: max(22px, var(--study-safe-bottom));
 }
 
+#tide-watch .chat-compose,
+#tide-watch .chat-error {
+  display: none;
+}
+
 @media (max-height: 480px) {
   .greeting-band { padding-bottom: max(6px, var(--study-safe-bottom)); }
 }
