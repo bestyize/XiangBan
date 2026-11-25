@@ -14,7 +14,9 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+#[cfg(not(target_os = "macos"))]
+use tauri::{PhysicalPosition, PhysicalSize};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub const LABEL: &str = "assistant";
@@ -26,8 +28,8 @@ pub const OPEN_MODES: &[&str] = &["voice", "type"];
 /// When answers are read aloud.
 pub const READ_MODES: &[&str] = &["voice", "always", "never"];
 
-/// The stage: one transparent window that holds the ball, the capsule and its card, in logical pixels. Going from
-/// the ball to the capsule and back is drawn inside it, so the native window never moves or resizes on the way.
+/// The stage: one transparent window that holds the ball, the capsule and its card, in logical pixels.
+/// Once it fits the display, the ball and capsule swap entirely inside that window.
 const WIDTH: f64 = 480.0;
 // The reply card keeps a fixed body height and scrolls, so the stage only needs room for the capsule's tallest
 // state (answer card, question block, attachment tray).
@@ -48,7 +50,7 @@ const BALL_BOTTOM_GAP: f64 = 160.0;
 /// The ball's position is saved this long after the last time it moved.
 const SAVE_AFTER_MOVE: Duration = Duration::from_millis(600);
 
-/// A rectangle in physical pixels.
+/// A rectangle in global AppKit points on macOS and physical pixels on Windows.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Area {
     x: i32,
@@ -63,6 +65,27 @@ impl Area {
     }
     fn right(&self) -> i32 {
         self.x + self.w
+    }
+    fn center(self) -> (f64, f64) {
+        (f64::from(self.x) + f64::from(self.w) / 2.0, f64::from(self.y) + f64::from(self.h) / 2.0)
+    }
+    fn contains(self, x: f64, y: f64) -> bool {
+        x >= f64::from(self.x) && x < f64::from(self.right())
+            && y >= f64::from(self.y) && y < f64::from(self.bottom())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Display {
+    bounds: Area,
+    work: Area,
+    scale: f64,
+    primary: bool,
+}
+
+impl Display {
+    fn ball_size(&self) -> i32 {
+        (BALL_WINDOW * self.scale).round() as i32
     }
 }
 
@@ -103,8 +126,7 @@ pub struct AssistantState {
     /// Where the capsule was left, for this run.
     moved: Mutex<Offset>,
     mode: Mutex<Mode>,
-    /// The ball's top-left corner in physical pixels as it was last seen, for this run. The saved offset in the
-    /// settings decides the first spot after a start.
+    /// The ball's center as last seen in this run, in the same coordinates as the displays.
     ball_at: Mutex<Option<(i32, i32)>>,
     move_tick: AtomicU64,
     saving: AtomicBool,
@@ -309,29 +331,59 @@ fn build(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
     Ok(window)
 }
 
-fn area_of(monitor: &tauri::Monitor) -> Area {
-    let area = monitor.work_area();
-    Area { x: area.position.x, y: area.position.y, w: area.size.width as i32, h: area.size.height as i32 }
+#[cfg(target_os = "macos")]
+fn available_displays(app: &tauri::AppHandle) -> Result<Vec<Display>, String> {
+    use objc2_app_kit::NSScreen;
+    use objc2_foundation::NSRect;
+
+    // A common point coordinate space works across screens with different backing scale factors.
+    crate::macos::on_main(app, |mtm| {
+        let screens = NSScreen::screens(mtm);
+        let primary_height = screens.firstObject().ok_or("没有找到显示器")?.frame().size.height;
+        let area = |frame: NSRect| {
+            let (x, y) = crate::widget_geometry::from_bottom_left(
+                primary_height, frame.origin.x, frame.origin.y, frame.size.height,
+            );
+            Area { x: x.round() as i32, y: y.round() as i32, w: frame.size.width.round() as i32, h: frame.size.height.round() as i32 }
+        };
+        Ok(screens.iter().enumerate().map(|(index, screen)| Display {
+            bounds: area(screen.frame()),
+            work: area(screen.visibleFrame()),
+            scale: 1.0,
+            primary: index == 0,
+        }).collect())
+    })
 }
 
-/// A monitor's full rectangle uses physical screen coordinates (not logical
-/// points or the work area, which excludes the Dock and menu bar).
-fn physical_monitor_area(monitor: &tauri::Monitor) -> Area {
-    let position = monitor.position();
-    let size = monitor.size();
-    Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 }
-}
-
-fn contains_physical_point(area: Area, x: f64, y: f64) -> bool {
-    x >= f64::from(area.x) && x < f64::from(area.x) + f64::from(area.w)
-        && y >= f64::from(area.y) && y < f64::from(area.y) + f64::from(area.h)
-}
-
-/// Tauri's monitor_from_point can return None for valid macOS/Retina physical
-/// coordinates. Enumerate physical monitor rectangles instead.
-fn monitor_at_physical_point(app: &tauri::AppHandle, x: f64, y: f64) -> Result<Option<tauri::Monitor>, String> {
+#[cfg(not(target_os = "macos"))]
+fn available_displays(app: &tauri::AppHandle) -> Result<Vec<Display>, String> {
+    let primary = app.primary_monitor().ok().flatten();
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
-    Ok(monitors.into_iter().find(|monitor| contains_physical_point(physical_monitor_area(monitor), x, y)))
+    let area = |position: &PhysicalPosition<i32>, size: &PhysicalSize<u32>| Area {
+        x: position.x, y: position.y, w: size.width as i32, h: size.height as i32,
+    };
+    Ok(monitors.iter().map(|monitor| {
+        let work = monitor.work_area();
+        Display {
+            bounds: area(monitor.position(), monitor.size()),
+            work: area(&work.position, &work.size),
+            scale: monitor.scale_factor(),
+            primary: primary.as_ref().is_some_and(|primary| primary.position() == monitor.position()),
+        }
+    }).collect())
+}
+
+fn display_at(displays: &[Display], x: f64, y: f64) -> Option<&Display> {
+    displays.iter().find(|display| display.bounds.contains(x, y))
+}
+
+fn display_for(displays: &[Display], point: Option<(f64, f64)>, page: Option<Area>) -> Result<&Display, String> {
+    let find = |(x, y)| display_at(displays, x, y);
+    point.and_then(find)
+        .or_else(|| page.and_then(|area| find(area.center())))
+        .or_else(|| displays.iter().find(|display| display.primary))
+        .or_else(|| displays.first())
+        .ok_or_else(|| "没有找到显示器".to_string())
 }
 
 /// The left edge and the bottom edge of a capsule `width` wide, for the given usable area and offset. It always stays
@@ -406,52 +458,57 @@ fn stage_for_capsule(area: Area, scale: f64, offset: Offset) -> Stage {
     Stage { rect: Area { x, y: bottom - height, w: width, h: height }, scale, ball: None, size: 0, right: false }
 }
 
-/// Where the ball is on the screen now, with its square size.
-fn ball_on_screen(stage: &Stage, x: i32, y: i32) -> Option<(i32, i32, i32)> {
-    stage.ball.map(|(dx, dy)| (x + dx, y + dy, stage.size))
-}
-
-/// The screen a physical point is on, else the window's, else the main one.
-fn screen_at(app: &tauri::AppHandle, window: Option<&WebviewWindow>, x: i32, y: i32) -> Result<tauri::Monitor, String> {
-    monitor_at_physical_point(app, f64::from(x), f64::from(y)).ok().flatten()
-        .or_else(|| window.and_then(|window| window.current_monitor().ok().flatten()))
-        .or_else(|| app.primary_monitor().ok().flatten())
-        .ok_or_else(|| "没有找到显示器".to_string())
+/// The page still paints the previous layout in CSS pixels after a drag, possibly at a new scale.
+fn ball_on_screen(stage: &Stage, page: Area, scale: f64) -> Option<(i32, i32, i32)> {
+    let (dx, dy) = stage.ball?;
+    let pixels = |value: i32| (f64::from(value) / stage.scale * scale).round() as i32;
+    Some((page.x + pixels(dx), page.y + pixels(dy), pixels(stage.size)))
 }
 
 /// The capsule's stage on the screen the pointer is on, at its default spot or where the user last left it.
 fn capsule_stage(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<Stage, String> {
-    let point = app.cursor_position().ok().map(|p| (p.x as i32, p.y as i32));
-    let monitor = match point {
-        Some((x, y)) => screen_at(app, Some(window), x, y)?,
-        None => screen_at(app, Some(window), i32::MIN, i32::MIN)?,
-    };
+    let displays = available_displays(app)?;
+    let display = display_for(&displays, crate::widgets::cursor(app).ok(), page_area(window))?;
     let offset = *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner());
-    Ok(stage_for_capsule(area_of(&monitor), monitor.scale_factor(), offset))
+    Ok(stage_for_capsule(display.work, display.scale, offset))
 }
 
 /// The ball's stage for where the ball should be now.
 fn ball_stage(app: &tauri::AppHandle) -> Result<Stage, String> {
-    let (x, y, size) = ball_target(app)?;
-    let monitor = screen_at(app, app.get_webview_window(LABEL).as_ref(), x + size / 2, y + size / 2)?;
-    Ok(stage_for_ball(area_of(&monitor), monitor.scale_factor(), x, y, size))
+    let displays = available_displays(app)?;
+    let seen = *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((x, y)) = seen {
+        if let Some(display) = display_at(&displays, f64::from(x), f64::from(y)) {
+            let size = display.ball_size();
+            return Ok(stage_for_ball(display.work, display.scale, x - size / 2, y - size / 2, size));
+        }
+    }
+    let display = display_for(&displays, None, None)?;
+    let size = display.ball_size();
+    let settings = crate::settings(app);
+    let offset = Offset { dx: settings.assistant_ball_dx, dy: settings.assistant_ball_dy };
+    let (x, y) = ball_anchor(display.work, display.scale, size, offset);
+    Ok(stage_for_ball(display.work, display.scale, x, y, size))
 }
 
-/// Gives the window the stage's rectangle and tells the page where the ball is. Only call it while nothing that
-/// would move is visible: the window hidden, or the page faded out for a re-anchor.
+/// Gives the window the stage's rectangle and tells the page where the ball is.
 fn set_stage(app: &tauri::AppHandle, window: &WebviewWindow, stage: Stage) -> Result<(), String> {
     let r = stage.rect;
     if page_area(window) != Some(r) {
-        // Move first so a window arriving on another screen takes that screen's scale before it is sized.
-        window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
-        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
-        window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
-        // Windows can retain a non-client frame. On macOS the move is queued on
-        // the main thread, so an immediate read can still report the previous position.
-        #[cfg(windows)]
-        if let Some(fixed) = page_area(window).and_then(|actual| allow_for_frame(r, actual)) {
-            window.set_size(PhysicalSize::new(fixed.w as u32, fixed.h as u32)).map_err(|e| e.to_string())?;
-            window.set_position(PhysicalPosition::new(fixed.x, fixed.y)).map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        crate::window_control::place(window, f64::from(r.x), f64::from(r.y), f64::from(r.w), f64::from(r.h))?;
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Move first so a window arriving on another screen takes that screen's scale before it is sized.
+            window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+            window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
+            window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+            // Windows can retain a non-client frame.
+            #[cfg(windows)]
+            if let Some(fixed) = page_area(window).and_then(|actual| allow_for_frame(r, actual)) {
+                window.set_size(PhysicalSize::new(fixed.w as u32, fixed.h as u32)).map_err(|e| e.to_string())?;
+                window.set_position(PhysicalPosition::new(fixed.x, fixed.y)).map_err(|e| e.to_string())?;
+            }
         }
     }
     *app.state::<AssistantState>().stage.lock().unwrap_or_else(|e| e.into_inner()) = Some(stage);
@@ -461,8 +518,24 @@ fn set_stage(app: &tauri::AppHandle, window: &WebviewWindow, stage: Stage) -> Re
 
 /// Where the page is on the screen: the window's client area, which is the whole window unless it has a frame.
 fn page_area(window: &WebviewWindow) -> Option<Area> {
-    let (position, size) = (window.inner_position().ok()?, window.inner_size().ok()?);
-    Some(Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 })
+    #[cfg(target_os = "macos")]
+    {
+        // The assistant has a borderless AppKit window, so the frame is the client area.
+        let (x, y, w, h) = crate::window_control::frame(window).ok()?;
+        Some(Area { x: x.round() as i32, y: y.round() as i32, w: w.round() as i32, h: h.round() as i32 })
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let (position, size) = (window.inner_position().ok()?, window.inner_size().ok()?);
+        Some(Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 })
+    }
+}
+
+fn page_scale(window: &WebviewWindow, stage_scale: f64) -> f64 {
+    #[cfg(target_os = "macos")]
+    { let _ = window; stage_scale }
+    #[cfg(not(target_os = "macos"))]
+    { window.scale_factor().unwrap_or(stage_scale) }
 }
 
 /// A non-client frame can only inset the page within the requested rectangle.
@@ -509,14 +582,25 @@ fn settle_ball(app: &tauri::AppHandle) {
     let state = app.state::<AssistantState>();
     if mode(app) != Mode::Ball || state.dragging.load(Ordering::SeqCst) { return; }
     let Some(window) = app.get_webview_window(LABEL) else { return };
-    let (Some(stage), Ok(position)) = (current_stage(app), window.inner_position()) else { return };
-    let Some((x, y, size)) = ball_on_screen(&stage, position.x, position.y) else { return };
-    let Ok(monitor) = screen_at(app, Some(&window), x + size / 2, y + size / 2) else { return };
-    let scale = monitor.scale_factor();
-    let size = (BALL_WINDOW * scale).round() as i32;
-    let area = area_of(&monitor);
-    let placed = Stage { rect: Area { x: position.x, y: position.y, ..stage.rect }, ..stage };
-    if !still_fits(&placed, area, scale, x, y, size) { reanchor::begin(app, stage_for_ball(area, scale, x, y, size)); }
+    if let Ok(Some(stage)) = refit_ball_stage(app, &window) { reanchor::begin(app, stage); }
+}
+
+fn refit_ball_stage(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<Option<Stage>, String> {
+    let (Some(stage), Some(page)) = (current_stage(app), page_area(window)) else {
+        return ball_stage(app).map(Some);
+    };
+    fit_ball_stage(stage, page, page_scale(window, stage.scale), &available_displays(app)?)
+}
+
+fn fit_ball_stage(stage: Stage, page: Area, scale: f64, displays: &[Display]) -> Result<Option<Stage>, String> {
+    let Some((x, y, drawn_size)) = ball_on_screen(&stage, page, scale) else { return Ok(None) };
+    let center = (x + drawn_size / 2, y + drawn_size / 2);
+    let display = display_for(displays, Some((f64::from(center.0), f64::from(center.1))), Some(page))?;
+    let size = display.ball_size();
+    let (x, y) = (center.0 - size / 2, center.1 - size / 2);
+    let placed = Stage { rect: page, ..stage };
+    Ok((!still_fits(&placed, display.work, display.scale, x, y, size))
+        .then(|| stage_for_ball(display.work, display.scale, x, y, size)))
 }
 
 /// Whether a stage that has been moved still works where the ball now is: same screen scale, opening toward the
@@ -525,8 +609,10 @@ fn settle_ball(app: &tauri::AppHandle) {
 fn still_fits(stage: &Stage, area: Area, scale: f64, x: i32, y: i32, size: i32) -> bool {
     let r = stage.rect;
     let slack = (2.0 * scale).round() as i32;
+    let (width, height) = stage_size(area, scale, size);
     (stage.scale - scale).abs() < 0.01
         && stage.size == size
+        && (r.w - width).abs() <= slack && (r.h - height).abs() <= slack
         && stage.right == (x + size / 2 >= area.x + area.w / 2)
         && r.x >= area.x - slack && r.y >= area.y - slack && r.right() <= area.right() + slack && r.bottom() <= area.bottom() + slack
         && x >= r.x && y >= r.y && x + size <= r.right() && y + size <= r.bottom()
@@ -534,12 +620,9 @@ fn still_fits(stage: &Stage, area: Area, scale: f64, x: i32, y: i32, size: i32) 
 
 /// Remembers where the user left the capsule, so the next time it opens it is there and not back at the default.
 fn remember(app: &tauri::AppHandle, window: &WebviewWindow) {
-    let (Ok(position), Ok(size), Ok(Some(monitor)), Ok(scale)) =
-        (window.inner_position(), window.inner_size(), window.current_monitor(), window.scale_factor())
-    else {
-        return;
-    };
-    let offset = offset_of(area_of(&monitor), scale, position.x, size.width as i32, position.y + size.height as i32);
+    let (Some(page), Ok(displays)) = (page_area(window), available_displays(app)) else { return };
+    let Ok(display) = display_for(&displays, None, Some(page)) else { return };
+    let offset = offset_of(display.work, display.scale, page.x, page.w, page.bottom());
     *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner()) = offset;
 }
 
@@ -576,25 +659,6 @@ fn announce(app: &tauri::AppHandle, window: &WebviewWindow) {
         Mode::Ball => { let _ = window.emit("assistant-close", ()); }
         Mode::Hidden => {}
     }
-}
-
-/// Where the ball goes: where it was last seen on a screen that still exists, else the saved offset on the main screen.
-fn ball_target(app: &tauri::AppHandle) -> Result<(i32, i32, i32), String> {
-    let seen = *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((x, y)) = seen {
-        if let Ok(Some(monitor)) = monitor_at_physical_point(app, f64::from(x) + 1.0, f64::from(y) + 1.0) {
-            let size = (BALL_WINDOW * monitor.scale_factor()).round() as i32;
-            let (x, y) = keep_inside(area_of(&monitor), x, y, size);
-            return Ok((x, y, size));
-        }
-    }
-    let monitor = app.primary_monitor().ok().flatten().ok_or("没有找到显示器")?;
-    let scale = monitor.scale_factor();
-    let size = (BALL_WINDOW * scale).round() as i32;
-    let settings = crate::settings(app);
-    let offset = Offset { dx: settings.assistant_ball_dx, dy: settings.assistant_ball_dy };
-    let (x, y) = ball_anchor(area_of(&monitor), scale, size, offset);
-    Ok((x, y, size))
 }
 
 /// A new opening or closing: any delayed step of an earlier one is dropped.
@@ -656,14 +720,23 @@ pub fn expand(app: &tauri::AppHandle, peek: bool) -> Result<(), String> {
         return Ok(());
     }
     let window = window(app)?;
-    match mode(app) {
-        Mode::Capsule => {
-            if !peek && state.peek.swap(false, Ordering::SeqCst) { window.set_focus().map_err(|e| e.to_string())?; }
-            return Ok(());
+    let was = mode(app);
+    if was == Mode::Capsule {
+        if !peek && state.peek.swap(false, Ordering::SeqCst) {
+            // A click arriving just after a hover-open should also cancel auto-close in the page.
+            announce(app, &window);
+            window.set_focus().map_err(|e| e.to_string())?;
         }
+        return Ok(());
+    }
+    next_turn(app);
+    crate::window_control::apply_saved(app, &window, "topmost")?;
+    match was {
         Mode::Ball if current_stage(app).is_some_and(|stage| stage.ball.is_some()) => {
-            // The ball may have been moved a moment ago; keep that spot for when it comes back. The window stays
-            // exactly where it is: the page turns the ball into the capsule inside it.
+            // A click can beat the refit scheduled after drag, or arrive after the work area has changed.
+            if let Some(stage) = refit_ball_stage(app, &window)? {
+                set_stage(app, &window, stage)?;
+            }
             save_ball(app, &window);
         }
         _ => {
@@ -672,14 +745,14 @@ pub fn expand(app: &tauri::AppHandle, peek: bool) -> Result<(), String> {
             set_stage(app, &window, capsule_stage(app, &window)?)?;
         }
     }
-    next_turn(app);
+    window.show().map_err(|e| e.to_string())?;
     state.peek.store(peek, Ordering::SeqCst);
     state.dragged_open.store(false, Ordering::SeqCst);
     set_mode(app, Mode::Capsule);
-    crate::window_control::apply_saved(app, &window, "topmost")?;
-    window.show().map_err(|e| e.to_string())?;
-    if !peek { window.set_focus().map_err(|e| e.to_string())?; }
     announce(app, &window);
+    if !peek {
+        if let Err(error) = window.set_focus() { eprintln!("超级小伴：{error}"); }
+    }
     Ok(())
 }
 
@@ -757,17 +830,16 @@ fn save_ball(app: &tauri::AppHandle, window: &WebviewWindow) {
     if mode(app) != Mode::Ball {
         return;
     }
-    let Some((x, y, size)) = ball_rect(app, window) else { return };
+    let (Some(stage), Some(page)) = (current_stage(app), page_area(window)) else { return };
+    let Some((x, y, drawn_size)) = ball_on_screen(&stage, page, page_scale(window, stage.scale)) else { return };
     // The stage may reach onto another screen; the ball belongs to the one under its centre.
-    let Ok(monitor) = screen_at(app, Some(window), x + size / 2, y + size / 2) else { return };
-    *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((x, y));
-    persist_ball(app, ball_offset(area_of(&monitor), monitor.scale_factor(), size, x, y));
-}
-
-/// The ball's own square in physical pixels: where it sits in the stage, wherever the stage is now.
-fn ball_rect(app: &tauri::AppHandle, window: &WebviewWindow) -> Option<(i32, i32, i32)> {
-    let position = window.inner_position().ok()?;
-    ball_on_screen(&current_stage(app)?, position.x, position.y)
+    let (cx, cy) = (x + drawn_size / 2, y + drawn_size / 2);
+    let Ok(displays) = available_displays(app) else { return };
+    let Ok(display) = display_for(&displays, Some((f64::from(cx), f64::from(cy))), Some(page)) else { return };
+    let size = display.ball_size();
+    let (x, y) = keep_inside(display.work, cx - size / 2, cy - size / 2, size);
+    *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((x + size / 2, y + size / 2));
+    persist_ball(app, ball_offset(display.work, display.scale, size, x, y));
 }
 
 /// The window moved. A ball being dragged moves many times a second; its spot is saved once it has been still.
@@ -1092,19 +1164,19 @@ mod tests {
     }
 
     #[test]
-    fn physical_display_lookup_handles_retina_and_multiple_monitors() {
-        // Regression: Tauri's monitor_from_point returned None on macOS for
-        // physical coordinates on a Retina external monitor.
-        let external = Area { x: 0, y: 0, w: 3840, h: 2160 };
-        let laptop = Area { x: 350, y: 2160, w: 3024, h: 1964 };
-        let left = Area { x: -1920, y: 0, w: 1920, h: 1080 };
-        assert!(contains_physical_point(external, 1512.0, 534.0));
-        assert!(contains_physical_point(external, 3839.0, 2159.0));
-        assert!(!contains_physical_point(external, 3840.0, 10.0));
-        assert!(contains_physical_point(laptop, 500.0, 2774.0));
-        assert!(!contains_physical_point(external, 500.0, 2774.0));
-        assert!(contains_physical_point(left, -1.0, 300.0));
-        assert!(!contains_physical_point(left, 0.0, 300.0));
+    fn macos_display_lookup_uses_shared_points_for_retina_and_external_screens() {
+        let main = Display { bounds: Area { x: 0, y: 0, w: 1440, h: 900 }, work: SCREEN, scale: 1.0, primary: true };
+        let left = Display {
+            bounds: Area { x: -1920, y: -180, w: 1920, h: 1080 },
+            work: Area { x: -1920, y: -156, w: 1920, h: 1008 },
+            scale: 1.0,
+            primary: false,
+        };
+        let displays = [main, left];
+        assert_eq!(display_at(&displays, -1.0, 300.0).unwrap().bounds, left.bounds);
+        assert_eq!(display_at(&displays, 0.0, 300.0).unwrap().bounds, main.bounds);
+        assert_eq!(display_at(&displays, -1600.0, -170.0).unwrap().work, left.work);
+        assert_eq!(display_for(&displays, Some((2700.0, 0.0)), None).unwrap().bounds, main.bounds);
     }
 
     #[test]
@@ -1162,6 +1234,40 @@ mod tests {
         assert!(!still_fits(&left, SCREEN, 1.0, 40, by, 72));
         // Onto a screen with another scale.
         assert!(!still_fits(&stage, RETINA, 2.0, bx * 2, by * 2, 144));
+    }
+
+    #[test]
+    fn opening_after_a_cross_screen_drag_refits_around_the_ball_at_the_live_scale() {
+        let (x, y) = ball_anchor(SCREEN, 1.0, 72, Offset::default());
+        let stage = stage_for_ball(SCREEN, 1.0, x, y, 72);
+        let left = Display {
+            bounds: Area { x: -2400, y: -250, w: 2400, h: 1350 },
+            work: Area { x: -2400, y: -200, w: 2400, h: 1260 },
+            scale: 1.25,
+            primary: false,
+        };
+        let main = Display { bounds: SCREEN, work: SCREEN, scale: 1.0, primary: true };
+        let displays = [main, left];
+        let page = Area { x: -1890, y: -760, w: 600, h: 750 };
+        let fitted = fit_ball_stage(stage, page, left.scale, &displays).unwrap().unwrap();
+        assert_eq!(fitted.rect, Area { x: -1380, y: -200, w: 600, h: 750 });
+        assert!(!fitted.right);
+        assert_eq!(ball_on_screen(&fitted, fitted.rect, left.scale), Some((-1380, -110, 90)));
+        assert!(fit_ball_stage(fitted, fitted.rect, left.scale, &displays).unwrap().is_none());
+    }
+
+    #[test]
+    fn opening_refits_a_stage_when_the_work_area_shrinks() {
+        let stage = stage_for_ball(SCREEN, 1.0, 1320, 720, 72);
+        let small = Display {
+            bounds: Area { x: 0, y: 0, w: 800, h: 600 },
+            work: Area { x: 0, y: 25, w: 800, h: 530 },
+            scale: 1.0,
+            primary: true,
+        };
+        let fitted = fit_ball_stage(stage, stage.rect, 1.0, &[small]).unwrap().unwrap();
+        assert_eq!(fitted.rect, Area { x: 320, y: 25, w: 480, h: 530 });
+        assert_eq!(ball_on_screen(&fitted, fitted.rect, 1.0), Some((728, 483, 72)));
     }
 
     #[test]

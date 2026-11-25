@@ -245,6 +245,26 @@ describe('the folded ball', () => {
     const {wrapper}=folded({layout:{ball:null,right:true}});await nextTick();
     expect(wrapper.find('[data-testid="assistant-ball-stage"]').exists()).toBe(false);
   });
+  it('anchors the capsule to the clicked ball and refits its direction when the stage gets shorter', async () => {
+    const height = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
+    try {
+      const {store, wrapper} = folded({layout: {ball: {x: 0, y: 80, size: 72}, right: false}});
+      store.unfold.mockImplementationOnce(() => { store.open = true; store.ball = false; });
+      await wrapper.get('[data-testid="assistant-ball"]').trigger('click');
+      await flushPromises();
+      const capsule = wrapper.get<HTMLElement>('[data-testid="assistant"]');
+      expect(capsule.classes()).toEqual(expect.arrayContaining(['anchored', 'opens-down']));
+      expect(capsule.element.style.getPropertyValue('--ball-center-y')).toBe('116px');
+
+      height.mockReturnValue(200);
+      window.dispatchEvent(new Event('resize'));
+      await nextTick();
+      expect(capsule.classes()).toContain('anchored');
+      expect(capsule.classes()).not.toContain('opens-down');
+    } finally {
+      height.mockRestore();
+    }
+  });
   it('says a finished answer beside itself, toward the middle of the screen, for three seconds', async () => {
     vi.useFakeTimers();
     const {store,wrapper}=folded();await nextTick();

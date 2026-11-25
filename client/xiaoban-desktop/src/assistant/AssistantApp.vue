@@ -119,6 +119,12 @@ let fadeEnd: ReturnType<typeof setTimeout> | undefined;
 let movingFallback: ReturnType<typeof setTimeout> | undefined, movingGiveUp: ReturnType<typeof setTimeout> | undefined;
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore; dictation?: Dictation }>();
+const stageHeight = ref(window.innerHeight);
+const ballCenterY = computed(() => {
+  const ball = props.store.layout.ball;
+  return ball ? ball.y + ball.size / 2 : null;
+});
+const opensDown = computed(() => ballCenterY.value !== null && ballCenterY.value < stageHeight.value / 2);
 const orbLabel = computed(() => {
   if (props.store.phase === 'speaking') return '停止朗读';
   if (props.asr.listening) return '结束录音';
@@ -240,7 +246,9 @@ function pasteImages(event: ClipboardEvent) {
   const files = Array.from(event.clipboardData?.files ?? []);
   if (files.length) { event.preventDefault(); void addImages(files); }
 }
-const inner = ref<HTMLElement>();
+const composer = ref<HTMLElement>();
+const cardSurface = ref<HTMLElement>();
+const chips = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
 const dragging = ref(false);
@@ -475,13 +483,20 @@ function syncHitRegions(){
   void invoke('assistant_set_regions',{regions}).catch(()=>{lastRegions='';});
 }
 function queueHitRegions(){cancelAnimationFrame(hitRaf);hitRaf=requestAnimationFrame(syncHitRegions);}
-watch([sessionsOpen,()=>props.store.open,()=>props.store.ball,hasCard,chipsShown,bubbleLeft],()=>void nextTick(queueHitRegions));
+function onResize() {
+  stageHeight.value = window.innerHeight;
+  grow();
+  queueHitRegions();
+}
+watch([sessionsOpen,()=>props.store.open,()=>props.store.ball,()=>props.store.layout,hasCard,chipsShown,bubbleLeft],()=>void nextTick(queueHitRegions));
 
-// The window keeps its size; only the parts that take the mouse change with the content.
+// Content can resize inside the anchored panel without resizing the panel itself.
 let observer: ResizeObserver | undefined;
-watch(inner, el => {
-  observer?.disconnect();
-  if (el) { observer = new ResizeObserver(queueHitRegions); observer.observe(el); queueHitRegions(); }
+watch([composer, cardSurface, chips], elements => {
+  observer ??= new ResizeObserver(queueHitRegions);
+  observer.disconnect();
+  for (const element of elements) if (element) observer.observe(element);
+  queueHitRegions();
 });
 function toBottom() { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); }
 watch(() => props.store.open, open => {
@@ -584,7 +599,7 @@ const onFocus=()=>{
 };
 let unlistenAnnounce: (() => void) | undefined;
 onMounted(()=>{
-  void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);window.addEventListener('resize',grow);
+  void nextTick(queueHitRegions);window.addEventListener('resize',onResize);
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
   void (async () => {
     unlistenAnnounce = await listen<{ text: string }>('speech-announcement', payload => {
@@ -595,7 +610,7 @@ onMounted(()=>{
 onBeforeUnmount(()=>{
   unlistenAnnounce?.();
   stopMorph(); hover.cancel(); clearTimeout(peekTimer); clearTimeout(movingFallback); clearTimeout(movingGiveUp); clearTimeout(fadeEnd);
-  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);
+  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',onResize);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);
   window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();
 });
 </script>
@@ -622,9 +637,9 @@ onBeforeUnmount(()=>{
     </Transition>
     <!-- With a ball, the morph's stand-ins do the showing; the capsule must come and go in the same frame as them. -->
     <Transition name="pop" :css="!store.layout.ball" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
-      <div v-if="store.open || morph === 'collapse'" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
+      <div v-if="store.open || morph === 'collapse'" class="inner" :class="{ anchored: ballCenterY !== null, 'opens-down': opensDown }" :style="ballCenterY === null ? undefined : { '--ball-center-y': `${ballCenterY}px` }" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
-          <section v-if="hasCard" class="card" data-testid="assistant-card">
+          <section v-if="hasCard" ref="cardSurface" class="card" data-testid="assistant-card">
             <header class="card-head">
               <div ref="sessionsHost" class="session-host" data-no-drag>
                 <button type="button" class="session-title" :aria-expanded="sessionsOpen" aria-haspopup="menu" title="切换最近的会话" data-testid="assistant-sessions" @click="sessionsOpen = !sessionsOpen"><span>{{ store.title || '新对话' }}</span><ChevronDown :size="13" :stroke-width="2.2" /></button>
@@ -688,14 +703,14 @@ onBeforeUnmount(()=>{
             </div>
           </section>
         </Transition>
-        <div v-if="chipsShown || dictationShown || (Boolean(store.input.trim()) && store.open)" class="chips" data-testid="assistant-chips">
+        <div v-if="chipsShown || dictationShown || (Boolean(store.input.trim()) && store.open)" ref="chips" class="chips" data-testid="assistant-chips">
           <button v-if="dictationShown" type="button" class="chip" :class="{ 'is-on': dictation?.active }" data-testid="assistant-chip-dictation" :disabled="dictation?.starting" @click="toggleDictation"><Mic :size="14" :stroke-width="1.75" /><span class="chip-text">{{ dictationLabel }}</span></button>
           <button v-if="dictationShown && !dictation?.active" type="button" class="chip" data-testid="assistant-chip-dictation-target" title="换一个要送字的应用" @click="cycleDictationTarget"><span class="chip-text">换目标</span></button>
           <button v-if="store.input.trim() && store.open" type="button" class="chip" data-testid="assistant-chip-inject" @click="injectToDesktop"><ArrowUpRight :size="14" :stroke-width="1.75" /><span class="chip-text">送字到桌面版</span></button>
           <button v-if="continueTitle" type="button" class="chip" data-testid="assistant-chip-continue" @click="revealCard"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ continueTitle }}」</span></button>
           <button v-else-if="otherRecent" type="button" class="chip" data-testid="assistant-chip-recent" @click="continueOther(otherRecent.id)"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ otherRecent.title }}」</span></button>
         </div>
-        <div class="composer" :class="{ 'drop-active': dropActive }" :data-phase="store.phase" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
+        <div ref="composer" class="composer" :class="{ 'drop-active': dropActive }" :data-phase="store.phase" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
           <input ref="filePicker" class="sr" type="file" :accept="ATTACHMENT_ACCEPT" multiple tabindex="-1" aria-label="选择要发送的附件" data-testid="assistant-image-input" @change="onPick" @cancel="picking = false" />
           <div v-if="store.attachments.length" class="image-tray" data-no-drag data-testid="assistant-attachments">
             <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img v-if="attachmentImage(image)" :src="attachmentImage(image)!" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><span v-if="!attachmentImage(image)" class="file-chip" :title="attachmentName(image)">{{ attachmentName(image) }}</span><button type="button" :aria-label="`移除附件 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
@@ -776,13 +791,17 @@ button{font:inherit}
 
 /* Capsule */
 /* The native window is transparent and clips at its edges: shadows stay within this margin. */
-.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:14px 16px 20px}
-.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:26px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);transition:box-shadow .2s}
+.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;min-height:0;padding:14px 16px 20px}
+/* Align the single-line input with the ball, leaving the larger side of the stage for replies. */
+.inner.anchored{--capsule-half-height:26px;position:absolute;inset-inline:0;top:14px;bottom:max(12px,calc(100% - var(--ball-center-y) - var(--capsule-half-height)));justify-content:flex-end;padding-block:0}
+.inner.opens-down{top:max(12px,calc(var(--ball-center-y) - var(--capsule-half-height)));bottom:20px;flex-direction:column-reverse}
+.composer{pointer-events:auto;cursor:grab;position:relative;display:flex;flex:none;flex-direction:column;max-height:100%;border-radius:26px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);transition:box-shadow .2s}
 .stage.light .composer{box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.95)}
 .composer[data-phase=listening]{box-shadow:0 0 0 .5px var(--edge),0 0 0 4px var(--accent-soft),var(--shadow)}
 .composer[data-phase=attention]{box-shadow:0 0 0 1px #D98A0B80,var(--shadow)}
 .composer.drop-active{box-shadow:0 0 0 2px var(--accent),var(--shadow)}
-.capsule{display:flex;align-items:flex-end;gap:2px;padding:8px}
+.capsule{display:flex;flex:none;align-items:flex-end;gap:2px;padding:8px}
+.opens-down .capsule{order:-1}
 .orb-button{touch-action:none;flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:none;cursor:grab}
 .orb-button:disabled{opacity:.6}
 .field:placeholder-shown{overflow:hidden}
@@ -812,12 +831,12 @@ button{font:inherit}
 .live-end:hover{filter:brightness(1.1)}
 .live-mute:focus-visible,.live-end:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tool:focus-visible,.send:focus-visible,.orb-button:focus-visible,.head-btn:focus-visible,.chip:focus-visible,.session-title:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.image-tray{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;cursor:default}
+.image-tray{display:flex;gap:6px;flex-wrap:wrap;align-content:flex-start;min-height:0;overflow-y:auto;padding:10px 12px 0;cursor:default}
 .image-thumb{position:relative;flex:none;height:42px}
 .image-thumb img{width:56px;height:42px;object-fit:cover;border-radius:9px;box-shadow:0 0 0 .5px var(--edge)}
 .image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;box-sizing:border-box;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
 .file-chip{display:inline-flex;align-items:center;max-width:180px;height:42px;padding:0 12px;box-sizing:border-box;border-radius:9px;background:var(--control);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.image-status{margin:0;padding:0 18px 8px;font-size:11.5px;color:var(--text-3);cursor:default}
+.image-status{flex:none;margin:0;padding:0 18px 8px;font-size:11.5px;color:var(--text-3);cursor:default}
 
 /* Quick actions */
 .chips{pointer-events:none;display:flex;gap:8px;padding-left:4px}
@@ -830,8 +849,8 @@ button{font:inherit}
 .chip-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Card */
-.card{pointer-events:auto;position:relative;border-radius:18px;background:var(--glass-card);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);cursor:grab}
-.card-head{display:flex;align-items:center;gap:4px;height:44px;padding:0 8px 0 8px;border-bottom:1px solid var(--line)}
+.card{pointer-events:auto;position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden;border-radius:18px;background:var(--glass-card);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);cursor:grab}
+.card-head{display:flex;flex:none;align-items:center;gap:4px;height:44px;padding:0 8px 0 8px;border-bottom:1px solid var(--line)}
 .head-gap{flex:1}
 .session-host{position:relative;min-width:0}
 .session-title{display:inline-flex;align-items:center;gap:5px;max-width:220px;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
@@ -839,7 +858,7 @@ button{font:inherit}
 .session-title svg{flex:none;color:var(--text-3);transition:transform .15s}
 .session-title[aria-expanded=true] svg{transform:rotate(180deg)}
 .session-title:hover,.session-title[aria-expanded=true]{background:var(--hover)}
-.session-menu{max-height:340px;overflow-y:auto;padding:6px 8px 8px;box-sizing:border-box;cursor:default;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.session-menu{min-height:0;max-height:340px;overflow-y:auto;padding:6px 8px 8px;box-sizing:border-box;cursor:default;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .menu-label{margin:0;padding:6px 9px 3px;font-size:11.5px;color:var(--text-3)}
 .menu-empty{margin:0;padding:6px 9px;font-size:12.5px;color:var(--text-3)}
 .menu-item{display:flex;align-items:center;gap:9px;width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:13px;text-align:left;cursor:pointer}
@@ -854,7 +873,7 @@ button{font:inherit}
 .head-btn:hover:not(:disabled){background:var(--hover);color:var(--text)}
 .head-btn.on{background:var(--accent-soft);color:var(--accent-ink)}
 .head-btn:disabled{opacity:.4;cursor:default}
-.card-body{cursor:auto;display:flex;flex-direction:column;gap:12px;max-height:min(340px,calc(100vh - 250px));overflow-y:auto;padding:14px 16px 12px;box-sizing:border-box;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.card-body{cursor:auto;display:flex;flex-direction:column;gap:12px;min-height:0;max-height:340px;overflow-y:auto;padding:14px 16px 12px;box-sizing:border-box;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 /* While an answer streams the body keeps one height: the text grows inside it and scrolls,
    so the card, the composer and the native window do not resize while it arrives. */
 .card-body.fixed{height:340px}

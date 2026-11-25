@@ -31,8 +31,9 @@ pub(super) fn begin(app: &tauri::AppHandle, stage: Stage) {
         let _ = set_stage(app, &window, stage);
         return;
     }
-    // One at a time; the one under way looks again when it is done.
+    // One at a time. An opening can refit the stage before this fade finishes.
     if state.reanchor.active.swap(true, Ordering::SeqCst) { return; }
+    let turn = state.turn.load(Ordering::SeqCst);
     let id = state.reanchor.next.fetch_add(1, Ordering::SeqCst) + 1;
     let (tx, rx) = mpsc::channel();
     *state.reanchor.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, tx));
@@ -46,7 +47,7 @@ pub(super) fn begin(app: &tauri::AppHandle, stage: Stage) {
             state.reanchor.pending.lock().unwrap_or_else(|e| e.into_inner()).take();
             if let Some(window) = main.get_webview_window(LABEL) {
                 // Only a ball is moved this way; anything else that happened meanwhile placed the window itself.
-                if mode(&main) == Mode::Ball && !state.dragging.load(Ordering::SeqCst) {
+                if state.turn.load(Ordering::SeqCst) == turn && mode(&main) == Mode::Ball && !state.dragging.load(Ordering::SeqCst) {
                     if let Err(error) = set_stage(&main, &window, stage) { eprintln!("超级小伴：{error}"); }
                 }
                 let _ = window.emit("assistant-reanchor-done", json!({ "id": id }));
