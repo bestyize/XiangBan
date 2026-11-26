@@ -18,7 +18,6 @@ body {
 body.studio-dark { background: #0c0d10; color: #eceef2; }
 button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
 button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-button:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
 h1, h2, h3, h4, p { margin: 0; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
@@ -30,7 +29,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   background: rgba(255, 255, 255, .92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, .07);
+  border-bottom: 0;
   padding: 10px 20px;
   display: flex;
   flex-wrap: wrap;
@@ -61,7 +60,7 @@ body.studio-dark .seg button.active { background: #2a2c33; color: #f4f5f8; }
 body.studio-dark .swatches { background: rgba(255, 255, 255, .08); }
 .swatch { width: 14px; height: 14px; border-radius: 50%; position: relative; transition: transform .14s; }
 .swatch:hover { transform: scale(1.15); }
-.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 0; }
 
 .pill-btn {
   height: 32px;
@@ -71,7 +70,7 @@ body.studio-dark .swatches { background: rgba(255, 255, 255, .08); }
   font-weight: 500;
   background: rgba(255, 255, 255, .86);
   color: #32343a;
-  border: 1px solid rgba(0, 0, 0, .08);
+  border: 0;
   white-space: nowrap;
 }
 body.studio-dark .pill-btn { background: #1e2026; color: #dce0e8; border-color: rgba(255, 255, 255, .1); }
@@ -106,7 +105,7 @@ body.studio-dark .pane-head span.hint { color: #8f939e; }
   font-weight: 500;
   background: rgba(255, 255, 255, .82);
   color: #3a3d45;
-  border: 1px solid rgba(0, 0, 0, .08);
+  border: 0;
 }
 body.studio-dark .pane-mini-btn { background: #202229; color: #d5d9e2; border-color: rgba(255, 255, 255, .1); }
 
@@ -128,18 +127,18 @@ body[data-device="mobile"] .pc-pane { display: none; }
   --line: #e4e4e4;
   --ring: rgba(0, 0, 0, .06);
   --accent: #e3203c;
-  --accent-soft: #fff3f4;
-  --accent-soft-line: #f5c7cd;
+
+
   --accent-ink: #e3203c;
-  --success: #2fa36b;
-  --success-soft: #eaf6f0;
-  --success-line: #bfe4d1;
+  --success: var(--ink);
+  --success-soft: var(--fill);
+  --success-line: var(--line);
   --danger: #e3203c;
-  --danger-soft: #fff3f4;
+  --danger-soft: var(--fill);
   --danger-line: #f5c7cd;
   --scrim: rgba(15, 16, 20, .44);
   --sheet-shadow: 0 -6px 28px rgba(0, 0, 0, .10);
-  --modal-shadow: 0 24px 64px rgba(15, 18, 28, .22), 0 0 0 1px rgba(0, 0, 0, .05);
+  --modal-shadow: 0 24px 64px rgba(15, 18, 28, .22);
   color: var(--ink);
 }
 .ui-scope.dark {
@@ -153,15 +152,15 @@ body[data-device="mobile"] .pc-pane { display: none; }
   --fill-hover: #353538;
   --line: #363639;
   --ring: rgba(255, 255, 255, .10);
-  --success: #45be83;
-  --success-soft: #1a3126;
-  --success-line: #28523d;
+  --success: var(--ink);
+  --success-soft: var(--fill);
+  --success-line: var(--line);
   --danger: #ff6369;
-  --danger-soft: #361e22;
+  --danger-soft: var(--fill);
   --danger-line: #5a2b33;
   --scrim: rgba(0, 0, 0, .62);
   --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .56);
-  --modal-shadow: 0 28px 72px rgba(0, 0, 0, .64), 0 0 0 1px rgba(255, 255, 255, .09);
+  --modal-shadow: 0 28px 72px rgba(0, 0, 0, .64);
 }
 
 /* ─── PC Browser Shell (Matches community-redesign / web-profile-suite) ─── */
@@ -170,7 +169,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   border-radius: 16px;
   overflow: hidden;
   background: var(--paper);
-  border: 1px solid rgba(0, 0, 0, .08);
+  border: 0;
   box-shadow: 0 22px 54px rgba(15, 20, 30, .10);
   height: 780px;
   display: flex;
@@ -185,7 +184,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   height: 40px;
   flex: none;
   background: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: 0;
   padding: 0 14px;
   display: flex;
   align-items: center;
@@ -196,14 +195,14 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .traffic i { width: 10px; height: 10px; border-radius: 50%; display: block; background: var(--line); }
 .traffic i:nth-child(1) { background: #ff5f57; }
 .traffic i:nth-child(2) { background: #febc2e; }
-.traffic i:nth-child(3) { background: #28c840; }
+.traffic i:nth-child(3) { background: #828282; }
 .url-bar {
   flex: 1;
   max-width: 420px;
   height: 26px;
   border-radius: 7px;
   background: var(--paper);
-  border: 1px solid var(--hairline);
+  border: 0;
   padding: 0 10px;
   display: flex;
   align-items: center;
@@ -228,7 +227,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   width: 68px;
   flex: none;
   background: var(--surface);
-  border-right: 1px solid var(--hairline);
+  border-right: 0;
   padding: 16px 0;
   display: flex;
   flex-direction: column;
@@ -288,7 +287,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   flex: none;
   padding: 0 24px;
   background: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -326,7 +325,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .pc-top-btn.subtle-outline {
   background: var(--surface);
   color: var(--ink);
-  border: 1px solid var(--line);
+  border: 0;
 }
 .pc-top-btn.subtle-outline:hover { background: var(--fill); }
 .pc-top-btn svg { width: 15px; height: 15px; }
@@ -341,7 +340,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   margin: 0 auto;
   background: var(--surface);
   border-radius: 16px;
-  border: 1px solid var(--hairline);
+  border: 0;
   padding: 24px 28px;
 }
 .pc-art-author { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
@@ -355,7 +354,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .pc-art-foot {
   margin-top: 22px;
   padding-top: 16px;
-  border-top: 1px solid var(--hairline);
+  border-top: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -398,7 +397,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .pc-modal-head {
   height: 54px;
   padding: 0 18px 0 22px;
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -435,7 +434,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 /* Left Preview Stage */
 .pc-card-stage {
   background: var(--paper);
-  border-right: 1px solid var(--hairline);
+  border-right: 0;
   padding: 20px 20px 18px;
   display: flex;
   flex-direction: column;
@@ -459,7 +458,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 5px 11px;
   border-radius: 99px;
   background: var(--surface);
-  border: 1px solid var(--hairline);
+  border: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
 }
 .pc-tone-dots { display: inline-flex; align-items: center; gap: 7px; padding: 0 2px; }
@@ -467,14 +466,14 @@ body[data-device="mobile"] .pc-pane { display: none; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid rgba(0, 0, 0, .14);
+  border: 0;
   transition: transform .14s ease;
 }
 .browser.dark .pc-tone-dot { border-color: rgba(255, 255, 255, .24); }
 .pc-tone-dot:hover { transform: scale(1.12); }
 .pc-tone-dot.active {
   border-color: var(--ink);
-  box-shadow: 0 0 0 2px var(--fill);
+  box-shadow: none;
 }
 .pc-tone-dot.t-white { background: #ffffff; }
 .pc-tone-dot.t-warm { background: #f3e8d5; }
@@ -521,7 +520,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 4px 4px 4px 12px;
   border-radius: 12px;
   background: var(--paper);
-  border: 1px solid var(--hairline);
+  border: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -541,7 +540,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 0 12px;
   border-radius: 8px;
   background: var(--surface);
-  border: 1px solid var(--hairline);
+  border: 0;
   color: var(--ink);
   font-size: 12px;
   font-weight: 600;
@@ -569,7 +568,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 13px 13px 12px;
   border-radius: 14px;
   background: var(--paper);
-  border: 1px solid var(--hairline);
+  border: 0;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -603,7 +602,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   height: 34px;
   border-radius: 10px;
   background: var(--surface);
-  border: 1px solid var(--hairline);
+  border: 0;
   color: var(--ink);
   display: grid;
   place-items: center;
@@ -615,7 +614,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 /* Secondary Action List */
 .pc-more-list {
   border-radius: 14px;
-  border: 1px solid var(--hairline);
+  border: 0;
   background: var(--surface);
   overflow: hidden;
 }
@@ -629,7 +628,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   text-align: left;
   transition: background .14s;
 }
-.pc-more-row + .pc-more-row { border-top: 1px solid var(--hairline); }
+.pc-more-row + .pc-more-row { border-top: 0; }
 .pc-more-row:hover { background: var(--paper); }
 .pc-mr-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .pc-mr-ico {
@@ -653,7 +652,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 /* PC Author Danger Footer (Single-step inline confirm) */
 .pc-author-foot {
   padding-top: 12px;
-  border-top: 1px solid var(--hairline);
+  border-top: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -723,7 +722,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .share-card.theme-white {
   background: #ffffff;
   color: #1f2024;
-  border: 1px solid rgba(0, 0, 0, .06);
+  border: 0;
   --sc-muted: #6e7078;
   --sc-soft: #f4f4f6;
   --sc-line: #ececef;
@@ -733,7 +732,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .share-card.theme-warm {
   background: #f8f4ec;
   color: #2b231c;
-  border: 1px solid rgba(160, 130, 95, .18);
+  border: 0;
   --sc-muted: #7c6f62;
   --sc-soft: #efe8dc;
   --sc-line: #e5dccd;
@@ -743,7 +742,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .share-card.theme-ink {
   background: #1c1d22;
   color: #f2f2f5;
-  border: 1px solid rgba(255, 255, 255, .11);
+  border: 0;
   --sc-muted: #989aa4;
   --sc-soft: #27282e;
   --sc-line: #2d2e35;
@@ -778,7 +777,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.share-card.theme-white .sc-excerpt { border-left-color: var(--accent-soft-line); }
+.share-card.theme-white .sc-excerpt { border-left-color: var(--sc-line); }
 .share-card.theme-warm .sc-excerpt { border-left-color: #d8cbb8; }
 .share-card.theme-ink .sc-excerpt { border-left-color: rgba(255, 255, 255, .20); }
 .sc-author { margin-top: 11px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--sc-muted); }
@@ -786,7 +785,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .sc-footer {
   margin-top: 13px;
   padding-top: 11px;
-  border-top: 1px dashed var(--sc-line);
+  border-top: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -803,7 +802,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   background: var(--sc-qr-bg);
   color: var(--sc-qr-ink);
   flex: none;
-  border: 1px solid rgba(0, 0, 0, .06);
+  border: 0;
 }
 .sc-qr svg { width: 100%; height: 100%; stroke: none; fill: currentColor; }
 
@@ -818,12 +817,12 @@ body[data-device="mobile"] .pc-pane { display: none; }
   flex-direction: column;
   overflow: hidden;
   border: 6px solid #ffffff;
-  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11);
   isolation: isolate;
 }
 .phone.dark {
   border-color: #242428;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
 }
 .status-bar {
   height: 36px;
@@ -840,7 +839,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 }
 .status-right { display: flex; align-items: center; gap: 6px; }
 .status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
-.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 0; background: var(--fill-hover); border-radius: 3px; position: relative; }
 .bat::before { content: ""; display: block; width: 78%; height: 100%; border-radius: 1.5px; background: var(--ink); }
 .bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
 
@@ -854,7 +853,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   gap: 5px;
   font-size: 11px;
   color: var(--ink3);
-  border-bottom: 0.5px solid var(--hairline);
+  border-bottom: 0;
 }
 .h5-browser-strip svg { width: 11px; height: 11px; }
 
@@ -928,7 +927,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   height: 52px;
   padding: 8px 14px;
   background: var(--surface);
-  border-top: 0.5px solid var(--hairline);
+  border-top: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -963,7 +962,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--paper);
-  border: 1px solid var(--hairline);
+  border: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -977,7 +976,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   display: grid;
   place-items: center;
 }
-.ctx-thumb.text-emblem { background: var(--fill); border: 1px solid var(--hairline); color: var(--ink2); }
+.ctx-thumb.text-emblem { background: var(--fill); border: 0; color: var(--ink2); }
 .ctx-thumb.text-emblem svg { width: 19px; height: 19px; }
 .ctx-thumb.repo-emblem { background: #6965db; color: #fff; font-size: 17px; font-weight: 700; }
 .ctx-thumb.daily-emblem { background: linear-gradient(135deg, #1f2430 0%, #3a4258 100%); color: #fff; }
@@ -1050,7 +1049,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 
 .action-item.primary .action-tile { background: var(--fill); color: var(--ink); }
 .action-item.primary .action-label { color: var(--ink); font-weight: 500; }
-.action-item.copied .action-tile { background: var(--success-soft); border: 1px solid var(--success-line); color: var(--success); }
+.action-item.copied .action-tile { background: var(--success-soft); border: 0; color: var(--success); }
 .action-item.copied .action-label { color: var(--success); font-weight: 600; }
 .action-item.danger .action-tile { background: var(--fill); color: var(--danger); }
 .action-item.danger:hover .action-tile { background: var(--danger-soft); }
@@ -1061,17 +1060,17 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 18px 16px 14px;
   border-radius: 14px;
   background: var(--paper);
-  border: 1px solid var(--hairline);
+  border: 0;
   text-align: center;
 }
 .confirm-box strong { display: block; font-size: 15.5px; font-weight: 650; color: var(--ink); }
 .confirm-box p { margin-top: 5px; font-size: 12.5px; color: var(--ink2); }
 .confirm-actions { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .confirm-cancel, .confirm-delete { height: 40px; border-radius: 99px; font-size: 14px; font-weight: 600; display: grid; place-items: center; }
-.confirm-cancel { background: var(--surface); border: 1px solid var(--hairline); color: var(--ink2); }
+.confirm-cancel { background: var(--surface); border: 0; color: var(--ink2); }
 .confirm-delete { background: var(--danger-soft); color: var(--danger); }
 
-.sheet-cancel-band { margin-top: 14px; border-top: 6px solid var(--paper); background: var(--surface); }
+.sheet-cancel-band { margin-top: 20px; border: 0; background: var(--surface); }
 .sheet-cancel { width: 100%; height: 48px; display: grid; place-items: center; font-size: 15px; font-weight: 500; color: var(--ink2); transition: background .15s; }
 .sheet-cancel:hover { background: var(--paper); }
 .home-bar { height: 18px; background: var(--surface); display: flex; align-items: center; justify-content: center; }
@@ -1110,12 +1109,12 @@ body[data-device="mobile"] .pc-pane { display: none; }
   padding: 6px 12px;
   border-radius: 99px;
   background: rgba(255, 255, 255, .10);
-  border: 1px solid rgba(255, 255, 255, .12);
+  border: 0;
 }
 .tone-dots { display: inline-flex; align-items: center; gap: 9px; padding: 0 2px; }
-.tone-dot { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .36); transition: transform .15s ease; }
+.tone-dot { width: 20px; height: 20px; border-radius: 50%; border: 0; transition: transform .15s ease; }
 .tone-dot:hover { transform: scale(1.1); }
-.tone-dot.active { border-color: #ffffff; box-shadow: 0 0 0 2.5px rgba(255, 255, 255, .28); }
+.tone-dot.active { border-color: #ffffff; box-shadow: none; }
 .tone-dot.t-white { background: #ffffff; }
 .tone-dot.t-warm { background: #f3e8d5; }
 .tone-dot.t-ink { background: #1d1e24; }
@@ -1150,7 +1149,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
   height: 54px;
   border-radius: 18px;
   background: rgba(255, 255, 255, .13);
-  border: 1px solid rgba(255, 255, 255, .14);
+  border: 0;
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -1190,7 +1189,7 @@ body[data-device="mobile"] .pc-pane { display: none; }
 .spec-card {
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid rgba(0, 0, 0, .06);
+  border: 0;
   padding: 18px 20px;
 }
 body.studio-dark .spec-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
@@ -1205,9 +1204,46 @@ body.studio-dark .spec-item p { color: #989ba4; }
 @media (max-width: 1120px) { .spec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
   .pc-modal-body { grid-template-columns: 1fr; }
-  .pc-card-stage { border-right: 0; border-bottom: 1px solid var(--hairline); }
+  .pc-card-stage { border-right: 0; border-bottom: 0; }
   .spec-grid { grid-template-columns: 1fr; }
 }
+[hidden] { display: none !important; }
+.work-cover { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ui-scope .solid-device { fill: currentColor; stroke: none; }
+.pc-more-list { display: grid; gap: 2px; overflow: visible; }
+.pc-more-row { padding: 11px 8px; border-radius: 9px; }
+.action-item.client-action { width: 96px; }
+:is(.tone-dot,.pc-tone-dot,.swatch).active::after {
+  content: ""; position: absolute; inset: 25% 19%; background: #272727; border: 0;
+  clip-path: polygon(0 49%,15% 32%,39% 56%,84% 0,100% 14%,41% 93%);
+}
+.tone-dot,.pc-tone-dot { position: relative; }
+:is(.t-ink,.swatch).active::after { background: white; }
+.ui-scope { --focus-bg: #292929; --focus-ink: #fff; }
+.ui-scope.dark { --focus-bg: #e9e9e9; --focus-ink: #181818; }
+button:focus-visible, a:focus-visible { outline: 0; background: var(--focus-bg,#292929); color: var(--focus-ink,#fff); }
+.ui-scope :is(.pc-more-row,.action-item,.pc-export-tile):focus-visible { --ink:#fff; --ink2:#fff; --ink3:#ddd; --fill:#454545; background:#292929; color:white; border-radius:10px; }
+.pc-tone-dot:focus-visible,.tone-dot:focus-visible,.swatch:focus-visible { filter:drop-shadow(0 4px 1px #777); }
+.runtime-preview { flex:1; display:grid; grid-template: auto minmax(0,1fr) / minmax(0,1fr); min-height:0; background:var(--surface); }
+.runtime-bar { display:flex; align-items:center; gap:4px; padding:0 6px 0 12px; height:48px; color:var(--ink); }
+.runtime-icon { display:grid; place-items:center; width:26px; height:26px; }
+.runtime-bar svg { width:17px; height:17px; }
+.runtime-bar h3 { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:14px; }
+.runtime-bar button { display:grid; place-items:center; min-width:40px; min-height:44px; border:0; border-radius:8px; }
+.runtime-bar button:hover { background:var(--fill); }
+.runtime-bar .runtime-open { display:flex; min-width:0; padding:0 4px; }
+.runtime-open span { display:inline-flex; gap:6px; align-items:center; white-space:nowrap; font-size:12.5px; font-weight:650; }
+.runtime-open svg { width:15px; height:15px; }
+.runtime-scene { min-height:0; background:#171717; }
+.runtime-scene img { width:100%; height:100%; display:block; object-fit:cover; }
+.runtime-preview:fullscreen { width:100vw; height:100dvh; }
+.client-hint { position:absolute; z-index:65; right:12px; bottom:22px; display:flex; align-items:center; gap:10px; border:0; border-radius:10px; padding:6px 12px; background:#292929; color:white; font-size:13px; }
+.client-hint a,.client-hint button { display:inline-flex; align-items:center; min-height:32px; color:white; }
+.client-hint :is(a,button):focus-visible { background:white; color:#292929; }
+.h5-pane { max-width:100%; }
+.phone .runtime-bar { gap:2px; padding-inline:6px; }
+.phone .runtime-bar button:not(.runtime-open) { width:44px; }
+@media(max-width:480px) { .stage { padding:8px; } .runtime-bar h3 { font-size:13px; } }
 </style>
 </head>
 <body data-device="both">
@@ -1238,6 +1274,7 @@ body.studio-dark .spec-item p { color: #989ba4; }
       <button type="button" data-role="guest" class="active">客态</button>
       <button type="button" data-role="author">主态（作者）</button>
     </div>
+    <button type="button" class="pill-btn" id="work-view" hidden>查看 V2 运行页</button>
     <div class="swatches" id="swatches" aria-label="分享图主题色"></div>
     <button type="button" class="pill-btn" id="dark-toggle">切换深色</button>
   </div>
@@ -1277,7 +1314,7 @@ body.studio-dark .spec-item p { color: #989ba4; }
       </div>
       <div class="spec-item">
         <strong>面板纯中性 + 分享图保留主题色</strong>
-        <p>PC 右栏操作区、H5 底部抽屉与手机 App 分享面板均采用纯黑白灰中性色阶（仅已复制切语义绿、主态删除用语义红）；主题色只克制用于分享图内的品牌徽标与白卡摘录竖线，保证导出的分享图仍有清晰的小伴品牌辨识度。</p>
+        <p>PC 右栏操作区、H5 底部抽屉与手机 App 分享面板均采用纯黑白灰中性色阶（复制完成显示勾选和文字，主态删除用语义红）；主题色只克制用于分享图内的品牌徽标与分享图标记，保证导出的分享图仍有清晰的小伴品牌辨识度。</p>
       </div>
       <div class="spec-item">
         <strong>单组件复用（DetailShareDialog.vue）</strong>
@@ -1287,14 +1324,15 @@ body.studio-dark .spec-item p { color: #989ba4; }
   </div>
 </section>
 
+<script src="./community-redesign/works.js"></script>
 <script>
 const THEMES = [
-  { id: 'red',      name: '小伴红', accent: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', darkSoft: '#351c22', darkLine: '#5c2934' },
-  { id: 'green',    name: '青竹绿', accent: '#1f9d63', soft: '#edf8f2', line: '#bde6cf', darkSoft: '#163024', darkLine: '#24523d' },
-  { id: 'blue',     name: '海湾蓝', accent: '#2563eb', soft: '#eff4ff', line: '#c5d8ff', darkSoft: '#1a2742', darkLine: '#2a4170' },
-  { id: 'purple',   name: '星云紫', accent: '#7c3aed', soft: '#f4f0ff', line: '#d8c9ff', darkSoft: '#281f3d', darkLine: '#44336b' },
-  { id: 'amber',    name: '暖阳橙', accent: '#d97706', soft: '#fff6e8', line: '#f5d9a8', darkSoft: '#362714', darkLine: '#5c411e' },
-  { id: 'graphite', name: '石墨灰', accent: '#3f444d', soft: '#f2f3f5', line: '#d6d9df', darkSoft: '#292c32', darkLine: '#424752' }
+  { id: 'red',      name: '小伴红', accent: '#e3203c' },
+  { id: 'green',    name: '青竹绿', accent: '#1f9d63' },
+  { id: 'blue',     name: '海湾蓝', accent: '#2563eb' },
+  { id: 'purple',   name: '星云紫', accent: '#7c3aed' },
+  { id: 'amber',    name: '暖阳橙', accent: '#d97706' },
+  { id: 'graphite', name: '石墨灰', accent: '#3f444d' }
 ];
 
 const SCENES = {
@@ -1381,6 +1419,10 @@ const SCENES = {
 };
 
 const ICONS = {
+  monitor: '<svg class="solid-device" viewBox="0 0 24 24"><path d="M4 3.5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6.5V20H17a1 1 0 0 1 0 2H7a1 1 0 0 1 0-2h3.5v-2.5H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2Z"/></svg>',
+  phone: '<svg class="solid-device" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M8 1.5h8a2.5 2.5 0 0 1 2.5 2.5v16a2.5 2.5 0 0 1-2.5 2.5H8a2.5 2.5 0 0 1-2.5-2.5V4A2.5 2.5 0 0 1 8 1.5ZM10.75 18.2a.85.85 0 0 0 0 1.7h2.5a.85.85 0 0 0 0-1.7Z"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></svg>',
+  expand: '<svg viewBox="0 0 24 24"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg>',
   spark: '<svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>',
   back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
@@ -1404,34 +1446,17 @@ const ICONS = {
   news: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/></svg>'
 };
 
-const COVER_SVG = `
-<svg class="cover-art" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
-  <defs>
-    <linearGradient id="bg-g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f4e6d4"/>
-      <stop offset="52%" stop-color="#e9d2ba"/>
-      <stop offset="100%" stop-color="#d4b596"/>
-    </linearGradient>
-    <radialGradient id="lamp-g" cx="72%" cy="28%" r="44%">
-      <stop offset="0%" stop-color="#fff8e3" stop-opacity=".95"/>
-      <stop offset="100%" stop-color="#fff8e3" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="400" height="220" fill="url(#bg-g)"/>
-  <circle cx="290" cy="64" r="95" fill="url(#lamp-g)"/>
-  <ellipse cx="200" cy="182" rx="126" ry="26" fill="#c79e78" opacity=".45"/>
-  <ellipse cx="200" cy="176" rx="92" ry="18" fill="#8fa883" opacity=".82"/>
-  <ellipse cx="192" cy="136" rx="44" ry="38" fill="#fcfaf6"/>
-  <circle cx="198" cy="100" r="28" fill="#fcfaf6"/>
-  <ellipse cx="174" cy="116" rx="11" ry="24" transform="rotate(14 174 116)" fill="#f0e4d6"/>
-  <ellipse cx="222" cy="116" rx="11" ry="24" transform="rotate(-14 222 116)" fill="#f0e4d6"/>
-  <circle cx="189" cy="96" r="3" fill="#2e2621"/>
-  <circle cx="208" cy="96" r="3" fill="#2e2621"/>
-  <ellipse cx="198.5" cy="103" rx="3.2" ry="2.2" fill="#d98989"/>
-  <circle cx="152" cy="154" r="7" fill="#e89a8d"/>
-  <circle cx="246" cy="156" r="6" fill="#f2c97d"/>
-  <circle cx="234" cy="166" r="5" fill="#d88fa8"/>
-</svg>`;
+const params = new URLSearchParams(location.search);
+const selectedWork = communityDesignWorks.find(work => work.player && work.player === params.get('work'))
+  || communityDesignWorks.find(work => work.player === 'plush-rabbit');
+const workCover = './community-redesign/' + selectedWork.cover.slice(2);
+Object.assign(SCENES.work, {
+  title: selectedWork.title, author: selectedWork.author, authorInitial: selectedWork.author.charAt(0),
+  sub: selectedWork.author + ' · ' + selectedWork.category, body: selectedWork.introduction,
+  time: selectedWork.date + ' · ' + selectedWork.category, likes: selectedWork.likes, comments: selectedWork.commentsCount,
+  excerpt: selectedWork.description, url: 'https://chat.xiangban.xyz/ideas/works/' + selectedWork.id,
+});
+const workArtwork = '<img class="work-cover" alt="" src="' + workCover + '">';
 
 const QR_SVG = `
 <svg viewBox="0 0 25 25" shape-rendering="crispEdges">
@@ -1442,6 +1467,7 @@ const QR_SVG = `
 const state = {
   device: 'both',
   scene: 'topic',
+  view: 'share',
   role: 'guest',
   theme: 'red',
   dark: false,
@@ -1468,7 +1494,6 @@ function applyThemeTokens() {
   document.querySelectorAll('.ui-scope').forEach(el => {
     el.classList.toggle('dark', state.dark);
     el.style.setProperty('--accent', t.accent);
-    el.style.setProperty('--accent-soft-line', t.line);
   });
   document.body.classList.toggle('studio-dark', state.dark);
   document.getElementById('dark-toggle').textContent = state.dark ? '切换浅色' : '切换深色';
@@ -1485,7 +1510,7 @@ function renderShareCard(scene) {
         </span>
         <span class="sc-kind-tag">${scene.badge}</span>
       </div>
-      ${showCover ? `<div class="sc-cover">${COVER_SVG}</div>` : ''}
+      ${showCover ? `<div class="sc-cover">${workArtwork}</div>` : ''}
       <div class="sc-title">${scene.title}</div>
       ${state.showExcerpt ? `<div class="sc-excerpt">${scene.excerpt}</div>` : ''}
       <div class="sc-author">
@@ -1507,7 +1532,7 @@ function renderShareCard(scene) {
 }
 
 function renderCtxThumb(scene) {
-  if (scene.thumbType === 'cover') return `<div class="ctx-thumb">${COVER_SVG}</div>`;
+  if (scene.thumbType === 'cover') return `<div class="ctx-thumb">${workArtwork}</div>`;
   if (scene.thumbType === 'repo') return `<div class="ctx-thumb repo-emblem">E</div>`;
   if (scene.thumbType === 'daily') return `<div class="ctx-thumb daily-emblem">${ICONS.news}</div>`;
   return `<div class="ctx-thumb text-emblem">${ICONS.doc}</div>`;
@@ -1530,6 +1555,7 @@ function showH5Toast(msg) {
 function renderPc() {
   const scene = SCENES[state.scene];
   const root = document.getElementById('pc-root');
+  if (state.scene === 'work' && state.view === 'run') { renderRuntime(root, false); return; }
   const isCopied = key => state.pcCopiedKey === key;
 
   root.innerHTML = `
@@ -1570,7 +1596,7 @@ function renderPc() {
               <button type="button" class="pc-top-btn subtle-outline" data-pc-act="open-share">${ICONS.share}<span>分享</span></button>
             </div>
             <h1 class="pc-art-title">${scene.title}</h1>
-            ${scene.thumbType === 'cover' ? `<div class="pc-art-cover">${COVER_SVG}</div>` : ''}
+            ${scene.thumbType === 'cover' ? `<div class="pc-art-cover">${workArtwork}</div>` : ''}
             <p class="pc-art-body">${scene.body}</p>
             <div class="pc-art-foot">
               <div class="pc-art-stats">
@@ -1671,6 +1697,11 @@ function renderPc() {
                         </span>
                         <span class="pc-mr-state ${isCopied('extra') ? 'done' : ''}">${isCopied('extra') ? '已复制' : (scene.extraKey === 'open-run' ? '打开' : '复制')}</span>
                       </button>
+                      ${scene.id === 'work' ? `<button type="button" class="pc-more-row" data-open-work="desktop">
+                        <span class="pc-mr-left"><span class="pc-mr-ico">${ICONS.monitor}</span>
+                          <span class="pc-mr-txt"><strong>在小伴桌面打开</strong><span>在桌面客户端运行此作品</span></span></span>
+                        <span class="pc-mr-state">打开</span>
+                      </button>` : ''}
                       <button type="button" class="pc-more-row" data-pc-act="ask-ai">
                         <span class="pc-mr-left">
                           <span class="pc-mr-ico">${ICONS.spark}</span>
@@ -1717,9 +1748,11 @@ function renderPc() {
 function renderH5() {
   const scene = SCENES[state.scene];
   const root = document.getElementById('h5-root');
+  if (state.scene === 'work' && state.view === 'run') { renderRuntime(root, true); return; }
   const railActions = [
     { key: 'system', label: '系统分享', icon: ICONS.share, cls: 'primary' },
     { key: 'link', label: state.h5CopiedKey === 'link' ? '已复制' : '复制链接', icon: state.h5CopiedKey === 'link' ? ICONS.check : ICONS.link, cls: state.h5CopiedKey === 'link' ? 'copied' : '' },
+    ...(scene.id === 'work' ? [{ key: 'client', label: '在小伴手机版打开', icon: ICONS.phone, cls: 'client-action' }] : []),
     { key: 'card', label: '分享卡片', icon: ICONS.card, cls: '' },
     { key: 'ai', label: '问问小伴', icon: ICONS.spark, cls: '' },
     { key: 'extra', label: state.h5CopiedKey === 'extra' ? '已复制' : scene.extraLabel.replace('新标签页体验', '复制推荐语'), icon: state.h5CopiedKey === 'extra' ? ICONS.check : (scene.extraKey === 'open-run' ? ICONS.quote : ICONS.doc), cls: state.h5CopiedKey === 'extra' ? 'copied' : '' },
@@ -1748,7 +1781,7 @@ function renderH5() {
     </header>
 
     <div class="detail-scroll">
-      ${scene.thumbType === 'cover' ? `<div class="hero-cover">${COVER_SVG}</div>` : ''}
+      ${scene.thumbType === 'cover' ? `<div class="hero-cover">${workArtwork}</div>` : ''}
       <h1 class="detail-title">${scene.title}</h1>
       <p class="detail-body">${scene.body}</p>
       <div class="detail-meta"><span>${scene.time}</span><span>·</span><span>${scene.badge}</span></div>
@@ -1804,7 +1837,7 @@ function renderH5() {
             <div class="rail-wrap" id="h5-rail-wrap">
               <div class="action-rail" id="h5-rail">
                 ${railActions.map(a => `
-                  <button type="button" class="action-item ${a.cls}" data-h5-rail="${a.key}">
+                  <button type="button" class="action-item ${a.cls}" data-h5-rail="${a.key}" ${a.key === 'client' ? 'data-open-work="mobile"' : ''}>
                     <span class="action-tile">${a.icon}${a.dot ? '<i class="ai-dot"></i>' : ''}</span>
                     <span class="action-label">${a.label}</span>
                   </button>
@@ -1898,7 +1931,75 @@ function bindH5RailScroll() {
   });
 }
 
+function renderRuntime(root, mobile) {
+  const device = mobile ? 'mobile' : 'desktop';
+  const image = selectedWork.player === 'whale-girl'
+    ? './community-redesign/assets/whale-girl-run-' + (mobile ? 'mobile' : 'pc') + '.webp' : workCover;
+  root.innerHTML = `<section class="runtime-preview" aria-label="${selectedWork.title}">
+    <header class="runtime-bar">
+      <span class="runtime-icon" aria-hidden="true">${ICONS.grid}</span><h3>${selectedWork.title}</h3>
+      <button type="button" class="runtime-open" data-open-work="${device}" aria-label="${mobile ? '在小伴手机版打开' : '在小伴桌面打开'}">
+        <span>${mobile ? ICONS.phone : ICONS.monitor}${mobile ? '用小伴打开' : '在小伴桌面打开'}</span>
+      </button>
+      <button type="button" data-runtime="reload" aria-label="重新加载">${ICONS.refresh}</button>
+      <button type="button" data-runtime="fullscreen" aria-label="全屏">${ICONS.expand}</button>
+      <button type="button" data-runtime="close" aria-label="关闭应用">${ICONS.close}</button>
+    </header>
+    <div class="runtime-scene"><img src="${image}" alt="${selectedWork.title}"></div>
+  </section>`;
+}
+
+function setView(view) {
+  state.view = view;
+  state.pcModalOpen = true;
+  state.h5Mode = 'sheet';
+  renderAll();
+}
+
+function openWork(button) {
+  const root = button.closest('.ui-scope');
+  root.querySelector('.client-hint')?.remove();
+  const hint = document.createElement('div');
+  hint.className = 'client-hint';
+  const download = 'https://wallpaper.xiangban.xyz/download#desktop-downloads';
+  hint.innerHTML = `<span role="status">没有打开小伴？</span><a href="${download}" target="_blank" rel="noopener noreferrer">下载客户端</a><button type="button">关闭</button>`;
+  hint.querySelector('button').onclick = () => { hint.remove(); button.focus(); };
+  root.appendChild(hint);
+  location.assign('xiaoban://community/run/idea/' + selectedWork.player);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) document.querySelectorAll('.client-hint').forEach(hint => hint.remove());
+});
+document.addEventListener('click', async e => {
+  const open = e.target.closest('[data-open-work]');
+  if (open) { openWork(open); return; }
+  const action = e.target.closest('[data-runtime]');
+  if (!action) return;
+  const preview = action.closest('.runtime-preview');
+  if (action.dataset.runtime === 'close') {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    setView('share');
+  } else if (action.dataset.runtime === 'fullscreen') {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await preview.requestFullscreen?.();
+  } else if (action.dataset.runtime === 'reload') {
+    const image = preview.querySelector('.runtime-scene img');
+    image.src = image.src;
+  }
+});
+
+document.getElementById('work-view').onclick = () => setView(state.view === 'run' ? 'share' : 'run');
+
 function renderAll() {
+  const runtime = state.scene === 'work' && state.view === 'run';
+  const viewButton = document.getElementById('work-view');
+  viewButton.hidden = state.scene !== 'work';
+  viewButton.textContent = runtime ? '查看分享面板' : '查看 V2 运行页';
+  document.getElementById('pc-reopen-btn').hidden = runtime;
+  document.getElementById('h5-toggle-btn').hidden = runtime;
+  document.querySelector('.pc-pane h2').textContent = runtime ? 'PC 网页 · V2 独立运行页' : 'PC 端网页 · 居中双栏分享弹窗';
+  document.querySelector('.h5-pane h2').textContent = runtime ? '手机网页 · V2 独立运行页' : '手机 H5 · 详情页分享面板';
   document.body.dataset.device = state.device;
   renderPc();
   renderH5();
@@ -1932,6 +2033,7 @@ document.getElementById('scene-seg').addEventListener('click', e => {
   const btn = e.target.closest('button[data-scene]');
   if (!btn) return;
   state.scene = btn.dataset.scene;
+  state.view = 'share';
   state.pcConfirmDelete = false;
   state.h5ConfirmDelete = false;
   document.querySelectorAll('#scene-seg button').forEach(b => b.classList.toggle('active', b === btn));
@@ -2015,7 +2117,11 @@ document.getElementById('pc-root').addEventListener('click', e => {
   else if (act === 'save-image') setPcCopied('save', '高清卡片 PNG 已开始下载');
   else if (act === 'copy-quote') setPcCopied('quote', '推荐语与链接已复制');
   else if (act === 'extra') {
-    if (scene.extraKey === 'open-run') showPcToast('已在新标签页打开作品运行页');
+    if (scene.extraKey === 'open-run') {
+      const url = new URL(location.href);
+      url.search = new URLSearchParams({ scene: 'work', work: selectedWork.player, view: 'run', device: 'desktop' });
+      window.open(url.href, '_blank', 'noopener,noreferrer');
+    }
     else setPcCopied('extra', `${scene.extraLabel.replace('复制', '')}已复制`);
   }
   else if (act === 'ask-ai') showPcToast('已带入「小伴 AI」开启解读对话');
@@ -2062,12 +2168,20 @@ document.getElementById('h5-root').addEventListener('click', e => {
 });
 
 /* URL Query Param Support */
-const params = new URLSearchParams(location.search);
 const devParam = params.get('device');
 if (devParam === 'desktop' || devParam === 'mobile' || devParam === 'both') {
   state.device = devParam;
   document.querySelectorAll('#device-seg button').forEach(b => b.classList.toggle('active', b.dataset.device === devParam));
 }
+if (Object.hasOwn(SCENES, params.get('scene'))) {
+  state.scene = params.get('scene');
+  document.querySelectorAll('#scene-seg button').forEach(b => b.classList.toggle('active', b.dataset.scene === state.scene));
+}
+if (params.get('role') === 'author') {
+  state.role = 'author';
+  document.querySelectorAll('#role-seg button').forEach(b => b.classList.toggle('active', b.dataset.role === state.role));
+}
+if (state.scene === 'work' && params.get('view') === 'run') state.view = 'run';
 if (params.get('dark') === '1') state.dark = true;
 
 renderAll();

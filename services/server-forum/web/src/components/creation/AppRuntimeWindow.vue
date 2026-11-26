@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import ClientOpenHint from './ClientOpenHint.vue'
+import type { ClientWork } from '@/lib/clientWork'
+import { useClientWork } from '@/lib/useClientWork'
 
 const props = defineProps<{
   title: string
+  clientWork?: ClientWork
   icon?: string | null
   compact?: boolean
   busy?: boolean
@@ -11,6 +15,7 @@ const props = defineProps<{
   orientation?: 'portrait' | 'landscape'
 }>()
 const emit = defineEmits<{ reload: []; close: [] }>()
+const client = useClientWork(() => props.clientWork)
 const workspace = ref<(HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> }) | null>(null)
 const fullscreenDocument = document as Document & {
   webkitFullscreenEnabled?: boolean
@@ -106,6 +111,7 @@ async function toggleFullscreen() {
 
 function handleEscape(event: KeyboardEvent) {
   if (event.defaultPrevented || event.repeat || changingSize.value) return
+  if (client.help.value) { event.preventDefault(); client.closeHint(); return }
   const active = fullscreenElement()
   if (active) {
     if (active === workspace.value) void toggleFullscreen()
@@ -125,6 +131,10 @@ function handleEscape(event: KeyboardEvent) {
           referrerpolicy="no-referrer" @error="failedIcon = icon || ''" />
         <span v-else class="app-icon fallback" aria-hidden="true"><AppIcon name="grid" :size="15" /></span>
         <h1 :title="title">{{ title }}</h1>
+        <button v-if="client.href.value" type="button" class="open-client" :aria-label="client.label" :title="client.label"
+          :disabled="closing" @click="client.open">
+          <span><AppIcon :name="client.icon" :size="15" />{{ client.mobile ? '用小伴打开' : client.label }}</span>
+        </button>
         <div class="window-actions">
           <button type="button" aria-label="重新加载" title="重新加载" :disabled="busy || closing" @click="emit('reload')">
             <AppIcon name="refresh" :size="18" />
@@ -141,6 +151,7 @@ function handleEscape(event: KeyboardEvent) {
       </header>
       <div ref="content" class="window-content" tabindex="-1" :inert="closing">
         <slot />
+        <ClientOpenHint v-if="client.help.value" :download="client.download" @dismiss="client.closeHint" />
         <p v-if="fullscreenError" class="fullscreen-feedback" role="status">{{ fullscreenError }}</p>
       </div>
     </section>
@@ -155,16 +166,17 @@ function handleEscape(event: KeyboardEvent) {
   height: 100vh;
   height: 100dvh;
   padding: clamp(16px, 4vh, 40px) clamp(16px, 4vw, 56px);
-  background: radial-gradient(ellipse at 50% 0, var(--brand-soft) 0, transparent 70%), var(--paper);
+  background: var(--surface-2);
 }
 .app-window {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   width: min(100%, 1120px);
   height: min(100%, 900px);
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--line-strong);
+  border: 0;
   border-radius: 18px;
   background: var(--surface);
   box-shadow: var(--shadow), 0 18px 62px rgb(0 0 0 / 10%);
@@ -176,7 +188,7 @@ function handleEscape(event: KeyboardEvent) {
   gap: 10px;
   min-height: 48px;
   padding: 0 6px 0 14px;
-  border-bottom: 1px solid var(--line);
+  min-width: 0;
   background: var(--surface);
   user-select: none;
 }
@@ -189,7 +201,7 @@ function handleEscape(event: KeyboardEvent) {
   object-fit: cover;
   background: var(--surface-2);
 }
-.app-icon.fallback { display: grid; place-items: center; color: var(--brand); }
+.app-icon.fallback { display: grid; place-items: center; background: var(--surface); color: var(--ink); }
 h1 {
   flex: 1;
   min-width: 0;
@@ -201,6 +213,14 @@ h1 {
   font-weight: 650;
 }
 .window-actions { display: flex; flex: none; align-items: center; gap: 2px; }
+.open-client { flex:none; min-height:44px; display:inline-flex; align-items:center; padding:0; border:0; background:transparent; color:var(--ink); font:inherit; }
+.open-client span { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 9px; border-radius:7px; font-size:12.5px; font-weight:650; white-space:nowrap; }
+.open-client:hover span { background:var(--surface-2); }
+.open-client:active span { background:var(--line-strong); }
+.open-client:focus-visible { outline:0; }
+.open-client:focus-visible span,.window-actions button:focus-visible { outline:0; background:var(--ink); color:var(--surface); }
+@media(max-width:640px) { .titlebar:has(.open-client) { gap:7px; } .open-client span { gap:4px; padding:0 8px; font-size:12px; } }
+@media(max-width:350px) { .open-client svg { display:none; } }
 .window-actions button {
   display: grid;
   place-items: center;
@@ -225,7 +245,8 @@ h1 {
   right: 8px;
   margin: 0;
   padding: 8px 12px;
-  border: 1px solid var(--line);
+  border: 0;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
   border-radius: 8px;
   background: var(--surface);
   color: var(--ink);

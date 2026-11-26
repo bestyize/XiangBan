@@ -7,8 +7,9 @@ import { clearInvite } from '@/lib/invite'
 import { SessionScope } from '@/lib/sessionScope'
 
 const STORAGE_KEY = 'chat.xiangban.session'
-const desktopWindow = window as Window & { __xiaobanDesktopCommunity?: { ticket: string | null } }
+const desktopWindow = window as Window & { __xiaobanDesktopCommunity?: { ticket: string | null }; __xiaobanWorkHost?: boolean }
 const desktopBootstrap = desktopWindow.__xiaobanDesktopCommunity
+export const inDesktopCommunity = Boolean(desktopBootstrap || desktopWindow.__xiaobanWorkHost)
 delete desktopWindow.__xiaobanDesktopCommunity
 const desktopStorageKey = `${STORAGE_KEY}.desktop`
 

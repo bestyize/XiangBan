@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use xiaoban_community as community;
 
-const DEFAULT_ORIGIN: &str = "https://chat.xiangban.xyz";
+pub(super) const DEFAULT_ORIGIN: &str = "https://chat.xiangban.xyz";
 
 pub(crate) fn origin() -> String {
     // Debug builds may point at a local forum while developing; release builds cannot be redirected.
@@ -18,6 +18,7 @@ pub(crate) fn origin() -> String {
 /// What the console is waiting to show: a link that arrived, and the one pack that was checked and is waiting for a yes.
 #[derive(Default)]
 pub struct CommunityState {
+    pub(super) work_windows: Mutex<()>,
     link: Mutex<Option<Value>>,
     staged: Mutex<Option<Staged>>,
 }

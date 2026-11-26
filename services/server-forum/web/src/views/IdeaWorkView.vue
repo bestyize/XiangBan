@@ -46,6 +46,7 @@ const share = computed<SharePayload | undefined>(() => {
     title: item.title,
     url: new URL(route.path, location.origin).href,
     badge: '创意作品',
+    clientWork: run.value ? { kind: 'idea', id: run.value.params.slug } : undefined,
     meta: [item.author, badge.value].filter(Boolean).join(' · '),
     author: item.author,
     excerpt: item.description || item.introduction,

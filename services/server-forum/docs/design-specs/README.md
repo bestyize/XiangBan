@@ -8,6 +8,8 @@
 
 - [PC + H5 同屏预览](http://127.0.0.1:1450/prototypes/web-detail-share.html) · [PC 端预览](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=desktop) · [手机 H5 预览](http://127.0.0.1:1450/prototypes/web-detail-share.html?device=mobile)
 
+- 在可运行作品的详情页打开分享面板，或从作品主按钮进入 V2 运行页。桌面和 Android 使用同一作品标识发起打开。[作品分享预览](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl) · [V2 运行页预览](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl&view=run)
+
 ---
 
 ## 全站主站 UI 重设计稿（活力社区风 · PC + 移动 H5）
@@ -15,6 +17,7 @@
 [社区全站 UI 重设计稿](prototypes/community-redesign/index.html) 采用 **现代活力视觉社区风**，覆盖 **PC 端网页**（左导轨 + 精简顶栏）与 **移动端 H5**（390px 交互样机与真机适配）：包含首页五栏目（创意、资讯、精选、排行榜、导航）、讨论（左文右图讨论卡）、资源、应用、小伴 AI 及作品/帖子详情与评论互动，详情页核心体验/访问/下载操作提升为品牌实心胶囊主按钮，支持 6 套客户端同款主题色与日间/夜间模式。
 
 ```sh
+# 跨稿跳转到分享与运行页时，同时启动上方原稿使用的 1450 服务。
 python3 -m http.server 1449 --bind 127.0.0.1 --directory services/server-forum/docs/design-specs/prototypes/community-redesign
 ```
 

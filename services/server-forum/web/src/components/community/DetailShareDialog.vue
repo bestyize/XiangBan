@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import ClientOpenHint from '@/components/creation/ClientOpenHint.vue'
+import { useClientWork } from '@/lib/useClientWork'
 import { track } from '@/lib/analytics'
 import type { ShareDeletion, SharePayload } from '@/lib/detailShare'
 import { canvasToBlob, renderPoster, sharePapers, type SharePaper } from '@/lib/poster'
@@ -10,6 +12,7 @@ import { useNarrow } from '@/lib/viewport'
 import { useToast } from '@/stores/toast'
 
 const props = defineProps<{ payload: SharePayload; deletion?: ShareDeletion; triggerClass?: string }>()
+const client = useClientWork(() => props.payload.clientWork)
 const router = useRouter()
 const toast = useToast()
 const { resolved, accent } = useTheme()
@@ -50,6 +53,7 @@ const imageFile = computed(() => image.value && new File(
 const canSendImage = computed(() => !!imageFile.value && navigator.canShare?.({ files: [imageFile.value] }) === true)
 
 function clearFeedback() {
+  client.dismiss()
   window.clearTimeout(feedbackTimer)
   copied.value = ''
   message.value = ''
@@ -99,7 +103,8 @@ function close() {
 
 function escape() {
   if (deleting.value) return
-  if (confirmDelete.value) void showDelete(false)
+  if (client.help.value) client.closeHint()
+  else if (confirmDelete.value) void showDelete(false)
   else if (mobile.value && studio.value) void showStudio(false)
   else close()
 }
@@ -254,10 +259,16 @@ const extraAction = computed(() => {
   if (!item) return
   return { id: 'extra', label: item.label, icon: item.icon, description: item.description, hint: 'text' in item ? '复制' : '打开', run: extra }
 })
-const moreActions = computed(() => [quoteAction, ...(extraAction.value ? [extraAction.value] : []), askAction])
+const clientActions = computed(() => client.href.value ? [{
+  id: 'client', label: client.label, icon: client.icon, hint: '打开',
+  description: client.mobile ? '在手机客户端运行此作品' : '在桌面客户端运行此作品',
+  run: () => { clearFeedback(); client.open() },
+}] : [])
+const moreActions = computed(() => [quoteAction, ...(extraAction.value ? [extraAction.value] : []), ...clientActions.value, askAction])
 const railActions = computed(() => [
   ...(systemShare ? [{ id: 'system', label: '系统分享', icon: 'share-up', run: () => shareNative() }] : []),
   { id: 'link', label: '复制链接', icon: 'link', run: () => copy(props.payload.url, 'link') },
+  ...clientActions.value,
   ...(!props.payload.linkOnly ? [
     { id: 'card', label: '分享卡片', icon: 'share-card', run: () => showStudio(true) },
     askAction,
@@ -305,7 +316,7 @@ function recordRailButton(id: string, element: unknown) {
             </div>
             <div class="card-controls" aria-label="卡片样式设置">
               <div class="tone-dots">
-                <button v-for="item in sharePapers" :key="item.id" type="button" class="tone-dot"
+                <button v-for="item in sharePapers" :key="item.id" type="button" class="tone-dot" :data-paper="item.id"
                   :style="{ background: item.swatch }" :aria-label="item.label" :title="item.label"
                   :aria-pressed="paper === item.id" @click="paper = item.id" />
               </div>
@@ -393,7 +404,7 @@ function recordRailButton(id: string, element: unknown) {
             <div v-else class="rail-wrap" :class="{ 'at-end': railEnd }">
               <div ref="rail" class="action-rail" @scroll.passive="syncRail" @wheel="wheelRail">
                 <button v-for="item in railActions" :key="item.id" :ref="el => recordRailButton(item.id, el)"
-                  type="button" class="action-item" :class="{ copied: copied === item.id, danger: item.id === 'delete', primary: item.id === 'system' }" @click="item.run">
+                  type="button" class="action-item" :class="{ 'client-action': item.id === 'client', copied: copied === item.id, danger: item.id === 'delete', primary: item.id === 'system' }" @click="item.run">
                   <span class="action-tile"><AppIcon :name="copied === item.id ? 'check' : item.icon" :size="22" /></span>
                   <span class="action-label">{{ copied === item.id ? '已复制' : item.label }}</span>
                 </button>
@@ -417,6 +428,7 @@ function recordRailButton(id: string, element: unknown) {
         <div class="share-feedback" role="status" aria-live="polite">
           <span v-if="message" :class="{ 'share-error': error }">{{ message }}</span>
         </div>
+        <ClientOpenHint v-if="client.help.value" :download="client.download" @dismiss="client.closeHint" />
       </template>
     </dialog>
   </Teleport>

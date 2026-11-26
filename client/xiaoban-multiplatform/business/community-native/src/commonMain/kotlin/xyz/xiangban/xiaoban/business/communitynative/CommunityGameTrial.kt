@@ -74,6 +74,15 @@ internal fun CommunityWorkLaunch(env: CommunityEnv, id: Long, version: Int? = nu
     }
 }
 
+/** Both a public web handoff and the in-app play button use the same verified package and mobile-data consent. */
+suspend fun openIdeaWork(env: CommunityEnv, id: String, confirmMobileDownload: suspend (Long) -> Boolean) {
+    val platform = env.platform
+    check(platform != null && env.config.runtimeV2) { "当前设备暂不支持小程序运行" }
+    val download = env.forum.ideaRuntime(id)
+    if (platform.needsIdeaRuntimeMobileConfirmation(download) && !confirmMobileDownload(download.size)) return
+    check(platform.playIdeaRuntime(download)) { "无法打开作品，请重试" }
+}
+
 @Composable
 internal fun IdeaRuntimeScreen(env: CommunityEnv, id: String, title: String, back: () -> Unit) {
     val platform = env.platform
@@ -86,18 +95,13 @@ internal fun IdeaRuntimeScreen(env: CommunityEnv, id: String, title: String, bac
         if (platform == null || !env.config.runtimeV2) return@LaunchedEffect
         error = null
         try {
-            val download = env.forum.ideaRuntime(id)
-            if (platform.needsIdeaRuntimeMobileConfirmation(download)) {
+            openIdeaWork(env, id) { size ->
                 val decision = CompletableDeferred<Boolean>()
-                pending = download.size to decision
+                pending = size to decision
                 val accepted = decision.await()
                 pending = null
-                if (!accepted) {
-                    onBack()
-                    return@LaunchedEffect
-                }
+                accepted
             }
-            check(platform.playIdeaRuntime(download)) { "无法打开作品，请重试" }
             onBack()
         } catch (e: CancellationException) {
             throw e

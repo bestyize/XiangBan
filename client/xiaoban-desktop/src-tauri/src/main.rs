@@ -27,6 +27,7 @@ mod chat;
 mod community;
 mod community_media;
 mod community_schemes;
+mod community_work;
 mod phone_link;
 mod phone_voice;
 mod phone_wire;
@@ -628,9 +629,14 @@ fn show_control(app: tauri::AppHandle) -> Result<(), String> {
     present_control(&app)
 }
 
-/// Route market requests and community pack links to the console. Community reading links open in the browser.
 fn route_link(app: &tauri::AppHandle, text: &str) {
-    if text.starts_with("xiaoban://community") { community::receive_link(app, text); } else { chat::store_market::receive_link(app, text); }
+    if text.starts_with(community_work::PREFIX) {
+        if let Some(work) = community_work::Work::parse(text) { community_work::launch(app, work); }
+    } else if text.starts_with("xiaoban://community") {
+        community::receive_link(app, text);
+    } else {
+        chat::store_market::receive_link(app, text);
+    }
 }
 
 pub(crate) fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
@@ -861,13 +867,15 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(float_assistant::plugin())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            let mut opens_work = false;
             for arg in &arguments {
                 let clean = arg.trim().trim_matches('"');
+                opens_work |= community_work::Work::parse(clean).is_some();
                 if clean.starts_with("xiaoban://") {
                     route_link(app, clean);
                 }
             }
-            if !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
+            if !opens_work && !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
         }));
     let builder = if updater_enabled { builder.plugin(tauri_plugin_updater::Builder::new().build()) } else { builder };
     #[cfg(target_os = "macos")]
@@ -937,6 +945,10 @@ fn main() {
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(chat_preview::PreviewState::default()).manage(design_mcp::DesignMcpState::default()).manage(voice_turn::VoiceTurnState::default()).manage(app_runtime::AppRuntimeState::default())
         .register_asynchronous_uri_scheme_protocol("wallpaper-asset", |context, request, responder| {
+            if let Some(denied) = community_work::deny_local_resource(context.webview_label()) {
+                responder.respond(denied);
+                return;
+            }
             if request.uri().path().starts_with("/widget-html/") {
                 let app = context.app_handle().clone();
                 let label = context.webview_label().to_string();
@@ -946,14 +958,28 @@ fn main() {
             }
         })
         .register_asynchronous_uri_scheme_protocol("effect-html", |context, request, responder| {
+            if let Some(denied) = community_work::deny_local_resource(context.webview_label()) {
+                responder.respond(denied);
+                return;
+            }
             let app = context.app_handle().clone();
             let label = context.webview_label().to_string();
             tauri::async_runtime::spawn_blocking(move || responder.respond(effects::serve_html(&app, &label, request)));
         })
-        .register_uri_scheme_protocol("chat-preview", |context, request| chat_preview::serve(context.app_handle(), request))
-        .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
-        .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
+        .register_uri_scheme_protocol("chat-preview", |context, request| {
+            community_work::deny_local_resource(context.webview_label()).unwrap_or_else(|| chat_preview::serve(context.app_handle(), request))
+        })
+        .register_uri_scheme_protocol("design-preview", |context, request| {
+            community_work::deny_local_resource(context.webview_label()).unwrap_or_else(|| design::serve(context.app_handle(), request))
+        })
+        .register_uri_scheme_protocol("game-pack", |context, request| {
+            community_work::deny_local_resource(context.webview_label()).unwrap_or_else(|| game_packs::serve(context.app_handle(), request))
+        })
         .register_asynchronous_uri_scheme_protocol("app-pack", |context, request, responder| {
+            if let Some(denied) = community_work::deny_local_resource(context.webview_label()) {
+                responder.respond(denied);
+                return;
+            }
             let app = context.app_handle().clone();
             let label = context.webview_label().to_string();
             tauri::async_runtime::spawn_blocking(move || responder.respond(app_runtime::serve(&app, &label, request)));
@@ -961,6 +987,7 @@ fn main() {
         .manage(widget_preview::State::default())
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if label.starts_with(community_work::WINDOW_PREFIX) { invoke.resolver.reject("社区作品网页没有原生命令权限"); return true; }
             if command.starts_with("lock_screen_") && label != "control" {
                 invoke.resolver.reject("只能在主窗口设置锁屏");
                 return true;
@@ -1002,18 +1029,12 @@ fn main() {
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
             }
-            {
-                // `xiaoban://market/...` links from the market website. They only ask the console to show a
-                // dialog; the console validates and the user confirms. A link that started the app is read here.
-                use tauri_plugin_deep_link::DeepLinkExt;
-                let handle = app.handle().clone();
-                app.deep_link().on_open_url(move |event| {
-                    for url in event.urls() { route_link(&handle, url.as_str()); }
-                });
-                if let Ok(Some(urls)) = app.deep_link().get_current() {
-                    for url in urls { route_link(app.handle(), url.as_str()); }
-                }
-            }
+            use tauri_plugin_deep_link::DeepLinkExt;
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() { route_link(&handle, url.as_str()); }
+            });
+            let startup_links = app.deep_link().get_current().ok().flatten().unwrap_or_default();
             app.manage(chat::ChatState::new(app.handle()));
             #[cfg(debug_assertions)]
             if std::env::args().any(|arg| arg == "--smoke-test") && std::env::var_os("XIAOBAN_BUILTIN_GAMES_SMOKE").is_some() {
@@ -1065,9 +1086,11 @@ fn main() {
             widgets::start(app.handle());
             proactivity::start(app.handle());
             reminders::start(app.handle());
-            if !design_mcp::autostart::background(std::env::args()) {
+            let opens_work = startup_links.iter().any(|url| community_work::Work::parse(url.as_str()).is_some());
+            if !opens_work && !design_mcp::autostart::background(std::env::args()) {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
+            for url in startup_links { route_link(app.handle(), url.as_str()); }
             account::activated(app.handle());
             for (label, win) in app.handle().webview_windows() {
                 eprintln!(">>> WebviewWindow label={label}, visible={:?}, size={:?}, pos={:?}", win.is_visible(), win.outer_size(), win.outer_position());

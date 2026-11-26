@@ -11,6 +11,7 @@ import { useCommunityResource } from '@/components/community/resource'
 import { canTrialPack } from '@/lib/appRuntime'
 import { builtinAsset, builtinGame, canOpenBundledWancisou, WANCISOU_ICON, WANCISOU_WEB_ENTRY } from '@/lib/builtinCreation'
 import { useHead } from '@/lib/head'
+import type { ClientWork } from '@/lib/clientWork'
 import { homeTabOf } from '@/lib/homeNavigation'
 import { ideaPlayerId, ideaPlayers, ideaReturnLocation } from '@/lib/ideaPlayers'
 
@@ -57,6 +58,14 @@ const launch = useCommunityResource(async () => {
 })
 const title = computed(() => ideaId.value ? ideaPlayers[ideaId.value].title :
   builtin.value?.name || launch.data.value?.pack.title || '小伴应用')
+const clientWork = computed<ClientWork | undefined>(() => {
+  if (isIdea.value) return ideaId.value ? { kind: 'idea', id: ideaId.value } : undefined
+  if (isBuiltin.value) return builtin.value ? { kind: 'builtin', id: builtin.value.id } : undefined
+  const pack = launch.data.value?.pack
+  if (pack?.id === packId.value && pack.versions.some(v => v.version === version.value && v.manifest.runtimeProtocol === 2)) {
+    return { kind: 'pack', id: pack.id, version: version.value }
+  }
+})
 const icon = computed(() => builtin.value?.icon ||
   (launch.data.value?.pack.slug === 'wancisou' ? WANCISOU_ICON : webLink(launch.data.value?.pack.cover_url)))
 useHead(() => ({ title: title.value }))
@@ -127,7 +136,7 @@ async function close() {
 
 <template>
   <AppRuntimeWindow :title="title" :icon="icon" :compact="builtin?.id === 'mbti'"
-    :orientation="fullscreenOrientation"
+    :orientation="fullscreenOrientation" :client-work="clientWork"
     :busy="reloading" :closing="closing" @reload="reload" @close="close">
     <BuiltinGamePlayer v-if="builtin" :key="revision" :game-id="builtin.id" @close="close" />
     <div v-else-if="isBuiltin" class="state" role="alert">找不到这个内置作品</div>

@@ -58,10 +58,12 @@ const paths: Record<string, string[]> = {
   shield: ['m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z', 'm8 12 3 3 5-6'],
 }
 const filledPaths: Record<string, string[]> = {
+  'client-monitor': ['M4 3.5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6.5V20H17a1 1 0 0 1 0 2H7a1 1 0 0 1 0-2h3.5v-2.5H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2Z'],
+  'client-phone': ['M8 1.5h8a2.5 2.5 0 0 1 2.5 2.5v16a2.5 2.5 0 0 1-2.5 2.5H8a2.5 2.5 0 0 1-2.5-2.5V4A2.5 2.5 0 0 1 8 1.5ZM10.75 18.2a.85.85 0 0 0 0 1.7h2.5a.85.85 0 0 0 0-1.7Z'],
   'play-solid': ['M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z'],
 }
 </script>
 <template>
-  <svg v-if="filledPaths[name]" :width="size" :height="size" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path v-for="(d,i) in filledPaths[name]" :key="i" :d="d" /></svg>
+  <svg v-if="filledPaths[name]" :width="size" :height="size" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path v-for="(d,i) in filledPaths[name]" :key="i" :d="d" /></svg>
   <svg v-else :width="size" :height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d,i) in paths[name] || paths.community" :key="i" :d="d" /></svg>
 </template>

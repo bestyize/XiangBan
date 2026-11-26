@@ -54,7 +54,7 @@ npm --prefix client/xiaoban-desktop run dev
 | [超级小伴社区 · 主站浏览（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 已合入 | 现代活力社区风主站，覆盖 PC 左导轨壳层与 390px 移动 H5，包含首页五栏目、讨论、资源、应用与小伴 AI |
 | [社区详情页（作品 / 帖子 / 开源三态 · PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 已合入 | 总导航按三类详情与身份视角拆出独立入口：创意作品（作者视角）、讨论帖子（读者视角）、开源精选（管理员视角） |
 | [社区个人中心四页套件（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-profile-suite.html) | chat.xiangban.xyz | 部分合入 | 1:1 对齐手机 App 方案 1 通栏精修，独立覆盖「我的 / 个人主页 / 我的作品 / 通知」四页（我的/通知已合入，我的作品草稿与居中删除确认待补齐） |
-| [社区详情页分享面板（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) | chat.xiangban.xyz | 已合入 | 纯黑白灰中性配色、仅分享图保留品牌主题色：H5 1:1 对齐手机 App，PC 端 716px 居中双栏弹窗与内联删除确认 |
+| [社区详情页分享面板（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) | chat.xiangban.xyz | 已合入 | 纯黑白灰中性配色、仅分享图保留品牌主题色：H5 1:1 对齐手机 App，PC 端 716px 居中双栏弹窗与内联删除确认。可运行作品支持从分享面板和 V2 标题栏打开客户端。[作品分享](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl) · [V2 运行页](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl&view=run) |
 
 ---
 

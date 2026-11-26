@@ -41,6 +41,10 @@ actual fun FullscreenWebView(
         modifier = modifier,
         captureBackPresses = captureBackPresses,
         platformWebViewParams = params,
+        onCreated = { view ->
+            // Keep Android/WebView identification for sites while suppressing the public handoff inside Xiaoban.
+            view.settings.userAgentString = view.settings.userAgentString + " XiaobanWorkHost"
+        },
     )
     if (chromeClient != null) {
         // Register after the WebView so Back exits fullscreen before navigating web history.

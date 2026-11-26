@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
 import { appRuntimeBase, appRuntimeEntry, canTrialPack } from '../src/lib/appRuntime.ts'
+import { clientWorkLink, workClientPlatform } from '../src/lib/clientWork.ts'
 import { readIdeaPlayerDocument } from '../src/lib/ideaPlayerDocument.ts'
 
 const manifest = { schemaVersion: 3, runtimeProtocol: 2 }
@@ -102,4 +103,24 @@ test('a player without a total reports actual received bytes', async t => {
   await readIdeaPlayerDocument(ideaUrl, 'allow-scripts', new AbortController().signal,
     (received, total) => progress.push([received, total]))
   assert.deepEqual(progress, [[0, undefined], [Buffer.byteLength(ideaHtml), undefined]])
+})
+
+test('public work links preserve their kind and selected published version', () => {
+  assert.equal(clientWorkLink({ kind: 'builtin', id: 'mbti' }), 'xiaoban://community/run/builtin/mbti')
+  assert.equal(clientWorkLink({ kind: 'idea', id: 'jiangshan-map' }), 'xiaoban://community/run/idea/jiangshan-map')
+  assert.equal(clientWorkLink({ kind: 'pack', id: 38, version: 7 }), 'xiaoban://community/run/pack/38/7')
+  assert.equal(clientWorkLink(), undefined)
+  for (const id of ['', 'a', '-bad', 'Bad', 'foo/bar', 'foo\n']) assert.equal(clientWorkLink({ kind: 'idea', id }), undefined)
+  for (const version of [0, -1, 1.5, 2147483648]) assert.equal(clientWorkLink({ kind: 'pack', id: 1, version }), undefined)
+  assert.equal(clientWorkLink({ kind: 'pack', id: Number.MAX_SAFE_INTEGER + 1, version: 1 }), undefined)
+})
+
+test('work handoff follows the installed platform independently of viewport size', () => {
+  assert.equal(workClientPlatform('Mozilla/5.0 (Windows NT 10.0)', 'Win32', 10), 'desktop')
+  assert.equal(workClientPlatform('Mozilla/5.0 (Macintosh)', 'MacIntel', 0), 'desktop')
+  assert.equal(workClientPlatform('Mozilla/5.0 (Linux; Android 15)', 'Linux aarch64', 5), 'android')
+  assert.equal(workClientPlatform('Mozilla/5.0 (Macintosh)', 'MacIntel', 5), undefined)
+  assert.equal(workClientPlatform('Mozilla/5.0 (iPhone)', 'iPhone', 5), undefined)
+  assert.equal(workClientPlatform('Mozilla/5.0 (Linux; Android 15) XiaobanWorkHost', 'Linux', 5), undefined)
+  assert.equal(workClientPlatform('Mozilla/5.0 (X11; Linux x86_64)', 'Linux', 0), undefined)
 })

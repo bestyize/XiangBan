@@ -1,3 +1,5 @@
+import type { ClientWork } from './clientWork'
+
 export type ShareExtra = {
   label: string
   description: string
@@ -15,6 +17,7 @@ export interface SharePayload {
   thumbnail?: string | null
   icon?: string
   extra?: ShareExtra
+  clientWork?: ClientWork
   metric?: string
   linkOnly?: boolean
   verify?: () => Promise<void>

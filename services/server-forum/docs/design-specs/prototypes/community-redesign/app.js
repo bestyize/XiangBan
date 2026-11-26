@@ -4,136 +4,7 @@
   /* ==========================================================================
      真实仓库内容与本地资源（均来自 services/server-forum）
      ========================================================================== */
-  const WORKS = [
-    {
-      id: 'whale-girl',
-      title: '潮汐书房 · 鲸鱼娘',
-      category: '3D 互动',
-      author: 'RealWorldBuilder',
-      avatarBg: '#2F6FDB',
-      date: '2026-11-19',
-      likes: 186,
-      commentsCount: 24,
-      cover: './assets/whale-girl.webp',
-      tall: true,
-      description: '拜访月湾书房的溟月，看她读书、写信，从书页间发现藏品。',
-      introduction: '月升时，溟月会坐在窗边读书，也会在贝壳灯下写信。可以陪她在书房散步，请她从书架取一本书，翻看夹页里的藏品，听听它的来历。作品免费体验，角色模型采用 CC BY-NC-SA 4.0 许可。',
-      controls: '桌面：点击地板散步，拖动环顾，滚轮缩放 · 手机：轻触地板散步，双指缩放',
-      actionLabel: '进入 3D 书房体验'
-    },
-    {
-      id: 'jiangshan-map',
-      title: '江山时序',
-      category: '工具',
-      author: 'DeanChensj',
-      avatarBg: '#A8640C',
-      date: '2026-11-18',
-      likes: 243,
-      commentsCount: 31,
-      cover: './assets/jiangshan-map.webp',
-      tall: false,
-      description: '沿时间轴看历代疆域，查古今地名，跟着历史人物走一程。',
-      introduction: '从公元前 403 年到 1948 年，拖动时间轴查看历代疆域，点击古城了解沿革，也可以搜索苏轼、李白等人物，沿地图回看他们的行迹。支持离线使用与桌面端导入。',
-      controls: '拖动时间轴，滚轮缩放，点击古城查看沿革',
-      actionLabel: '打开江山时序'
-    },
-    {
-      id: 'micro-gallery',
-      title: '微观展厅 · 龙鱼水族箱',
-      category: '展厅',
-      author: 'RealWorldBuilder',
-      avatarBg: '#07C160',
-      date: '2026-11-15',
-      likes: 164,
-      commentsCount: 19,
-      cover: './assets/micro-gallery.webp',
-      tall: true,
-      description: '看朱红龙鱼与孔雀鱼共游，轻触水面投喂，探索更多 3D 展品。',
-      introduction: '社区常驻 3D 微观展厅。水族箱默认展示朱红龙鱼和砂石水草，支持切换蓝色龙鱼与孔雀鱼组合，播放时轻按水面即可投喂。',
-      controls: '点按水面投喂，拖动视角环顾，设置内切换鱼群',
-      actionLabel: '进入微观展厅'
-    },
-    {
-      id: 'plush-rabbit',
-      title: '碎花垂耳兔',
-      category: '3D 模型',
-      author: 'RealWorldBuilder',
-      avatarBg: '#D93A44',
-      date: '2026-11-15',
-      likes: 129,
-      commentsCount: 14,
-      cover: './assets/plush-rabbit.webp',
-      tall: false,
-      description: '转动 3D 模型，近看绒毛、碎花布料与头顶蝴蝶结纹理。',
-      introduction: '奶白色的垂耳兔，内耳和头顶的蝴蝶结用了同样的碎花布。打开模型转一圈，可以近看耳朵的弧度和绒毛材质表现。',
-      controls: '拖动旋转模型，滚轮 / 双指缩放细节',
-      actionLabel: '体验 3D 模型'
-    },
-    {
-      id: 'starry-nightrider',
-      title: '星夜骑士：Starry Nightrider',
-      category: '游戏',
-      author: '@ebbyamir',
-      avatarBg: '#7152D8',
-      date: '2026-11-15',
-      likes: 215,
-      commentsCount: 28,
-      cover: './assets/starry-nightrider.webp',
-      tall: true,
-      description: '骑车穿过梵高《星夜》里的村庄，把收集到的光球送进教堂尖塔。',
-      introduction: '在油画笔触构成的小镇夜色中穿梭，收集散落星光并冲上山坡，支持键盘方向键与触控操作，内置本地排行榜。',
-      controls: '方向键 / WASD 控制骑行与跳跃，触屏支持虚拟按键',
-      actionLabel: '试玩星夜骑士'
-    },
-    {
-      id: 'little-prince',
-      title: '小王子：星辰之旅',
-      category: '游戏',
-      author: 'Sac',
-      avatarBg: '#2F6FDB',
-      date: '2026-11-15',
-      likes: 198,
-      commentsCount: 22,
-      cover: './assets/little-prince.webp',
-      tall: false,
-      description: '从 B-612 小行星出发，踏上星球间的柔和 3D 旅程。',
-      introduction: '在低重力微型星球表面漫步，照料玫瑰花并飞往相邻小行星，体验轻盈治愈的交互叙事。',
-      controls: 'WASD 移动，鼠标拖动调整视角',
-      actionLabel: '前往作品官网'
-    },
-    {
-      id: 'saltline',
-      title: '运输船：Saltline',
-      category: '游戏',
-      author: 'Felix Rieseberg',
-      avatarBg: '#2B2B30',
-      date: '2026-11-15',
-      likes: 142,
-      commentsCount: 16,
-      cover: './assets/saltline.webp',
-      tall: true,
-      description: '潜入雨夜货港，切断信号中继站后乘船撤离。',
-      introduction: '冷雨与探照灯交织的潜行小品，利用集装箱阴影躲避巡逻艇，单文件即可运行于小伴桌面与网页沙箱。',
-      controls: '方向键潜行移动，空格键互动与切断电源',
-      actionLabel: '启动 Saltline'
-    },
-    {
-      id: 'oil-paint',
-      title: 'Oil Paint · 实时油画漫步',
-      category: '游戏',
-      author: '@BlendiByl',
-      avatarBg: '#D93A44',
-      date: '2026-11-15',
-      likes: 176,
-      commentsCount: 20,
-      cover: './assets/oil-paint.webp',
-      tall: false,
-      description: '在实时笔触绘成的 3D 油画里漫步，探索秋林与极光下的雪脊。',
-      introduction: '基于 WebGL2 与 Rapier 物理引擎构建的后处理笔触世界，每一帧画面都像流动的厚涂油画。',
-      controls: 'WASD 漫步，鼠标拖动转动视角',
-      actionLabel: '进入画中世界'
-    }
-  ];
+  const WORKS = communityDesignWorks;
 
   const FRONTIER_ITEMS = [
     {
@@ -1584,6 +1455,7 @@
       if (!w) return null;
       return {
         key: w.id,
+        player: w.player,
         badge: w.category,
         tags: [w.category, '小伴创意', w.kind || '交互作品'].filter((v, i, a) => v && a.indexOf(v) === i),
         title: w.title,
@@ -1671,7 +1543,7 @@
 
   function getDetailMoreItems(item, device) {
     const isPinned = state.pinnedKeys.has(item.key);
-    const includeShare = device === 'mobile' && state.role !== 'author';
+    const includeShare = device === 'mobile' && state.role !== 'author' && !item.player;
     const items = [];
     if (includeShare) {
       items.push({ icon: 'share', label: '分享给好友', action: 'detail-more-toast', msg: '已复制分享链接' });
@@ -1788,7 +1660,7 @@
     const tagsHtml = (item.tags || []).map(tag => `<span class="xhs-hashtag">#${esc(tag)}</span>`).join(' ');
     const actionIcon = item.actionKind === 'external' ? 'external' : item.actionKind === 'download' ? 'download' : 'play';
     const primaryCtaHtml = item.actionLabel ? `
-      <button type="button" class="xhs-primary-cta" data-action="toast" data-msg="演示打开：${esc(item.actionLabel)}">
+      <button type="button" class="xhs-primary-cta" data-action="${item.player ? 'work-run' : 'toast'}" data-device="${device}" data-msg="演示打开：${esc(item.actionLabel)}">
         <span class="xhs-primary-cta-icon">${icon(actionIcon, actionIcon === 'play' ? 16 : 15)}</span>
         <span class="xhs-primary-cta-label">${esc(item.actionLabel)}</span>
       </button>
@@ -1822,7 +1694,7 @@
               </div>
               <div class="xhs-author-actions">
                 ${!isAuthor ? `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(item.author)}">${followed ? '已关注' : '关注'}</button>` : ''}
-                <button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制分享链接">${icon('share', 16)}</button>
+                <button type="button" class="h5-icon-btn" aria-label="分享" data-action="${item.player ? 'work-share' : 'toast'}" data-device="desktop" data-msg="已复制分享链接">${icon('share', 16)}</button>
                 <div class="xhs-more-wrap">
                   <button type="button" class="h5-icon-btn ${state.pcMoreOpen ? 'is-open' : ''}" aria-label="更多操作" aria-expanded="${state.pcMoreOpen}" data-action="toggle-pc-more">${icon('more', 17)}</button>
                   ${state.pcMoreOpen ? `
@@ -2065,9 +1937,8 @@
               ${isAuthor ? '<span class="xhs-role-pill">我</span>' : ''}
               ${isPinned ? '<span class="xhs-pin-pill">置顶</span>' : ''}
             </div>
-            ${isAuthor
-              ? `<button type="button" class="h5-icon-btn" aria-label="分享" data-action="toast" data-msg="已复制作品分享链接">${icon('share', 18)}</button>`
-              : `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>`}
+            ${!isAuthor ? `<button type="button" class="xhs-follow-btn ${followed ? 'is-followed' : ''}" data-action="toggle-follow" data-author="${esc(detailItem.author)}">${followed ? '已关注' : '关注'}</button>` : ''}
+            ${isAuthor || detailItem.player ? `<button type="button" class="h5-icon-btn" aria-label="分享" data-action="${detailItem.player ? 'work-share' : 'toast'}" data-device="mobile" data-msg="已复制作品分享链接">${icon('share', 18)}</button>` : ''}
             <button type="button" class="h5-icon-btn ${state.h5MoreOpen ? 'is-open' : ''}" aria-label="更多操作" data-action="open-h5-more">${icon('more', 18)}</button>
           </div>
         </header>
@@ -2476,6 +2347,19 @@
 
     const action = btn.getAttribute('data-action');
     switch (action) {
+      case 'work-run':
+      case 'work-share': {
+        const item = getDetailModel();
+        if (!item?.player) break;
+        const standalone = location.port === '1449' && ['127.0.0.1', 'localhost'].includes(location.hostname);
+        const url = standalone ? new URL('http://' + location.hostname + ':1450/prototypes/web-detail-share.html')
+          : new URL('../web-detail-share.html', location.href);
+        url.search = new URLSearchParams({ scene: 'work', work: item.player,
+          view: action === 'work-run' ? 'run' : 'share', device: btn.dataset.device || 'mobile',
+          role: state.role === 'author' ? 'author' : 'guest' }).toString();
+        location.assign(url.href);
+        break;
+      }
       case 'go-page':
         state.detail = null;
         state.detailSlide = 0;

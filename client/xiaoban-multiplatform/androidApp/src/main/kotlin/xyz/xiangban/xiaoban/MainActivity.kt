@@ -21,12 +21,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.openCommunityWork
+import xyz.xiangban.xiaoban.business.communitynative.openIdeaWork
 import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.nativeAgentBridgeOrNull
 import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
@@ -37,6 +39,9 @@ class MainActivity : ComponentActivity() {
         private set
     private var sharingPlatform: CommunitySharingPlatform? = null
     private var shortcutJob: Job? = null
+    private var webWorkJob: Job? = null
+    private var pendingWebWork: String? = null
+    private var webWorkRequest = 0L
     private lateinit var reminders: AndroidReminders
     private var voicePlatform: AndroidPlatformActions? = null
     private var appUpdates: AndroidAppUpdates? = null
@@ -44,8 +49,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        sharingPlatform?.accept(intent)
-        openWorkShortcut(intent)
+        handleIncoming(intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -85,7 +89,6 @@ class MainActivity : ComponentActivity() {
         voicePlatform = platform
         val forumPlatform = CommunitySharingPlatform(ForumPickerPlatform(platform, AndroidForumPicker(this)), this)
         sharingPlatform = forumPlatform
-        forumPlatform.accept(intent)
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
         var askingNotifications = false
@@ -133,7 +136,10 @@ class MainActivity : ComponentActivity() {
             speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffset,
         )
         setContent { CommunityNativeApp(communityEnv) }
-        if (savedInstanceState == null) openWorkShortcut(intent)
+        val interrupted = savedInstanceState?.getString("pendingWebWork")
+        if (interrupted != null) handleIncoming(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(interrupted)))
+        else if (savedInstanceState == null) handleIncoming(intent)
+        else if (WebWorkLink.parse(intent.dataString) == null) forumPlatform.accept(intent)
         hideNavigationBar()
         (application as XiaobanApplication).prefetchSpeechResources()
     }
@@ -155,6 +161,49 @@ class MainActivity : ComponentActivity() {
         voicePlatform?.releaseVoice()
         voicePlatform = null
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pendingWebWork", pendingWebWork)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun handleIncoming(intent: Intent) {
+        val raw = intent.dataString
+        val work = if (intent.action == Intent.ACTION_VIEW) WebWorkLink.parse(raw) else null
+        if (work == null) {
+            webWorkRequest++
+            webWorkJob?.cancel()
+            pendingWebWork = null
+            sharingPlatform?.accept(intent)
+            openWorkShortcut(intent)
+            return
+        }
+        if (raw == pendingWebWork && webWorkJob?.isActive == true) return
+        val request = ++webWorkRequest
+        sharingPlatform?.consumeCommunityLink()
+        val previous = webWorkJob
+        previous?.cancel()
+        pendingWebWork = raw
+        webWorkJob = lifecycleScope.launch {
+            try {
+                previous?.join()
+                when (work) {
+                    is WebWorkLink.Builtin -> check(bundledGameRoot(work.id) != null && AndroidGameLauncher.open(this@MainActivity, work.id)) { "当前版本没有这个内置作品" }
+                    is WebWorkLink.Idea -> openIdeaWork(communityEnv, work.id, ::confirmShortcutDownload)
+                    is WebWorkLink.Pack -> {
+                        communityEnv.communityGameBusy.first { busy -> !busy }
+                        openCommunityWork(communityEnv, work.id, work.version, confirmMobileDownload = ::confirmShortcutDownload)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, e.message ?: "无法打开作品，请重试", Toast.LENGTH_LONG).show()
+            } finally {
+                if (webWorkRequest == request) pendingWebWork = null
+            }
+        }
     }
 
     private fun openWorkShortcut(intent: Intent) {

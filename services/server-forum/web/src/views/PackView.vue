@@ -143,6 +143,8 @@ const share = computed<SharePayload | undefined>(() => {
     cover: postImage.value,
     icon: 'image',
     metric: 'pack',
+    clientWork: trialVersion.value?.manifest.runtimeProtocol === 2
+      ? { kind: 'pack', id: work.id, version: trialVersion.value.version } : undefined,
     verify: isAuthor.value ? async () => {
       try { await contentApi.sharePack(work.id) }
       catch (e) {
@@ -198,7 +200,7 @@ const shareDeletion = computed<ShareDeletion | undefined>(() => {
             <details ref="actionsMenu" class="more-actions" @focusout="dismissActions" @keydown.esc.stop.prevent="closeActions(true)">
               <summary ref="actionsTrigger" class="icon-action" aria-label="更多作品操作" title="更多作品操作"><AppIcon name="more" :size="22" /></summary>
               <div class="actions-panel" @click="closeActions(true)">
-                <a v-if="runLocation && clientLink" class="action-item desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">在小伴中打开</a>
+                <a v-if="runLocation && clientLink && !share?.clientWork" class="action-item desktop-only" :href="clientLink" @click="track('apply_click', pack.kind)">在小伴中打开</a>
                 <button v-if="runLocation || clientLink" class="action-item" :class="{ 'desktop-only': !runLocation }" type="button" :disabled="busy" @click="download">下载压缩包</button>
                 <button v-if="latest" class="action-item" type="button" :aria-expanded="versionsOpen" aria-controls="pack-versions" @click.stop="toggleVersions">
                   {{ versionsOpen ? '收起版本记录' : '版本记录' }}
