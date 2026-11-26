@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Icon from '@/components/Icon.vue'
+import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect.vue'
+import TagChipEditor from '@/components/admin/TagChipEditor.vue'
 import { createCustomWallpaper, uploadFile } from '@/admin/api'
 import { toast } from '@/composables/toast'
 import { useCatalog } from '@/stores/catalog'
@@ -13,95 +15,128 @@ const mediaType = ref<'image' | 'video'>('image')
 const title = ref('')
 const description = ref('')
 const category = ref('')
-const tagsText = ref('')
-const status = ref('published')
+const tags = ref<string[]>([])
+const status = ref<'published' | 'pending'>('published')
 
-// 资源链接
 const previewUrl = ref('')
 const regularUrl = ref('')
 const videoUrl = ref('')
+const fileName = ref('')
 const width = ref<number | undefined>(undefined)
 const height = ref<number | undefined>(undefined)
 const orientation = ref<'landscape' | 'portrait' | 'squarish'>('landscape')
+const previewFrame = ref<'desktop' | 'phone'>('desktop')
 
-// 上传中状态
-const uploadingImage = ref(false)
-const uploadingVideo = ref(false)
+const dragging = ref(false)
+const uploadingMedia = ref(false)
+const uploadingPoster = ref(false)
 const submitting = ref(false)
 
-async function handleImageFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  uploadingImage.value = true
+const categoryOptions = computed<SelectOption[]>(() => [
+  { value: '', label: '未分类' },
+  ...catalog.categories.map((c) => ({ value: c.id, label: c.name })),
+])
+
+const orientationOptions: SelectOption[] = [
+  { value: 'landscape', label: '横屏 (PC)', icon: 'monitor' },
+  { value: 'portrait', label: '竖屏 (手机)', icon: 'phone' },
+  { value: 'squarish', label: '方形', icon: 'grid' },
+]
+
+onMounted(() => {
+  if (catalog.categories.length === 0) void catalog.load()
+})
+
+function resetMedia() {
+  previewUrl.value = ''
+  regularUrl.value = ''
+  videoUrl.value = ''
+  fileName.value = ''
+  width.value = undefined
+  height.value = undefined
+}
+
+async function processImageFile(file: File) {
+  uploadingMedia.value = true
   try {
     const res = await uploadFile(file)
     regularUrl.value = res.url
     previewUrl.value = res.url
-    if (!title.value) {
-      title.value = file.name.replace(/\.[^/.]+$/, '')
-    }
+    fileName.value = file.name
+    if (!title.value) title.value = file.name.replace(/\.[^/.]+$/, '')
 
-    // 探测图片真实尺寸与方向
     const img = new Image()
     img.src = res.url
     img.onload = () => {
       width.value = img.naturalWidth
       height.value = img.naturalHeight
       const ratio = img.naturalWidth / img.naturalHeight
-      if (ratio > 1.2) orientation.value = 'landscape'
-      else if (ratio < 0.85) orientation.value = 'portrait'
-      else orientation.value = 'squarish'
+      orientation.value = ratio > 1.2 ? 'landscape' : ratio < 0.85 ? 'portrait' : 'squarish'
     }
-
-    toast('图片上传成功！')
-  } catch (err: any) {
-    toast(err?.message || '图片上传失败')
+    toast('图片上传成功')
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '图片上传失败')
   } finally {
-    uploadingImage.value = false
+    uploadingMedia.value = false
   }
 }
 
-async function handleVideoFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  uploadingVideo.value = true
+async function processVideoFile(file: File) {
+  uploadingMedia.value = true
   try {
     const res = await uploadFile(file)
     videoUrl.value = res.url
     regularUrl.value = res.url
-    if (!title.value) {
-      title.value = file.name.replace(/\.[^/.]+$/, '')
-    }
+    fileName.value = file.name
+    if (!title.value) title.value = file.name.replace(/\.[^/.]+$/, '')
 
-    // 探测视频尺寸与方向
     const vid = document.createElement('video')
     vid.src = res.url
     vid.onloadedmetadata = () => {
       width.value = vid.videoWidth
       height.value = vid.videoHeight
       const ratio = vid.videoWidth / vid.videoHeight
-      if (ratio > 1.2) orientation.value = 'landscape'
-      else if (ratio < 0.85) orientation.value = 'portrait'
-      else orientation.value = 'squarish'
+      orientation.value = ratio > 1.2 ? 'landscape' : ratio < 0.85 ? 'portrait' : 'squarish'
     }
-
-    toast('视频上传成功！建议同时上传一张视频海报/封面图')
-  } catch (err: any) {
-    toast(err?.message || '视频上传失败')
+    toast('视频上传成功')
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '视频上传失败')
   } finally {
-    uploadingVideo.value = false
+    uploadingMedia.value = false
   }
 }
 
-async function handlePosterFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
+function onMediaInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
   if (!file) return
+  if (mediaType.value === 'image') void processImageFile(file)
+  else void processVideoFile(file)
+}
+
+function onDrop(e: DragEvent) {
+  dragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (!file) return
+  if (mediaType.value === 'image') void processImageFile(file)
+  else void processVideoFile(file)
+}
+
+async function onPosterInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  uploadingPoster.value = true
   try {
     const res = await uploadFile(file)
     previewUrl.value = res.url
-    toast('视频封面图上传成功！')
-  } catch (err: any) {
-    toast(err?.message || '封面图上传失败')
+    toast('视频封面已上传')
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '封面上传失败')
+  } finally {
+    uploadingPoster.value = false
   }
 }
 
@@ -114,36 +149,27 @@ async function submit() {
     toast(mediaType.value === 'image' ? '请先上传壁纸图片' : '请先上传视频文件')
     return
   }
-  if (mediaType.value === 'video' && !previewUrl.value) {
-    previewUrl.value = regularUrl.value
-  }
-
+  const poster = previewUrl.value || regularUrl.value
   submitting.value = true
-  const tags = tagsText.value
-    .split(/[,，]/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-
   try {
     await createCustomWallpaper({
       title: title.value.trim(),
       description: description.value.trim() || undefined,
       media_type: mediaType.value,
-      preview_url: previewUrl.value,
+      preview_url: poster,
       regular_url: regularUrl.value,
       video_url: mediaType.value === 'video' ? videoUrl.value : undefined,
       category: category.value || undefined,
-      tags,
+      tags: tags.value,
       orientation: orientation.value,
       width: width.value,
       height: height.value,
       status: status.value,
     })
-
-    toast('壁纸创建并上架成功！')
+    toast('已创建并发布到壁纸图库')
     router.push('/admin/wallpapers')
-  } catch (err: any) {
-    toast(err?.message || '上架失败')
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '上架失败')
   } finally {
     submitting.value = false
   }
@@ -151,186 +177,158 @@ async function submit() {
 </script>
 
 <template>
-  <div class="upload-view">
-    <header class="head">
-      <div class="title-wrap">
-        <h1 class="a-h1">自定义壁纸 / 视频上架</h1>
-        <p class="desc">直接上传本地原创或高质量壁纸、4K 视频，填入分类与标签并发布到前台。</p>
+  <div class="xb-page is-narrow">
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg">
+        <button
+          type="button"
+          :class="{ 'is-active': mediaType === 'image' }"
+          @click="mediaType = 'image'; resetMedia()"
+        >
+          静态图片
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-active': mediaType === 'video' }"
+          @click="mediaType = 'video'; resetMedia()"
+        >
+          动态视频
+        </button>
+      </div>
+      <div class="xb-page-actions">
+        <RouterLink to="/admin/wallpapers" class="xb-btn-ghost">取消</RouterLink>
+        <button
+          type="button"
+          class="xb-btn-primary"
+          :disabled="submitting || uploadingMedia || uploadingPoster"
+          @click="submit"
+        >
+          {{ submitting ? '发布中…' : '上架发布' }}
+        </button>
       </div>
     </header>
 
-    <div class="form-container">
-      <!-- 媒体类型切换 -->
-      <div class="type-selector">
-        <label
-          class="type-card"
-          :class="{ active: mediaType === 'image' }"
-          @click="mediaType = 'image'"
-        >
-          <Icon name="image" :size="24" />
-          <div class="type-text">
-            <span class="type-title">静态图片壁纸</span>
-            <span class="type-sub">支持 4K/8K JPG, PNG, WEBP</span>
+    <div class="xb-split-2">
+      <div class="col-stack">
+        <div v-if="regularUrl" class="xb-group xb-group-pad preview-card">
+          <div class="preview-top">
+            <span class="xb-mono fname" :title="fileName">{{ fileName || '已上传素材' }}</span>
+            <div class="xb-seg">
+              <button type="button" :class="{ 'is-active': previewFrame === 'desktop' }" @click="previewFrame = 'desktop'">
+                桌面
+              </button>
+              <button type="button" :class="{ 'is-active': previewFrame === 'phone' }" @click="previewFrame = 'phone'">
+                手机
+              </button>
+            </div>
           </div>
-        </label>
+
+          <div class="device-frame" :class="{ 'is-phone': previewFrame === 'phone' }">
+            <video
+              v-if="mediaType === 'video'"
+              :src="videoUrl"
+              controls
+              autoplay
+              muted
+              loop
+              playsinline
+            />
+            <img v-else :src="regularUrl" alt="预览" />
+          </div>
+
+          <div class="preview-foot">
+            <span class="xb-num res">{{ width && height ? `${width} × ${height}` : '自动探测中…' }}</span>
+            <label class="xb-btn-ghost is-sm file-trigger">
+              <span>更换素材</span>
+              <input
+                type="file"
+                :accept="mediaType === 'image' ? 'image/*' : 'video/*'"
+                hidden
+                @change="onMediaInput"
+              />
+            </label>
+          </div>
+        </div>
 
         <label
-          class="type-card"
-          :class="{ active: mediaType === 'video' }"
-          @click="mediaType = 'video'"
+          v-else
+          class="drop-zone"
+          :class="{ 'is-drag': dragging }"
+          @dragover.prevent="dragging = true"
+          @dragleave="dragging = false"
+          @drop.prevent="onDrop"
         >
-          <Icon name="play" :size="24" />
-          <div class="type-text">
-            <span class="type-title">动态视频壁纸</span>
-            <span class="type-sub">支持 MP4, WebM 高清与 4K 循环动态壁纸</span>
-          </div>
-        </label>
-      </div>
-
-      <!-- 文件上传卡片 -->
-      <div class="upload-sections">
-        <!-- 静态壁纸上传 -->
-        <div v-if="mediaType === 'image'" class="drop-zone">
           <input
             type="file"
-            accept="image/*"
-            class="file-input"
-            @change="handleImageFile"
+            :accept="mediaType === 'image' ? 'image/*' : 'video/*'"
+            hidden
+            @change="onMediaInput"
           />
-          <div v-if="regularUrl" class="preview-wrap">
-            <img :src="regularUrl" alt="预览图" class="uploaded-img" />
-            <span class="re-upload-tip">点击或拖拽可更换图片</span>
-          </div>
-          <div v-else class="upload-placeholder">
-            <Icon name="upload" :size="36" />
-            <span class="main-tip">{{ uploadingImage ? '正在上传图片...' : '点击或拖拽上传壁纸图片' }}</span>
-            <span class="sub-tip">推荐 3840x2160 (4K) 或更高分辨率</span>
-          </div>
-        </div>
+          <span class="drop-ico"><Icon :name="mediaType === 'video' ? 'play' : 'upload'" :size="26" /></span>
+          <strong>
+            {{ uploadingMedia ? '上传中…' : `点击或拖拽上传${mediaType === 'video' ? '动态视频' : '高清图片'}` }}
+          </strong>
+          <span class="drop-sub">
+            {{ mediaType === 'video' ? 'MP4 / WebM，建议无缝循环' : 'JPG / PNG / WebP，推荐 4K 以上' }}
+          </span>
+        </label>
 
-        <!-- 动态壁纸上传 -->
-        <div v-else class="video-upload-grid">
-          <!-- 视频主体 -->
-          <div class="drop-zone">
-            <input
-              type="file"
-              accept="video/*"
-              class="file-input"
-              @change="handleVideoFile"
-            />
-            <div v-if="videoUrl" class="preview-wrap">
-              <video :src="videoUrl" controls autoplay muted loop class="uploaded-video" />
-              <span class="re-upload-tip">点击可更换视频</span>
+        <div v-if="mediaType === 'video'" class="xb-group">
+          <div class="xb-row" title="不上传时由后端 FFmpeg 自动截取第 1 帧作为封面">
+            <div class="poster-info">
+              <span style="font-weight: 550">视频封面海报</span>
+              <span v-if="previewUrl && previewUrl !== videoUrl" class="xb-pill is-ok">已上传</span>
             </div>
-            <div v-else class="upload-placeholder">
-              <Icon name="play" :size="36" />
-              <span class="main-tip">{{ uploadingVideo ? '正在上传视频...' : '点击上传动态壁纸视频 (MP4/WebM)' }}</span>
-              <span class="sub-tip">建议无黑边、支持无缝循环的短视频</span>
-            </div>
-          </div>
-
-          <!-- 视频封面图（可选） -->
-          <div class="drop-zone mini">
-            <input
-              type="file"
-              accept="image/*"
-              class="file-input"
-              @change="handlePosterFile"
-            />
-            <div v-if="previewUrl && previewUrl !== videoUrl" class="preview-wrap">
-              <img :src="previewUrl" alt="封面图" class="uploaded-img" />
-              <span class="re-upload-tip">点击更换封面</span>
-            </div>
-            <div v-else class="upload-placeholder">
-              <Icon name="image" :size="24" />
-              <span class="main-tip">上传视频海报图 (可选)</span>
-              <span class="sub-tip">若不上传将使用视频首帧</span>
-            </div>
+            <label class="xb-btn-soft is-sm file-trigger">
+              <span>{{ uploadingPoster ? '上传中…' : previewUrl && previewUrl !== videoUrl ? '更换封面' : '上传封面' }}</span>
+              <input type="file" accept="image/*" hidden @change="onPosterInput" />
+            </label>
           </div>
         </div>
       </div>
 
-      <!-- 元信息表单 -->
-      <div class="meta-form">
-        <div class="form-row">
-          <div class="form-item flex-2">
-            <label class="label">壁纸标题 *</label>
-            <input
-              v-model="title"
-              type="text"
-              placeholder="例如：赛博朋克雨夜 4K"
-              class="a-input"
+      <div class="xb-group xb-group-pad form-col">
+        <label class="xb-field">
+          <span class="xb-field-label">标题</span>
+          <input v-model="title" type="text" class="xb-input" placeholder="例如：冰岛极光湖面 4K" />
+        </label>
+
+        <div class="xb-split-eq">
+          <div class="xb-field">
+            <span class="xb-field-label">分类</span>
+            <AdminSelect v-model="category" :options="categoryOptions" full />
+          </div>
+          <div class="xb-field">
+            <span class="xb-field-label">画幅</span>
+            <AdminSelect
+              :model-value="orientation"
+              :options="orientationOptions"
+              full
+              @update:model-value="orientation = $event as 'landscape' | 'portrait' | 'squarish'"
             />
           </div>
-
-          <div class="form-item flex-1">
-            <label class="label">所属分类</label>
-            <select v-model="category" class="a-select">
-              <option value="">未分类</option>
-              <option v-for="cat in catalog.categories" :key="cat.id" :value="cat.id">
-                {{ cat.name }}
-              </option>
-            </select>
-          </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-item flex-2">
-            <label class="label">标签 (逗号分隔)</label>
-            <input
-              v-model="tagsText"
-              type="text"
-              placeholder="例如：城市, 雨夜, 霓虹, 4K"
-              class="a-input"
-            />
-          </div>
-
-          <div class="form-item flex-1">
-            <label class="label">屏幕方向</label>
-            <select v-model="orientation" class="a-select">
-              <option value="landscape">横屏 (PC 电脑)</option>
-              <option value="portrait">竖屏 (手机 / 平板)</option>
-              <option value="squarish">方形</option>
-            </select>
-          </div>
+        <div class="xb-field">
+          <span class="xb-field-label">标签</span>
+          <TagChipEditor v-model="tags" />
         </div>
 
-        <div class="form-row">
-          <div class="form-item flex-1">
-            <label class="label">分辨率（自动探测）</label>
-            <div class="res-display">
-              {{ width && height ? `${width} × ${height}` : '上传文件后自动识别' }}
-            </div>
+        <label class="xb-field">
+          <span class="xb-field-label">备注</span>
+          <textarea v-model="description" class="xb-textarea" rows="3" placeholder="可选：作者署名或拍摄参数" />
+        </label>
+
+        <div class="xb-field">
+          <span class="xb-field-label">上架状态</span>
+          <div class="xb-seg" style="align-self: flex-start">
+            <button type="button" :class="{ 'is-active': status === 'published' }" @click="status = 'published'">
+              立即上架
+            </button>
+            <button type="button" :class="{ 'is-active': status === 'pending' }" @click="status = 'pending'">
+              存入待审核
+            </button>
           </div>
-
-          <div class="form-item flex-1">
-            <label class="label">上架状态</label>
-            <select v-model="status" class="a-select">
-              <option value="published">立即对外上架 (Published)</option>
-              <option value="pending">仅存入待审核库 (Pending)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-item">
-          <label class="label">描述信息 (可选)</label>
-          <textarea
-            v-model="description"
-            rows="3"
-            placeholder="填写简要壁纸说明或作者来源版权信息..."
-            class="a-input"
-          />
-        </div>
-
-        <div class="form-actions">
-          <button
-            type="button"
-            class="a-btn primary submit-btn"
-            :disabled="submitting || uploadingImage || uploadingVideo"
-            @click="submit"
-          >
-            {{ submitting ? '正在上架...' : '确认上架发布' }}
-          </button>
         </div>
       </div>
     </div>
@@ -338,216 +336,83 @@ async function submit() {
 </template>
 
 <style scoped>
-.upload-view {
+.col-stack {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 32px 36px 60px;
-  max-width: 1200px;
+  gap: 12px;
 }
-
-.head {
+.form-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
 }
-
-.desc {
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.form-container {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  padding: 28px;
-}
-
-.type-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.type-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  border-radius: var(--r-card);
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.25);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.type-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.type-card.active {
-  border-color: rgba(59, 130, 246, 0.6);
-  background: rgba(59, 130, 246, 0.08);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
-}
-
-.type-title {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.type-sub {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
 .drop-zone {
-  position: relative;
+  border-radius: 12px;
+  background: var(--ui-surface-sunken);
   min-height: 240px;
-  border: 2px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
+  padding: 28px 24px;
+  border: 1.5px dashed var(--ui-border-strong);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.2);
+  gap: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+}
+.drop-zone:hover,
+.drop-zone.is-drag {
+  background: var(--ui-soft);
+  border-color: var(--ui-btn);
+}
+.drop-ico { color: var(--ui-ink); }
+.drop-sub { font-size: 12px; color: var(--ui-text-tertiary); }
+
+.preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.preview-top,
+.preview-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fname {
+  font-size: 12px;
+  color: var(--ui-text-secondary);
   overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.2s;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.drop-zone:hover {
-  border-color: rgba(255, 255, 255, 0.35);
+.res { font-size: 12px; color: var(--ui-text-tertiary); }
+.device-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
 }
-
-.drop-zone.mini {
-  min-height: 140px;
+.device-frame.is-phone {
+  width: 164px;
+  aspect-ratio: 9 / 18;
+  margin: 0 auto;
+  border-radius: 22px;
+  border: 5px solid #1C1C1F;
 }
-
-.file-input {
-  position: absolute;
-  inset: 0;
+.device-frame img,
+.device-frame video {
   width: 100%;
   height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 10;
+  object-fit: cover;
 }
-
-.upload-placeholder {
+.poster-info {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
-  pointer-events: none;
 }
-
-.main-tip {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.sub-tip {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.preview-wrap {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.uploaded-img {
-  max-height: 280px;
-  max-width: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-}
-
-.uploaded-video {
-  max-height: 280px;
-  max-width: 100%;
-  border-radius: 8px;
-}
-
-.re-upload-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.video-upload-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
-}
-
-.meta-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-row {
-  display: flex;
-  gap: 16px;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.flex-2 {
-  flex: 2;
-}
-
-.form-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.res-display {
-  display: flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 12px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--line);
-  border-radius: var(--r-input);
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.submit-btn {
-  min-width: 180px;
-  padding: 12px 28px;
-  font-size: 14px;
-}
+.file-trigger { cursor: pointer; }
 </style>

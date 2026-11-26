@@ -13,12 +13,12 @@ import { toastMessage } from '@/composables/toast'
   position: fixed;
   left: 50%;
   bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 20px);
-  z-index: 200;
+  z-index: 500;
   max-width: calc(100vw - 32px);
   padding: 11px 20px;
   border-radius: 999px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--ui-ink, var(--text));
+  color: var(--ui-card, var(--bg));
   font-size: 14px;
   font-weight: 500;
   transform: translateX(-50%);

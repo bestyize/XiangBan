@@ -5,6 +5,7 @@ import { formatBytes, formatDuration, formatPercent, splitTtl, TTL_UNITS } from 
 import type { CacheOverview } from '@/admin/types'
 import ConfirmButton from '@/components/admin/ConfirmButton.vue'
 import ToggleSwitch from '@/components/admin/ToggleSwitch.vue'
+import Icon from '@/components/Icon.vue'
 import { toast } from '@/composables/toast'
 
 const overview = ref<CacheOverview | null>(null)
@@ -40,14 +41,17 @@ async function load(refillForm = false) {
 }
 
 onMounted(() => {
-  load(true)
-  // Only the figures move on their own; edits in progress are left alone.
-  refreshTimer = setInterval(() => load(false), 10_000)
+  void load(true)
+  refreshTimer = setInterval(() => void load(false), 10_000)
 })
-
 onBeforeUnmount(() => clearInterval(refreshTimer))
 
 const ttlSecs = computed(() => Math.round(form.ttlValue * form.ttlUnit))
+const hitPct = computed(() => Math.round((overview.value?.hit_rate ?? 0) * 100))
+const capPct = computed(() => {
+  if (!overview.value || !overview.value.settings.max_entries) return 0
+  return Math.min(100, Math.round((overview.value.stats.entries / overview.value.settings.max_entries) * 100))
+})
 
 async function save() {
   if (saving.value) return
@@ -80,112 +84,141 @@ async function clear() {
 </script>
 
 <template>
-  <div class="a-page">
-    <header class="a-head">
-      <h1 class="display">搜索缓存</h1>
-      <p>
-        完全相同的搜索（关键词、分类、画幅、来源、页码都一样）会直接返回已保存的结果，不再请求供应商，
-        用来节省它们的调用额度。结果保存在 PostgreSQL 里，重启服务后仍然有效。
-      </p>
+  <div class="xb-page is-narrow">
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">搜索缓存</h1>
+      <div class="xb-page-actions">
+        <ConfirmButton label="清空缓存" confirm-label="确认清空" :busy="!overview" @confirm="clear" />
+        <button type="button" class="xb-btn-primary" :disabled="saving || !dirty" @click="save">
+          {{ saving ? '保存中…' : '保存设置' }}
+        </button>
+      </div>
     </header>
 
-    <p v-if="loading" class="a-note">加载中…</p>
-    <p v-else-if="loadError" class="a-error" role="alert">
-      {{ loadError }}
-      <button class="a-link" type="button" @click="load(true)">重试</button>
-    </p>
+    <div v-if="loadError" class="xb-alert is-danger" role="alert">
+      <div class="xb-alert-l"><Icon name="alert" :size="15" /><span>{{ loadError }}</span></div>
+      <button type="button" class="xb-btn-ghost is-sm" @click="load(true)">重试</button>
+    </div>
+
+    <div v-if="loading && !overview" class="xb-group xb-empty-box">加载中…</div>
 
     <template v-if="overview">
-      <section class="a-section" aria-label="缓存状态">
-        <dl class="a-figures">
-          <div class="a-figure">
-            <dt>命中率</dt>
-            <dd>{{ formatPercent(overview.hit_rate) }}</dd>
+      <div class="xb-kpi-grid">
+        <div class="xb-kpi-card">
+          <div class="xb-kpi-top"><span>命中率</span></div>
+          <div class="xb-kpi-val xb-num">{{ formatPercent(overview.hit_rate) }}</div>
+          <div class="xb-meter"><i :style="{ width: `${hitPct}%` }" /></div>
+        </div>
+        <div class="xb-kpi-card">
+          <div class="xb-kpi-top"><span>条目容量</span></div>
+          <div class="xb-kpi-val xb-num">
+            {{ overview.stats.entries }}<span class="sub-u">/{{ overview.settings.max_entries }}</span>
           </div>
-          <div class="a-figure">
-            <dt>已缓存 / 上限</dt>
-            <dd>{{ overview.stats.entries }} / {{ overview.settings.max_entries }}</dd>
+          <div class="xb-meter"><i :style="{ width: `${capPct}%` }" /></div>
+        </div>
+        <div class="xb-kpi-card">
+          <div class="xb-kpi-top"><span>占用空间</span></div>
+          <div class="xb-kpi-val xb-num">{{ formatBytes(overview.stats.bytes) }}</div>
+          <div class="xb-kpi-foot"><span>PostgreSQL 持久化</span></div>
+        </div>
+        <div class="xb-kpi-card">
+          <div class="xb-kpi-top"><span>最早条目</span></div>
+          <div class="xb-kpi-val" style="font-size: 18px">
+            {{ overview.stats.oldest_age_secs === null ? '—' : formatDuration(overview.stats.oldest_age_secs) }}
           </div>
-          <div class="a-figure">
-            <dt>占用空间</dt>
-            <dd>{{ formatBytes(overview.stats.bytes) }}</dd>
-          </div>
-          <div class="a-figure">
-            <dt>最早一条已保存</dt>
-            <dd>{{ overview.stats.oldest_age_secs === null ? '—' : formatDuration(overview.stats.oldest_age_secs) }}</dd>
-          </div>
-        </dl>
-        <p class="a-small">
-          服务启动以来：{{ overview.stats.hits }} 次直接用缓存，{{ overview.stats.misses }} 次去请求了供应商。
-        </p>
-      </section>
+          <div class="xb-kpi-foot xb-num">命中 {{ overview.stats.hits }} / 回源 {{ overview.stats.misses }}</div>
+        </div>
+      </div>
 
-      <section class="a-section" aria-label="缓存设置">
-        <div class="a-section-head">
-          <h2 class="display">设置</h2>
+      <p v-if="saveError" class="xb-error" role="alert">{{ saveError }}</p>
+
+      <div class="xb-group">
+        <div class="xb-row" title="关闭后每次检索都实时回源请求供应商">
+          <span style="font-weight: 550">启用搜索缓存</span>
+          <ToggleSwitch
+            v-model="form.enabled"
+            label="启用搜索缓存"
+            @update:model-value="dirty = true"
+          />
         </div>
 
-        <form class="a-form" @submit.prevent="save" @input="dirty = true" @change="dirty = true">
-          <label class="switch-line">
-            <span>
-              启用缓存
-              <span class="a-hint">关闭后每次搜索都会请求供应商，已保存的结果也不会被使用。</span>
-            </span>
-            <ToggleSwitch v-model="form.enabled" label="启用缓存" @update:model-value="dirty = true" />
-          </label>
+        <div class="xb-row" title="超过有效期不再命中，最长 30 天">
+          <span style="font-weight: 550">有效期</span>
+          <div class="ctrl-row">
+            <div class="xb-stepper">
+              <button
+                type="button"
+                aria-label="减少"
+                @click="form.ttlValue = Math.max(1, form.ttlValue - 1); dirty = true"
+              >
+                <Icon name="minus" :size="14" />
+              </button>
+              <input v-model.number="form.ttlValue" class="xb-num" type="number" min="1" @input="dirty = true" />
+              <button
+                type="button"
+                aria-label="增加"
+                @click="form.ttlValue += 1; dirty = true"
+              >
+                <Icon name="plus" :size="14" />
+              </button>
+            </div>
+            <div class="xb-seg">
+              <button
+                v-for="u in TTL_UNITS"
+                :key="u.secs"
+                type="button"
+                :class="{ 'is-active': form.ttlUnit === u.secs }"
+                @click="form.ttlUnit = u.secs; dirty = true"
+              >
+                {{ u.label }}
+              </button>
+            </div>
+          </div>
+        </div>
 
-          <label class="a-field">
-            有效期
-            <span class="a-unit">
-              <input v-model.number="form.ttlValue" class="a-input" type="number" min="1" step="1" required />
-              <select v-model.number="form.ttlUnit" class="a-select" aria-label="有效期单位">
-                <option v-for="unit in TTL_UNITS" :key="unit.secs" :value="unit.secs">{{ unit.label }}</option>
-              </select>
-            </span>
-            <span class="a-hint">
-              超过这个时间的结果不再使用。最长 30 天。修改后立刻对已缓存的结果生效。
-            </span>
-          </label>
-
-          <label class="a-field">
-            最多保存的条数
-            <input v-model.number="form.maxEntries" class="a-input" type="number" min="1" max="100000" step="1" required />
-            <span class="a-hint">超过时，先淘汰最久没被用到的结果。每条约 20 到 60 KB。</span>
-          </label>
-
-          <p v-if="saveError" class="a-error" role="alert">{{ saveError }}</p>
-          <div class="a-actions">
-            <button class="a-btn primary" type="submit" :disabled="saving || !dirty">
-              {{ saving ? '保存中…' : '保存设置' }}
+        <div class="xb-row" title="超过上限时优先淘汰最久未命中的缓存条目">
+          <span style="font-weight: 550">最大条数</span>
+          <div class="xb-stepper">
+            <button
+              type="button"
+              aria-label="减少 100"
+              @click="form.maxEntries = Math.max(100, form.maxEntries - 100); dirty = true"
+            >
+              <Icon name="minus" :size="14" />
+            </button>
+            <input
+              v-model.number="form.maxEntries"
+              class="xb-num"
+              style="width: 84px"
+              type="number"
+              min="1"
+              max="100000"
+              @input="dirty = true"
+            />
+            <button
+              type="button"
+              aria-label="增加 100"
+              @click="form.maxEntries = Math.min(100000, form.maxEntries + 100); dirty = true"
+            >
+              <Icon name="plus" :size="14" />
             </button>
           </div>
-        </form>
-      </section>
-
-      <section class="a-section" aria-label="清空缓存">
-        <div class="a-section-head">
-          <div>
-            <h2 class="display">清空</h2>
-            <p class="a-sub">立刻删除所有已保存的搜索结果。添加、删除或停用密钥时也会自动清空。</p>
-          </div>
-          <ConfirmButton label="清空缓存" confirm-label="确认清空" @confirm="clear" />
         </div>
-      </section>
+      </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-.switch-line {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  font-size: 14px;
+.sub-u {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-text-tertiary);
 }
-
-.switch-line > span {
-  display: grid;
-  gap: 2px;
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

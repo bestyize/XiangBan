@@ -1,6 +1,6 @@
 # 小伴桌面官网设计预览（wallpaper.xiangban.xyz）
 
-状态：设计参考（已合入 `services/server-xiaoban/web` 的 `ProductFeatures.vue` 与 `ProductDownload.vue`），静态文件不参与生产构建。全端统一入口见[小伴设计稿总导航](../../../../docs/design-preview/index.html)。
+状态：设计参考（功能页/下载页已合入 `ProductFeatures.vue` 与 `ProductDownload.vue`，管理后台已合入 `services/server-xiaoban/web/src/views/admin/`），静态文件不参与生产构建。全端统一入口见[小伴设计稿总导航](../../../../docs/design-preview/index.html)。
 
 ## 功能页 & 下载页 UI 重设计稿（v2.3 · PC + 移动 H5）
 
