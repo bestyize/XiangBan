@@ -58,22 +58,22 @@ internal fun AppActionButton(text: String, onClick: () -> Unit, modifier: Modifi
 }
 
 @Composable
-internal fun AppShortcutIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier.size(56.dp)) {
+internal fun AppShortcutIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier.size(56.dp), corner: Dp = 14.dp) {
     val glyph = if (item.source == "builtin") BuiltinMobileGames.glyph(item.id) else null
-    AppArtworkIcon(env, item, modifier, glyph)
+    AppArtworkIcon(env, item, modifier, glyph, corner)
 }
 
 @Composable
-private fun AppGlyphIcon(glyph: String, modifier: Modifier) {
+private fun AppGlyphIcon(glyph: String, modifier: Modifier, corner: Dp = 14.dp) {
     val tint = if (ThemeState.dark) Color(0xFFE0A274) else Color(0xFFB06A34)
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(corner)
     BoxWithConstraints(modifier.clip(shape).background(tint.copy(alpha = if (ThemeState.dark) .18f else .12f)).border(0.5.dp, tint.copy(alpha = .3f), shape), contentAlignment = Alignment.Center) {
         Text(glyph, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = (maxWidth.value * .46f).sp, color = tint)
     }
 }
 
 @Composable
-private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier, glyph: String?) {
+private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier, glyph: String?, corner: Dp = 14.dp) {
     val revision = if (item.source == "local") env.games?.revision?.collectAsState()?.value else null
     var bytes by remember(item.key, item.slug, revision) { mutableStateOf<ByteArray?>(null) }
     LaunchedEffect(env, item.key, item.slug, revision) {
@@ -93,11 +93,14 @@ private fun AppArtworkIcon(env: CommunityEnv, item: AppShortcut, modifier: Modif
             }
         } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }
     }
-    Box(modifier.clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-        if (glyph != null) AppGlyphIcon(glyph, Modifier.fillMaxSize())
+    val shape = RoundedCornerShape(corner)
+    val ring = if (ThemeState.dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+    Box(modifier.clip(shape).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+        if (glyph != null) AppGlyphIcon(glyph, Modifier.fillMaxSize(), corner)
         else XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
         val model: Any? = bytes ?: item.coverUrl?.let(env.forum::imageUrl)
         if (model != null) AsyncImage(model, null, imageLoader = rememberAppImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().border(0.5.dp, ring, shape))
     }
 }
 
