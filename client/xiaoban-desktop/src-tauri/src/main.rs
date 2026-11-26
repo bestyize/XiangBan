@@ -287,7 +287,7 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     if pets::active(app) { pets::sync(app); return Ok(()); }
     if !settings(app).companion_enabled { return Ok(()); }
     if let Some(window) = app.get_webview_window("pet") {
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         window.set_always_on_top(mode == "floating").map_err(|e| e.to_string())?;
         #[cfg(target_os = "macos")]
         macos::configure_scene(&window, mode == "wallpaper", false)?;
