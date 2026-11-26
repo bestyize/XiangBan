@@ -3,14 +3,14 @@ import StoreDialog from '../ai-store/StoreDialog.vue';
 import StoreRemoveAction from '../ai-store/StoreRemoveAction.vue';
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NSkeleton } from 'naive-ui';
-import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug } from 'lucide-vue-next';
+import { Search, RefreshCw, ArrowRight, Download, Check, Plus, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug, ShieldCheck, LockKeyhole, FileText, Code2, Copy } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
 import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
 import ConnectorCenter from '../ai-store/ConnectorCenter.vue';
 import LocalPluginInstaller from '../ai-store/LocalPluginInstaller.vue';
-import { categoryIcon } from '../ai-store/hues.ts';
+import { categoryIcon, hueStyle } from '../ai-store/hues.ts';
 import MarketGroupDialog from '../ai-store/MarketGroupDialog.vue';
 import MarketUpdateDialog, { type InstalledPackage } from '../ai-store/MarketUpdateDialog.vue';
 import MarketLinkDialog from '../ai-store/MarketLinkDialog.vue';
@@ -339,6 +339,20 @@ async function uninstallSkill() {
 function reset() { query.value = ''; category.value = '全部'; installedOnly.value = false; skillSort.value = 'score'; marketSort.value = 'hot'; skillSource.value = ''; }
 const tagOf = (s: Skill) => installed(s.slug)?.source || (variantLabel(s.variant) || (effMarket.value ? (s.source === 'official' ? '小伴市场 · 官方' : '小伴市场') : s.source === 'official' ? 'SkillHub · 官方' : s.source === 'community' ? 'SkillHub · 社区' : 'SkillHub'));
 const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`;
+function copyDigest(sha: string) {
+  void navigator.clipboard?.writeText(sha).then(() => props.store.notify('已复制完整清单摘要')).catch(() => {});
+}
+function stripFrontmatter(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('---')) return trimmed;
+  const end = trimmed.indexOf('\n---', 3);
+  return end > 0 ? trimmed.slice(end + 4).trim() : trimmed;
+}
+function skillIconComponent(s: Skill) {
+  if (s.variant === 'team') return Users;
+  if (s.variant === 'bundle') return Layers;
+  return categoryIcon(s.category ?? undefined);
+}
 </script>
 
 <template>
@@ -368,17 +382,20 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
           <button type="button" :aria-pressed="!effMarket" @click="pickSource('hub')">SkillHub</button>
         </div>
         <template v-if="packageTab && !installedOnly">
-          <label v-if="effMarket">排序 <select v-model="marketSort" aria-label="排序">
-            <option value="hot">推荐</option><option value="new">最新</option>
-          </select></label>
-          <label v-else>排序 <select v-model="skillSort" aria-label="技能排序">
-            <option value="score">综合评分</option><option value="downloads">最多下载</option>
-            <option value="stars">最多收藏</option><option value="installs">最多安装</option>
-            <option value="updated_at">最近更新</option>
-          </select></label>
-          <label>来源 <select v-model="skillSource" aria-label="技能来源">
-            <option value="">全部</option><option value="official">官方</option><option value="community">社区</option>
-          </select></label>
+          <div v-if="effMarket" class="xb-seg" role="group" aria-label="排序">
+            <button type="button" :aria-pressed="marketSort === 'hot'" @click="marketSort = 'hot'">推荐</button>
+            <button type="button" :aria-pressed="marketSort === 'new'" @click="marketSort = 'new'">最新</button>
+          </div>
+          <template v-else>
+            <label>排序 <select v-model="skillSort" aria-label="技能排序">
+              <option value="score">综合评分</option><option value="downloads">最多下载</option>
+              <option value="stars">最多收藏</option><option value="installs">最多安装</option>
+              <option value="updated_at">最近更新</option>
+            </select></label>
+            <label>来源 <select v-model="skillSource" aria-label="技能来源">
+              <option value="">全部</option><option value="official">官方</option><option value="community">社区</option>
+            </select></label>
+          </template>
         </template>
       </div>
     </div>
@@ -386,21 +403,23 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
       <div v-if="packageTab" class="store-section-heading"><h2>{{ heading }}</h2><span>{{ description }}</span></div>
       <NAlert v-if="!store.desktop && packageTab" class="store-alert" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
       <NAlert v-if="marketDown" class="store-alert market-down" type="warning" :show-icon="false" role="status"><TriangleAlert :size="14" />暂时无法连接小伴市场，已先显示 SkillHub 的内容。已安装的插件不受影响。 <button class="text-action" @click="retryMarket">重试</button></NAlert>
-      <NAlert v-if="packageTab && !installedOnly && updatable.length" class="store-alert update-hint" type="info" :show-icon="false" role="status">{{ updatable.length }} 个已安装{{ noun }}有新版本。 <button class="text-action" @click="installedOnly = true; category = '全部'">查看更新</button></NAlert>
-      <NAlert v-if="packageTab && installedOnly && effMarket" class="store-alert" type="info" :show-icon="false" role="status"><b>{{ updatable.length }} 项可更新</b>。更新前会展示新版本与现有版本的文件差异。 <button class="text-action" @click="checkUpdates(true)">立即检查</button></NAlert>
+      <div v-if="packageTab && !installedOnly && updatable.length" class="store-banner update-hint" role="status"><i class="update-dot" aria-hidden="true" /><span><b>{{ updatable.length }} 个已安装{{ noun }}</b>有新版本可供审查更新。</span><button class="text-action banner-btn" @click="installedOnly = true; category = '全部'">查看更新</button></div>
+      <div v-if="packageTab && installedOnly && effMarket" class="store-banner" role="status"><i v-if="updatable.length" class="update-dot" aria-hidden="true" /><span><b>{{ updatable.length }} 项可更新</b>。更新前会展示新版本与现有版本的文件差异。</span><button class="text-action banner-btn" @click="checkUpdates(true)">立即检查</button></div>
       <NAlert v-if="categoriesError && tab === 'skills' && !installedOnly && !effMarket" class="store-alert" type="warning" :show-icon="false">{{ categoriesError }} <button class="text-action" @click="loadSkillCategories">重试</button></NAlert>
       <NAlert v-if="localError" class="store-alert" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
       <NAlert v-if="error && packageTab && !installedOnly" class="store-alert" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="browse">重试</button></NAlert>
 
       <template v-if="packageTab">
-        <div v-if="loading" class="xc-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="126px" :sharp="false" /></div>
+        <div v-if="loading" class="xc-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="152px" style="border-radius:16px" :sharp="false" /></div>
         <div v-else class="xc-grid skill-grid">
-          <article v-for="s in visibleSkills" :key="s.slug" class="xc store-card skill-card" :title="s.description" :aria-description="s.description" >
+          <article v-for="s in visibleSkills" :key="s.slug" class="xc store-card skill-card" :style="hueStyle(s.category ?? undefined, s.slug)" :title="s.description" :aria-description="s.description">
             <div class="xc-top">
-              <div class="xc-ic" :class="{ 'has-img': skillIcon(s) }"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Users v-else-if="s.variant === 'team'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Layers v-else-if="s.variant === 'bundle'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Users v-else-if="tab === 'experts'" :size="24" :stroke-width="1.9" aria-hidden="true" /><component :is="categoryIcon(s.category ?? undefined)" v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
+              <div class="xc-ic" :class="{ 'has-img': skillIcon(s) }"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><component :is="skillIconComponent(s)" v-else :size="22" :stroke-width="1.9" aria-hidden="true" /></div>
               <div class="xc-main">
-                <div class="xc-title"><h3><button class="xc-title-button" type="button" :title="s.description" :aria-description="s.description" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)">{{ s.name || s.slug }}</button></h3><svg v-if="s.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="var(--ui-text-on-btn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
-                <span class="xc-kind">{{ tab === 'experts' ? '专家' : '技能' }}</span>
+                <div class="xc-head-line">
+                  <div class="xc-title"><h3><button class="xc-title-button" type="button" :title="s.description" :aria-description="s.description" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)">{{ s.name || s.slug }}</button></h3><svg v-if="s.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="var(--ui-text-on-btn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                </div>
+                <p class="xc-desc" :class="{ 'is-empty': !s.description }">{{ s.description || (tab === 'experts' ? '点击查看专家详情与使用方式' : '点击查看技能说明与文件清单') }}</p>
               </div>
             </div>
             <div class="xc-foot">
@@ -410,35 +429,69 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
               <span v-else-if="s.version" class="xc-meta">v{{ s.version }}</span>
               <div class="xc-act">
                 <button v-if="updates[s.slug] && installed(s.slug)" class="small-action xc-pill xc-pill-fill" :disabled="!store.desktop || !localReady" @click="openUpdate(installed(s.slug)!)">更新</button>
-                <button v-else class="small-action xc-pill" :class="{ installed: installed(s.slug), 'is-done': installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)"><Check v-if="installed(s.slug)" :size="12" :stroke-width="3" /><Plus v-else :size="12" :stroke-width="2.6" />{{ installed(s.slug) ? '已安装' : '安装' }}</button>
+                <button v-else class="small-action xc-pill" :class="{ installed: installed(s.slug), 'is-done': installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)"><Check v-if="installed(s.slug)" :size="12" :stroke-width="2.8" /><Plus v-else :size="12" :stroke-width="2.5" />{{ installed(s.slug) ? '已安装' : '安装' }}</button>
               </div>
             </div>
           </article>
         </div>
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
-      <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" />
+      <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" :installed-only="installedOnly" />
       <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" :updates="updates" @unavailable="onMarketError" @installed="marketConnectorInstalled" @changed="connectorCenter?.refresh()" @center="showConnectorCenter">
       </RegistryCatalog>
       <div v-if="empty && !error && (!packageTab || store.desktop)" class="xb-empty store-empty"><div class="xb-empty-icon"><Search :size="24" /></div><h3>{{ installedOnly ? `暂无匹配的已安装${noun}` : '没有找到匹配内容' }}</h3><p>试试其他关键词或分类</p><button class="xb-btn is-sm" @click="reset">清除筛选</button></div>
     </div>
 
     </template>
-    <StoreDialog :show="!!skill" preset="card" :title="skill?.name || skill?.slug" class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
-      <template v-if="skill"><div class="store-identity" :title="skill.description" :aria-description="skill.description"><div class="xc-ic"><Puzzle :size="28" /></div><span>{{ reviewKind === 'experts' ? '专家' : '技能' }}</span></div><div class="detail-tags"><span class="store-tag">{{ installed(skill.slug)?.source || (reviewVia === 'market' ? '小伴市场' : 'SkillHub') }}</span><span v-if="skill.version" class="store-tag">v{{ skill.version }}</span></div>
+    <StoreDialog :show="!!skill" preset="card" :title="skill?.name || skill?.slug" hide-title class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:660px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
+      <template v-if="skill">
+        <div class="dlg-hero" :style="hueStyle(skill.category ?? undefined, skill.slug)">
+          <div class="xc-ic" :class="{ 'has-img': skillIcon(skill) }"><img v-if="skillIcon(skill)" :src="skillIcon(skill)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(skill)!] = true" /><component :is="skillIconComponent(skill)" v-else :size="24" :stroke-width="1.85" aria-hidden="true" /></div>
+          <div class="dlg-hero-main">
+            <div class="dlg-hero-title"><h2>{{ skill.name || skill.slug }}</h2><svg v-if="skill.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="var(--ui-text-on-btn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+            <p v-if="skill.description" class="dlg-hero-desc">{{ skill.description }}</p>
+            <div class="dlg-meta-row">
+              <span class="store-tag">{{ reviewKind === 'experts' ? '专家' : '技能' }}</span>
+              <span class="store-tag">{{ installed(skill.slug)?.source || (reviewVia === 'market' ? '小伴市场' : 'SkillHub') }}</span>
+              <span v-if="skill.version" class="store-tag">v{{ skill.version }}</span>
+              <span v-if="installed(skill.slug)" class="store-tag is-ok"><Check :size="11" :stroke-width="2.8" />已安装</span>
+            </div>
+          </div>
+        </div>
         <NAlert v-if="detail && localError" type="error" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
         <div v-if="reviewing" class="review-loading"><RefreshCw :size="17" />正在读取固定版本的文件与脚本…</div>
         <NAlert v-if="reviewError" type="error" :show-icon="false">{{ reviewError }} <button v-if="!installed(skill.slug)" class="text-action" :disabled="busy" @click="openSkill(skill, reviewVia, reviewKind)">重试</button></NAlert>
         <template v-if="review && !installed(skill.slug)">
-          <h4>技能说明</h4><pre class="review-content">{{ review.content }}</pre>
-          <h4>文件清单 <small>{{ review.manifest.fileCount }} 个文件 · {{ bytes(review.manifest.totalBytes) }}</small></h4><ul class="review-files"><li v-for="file in review.manifest.files" :key="file.path"><div><code>{{ file.path }}</code><span>{{ bytes(file.size) }}{{ file.executableScript ? ' · 脚本' : '' }}</span></div><small>SHA256 {{ file.sha256 }}</small></li></ul>
-          <p v-if="reviewVia === 'market'" class="version-lock"><span>版本锁定</span><code>清单摘要 {{ shortDigest(review.sha256) }}</code><span class="lock-ok"><Check :size="12" :stroke-width="3" />已逐文件重新计算，与小伴市场记录一致</span></p>
+          <div class="dlg-section">
+            <div class="dlg-section-head"><h4>技能说明</h4><span>自动按需加载 · 不改写原文件</span></div>
+            <pre class="review-content">{{ stripFrontmatter(review.content) || review.content }}</pre>
+          </div>
+          <div class="dlg-section">
+            <div class="dlg-section-head"><h4>安装前审查</h4><span>{{ review.manifest.fileCount }} 个文件 · {{ bytes(review.manifest.totalBytes) }}</span></div>
+            <div class="audit-card">
+              <div v-if="reviewVia === 'market'" class="audit-bar version-lock">
+                <span class="audit-ok"><ShieldCheck :size="14" />已逐文件重新计算，与小伴市场记录一致</span>
+                <button type="button" class="audit-digest" :title="`SHA256 ${review.sha256}`" @click="copyDigest(review.sha256)"><Copy :size="11" />{{ shortDigest(review.sha256) }}</button>
+              </div>
+              <ul class="review-files">
+                <li v-for="file in review.manifest.files" :key="file.path" :title="`SHA256 ${file.sha256}`">
+                  <div>
+                    <span class="file-name-cell"><Code2 v-if="file.executableScript" :size="13" aria-hidden="true" /><FileText v-else :size="13" aria-hidden="true" /><code>{{ file.path }}</code><span v-if="file.executableScript" class="file-badge is-script">脚本</span></span>
+                    <span>{{ bytes(file.size) }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
           <details v-for="script in review.scripts" :key="script.path" class="script-preview"><summary>{{ script.path }} · 脚本预览{{ script.previewTruncated ? '（已截断）' : '' }}</summary><pre>{{ script.preview || '此脚本暂无文本预览，请在确认来源后再安装。' }}</pre></details>
-          <p class="detail-note">安装不会执行脚本。脚本运行时需单独确认，并使用本机账户权限；文件校验不代表安全认证。</p>
         </template>
         <div v-if="installed(skill.slug)" class="installed-detail"><Check :size="17" /><p>{{ installed(skill.slug)?.plugin ? '这位专家已安装，召唤后会开一个由 TA 负责的新对话。' : installed(skill.slug)?.marketKind === 'expert' ? '此专家已安装，可在聊天中新建任务使用。' : '此技能已安装，可在聊天中新建任务使用。' }}</p></div>
         <StoreRemoveAction v-if="installed(skill.slug)" :key="skill.slug" :name="removalTarget?.name || skill.name || skill.slug" :label="removalTarget?.label" :removable="!!removalTarget" :description="removalTarget?.description || ''" :busy="busy" @confirm="uninstallSkill"><button class="store-primary" :disabled="busy" @click="useSkill(skill)">{{ installed(skill.slug)?.plugin ? '召唤这位专家' : installed(skill.slug)?.marketKind === 'expert' ? '使用专家' : '使用技能' }} <ArrowRight :size="14" /></button></StoreRemoveAction>
-        <div v-else class="dialog-actions"><button class="store-primary" :disabled="!review || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '安装' }}<Download :size="14" /></button></div>
+        <div v-else class="dialog-actions">
+          <span class="dialog-footer-hint"><LockKeyhole :size="13" />安装不执行脚本；文件校验不代表安全认证</span>
+          <button v-if="!detail" class="store-secondary" :disabled="busy" @click="skill = null">取消</button>
+          <button class="store-primary" :disabled="!review || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '确认安装' }}<Download :size="14" /></button>
+        </div>
       </template>
     </StoreDialog>
     <MarketGroupDialog :item="group" :kind="tab === 'experts' ? 'experts' : 'skills'" @close="group = null" @done="groupDone" @changed="marketConnectorInstalled" />
@@ -454,50 +507,49 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 .store-tabs{flex:none}
 .store-tabs>button{white-space:nowrap}
 .store-tab-icon{display:none}
-.store-header .xb-page-actions .xb-search{width:220px;height:32px;padding:0 10px;gap:8px;border-radius:9px;background:var(--ui-control);box-sizing:border-box}
+.store-header .xb-page-actions .xb-search{width:210px;height:32px;padding:0 10px;gap:7px;border-radius:9px;background:var(--ui-control);box-sizing:border-box;transition:box-shadow .15s,background .15s}
+.store-header .xb-page-actions .xb-search:focus-within{background:var(--ui-surface);box-shadow:inset 0 0 0 1.5px var(--ui-btn)}
 .store-search .clear{border:0;background:none;color:var(--ui-text-tertiary);font-size:16px;line-height:1;cursor:pointer;padding:0}
-.installed-filter .count{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ui-soft);color:var(--ui-ink);font-size:11px;font-weight:600;display:inline-grid;place-items:center}
-.installed-filter.selected{box-shadow:inset 0 0 0 1.5px var(--ui-btn);color:var(--ui-ink)}
-.store-toolbar{flex:none;margin-top:18px;display:flex;align-items:center;gap:12px;padding-bottom:12px;flex-wrap:wrap}
+.installed-filter .count{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ui-control);color:var(--ui-text-secondary);font-size:11px;font-weight:600;display:inline-grid;place-items:center}
+.installed-filter.selected{background:var(--ui-text-primary);color:var(--ui-surface);box-shadow:none}
+.installed-filter.selected .count{background:color-mix(in srgb,var(--ui-surface) 18%,transparent);color:var(--ui-surface)}
+.store-toolbar{flex:none;margin-top:16px;display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap}
 .store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
-.store-filters button{height:30px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
-.store-filters button:hover{background:var(--ui-control)}
-.store-filters button.active{background:var(--ui-soft);color:var(--ui-ink);font-weight:600}
-.skill-query-options{margin-left:auto;display:flex;align-items:center;gap:12px}
+.store-filters button{height:29px;padding:0 11px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:12.5px;white-space:nowrap;cursor:pointer}
+.store-filters button:hover{background:var(--ui-control);color:var(--ui-text-primary)}
+.store-filters button.active{background:var(--ui-text-primary);color:var(--ui-surface);font-weight:500}
+.skill-query-options{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .skill-query-options label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px;color:var(--ui-text-secondary)}
 .skill-query-options select{max-width:120px;height:28px;border:0;border-radius:8px;padding:0 8px;background:var(--ui-control);color:var(--ui-text-primary);font:inherit;font-size:12px}
-.store-content{flex:1;min-height:0;overflow-y:auto;margin:0 -28px;padding:16px 28px 28px}
+.store-content{flex:1;min-height:0;overflow-y:auto;margin:0 -28px;padding:18px 28px 28px}
 .store-section-heading{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
-.store-section-heading h2{font-size:14px;font-weight:600;margin:0}
+.store-section-heading h2{font-size:13.5px;font-weight:600;margin:0}
 .store-section-heading>span{font-size:12px;color:var(--ui-text-tertiary)}
 .store-alert{margin-bottom:14px}
-.text-action{border:0;background:none;color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer}
+.store-banner{display:flex;align-items:center;gap:8px;padding:9px 13px;margin-bottom:14px;border-radius:10px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);color:var(--ui-text-secondary);font-size:12px}
+.store-banner b{color:var(--ui-text-primary);font-weight:600}
+.store-banner .banner-btn{margin-left:auto;padding:3px 9px;border-radius:7px;background:var(--ui-surface);box-shadow:var(--ui-shadow-btn-secondary);color:var(--ui-text-primary);font-weight:500;text-decoration:none}
+.store-banner .banner-btn:hover{background:var(--ui-control)}
+.text-action{border:0;background:none;color:var(--ui-text-primary);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
 .store-empty{min-height:230px}
 .store-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 0;font-size:12px;color:var(--ui-text-secondary)}
 .store-pagination button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
 .store-pagination button:disabled{opacity:.45;cursor:not-allowed}
-.connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
-.connection-status.xb-ok{color:var(--ui-success-text)}
 .update-dot,.down-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none}
 .update-dot{background:var(--ui-dot)}
 .down-dot{background:var(--ui-warning);margin-left:6px}
 .source-switch{margin-right:2px}
-.source-settings{border-radius:8px}
+.source-settings{border-radius:9px;background:var(--ui-surface);box-shadow:var(--ui-shadow-btn-secondary)}
 .market-down :deep(.n-alert-body),.market-down{display:flex;align-items:center;gap:8px}
-.xc-pill-fill{color:var(--ui-text-on-btn)!important;background:var(--ui-btn)!important;box-shadow:none!important}
-.xc-tag-group{background:var(--ui-soft);color:var(--ui-ink)}
-.version-lock{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;padding:11px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--ui-border);font-size:12px;color:var(--ui-text-secondary)}
-.version-lock code{color:var(--ui-text-primary)}
-.lock-ok{display:inline-flex;align-items:center;gap:4px;color:var(--ui-success-text)}
+.file-name-cell{display:inline-flex;align-items:center;gap:7px;min-width:0}
+.file-name-cell svg{flex:none;color:var(--ui-text-tertiary)}
 @container (max-width: 760px){
-  .store-tabs{gap:8px}
-  .store-tabs>button{display:grid;place-items:center;width:32px;height:32px;border-radius:8px}
-  .store-tabs>button[aria-selected=true]{background:var(--ui-soft);color:var(--ui-ink)}
-  .store-tab-icon{display:block}
-  .store-tab-label{display:none}
-  .store-header .xb-page-actions .xb-search{width:140px}
+  .store-tabs{gap:16px}
+  .store-tabs>button{font-size:17px}
+  .store-header .xb-page-actions .xb-search{width:150px}
+  .store-header :deep(.local-pkg-label){display:none}
 }
-@container (max-width: 500px){
+@container (max-width: 520px){
   .store-header{flex-wrap:wrap;gap:10px}
   .store-header .xb-page-actions{width:100%;min-width:0}
   .store-header .xb-page-actions .xb-search{flex:1;min-width:0}

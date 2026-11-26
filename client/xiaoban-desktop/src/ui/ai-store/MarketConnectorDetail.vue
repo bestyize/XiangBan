@@ -34,6 +34,7 @@ const allConnected = computed(() => services.value.length > 0 && services.value.
 const detailBody = ref<HTMLElement>(), requestedExample = ref<number | null>(null);
 const examples = computed(() => props.connector.examples.zh?.length ? props.connector.examples.zh : props.connector.examples.en ?? []);
 const displayName = computed(() => props.connector.displayName.zh || props.connector.displayName.en || props.slug);
+const authLabels = computed(() => props.connector.authTypes.map(auth => connectorAuth[auth]).join('、') || '无');
 function serviceBusy(id: string, value: boolean) { connecting.value = { ...connecting.value, [id]: value }; emit('busy', busy.value || Object.values(connecting.value).some(Boolean)); }
 function updated(item: InstalledConnector) { services.value = services.value.map(s => s.id === item.id ? item : s); emit('changed'); }
 async function loadServices() {
@@ -102,15 +103,20 @@ onMounted(() => { void inspect(); fit(); });
       <NAlert v-for="warning in warnings" :key="warning" type="warning" :show-icon="false">{{ warning }}</NAlert>
       <p v-if="!namespace || !targetVersion" role="status">此连接器暂未提供可安装的版本。</p>
       <div class="market-connect-action"><button class="store-primary" :disabled="busy || loading || ((!installed || !!updateVersion) && !canInstall)" @click="start">{{ busy ? '连接中…' : loading ? '准备中…' : installed && !updateVersion ? '管理' : updateVersion ? '更新并连接' : connectOnInstall ? '连接' : '安装' }}</button></div>
-      <section v-if="examples.length" class="connector-examples"><h4><Lightbulb :size="16" />试试这样用</h4><button v-for="(example, index) in examples" :key="example" class="connector-example" :title="example" :disabled="busy || loading" @click="tryExample(index)"><span>“{{ example }}”</span><MessageCircle :size="15" /></button></section>
-      <details class="connector-management"><summary>连接信息与安装内容</summary>
-        <div class="detail-tags"><span v-for="auth in connector.authTypes" :key="auth" class="store-tag">{{ connectorAuth[auth] }}</span><span v-if="version" class="store-tag">v{{ version }}</span><span v-if="installed" class="store-tag">已安装</span></div>
-        <h4>需要填写的令牌字段</h4><ul v-if="connector.tokenFields.length"><li v-for="field in connector.tokenFields" :key="field.server + ':' + field.key">{{ field.label || field.key }} · {{ field.required ? '必填' : '选填' }}</li></ul><p v-else>无需填写令牌字段。</p>
-        <h4>传输方式</h4><p>{{ connector.transports.join('、') }}</p><p>被策略禁用的工具：{{ connector.disabledToolCount }} 个</p>
-        <h4>随包技能 · {{ connector.skillCount }} 个</h4><ul><li v-for="name in connector.skills" :key="name">{{ name }}</li></ul>
+      <section v-if="examples.length" class="connector-examples"><h4><Lightbulb :size="15" />试试这样用</h4><button v-for="(example, index) in examples" :key="example" class="connector-example" :title="example" :disabled="busy || loading" @click="tryExample(index)"><span>“{{ example }}”</span><MessageCircle :size="14" /></button></section>
+      <div class="market-foot-sep">
+      <details class="connector-management"><summary>连接信息与安装内容{{ version ? `（v${version}）` : '' }}</summary>
+        <div class="conn-kv">
+          <b>认证方式</b><span>{{ authLabels }}</span>
+          <b>传输方式</b><span>{{ connector.transports.join('、') || '—' }}</span>
+          <b>禁用策略</b><span>被策略禁用的工具：{{ connector.disabledToolCount }} 个</span>
+          <b v-if="version">版本</b><span v-if="version">v{{ version }}{{ installed ? ' · 已安装' : '' }}</span>
+        </div>
+        <h4>需要填写的令牌字段</h4><ul v-if="connector.tokenFields.length" class="compact-list"><li v-for="field in connector.tokenFields" :key="field.server + ':' + field.key">{{ field.label || field.key }} · {{ field.required ? '必填' : '选填' }}</li></ul><p v-else>无需填写令牌字段。</p>
+        <h4>随包技能 · {{ connector.skillCount }} 个</h4><ul v-if="connector.skills.length" class="compact-list"><li v-for="name in connector.skills" :key="name">{{ name }}</li></ul>
         <template v-if="review">
-          <h4>安装审查 · v{{ review.manifest.version }}</h4><h4>MCP 服务 · {{ review.manifest.connectorCount }} 个</h4>
-          <ul class="review-files"><li v-for="server in review.manifest.servers" :key="server.name"><div>{{ server.name }} · {{ server.transport }}</div><p v-if="server.url">地址：<code>{{ server.url }}</code></p><p v-if="server.command">将运行的命令：<code>{{ [server.command, ...(server.args ?? [])].join(' ') }}</code></p><p>环境变量名：{{ server.envKeys?.join('、') || '无' }}</p><p>请求头名：{{ server.headerKeys?.join('、') || '无' }}</p></li></ul>
+          <h4>安装审查 · v{{ review.manifest.version }} · MCP 服务 · {{ review.manifest.connectorCount }} 个</h4>
+          <ul class="review-files"><li v-for="server in review.manifest.servers" :key="server.name"><div><b>{{ server.name }} · {{ server.transport }}</b></div><p v-if="server.url">地址：<code>{{ server.url }}</code></p><p v-if="server.command">将运行的命令：<code>{{ [server.command, ...(server.args ?? [])].join(' ') }}</code></p><p>环境变量名：{{ server.envKeys?.join('、') || '无' }}</p><p>请求头名：{{ server.headerKeys?.join('、') || '无' }}</p></li></ul>
           <h4>文件清单</h4><ul class="review-files"><li v-for="file in review.manifest.files" :key="file.path"><div><code>{{ file.path }}</code><span>{{ file.executableScript ? '脚本' : '' }}</span></div><small>SHA256 {{ file.sha256 }}</small></li></ul>
           <p class="version-lock">版本锁定 · 清单摘要 <code>{{ review.sha256 }}</code></p>
           <details v-for="script in review.scripts" :key="script.path" class="script-preview"><summary>{{ script.path }} · 脚本预览{{ script.previewTruncated ? '（已截断）' : '' }}</summary><pre class="review-content">{{ script.preview || '此脚本暂无文本预览，请在确认来源后再安装。' }}</pre></details>
@@ -118,6 +124,7 @@ onMounted(() => { void inspect(); fit(); });
           <label class="connect-option"><input v-model="connectOnInstall" type="checkbox" :disabled="busy" />安装后连接远程服务（需要登录时打开浏览器）</label>
         </template>
       </details>
+      </div>
     </template>
     <template v-else>
       <NAlert v-if="error" type="error" :show-icon="false">{{ error }}</NAlert>
@@ -128,5 +135,13 @@ onMounted(() => { void inspect(); fit(); });
   </div>
 </template>
 <style scoped>
-.market-connect-action{display:flex;justify-content:center;margin-top:22px}.market-connect-action .store-primary{min-width:76px}.connector-management{margin-top:16px}p,li{font-size:13px;line-height:1.7;overflow-wrap:anywhere}.detail-tags{margin-top:14px}
+.market-connect-action{display:flex;justify-content:center;margin-top:20px}
+.market-connect-action .store-primary{min-width:112px}
+.market-foot-sep{margin-top:18px;padding-top:14px;border-top:1px solid var(--ui-line)}
+.market-foot-sep>.connector-management{margin-top:0}
+.compact-list{margin:6px 0 10px;padding-left:18px}
+.connect-option{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--ui-text-secondary)}
+.connect-option input{accent-color:var(--ui-btn)}
+.version-lock{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);font-size:11.5px;color:var(--ui-text-secondary);word-break:break-all}
+p,li{font-size:12.5px;line-height:1.65;overflow-wrap:anywhere}
 </style>

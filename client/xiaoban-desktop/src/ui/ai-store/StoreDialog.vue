@@ -14,7 +14,7 @@ watch(() => props.show, show => {
 });
 </script>
 <template>
-  <section v-if="detached && show" v-bind="$attrs" class="store-detached-dialog" aria-label="插件详情">
+  <section v-if="detached && show" v-bind="$attrs" class="store-detached-dialog" :class="{ 'no-title': hideTitle }" aria-label="插件详情">
     <header v-if="!hideTitle" class="store-detail-title"><h1>{{ title }}</h1></header>
     <div class="store-detail-content"><slot /></div>
   </section>
@@ -24,5 +24,6 @@ watch(() => props.show, show => {
 .store-detached-dialog{display:flex;flex-direction:column;width:100%!important;max-width:none!important;height:100%;min-height:0;background:var(--ui-surface)}
 .store-detail-title{padding:14px 28px 20px;flex:none}.store-detail-title h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.025em;color:var(--ui-text-primary)}
 .store-detail-content{padding:0 28px 28px;flex:1;min-height:0;overflow:auto;overscroll-behavior:none}
+.store-detached-dialog.no-title>.store-detail-content{padding-top:18px}
 @media(max-width:500px){.store-detail-title{padding:12px 18px 18px}.store-detail-content{padding:0 18px 18px}}
 </style>

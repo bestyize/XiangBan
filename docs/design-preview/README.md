@@ -73,7 +73,8 @@ npm --prefix client/xiaoban-desktop run dev
 | [组件与伙伴卡片](../../client/xiaoban-desktop/docs/design-specs/prototypes/decor-library.html) | 装扮与桌面空间 | 已合入 | 组件默认四列放大真实预览，伙伴无外框卡片与轻量实例计数；需运行桌面 Vite `npm run dev` |
 | [游戏库卡片重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/game-library.html) | 装扮与桌面空间 | 待合入 | 3–4 列统一方形封面无外框卡片、悬停展开「开始游戏」；正式游戏页尚未改造；需运行桌面 Vite `npm run dev` |
 | [特效页优化设计稿](../../client/xiaoban-desktop/docs/design-specs/prototypes/effects-library.html) | 装扮与桌面空间 | 待合入 | 三列特效库与右侧参数面板，静帧采样、悬停播放、预览调参后手动应用；正式特效页尚未改造；需运行桌面 Vite `npm run dev` |
-| [AI 插件页卡片与独立窗口重设计（定稿方案 A）](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html) | 核心 AI 与对话 | 待合入 | 定稿方案 A 精装目录卡（克制主题色、2 行简介、低饱和分类图标、宽屏 3 列、整卡可点），覆盖专家 / 技能 / 连接器三页与 5 类安装/更新/连接器独立窗口；纯静态可直开 |
+| [AI 插件页卡片与独立窗口重设计（定稿方案 A）](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html) | 核心 AI 与对话 | 已合入 | 定稿方案 A 精装目录卡（克制主题色、2 行简介、低饱和分类图标、宽屏 3 列、整卡可点），覆盖专家 / 技能 / 连接器三页与 5 类安装/更新/连接器独立窗口；纯静态可直开 |
+| [关怀提醒与定时任务重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html) | 关怀与效率 | 待合入 | 右侧偏好单行即开即存 + 伙伴迷你气泡预览、规则行整行编辑与 `⋯` 菜单、定时任务直达对话与试跑、双 Tab 三列场景模板、独立窗口编辑器（含时段间隔与星期 pill）；纯静态可直开（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html)） |
 
 ---
 

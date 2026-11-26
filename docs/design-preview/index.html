@@ -1396,8 +1396,8 @@
       title: 'AI 插件页卡片与独立窗口重设计（方案 A）',
       domains: ['desktop'],
       subcat: '核心 AI 与对话',
-      status: 'pending',
-      statusNote: '定稿方案 A（精装目录卡 + 5 类独立窗口）',
+      status: 'merged',
+      statusNote: '定稿方案 A 已合入 AiStorePage / RegistryCatalog / ConnectorCenter 与 5 类独立窗口',
       runtime: 'static',
       path: 'client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html',
       summary: '定稿方案 A · 精装目录卡与独立窗口设计：克制主题色、2 行简介、低饱和分类软底图标、宽屏 3 列、整卡点击，覆盖专家/技能/连接器三页及安装审查、专家团整组安装、版本更新、连接器四态与移除确认 5 类独立窗口。',
@@ -1408,6 +1408,24 @@
         { label: '安装审查窗', query: '?modal=skill' },
         { label: '专家团窗', query: '?modal=group' },
         { label: '连接器窗', query: '?modal=connector' },
+      ]
+    },
+    {
+      id: 'care-reminders-redesign',
+      title: '关怀提醒与定时任务重设计',
+      domains: ['desktop'],
+      subcat: '关怀与效率',
+      status: 'pending',
+      statusNote: '待确认（正式 CarePage 尚未改造）',
+      runtime: 'static',
+      path: 'client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html',
+      summary: '精简右侧提醒方式（单行即开即存 + 伙伴迷你气泡预览）、规则行点击编辑与悬停 ⋯ 菜单、最近触发高亮与已完成折叠、定时任务直达聊天与立即试跑、双 Tab 三列场景模板及独立窗口表单（含时段间隔、星期 pill 与强提醒气泡修正）。',
+      presets: [
+        { label: '关怀提醒', query: '?tab=reminders' },
+        { label: '定时任务', query: '?tab=tasks' },
+        { label: '免打扰态', query: '?state=quiet' },
+        { label: '时段间隔窗', query: '?modal=interval' },
+        { label: '新建任务窗', query: '?modal=task' },
       ]
     },
 

@@ -13,7 +13,7 @@ import MarketConnectorDetail from './MarketConnectorDetail.vue';
 import { connectorAuth, connectorStatus, type InstalledConnector, type MarketConnector } from './connector-plugins.ts';
 import { openStoreTask, openStoreWindow, storeWindowScene, useNativeStoreWindow, type StoreEntry } from './store-window.ts';
 import type { UpdateInfo } from './market.ts';
-import { categoryIcon } from './hues.ts';
+import { categoryIcon, hueStyle } from './hues.ts';
 import './store-cards.css';
 
 interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number; namespace?: string; version?: string; connector?: MarketConnector }
@@ -281,27 +281,37 @@ onMounted(async () => { if (props.detail) { await refreshLocal(); await open({ .
 <template>
   <div class="registry">
     <template v-if="!detail">
+    <div v-if="store.desktop && !installedOnly" class="registry-heading">
+      <h2>{{ kind === 'experts' ? '发现专家' : '发现连接器' }}</h2>
+      <span>{{ data.total ? `共 ${data.total.toLocaleString('zh-CN')} 项可接入服务 · ` : '' }}{{ source === 'market' ? '小伴市场' : 'SkillHub' }}</span>
+    </div>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在小伴桌面客户端中浏览和安装。</NAlert>
     <NAlert v-if="error" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="refresh">重试</button></NAlert>
     <NAlert v-if="localError" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
     <NAlert v-if="fromMarket() && pluginError" type="warning" :show-icon="false">{{ pluginError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
-    <div v-if="loading" class="xc-grid" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="126px" :sharp="false" /></div>
+    <div v-if="loading" class="xc-grid" :class="{ 'connector-grid': kind === 'connectors' }" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="152px" style="border-radius:16px" :sharp="false" /></div>
     <div v-else class="xc-grid" :class="{ 'connector-grid': kind === 'connectors' }">
       <slot name="prefix" />
-      <article v-for="entry in entries" :key="entry.slug" class="xc store-card" :class="[kind === 'experts' ? 'expert-card' : 'connector-card', { 'market-plugin-card': isPlugin(entry) }]" :title="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description" :aria-description="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description">
+      <article v-for="entry in entries" :key="entry.slug" class="xc store-card" :class="[kind === 'experts' ? 'expert-card' : 'connector-card', { 'market-plugin-card': isPlugin(entry) }]" :style="hueStyle(entry.category, entry.slug)" :title="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description" :aria-description="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description">
         <div class="xc-top">
-          <div class="xc-ic" :class="{ 'has-img': icon(entry), 'is-contain': icon(entry) && kind === 'connectors' }"><img v-if="icon(entry)" :src="icon(entry)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[entry.slug] = true" /><component :is="categoryIcon(kind === 'experts' ? entry.category : undefined)" v-else-if="kind === 'experts'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Plug v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
-          <div class="xc-main"><div class="xc-title"><h3><button type="button" class="xc-title-button" @click="open(entry)">{{ isPlugin(entry) ? entry.connector?.displayName.zh || entry.connector?.displayName.en || entry.name : entry.name }}</button></h3></div><span class="xc-kind">{{ kind === 'experts' ? '专家工作流' : authLabel(entry) || 'MCP 连接器' }}</span></div>
+          <div class="xc-ic" :class="{ 'has-img': icon(entry), 'is-contain': icon(entry) && kind === 'connectors', 'is-brand': kind === 'connectors' }"><img v-if="icon(entry)" :src="icon(entry)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[entry.slug] = true" /><component :is="categoryIcon(kind === 'experts' ? entry.category : undefined)" v-else-if="kind === 'experts'" :size="22" :stroke-width="1.9" aria-hidden="true" /><Plug v-else :size="22" :stroke-width="1.9" aria-hidden="true" /></div>
+          <div class="xc-main">
+            <div class="xc-head-line">
+              <div class="xc-title"><h3><button type="button" class="xc-title-button" @click="open(entry)">{{ isPlugin(entry) ? entry.connector?.displayName.zh || entry.connector?.displayName.en || entry.name : entry.name }}</button></h3></div>
+              <span v-if="isPlugin(entry)" class="xc-status connection-status" :class="[plugin(entry.slug)?.status, { 'xb-ok': plugin(entry.slug)?.status === 'connected' }]"><i />{{ plugin(entry.slug) ? connectorStatus[plugin(entry.slug)!.status] : '未安装' }}</span>
+              <span v-else-if="kind === 'connectors'" class="xc-status connection-status" :class="{ connected: connection(entry.slug)?.connected, 'xb-ok': connection(entry.slug)?.connected }"><i />{{ connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置' }}</span>
+            </div>
+            <p class="xc-desc" :class="{ 'is-empty': !(entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description) }">{{ entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description || (kind === 'experts' ? '点击查看专家工作流与依赖技能' : '点击查看连接方式与服务说明') }}</p>
+          </div>
         </div>
         <div class="xc-foot">
           <span class="xc-tag">{{ entry.category || (source === 'market' && kind === 'connectors' ? '小伴市场' : 'SkillHub') }}</span>
-          <span v-if="kind === 'experts' && entry.skillCount !== undefined" class="xc-meta"><Sparkles :size="13" aria-hidden="true" />{{ entry.skillCount }} 个技能</span>
-          <template v-if="isPlugin(entry)"><span class="connection-status" :class="{ 'xb-ok': plugin(entry.slug)?.status === 'connected' }">{{ plugin(entry.slug) ? connectorStatus[plugin(entry.slug)!.status] : '未安装' }}</span></template>
-          <span v-else-if="kind === 'connectors'" class="connection-status" :class="{ 'xb-ok': connection(entry.slug)?.connected }">{{ connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置' }}</span>
+          <span v-if="kind === 'experts' && entry.skillCount !== undefined" class="xc-meta"><Sparkles :size="12" aria-hidden="true" />{{ entry.skillCount }} 个技能</span>
+          <span v-else-if="kind === 'connectors'" class="xc-meta">{{ authLabel(entry) || 'MCP 连接器' }}</span>
           <div class="xc-act">
             <button v-if="kind === 'experts' && pack(entry.slug)" class="xc-link" aria-label="管理专家包" @click="open(entry)">管理</button>
-            <button class="small-action xc-pill" :class="{ 'is-done': kind === 'experts' ? !!pack(entry.slug) : isPlugin(entry) ? !!plugin(entry.slug) : !!connection(entry.slug) }" :disabled="busy || !store.desktop || (isPlugin(entry) ? !pluginReady || !!pluginError : !!localError)" @click="kind === 'experts' && pack(entry.slug)?.ready ? usePack(entry) : open(entry)">
-              <template v-if="kind === 'experts'"><template v-if="pack(entry.slug)?.ready"><Check :size="12" :stroke-width="3" />使用专家</template><template v-else-if="pack(entry.slug)">依赖缺失</template><template v-else><Plus :size="12" :stroke-width="2.6" />安装</template></template>
+            <button class="small-action xc-pill" :class="{ 'xc-pill-fill': !!pluginUpdate(entry), 'is-done': !pluginUpdate(entry) && (kind === 'experts' ? !!pack(entry.slug) : isPlugin(entry) ? !!plugin(entry.slug) : !!connection(entry.slug)) }" :disabled="busy || !store.desktop || (isPlugin(entry) ? !pluginReady || !!pluginError : !!localError)" @click="kind === 'experts' && pack(entry.slug)?.ready ? usePack(entry) : open(entry)">
+              <template v-if="kind === 'experts'"><template v-if="pack(entry.slug)?.ready"><Check :size="12" :stroke-width="2.8" />使用专家</template><template v-else-if="pack(entry.slug)">依赖缺失</template><template v-else><Plus :size="12" :stroke-width="2.5" />安装</template></template>
               <template v-else-if="isPlugin(entry)">{{ pluginUpdate(entry) ? '更新' : plugin(entry.slug) ? '管理' : '连接' }}</template>
               <template v-else>{{ connection(entry.slug) ? '管理' : '连接' }}<ArrowRight v-if="!connection(entry.slug)" :size="12" /></template>
             </button>
@@ -312,25 +322,36 @@ onMounted(async () => { if (props.detail) { await refreshLocal(); await open({ .
     <div v-if="!loading && !error && store.desktop && !entries.length && category !== '本机'" class="xb-empty store-empty"><p>没有找到匹配的{{ kind === 'experts' ? '专家包' : '连接器' }}</p></div>
     <div v-if="!installedOnly && !loading && !error && (page > 1 || data.hasMore)" class="pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!data.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
     </template>
-    <StoreDialog :show="!!selected" preset="card" :title="marketPlugin?.displayName.zh || marketPlugin?.displayName.en || selected?.name" :hide-title="kind === 'connectors' && !!marketPlugin" class="registry-dialog" :class="{ 'store-dialog': !!marketPlugin, 'connector-connect-dialog': !!marketPlugin }" :closable="!busy" :mask-closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
+    <StoreDialog :show="!!selected" preset="card" :title="marketPlugin?.displayName.zh || marketPlugin?.displayName.en || selected?.name" hide-title class="registry-dialog" :class="{ 'store-dialog': !!marketPlugin, 'connector-connect-dialog': !!marketPlugin }" :closable="!busy" :mask-closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
       <template v-if="selected">
         <NAlert v-if="detail && (localError || pluginError)" type="error" :show-icon="false">{{ localError || pluginError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
-        <div v-if="!marketPlugin" class="store-identity" :title="selected.description" :aria-description="selected.description"><div class="xc-ic"><Plug v-if="kind === 'connectors'" :size="28" /><Sparkles v-else :size="28" /></div><span>{{ kind === 'connectors' ? 'MCP 连接器' : '专家工作流' }}</span></div>
+        <div v-if="!marketPlugin" class="dlg-hero" :style="hueStyle(selected.category, selected.slug)">
+          <div class="xc-ic" :class="{ 'has-img': icon(selected), 'is-contain': icon(selected) && kind === 'connectors', 'is-brand': kind === 'connectors' }"><img v-if="icon(selected)" :src="icon(selected)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[selected.slug] = true" /><Plug v-else-if="kind === 'connectors'" :size="24" /><component :is="categoryIcon(selected.category)" v-else :size="24" /></div>
+          <div class="dlg-hero-main">
+            <div class="dlg-hero-title"><h2>{{ selected.name }}</h2></div>
+            <p v-if="selected.description" class="dlg-hero-desc">{{ selected.description }}</p>
+            <div class="dlg-meta-row">
+              <span class="store-tag">{{ kind === 'connectors' ? 'MCP 连接器' : '专家工作流' }}</span>
+              <span v-if="selected.category" class="store-tag">{{ selected.category }}</span>
+              <span class="store-tag">{{ source === 'market' ? '小伴市场' : 'SkillHub' }}</span>
+            </div>
+          </div>
+        </div>
         <div v-if="detailLoading" class="review-loading">正在读取说明与依赖…</div>
         <NAlert v-if="detailError" type="error" :show-icon="false">{{ detailError }} <button v-if="!busy&&!authorization" class="text-action" @click="open(selected)">重新读取</button></NAlert>
         <template v-if="kind === 'experts'">
           <template v-if="pack(selected.slug)">
-            <p>{{ pack(selected.slug)?.ready ? '工作流与依赖技能已就绪。' : '依赖缺失或版本发生变化，请移除工作流后重新安装。' }}</p>
-            <ul><li v-for="dep in pack(selected.slug)?.dependencies" :key="dep.slug">{{ dep.namespace ? '@' + dep.namespace + '/' : '' }}{{ dep.slug }} · {{ dep.version }}</li></ul>
+            <div class="installed-detail"><Check :size="17" /><p>{{ pack(selected.slug)?.ready ? '工作流与依赖技能已就绪。' : '依赖缺失或版本发生变化，请移除工作流后重新安装。' }}</p></div>
+            <ul class="review-files" style="margin-top:12px"><li v-for="dep in pack(selected.slug)?.dependencies" :key="dep.slug"><div><code>{{ dep.namespace ? '@' + dep.namespace + '/' : '' }}{{ dep.slug }}</code><span>v{{ dep.version }}</span></div></li></ul>
             <p class="detail-note">这是技能工作流。依赖服务、凭据及本机环境仍需满足；不代表拥有独立成长的多智能体专家团。</p>
             <StoreRemoveAction :key="selected.slug" :name="selected.name" :description="pack(selected.slug)?.plugin ? '将卸载此专家包及随包技能。之后可以重新安装。' : '将移除此专家工作流，保留其他专家可能共用的依赖技能。之后可以重新安装。'" :busy="busy" @confirm="removePack"><button class="store-primary" :disabled="busy || !pack(selected.slug)?.ready || !!localError" @click="usePack(selected)">使用专家 <ArrowRight :size="14" /></button></StoreRemoveAction>
           </template>
           <template v-else-if="packReview">
-            <h4>工作流</h4><pre class="review-content">{{ packReview.content }}</pre>
-            <h4>依赖技能与固定版本</h4>
-            <details v-for="(item, i) in packReview.skills" :key="item.slug" class="dependency-review"><summary>{{ packReview.dependencies[i]?.namespace ? '@' + packReview.dependencies[i]?.namespace + '/' : '' }}{{ item.slug }} · {{ item.manifest.version }} · {{ item.manifest.fileCount }} 个文件</summary><pre>{{ item.content }}</pre><ul><li v-for="file in item.manifest.files" :key="file.path">{{ file.path }}<small>SHA256 {{ file.sha256 }}</small></li></ul><details v-for="script in item.scripts" :key="script.path"><summary>{{ script.path }}{{ script.previewTruncated ? '（预览已截断）' : '' }}</summary><pre>{{ script.preview || '暂无脚本文本预览' }}</pre></details></details>
+            <div class="dlg-section"><div class="dlg-section-head"><h4>工作流说明</h4></div><pre class="review-content">{{ packReview.content }}</pre></div>
+            <div class="dlg-section"><div class="dlg-section-head"><h4>依赖技能与固定版本</h4><span>{{ packReview.skills.length }} 个依赖</span></div>
+            <details v-for="(item, i) in packReview.skills" :key="item.slug" class="dependency-review"><summary>{{ packReview.dependencies[i]?.namespace ? '@' + packReview.dependencies[i]?.namespace + '/' : '' }}{{ item.slug }} · v{{ item.manifest.version }} · {{ item.manifest.fileCount }} 个文件</summary><pre>{{ item.content }}</pre><ul><li v-for="file in item.manifest.files" :key="file.path">{{ file.path }}<small>SHA256 {{ file.sha256 }}</small></li></ul><details v-for="script in item.scripts" :key="script.path"><summary>{{ script.path }}{{ script.previewTruncated ? '（预览已截断）' : '' }}</summary><pre>{{ script.preview || '暂无脚本文本预览' }}</pre></details></details></div>
             <p class="detail-note">安装会校验整个工作流和各依赖版本，不执行脚本或覆盖不同版本。脚本及外部工具使用时另行确认。</p>
-            <div class="dialog-actions"><button class="store-primary" :disabled="busy || !!localError" @click="installPack">{{ busy ? '正在安装…' : '安装专家包' }}<Download :size="14" /></button></div>
+            <div class="dialog-actions"><button v-if="!detail" class="store-secondary" :disabled="busy" @click="close">取消</button><button class="store-primary" :disabled="busy || !!localError" @click="installPack">{{ busy ? '正在安装…' : '安装专家包' }}<Download :size="14" /></button></div>
           </template>
         </template>
         <template v-else-if="marketPlugin">
@@ -358,7 +379,7 @@ onMounted(async () => { if (props.detail) { await refreshLocal(); await open({ .
           <ConnectorConfig v-model="configText" :disabled="busy" @valid="configValid=$event" />
           <p class="detail-note">支持 stdio 和 Streamable HTTP。标准网页登录授权会在浏览器中完成；部分服务需填写密钥或独立注册小伴客户端。本地服务会启动配置中的命令；凭据仅保存在本机。</p>
           <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已检查服务来源与配置，允许小伴连接此服务。</label>
-          <div class="dialog-actions"><button class="store-primary" :disabled="busy || !confirmed || !configText.trim() || !configValid" @click="connect">{{ busy ? '正在连接…' : '连接服务' }}<Plug :size="14" /></button></div>
+          <div class="dialog-actions"><button v-if="!detail" class="store-secondary" :disabled="busy" @click="close">取消</button><button class="store-primary" :disabled="busy || !confirmed || !configText.trim() || !configValid" @click="connect">{{ busy ? '正在连接…' : '连接服务' }}<Plug :size="14" /></button></div>
           </template>
           </template>
         </template>
@@ -369,17 +390,16 @@ onMounted(async () => { if (props.detail) { await refreshLocal(); await open({ .
 
 <style scoped>
 .registry{min-width:0}
-.market-plugin-card .xc-foot{flex-wrap:wrap}
-.market-plugin-card .xc-meta{white-space:normal;overflow-wrap:anywhere}
+.registry-heading{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+.registry-heading h2{margin:0;font-size:13.5px;font-weight:600;color:var(--ui-text-primary)}
+.registry-heading span{font-size:12px;color:var(--ui-text-tertiary)}
 .registry :deep(.n-alert){margin-bottom:14px}
-.text-action{color:var(--ui-ink);background:none;border:0;font:inherit;font-size:12px;cursor:pointer}
-.pagination{display:flex;align-items:center;justify-content:center;gap:15px;margin:24px 0 4px;font-size:12px;color:var(--ui-text-secondary)}
+.text-action{color:var(--ui-text-primary);background:none;border:0;font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 4px;font-size:12px;color:var(--ui-text-secondary)}
 .pagination button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
 .pagination button:disabled{opacity:.45;cursor:not-allowed}
-.connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
-.device-code-inline{background:var(--ui-control);padding:10px 12px;border-radius:8px;margin:8px 0}
-.code-row{display:flex;align-items:center;gap:10px;margin-top:6px}
-.user-code{font-size:18px;letter-spacing:2px;font-family:monospace;background:var(--ui-control);padding:4px 10px;border-radius:6px}
-.connection-status.xb-ok{color:var(--ui-success-text)}
+.device-code-inline{background:var(--ui-surface);box-shadow:inset 0 0 0 1px var(--ui-line);padding:14px 16px;border-radius:12px;margin:12px auto;max-width:360px}
+.code-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px}
+.user-code{font-size:20px;letter-spacing:2.5px;font-family:var(--ui-font-mono,monospace);color:var(--ui-text-primary)}
 .store-empty{min-height:200px}
 </style>

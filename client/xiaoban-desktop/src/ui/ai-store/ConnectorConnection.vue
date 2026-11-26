@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '../../bridge.ts';
 import ConnectorTokenForm from './ConnectorTokenForm.vue';
 import ConnectionJourney from './ConnectionJourney.vue';
-import { type ConnectorAuthorization, type InstalledConnector } from './connector-plugins.ts';
+import { connectorAuth, type ConnectorAuthorization, type InstalledConnector } from './connector-plugins.ts';
 
 const props = defineProps<{ connector: InstalledConnector; autoConnect?: boolean }>();
 const emit = defineEmits<{ updated: [item: InstalledConnector]; connected: [item: InstalledConnector]; busy: [value: boolean]; screen: [value: string]; use: []; close: [] }>();
@@ -212,7 +212,7 @@ onBeforeUnmount(() => {
     <div v-if="authorization" ref="waitPane" class="authorization-panel" tabindex="-1" role="status" aria-live="polite">
       <template v-if="authorization.userCode">
         <p>{{ browserOpened ? '已在浏览器打开授权页，请输入下方验证码完成授权：' : '请打开授权页面，输入下方验证码完成授权：' }}</p>
-        <div class="code-row"><strong class="user-code" data-testid="connector-user-code">{{ authorization.userCode }}</strong><button class="xb-btn" type="button" @click="copyUserCode">{{ copied ? '已复制' : '复制验证码' }}</button></div>
+        <div class="code-row"><strong class="user-code" data-testid="connector-user-code">{{ authorization.userCode }}</strong><button class="xb-btn code-copy-btn" type="button" @click="copyUserCode">{{ copied ? '已复制' : '复制验证码' }}</button></div>
       </template>
       <p v-else>请在浏览器完成授权，完成后会自动更新连接状态。</p>
       <div class="connection-actions"><button class="store-primary" :disabled="busy" @click="openAuthorizationPage">打开授权页面</button></div>
@@ -226,7 +226,7 @@ onBeforeUnmount(() => {
       <p v-if="local" class="local-warning">连接时将在本机运行以下命令，需要本机已有对应运行环境：</p>
       <pre v-if="local && connector.command">{{ [connector.command, ...(connector.args ?? [])].join(' ') }}</pre>
       <button v-if="baiduManual" class="xb-btn" @click="openBaiduAuthorization">打开百度授权页面</button>
-      <ConnectorTokenForm :schema="connector.auth.schema" :configured="connector.auth.configured" :busy="busy || connector.status === 'connecting'" :confirmation-required="false" cancelable :submit-label="local ? '运行并连接' : '保存并连接'" @connect="connect" @cancel="configuring = false; manualToken = false; baiduManual = false" />
+      <ConnectorTokenForm :schema="connector.auth.schema" :configured="connector.auth.configured" :service-name="connector.name" :service-icon="connector.iconUrl" :auth-label="connectorAuth[connector.auth.type]" :busy="busy || connector.status === 'connecting'" :confirmation-required="false" cancelable :submit-label="local ? '运行并连接' : '保存并连接'" @connect="connect" @cancel="configuring = false; manualToken = false; baiduManual = false" />
     </template>
     <template v-else-if="configurable">
       <template v-if="connector.status === 'connected'">
@@ -247,10 +247,25 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.connector-connection{margin:0;padding:12px 0 0}.connector-connection p{font-size:13px;line-height:1.75;overflow-wrap:anywhere}.connection-error{margin:18px 0 0;padding:10px 12px;border-radius:8px;background:var(--ui-control);color:var(--ui-danger)}
-.connection-actions{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px}.connection-actions .store-primary{min-width:76px;padding:0 18px}.connection-secondary{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:10px}.connection-secondary .xb-btn{font-size:12px;height:28px;padding:0 8px}
-.authorization-panel{text-align:center;outline:none;padding:0 0 4px}.authorization-panel:focus-visible{outline:2px solid var(--ui-btn);outline-offset:4px}.authorization-panel>p{margin:16px 0 0;color:var(--ui-text-secondary)}.code-row{display:flex;justify-content:center;align-items:center;gap:12px;margin:14px 0 0;flex-wrap:wrap}.user-code{font-size:25px;letter-spacing:3px;font-family:var(--ui-font-mono,monospace);color:var(--ui-text-primary)}
-.connection-success{margin:16px 0 0;text-align:center;color:var(--ui-success-text)}.connection-alternatives{margin-top:18px;text-align:center;font-size:11px;color:var(--ui-text-tertiary)}.connection-alternatives summary{cursor:pointer}.connection-alternatives .xb-btn{margin:8px 0 0;font-size:12px}
-.local-warning{margin:18px 0 0;color:var(--ui-text-secondary)}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--ui-control);padding:12px;border-radius:8px}
-.is-configuring{padding-top:0}
+.connector-connection{margin:0;padding:8px 0 0}
+.connector-connection p{font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.connection-error{margin:16px 0 0;padding:10px 13px;border-radius:10px;background:color-mix(in srgb,var(--ui-danger) 8%,var(--ui-surface-sunken));color:var(--ui-danger)}
+.connection-actions{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px}
+.connection-actions .store-primary{min-width:108px;padding:0 18px}
+.connection-secondary{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:8px}
+.connection-secondary .xb-btn{font-size:12px;height:28px;padding:0 10px}
+.authorization-panel{text-align:center;outline:none;padding:0 0 4px}
+.authorization-panel:focus-visible{outline:2px solid var(--ui-btn);outline-offset:4px}
+.authorization-panel>p{margin:14px 0 0;color:var(--ui-text-secondary)}
+.code-row{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:340px;margin:16px auto 0;padding:13px 16px;border-radius:13px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);flex-wrap:wrap}
+.user-code{font-size:22px;letter-spacing:3px;font-family:var(--ui-font-mono,monospace);color:var(--ui-text-primary)}
+.code-copy-btn{height:30px;padding:0 12px;border-radius:8px;background:var(--ui-surface);box-shadow:var(--ui-shadow-btn-secondary);color:var(--ui-text-primary);font-size:12px}
+.connection-success{display:inline-flex;align-items:center;gap:6px;margin:12px auto 0;padding:4px 12px;border-radius:999px;background:color-mix(in srgb,var(--ui-success) 12%,transparent);color:var(--ui-success-text);font-size:12px;font-weight:500}
+.connector-connection:has(.connection-success){text-align:center}
+.connection-alternatives{margin-top:16px;text-align:center;font-size:11.5px;color:var(--ui-text-tertiary)}
+.connection-alternatives summary{cursor:pointer}
+.connection-alternatives .xb-btn{margin:8px 0 0;font-size:12px}
+.local-warning{margin:16px 0 0;color:var(--ui-text-secondary)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);padding:11px 13px;border-radius:10px;text-align:left}
+.is-configuring{padding-top:0;text-align:left}
 </style>

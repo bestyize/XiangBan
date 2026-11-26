@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue';
 import { NModal } from 'naive-ui';
+import { Package } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 
 interface PluginReview {
@@ -66,7 +67,7 @@ onBeforeUnmount(() => { alive = false; unlisten?.(); });
 </script>
 
 <template>
-  <button class="xb-btn" :disabled="!desktop" @click="open">从本地插件包安装</button>
+  <button type="button" class="xb-btn local-pkg-btn" title="从本地插件包安装" aria-label="从本地插件包安装" :disabled="!desktop" @click="open"><Package :size="14" aria-hidden="true" /><span class="local-pkg-label">本地包</span></button>
   <NModal :show="show" preset="card" title="从本地插件包安装" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:600px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (show = false)">
     <form class="local-plugin-form" @submit.prevent="inspect">
       <p>选择或拖入 ZIP 插件包，先查看审查结果再安装。</p>
