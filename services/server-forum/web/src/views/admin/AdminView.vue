@@ -1,144 +1,258 @@
 <script setup lang="ts">
-// 管理后台外壳：未登录显示登录页；已登录显示侧栏（窄屏为顶部标签行）和当前分区。
-// 分区由路由参数 section 决定：/admin、/admin/reports、/admin/topics ……
-import { computed, watch } from 'vue'
+// 管理后台外壳：4 大域 × 12 项导航 + 二级聚合 Tab，100% 兼容 23 个历史 /admin/:section 路由。
+import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import { adminApi, adminAuth, clearAdminToken } from '@/api/admin'
+import BrandMark from '@/components/BrandMark.vue'
+import { useTheme, THEME_LABEL } from '@/lib/theme'
+import AdminCommandPalette from './AdminCommandPalette.vue'
+import AdminIcon from './AdminIcon.vue'
 import AdminLogin from './AdminLogin.vue'
-import OverviewPanel from './OverviewPanel.vue'
-import ReportsPanel from './ReportsPanel.vue'
-import ContentReportsPanel from './ContentReportsPanel.vue'
-import TopicsPanel from './TopicsPanel.vue'
-import UsersPanel from './UsersPanel.vue'
-import EditorPanel from './EditorPanel.vue'
-import EditorAccounts from './EditorAccounts.vue'
+import { ADMIN_NAV_GROUPS, adminSectionPath, resolveAdminRoute, type AdminSubTab } from './adminNav'
+import AccountPanel from './AccountPanel.vue'
+import AuditPanel from './AuditPanel.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
-import MetricsPanel from './MetricsPanel.vue'
-import ModerationPanel from './ModerationPanel.vue'
-import WordsPanel from './WordsPanel.vue'
-import PacksPanel from './PacksPanel.vue'
-import ProjectsPanel from './ProjectsPanel.vue'
-import WeeklyPanel from './WeeklyPanel.vue'
-import DiscoverPanel from './DiscoverPanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
-import ContactPanel from './ContactPanel.vue'
-import ToolMirrorsPanel from './ToolMirrorsPanel.vue'
 import CommunityEditorialPanel from './CommunityEditorialPanel.vue'
 import CommunityOperationsPanel from './CommunityOperationsPanel.vue'
-import AuditPanel from './AuditPanel.vue'
-import AccountPanel from './AccountPanel.vue'
+import ContactPanel from './ContactPanel.vue'
+import ContentReportsPanel from './ContentReportsPanel.vue'
+import DiscoverPanel from './DiscoverPanel.vue'
+import EditorAccounts from './EditorAccounts.vue'
+import EditorPanel from './EditorPanel.vue'
+import MetricsPanel from './MetricsPanel.vue'
+import ModerationPanel from './ModerationPanel.vue'
 import OpenSourcePanel from './OpenSourcePanel.vue'
-import { openReports, toasts } from './shared'
+import OverviewPanel from './OverviewPanel.vue'
+import PacksPanel from './PacksPanel.vue'
+import ProjectsPanel from './ProjectsPanel.vue'
+import ReportsPanel from './ReportsPanel.vue'
+import ToolMirrorsPanel from './ToolMirrorsPanel.vue'
+import TopicsPanel from './TopicsPanel.vue'
+import UsersPanel from './UsersPanel.vue'
+import WeeklyPanel from './WeeklyPanel.vue'
+import WordsPanel from './WordsPanel.vue'
+import {
+  openContentReports,
+  openModeration,
+  openReports,
+  refreshReviewBadges,
+  toasts,
+  totalReviewTodo,
+} from './shared'
 import './admin.css'
-import { useTheme, THEME_LABEL } from '@/lib/theme'
+
 const { preference, cycleTheme } = useTheme()
-
-const SECTIONS = [
-  { key: '', label: '概览', comp: OverviewPanel },
-  { key: 'metrics', label: '数据', comp: MetricsPanel },
-  { key: 'reports', label: '举报', comp: ReportsPanel },
-  { key: 'content-reports', label: '作品举报', comp: ContentReportsPanel },
-  { key: 'topics', label: '帖子', comp: TopicsPanel },
-  { key: 'users', label: '用户', comp: UsersPanel },
-  { key: 'editor-accounts', label: '编辑账号', comp: EditorAccounts },
-  { key: 'editor', label: '批量发帖', comp: EditorPanel },
-  { key: 'categories', label: '分类', comp: CategoriesPanel },
-  { key: 'moderation', label: '待审', comp: ModerationPanel },
-  { key: 'words', label: '敏感词', comp: WordsPanel },
-  { key: 'packs', label: '内容包', comp: PacksPanel },
-  { key: 'projects', label: '项目', comp: ProjectsPanel },
-  { key: 'weekly', label: '周刊', comp: WeeklyPanel },
-  { key: 'discover', label: '发现页', comp: DiscoverPanel },
-  { key: 'open-source', label: '精选项目', comp: OpenSourcePanel },
-  { key: 'collection', label: '内容采集', comp: CollectionPanel },
-  { key: 'community-operations', label: '栏目运营', comp: CommunityOperationsPanel },
-  { key: 'tool-mirrors', label: '工具镜像', comp: ToolMirrorsPanel },
-  { key: 'community-editorial', label: '精选与挑战', comp: CommunityEditorialPanel },
-  { key: 'audit', label: '操作日志', comp: AuditPanel },
-  { key: 'account', label: '账号', comp: AccountPanel },
-  { key: 'contact', label: '联系方式', comp: ContactPanel },
-] as const
-
-const GROUPS = [
-  { label: '工作台', keys: ['', 'metrics'] },
-  { label: '内容运营', keys: ['discover', 'open-source', 'collection', 'community-operations', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
-  { label: '社区治理', keys: ['reports', 'content-reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
-  { label: '系统', keys: ['contact', 'audit', 'account'] },
-].map(group => ({...group, sections: group.keys.map(key => SECTIONS.find(section => section.key === key)!)}))
-const DESCRIPTIONS: Record<string,string> = {
-  'community-operations': '核对栏目内容与来源新鲜度，检查维护链接',
-  'tool-mirrors': '核验官方安装包，管理资源镜像和下载回退',
-  collection: '管理官方数据源，检查采集记录与待审内容', discover: '编排社区栏目，保存草稿并审核发布',
-  'community-editorial': '选择首页作品，发起挑战并管理投稿', packs: '审核作品、版本和资源来源',
-  'open-source': '仅管理精选板块的项目、素材、封面模板和发布版本',
-  projects: '维护项目介绍与讨论入口', weekly: '组织本期内容，发布社区周刊',
-}
 const route = useRoute()
+const sideOpen = ref(false)
+const cmdOpen = ref(false)
 
-const current = computed(() => {
-  const key = String(route.params.section ?? '')
-  return SECTIONS.find(s => s.key === key) ?? SECTIONS[0]
-})
+const PANEL_MAP: Record<string, Component> = {
+  '': OverviewPanel,
+  metrics: MetricsPanel,
+  reports: ReportsPanel,
+  'content-reports': ContentReportsPanel,
+  moderation: ModerationPanel,
+  topics: TopicsPanel,
+  users: UsersPanel,
+  'editor-accounts': EditorAccounts,
+  categories: CategoriesPanel,
+  words: WordsPanel,
+  discover: DiscoverPanel,
+  'open-source': OpenSourcePanel,
+  collection: CollectionPanel,
+  'community-operations': CommunityOperationsPanel,
+  'tool-mirrors': ToolMirrorsPanel,
+  packs: PacksPanel,
+  'community-editorial': CommunityEditorialPanel,
+  projects: ProjectsPanel,
+  weekly: WeeklyPanel,
+  editor: EditorPanel,
+  contact: ContactPanel,
+  audit: AuditPanel,
+  account: AccountPanel,
+}
 
+const resolved = computed(() => resolveAdminRoute(String(route.params.section ?? '')))
+const currentComp = computed(() => PANEL_MAP[resolved.value.section] ?? OverviewPanel)
 const loggedIn = computed(() => !!adminAuth.token)
+const adminInitials = computed(() => (adminAuth.username || 'AD').slice(0, 2).toUpperCase())
 
-// 登录后（含刷新页面时带着旧令牌）确认身份并取待处理举报数；令牌失效时接口会自动清空登录态。
+function navBadge(navId: string): number {
+  if (navId === 'review') return totalReviewTodo.value
+  return 0
+}
+
+function subtabBadge(tab: AdminSubTab): number {
+  if (tab.badgeKey === 'reports') return openReports.value
+  if (tab.badgeKey === 'contentReports') return openContentReports.value
+  if (tab.badgeKey === 'moderation') return openModeration.value
+  return 0
+}
+
 watch(
   loggedIn,
   async ok => {
     if (!ok) return
     try {
-      const [me, stats] = await Promise.all([adminApi.me(), adminApi.stats()])
+      const me = await adminApi.me()
       adminAuth.username = me.username
-      openReports.value = stats.reports_open
+      await refreshReviewBadges()
     } catch {
-      // 401 已由请求层处理；其他错误不影响进入后台
+      // 401 已由请求层处理
     }
   },
   { immediate: true },
 )
 
-function logout() {
-  clearAdminToken()
+watch(
+  () => route.fullPath,
+  () => {
+    sideOpen.value = false
+  },
+)
+
+function onGlobalKey(e: KeyboardEvent) {
+  if (!loggedIn.value) return
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    cmdOpen.value = !cmdOpen.value
+  }
 }
 
-function to(key: string) {
-  return key ? `/admin/${key}` : '/admin'
+onMounted(() => window.addEventListener('keydown', onGlobalKey))
+onUnmounted(() => window.removeEventListener('keydown', onGlobalKey))
+
+function logout() {
+  clearAdminToken()
 }
 </script>
 
 <template>
   <AdminLogin v-if="!loggedIn" />
   <div v-else class="adm">
-    <aside class="adm-side">
+    <div class="adm-side-scrim" :class="{ 'is-open': sideOpen }" @click="sideOpen = false" />
+
+    <aside class="adm-side" :class="{ 'is-open': sideOpen }">
       <div class="adm-brand">
-        <span class="adm-brand-mark" aria-hidden="true" />
-        <span>超级小伴 <small>管理后台</small></span>
+        <span class="adm-brand-logo"><BrandMark /></span>
+        <span class="adm-brand-text">
+          <strong>超级小伴</strong>
+          <small>社区运营台 · chat</small>
+        </span>
       </div>
+
+      <button class="adm-cmd-trigger" type="button" @click="cmdOpen = true">
+        <span class="adm-cmd-trigger-l">
+          <AdminIcon name="search" :size="14" />
+          快速跳转…
+        </span>
+        <span class="adm-kbd">⌘K</span>
+      </button>
+
       <nav class="adm-nav" aria-label="后台导航">
-        <div v-for="group in GROUPS" :key="group.label" class="adm-nav-group">
+        <div v-for="group in ADMIN_NAV_GROUPS" :key="group.label" class="adm-nav-group">
           <span class="adm-nav-label">{{ group.label }}</span>
-          <RouterLink v-for="s in group.sections" :key="s.key" :to="to(s.key)" :class="{ 'is-active': s.key === current.key }" :aria-current="s.key === current.key ? 'page' : undefined">
-            {{ s.label }}<span v-if="s.key === 'reports' && openReports > 0" class="adm-badge">{{ openReports }}</span>
+          <RouterLink
+            v-for="item in group.items"
+            :key="item.id"
+            :to="adminSectionPath(item.defaultSection)"
+            :class="{ 'is-active': resolved.nav.id === item.id }"
+            :aria-current="resolved.nav.id === item.id ? 'page' : undefined"
+          >
+            <AdminIcon :name="item.icon" :size="16" />
+            <span class="adm-nav-text">{{ item.label }}</span>
+            <span v-if="navBadge(item.id) > 0" class="adm-badge" :class="{ 'is-soft': item.badgeType === 'soft' }">
+              {{ navBadge(item.id) }}
+            </span>
           </RouterLink>
         </div>
       </nav>
+
       <div class="adm-side-foot">
-        <span class="adm-who">登录为 <b>{{ adminAuth.username || '管理员' }}</b></span>
+        <div class="adm-who-card">
+          <span class="adm-avatar">{{ adminInitials }}</span>
+          <div class="adm-who-meta">
+            <b>{{ adminAuth.username || '管理员' }}</b>
+            <span>管理员会话有效</span>
+          </div>
+        </div>
         <div class="adm-side-links">
-          <RouterLink class="btn btn-ghost btn-sm" to="/">打开论坛</RouterLink>
-          <button class="btn btn-ghost btn-sm" type="button" aria-label="切换后台主题" @click="cycleTheme">{{ THEME_LABEL[preference] }}外观</button>
-          <button class="btn btn-ghost btn-sm" @click="logout">退出登录</button>
+          <RouterLink class="adm-foot-btn" to="/" title="打开社区前台">
+            <AdminIcon name="external" :size="12" /> 前台
+          </RouterLink>
+          <button class="adm-foot-btn" type="button" aria-label="切换后台主题" @click="cycleTheme">
+            <AdminIcon name="sun" :size="12" /> {{ THEME_LABEL[preference] }}
+          </button>
+          <button class="adm-foot-btn" type="button" @click="logout">
+            <AdminIcon name="logout" :size="12" /> 退出
+          </button>
         </div>
       </div>
     </aside>
 
-    <main class="adm-main">
-      <div class="adm-head">
-        <div><p class="adm-breadcrumb">超级小伴 <span>/</span> 管理后台</p><h1>{{ current.label }}</h1><p v-if="DESCRIPTIONS[current.key]" class="adm-page-description">{{ DESCRIPTIONS[current.key] }}</p></div>
-      </div>
-      <div class="adm-content"><component :is="current.comp" :key="current.key" /></div>
-    </main>
+    <div class="adm-col">
+      <header class="adm-topbar">
+        <div class="adm-topbar-left">
+          <button class="adm-menu-btn" type="button" aria-label="展开导航" @click="sideOpen = true">
+            <AdminIcon name="menu" :size="18" />
+          </button>
+          <p class="adm-breadcrumb">
+            <span>超级小伴</span>
+            <span>/</span>
+            <span>{{ resolved.groupLabel }}</span>
+            <span>/</span>
+            <strong>{{ resolved.nav.label }}</strong>
+            <template v-if="resolved.subtabLabel">
+              <span>/</span>
+              <span>{{ resolved.subtabLabel }}</span>
+            </template>
+          </p>
+        </div>
+        <div class="adm-topbar-right">
+          <RouterLink v-if="totalReviewTodo > 0" class="btn btn-sm btn-soft" to="/admin/reports">
+            待审核 {{ totalReviewTodo }}
+          </RouterLink>
+          <button class="btn btn-sm btn-ghost" type="button" title="快捷键 ⌘K" @click="cmdOpen = true">
+            <AdminIcon name="search" :size="14" /> 跳转
+          </button>
+        </div>
+      </header>
+
+      <main class="adm-main">
+        <div class="adm-head">
+          <div>
+            <h1>{{ resolved.nav.label }}</h1>
+            <p class="adm-page-description">{{ resolved.nav.description }}</p>
+          </div>
+        </div>
+
+        <nav v-if="resolved.nav.subtabs" class="adm-subtabs" :aria-label="`${resolved.nav.label}子模块`">
+          <RouterLink
+            v-for="tab in resolved.nav.subtabs"
+            :key="tab.section"
+            :to="adminSectionPath(tab.section)"
+            class="adm-subtab"
+            :class="{ 'is-active': resolved.section === tab.section }"
+          >
+            <span>{{ tab.label }}</span>
+            <span
+              v-if="subtabBadge(tab) > 0"
+              class="adm-subtab-cnt"
+              :class="{ 'is-danger': tab.badgeKey !== undefined }"
+            >
+              {{ subtabBadge(tab) }}
+            </span>
+          </RouterLink>
+        </nav>
+
+        <div class="adm-content">
+          <component :is="currentComp" :key="resolved.section" />
+        </div>
+      </main>
+    </div>
+
+    <AdminCommandPalette :open="cmdOpen" @close="cmdOpen = false" @toggle-theme="cycleTheme" />
 
     <div class="adm-toasts" aria-live="polite">
       <div v-for="t in toasts" :key="t.id" class="adm-toast" :class="t.kind">{{ t.text }}</div>

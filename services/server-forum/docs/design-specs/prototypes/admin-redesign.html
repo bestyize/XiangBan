@@ -1,0 +1,2788 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>超级小伴社区 · 管理后台 UI 重设计稿</title>
+<style>
+/* ==========================================================================
+   超级小伴社区管理后台 · 现代极简运营工作台设计令牌
+   与小伴全端 6 套官方主题色 & 日夜间规范 1:1 对齐
+   ========================================================================== */
+:root {
+  --bg-studio: #e9ebef;
+  --bg-canvas: #f6f7f9;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f2f3f6;
+  --bg-hover: #eceef2;
+  --bg-active: #ffffff;
+
+  --ink-1: #14151a;
+  --ink-2: #4e5361;
+  --ink-3: #878c9a;
+  --ink-4: #b2b7c4;
+
+  --line: #e7e9ef;
+  --line-strong: #d3d7e2;
+  --line-subtle: #f0f1f5;
+
+  /* 主题色（默认小伴红，由 JS 动态切换 6 套官方色板） */
+  --brand: #E3203C;
+  --brand-fill: #E3203C;
+  --brand-hover: #F0506A;
+  --brand-soft: #FFF1F3;
+  --brand-ink: #ffffff;
+
+  /* 固定语义色（不随主题色变化） */
+  --ok: #1f9d63;
+  --ok-soft: #eaf8f1;
+  --warn: #c97a08;
+  --warn-soft: #fef5e7;
+  --danger: #dc2642;
+  --danger-soft: #feecef;
+  --info: #2563eb;
+  --info-soft: #edf3ff;
+
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(16, 18, 24, 0.04);
+  --shadow-pop: 0 12px 32px rgba(16, 18, 24, 0.12), 0 2px 6px rgba(16, 18, 24, 0.05);
+  --shadow-drawer: -12px 0 36px rgba(16, 18, 24, 0.10);
+  --scrim: rgba(16, 18, 24, 0.36);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme="dark"] {
+  --bg-studio: #090a0d;
+  --bg-canvas: #0f1014;
+  --bg-surface: #17181e;
+  --bg-subtle: #20222a;
+  --bg-hover: #282b35;
+  --bg-active: #252832;
+
+  --ink-1: #f0f2f7;
+  --ink-2: #a0a6b6;
+  --ink-3: #6c7282;
+  --ink-4: #4b505e;
+
+  --line: #252832;
+  --line-strong: #353947;
+  --line-subtle: #1d1f27;
+
+  --ok: #34c27c;
+  --ok-soft: rgba(52, 194, 124, 0.14);
+  --warn: #f5b638;
+  --warn-soft: rgba(245, 182, 56, 0.14);
+  --danger: #ff5c6c;
+  --danger-soft: rgba(255, 92, 108, 0.15);
+  --info: #6aa3ff;
+  --info-soft: rgba(106, 163, 255, 0.15);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --shadow-drawer: -16px 0 42px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.62);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-1);
+  background: var(--bg-studio);
+  transition: background .2s ease, color .2s ease;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p { margin: 0; }
+svg.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* ==========================================================================
+   顶部设计稿展示控制栏（Studio Bar，不属于后台本身）
+   ========================================================================== */
+.studio-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: color-mix(in srgb, var(--bg-surface) 90%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+.sb-left, .sb-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sb-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; letter-spacing: -.01em; }
+.sb-pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-pill); background: var(--brand-soft); color: var(--brand); }
+.sb-seg {
+  display: inline-flex; align-items: center; padding: 3px; border-radius: 9px;
+  background: var(--bg-subtle); border: 1px solid var(--line); gap: 2px;
+}
+.sb-seg button {
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px; color: var(--ink-2);
+  transition: background .15s, color .15s; white-space: nowrap;
+}
+.sb-seg button.active {
+  background: var(--bg-surface); color: var(--ink-1); font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.swatches {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px;
+  border-radius: 9px; background: var(--bg-subtle); border: 1px solid var(--line);
+}
+.swatch {
+  width: 14px; height: 14px; border-radius: 50%; position: relative;
+  transition: transform .15s var(--ease);
+}
+.swatch:hover { transform: scale(1.16); }
+.swatch.active::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid var(--ink-1);
+}
+.sb-btn {
+  height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12px; font-weight: 500;
+  background: var(--bg-surface); border: 1px solid var(--line-strong); color: var(--ink-1);
+  display: inline-flex; align-items: center; gap: 6px; transition: background .15s, border-color .15s;
+}
+.sb-btn:hover { background: var(--bg-hover); }
+.sb-btn.accent { background: var(--brand-soft); border-color: transparent; color: var(--brand); font-weight: 600; }
+
+/* 视口画布容器（支持 PC 满宽 / 平板 960px / 移动 390px 预览） */
+.stage {
+  padding: 14px 16px 28px;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 49px);
+}
+.stage.vp-desktop { padding: 0; }
+.viewport-frame {
+  width: 100%;
+  min-height: calc(100vh - 49px);
+  background: var(--bg-canvas);
+  position: relative;
+  overflow-x: clip;
+  transition: width .25s var(--ease), border-radius .25s var(--ease);
+}
+.stage.vp-tablet .viewport-frame {
+  width: 960px; max-width: 100%;
+  border-radius: 16px; border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-pop); overflow: hidden;
+  min-height: 760px;
+}
+.stage.vp-mobile .viewport-frame {
+  width: 390px; max-width: 100%;
+  border-radius: 26px; border: 6px solid var(--ink-1);
+  box-shadow: var(--shadow-pop); overflow: hidden;
+  height: 820px; min-height: 820px; display: flex; flex-direction: column;
+}
+
+/* ==========================================================================
+   管理后台主壳层：左导轨 + 顶栏 + 主画布
+   ========================================================================== */
+.app-shell {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  min-height: calc(100vh - 49px);
+}
+.stage.vp-tablet .app-shell,
+.stage.vp-mobile .app-shell {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100%;
+  height: 100%;
+}
+
+/* 左侧边栏 */
+.sidebar {
+  position: sticky;
+  top: var(--studio-h, 49px);
+  height: calc(100vh - var(--studio-h, 49px));
+  background: var(--bg-surface);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px 12px;
+  z-index: 40;
+}
+.stage.vp-tablet .sidebar,
+.stage.vp-mobile .sidebar {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  height: 100%;
+  width: 264px;
+  transform: translateX(-104%);
+  transition: transform .22s var(--ease);
+  box-shadow: var(--shadow-pop);
+}
+.stage.vp-tablet .sidebar.open,
+.stage.vp-mobile .sidebar.open { transform: translateX(0); }
+
+.side-scrim {
+  display: none;
+  position: absolute; inset: 0; background: var(--scrim); z-index: 35;
+}
+.side-scrim.open { display: block; }
+
+.brand-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 8px 14px;
+}
+.brand-logo { width: 30px; height: 30px; border-radius: 9px; flex: none; overflow: hidden; box-shadow: 0 2px 8px rgba(227,32,60,.22); }
+.brand-text { min-width: 0; }
+.brand-text strong { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -.015em; line-height: 1.2; }
+.brand-text span { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+
+.cmd-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 34px; padding: 0 10px; margin: 0 2px 12px;
+  border-radius: var(--r-sm); background: var(--bg-subtle); border: 1px solid var(--line);
+  color: var(--ink-3); font-size: 12.5px;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.cmd-trigger:hover { border-color: var(--line-strong); color: var(--ink-2); }
+.cmd-trigger .left { display: inline-flex; align-items: center; gap: 7px; }
+.kbd {
+  font-family: var(--font-mono); font-size: 10.5px; padding: 1px 5px;
+  border-radius: 5px; background: var(--bg-surface); border: 1px solid var(--line-strong);
+  color: var(--ink-3); line-height: 1.3;
+}
+
+.nav-scroll { flex: 1; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
+.nav-group { margin-bottom: 14px; }
+.nav-group-label {
+  padding: 0 10px 6px; font-size: 11px; font-weight: 600;
+  color: var(--ink-3); letter-spacing: .04em;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-item {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  height: 34px; padding: 0 10px; border-radius: var(--r-sm);
+  color: var(--ink-2); font-size: 13px; font-weight: 500;
+  transition: background .14s, color .14s;
+  position: relative; margin-bottom: 1px; text-align: left;
+}
+.nav-item:hover { background: var(--bg-subtle); color: var(--ink-1); }
+.nav-item.active {
+  background: var(--brand-soft); color: var(--brand); font-weight: 600;
+}
+.nav-item.active::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--brand-fill);
+}
+.nav-item .label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff; font-variant-numeric: tabular-nums;
+}
+.nav-badge.soft { background: var(--bg-hover); color: var(--ink-2); }
+.nav-item.active .nav-badge.soft { background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand); }
+
+.side-footer {
+  margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.admin-card-mini {
+  display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: var(--r-sm);
+}
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-weight: 700; font-size: 12px;
+  background: var(--brand-soft); color: var(--brand);
+}
+.avatar.sm { width: 26px; height: 26px; font-size: 11px; }
+.admin-card-mini .meta { min-width: 0; flex: 1; }
+.admin-card-mini strong { display: block; font-size: 12.5px; line-height: 1.25; }
+.admin-card-mini span { display: block; font-size: 11px; color: var(--ink-3); }
+.side-foot-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.side-foot-btn {
+  height: 30px; border-radius: var(--r-xs); background: var(--bg-subtle);
+  color: var(--ink-2); font-size: 12px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  transition: background .14s, color .14s;
+}
+.side-foot-btn:hover { background: var(--bg-hover); color: var(--ink-1); }
+
+/* 右侧主区 */
+.main-col { min-width: 0; display: flex; flex-direction: column; }
+.stage.vp-mobile .main-col { overflow-y: auto; height: 100%; }
+.topbar {
+  position: sticky; top: var(--studio-h, 49px); z-index: 30;
+  height: 52px; padding: 0 28px;
+  background: color-mix(in srgb, var(--bg-canvas) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.stage.vp-tablet .topbar,
+.stage.vp-mobile .topbar { top: 0; padding: 0 14px; }
+
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.menu-btn {
+  display: none; width: 34px; height: 34px; border-radius: var(--r-sm);
+  align-items: center; justify-content: center; color: var(--ink-1);
+}
+.menu-btn:hover { background: var(--bg-hover); }
+.stage.vp-tablet .menu-btn,
+.stage.vp-mobile .menu-btn { display: inline-flex; }
+
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.breadcrumb strong { color: var(--ink-1); font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.status-chip {
+  height: 28px; padding: 0 10px; border-radius: var(--r-pill);
+  background: var(--bg-surface); border: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px;
+}
+.stage.vp-mobile .status-chip { display: none; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.danger { background: var(--danger); }
+.dot.info { background: var(--info); }
+.dot.muted { background: var(--ink-4); }
+
+.content-wrap {
+  width: 100%; max-width: 1360px; margin: 0 auto;
+  padding: 22px 28px 56px;
+}
+.stage.vp-mobile .content-wrap { padding: 14px 14px 36px; }
+
+.page-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.page-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
+.page-header p { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
+.page-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ==========================================================================
+   基础控件与卡片规范（统一全后台 30 个面板的原子语言）
+   ========================================================================== */
+.btn {
+  height: 34px; padding: 0 13px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong); background: var(--bg-surface); color: var(--ink-1);
+  font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap; transition: background .14s, border-color .14s, color .14s, opacity .14s;
+}
+.btn:hover { background: var(--bg-subtle); border-color: var(--ink-4); }
+.btn:disabled { opacity: .48; cursor: not-allowed; }
+.btn-primary { background: var(--brand-fill); border-color: var(--brand-fill); color: var(--brand-ink); font-weight: 600; }
+.btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn-soft { background: var(--brand-soft); border-color: transparent; color: var(--brand); font-weight: 600; }
+.btn-soft:hover { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+.btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, var(--line)); }
+.btn-danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+.btn-danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--bg-subtle); color: var(--ink-1); }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
+.btn-icon { width: 30px; height: 30px; padding: 0; border-radius: 7px; }
+
+.input, .select, .textarea {
+  height: 34px; padding: 0 11px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong); background: var(--bg-surface); color: var(--ink-1);
+  font-size: 13px; transition: border-color .14s, box-shadow .14s;
+}
+.textarea { height: auto; padding: 9px 11px; min-height: 86px; resize: vertical; line-height: 1.6; }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.search-box { position: relative; display: inline-flex; align-items: center; }
+.search-box svg { position: absolute; left: 10px; color: var(--ink-3); pointer-events: none; }
+.search-box .input { padding-left: 32px; width: 240px; }
+.stage.vp-mobile .search-box, .stage.vp-mobile .search-box .input { width: 100%; }
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+}
+.card-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-subtle);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.card-head h2, .card-head h3 { font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.card-body { padding: 16px 18px; }
+
+/* 子导航 Tab 条 */
+.subtabs {
+  display: flex; align-items: center; gap: 4px;
+  border-bottom: 1px solid var(--line); margin-bottom: 16px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtab {
+  height: 38px; padding: 0 14px; font-size: 13px; font-weight: 500;
+  color: var(--ink-2); border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  transition: color .14s, border-color .14s; margin-bottom: -1px;
+}
+.subtab:hover { color: var(--ink-1); }
+.subtab.active { color: var(--brand); border-bottom-color: var(--brand-fill); font-weight: 600; }
+.subtab .cnt {
+  font-size: 11px; padding: 1px 6px; border-radius: var(--r-pill);
+  background: var(--bg-subtle); color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
+.subtab.active .cnt { background: var(--brand-soft); color: var(--brand); }
+.subtab .cnt.danger { background: var(--danger-soft); color: var(--danger); }
+
+/* 筛选条与胶囊组 */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pills { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 9px; background: var(--bg-subtle); border: 1px solid var(--line); }
+.pill-btn {
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px; color: var(--ink-2);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.pill-btn.active { background: var(--bg-surface); color: var(--ink-1); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.07); }
+
+/* 状态标签 */
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 8px; border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 500; white-space: nowrap;
+  background: var(--bg-subtle); color: var(--ink-2);
+}
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.danger { background: var(--danger-soft); color: var(--danger); }
+.tag.info { background: var(--info-soft); color: var(--info); }
+.tag.brand { background: var(--brand-soft); color: var(--brand); }
+.tag.outline { background: transparent; border: 1px solid var(--line-strong); color: var(--ink-2); }
+
+/* 表格 */
+.table-wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  padding: 10px 16px; text-align: left; font-size: 11.5px; font-weight: 600;
+  color: var(--ink-3); background: var(--bg-subtle);
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.tbl td {
+  padding: 12px 16px; border-bottom: 1px solid var(--line-subtle);
+  vertical-align: middle; font-size: 13px;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr { transition: background .12s; }
+.tbl tbody tr:hover { background: color-mix(in srgb, var(--bg-subtle) 65%, transparent); }
+.tbl .cell-title { font-weight: 600; color: var(--ink-1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tbl .cell-sub { font-size: 12px; color: var(--ink-3); margin-top: 3px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tbl .right { text-align: right; }
+
+/* 表单字段 */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field > span { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.field small { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.form-grid .wide { grid-column: 1 / -1; }
+.stage.vp-mobile .form-grid { grid-template-columns: 1fr; }
+
+/* ==========================================================================
+   特定页面布局
+   ========================================================================== */
+/* 1. 概览与待办 */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+.stage.vp-tablet .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stage.vp-mobile .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kpi-card {
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+  cursor: pointer; transition: border-color .15s, transform .15s;
+}
+.kpi-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); font-weight: 500; }
+.kpi-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.kpi-val { font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.kpi-val.danger { color: var(--danger); }
+.kpi-delta { font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-pill); }
+.kpi-delta.up { background: var(--ok-soft); color: var(--ok); }
+.kpi-delta.alert { background: var(--danger-soft); color: var(--danger); }
+.kpi-delta.neutral { background: var(--bg-subtle); color: var(--ink-2); }
+.spark { width: 76px; height: 26px; flex: none; }
+
+.dash-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+.stage.vp-tablet .dash-grid, .stage.vp-mobile .dash-grid { grid-template-columns: 1fr; }
+
+.todo-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--line-subtle);
+  transition: background .12s; cursor: pointer;
+}
+.todo-item:last-child { border-bottom: 0; }
+.todo-item:hover { background: var(--bg-subtle); }
+.todo-left { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
+.todo-icon {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: grid; place-items: center;
+}
+.todo-icon.danger { background: var(--danger-soft); color: var(--danger); }
+.todo-icon.warn { background: var(--warn-soft); color: var(--warn); }
+.todo-icon.info { background: var(--info-soft); color: var(--info); }
+.todo-title { font-size: 13px; font-weight: 600; color: var(--ink-1); }
+.todo-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+.health-list { display: flex; flex-direction: column; }
+.health-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 18px; border-bottom: 1px solid var(--line-subtle);
+}
+.health-row:last-child { border-bottom: 0; }
+.health-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.health-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+
+/* 2. 审核中心：主从分栏 */
+.split-view {
+  display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; align-items: start;
+}
+.stage.vp-tablet .split-view, .stage.vp-mobile .split-view { grid-template-columns: 1fr; }
+.queue-item {
+  padding: 13px 16px; border-bottom: 1px solid var(--line-subtle); cursor: pointer;
+  transition: background .12s; position: relative;
+}
+.queue-item:last-child { border-bottom: 0; }
+.queue-item:hover { background: var(--bg-subtle); }
+.queue-item.active { background: var(--brand-soft); }
+.queue-item.active::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand-fill);
+}
+.quote-box {
+  padding: 12px 14px; border-radius: var(--r-sm); background: var(--bg-subtle);
+  border-left: 3px solid var(--line-strong); font-size: 13px; color: var(--ink-2);
+  margin: 12px 0; line-height: 1.65;
+}
+.quick-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip-btn {
+  height: 26px; padding: 0 10px; border-radius: var(--r-pill); font-size: 12px;
+  background: var(--bg-subtle); border: 1px solid var(--line); color: var(--ink-2);
+  transition: all .14s;
+}
+.chip-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+
+/* 3. 发现页编排：左侧频道 + 右侧表格 */
+.discover-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; align-items: start; }
+.stage.vp-tablet .discover-grid, .stage.vp-mobile .discover-grid { grid-template-columns: 1fr; }
+.channel-list { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.stage.vp-tablet .channel-list, .stage.vp-mobile .channel-list { flex-direction: row; overflow-x: auto; }
+.channel-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r-sm); font-size: 12.5px; color: var(--ink-2);
+  white-space: nowrap; transition: background .12s, color .12s;
+}
+.channel-btn:hover { background: var(--bg-subtle); color: var(--ink-1); }
+.channel-btn.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+
+/* 4. 精选项目工作台：四步进度条 + 三栏 */
+.stepper {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 18px; margin-bottom: 14px;
+}
+.step-node { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 500; }
+.step-node .num-dot {
+  width: 22px; height: 22px; border-radius: 50%; font-size: 11.5px; font-weight: 700;
+  display: grid; place-items: center; background: var(--bg-subtle); color: var(--ink-3);
+  border: 1px solid var(--line-strong);
+}
+.step-node.done { color: var(--ok); }
+.step-node.done .num-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.step-node.current { color: var(--ink-1); font-weight: 600; }
+.step-node.current .num-dot { background: var(--brand-fill); border-color: var(--brand-fill); color: #fff; }
+.step-sep { flex: 1; min-width: 18px; height: 1px; background: var(--line-strong); }
+
+.os-workbench { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: 16px; align-items: start; }
+.stage.vp-tablet .os-workbench { grid-template-columns: 210px minmax(0, 1fr); }
+.stage.vp-mobile .os-workbench { grid-template-columns: 1fr; }
+.os-item {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--r-sm); text-align: left;
+  transition: background .12s; margin-bottom: 2px;
+}
+.os-item:hover { background: var(--bg-subtle); }
+.os-item.active { background: var(--brand-soft); }
+.os-icon-box {
+  width: 34px; height: 34px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff;
+}
+.os-preview-cover {
+  aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden;
+  padding: 16px; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; border: 1px solid var(--line);
+}
+.os-preview-code {
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.55;
+  padding: 8px 10px; border-radius: 7px; background: rgba(0,0,0,.22); color: #f6f8fa;
+  backdrop-filter: blur(6px);
+}
+
+/* 5. 采编与健康 */
+.source-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stage.vp-tablet .source-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stage.vp-mobile .source-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.source-card {
+  padding: 13px 14px; border-radius: var(--r-md); background: var(--bg-surface);
+  border: 1px solid var(--line); text-align: left; cursor: pointer;
+  transition: border-color .14s, background .14s;
+}
+.source-card:hover { border-color: var(--line-strong); }
+.source-card.active { border-color: var(--brand); background: var(--brand-soft); }
+.source-card strong { display: block; font-size: 13px; margin-bottom: 6px; }
+.source-card span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--ink-2); }
+
+/* 6. 树形分类 & 联系方式 */
+.tree-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--line-subtle);
+}
+.tree-row:last-child { border-bottom: 0; }
+.tree-row.parent { background: color-mix(in srgb, var(--bg-subtle) 55%, transparent); }
+.tree-row.child { padding-left: 44px; position: relative; }
+.tree-row.child::before {
+  content: ""; position: absolute; left: 26px; top: 0; bottom: 50%; width: 10px;
+  border-left: 1.5px solid var(--line-strong); border-bottom: 1.5px solid var(--line-strong);
+  border-bottom-left-radius: 4px;
+}
+
+.contact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.stage.vp-tablet .contact-grid, .stage.vp-mobile .contact-grid { grid-template-columns: 1fr; }
+.qr-box {
+  width: 96px; height: 96px; border-radius: 10px; background: #fff;
+  border: 1px solid var(--line); display: grid; place-items: center; padding: 8px;
+}
+
+/* 批量操作悬浮条 */
+.batch-bar {
+  position: sticky; bottom: 18px; z-index: 35;
+  margin-top: 14px; padding: 10px 16px; border-radius: 12px;
+  background: var(--ink-1); color: var(--bg-surface);
+  box-shadow: var(--shadow-pop);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.batch-bar .btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.18); color: #fff; }
+.batch-bar .btn:hover { background: rgba(255,255,255,.22); }
+:root[data-theme="dark"] .batch-bar { background: #262936; color: #f4f6fb; border: 1px solid var(--line-strong); }
+
+/* ==========================================================================
+   右侧抽屉 Drawer / 居中弹窗 Modal / ⌘K 命令面板 / Toast
+   ========================================================================== */
+.overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--scrim); display: none; align-items: center; justify-content: center;
+  padding: 20px; backdrop-filter: blur(3px);
+}
+.overlay.open { display: flex; }
+.overlay.drawer-mode { justify-content: flex-end; padding: 0; align-items: stretch; }
+
+.drawer {
+  width: 580px; max-width: 100vw; background: var(--bg-surface);
+  border-left: 1px solid var(--line); box-shadow: var(--shadow-drawer);
+  display: flex; flex-direction: column; max-height: 100vh;
+  animation: slideIn .2s var(--ease);
+}
+.drawer.wide { width: 680px; }
+@keyframes slideIn { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
+.drawer-head {
+  padding: 16px 22px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.drawer-head h3 { font-size: 16px; font-weight: 700; }
+.drawer-body { padding: 20px 22px; overflow-y: auto; flex: 1; }
+.drawer-foot {
+  padding: 14px 22px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg-surface);
+}
+
+.modal {
+  width: 460px; max-width: 100%; background: var(--bg-surface);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop); overflow: hidden;
+  animation: popIn .18s var(--ease);
+}
+.modal.wide { width: 760px; max-height: 86vh; display: flex; flex-direction: column; }
+@keyframes popIn { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-head { padding: 18px 22px 12px; display: flex; align-items: center; justify-content: space-between; }
+.modal-head h3 { font-size: 16px; font-weight: 700; }
+.modal-body { padding: 4px 22px 20px; overflow-y: auto; }
+.modal-foot { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ⌘K 命令面板 */
+.cmd-box {
+  width: 560px; max-width: 100%; background: var(--bg-surface);
+  border: 1px solid var(--line-strong); border-radius: 14px;
+  box-shadow: var(--shadow-pop); overflow: hidden; align-self: flex-start; margin-top: 9vh;
+}
+.cmd-input-row {
+  display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cmd-input-row input { flex: 1; border: 0; outline: 0; background: none; font-size: 14.5px; }
+.cmd-results { max-height: 360px; overflow-y: auto; padding: 8px; }
+.cmd-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; text-align: left; font-size: 13px;
+}
+.cmd-row:hover { background: var(--bg-subtle); }
+.cmd-row .left { display: flex; align-items: center; gap: 10px; }
+.cmd-row small { color: var(--ink-3); font-size: 11.5px; }
+
+/* 独立登录页 */
+.login-stage {
+  min-height: calc(100vh - 49px); display: grid; place-items: center; padding: 32px 16px;
+  background: radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 46%),
+              radial-gradient(circle at 82% 85%, color-mix(in srgb, var(--info) 6%, transparent), transparent 48%),
+              var(--bg-canvas);
+}
+.login-card {
+  width: 400px; max-width: 100%; padding: 34px 32px 28px;
+  background: var(--bg-surface); border: 1px solid var(--line);
+  border-radius: 20px; box-shadow: var(--shadow-pop);
+}
+
+/* Diff 双栏代码 */
+.diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stage.vp-mobile .diff-grid { grid-template-columns: 1fr; }
+.code-block {
+  margin: 0; padding: 12px; border-radius: 8px; background: var(--bg-subtle);
+  border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11.5px;
+  line-height: 1.6; overflow: auto; max-height: 300px; white-space: pre-wrap;
+}
+
+/* Toast */
+.toast-host {
+  position: fixed; right: 20px; bottom: 20px; z-index: 400;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 10px 15px; border-radius: 10px; font-size: 13px; font-weight: 500;
+  background: var(--ink-1); color: var(--bg-surface); box-shadow: var(--shadow-pop);
+  display: inline-flex; align-items: center; gap: 8px;
+  animation: popIn .18s var(--ease);
+}
+.toast.ok .t-dot { background: var(--ok); }
+.toast.danger { background: var(--danger); color: #fff; }
+.t-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-fill); }
+
+/* 进度条 / 数据条 */
+.bar-track { height: 8px; border-radius: 99px; background: var(--bg-subtle); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 99px; background: var(--brand-fill); }
+
+/* 图表提示 */
+.chart-legend { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--ink-2); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-box { width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ==================== 顶部设计稿演示控制栏 ==================== -->
+<header class="studio-bar">
+  <div class="sb-left">
+    <span class="sb-title">
+      <svg width="20" height="20" viewBox="0 0 120 120" style="border-radius:6px;flex:none">
+        <defs><linearGradient id="sbG" x1="12%" y1="6%" x2="88%" y2="96%"><stop offset="0%" stop-color="#FF6584"/><stop offset="100%" stop-color="#F9744B"/></linearGradient></defs>
+        <rect width="120" height="120" rx="28" fill="url(#sbG)"/>
+        <path d="M53 29 C56 47 63 54 81 57 C63 60 56 67 53 85 C50 67 43 60 25 57 C43 54 50 47 53 29Z" fill="#fff"/>
+        <path d="M84 68 C85.5 76 89 79.5 97 81 C89 82.5 85.5 86 84 94 C82.5 86 79 82.5 71 81 C79 79.5 82.5 76 84 68Z" fill="#FFF3D6"/>
+      </svg>
+      超级小伴社区 · 管理后台重设计稿
+    </span>
+    <span class="sb-pill">23 菜单 → 12 域重构</span>
+    <div class="sb-seg" id="vpSeg" aria-label="视口切换">
+      <button class="active" data-vp="desktop">PC 桌面</button>
+      <button data-vp="tablet">平板 960</button>
+      <button data-vp="mobile">手机 390</button>
+    </div>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn accent" id="btnCompare">新旧信息架构对照</button>
+    <button class="sb-btn" id="btnLoginToggle">预览登录页</button>
+    <div class="swatches" id="swatchBar" aria-label="6套官方主题色"></div>
+    <div class="sb-seg" id="themeSeg" aria-label="日夜模式">
+      <button class="active" data-theme="light">日间</button>
+      <button data-theme="dark">夜间</button>
+    </div>
+  </div>
+</header>
+
+<!-- ==================== 主画布舞台 ==================== -->
+<div class="stage vp-desktop" id="stage">
+  <div class="viewport-frame" id="viewportFrame">
+
+    <!-- 独立登录页（点击顶部「预览登录页」切换） -->
+    <div class="login-stage" id="loginView" style="display:none">
+      <div class="login-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:22px">
+          <div class="brand-logo" style="width:40px;height:40px;border-radius:12px">
+            <svg width="40" height="40" viewBox="0 0 120 120">
+              <defs><linearGradient id="lgG" x1="12%" y1="6%" x2="88%" y2="96%"><stop offset="0%" stop-color="#FF6584"/><stop offset="100%" stop-color="#F9744B"/></linearGradient></defs>
+              <rect width="120" height="120" rx="28" fill="url(#lgG)"/>
+              <path d="M53 29 C56 47 63 54 81 57 C63 60 56 67 53 85 C50 67 43 60 25 57 C43 54 50 47 53 29Z" fill="#fff"/>
+              <path d="M84 68 C85.5 76 89 79.5 97 81 C89 82.5 85.5 86 84 94 C82.5 86 79 82.5 71 81 C79 79.5 82.5 76 84 68Z" fill="#FFF3D6"/>
+            </svg>
+          </div>
+          <div>
+            <h1 style="font-size:19px;font-weight:700;letter-spacing:-.02em">超级小伴 · 运营管理台</h1>
+            <p style="font-size:12.5px;color:var(--ink-3);margin-top:2px">chat.xiangban.xyz 独立管理员通道</p>
+          </div>
+        </div>
+        <form onsubmit="event.preventDefault(); toggleLogin(false); showToast('登录成功，欢迎回来 admin', 'ok');" style="display:grid;gap:14px">
+          <div class="field">
+            <label>管理员账号</label>
+            <input class="input" value="admin" placeholder="请输入用户名" style="height:38px">
+          </div>
+          <div class="field">
+            <label>登录密码</label>
+            <input class="input" type="password" value="••••••••••••" placeholder="请输入密码" style="height:38px">
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-3);padding:2px 0">
+            <span>HS256 独立会话 · 审计全程留痕</span>
+            <span>输错 5 次锁定 15 分钟</span>
+          </div>
+          <button class="btn btn-primary" type="submit" style="height:40px;font-size:14px;margin-top:4px">进入管理后台</button>
+        </form>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3)">
+          <a href="#" onclick="event.preventDefault();toggleLogin(false)">← 返回社区前台</a>
+          <span>v2.0 界面重设计预览</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 后台主壳层 -->
+    <div class="app-shell" id="appShell">
+      <div class="side-scrim" id="sideScrim"></div>
+
+      <!-- 左侧导航栏 -->
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-box">
+          <div class="brand-logo">
+            <svg width="30" height="30" viewBox="0 0 120 120">
+              <defs><linearGradient id="brG" x1="12%" y1="6%" x2="88%" y2="96%"><stop offset="0%" stop-color="#FF6584"/><stop offset="100%" stop-color="#F9744B"/></linearGradient></defs>
+              <rect width="120" height="120" rx="28" fill="url(#brG)"/>
+              <path d="M53 29 C56 47 63 54 81 57 C63 60 56 67 53 85 C50 67 43 60 25 57 C43 54 50 47 53 29Z" fill="#fff"/>
+              <path d="M84 68 C85.5 76 89 79.5 97 81 C89 82.5 85.5 86 84 94 C82.5 86 79 82.5 71 81 C79 79.5 82.5 76 84 68Z" fill="#FFF3D6"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <strong>超级小伴</strong>
+            <span>社区运营台 · chat</span>
+          </div>
+        </div>
+
+        <button class="cmd-trigger" id="cmdBtn" type="button">
+          <span class="left">
+            <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            快速跳转 / 搜索…
+          </span>
+          <span class="kbd">⌘K</span>
+        </button>
+
+        <nav class="nav-scroll" id="sideNav" aria-label="后台主导航"></nav>
+
+        <div class="side-footer">
+          <div class="admin-card-mini">
+            <div class="avatar">AD</div>
+            <div class="meta">
+              <strong>admin</strong>
+              <span>超级管理员 · 会话有效</span>
+            </div>
+          </div>
+          <div class="side-foot-actions">
+            <button class="side-foot-btn" onclick="showToast('已在新标签打开社区前台 chat.xiangban.xyz')">
+              <svg class="ic" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              打开社区
+            </button>
+            <button class="side-foot-btn" onclick="toggleLogin(true)">
+              <svg class="ic" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              退出登录
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 主内容区 -->
+      <div class="main-col">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="menu-btn" id="menuBtn" aria-label="展开导航">
+              <svg class="ic" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+            <div class="breadcrumb" id="breadcrumb"></div>
+          </div>
+          <div class="topbar-right">
+            <span class="status-chip" title="所有自动采集源与资源服务健康">
+              <i class="dot ok"></i> 采集健康 4/5 · 外链待核对 2
+            </span>
+            <button class="btn btn-sm btn-soft" onclick="navigate('review')">
+              待处理 <span class="num" id="topTodoCount">8</span>
+            </button>
+          </div>
+        </header>
+
+        <main class="content-wrap" id="pageContent"></main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 抽屉 / 弹层 / ⌘K 宿主 -->
+<div class="overlay drawer-mode" id="drawerOverlay"></div>
+<div class="overlay" id="modalOverlay"></div>
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+   数据与状态模型（真实还原超级小伴社区 23 个后台模块）
+   ========================================================================== */
+const ACCENTS = [
+  { id: 'red', name: '小伴红',
+    light: { brand: '#E3203C', fill: '#E3203C', hover: '#F0506A', soft: '#FFF1F3', ink: '#ffffff' },
+    dark:  { brand: '#FF8590', fill: '#EE4B5F', hover: '#F76B7D', soft: '#3A2225', ink: '#ffffff' } },
+  { id: 'green', name: '薄荷绿',
+    light: { brand: '#1E6A45', fill: '#2E8B5E', hover: '#3FA172', soft: '#E5F5EC', ink: '#ffffff' },
+    dark:  { brand: '#72D6A2', fill: '#34A36D', hover: '#48B981', soft: '#1D3328', ink: '#ffffff' } },
+  { id: 'blue', name: '海湾蓝',
+    light: { brand: '#1D53AE', fill: '#2F6FDB', hover: '#4A84E6', soft: '#E8F0FE', ink: '#ffffff' },
+    dark:  { brand: '#8DB6FF', fill: '#3B7BE8', hover: '#5A92F0', soft: '#1E2A42', ink: '#ffffff' } },
+  { id: 'purple', name: '暮紫',
+    light: { brand: '#5537B8', fill: '#7152D8', hover: '#8669E3', soft: '#EEE9FD', ink: '#ffffff' },
+    dark:  { brand: '#BBA8FF', fill: '#8466E6', hover: '#9A80EE', soft: '#2A2342', ink: '#ffffff' } },
+  { id: 'amber', name: '琥珀',
+    light: { brand: '#87500A', fill: '#A8640C', hover: '#BD7A1C', soft: '#FBF0DF', ink: '#ffffff' },
+    dark:  { brand: '#F0B65A', fill: '#C27A1A', hover: '#D69130', soft: '#3A2C17', ink: '#ffffff' } },
+  { id: 'graphite', name: '石墨',
+    light: { brand: '#2B2B30', fill: '#2B2B30', hover: '#4A4A50', soft: '#ECECEF', ink: '#ffffff' },
+    dark:  { brand: '#E5E5EA', fill: '#636368', hover: '#7C7C82', soft: '#323238', ink: '#ffffff' } },
+];
+
+const ICONS = {
+  home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  radar: '<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6a6 6 0 1 0 6 6"/><circle cx="12" cy="12" r="2"/><path d="M12 12l7-7"/>',
+  cube: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  more: '<circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/><circle cx="5" cy="12" r="1.4"/>',
+  arrow: '<polyline points="9 18 15 12 9 6"/>',
+  refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+};
+const ic = (name, size = 16) => `<svg class="ic" style="width:${size}px;height:${size}px" viewBox="0 0 24 24">${ICONS[name] || ''}</svg>`;
+
+const NAV_GROUPS = [
+  { label: '工作台', items: [
+    { key: 'overview', label: '概览与待办', icon: 'home', desc: '社区核心指标、跨模块待办行动中心与系统健康态势' },
+    { key: 'metrics', label: '数据分析', icon: 'chart', desc: '匿名活跃设备、次日留存趋势与站内核心交互漏斗' },
+  ]},
+  { label: '审核与治理', items: [
+    { key: 'review', label: '审核中心', icon: 'shield', badgeType: 'danger', desc: '聚合处理帖子举报、作品/方案举报与待审内容队列（兼容旧路由 /reports、/content-reports、/moderation）' },
+    { key: 'topics', label: '帖子管理', icon: 'doc', desc: '多维检索社区帖子，支持侧滑详情、批量治理与置顶/分类调度' },
+    { key: 'users', label: '用户与编辑', icon: 'users', desc: '维护信任等级、限时禁言/封禁与站方编辑账号（聚合 /users 与 /editor-accounts）' },
+    { key: 'taxonomy', label: '板块与安全', icon: 'folder', desc: '树形维护社区一二级板块权限及拦截词/复核词库（聚合 /categories 与 /words）' },
+  ]},
+  { label: '内容运营', items: [
+    { key: 'discover', label: '发现页编排', icon: 'compass', badgeType: 'soft', badge: 5, desc: '管理首页头图、小伴前沿、AI 日报、排行榜与导航等 12 类发现页草稿与发布' },
+    { key: 'open-source', label: '精选项目', icon: 'star', desc: '精选 GitHub 项目目录、封面模板实时预览、素材入库与版本发布工作台' },
+    { key: 'collection', label: '采编与健康', icon: 'radar', badgeType: 'soft', badge: 2, desc: '官方数据源自动采集、栏目新鲜度与外链巡检、工具镜像校验及榜单翻译（聚合 4 项采编模块）' },
+    { key: 'works', label: '作品与活动', icon: 'cube', desc: '内容包上下架与官方登记、首页精选排序、主题挑战、项目/周刊及批量发帖' },
+  ]},
+  { label: '系统', items: [
+    { key: 'ops-sys', label: '站务与日志', icon: 'mail', desc: '维护站务交流群二维码与过期策略，检索全站管理员审计日志（聚合 /contact 与 /audit）' },
+    { key: 'account', label: '账号安全', icon: 'lock', desc: '修改管理员登录密码与会话安全管理' },
+  ]},
+];
+
+/* 真实感 Mock 状态（支持交互变更） */
+const state = {
+  page: 'overview',
+  subtab: { review: 'reports', users: 'all', collection: 'sources', works: 'packs', taxonomy: 'categories', 'ops-sys': 'contact' },
+  reviewSelected: 101,
+  discoverKind: 'frontier',
+  discoverView: 'drafts',
+  osSelected: 0,
+  osStep: 2, // 1=编辑 2=已保存草稿 3=已校验预览 4=已发布
+  osTemplate: 'interface',
+  selectedTopics: new Set(),
+  topicFilter: { q: '', status: 'all' },
+  userFilter: { q: '', status: '' },
+  collectionSource: 'artificial_analysis',
+  metricsDays: 14,
+};
+
+const DATA = {
+  reviews: {
+    reports: [
+      { id: 101, reason: '账号或 Key 交易', count: 3, status: 'open', time: '12 分钟前', targetType: 'topic', targetId: 1842,
+        title: '出闲置 API 额度账号，低价包月可测试', author: '云端折腾中', reporter: '林雾',
+        excerpt: '手头多余几个高配 API 账号，私聊发二维码，支持按天试用，比官网便宜一半……',
+        detail: '多次在学习教程版块发引流交易贴，疑似黑产中转号。' },
+      { id: 102, reason: '垃圾广告', count: 1, status: 'open', time: '48 分钟前', targetType: 'post', targetId: 9412,
+        title: '小伴桌面 3.1.8 壁纸帧率优化经验分享（第 14 楼）', author: 'promo_882', reporter: '阿哲',
+        excerpt: '点我头像领取免费加速器时长，全网独家兑换码……',
+        detail: '纯引流广告回复，与原帖内容无关。' },
+      { id: 103, reason: '侵权', count: 2, status: 'open', time: '2 小时前', targetType: 'topic', targetId: 1819,
+        title: '搬运整理：200 套付费动态壁纸合集网盘直链', author: '素材搬运君', reporter: '画师小鱼',
+        excerpt: '整理了某站作者全部收费壁纸打包，回复可见提取码。',
+        detail: '包含本人原创付费动态壁纸未授权二次分发。' },
+    ],
+    contentReports: [
+      { id: 201, reason: '侵权', count: 1, status: 'open', time: '35 分钟前', targetType: 'pack', targetId: 412,
+        title: '《像素雨夜》桌面动态壁纸包 v1.0.2', author: 'NightPixel', reporter: 'MoriArt',
+        excerpt: '内容包类型：壁纸（18.4 MB · 协议 2）· 当前状态：已上架',
+        detail: '使用了未获授权的商业插画原图作为主背景图层，附原作链接举证。' },
+    ],
+    moderation: [
+      { id: 301, reason: '新发布内容包', count: 1, status: 'open', time: '9 分钟前', targetType: 'pack', targetId: 438,
+        title: '专注番茄钟 · 极简桌面小组件 v1.2.0', author: '苏木', reporter: '系统自动入队',
+        excerpt: '类型：小组件（widget · 412 KB · 协议 2）· 清单校验通过 · 权限声明：无联网',
+        detail: '用户首次发布 T2 内容包，等待审核后升级为 T1 已审核。' },
+      { id: 302, reason: '新发布内容包', count: 1, status: 'open', time: '27 分钟前', targetType: 'pack', targetId: 437,
+        title: '《星河弹珠》休闲解压小游戏 v1.0.0', author: '像素猫', reporter: '系统自动入队',
+        excerpt: '类型：游戏（game · 6.8 MB · 协议 2）· 横屏触控/键鼠 · 无外部请求',
+        detail: '通过资源机 SHA-256 与清单校验，请核对可玩性与封面合规性。' },
+      { id: 303, reason: '命中复核词', count: 1, status: 'open', time: '1 小时前', targetType: 'topic', targetId: 1839,
+        title: '本地部署模型配合小伴 AI 网关的代理配置记录', author: '极客老陈', reporter: '敏感词引擎',
+        excerpt: '命中复核词「代理」「中转」：正文讨论的是本机 localhost 反向代理配置，非违规服务。',
+        detail: '自动标记复核，请确认是否正常放行。' },
+      { id: 304, reason: '新版本更新', count: 1, status: 'open', time: '3 小时前', targetType: 'pack', targetId: 391,
+        title: '极光呼吸粒子特效包 v2.1.0', author: '星落', reporter: '系统自动入队',
+        excerpt: '类型：特效（effect · 192 KB）· 变更日志：优化夜间低亮屏幕叠加混合模式。',
+        detail: '原 v2.0.0 为 T1 已审核，发新版本后自动降级等待复核。' },
+    ],
+  },
+  topics: [
+    { id: 1844, title: '小伴桌面 3.1.8 正式发布：工作区检索与全新伙伴配置独立窗口', category: '站务 / 公告', author: '小伴官方', time: '2026-11-26 10:15', status: 'normal', replies: 86, pin: 'site', featured: true, locked: false, reports: 0 },
+    { id: 1842, title: '出闲置 API 额度账号，低价包月可测试', category: '讨论 / 学习和教程', author: '云端折腾中', time: '2026-11-26 09:42', status: 'normal', replies: 3, pin: 'none', featured: false, locked: false, reports: 3 },
+    { id: 1841, title: '用 200 行 HTML 做了一个赛博盆栽 V2 应用，欢迎试玩与改编', category: '创意 / 作品分享', author: '苏木', time: '2026-11-26 08:20', status: 'normal', replies: 41, pin: 'category', featured: true, locked: false, reports: 0 },
+    { id: 1839, title: '本地部署模型配合小伴 AI 网关的代理配置记录', category: '讨论 / 学习和教程', author: '极客老陈', time: '2026-11-25 22:18', status: 'normal', replies: 19, pin: 'none', featured: false, locked: false, reports: 0 },
+    { id: 1835, title: '求助：找一款开源跨平台白板软件（悬赏 120 积分）', category: '资源 / 求助悬赏', author: '青柠茶', time: '2026-11-25 19:04', status: 'normal', replies: 12, pin: 'none', featured: false, locked: false, reports: 0 },
+    { id: 1829, title: '测试贴请勿回复 11111', category: '讨论 / 休闲', author: 'test_user9', time: '2026-11-25 14:11', status: 'hidden', replies: 0, pin: 'none', featured: false, locked: true, reports: 0 },
+  ],
+  users: [
+    { uid: 'u_9028114a', nickname: '苏木', trust: 3, status: 'active', mutedUntil: null, created: '2026-04-12', lastSeen: '5 分钟前', topics: 28, posts: 194, points: 1480 },
+    { uid: 'u_7741029c', nickname: '极客老陈', trust: 2, status: 'active', mutedUntil: null, created: '2026-06-03', lastSeen: '18 分钟前', topics: 14, posts: 112, points: 860 },
+    { uid: 'u_5512098f', nickname: '云端折腾中', trust: 0, status: 'active', mutedUntil: null, created: '2026-11-25', lastSeen: '12 分钟前', topics: 2, posts: 1, points: 51 },
+    { uid: 'u_4410923b', nickname: 'promo_882', trust: 0, status: 'muted', mutedUntil: '2026-11-29 10:00', created: '2026-11-20', lastSeen: '48 分钟前', topics: 0, posts: 9, points: 50 },
+    { uid: 'u_2109482e', nickname: '素材搬运君', trust: 1, status: 'active', mutedUntil: null, created: '2026-09-18', lastSeen: '2 小时前', topics: 6, posts: 23, points: 230 },
+    { uid: 'u_1004921d', nickname: 'spam_bot_04', trust: 0, status: 'banned', mutedUntil: null, created: '2026-10-02', lastSeen: '19 天前', topics: 4, posts: 31, points: 0 },
+  ],
+  discoverKinds: [
+    { key: 'banner', label: '首页头图', live: 3, draft: 1 },
+    { key: 'frontier', label: '小伴前沿', live: 24, draft: 2 },
+    { key: 'news', label: 'AI 日报', live: 86, draft: 1 },
+    { key: 'repo_issue', label: '开源热榜', live: 7, draft: 0 },
+    { key: 'model_board', label: '模型能力榜', live: 1, draft: 0 },
+    { key: 'model_usage', label: '调用量榜', live: 1, draft: 0 },
+    { key: 'nav', label: 'AI 导航', live: 66, draft: 1 },
+    { key: 'tool', label: 'AI 工具', live: 18, draft: 0 },
+    { key: 'doc', label: '资料导读', live: 32, draft: 0 },
+    { key: 'hotword', label: '热门搜索', live: 8, draft: 0 },
+  ],
+  discoverDrafts: [
+    { key: 'frontier-20261126-agent-runtime', kind: 'frontier', title: '桌面 Agent 运行时演进：为什么沙箱与本地工作区同等重要', sort: 10, status: 'draft', rev: 3, source: '小伴编辑部', updated: '2026-11-26 09:30', summary: '拆解协议 2 应用沙箱、MCP 连接器与本机工作区权限边界的工程权衡。' },
+    { key: 'frontier-20261125-webgl-craft', kind: 'frontier', title: '从《鲸鱼娘》到微观展厅：单文件 WebGL 互动作品的离线打包实践', sort: 20, status: 'scheduled', rev: 2, publishAfter: '2026-11-26 18:00', source: '创意观察', updated: '2026-11-25 21:14', summary: '介绍如何将 3D 模型与贴图压缩为可跨桌面与手机离线的 V2 内容包。' },
+    { key: 'frontier-20261123-local-ai', kind: 'frontier', title: '多模型协作实测：轻量推理与代码生成如何分配预算', sort: 30, status: 'published', rev: 5, source: '小伴实验室', updated: '2026-11-23 11:00', summary: '对比主流开源与闭源模型在真实桌面任务下的延迟与成本曲线。' },
+  ],
+  osProjects: [
+    { full_name: 'excalidraw/excalidraw', name: 'Excalidraw', title: '手绘风开源协作白板，打开浏览器即可画架构图', category: '设计创作', featured: true, accent: '#6965DB', tags: ['白板', '手绘', '协作'], summary: '极简手绘风格虚拟白板，支持端到端加密多人协作、本地离线存储与丰富素材库。', lines: ['npx create-excalidraw', '支持实时多人协作与 SVG/PNG 无损导出', '内置 120+ 架构与流程图手绘组件库'] },
+    { full_name: 'toeverything/AFFiNE', name: 'AFFiNE', title: '融合文档、白板与数据库的本地优先知识工作台', category: '效率笔记', featured: true, accent: '#1E96EB', tags: ['知识库', '本地优先'], summary: '集 Notion 文档块与 Miro 无界画布于一体，支持离线编辑与自托管同步。', lines: ['文档模式 ↔ 无界白板一键切换', '本地优先存储，断网也能流畅书写', '支持 Markdown 双向导入导出'] },
+    { full_name: 'jesseduffield/lazygit', name: 'Lazygit', title: '终端里的可视化 Git 工作台，交互式变基只需按键', category: '开发效率', featured: false, accent: '#2E8B5E', tags: ['Git', '终端', 'Go'], summary: '为命令行开发者打造的 TUI Git 工具，分屏浏览暂存区、提交历史与冲突解决。', lines: ['$ brew install lazygit', '空格暂存单行变更 · e 直接编辑冲突', '可视化分支图与交互式 Rebase'] },
+    { full_name: 'imputnet/cobalt', name: 'Cobalt', title: '无广告极简媒体保存工具，粘贴链接即得原画质文件', category: '影音工具', featured: true, accent: '#E3203C', tags: ['媒体', '极简'], summary: '干净克制的开源媒体解析服务，零追踪器、零弹窗，支持自部署。', lines: ['粘贴链接 → 自动识别最佳清晰度', '纯音频提取与无水印保存', '支持 Docker 一键私有化部署'] },
+  ],
+  sources: [
+    { id: 'artificial_analysis', name: 'Artificial Analysis', sub: '模型能力榜', mode: '自动发布', enabled: true, ready: true, status: 'ok', lastOk: '2026-11-26 06:00', nextRun: '2026-11-27 06:00', interval: 1440, count: 148, ok24: 1, fail24: 0 },
+    { id: 'openrouter', name: 'OpenRouter', sub: '调用量榜', mode: '自动发布', enabled: true, ready: true, status: 'ok', lastOk: '2026-11-26 06:05', nextRun: '2026-11-27 06:05', interval: 1440, count: 60, ok24: 1, fail24: 0 },
+    { id: 'github_repos', name: 'GitHub 热榜', sub: 'Weekly Trending', mode: '自动发布', enabled: true, ready: true, status: 'ok', lastOk: '2026-11-26 04:00', nextRun: '2026-11-27 04:00', interval: 1440, count: 30, ok24: 1, fail24: 0 },
+    { id: 'github_tools', name: 'AI 工具版本', sub: 'Release 同步', mode: '人工终审', enabled: true, ready: true, status: 'warn', lastOk: '2026-11-25 18:10', nextRun: '2026-11-26 18:10', interval: 720, count: 4, ok24: 1, fail24: 1, err: 'ollama/ollama 单文件超过 128 MiB 上限，需人工维护镜像' },
+    { id: 'official_news', name: '官方 AI 日报', sub: 'RSS 订阅源', mode: '人工终审', enabled: false, ready: true, status: 'muted', lastOk: '2026-11-25 09:00', nextRun: '已停用', interval: 360, count: 6, ok24: 0, fail24: 0 },
+  ],
+  packs: [
+    { id: 438, title: '专注番茄钟 · 极简桌面小组件', ver: '1.2.0', kind: '小组件', trust: 'T2 未审', status: 'pending', author: '苏木', applies: 12, featured: false, protocol: 2, updated: '2026-11-26 09:50' },
+    { id: 435, title: '《潮汐书房 · 鲸鱼娘》离线故事包', ver: '1.1.0', kind: '游戏', trust: 'T0 官方', status: 'published', author: '官方', applies: 4820, featured: true, protocol: 2, updated: '2026-11-24 14:20' },
+    { id: 429, title: '柔软山丘 · 动态极光壁纸', ver: '2.0.1', kind: '壁纸', trust: 'T1 已审核', status: 'published', author: '林雾', applies: 1940, featured: true, protocol: 2, updated: '2026-11-22 19:05' },
+    { id: 412, title: '《像素雨夜》桌面动态壁纸包', ver: '1.0.2', kind: '壁纸', trust: 'T2 未审', status: 'published', author: 'NightPixel', applies: 83, featured: false, protocol: 2, updated: '2026-11-21 11:30' },
+  ],
+  categories: [
+    { id: 1, parent: null, name: '创意', slug: 'ideas', section: '创意', topics: 412, minLevel: '新人', flags: [] },
+    { id: 2, parent: 1, name: '作品分享', slug: 'works', section: '创意', topics: 286, minLevel: '新人', flags: [] },
+    { id: 3, parent: 1, name: '桌面方案', slug: 'schemes', section: '创意', topics: 126, minLevel: '成员', flags: [] },
+    { id: 4, parent: null, name: '讨论', slug: 'discuss', section: '讨论', topics: 1084, minLevel: '成员', flags: [] },
+    { id: 5, parent: 4, name: '学习和教程', slug: 'learn', section: '讨论', topics: 534, minLevel: '成员', flags: [] },
+    { id: 6, parent: 4, name: '休闲', slug: 'casual', section: '讨论', topics: 550, minLevel: '成员', flags: ['允许无标题'] },
+    { id: 7, parent: null, name: '资源', slug: 'resources', section: '资源', topics: 628, minLevel: '成员', flags: [] },
+    { id: 8, parent: 7, name: '求助悬赏', slug: 'bounty', section: '资源', topics: 192, minLevel: '成员', flags: ['支持悬赏'] },
+    { id: 9, parent: null, name: '站务', slug: 'site', section: '站务', topics: 38, minLevel: '守护者', flags: ['仅守护者', '不奖励积分'] },
+  ],
+  audit: [
+    { time: '2026-11-26 10:12', admin: 'admin', action: '发布发现页内容', target: '小伴前沿 · frontier-20261123-local-ai', detail: '审核版本 rev.5 并立即上线' },
+    { time: '2026-11-26 09:45', admin: 'admin', action: '修改用户状态', target: '用户 · promo_882', detail: '禁言 72 小时：在帖子下连续发布推广广告' },
+    { time: '2026-11-26 08:30', admin: 'admin', action: '设为精选作品', target: '内容包 #429', detail: '柔软山丘 · 动态极光壁纸（首页创意曝光）' },
+    { time: '2026-11-25 22:04', admin: 'editor_lin', action: '保存精选草稿', target: '精选项目 · revision 14', detail: '更新 Excalidraw 封面构图与中文导读' },
+    { time: '2026-11-25 17:19', admin: 'admin', action: '处理举报', target: '举报 #98（回复 #9301）', detail: '已隐藏违规回复并记录说明' },
+  ],
+};
+
+/* ==========================================================================
+   主题、色板、视口控制
+   ========================================================================== */
+function applyPalette(accentId, theme) {
+  const opt = ACCENTS.find(a => a.id === accentId) || ACCENTS[0];
+  const p = theme === 'dark' ? opt.dark : opt.light;
+  const r = document.documentElement;
+  r.dataset.theme = theme;
+  r.dataset.accent = opt.id;
+  r.style.setProperty('--brand', p.brand);
+  r.style.setProperty('--brand-fill', p.fill);
+  r.style.setProperty('--brand-hover', p.hover);
+  r.style.setProperty('--brand-soft', p.soft);
+  r.style.setProperty('--brand-ink', p.ink);
+}
+
+function initStudioControls() {
+  const bar = document.getElementById('swatchBar');
+  bar.innerHTML = ACCENTS.map(a =>
+    `<button class="swatch ${a.id === 'red' ? 'active' : ''}" data-accent="${a.id}" title="${a.name}" style="background:${a.light.fill}"></button>`
+  ).join('');
+  bar.addEventListener('click', e => {
+    const btn = e.target.closest('.swatch');
+    if (!btn) return;
+    bar.querySelectorAll('.swatch').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyPalette(btn.dataset.accent, document.documentElement.dataset.theme);
+  });
+
+  document.getElementById('themeSeg').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#themeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyPalette(document.documentElement.dataset.accent, btn.dataset.theme);
+  });
+
+  document.getElementById('vpSeg').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#vpSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const st = document.getElementById('stage');
+    st.className = 'stage vp-' + btn.dataset.vp;
+    closeMobileSide();
+  });
+
+  document.getElementById('btnCompare').addEventListener('click', openCompareModal);
+  document.getElementById('btnLoginToggle').addEventListener('click', () => {
+    const visible = document.getElementById('loginView').style.display !== 'none';
+    toggleLogin(!visible);
+  });
+
+  document.getElementById('menuBtn').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sideScrim').classList.add('open');
+  });
+  document.getElementById('sideScrim').addEventListener('click', closeMobileSide);
+  document.getElementById('cmdBtn').addEventListener('click', openCommandPalette);
+  window.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    } else if (e.key === 'Escape') {
+      closeDrawer();
+      closeModal();
+    }
+  });
+}
+
+function closeMobileSide() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sideScrim').classList.remove('open');
+}
+
+function toggleLogin(show) {
+  document.getElementById('loginView').style.display = show ? 'grid' : 'none';
+  document.getElementById('appShell').style.display = show ? 'none' : 'grid';
+  document.getElementById('btnLoginToggle').textContent = show ? '返回后台界面' : '预览登录页';
+}
+
+/* ==========================================================================
+   导航与统计渲染
+   ========================================================================== */
+function pendingReviewTotal() {
+  const r = DATA.reviews.reports.filter(x => x.status === 'open').length;
+  const c = DATA.reviews.contentReports.filter(x => x.status === 'open').length;
+  const m = DATA.reviews.moderation.filter(x => x.status === 'open').length;
+  return r + c + m;
+}
+
+function renderSidebar() {
+  const totalReview = pendingReviewTotal();
+  document.getElementById('topTodoCount').textContent = totalReview;
+  document.getElementById('sideNav').innerHTML = NAV_GROUPS.map(g => `
+    <div class="nav-group">
+      <div class="nav-group-label">${g.label}</div>
+      ${g.items.map(item => {
+        const badge = item.key === 'review' ? totalReview : (item.badge || 0);
+        return `
+          <button class="nav-item ${state.page === item.key ? 'active' : ''}" onclick="navigate('${item.key}')">
+            ${ic(item.icon, 16)}
+            <span class="label">${item.label}</span>
+            ${badge > 0 ? `<span class="nav-badge ${item.badgeType === 'soft' ? 'soft' : ''}">${badge}</span>` : ''}
+          </button>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function findNavMeta(key) {
+  for (const g of NAV_GROUPS) {
+    const it = g.items.find(x => x.key === key);
+    if (it) return { group: g.label, item: it };
+  }
+  return { group: '工作台', item: NAV_GROUPS[0].items[0] };
+}
+
+function navigate(key, sub) {
+  state.page = key;
+  if (sub) state.subtab[key] = sub;
+  closeMobileSide();
+  toggleLogin(false);
+  renderSidebar();
+  const meta = findNavMeta(key);
+  document.getElementById('breadcrumb').innerHTML = `<span>超级小伴</span><span>/</span><span>${meta.group}</span><span>/</span><strong>${meta.item.label}</strong>`;
+  renderPage();
+  const mainCol = document.querySelector('.main-col');
+  if (mainCol) mainCol.scrollTop = 0;
+}
+
+/* ==========================================================================
+   各页面渲染函数
+   ========================================================================== */
+function renderPage() {
+  const el = document.getElementById('pageContent');
+  const map = {
+    overview: renderOverview,
+    metrics: renderMetrics,
+    review: renderReview,
+    topics: renderTopics,
+    users: renderUsers,
+    taxonomy: renderTaxonomy,
+    discover: renderDiscover,
+    'open-source': renderOpenSource,
+    collection: renderCollection,
+    works: renderWorks,
+    'ops-sys': renderOpsSys,
+    account: renderAccount,
+  };
+  el.innerHTML = (map[state.page] || renderOverview)();
+}
+
+/* ---------- 1. 概览与待办 ---------- */
+function renderOverview() {
+  const openR = DATA.reviews.reports.filter(x => x.status === 'open').length;
+  const openC = DATA.reviews.contentReports.filter(x => x.status === 'open').length;
+  const openM = DATA.reviews.moderation.filter(x => x.status === 'open').length;
+  const todoAll = openR + openC + openM;
+  return `
+    <div class="page-header">
+      <div>
+        <h1>工作台概览</h1>
+        <p>实时掌握社区活跃度、全站待审待办与采集运行健康状态。</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" onclick="showToast('已同步最新统计快照', 'ok')">${ic('refresh', 14)} 刷新数据</button>
+        <button class="btn btn-primary" onclick="navigate('review')">进入审核中心 (${todoAll})</button>
+      </div>
+    </div>
+
+    <section class="kpi-grid">
+      <div class="card kpi-card" onclick="navigate('metrics')">
+        <div class="kpi-top"><span>今日活跃用户 (DAU)</span><span class="kpi-delta up">+12.4%</span></div>
+        <div class="kpi-mid">
+          <div><div class="kpi-val num">1,428</div><div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">用户总数 18,640 · 24h 新增 +64</div></div>
+          <svg class="spark" viewBox="0 0 80 28"><polyline fill="none" stroke="var(--brand-fill)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="2,22 14,19 26,20 38,14 50,15 62,9 78,5"/></svg>
+        </div>
+      </div>
+      <div class="card kpi-card" onclick="navigate('topics')">
+        <div class="kpi-top"><span>24 小时新增内容</span><span class="kpi-delta up">+8.1%</span></div>
+        <div class="kpi-mid">
+          <div><div class="kpi-val num">318</div><div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">新帖 47 · 新回复 271</div></div>
+          <svg class="spark" viewBox="0 0 80 28"><polyline fill="none" stroke="var(--info)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="2,20 14,17 26,18 38,11 50,13 62,8 78,7"/></svg>
+        </div>
+      </div>
+      <div class="card kpi-card" onclick="navigate('review')">
+        <div class="kpi-top"><span>待处理治理与审核</span><span class="kpi-delta ${todoAll ? 'alert' : 'up'}">${todoAll ? '需优先处理' : '全部清空'}</span></div>
+        <div class="kpi-mid">
+          <div><div class="kpi-val num ${todoAll ? 'danger' : ''}">${todoAll}</div><div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">举报 ${openR + openC} · 待审内容 ${openM}</div></div>
+          <svg class="spark" viewBox="0 0 80 28"><polyline fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="2,10 14,14 26,12 38,17 50,14 62,19 78,16"/></svg>
+        </div>
+      </div>
+      <div class="card kpi-card" onclick="navigate('discover')">
+        <div class="kpi-top"><span>待发布运营草稿</span><span class="kpi-delta neutral">含 1 条定时</span></div>
+        <div class="kpi-mid">
+          <div><div class="kpi-val num">5</div><div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">前沿 2 · 日报 1 · 导航 1 · 头图 1</div></div>
+          <svg class="spark" viewBox="0 0 80 28"><polyline fill="none" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="2,16 14,16 26,12 38,14 50,10 62,12 78,9"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <div class="dash-grid">
+      <!-- 统一待办行动中心 -->
+      <section class="card">
+        <div class="card-head">
+          <h2>待办行动中心 <span class="tag danger">${todoAll + 7} 项待关注</span></h2>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('review')">前往审核中心 →</button>
+        </div>
+        <div>
+          <div class="todo-item" onclick="navigate('review','reports')">
+            <div class="todo-left">
+              <div class="todo-icon danger">${ic('shield', 16)}</div>
+              <div>
+                <div class="todo-title">帖子与回复举报待处理（${openR} 条）</div>
+                <div class="todo-meta">最高优先级：#1842 涉嫌账号/Key 交易（已被 3 人举报 · 12 分钟前）</div>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-soft">立即处理</button>
+          </div>
+          <div class="todo-item" onclick="navigate('review','contentReports')">
+            <div class="todo-left">
+              <div class="todo-icon danger">${ic('cube', 16)}</div>
+              <div>
+                <div class="todo-title">作品与方案举报待核实（${openC} 条）</div>
+                <div class="todo-meta">壁纸包 #412《像素雨夜》被举报原画未授权使用</div>
+              </div>
+            </div>
+            <button class="btn btn-sm">去核对</button>
+          </div>
+          <div class="todo-item" onclick="navigate('review','moderation')">
+            <div class="todo-left">
+              <div class="todo-icon warn">${ic('check', 16)}</div>
+              <div>
+                <div class="todo-title">新发布内容包与复核词队列（${openM} 条）</div>
+                <div class="todo-meta">含 3 个协议 2 内容包待升 T1 审核、1 篇帖子命中复核词</div>
+              </div>
+            </div>
+            <button class="btn btn-sm">进入队列</button>
+          </div>
+          <div class="todo-item" onclick="navigate('discover')">
+            <div class="todo-left">
+              <div class="todo-icon info">${ic('compass', 16)}</div>
+              <div>
+                <div class="todo-title">发现页草稿待审核发布（5 条）</div>
+                <div class="todo-meta">小伴前沿《桌面 Agent 运行时演进》rev.3 等待预览终审</div>
+              </div>
+            </div>
+            <button class="btn btn-sm">预览发布</button>
+          </div>
+          <div class="todo-item" onclick="navigate('collection','links')">
+            <div class="todo-left">
+              <div class="todo-icon warn">${ic('warn', 16)}</div>
+              <div>
+                <div class="todo-title">外链巡检发现 2 个异常链接 · 1 个工具安装包超限</div>
+                <div class="todo-meta">AI 工具 ollama/ollama 安装包超过 128 MiB 需人工核对镜像</div>
+              </div>
+            </div>
+            <button class="btn btn-sm">查看详情</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 采集源健康灯 -->
+      <section class="card">
+        <div class="card-head">
+          <h2>自动采集源健康</h2>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('collection')">管理来源 →</button>
+        </div>
+        <div class="health-list">
+          ${DATA.sources.map(s => `
+            <div class="health-row">
+              <div>
+                <div class="health-name"><i class="dot ${s.status}"></i>${s.name} <span style="font-weight:400;color:var(--ink-3);font-size:12px">· ${s.sub}</span></div>
+                <div class="health-sub">最近成功 ${s.lastOk} · ${s.mode}</div>
+              </div>
+              <span class="tag ${s.status === 'ok' ? 'ok' : s.status === 'warn' ? 'warn' : ''}">${s.status === 'ok' ? '正常' : s.status === 'warn' ? '有告警' : '已停用'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    </div>
+
+    <div class="dash-grid">
+      <!-- 近 7 日趋势 SVG -->
+      <section class="card">
+        <div class="card-head">
+          <h2>近 7 日社区活跃趋势</h2>
+          <div class="chart-legend">
+            <span><i class="legend-box" style="background:var(--brand-fill)"></i>活跃用户</span>
+            <span><i class="legend-box" style="background:var(--info)"></i>发帖与回复</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <svg viewBox="0 0 600 180" style="width:100%;height:175px;display:block">
+            <g stroke="var(--line)" stroke-width="1">
+              <line x1="36" y1="20" x2="584" y2="20"/><line x1="36" y1="62" x2="584" y2="62"/>
+              <line x1="36" y1="104" x2="584" y2="104"/><line x1="36" y1="146" x2="584" y2="146"/>
+            </g>
+            <g fill="var(--ink-3)" font-size="10.5">
+              <text x="6" y="24">1.6k</text><text x="6" y="66">1.2k</text><text x="6" y="108">800</text><text x="6" y="150">400</text>
+              <text x="64" y="168">11-20</text><text x="148" y="168">11-21</text><text x="232" y="168">11-22</text>
+              <text x="316" y="168">11-23</text><text x="400" y="168">11-24</text><text x="484" y="168">11-25</text><text x="552" y="168">今日</text>
+            </g>
+            <path d="M76,92 L160,84 L244,78 L328,60 L412,66 L496,46 L566,34 L566,146 L76,146 Z" fill="var(--brand-fill)" opacity="0.10"/>
+            <polyline fill="none" stroke="var(--brand-fill)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="76,92 160,84 244,78 328,60 412,66 496,46 566,34"/>
+            <polyline fill="none" stroke="var(--info)" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round" points="76,126 160,118 244,114 328,100 412,108 496,95 566,86"/>
+            ${[[76,92],[160,84],[244,78],[328,60],[412,66],[496,46],[566,34]].map(([x,y]) => `<circle cx="${x}" cy="${y}" r="3.8" fill="var(--bg-surface)" stroke="var(--brand-fill)" stroke-width="2.2"/>`).join('')}
+          </svg>
+        </div>
+      </section>
+
+      <!-- 最近操作审计 -->
+      <section class="card">
+        <div class="card-head">
+          <h2>最近操作动态</h2>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('ops-sys','audit')">全部日志 →</button>
+        </div>
+        <div class="health-list">
+          ${DATA.audit.slice(0, 4).map(a => `
+            <div class="health-row" style="align-items:flex-start">
+              <div style="min-width:0">
+                <div style="font-size:13px"><strong>${a.admin}</strong> · <span style="color:var(--ink-2)">${a.action}</span></div>
+                <div class="health-sub" style="margin-top:3px">${a.target} — ${a.detail}</div>
+              </div>
+              <span style="font-size:11.5px;color:var(--ink-3);white-space:nowrap">${a.time.slice(11)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+/* ---------- 2. 审核中心（聚合 举报 + 作品举报 + 待审队列） ---------- */
+function renderReview() {
+  const tab = state.subtab.review || 'reports';
+  const rows = DATA.reviews[tab] || [];
+  const openR = DATA.reviews.reports.filter(x => x.status === 'open').length;
+  const openC = DATA.reviews.contentReports.filter(x => x.status === 'open').length;
+  const openM = DATA.reviews.moderation.filter(x => x.status === 'open').length;
+
+  let activeItem = rows.find(x => x.id === state.reviewSelected) || rows[0];
+  if (activeItem) state.reviewSelected = activeItem.id;
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>审核中心</h1>
+        <p>统一收口「帖子与回复举报」「作品与方案举报」与「待审内容队列」，左侧选单、右侧一站式核对处置。</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" onclick="showToast('队列已刷新')">${ic('refresh', 14)} 刷新队列</button>
+      </div>
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab === 'reports' ? 'active' : ''}" onclick="setSubtab('review','reports')">帖子与回复举报 <span class="cnt ${openR?'danger':''}">${openR}</span></button>
+      <button class="subtab ${tab === 'contentReports' ? 'active' : ''}" onclick="setSubtab('review','contentReports')">作品与方案举报 <span class="cnt ${openC?'danger':''}">${openC}</span></button>
+      <button class="subtab ${tab === 'moderation' ? 'active' : ''}" onclick="setSubtab('review','moderation')">待审内容队列 <span class="cnt ${openM?'danger':''}">${openM}</span></button>
+    </div>
+
+    <div class="split-view">
+      <!-- 左侧待办队列 -->
+      <section class="card" style="overflow:hidden">
+        <div class="card-head" style="padding:11px 14px">
+          <span style="font-size:12.5px;font-weight:600;color:var(--ink-2)">待处理队列（${rows.filter(x=>x.status==='open').length} / ${rows.length}）</span>
+          <span class="tag outline">按提交时间</span>
+        </div>
+        ${rows.length ? rows.map(r => `
+          <div class="queue-item ${activeItem && activeItem.id === r.id ? 'active' : ''}" onclick="state.reviewSelected=${r.id};renderPage()">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="tag ${r.status !== 'open' ? 'ok' : tab === 'moderation' ? 'warn' : 'danger'}">${r.status !== 'open' ? '已处置' : r.reason}</span>
+                ${r.count > 1 ? `<span class="tag outline">${r.count} 次举报</span>` : ''}
+              </div>
+              <span style="font-size:11.5px;color:var(--ink-3)">${r.time}</span>
+            </div>
+            <div style="font-weight:600;font-size:13px;line-height:1.45;margin-bottom:4px">${r.title}</div>
+            <div style="font-size:12px;color:var(--ink-3)">作者：${r.author} · 来源：${r.reporter}</div>
+          </div>
+        `).join('') : '<div style="padding:36px;text-align:center;color:var(--ink-3)">当前队列已清空</div>'}
+      </section>
+
+      <!-- 右侧沉浸检视与处置面板 -->
+      <section class="card">
+        ${activeItem ? `
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="tag ${activeItem.status !== 'open' ? 'ok' : tab === 'moderation' ? 'warn' : 'danger'}">${activeItem.status !== 'open' ? '已处理' : activeItem.reason}</span>
+              <span class="mono" style="color:var(--ink-3)">#${activeItem.targetId} · ${activeItem.targetType}</span>
+            </div>
+            <button class="btn btn-sm" onclick="showToast('已在新窗口打开前台页面')">${ic('external', 13)} 查看前台原页</button>
+          </div>
+          <div class="card-body">
+            <h2 style="font-size:17px;font-weight:700;margin-bottom:8px">${activeItem.title}</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink-2);margin-bottom:14px">
+              <span>被检作者：<strong>${activeItem.author}</strong></span>
+              <span>提交方：<strong>${activeItem.reporter}</strong></span>
+              <span>提交时间：${activeItem.time}</span>
+            </div>
+
+            <div style="font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:4px">目标内容摘录</div>
+            <div class="quote-box">${activeItem.excerpt}</div>
+
+            <div style="font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:4px">${tab === 'moderation' ? '系统入队说明' : '举报人补充说明'}</div>
+            <p style="font-size:13px;color:var(--ink-1);margin-bottom:18px;padding:10px 12px;background:var(--bg-subtle);border-radius:8px">${activeItem.detail}</p>
+
+            ${activeItem.status === 'open' ? `
+              <div style="border-top:1px solid var(--line);padding-top:16px">
+                <div style="font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:8px">快捷处理说明（点击填入，替代原生 window.prompt）</div>
+                <div class="quick-reasons">
+                  ${(tab === 'moderation'
+                    ? ['清单与运行安全校验通过，准予上架', '内容正常，命中复核词为误报，放行', '缺少必要权限说明或存在版权风险，拒绝']
+                    : ['确认违反社区规范，已隐藏内容', '确认侵权属实，已下架作品并处理关联举报', '核实内容未违规，驳回本次举报']
+                  ).map(txt => `<button class="chip-btn" type="button" onclick="document.getElementById('reviewNote').value='${txt}'">${txt}</button>`).join('')}
+                </div>
+                <div class="field" style="margin-bottom:14px">
+                  <label>处理说明（写入操作审计日志${tab === 'contentReports' ? '，作品举报必填，不向作者公开' : '，选填'}）</label>
+                  <textarea id="reviewNote" class="textarea" rows="2" placeholder="输入处理结论或内部审核备注…"></textarea>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  ${tab === 'moderation' ? `
+                    <button class="btn btn-primary" onclick="handleReviewItem('${tab}', ${activeItem.id}, '通过审核')">${ic('check', 14)} 通过审核</button>
+                    <button class="btn btn-danger" onclick="handleReviewItem('${tab}', ${activeItem.id}, '拒绝并记录原因')">拒绝</button>
+                  ` : tab === 'contentReports' ? `
+                    <button class="btn btn-danger-fill" onclick="handleReviewItem('${tab}', ${activeItem.id}, '下架并处理全部举报')">下架并处理全部举报</button>
+                    <button class="btn" onclick="handleReviewItem('${tab}', ${activeItem.id}, '驳回举报')">驳回此条举报</button>
+                  ` : `
+                    <button class="btn btn-primary" onclick="handleReviewItem('${tab}', ${activeItem.id}, '已处理并隐藏内容')">处理并隐藏内容</button>
+                    <button class="btn" onclick="handleReviewItem('${tab}', ${activeItem.id}, '仅标记已处理')">处理不隐藏</button>
+                    <button class="btn btn-ghost" onclick="handleReviewItem('${tab}', ${activeItem.id}, '已驳回举报')">驳回举报</button>
+                  `}
+                </div>
+              </div>
+            ` : `
+              <div style="padding:12px 14px;border-radius:8px;background:var(--ok-soft);color:var(--ok);font-size:13px;font-weight:500">
+                ✓ 该条目已由 admin 处置完成并写入审计日志。
+              </div>
+            `}
+          </div>
+        ` : '<div class="card-body" style="color:var(--ink-3);text-align:center;padding:48px">请从左侧选择一条待审核项</div>'}
+      </section>
+    </div>
+  `;
+}
+
+function handleReviewItem(tab, id, label) {
+  const row = DATA.reviews[tab].find(x => x.id === id);
+  if (row) row.status = 'resolved';
+  showToast(label, 'ok');
+  renderSidebar();
+  renderPage();
+}
+
+/* ---------- 3. 帖子管理（清爽表格 + 侧滑治理抽屉 + 批量悬浮条） ---------- */
+function renderTopics() {
+  const f = state.topicFilter;
+  const list = DATA.topics.filter(t =>
+    (f.status === 'all' || t.status === f.status) &&
+    (!f.q || t.title.includes(f.q) || String(t.id).includes(f.q))
+  );
+  const pinMap = { none: '', site: '全站置顶', parent: '一级置顶', category: '板块置顶' };
+  const statusMap = { normal: ['ok', '正常'], hidden: ['warn', '已隐藏'], deleted: ['danger', '已删除'] };
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>帖子管理</h1>
+        <p>将原本塞爆行尾的 6 个按钮与下拉框收口为「侧滑治理抽屉 + 批量悬浮操作条」，表格信息一目了然。</p>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="search-box">
+          <svg class="ic" style="width:14px;height:14px" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input class="input" value="${f.q}" placeholder="搜索标题或帖子 #ID" oninput="state.topicFilter.q=this.value;renderPage()">
+        </div>
+        <div class="pills">
+          ${[['all','全部'],['normal','正常'],['hidden','已隐藏'],['deleted','已删除']].map(([k,l]) =>
+            `<button class="pill-btn ${f.status===k?'active':''}" onclick="state.topicFilter.status='${k}';renderPage()">${l}</button>`
+          ).join('')}
+        </div>
+        <select class="select" aria-label="板块筛选" onchange="showToast('已按板块筛选')">
+          <option>全部板块</option><option>创意 / 作品分享</option><option>讨论 / 学习和教程</option><option>讨论 / 休闲</option><option>资源 / 求助悬赏</option><option>站务</option>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <span style="font-size:12px;color:var(--ink-3)">共 ${list.length} 篇</span>
+      </div>
+    </div>
+
+    <section class="card" style="overflow:hidden">
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:38px"><input type="checkbox" ${state.selectedTopics.size === list.length && list.length ? 'checked' : ''} onchange="toggleAllTopics(this.checked)"></th>
+              <th>帖子与标签</th>
+              <th>板块</th>
+              <th>状态</th>
+              <th class="right">回复</th>
+              <th class="right" style="width:154px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(t => {
+              const [tone, stTxt] = statusMap[t.status];
+              return `
+              <tr>
+                <td><input type="checkbox" ${state.selectedTopics.has(t.id)?'checked':''} onchange="toggleTopicSel(${t.id}, this.checked)"></td>
+                <td>
+                  <div class="cell-title">
+                    <a href="#" onclick="event.preventDefault();openTopicDrawer(${t.id})">${t.title}</a>
+                    ${t.pin !== 'none' ? `<span class="tag info">${pinMap[t.pin]}</span>` : ''}
+                    ${t.featured ? `<span class="tag brand">精华</span>` : ''}
+                    ${t.locked ? `<span class="tag outline">已锁定</span>` : ''}
+                    ${t.reports ? `<span class="tag danger">${t.reports} 条举报</span>` : ''}
+                  </div>
+                  <div class="cell-sub">
+                    <span class="mono">#${t.id}</span>
+                    <span>${t.author}</span>
+                    <span>${t.time}</span>
+                  </div>
+                </td>
+                <td style="white-space:nowrap;color:var(--ink-2)">${t.category}</td>
+                <td><span class="tag ${tone}"><i class="dot ${tone}"></i>${stTxt}</span></td>
+                <td class="right num">${t.replies}</td>
+                <td class="right">
+                  <div style="display:inline-flex;gap:6px">
+                    <button class="btn btn-sm" onclick="openTopicDrawer(${t.id})">管理</button>
+                    <button class="btn btn-sm ${t.status==='normal'?'btn-ghost':'btn-soft'}" onclick="quickToggleTopic(${t.id})">${t.status==='normal'?'隐藏':'恢复'}</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    ${state.selectedTopics.size ? `
+      <div class="batch-bar">
+        <span>已勾选 <strong>${state.selectedTopics.size}</strong> 篇帖子</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="batchTopics('已批量隐藏选中帖子')">批量隐藏</button>
+          <button class="btn btn-sm" onclick="batchTopics('已批量设为精华')">批量加精</button>
+          <button class="btn btn-sm" onclick="state.selectedTopics.clear();renderPage()">取消选择</button>
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+function toggleTopicSel(id, checked) { checked ? state.selectedTopics.add(id) : state.selectedTopics.delete(id); renderPage(); }
+function toggleAllTopics(checked) {
+  state.selectedTopics.clear();
+  if (checked) DATA.topics.forEach(t => state.selectedTopics.add(t.id));
+  renderPage();
+}
+function batchTopics(msg) { state.selectedTopics.clear(); showToast(msg, 'ok'); renderPage(); }
+function quickToggleTopic(id) {
+  const t = DATA.topics.find(x => x.id === id);
+  if (!t) return;
+  t.status = t.status === 'normal' ? 'hidden' : 'normal';
+  showToast(t.status === 'hidden' ? `帖子 #${id} 已隐藏` : `帖子 #${id} 已恢复`, 'ok');
+  renderPage();
+}
+
+function openTopicDrawer(id) {
+  const t = DATA.topics.find(x => x.id === id);
+  if (!t) return;
+  openDrawer(`管理帖子 #${t.id}`, `
+    <div style="margin-bottom:18px">
+      <div style="font-size:16px;font-weight:700;line-height:1.45;margin-bottom:6px">${t.title}</div>
+      <div style="font-size:12.5px;color:var(--ink-3)">作者：${t.author} · 发布于 ${t.time} · ${t.replies} 条回复</div>
+    </div>
+    <div class="form-grid" style="margin-bottom:18px">
+      <div class="field">
+        <label>置顶范围</label>
+        <select class="select" id="drPin">
+          <option value="none" ${t.pin==='none'?'selected':''}>不置顶</option>
+          <option value="category" ${t.pin==='category'?'selected':''}>当前板块置顶</option>
+          <option value="parent" ${t.pin==='parent'?'selected':''}>一级板块置顶</option>
+          <option value="site" ${t.pin==='site'?'selected':''}>全站置顶</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>所属分类（移动板块）</label>
+        <select class="select" id="drCat">
+          ${['创意 / 作品分享','讨论 / 学习和教程','讨论 / 休闲','资源 / 求助悬赏','站务 / 公告'].map(c =>
+            `<option ${t.category===c?'selected':''}>${c}</option>`
+          ).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="card" style="padding:14px 16px;display:grid;gap:12px;margin-bottom:18px">
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div><strong style="font-size:13px">设为精华帖</strong><div style="font-size:12px;color:var(--ink-3)">同帖首次加精自动向作者发放 +10 积分</div></div>
+        <input type="checkbox" id="drFeat" ${t.featured?'checked':''} style="width:16px;height:16px;accent-color:var(--brand)">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding-top:10px;border-top:1px solid var(--line-subtle)">
+        <div><strong style="font-size:13px">锁定回复</strong><div style="font-size:12px;color:var(--ink-3)">锁定后普通成员不可继续跟帖评论</div></div>
+        <input type="checkbox" id="drLock" ${t.locked?'checked':''} style="width:16px;height:16px;accent-color:var(--brand)">
+      </label>
+    </div>
+    <div style="padding:14px 16px;border-radius:10px;border:1px solid color-mix(in srgb,var(--danger) 28%,var(--line));background:var(--danger-soft)">
+      <div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px">高危操作区</div>
+      <p style="font-size:12px;color:var(--ink-2);margin-bottom:10px">删除后前台不可见，仍可在管理后台通过「恢复」找回。</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="quickToggleTopic(${t.id});closeDrawer()">${t.status==='normal'?'隐藏帖子':'恢复正常'}</button>
+        <button class="btn btn-sm btn-danger" onclick="t_del(${t.id})">删除帖子</button>
+      </div>
+    </div>
+  `, `
+    <button class="btn btn-ghost" onclick="closeDrawer()">取消</button>
+    <button class="btn btn-primary" onclick="saveTopicDrawer(${t.id})">保存变更</button>
+  `);
+}
+function saveTopicDrawer(id) {
+  const t = DATA.topics.find(x => x.id === id);
+  if (t) {
+    t.pin = document.getElementById('drPin').value;
+    t.category = document.getElementById('drCat').value;
+    t.featured = document.getElementById('drFeat').checked;
+    t.locked = document.getElementById('drLock').checked;
+  }
+  closeDrawer(); showToast(`帖子 #${id} 设置已更新`, 'ok'); renderPage();
+}
+function t_del(id) {
+  const t = DATA.topics.find(x => x.id === id);
+  if (t) t.status = 'deleted';
+  closeDrawer(); showToast(`帖子 #${id} 已标记删除`, 'ok'); renderPage();
+}
+
+/* ---------- 4. 用户与编辑（聚合 用户 + 编辑账号，移除行内禁言输入框） ---------- */
+function renderUsers() {
+  const tab = state.subtab.users || 'all';
+  const trustLabels = ['0 新人', '1 成员', '2 老用户', '3 守护者'];
+  const statusMap = { active: ['ok', '正常'], muted: ['warn', '禁言中'], banned: ['danger', '已封禁'] };
+  const f = state.userFilter;
+  const rows = DATA.users.filter(u =>
+    (!f.status || u.status === f.status) &&
+    (!f.q || u.nickname.includes(f.q) || u.uid.includes(f.q))
+  );
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>用户与编辑账号</h1>
+        <p>聚合社区成员治理与站方编辑账号；点击「禁言」以轻量弹层选择时长，告别每行常驻 148px 输入框。</p>
+      </div>
+      ${tab === 'editors' ? `<button class="btn btn-primary" onclick="showToast('已打开新建编辑账号弹层')">${ic('plus', 14)} 新建编辑账号</button>` : ''}
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab==='all'?'active':''}" onclick="setSubtab('users','all')">社区用户 <span class="cnt">${DATA.users.length}</span></button>
+      <button class="subtab ${tab==='editors'?'active':''}" onclick="setSubtab('users','editors')">站方编辑账号 <span class="cnt">3</span></button>
+    </div>
+
+    ${tab === 'all' ? `
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <svg class="ic" style="width:14px;height:14px" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="input" value="${f.q}" placeholder="搜索昵称或完整 UID" oninput="state.userFilter.q=this.value;renderPage()">
+          </div>
+          <div class="pills">
+            ${[['','全部'],['active','正常'],['muted','禁言中'],['banned','已封禁']].map(([k,l]) =>
+              `<button class="pill-btn ${f.status===k?'active':''}" onclick="state.userFilter.status='${k}';renderPage()">${l}</button>`
+            ).join('')}
+          </div>
+        </div>
+      </div>
+
+      <section class="card" style="overflow:hidden">
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr><th>用户</th><th>信任等级</th><th>账号状态</th><th>社区数据</th><th class="right">操作</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(u => {
+                const [tone, stTxt] = statusMap[u.status];
+                return `
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="avatar sm">${u.nickname.slice(0,1)}</div>
+                      <div>
+                        <div class="cell-title">${u.nickname}</div>
+                        <div class="cell-sub"><span class="mono">${u.uid}</span><span>注册 ${u.created}</span><span>活跃 ${u.lastSeen}</span></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <select class="select" style="height:28px;font-size:12px" onchange="showToast('已更新 ${u.nickname} 的信任等级','ok')">
+                      ${trustLabels.map((lbl, idx) => `<option value="${idx}" ${u.trust===idx?'selected':''}>${lbl}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td>
+                    <span class="tag ${tone}"><i class="dot ${tone}"></i>${stTxt}</span>
+                    ${u.status==='muted' ? `<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">${u.mutedUntil ? '至 ' + u.mutedUntil : '无限期'}</div>` : ''}
+                  </td>
+                  <td>
+                    <div class="num" style="font-size:12.5px;color:var(--ink-2)">帖 ${u.topics} · 回 ${u.posts} · <strong>${u.points}</strong> 分</div>
+                  </td>
+                  <td class="right">
+                    <div style="display:inline-flex;gap:6px">
+                      ${u.status !== 'banned' ? `<button class="btn btn-sm" onclick="openMuteModal('${u.uid}')">禁言</button>` : ''}
+                      ${u.status !== 'active' ? `<button class="btn btn-sm btn-soft" onclick="restoreUser('${u.uid}')">恢复</button>` : ''}
+                      ${u.status !== 'banned' ? `<button class="btn btn-sm btn-danger" onclick="openBanModal('${u.uid}')">封禁</button>` : ''}
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ` : `
+      <section class="card" style="overflow:hidden">
+        <table class="tbl">
+          <thead><tr><th>编辑账号</th><th>UID</th><th>绑定类型</th><th>创作令牌</th><th class="right">操作</th></tr></thead>
+          <tbody>
+            <tr><td><strong>小伴官方</strong></td><td class="mono">u_official_01</td><td><span class="tag brand">站方直建</span></td><td><span class="tag ok">2 枚有效</span></td><td class="right"><button class="btn btn-sm" onclick="showToast('已打开令牌管理')">管理令牌</button></td></tr>
+            <tr><td><strong>小伴编辑部</strong></td><td class="mono">u_editorial_02</td><td><span class="tag brand">站方直建</span></td><td><span class="tag ok">1 枚有效</span></td><td class="right"><button class="btn btn-sm" onclick="showToast('已打开令牌管理')">管理令牌</button></td></tr>
+            <tr><td><strong>林雾（专栏作者）</strong></td><td class="mono">u_8841209k</td><td><span class="tag outline">用户绑定</span></td><td><span class="tag">无令牌</span></td><td class="right"><button class="btn btn-sm" onclick="showToast('已打开令牌管理')">管理令牌</button></td></tr>
+          </tbody>
+        </table>
+      </section>
+    `}
+  `;
+}
+
+function openMuteModal(uid) {
+  const u = DATA.users.find(x => x.uid === uid);
+  if (!u) return;
+  openModal(`禁言用户 · ${u.nickname}`, `
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">选择禁言时长，期间该用户将无法发帖、评论与发布作品，可随时解除。</p>
+    <div class="quick-reasons" style="margin-bottom:14px">
+      ${[['24','24 小时'],['72','3 天'],['168','7 天'],['720','30 天'],['','无限期']].map(([h,l]) =>
+        `<button type="button" class="chip-btn" onclick="document.getElementById('muteH').value='${h}'">${l}</button>`
+      ).join('')}
+    </div>
+    <div class="field">
+      <label>自定义小时数（留空为无限期）</label>
+      <input id="muteH" class="input" type="number" min="1" value="24" placeholder="例如 72">
+    </div>
+  `, `
+    <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmMute('${uid}')">确认禁言</button>
+  `);
+}
+function confirmMute(uid) {
+  const u = DATA.users.find(x => x.uid === uid);
+  const h = document.getElementById('muteH').value.trim();
+  if (u) { u.status = 'muted'; u.mutedUntil = h ? `${h} 小时后自动解除` : null; }
+  closeModal(); showToast(`已禁言 ${u.nickname}`, 'ok'); renderPage();
+}
+function openBanModal(uid) {
+  const u = DATA.users.find(x => x.uid === uid);
+  openModal(`确认封禁「${u.nickname}」？`, `
+    <p style="font-size:13px;color:var(--ink-2)">封禁后该用户将被限制使用论坛，其关联的首页精选作品也会自动退出公开展示；可随时点「恢复」解除。</p>
+  `, `
+    <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+    <button class="btn btn-danger-fill" onclick="confirmBan('${uid}')">确认封禁</button>
+  `);
+}
+function confirmBan(uid) {
+  const u = DATA.users.find(x => x.uid === uid);
+  if (u) u.status = 'banned';
+  closeModal(); showToast(`已封禁 ${u.nickname}`, 'ok'); renderPage();
+}
+function restoreUser(uid) {
+  const u = DATA.users.find(x => x.uid === uid);
+  if (u) { u.status = 'active'; u.mutedUntil = null; }
+  showToast(`已恢复 ${u.nickname} 为正常状态`, 'ok'); renderPage();
+}
+
+/* ---------- 5. 发现页编排（左频道栏 + 右侧列表 + 侧滑抽屉编辑与 Diff） ---------- */
+function renderDiscover() {
+  const kObj = DATA.discoverKinds.find(k => k.key === state.discoverKind) || DATA.discoverKinds[1];
+  return `
+    <div class="page-header">
+      <div>
+        <h1>发现页编排</h1>
+        <p>左侧快速切换 12 类发现页频道，点击任意条目在右侧抽屉完成结构化编辑、线上 Diff 核对与定时发布。</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" onclick="openDiscoverTokensDrawer()">采集令牌</button>
+        <button class="btn" onclick="showToast('已打开 JSON 批量导入抽屉')">批量导入</button>
+        <button class="btn btn-primary" onclick="openDiscoverEditor()">${ic('plus', 14)} 新增草稿</button>
+      </div>
+    </div>
+
+    <div class="discover-grid">
+      <aside class="card channel-list">
+        ${DATA.discoverKinds.map(k => `
+          <button class="channel-btn ${state.discoverKind===k.key?'active':''}" onclick="state.discoverKind='${k.key}';renderPage()">
+            <span>${k.label}</span>
+            <span style="display:inline-flex;gap:4px">
+              ${k.draft ? `<span class="tag warn" style="height:18px;padding:0 6px;font-size:11px">${k.draft}</span>` : ''}
+              <span style="font-size:11.5px;color:var(--ink-3)" class="num">${k.live}</span>
+            </span>
+          </button>
+        `).join('')}
+      </aside>
+
+      <div style="min-width:0">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="pills">
+              <button class="pill-btn ${state.discoverView==='drafts'?'active':''}" onclick="state.discoverView='drafts';renderPage()">编辑与审核（草稿箱）</button>
+              <button class="pill-btn ${state.discoverView==='live'?'active':''}" onclick="state.discoverView='live';renderPage()">当前线上内容</button>
+            </div>
+            <span class="tag outline">频道：${kObj.label}</span>
+          </div>
+          <button class="btn btn-sm" onclick="showToast('已刷新频道列表')">${ic('refresh', 13)} 刷新</button>
+        </div>
+
+        <section class="card" style="overflow:hidden">
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr><th>条目标题与稳定 Key</th><th>排序</th><th>状态</th><th>更新时间</th><th class="right">操作</th></tr>
+              </thead>
+              <tbody>
+                ${DATA.discoverDrafts.map((d, idx) => `
+                  <tr>
+                    <td>
+                      <div class="cell-title">${d.title}</div>
+                      <div class="cell-sub"><span class="mono">${d.key}</span><span>来源：${d.source}</span><span>rev.${d.rev}</span></div>
+                    </td>
+                    <td class="num">${d.sort}</td>
+                    <td>
+                      ${d.status==='draft' ? '<span class="tag warn">待审核</span>' : d.status==='scheduled' ? `<span class="tag info">定时 ${d.publishAfter.slice(5)}</span>` : '<span class="tag ok">已发布副本</span>'}
+                    </td>
+                    <td style="white-space:nowrap;color:var(--ink-3);font-size:12px">${d.updated}</td>
+                    <td class="right">
+                      <button class="btn btn-sm btn-soft" onclick="openDiscoverEditor(${idx})">编辑与审核</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+function openDiscoverEditor(idx) {
+  const d = typeof idx === 'number' ? DATA.discoverDrafts[idx] : { key: 'frontier-20261126-new', title: '', source: '小伴编辑部', sort: 10, summary: '', rev: 0, status: 'draft' };
+  openDrawer(typeof idx === 'number' ? '编辑与审核草稿' : '新增发现页草稿', `
+    <div class="subtabs" style="margin-top:-6px">
+      <button class="subtab active" onclick="switchDrawerTab(this,'df-form')">结构化表单</button>
+      <button class="subtab" onclick="switchDrawerTab(this,'df-diff')">线上 Diff 核对</button>
+      <button class="subtab" onclick="switchDrawerTab(this,'df-json')">高级 JSON</button>
+    </div>
+
+    <div id="df-form" class="df-pane">
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="field"><label>稳定 Key</label><input class="input mono" value="${d.key}" ${typeof idx==='number'?'disabled':''}></div>
+        <div class="field"><label>排序权重（小在前）</label><input class="input" type="number" value="${d.sort}"></div>
+        <div class="field wide"><label>展示标题</label><input class="input" value="${d.title}" placeholder="输入文章或卡片标题"></div>
+        <div class="field"><label>来源名称</label><input class="input" value="${d.source}"></div>
+        <div class="field"><label>定时发布时间（留空立即发布）</label><input class="input" type="datetime-local"></div>
+        <div class="field wide"><label>摘要说明</label><textarea class="textarea" rows="3">${d.summary}</textarea></div>
+      </div>
+      <div style="padding:12px 14px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--line);font-size:12.5px;color:var(--ink-2)">
+        发布保护：保存后须完成预览校验方可发布；再次修改已审核草稿将自动重置审核状态。
+      </div>
+    </div>
+
+    <div id="df-diff" class="df-pane" style="display:none">
+      <div class="diff-grid">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--brand);margin-bottom:6px">本次待审草稿（rev.${d.rev}）</div>
+          <pre class="code-block">{
+  "title": "${d.title || '新文章标题'}",
+  "source": "${d.source}",
+  "summary": "${d.summary || '…'}",
+  "cover_url": "/api/frontier/assets/01.webp"
+}</pre>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:6px">当前线上版本</div>
+          <pre class="code-block">{
+  "title": "桌面 Agent 运行时演进（旧版）",
+  "source": "小伴编辑部",
+  "summary": "初稿待补充实测数据。",
+  "cover_url": ""
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div id="df-json" class="df-pane" style="display:none">
+      <div class="field">
+        <label>原始数据 JSON（与结构化表单实时同步）</label>
+        <textarea class="textarea mono" rows="12">${JSON.stringify({ title: d.title, source: d.source, summary: d.summary, sort_order: d.sort }, null, 2)}</textarea>
+      </div>
+    </div>
+  `, `
+    <button class="btn btn-ghost" onclick="closeDrawer()">关闭</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="showToast('已保存为草稿 rev.${d.rev+1}','ok')">保存草稿</button>
+      <button class="btn btn-primary" onclick="closeDrawer();showToast('审核通过，已发布至线上发现页','ok')">审核并发布</button>
+    </div>
+  `, true);
+}
+
+function openDiscoverTokensDrawer() {
+  openDrawer('发现页采集令牌', `
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">令牌默认仅可写入勾选类型的草稿；前沿与日报自动发布需显式授权，创建后仅显示一次。</p>
+    <div class="card" style="overflow:hidden;margin-bottom:16px">
+      <table class="tbl">
+        <thead><tr><th>名称</th><th>允许类型</th><th>发布权限</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td><strong>frontier-skill-bot</strong></td><td>frontier, news</td><td><span class="tag info">自动：frontier</span></td><td><span class="tag ok">有效</span></td></tr>
+          <tr><td><strong>local-importer</strong></td><td>nav, doc</td><td><span class="tag">仅草稿</span></td><td><span class="tag ok">有效</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary" onclick="showToast('已生成新采集令牌并复制到剪贴板','ok')">${ic('plus', 14)} 创建新令牌</button>
+  `, `<button class="btn" onclick="closeDrawer()">关闭</button>`);
+}
+
+/* ---------- 6. 精选项目工作台（4 步流程条 + 舒适三栏） ---------- */
+function renderOpenSource() {
+  const p = DATA.osProjects[state.osSelected] || DATA.osProjects[0];
+  const steps = ['编辑目录草稿', '保存版本 (v14)', '校验结构与素材', '发布上线 (线上 v13)'];
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>精选项目工作台</h1>
+        <p>独立管理首页「精选」GitHub 项目、中文导读与 1280×720 封面模板；网页与手机读取同一发布快照。</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" onclick="state.osStep=2;showToast('草稿 v14 已保存','ok');renderPage()">保存草稿</button>
+        <button class="btn" onclick="state.osStep=3;showToast('版本 v14 校验通过，现可发布','ok');renderPage()">校验预览</button>
+        <button class="btn btn-primary" ${state.osStep<3?'disabled':''} onclick="state.osStep=4;showToast('精选目录 v14 已发布上线！','ok');renderPage()">发布此版本</button>
+      </div>
+    </div>
+
+    <!-- 4 步发布流引导 -->
+    <div class="card stepper">
+      ${steps.map((s, i) => `
+        <div class="step-node ${state.osStep > i+1 ? 'done' : state.osStep === i+1 ? 'current' : ''}">
+          <span class="num-dot">${state.osStep > i+1 ? '✓' : i+1}</span>
+          <span>${s}</span>
+        </div>
+        ${i < steps.length - 1 ? '<div class="step-sep"></div>' : ''}
+      `).join('')}
+    </div>
+
+    <!-- GitHub 快速导入条 -->
+    <div class="toolbar">
+      <div style="display:flex;gap:8px;flex:1;min-width:260px">
+        <input class="input" style="flex:1" placeholder="输入 GitHub 仓库地址或 owner/repo 一键拉取元数据与 README 素材候选">
+        <button class="btn" onclick="showToast('已解析 GitHub 仓库资料与 4 张候选素材','ok')">获取项目资料</button>
+        <button class="btn btn-ghost" onclick="showToast('已新建空白项目草稿')">手工新增</button>
+      </div>
+    </div>
+
+    <div class="os-workbench">
+      <!-- 左侧项目列表（236px 舒适宽度） -->
+      <aside class="card" style="padding:10px">
+        <input class="input" style="width:100%;margin-bottom:8px;height:30px;font-size:12px" placeholder="过滤草稿项目…">
+        ${DATA.osProjects.map((item, i) => `
+          <button class="os-item ${state.osSelected===i?'active':''}" onclick="state.osSelected=${i};renderPage()">
+            <div class="os-icon-box" style="background:${item.accent}">${item.name.slice(0,2)}</div>
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:4px">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</span>
+                ${item.featured ? '<span style="color:var(--warn);font-size:11px">★</span>' : ''}
+              </div>
+              <div class="mono" style="font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.full_name}</div>
+            </div>
+          </button>
+        `).join('')}
+      </aside>
+
+      <!-- 中间分组卡片编辑器 -->
+      <div style="display:grid;gap:14px;min-width:0">
+        <section class="card">
+          <div class="card-head">
+            <h3>基础资料</h3>
+            <span class="tag outline">${p.category}</span>
+          </div>
+          <div class="card-body form-grid">
+            <div class="field"><label>仓库标识</label><input class="input mono" value="${p.full_name}"></div>
+            <div class="field"><label>项目名称</label><input class="input" value="${p.name}"></div>
+            <div class="field wide"><label>中文推荐标题</label><input class="input" value="${p.title}"></div>
+            <div class="field wide"><label>简短介绍（详情与搜索展示）</label><textarea class="textarea" rows="2">${p.summary}</textarea></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h3>封面模板与素材</h3>
+            <span style="font-size:12px;color:var(--ink-3)">固定 1280×720 · 不依赖模型生图</span>
+          </div>
+          <div class="card-body form-grid">
+            <div class="field">
+              <label>封面模板</label>
+              <select class="select" onchange="state.osTemplate=this.value;renderPage()">
+                <option value="interface" ${state.osTemplate==='interface'?'selected':''}>界面截图模板</option>
+                <option value="command" ${state.osTemplate==='command'?'selected':''}>命令示例模板</option>
+                <option value="flow" ${state.osTemplate==='flow'?'selected':''}>流程示意模板</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>品牌点缀色</label>
+              <input class="input mono" value="${p.accent}">
+            </div>
+            <div class="field wide">
+              <label>示意要点（最多 3 行）</label>
+              <textarea class="textarea mono" rows="3">${p.lines.join('\n')}</textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右侧实时 16:9 封面预览 -->
+      <aside class="card" style="position:sticky;top:72px">
+        <div class="card-head">
+          <h3>实时卡片预览</h3>
+          <span class="tag ok">1280×720</span>
+        </div>
+        <div class="card-body">
+          <div class="os-preview-cover" style="background:linear-gradient(135deg, ${p.accent}, color-mix(in srgb, ${p.accent} 62%, #111))">
+            <div style="display:flex;align-items:center;justify-content:space-between;color:#fff">
+              <span style="font-weight:700;font-size:14px">${p.name}</span>
+              <span style="font-size:10.5px;padding:2px 7px;border-radius:99px;background:rgba(255,255,255,.18)">${state.osTemplate==='command'?'命令示意':state.osTemplate==='flow'?'流程示意':'真实界面'}</span>
+            </div>
+            <div class="os-preview-code">${p.lines.map(l => `› ${l}`).join('<br>')}</div>
+          </div>
+          <div style="margin-top:12px;font-weight:600;font-size:13.5px;line-height:1.45">${p.title}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 14px">
+            ${p.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+          </div>
+          <button class="btn" style="width:100%" onclick="showToast('已导出 ${p.name}-cover-1280x720.png','ok')">导出 PNG 封面</button>
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+/* ---------- 7. 采编与健康（聚合 内容采集 + 外链巡检 + 工具镜像 + 翻译服务） ---------- */
+function renderCollection() {
+  const tab = state.subtab.collection || 'sources';
+  const curSrc = DATA.sources.find(s => s.id === state.collectionSource) || DATA.sources[0];
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>采编与健康</h1>
+        <p>一站串联「官方采集源 → 栏目新鲜度与外链巡检 → 工具镜像校验 → 榜单翻译」，不再跨 4 个分散菜单跳转。</p>
+      </div>
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab==='sources'?'active':''}" onclick="setSubtab('collection','sources')">采集来源与调度 <span class="cnt">5</span></button>
+      <button class="subtab ${tab==='links'?'active':''}" onclick="setSubtab('collection','links')">栏目健康与外链巡检 <span class="cnt danger">2</span></button>
+      <button class="subtab ${tab==='mirrors'?'active':''}" onclick="setSubtab('collection','mirrors')">工具镜像校验 <span class="cnt">4</span></button>
+      <button class="subtab ${tab==='translation'?'active':''}" onclick="setSubtab('collection','translation')">榜单翻译服务</button>
+    </div>
+
+    ${tab === 'sources' ? `
+      <div class="source-cards">
+        ${DATA.sources.map(s => `
+          <button class="source-card ${state.collectionSource===s.id?'active':''}" onclick="state.collectionSource='${s.id}';renderPage()">
+            <strong>${s.name}</strong>
+            <span><i class="dot ${s.status}"></i>${s.enabled ? '自动 · ' + s.mode : '手动采集'}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="dash-grid">
+        <section class="card">
+          <div class="card-head">
+            <h2>${curSrc.name} · ${curSrc.sub}</h2>
+            <span class="tag ${curSrc.status==='ok'?'ok':curSrc.status==='warn'?'warn':''}">${curSrc.mode}</span>
+          </div>
+          <div class="card-body" style="display:grid;gap:14px">
+            ${curSrc.err ? `<div style="padding:10px 12px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-size:12.5px">最近告警：${curSrc.err}</div>` : ''}
+            <div class="form-grid">
+              <div class="field"><label>API 凭据（只写不回显）</label><input class="input" type="password" placeholder="已配置 · 输入新 Key 以轮换"></div>
+              <div class="field"><label>采集周期（分钟）</label><input class="input num" type="number" value="${curSrc.interval}"></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:10px;border-top:1px solid var(--line-subtle)">
+              <span style="font-size:12px;color:var(--ink-3)">上次成功：${curSrc.lastOk} · 下次计划：${curSrc.nextRun}</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn" onclick="showToast('采集计划已保存','ok')">保存配置</button>
+                <button class="btn btn-primary" onclick="showToast('已受理 ${curSrc.name} 立即采集任务','ok')">立即采集</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h3>最近采集批次</h3><button class="btn btn-ghost btn-sm" onclick="showToast('已刷新运行记录')">刷新</button></div>
+          <div class="health-list">
+            <div class="health-row">
+              <div><div class="health-name"><span class="tag ok">成功</span> 2026-11-26 06:00</div><div class="health-sub">采集 148 条 · 自动校验发布</div></div>
+              <button class="btn btn-sm" onclick="openDiscoverEditor(0)">核对批次</button>
+            </div>
+            <div class="health-row">
+              <div><div class="health-name"><span class="tag warn">部分告警</span> 2026-11-25 18:10</div><div class="health-sub">AI 工具版本 · 1 文件超过 128 MiB</div></div>
+              <button class="btn btn-sm" onclick="setSubtab('collection','mirrors')">去处理镜像</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    ` : tab === 'links' ? `
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <span class="tag ok">可访问 184</span>
+          <span class="tag warn">访问受限 3</span>
+          <span class="tag danger">不存在或失效 2</span>
+          <span class="tag outline">未检查 12</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('已启动一批 40 个链接并发巡检','ok')">手动检查一批</button>
+      </div>
+      <section class="card" style="overflow:hidden">
+        <table class="tbl">
+          <thead><tr><th>域名与链接位置</th><th>巡检状态</th><th>耗时 / HTTP</th><th>最近检查</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div class="cell-title">docs.example-ai.dev</div><div class="cell-sub"><span class="mono">https://docs.example-ai.dev/v2/guide</span><span>引用：资料导读 · claude-guide</span></div></td>
+              <td><span class="tag danger">不存在或已移除</span></td>
+              <td class="mono">HTTP 404 · 312 ms</td>
+              <td style="color:var(--ink-3);font-size:12px">2026-11-26 07:10</td>
+            </tr>
+            <tr>
+              <td><div class="cell-title">api.vendor-cloud.io</div><div class="cell-sub"><span class="mono">https://api.vendor-cloud.io/pricing</span><span>引用：AI 导航 · vendor-cloud</span></div></td>
+              <td><span class="tag warn">检查超时</span></td>
+              <td class="mono">Timeout · 8000 ms</td>
+              <td style="color:var(--ink-3);font-size:12px">2026-11-26 07:10</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    ` : tab === 'mirrors' ? `
+      <section class="card">
+        <div class="card-head">
+          <h3>官方工具安装包镜像校验</h3>
+          <span class="tag ok">资源机已连接 · 单文件上限 128 MiB</span>
+        </div>
+        <div class="card-body" style="display:grid;gap:12px">
+          <div style="padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600">CherryStudio-1.4.2-arm64.dmg <span class="tag ok" style="margin-left:6px">SHA-256 已回读校验</span></div>
+              <div class="mono" style="color:var(--ink-3);margin-top:4px">macOS / arm64 · 84.2 MiB · sha256: 9f4c…e821</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="showToast('重新核验通过，哈希一致','ok')">重新核验</button>
+              <button class="btn btn-sm btn-ghost">GitHub 官方源</button>
+            </div>
+          </div>
+          <div style="padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600">CherryStudio-1.4.2-x64-setup.exe <span class="tag warn" style="margin-left:6px">尚未创建镜像</span></div>
+              <div class="mono" style="color:var(--ink-3);margin-top:4px">Windows / x64 · 91.6 MiB · 待镜像</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="showToast('正在下载写入并回读校验 SHA-256…','ok')">校验并创建镜像</button>
+          </div>
+        </div>
+      </section>
+    ` : `
+      <section class="card">
+        <div class="card-head"><h3>榜单与项目简介翻译服务</h3><span class="tag ok">翻译接口就绪</span></div>
+        <div class="card-body form-grid">
+          <div class="field"><label>上游端点</label><input class="input mono" value="https://ai.xiangban.xyz/v1"></div>
+          <div class="field"><label>翻译模型</label><input class="input mono" value="xiaoban-fast-translate"></div>
+          <div class="field wide"><label>快速试译</label><div style="display:flex;gap:8px"><input class="input" style="flex:1" value="Virtual whiteboard for sketching hand-drawn like diagrams"><button class="btn btn-primary" onclick="showToast('试译成功：手绘风格开源虚拟白板（耗时 0.42s）','ok')">测试翻译</button></div></div>
+        </div>
+      </section>
+    `}
+  `;
+}
+
+/* ---------- 8. 作品与活动（聚合 内容包 + 精选与挑战 + 项目/周刊 + 批量发帖） ---------- */
+function renderWorks() {
+  const tab = state.subtab.works || 'packs';
+  return `
+    <div class="page-header">
+      <div>
+        <h1>作品与活动运营</h1>
+        <p>集中管理社区内容包审核与官方登记、首页精选排序、主题挑战、专题项目/周刊及站方批量发帖。</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openOfficialPackDrawer()">${ic('plus', 14)} 官方登记内容包</button>
+      </div>
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab==='packs'?'active':''}" onclick="setSubtab('works','packs')">内容包管理 <span class="cnt">${DATA.packs.length}</span></button>
+      <button class="subtab ${tab==='editorial'?'active':''}" onclick="setSubtab('works','editorial')">首页精选与挑战</button>
+      <button class="subtab ${tab==='weekly'?'active':''}" onclick="setSubtab('works','weekly')">项目与周刊</button>
+      <button class="subtab ${tab==='batch'?'active':''}" onclick="setSubtab('works','batch')">站方批量发帖</button>
+    </div>
+
+    ${tab === 'packs' ? `
+      <section class="card" style="overflow:hidden">
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>作品与版本</th><th>类型 / 协议</th><th>信任等级</th><th>状态</th><th class="right">应用数</th><th class="right">操作</th></tr></thead>
+            <tbody>
+              ${DATA.packs.map(p => `
+                <tr>
+                  <td>
+                    <div class="cell-title">${p.title} ${p.featured ? '<span class="tag brand">首页精选</span>' : ''}</div>
+                    <div class="cell-sub"><span class="mono">#${p.id} · v${p.ver}</span><span>作者：${p.author}</span><span>${p.updated}</span></div>
+                  </td>
+                  <td>${p.kind} <span class="tag outline" style="margin-left:4px">协议 ${p.protocol}</span></td>
+                  <td><span class="tag ${p.trust.startsWith('T0')?'info':p.trust.startsWith('T1')?'ok':'warn'}">${p.trust}</span></td>
+                  <td><span class="tag ${p.status==='published'?'ok':'warn'}">${p.status==='published'?'已上架':'待审'}</span></td>
+                  <td class="right num">${p.applies.toLocaleString()}</td>
+                  <td class="right">
+                    <div style="display:inline-flex;gap:6px">
+                      <button class="btn btn-sm ${p.featured?'btn-soft':''}" onclick="togglePackFeat(${p.id})">${p.featured?'取消精选':'设为精选'}</button>
+                      <button class="btn btn-sm btn-ghost" onclick="showToast('已更新内容包 #${p.id} 状态','ok')">${p.status==='published'?'下架':'通过上架'}</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ` : tab === 'editorial' ? `
+      <div class="dash-grid">
+        <section class="card">
+          <div class="card-head"><h3>首页精选作品排序（最多 30 件）</h3><button class="btn btn-sm btn-primary" onclick="showToast('精选排序已保存','ok')">保存顺序</button></div>
+          <div class="health-list">
+            ${DATA.packs.filter(p => p.featured).map((p, i) => `
+              <div class="health-row">
+                <div class="health-name"><span class="mono" style="color:var(--ink-3)">0${i+1}</span> ${p.title} <span class="tag outline">${p.kind}</span></div>
+                <div style="display:flex;gap:5px"><button class="btn btn-sm">↑</button><button class="btn btn-sm">↓</button><button class="btn btn-sm btn-ghost">移除</button></div>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>主题创作挑战</h3><button class="btn btn-sm btn-primary" onclick="showToast('已新建挑战草稿')">新建挑战</button></div>
+          <div class="health-list">
+            <div class="health-row">
+              <div><div class="health-name">冬日桌面氛围挑战 <span class="tag ok">投稿中</span></div><div class="health-sub">28 件公开投稿 · 截止 2026-12-10 · 标签 #winter-desk</div></div>
+              <button class="btn btn-sm">管理投稿</button>
+            </div>
+            <div class="health-row">
+              <div><div class="health-name">协议 2 单文件小游戏大赛 <span class="tag warn">待审核草稿</span></div><div class="health-sub">0 件投稿 · 预计 2026-12-15 开始</div></div>
+              <button class="btn btn-sm btn-soft">审核发布</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    ` : `
+      <section class="card"><div class="card-body" style="color:var(--ink-2)">
+        <h3 style="margin-bottom:8px">${tab === 'weekly' ? '专题项目与社区周刊编排' : '站方批量发帖与草稿导入'}</h3>
+        <p style="font-size:13px">保留原「项目」「周刊」「批量发帖」全部后端接口与表单字段，统一套用新版 12px 卡片、分组表单栅格与侧滑预览抽屉，不再单独占据 3 个顶层侧栏菜单。</p>
+      </div></section>
+    `}
+  `;
+}
+function togglePackFeat(id) {
+  const p = DATA.packs.find(x => x.id === id);
+  if (p) p.featured = !p.featured;
+  showToast(p.featured ? `内容包 #${id} 已设为首页精选` : `已取消精选`, 'ok');
+  renderPage();
+}
+function openOfficialPackDrawer() {
+  openDrawer('官方登记内容包（T0 / T1）', `
+    <p style="font-size:12.5px;color:var(--ink-2);margin-bottom:16px">资源文件由运维预先放置于资源机（如 official/xxx.zip），此处登记元数据与 SHA-256 校验值。</p>
+    <div class="form-grid">
+      <div class="field"><label>内容类型</label><select class="select"><option>游戏 (game)</option><option>应用 (app)</option><option>壁纸 (wallpaper)</option><option>特效 (effect)</option><option>小组件 (widget)</option></select></div>
+      <div class="field"><label>信任等级</label><select class="select"><option>T0 官方</option><option>T1 已审核第三方</option></select></div>
+      <div class="field wide"><label>作品标题</label><input class="input" placeholder="例如：极光动态壁纸"></div>
+      <div class="field wide"><label>资源机文件键 (file_key)</label><input class="input mono" placeholder="official/aurora-1.0.0.zip"></div>
+      <div class="field wide"><label>SHA-256 校验值</label><input class="input mono" placeholder="64 位小写十六进制哈希"></div>
+      <div class="field wide"><label>manifest.json</label><textarea class="textarea mono" rows="4">{"schemaVersion":3,"runtimeProtocol":2,"kind":"game"}</textarea></div>
+    </div>
+  `, `
+    <button class="btn btn-ghost" onclick="closeDrawer()">取消</button>
+    <button class="btn btn-primary" onclick="closeDrawer();showToast('官方内容包已登记上架','ok')">确认登记</button>
+  `);
+}
+
+/* ---------- 9. 数据分析（图表化留存与事件漏斗） ---------- */
+function renderMetrics() {
+  const events = [
+    { name: '看首页 (view_home)', count: 14820, dev: 4120, pct: 100 },
+    { name: '看讨论 (view_discuss)', count: 6940, dev: 2380, pct: 47 },
+    { name: '看内容包 (view_pack)', count: 4210, dev: 1690, pct: 28 },
+    { name: '点「在小伴中打开」', count: 1840, dev: 920, pct: 12 },
+    { name: '点下载 (download_click)', count: 1290, dev: 740, pct: 9 },
+    { name: '发布完成 (publish_done)', count: 184, dev: 112, pct: 2 },
+  ];
+  return `
+    <div class="page-header">
+      <div>
+        <h1>数据分析</h1>
+        <p>匿名设备哈希统计，以直观柱线图与进度漏斗替代原版纯数字长表格。</p>
+      </div>
+      <div class="page-actions">
+        <div class="pills">
+          ${[7, 14, 30].map(d => `<button class="pill-btn ${state.metricsDays===d?'active':''}" onclick="state.metricsDays=${d};renderPage()">近 ${d} 天</button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <section class="card">
+        <div class="card-head"><h3>每日活跃设备与次日留存</h3><span class="tag ok">平均次日留存 38.4%</span></div>
+        <div class="card-body">
+          <svg viewBox="0 0 560 190" style="width:100%;height:185px;display:block">
+            ${[320,380,350,440,490,460,540,510,590,630].map((v,i) => {
+              const h = Math.round(v / 700 * 130);
+              const x = 28 + i * 52;
+              return `<rect x="${x}" y="${152-h}" width="26" height="${h}" rx="5" fill="var(--brand-fill)" opacity="${i===9?'.95':'.28'}"/>
+                      <text x="${x+13}" y="172" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">${17+i}日</text>`;
+            }).join('')}
+            <polyline fill="none" stroke="var(--ok)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" points="41,96 93,88 145,92 197,78 249,70 301,76 353,62 405,66 457,54 509,48"/>
+          </svg>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h3>核心事件触发排行（近 ${state.metricsDays} 天）</h3></div>
+        <div class="card-body" style="display:grid;gap:14px">
+          ${events.map(e => `
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px">
+                <span style="font-weight:500">${e.name}</span>
+                <span class="num" style="color:var(--ink-2)"><strong>${e.count.toLocaleString()}</strong> 次 · ${e.dev.toLocaleString()} 设备·天</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="width:${e.pct}%"></div></div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+/* ---------- 10. 板块与安全（分类树 + 敏感词） ---------- */
+function renderTaxonomy() {
+  const tab = state.subtab.taxonomy || 'categories';
+  return `
+    <div class="page-header">
+      <div>
+        <h1>板块与安全</h1>
+        <p>清晰树形维护一二级板块发帖权限与开关，以及拦截词 / 复核词两级风控词库。</p>
+      </div>
+      <button class="btn btn-primary" onclick="showToast('${tab==='categories'?'已打开新建分类抽屉':'已添加敏感词'}','ok')">${ic('plus', 14)} ${tab==='categories'?'新建板块':'新增词条'}</button>
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab==='categories'?'active':''}" onclick="setSubtab('taxonomy','categories')">板块分类树 <span class="cnt">${DATA.categories.length}</span></button>
+      <button class="subtab ${tab==='words'?'active':''}" onclick="setSubtab('taxonomy','words')">敏感词与复核词 <span class="cnt">42</span></button>
+    </div>
+
+    ${tab === 'categories' ? `
+      <section class="card" style="overflow:hidden">
+        ${DATA.categories.map(c => `
+          <div class="tree-row ${c.parent ? 'child' : 'parent'}">
+            <div>
+              <div class="cell-title">
+                ${c.name}
+                <span class="tag outline">${c.section}</span>
+                ${c.flags.map(fl => `<span class="tag warn">${fl}</span>`).join('')}
+              </div>
+              <div class="cell-sub"><span class="mono">${c.slug}</span><span>${c.topics} 篇帖子</span><span>最低发帖：${c.minLevel}</span></div>
+            </div>
+            <button class="btn btn-sm" onclick="showToast('已打开「${c.name}」侧滑编辑抽屉')">编辑</button>
+          </div>
+        `).join('')}
+      </section>
+    ` : `
+      <div class="dash-grid">
+        <section class="card">
+          <div class="card-head"><h3>直接拦截词（阻止发布）</h3><span class="tag danger">24 条</span></div>
+          <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+            ${['低价API代充','黑号批发','外挂辅助','赌博引流','加微领福利'].map(w => `<span class="tag danger">${w} ×</span>`).join('')}
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>人工复核词（发布后进待审队列）</h3><span class="tag warn">18 条</span></div>
+          <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+            ${['代理','中转','拼车','闲置转让','网盘合集'].map(w => `<span class="tag warn">${w} ×</span>`).join('')}
+          </div>
+        </section>
+      </div>
+    `}
+  `;
+}
+
+/* ---------- 11. 站务与日志（联系方式卡片 + 操作审计） ---------- */
+function renderOpsSys() {
+  const tab = state.subtab['ops-sys'] || 'contact';
+  return `
+    <div class="page-header">
+      <div>
+        <h1>站务与审计日志</h1>
+        <p>三栏卡片式维护站务官方交流群二维码与过期隐藏日期，并可随时追溯所有管理员操作审计记录。</p>
+      </div>
+      ${tab==='contact' ? `<button class="btn btn-primary" onclick="showToast('联系方式配置已同步至 /contact','ok')">保存全部更改</button>` : ''}
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab ${tab==='contact'?'active':''}" onclick="setSubtab('ops-sys','contact')">官方联系方式（/contact）</button>
+      <button class="subtab ${tab==='audit'?'active':''}" onclick="setSubtab('ops-sys','audit')">操作审计日志</button>
+    </div>
+
+    ${tab === 'contact' ? `
+      <div class="contact-grid">
+        ${[
+          { title: '微信公众号', name: '超级小伴助手', extra: '永久有效 · 公开展示', expire: '' },
+          { title: '官方 QQ 交流群', name: '超级小伴官方 1 群', extra: '群号：892410332', expire: '' },
+          { title: '微信交流群', name: '小伴创作者交流群', extra: '到期零时自动隐藏', expire: '2026-12-03' },
+        ].map(ch => `
+          <section class="card">
+            <div class="card-head"><h3>${ch.title}</h3><span class="tag ${ch.expire?'warn':'ok'}">${ch.expire ? '7 天后失效' : '展示中'}</span></div>
+            <div class="card-body" style="display:grid;gap:12px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <div class="qr-box">
+                  <svg viewBox="0 0 36 36" width="76" height="76" fill="#18191e"><rect x="2" y="2" width="10" height="10" rx="1.5"/><rect x="4.5" y="4.5" width="5" height="5" fill="#fff"/><rect x="24" y="2" width="10" height="10" rx="1.5"/><rect x="26.5" y="4.5" width="5" height="5" fill="#fff"/><rect x="2" y="24" width="10" height="10" rx="1.5"/><rect x="4.5" y="26.5" width="5" height="5" fill="#fff"/><rect x="15" y="15" width="6" height="6" rx="1" fill="var(--brand-fill)"/><rect x="24" y="24" width="4" height="4"/><rect x="30" y="28" width="4" height="6"/><rect x="16" y="4" width="4" height="6"/><rect x="15" y="25" width="5" height="5"/></svg>
+                </div>
+                <div style="display:grid;gap:6px">
+                  <button class="btn btn-sm" onclick="showToast('选择 ≤ 5 MiB 的 PNG/JPG/WebP 二维码')">更换二维码</button>
+                  <span style="font-size:11.5px;color:var(--ink-3)">${ch.extra}</span>
+                </div>
+              </div>
+              <div class="field"><label>显示名称</label><input class="input" value="${ch.name}"></div>
+              ${ch.expire ? `<div class="field"><label>二维码失效日期 (CST)</label><input class="input" type="date" value="${ch.expire}"></div>` : ''}
+            </div>
+          </section>
+        `).join('')}
+      </div>
+    ` : `
+      <section class="card" style="overflow:hidden">
+        <table class="tbl">
+          <thead><tr><th>时间</th><th>管理员</th><th>操作动作</th><th>目标对象</th><th>详情</th></tr></thead>
+          <tbody>
+            ${DATA.audit.map(a => `
+              <tr>
+                <td class="mono" style="white-space:nowrap;color:var(--ink-3)">${a.time}</td>
+                <td><strong>${a.admin}</strong></td>
+                <td><span class="tag outline">${a.action}</span></td>
+                <td>${a.target}</td>
+                <td style="color:var(--ink-2)">${a.detail}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </section>
+    `}
+  `;
+}
+
+/* ---------- 12. 账号安全 ---------- */
+function renderAccount() {
+  return `
+    <div class="page-header">
+      <div><h1>账号安全</h1><p>独立管理员凭据与登录保护策略；修改密码后所有历史会话令牌将自动失效。</p></div>
+    </div>
+    <section class="card" style="max-width:520px">
+      <div class="card-head"><h3>修改登录密码</h3><span class="tag ok">当前登录：admin</span></div>
+      <form class="card-body" style="display:grid;gap:14px" onsubmit="event.preventDefault();showToast('密码已更新，旧令牌已全部吊销','ok')">
+        <div class="field"><label>当前密码</label><input class="input" type="password" placeholder="请输入当前密码"></div>
+        <div class="field"><label>新密码（至少 12 位）</label><input class="input" type="password" placeholder="建议使用大小写字母、数字与符号组合"></div>
+        <div class="field"><label>确认新密码</label><input class="input" type="password" placeholder="再次输入新密码"></div>
+        <div><button class="btn btn-primary" type="submit">保存新密码</button></div>
+      </form>
+    </section>
+  `;
+}
+
+function setSubtab(page, sub) { state.subtab[page] = sub; renderPage(); }
+
+/* ==========================================================================
+   抽屉、弹窗、⌘K 命令面板、信息架构对照、Toast
+   ========================================================================== */
+function openDrawer(title, bodyHtml, footHtml, wide = false) {
+  const host = document.getElementById('drawerOverlay');
+  host.innerHTML = `
+    <div class="drawer ${wide ? 'wide' : ''}" onclick="event.stopPropagation()">
+      <div class="drawer-head">
+        <h3>${title}</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeDrawer()" aria-label="关闭">${ic('x', 16)}</button>
+      </div>
+      <div class="drawer-body">${bodyHtml}</div>
+      <div class="drawer-foot">${footHtml || ''}</div>
+    </div>`;
+  host.classList.add('open');
+  host.onclick = closeDrawer;
+}
+function closeDrawer() { document.getElementById('drawerOverlay').classList.remove('open'); }
+
+function switchDrawerTab(btn, id) {
+  btn.parentElement.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.df-pane').forEach(p => p.style.display = p.id === id ? 'block' : 'none');
+}
+
+function openModal(title, bodyHtml, footHtml, wide = false) {
+  const host = document.getElementById('modalOverlay');
+  host.innerHTML = `
+    <div class="modal ${wide ? 'wide' : ''}" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h3>${title}</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal()" aria-label="关闭">${ic('x', 16)}</button>
+      </div>
+      <div class="modal-body">${bodyHtml}</div>
+      ${footHtml ? `<div class="modal-foot">${footHtml}</div>` : ''}
+    </div>`;
+  host.classList.add('open');
+  host.onclick = closeModal;
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+function openCommandPalette() {
+  const allCmds = [
+    { label: '概览与待办', sub: '/admin', fn: () => navigate('overview') },
+    { label: '审核中心 · 帖子与回复举报', sub: '原 /admin/reports', fn: () => navigate('review','reports') },
+    { label: '审核中心 · 作品与方案举报', sub: '原 /admin/content-reports', fn: () => navigate('review','contentReports') },
+    { label: '审核中心 · 待审内容队列', sub: '原 /admin/moderation', fn: () => navigate('review','moderation') },
+    { label: '帖子管理', sub: '/admin/topics', fn: () => navigate('topics') },
+    { label: '用户管理', sub: '/admin/users', fn: () => navigate('users','all') },
+    { label: '站方编辑账号', sub: '原 /admin/editor-accounts', fn: () => navigate('users','editors') },
+    { label: '板块分类树', sub: '原 /admin/categories', fn: () => navigate('taxonomy','categories') },
+    { label: '敏感词与复核词', sub: '原 /admin/words', fn: () => navigate('taxonomy','words') },
+    { label: '发现页编排（12 类频道）', sub: '/admin/discover', fn: () => navigate('discover') },
+    { label: '精选项目工作台', sub: '/admin/open-source', fn: () => navigate('open-source') },
+    { label: '内容采集与调度', sub: '/admin/collection', fn: () => navigate('collection','sources') },
+    { label: '栏目健康与外链巡检', sub: '原 /admin/community-operations', fn: () => navigate('collection','links') },
+    { label: '工具镜像校验', sub: '原 /admin/tool-mirrors', fn: () => navigate('collection','mirrors') },
+    { label: '内容包管理与官方登记', sub: '/admin/packs', fn: () => navigate('works','packs') },
+    { label: '首页精选与主题挑战', sub: '原 /admin/community-editorial', fn: () => navigate('works','editorial') },
+    { label: '官方联系方式（二维码）', sub: '原 /admin/contact', fn: () => navigate('ops-sys','contact') },
+    { label: '操作审计日志', sub: '原 /admin/audit', fn: () => navigate('ops-sys','audit') },
+  ];
+  window.__cmds = allCmds;
+  const host = document.getElementById('modalOverlay');
+  host.innerHTML = `
+    <div class="cmd-box" onclick="event.stopPropagation()">
+      <div class="cmd-input-row">
+        ${ic('compass', 16)}
+        <input id="cmdSearchInput" placeholder="输入模块名或旧路由（支持 23 个全部旧入口直达）…" autofocus oninput="filterCmds(this.value)">
+        <span class="kbd">ESC</span>
+      </div>
+      <div class="cmd-results" id="cmdResults"></div>
+    </div>`;
+  host.classList.add('open');
+  host.onclick = closeModal;
+  filterCmds('');
+  setTimeout(() => document.getElementById('cmdSearchInput')?.focus(), 20);
+}
+function filterCmds(q) {
+  const kw = q.trim().toLowerCase();
+  const list = (window.__cmds || []).filter(c => !kw || c.label.toLowerCase().includes(kw) || c.sub.toLowerCase().includes(kw));
+  document.getElementById('cmdResults').innerHTML = list.map((c, idx) => `
+    <button class="cmd-row" onclick="closeModal();window.__cmds[${(window.__cmds).indexOf(c)}].fn()">
+      <span class="left"><strong>${c.label}</strong></span>
+      <small class="mono">${c.sub}</small>
+    </button>
+  `).join('') || '<div style="padding:20px;text-align:center;color:var(--ink-3)">未找到匹配项</div>';
+}
+
+function openCompareModal() {
+  openModal('信息架构重设计对照（23 项平铺 → 12 项聚合，100% 路由兼容）', `
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">不删减任何已有业务能力与后端接口；所有旧 URL（如 <code>/admin/content-reports</code>、<code>/admin/words</code>）可自动重定向或映射至新模块的二级 Tab。</p>
+    <table class="tbl" style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
+      <thead><tr><th>新侧栏入口（12 项）</th><th>收口覆盖的旧入口（原 23 项）</th><th>核心体验升级</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. 概览与待办</strong></td><td>概览</td><td>新增环比 KPI、跨模块待办中心、采集健康灯与 7 日趋势图</td></tr>
+        <tr><td><strong>2. 数据分析</strong></td><td>数据</td><td>纯文本表格升级为柱线组合留存图与事件漏斗条</td></tr>
+        <tr><td><strong>3. 审核中心</strong></td><td>举报 + 作品举报 + 待审</td><td>三队列统一入口 + 主从双栏处置 + 快捷理由芯片（淘汰原生 prompt）</td></tr>
+        <tr><td><strong>4. 帖子管理</strong></td><td>帖子</td><td>6 控件行尾收口为侧滑治理抽屉 + 勾选批量操作悬浮条</td></tr>
+        <tr><td><strong>5. 用户与编辑</strong></td><td>用户 + 编辑账号</td><td>移除每行常驻 148px 禁言输入框，改用快捷时长弹层</td></tr>
+        <tr><td><strong>6. 板块与安全</strong></td><td>分类 + 敏感词</td><td>清晰缩进树形视图 + 拦截词/复核词分栏词库</td></tr>
+        <tr><td><strong>7. 发现页编排</strong></td><td>发现页</td><td>左 12 类频道导航 + 右侧宽抽屉编辑/Diff 对照/定时发布</td></tr>
+        <tr><td><strong>8. 精选项目</strong></td><td>精选项目</td><td>新增 4 步发布流程条、236px 项目列表与分组表单</td></tr>
+        <tr><td><strong>9. 采编与健康</strong></td><td>内容采集 + 栏目运营 + 工具镜像 + 翻译</td><td>打通数据采集 → 外链巡检 → 镜像校验 → 翻译的上下游闭环</td></tr>
+        <tr><td><strong>10. 作品与活动</strong></td><td>内容包 + 精选与挑战 + 项目 + 周刊 + 批量发帖</td><td>聚合创作者生态与官方运营活动，官方登记收进侧滑抽屉</td></tr>
+        <tr><td><strong>11. 站务与日志</strong></td><td>联系方式 + 操作日志</td><td>三栏二维码卡片与到期提醒 + 结构化审计日志表</td></tr>
+        <tr><td><strong>12. 账号安全</strong></td><td>账号（+ 独立登录页）</td><td>视觉对齐小伴全端品牌与极简工作台质感</td></tr>
+      </tbody>
+    </table>
+  `, `<button class="btn btn-primary" onclick="closeModal()">知道了</button>`, true);
+}
+
+function showToast(text, kind = 'default') {
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<i class="t-dot"></i><span>${text}</span>`;
+  host.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* ==========================================================================
+   初始化 + URL 参数支持（供设计稿总导航快捷预设直达）
+   ========================================================================== */
+initStudioControls();
+function syncStudioHeight() {
+  const bar = document.querySelector('.studio-bar');
+  if (bar) document.documentElement.style.setProperty('--studio-h', `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+}
+syncStudioHeight();
+window.addEventListener('resize', syncStudioHeight);
+applyPalette('red', 'light');
+const params = new URLSearchParams(location.search);
+const initPage = params.get('page');
+const initSub = params.get('sub');
+if (params.get('view') === 'login') {
+  navigate('overview');
+  toggleLogin(true);
+} else if (initPage) {
+  navigate(initPage, initSub || undefined);
+} else {
+  navigate('overview');
+}
+</script>
+</body>
+</html>

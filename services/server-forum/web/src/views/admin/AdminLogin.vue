@@ -2,6 +2,7 @@
 // 管理员登录：成功后令牌写入 localStorage，AdminView 随之切换到后台界面。
 import { ref } from 'vue'
 import { adminApi, adminAuth, setAdminToken } from '@/api/admin'
+import BrandMark from '@/components/BrandMark.vue'
 import { errorText } from './shared'
 
 const username = ref('')
@@ -32,24 +33,36 @@ async function submit() {
 
 <template>
   <div class="adm-login">
-    <div class="panel adm-login-box">
-      <h1>
-        <span class="adm-brand-mark" aria-hidden="true" />
-        超级小伴
-      </h1>
-      <p>管理后台</p>
+    <div class="adm-login-box">
+      <div class="adm-login-brand">
+        <span class="adm-brand-logo"><BrandMark /></span>
+        <div>
+          <h1>超级小伴 · 运营管理台</h1>
+          <p>chat.xiangban.xyz 独立管理员通道</p>
+        </div>
+      </div>
+
       <form @submit.prevent="submit">
         <label class="field">
-          <span>用户名</span>
-          <input v-model="username" class="input" autocomplete="username" autocapitalize="none" autofocus />
+          <span>管理员账号</span>
+          <input v-model="username" class="input" autocomplete="username" autocapitalize="none" placeholder="请输入用户名" autofocus />
         </label>
         <label class="field">
-          <span>密码</span>
-          <input v-model="password" class="input" type="password" autocomplete="current-password" />
+          <span>登录密码</span>
+          <input v-model="password" class="input" type="password" autocomplete="current-password" placeholder="请输入密码" />
         </label>
+        <div class="adm-login-meta">
+          <span>独立会话 · 操作全程审计</span>
+          <span>连续输错 5 次锁 15 分钟</span>
+        </div>
         <p v-if="error" class="error-text" role="alert" style="margin: 0">{{ error }}</p>
-        <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '登录中' : '登录' }}</button>
+        <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '登录中…' : '进入管理后台' }}</button>
       </form>
+
+      <div class="adm-login-foot">
+        <RouterLink to="/">← 返回社区前台</RouterLink>
+        <span>超级小伴社区</span>
+      </div>
     </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
-// 管理后台共用的文案映射、时间格式化、提示消息与列表加载逻辑。
-import { ref, type Ref } from 'vue'
-import { AdminApiError, type AdminPage } from '@/api/admin'
+// 管理后台共用的文案映射、时间格式化、提示消息、全局待办计数与列表加载逻辑。
+import { computed, ref, type Ref } from 'vue'
+import { adminApi, AdminApiError, type AdminPage } from '@/api/admin'
+import { contentReportsApi } from '@/api/contentSocial'
 
 // ───────────────────────── 文案 ─────────────────────────
 
@@ -66,6 +67,7 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'pack.reject': '拒绝内容包',
   'pack.remove': '下架内容包',
   'pack.restore': '恢复内容包',
+  'pack.featured': '调整内容包精选',
   'project.put': '保存项目',
   'weekly.put': '保存周刊',
   'discover.put': '保存发现页内容',
@@ -105,7 +107,7 @@ export function trustName(level: number): string {
 
 /** 状态对应的标签色调，样式见 admin.css。 */
 export function topicTone(status: string): string {
-  return status === 'normal' ? 'valid' : status === 'hidden' ? 'suspect' : 'expired'
+  return status === 'normal' ? 'valid' : status === 'hidden' ? 'suspect' : 'danger'
 }
 export function userTone(status: string): string {
   return status === 'active' ? 'valid' : status === 'muted' ? 'suspect' : 'danger'
@@ -221,5 +223,25 @@ export function usePagedList<T>(fetcher: (page: number, pageSize: number) => Pro
   return { items, total, page, pageSize, loading, error, load, search, goto }
 }
 
-/** 页面顶部的未处理举报数，侧栏用来显示角标。 */
+// ───────────────────────── 全局待办角标 ─────────────────────────
+
+/** 帖子与回复待处理举报数 */
 export const openReports = ref(0)
+/** 作品与方案待处理举报数 */
+export const openContentReports = ref(0)
+/** 待审内容队列条数 */
+export const openModeration = ref(0)
+/** 审核中心聚合待办总数 */
+export const totalReviewTodo = computed(() => openReports.value + openContentReports.value + openModeration.value)
+
+/** 并行刷新三项审核角标，单接口异常不影响其他计数。 */
+export async function refreshReviewBadges() {
+  const [statsRes, contentRes, modRes] = await Promise.allSettled([
+    adminApi.stats(),
+    contentReportsApi.list('open', 1),
+    adminApi.moderationQueue(),
+  ])
+  if (statsRes.status === 'fulfilled') openReports.value = statsRes.value.reports_open
+  if (contentRes.status === 'fulfilled') openContentReports.value = contentRes.value.total
+  if (modRes.status === 'fulfilled') openModeration.value = modRes.value.items.length
+}
