@@ -367,16 +367,18 @@
   .pet-card-v2.is-menu-open { z-index: 40; }
   .pet-card-v2.is-off .card-stage { opacity: .46; filter: grayscale(.55); }
 
-  /* 舞台区：纯中性柔光摄影棚底色，让花朵与多肉自然色彩成为唯一焦点 */
+  /* 舞台区：温润暖瓷柔光摄影棚，与陶瓷花盆和植物自然色彩高度和谐 */
   .card-stage {
     position: relative; aspect-ratio: 1.08; border-radius: 12px; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
-    background: radial-gradient(ellipse 72% 58% at 50% 42%, #FFFFFF 0%, #F4F4F6 66%, #ECECEF 100%);
+    background: radial-gradient(ellipse 76% 62% at 50% 34%, #FFFFFF 0%, #FAF8F5 58%, #F1EDE7 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .92), inset 0 0 0 1px rgba(120, 106, 92, .065);
     cursor: pointer;
-    transition: background .2s ease;
+    transition: background .2s ease, box-shadow .2s ease;
   }
   html[data-theme="dark"] .card-stage {
-    background: radial-gradient(ellipse 72% 58% at 50% 42%, #2B2C30 0%, #212226 68%, #1B1C20 100%);
+    background: radial-gradient(ellipse 74% 58% at 50% 36%, #302E2C 0%, #242322 64%, #1C1B1A 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), inset 0 0 0 1px rgba(255, 255, 255, .06);
   }
   .card-stage .pet-art-host {
     width: 86%; height: 86%; display: flex; align-items: center; justify-content: center;
@@ -503,7 +505,7 @@
   .pet-card-v2.force-hover .card-cta-add { background: var(--ui-control-hover); }
   .static-menu-preview { position: static; width: 100%; margin-top: 6px; }
 
-  /* ── 视图 3 & 4：原生独立配置窗口（伙伴设置 / 主动陪伴） ────────────── */
+  /* ── 视图 3 & 4：原生独立配置窗口（伙伴管理 / 主动陪伴） ────────────── */
   .win-workspace {
     max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px;
   }
@@ -514,74 +516,165 @@
     color: var(--ui-text-primary);
   }
   .pet-settings-win {
-    width: 656px; max-width: 100%; height: 496px;
-    display: grid; grid-template-columns: 224px minmax(0, 1fr);
+    width: 704px; max-width: 100%; height: 504px;
+    display: grid; grid-template-columns: 260px minmax(0, 1fr);
+    background: #F4F4F6;
   }
+  html[data-theme="dark"] .pet-settings-win { background: #1B1B1F; }
   @media (max-width: 700px) { .pet-settings-win { grid-template-columns: 1fr; height: auto; } }
 
+  /* 左半边：纯净无框白展台，不套灰盒子，让小伴与花朵自由呼吸 */
   .ps-left {
-    background: var(--ui-configuration-sidebar);
-    padding: 14px 14px 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0;
+    background:
+      radial-gradient(ellipse 90% 48% at 50% 48%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 64%, #F9F8F6 100%);
+    padding: 14px 18px 14px; display: flex; flex-direction: column; align-items: center; min-height: 0;
     border-right: 1px solid var(--ui-line);
   }
-  .win-chrome { display: flex; align-items: center; gap: 7px; padding: 0 2px 4px; user-select: none; }
-  .win-chrome-title { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--ui-text-secondary); }
+  html[data-theme="dark"] .ps-left {
+    background:
+      radial-gradient(ellipse 86% 48% at 50% 46%, rgba(255, 255, 255, .045) 0%, transparent 72%),
+      linear-gradient(180deg, #26262A 0%, #232327 68%, #1F1F23 100%);
+    border-right: 1px solid rgba(255, 255, 255, .07);
+  }
+  .win-chrome { align-self: stretch; display: flex; align-items: center; gap: 7px; padding: 0 0 2px; user-select: none; }
+  .ps-hero {
+    flex: 1; width: 100%; min-height: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  }
 
   .ps-stage-box {
-    width: 100%; aspect-ratio: 1; max-height: 204px; flex: none; border-radius: 14px; position: relative;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: radial-gradient(ellipse 72% 56% at 50% 44%, #FFFFFF 0%, #F4F4F6 68%, #ECECEF 100%);
-    padding: 10px; cursor: pointer; overflow: hidden;
+    width: 224px; height: 224px; flex: none; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    cursor: pointer;
   }
-  html[data-theme="dark"] .ps-stage-box {
-    background: radial-gradient(ellipse 72% 56% at 50% 44%, #2B2C30 0%, #212226 68%, #1B1C20 100%);
+  .ps-stage-box::after {
+    content: ""; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    width: 132px; height: 20px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(60, 48, 36, .10) 0%, transparent 72%);
   }
-  .ps-meta-line { font-size: 11.5px; color: var(--ui-text-secondary); text-align: center; margin-top: 2px; }
-  .ps-stage-hint { font-size: 11px; color: var(--ui-text-tertiary); text-align: center; margin-top: -4px; }
-  .ps-left-acts { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; }
+  html[data-theme="dark"] .ps-stage-box::after {
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, .42) 0%, transparent 74%);
+  }
+  .ps-stage-box.is-hidden-pet { opacity: .44; filter: grayscale(.55); }
+  .ps-preview-tag {
+    position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
+    height: 22px; padding: 0 9px; border-radius: 999px;
+    background: var(--ui-soft); color: var(--ui-ink);
+    font-size: 11px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 4px;
+    opacity: 0; transition: opacity .15s ease; pointer-events: none; white-space: nowrap;
+  }
+  .ps-preview-tag.is-visible { opacity: 1; }
+
+  /* 左栏内联改名（替代右栏占一整行的“名字输入框”） */
+  .ps-name-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 2px; }
+  .ps-name-btn {
+    max-width: 100%; height: 30px; padding: 0 10px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 15px; font-weight: 600; color: var(--ui-text-primary);
+    transition: background .14s;
+  }
+  .ps-name-btn:hover { background: var(--ui-surface-hover); }
+  .ps-name-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ps-name-btn svg { color: var(--ui-text-tertiary); opacity: 0; transition: opacity .14s; }
+  .ps-name-btn:hover svg { opacity: 1; }
+  .ps-name-input {
+    width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; text-align: center;
+    background: var(--ui-configuration-surface); color: var(--ui-text-primary);
+    font-size: 14.5px; font-weight: 600; outline: none; box-shadow: 0 0 0 2px var(--ui-btn);
+  }
+  .ps-name-input.is-err { box-shadow: 0 0 0 1.5px var(--ui-danger); }
+  .ps-meta-line { font-size: 11.5px; color: var(--ui-text-secondary); text-align: center; }
+  .ps-stage-hint { font-size: 11px; color: var(--ui-text-tertiary); text-align: center; }
+  .ps-left-acts { width: 100%; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; flex: none; }
   .ps-left-acts .xb-btn-ghost { width: 100%; justify-content: flex-start; height: 30px; font-size: 12px; }
 
+  /* 右栏：三段直达工作台（常规 / 心情 / 形象），零拥挤下拉浮层 */
   .ps-right { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .ps-right-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 16px 22px 10px; }
-  .ps-right-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
-  .ps-live-chip {
-    margin-left: auto; height: 22px; padding: 0 8px; border-radius: 999px;
+  .ps-right-head {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 14px 20px 10px;
+  }
+  .ps-nav-seg { padding: 3px; border-radius: 9px; background: var(--ui-configuration-control); display: inline-flex; gap: 2px; }
+  .ps-nav-seg button {
+    height: 26px; padding: 0 13px; border-radius: 7px; font-size: 12.5px; color: var(--ui-text-secondary);
+    transition: background .14s, color .14s, box-shadow .14s;
+  }
+  .ps-nav-seg button:hover { color: var(--ui-text-primary); }
+  .ps-nav-seg button[aria-selected="true"] {
+    background: var(--ui-configuration-surface); color: var(--ui-text-primary); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .09);
+  }
+  html[data-theme="dark"] .ps-nav-seg button[aria-selected="true"] { background: #48484C; }
+
+  .ps-head-status {
+    height: 22px; padding: 0 8px; border-radius: 999px;
     background: var(--ui-configuration-control); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500;
     display: inline-flex; align-items: center; gap: 5px;
   }
-  .ps-live-chip i { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--ui-success); }
+  .ps-head-status i { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--ui-success); }
+  .ps-head-status.off i { background: var(--ui-text-disabled); }
 
   .ps-scroll {
-    flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 18px;
-    display: flex; flex-direction: column; gap: 12px;
+    flex: 1; min-height: 0; overflow-y: auto; padding: 2px 20px 16px;
+    display: flex; flex-direction: column; gap: 10px;
     scrollbar-width: thin; scrollbar-color: var(--ui-scrollbar) transparent;
   }
-  .cfg-card { background: var(--ui-configuration-group); border-radius: 12px; padding: 2px 14px; }
+  .cfg-card {
+    background: var(--ui-configuration-group); border-radius: 12px; padding: 2px 14px;
+    box-shadow: 0 1px 2px rgba(32, 26, 20, .035), 0 0 0 1px rgba(32, 26, 20, .055);
+  }
+  html[data-theme="dark"] .cfg-card {
+    background: #28272B;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .065);
+  }
   .cfg-row {
-    display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 0;
+    display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 0;
     border-top: 1px solid var(--ui-line);
   }
   .cfg-row:first-child { border-top: 0; }
   .cfg-row.col { flex-direction: column; align-items: stretch; gap: 8px; padding: 11px 0; }
-  .cfg-lbl { font-size: 13px; font-weight: 500; color: var(--ui-text-primary); min-width: 76px; flex: none; }
+  .cfg-lbl { font-size: 13px; font-weight: 500; color: var(--ui-text-primary); min-width: 64px; flex: none; }
   .cfg-grow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-  .cfg-input {
-    width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 8px;
-    background: var(--ui-configuration-control); color: var(--ui-text-primary); font-size: 13px; outline: none;
-  }
-  .cfg-input:focus { box-shadow: 0 0 0 2px var(--ui-btn); background: var(--ui-configuration-surface); }
-  .cfg-input.is-err { box-shadow: 0 0 0 1.5px var(--ui-danger); }
   .cfg-err { font-size: 11px; color: var(--ui-danger); }
 
-  .cfg-select-btn {
-    width: 100%; height: 32px; padding: 0 10px; border-radius: 8px;
-    background: var(--ui-configuration-control); color: var(--ui-text-primary);
-    display: flex; align-items: center; gap: 8px; font-size: 13px; text-align: left;
+  /* 常规页里的直达摘要入口行（点一下进「心情」/「形象」） */
+  .jump-row {
+    width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 0;
+    border-top: 1px solid var(--ui-line); text-align: left; cursor: pointer;
   }
-  .cfg-select-btn:hover { background: var(--ui-control-hover); }
-  .cfg-select-btn .sub-grp { font-size: 11.5px; color: var(--ui-text-tertiary); }
-  .cfg-select-btn .chev { margin-left: auto; color: var(--ui-text-tertiary); }
+  .jump-row:first-child { border-top: 0; }
+  .jump-row .jump-val {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--ui-text-secondary);
+  }
+  .jump-row:hover .jump-val { color: var(--ui-text-primary); }
+  .jump-thumb {
+    width: 24px; height: 24px; border-radius: 6px; background: var(--ui-configuration-control);
+    display: grid; place-items: center; overflow: hidden;
+  }
 
+  /* 层级二选一轻卡片 */
+  .layer-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .layer-card {
+    height: 36px; padding: 0 11px; border-radius: 9px;
+    background: #F4F2EE; color: var(--ui-text-secondary);
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500;
+    transition: background .14s, color .14s, box-shadow .14s;
+  }
+  html[data-theme="dark"] .layer-card { background: #313036; }
+  .layer-card:hover { color: var(--ui-text-primary); background: #EEEAE4; }
+  html[data-theme="dark"] .layer-card:hover { background: #38373E; }
+  .layer-card[aria-checked="true"] {
+    background: var(--ui-configuration-surface); color: var(--ui-text-primary); font-weight: 600;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ui-btn) 42%, var(--ui-border-strong)), 0 2px 6px rgba(32, 26, 20, .06);
+  }
+  .layer-card .chk { margin-left: auto; opacity: 0; color: var(--ui-btn); }
+  .layer-card[aria-checked="true"] .chk { opacity: 1; }
+
+  /* 尺寸滑块 + 档位 */
   .size-head { display: flex; align-items: center; gap: 8px; }
   .size-val { font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 500; color: var(--ui-text-secondary); margin-left: auto; }
   .size-presets { display: flex; gap: 4px; }
@@ -591,34 +684,65 @@
   }
   .size-presets button.active { background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .10); }
   html[data-theme="dark"] .size-presets button.active { background: #48484C; }
-  .cfg-range { width: 100%; margin: 0; accent-color: var(--ui-btn); cursor: pointer; }
+  .cfg-range {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 5px; margin: 4px 0 2px; border-radius: 999px;
+    background: linear-gradient(to right, var(--ui-btn) 0%, var(--ui-btn) var(--range-pct, 38%), var(--ui-configuration-control) var(--range-pct, 38%), var(--ui-configuration-control) 100%);
+    outline: none; cursor: pointer;
+  }
+  .cfg-range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .22), 0 0 0 1px rgba(0, 0, 0, .08);
+  }
 
-  .mood-panel, .plant-panel {
-    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 70;
-    max-height: 248px; overflow-y: auto; padding: 6px; border-radius: 12px;
-    background: var(--ui-surface-raised); box-shadow: var(--ui-shadow-menu);
+  /* 心情直选面板（彻底替代小下拉浮层 · 悬停实时预览 · 4 列免滚动） */
+  .mood-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .mood-filter-pills { display: inline-flex; gap: 4px; }
+  .mood-filter-pills button {
+    height: 24px; padding: 0 9px; border-radius: 7px; font-size: 11.5px;
+    color: var(--ui-text-secondary); background: transparent;
   }
-  .mood-panel.is-up, .plant-panel.is-up { top: auto; bottom: calc(100% + 6px); }
-  .mood-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin-bottom: 4px; }
-  .mood-opt {
-    height: 28px; padding: 0 8px; border-radius: 7px; font-size: 12.5px;
-    display: flex; align-items: center; gap: 5px; color: var(--ui-text-primary);
+  .mood-filter-pills button:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .mood-filter-pills button[aria-pressed="true"] {
+    background: var(--ui-configuration-group); color: var(--ui-text-primary); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .07);
   }
-  .mood-opt:hover { background: var(--ui-surface-hover); }
-  .mood-opt.on { background: var(--ui-control); color: var(--ui-text-primary); font-weight: 600; }
-  .plant-opt {
-    width: 100%; height: 36px; padding: 0 8px; border-radius: 8px;
-    display: flex; align-items: center; gap: 9px; font-size: 12.5px;
+  .mood-section-label { font-size: 11px; font-weight: 600; color: var(--ui-text-tertiary); padding: 6px 2px 4px; }
+  .mood-section-label:first-child { padding-top: 2px; }
+  .mood-board-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .mood-tile {
+    height: 32px; padding: 0 9px; border-radius: 8px;
+    background: var(--ui-configuration-group); color: var(--ui-text-primary);
+    font-size: 12.5px; display: flex; align-items: center; justify-content: space-between; gap: 4px;
+    box-shadow: 0 1px 1.5px rgba(32, 26, 20, .03), inset 0 0 0 1px rgba(32, 26, 20, .065);
+    transition: background .12s, box-shadow .12s, color .12s;
   }
-  .plant-opt:hover { background: var(--ui-surface-hover); }
-  .plant-opt.on { background: var(--ui-control); color: var(--ui-text-primary); font-weight: 600; }
-  .plant-opt .thumb { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: var(--ui-configuration-control); flex: none; overflow: hidden; }
+  html[data-theme="dark"] .mood-tile {
+    background: #28272B;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+  }
+  .mood-tile:hover, .mood-tile:focus-visible {
+    background: #F6F3EE;
+    box-shadow: inset 0 0 0 1px rgba(32, 26, 20, .14);
+    outline: none;
+  }
+  html[data-theme="dark"] .mood-tile:hover, html[data-theme="dark"] .mood-tile:focus-visible {
+    background: #333238;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+  }
+  .mood-tile.on {
+    background: var(--ui-soft); color: var(--ui-ink); font-weight: 600;
+    box-shadow: inset 0 0 0 1.25px color-mix(in srgb, var(--ui-btn) 38%, transparent);
+  }
+  .mood-hover-note {
+    font-size: 11px; color: var(--ui-text-tertiary); display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 0;
+  }
 
   .ps-foot {
     flex: none; display: flex; align-items: center; gap: 8px;
-    padding: 11px 22px 13px; border-top: 1px solid var(--ui-line);
-    background: var(--ui-configuration-canvas);
+    padding: 11px 20px 13px; border-top: 1px solid var(--ui-line);
+    background: #F4F4F6;
   }
+  html[data-theme="dark"] .ps-foot { background: #1B1B1F; }
   .ps-foot .spacer { margin-right: auto; display: flex; align-items: center; gap: 6px; }
 
   /* 主动陪伴独立窗口 */
@@ -680,7 +804,7 @@
     <div class="review-group" role="group" aria-label="视图切换">
       <button type="button" data-view="page" aria-pressed="true">1. 伙伴页画廊</button>
       <button type="button" data-view="spec" aria-pressed="false">2. 卡片全状态展板</button>
-      <button type="button" data-view="settings" aria-pressed="false">3. 伙伴设置独立窗</button>
+      <button type="button" data-view="settings" aria-pressed="false">3. 伙伴管理独立窗（新版）</button>
       <button type="button" data-view="proactivity" aria-pressed="false">4. 主动陪伴独立窗</button>
     </div>
     <div class="review-group" role="group" aria-label="外观模式">
@@ -756,7 +880,7 @@
 <!-- ── 视图 2：卡片全状态解剖展板 ── -->
 <section id="view-spec" class="spec-wrap" hidden></section>
 
-<!-- ── 视图 3：伙伴设置 · 原生独立窗口 ── -->
+<!-- ── 视图 3：伙伴管理 · 原生独立窗口（重新设计：三段直达工作台，零拥挤浮层） ── -->
 <section id="view-settings" class="win-workspace" hidden>
   <div class="native-win pet-settings-win">
     <aside class="ps-left">
@@ -765,25 +889,32 @@
         <span class="tl m" title="最小化"></span>
         <span class="tl e" title="全屏 / 最大化"></span>
       </div>
-      <div class="ps-stage-box" id="settingsStage" title="点击戳一戳互动">
-        <div id="settingsStageSvg" style="width:160px;height:160px;display:grid;place-items:center;transition:transform .2s"></div>
+      <div class="ps-hero">
+        <div class="ps-stage-box" id="settingsStage" title="点击戳一戳互动">
+          <span class="ps-preview-tag" id="psPreviewTag"></span>
+          <div id="settingsStageSvg" style="width:196px;height:196px;display:grid;place-items:center;transition:transform .2s"></div>
+        </div>
+        <div class="ps-name-wrap" id="psNameWrap"></div>
+        <span class="ps-meta-line" id="psMetaLine">花朵心语 · 小雏菊 · 主屏</span>
+        <span class="ps-stage-hint">戳一戳试试回应</span>
       </div>
-      <span class="ps-meta-line" id="psMetaLine">花朵心语 · 小雏菊 · 主屏</span>
-      <span class="ps-stage-hint">戳一戳试试回应</span>
       <div class="ps-left-acts">
         <button type="button" class="xb-btn-ghost" title="将这只伙伴移回所在显示器正中央" onclick="toast('已将伙伴移到屏幕正中央')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>移到屏幕中间
         </button>
         <button type="button" class="xb-btn-ghost" title="以当前形象为参考让 AI 创作新主题" onclick="toast('已带入当前主题上下文进入创作对话')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg>让 AI 换个形象
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg>基于此创作新伙伴
         </button>
       </div>
     </aside>
 
     <div class="ps-right">
       <header class="ps-right-head">
-        <h2 id="psHeadTitle">小雏菊</h2>
-        <span class="ps-live-chip" title="调整大小、心情与层级时桌面同步预览"><i></i>实时预览</span>
+        <div class="ps-nav-seg" role="tablist" aria-label="伙伴管理分区" id="psTabSeg">
+          <button type="button" role="tab" data-pstab="general" aria-selected="true" onclick="setManageTab('general')">常规</button>
+          <button type="button" role="tab" data-pstab="mood" aria-selected="false" onclick="setManageTab('mood')">心情</button>
+        </div>
+        <span class="ps-head-status" id="psHeadStatus"><i></i>在桌面上</span>
       </header>
       <div class="ps-scroll" id="settingsFormBody"></div>
       <footer class="ps-foot" id="settingsFooter"></footer>
@@ -862,6 +993,10 @@ var state = {
   ],
   editingId: 'pet-1',
   editingSnapshot: null,
+  manageTab: 'general', // 'general' | 'mood'
+  moodGroupFilter: 'all', // 'all' | '日常' | '情绪' | '状态'
+  hoverMood: null,
+  renaming: false,
   confirmRemoveId: null,
   openMenu: null,
   settingsDropdown: null,
@@ -1035,11 +1170,17 @@ function renderSubBar() {
       <span class="hint">切换顶部 6 套主题色与深浅色，可检验每张卡在不同配色下的和谐度</span>`;
   } else if (state.view === 'settings') {
     bar.innerHTML = `
-      <span class="lbl">当前审阅的伙伴</span>
+      <span class="lbl">审阅样本</span>
       <div class="review-group">
         ${state.instances.map(i => `<button type="button" onclick="selectEditing('${i.id}')" aria-pressed="${i.id===state.editingId}">${i.name}</button>`).join('')}
       </div>
-      <span class="hint">窗口只聚焦当前这一只伙伴（顶栏仅用于评审切换样本，不属于客户端界面）</span>`;
+      <span class="sep"></span>
+      <span class="lbl">直达分区</span>
+      <div class="review-group">
+        <button type="button" onclick="setManageTab('general')" aria-pressed="${state.manageTab==='general'}">常规</button>
+        <button type="button" onclick="setManageTab('mood')" aria-pressed="${state.manageTab==='mood'}">心情（25 态悬停预览）</button>
+      </div>
+      <span class="hint">专注管理单只伙伴 · 点左侧名字内联重命名 · 悬停心情时左侧舞台实时试看</span>`;
   } else {
     bar.innerHTML = `
       <span class="lbl">主动陪伴 · 独立窗口</span>
@@ -1326,14 +1467,43 @@ function renderSpecBoard() {
     </div>`;
 }
 
-/* ── 视图 3：伙伴设置独立窗口 ── */
+/* ── 视图 3：重新设计的伙伴管理独立窗口（常规 / 心情 双段直达，专注单只伙伴） ── */
 function openSettingsFor(id) {
   state.editingId = id;
   const inst = state.instances.find(i => i.id === id);
   state.editingSnapshot = inst ? { ...inst } : null;
-  state.settingsDropdown = null;
+  state.manageTab = 'general';
+  state.hoverMood = null;
+  state.renaming = false;
   state.confirmRemoveId = null;
   switchView('settings');
+}
+
+function setManageTab(tab) {
+  state.manageTab = tab === 'mood' ? 'mood' : 'general';
+  state.hoverMood = null;
+  renderSettingsWindow();
+}
+
+function updateLeftStagePreview() {
+  const inst = state.instances.find(i => i.id === state.editingId);
+  if (!inst) return;
+  const activeExpr = state.hoverMood || inst.expression;
+  const theme = findTheme(inst.themeId);
+  const pet = findPet(inst.themeId, inst.petId);
+  const previewPx = Math.round(148 + ((inst.size - 80) / 340) * 70);
+  const stageBox = document.getElementById('settingsStage');
+  stageBox.classList.toggle('is-hidden-pet', !inst.enabled);
+  const stageHost = document.getElementById('settingsStageSvg');
+  stageHost.style.width = `${previewPx}px`;
+  stageHost.style.height = `${previewPx}px`;
+  stageHost.innerHTML = renderOriginalPet(pet, activeExpr);
+  const tag = document.getElementById('psPreviewTag');
+  if (tag) {
+    tag.textContent = state.hoverMood ? `试看 · ${EXPRESSIONS[activeExpr]}` : '';
+    tag.classList.toggle('is-visible', !!state.hoverMood);
+  }
+  document.getElementById('psMetaLine').textContent = `${theme?.name ?? ''} · ${pet?.name ?? ''} · ${inst.monitor}`;
 }
 
 function renderSettingsWindow() {
@@ -1341,11 +1511,15 @@ function renderSettingsWindow() {
   const inst = state.instances.find(i => i.id === state.editingId);
   renderSubBar();
 
+  document.querySelectorAll('#psTabSeg button').forEach(b => {
+    b.setAttribute('aria-selected', String(b.dataset.pstab === state.manageTab));
+  });
+
   const body = document.getElementById('settingsFormBody');
   const footer = document.getElementById('settingsFooter');
   if (!inst) {
-    document.getElementById('psHeadTitle').textContent = '暂无桌面伙伴';
     document.getElementById('settingsStageSvg').innerHTML = '';
+    document.getElementById('psNameWrap').innerHTML = '';
     document.getElementById('psMetaLine').textContent = '';
     body.innerHTML = `<div class="xb-empty" style="margin-top:8px"><h3>桌面上暂无伙伴</h3><button type="button" class="xb-btn-primary is-sm" onclick="switchView('page')">返回伙伴页</button></div>`;
     footer.innerHTML = '';
@@ -1354,86 +1528,109 @@ function renderSettingsWindow() {
 
   const theme = findTheme(inst.themeId);
   const pet = findPet(inst.themeId, inst.petId);
-  document.getElementById('psHeadTitle').textContent = inst.name || pet?.name || '伙伴设置';
-  document.getElementById('psMetaLine').textContent = `${theme?.name ?? ''} · ${pet?.name ?? ''} · ${inst.monitor}`;
-  const previewPx = Math.round(112 + ((inst.size - 80) / 340) * 68);
-  const stageHost = document.getElementById('settingsStageSvg');
-  stageHost.style.width = `${previewPx}px`;
-  stageHost.style.height = `${previewPx}px`;
-  stageHost.innerHTML = renderOriginalPet(pet, inst.expression);
-
-  const moodGroupName = MOOD_GROUPS.find(g => g.items.includes(inst.expression))?.name || '日常';
   const nameInvalid = !inst.name.trim();
+  const moodGroupName = MOOD_GROUPS.find(g => g.items.includes(inst.expression))?.name || '日常';
+  const sizePct = `${((inst.size - 80) / 340) * 100}%`;
 
-  body.innerHTML = `
-    <div class="cfg-card">
-      <div class="cfg-row">
-        <span class="cfg-lbl">名字</span>
-        <div class="cfg-grow" style="flex-direction:column;align-items:stretch;gap:3px">
-          <input type="text" class="cfg-input ${nameInvalid ? 'is-err' : ''}" maxlength="40" value="${inst.name.replace(/"/g, '&quot;')}" placeholder="输入伙伴昵称" oninput="updateEditing({name:this.value},true)" />
-          ${nameInvalid ? '<span class="cfg-err">请输入 1–40 个字符的昵称</span>' : ''}
-        </div>
-      </div>
-      <div class="cfg-row">
-        <span class="cfg-lbl">形象</span>
-        <div class="cfg-grow pop-anchor">
-          <button type="button" class="cfg-select-btn" onclick="toggleSettingsDrop(event,'plant')">
-            <span>${theme?.name} · ${pet?.name}</span>
-            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
-          </button>
-          ${state.settingsDropdown === 'plant' ? `<div class="plant-panel" role="listbox" onclick="event.stopPropagation()">
-            ${THEMES.map(t => `<div class="xb-menu-label">${t.name}</div>` + t.pets.map(p => `
-              <button type="button" class="plant-opt ${inst.themeId===t.id && inst.petId===p.id ? 'on' : ''}" onclick="updateEditing({themeId:'${t.id}',petId:'${p.id}'});state.settingsDropdown=null;renderSettingsWindow()">
-                <span class="thumb">${renderOriginalPet(p, inst.expression)}</span>
-                <span>${p.name}</span>
-              </button>`).join('')).join('')}
-          </div>` : ''}
-        </div>
-      </div>
-      <div class="cfg-row col">
-        <div class="size-head">
-          <span class="cfg-lbl">大小</span>
-          <div class="size-presets">
-            <button type="button" class="${inst.size===140?'active':''}" onclick="updateEditing({size:140})">小</button>
-            <button type="button" class="${inst.size===210?'active':''}" onclick="updateEditing({size:210})">标准</button>
-            <button type="button" class="${inst.size===300?'active':''}" onclick="updateEditing({size:300})">大</button>
-          </div>
-          <span class="size-val">${inst.size} px</span>
-        </div>
-        <input type="range" class="cfg-range" min="80" max="420" step="10" value="${inst.size}" aria-label="大小" oninput="updateEditing({size:Number(this.value)},true)" />
-      </div>
-    </div>
+  const statusEl = document.getElementById('psHeadStatus');
+  statusEl.classList.toggle('off', !inst.enabled);
+  statusEl.innerHTML = `<i></i>${inst.enabled ? '在桌面上' : '已隐藏'}`;
 
-    <div class="cfg-card">
-      <div class="cfg-row">
-        <span class="cfg-lbl">心情</span>
-        <div class="cfg-grow pop-anchor">
-          <button type="button" class="cfg-select-btn" onclick="toggleSettingsDrop(event,'mood')">
-            <i style="width:7px;height:7px;border-radius:50%;background:var(--ui-dot)"></i>
-            <span>${EXPRESSIONS[inst.expression]}</span>
-            <span class="sub-grp">${moodGroupName}</span>
-            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
-          </button>
-          ${state.settingsDropdown === 'mood' ? `<div class="mood-panel is-up" role="listbox" onclick="event.stopPropagation()">
-            ${MOOD_GROUPS.map(g => `<div class="xb-menu-label">${g.name}</div><div class="mood-grid">` + g.items.map(key => `
-              <button type="button" class="mood-opt ${inst.expression===key?'on':''}" onclick="updateEditing({expression:'${key}'});state.settingsDropdown=null;renderSettingsWindow()">${EXPRESSIONS[key]}</button>`).join('') + `</div>`).join('')}
-          </div>` : ''}
+  /* 左栏内联改名区 */
+  const nameWrap = document.getElementById('psNameWrap');
+  if (state.renaming) {
+    nameWrap.innerHTML = `
+      <input id="psInlineNameInput" type="text" class="ps-name-input ${nameInvalid ? 'is-err' : ''}" maxlength="40" value="${inst.name.replace(/"/g, '&quot;')}" placeholder="输入伙伴昵称"
+        oninput="updateEditing({name:this.value},true)"
+        onkeydown="if(event.key==='Enter'||event.key==='Escape'){finishRename()}"
+        onblur="finishRename()" />
+      ${nameInvalid ? '<span class="cfg-err">请输入昵称</span>' : ''}`;
+    requestAnimationFrame(() => { const inp = document.getElementById('psInlineNameInput'); if (inp) { inp.focus(); inp.select(); } });
+  } else {
+    nameWrap.innerHTML = `<button type="button" class="ps-name-btn" title="点击修改名字" onclick="state.renaming=true;renderSettingsWindow()">
+      <span>${inst.name || '未命名伙伴'}</span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>`;
+  }
+
+  updateLeftStagePreview();
+
+  if (state.manageTab === 'general') {
+    body.innerHTML = `
+      <div class="cfg-card">
+        <div class="cfg-row" title="控制这只伙伴当前是否在桌面上显示">
+          <span class="cfg-lbl" style="flex:1">在桌面上显示</span>
+          <button type="button" role="switch" class="xb-switch" aria-checked="${inst.enabled}" onclick="updateEditing({enabled:!${inst.enabled}})"></button>
+        </div>
+        <div class="cfg-row col">
+          <div class="size-head">
+            <span class="cfg-lbl">大小</span>
+            <div class="size-presets">
+              <button type="button" class="${inst.size===140?'active':''}" onclick="updateEditing({size:140})">小</button>
+              <button type="button" class="${inst.size===210?'active':''}" onclick="updateEditing({size:210})">标准</button>
+              <button type="button" class="${inst.size===300?'active':''}" onclick="updateEditing({size:300})">大</button>
+            </div>
+            <span class="size-val">${inst.size} px</span>
+          </div>
+          <input type="range" class="cfg-range" min="80" max="420" step="10" value="${inst.size}" style="--range-pct:${sizePct}" aria-label="大小" oninput="updateEditing({size:Number(this.value)},true)" />
         </div>
       </div>
-      <div class="cfg-row">
-        <span class="cfg-lbl" title="决定伙伴显示在其他窗口上方，还是贴在桌面图标下方">层级</span>
-        <div class="cfg-grow">
-          <div class="xb-seg" role="radiogroup" aria-label="层级">
-            <button type="button" role="radio" aria-checked="${inst.layer==='desktop'}" title="在桌面图标下方，不遮挡窗口" onclick="updateEditing({layer:'desktop'})">贴在桌面</button>
-            <button type="button" role="radio" aria-checked="${inst.layer==='topmost'}" title="浮在所有窗口上方，随时能戳到" onclick="updateEditing({layer:'topmost'})">始终置顶</button>
+
+      <div class="cfg-card">
+        <div class="cfg-row col">
+          <span class="cfg-lbl">显示层级</span>
+          <div class="layer-cards" role="radiogroup" aria-label="显示层级">
+            <button type="button" role="radio" class="layer-card" aria-checked="${inst.layer==='topmost'}" title="浮在所有窗口上方，随时能戳到" onclick="updateEditing({layer:'topmost'})">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1h1V4H7v2h1a1 1 0 0 1 1 1z"/></svg>
+              始终置顶
+              <svg class="chk" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button type="button" role="radio" class="layer-card" aria-checked="${inst.layer==='desktop'}" title="贴在桌面图标下方，不遮挡其他窗口" onclick="updateEditing({layer:'desktop'})">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              贴在桌面
+              <svg class="chk" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
           </div>
         </div>
+        <div class="cfg-row" title="开启后，伙伴会对桌面特效、问候和离开后的重逢做出回应">
+          <span class="cfg-lbl" style="flex:1">回应桌面状态</span>
+          <button type="button" role="switch" class="xb-switch" aria-checked="${inst.links}" onclick="updateEditing({links:!${inst.links}})"></button>
+        </div>
       </div>
-      <div class="cfg-row" title="开启后，伙伴会对桌面特效、问候和离开后的重逢做出回应">
-        <span class="cfg-lbl" style="flex:1">回应桌面状态</span>
-        <button type="button" role="switch" class="xb-switch" aria-checked="${inst.links}" onclick="updateEditing({links:!${inst.links}})"></button>
+
+      <div class="cfg-card">
+        <button type="button" class="jump-row" onclick="setManageTab('mood')">
+          <span class="cfg-lbl">心情</span>
+          <span class="jump-val">${EXPRESSIONS[inst.expression]} · ${moodGroupName} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+      </div>`;
+  } else {
+    const visibleGroups = state.moodGroupFilter === 'all'
+      ? MOOD_GROUPS
+      : MOOD_GROUPS.filter(g => g.name === state.moodGroupFilter);
+    body.innerHTML = `
+      <div class="mood-toolbar">
+        <div class="mood-filter-pills" role="group" aria-label="心情分组">
+          ${['all', '日常', '情绪', '状态'].map(g => `<button type="button" aria-pressed="${state.moodGroupFilter===g}" onclick="state.moodGroupFilter='${g}';renderSettingsWindow()">${g === 'all' ? '全部 25' : g}</button>`).join('')}
+        </div>
+        <button type="button" class="xb-btn-ghost" style="height:24px;font-size:11.5px" title="随机切换一个心情" onclick="pickRandomMood()">随机试试</button>
       </div>
-    </div>`;
+      <div>
+        ${visibleGroups.map(g => `
+          ${state.moodGroupFilter === 'all' ? `<div class="mood-section-label">${g.name}</div>` : ''}
+          <div class="mood-board-grid" role="listbox" aria-label="${g.name}">
+            ${g.items.map(key => `
+              <button type="button" role="option" class="mood-tile ${inst.expression===key?'on':''}" aria-selected="${inst.expression===key}"
+                onpointerenter="previewMood('${key}')" onfocus="previewMood('${key}')"
+                onpointerleave="previewMood(null)" onblur="previewMood(null)"
+                onclick="updateEditing({expression:'${key}'})">
+                <span>${EXPRESSIONS[key]}</span>
+                ${inst.expression===key ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+              </button>`).join('')}
+          </div>`).join('')}
+      </div>
+      <div class="mood-hover-note"><span>悬停或键盘聚焦即可在左侧实时预览表情</span><span>点击确认选中</span></div>`;
+  }
 
   footer.innerHTML = `
     <div class="spacer">
@@ -1442,8 +1639,24 @@ function renderSettingsWindow() {
            <button type="button" class="xb-btn-ghost" onclick="state.confirmRemoveId=null;renderSettingsWindow()">保留</button>`
         : `<button type="button" class="xb-btn-ghost is-danger" title="移除这只伙伴，主题作品仍保留" onclick="state.confirmRemoveId='${inst.id}';renderSettingsWindow()">从桌面移除</button>`}
     </div>
-    <button type="button" class="xb-btn-ghost" onclick="revertEditing()">还原改动</button>
+    <button type="button" class="xb-btn-ghost" onclick="revertEditing()">还原</button>
     <button type="button" class="xb-btn-primary flat is-sm" ${nameInvalid ? 'disabled' : ''} onclick="toast('设置已保存并同步');switchView('page')">完成</button>`;
+}
+
+function finishRename() {
+  const inst = state.instances.find(i => i.id === state.editingId);
+  if (inst && !inst.name.trim() && state.editingSnapshot) inst.name = state.editingSnapshot.name;
+  state.renaming = false;
+  renderSettingsWindow();
+}
+function previewMood(expr) { state.hoverMood = expr; updateLeftStagePreview(); }
+function pickRandomMood() {
+  const keys = Object.keys(EXPRESSIONS);
+  const inst = state.instances.find(i => i.id === state.editingId);
+  const pool = keys.filter(k => k !== inst?.expression);
+  const chosen = pool[Math.floor(Math.random() * pool.length)];
+  updateEditing({ expression: chosen });
+  toast(`已切换心情：${EXPRESSIONS[chosen]}`);
 }
 
 /* ── 视图 4：主动陪伴独立窗口 ── */
@@ -1577,13 +1790,11 @@ function updateEditing(patch, lightUpdate = false) {
   if (!inst) return;
   Object.assign(inst, patch);
   if (lightUpdate) {
-    document.getElementById('psHeadTitle').textContent = inst.name || '伙伴设置';
-    const previewPx = Math.round(108 + ((inst.size - 80) / 340) * 68);
-    const stageHost = document.getElementById('settingsStageSvg');
-    stageHost.style.width = `${previewPx}px`;
-    stageHost.style.height = `${previewPx}px`;
+    updateLeftStagePreview();
     const valEl = document.querySelector('.size-val');
     if (valEl) valEl.textContent = `${inst.size} px`;
+    const rangeEl = document.querySelector('.cfg-range');
+    if (rangeEl) rangeEl.style.setProperty('--range-pct', `${((inst.size - 80) / 340) * 100}%`);
   } else {
     renderSettingsWindow();
   }
@@ -1645,6 +1856,9 @@ document.querySelectorAll('#pageFilterSeg button').forEach(btn => btn.addEventLi
   state.filter = btn.dataset.filter;
   state.openMenu = null;
   renderPage();
+}));
+document.querySelectorAll('#psTabSeg button').forEach(btn => btn.addEventListener('click', () => {
+  setManageTab(btn.dataset.pstab);
 }));
 document.getElementById('masterSwitch').addEventListener('click', toggleMaster);
 
