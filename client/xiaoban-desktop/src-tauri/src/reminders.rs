@@ -216,14 +216,18 @@ fn quiet(config: &CareConfig, now: NaiveTime) -> bool {
 }
 /// Whether a bubble is read aloud: per-item override takes precedence, then global voice or one-time voice policy.
 fn speaks(config: &CareConfig, sticky: bool) -> bool { config.voice || (sticky && config.once_voice) }
-fn delivery_voice(config: &CareConfig, items: &[Pending], sticky: bool) -> bool {
-    if items.iter().any(|item| item.voice == Some(true)) { return true; }
-    if !items.is_empty() && items.iter().all(|item| item.voice == Some(false)) { return false; }
-    speaks(config, sticky)
+fn speakable_items<'a>(config: &'a CareConfig, items: &'a [Pending]) -> impl Iterator<Item = &'a Pending> + 'a {
+    items.iter().filter(move |item| {
+        item.voice.unwrap_or_else(|| speaks(config, item.sticky)) && !item.text.trim().is_empty()
+    })
 }
-/// What is said for a bubble: the reminders themselves, led in by a word so a bare "买花" is understood as a reminder.
-fn spoken(items: &[Pending]) -> String {
-    let texts: Vec<&str> = items.iter().map(|item| item.text.trim()).filter(|text| !text.is_empty()).collect();
+fn delivery_voice(config: &CareConfig, items: &[Pending]) -> bool {
+    speakable_items(config, items).next().is_some()
+}
+/// Format only reminders that allow narration; silence applies even in mixed bundles.
+fn spoken(config: &CareConfig, items: &[Pending]) -> String {
+    let items: Vec<&Pending> = speakable_items(config, items).collect();
+    let texts: Vec<&str> = items.iter().map(|item| item.text.trim()).collect();
     let body = if texts.len() > 2 { format!("{}。还有 {} 条到期提醒。", texts[..2].join("。"), texts.len() - 2) } else { texts.join("。") };
     let own_words = items.iter().all(|item| matches!(item.kind.as_str(), "custom" | "off-work" | "rest"));
     if body.is_empty() || !own_words { body } else { format!("提醒：{body}") }
@@ -481,7 +485,7 @@ fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
     let sticky = items.iter().any(|item| item.sticky);
     let sound = delivery_sound(&config, &items, sticky);
-    let voice = delivery_voice(&config, &items, sticky);
+    let voice = delivery_voice(&config, &items);
     let delivery = Delivery {
         id: format!("bubble-{}", Local::now().timestamp_millis()),
         items, sound, voice,
@@ -527,10 +531,13 @@ pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result
     let delivery = app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone()
         .filter(|delivery| delivery.id == id && delivery.voice).ok_or("提醒已关闭或未开启语音播报")?;
     if blocked(&app, &care_system::activity()) { return Err("当前不适合播报提醒".into()); }
-    let text = spoken(&delivery.items);
+    let config = app.state::<ReminderState>().store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
+    let text = spoken(&config, &delivery.items);
     if text.is_empty() { return Err("提醒没有可播报的文字".into()); }
-    let audio = crate::tts::tts_synthesize(app.clone(), text, None).await?;
-    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_none_or(|active| active.id != id)
+    let audio = crate::tts::tts_synthesize(app.clone(), text.clone(), None).await?;
+    let config = app.state::<ReminderState>().store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
+    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref()
+        .is_none_or(|active| active.id != id || spoken(&config, &active.items) != text)
         || blocked(&app, &care_system::activity()) { return Err("提醒已关闭".into()); }
     let _ = app.emit_to("control", "care-voice-start", ());
     Ok(audio)
@@ -1068,10 +1075,10 @@ mod tests {
         let old: CareConfig = serde_json::from_str(r#"{"enabled":true,"voice":false}"#).unwrap();
         assert!(old.once_voice);
         let item = |kind: &str, text: &str| Pending { key: text.into(), rule_id: "r".into(), revision: 1, kind: kind.into(), text: text.into(), due_at: 0, available_at: 0, expires_at: 0, preview: false, weather_ready: true, weather_at: None, sticky: true, sound: None, voice: None, session: None };
-        assert_eq!(spoken(&[item("custom", "买花")]), "提醒：买花");
-        assert_eq!(spoken(&[item("custom", "买花"), item("custom", "喝水"), item("rest", "站起来")]), "提醒：买花。喝水。还有 1 条到期提醒。");
-        assert_eq!(spoken(&[item("agent", "今天有 3 封新邮件")]), "今天有 3 封新邮件", "a task's result is not led in as a reminder");
-        assert_eq!(spoken(&[item("custom", "  ")]), "");
+        assert_eq!(spoken(&CareConfig { voice: true, ..CareConfig::default() }, &[item("custom", "买花")]), "提醒：买花");
+        assert_eq!(spoken(&CareConfig { voice: true, ..CareConfig::default() }, &[item("custom", "买花"), item("custom", "喝水"), item("rest", "站起来")]), "提醒：买花。喝水。还有 1 条到期提醒。");
+        assert_eq!(spoken(&CareConfig { voice: true, ..CareConfig::default() }, &[item("agent", "今天有 3 封新邮件")]), "今天有 3 封新邮件", "a task's result is not led in as a reminder");
+        assert_eq!(spoken(&CareConfig { voice: true, ..CareConfig::default() }, &[item("custom", "  ")]), "");
     }
     #[test] fn one_time_reminders_beep_by_default_and_everything_else_stays_quiet() {
         let config = CareConfig::default();
@@ -1182,13 +1189,52 @@ mod tests {
             sticky: false, sound: Some(true), voice: Some(true), session: None,
         };
         assert!(delivery_sound(&config, &[base.clone()], false));
-        assert!(delivery_voice(&config, &[base.clone()], false));
+        assert!(delivery_voice(&config, &[base.clone()]));
         let quiet_once = Pending { sticky: true, sound: Some(false), voice: Some(false), ..base };
         assert!(!delivery_sound(&config, &[quiet_once.clone()], true));
-        assert!(!delivery_voice(&config, &[quiet_once], true));
+        assert!(!delivery_voice(&config, &[quiet_once]));
         let pinned_daily = Rule { repeat: "daily".into(), sticky: Some(true), ..scheduled() };
         assert!(lasts(&pinned_daily));
         let auto_once = Rule { repeat: "once".into(), sticky: Some(false), ..scheduled() };
         assert!(!lasts(&auto_once));
+    }
+
+    fn bundled_item(kind: &str, text: &str, voice: Option<bool>, sticky: bool) -> Pending {
+        Pending {
+            key: text.into(), rule_id: text.into(), revision: 1, kind: kind.into(), text: text.into(),
+            due_at: 0, available_at: 0, expires_at: 60, preview: false, weather_ready: true,
+            weather_at: None, sticky, sound: None, voice, session: None,
+        }
+    }
+
+    #[test]
+    fn mixed_delivery_never_narrates_voice_off_items() {
+        let config = CareConfig { voice: true, once_voice: true, ..CareConfig::default() };
+        let quiet = bundled_item("agent", "静音测试", Some(false), true);
+        let aloud = bundled_item("custom", "喝水", Some(true), false);
+        assert_eq!(spoken(&config, &[quiet.clone(), aloud.clone()]), "提醒：喝水");
+        assert_eq!(spoken(&config, &[aloud.clone(), quiet.clone()]), "提醒：喝水");
+        let items = [quiet.clone(), aloud, bundled_item("custom", "买花", None, false), quiet.clone()];
+        assert!(delivery_voice(&config, &items));
+        assert_eq!(spoken(&config, &items), "提醒：喝水。买花");
+        assert!(!delivery_voice(&config, &[quiet.clone()]));
+        assert!(spoken(&config, &[quiet]).is_empty());
+    }
+
+    #[test]
+    fn bundled_items_inherit_voice_using_their_own_sticky_setting() {
+        let mut config = CareConfig { voice: false, once_voice: true, ..CareConfig::default() };
+        let ordinary = bundled_item("custom", "普通提醒", None, false);
+        let sticky = bundled_item("custom", "置顶提醒", None, true);
+        assert_eq!(spoken(&config, &[ordinary.clone(), sticky.clone()]), "提醒：置顶提醒");
+        let silent_sticky = bundled_item("custom", "静音置顶", Some(false), true);
+        let blank = bundled_item("custom", "  ", Some(true), false);
+        let items = [ordinary.clone(), silent_sticky, blank];
+        assert!(!delivery_voice(&config, &items));
+        assert!(spoken(&config, &items).is_empty());
+        config.once_voice = false;
+        assert!(!delivery_voice(&config, &[sticky]));
+        config.voice = true;
+        assert_eq!(spoken(&config, &[ordinary]), "提醒：普通提醒");
     }
 }
