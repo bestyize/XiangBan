@@ -116,7 +116,8 @@ const definition = computed(() => {
   return props.themes.find(theme => theme.id === themeId)?.pets.find(pet => pet.id === petId);
 });
 const theme = computed(() => props.themes.find(item => item.id === draft.plant.split('/')[0]));
-const previewSize = computed(() => Math.round(76 + (Math.min(420, Math.max(80, draft.size)) - 80) / 340 * 108));
+const previewSize = computed(() => Math.round(96 + (Math.min(420, Math.max(80, draft.size)) - 80) / 340 * 82));
+const sizeProgress = computed(() => `${((Math.min(420, Math.max(80, draft.size)) - 80) / 340) * 100}%`);
 const nameInvalid = computed(() => !draft.name.trim());
 const metaLine = computed(() => {
   const parts = [theme.value?.name, definition.value?.name ?? '作品暂不可用', props.instance?.monitor].filter(Boolean);
@@ -151,7 +152,7 @@ function onKeydown(event: KeyboardEvent) { if (event.key === 'Escape' && moodOpe
   <template v-if="detached">
     <section v-if="instance" class="pet-dialog is-detached" role="region" aria-label="伙伴设置" data-testid="pet-settings-dialog" @pointerdown="onPointerDown" @keydown="onKeydown">
       <aside class="pd-left">
-        <WindowChrome :platform="platform" title="伙伴设置" />
+        <WindowChrome :platform="platform" />
         <div class="pd-stage">
           <PetActor v-if="definition" :definition="definition" :size="previewSize" :expression="draft.expression" :links="draft.links" :paused="paused" />
         </div>
@@ -194,7 +195,7 @@ function onKeydown(event: KeyboardEvent) { if (event.key === 'Escape' && moodOpe
                 </div>
                 <b class="size-val" data-testid="pet-dialog-size">{{ draft.size }} px</b>
               </div>
-              <input v-model.number="draft.size" type="range" min="80" max="420" step="10" class="pd-range" aria-label="大小" />
+              <input v-model.number="draft.size" type="range" min="80" max="420" step="10" class="pd-range" :style="{ '--range-pct': sizeProgress }" aria-label="大小" />
             </div>
           </div>
 
@@ -296,7 +297,7 @@ function onKeydown(event: KeyboardEvent) { if (event.key === 'Escape' && moodOpe
                 </div>
                 <b class="size-val" data-testid="pet-dialog-size">{{ draft.size }} px</b>
               </div>
-              <input v-model.number="draft.size" type="range" min="80" max="420" step="10" class="pd-range" aria-label="大小" />
+              <input v-model.number="draft.size" type="range" min="80" max="420" step="10" class="pd-range" :style="{ '--range-pct': sizeProgress }" aria-label="大小" />
             </div>
           </div>
 
@@ -357,14 +358,14 @@ function onKeydown(event: KeyboardEvent) { if (event.key === 'Escape' && moodOpe
 .pet-dialog{display:grid;grid-template-columns:224px minmax(0,1fr);background:var(--ui-configuration-canvas);color:var(--ui-text-primary);font-family:var(--ui-font-family);overflow:hidden}
 .pet-dialog.is-detached{width:100%;height:100%}
 .pet-dialog.is-modal{width:656px;max-width:calc(100vw - 32px);max-height:min(580px,calc(100vh - 48px));border-radius:var(--ui-radius-dialog);box-shadow:0 0 0 1px var(--ui-border),var(--ui-shadow-dialog)}
-.pd-left{background:var(--ui-configuration-sidebar);border-right:1px solid var(--ui-line);padding:14px 14px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:0}
+.pd-left{background:var(--ui-configuration-sidebar);border-right:1px solid var(--ui-line);padding:14px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:0}
 .is-detached .pd-left{padding-top:4px}
-.pd-left>:deep(.configuration-chrome){align-self:stretch;margin:0 -6px 2px}
-.pd-stage{width:100%;flex:1;min-height:212px;border-radius:14px;box-sizing:border-box;padding:10px;display:flex;align-items:flex-end;justify-content:center;background:radial-gradient(ellipse 72% 56% at 50% 42%,#fff 0%,#f4f4f6 68%,#ececef 100%);overflow:hidden}
-html[data-theme=dark] .pd-stage{background:radial-gradient(ellipse 72% 56% at 50% 42%,#2b2c30 0%,#212226 68%,#1b1c20 100%)}
-.pd-meta{font-size:11.5px;color:var(--ui-text-secondary);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-left>:deep(.configuration-chrome){align-self:stretch;margin:0 -6px 0}
+.pd-stage{width:100%;aspect-ratio:1;max-height:204px;flex:none;border-radius:14px;box-sizing:border-box;padding:10px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 72% 56% at 50% 44%,#fff 0%,#f4f4f6 68%,#ececef 100%);overflow:hidden}
+html[data-theme=dark] .pd-stage{background:radial-gradient(ellipse 72% 56% at 50% 44%,#2b2c30 0%,#212226 68%,#1b1c20 100%)}
+.pd-meta{font-size:11.5px;color:var(--ui-text-secondary);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 .pd-hint{font-size:11px;color:var(--ui-text-tertiary);margin-top:-4px}
-.pd-left-acts{width:100%;display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.pd-left-acts{width:100%;display:flex;flex-direction:column;gap:2px;margin-top:auto;padding-top:8px}
 .pd-left-acts .xb-btn-ghost{width:100%;justify-content:flex-start;height:30px;font-size:12px}
 
 .pd-right{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -399,7 +400,10 @@ html[data-theme=dark] .pd-stage{background:radial-gradient(ellipse 72% 56% at 50
 .size-presets button.active{background:var(--ui-surface);color:var(--ui-text-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.1)}
 html[data-theme=dark] .size-presets button.active{background:#48484c}
 .size-val{margin-left:auto;font-size:12.5px;font-weight:500;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
-.pd-range{width:100%;margin:0;accent-color:var(--ui-btn)}
+.pd-range{-webkit-appearance:none;appearance:none;width:100%;height:5px;margin:6px 0 4px;border-radius:999px;background:linear-gradient(to right,var(--ui-btn) 0%,var(--ui-btn) var(--range-pct,38%),var(--ui-configuration-control) var(--range-pct,38%),var(--ui-configuration-control) 100%);outline:none;cursor:pointer}
+.pd-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.08);transition:transform .12s}
+.pd-range::-webkit-slider-thumb:hover{transform:scale(1.08)}
+.pd-range::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.08)}
 
 .mood-wrap{position:relative}
 .mood-btn{width:100%;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;border:0;border-radius:8px;background:var(--ui-configuration-control);color:var(--ui-text-primary);font-size:13px;text-align:left;cursor:pointer}

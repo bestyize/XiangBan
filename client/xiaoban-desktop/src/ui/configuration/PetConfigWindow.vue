@@ -202,8 +202,8 @@ onBeforeUnmount(() => {
 
 <style>
 html,body,#app{height:100%;margin:0}
-html.configuration-frameless,html.configuration-frameless body,html.configuration-frameless #app{background:transparent}
-.pet-config-window{height:100dvh;width:100%;overflow:hidden;border-radius:12px;background:var(--ui-configuration-canvas);color:var(--ui-text-primary);font-family:var(--ui-font-family)}
+html.configuration-frameless,html.configuration-frameless body,html.configuration-frameless body.desktop-control,html.configuration-frameless #app{background:transparent!important}
+.pet-config-window{height:100dvh;width:100%;overflow:hidden;border-radius:12px;background:var(--ui-configuration-canvas);box-shadow:inset 0 0 0 1px var(--ui-border);color:var(--ui-text-primary);font-family:var(--ui-font-family)}
 html.configuration-expanded .pet-config-window{border-radius:0}
 .pet-config-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:13px;color:var(--ui-text-secondary)}
 .pet-config-empty>.configuration-chrome{position:absolute;top:0;left:0;right:0}
