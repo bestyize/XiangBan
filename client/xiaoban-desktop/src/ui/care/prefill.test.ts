@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
-import { flushPromises, shallowMount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NSelect } from 'naive-ui';
 import CarePage from '../pages/CarePage.vue';
 import { invoke } from '../../bridge';
 import { emptyCareStatus } from './state';
@@ -20,19 +19,18 @@ async function mountNative(provider: 'open-meteo' | 'disabled' = 'open-meteo') {
     if (command === 'detect_care_city') return located;
     throw new Error(`unexpected command ${command}`);
   });
-  const store = { desktop: true, settings: { companionEnabled: true }, notify: vi.fn(), navigate: vi.fn() } as unknown as ControlStore;
-  const wrapper = shallowMount(CarePage, { props: { store }, global: { renderStubDefaultSlot: true, stubs: { NModal: { props: ['show'], template: '<div v-if="show"><slot /></div>' } } } });
+  const store = { desktop: true, settings: { companionEnabled: true }, notify: vi.fn(), navigate: vi.fn(), chat: { select: vi.fn() } } as unknown as ControlStore;
+  const wrapper = mount(CarePage, { props: { store }, global: { stubs: { NAlert: true } } });
   await flushPromises();
   return { wrapper, store };
 }
 const detectCalls = () => vi.mocked(invoke).mock.calls.filter(([command]) => command === 'detect_care_city').length;
 type Wrapper = Awaited<ReturnType<typeof mountNative>>['wrapper'];
-// The page's own open(): with Naive UI replaced by stubs, a click on the stubbed button does not run it.
 const openDialog = (wrapper: Wrapper, kind: string) => (wrapper.vm as unknown as { open: (kind: string) => void }).open(kind);
 async function chooseWeather(wrapper: Wrapper) {
-  openDialog(wrapper, 'custom'); await flushPromises();
-  const kind = wrapper.findAllComponents(NSelect).find(item => item.attributes('data-testid') === 'care-kind')!;
-  kind.vm.$emit('update:value', 'weather');
+  openDialog(wrapper, 'custom');
+  await flushPromises();
+  await wrapper.get('[data-testid="care-kind-weather"]').trigger('click');
   await flushPromises();
 }
 

@@ -74,7 +74,7 @@ npm --prefix client/xiaoban-desktop run dev
 | [游戏库卡片重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/game-library.html) | 装扮与桌面空间 | 待合入 | 3–4 列统一方形封面无外框卡片、悬停展开「开始游戏」；正式游戏页尚未改造；需运行桌面 Vite `npm run dev` |
 | [特效页优化设计稿](../../client/xiaoban-desktop/docs/design-specs/prototypes/effects-library.html) | 装扮与桌面空间 | 待合入 | 三列特效库与右侧参数面板，静帧采样、悬停播放、预览调参后手动应用；正式特效页尚未改造；需运行桌面 Vite `npm run dev` |
 | [AI 插件页卡片与独立窗口重设计（定稿方案 A）](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html) | 核心 AI 与对话 | 已合入 | 定稿方案 A 精装目录卡（克制主题色、2 行简介、低饱和分类图标、宽屏 3 列、整卡可点），覆盖专家 / 技能 / 连接器三页与 5 类安装/更新/连接器独立窗口；纯静态可直开 |
-| [关怀提醒与定时任务重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html) | 关怀与效率 | 待合入 | V2 单栏专注流重构：移除右侧常驻设置栏，改为按条绑定提醒方式（行内直切响铃/朗读/常驻 + 编辑窗 3 格卡），全局免打扰与默认偏好收纳进页头浮层；新增一句话快建栏、下一条提醒焦点卡与定时任务结果卡片流；纯静态可直开（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html)） |
+| [关怀提醒与定时任务重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html) | 关怀与效率 | 已合入 | V2 单栏专注流重构（已合入 `CarePage.vue`、`care-bubble.ts` 与 `reminders.rs`）：移除右侧常驻设置栏，改为按条绑定提醒方式（行内直切响铃/朗读/常驻 + 编辑窗 3 格卡），全局免打扰与默认偏好收纳进页头浮层；新增一句话快建栏、下一条提醒焦点卡、定时任务结果卡片流与 4 态悬浮气泡（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html)） |
 | [内置小组件精修与组件页排版重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/widgets-redesign.html) | 装扮与桌面空间 | 已合入 | 8 款内置小组件矢量精修（暖白 / 深色 / 柔雾玻璃三材质、标题栏避让设置按钮、天气 6 态 + 3 日预报、待办快输、日程 Flex 徽章、股票昨收线与悬停读数、木鱼连击多气泡、月历农历 + 休/班、纪念日自定义短句）与组件页 Bento 跨列画廊、轻量层级菜单及统一主题设置浮窗；纯静态可直开（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/widgets-redesign.html)） |
 
 ---

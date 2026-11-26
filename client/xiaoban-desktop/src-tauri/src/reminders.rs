@@ -49,12 +49,27 @@ pub struct Rule {
     /// Monday=1, Sunday=7; never infer a user's working week.
     pub weekdays: Vec<u32>,
     pub interval_minutes: u32,
+    /// For `repeat == "interval"`: fire every N minutes inside `[window_start, window_end]`.
+    pub interval_every_minutes: u32,
+    pub window_start: String,
+    pub window_end: String,
     pub text: String,
     pub city: Option<City>,
     pub not_before: i64,
+    /// Per-rule delivery overrides (`None` falls back to global config / one-time policy).
+    pub sound: Option<bool>,
+    pub voice: Option<bool>,
+    pub sticky: Option<bool>,
 }
 impl Default for Rule {
-    fn default() -> Self { Self { id: String::new(), revision: 0, enabled: true, kind: "custom".into(), repeat: "daily".into(), time: "15:00".into(), once_at: String::new(), weekdays: vec![], interval_minutes: 60, text: String::new(), city: None, not_before: 0 } }
+    fn default() -> Self {
+        Self {
+            id: String::new(), revision: 0, enabled: true, kind: "custom".into(), repeat: "daily".into(),
+            time: "15:00".into(), once_at: String::new(), weekdays: vec![], interval_minutes: 60,
+            interval_every_minutes: 90, window_start: "09:00".into(), window_end: "18:00".into(),
+            text: String::new(), city: None, not_before: 0, sound: None, voice: None, sticky: None,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,9 +86,15 @@ pub struct Pending {
     pub weather_ready: bool,
     #[serde(default)]
     pub weather_at: Option<i64>,
-    /// A one-time reminder: its bubble does not go away by itself.
+    /// A one-time or pinned reminder: its bubble does not go away by itself.
     #[serde(default)]
     pub sticky: bool,
+    #[serde(default)]
+    pub sound: Option<bool>,
+    #[serde(default)]
+    pub voice: Option<bool>,
+    #[serde(default)]
+    pub session: Option<String>,
 }
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -115,6 +136,7 @@ pub struct Delivery {
 struct Runtime {
     active: Option<Delivery>,
     shown_at: Option<i64>,
+    hovered: bool,
     ready: bool,
     focus: bool,
     weather_attempt: i64,
@@ -163,12 +185,23 @@ fn validate(rule: &Rule) -> Result<(), String> {
     if rule.kind == "rest" {
         if !(5..=480).contains(&rule.interval_minutes) { return Err("休息间隔应为 5–480 分钟".into()); }
     } else {
-        time(&rule.time)?;
         match rule.repeat.as_str() {
-            "once" => { NaiveDateTime::parse_from_str(&rule.once_at, "%Y-%m-%dT%H:%M").map_err(|_| "请选择一次提醒的日期和时间")?; },
-            "daily" => {},
-            "weekdays" if !rule.weekdays.is_empty() && rule.weekdays.iter().all(|day| (1..=7).contains(day)) => {},
+            "once" => {
+                time(&rule.time)?;
+                NaiveDateTime::parse_from_str(&rule.once_at, "%Y-%m-%dT%H:%M").map_err(|_| "请选择一次提醒的日期和时间")?;
+            },
+            "daily" => { time(&rule.time)?; },
+            "weekdays" if !rule.weekdays.is_empty() && rule.weekdays.iter().all(|day| (1..=7).contains(day)) => { time(&rule.time)?; },
             "weekdays" => return Err("按星期重复需要至少选一天：weekdays 填 1（周一）到 7（周日），例如工作日是 [1,2,3,4,5]".into()),
+            "interval" => {
+                if !(15..=360).contains(&rule.interval_every_minutes) { return Err("时段间隔应为 15–360 分钟".into()); }
+                let start = time(&rule.window_start).map_err(|_| "请选择有效的时段开始时间")?;
+                let end = time(&rule.window_end).map_err(|_| "请选择有效的时段结束时间")?;
+                if start >= end { return Err("时段结束时间应晚于开始时间".into()); }
+                if !rule.weekdays.iter().all(|day| (1..=7).contains(day)) {
+                    return Err("按星期重复需要有效的星期：weekdays 填 1（周一）到 7（周日）".into());
+                }
+            },
             _ => return Err("请选择每天、一次或有效的星期".into()),
         }
     }
@@ -181,8 +214,13 @@ fn quiet(config: &CareConfig, now: NaiveTime) -> bool {
     if start == end { return true; }
     if start < end { now >= start && now < end } else { now >= start || now < end }
 }
-/// Whether a bubble is read aloud: when voice is on, or when it holds a one-time reminder and those are set to.
+/// Whether a bubble is read aloud: per-item override takes precedence, then global voice or one-time voice policy.
 fn speaks(config: &CareConfig, sticky: bool) -> bool { config.voice || (sticky && config.once_voice) }
+fn delivery_voice(config: &CareConfig, items: &[Pending], sticky: bool) -> bool {
+    if items.iter().any(|item| item.voice == Some(true)) { return true; }
+    if !items.is_empty() && items.iter().all(|item| item.voice == Some(false)) { return false; }
+    speaks(config, sticky)
+}
 /// What is said for a bubble: the reminders themselves, led in by a word so a bare "买花" is understood as a reminder.
 fn spoken(items: &[Pending]) -> String {
     let texts: Vec<&str> = items.iter().map(|item| item.text.trim()).filter(|text| !text.is_empty()).collect();
@@ -190,15 +228,34 @@ fn spoken(items: &[Pending]) -> String {
     let own_words = items.iter().all(|item| matches!(item.kind.as_str(), "custom" | "off-work" | "rest"));
     if body.is_empty() || !own_words { body } else { format!("提醒：{body}") }
 }
-/// Whether a bubble beeps: when sounds are on, or when it holds a one-time reminder and those are set to.
+/// Whether a bubble beeps: per-item override takes precedence, then global sound or one-time sound policy.
 fn plays_sound(config: &CareConfig, sticky: bool) -> bool { config.sound || (sticky && config.once_sound) }
-/// Whether a rule is a one-time reminder, which is kept up until the user answers it.
-fn lasts(rule: &Rule) -> bool { rule.repeat == "once" && rule.kind == "custom" }
+fn delivery_sound(config: &CareConfig, items: &[Pending], sticky: bool) -> bool {
+    if items.iter().any(|item| item.sound == Some(true)) { return true; }
+    if !items.is_empty() && items.iter().all(|item| item.sound == Some(false)) { return false; }
+    plays_sound(config, sticky)
+}
+/// Whether a rule is a sticky reminder, kept up until the user answers it.
+fn lasts(rule: &Rule) -> bool { rule.sticky.unwrap_or(rule.repeat == "once" && rule.kind == "custom") }
 fn local_due(rule: &Rule, now: DateTime<Local>) -> Vec<(String, i64)> {
     if rule.kind == "rest" { return vec![]; }
     let mut candidates = Vec::new();
     if rule.repeat == "once" {
         if let Ok(value) = NaiveDateTime::parse_from_str(&rule.once_at, "%Y-%m-%dT%H:%M") { candidates.push(value); }
+    } else if rule.repeat == "interval" {
+        if let (Ok(start), Ok(end)) = (time(&rule.window_start), time(&rule.window_end)) {
+            let step = i64::from(rule.interval_every_minutes.clamp(15, 360));
+            for offset in [0, 1] {
+                let date = now.date_naive() - CalendarDuration::days(offset);
+                if !rule.weekdays.is_empty() && !rule.weekdays.contains(&date.weekday().number_from_monday()) { continue; }
+                let mut cursor = date.and_time(start);
+                let end_dt = date.and_time(end);
+                while cursor <= end_dt {
+                    candidates.push(cursor);
+                    cursor += CalendarDuration::minutes(step);
+                }
+            }
+        }
     } else if let Ok(clock) = time(&rule.time) {
         for offset in [0, 1] {
             let date = now.date_naive() - CalendarDuration::days(offset);
@@ -245,7 +302,7 @@ fn collect_with_widgets(store: &mut Store, now: DateTime<Local>, active_seconds:
             // Weather and agent items wait for their text (`weather_ready`); an agent's result may wait longer to be seen.
             let expires_at = due + if rule.kind == "agent" { AGENT_VALID_SECONDS } else if lasts(&rule) { ONCE_VALID_SECONDS } else { VALID_SECONDS };
             store.pending.push(Pending { key, rule_id: rule.id.clone(), revision: rule.revision, kind: rule.kind.clone(), text: rule.text.clone(),
-                due_at: due, available_at: due, expires_at, preview: false, weather_ready: !matches!(rule.kind.as_str(), "weather" | "agent"), weather_at: None, sticky: lasts(&rule) });
+                due_at: due, available_at: due, expires_at, preview: false, weather_ready: !matches!(rule.kind.as_str(), "weather" | "agent"), weather_at: None, sticky: lasts(&rule), sound: rule.sound, voice: rule.voice, session: None });
             changed = true;
         }
     }
@@ -365,7 +422,7 @@ fn position(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(),
     let scale = monitor.scale_factor();
     let origin = monitor.position(); let size = monitor.size();
     let margin = (20.0 * scale).round() as i32;
-    let width = (340.0 * scale).round() as i32;
+    let width = (360.0 * scale).round() as i32;
     let x = origin.x + (size.width as i32 - width - margin).max(margin);
     let y = origin.y + margin;
     window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
@@ -380,7 +437,7 @@ fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
     }
     let builder = WebviewWindowBuilder::new(app, "care", WebviewUrl::App("index.html?scene=care".into()))
         .title("小伴关怀").decorations(false).shadow(false).resizable(false).skip_taskbar(true)
-        .always_on_top(true).transparent(true).visible(false).focused(false).focusable(false).inner_size(340.0, 180.0);
+        .always_on_top(true).transparent(true).visible(false).focused(false).focusable(false).inner_size(360.0, 210.0);
     #[cfg(windows)] let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os = "macos")] let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     let window = builder.build().map_err(|e| e.to_string())?;
@@ -390,7 +447,7 @@ fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
 }
 fn close_active(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();
-    let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = None; runtime.shown_at = None; drop(runtime);
+    let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = None; runtime.shown_at = None; runtime.hovered = false; drop(runtime);
     if let Some(window) = app.get_webview_window("care") { let _ = care_system::hide_bubble(&window); let _ = window.emit("care-delivery", Option::<Delivery>::None); }
 }
 fn remove_active_rule(runtime: &mut Runtime, id: &str) -> bool {
@@ -422,10 +479,15 @@ fn cancel_active_rule(app: &tauri::AppHandle, id: &str) {
 fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
     let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
-    let sticky = items.iter().any(|item| item.sticky && !item.preview);
-    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: plays_sound(&config, sticky), voice: speaks(&config, sticky),
-        display_seconds: if sticky { STICKY_SECONDS } else if config.voice { 30 } else { BUBBLE_SECONDS } };
-    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
+    let sticky = items.iter().any(|item| item.sticky);
+    let sound = delivery_sound(&config, &items, sticky);
+    let voice = delivery_voice(&config, &items, sticky);
+    let delivery = Delivery {
+        id: format!("bubble-{}", Local::now().timestamp_millis()),
+        items, sound, voice,
+        display_seconds: if sticky { STICKY_SECONDS } else if voice { 30 } else { BUBBLE_SECONDS },
+    };
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.hovered = false; runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
     if blocked(app, &care_system::activity()) { defer_active(app); return Ok(()); }
     if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_none_or(|d| d.id != delivery.id) { return Ok(()); }
@@ -491,6 +553,56 @@ pub fn snooze_care(window: tauri::WebviewWindow, id: String) -> Result<(), Strin
     save(app, &next)?; *store = next; drop(store); close_active(app); publish(app); Ok(())
 }
 #[tauri::command]
+pub fn care_hover(window: tauri::WebviewWindow, hovering: bool) -> Result<(), String> {
+    bubble(&window)?;
+    let state = window.app_handle().state::<ReminderState>();
+    let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner());
+    runtime.hovered = hovering;
+    if !hovering && runtime.active.is_some() {
+        runtime.shown_at = Some(Local::now().timestamp());
+    }
+    Ok(())
+}
+#[tauri::command]
+pub fn care_open_session(window: tauri::WebviewWindow, id: String, session: String) -> Result<(), String> {
+    bubble(&window)?;
+    let app = window.app_handle();
+    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_some_and(|d| d.id == id) {
+        close_active(app);
+    }
+    if let Some(control_window) = app.get_webview_window("control") {
+        let _ = control_window.unminimize();
+        let _ = control_window.show();
+        let _ = control_window.set_focus();
+    }
+    let _ = app.emit_to("control", "assistant-open-chat", serde_json::json!({ "session": session }));
+    Ok(())
+}
+#[tauri::command]
+pub fn run_care_agent_now(window: tauri::WebviewWindow, id: String) -> Result<serde_json::Value, String> {
+    control(&window)?;
+    let app = window.app_handle();
+    let state = app.state::<ReminderState>();
+    let now = Local::now().timestamp();
+    let rule = {
+        let store = state.store.lock().unwrap_or_else(|e| e.into_inner());
+        store.rules.iter().find(|r| r.id == id && r.kind == "agent").cloned().ok_or("找不到这条定时任务")?
+    };
+    let key = format!("{}:{}:manual:{}", rule.id, rule.revision, now);
+    {
+        let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
+        store.pending.push(Pending {
+            key, rule_id: rule.id.clone(), revision: rule.revision, kind: rule.kind.clone(), text: rule.text.clone(),
+            due_at: now, available_at: now, expires_at: now + AGENT_VALID_SECONDS, preview: false,
+            weather_ready: false, weather_at: None, sticky: lasts(&rule), sound: rule.sound, voice: rule.voice, session: None,
+        });
+        save(app, &store)?;
+    }
+    start_agent_tasks(app);
+    publish(app);
+    Ok(status(app))
+}
+#[tauri::command]
 pub async fn preview_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> Result<(), String> {
     control(&window)?; validate(&rule)?; let app = window.app_handle().clone();
     if blocked(&app, &care_system::activity()) { return Err("当前处于免打扰、游戏、锁屏或小伴隐藏状态，预览已暂缓；不会创建到期任务".into()); }
@@ -504,8 +616,9 @@ pub async fn preview_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> 
     // A preview shows the task, not its result: running it here would spend model calls on every preview.
     if rule.kind == "agent" { rule.text = format!("到时小伴会去做：{}", rule.text.chars().take(80).collect::<String>()); }
     let now = Local::now().timestamp();
+    let sticky = rule.sticky.unwrap_or(false);
     show(&app, vec![Pending { key: "preview".into(), rule_id: rule.id, revision: rule.revision, kind: rule.kind, text: rule.text,
-        due_at: now, available_at: now, expires_at: now + VALID_SECONDS, preview: true, weather_ready: true, weather_at: None, sticky: false }])
+        due_at: now, available_at: now, expires_at: now + VALID_SECONDS, preview: true, weather_ready: true, weather_at: None, sticky, sound: rule.sound, voice: rule.voice, session: None }])
 }
 #[tauri::command]
 pub async fn search_care_cities(window: tauri::WebviewWindow, query: String) -> Result<Vec<City>, String> {
@@ -615,8 +728,8 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
         let waiting = active.items.iter().any(|item| item.sticky && !item.preview)
             && state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.iter().any(|p| p.available_at <= now.timestamp() && !active.items.iter().any(|item| item.key == p.key));
         if waiting { defer_active(app); } else {
-            let shown_at = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).shown_at;
-            if shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
+            let (shown_at, hovered) = { let rt = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); (rt.shown_at, rt.hovered) };
+            if !hovered && shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
             else if let Some(window) = app.get_webview_window("care") { let _ = position(app, &window); }
             return;
         }
@@ -683,6 +796,7 @@ fn start_agent_tasks(app: &tauri::AppHandle) {
                 if let Some(item) = store.pending.iter_mut().find(|p| p.key == key) {
                     item.text = text;
                     item.weather_ready = true;
+                    item.session = outcome.session.clone();
                 }
                 if let Err(error) = save(&app, &store) { store.error = Some(error); }
             }
@@ -806,7 +920,7 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
         let disk: Store = serde_json::from_slice(&std::fs::read(&disk_path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         if disk.rules.len() != 1 || disk.rules[0].text != rule.text { return Err("关怀规则没有正确持久化".into()); }
         let pending = |preview: bool| Pending { key: if preview { "smoke-preview".into() } else { "smoke-due".into() }, rule_id: rule.id.clone(), revision: disk.rules[0].revision,
-            kind: "custom".into(), text: rule.text.clone(), due_at: now.timestamp(), available_at: now.timestamp(), expires_at: now.timestamp() + VALID_SECONDS, preview, weather_ready: true, weather_at: None, sticky: false };
+            kind: "custom".into(), text: rule.text.clone(), due_at: now.timestamp(), available_at: now.timestamp(), expires_at: now.timestamp() + VALID_SECONDS, preview, weather_ready: true, weather_at: None, sticky: false, sound: None, voice: None, session: None };
         show(app, vec![pending(true)])?;
         let deadline = Instant::now() + Duration::from_secs(20);
         while !state.runtime.lock().unwrap_or_else(|e| e.into_inner()).ready {
@@ -953,7 +1067,7 @@ mod tests {
         assert!(speaks(&CareConfig { voice: true, once_voice: false, ..CareConfig::default() }, false));
         let old: CareConfig = serde_json::from_str(r#"{"enabled":true,"voice":false}"#).unwrap();
         assert!(old.once_voice);
-        let item = |kind: &str, text: &str| Pending { key: text.into(), rule_id: "r".into(), revision: 1, kind: kind.into(), text: text.into(), due_at: 0, available_at: 0, expires_at: 0, preview: false, weather_ready: true, weather_at: None, sticky: true };
+        let item = |kind: &str, text: &str| Pending { key: text.into(), rule_id: "r".into(), revision: 1, kind: kind.into(), text: text.into(), due_at: 0, available_at: 0, expires_at: 0, preview: false, weather_ready: true, weather_at: None, sticky: true, sound: None, voice: None, session: None };
         assert_eq!(spoken(&[item("custom", "买花")]), "提醒：买花");
         assert_eq!(spoken(&[item("custom", "买花"), item("custom", "喝水"), item("rest", "站起来")]), "提醒：买花。喝水。还有 1 条到期提醒。");
         assert_eq!(spoken(&[item("agent", "今天有 3 封新邮件")]), "今天有 3 封新邮件", "a task's result is not led in as a reminder");
@@ -1037,5 +1151,44 @@ mod tests {
             assert!(runtime.active.is_none());
             assert!(runtime.shown_at.is_none());
         }
+    }
+    #[test]
+    fn interval_repeat_validates_window_and_fires_on_steps() {
+        let mut rule = Rule {
+            id: "drink".into(), revision: 1, kind: "custom".into(), repeat: "interval".into(),
+            interval_every_minutes: 90, window_start: "09:00".into(), window_end: "18:00".into(),
+            weekdays: vec![1, 2, 3, 4, 5], text: "喝水".into(), ..Rule::default()
+        };
+        assert!(validate(&rule).is_ok());
+        // 2026-10-09 is Friday (weekday 5); steps are 09:00, 10:30, 12:00, 13:30, 15:00, 16:30, 18:00.
+        let at_1040 = Local.with_ymd_and_hms(2026, 10, 9, 10, 40, 0).earliest().unwrap();
+        let dues = local_due(&rule, at_1040);
+        assert_eq!(dues.len(), 1);
+        assert!(dues[0].0.ends_with("2026-10-09T10:30"));
+        let sat = Local.with_ymd_and_hms(2026, 10, 10, 10, 40, 0).earliest().unwrap();
+        assert!(local_due(&rule, sat).is_empty(), "respects weekday filter");
+        rule.window_start = "18:00".into();
+        assert!(validate(&rule).is_err(), "rejects non-increasing window");
+        rule.window_start = "09:00".into();
+        rule.interval_every_minutes = 10;
+        assert!(validate(&rule).is_err(), "rejects step below 15 minutes");
+    }
+    #[test]
+    fn per_rule_delivery_overrides_global_defaults() {
+        let config = CareConfig { sound: false, once_sound: true, voice: false, once_voice: true, ..CareConfig::default() };
+        let base = Pending {
+            key: "k".into(), rule_id: "r".into(), revision: 1, kind: "custom".into(), text: "喝水".into(),
+            due_at: 0, available_at: 0, expires_at: 60, preview: false, weather_ready: true, weather_at: None,
+            sticky: false, sound: Some(true), voice: Some(true), session: None,
+        };
+        assert!(delivery_sound(&config, &[base.clone()], false));
+        assert!(delivery_voice(&config, &[base.clone()], false));
+        let quiet_once = Pending { sticky: true, sound: Some(false), voice: Some(false), ..base };
+        assert!(!delivery_sound(&config, &[quiet_once.clone()], true));
+        assert!(!delivery_voice(&config, &[quiet_once], true));
+        let pinned_daily = Rule { repeat: "daily".into(), sticky: Some(true), ..scheduled() };
+        assert!(lasts(&pinned_daily));
+        let auto_once = Rule { repeat: "once".into(), sticky: Some(false), ..scheduled() };
+        assert!(!lasts(&auto_once));
     }
 }

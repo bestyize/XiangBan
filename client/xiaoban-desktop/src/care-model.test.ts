@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { careRuleError, deliverySummary, describeAgentRun, describeCareRule, newCareRule, weatherIsFresh, type CareWeather, type CareDelivery } from "./care-model.ts";
+import { careRuleError, deliverySummary, describeAgentRun, describeCareRule, newCareRule, resolveRuleNotify, weatherIsFresh, type CareConfig, type CareWeather, type CareDelivery } from "./care-model.ts";
 
 describe("care rule editing", () => {
   it("does not infer working weekdays", () => {
@@ -45,5 +45,27 @@ describe("weather freshness and consolidated deliveries", () => {
   it("consolidates a backlog into a bounded summary", () => {
     const delivery = { items: [{ text: "喝水" }, { text: "下班" }, { text: "看天气" }] } as CareDelivery;
     expect(deliverySummary(delivery)).toBe("喝水\n下班\n还有 1 条到期提醒。");
+  });
+  it("validates interval rules and resolves per-rule delivery channels", () => {
+    const rule = newCareRule("custom");
+    rule.repeat = "interval";
+    rule.intervalEveryMinutes = 90;
+    rule.windowStart = "09:00";
+    rule.windowEnd = "18:00";
+    rule.weekdays = [1, 2, 3, 4, 5];
+    expect(careRuleError(rule)).toBeNull();
+    expect(describeCareRule(rule)).toBe("工作日 09:00–18:00 · 每 90 分钟");
+    rule.windowStart = "18:00";
+    expect(careRuleError(rule)).not.toBeNull();
+
+    const cfg: CareConfig = {
+      enabled: true, sound: false, onceSound: true, voice: false, onceVoice: true,
+      quietEnabled: false, quietStart: "22:00", quietEnd: "08:00",
+      weatherSource: { provider: "open-meteo", forecastUrl: "", geocodingUrl: "" },
+    };
+    const customOverride = { ...newCareRule("custom"), sound: true, voice: true, sticky: true };
+    expect(resolveRuleNotify(customOverride, cfg)).toEqual({ sound: true, voice: true, sticky: true });
+    const silentOnce = { ...newCareRule("custom"), repeat: "once" as const, sound: false, voice: false, sticky: false };
+    expect(resolveRuleNotify(silentOnce, cfg)).toEqual({ sound: false, voice: false, sticky: false });
   });
 });

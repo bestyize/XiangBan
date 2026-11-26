@@ -896,8 +896,8 @@ fn main() {
             widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
             widget_preview::widget_preview_report,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
-            reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
-            reminders::snooze_care, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
+            reminders::preview_care_rule, reminders::run_care_agent_now, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
+            reminders::snooze_care, reminders::care_hover, reminders::care_open_session, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info,
             lock_screen::lock_screen_picture_mode, lock_screen::lock_screen_wallpaper_source, lock_screen::lock_screen_apply_picture, lock_screen::lock_screen_save_picture,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
@@ -1011,7 +1011,7 @@ fn main() {
                 if command.starts_with("library_") { return label=="control"; }
                  if command=="ui_smoke_report" || command=="chat_screenshot" {return label=="control";}
                 if command=="set_appearance" || command=="set_accent" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_chat_composer_pet" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
-                if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
+                if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize","care_hover","care_open_session"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)
             });
