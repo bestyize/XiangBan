@@ -1428,6 +1428,25 @@
         { label: '新建任务窗', query: '?modal=task' },
       ]
     },
+    {
+      id: 'widgets-redesign',
+      title: '内置小组件精修与组件页排版重设计',
+      domains: ['desktop'],
+      subcat: '装扮与桌面空间',
+      status: 'pending',
+      statusNote: 'V3 待确认（正式 WidgetSurface 与 WidgetsPage 尚未改造）',
+      runtime: 'static',
+      path: 'client/xiaoban-desktop/docs/design-specs/prototypes/widgets-redesign.html',
+      summary: '优先精修 8 款内置小组件（独立矢量插画、暖白/深色/柔雾玻璃三材质、标题栏避让设置按钮、天气 6 态+3 日预报、待办快输、日程 Flex 徽章、股票昨收线与悬停读数、木鱼连击多气泡、月历农历+2026 休/班、纪念日自定义文案），并重排组件页 Bento 跨列画廊、轻量层级菜单、多屏实例标签与统一主题设置浮窗。',
+      presets: [
+        { label: '内置小组件 · 暖白', query: '?mat=ivory&bg=warm' },
+        { label: '内置小组件 · 深色', query: '?mat=dark&bg=night' },
+        { label: '内置小组件 · 柔雾', query: '?mat=glass&bg=dusk' },
+        { label: '组件页 · Bento 画廊', query: '?view=page&tab=all' },
+        { label: '在桌面上 · 实例管理', query: '?view=page&tab=desk' },
+        { label: '组件设置浮窗', query: '?view=page&tab=settings' },
+      ]
+    },
 
     // ==================== 4. 小游戏与小程序（协议 2 与应用广场） ====================
     {
