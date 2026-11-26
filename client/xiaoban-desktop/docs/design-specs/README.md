@@ -97,3 +97,5 @@
 特效页优化设计稿（待确认）：[设计稿源码](prototypes/effects-library.html)，保留三列特效库与右侧参数面板；采样代表性静帧、悬停播放，区分查看与启用，顶部关闭特效，参数在预览中调整后手动应用。支持明暗、窄窗口与模拟启停；所有交互仅修改页面内演示状态，不修改真实桌面。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/effects-library.html)。正式页面未改动。
 
 组件与伙伴卡片设计稿（已合入 `WidgetsPage.vue` / `CompanionPage.vue`）：[源码](prototypes/decor-library.html)，组件默认四列，放大真实组件预览，保留添加层级选择；伙伴采用无外框卡片、轻量实例数量、固定位置的管理/添加操作，主题导出收进更多菜单。支持页签、明暗、窄窗口、模拟添加与实例管理，均不改变真实桌面。[组件预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=widgets) / [伙伴预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=pets)。
+
+AI 插件页卡片与独立窗口设计稿（定稿方案 A · 精装目录卡）：[设计稿源码](prototypes/ai-plugins-redesign.html)，纯静态自包含单页原型，可直接浏览器打开或经设计总导航查看（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html)）。采用克制主题色的精装目录卡（2 行简介、低饱和分类软底图标、中性按钮、宽屏 3 列、整卡可点），覆盖专家、技能、连接器三页与 5 类原生独立窗口（专家/技能安装审查、专家团整组安装、版本更新审查、连接器准备/授权/密钥/已连接四态、已安装管理与移除确认），支持 6 套主题色、深浅模式及宽/标准/窄窗口切换。

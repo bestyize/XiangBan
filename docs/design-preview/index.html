@@ -1391,6 +1391,25 @@
       vitePath: '/docs/design-specs/prototypes/effects-library.html',
       summary: '三列特效库与右侧参数面板：采样代表性静帧、悬停动态播放，区分查看预览与启用生效，顶部一键关闭特效，参数在右侧实时预览后手动应用到桌面。'
     },
+    {
+      id: 'ai-plugins-redesign',
+      title: 'AI 插件页卡片与独立窗口重设计（方案 A）',
+      domains: ['desktop'],
+      subcat: '核心 AI 与对话',
+      status: 'pending',
+      statusNote: '定稿方案 A（精装目录卡 + 5 类独立窗口）',
+      runtime: 'static',
+      path: 'client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html',
+      summary: '定稿方案 A · 精装目录卡与独立窗口设计：克制主题色、2 行简介、低饱和分类软底图标、宽屏 3 列、整卡点击，覆盖专家/技能/连接器三页及安装审查、专家团整组安装、版本更新、连接器四态与移除确认 5 类独立窗口。',
+      presets: [
+        { label: '专家页', query: '?tab=experts' },
+        { label: '技能页', query: '?tab=skills' },
+        { label: '连接器页', query: '?tab=connectors' },
+        { label: '安装审查窗', query: '?modal=skill' },
+        { label: '专家团窗', query: '?modal=group' },
+        { label: '连接器窗', query: '?modal=connector' },
+      ]
+    },
 
     // ==================== 4. 小游戏与小程序（协议 2 与应用广场） ====================
     {
