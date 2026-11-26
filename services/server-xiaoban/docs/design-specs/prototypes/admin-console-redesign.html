@@ -1,0 +1,2808 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴官网管理后台 · 规范对齐重设计稿 v2.0</title>
+<style>
+  /* ==========================================================================
+     小伴官方设计令牌（方案四 × 浅底白卡无描边规范 × 6 套主题色 × 明暗模式）
+     严格对齐 client/xiaoban-desktop/src/ui/design-tokens.ts & surfaces.css & control.css
+     ========================================================================== */
+  :root,
+  html[data-theme="light"] {
+    --ui-surface: #FFFFFF;
+    --ui-surface-alt: #F2F2F4;
+    --ui-surface-sunken: #F5F5F7;
+    --ui-surface-hover: rgba(0, 0, 0, .045);
+    --ui-surface-raised: rgba(255, 255, 255, .97);
+    --ui-control: #F0F1F3;
+    --ui-control-hover: #E6E7EB;
+    --ui-line: rgba(0, 0, 0, .06);
+    --ui-border: rgba(0, 0, 0, .07);
+    --ui-border-strong: rgba(0, 0, 0, .13);
+
+    --ui-text-primary: #1D1D1F;
+    --ui-text-secondary: #636369;
+    --ui-text-tertiary: #8E8E93;
+    --ui-text-disabled: #A1A1A6;
+    --ui-text-on-btn: #FFFFFF;
+
+    /* 固定语义色（不随主题色变化） */
+    --ui-success: #2FA36B;
+    --ui-success-text: #1F7A4D;
+    --ui-success-soft: #E9F7F0;
+    --ui-warning: #D98A1C;
+    --ui-warning-text: #9A5410;
+    --ui-warning-soft: #FDF3E3;
+    --ui-danger: #D93A44;
+    --ui-danger-soft: #FDECEE;
+    --ui-info: #2F6FDB;
+    --ui-info-soft: #EAF1FD;
+
+    /* 阴影只给浮层与面板壳层 */
+    --ui-shadow-panel: 0 0 0 1px rgba(0, 0, 0, .05), 0 4px 16px rgba(0, 0, 0, .04);
+    --ui-shadow-menu: 0 0 0 1px rgba(0, 0, 0, .07), 0 14px 36px rgba(0, 0, 0, .15);
+    --ui-shadow-dialog: 0 0 0 1px rgba(0, 0, 0, .07), 0 24px 64px rgba(0, 0, 0, .18);
+    --ui-shadow-toast: 0 8px 24px rgba(0, 0, 0, .16);
+    --ui-scrim: rgba(18, 18, 23, .36);
+
+    --ui-font: -apple-system, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+    --ui-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    --ui-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    color-scheme: light;
+  }
+
+  html[data-theme="dark"] {
+    --ui-surface: #232429;
+    --ui-surface-alt: #2C2D33;
+    --ui-surface-sunken: #2B2D33;
+    --ui-surface-hover: rgba(255, 255, 255, .065);
+    --ui-surface-raised: rgba(42, 43, 49, .97);
+    --ui-control: #34363E;
+    --ui-control-hover: #3E404A;
+    --ui-line: rgba(255, 255, 255, .07);
+    --ui-border: rgba(255, 255, 255, .09);
+    --ui-border-strong: rgba(255, 255, 255, .16);
+
+    --ui-text-primary: #F5F5F7;
+    --ui-text-secondary: #AEAEB4;
+    --ui-text-tertiary: #84848B;
+    --ui-text-disabled: #5E5E65;
+    --ui-text-on-btn: #FFFFFF;
+
+    --ui-success: #3FB87A;
+    --ui-success-text: #72DBA4;
+    --ui-success-soft: rgba(63, 184, 122, .16);
+    --ui-warning: #F0A93A;
+    --ui-warning-text: #F6C36B;
+    --ui-warning-soft: rgba(240, 169, 58, .16);
+    --ui-danger: #F26468;
+    --ui-danger-soft: rgba(242, 100, 104, .16);
+    --ui-info: #6EA4FF;
+    --ui-info-soft: rgba(110, 164, 255, .16);
+
+    --ui-shadow-panel: 0 0 0 1px rgba(255, 255, 255, .06), 0 4px 18px rgba(0, 0, 0, .32);
+    --ui-shadow-menu: 0 0 0 1px rgba(255, 255, 255, .10), 0 16px 40px rgba(0, 0, 0, .55);
+    --ui-shadow-dialog: 0 0 0 1px rgba(255, 255, 255, .10), 0 28px 72px rgba(0, 0, 0, .62);
+    --ui-shadow-toast: 0 10px 28px rgba(0, 0, 0, .48);
+    --ui-scrim: rgba(0, 0, 0, .60);
+    color-scheme: dark;
+  }
+
+  /* 6 套官方主题色（对齐 appearance.ts & companion-redesign.html） */
+  html[data-theme="light"][data-accent="red"]      { --ui-btn:#D93A44; --ui-btn-hi:#E8565F; --ui-soft:#FCEBEC; --ui-ink:#B42A33; --ui-tint:#F5F1F1; --ui-dot:#E5484D; }
+  html[data-theme="light"][data-accent="green"]    { --ui-btn:#2E8B5E; --ui-btn-hi:#3FA172; --ui-soft:#E3F2E9; --ui-ink:#1E6A45; --ui-tint:#EEF4F0; --ui-dot:#34A36D; }
+  html[data-theme="light"][data-accent="blue"]     { --ui-btn:#2F6FDB; --ui-btn-hi:#4A84E6; --ui-soft:#E6EEFC; --ui-ink:#1D53AE; --ui-tint:#EFF3F9; --ui-dot:#3B7BE8; }
+  html[data-theme="light"][data-accent="purple"]   { --ui-btn:#7152D8; --ui-btn-hi:#8669E3; --ui-soft:#EDE8FC; --ui-ink:#5537B8; --ui-tint:#F3F1F9; --ui-dot:#7C5CE6; }
+  html[data-theme="light"][data-accent="amber"]    { --ui-btn:#B46B0E; --ui-btn-hi:#C97F1F; --ui-soft:#FAEEDB; --ui-ink:#87500A; --ui-tint:#F6F3ED; --ui-dot:#E09A2B; }
+  html[data-theme="light"][data-accent="graphite"] { --ui-btn:#2B2B30; --ui-btn-hi:#43434A; --ui-soft:#E9E9EC; --ui-ink:#2B2B30; --ui-tint:#F2F2F3; --ui-dot:#55555B; }
+
+  html[data-theme="dark"][data-accent="red"]       { --ui-btn:#E54D56; --ui-btn-hi:#F0646C; --ui-soft:rgba(229,77,86,.18);   --ui-ink:#FF868D; --ui-tint:#1A181A; --ui-dot:#F0646C; }
+  html[data-theme="dark"][data-accent="green"]     { --ui-btn:#38A16E; --ui-btn-hi:#49B680; --ui-soft:rgba(56,161,110,.18);  --ui-ink:#6FE0A8; --ui-tint:#171B19; --ui-dot:#49B680; }
+  html[data-theme="dark"][data-accent="blue"]      { --ui-btn:#4481E8; --ui-btn-hi:#5E96F2; --ui-soft:rgba(68,129,232,.19);  --ui-ink:#87B5FF; --ui-tint:#171A1F; --ui-dot:#5E96F2; }
+  html[data-theme="dark"][data-accent="purple"]    { --ui-btn:#8669E3; --ui-btn-hi:#9A80EC; --ui-soft:rgba(134,105,227,.20); --ui-ink:#B7A3F8; --ui-tint:#1A1820; --ui-dot:#9A80EC; }
+  html[data-theme="dark"][data-accent="amber"]     { --ui-btn:#C98220; --ui-btn-hi:#DC9636; --ui-soft:rgba(201,130,32,.20);  --ui-ink:#F2BA68; --ui-tint:#1D1A16; --ui-dot:#E8A543; }
+  html[data-theme="dark"][data-accent="graphite"]  { --ui-btn:#6B6B73; --ui-btn-hi:#80808A; --ui-soft:rgba(255,255,255,.12); --ui-ink:#DCDCE2; --ui-tint:#18181B; --ui-dot:#9A9AA3; }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--ui-font);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ui-text-primary);
+    background: var(--ui-tint);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; padding: 0; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--ui-btn); outline-offset: 2px; }
+  button:disabled { opacity: .48; cursor: not-allowed; }
+  svg { display: block; flex: none; }
+  code, .mono { font-family: var(--ui-mono); }
+  .num { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  /* ==========================================================================
+     顶部设计评审条（非产品 UI，支持 6 套主题色 + 明暗 + 视口 + 收起）
+     ========================================================================== */
+  .review-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+    height: 44px; padding: 0 14px;
+    background: rgba(20, 20, 24, .93);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    color: #F3F3F5; border-bottom: 1px solid rgba(255, 255, 255, .08);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 12px; transition: transform .22s var(--ui-ease);
+  }
+  .review-bar.collapsed { transform: translateY(-100%); }
+  .review-restore {
+    position: fixed; top: 10px; right: 14px; z-index: 310;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    background: rgba(20, 20, 24, .9); color: #fff; font-size: 12px; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+  }
+  .review-bar.collapsed + .review-restore { display: inline-flex; }
+  .rb-g { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .rb-title { font-weight: 600; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; line-height: 1; }
+  .rb-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 20px; padding: 0 8px; border-radius: 999px; line-height: 1;
+    background: rgba(255, 255, 255, .12); color: #fff; font-size: 11px; font-weight: 600;
+  }
+  .rb-seg { display: inline-flex; align-items: center; padding: 2px; border-radius: 8px; background: rgba(255, 255, 255, .09); gap: 2px; }
+  .rb-seg button {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 24px; padding: 0 9px; border-radius: 6px; line-height: 1;
+    color: rgba(255, 255, 255, .72); white-space: nowrap; transition: .14s;
+  }
+  .rb-seg button:hover { color: #fff; }
+  .rb-seg button.active { background: #fff; color: #18181B; font-weight: 600; }
+  .rb-swatches { display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; }
+  .rb-sw {
+    width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent;
+    transition: transform .14s, border-color .14s;
+  }
+  .rb-sw:hover { transform: scale(1.12); }
+  .rb-sw.active { border-color: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+  .rb-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 26px; padding: 0 9px; border-radius: 7px; line-height: 1;
+    background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .82); white-space: nowrap;
+  }
+  .rb-chip:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+  .rb-chip.on { background: rgba(240, 169, 58, .24); color: #FBD38D; }
+
+  /* ==========================================================================
+     Viewport Stage（PC 满屏 / 平板 960 / 窄屏 390）
+     ========================================================================== */
+  .stage {
+    position: fixed; inset: 44px 0 0 0;
+    background: var(--ui-tint);
+    transition: top .22s var(--ui-ease);
+    display: flex; justify-content: center; align-items: stretch;
+  }
+  .stage.bar-hidden { top: 0; }
+  .stage.device-tablet,
+  .stage.device-mobile {
+    padding: 20px; align-items: center; overflow: auto;
+  }
+  .app-frame { width: 100%; height: 100%; background: var(--ui-tint); position: relative; overflow: hidden; }
+  .stage.device-tablet .app-frame {
+    width: 960px; max-width: 100%; height: min(760px, 100%);
+    border-radius: 16px; box-shadow: var(--ui-shadow-dialog);
+  }
+  .stage.device-mobile .app-frame {
+    width: 390px; max-width: 100%; height: min(812px, 100%);
+    border-radius: 38px; box-shadow: 0 28px 80px rgba(0, 0, 0, .26), 0 0 0 8px #1C1C1F;
+  }
+
+  /* ==========================================================================
+     方案四外壳（左 --ui-tint 侧栏 + 右浮起白色圆角面板 .control-main）
+     ========================================================================== */
+  .control-app {
+    height: 100%; display: grid; grid-template-columns: 232px minmax(0, 1fr);
+    background: var(--ui-tint); overflow: hidden; position: relative;
+  }
+  .stage.device-tablet .control-app { grid-template-columns: 208px minmax(0, 1fr); }
+  .stage.device-mobile .control-app { grid-template-columns: minmax(0, 1fr); }
+
+  /* Left Sidebar (无边框，纯 --ui-tint 承载，单色线性图标，无多余底板) */
+  .xb-side {
+    display: flex; flex-direction: column; padding: 14px 10px 12px;
+    overflow-y: auto; scrollbar-width: none; background: var(--ui-tint);
+  }
+  .xb-side::-webkit-scrollbar { display: none; }
+  .stage.device-mobile .xb-side {
+    position: absolute; inset: 0 auto 0 0; width: 256px; z-index: 80;
+    transform: translateX(-105%); transition: transform .24s var(--ui-ease);
+    box-shadow: var(--ui-shadow-dialog);
+  }
+  .stage.device-mobile .xb-side.open { transform: translateX(0); }
+  .mobile-scrim { display: none; position: absolute; inset: 0; z-index: 75; background: var(--ui-scrim); }
+  .stage.device-mobile .mobile-scrim.open { display: block; }
+
+  .side-brand {
+    display: flex; align-items: center; gap: 10px;
+    height: 44px; padding: 0 8px; border-radius: 10px;
+    cursor: pointer; transition: background .14s;
+  }
+  .side-brand:hover { background: var(--ui-surface-hover); }
+  .xb-mark {
+    width: 28px; height: 28px; border-radius: 8px; flex: none; overflow: hidden;
+    background: linear-gradient(150deg, var(--ui-btn-hi), var(--ui-btn));
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+  }
+  .xb-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .side-brand-name { font-size: 14.5px; font-weight: 650; line-height: 1; letter-spacing: -.01em; }
+
+  .xb-search-trigger {
+    margin: 8px 2px 12px; height: 32px; padding: 0 10px; border-radius: 8px;
+    background: var(--ui-surface-hover); color: var(--ui-text-secondary);
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px; line-height: 1;
+    transition: background .14s, color .14s;
+  }
+  .xb-search-trigger:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+  .xb-kbd-mini {
+    margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+    height: 19px; padding: 0 5px; border-radius: 5px; line-height: 1;
+    font-family: var(--ui-mono); font-size: 10.5px; color: var(--ui-text-tertiary);
+    background: var(--ui-surface);
+  }
+
+  .side-nav { flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .side-group-title {
+    padding: 0 10px 4px; font-size: 11px; font-weight: 600;
+    color: var(--ui-text-tertiary); line-height: 1;
+  }
+  .side-list { display: flex; flex-direction: column; gap: 2px; }
+  .side-item {
+    display: flex; align-items: center; gap: 9px;
+    height: 34px; padding: 0 10px; border-radius: 8px; width: 100%; text-align: left;
+    color: var(--ui-text-secondary); font-size: 13px; font-weight: 450; line-height: 1;
+    transition: background .14s, color .14s;
+  }
+  .side-item:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .side-item.is-active { background: var(--ui-soft); color: var(--ui-ink); font-weight: 600; }
+  .side-item svg { width: 15px; height: 15px; opacity: .82; }
+  .side-item.is-active svg { opacity: 1; color: var(--ui-ink); }
+  .side-count {
+    margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+    height: 18px; padding: 0 6px; border-radius: 999px; line-height: 1;
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: var(--ui-surface-hover); color: var(--ui-text-secondary);
+  }
+  .side-count.is-warn { background: var(--ui-warning-soft); color: var(--ui-warning-text); }
+  .side-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-warning); }
+
+  .side-foot {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ui-line);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .side-acc {
+    display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 8px;
+    border-radius: 10px; transition: background .14s;
+  }
+  .side-acc:hover { background: var(--ui-surface-hover); }
+  .side-acc-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; text-align: left; }
+  .side-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    background: var(--ui-soft); color: var(--ui-ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 650; line-height: 1;
+  }
+  .side-acc-name { font-size: 13px; font-weight: 550; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Right Floating White Panel (.control-main) */
+  .control-main {
+    position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    margin: 8px 8px 8px 0;
+    background: var(--ui-surface);
+    border-radius: 12px;
+    box-shadow: var(--ui-shadow-panel);
+    overflow: hidden;
+  }
+  .stage.device-mobile .control-main { margin: 0; border-radius: 0; box-shadow: none; }
+
+  .control-workspace {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .xb-page {
+    max-width: 1240px; margin: 0 auto;
+    padding: 24px 28px 64px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .xb-page.is-narrow { max-width: 880px; }
+  .stage.device-mobile .xb-page { padding: 16px 16px 56px; gap: 16px; }
+
+  /* Mobile top strip (only shown on narrow viewports) */
+  .mobile-bar {
+    display: none; height: 48px; padding: 0 12px; flex: none;
+    border-bottom: 1px solid var(--ui-line);
+    align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .stage.device-mobile .mobile-bar { display: flex; }
+
+  /* ==========================================================================
+     官方基础组件（无描边、平面主题色主按钮、透明次按钮、浅灰承载面）
+     ========================================================================== */
+  .xb-page-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; min-height: 36px;
+  }
+  .xb-page-title { font-size: 20px; font-weight: 650; line-height: 1.25; letter-spacing: -.015em; }
+  .xb-page-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  /* Page-top large tabs (壁纸图库 / 采集工作台 / 自定义上架 风格一致) */
+  .xb-tabs-lg { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .xb-tabs-lg button {
+    display: inline-flex; align-items: center; gap: 6px; line-height: 1.25;
+    font-size: 20px; font-weight: 650; color: var(--ui-text-disabled);
+    transition: color .14s;
+  }
+  .xb-tabs-lg button:hover { color: var(--ui-text-secondary); }
+  .xb-tabs-lg button.is-active { color: var(--ui-text-primary); }
+  .xb-tabs-lg .tab-n { font-size: 13px; font-weight: 550; color: var(--ui-text-tertiary); font-variant-numeric: tabular-nums; }
+  .xb-tabs-lg button.is-active .tab-n { color: var(--ui-ink); }
+
+  /* Buttons — 无灰色细描边，严格光学居中 */
+  .xb-btn-primary,
+  .xb-btn-soft,
+  .xb-btn-ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 14px; border-radius: 8px; border: 0; box-shadow: none;
+    font-size: 13px; font-weight: 500; line-height: 1; white-space: nowrap;
+    transition: background .14s, color .14s, opacity .14s;
+  }
+  .xb-btn-primary { background: var(--ui-btn); color: var(--ui-text-on-btn); }
+  .xb-btn-primary:hover:not(:disabled) { background: var(--ui-btn-hi); }
+  .xb-btn-primary:disabled { background: var(--ui-control); color: var(--ui-text-disabled); opacity: 1; }
+
+  .xb-btn-soft { background: var(--ui-control); color: var(--ui-text-primary); }
+  .xb-btn-soft:hover:not(:disabled) { background: var(--ui-control-hover); }
+
+  .xb-btn-ghost { background: transparent; color: var(--ui-text-secondary); padding: 0 10px; }
+  .xb-btn-ghost:hover:not(:disabled) { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+
+  .is-danger { color: var(--ui-danger) !important; }
+  .xb-btn-soft.is-danger { background: var(--ui-danger-soft); }
+  .xb-btn-ghost.is-danger:hover:not(:disabled) { background: var(--ui-danger-soft); }
+
+  .is-sm { height: 28px; padding: 0 10px; font-size: 12.5px; border-radius: 7px; }
+  .is-lg { height: 38px; padding: 0 18px; font-size: 13.5px; border-radius: 10px; }
+
+  .xb-icon-btn {
+    width: 30px; height: 30px; border-radius: 8px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ui-text-secondary); transition: background .14s, color .14s;
+  }
+  .xb-icon-btn:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .xb-icon-btn.is-sm { width: 26px; height: 26px; border-radius: 7px; }
+
+  /* Borderless Inputs (surfaces.css: --ui-control 实底，无灰细描边) */
+  .xb-input, .xb-textarea {
+    width: 100%; border: 0; border-radius: 8px;
+    background: var(--ui-control); color: var(--ui-text-primary);
+    font-size: 13px; transition: background .14s, box-shadow .14s;
+  }
+  .xb-input { height: 34px; padding: 0 11px; line-height: normal; }
+  .xb-input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+  .xb-input[type="number"]::-webkit-outer-spin-button,
+  .xb-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .xb-textarea { padding: 9px 11px; min-height: 80px; resize: vertical; line-height: 1.55; }
+  .xb-input:focus, .xb-textarea:focus {
+    outline: none; background: var(--ui-surface);
+    box-shadow: 0 0 0 2px var(--ui-btn);
+  }
+  .xb-input::placeholder, .xb-textarea::placeholder { color: var(--ui-text-tertiary); }
+  .xb-input:disabled { opacity: .6; cursor: not-allowed; }
+
+  /* Input with clean prefix/suffix icons */
+  .xb-affix { position: relative; display: flex; align-items: center; width: 100%; }
+  .xb-affix .af-l {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--ui-text-tertiary); pointer-events: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .xb-affix .af-r {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; border-radius: 6px; color: var(--ui-text-tertiary);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .xb-affix .af-r:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .xb-affix.has-l .xb-input { padding-left: 32px; }
+  .xb-affix.has-r .xb-input { padding-right: 32px; }
+
+  .xb-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .xb-field-label {
+    font-size: 12px; font-weight: 550; color: var(--ui-text-secondary);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; line-height: 1.2;
+  }
+
+  /* Segmented Control (.xb-seg — 无外描边，实底 --ui-control) */
+  .xb-seg {
+    display: inline-flex; align-items: center; padding: 3px; border-radius: 9px;
+    background: var(--ui-control); gap: 2px;
+  }
+  .xb-seg button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 26px; padding: 0 11px; border-radius: 6.5px; line-height: 1;
+    font-size: 12.5px; color: var(--ui-text-secondary); white-space: nowrap;
+    transition: background .14s, color .14s;
+  }
+  .xb-seg button:hover { color: var(--ui-text-primary); }
+  .xb-seg button.is-active {
+    background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 550;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+  }
+  html[data-theme="dark"] .xb-seg button.is-active { background: #484952; }
+
+  /* Switch (主题色开启态) */
+  .xb-switch {
+    position: relative; flex: none; width: 36px; height: 20px; border-radius: 999px;
+    background: var(--ui-control-hover); transition: background .18s;
+  }
+  .xb-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+    transition: transform .2s var(--ui-ease);
+  }
+  .xb-switch[aria-checked="true"] { background: var(--ui-btn); }
+  .xb-switch[aria-checked="true"]::after { transform: translateX(16px); }
+
+  /* Custom Checkbox */
+  .xb-check {
+    width: 17px; height: 17px; border-radius: 5px; flex: none;
+    background: var(--ui-control);
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+    transition: background .14s;
+  }
+  .xb-check:hover { background: var(--ui-control-hover); }
+  .xb-check.is-checked { background: var(--ui-btn); }
+
+  /* Pill / Status Chip (无描边，仅柔和语义底 + 圆点) */
+  .xb-pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 22px; padding: 0 8px; border-radius: 999px; line-height: 1;
+    font-size: 11.5px; font-weight: 550; white-space: nowrap;
+    background: var(--ui-control); color: var(--ui-text-secondary);
+  }
+  .xb-pill i.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+  .xb-pill.is-ok { background: var(--ui-success-soft); color: var(--ui-success-text); }
+  .xb-pill.is-warn { background: var(--ui-warning-soft); color: var(--ui-warning-text); }
+  .xb-pill.is-danger { background: var(--ui-danger-soft); color: var(--ui-danger); }
+  .xb-pill.is-info { background: var(--ui-info-soft); color: var(--ui-info); }
+  .xb-pill.is-accent { background: var(--ui-soft); color: var(--ui-ink); }
+
+  /* ==========================================================================
+     标准 .xb-menu 浮层菜单（176–240px、单项 32–34px、一项一行、说明放悬停提示）
+     ========================================================================== */
+  .xb-select-btn {
+    height: 34px; padding: 0 10px 0 11px; border-radius: 8px;
+    background: var(--ui-control); color: var(--ui-text-primary);
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 13px; line-height: 1; white-space: nowrap;
+    transition: background .14s, box-shadow .14s;
+  }
+  .xb-select-btn.is-sm { height: 30px; font-size: 12.5px; padding: 0 9px 0 10px; }
+  .xb-select-btn.is-full { width: 100%; }
+  .xb-select-btn:hover { background: var(--ui-control-hover); }
+  .xb-select-btn.is-open { background: var(--ui-surface); box-shadow: 0 0 0 2px var(--ui-btn); }
+  .xb-select-val { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+  .xb-select-val .pfx { color: var(--ui-text-tertiary); }
+  .xb-select-val .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xb-select-chev { color: var(--ui-text-tertiary); transition: transform .16s var(--ui-ease); }
+  .xb-select-btn.is-open .xb-select-chev { transform: rotate(180deg); color: var(--ui-text-primary); }
+
+  .xb-menu {
+    position: fixed; z-index: 420;
+    min-width: 176px; max-width: 260px; max-height: 280px; overflow-y: auto;
+    padding: 5px; border-radius: 12px;
+    background: var(--ui-surface-raised);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--ui-shadow-menu);
+    display: flex; flex-direction: column; gap: 2px;
+    animation: menuIn .13s var(--ui-ease);
+  }
+  @keyframes menuIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+  .xb-menu-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    height: 33px; padding: 0 10px; border-radius: 8px;
+    color: var(--ui-text-primary); font-size: 13px; line-height: 1; text-align: left;
+    transition: background .12s, color .12s;
+  }
+  .xb-menu-item:hover { background: var(--ui-surface-hover); }
+  .xb-menu-item.is-active { background: var(--ui-soft); color: var(--ui-ink); font-weight: 550; }
+  .xb-menu-item.is-danger { color: var(--ui-danger); }
+  .xb-menu-item.is-danger:hover { background: var(--ui-danger-soft); }
+  .xb-menu-item .m-ico { color: var(--ui-text-secondary); }
+  .xb-menu-item.is-active .m-ico { color: var(--ui-ink); }
+  .xb-menu-item.is-danger .m-ico { color: var(--ui-danger); }
+  .xb-menu-item .m-hint { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); }
+  .xb-menu-item .m-chk { margin-left: auto; color: var(--ui-ink); }
+  .xb-menu-sep { height: 1px; margin: 4px 6px; background: var(--ui-line); }
+  .xb-menu-label { padding: 5px 10px 3px; font-size: 11px; font-weight: 600; color: var(--ui-text-tertiary); line-height: 1; }
+
+  /* ==========================================================================
+     分组块与设置行（浅灰分组底 --ui-surface-sunken，零描边，细分隔线）
+     ========================================================================== */
+  .xb-sec-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .xb-sec-title { font-size: 13.5px; font-weight: 600; color: var(--ui-text-primary); display: inline-flex; align-items: center; gap: 7px; line-height: 1; }
+  .xb-group {
+    background: var(--ui-surface-sunken); border-radius: 12px; overflow: hidden;
+  }
+  .xb-group-pad { padding: 16px 18px; }
+  .xb-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    min-height: 52px; padding: 10px 16px; border-top: 1px solid var(--ui-line);
+  }
+  .xb-row:first-child { border-top: 0; }
+  .xb-row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+  .xb-row-title { font-size: 13.5px; font-weight: 550; line-height: 1.3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .xb-row-meta { font-size: 12px; color: var(--ui-text-tertiary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; line-height: 1.2; }
+  .xb-row-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+
+  /* 警示条（规范唯一允许留在界面上的一句话风险警示） */
+  .xb-alert {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 10px 14px; border-radius: 10px;
+    background: var(--ui-warning-soft); color: var(--ui-warning-text); font-size: 13px;
+  }
+  .xb-alert-l { display: flex; align-items: center; gap: 8px; line-height: 1.35; }
+
+  /* ==========================================================================
+     总览 KPI & 布局栅格（无描边浅底卡）
+     ========================================================================== */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .stage.device-tablet .kpi-grid,
+  .stage.device-mobile .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-card {
+    background: var(--ui-surface-sunken); border-radius: 12px; padding: 15px 16px;
+    display: flex; flex-direction: column; gap: 8px; cursor: pointer;
+    transition: background .14s;
+  }
+  .kpi-card:hover { background: var(--ui-control); }
+  .kpi-top { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 500; color: var(--ui-text-secondary); line-height: 1; }
+  .kpi-val { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; display: flex; align-items: baseline; gap: 4px; }
+  .kpi-foot { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ui-text-tertiary); line-height: 1; min-height: 20px; }
+
+  .split-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .split-eq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .stage.device-tablet .split-2,
+  .stage.device-mobile .split-2,
+  .stage.device-mobile .split-eq { grid-template-columns: minmax(0, 1fr); }
+
+  /* ==========================================================================
+     壁纸画廊与列表（无外框纯净画框，壁纸本身是主角，次要动作进 ⋯ 菜单）
+     ========================================================================== */
+  .filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .filter-l, .filter-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .wp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .stage.device-tablet .wp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stage.device-mobile .wp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+  .wp-card {
+    border-radius: 12px; background: var(--ui-surface-sunken); overflow: hidden;
+    display: flex; flex-direction: column; transition: background .14s, box-shadow .14s;
+  }
+  .wp-card.is-selected { box-shadow: 0 0 0 2px var(--ui-btn); }
+  .wp-thumb { position: relative; aspect-ratio: 16 / 10; overflow: hidden; cursor: pointer; background: var(--ui-control); }
+  .wp-art { width: 100%; height: 100%; display: block; transition: transform .3s var(--ui-ease); }
+  .wp-card:hover .wp-art { transform: scale(1.03); }
+
+  .wp-sel-btn {
+    position: absolute; top: 8px; left: 8px; z-index: 4;
+    width: 22px; height: 22px; border-radius: 6px;
+    background: rgba(18, 18, 22, .52); backdrop-filter: blur(8px);
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+    opacity: 0; transition: opacity .14s, background .14s;
+  }
+  .wp-card:hover .wp-sel-btn, .wp-card.is-selected .wp-sel-btn { opacity: 1; }
+  .wp-card.is-selected .wp-sel-btn { background: var(--ui-btn); }
+
+  .wp-top-r { position: absolute; top: 8px; right: 8px; z-index: 4; display: flex; align-items: center; gap: 5px; }
+  .wp-bot-l { position: absolute; bottom: 8px; left: 8px; z-index: 3; display: flex; align-items: center; gap: 5px; }
+  .wp-glass {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    height: 22px; padding: 0 8px; border-radius: 999px; line-height: 1;
+    background: rgba(16, 16, 20, .62); backdrop-filter: blur(10px);
+    color: #fff; font-size: 11px; font-weight: 550;
+  }
+  .wp-glass.is-ok { background: rgba(47, 163, 107, .92); }
+  .wp-glass.is-action { background: rgba(255, 255, 255, .94); color: #1D1D1F; font-weight: 600; }
+  .wp-glass.is-action:hover { background: #fff; }
+
+  .wp-info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .wp-info-l { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .wp-title { font-size: 13px; font-weight: 550; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wp-sub { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ui-text-tertiary); line-height: 1; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .status-dot.ok { background: var(--ui-success); }
+  .status-dot.warn { background: var(--ui-warning); }
+  .status-dot.danger { background: var(--ui-danger); }
+  .status-dot.off { background: var(--ui-text-disabled); }
+
+  /* Table */
+  .tbl-wrap { background: var(--ui-surface-sunken); border-radius: 12px; overflow-x: auto; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th, .tbl td { padding: 10px 14px; text-align: left; border-top: 1px solid var(--ui-line); vertical-align: middle; }
+  .tbl thead th { border-top: 0; font-size: 11.5px; font-weight: 550; color: var(--ui-text-tertiary); white-space: nowrap; }
+  .tbl tbody tr:hover { background: var(--ui-surface-hover); }
+  .tbl tbody tr.is-selected { background: var(--ui-soft); }
+  .mini-thumb { width: 76px; height: 48px; border-radius: 7px; overflow: hidden; cursor: pointer; flex: none; }
+  .mini-thumb svg { width: 100%; height: 100%; }
+
+  /* Floating Batch Bar */
+  .batch-bar {
+    position: fixed; left: calc(50% + 116px); bottom: 24px; transform: translateX(-50%);
+    z-index: 90; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 8px 6px 14px; border-radius: 999px;
+    background: #1D1D1F; color: #F5F5F7; box-shadow: var(--ui-shadow-dialog);
+    font-size: 12.5px; line-height: 1;
+  }
+  html[data-theme="dark"] .batch-bar { background: #F5F5F7; color: #1D1D1F; }
+  .stage.device-tablet .batch-bar,
+  .stage.device-mobile .batch-bar { position: sticky; left: auto; transform: none; bottom: 12px; align-self: center; }
+  .batch-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 28px; padding: 0 11px; border-radius: 999px; line-height: 1;
+    background: rgba(255, 255, 255, .14); color: inherit; font-size: 12px; font-weight: 550;
+  }
+  .batch-btn:hover { background: rgba(255, 255, 255, .24); }
+  .batch-btn.is-danger-fill { background: var(--ui-danger); color: #fff; }
+  html[data-theme="dark"] .batch-btn { background: rgba(0, 0, 0, .1); }
+
+  /* Collector Preset Strip */
+  .preset-strip {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 9px 14px; border-radius: 10px; background: var(--ui-soft); color: var(--ui-ink);
+    font-size: 12.5px;
+  }
+  .preset-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* Provider Source Tabs */
+  .src-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .stage.device-tablet .src-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stage.device-mobile .src-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .src-tab {
+    padding: 11px 12px; border-radius: 10px; background: var(--ui-surface-sunken);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    text-align: left; transition: background .14s;
+  }
+  .src-tab:hover { background: var(--ui-control); }
+  .src-tab.is-active { background: var(--ui-soft); color: var(--ui-ink); }
+  .src-tab-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .src-tab-sub { font-size: 11.5px; color: var(--ui-text-tertiary); margin-top: 3px; line-height: 1; }
+  .src-tab.is-active .src-tab-sub { color: var(--ui-ink); opacity: .8; }
+
+  /* Platform Matrix */
+  .plat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .stage.device-tablet .plat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stage.device-mobile .plat-grid { grid-template-columns: 1fr; }
+  .plat-slot {
+    padding: 12px 13px; border-radius: 10px; background: var(--ui-surface);
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .plat-slot.is-missing { background: transparent; border: 1px dashed var(--ui-border-strong); opacity: .7; }
+  .plat-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12.5px; font-weight: 600; line-height: 1; }
+  .plat-meta { font-size: 11.5px; color: var(--ui-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sha-chip {
+    margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    height: 24px; padding: 0 7px; border-radius: 6px; background: var(--ui-surface-sunken);
+    font-family: var(--ui-mono); font-size: 10.5px; color: var(--ui-text-tertiary); line-height: 1;
+  }
+
+  /* Tag Chips & Stepper */
+  .tag-box {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    min-height: 36px; padding: 4px 8px; border-radius: 8px; background: var(--ui-control);
+  }
+  .tag-box:focus-within { background: var(--ui-surface); box-shadow: 0 0 0 2px var(--ui-btn); }
+  .tag-chip {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    height: 24px; padding: 0 6px 0 9px; border-radius: 6px; line-height: 1;
+    background: var(--ui-surface); font-size: 12px; font-weight: 500;
+  }
+  .tag-chip button { width: 15px; height: 15px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ui-text-tertiary); }
+  .tag-chip button:hover { color: var(--ui-danger); background: var(--ui-danger-soft); }
+  .tag-box input { flex: 1; min-width: 72px; height: 26px; border: 0; background: transparent; outline: none; font-size: 12.5px; }
+
+  .xb-stepper {
+    display: inline-flex; align-items: center; height: 34px; border-radius: 8px;
+    background: var(--ui-control); overflow: hidden;
+  }
+  .xb-stepper button { width: 32px; height: 100%; display: inline-flex; align-items: center; justify-content: center; color: var(--ui-text-secondary); }
+  .xb-stepper button:hover { background: var(--ui-control-hover); color: var(--ui-text-primary); }
+  .xb-stepper input { width: 64px; height: 100%; border: 0; background: transparent; text-align: center; font-weight: 600; font-size: 13px; outline: none; }
+
+  .meter { height: 5px; border-radius: 999px; background: var(--ui-control); overflow: hidden; }
+  .meter > i { display: block; height: 100%; border-radius: 999px; background: var(--ui-btn); }
+
+  /* Upload Drop Zone */
+  .drop-zone {
+    border-radius: 12px; background: var(--ui-surface-sunken); min-height: 240px; padding: 24px;
+    border: 1.5px dashed var(--ui-border-strong);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    text-align: center; cursor: pointer; transition: background .14s, border-color .14s;
+  }
+  .drop-zone:hover { background: var(--ui-soft); border-color: var(--ui-btn); }
+  .device-frame { width: 100%; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; position: relative; background: #111; }
+  .device-frame.is-phone { width: 164px; aspect-ratio: 9/18; margin: 0 auto; border-radius: 22px; border: 5px solid #1C1C1F; }
+
+  /* Android Dialog Preview */
+  .phone-mock { width: 256px; margin: 0 auto; border-radius: 28px; background: #18181B; padding: 9px; }
+  .phone-screen {
+    border-radius: 20px; background: var(--ui-tint); height: 396px; position: relative;
+    overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 14px;
+  }
+  .phone-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); }
+  .android-dlg {
+    position: relative; z-index: 2; width: 100%; border-radius: 22px; background: var(--ui-surface);
+    padding: 18px 16px 14px; box-shadow: var(--ui-shadow-dialog);
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .android-dlg h4 { font-size: 14.5px; font-weight: 650; line-height: 1.3; }
+  .android-dlg p { font-size: 12.5px; color: var(--ui-text-secondary); line-height: 1.55; white-space: pre-wrap; max-height: 132px; overflow-y: auto; }
+  .android-dlg-btns { display: flex; gap: 8px; margin-top: 6px; }
+  .android-dlg-btns span {
+    flex: 1; height: 34px; border-radius: 9px; font-size: 12.5px; font-weight: 600; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .android-dlg-btns .c { background: var(--ui-control); color: var(--ui-text-secondary); }
+  .android-dlg-btns .o { background: var(--ui-btn); color: #fff; }
+
+  /* ==========================================================================
+     弹层：抽屉（20px 圆角）& 弹窗（24px 圆角）& 命令面板 & Toast
+     ========================================================================== */
+  .xb-backdrop {
+    position: fixed; inset: 0; z-index: 350;
+    background: var(--ui-scrim); backdrop-filter: blur(4px);
+    display: flex; justify-content: flex-end; animation: fadeIn .15s ease;
+  }
+  .xb-backdrop.is-center { justify-content: center; align-items: center; padding: 20px; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .xb-drawer {
+    width: min(520px, 100vw); height: 100%;
+    background: var(--ui-surface); box-shadow: var(--ui-shadow-dialog);
+    border-radius: 20px 0 0 20px; overflow: hidden;
+    display: flex; flex-direction: column; animation: slideL .2s var(--ui-ease);
+  }
+  .xb-drawer.is-wide { width: min(740px, 100vw); }
+  @keyframes slideL { from { transform: translateX(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+
+  .xb-dialog {
+    width: min(700px, 100%); max-height: calc(100vh - 48px);
+    background: var(--ui-surface); box-shadow: var(--ui-shadow-dialog);
+    border-radius: 24px; overflow: hidden;
+    display: flex; flex-direction: column; animation: pop .18s var(--ui-ease);
+  }
+  .xb-dialog.is-sm { width: min(420px, 100%); }
+  @keyframes pop { from { transform: scale(.97) translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .ov-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 22px 14px; border-bottom: 1px solid var(--ui-line); flex: none;
+  }
+  .ov-head h2 { font-size: 16.5px; font-weight: 650; line-height: 1.25; }
+  .ov-body { flex: 1; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .ov-foot {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 14px 22px; border-top: 1px solid var(--ui-line); flex: none;
+  }
+
+  /* Compact single-row Model Editor inside AI Modal (ui-conventions: 紧凑单行列表) */
+  .model-item {
+    padding: 10px 12px; border-radius: 10px; background: var(--ui-surface-sunken);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .model-row { display: grid; grid-template-columns: 1fr 1fr 140px auto; gap: 8px; align-items: center; }
+  .effort-bar { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .effort-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 24px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; font-family: var(--ui-mono); line-height: 1;
+    background: var(--ui-control); color: var(--ui-text-secondary);
+  }
+  .effort-chip.is-on { background: var(--ui-soft); color: var(--ui-ink); font-weight: 600; }
+
+  /* Command Palette */
+  .cmd-box {
+    width: min(460px, 100%); background: var(--ui-surface-raised);
+    backdrop-filter: blur(20px); border-radius: 16px; box-shadow: var(--ui-shadow-dialog);
+    overflow: hidden; margin-top: -10vh;
+  }
+  .cmd-top { display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 14px; border-bottom: 1px solid var(--ui-line); }
+  .cmd-top input { flex: 1; border: 0; background: transparent; outline: none; font-size: 13.5px; }
+  .cmd-list { max-height: 320px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+
+  /* Login Page */
+  .login-stage {
+    height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: var(--ui-tint);
+  }
+  .login-card {
+    width: min(368px, 100%); padding: 28px 26px 24px; border-radius: 24px;
+    background: var(--ui-surface); box-shadow: var(--ui-shadow-dialog);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+
+  /* Toast */
+  .toast-host { position: fixed; bottom: 22px; right: 22px; z-index: 480; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast {
+    height: 38px; padding: 0 14px; border-radius: 10px; line-height: 1;
+    background: #1D1D1F; color: #F5F5F7; font-size: 13px; font-weight: 500;
+    box-shadow: var(--ui-shadow-toast);
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    animation: pop .15s var(--ui-ease);
+  }
+  html[data-theme="dark"] .toast { background: #F5F5F7; color: #1D1D1F; }
+
+  @media (max-width: 860px) {
+    .stage.device-desktop .control-app { grid-template-columns: minmax(0, 1fr); }
+    .stage.device-desktop .xb-side {
+      position: fixed; inset: 44px auto 0 0; width: 256px; z-index: 80;
+      transform: translateX(-105%); transition: transform .24s var(--ui-ease); box-shadow: var(--ui-shadow-dialog);
+    }
+    .stage.device-desktop .xb-side.open { transform: translateX(0); }
+    .stage.device-desktop .control-main { margin: 0; border-radius: 0; }
+    .stage.device-desktop .mobile-bar { display: flex; }
+    .stage.device-desktop .kpi-grid,
+    .stage.device-desktop .wp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stage.device-desktop .split-2,
+    .stage.device-desktop .plat-grid { grid-template-columns: 1fr; }
+    .stage.device-desktop .batch-bar { left: 50%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 顶部设计评审条（6 套官方主题色 + 明暗 + 视口） ==================== -->
+<div id="reviewBar" class="review-bar">
+  <div class="rb-g">
+    <span class="rb-title">小伴官网管理后台 <span class="rb-badge">v2.0 规范对齐版</span></span>
+    <div class="rb-seg">
+      <button id="modeConsoleBtn" class="active" onclick="setAppMode('console')">控制台</button>
+      <button id="modeLoginBtn" onclick="setAppMode('login')">登录页</button>
+    </div>
+  </div>
+  <div class="rb-g">
+    <div class="rb-swatches" role="group" aria-label="6 套官方主题色">
+      <button class="rb-sw active" data-acc="red" style="background:#D93A44" title="小伴红" onclick="setAccent('red')"></button>
+      <button class="rb-sw" data-acc="green" style="background:#2E8B5E" title="薄荷绿" onclick="setAccent('green')"></button>
+      <button class="rb-sw" data-acc="blue" style="background:#2F6FDB" title="海湾蓝" onclick="setAccent('blue')"></button>
+      <button class="rb-sw" data-acc="purple" style="background:#7152D8" title="暮紫" onclick="setAccent('purple')"></button>
+      <button class="rb-sw" data-acc="amber" style="background:#C97F1F" title="琥珀" onclick="setAccent('amber')"></button>
+      <button class="rb-sw" data-acc="graphite" style="background:#4A4A52" title="石墨" onclick="setAccent('graphite')"></button>
+    </div>
+    <div class="rb-seg">
+      <button id="themeLightBtn" class="active" onclick="setTheme('light')">浅色</button>
+      <button id="themeDarkBtn" onclick="setTheme('dark')">深色</button>
+    </div>
+    <div class="rb-seg">
+      <button id="devDesktopBtn" class="active" onclick="setDevice('desktop')">PC</button>
+      <button id="devTabletBtn" onclick="setDevice('tablet')">960</button>
+      <button id="devMobileBtn" onclick="setDevice('mobile')">390</button>
+    </div>
+    <button id="pwdWarnBtn" class="rb-chip on" onclick="toggleDefaultPwd()" title="切换默认密码安全警示">警示条</button>
+    <button class="rb-chip" onclick="toggleReviewBar(true)">收起</button>
+  </div>
+</div>
+<button class="review-restore" onclick="toggleReviewBar(false)">展开评审条</button>
+
+<div id="stage" class="stage device-desktop">
+  <div id="appFrame" class="app-frame"></div>
+</div>
+<div id="overlayRoot"></div>
+<div id="menuRoot"></div>
+<div id="toastHost" class="toast-host"></div>
+
+<script>
+/* ============================================================================
+   14–16px 线性 SVG 图标库（对齐 Lucide）
+   ============================================================================ */
+const ICONS = {
+  dashboard: '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-4.8-4.8a1.5 1.5 0 0 0-2.1 0L6 18.3"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><polygon points="16.2 7.8 14.1 14.1 7.8 16.2 9.9 9.9 16.2 7.8"/>',
+  upload: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  package: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12 4 7.5"/>',
+  megaphone: '<path d="m3 11 15-5v12L3 13v-2Z"/><path d="M11 14v4a2 2 0 0 1-2 2H8"/><path d="M18 8a4 4 0 0 1 0 8"/>',
+  sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7"/><path d="m16 7 2.5 2.5"/>',
+  network: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5V12m0 0-5.3 4.8M12 12l5.3 4.8"/>',
+  database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>',
+  shield: '<path d="M12 3 5 6v6c0 4.5 3 7.7 7 9 4-1.3 7-4.5 7-9V6l-7-3Z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  check: '<path d="m5 13 4 4L19 7"/>',
+  close: '<path d="M18 6 6 18M6 6l12 12"/>',
+  chevDown: '<path d="m6 9 6 6 6-6"/>',
+  more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  moon: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a6.8 6.8 0 0 0 11 11Z"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  external: '<path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  alert: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.4h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+  refresh: '<path d="M20 11a8 8 0 0 0-14.5-4.6L3 9"/><path d="M3 4v5h5"/><path d="M4 13a8 8 0 0 0 14.5 4.6L21 15"/><path d="M21 20v-5h-5"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.4 0 10 8 10 8a18.5 18.5 0 0 1-2.2 3.2"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3.6 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/>',
+  bolt: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  download: '<path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 18v2h16v-2"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  win: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
+  apple: '<path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/>',
+  android: '<path d="M5 16v-3a7 7 0 0 1 14 0v3H5Z"/><path d="M9 6 7 3M15 6l2-3"/><circle cx="9.5" cy="11.5" r=".8" fill="currentColor"/><circle cx="14.5" cy="11.5" r=".8" fill="currentColor"/><path d="M5 18h14"/>',
+};
+function icon(name, size = 15) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+/* ============================================================================
+   标准 .xb-menu 浮层菜单引擎（用于所有下拉选择器与 ⋯ 更多操作菜单）
+   遵守 ui-conventions.md：一项一行、33px 高、说明进 title + aria-description
+   ============================================================================ */
+const MENU_REG = new Map();
+let activeMenuKey = null;
+
+function xbSelect({ id, value, options, prefix = '', sm = false, full = false, width = '', title = '', onChange }) {
+  MENU_REG.set(id, { kind: 'select', value, options, onChange });
+  const cur = options.find(o => String(o.value) === String(value)) || options[0] || { label: '请选择' };
+  const isOpen = activeMenuKey === id;
+  const cls = ['xb-select-btn', sm ? 'is-sm' : '', full ? 'is-full' : '', isOpen ? 'is-open' : ''].filter(Boolean).join(' ');
+  const st = width ? `style="min-width:${width}"` : '';
+  return `
+    <button type="button" class="${cls}" ${st} data-menu-trigger="${esc(id)}"
+      aria-haspopup="listbox" aria-expanded="${isOpen}"
+      title="${esc(title || cur.desc || cur.label)}" aria-description="${esc(title || cur.desc || '')}"
+      onclick="event.stopPropagation();openXbMenu('${esc(id)}', this)">
+      <span class="xb-select-val">
+        ${cur.dot ? `<i class="status-dot ${cur.dot}"></i>` : ''}
+        ${prefix ? `<span class="pfx">${esc(prefix)}</span>` : ''}
+        <span class="txt">${esc(cur.label)}</span>
+      </span>
+      <span class="xb-select-chev">${icon('chevDown', 14)}</span>
+    </button>
+  `;
+}
+
+function xbMoreMenu(id, items) {
+  MENU_REG.set(id, { kind: 'action', items });
+  return `
+    <button type="button" class="xb-icon-btn is-sm" data-menu-trigger="${esc(id)}"
+      aria-haspopup="menu" aria-label="更多操作" title="更多操作"
+      onclick="event.stopPropagation();openXbMenu('${esc(id)}', this)">
+      ${icon('more', 15)}
+    </button>
+  `;
+}
+
+function openXbMenu(id, triggerEl) {
+  if (activeMenuKey === id) { closeXbMenu(); return; }
+  closeXbMenu();
+  const cfg = MENU_REG.get(id);
+  if (!cfg) return;
+  activeMenuKey = id;
+  triggerEl.classList.add('is-open');
+
+  const rect = triggerEl.getBoundingClientRect();
+  const rows = cfg.kind === 'select' ? cfg.options : cfg.items;
+  const menuW = cfg.kind === 'select' ? Math.max(Math.min(rect.width, 260), 176) : 184;
+  const estH = Math.min(rows.length * 35 + 14, 280);
+  const openUp = rect.bottom + estH + 10 > window.innerHeight && rect.top > estH;
+  const alignRight = cfg.kind === 'action' || rect.left + menuW > window.innerWidth - 12;
+  const left = alignRight ? Math.max(10, rect.right - menuW) : Math.min(rect.left, window.innerWidth - menuW - 12);
+  const top = openUp ? Math.max(10, rect.top - estH - 6) : rect.bottom + 6;
+
+  const html = cfg.kind === 'select'
+    ? cfg.options.map(o => {
+        const active = String(o.value) === String(cfg.value);
+        return `
+          <button type="button" class="xb-menu-item ${active ? 'is-active' : ''}" role="option" aria-selected="${active}"
+            title="${esc(o.desc || o.label)}" aria-description="${esc(o.desc || '')}"
+            onclick="pickMenuSelect('${esc(id)}','${esc(String(o.value))}')">
+            ${o.icon ? `<span class="m-ico">${icon(o.icon, 14)}</span>` : o.dot ? `<i class="status-dot ${o.dot}"></i>` : ''}
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.label)}</span>
+            ${active ? `<span class="m-chk">${icon('check', 14)}</span>` : o.hint ? `<span class="m-hint">${esc(o.hint)}</span>` : ''}
+          </button>
+        `;
+      }).join('')
+    : cfg.items.map((it, idx) => {
+        if (it.sep) return '<div class="xb-menu-sep"></div>';
+        return `
+          <button type="button" class="xb-menu-item ${it.danger ? 'is-danger' : ''}" role="menuitem"
+            title="${esc(it.desc || it.label)}" aria-description="${esc(it.desc || '')}"
+            onclick="runMenuAction('${esc(id)}', ${idx})">
+            ${it.icon ? `<span class="m-ico">${icon(it.icon, 14)}</span>` : ''}
+            <span>${esc(it.label)}</span>
+          </button>
+        `;
+      }).join('');
+
+  document.getElementById('menuRoot').innerHTML = `
+    <div class="xb-menu" role="${cfg.kind === 'select' ? 'listbox' : 'menu'}"
+      style="left:${left}px;top:${top}px;width:${menuW}px" onclick="event.stopPropagation()">
+      ${html}
+    </div>
+  `;
+}
+
+function pickMenuSelect(id, val) {
+  const cfg = MENU_REG.get(id);
+  closeXbMenu();
+  if (cfg?.onChange) cfg.onChange(val);
+}
+function runMenuAction(id, idx) {
+  const cfg = MENU_REG.get(id);
+  const item = cfg?.items?.[idx];
+  closeXbMenu();
+  if (item?.run) item.run();
+}
+function closeXbMenu() {
+  activeMenuKey = null;
+  document.querySelectorAll('.xb-select-btn.is-open').forEach(el => el.classList.remove('is-open'));
+  const root = document.getElementById('menuRoot');
+  if (root) root.innerHTML = '';
+}
+document.addEventListener('click', closeXbMenu);
+window.addEventListener('resize', closeXbMenu);
+window.addEventListener('scroll', (e) => {
+  if (e.target?.closest?.('.xb-menu')) return;
+  closeXbMenu();
+}, true);
+
+/* ============================================================================
+   Wallpaper Artwork SVGs
+   ============================================================================ */
+function artSvg(seed) {
+  const presets = {
+    aurora: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="au1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#071525"/><stop offset="55%" stop-color="#0d2b3e"/><stop offset="100%" stop-color="#191632"/></linearGradient><radialGradient id="au2" cx="45%" cy="32%" r="60%"><stop offset="0%" stop-color="#3bf4c5" stop-opacity=".75"/><stop offset="50%" stop-color="#22a7f0" stop-opacity=".32"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs><rect width="400" height="250" fill="url(#au1)"/><rect width="400" height="250" fill="url(#au2)"/><path d="M0 165 Q90 95 190 138 T400 110 L400 250 L0 250 Z" fill="#0b1a2a" opacity=".82"/><path d="M0 198 L75 142 L150 185 L238 128 L330 176 L400 148 L400 250 L0 250 Z" fill="#060f1a"/></svg>`,
+    sunset: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="su1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1f1738"/><stop offset="48%" stop-color="#c94c6c"/><stop offset="82%" stop-color="#f9975d"/><stop offset="100%" stop-color="#ffd59e"/></linearGradient></defs><rect width="400" height="250" fill="url(#su1)"/><circle cx="220" cy="148" r="44" fill="#fff0c8" opacity=".92"/><path d="M0 168 Q110 140 215 164 T400 156 L400 250 L0 250 Z" fill="#3a2146" opacity=".7"/><path d="M0 195 Q130 168 250 196 T400 182 L400 250 L0 250 Z" fill="#1b1126"/></svg>`,
+    cyber: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="cy1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0b0818"/><stop offset="55%" stop-color="#1b1038"/><stop offset="100%" stop-color="#0c1e35"/></linearGradient></defs><rect width="400" height="250" fill="url(#cy1)"/><circle cx="310" cy="68" r="56" fill="#ff3e7f" opacity=".28"/><circle cx="95" cy="96" r="68" fill="#00e5ff" opacity=".22"/><rect x="24" y="102" width="44" height="148" fill="#120c26"/><rect x="82" y="72" width="52" height="178" fill="#181034"/><rect x="150" y="92" width="48" height="158" fill="#110b24"/><rect x="214" y="54" width="58" height="196" fill="#1a123b"/><rect x="288" y="84" width="44" height="166" fill="#120c26"/><g fill="#00e5ff" opacity=".8"><rect x="92" y="88" width="12" height="4"/><rect x="112" y="88" width="12" height="4"/><rect x="226" y="72" width="28" height="4"/></g><g fill="#ff4785" opacity=".85"><rect x="160" y="110" width="26" height="4"/><rect x="298" y="104" width="22" height="4"/></g></svg>`,
+    dune: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="du1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2e4d3"/><stop offset="100%" stop-color="#dfb892"/></linearGradient></defs><rect width="400" height="250" fill="url(#du1)"/><circle cx="318" cy="58" r="24" fill="#fffaf2" opacity=".9"/><path d="M0 142 Q120 96 245 148 T400 130 L400 250 L0 250 Z" fill="#e2a878"/><path d="M0 176 Q140 132 275 186 T400 174 L400 250 L0 250 Z" fill="#b86b42"/><path d="M0 218 Q165 185 400 212 L400 250 L0 250 Z" fill="#7c3e24"/></svg>`,
+    ocean: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="oc1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0f3d57"/><stop offset="50%" stop-color="#177894"/><stop offset="100%" stop-color="#58c4c6"/></linearGradient></defs><rect width="400" height="250" fill="url(#oc1)"/><path d="M0 142 Q120 105 240 148 T400 132 L400 250 L0 250 Z" fill="#0d4a66" opacity=".55"/><path d="M0 185 Q130 156 260 192 T400 176 L400 250 L0 250 Z" fill="#082e42" opacity=".78"/></svg>`,
+    forest: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="fo1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d7e6dc"/><stop offset="55%" stop-color="#8bb19b"/><stop offset="100%" stop-color="#224436"/></linearGradient></defs><rect width="400" height="250" fill="url(#fo1)"/><path d="M0 138 Q105 92 220 128 T400 112 L400 250 L0 250 Z" fill="#46735d" opacity=".68"/><path d="M0 172 L35 128 L66 172 L95 118 L128 172 L170 136 L205 172 L254 114 L292 172 L336 126 L372 172 L400 144 L400 250 L0 250 Z" fill="#183328"/></svg>`,
+    arch: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><rect width="400" height="250" fill="#f1ece4"/><polygon points="0,250 175,45 175,250" fill="#c7bfb4"/><polygon points="175,45 310,120 310,250 175,250" fill="#2c2a2e"/><polygon points="310,120 400,72 400,250 310,250" fill="#d93a44" opacity=".82"/><circle cx="96" cy="72" r="22" fill="#18171a"/></svg>`,
+    sakura: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sa1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fde8ee"/><stop offset="55%" stop-color="#f7b9cb"/><stop offset="100%" stop-color="#7c639b"/></linearGradient></defs><rect width="400" height="250" fill="url(#sa1)"/><circle cx="290" cy="84" r="50" fill="#fff7f9" opacity=".85"/><path d="M0 185 Q120 146 250 182 T400 165 L400 250 L0 250 Z" fill="#5e4376" opacity=".68"/><path d="M0 210 Q160 178 400 206 L400 250 L0 250 Z" fill="#2f2242"/></svg>`,
+    space: `<svg class="wp-art" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="sp1" cx="35%" cy="35%" r="75%"><stop offset="0%" stop-color="#2c1f57"/><stop offset="55%" stop-color="#100f24"/><stop offset="100%" stop-color="#05050a"/></radialGradient><linearGradient id="sp2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f9744b"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs><rect width="400" height="250" fill="url(#sp1)"/><circle cx="215" cy="126" r="52" fill="url(#sp2)"/><ellipse cx="215" cy="130" rx="112" ry="22" fill="none" stroke="#ffd4b8" stroke-width="5" stroke-opacity=".65" transform="rotate(-14 215 130)"/></svg>`,
+  };
+  return presets[seed] || presets.aurora;
+}
+
+/* ============================================================================
+   Domain State
+   ============================================================================ */
+const CATEGORIES = [
+  { id: 'nature', name: '自然风景', desc: '山川、极光、日落与森林摄影' },
+  { id: 'cyberpunk', name: '赛博霓虹', desc: '都市雨夜、科幻与霓虹光影' },
+  { id: 'minimal', name: '极简建筑', desc: '几何留白与现代建筑线条' },
+  { id: 'anime', name: '二次元治愈', desc: '樱花、手绘插画与治愈风' },
+  { id: 'space', name: '宇宙星云', desc: '深空行星与银河星云' },
+  { id: 'ocean', name: '海洋流光', desc: '航拍海浪与浅滩微光' },
+];
+
+const PLATFORMS = [
+  { id: 'windows-x86_64', short: 'Windows x64', label: 'Windows 10/11 · 64 位', ico: 'win' },
+  { id: 'darwin-aarch64', short: 'macOS ARM', label: 'macOS 12+ · Apple 芯片', ico: 'apple' },
+  { id: 'darwin-x86_64', short: 'macOS Intel', label: 'macOS · Intel', ico: 'apple' },
+  { id: 'android-arm64', short: 'Android APK', label: 'Android 10+ · 手机版', ico: 'android' },
+];
+
+const state = {
+  appMode: 'console',
+  device: 'desktop',
+  theme: 'light',
+  accent: 'red',
+  page: 'overview',
+  mobileMenuOpen: false,
+  defaultPwdWarn: true,
+
+  wpFilter: { status: 'all', media: 'all', category: 'all', source: 'all', q: '', view: 'grid' },
+  wpSelected: new Set(),
+  wallpapers: [
+    { id: 'wp-101', title: '极光冰湖 · 4K 延时循环', art: 'aurora', media_type: 'video', duration: '00:18', category: 'nature', tags: ['极光', '4K', '无缝循环'], resolution: '3840×2160', orientation: 'landscape', source_type: 'custom', provider: '自主上架', status: 'published', localCopy: true, desc: '冰岛杰古沙龙冰河湖实拍 60fps 延时。' },
+    { id: 'wp-102', title: '日落珊瑚海岸线', art: 'sunset', media_type: 'image', category: 'nature', tags: ['日落', '治愈'], resolution: '5120×2880', orientation: 'landscape', source_type: 'collected', provider: 'unsplash', status: 'published', localCopy: false, desc: '黄昏温暖色调，适配浅深色桌面图标。' },
+    { id: 'wp-103', title: '新东京雨夜霓虹街景', art: 'cyber', media_type: 'video', duration: '00:12', category: 'cyberpunk', tags: ['赛博朋克', '雨夜'], resolution: '3840×2160', orientation: 'landscape', source_type: 'collected', provider: 'pexels', status: 'pending', localCopy: true, desc: '待核对循环接缝与暗部噪点。' },
+    { id: 'wp-104', title: '晨雾沙丘极简光影', art: 'dune', media_type: 'image', category: 'minimal', tags: ['沙丘', '极简'], resolution: '4096×2304', orientation: 'landscape', source_type: 'collected', provider: 'unsplash', status: 'pending', localCopy: false, desc: '柔和低饱和度沙漠光影。' },
+    { id: 'wp-105', title: '樱花暮色列车（竖屏）', art: 'sakura', media_type: 'image', category: 'anime', tags: ['樱花', '手机'], resolution: '1440×3120', orientation: 'portrait', source_type: 'collected', provider: 'okslop', status: 'pending', localCopy: false, desc: 'AI 生成竖屏壁纸，需复核清晰度。' },
+    { id: 'wp-106', title: '深海翡翠浪涌 4K', art: 'ocean', media_type: 'video', duration: '00:24', category: 'ocean', tags: ['海洋', '4K'], resolution: '3840×2160', orientation: 'landscape', source_type: 'custom', provider: '自主上架', status: 'published', localCopy: true, desc: '俯拍慢动作海浪，已生成首帧海报。' },
+    { id: 'wp-107', title: '几何美术馆红光走廊', art: 'arch', media_type: 'image', category: 'minimal', tags: ['建筑', '几何'], resolution: '3840×2160', orientation: 'landscape', source_type: 'collected', provider: 'pixabay', status: 'published', localCopy: true, desc: 'Pixabay 已自动保存本站副本。' },
+    { id: 'wp-108', title: '迷雾松林晨光（已替换）', art: 'forest', media_type: 'image', category: 'nature', tags: ['森林', '护眼'], resolution: '2560×1440', orientation: 'landscape', source_type: 'collected', provider: 'bing', status: 'offline', localCopy: false, desc: '已有更高清 4K 版本。' },
+  ],
+
+  collector: {
+    q: '', media: 'image', orientation: 'all', provider: 'all',
+    quickMode: true, presetCategory: 'nature', presetStatus: 'published',
+    selected: new Set(), collectedIds: new Set(['ext-2', 'ext-5']),
+    items: [
+      { id: 'ext-1', title: '土星光环深空星云', art: 'space', provider: 'unsplash', media_type: 'image', resolution: '5120×2880', orientation: 'landscape' },
+      { id: 'ext-2', title: '日落珊瑚海岸线', art: 'sunset', provider: 'unsplash', media_type: 'image', resolution: '5120×2880', orientation: 'landscape' },
+      { id: 'ext-3', title: '北欧薄雾雪松林', art: 'forest', provider: 'pexels', media_type: 'image', resolution: '4000×2667', orientation: 'landscape' },
+      { id: 'ext-4', title: '珊瑚几何展厅光影', art: 'arch', provider: 'pixabay', media_type: 'image', resolution: '3840×2160', orientation: 'landscape' },
+      { id: 'ext-5', title: '极光冰湖延时动态', art: 'aurora', provider: 'pexels', media_type: 'video', duration: '00:18', resolution: '3840×2160', orientation: 'landscape' },
+      { id: 'ext-6', title: '赛博雨夜高架桥流光', art: 'cyber', provider: 'pexels', media_type: 'video', duration: '00:15', resolution: '3840×2160', orientation: 'landscape' },
+      { id: 'ext-7', title: '粉紫色樱花晚霞', art: 'sakura', provider: 'okslop', media_type: 'image', resolution: '1024×1024', orientation: 'squarish' },
+      { id: 'ext-8', title: '翡翠浅海航拍波纹', art: 'ocean', provider: 'bing', media_type: 'image', resolution: '3840×2160', orientation: 'landscape' },
+    ]
+  },
+
+  upload: {
+    mediaType: 'image', uploadedArt: null, fileName: '', posterReady: false,
+    title: '', category: 'nature', tags: ['4K', '原创'],
+    orientation: 'landscape', width: null, height: null,
+    status: 'published', desc: '', previewFrame: 'desktop',
+  },
+
+  releases: [
+    {
+      version: '3.1.8', published: true, publishedAt: '2026-11-22 20:00',
+      notes: '• 伙伴页卡片与独立配置窗口视觉升级\n• 新增 8 款桌面小组件柔雾玻璃材质\n• 修复 macOS 多显示器唤醒黑屏问题',
+      platforms: {
+        'windows-x86_64': { url: '/api/v1/desktop/downloads/3.1.8/win', bytes: 88421000, sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', fileName: 'XiaoBan-3.1.8-setup.exe' },
+        'darwin-aarch64': { url: '/api/v1/desktop/downloads/3.1.8/mac-arm', bytes: 79210400, sha256: '7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730', fileName: 'XiaoBan-3.1.8-arm64.dmg' },
+        'darwin-x86_64': { url: 'https://github.com/bestyize/XiangBan/releases/v3.1.8/x64.dmg', bytes: 82100000, fileName: 'XiaoBan-3.1.8-x64.dmg' },
+        'android-arm64': { url: '/api/v1/desktop/downloads/3.1.8/android', bytes: 42650000, sha256: '4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a', fileName: 'XiaoBan-3.1.8.apk' },
+      }
+    },
+    {
+      version: '3.2.0-beta.1', published: false, publishedAt: '2026-12-01 10:00',
+      notes: '• 实验性接入本地语音实时通话模式\n• 优化壁纸离线缓存校验速度',
+      platforms: {
+        'windows-x86_64': { url: '/api/v1/desktop/downloads/3.2.0-beta.1/win', bytes: 91200000, sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', fileName: 'XiaoBan-3.2.0-beta.exe' },
+        'darwin-aarch64': { url: '/api/v1/desktop/downloads/3.2.0-beta.1/mac-arm', bytes: 81400000, sha256: '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b', fileName: 'XiaoBan-3.2.0-beta.dmg' },
+      }
+    }
+  ],
+
+  desktopConfig: {
+    siteUrl: 'https://wallpaper.xiangban.xyz',
+    introduction: '小伴是一款集 AI 工作助手、动态 4K 壁纸、3D 桌面伙伴、14 种桌面特效与实用小组件于一体的跨端陪伴应用。',
+    dirty: false,
+    announcements: [
+      { id: 'n-1', title: '小伴 3.1.8 正式发布：伙伴独立配置窗上线', body: '本次更新重构了伙伴卡片与独立配置窗口，支持双屏分别摆放伙伴与一键切换桌面层级。', published: true, audience: ['website', 'desktop', 'android'], startsAt: '2026-11-22 20:00', endsAt: '2026-12-15 23:59', skippable: true, confirmText: '立即更新', cancelText: '稍后再说', confirmUrl: 'https://wallpaper.xiangban.xyz/download' },
+      { id: 'n-2', title: '冬季 4K 动态壁纸专题已上新', body: '图库新增 40+ 条冰岛极光与暖冬雪景无缝循环 4K 动态壁纸，打开壁纸页即可免费一键应用。', published: true, audience: ['desktop'], startsAt: '2026-11-25 09:00', endsAt: '', skippable: true, confirmText: '', cancelText: '', confirmUrl: '' },
+      { id: 'n-3', title: '12 月例行维护预告', body: '服务器将于周日凌晨 03:00 进行 15 分钟数据库索引优化，期间已缓存壁纸可离线正常使用。', published: false, audience: ['website', 'desktop'], startsAt: '2026-12-06 00:00', endsAt: '2026-12-06 04:00', skippable: true, confirmText: '', cancelText: '', confirmUrl: '' }
+    ]
+  },
+
+  aiCatalogue: {
+    revision: 14, xiaobanAiEnabled: true, filterType: 'all',
+    providers: [
+      { id: 'deepseek', provider: 'DeepSeek', type: 'third', enabled: true, description: '高性价比国产推理与编程主力模型', endPoint: 'https://api.deepseek.com/v1', protocol: 'OpenAI Chat', defaultModel: 'deepseek-chat', hasKey: false, userAccess: [], models: [{ id: 'deepseek-chat', name: 'DeepSeek V3', enabled: true, reasoningEfforts: null }, { id: 'deepseek-reasoner', name: 'DeepSeek R1', enabled: true, reasoningEfforts: ['low', 'high', 'max'] }] },
+      { id: 'xiaoban-free', provider: '小伴公益速答', type: 'free', enabled: true, description: '登录即用的轻量免费对话模型', endPoint: 'https://ai.xiangban.xyz/free/v1', protocol: 'OpenAI Responses', defaultModel: 'xb-flash-lite', hasKey: true, userAccess: [], models: [{ id: 'xb-flash-lite', name: '小伴极速版', enabled: true, reasoningEfforts: [] }] },
+      { id: 'anthropic', provider: 'Anthropic Claude', type: 'third', enabled: true, description: '复杂工程架构与精细写作', endPoint: 'https://api.anthropic.com', protocol: 'Anthropic Messages', defaultModel: 'claude-sonnet-4-5', hasKey: false, userAccess: [], models: [{ id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', enabled: true, reasoningEfforts: ['low', 'medium', 'high'] }, { id: 'claude-opus-4', name: 'Claude Opus 4', enabled: false, reasoningEfforts: ['high', 'max'] }] },
+      { id: 'team-paid', provider: '内测高速通道', type: 'paid', enabled: false, description: '白名单用户专属受限网关', endPoint: 'https://gateway.xiangban.xyz/v1', protocol: 'OpenAI Responses', defaultModel: 'gpt-5-mini', hasKey: false, userAccess: [{ uid: '7a8d39e5-df8f-4d99-b163-0e491b4f4b87', hasKey: true }], models: [{ id: 'gpt-5-mini', name: 'GPT-5 Mini', enabled: true, reasoningEfforts: null }] },
+    ]
+  },
+
+  activeSourceId: 'unsplash',
+  sources: [
+    { id: 'unsplash', name: 'Unsplash', keyLabel: 'Access Key', docs: 'https://unsplash.com/developers', use_proxy: true, hotlink: { image: { policy: 'source', default: 'source', custom: false }, video: { policy: 'source', default: 'source', custom: false } }, keys: [{ id: 1, label: '主账号 Key #1', preview: 'un_8f2a…91cd', enabled: true, requests: 1842, failures: 3, last_status: 200, cooldown_secs: null }, { id: 2, label: '备用轮询 Key #2', preview: 'un_3c91…40be', enabled: true, requests: 924, failures: 0, last_status: 200, cooldown_secs: null }] },
+    { id: 'pixabay', name: 'Pixabay', keyLabel: 'API Key', docs: 'https://pixabay.com/api/docs/', use_proxy: true, warn: 'Pixabay 图片链接 24 小时失效且禁止永久直链，图片默认保存本站副本。', hotlink: { image: { policy: 'copy', default: 'copy', custom: false }, video: { policy: 'source', default: 'source', custom: false } }, keys: [{ id: 3, label: 'Pixabay 主 Key', preview: '41829…f01a', enabled: true, requests: 3102, failures: 19, last_status: 429, cooldown_secs: 840 }, { id: 4, label: 'Pixabay 备用 Key', preview: '50912…c83b', enabled: true, requests: 640, failures: 1, last_status: 200, cooldown_secs: null }] },
+    { id: 'pexels', name: 'Pexels', keyLabel: 'API Key', docs: 'https://www.pexels.com/api/', use_proxy: true, hotlink: { image: { policy: 'source', default: 'source', custom: false }, video: { policy: 'source', default: 'source', custom: false } }, keys: [{ id: 5, label: 'Pexels 生产 Key', preview: 'px_9a10…77df', enabled: true, requests: 2210, failures: 2, last_status: 200, cooldown_secs: null }] },
+    { id: 'okslop', name: 'okslop', keyLabel: 'API Key', docs: 'https://okslop.com/developers', use_proxy: false, warn: '免费层每日限 1000 次且仅支持图片，请勿批量抓取。', hotlink: { image: { policy: 'source', default: 'source', custom: false }, video: { policy: 'source', default: 'source', custom: false } }, keys: [{ id: 6, label: 'okslop 测试 Key', preview: 'ok_72fe…112c', enabled: false, requests: 118, failures: 4, last_status: 429, cooldown_secs: null }] },
+    { id: 'bing', name: 'Bing 必应', keyLabel: 'API Key (可选)', docs: 'https://www.bing.com', use_proxy: false, hotlink: { image: { policy: 'source', default: 'source', custom: false }, video: { policy: 'source', default: 'source', custom: false } }, keys: [] },
+  ],
+
+  proxyStrategy: 'round_robin',
+  proxies: [
+    { id: 1, name: '香港 CN2 节点', url: 'socks5h://hk-edge.internal:1080', has_auth: true, enabled: true, requests: 3420, failures: 12, last_error: null, cooldown_secs: null, probes: null },
+    { id: 2, name: '新加坡中转节点', url: 'http://sg-relay.internal:7890', has_auth: true, enabled: true, requests: 1400, failures: 4, last_error: null, cooldown_secs: null, probes: null },
+    { id: 3, name: '东京备用节点', url: 'socks5://jp-backup.internal:1080', has_auth: false, enabled: false, requests: 210, failures: 38, last_error: 'TLS handshake timeout after 10s', cooldown_secs: 24, probes: null },
+  ],
+
+  cache: { enabled: true, ttlValue: 6, ttlUnit: 3600, maxEntries: 1000, entries: 618, bytes: 26004684, hits: 4218, misses: 768, oldestAge: '6 小时 12 分', dirty: false },
+  account: { username: 'admin' },
+};
+
+/* ============================================================================
+   分组侧栏（内容与壁纸内页用页头大标签联动，侧栏更精炼）
+   ============================================================================ */
+const NAV_GROUPS = [
+  { label: '总览', items: [{ id: 'overview', label: '运营总览', icon: 'dashboard', desc: '图库待审、App 发版、图源与缓存全局健康度' }] },
+  {
+    label: '内容与壁纸',
+    items: [
+      { id: 'wallpapers', label: '壁纸图库', icon: 'image', desc: '审核、分类并上下架库内图片与动态视频', count: () => { const n = state.wallpapers.filter(w => w.status === 'pending').length; return n ? { text: String(n), warn: true } : null; } },
+      { id: 'collector', label: '采集工作台', icon: 'compass', desc: '聚合检索外部图源并一键采入图库' },
+      { id: 'upload', label: '自定义上架', icon: 'upload', desc: '上传本地 4K 图片或循环视频并自动探测规格' },
+    ]
+  },
+  {
+    label: '产品与分发',
+    items: [
+      { id: 'apps', label: 'App 版本发布', icon: 'package', desc: '上传四端安装包、管理版本号与更新说明', count: () => ({ text: 'v' + (state.releases.find(r => r.published)?.version || '—') }) },
+      { id: 'desktop', label: '官网与公告', icon: 'megaphone', desc: '配置官网源站地址、简介及多端弹窗公告', count: () => ({ text: String(state.desktopConfig.announcements.filter(a => a.published).length) }) },
+      { id: 'ai-providers', label: 'AI 模型目录', icon: 'sparkles', desc: '管理桌面端“设置 → AI 模型”服务商与默认推荐' },
+    ]
+  },
+  {
+    label: '基础设施',
+    items: [
+      { id: 'keys', label: '图源与密钥', icon: 'key', desc: '多密钥轮询、熔断状态与直链/副本策略', dot: () => state.sources.some(s => s.keys.some(k => k.cooldown_secs)) },
+      { id: 'proxies', label: '代理池', icon: 'network', desc: '出网代理轮换策略与多源连通性测速' },
+      { id: 'cache', label: '搜索缓存', icon: 'database', desc: 'PostgreSQL 检索缓存命中率与容量策略' },
+    ]
+  }
+];
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+function fmtBytes(b) { if (!b) return '—'; return b < 1024 * 1024 ? (b / 1024).toFixed(1) + ' KB' : (b / 1024 / 1024).toFixed(1) + ' MB'; }
+function catName(id) { return CATEGORIES.find(c => c.id === id)?.name || '未分类'; }
+function statusLabel(st) { return st === 'published' ? '已上架' : st === 'pending' ? '待审核' : '已下架'; }
+function statusDot(st) { return st === 'published' ? 'ok' : st === 'pending' ? 'warn' : 'danger'; }
+
+function toast(msg) {
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `${icon('check', 14)}<span>${esc(msg)}</span>`;
+  host.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = '.18s'; }, 2300);
+  setTimeout(() => el.remove(), 2550);
+}
+
+/* ============================================================================
+   顶部评审条控制
+   ============================================================================ */
+function setAppMode(m) {
+  state.appMode = m;
+  document.getElementById('modeConsoleBtn').classList.toggle('active', m === 'console');
+  document.getElementById('modeLoginBtn').classList.toggle('active', m === 'login');
+  render();
+}
+function setAccent(acc) {
+  state.accent = acc;
+  document.documentElement.setAttribute('data-accent', acc);
+  document.querySelectorAll('.rb-sw').forEach(b => b.classList.toggle('active', b.dataset.acc === acc));
+}
+function setTheme(t) {
+  state.theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeLightBtn').classList.toggle('active', t === 'light');
+  document.getElementById('themeDarkBtn').classList.toggle('active', t === 'dark');
+  render();
+}
+function setDevice(d) {
+  state.device = d;
+  const s = document.getElementById('stage');
+  s.classList.remove('device-desktop', 'device-tablet', 'device-mobile');
+  s.classList.add('device-' + d);
+  ['desktop', 'tablet', 'mobile'].forEach(k => document.getElementById('dev' + k[0].toUpperCase() + k.slice(1) + 'Btn').classList.toggle('active', d === k));
+  state.mobileMenuOpen = false;
+  render();
+}
+function toggleDefaultPwd() { state.defaultPwdWarn = !state.defaultPwdWarn; document.getElementById('pwdWarnBtn').classList.toggle('on', state.defaultPwdWarn); render(); }
+function toggleReviewBar(c) { document.getElementById('reviewBar').classList.toggle('collapsed', c); document.getElementById('stage').classList.toggle('bar-hidden', c); }
+function go(p) { closeXbMenu(); state.page = p; state.appMode = 'console'; state.mobileMenuOpen = false; document.getElementById('modeConsoleBtn').classList.add('active'); document.getElementById('modeLoginBtn').classList.remove('active'); render(); }
+
+/* ============================================================================
+   Core Render
+   ============================================================================ */
+function render() {
+  closeXbMenu();
+  const frame = document.getElementById('appFrame');
+  if (state.appMode === 'login') { frame.innerHTML = renderLogin(); return; }
+
+  const narrow = ['upload', 'desktop', 'proxies', 'cache', 'account'].includes(state.page);
+  const pageTitle = state.page === 'account' ? '管理员账户' : NAV_GROUPS.flatMap(g => g.items).find(i => i.id === state.page)?.label || '运营总览';
+
+  frame.innerHTML = `
+    <div class="control-app">
+      <div class="mobile-scrim ${state.mobileMenuOpen ? 'open' : ''}" onclick="state.mobileMenuOpen=false;render()"></div>
+      <aside class="xb-side ${state.mobileMenuOpen ? 'open' : ''}">
+        <div class="side-brand" onclick="go('overview')" title="wallpaper.xiangban.xyz · 返回运营总览">
+          <span class="xb-mark"><img src="assets/app-icon-new.webp" alt="小伴" onerror="this.style.display='none'" /></span>
+          <span class="side-brand-name">小伴控制台</span>
+        </div>
+
+        <button type="button" class="xb-search-trigger" onclick="openCmd()" title="快捷跳转与操作 (⌘K)">
+          ${icon('search', 14)}<span>快速跳转…</span><span class="xb-kbd-mini">⌘K</span>
+        </button>
+
+        <nav class="side-nav" aria-label="后台导航">
+          ${NAV_GROUPS.map(g => `
+            <div>
+              <div class="side-group-title">${esc(g.label)}</div>
+              <div class="side-list">
+                ${g.items.map(it => {
+                  const cnt = it.count ? it.count() : null;
+                  const dot = it.dot ? it.dot() : false;
+                  return `
+                    <button type="button" class="side-item ${state.page === it.id ? 'is-active' : ''}"
+                      title="${esc(it.desc)}" aria-description="${esc(it.desc)}"
+                      onclick="go('${it.id}')">
+                      ${icon(it.icon, 15)}
+                      <span>${esc(it.label)}</span>
+                      ${cnt ? `<span class="side-count ${cnt.warn ? 'is-warn' : ''}">${esc(cnt.text)}</span>` : ''}
+                      ${dot ? `<span class="side-dot" title="存在冷却中的图源密钥"></span>` : ''}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </nav>
+
+        <div class="side-foot">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+            <a class="xb-btn-ghost is-sm" href="features-download-redesign.html" target="_blank" title="打开小伴官网前台">
+              ${icon('external', 13)}<span>访问前台</span>
+            </a>
+            <button type="button" class="xb-icon-btn is-sm" title="${state.theme === 'light' ? '切换深色暗室模式' : '切换浅色模式'}" onclick="setTheme(state.theme==='light'?'dark':'light')">
+              ${icon(state.theme === 'light' ? 'moon' : 'sun', 15)}
+            </button>
+          </div>
+          <div class="side-acc">
+            <button type="button" class="side-acc-btn" onclick="go('account')" title="修改管理员用户名与密码">
+              <span class="side-avatar">${esc(state.account.username[0].toUpperCase())}</span>
+              <span class="side-acc-name">${esc(state.account.username)}</span>
+            </button>
+            <button type="button" class="xb-icon-btn is-sm" title="退出登录" onclick="setAppMode('login');toast('已退出登录')">
+              ${icon('logout', 14)}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="control-main">
+        <div class="mobile-bar">
+          <button type="button" class="xb-icon-btn" aria-label="菜单" onclick="state.mobileMenuOpen=true;render()">${icon('menu', 18)}</button>
+          <strong style="font-size:14px">${esc(pageTitle)}</strong>
+          <button type="button" class="xb-icon-btn" aria-label="快捷跳转" onclick="openCmd()">${icon('search', 16)}</button>
+        </div>
+
+        <div class="control-workspace">
+          <div class="xb-page ${narrow ? 'is-narrow' : ''}">
+            ${state.defaultPwdWarn && state.page !== 'account' ? `
+              <div class="xb-alert" role="alert">
+                <div class="xb-alert-l">${icon('alert', 15)}<span>当前仍在使用默认管理员密码，存在未授权登录风险。</span></div>
+                <button type="button" class="xb-btn-ghost is-sm" style="color:inherit;font-weight:600" onclick="go('account')">修改密码</button>
+              </div>
+            ` : ''}
+            ${renderPage()}
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderPage() {
+  switch (state.page) {
+    case 'overview': return renderOverview();
+    case 'wallpapers': return renderWallpapers();
+    case 'collector': return renderCollector();
+    case 'upload': return renderUpload();
+    case 'apps': return renderApps();
+    case 'desktop': return renderDesktop();
+    case 'ai-providers': return renderAiProviders();
+    case 'keys': return renderKeys();
+    case 'proxies': return renderProxies();
+    case 'cache': return renderCache();
+    case 'account': return renderAccount();
+    default: return renderOverview();
+  }
+}
+
+/* ============================================================================
+   1. 运营总览（紧凑、无废话副标题、清晰数据与快捷入口）
+   ============================================================================ */
+function renderOverview() {
+  const pubCount = state.wallpapers.filter(w => w.status === 'published').length;
+  const pending = state.wallpapers.filter(w => w.status === 'pending');
+  const videoCount = state.wallpapers.filter(w => w.media_type === 'video').length;
+  const activeNotices = state.desktopConfig.announcements.filter(a => a.published).length;
+  const latestRel = state.releases.find(r => r.published);
+  const hitRate = ((state.cache.hits / (state.cache.hits + state.cache.misses)) * 100).toFixed(1);
+
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">运营总览</h1>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" onclick="go('collector')">${icon('compass', 14)}<span>采集壁纸</span></button>
+        <button type="button" class="xb-btn-ghost" onclick="go('upload')">${icon('upload', 14)}<span>自定义上架</span></button>
+        <button type="button" class="xb-btn-primary" onclick="go('apps');openReleaseDrawer()">${icon('plus', 14)}<span>发布版本</span></button>
+      </div>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi-card" onclick="go('wallpapers')" title="查看全部壁纸图库">
+        <div class="kpi-top"><span>已上架壁纸</span>${icon('image', 15)}</div>
+        <div class="kpi-val num">${1280 + pubCount}</div>
+        <div class="kpi-foot"><span>视频 ${239 + videoCount}</span><span>·</span>${pending.length ? `<span class="xb-pill is-warn">${pending.length} 待审</span>` : '<span class="xb-pill is-ok">已清零</span>'}</div>
+      </div>
+      <div class="kpi-card" onclick="go('apps')" title="管理客户端安装包与发布状态">
+        <div class="kpi-top"><span>线上最新版本</span>${icon('package', 15)}</div>
+        <div class="kpi-val num">v${esc(latestRel?.version || '—')}</div>
+        <div class="kpi-foot"><span class="xb-pill is-ok"><i class="dot"></i>4/4 平台</span><span>1 草稿</span></div>
+      </div>
+      <div class="kpi-card" onclick="go('desktop')" title="管理网站、桌面端与 Android 公告">
+        <div class="kpi-top"><span>生效中公告</span>${icon('megaphone', 15)}</div>
+        <div class="kpi-val num">${activeNotices}<span style="font-size:13px;font-weight:500;color:var(--ui-text-tertiary)">条</span></div>
+        <div class="kpi-foot"><span>官网 · 桌面 · Android</span></div>
+      </div>
+      <div class="kpi-card" onclick="go('cache')" title="查看搜索缓存命中与容量">
+        <div class="kpi-top"><span>缓存命中率</span>${icon('database', 15)}</div>
+        <div class="kpi-val num">${hitRate}%</div>
+        <div class="kpi-foot"><span>${state.cache.entries}/${state.cache.maxEntries} 条 · ${fmtBytes(state.cache.bytes)}</span></div>
+      </div>
+    </div>
+
+    <div class="split-2">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <section>
+          <div class="xb-sec-head">
+            <h2 class="xb-sec-title">待审核壁纸 ${pending.length ? `<span class="xb-pill is-warn">${pending.length}</span>` : ''}</h2>
+            <button type="button" class="xb-btn-ghost is-sm" onclick="state.wpFilter.status='pending';go('wallpapers')">全部</button>
+          </div>
+          <div class="xb-group">
+            ${pending.length ? pending.map(w => `
+              <div class="xb-row">
+                <div class="xb-row-main">
+                  <div class="mini-thumb" onclick="openLightbox('${w.id}','library')" title="预览大图">${artSvg(w.art)}</div>
+                  <div style="min-width:0">
+                    <div class="xb-row-title">${esc(w.title)}</div>
+                    <div class="xb-row-meta">
+                      <span>${w.media_type === 'video' ? '视频' : '图片'}</span><span>·</span>
+                      <span class="num">${esc(w.resolution)}</span><span>·</span>
+                      <span>${esc(catName(w.category))}</span><span>·</span>
+                      <span>${esc(w.provider)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="xb-row-actions">
+                  <button type="button" class="xb-btn-ghost is-sm" onclick="openWpDrawer('${w.id}')">编辑</button>
+                  <button type="button" class="xb-btn-primary is-sm" onclick="quickWpStatus('${w.id}','published')">上架</button>
+                </div>
+              </div>
+            `).join('') : '<div style="padding:32px;text-align:center;color:var(--ui-text-tertiary)">暂无待审核壁纸</div>'}
+          </div>
+        </section>
+
+        <section>
+          <div class="xb-sec-head">
+            <h2 class="xb-sec-title">AI 模型目录 <span class="xb-pill">修订 #${state.aiCatalogue.revision}</span></h2>
+            <button type="button" class="xb-btn-ghost is-sm" onclick="go('ai-providers')">管理</button>
+          </div>
+          <div class="xb-group">
+            <div class="xb-row" title="桌面端排首位的官方额度服务入口，关闭后客户端下次刷新将隐藏">
+              <div class="xb-row-main">
+                <span class="xb-pill is-accent">${icon('sparkles', 12)}<span>小伴 AI 入口</span></span>
+                <span style="font-size:12.5px;color:var(--ui-text-secondary)">${state.aiCatalogue.xiaobanAiEnabled ? '桌面端展示中' : '已隐藏'}</span>
+              </div>
+              <button type="button" class="xb-switch" role="switch" aria-checked="${state.aiCatalogue.xiaobanAiEnabled}" onclick="toggleXiaobanAi()"></button>
+            </div>
+            <div class="xb-row" style="gap:6px;justify-content:flex-start">
+              ${state.aiCatalogue.providers.map(p => `
+                <span class="xb-pill ${p.enabled ? 'is-ok' : ''}" title="${esc(p.endPoint)}"><i class="dot"></i>${esc(p.provider)}</span>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <section>
+          <div class="xb-sec-head">
+            <h2 class="xb-sec-title">图源状态</h2>
+            <button type="button" class="xb-btn-ghost is-sm" onclick="go('keys')">配置</button>
+          </div>
+          <div class="xb-group">
+            ${state.sources.map(s => {
+              const en = s.keys.filter(k => k.enabled).length;
+              const cool = s.keys.some(k => k.cooldown_secs);
+              return `
+                <div class="xb-row" style="cursor:pointer" onclick="state.activeSourceId='${s.id}';go('keys')" title="${esc(s.warn || s.docs)}">
+                  <div style="min-width:0">
+                    <div class="xb-row-title">${esc(s.name)} ${s.use_proxy ? '<span class="xb-pill is-info">代理</span>' : ''}</div>
+                    <div class="xb-row-meta">
+                      <span>${s.keys.length ? `${en}/${s.keys.length} 密钥` : '免密/未配'}</span><span>·</span>
+                      <span>${s.hotlink.image.policy === 'copy' ? '本站副本' : '直链优先'}</span>
+                    </div>
+                  </div>
+                  ${cool ? '<span class="xb-pill is-warn"><i class="dot"></i>冷却中</span>' : en > 0 || s.id === 'bing' ? '<span class="xb-pill is-ok"><i class="dot"></i>正常</span>' : '<span class="xb-pill">停用</span>'}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </section>
+
+        <section>
+          <div class="xb-sec-head">
+            <h2 class="xb-sec-title">代理池</h2>
+            <button type="button" class="xb-btn-ghost is-sm" onclick="go('proxies')">测速</button>
+          </div>
+          <div class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+              <span style="color:var(--ui-text-secondary)">${state.proxyStrategy === 'round_robin' ? '顺序轮询' : '随机挑选'}</span>
+              <strong class="num">${state.proxies.filter(p => p.enabled).length} / ${state.proxies.length} 在线</strong>
+            </div>
+            <div class="meter"><i style="width:${Math.round(state.proxies.filter(p => p.enabled).length / state.proxies.length * 100)}%"></i></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================================
+   2. 壁纸图库（页头大标签 + 无描边筛选 + 纯净画框 + ⋯ 菜单）
+   ============================================================================ */
+function filteredWp() {
+  const f = state.wpFilter;
+  return state.wallpapers.filter(w => {
+    if (f.status !== 'all' && w.status !== f.status) return false;
+    if (f.media !== 'all' && w.media_type !== f.media) return false;
+    if (f.category !== 'all' && w.category !== f.category) return false;
+    if (f.source !== 'all') {
+      if (f.source === 'custom' && w.source_type !== 'custom') return false;
+      if (f.source !== 'custom' && w.provider !== f.source) return false;
+    }
+    if (f.q.trim()) {
+      const kw = f.q.trim().toLowerCase();
+      if (!(w.title + ' ' + w.tags.join(' ') + ' ' + w.provider).toLowerCase().includes(kw)) return false;
+    }
+    return true;
+  });
+}
+
+function renderWallpapers() {
+  const list = filteredWp();
+  const counts = {
+    all: state.wallpapers.length,
+    published: state.wallpapers.filter(w => w.status === 'published').length,
+    pending: state.wallpapers.filter(w => w.status === 'pending').length,
+    offline: state.wallpapers.filter(w => w.status === 'offline').length,
+  };
+  const selN = state.wpSelected.size;
+
+  const mediaOpts = [
+    { value: 'all', label: '全部类型' },
+    { value: 'image', label: '静态图片', icon: 'image' },
+    { value: 'video', label: '动态视频', icon: 'play' },
+  ];
+  const catOpts = [{ value: 'all', label: '全部分类' }, ...CATEGORIES.map(c => ({ value: c.id, label: c.name, desc: c.desc }))];
+  const srcOpts = [
+    { value: 'all', label: '全部来源' },
+    { value: 'custom', label: '自主上架', dot: 'ok' },
+    { value: 'unsplash', label: 'Unsplash', dot: 'ok' },
+    { value: 'pexels', label: 'Pexels', dot: 'ok' },
+    { value: 'pixabay', label: 'Pixabay', dot: 'warn' },
+    { value: 'okslop', label: 'okslop', dot: 'off' },
+    { value: 'bing', label: 'Bing 必应', dot: 'ok' },
+  ];
+
+  return `
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg" role="tablist">
+        ${[['all', '全部'], ['published', '已上架'], ['pending', '待审核'], ['offline', '已下架']].map(([k, l]) => `
+          <button type="button" class="${state.wpFilter.status === k ? 'is-active' : ''}" onclick="state.wpFilter.status='${k}';render()">
+            <span>${l}</span><span class="tab-n">${counts[k]}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" onclick="go('collector')">${icon('compass', 14)}<span>采集</span></button>
+        <button type="button" class="xb-btn-primary" onclick="go('upload')">${icon('plus', 14)}<span>自定义上架</span></button>
+      </div>
+    </header>
+
+    <div class="filter-bar">
+      <div class="filter-l">
+        <div class="xb-affix has-l ${state.wpFilter.q ? 'has-r' : ''}" style="width:210px">
+          <span class="af-l">${icon('search', 14)}</span>
+          <input class="xb-input" type="search" placeholder="搜索标题或标签…" value="${esc(state.wpFilter.q)}" oninput="state.wpFilter.q=this.value;render()" />
+          ${state.wpFilter.q ? `<button type="button" class="af-r" aria-label="清空" onclick="state.wpFilter.q='';render()">${icon('close', 13)}</button>` : ''}
+        </div>
+        ${xbSelect({ id: 'wp-m', value: state.wpFilter.media, options: mediaOpts, onChange: v => { state.wpFilter.media = v; render(); } })}
+        ${xbSelect({ id: 'wp-c', value: state.wpFilter.category, options: catOpts, onChange: v => { state.wpFilter.category = v; render(); } })}
+        ${xbSelect({ id: 'wp-s', value: state.wpFilter.source, options: srcOpts, onChange: v => { state.wpFilter.source = v; render(); } })}
+      </div>
+      <div class="filter-r">
+        ${list.length ? `<button type="button" class="xb-btn-ghost is-sm" onclick="toggleAllWp()">${selN === list.length ? '取消全选' : '全选'}</button>` : ''}
+        <div class="xb-seg" role="group" aria-label="视图切换">
+          <button type="button" class="${state.wpFilter.view === 'grid' ? 'is-active' : ''}" title="画廊视图" onclick="state.wpFilter.view='grid';render()">${icon('grid', 14)}</button>
+          <button type="button" class="${state.wpFilter.view === 'table' ? 'is-active' : ''}" title="列表视图" onclick="state.wpFilter.view='table';render()">${icon('list', 14)}</button>
+        </div>
+      </div>
+    </div>
+
+    ${!list.length ? `
+      <div class="xb-group" style="padding:52px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <span style="color:var(--ui-text-tertiary)">${icon('image', 28)}</span>
+        <strong style="font-size:14px">暂无匹配壁纸</strong>
+        <button type="button" class="xb-btn-soft is-sm" onclick="state.wpFilter={status:'all',media:'all',category:'all',source:'all',q:'',view:state.wpFilter.view};render()">重置筛选</button>
+      </div>
+    ` : state.wpFilter.view === 'grid' ? `
+      <div class="wp-grid">
+        ${list.map(w => {
+          const sel = state.wpSelected.has(w.id);
+          return `
+            <article class="wp-card ${sel ? 'is-selected' : ''}">
+              <div class="wp-thumb" onclick="openLightbox('${w.id}','library')">
+                ${artSvg(w.art)}
+                <button type="button" class="wp-sel-btn" aria-label="选择" onclick="event.stopPropagation();toggleWp('${w.id}')">${sel ? icon('check', 13) : ''}</button>
+                <div class="wp-top-r">
+                  ${w.media_type === 'video' ? `<span class="wp-glass">${icon('play', 10)}<span>${w.duration}</span></span>` : ''}
+                  <span class="wp-glass num">${esc(w.resolution)}</span>
+                </div>
+                <div class="wp-bot-l">
+                  <span class="wp-glass">${esc(w.provider)}</span>
+                </div>
+              </div>
+              <div class="wp-info">
+                <div class="wp-info-l">
+                  <div class="wp-title" title="${esc(w.title)}">${esc(w.title)}</div>
+                  <div class="wp-sub">
+                    <i class="status-dot ${statusDot(w.status)}"></i>
+                    <span>${statusLabel(w.status)}</span><span>·</span>
+                    <span>${esc(catName(w.category))}</span>
+                  </div>
+                </div>
+                ${xbMoreMenu('wpm-' + w.id, [
+                  { label: w.status === 'published' ? '下架' : '立即上架', icon: 'bolt', run: () => quickWpStatus(w.id, w.status === 'published' ? 'offline' : 'published') },
+                  { label: '编辑信息', icon: 'edit', run: () => openWpDrawer(w.id) },
+                  { label: '查看大图', icon: 'eye', run: () => openLightbox(w.id, 'library') },
+                  { sep: true },
+                  { label: '永久删除', icon: 'trash', danger: true, desc: '删除后不可恢复', run: () => deleteWp(w.id) },
+                ])}
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    ` : `
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:40px"><button type="button" class="xb-check ${selN === list.length && list.length ? 'is-checked' : ''}" onclick="toggleAllWp()">${selN === list.length && list.length ? icon('check', 12) : ''}</button></th>
+              <th style="width:94px">预览</th>
+              <th>标题</th>
+              <th>分类</th>
+              <th>规格</th>
+              <th>来源</th>
+              <th>状态</th>
+              <th style="text-align:right;width:110px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(w => {
+              const sel = state.wpSelected.has(w.id);
+              return `
+                <tr class="${sel ? 'is-selected' : ''}">
+                  <td><button type="button" class="xb-check ${sel ? 'is-checked' : ''}" onclick="toggleWp('${w.id}')">${sel ? icon('check', 12) : ''}</button></td>
+                  <td><div class="mini-thumb" onclick="openLightbox('${w.id}','library')">${artSvg(w.art)}</div></td>
+                  <td><div style="font-weight:550" title="${esc(w.tags.join(' / '))}">${esc(w.title)}</div></td>
+                  <td>${esc(catName(w.category))}</td>
+                  <td class="num" style="color:var(--ui-text-secondary)">${esc(w.resolution)}</td>
+                  <td><span class="xb-pill">${esc(w.provider)}</span></td>
+                  <td><span class="xb-pill is-${statusDot(w.status)}"><i class="dot"></i>${statusLabel(w.status)}</span></td>
+                  <td style="text-align:right">
+                    <div style="display:inline-flex;align-items:center;gap:4px">
+                      <button type="button" class="xb-btn-ghost is-sm" onclick="openWpDrawer('${w.id}')">编辑</button>
+                      ${xbMoreMenu('wpt-' + w.id, [
+                        { label: w.status === 'published' ? '下架' : '上架', icon: 'bolt', run: () => quickWpStatus(w.id, w.status === 'published' ? 'offline' : 'published') },
+                        { sep: true },
+                        { label: '永久删除', icon: 'trash', danger: true, run: () => deleteWp(w.id) },
+                      ])}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+
+    ${selN > 0 ? `
+      <div class="batch-bar">
+        <span>已选 <strong class="num">${selN}</strong> 项</span>
+        <button type="button" class="batch-btn" onclick="batchWp('published')">上架</button>
+        <button type="button" class="batch-btn" onclick="batchWp('offline')">下架</button>
+        <button type="button" class="batch-btn is-danger-fill" onclick="batchDelWp()">删除</button>
+        <button type="button" class="batch-btn" onclick="state.wpSelected.clear();render()">取消</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+/* ============================================================================
+   3. 采集工作台
+   ============================================================================ */
+function renderCollector() {
+  const c = state.collector;
+  const list = c.items.filter(it => {
+    if (it.media_type !== c.media) return false;
+    if (c.provider !== 'all' && it.provider !== c.provider) return false;
+    if (c.orientation !== 'all' && it.orientation !== c.orientation) return false;
+    if (c.q.trim() && !it.title.toLowerCase().includes(c.q.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const srcOpts = [
+    { value: 'all', label: '全部图源', dot: 'ok' },
+    { value: 'unsplash', label: 'Unsplash', dot: 'ok' },
+    { value: 'pexels', label: 'Pexels', dot: 'ok' },
+    { value: 'pixabay', label: 'Pixabay', dot: 'warn', hint: '1 冷却' },
+    { value: 'okslop', label: 'okslop', dot: 'off' },
+    { value: 'bing', label: 'Bing 必应', dot: 'ok' },
+  ];
+  const oriOpts = [
+    { value: 'all', label: '全部画幅' },
+    { value: 'landscape', label: '横屏', icon: 'monitor' },
+    { value: 'portrait', label: '竖屏', icon: 'phone' },
+    { value: 'squarish', label: '方形', icon: 'grid' },
+  ];
+  const catOpts = CATEGORIES.map(x => ({ value: x.id, label: x.name, desc: x.desc }));
+  const stOpts = [
+    { value: 'published', label: '立即上架', dot: 'ok' },
+    { value: 'pending', label: '待审核', dot: 'warn' },
+  ];
+
+  return `
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg">
+        <button type="button" class="${c.media === 'image' ? 'is-active' : ''}" onclick="state.collector.media='image';render()">图片壁纸</button>
+        <button type="button" class="${c.media === 'video' ? 'is-active' : ''}" onclick="state.collector.media='video';render()">动态视频</button>
+      </div>
+      <div class="xb-page-actions">
+        ${xbSelect({ id: 'col-src', value: c.provider, options: srcOpts, onChange: v => { state.collector.provider = v; render(); } })}
+        ${xbSelect({ id: 'col-ori', value: c.orientation, options: oriOpts, onChange: v => { state.collector.orientation = v; render(); } })}
+      </div>
+    </header>
+
+    <div class="filter-bar">
+      <div class="xb-affix has-l ${c.q ? 'has-r' : ''}" style="flex:1;min-width:220px">
+        <span class="af-l">${icon('search', 14)}</span>
+        <input class="xb-input" type="search" placeholder="搜索外部供应商素材（如 极光、Cyberpunk、4K…）" value="${esc(c.q)}" oninput="state.collector.q=this.value;render()" />
+        ${c.q ? `<button type="button" class="af-r" onclick="state.collector.q='';render()">${icon('close', 13)}</button>` : ''}
+      </div>
+      <button type="button" class="xb-btn-primary" onclick="toast('已刷新检索结果')">检索</button>
+    </div>
+
+    <div class="preset-strip" title="开启一键快采后，点击卡片直接按此处分类与状态入库，跳过确认弹窗">
+      <div class="preset-l">
+        <strong style="display:inline-flex;align-items:center;gap:5px">${icon('bolt', 13)}<span>采集预设</span></strong>
+        ${xbSelect({ id: 'col-pc', value: c.presetCategory, options: catOpts, prefix: '分类：', sm: true, onChange: v => { state.collector.presetCategory = v; render(); } })}
+        ${xbSelect({ id: 'col-ps', value: c.presetStatus, options: stOpts, prefix: '状态：', sm: true, onChange: v => { state.collector.presetStatus = v; render(); } })}
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:8px;cursor:pointer" onclick="state.collector.quickMode=!state.collector.quickMode;render()">
+        <span>一键快采</span>
+        <button type="button" class="xb-switch" role="switch" aria-checked="${c.quickMode}"></button>
+      </div>
+    </div>
+
+    <div class="wp-grid">
+      ${list.map(it => {
+        const done = c.collectedIds.has(it.id);
+        const sel = c.selected.has(it.id);
+        return `
+          <article class="wp-card ${sel ? 'is-selected' : ''}">
+            <div class="wp-thumb" onclick="openLightbox('${it.id}','collector')">
+              ${artSvg(it.art)}
+              ${!done ? `<button type="button" class="wp-sel-btn" onclick="event.stopPropagation();toggleCol('${it.id}')">${sel ? icon('check', 13) : ''}</button>` : ''}
+              <div class="wp-top-r">
+                ${done ? `<span class="wp-glass is-ok">${icon('check', 11)}<span>已入库</span></span>` : `
+                  <button type="button" class="wp-glass is-action" onclick="event.stopPropagation();handleCollect('${it.id}')">
+                    ${icon(c.quickMode ? 'bolt' : 'download', 11)}<span>${c.quickMode ? '快采' : '采集'}</span>
+                  </button>
+                `}
+              </div>
+              <div class="wp-bot-l">
+                ${it.media_type === 'video' ? `<span class="wp-glass">${icon('play', 10)}<span>${it.duration}</span></span>` : ''}
+                <span class="wp-glass num">${esc(it.resolution)}</span>
+              </div>
+            </div>
+            <div class="wp-info">
+              <div class="wp-info-l">
+                <div class="wp-title">${esc(it.title)}</div>
+                <div class="wp-sub"><span>${esc(it.provider)}</span><span>·</span><span>${it.orientation === 'landscape' ? '横屏' : it.orientation === 'portrait' ? '竖屏' : '方形'}</span></div>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+
+    ${c.selected.size > 0 ? `
+      <div class="batch-bar">
+        <span>已选 <strong class="num">${c.selected.size}</strong> 项</span>
+        <button type="button" class="batch-btn" onclick="batchColImport()">批量入库至「${esc(catName(c.presetCategory))}」</button>
+        <button type="button" class="batch-btn" onclick="state.collector.selected.clear();render()">取消</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+/* ============================================================================
+   4. 自定义上架
+   ============================================================================ */
+function renderUpload() {
+  const u = state.upload;
+  const catOpts = [{ value: '', label: '未分类' }, ...CATEGORIES.map(c => ({ value: c.id, label: c.name, desc: c.desc }))];
+  const oriOpts = [
+    { value: 'landscape', label: '横屏 (PC)', icon: 'monitor' },
+    { value: 'portrait', label: '竖屏 (手机)', icon: 'phone' },
+    { value: 'squarish', label: '方形', icon: 'grid' },
+  ];
+
+  return `
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg">
+        <button type="button" class="${u.mediaType === 'image' ? 'is-active' : ''}" onclick="state.upload.mediaType='image';render()">静态图片</button>
+        <button type="button" class="${u.mediaType === 'video' ? 'is-active' : ''}" onclick="state.upload.mediaType='video';render()">动态视频</button>
+      </div>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" onclick="go('wallpapers')">取消</button>
+        <button type="button" class="xb-btn-primary" onclick="submitUpload()">上架发布</button>
+      </div>
+    </header>
+
+    <div class="split-2">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        ${u.uploadedArt ? `
+          <div class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span class="mono" style="font-size:12px;color:var(--ui-text-secondary)">${esc(u.fileName)}</span>
+              <div class="xb-seg">
+                <button type="button" class="${u.previewFrame === 'desktop' ? 'is-active' : ''}" onclick="state.upload.previewFrame='desktop';render()">桌面</button>
+                <button type="button" class="${u.previewFrame === 'phone' ? 'is-active' : ''}" onclick="state.upload.previewFrame='phone';render()">手机</button>
+              </div>
+            </div>
+            <div class="device-frame ${u.previewFrame === 'phone' ? 'is-phone' : ''}">${artSvg(u.uploadedArt)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span class="num" style="font-size:12px;color:var(--ui-text-tertiary)">${u.width} × ${u.height}</span>
+              <button type="button" class="xb-btn-ghost is-sm" onclick="state.upload.uploadedArt=null;u.width=null;render()">更换素材</button>
+            </div>
+          </div>
+        ` : `
+          <div class="drop-zone" onclick="simUpload()" title="点击或拖拽 JPG / PNG / WebP / MP4 / WebM">
+            <span style="color:var(--ui-ink)">${icon(u.mediaType === 'video' ? 'play' : 'upload', 26)}</span>
+            <strong style="font-size:14px">点击或拖拽上传${u.mediaType === 'video' ? '动态视频' : '高清图片'}</strong>
+            <button type="button" class="xb-btn-soft is-sm" onclick="event.stopPropagation();simUpload()">载入示例预览</button>
+          </div>
+        `}
+        ${u.mediaType === 'video' ? `
+          <div class="xb-group">
+            <div class="xb-row" title="不上传时将由后端 FFmpeg 自动截取第 1 帧作为海报">
+              <span style="font-size:13px;font-weight:500">视频封面海报</span>
+              <button type="button" class="xb-btn-soft is-sm" onclick="state.upload.posterReady=!state.upload.posterReady;toast(state.upload.posterReady?'已上传封面':'已恢复首帧截屏');render()">${u.posterReady ? '已上传 ✓' : '上传封面'}</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:14px">
+        <label class="xb-field">
+          <span class="xb-field-label">标题</span>
+          <input class="xb-input" placeholder="例如：冰岛极光湖面 4K" value="${esc(u.title)}" oninput="state.upload.title=this.value" />
+        </label>
+        <div class="split-eq" style="gap:10px">
+          <div class="xb-field">
+            <span class="xb-field-label">分类</span>
+            ${xbSelect({ id: 'up-cat', value: u.category, options: catOpts, full: true, onChange: v => { state.upload.category = v; render(); } })}
+          </div>
+          <div class="xb-field">
+            <span class="xb-field-label">画幅</span>
+            ${xbSelect({ id: 'up-ori', value: u.orientation, options: oriOpts, full: true, onChange: v => { state.upload.orientation = v; render(); } })}
+          </div>
+        </div>
+        <div class="xb-field">
+          <span class="xb-field-label">标签</span>
+          ${renderTags('upload', u.tags)}
+        </div>
+        <label class="xb-field">
+          <span class="xb-field-label">备注</span>
+          <textarea class="xb-textarea" rows="3" placeholder="可选：作者署名或拍摄参数" oninput="state.upload.desc=this.value">${esc(u.desc)}</textarea>
+        </label>
+        <div class="xb-field">
+          <span class="xb-field-label">上架状态</span>
+          <div class="xb-seg" style="align-self:flex-start">
+            <button type="button" class="${u.status === 'published' ? 'is-active' : ''}" onclick="state.upload.status='published';render()">立即上架</button>
+            <button type="button" class="${u.status === 'pending' ? 'is-active' : ''}" onclick="state.upload.status='pending';render()">存入待审核</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================================
+   5. App 版本发布
+   ============================================================================ */
+function renderApps() {
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">App 版本发布</h1>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" onclick="go('desktop')">官网与公告</button>
+        <button type="button" class="xb-btn-primary" onclick="openReleaseDrawer()">${icon('plus', 14)}<span>新建版本</span></button>
+      </div>
+    </header>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      ${state.releases.map((rel, idx) => `
+        <section class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <strong class="num" style="font-size:17px">v${esc(rel.version)}</strong>
+              <span class="xb-pill ${rel.published ? 'is-ok' : 'is-warn'}"><i class="dot"></i>${rel.published ? '已上架' : '草稿'}</span>
+              <span class="xb-pill">${rel.version.includes('-') ? '预发布' : '稳定版'}</span>
+              <span style="font-size:12px;color:var(--ui-text-tertiary)">${esc(rel.publishedAt)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" class="xb-btn-ghost is-sm" onclick="openReleaseDrawer(${idx})">编辑</button>
+              <button type="button" class="xb-btn-soft is-sm" onclick="toggleRel(${idx})">${rel.published ? '下架' : '上架'}</button>
+              ${xbMoreMenu('relm-' + idx, [
+                { label: '编辑与传包', icon: 'edit', run: () => openReleaseDrawer(idx) },
+                { sep: true },
+                { label: '删除版本', icon: 'trash', danger: true, desc: '从官网与更新检测中移除', run: () => { state.releases.splice(idx, 1); toast('版本已删除'); render(); } },
+              ])}
+            </div>
+          </div>
+
+          <div class="plat-grid">
+            ${PLATFORMS.map(t => {
+              const pkg = rel.platforms[t.id];
+              if (!pkg) {
+                return `<div class="plat-slot is-missing"><div class="plat-top"><span style="display:inline-flex;align-items:center;gap:6px">${icon(t.ico, 14)}<span>${esc(t.short)}</span></span><span class="xb-pill">未配置</span></div></div>`;
+              }
+              const managed = pkg.url.startsWith('/api/');
+              return `
+                <div class="plat-slot" title="${esc(pkg.fileName || pkg.url)}">
+                  <div class="plat-top">
+                    <span style="display:inline-flex;align-items:center;gap:6px">${icon(t.ico, 14)}<span>${esc(t.short)}</span></span>
+                    <span class="xb-pill ${managed ? 'is-ok' : 'is-info'}">${managed ? '站内' : '外链'}</span>
+                  </div>
+                  <div class="plat-meta num">${esc(pkg.fileName)} · ${fmtBytes(pkg.bytes)}</div>
+                  ${pkg.sha256 ? `<div class="sha-chip"><span>SHA256 ${pkg.sha256.slice(0, 10)}…</span><button type="button" title="复制 SHA-256" onclick="copyText('${pkg.sha256}','已复制 SHA-256')">${icon('copy', 12)}</button></div>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div style="font-size:12.5px;color:var(--ui-text-secondary);white-space:pre-wrap;line-height:1.6">${esc(rel.notes)}</div>
+        </section>
+      `).join('')}
+    </div>
+  `;
+}
+
+/* ============================================================================
+   6. 官网与公告
+   ============================================================================ */
+function renderDesktop() {
+  const dc = state.desktopConfig;
+  const audMap = { website: '网站', desktop: '桌面', android: 'Android' };
+
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">官网与公告</h1>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" onclick="go('apps')">App 版本</button>
+        <button type="button" class="xb-btn-primary" onclick="openNoticeDrawer()">${icon('plus', 14)}<span>新建公告</span></button>
+      </div>
+    </header>
+
+    <section>
+      <div class="xb-sec-head">
+        <h2 class="xb-sec-title">官网基础信息</h2>
+        <button type="button" class="xb-btn-primary is-sm" ${dc.dirty ? '' : 'disabled'} onclick="state.desktopConfig.dirty=false;toast('已保存');render()">保存</button>
+      </div>
+      <div class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:14px">
+        <label class="xb-field" title="正式地址使用 HTTPS，本机测试可填 http://localhost:8080">
+          <span class="xb-field-label">网站地址</span>
+          <input class="xb-input mono" type="url" value="${esc(dc.siteUrl)}" oninput="state.desktopConfig.siteUrl=this.value;state.desktopConfig.dirty=true;render()" />
+        </label>
+        <label class="xb-field">
+          <span class="xb-field-label">产品介绍</span>
+          <textarea class="xb-textarea" rows="3" oninput="state.desktopConfig.introduction=this.value;state.desktopConfig.dirty=true;render()">${esc(dc.introduction)}</textarea>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <div class="xb-sec-head">
+        <h2 class="xb-sec-title">多端公告 <span class="xb-pill">${dc.announcements.length}</span></h2>
+      </div>
+      <div class="xb-group">
+        ${dc.announcements.map((n, i) => `
+          <div class="xb-row" title="${esc(n.body)}">
+            <div style="flex:1;min-width:200px">
+              <div class="xb-row-title">
+                <span>${esc(n.title)}</span>
+                <span class="xb-pill ${n.published ? 'is-ok' : 'is-warn'}"><i class="dot"></i>${n.published ? '生效中' : '草稿'}</span>
+                ${n.audience.includes('android') && !n.skippable ? '<span class="xb-pill is-danger">强弹</span>' : ''}
+              </div>
+              <div class="xb-row-meta">
+                ${n.audience.map(a => `<span>${audMap[a]}</span>`).join('<span>·</span>')}
+                <span>·</span>
+                <span>${n.startsAt || '立即'} ~ ${n.endsAt || '长期'}</span>
+              </div>
+            </div>
+            <div class="xb-row-actions">
+              <button type="button" class="xb-switch" role="switch" aria-checked="${n.published}" title="${n.published ? '下架' : '发布'}" onclick="state.desktopConfig.announcements[${i}].published=!state.desktopConfig.announcements[${i}].published;toast(state.desktopConfig.announcements[${i}].published?'公告已发布':'公告已下架');render()"></button>
+              <button type="button" class="xb-btn-ghost is-sm" onclick="openNoticeDrawer(${i})">编辑</button>
+              ${xbMoreMenu('ntm-' + i, [
+                { label: '编辑与真机预览', icon: 'phone', run: () => openNoticeDrawer(i) },
+                { sep: true },
+                { label: '删除公告', icon: 'trash', danger: true, run: () => { state.desktopConfig.announcements.splice(i, 1); toast('公告已删除'); render(); } },
+              ])}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
+/* ============================================================================
+   7. AI 模型目录（紧凑分组行 + 单行模型弹窗）
+   ============================================================================ */
+function renderAiProviders() {
+  const cat = state.aiCatalogue;
+  const tMeta = { third: { l: '第三方', c: '' }, free: { l: '免费', c: 'is-ok' }, paid: { l: '付费', c: 'is-warn' } };
+  const list = cat.providers.filter(p => cat.filterType === 'all' || p.type === cat.filterType);
+
+  return `
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg">
+        ${[['all', '全部服务商'], ['third', '第三方'], ['free', '小伴免费'], ['paid', '小伴付费']].map(([v, l]) => `
+          <button type="button" class="${cat.filterType === v ? 'is-active' : ''}" onclick="state.aiCatalogue.filterType='${v}';render()">${l}</button>
+        `).join('')}
+      </div>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost" title="修订 #${cat.revision}" onclick="toast('已刷新目录')">${icon('refresh', 14)}<span>刷新</span></button>
+        <button type="button" class="xb-btn-primary" onclick="openAiModal()">${icon('plus', 14)}<span>新增供应商</span></button>
+      </div>
+    </header>
+
+    <div class="xb-group">
+      <div class="xb-row" title="桌面端排首位的官方额度服务入口，关闭后客户端下次刷新将隐藏">
+        <div class="xb-row-main">
+          <span class="xb-pill is-accent">${icon('sparkles', 12)}<span>小伴 AI 官方入口</span></span>
+          <span class="xb-pill ${cat.xiaobanAiEnabled ? 'is-ok' : 'is-warn'}"><i class="dot"></i>${cat.xiaobanAiEnabled ? '已开启' : '已隐藏'}</span>
+        </div>
+        <button type="button" class="xb-switch" role="switch" aria-checked="${cat.xiaobanAiEnabled}" onclick="toggleXiaobanAi()"></button>
+      </div>
+    </div>
+
+    <div class="xb-group">
+      ${list.map(p => {
+        const tm = tMeta[p.type];
+        const en = p.models.filter(m => m.enabled).length;
+        return `
+          <div class="xb-row" style="${p.enabled ? '' : 'opacity:.6'}" title="${esc(p.description + ' · ' + p.endPoint)}">
+            <div style="flex:1;min-width:200px">
+              <div class="xb-row-title">
+                <span>${esc(p.provider)}</span>
+                <span class="xb-pill ${tm.c}">${tm.l}</span>
+                <span class="mono" style="font-size:12px;color:var(--ui-text-tertiary);font-weight:400">${esc(p.defaultModel)}</span>
+              </div>
+              <div class="xb-row-meta">
+                <span>${esc(p.protocol)}</span><span>·</span>
+                <span class="num">${en}/${p.models.length} 模型启用</span><span>·</span>
+                <span>${p.type === 'third' ? '用户自备' : p.type === 'paid' ? `${p.userAccess.length} 人授权` : p.hasKey ? '已配 Key' : '免密'}</span>
+              </div>
+            </div>
+            <div class="xb-row-actions">
+              <button type="button" class="xb-switch" role="switch" aria-checked="${p.enabled}" onclick="toggleAi('${p.id}')"></button>
+              <button type="button" class="xb-btn-ghost is-sm" onclick="openAiModal('${p.id}')">配置</button>
+              ${xbMoreMenu('aim-' + p.id, [
+                { label: '编辑与模型', icon: 'edit', run: () => openAiModal(p.id) },
+                { sep: true },
+                { label: '删除供应商', icon: 'trash', danger: true, run: () => { state.aiCatalogue.providers = state.aiCatalogue.providers.filter(x => x.id !== p.id); toast('已删除'); render(); } },
+              ])}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ============================================================================
+   8. 图源与密钥
+   ============================================================================ */
+function renderKeys() {
+  const active = state.sources.find(s => s.id === state.activeSourceId) || state.sources[0];
+  const polMap = { source: '直链优先', copy: '本站副本' };
+
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">图源与密钥</h1>
+      <div class="xb-page-actions">
+        <a class="xb-btn-ghost" href="${active.docs}" target="_blank" rel="noopener">${icon('external', 13)}<span>获取 ${esc(active.keyLabel)}</span></a>
+      </div>
+    </header>
+
+    <div class="src-tabs" role="tablist">
+      ${state.sources.map(s => {
+        const en = s.keys.filter(k => k.enabled).length;
+        const cool = s.keys.some(k => k.cooldown_secs);
+        return `
+          <button type="button" class="src-tab ${s.id === active.id ? 'is-active' : ''}" onclick="state.activeSourceId='${s.id}';render()">
+            <div>
+              <div class="src-tab-name">${esc(s.name)}</div>
+              <div class="src-tab-sub">${s.keys.length ? `${en}/${s.keys.length} 密钥` : '免密/未配'}</div>
+            </div>
+            <i class="status-dot ${cool ? 'warn' : en > 0 || s.id === 'bing' ? 'ok' : 'off'}"></i>
+          </button>
+        `;
+      }).join('')}
+    </div>
+
+    ${active.warn ? `<div class="xb-alert"><div class="xb-alert-l">${icon('alert', 15)}<span>${esc(active.warn)}</span></div></div>` : ''}
+
+    <div class="xb-group">
+      <div class="xb-row" title="开启后访问此图源接口将通过代理池转发">
+        <span style="font-weight:550">通过代理池访问</span>
+        <button type="button" class="xb-switch" role="switch" aria-checked="${active.use_proxy}" onclick="activeSourceToggleProxy('${active.id}')"></button>
+      </div>
+      <div class="xb-row" title="直链优先可节省存储，本站副本由服务器保存兜底">
+        <span style="font-weight:550">素材链接策略</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${['image', 'video'].map(k => {
+            const hl = active.hotlink[k];
+            const val = hl.custom ? hl.policy : 'default';
+            return xbSelect({
+              id: `hl-${active.id}-${k}`,
+              value: val,
+              prefix: k === 'image' ? '图片：' : '视频：',
+              sm: true,
+              options: [
+                { value: 'default', label: `默认 (${polMap[hl.default]})`, desc: '恢复系统默认策略' },
+                { value: 'source', label: '直链优先', dot: 'ok', desc: '优先使用供应商直链' },
+                { value: 'copy', label: '本站副本', dot: 'info', desc: '采集时下载到本地保存' },
+              ],
+              onChange: v => setHotlink(active.id, k, v),
+            });
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div class="xb-sec-head"><h2 class="xb-sec-title">密钥池</h2></div>
+      <div class="xb-group">
+        ${active.keys.length ? active.keys.map((k, idx) => `
+          <div class="xb-row">
+            <div style="min-width:0;flex:1">
+              <div class="xb-row-title">
+                <span>${esc(k.label)}</span>
+                ${!k.enabled ? '<span class="xb-pill">停用</span>' : k.cooldown_secs ? `<span class="xb-pill is-warn"><i class="dot"></i>冷却 ${Math.ceil(k.cooldown_secs / 60)}m</span>` : '<span class="xb-pill is-ok"><i class="dot"></i>可用</span>'}
+                ${k.last_status >= 400 ? `<span class="xb-pill is-danger">HTTP ${k.last_status}</span>` : ''}
+              </div>
+              <div class="xb-row-meta">
+                <span class="mono">${esc(k.preview)}</span><span>·</span>
+                <span class="num">请求 ${k.requests.toLocaleString()}</span><span>·</span>
+                <span class="num">失败 ${k.failures}</span>
+              </div>
+            </div>
+            <div class="xb-row-actions">
+              <button type="button" class="xb-switch" role="switch" aria-checked="${k.enabled}" onclick="toggleKey('${active.id}',${idx})"></button>
+              ${xbMoreMenu('km-' + k.id, [
+                { label: '删除密钥', icon: 'trash', danger: true, desc: '删除后自动清空搜索缓存', run: () => delKey(active.id, idx) },
+              ])}
+            </div>
+          </div>
+        `).join('') : '<div style="padding:24px;text-align:center;color:var(--ui-text-tertiary)">暂无密钥</div>'}
+
+        <form class="xb-row" style="gap:10px" onsubmit="event.preventDefault();addKey('${active.id}',this)">
+          <input name="label" class="xb-input" style="flex:1;min-width:120px" placeholder="备注名称（如 主账号）" required />
+          <div class="xb-affix has-r" style="flex:2;min-width:180px">
+            <input id="keyPw" name="key" class="xb-input mono" type="password" placeholder="粘贴 ${esc(active.keyLabel)}" required />
+            <button type="button" class="af-r" onclick="togglePw('keyPw',this)">${icon('eye', 14)}</button>
+          </div>
+          <button type="submit" class="xb-btn-primary">添加密钥</button>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+/* ============================================================================
+   9. 代理池
+   ============================================================================ */
+function renderProxies() {
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">代理池</h1>
+      <div class="xb-page-actions">
+        <div class="xb-seg">
+          <button type="button" class="${state.proxyStrategy === 'round_robin' ? 'is-active' : ''}" onclick="state.proxyStrategy='round_robin';toast('已切为顺序轮询');render()">顺序轮询</button>
+          <button type="button" class="${state.proxyStrategy === 'random' ? 'is-active' : ''}" onclick="state.proxyStrategy='random';toast('已切为随机挑选');render()">随机挑选</button>
+        </div>
+        <button type="button" class="xb-btn-primary" onclick="probeAll()">${icon('bolt', 14)}<span>全部测速</span></button>
+      </div>
+    </header>
+
+    <div class="xb-group">
+      ${state.proxies.map((p, idx) => `
+        <div class="xb-row">
+          <div style="flex:1;min-width:220px">
+            <div class="xb-row-title">
+              <span>${esc(p.name)}</span>
+              ${!p.enabled ? '<span class="xb-pill">停用</span>' : p.cooldown_secs ? `<span class="xb-pill is-warn">暂停 ${p.cooldown_secs}s</span>` : '<span class="xb-pill is-ok"><i class="dot"></i>在线</span>'}
+              ${p.has_auth ? '<span class="xb-pill">含鉴权</span>' : ''}
+            </div>
+            <div class="xb-row-meta">
+              <span class="mono">${esc(p.url)}</span><span>·</span>
+              <span class="num">${p.requests.toLocaleString()} 次</span><span>·</span>
+              <span class="num">失败 ${p.failures}</span>
+            </div>
+            ${p.last_error ? `<div style="margin-top:4px;font-size:12px;color:var(--ui-danger)">${esc(p.last_error)}</div>` : ''}
+          </div>
+          <div class="xb-row-actions">
+            <button type="button" class="xb-btn-ghost is-sm" onclick="probeOne(${idx})">测速</button>
+            <button type="button" class="xb-switch" role="switch" aria-checked="${p.enabled}" onclick="state.proxies[${idx}].enabled=!state.proxies[${idx}].enabled;render()"></button>
+            ${xbMoreMenu('pxm-' + p.id, [
+              { label: '删除节点', icon: 'trash', danger: true, run: () => { state.proxies.splice(idx, 1); toast('节点已删除'); render(); } },
+            ])}
+          </div>
+          ${p.probes ? `
+            <div style="width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding-top:8px">
+              ${p.probes.map(pr => `
+                <div style="padding:8px 10px;border-radius:8px;background:var(--ui-surface);display:flex;align-items:center;justify-content:space-between;font-size:12px" title="${esc(pr.ok ? 'HTTP ' + pr.status : pr.error)}">
+                  <span>${esc(pr.target)}</span>
+                  <span class="xb-pill ${pr.ok ? 'is-ok' : 'is-danger'}">${pr.ok ? pr.ms + 'ms' : '失败'}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+
+      <form class="xb-row" style="gap:10px" onsubmit="event.preventDefault();addProxy(this)">
+        <input name="name" class="xb-input" style="flex:1;min-width:120px" placeholder="节点名称" required />
+        <input name="url" class="xb-input mono" style="flex:2;min-width:200px" placeholder="socks5h://user:pass@host:1080" required />
+        <button type="submit" class="xb-btn-primary">添加节点</button>
+      </form>
+    </div>
+  `;
+}
+
+/* ============================================================================
+   10. 搜索缓存 & 11. 管理员账户 & 登录页
+   ============================================================================ */
+function renderCache() {
+  const c = state.cache;
+  const hitRate = ((c.hits / (c.hits + c.misses)) * 100).toFixed(1);
+  const capPct = Math.min(100, Math.round(c.entries / c.maxEntries * 100));
+
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">搜索缓存</h1>
+      <div class="xb-page-actions">
+        <button type="button" class="xb-btn-ghost is-danger" onclick="clearCache()">清空缓存</button>
+        <button type="button" class="xb-btn-primary" ${c.dirty ? '' : 'disabled'} onclick="state.cache.dirty=false;toast('已保存');render()">保存设置</button>
+      </div>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-top"><span>命中率</span></div><div class="kpi-val num">${hitRate}%</div><div class="meter"><i style="width:${hitRate}%"></i></div></div>
+      <div class="kpi-card"><div class="kpi-top"><span>条目容量</span></div><div class="kpi-val num">${c.entries}<span style="font-size:13px;color:var(--ui-text-tertiary)">/${c.maxEntries}</span></div><div class="meter"><i style="width:${capPct}%"></i></div></div>
+      <div class="kpi-card"><div class="kpi-top"><span>占用空间</span></div><div class="kpi-val num">${fmtBytes(c.bytes)}</div><div class="kpi-foot"><span>PostgreSQL 持久化</span></div></div>
+      <div class="kpi-card"><div class="kpi-top"><span>最早条目</span></div><div class="kpi-val" style="font-size:18px">${esc(c.oldestAge)}</div><div class="kpi-foot"><span>命中 ${c.hits} / 回源 ${c.misses}</span></div></div>
+    </div>
+
+    <div class="xb-group">
+      <div class="xb-row" title="关闭后每次检索都会实时请求外部供应商">
+        <span style="font-weight:550">启用搜索缓存</span>
+        <button type="button" class="xb-switch" role="switch" aria-checked="${c.enabled}" onclick="state.cache.enabled=!state.cache.enabled;state.cache.dirty=true;render()"></button>
+      </div>
+      <div class="xb-row" title="超过有效期不再命中，最长 30 天">
+        <span style="font-weight:550">有效期</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="xb-stepper">
+            <button type="button" onclick="state.cache.ttlValue=Math.max(1,state.cache.ttlValue-1);state.cache.dirty=true;render()">${icon('minus', 14)}</button>
+            <input class="num" type="number" value="${c.ttlValue}" oninput="state.cache.ttlValue=Math.max(1,+this.value||1);state.cache.dirty=true" />
+            <button type="button" onclick="state.cache.ttlValue++;state.cache.dirty=true;render()">${icon('plus', 14)}</button>
+          </div>
+          <div class="xb-seg">
+            ${[[60, '分钟'], [3600, '小时'], [86400, '天']].map(([s, l]) => `<button type="button" class="${c.ttlUnit === s ? 'is-active' : ''}" onclick="state.cache.ttlUnit=${s};state.cache.dirty=true;render()">${l}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="xb-row" title="超过上限时按 LRU 淘汰最久未命中条目">
+        <span style="font-weight:550">最大条数</span>
+        <div class="xb-stepper">
+          <button type="button" onclick="state.cache.maxEntries=Math.max(100,state.cache.maxEntries-100);state.cache.dirty=true;render()">${icon('minus', 14)}</button>
+          <input class="num" style="width:82px" type="number" value="${c.maxEntries}" oninput="state.cache.maxEntries=Math.max(1,+this.value||100);state.cache.dirty=true" />
+          <button type="button" onclick="state.cache.maxEntries+=100;state.cache.dirty=true;render()">${icon('plus', 14)}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAccount() {
+  return `
+    <header class="xb-page-head">
+      <h1 class="xb-page-title">管理员账户</h1>
+    </header>
+    ${state.defaultPwdWarn ? `<div class="xb-alert"><div class="xb-alert-l">${icon('alert', 15)}<span>当前仍为初始密码 123456，请立即修改。</span></div></div>` : ''}
+    <form class="xb-group xb-group-pad" style="display:flex;flex-direction:column;gap:14px;max-width:460px" onsubmit="event.preventDefault();saveAcc(this)">
+      <label class="xb-field">
+        <span class="xb-field-label">当前密码</span>
+        <div class="xb-affix has-r">
+          <input id="pCur" name="cur" class="xb-input" type="password" placeholder="输入当前密码" required />
+          <button type="button" class="af-r" onclick="togglePw('pCur',this)">${icon('eye', 14)}</button>
+        </div>
+      </label>
+      <label class="xb-field" title="3 到 32 位，支持字母、数字、下划线、点和短横线">
+        <span class="xb-field-label">用户名</span>
+        <input name="user" class="xb-input" value="${esc(state.account.username)}" required />
+      </label>
+      <label class="xb-field" title="至少 8 位，修改后其他设备会话自动失效">
+        <span class="xb-field-label">新密码</span>
+        <div class="xb-affix has-r">
+          <input id="pNew" name="npw" class="xb-input" type="password" placeholder="不修改请留空（至少 8 位）" />
+          <button type="button" class="af-r" onclick="togglePw('pNew',this)">${icon('eye', 14)}</button>
+        </div>
+      </label>
+      <label class="xb-field">
+        <span class="xb-field-label">确认新密码</span>
+        <div class="xb-affix has-r">
+          <input id="pCfm" name="cpw" class="xb-input" type="password" placeholder="再次输入新密码" />
+          <button type="button" class="af-r" onclick="togglePw('pCfm',this)">${icon('eye', 14)}</button>
+        </div>
+      </label>
+      <div style="display:flex;justify-content:flex-end;padding-top:4px">
+        <button type="submit" class="xb-btn-primary">保存修改</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderLogin() {
+  return `
+    <div class="login-stage">
+      <div class="login-card">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span class="xb-mark" style="width:36px;height:36px;border-radius:10px"><img src="assets/app-icon-new.webp" alt="小伴" onerror="this.style.display='none'" /></span>
+          <div>
+            <h1 style="font-size:18px;font-weight:650;line-height:1.2">小伴控制台</h1>
+            <div style="font-size:12px;color:var(--ui-text-tertiary);margin-top:2px">wallpaper.xiangban.xyz</div>
+          </div>
+        </div>
+        <form style="display:flex;flex-direction:column;gap:12px" onsubmit="event.preventDefault();setAppMode('console');toast('欢迎回来，'+state.account.username)">
+          <label class="xb-field"><span class="xb-field-label">用户名</span><input class="xb-input" value="${esc(state.account.username)}" required /></label>
+          <label class="xb-field">
+            <span class="xb-field-label">密码</span>
+            <div class="xb-affix has-r">
+              <input id="lgPw" class="xb-input" type="password" value="••••••••" required />
+              <button type="button" class="af-r" onclick="togglePw('lgPw',this)">${icon('eye', 14)}</button>
+            </div>
+          </label>
+          <button type="submit" class="xb-btn-primary is-lg" style="margin-top:4px">登录</button>
+        </form>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ui-text-tertiary)">
+          <a href="features-download-redesign.html" target="_blank">← 返回官网</a>
+          <button type="button" onclick="setTheme(state.theme==='light'?'dark':'light')">${state.theme === 'light' ? '深色' : '浅色'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================================
+   弹层与交互逻辑（20px 抽屉 / 24px 弹窗 / 命令面板）
+   ============================================================================ */
+function closeOverlay() { closeXbMenu(); document.getElementById('overlayRoot').innerHTML = ''; }
+
+function renderTags(scope, tags) {
+  return `
+    <div class="tag-box" onclick="this.querySelector('input')?.focus()">
+      ${tags.map((t, i) => `<span class="tag-chip"><span>${esc(t)}</span><button type="button" onclick="event.stopPropagation();rmTag('${scope}',${i})">${icon('close', 11)}</button></span>`).join('')}
+      <input placeholder="输入后回车…" onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault();addTag('${scope}',this.value)}" />
+    </div>
+  `;
+}
+function addTag(scope, v) {
+  const s = v.trim().replace(/[,，]+/g, '');
+  if (!s) return;
+  if (scope === 'upload') { if (!state.upload.tags.includes(s)) state.upload.tags.push(s); render(); }
+  else if (scope === 'drawer' && wpDraft) { if (!wpDraft.tags.includes(s)) wpDraft.tags.push(s); renderWpDrawer(); }
+}
+function rmTag(scope, i) {
+  if (scope === 'upload') { state.upload.tags.splice(i, 1); render(); }
+  else if (scope === 'drawer' && wpDraft) { wpDraft.tags.splice(i, 1); renderWpDrawer(); }
+}
+
+let wpDraft = null;
+function openWpDrawer(id) { const w = state.wallpapers.find(x => x.id === id); if (!w) return; wpDraft = JSON.parse(JSON.stringify(w)); renderWpDrawer(); }
+function renderWpDrawer() {
+  const w = wpDraft;
+  const catOpts = [{ value: '', label: '未分类' }, ...CATEGORIES.map(c => ({ value: c.id, label: c.name, desc: c.desc }))];
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop" onclick="if(event.target===this)closeOverlay()">
+      <form class="xb-drawer" onsubmit="event.preventDefault();saveWpDrawer()">
+        <div class="ov-head"><h2>编辑壁纸</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body">
+          <div style="border-radius:10px;overflow:hidden;aspect-ratio:16/9">${artSvg(w.art)}</div>
+          <label class="xb-field"><span class="xb-field-label">标题</span><input class="xb-input" value="${esc(w.title)}" oninput="wpDraft.title=this.value" required /></label>
+          <div class="xb-field"><span class="xb-field-label">分类</span>${xbSelect({ id: 'dw-c', value: w.category || '', options: catOpts, full: true, onChange: v => { wpDraft.category = v; renderWpDrawer(); } })}</div>
+          <div class="xb-field">
+            <span class="xb-field-label">状态</span>
+            <div class="xb-seg" style="align-self:flex-start">
+              ${[['published', '已上架'], ['pending', '待审核'], ['offline', '已下架']].map(([v, l]) => `<button type="button" class="${w.status === v ? 'is-active' : ''}" onclick="wpDraft.status='${v}';renderWpDrawer()">${l}</button>`).join('')}
+            </div>
+          </div>
+          <div class="xb-field"><span class="xb-field-label">标签</span>${renderTags('drawer', w.tags)}</div>
+        </div>
+        <div class="ov-foot">
+          <button type="button" class="xb-btn-ghost" onclick="closeOverlay()">取消</button>
+          <button type="submit" class="xb-btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+function saveWpDrawer() { const i = state.wallpapers.findIndex(x => x.id === wpDraft.id); if (i >= 0) state.wallpapers[i] = wpDraft; closeOverlay(); toast('已保存'); render(); }
+
+function openLightbox(id, from) {
+  const it = from === 'collector' ? state.collector.items.find(x => x.id === id) : state.wallpapers.find(x => x.id === id);
+  if (!it) return;
+  const done = from === 'collector' && state.collector.collectedIds.has(it.id);
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop is-center" onclick="if(event.target===this)closeOverlay()">
+      <div class="xb-dialog">
+        <div class="ov-head"><h2>${esc(it.title)}</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body" style="padding:14px"><div style="border-radius:12px;overflow:hidden;aspect-ratio:16/10">${artSvg(it.art)}</div></div>
+        <div class="ov-foot" style="justify-content:space-between">
+          <span class="num" style="font-size:12px;color:var(--ui-text-tertiary)">${esc(it.resolution)} · ${esc(it.provider)}</span>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="xb-btn-ghost" onclick="closeOverlay()">关闭</button>
+            ${from === 'collector' ? (done ? '<span class="xb-pill is-ok" style="height:32px;padding:0 12px">已入库</span>' : `<button type="button" class="xb-btn-primary" onclick="importExt('${it.id}',state.collector.presetCategory,state.collector.presetStatus);closeOverlay()">采入图库</button>`) : `<button type="button" class="xb-btn-primary" onclick="closeOverlay();openWpDrawer('${it.id}')">编辑</button>`}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+let colDraft = null;
+function openColModal(id) { const it = state.collector.items.find(x => x.id === id); if (!it) return; colDraft = { it, cat: state.collector.presetCategory, st: state.collector.presetStatus }; renderColModal(); }
+function renderColModal() {
+  const { it, cat, st } = colDraft;
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop is-center" onclick="if(event.target===this)closeOverlay()">
+      <form class="xb-dialog is-sm" onsubmit="event.preventDefault();importExt('${it.id}',colDraft.cat,colDraft.st);closeOverlay()">
+        <div class="ov-head"><h2>采集入库</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--ui-surface-sunken)">
+            <div class="mini-thumb">${artSvg(it.art)}</div>
+            <div style="min-width:0"><div style="font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</div><div class="num" style="font-size:11.5px;color:var(--ui-text-tertiary)">${esc(it.resolution)}</div></div>
+          </div>
+          <div class="xb-field"><span class="xb-field-label">分类</span>${xbSelect({ id: 'cm-c', value: cat, options: CATEGORIES.map(c => ({ value: c.id, label: c.name, desc: c.desc })), full: true, onChange: v => { colDraft.cat = v; renderColModal(); } })}</div>
+          <div class="xb-field"><span class="xb-field-label">状态</span><div class="xb-seg" style="align-self:flex-start"><button type="button" class="${st === 'published' ? 'is-active' : ''}" onclick="colDraft.st='published';renderColModal()">立即上架</button><button type="button" class="${st === 'pending' ? 'is-active' : ''}" onclick="colDraft.st='pending';renderColModal()">待审核</button></div></div>
+        </div>
+        <div class="ov-foot"><button type="button" class="xb-btn-ghost" onclick="closeOverlay()">取消</button><button type="submit" class="xb-btn-primary">确认入库</button></div>
+      </form>
+    </div>
+  `;
+}
+
+let relDraft = null, relIdx = null;
+function openReleaseDrawer(idx = null) {
+  relIdx = idx;
+  relDraft = idx !== null ? JSON.parse(JSON.stringify(state.releases[idx])) : { version: '', published: false, publishedAt: '2026-11-28 20:00', notes: '', platforms: {} };
+  renderRelDrawer();
+}
+function renderRelDrawer() {
+  const d = relDraft;
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop" onclick="if(event.target===this)closeOverlay()">
+      <form class="xb-drawer is-wide" onsubmit="event.preventDefault();saveRel(true)">
+        <div class="ov-head"><h2>${relIdx !== null ? '编辑 v' + esc(d.version) : '新建版本'}</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body">
+          <div class="split-eq" style="gap:10px">
+            <label class="xb-field"><span class="xb-field-label">版本号</span><input class="xb-input mono" placeholder="3.2.0" value="${esc(d.version)}" ${relIdx !== null ? 'disabled' : ''} oninput="relDraft.version=this.value" required /></label>
+            <label class="xb-field"><span class="xb-field-label">发布时间</span><div class="xb-affix has-l"><span class="af-l">${icon('calendar', 14)}</span><input class="xb-input num" value="${esc(d.publishedAt)}" oninput="relDraft.publishedAt=this.value" /></div></label>
+          </div>
+          <label class="xb-field"><span class="xb-field-label">更新说明</span><textarea class="xb-textarea" rows="3" oninput="relDraft.notes=this.value">${esc(d.notes)}</textarea></label>
+          <div class="xb-field">
+            <span class="xb-field-label">平台安装包</span>
+            <div class="split-eq" style="gap:10px">
+              ${PLATFORMS.map(t => {
+                const p = d.platforms[t.id];
+                return `
+                  <div class="xb-group xb-group-pad" style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                      <strong style="font-size:13px;display:inline-flex;align-items:center;gap:6px">${icon(t.ico, 14)}<span>${esc(t.short)}</span></strong>
+                      ${p ? `<button type="button" class="xb-btn-ghost is-sm" onclick="delete relDraft.platforms['${t.id}'];renderRelDrawer()">移除</button>` : ''}
+                    </div>
+                    ${p ? `<div class="num" style="font-size:12px;color:var(--ui-success-text)">✓ ${esc(p.fileName)} · ${fmtBytes(p.bytes)}</div>` : ''}
+                    <button type="button" class="xb-btn-soft is-sm" style="align-self:flex-start" onclick="simPkg('${t.id}')">${icon('upload', 12)}<span>${p ? '更换包' : '上传安装包'}</span></button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="ov-foot" style="justify-content:space-between">
+          <button type="button" class="xb-btn-ghost" onclick="closeOverlay()">取消</button>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="xb-btn-soft" onclick="saveRel(false)">保存草稿</button>
+            <button type="submit" class="xb-btn-primary">保存并上架</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+function simPkg(t) { relDraft.platforms[t] = { url: `/api/v1/desktop/downloads/new/${t}`, bytes: 74200000, sha256: 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3f12a8e41b091c7d4200ef112', fileName: `XiaoBan-${relDraft.version || '3.2.0'}-${t}.pkg` }; toast('安装包已上传'); renderRelDrawer(); }
+function saveRel(pub) {
+  if (!relDraft.version.trim()) { toast('请输入版本号'); return; }
+  relDraft.published = pub;
+  if (relIdx !== null) state.releases[relIdx] = relDraft; else state.releases.unshift(relDraft);
+  closeOverlay(); toast(pub ? '版本已上架' : '草稿已保存'); render();
+}
+
+let ntDraft = null, ntIdx = null;
+function openNoticeDrawer(idx = null) {
+  ntIdx = idx;
+  ntDraft = idx !== null ? JSON.parse(JSON.stringify(state.desktopConfig.announcements[idx])) : { id: 'n-' + Date.now(), title: '', body: '', published: false, audience: ['website', 'desktop', 'android'], startsAt: '', endsAt: '', skippable: true, confirmText: '立即查看', cancelText: '暂不', confirmUrl: '' };
+  renderNoticeDrawer();
+}
+function renderNoticeDrawer() {
+  const n = ntDraft;
+  const hasAnd = n.audience.includes('android');
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop" onclick="if(event.target===this)closeOverlay()">
+      <form class="xb-drawer is-wide" onsubmit="event.preventDefault();saveNt()">
+        <div class="ov-head"><h2>${ntIdx !== null ? '编辑公告' : '新建公告'}</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body">
+          <div class="split-2" style="grid-template-columns:minmax(0,1.2fr) minmax(256px,.9fr)">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <label class="xb-field"><span class="xb-field-label">标题</span><input class="xb-input" value="${esc(n.title)}" oninput="ntDraft.title=this.value;syncNtPreview()" required /></label>
+              <label class="xb-field"><span class="xb-field-label">正文</span><textarea class="xb-textarea" rows="4" oninput="ntDraft.body=this.value;syncNtPreview()">${esc(n.body)}</textarea></label>
+              <div class="split-eq" style="gap:8px">
+                <label class="xb-field"><span class="xb-field-label">开始时间</span><input class="xb-input num" placeholder="立即" value="${esc(n.startsAt)}" oninput="ntDraft.startsAt=this.value" /></label>
+                <label class="xb-field"><span class="xb-field-label">结束时间</span><input class="xb-input num" placeholder="长期" value="${esc(n.endsAt)}" oninput="ntDraft.endsAt=this.value" /></label>
+              </div>
+              <div class="xb-field">
+                <span class="xb-field-label">投放端</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  ${[['website', '网站'], ['desktop', '桌面端'], ['android', 'Android 弹窗']].map(([v, l]) => `
+                    <button type="button" class="${n.audience.includes(v) ? 'xb-btn-primary' : 'xb-btn-soft'} is-sm" onclick="toggleAud('${v}')">${l}</button>
+                  `).join('')}
+                </div>
+              </div>
+              ${hasAnd ? `
+                <div class="xb-group xb-group-pad" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;justify-content:space-between" title="关闭后每次启动必弹，直到下架">
+                    <span style="font-size:12.5px;font-weight:550">允许跳过弹窗</span>
+                    <button type="button" class="xb-switch" role="switch" aria-checked="${n.skippable}" onclick="ntDraft.skippable=!ntDraft.skippable;renderNoticeDrawer()"></button>
+                  </div>
+                  <div class="split-eq" style="gap:8px">
+                    <input class="xb-input" placeholder="确定文案" value="${esc(n.confirmText || '')}" oninput="ntDraft.confirmText=this.value;syncNtPreview()" />
+                    <input class="xb-input" placeholder="取消文案" ${!n.skippable ? 'disabled' : ''} value="${esc(n.cancelText || '')}" oninput="ntDraft.cancelText=this.value;syncNtPreview()" />
+                  </div>
+                  <input class="xb-input mono" placeholder="HTTPS 跳转链接（可选）" value="${esc(n.confirmUrl || '')}" oninput="ntDraft.confirmUrl=this.value" />
+                </div>
+              ` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+              <span class="xb-pill">Android 弹窗预览</span>
+              <div class="phone-mock"><div class="phone-screen"><div class="phone-dim"></div><div class="android-dlg" id="ntPrev">
+                <h4>${esc(n.title || '公告标题')}</h4>
+                <p>${esc(n.body || '输入公告内容实时预览')}</p>
+                <div class="android-dlg-btns">${n.skippable ? `<span class="c">${esc(n.cancelText || '取消')}</span>` : ''}<span class="o">${esc(n.confirmText || '确定')}</span></div>
+              </div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="ov-foot" style="justify-content:space-between">
+          <div style="display:inline-flex;align-items:center;gap:8px;cursor:pointer" onclick="ntDraft.published=!ntDraft.published;renderNoticeDrawer()">
+            <button type="button" class="xb-switch" role="switch" aria-checked="${n.published}"></button><span style="font-size:13px">立即发布</span>
+          </div>
+          <div style="display:flex;gap:8px"><button type="button" class="xb-btn-ghost" onclick="closeOverlay()">取消</button><button type="submit" class="xb-btn-primary">保存</button></div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+function syncNtPreview() {
+  const b = document.getElementById('ntPrev'); if (!b) return;
+  const n = ntDraft;
+  b.innerHTML = `<h4>${esc(n.title || '公告标题')}</h4><p>${esc(n.body || '输入公告内容实时预览')}</p><div class="android-dlg-btns">${n.skippable ? `<span class="c">${esc(n.cancelText || '取消')}</span>` : ''}<span class="o">${esc(n.confirmText || '确定')}</span></div>`;
+}
+function toggleAud(v) { const i = ntDraft.audience.indexOf(v); if (i >= 0) ntDraft.audience.splice(i, 1); else ntDraft.audience.push(v); renderNoticeDrawer(); }
+function saveNt() { if (!ntDraft.title.trim()) return; if (ntIdx !== null) state.desktopConfig.announcements[ntIdx] = ntDraft; else state.desktopConfig.announcements.unshift(ntDraft); closeOverlay(); toast('公告已保存'); render(); }
+
+let aiDraft = null, aiOrig = null;
+function openAiModal(id = null) {
+  aiOrig = id;
+  const ex = id ? state.aiCatalogue.providers.find(p => p.id === id) : null;
+  aiDraft = ex ? JSON.parse(JSON.stringify(ex)) : { id: '', provider: '', type: 'third', enabled: true, description: '', endPoint: 'https://api.example.com/v1', protocol: 'OpenAI Responses', defaultModel: '', hasKey: false, userAccess: [], models: [{ id: '', name: '', enabled: true, reasoningEfforts: null }] };
+  renderAiModal();
+}
+function renderAiModal() {
+  const d = aiDraft;
+  const levels = ['low', 'medium', 'high', 'xhigh', 'max'];
+  const protoOpts = [
+    { value: 'OpenAI Responses', label: 'OpenAI Responses', desc: '推荐的新一代接口协议' },
+    { value: 'OpenAI Chat', label: 'OpenAI Chat', desc: 'OpenAI Chat Completions 兼容协议' },
+    { value: 'Anthropic Messages', label: 'Anthropic Messages', desc: 'Claude 原生消息协议' },
+  ];
+  const effOpts = [
+    { value: 'auto', label: '自动识别', desc: '由客户端按模型名推断' },
+    { value: 'manual', label: '手动声明', desc: '显式勾选可用思考档位' },
+    { value: 'off', label: '不支持', desc: '隐藏思考等级选项' },
+  ];
+
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop is-center" onclick="if(event.target===this)closeOverlay()">
+      <form class="xb-dialog" onsubmit="event.preventDefault();saveAi()">
+        <div class="ov-head"><h2>${aiOrig ? esc(d.provider) : '新增模型供应商'}</h2><button type="button" class="xb-icon-btn" onclick="closeOverlay()">${icon('close', 18)}</button></div>
+        <div class="ov-body">
+          <div class="split-eq" style="gap:10px">
+            <label class="xb-field"><span class="xb-field-label">名称</span><input class="xb-input" value="${esc(d.provider)}" oninput="aiDraft.provider=this.value" required /></label>
+            <label class="xb-field"><span class="xb-field-label">ID</span><input class="xb-input mono" value="${esc(d.id)}" ${aiOrig ? 'disabled' : ''} oninput="aiDraft.id=this.value" required /></label>
+          </div>
+          <div class="split-eq" style="gap:10px">
+            <div class="xb-field">
+              <span class="xb-field-label">类型</span>
+              <div class="xb-seg" style="align-self:flex-start">${[['third', '第三方'], ['free', '免费'], ['paid', '付费']].map(([v, l]) => `<button type="button" class="${d.type === v ? 'is-active' : ''}" onclick="aiDraft.type='${v}';renderAiModal()">${l}</button>`).join('')}</div>
+            </div>
+            <div class="xb-field"><span class="xb-field-label">协议</span>${xbSelect({ id: 'ai-p', value: d.protocol, options: protoOpts, full: true, onChange: v => { aiDraft.protocol = v; renderAiModal(); } })}</div>
+          </div>
+          <label class="xb-field"><span class="xb-field-label">API 地址</span><input class="xb-input mono" value="${esc(d.endPoint)}" oninput="aiDraft.endPoint=this.value" /></label>
+          <div class="xb-field">
+            <div class="xb-field-label"><span>模型（${d.models.length}）</span><button type="button" class="xb-btn-ghost is-sm" onclick="aiDraft.models.push({id:'',name:'',enabled:true,reasoningEfforts:null});renderAiModal()">${icon('plus', 13)}<span>添加</span></button></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${d.models.map((m, i) => {
+                const mode = m.reasoningEfforts == null ? 'auto' : m.reasoningEfforts.length ? 'manual' : 'off';
+                return `
+                  <div class="model-item">
+                    <div class="model-row">
+                      <input class="xb-input mono" placeholder="调用 ID" value="${esc(m.id)}" oninput="aiDraft.models[${i}].id=this.value" />
+                      <input class="xb-input" placeholder="展示名称" value="${esc(m.name)}" oninput="aiDraft.models[${i}].name=this.value" />
+                      ${xbSelect({ id: `me-${i}`, value: mode, options: effOpts, sm: true, full: true, title: '思考等级策略', onChange: v => { m.reasoningEfforts = v === 'auto' ? null : v === 'off' ? [] : ['low', 'high', 'max']; renderAiModal(); } })}
+                      <div style="display:flex;align-items:center;gap:4px">
+                        <button type="button" class="xb-switch" role="switch" aria-checked="${m.enabled}" onclick="aiDraft.models[${i}].enabled=!aiDraft.models[${i}].enabled;renderAiModal()"></button>
+                        <button type="button" class="xb-icon-btn is-sm is-danger" onclick="aiDraft.models.splice(${i},1);renderAiModal()">${icon('trash', 14)}</button>
+                      </div>
+                    </div>
+                    ${mode === 'manual' ? `<div class="effort-bar">${levels.map(lv => `<button type="button" class="effort-chip ${m.reasoningEfforts.includes(lv) ? 'is-on' : ''}" onclick="toggleEff(${i},'${lv}')">${lv}</button>`).join('')}</div>` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="ov-foot"><button type="button" class="xb-btn-ghost" onclick="closeOverlay()">取消</button><button type="submit" class="xb-btn-primary">保存并生效</button></div>
+      </form>
+    </div>
+  `;
+}
+function toggleEff(i, lv) { const a = aiDraft.models[i].reasoningEfforts; const p = a.indexOf(lv); if (p >= 0) { if (a.length > 1) a.splice(p, 1); } else a.push(lv); renderAiModal(); }
+function saveAi() {
+  if (!aiDraft.provider.trim() || !aiDraft.id.trim()) { toast('请填写名称和 ID'); return; }
+  if (!aiDraft.defaultModel && aiDraft.models.length) aiDraft.defaultModel = aiDraft.models[0].id;
+  const i = state.aiCatalogue.providers.findIndex(p => p.id === aiOrig);
+  if (i >= 0) state.aiCatalogue.providers[i] = aiDraft; else state.aiCatalogue.providers.push(aiDraft);
+  state.aiCatalogue.revision++; closeOverlay(); toast('已保存'); render();
+}
+
+function openCmd() {
+  const cmds = [
+    ...NAV_GROUPS.flatMap(g => g.items.map(i => ({ icon: i.icon, label: i.label, hint: g.label, run: () => go(i.id) }))),
+    { icon: 'shield', label: '管理员账户', hint: '系统', run: () => go('account') },
+    { icon: 'plus', label: '新建 App 版本', hint: '操作', run: () => { go('apps'); openReleaseDrawer(); } },
+    { icon: 'megaphone', label: '新建多端公告', hint: '操作', run: () => { go('desktop'); openNoticeDrawer(); } },
+    { icon: state.theme === 'light' ? 'moon' : 'sun', label: state.theme === 'light' ? '切换深色模式' : '切换浅色模式', hint: '外观', run: () => setTheme(state.theme === 'light' ? 'dark' : 'light') },
+  ];
+  window.__cmds = cmds;
+  document.getElementById('overlayRoot').innerHTML = `
+    <div class="xb-backdrop is-center" onclick="if(event.target===this)closeOverlay()">
+      <div class="cmd-box">
+        <div class="cmd-top">${icon('search', 15)}<input id="cmdIn" placeholder="快速跳转…" autofocus oninput="filterCmd(this.value)" /><span class="xb-kbd-mini">ESC</span></div>
+        <div class="cmd-list" id="cmdLs">${renderCmdRows(cmds, '')}</div>
+      </div>
+    </div>
+  `;
+  setTimeout(() => document.getElementById('cmdIn')?.focus(), 20);
+}
+function renderCmdRows(cmds, q) {
+  const kw = q.trim().toLowerCase();
+  return cmds.map((c, i) => ({ c, i })).filter(({ c }) => !kw || c.label.toLowerCase().includes(kw)).map(({ c, i }) => `
+    <button type="button" class="xb-menu-item" onclick="closeOverlay();window.__cmds[${i}].run()">
+      <span class="m-ico">${icon(c.icon, 14)}</span><span>${esc(c.label)}</span><span class="m-hint">${esc(c.hint)}</span>
+    </button>
+  `).join('') || '<div style="padding:20px;text-align:center;color:var(--ui-text-tertiary);font-size:12.5px">无匹配项</div>';
+}
+function filterCmd(q) { const el = document.getElementById('cmdLs'); if (el) el.innerHTML = renderCmdRows(window.__cmds, q); }
+
+/* ============================================================================
+   Domain Actions
+   ============================================================================ */
+function quickWpStatus(id, next) { const w = state.wallpapers.find(x => x.id === id); if (!w) return; w.status = next; toast(next === 'published' ? '已上架' : '已下架'); render(); }
+function deleteWp(id) { state.wallpapers = state.wallpapers.filter(x => x.id !== id); state.wpSelected.delete(id); toast('已删除'); render(); }
+function toggleWp(id) { state.wpSelected.has(id) ? state.wpSelected.delete(id) : state.wpSelected.add(id); render(); }
+function toggleAllWp() { const l = filteredWp(); if (state.wpSelected.size === l.length) state.wpSelected.clear(); else l.forEach(w => state.wpSelected.add(w.id)); render(); }
+function batchWp(st) { state.wallpapers.forEach(w => { if (state.wpSelected.has(w.id)) w.status = st; }); const n = state.wpSelected.size; state.wpSelected.clear(); toast(`已批量${st === 'published' ? '上架' : '下架'} ${n} 项`); render(); }
+function batchDelWp() { const n = state.wpSelected.size; state.wallpapers = state.wallpapers.filter(w => !state.wpSelected.has(w.id)); state.wpSelected.clear(); toast(`已删除 ${n} 项`); render(); }
+
+function toggleCol(id) { state.collector.selected.has(id) ? state.collector.selected.delete(id) : state.collector.selected.add(id); render(); }
+function handleCollect(id) { state.collector.quickMode ? importExt(id, state.collector.presetCategory, state.collector.presetStatus) : openColModal(id); }
+function importExt(id, cat, st) {
+  const it = state.collector.items.find(x => x.id === id); if (!it) return;
+  state.collector.collectedIds.add(id); state.collector.selected.delete(id);
+  state.wallpapers.unshift({ id: 'wp-' + Math.floor(200 + Math.random() * 700), title: it.title, art: it.art, media_type: it.media_type, duration: it.duration, category: cat, tags: [it.provider], resolution: it.resolution, orientation: it.orientation, source_type: 'collected', provider: it.provider, status: st, localCopy: it.provider === 'pixabay', desc: '' });
+  toast(`已采入「${it.title}」`); render();
+}
+function batchColImport() { const ids = [...state.collector.selected]; ids.forEach(id => importExt(id, state.collector.presetCategory, state.collector.presetStatus)); toast(`已批量入库 ${ids.length} 项`); }
+
+function simUpload() {
+  const v = state.upload.mediaType === 'video';
+  state.upload.uploadedArt = v ? 'ocean' : 'space';
+  state.upload.fileName = v ? 'emerald-waves-4k.mp4' : 'saturn-nebula-5k.webp';
+  state.upload.width = v ? 3840 : 5120; state.upload.height = v ? 2160 : 2880;
+  if (!state.upload.title) state.upload.title = v ? '翡翠浅海浪涌 4K' : '土星光环深空星云 5K';
+  toast('已载入示例并探测规格'); render();
+}
+function submitUpload() {
+  if (!state.upload.uploadedArt || !state.upload.title.trim()) { toast('请先上传素材并填写标题'); return; }
+  state.wallpapers.unshift({ id: 'wp-' + Date.now(), title: state.upload.title.trim(), art: state.upload.uploadedArt, media_type: state.upload.mediaType, duration: state.upload.mediaType === 'video' ? '00:20' : undefined, category: state.upload.category, tags: [...state.upload.tags], resolution: `${state.upload.width}×${state.upload.height}`, orientation: state.upload.orientation, source_type: 'custom', provider: '自主上架', status: state.upload.status, localCopy: true, desc: state.upload.desc });
+  state.upload.uploadedArt = null; state.upload.title = ''; toast('已发布到壁纸图库'); go('wallpapers');
+}
+
+function toggleRel(i) { state.releases[i].published = !state.releases[i].published; toast(state.releases[i].published ? '已上架' : '已下架'); render(); }
+function copyText(t, m) { navigator.clipboard?.writeText(t).catch(() => {}); toast(m); }
+function toggleXiaobanAi() { state.aiCatalogue.xiaobanAiEnabled = !state.aiCatalogue.xiaobanAiEnabled; state.aiCatalogue.revision++; toast(state.aiCatalogue.xiaobanAiEnabled ? '已开启入口' : '已隐藏入口'); render(); }
+function toggleAi(id) { const p = state.aiCatalogue.providers.find(x => x.id === id); if (!p) return; p.enabled = !p.enabled; state.aiCatalogue.revision++; toast(p.enabled ? '已启用' : '已停用'); render(); }
+function activeSourceToggleProxy(id) { const s = state.sources.find(x => x.id === id); if (!s) return; s.use_proxy = !s.use_proxy; toast(s.use_proxy ? '已走代理池' : '已改直连'); render(); }
+function setHotlink(id, k, v) { const s = state.sources.find(x => x.id === id); if (!s) return; if (v === 'default') { s.hotlink[k].custom = false; s.hotlink[k].policy = s.hotlink[k].default; } else { s.hotlink[k].custom = true; s.hotlink[k].policy = v; } toast('策略已保存'); render(); }
+function toggleKey(sid, i) { const s = state.sources.find(x => x.id === sid); s.keys[i].enabled = !s.keys[i].enabled; render(); }
+function delKey(sid, i) { const s = state.sources.find(x => x.id === sid); s.keys.splice(i, 1); toast('密钥已删除'); render(); }
+function addKey(sid, f) { const s = state.sources.find(x => x.id === sid); const fd = new FormData(f); const lb = String(fd.get('label') || '').trim(), k = String(fd.get('key') || '').trim(); if (!lb || !k) return; s.keys.push({ id: Date.now(), label: lb, preview: k.slice(0, 4) + '…' + k.slice(-4), enabled: true, requests: 0, failures: 0, last_status: null, cooldown_secs: null }); toast('密钥已添加'); render(); }
+function probeOne(i) { const p = state.proxies[i]; p.probes = [{ target: 'Unsplash', ok: p.enabled, status: 200, ms: 132 + i * 40, error: '超时' }, { target: 'Pexels', ok: p.enabled, status: 200, ms: 168 + i * 35, error: '握手失败' }, { target: 'Pixabay', ok: p.enabled, status: 200, ms: 196 + i * 25, error: '重置' }, { target: 'okslop', ok: i === 0, status: 200, ms: 254, error: '403' }]; toast('测速完成'); render(); }
+function probeAll() { state.proxies.forEach((_, i) => probeOne(i)); }
+function addProxy(f) { const fd = new FormData(f); const n = String(fd.get('name') || '').trim(), u = String(fd.get('url') || '').trim(); if (!n || !u) return; state.proxies.push({ id: Date.now(), name: n, url: u.replace(/\/\/[^@]+@/, '//'), has_auth: u.includes('@'), enabled: true, requests: 0, failures: 0, last_error: null, cooldown_secs: null, probes: null }); toast('节点已添加'); render(); }
+function clearCache() { state.cache.entries = 0; state.cache.bytes = 0; state.cache.oldestAge = '—'; toast('缓存已清空'); render(); }
+function togglePw(id, b) { const e = document.getElementById(id); if (!e) return; const sh = e.type === 'password'; e.type = sh ? 'text' : 'password'; b.innerHTML = icon(sh ? 'eyeOff' : 'eye', 14); }
+function saveAcc(f) { const fd = new FormData(f); const u = String(fd.get('user') || '').trim(), np = String(fd.get('npw') || ''), cp = String(fd.get('cpw') || ''); if (np && np !== cp) { toast('两次密码不一致'); return; } state.account.username = u || state.account.username; if (np) state.defaultPwdWarn = false; toast('已保存'); render(); }
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (state.appMode === 'console') openCmd(); }
+  else if (e.key === 'Escape') { if (activeMenuKey) closeXbMenu(); else closeOverlay(); }
+});
+
+(function init() {
+  const q = new URLSearchParams(location.search);
+  const p = q.get('page'), t = q.get('theme'), d = q.get('device'), a = q.get('accent'), m = q.get('mode');
+  if (p) state.page = p;
+  if (a && ['red', 'green', 'blue', 'purple', 'amber', 'graphite'].includes(a)) setAccent(a);
+  if (t === 'dark' || t === 'light') { state.theme = t; document.documentElement.setAttribute('data-theme', t); document.getElementById('themeLightBtn').classList.toggle('active', t === 'light'); document.getElementById('themeDarkBtn').classList.toggle('active', t === 'dark'); }
+  if (d === 'tablet' || d === 'mobile' || d === 'desktop') setDevice(d);
+  if (m === 'login') setAppMode('login');
+  render();
+})();
+</script>
+</body>
+</html>
