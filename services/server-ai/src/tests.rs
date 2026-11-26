@@ -41,6 +41,7 @@ const REAL_PREMIUM: &str = "claude-sonnet-5.5";
 
 #[derive(Clone, Copy, PartialEq)]
 enum ChatMode {
+    Workbench,
     Json,
     Sse,
     Fail,
@@ -228,6 +229,7 @@ async fn mock_chat(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): J
         ChatMode::Json => Json(json!({ "id": "chatcmpl-1", "object": "chat.completion", "model": model,
             "choices": [{ "index": 0, "message": { "role": "assistant", "content": "你好" }, "finish_reason": "stop" }] }))
         .into_response(),
+        ChatMode::Workbench => workbench::model_reply(&body),
         ChatMode::Sse => {
             let chunk = |text: &str| format!("data: {}\n\n", json!({ "id": "1", "model": model, "choices": [{ "delta": { "content": text } }] }));
             let payload = format!("{}{}data: [DONE]\n\n", chunk("你"), chunk("好"));
@@ -433,6 +435,7 @@ impl Harness {
 
         let (redeem_user_limiter, redeem_ip_limiter) = crate::state::redeem_limiters();
         let state = AppState {
+            workbench_slots: Arc::new(tokio::sync::Semaphore::new(config.workbench_concurrency)),
             pool,
             redeem_user_limiter,
             redeem_ip_limiter,
@@ -2104,3 +2107,6 @@ async fn media_models_are_set_per_product_in_the_admin_and_can_require_paid_quot
     assert_eq!(status, StatusCode::UNAUTHORIZED, "only admins see the real models");
     h.cleanup().await;
 }
+
+#[path = "workbench/tests.rs"]
+mod workbench;

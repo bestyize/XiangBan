@@ -29,6 +29,7 @@ fn bearer_or_api_key(parts: &Parts) -> Option<&str> {
 }
 
 /// 账号中心登录用户，并由令牌 `aud` 解析出所属产品。客户端不属于任何已启用产品时拒绝。
+#[derive(Clone)]
 pub struct AuthUser {
     pub uid: Uuid,
     pub product: Product,

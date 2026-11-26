@@ -6,6 +6,7 @@ description = "相伴 AI 网关与额度系统：按产品隔离的试用与额�
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+agent-kernel = { path = "../../libs/agent-kernel", features = ["native-tls"] }
 axum = { version = "0.8", features = ["multipart", "ws"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }

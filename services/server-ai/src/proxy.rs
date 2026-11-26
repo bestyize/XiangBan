@@ -132,8 +132,28 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     let fields = request.as_object_mut().ok_or_else(|| AppError::BadRequest("请求体需要是 JSON 对象".into()))?;
 
     let requested = fields.get("model").and_then(Value::as_str).map(str::to_string);
+    let (tier, active) = model_access(state, &auth, requested.as_deref()).await?;
+    fields.insert("model".into(), Value::String(tier.model.clone()));
+    validate_reasoning(api, fields, &crate::reasoning::levels(&tier.model, tier.reasoning_efforts.as_deref()))?;
+    let bridged = if api == Api::ChatCompletions && crate::handlers::user::is_responses_only_model(&tier.model) {
+        Some(responses_bridge::chat_to_responses(&request, tier.capabilities.as_ref().and_then(|cap| cap.0.max_output_tokens))?)
+    } else {
+        None
+    };
+
+    if let Some((payload, want_stream)) = bridged {
+        let upstream = state.newapi.relay(Api::Responses.path(), &active.key, payload, &[]).await?;
+        return responses_bridge::respond_as_chat(upstream, &tier.tier, want_stream).await;
+    }
+
+    let payload = serde_json::to_vec(&request).map_err(|e| AppError::Internal(e.to_string()))?;
+    let upstream = state.newapi.relay(api.path(), &active.key, payload, &forwarded_headers(api, headers)).await?;
+    respond(upstream, &tier.tier).await
+}
+
+pub(crate) async fn model_access(state: &AppState, auth: &AuthUser, requested: Option<&str>) -> Result<(products::Tier, binding::ActiveBinding), AppError> {
     let tiers = products::tiers(&state.pool, &auth.product.product_id, true).await?;
-    let tier = products::resolve_tier(&tiers, requested.as_deref()).ok_or_else(|| AppError::Coded {
+    let tier = products::resolve_tier(&tiers, requested).ok_or_else(|| AppError::Coded {
         status: StatusCode::BAD_REQUEST,
         code: "model_not_found",
         message: "未知的模型档位".into(),
@@ -149,23 +169,8 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
         });
     }
 
-    fields.insert("model".into(), Value::String(tier.model.clone()));
-    validate_reasoning(api, fields, &crate::reasoning::levels(&tier.model, tier.reasoning_efforts.as_deref()))?;
-    let bridged = if api == Api::ChatCompletions && crate::handlers::user::is_responses_only_model(&tier.model) {
-        Some(responses_bridge::chat_to_responses(&request, tier.capabilities.as_ref().and_then(|cap| cap.0.max_output_tokens))?)
-    } else {
-        None
-    };
     sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
-
-    if let Some((payload, want_stream)) = bridged {
-        let upstream = state.newapi.relay(Api::Responses.path(), &active.key, payload, &[]).await?;
-        return responses_bridge::respond_as_chat(upstream, &tier.tier, want_stream).await;
-    }
-
-    let payload = serde_json::to_vec(&request).map_err(|e| AppError::Internal(e.to_string()))?;
-    let upstream = state.newapi.relay(api.path(), &active.key, payload, &forwarded_headers(api, headers)).await?;
-    respond(upstream, &tier.tier).await
+    Ok((tier.clone(), active))
 }
 
 pub(crate) async fn require_quota(state: &AppState, binding_id: i64) -> Result<(), AppError> {
@@ -269,13 +274,17 @@ pub async fn web_search(State(state): State<AppState>, auth: Result<AuthUser, Ap
     let result = async {
         let body = body.map_err(|error| map_body_error(error.status()))?;
         let request = search::parse_search(&body)?;
-        let caller = search_caller(&state, auth).await?;
-        let (results, ours) = state.search.search(&request, Some(&caller.key)).await?;
-        if ours && !results.is_empty() { charge(&state, caller.id, state.config.search_cost).await; }
-        Ok::<_, AppError>(Json(json!({ "results": results })).into_response())
+        Ok::<_, AppError>(Json(search_for_user(&state, auth?, &request).await?).into_response())
     }
     .await;
     result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
+}
+
+pub(crate) async fn search_for_user(state: &AppState, auth: AuthUser, request: &search::SearchRequest) -> Result<Value, AppError> {
+    let caller = search_caller(state, Ok(auth)).await?;
+    let (results, ours) = state.search.search(request, Some(&caller.key)).await?;
+    if ours && !results.is_empty() { charge(state, caller.id, state.config.search_cost).await; }
+    Ok(json!({ "results": results }))
 }
 
 /// `POST /v1/fetch`: one public page as Markdown.

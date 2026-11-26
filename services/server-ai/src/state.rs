@@ -11,6 +11,7 @@ const REDEEM_WINDOW: Duration = Duration::from_secs(15 * 60);
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub workbench_slots: Arc<tokio::sync::Semaphore>,
     pub config: Arc<AppConfig>,
     pub keys: Arc<Keys>,
     pub verifier: Arc<JwksVerifier>,

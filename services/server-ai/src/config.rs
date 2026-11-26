@@ -20,6 +20,7 @@ pub struct AppConfig {
     pub trust_proxy: bool,
     pub cors_origins: Vec<String>,
     pub web_dir: PathBuf,
+    pub workbench_concurrency: usize,
     pub max_body_bytes: usize,
     /// Search providers behind `/v1/search` and `/v1/fetch`, tried in this order. One without a key is skipped.
     pub search_providers: Vec<String>,
@@ -68,6 +69,7 @@ impl AppConfig {
                 .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default(),
             web_dir: PathBuf::from(get("AI_WEB_DIR").unwrap_or_else(|| "services/server-ai/web/dist".into())),
+            workbench_concurrency: num("AI_WORKBENCH_CONCURRENCY", 32).clamp(1, 512) as usize,
             max_body_bytes: num("AI_MAX_BODY_BYTES", 8 * 1024 * 1024).max(1024) as usize,
             search_providers: get("AI_SEARCH_PROVIDERS")
                 .unwrap_or_else(|| "newapi,deepseek".into())

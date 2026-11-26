@@ -4,6 +4,13 @@
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55010。
 
+## 网页对话工作台
+
+论坛网页版使用账号令牌访问 `/api/workbench/sessions`。创建会话时由客户端提供 UUID，每次发送使用独立的 `requestId`。同一会话重复提交相同请求会返回原来的运行 ID。事件接口 `GET /api/workbench/sessions/{session}/events?after={seq}` 通过 SSE 回放已提交的记录。
+
+服务端通过共用的 Agent 内核运行模型，并使用当前账号的 New API 额度。浏览器断开后任务继续运行。可用的云端工具是经单次确认的联网搜索。待确认的请求十分钟后按拒绝处理。系统文件、窗口和桌面操作由桌面客户端处理。进程意外退出后保留已收到的内容并结束中断的任务。每个服务实例可通过 `AI_WORKBENCH_CONCURRENCY` 调整并行运行数，默认 32。
+
+
 ## 它做什么
 
 - 用账号中心的 JWKS 离线验签，令牌 `aud` 决定用户属于哪个产品（`products.client_ids`）。

@@ -192,5 +192,6 @@ pub async fn connect(url: &str, schema: Option<&str>) -> Result<PgPool, AppError
 pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(SCHEMA).execute(pool).await?;
     crate::information_jobs::init(pool).await?;
+    sqlx::raw_sql(include_str!("workbench/schema.sql")).execute(pool).await?;
     Ok(())
 }

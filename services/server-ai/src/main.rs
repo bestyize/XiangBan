@@ -1,3 +1,4 @@
+mod workbench;
 mod information_jobs;
 mod image_jobs;
 mod admin_auth;
@@ -48,6 +49,7 @@ use tracing::info;
 
 pub fn build_router(state: AppState) -> Router {
     let api = Router::new()
+        .nest("/workbench", workbench::routes())
         .route("/health", get(meta::health))
         .route("/internal/information-jobs/{action}", post(information_jobs::action).layer(DefaultBodyLimit::max(256 * 1024)))
         .route("/internal/information-execution/{action}", post(information_jobs::execute).layer(DefaultBodyLimit::max(64 * 1024)))
@@ -100,8 +102,8 @@ pub fn build_router(state: AppState) -> Router {
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。
     let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, axum::http::HeaderName::from_static("last-event-id")]);
     let cors = if origins.is_empty() { cors.allow_origin(Any) } else { cors.allow_origin(origins) };
 
     let mut router = Router::new().nest("/api", api).nest("/v1", v1);
@@ -155,6 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let (redeem_user_limiter, redeem_ip_limiter) = state::redeem_limiters();
     let state = AppState {
+        workbench_slots: Arc::new(tokio::sync::Semaphore::new(config.workbench_concurrency)),
         pool,
         redeem_user_limiter,
         redeem_ip_limiter,
@@ -166,6 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dummy_password_hash: Arc::new(dummy_password_hash),
     };
     tokio::spawn(sync::run_loop(state.clone()));
+    tokio::spawn(workbench::maintain(state.pool.clone()));
     tokio::spawn(image_jobs::maintain(state.pool.clone()));
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
