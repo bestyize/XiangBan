@@ -5,7 +5,7 @@ const checked = defineModel<boolean>({ required: true })
 
 <template>
   <button
-    class="switch"
+    class="xb-switch"
     type="button"
     role="switch"
     :aria-checked="checked"
@@ -19,44 +19,35 @@ const checked = defineModel<boolean>({ required: true })
 </template>
 
 <style scoped>
-.switch {
+.xb-switch {
   position: relative;
   flex: none;
-  width: 40px;
-  height: 24px;
+  width: 36px;
+  height: 20px;
   border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface-2);
-  transition:
-    background 0.2s,
-    border-color 0.2s;
+  border: 0;
+  background: var(--ui-control-hover);
+  transition: background 0.18s;
 }
-
-.switch[aria-checked='true'] {
-  background: var(--text);
-  border-color: var(--text);
+.xb-switch[aria-checked='true'] {
+  background: var(--ui-btn);
 }
-
 .knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--text-2);
-  transition:
-    transform 0.25s var(--ease),
-    background 0.2s;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s var(--ui-ease);
 }
-
-.switch[aria-checked='true'] .knob {
-  background: var(--bg);
+.xb-switch[aria-checked='true'] .knob {
   transform: translateX(16px);
 }
-
-.switch:disabled {
-  opacity: 0.5;
-  cursor: default;
+.xb-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

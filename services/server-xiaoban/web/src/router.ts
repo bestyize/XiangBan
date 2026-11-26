@@ -37,8 +37,9 @@ export const router = createRouter({
       path: '/admin',
       component: () => import('./views/admin/AdminLayout.vue'),
       meta: { admin: true },
-      redirect: '/admin/collector',
+      redirect: '/admin/overview',
       children: [
+        { path: 'overview', name: 'admin-overview', component: () => import('./views/admin/OverviewView.vue') },
         { path: 'ai-providers', name: 'admin-ai-providers', component: () => import('./views/admin/AiProvidersView.vue') },
         { path: 'apps', name: 'admin-apps', component: () => import('./views/admin/AppReleasesView.vue') },
         { path: 'desktop', name: 'admin-desktop', component: () => import('./views/admin/DesktopAdminView.vue') },
@@ -62,7 +63,7 @@ router.beforeEach(async (to) => {
   if (!admin.checked) await admin.refresh()
 
   const isLogin = to.matched.some((r) => r.meta.public)
-  if (isLogin) return admin.user ? '/admin/keys' : undefined
+  if (isLogin) return admin.user ? '/admin/overview' : undefined
   if (!admin.user) return { path: '/admin/login', query: { redirect: to.fullPath } }
 })
 

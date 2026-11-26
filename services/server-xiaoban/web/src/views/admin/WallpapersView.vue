@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import ConfirmButton from '@/components/admin/ConfirmButton.vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Icon from '@/components/Icon.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import Viewer from '@/components/Viewer.vue'
+import AdminMoreMenu, { type MoreMenuItem } from '@/components/admin/AdminMoreMenu.vue'
+import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect.vue'
+import TagChipEditor from '@/components/admin/TagChipEditor.vue'
 import {
   deleteWallpaper,
   listAdminWallpapers,
@@ -10,42 +14,77 @@ import {
   updateWallpaperStatus,
 } from '@/admin/api'
 import { toast } from '@/composables/toast'
+import { openViewer } from '@/composables/viewer'
 import { useCatalog } from '@/stores/catalog'
 import type { WallpaperItem } from '@/types'
 
+const route = useRoute()
+const router = useRouter()
 const catalog = useCatalog()
 
 const items = ref<WallpaperItem[]>([])
 const total = ref(0)
+const counts = ref({ all: 0, published: 0, pending: 0, offline: 0 })
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// 过滤器
-const status = ref('all')
+const status = ref(typeof route.query.status === 'string' ? route.query.status : 'all')
 const category = ref('all')
 const mediaType = ref('all')
 const q = ref('')
+const viewMode = ref<'grid' | 'table'>('grid')
 const page = ref(1)
-const perPage = ref(20)
+const perPage = ref(24)
 
-// 编辑模态框
+const selectedIds = ref<Set<string>>(new Set())
+const batchBusy = ref(false)
+
+// Slide-over Edit Drawer
 const editItem = ref<WallpaperItem | null>(null)
 const editTitle = ref('')
 const editCategory = ref('')
-const editTagsText = ref('')
+const editTags = ref<string[]>([])
 const editStatus = ref('published')
 const saving = ref(false)
 
-onMounted(async () => {
-  if (catalog.categories.length === 0) {
-    await catalog.load()
-  }
-  loadList()
-})
+const mediaOptions: SelectOption[] = [
+  { value: 'all', label: '全部类型' },
+  { value: 'image', label: '静态图片', icon: 'image' },
+  { value: 'video', label: '动态视频', icon: 'play' },
+]
+
+const categoryOptions = computed<SelectOption[]>(() => [
+  { value: 'all', label: '全部分类' },
+  ...catalog.categories.map((c) => ({ value: c.id, label: c.name })),
+])
+
+const editCategoryOptions = computed<SelectOption[]>(() => [
+  { value: '', label: '未分类' },
+  ...catalog.categories.map((c) => ({ value: c.id, label: c.name })),
+])
+
+const allSelected = computed(() => items.value.length > 0 && selectedIds.value.size === items.value.length)
+const catName = (id?: string) => catalog.categories.find((c) => c.id === id)?.name || id || '未分类'
+const statusLabel = (st?: string) => (st === 'published' ? '已上架' : st === 'pending' ? '待审核' : '已下架')
+const statusDot = (st?: string) => (st === 'published' ? 'ok' : st === 'pending' ? 'warn' : 'danger')
+
+async function loadCounts() {
+  const [a, p, d, o] = await Promise.allSettled([
+    listAdminWallpapers({ status: 'all', page: 1, per_page: 1 }),
+    listAdminWallpapers({ status: 'published', page: 1, per_page: 1 }),
+    listAdminWallpapers({ status: 'pending', page: 1, per_page: 1 }),
+    listAdminWallpapers({ status: 'offline', page: 1, per_page: 1 }),
+  ])
+  if (a.status === 'fulfilled') counts.value.all = a.value.total
+  if (p.status === 'fulfilled') counts.value.published = p.value.total
+  if (d.status === 'fulfilled') counts.value.pending = d.value.total
+  if (o.status === 'fulfilled') counts.value.offline = o.value.total
+}
 
 async function loadList() {
   loading.value = true
   error.value = null
+  selectedIds.value = new Set()
   try {
     const res = await listAdminWallpapers({
       status: status.value,
@@ -57,35 +96,59 @@ async function loadList() {
     })
     items.value = res.items
     total.value = res.total
-  } catch (err: any) {
-    error.value = err?.message || '加载图库列表失败'
+  } catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : '加载图库列表失败'
   } finally {
     loading.value = false
   }
 }
 
+onMounted(async () => {
+  if (catalog.categories.length === 0) await catalog.load()
+  await Promise.all([loadList(), loadCounts()])
+})
+
 watch([status, category, mediaType], () => {
   page.value = 1
-  loadList()
+  void loadList()
 })
 
 function handleSearch() {
   page.value = 1
-  loadList()
+  void loadList()
 }
 
 function prevPage() {
   if (page.value > 1) {
     page.value--
-    loadList()
+    void loadList()
   }
 }
 
 function nextPage() {
   if (page.value * perPage.value < total.value) {
     page.value++
-    loadList()
+    void loadList()
   }
+}
+
+function toggleSelect(id: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedIds.value = next
+}
+
+function toggleAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(items.value.map((i) => i.id))
+  }
+}
+
+function previewItem(item: WallpaperItem) {
+  openViewer(router, { items }, item)
 }
 
 async function quickToggleStatus(item: WallpaperItem) {
@@ -94,8 +157,9 @@ async function quickToggleStatus(item: WallpaperItem) {
     await updateWallpaperStatus(item.id, nextStatus)
     item.status = nextStatus
     toast(nextStatus === 'published' ? '已上架对外展示' : '已下架')
-  } catch (err: any) {
-    toast(err?.message || '切换状态失败')
+    void loadCounts()
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '切换状态失败')
   }
 }
 
@@ -103,33 +167,30 @@ function openEdit(item: WallpaperItem) {
   editItem.value = item
   editTitle.value = item.title
   editCategory.value = item.category || ''
-  editTagsText.value = item.tags.join(', ')
+  editTags.value = [...item.tags]
   editStatus.value = item.status || 'published'
 }
 
 async function confirmSaveEdit() {
   if (!editItem.value) return
   saving.value = true
-  const tags = editTagsText.value
-    .split(/[,，]/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-
   try {
+    const cleanTitle = editTitle.value.trim() || editItem.value.title
     await updateWallpaperMeta(editItem.value.id, {
-      title: editTitle.value.trim() || editItem.value.title,
+      title: cleanTitle,
       category: editCategory.value || undefined,
-      tags,
+      tags: editTags.value,
       status: editStatus.value,
     })
-    editItem.value.title = editTitle.value.trim()
+    editItem.value.title = cleanTitle
     editItem.value.category = editCategory.value || undefined
-    editItem.value.tags = tags
+    editItem.value.tags = [...editTags.value]
     editItem.value.status = editStatus.value
-    toast('壁纸信息更新成功')
+    toast('壁纸信息已保存')
     editItem.value = null
-  } catch (err: any) {
-    toast(err?.message || '更新壁纸失败')
+    void loadCounts()
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '更新壁纸失败')
   } finally {
     saving.value = false
   }
@@ -140,551 +201,524 @@ async function handleDelete(id: string) {
     await deleteWallpaper(id)
     items.value = items.value.filter((it) => it.id !== id)
     total.value = Math.max(0, total.value - 1)
+    const next = new Set(selectedIds.value)
+    next.delete(id)
+    selectedIds.value = next
     toast('已删除壁纸')
-  } catch (err: any) {
-    toast(err?.message || '删除失败')
+    void loadCounts()
+  } catch (err: unknown) {
+    toast(err instanceof Error ? err.message : '删除失败')
   }
+}
+
+async function batchSetStatus(nextStatus: 'published' | 'offline') {
+  if (batchBusy.value || !selectedIds.value.size) return
+  batchBusy.value = true
+  const ids = [...selectedIds.value]
+  let ok = 0
+  for (const id of ids) {
+    try {
+      await updateWallpaperStatus(id, nextStatus)
+      const it = items.value.find((x) => x.id === id)
+      if (it) it.status = nextStatus
+      ok++
+    } catch { /* continue */ }
+  }
+  selectedIds.value = new Set()
+  batchBusy.value = false
+  toast(`已批量${nextStatus === 'published' ? '上架' : '下架'} ${ok} 项`)
+  void loadCounts()
+}
+
+async function batchDelete() {
+  if (batchBusy.value || !selectedIds.value.size) return
+  batchBusy.value = true
+  const ids = [...selectedIds.value]
+  let ok = 0
+  for (const id of ids) {
+    try {
+      await deleteWallpaper(id)
+      ok++
+    } catch { /* continue */ }
+  }
+  items.value = items.value.filter((x) => !ids.includes(x.id))
+  total.value = Math.max(0, total.value - ok)
+  selectedIds.value = new Set()
+  batchBusy.value = false
+  toast(`已删除 ${ok} 项`)
+  void loadCounts()
+}
+
+function menuFor(item: WallpaperItem): MoreMenuItem[] {
+  return [
+    {
+      label: item.status === 'published' ? '下架' : '立即上架',
+      icon: 'bolt',
+      action: () => void quickToggleStatus(item),
+    },
+    { label: '编辑信息', icon: 'edit', action: () => openEdit(item) },
+    { label: '查看大图', icon: 'eye', action: () => previewItem(item) },
+    { sep: true },
+    {
+      label: '永久删除',
+      icon: 'trash',
+      danger: true,
+      desc: '从图库中永久删除，不可恢复',
+      confirmText: '确认删除？',
+      action: () => void handleDelete(item.id),
+    },
+  ]
 }
 </script>
 
 <template>
-  <div class="wallpapers-view">
-    <header class="head">
-      <div class="title-wrap">
-        <h1 class="a-h1">壁纸图库管理</h1>
-        <p class="desc">管理数据库中已采集与自主上架的壁纸及视频资源（共 {{ total }} 条）。</p>
+  <div class="xb-page">
+    <header class="xb-page-head">
+      <div class="xb-tabs-lg" role="tablist">
+        <button
+          v-for="tab in [
+            { k: 'all', l: '全部', n: counts.all },
+            { k: 'published', l: '已上架', n: counts.published },
+            { k: 'pending', l: '待审核', n: counts.pending },
+            { k: 'offline', l: '已下架', n: counts.offline },
+          ]"
+          :key="tab.k"
+          type="button"
+          :class="{ 'is-active': status === tab.k }"
+          @click="status = tab.k"
+        >
+          <span>{{ tab.l }}</span>
+          <span class="tab-n">{{ tab.n }}</span>
+        </button>
       </div>
-
-      <!-- 筛选栏 -->
-      <div class="filter-bar">
-        <form class="search-form" @submit.prevent="handleSearch">
-          <input
-            v-model="q"
-            type="search"
-            placeholder="搜索标题或标签..."
-            class="a-input search-input"
-          />
-          <button type="submit" class="a-btn">搜索</button>
-        </form>
-
-        <div class="filters-row">
-          <select v-model="status" class="a-select">
-            <option value="all">全部状态</option>
-            <option value="published">已上架 (公开)</option>
-            <option value="pending">待审核 (未公开)</option>
-            <option value="offline">已下架</option>
-          </select>
-
-          <select v-model="mediaType" class="a-select">
-            <option value="all">全部媒体类型</option>
-            <option value="image">静态图片</option>
-            <option value="video">动态视频</option>
-          </select>
-
-          <select v-model="category" class="a-select">
-            <option value="all">全部分类</option>
-            <option v-for="cat in catalog.categories" :key="cat.id" :value="cat.id">
-              {{ cat.name }}
-            </option>
-          </select>
-
-          <RouterLink to="/admin/upload" class="a-btn primary upload-link">
-            <Icon name="upload" :size="16" />
-            自定义上架
-          </RouterLink>
-        </div>
+      <div class="xb-page-actions">
+        <RouterLink to="/admin/collector" class="xb-btn-ghost">
+          <Icon name="compass" :size="14" /><span>采集</span>
+        </RouterLink>
+        <RouterLink to="/admin/upload" class="xb-btn-primary">
+          <Icon name="plus" :size="14" /><span>自定义上架</span>
+        </RouterLink>
       </div>
     </header>
 
-    <div class="table-wrap">
-      <div v-if="loading && items.length === 0" class="loading-state">
-        正在加载图库数据...
+    <div class="filter-bar">
+      <form class="filter-l" @submit.prevent="handleSearch">
+        <div class="xb-affix has-l" :class="{ 'has-r': !!q }" style="width: 220px">
+          <span class="af-l"><Icon name="search" :size="14" /></span>
+          <input v-model="q" type="search" class="xb-input" placeholder="搜索标题或标签…" />
+          <button v-if="q" type="button" class="af-r" aria-label="清空" @click="q = ''; handleSearch()">
+            <Icon name="close" :size="13" />
+          </button>
+        </div>
+        <AdminSelect v-model="mediaType" :options="mediaOptions" />
+        <AdminSelect v-model="category" :options="categoryOptions" />
+        <button type="submit" class="xb-btn-soft">搜索</button>
+      </form>
+
+      <div class="filter-r">
+        <button v-if="items.length" type="button" class="xb-btn-ghost is-sm" @click="toggleAll">
+          {{ allSelected ? '取消全选' : '全选' }}
+        </button>
+        <div class="xb-seg" role="group" aria-label="视图切换">
+          <button type="button" :class="{ 'is-active': viewMode === 'grid' }" title="画廊视图" @click="viewMode = 'grid'">
+            <Icon name="grid" :size="14" />
+          </button>
+          <button type="button" :class="{ 'is-active': viewMode === 'table' }" title="列表视图" @click="viewMode = 'table'">
+            <Icon name="list" :size="14" />
+          </button>
+        </div>
       </div>
-      <StateBlock
-        v-else-if="error && items.length === 0"
-        kind="error"
-        :title="error"
-        action="重新加载"
-        @action="loadList"
-      />
-      <StateBlock
-        v-else-if="items.length === 0"
-        kind="empty"
-        title="暂无壁纸记录"
-        hint="可以前往「采集工作台」挑选外部壁纸入库，或点击右上角「自定义上架」上传本地资源。"
-      />
-      <table v-else class="data-table">
+    </div>
+
+    <div v-if="loading && !items.length" class="xb-group xb-empty-box">正在加载图库…</div>
+    <StateBlock
+      v-else-if="error && !items.length"
+      kind="error"
+      :title="error"
+      action="重试"
+      @action="loadList"
+    />
+    <div v-else-if="!items.length" class="xb-group xb-empty-box">
+      <Icon name="image" :size="28" />
+      <strong>暂无匹配壁纸</strong>
+      <button
+        type="button"
+        class="xb-btn-soft is-sm"
+        @click="status = 'all'; mediaType = 'all'; category = 'all'; q = ''; handleSearch()"
+      >
+        重置筛选
+      </button>
+    </div>
+
+    <div v-else-if="viewMode === 'grid'" class="wp-grid">
+      <article
+        v-for="item in items"
+        :key="item.id"
+        class="wp-card"
+        :class="{ 'is-selected': selectedIds.has(item.id) }"
+      >
+        <div class="wp-thumb" @click="previewItem(item)">
+          <img :src="item.preview_url" :alt="item.title" loading="lazy" />
+          <button
+            type="button"
+            class="wp-sel"
+            aria-label="选择壁纸"
+            @click.stop="toggleSelect(item.id)"
+          >
+            <Icon v-if="selectedIds.has(item.id)" name="check" :size="13" />
+          </button>
+          <div class="wp-top-r">
+            <span v-if="item.media_type === 'video'" class="wp-glass">
+              <Icon name="play" :size="10" /><span>视频</span>
+            </span>
+            <span class="wp-glass xb-num">{{ item.resolution.width }}×{{ item.resolution.height }}</span>
+          </div>
+          <div class="wp-bot-l">
+            <span class="wp-glass">{{ item.source_type === 'custom' ? '自主上架' : item.provider }}</span>
+          </div>
+        </div>
+        <div class="wp-info">
+          <div class="wp-info-l">
+            <div class="wp-title" :title="item.title">{{ item.title }}</div>
+            <div class="wp-sub">
+              <i class="xb-dot-status" :class="statusDot(item.status)" />
+              <span>{{ statusLabel(item.status) }}</span>
+              <span>·</span>
+              <span>{{ catName(item.category) }}</span>
+            </div>
+          </div>
+          <AdminMoreMenu :items="menuFor(item)" />
+        </div>
+      </article>
+    </div>
+
+    <div v-else class="tbl-wrap">
+      <table class="tbl">
         <thead>
           <tr>
-            <th style="width: 80px">预览</th>
-            <th>标题与标签</th>
-            <th style="width: 100px">分类</th>
-            <th style="width: 100px">类型/规格</th>
-            <th style="width: 90px">来源</th>
-            <th style="width: 110px">状态</th>
-            <th style="width: 160px; text-align: right">操作</th>
+            <th style="width: 40px">
+              <button type="button" class="xb-check" :class="{ 'is-checked': allSelected }" @click="toggleAll">
+                <Icon v-if="allSelected" name="check" :size="12" />
+              </button>
+            </th>
+            <th style="width: 92px">预览</th>
+            <th>标题</th>
+            <th>分类</th>
+            <th>规格</th>
+            <th>来源</th>
+            <th>状态</th>
+            <th style="text-align: right; width: 100px">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in items" :key="item.id">
+          <tr v-for="item in items" :key="item.id" :class="{ 'is-selected': selectedIds.has(item.id) }">
             <td>
-              <div class="thumb-box">
-                <img :src="item.preview_url" :alt="item.title" loading="lazy" />
-                <span v-if="item.media_type === 'video'" class="video-tag">
-                  <Icon name="play" :size="11" />
-                </span>
-              </div>
-            </td>
-            <td>
-              <div class="item-title">{{ item.title }}</div>
-              <div v-if="item.tags.length" class="tags-list">
-                <span v-for="t in item.tags.slice(0, 4)" :key="t" class="tag">{{ t }}</span>
-                <span v-if="item.tags.length > 4" class="tag-more">+{{ item.tags.length - 4 }}</span>
-              </div>
-            </td>
-            <td>
-              <span class="category-badge">{{ item.category || '未分类' }}</span>
-            </td>
-            <td>
-              <div class="spec-text">
-                {{ item.media_type === 'video' ? '视频' : '图片' }}
-              </div>
-              <div class="res-text">{{ item.resolution.width }}x{{ item.resolution.height }}</div>
-            </td>
-            <td>
-              <span class="source-badge" :class="item.source_type">
-                {{ item.source_type === 'custom' ? '自主上架' : item.provider }}
-              </span>
-            </td>
-            <td>
-              <span
-                class="status-pill"
-                :class="item.status"
-                :title="item.status === 'published' ? '对外展示中' : '未对外展示'"
+              <button
+                type="button"
+                class="xb-check"
+                :class="{ 'is-checked': selectedIds.has(item.id) }"
+                @click="toggleSelect(item.id)"
               >
-                {{
-                  item.status === 'published'
-                    ? '● 已上架'
-                    : item.status === 'pending'
-                      ? '○ 待审核'
-                      : '✕ 已下架'
-                }}
+                <Icon v-if="selectedIds.has(item.id)" name="check" :size="12" />
+              </button>
+            </td>
+            <td>
+              <div class="mini-thumb" @click="previewItem(item)">
+                <img :src="item.preview_url" :alt="item.title" loading="lazy" />
+              </div>
+            </td>
+            <td>
+              <div class="row-title" :title="item.tags.join(' / ')">{{ item.title }}</div>
+            </td>
+            <td>{{ catName(item.category) }}</td>
+            <td class="xb-num sub-col">{{ item.resolution.width }}×{{ item.resolution.height }}</td>
+            <td><span class="xb-pill">{{ item.source_type === 'custom' ? '自主上架' : item.provider }}</span></td>
+            <td>
+              <span class="xb-pill" :class="`is-${statusDot(item.status)}`">
+                <i class="dot" />{{ statusLabel(item.status) }}
               </span>
             </td>
             <td style="text-align: right">
-              <div class="actions">
-                <button
-                  type="button"
-                  class="action-btn"
-                  :class="{ active: item.status === 'published' }"
-                  :title="item.status === 'published' ? '点击下架' : '点击上架'"
-                  @click="quickToggleStatus(item)"
-                >
-                  {{ item.status === 'published' ? '下架' : '上架' }}
-                </button>
-                <button type="button" class="action-btn" title="编辑信息" @click="openEdit(item)">
-                  编辑
-                </button>
-                <ConfirmButton
-                  label="删除"
-                  confirm-label="确定删除？"
-                  class="delete-btn"
-                  @confirm="handleDelete(item.id)"
-                />
+              <div class="tbl-acts">
+                <button type="button" class="xb-btn-ghost is-sm" @click="openEdit(item)">编辑</button>
+                <AdminMoreMenu :items="menuFor(item)" />
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
 
-      <!-- 底部翻页 -->
-      <div v-if="total > perPage" class="pagination">
-        <span class="page-info">
-          第 {{ page }} 页 / 共 {{ Math.ceil(total / perPage) }} 页（{{ total }} 条）
-        </span>
-        <div class="page-btns">
-          <button type="button" class="a-btn" :disabled="page <= 1" @click="prevPage">
-            上一页
-          </button>
-          <button
-            type="button"
-            class="a-btn"
-            :disabled="page * perPage >= total"
-            @click="nextPage"
-          >
-            下一页
-          </button>
-        </div>
+    <div v-if="total > perPage" class="pager">
+      <span class="sub-col xb-num">第 {{ page }} / {{ Math.ceil(total / perPage) }} 页（共 {{ total }} 条）</span>
+      <div class="pager-btns">
+        <button type="button" class="xb-btn-soft is-sm" :disabled="page <= 1" @click="prevPage">上一页</button>
+        <button type="button" class="xb-btn-soft is-sm" :disabled="page * perPage >= total" @click="nextPage">
+          下一页
+        </button>
       </div>
     </div>
 
-    <!-- 编辑模态框 -->
-    <div v-if="editItem" class="modal-backdrop" @click="editItem = null">
-      <div class="modal-card" @click.stop>
-        <div class="modal-header">
-          <h3>编辑壁纸信息</h3>
-          <button type="button" class="close-btn" @click="editItem = null">
-            <Icon name="close" :size="18" />
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label">标题：</label>
-            <input v-model="editTitle" type="text" class="a-input full" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">所属分类：</label>
-            <select v-model="editCategory" class="a-select full">
-              <option value="">未分类</option>
-              <option v-for="cat in catalog.categories" :key="cat.id" :value="cat.id">
-                {{ cat.name }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">标签（逗号分隔）：</label>
-            <input
-              v-model="editTagsText"
-              type="text"
-              placeholder="例如：风景, 治愈, 4K"
-              class="a-input full"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">上架状态：</label>
-            <select v-model="editStatus" class="a-select full">
-              <option value="published">已上架 (Published 对外公开)</option>
-              <option value="pending">待审核 (Pending 仅库内保存)</option>
-              <option value="offline">已下架 (Offline 隐藏)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="modal-foot">
-          <button type="button" class="a-btn" @click="editItem = null">取消</button>
-          <button type="button" class="a-btn primary" :disabled="saving" @click="confirmSaveEdit">
-            {{ saving ? '保存中...' : '保存修改' }}
-          </button>
-        </div>
-      </div>
+    <div v-if="selectedIds.size > 0" class="xb-batch-bar">
+      <span>已选 <strong class="xb-num">{{ selectedIds.size }}</strong> 项</span>
+      <button type="button" class="xb-batch-btn" :disabled="batchBusy" @click="batchSetStatus('published')">上架</button>
+      <button type="button" class="xb-batch-btn" :disabled="batchBusy" @click="batchSetStatus('offline')">下架</button>
+      <button type="button" class="xb-batch-btn is-danger-fill" :disabled="batchBusy" @click="batchDelete">删除</button>
+      <button type="button" class="xb-batch-btn" @click="selectedIds = new Set()">取消</button>
     </div>
+
+    <!-- 20px Slide-over Edit Drawer -->
+    <Teleport to="body">
+      <div v-if="editItem" class="xb-backdrop" @click.self="editItem = null">
+        <form class="xb-drawer" @submit.prevent="confirmSaveEdit">
+          <header class="xb-ov-head">
+            <h2>编辑壁纸</h2>
+            <button type="button" class="xb-icon-btn" aria-label="关闭" @click="editItem = null">
+              <Icon name="close" :size="18" />
+            </button>
+          </header>
+
+          <div class="xb-ov-body">
+            <div class="drawer-preview">
+              <img :src="editItem.preview_url" :alt="editItem.title" />
+            </div>
+
+            <label class="xb-field">
+              <span class="xb-field-label">标题</span>
+              <input v-model="editTitle" type="text" class="xb-input" required />
+            </label>
+
+            <div class="xb-field">
+              <span class="xb-field-label">所属分类</span>
+              <AdminSelect v-model="editCategory" :options="editCategoryOptions" full />
+            </div>
+
+            <div class="xb-field">
+              <span class="xb-field-label">状态</span>
+              <div class="xb-seg" style="align-self: flex-start">
+                <button
+                  v-for="s in [
+                    { v: 'published', l: '已上架' },
+                    { v: 'pending', l: '待审核' },
+                    { v: 'offline', l: '已下架' },
+                  ]"
+                  :key="s.v"
+                  type="button"
+                  :class="{ 'is-active': editStatus === s.v }"
+                  @click="editStatus = s.v"
+                >
+                  {{ s.l }}
+                </button>
+              </div>
+            </div>
+
+            <div class="xb-field">
+              <span class="xb-field-label">标签</span>
+              <TagChipEditor v-model="editTags" />
+            </div>
+          </div>
+
+          <footer class="xb-ov-foot">
+            <button type="button" class="xb-btn-ghost" @click="editItem = null">取消</button>
+            <button type="submit" class="xb-btn-primary" :disabled="saving">
+              {{ saving ? '保存中…' : '保存' }}
+            </button>
+          </footer>
+        </form>
+      </div>
+    </Teleport>
+
+    <Viewer />
   </div>
 </template>
 
 <style scoped>
-.wallpapers-view {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 32px 36px 60px;
-  max-width: 1600px;
-}
-
-.head {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.desc {
-  font-size: 14px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-
 .filter-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 16px 20px;
-  border-radius: var(--r-card);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
+  gap: 10px;
+  flex-wrap: wrap;
 }
-
-.search-form {
+.filter-l,
+.filter-r {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.search-input {
-  width: 260px;
-}
-
-.filters-row {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
 }
-
-.upload-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.wp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
-
-.loading-state {
-  padding: 60px 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.table-wrap {
+.wp-card {
+  border-radius: 12px;
+  background: var(--ui-surface-sunken);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border-radius: var(--r-card);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
-  padding: 8px 16px 20px;
+  transition: box-shadow 0.14s;
+}
+.wp-card.is-selected { box-shadow: 0 0 0 2px var(--ui-btn); }
+.wp-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--ui-control);
+}
+.wp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s var(--ui-ease);
+}
+.wp-card:hover .wp-thumb img { transform: scale(1.03); }
+.wp-sel {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(18, 18, 22, 0.54);
+  backdrop-filter: blur(8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.14s, background 0.14s;
+}
+.wp-card:hover .wp-sel,
+.wp-card.is-selected .wp-sel { opacity: 1; }
+.wp-card.is-selected .wp-sel { background: var(--ui-btn); }
+.wp-top-r {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.wp-bot-l {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.wp-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  line-height: 1;
+  background: rgba(16, 16, 20, 0.62);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 550;
+}
+.wp-info {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wp-info-l {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wp-title {
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wp-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ui-text-tertiary);
+  line-height: 1;
 }
 
-.data-table {
+.tbl-wrap {
+  background: var(--ui-surface-sunken);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.tbl {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-
-.data-table th,
-.data-table td {
-  padding: 14px 12px;
+.tbl th,
+.tbl td {
+  padding: 10px 14px;
   text-align: left;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--ui-line);
+  vertical-align: middle;
 }
-
-.data-table th {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 12px;
-}
-
-.thumb-box {
-  position: relative;
-  width: 72px;
-  height: 48px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.thumb-box img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.video-tag {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
-  padding: 2px 4px;
-  color: #fff;
-  display: flex;
-  align-items: center;
-}
-
-.item-title {
-  font-weight: 500;
-  color: var(--ink);
-  margin-bottom: 4px;
-  max-width: 320px;
+.tbl thead th {
+  border-top: 0;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--ui-text-tertiary);
   white-space: nowrap;
+}
+.tbl tbody tr:hover { background: var(--ui-surface-hover); }
+.tbl tbody tr.is-selected { background: var(--ui-soft); }
+.mini-thumb {
+  width: 76px;
+  height: 48px;
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--ui-control);
+}
+.mini-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.row-title {
+  font-weight: 550;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.sub-col { color: var(--ui-text-secondary); font-size: 12.5px; }
+.tbl-acts { display: inline-flex; align-items: center; gap: 4px; }
 
-.tags-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.tag {
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: var(--muted);
-}
-
-.tag-more {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.category-badge {
-  font-size: 12px;
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.spec-text {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.res-text {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.source-badge {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted);
-}
-
-.source-badge.custom {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  font-weight: 500;
-}
-
-.status-pill {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-pill.published {
-  color: #34d399;
-}
-
-.status-pill.pending {
-  color: #fbbf24;
-}
-
-.status-pill.offline {
-  color: #f87171;
-}
-
-.actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.action-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.action-btn.active {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.pagination {
+.pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 16px;
+  gap: 12px;
 }
+.pager-btns { display: flex; gap: 8px; }
 
-.page-info {
-  font-size: 13px;
-  color: var(--muted);
+.drawer-preview {
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--ui-control);
 }
+.drawer-preview img { width: 100%; height: 100%; object-fit: cover; }
 
-.page-btns {
-  display: flex;
-  gap: 10px;
-}
-
-/* Modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.65);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-.modal-card {
-  width: 90%;
-  max-width: 480px;
-  background: #18181c;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px;
-}
-
-.modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.modal-foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.full {
-  width: 100%;
-}
+@media (max-width: 1100px) { .wp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .wp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
 </style>

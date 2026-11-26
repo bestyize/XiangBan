@@ -40,25 +40,28 @@ function finish(save: boolean) {
 
 <style scoped>
 .text {
-  padding: 0 4px;
-  margin: 0 -4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
   border-radius: 6px;
-  font-weight: 500;
+  font-weight: 550;
+  color: var(--ui-text-primary);
   text-align: left;
+  transition: background 0.14s;
 }
-
 .text:hover {
-  background: var(--surface-2);
+  background: var(--ui-surface-hover);
 }
-
 .edit {
   width: 14em;
   max-width: 100%;
   height: 28px;
   padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line-strong);
-  background: var(--field, #16161a);
-  font-weight: 500;
+  border-radius: 7px;
+  border: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text-primary);
+  box-shadow: 0 0 0 2px var(--ui-btn);
+  font-weight: 550;
+  outline: none;
 }
 </style>

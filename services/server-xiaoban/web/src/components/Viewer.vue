@@ -400,7 +400,7 @@ async function share() {
 .viewer {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 450;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   background: #08080a;
