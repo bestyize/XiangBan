@@ -79,8 +79,30 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
     val running = status.running
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
-    BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
-        Text("在手机上识别语音", style = XType.Title, fontWeight = FontWeight.SemiBold)
+    BottomSheet(
+        onDismiss = { job?.cancel(); onFinished(false) },
+        panelModifier = panelModifier,
+        showHandle = true,
+        cancelLabel = "关闭",
+        confirmLabel = if (running) "下载中…" else if (models.ready) "已就绪" else if (error != null || status.error != null) "重试" else "下载",
+        confirmEnabled = !running && !models.ready,
+        onConfirm = {
+            error = null
+            job = env.scope.launch {
+                try {
+                    models.download { _, _ -> }
+                    onFinished(true)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: ModelDownloadException) {
+                    error = e.message
+                } catch (e: Exception) {
+                    error = "下载失败，请检查网络后重试"
+                }
+            }
+        },
+    ) {
+        Text("在手机上识别语音", style = XType.Section, fontWeight = FontWeight.SemiBold)
         Text(
             "下载本地语音组件和模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
             Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -93,24 +115,6 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
             Text("${(fraction * 100).toInt()}%  ${done / 1_000_000} / ${total / 1_000_000} MB", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         error?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, color = Danger) }
-        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("关闭", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
-            PillButton(if (running) "下载中…" else if (models.ready) "已就绪" else if (error != null || status.error != null) "重试" else "下载", {
-                error = null
-                job = env.scope.launch {
-                    try {
-                        models.download { _, _ -> }
-                        onFinished(true)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: ModelDownloadException) {
-                        error = e.message
-                    } catch (e: Exception) {
-                        error = "下载失败，请检查网络后重试"
-                    }
-                }
-            }, Modifier.weight(1f), enabled = !running && !models.ready)
-        }
     }
 }
 

@@ -147,25 +147,22 @@ private fun Waveform(color: Color) {
     }
 }
 
-/** 没有麦克风权限时的底部面板：说明声音只用来识别，不保存；可以去系统设置里打开。 */
+/** 没有麦克风权限时的居中权限引导弹层：说明声音只用来识别，不保存；可以去系统设置里打开。 */
 @Composable
 fun MicPermissionLayer(env: CommunityEnv, voice: VoiceInputController, onNotice: (String) -> Unit) {
-    OverlayTransition(voice.micDenied) { panel ->
-        BottomSheet({ voice.micDenied = false }, panel) {
-            Text("需要使用麦克风", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text(
-                "按住说话要用麦克风。声音只用来识别，不会保存录音。你可以在系统设置里打开。",
-                Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                GhostPillButton("以后再说", { voice.micDenied = false }, Modifier.weight(1f))
-                PillButton("去设置", {
-                    voice.micDenied = false
-                    if (env.platform?.openAppSettings() != true) onNotice("请在系统设置里给小伴打开麦克风权限")
-                }, Modifier.weight(1f))
-            }
-        }
-    }
+    if (!voice.micDenied) return
+    CommunityCardDialog(
+        title = "需要使用麦克风",
+        description = "按住说话要用麦克风。声音只用来识别，不会保存录音。你可以在系统设置里打开。",
+        icon = XIcons.Mic,
+        confirmLabel = "去设置",
+        dismissLabel = "以后再说",
+        onConfirm = {
+            voice.micDenied = false
+            if (env.platform?.openAppSettings() != true) onNotice("请在系统设置里给小伴打开麦克风权限")
+        },
+        onDismiss = { voice.micDenied = false },
+    )
 }
 
 /** 第一次切到语音模式时输入框上方的提示：怎么按、怎么取消、怎么转文字。关掉后不再出现（记在本地偏好里）。 */

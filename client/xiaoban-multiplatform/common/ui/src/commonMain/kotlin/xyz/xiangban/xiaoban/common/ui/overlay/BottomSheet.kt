@@ -55,6 +55,7 @@ fun BottomSheet(
     cancelLabel: String? = null,
     confirmLabel: String? = null,
     onConfirm: (() -> Unit)? = null,
+    confirmEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -100,11 +101,16 @@ fun BottomSheet(
                     if (!confirmLabel.isNullOrBlank() && onConfirm != null) {
                         Box(
                             Modifier.weight(1f).heightIn(min = 54.dp)
-                                .clickable(role = Role.Button, onClick = onConfirm)
+                                .clickable(enabled = confirmEnabled, role = Role.Button, onClick = onConfirm)
                                 .padding(horizontal = XDimens.Space16, vertical = 12.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(confirmLabel, style = XType.Body, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                confirmLabel,
+                                style = XType.Body,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (confirmEnabled) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3,
+                            )
                         }
                     }
                 }

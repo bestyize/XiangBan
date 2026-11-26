@@ -330,8 +330,8 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank, open: (Route) -> Unit) {
 private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
     val loader = rememberLoader(env, "repo-issues") { env.forum.repoIssues() }
     val state by loader.state.collectAsState()
-    BottomSheet(onDismiss) {
-        Text("往期热榜", style = XType.Title, fontWeight = FontWeight.SemiBold)
+    BottomSheet(onDismiss, showHandle = true, cancelLabel = "取消") {
+        Text("往期热榜", style = XType.Section, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         LoadBox(state, loader::reload) { list ->
             if (list.items.isEmpty()) Text("还没有往期", Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -339,7 +339,6 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
                 RadioRow(selected = (current ?: list.items.first().key) == ref.key, title = if (ref.key.startsWith("github-rolling-")) "${ref.weekEnd} 观测榜" else "第 ${ref.issueNo} 期", desc = listOf(ref.weekStart, ref.weekEnd).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { null }, onClick = { onPick(if (i == 0) null else ref.key) })
             }
         }
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
     }
 }
 

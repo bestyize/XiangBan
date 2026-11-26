@@ -692,7 +692,21 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
     val edited = steps.map { it.trim() }.filter { it.isNotEmpty() }
     val changed = edited.isNotEmpty() && edited != pending
     val ready = changed || note.isNotBlank()
-    BottomSheet(onDismiss, panelModifier) {
+    BottomSheet(
+        onDismiss = onDismiss,
+        panelModifier = panelModifier,
+        showHandle = true,
+        cancelLabel = "取消",
+        confirmLabel = "调整并继续",
+        confirmEnabled = ready,
+        onConfirm = {
+            val parts = buildList {
+                if (changed) add("后续步骤改为：\n" + edited.mapIndexed { i, step -> "${i + 1}. $step" }.joinToString("\n"))
+                if (note.isNotBlank()) add(note.trim())
+            }
+            onSubmit(parts.joinToString("\n\n"))
+        },
+    ) {
         Text("调整后续计划", style = XType.Section, fontWeight = FontWeight.SemiBold)
         Text("已完成的步骤会保留。提交后先停止当前执行，再由小伴核对现场、调整计划并继续。", Modifier.padding(top = 4.dp), style = XType.Caption, color = extra.ink3)
         Column(Modifier.padding(top = 6.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
@@ -737,16 +751,6 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
                     style = XType.Body, maxLines = 1,
                 )
             }
-        }
-        Row(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("取消", onDismiss, Modifier.weight(1f), height = 44.dp)
-            PillButton("调整并继续", {
-                val parts = buildList {
-                    if (changed) add("后续步骤改为：\n" + edited.mapIndexed { i, step -> "${i + 1}. $step" }.joinToString("\n"))
-                    if (note.isNotBlank()) add(note.trim())
-                }
-                onSubmit(parts.joinToString("\n\n"))
-            }, Modifier.weight(1f), enabled = ready, height = 44.dp)
         }
     }
 }

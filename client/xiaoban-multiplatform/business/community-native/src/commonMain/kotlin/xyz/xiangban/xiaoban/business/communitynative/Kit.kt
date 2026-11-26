@@ -122,8 +122,9 @@ fun BottomSheet(
     cancelLabel: String? = null,
     confirmLabel: String? = null,
     onConfirm: (() -> Unit)? = null,
+    confirmEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
-) = UiBottomSheet(onDismiss, panelModifier, flush, cornerRadius, onBack, topPadding, scrim, showHandle, cancelLabel, confirmLabel, onConfirm, content)
+) = UiBottomSheet(onDismiss, panelModifier, flush, cornerRadius, onBack, topPadding, scrim, showHandle, cancelLabel, confirmLabel, onConfirm, confirmEnabled, content)
 
 @Composable
 fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) =

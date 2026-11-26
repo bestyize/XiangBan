@@ -630,11 +630,7 @@ internal fun AiChatPage(
             }
         }
         OverlayTransition(executionSheet) { panel ->
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                BottomSheet({ executionSheet = false }, panel.heightIn(max = maxHeight * 0.85f)) {
-                    CloudExecutionSettings(chat, cloud) { executionSheet = false }
-                }
-            }
+            CloudExecutionSheet(chat, cloud, panel) { executionSheet = false }
         }
         OverlayTransition(attach) { panel ->
             fun pick(label: String) {

@@ -405,22 +405,16 @@ internal fun AgentTaskStrip(cloud: CloudChatState, compact: Boolean, reviewPlan:
     }
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 internal fun AgentSheet(title: String, dismiss: () -> Unit, panel: Modifier, content: @Composable ColumnScope.() -> Unit) {
-    androidx.compose.ui.backhandler.BackHandler(onBack = dismiss)
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f))
-        .clickable(indication = null, interactionSource = null, onClick = dismiss).imePadding(), contentAlignment = Alignment.BottomCenter) {
-        val shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
-        Column(panel.fillMaxWidth().heightIn(max = maxHeight * .78f)
-            .clip(shape).background(MaterialTheme.colorScheme.surface)
-            .clickable(indication = null, interactionSource = null) {}.navigationBarsPadding()
-            .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 26.dp)) {
-            Box(Modifier.align(Alignment.CenterHorizontally).size(34.dp, 4.dp).background(AgentLine, CircleShape))
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(title, Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight(650))
-                AgentIconButton(AiHomeIcons.Close, "关闭", dismiss, size = 32.dp)
-            }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        BottomSheet(
+            onDismiss = dismiss,
+            panelModifier = panel.heightIn(max = maxHeight * .78f),
+            showHandle = true,
+            cancelLabel = "取消",
+        ) {
+            Text(title, Modifier.padding(bottom = 10.dp), style = XType.Section, fontWeight = FontWeight(650))
             content()
         }
     }
@@ -432,15 +426,14 @@ internal fun AgentChoiceRow(
     modifier: Modifier = Modifier, enabled: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
     Row(modifier.padding(bottom = 4.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-        .background(if (selected) extra.brandSoft else Color.Transparent).alpha(if (enabled) 1f else .5f)
+        .alpha(if (enabled) 1f else .5f)
         .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-        .padding(horizontal = 10.dp, vertical = 11.dp),
+        .padding(horizontal = 4.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = FontWeight.SemiBold,
-                color = if (selected) extra.brandInk else colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = XType.Body.copy(fontSize = 14.sp), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!description.isNullOrBlank()) Text(description, Modifier.padding(top = 2.dp), style = XType.Caption, color = colors.onSurfaceVariant)
         }
         if (selected) XIcon(AiHomeIcons.Check, tint = Brand, size = 20.dp)

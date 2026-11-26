@@ -167,14 +167,17 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     }
     OverlayTransition(manage != null) { panel ->
         lastManage?.let { peer ->
-            BottomSheet({ manage = null }, panel) {
-                Text(peer.name, style = XType.Title, fontWeight = FontWeight.SemiBold)
-                SheetAction(XIcons.Close, "从账号中移除这台设备", "它再次启动并开启手机遥控后会重新出现") {
-                    manage = null
-                    env.remoteChat.removePeer(peer.id)
-                }
-                GhostPillButton("取消", { manage = null }, Modifier.padding(top = 8.dp).fillMaxWidth())
-            }
+            ActionSheet(
+                title = peer.name,
+                contextText = "它再次启动并开启手机遥控后会重新出现",
+                panelModifier = panel,
+                onDismiss = { manage = null },
+                items = listOf(
+                    ActionSheetItem("从账号中移除这台设备", XIcons.Trash, danger = true) {
+                        env.remoteChat.removePeer(peer.id)
+                    },
+                ),
+            )
         }
     }
 }
@@ -327,36 +330,33 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 )
             }
         }
-        OverlayTransition(permissionStep != 0) { panel ->
-            BottomSheet({ permissionStep = 0 }, panel) {
-                if (permissionStep == 2) {
-                    Text("开启自动模式？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "开启后，这个对话里小伴在“${peer?.name ?: "设备"}”上读写文件、运行命令都不再逐步问你，会直接执行。\n删除文件、危险命令这类高风险操作仍然每次都问你。\n只在你信任这次任务时开启，随时可以关掉。",
-                        Modifier.padding(top = 10.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GhostPillButton("取消", { permissionStep = 0 }, Modifier.weight(1f))
-                        PillButton("开启自动模式", { permissionStep = 0; env.remoteChat.setPermission("auto") }, Modifier.weight(1f))
-                    }
-                } else {
-                    Text("这个对话的权限", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    Text("只对当前这个对话生效，和电脑上的开关是同一个。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    RadioRow(
-                        selected = !remote.fullTrust, title = "默认权限", desc = "改动文件、运行命令之前先问你",
-                        onClick = { permissionStep = 0; env.remoteChat.setPermission("ask") },
-                    )
-                    RadioRow(
-                        selected = remote.fullTrust, title = "自动模式", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
-                        onClick = { permissionStep = 0; env.remoteChat.setPermission("auto") },
-                    )
-                    GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())
-                }
+        OverlayTransition(permissionStep == 1) { panel ->
+            BottomSheet({ permissionStep = 0 }, panel, showHandle = true, cancelLabel = "取消") {
+                Text("这个对话的权限", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                Text("只对当前这个对话生效，和电脑上的开关是同一个。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RadioRow(
+                    selected = !remote.fullTrust, title = "默认权限", desc = "改动文件、运行命令之前先问你",
+                    onClick = { permissionStep = 0; env.remoteChat.setPermission("ask") },
+                )
+                RadioRow(
+                    selected = remote.fullTrust, title = "自动模式", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
+                    onClick = { permissionStep = 2 },
+                )
             }
         }
+        if (permissionStep == 2) {
+            CommunityCardDialog(
+                title = "开启自动模式？",
+                description = "开启后，这个对话里小伴在“${peer?.name ?: "设备"}”上读写文件、运行命令都不再逐步问你，会直接执行。\n删除文件、危险命令这类高风险操作仍然每次都问你。\n只在你信任这次任务时开启，随时可以关掉。",
+                icon = XIcons.Lock,
+                confirmLabel = "开启自动模式",
+                onConfirm = { permissionStep = 0; env.remoteChat.setPermission("auto") },
+                onDismiss = { permissionStep = 0 },
+            )
+        }
         OverlayTransition(modelSheet) { panel ->
-            BottomSheet({ modelSheet = false }, panel) {
-                Text("这个对话用的模型", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            BottomSheet({ modelSheet = false }, panel, showHandle = true, cancelLabel = "取消") {
+                Text("这个对话用的模型", style = XType.Section, fontWeight = FontWeight.SemiBold)
                 Text("只对当前这个对话生效，模型来自${peer?.name ?: "设备"}上已经配置好的服务。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                     if (remote.models.isEmpty()) {
@@ -369,7 +369,6 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                         )
                     }
                 }
-                GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 8.dp).fillMaxWidth())
             }
         }
         OverlayTransition(adjust) { panel ->
@@ -610,8 +609,8 @@ private fun DrawerSession(s: RemoteSessionSummary, selected: Boolean, indent: Dp
 @Composable
 private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier) {
     val have = remote.sidebar.projects.map { it.path.trimEnd('/', '\\') }.toSet()
-    BottomSheet(onDismiss, panelModifier) {
-        Text("新项目", style = XType.Title, fontWeight = FontWeight.SemiBold)
+    BottomSheet(onDismiss, panelModifier, showHandle = true, cancelLabel = "取消") {
+        Text("新项目", style = XType.Section, fontWeight = FontWeight.SemiBold)
         Text("项目是${remote.selectedPeer?.name ?: "设备"}上的一个文件夹，这个项目里的对话都在这个文件夹里干活。", Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("设备上最近用过的文件夹", Modifier.padding(top = 14.dp, bottom = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (remote.recentProjects.isEmpty()) {
@@ -633,6 +632,5 @@ private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPi
             }
         }
         Text("手机不能浏览设备上的文件，所以只列出最近用过的文件夹。其他文件夹请在设备小伴里先打开一次。", Modifier.padding(top = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 14.dp).fillMaxWidth())
     }
 }

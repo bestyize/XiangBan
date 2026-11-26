@@ -35,19 +35,17 @@ internal fun OfficialAppSheet(env: CommunityEnv, game: MobileGame, cover: ByteAr
     var message by remember { mutableStateOf<String?>(null) }
     val shortcut = AppShortcut("builtin", game.id, game.name)
     val favorite = env.appLibrary.favorites.any { it.key == shortcut.key }
-    BottomSheet(dismiss) {
+    BottomSheet(dismiss, showHandle = true, cancelLabel = "关闭") {
         Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AppShortcutIcon(env, shortcut, Modifier.size(64.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(game.name, style = XType.Title, fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("官方", Modifier.clip(CircleShape).background(LocalExtraColors.current.brandSoft).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.brandInk)
+                        Text("官方", Modifier.clip(CircleShape).background(LocalExtraColors.current.fill).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${BuiltinMobileGames.genre(game.id)} · ${if (game.orientation == "landscape") "横屏" else "竖屏"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
                     }
                 }
-                IconTap(XIcons.Close, "关闭官方应用详情", dismiss)
             }
             if (cover != null) Row(Modifier.horizontalScroll(rememberScrollState())) {
                 AsyncImage(cover, "${game.name}封面", imageLoader = loader, contentScale = ContentScale.Fit,
@@ -123,7 +121,7 @@ internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: 
     var message by remember { mutableStateOf<String?>(null) }
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
-    BottomSheet(dismiss, panel) {
+    BottomSheet(dismiss, panel, showHandle = true, cancelLabel = "取消") {
         Column(Modifier.fillMaxWidth().heightIn(max = 540.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("做一个我的版本", style = XType.Title, fontWeight = FontWeight.SemiBold)

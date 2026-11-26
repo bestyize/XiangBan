@@ -238,9 +238,17 @@ internal fun ImageGenerationSheet(
     var gif by remember { mutableStateOf(false) }
     var frames by remember { mutableStateOf("9") }
     var duration by remember { mutableStateOf("200") }
+    val canGenerate = prompt.trim().length in 1..4000 && (!gif || (frames.toIntOrNull() in 2..16 && duration.toIntOrNull() in 20..2000))
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        BottomSheet(onDismiss) {
-            Text("生成图片", style = XType.Title)
+        BottomSheet(
+            onDismiss = onDismiss,
+            showHandle = true,
+            cancelLabel = "取消",
+            confirmLabel = "生成",
+            confirmEnabled = canGenerate,
+            onConfirm = { onGenerate(prompt, if (gif) 1 else count, size, if (gif) "gif" else "png", frames.toIntOrNull() ?: 9, duration.toIntOrNull() ?: 200) },
+        ) {
+            Text("生成图片", style = XType.Section, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             if ("gif" in formats) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ChipPill("静态图片", selected = !gif, onClick = { gif = false })
                 ChipPill("GIF 动图", selected = gif, onClick = { gif = true })
@@ -274,8 +282,6 @@ internal fun ImageGenerationSheet(
                 else "$quota · 基础参考 $estimate 点，按实际用量扣费",
                 Modifier.padding(top = 10.dp), style = XType.Caption,
             )
-            GhostPillButton("生成", { onGenerate(prompt, if (gif) 1 else count, size, if (gif) "gif" else "png", frames.toIntOrNull() ?: 9, duration.toIntOrNull() ?: 200) }, Modifier.fillMaxWidth().padding(top = 10.dp),
-                enabled = prompt.trim().length in 1..4000 && (!gif || (frames.toIntOrNull() in 2..16 && duration.toIntOrNull() in 20..2000)))
         }
     }
 }

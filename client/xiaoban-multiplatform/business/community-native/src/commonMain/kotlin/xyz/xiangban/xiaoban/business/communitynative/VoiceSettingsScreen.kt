@@ -185,22 +185,18 @@ private fun RateRow(step: Int, onChange: (Int) -> Unit) {
     }
 }
 
-/** 底部选项面板：标题，通栏的选项行，灰色一道缝，再一行“取消”。 */
+/** 底部选项面板：统一顶部拖拽条、通栏选项行与底部细线居中「取消」。 */
 @Composable
 private fun OptionSheet(title: String, onDismiss: () -> Unit, panel: Modifier, options: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    BottomSheet(onDismiss, panel, flush = true) {
-        Text(title, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
+    BottomSheet(onDismiss, panel, flush = true, showHandle = true, cancelLabel = "取消") {
+        Text(title, Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
         options()
-        Box(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.background))
-        Box(Modifier.fillMaxWidth().height(52.dp).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-            Text("取消", style = XType.Body, fontWeight = FontWeight.SemiBold)
-        }
     }
 }
 
 @Composable
 private fun OptionRow(selected: Boolean, onClick: () -> Unit, text: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Hairline()
+    Hairline(Modifier.padding(horizontal = 16.dp))
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         RadioMark(selected)
         Column(Modifier.weight(1f), content = text)

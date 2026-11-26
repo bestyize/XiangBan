@@ -295,10 +295,9 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
 /** 底栏提供 AI 创作和发帖入口；作品可从发帖页添加。 */
 @Composable
 private fun PublishSheet(onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, panelModifier: Modifier) {
-    BottomSheet(onDismiss, panelModifier) {
-        Text("发布", style = XType.Title, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+    BottomSheet(onDismiss, panelModifier, showHandle = true, cancelLabel = "取消") {
+        Text("发布", style = XType.Section, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Pen, "发帖", "发布到创意、讨论或资源板块", onNewPost)
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
     }
 }
