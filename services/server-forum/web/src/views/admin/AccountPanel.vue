@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 账号：修改管理员密码。成功后旧令牌立即失效，用接口返回的新令牌继续使用。
+// 账号安全：修改管理员密码。成功后旧令牌立即失效，用接口返回的新令牌继续使用。
 import { reactive, ref } from 'vue'
 import { adminApi, adminAuth, setAdminToken } from '@/api/admin'
 import { errorText, notify } from './shared'
@@ -23,7 +23,7 @@ async function submit() {
     const res = await adminApi.changePassword(form.current, form.next)
     setAdminToken(res.token)
     form.current = form.next = form.again = ''
-    notify('密码已修改')
+    notify('密码已修改，历史设备令牌已吊销')
   } catch (e) {
     error.value = errorText(e)
   } finally {
@@ -33,9 +33,12 @@ async function submit() {
 </script>
 
 <template>
-  <div class="panel adm-card adm-account">
+  <section class="panel adm-card adm-account">
+    <div class="adm-card-head">
+      <h3>修改登录密码</h3>
+      <span class="adm-tag valid">当前账号：{{ adminAuth.username || '管理员' }}</span>
+    </div>
     <form class="adm-form" @submit.prevent="submit">
-      <p style="margin: 0" class="muted">当前账号：{{ adminAuth.username || '管理员' }}</p>
       <label class="field">
         <span>当前密码</span>
         <input v-model="form.current" class="input" type="password" autocomplete="current-password" required />
@@ -43,7 +46,7 @@ async function submit() {
       <label class="field">
         <span>新密码</span>
         <input v-model="form.next" class="input" type="password" autocomplete="new-password" required minlength="8" maxlength="128" />
-        <small>8-128 位。修改后其他设备上的登录会失效。</small>
+        <small>8-128 位。修改后其他设备上的历史令牌将立即失效。</small>
       </label>
       <label class="field">
         <span>再输入一次新密码</span>
@@ -51,8 +54,8 @@ async function submit() {
       </label>
       <p v-if="error" class="error-text" role="alert" style="margin: 0">{{ error }}</p>
       <div class="adm-form-actions">
-        <button class="btn btn-primary" type="submit" :disabled="busy">修改密码</button>
+        <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '保存中…' : '保存新密码' }}</button>
       </div>
     </form>
-  </div>
+  </section>
 </template>

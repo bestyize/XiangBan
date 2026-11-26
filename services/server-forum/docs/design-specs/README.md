@@ -2,6 +2,14 @@
 
 全端统一浏览入口见[小伴设计稿总导航](../../../../docs/design-preview/index.html)（仓库根运行 `python3 docs/design-preview/serve.py --open`）。
 
+## 管理后台 UI 重设计稿（现代极简运营工作台 · PC / 平板 / 移动）
+
+[社区管理后台 UI 重设计稿](prototypes/admin-redesign.html) 针对现有 `/admin` 后台 23 个平铺导航项与视觉割裂问题进行全面重构：在 100% 兼容原有路由与后端接口的前提下，将侧栏收口为 **4 大域 × 12 个清晰入口**（工作台 / 审核与治理 / 内容运营 / 系统）并新增 `⌘K` 全局命令面板；将「概览」升级为带 KPI 环比、跨模块待办行动中心与采集健康灯的决策视口；将「举报 / 作品举报 / 待审队列」聚合为左侧队列 + 右侧一站式处置的主从审核中心；将帖子行尾 6 控件与发现页长表单收口为侧滑抽屉，彻底淘汰原生 `window.prompt/confirm` 与用户行内常驻禁言框；完整支持 6 套小伴官方主题色、日夜模式与 PC/平板/手机抽屉导航预览。
+
+- [默认概览](http://127.0.0.1:1455/services/server-forum/docs/design-specs/prototypes/admin-redesign.html) · [审核中心](http://127.0.0.1:1455/services/server-forum/docs/design-specs/prototypes/admin-redesign.html?page=review) · [发现页编排](http://127.0.0.1:1455/services/server-forum/docs/design-specs/prototypes/admin-redesign.html?page=discover) · [精选项目工作台](http://127.0.0.1:1455/services/server-forum/docs/design-specs/prototypes/admin-redesign.html?page=open-source) · [登录页](http://127.0.0.1:1455/services/server-forum/docs/design-specs/prototypes/admin-redesign.html?view=login)
+
+---
+
 ## 详情页分享面板重设计稿（PC + 移动 H5）
 
 [详情页分享面板重设计稿](prototypes/web-detail-share.html) 覆盖社区全站详情页（社区帖子 / 创意作品 / 开源精选 / AI 日报），**分享面板纯黑白灰中性配色、仅分享图内保留品牌主题色**：**手机 H5 1:1 对齐手机 App 分享面板**（单行预览条 + 单行可横滑图标轨 + 通栏「取消」+ 沉浸式磨砂分享卡片页），**PC 端采用 716px 居中双栏弹窗**（左栏实时预览卡片与纸色/摘录/二维码控制，右栏集成链接复制、直接复制卡片图片粘贴进微信/飞书、保存 PNG、复制推荐语/全文与问问小伴；主态作者删除收在右栏底行并走单步内联确认）。支持 PC + H5 同屏、主态/客态、深浅色与分享图 6 套主题色切换（与个人中心共用 1450 端口）。

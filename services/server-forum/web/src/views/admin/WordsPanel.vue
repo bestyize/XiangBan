@@ -1,12 +1,15 @@
 <script setup lang="ts">
-// 敏感词：拦截的词直接拒绝发布，复核的词先发布再进待审队列。匹配前会去掉空格和标点，所以不用逐个写变体。
-import { onMounted, ref } from 'vue'
+// 敏感词库：拦截词（拒绝发布）与复核词（发布后进入待审队列）双栏分组展示。
+import { computed, onMounted, ref } from 'vue'
 import { adminApi, type SensitiveWord } from '@/api/admin'
 import { perform } from './shared'
 
 const words = ref<SensitiveWord[]>([])
 const text = ref('')
 const action = ref<'block' | 'review'>('block')
+
+const blockWords = computed(() => words.value.filter(w => w.action === 'block'))
+const reviewWords = computed(() => words.value.filter(w => w.action === 'review'))
 
 async function load() {
   words.value = (await adminApi.words()).items
@@ -18,7 +21,7 @@ async function add() {
     const r = await adminApi.addWords(text.value, action.value)
     text.value = ''
     return r
-  }, '已添加')
+  }, '敏感词已添加')
   if (ok) await load()
 }
 
@@ -31,31 +34,67 @@ onMounted(load)
 
 <template>
   <form class="panel adm-card adm-form" @submit.prevent="add">
-    <p class="adm-sub">每行一个词（也可以用逗号分隔），每个词 2～40 个字。命中“拦截”的内容无法发布，且不会告诉用户是哪个词；命中“复核”的内容先发布并进入待审队列。</p>
+    <p class="adm-sub" style="margin: 0">
+      每行一个词（或用逗号分隔），每词 2–40 字。匹配前自动去除空格与标点；命中「拦截」直接拒绝发布，命中「复核」先发布并进入审核中心待审队列。
+    </p>
     <label class="field wide">
-      <span>词</span>
-      <textarea v-model="text" class="input" rows="4" spellcheck="false" />
+      <span>批量添加词条</span>
+      <textarea v-model="text" class="textarea" rows="3" spellcheck="false" placeholder="输入词条，每行一个或逗号分隔…" />
     </label>
-    <div class="adm-form-actions">
-      <select v-model="action" class="select" aria-label="处理方式">
-        <option value="block">拦截（拒绝发布）</option>
-        <option value="review">复核（先发布，进待审）</option>
-      </select>
-      <button class="btn btn-primary" type="submit">添加</button>
+    <div class="adm-form-actions" style="border-top: 0; padding-top: 0; margin-top: 0">
+      <div class="adm-seg" role="group" aria-label="处理方式">
+        <button type="button" :class="{ 'is-on': action === 'block' }" @click="action = 'block'">拦截（拒绝发布）</button>
+        <button type="button" :class="{ 'is-on': action === 'review' }" @click="action = 'review'">复核（进入待审）</button>
+      </div>
+      <button class="btn btn-primary" type="submit" :disabled="!text.trim()">添加词条</button>
     </div>
   </form>
 
-  <div class="panel adm-card">
-    <p v-if="!words.length" class="adm-empty">还没有敏感词</p>
-    <table v-else class="adm-table">
-      <thead><tr><th>词</th><th>处理方式</th><th>操作</th></tr></thead>
-      <tbody>
-        <tr v-for="w in words" :key="w.id">
-          <td data-label="词">{{ w.word }}</td>
-          <td data-label="处理方式">{{ w.action === 'block' ? '拦截' : '复核' }}</td>
-          <td data-label="操作" class="adm-actions"><button class="btn btn-sm" @click="remove(w)">删除</button></td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="adm-dash-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr))">
+    <section class="panel adm-card">
+      <div class="adm-card-head">
+        <h3>直接拦截词</h3>
+        <span class="adm-tag danger">{{ blockWords.length }} 条</span>
+      </div>
+      <div class="adm-card-body">
+        <p v-if="!blockWords.length" class="adm-empty" style="padding: 16px">暂无拦截词</p>
+        <div v-else class="adm-chips" style="margin: 0">
+          <button
+            v-for="w in blockWords"
+            :key="w.id"
+            type="button"
+            class="adm-tag danger"
+            style="border: 0; cursor: pointer"
+            title="点击删除"
+            @click="remove(w)"
+          >
+            {{ w.word }} ×
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel adm-card">
+      <div class="adm-card-head">
+        <h3>人工复核词</h3>
+        <span class="adm-tag suspect">{{ reviewWords.length }} 条</span>
+      </div>
+      <div class="adm-card-body">
+        <p v-if="!reviewWords.length" class="adm-empty" style="padding: 16px">暂无复核词</p>
+        <div v-else class="adm-chips" style="margin: 0">
+          <button
+            v-for="w in reviewWords"
+            :key="w.id"
+            type="button"
+            class="adm-tag suspect"
+            style="border: 0; cursor: pointer"
+            title="点击删除"
+            @click="remove(w)"
+          >
+            {{ w.word }} ×
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

@@ -1232,6 +1232,26 @@
       ]
     },
     {
+      id: 'web-admin-redesign',
+      title: '社区管理后台 UI 重设计（全模块）',
+      domains: ['web'],
+      subcat: '超级小伴社区',
+      status: 'merged',
+      statusNote: '已合入 views/admin/ 壳层、样式与全部核心面板（100% 兼容 23 个旧路由）',
+      runtime: 'static',
+      path: 'services/server-forum/docs/design-specs/prototypes/admin-redesign.html',
+      summary: '将现有 23 项平铺后台菜单重构为 4 大域 × 12 项聚合入口（100% 兼容旧路由）：工作台待办行动中心、主从双栏审核中心、帖子/发现页侧滑抽屉、精选项目 4 步发布流、采编与外链健康闭环、⌘K 命令面板及 6 套主题色/日夜/三端视口切换。',
+      presets: [
+        { label: '概览与待办', query: '?page=overview' },
+        { label: '审核中心', query: '?page=review' },
+        { label: '帖子管理', query: '?page=topics' },
+        { label: '发现页编排', query: '?page=discover' },
+        { label: '精选项目', query: '?page=open-source' },
+        { label: '采编与健康', query: '?page=collection' },
+        { label: '登录页', query: '?view=login' },
+      ]
+    },
+    {
       id: 'gateway-admin-redesign',
       title: 'AI 网关管理后台 · 极简现代控制台重设计',
       domains: ['web'],
