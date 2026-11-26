@@ -165,32 +165,39 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
             panelModifier = panel,
         )
     }
-    if (editing) CenterDialog({ editing = false }) {
-        Text(if (original == null) "新建工作空间" else "管理工作空间", style = XType.Title, fontWeight = FontWeight.SemiBold)
-        Text("把相关的聊天收在一起", Modifier.padding(top = 6.dp, bottom = 16.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(name, { name = it.take(40) }, label = { Text("名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    if (editing) {
         val valid = name.trim().isNotEmpty() && (name.trim() == original || name.trim() !in cloud.workspaces)
-        Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("取消", { editing = false }, Modifier.weight(1f))
-            if (valid) PillButton("保存", {
+        CommunityCardDialog(
+            title = if (original == null) "新建工作空间" else "管理工作空间",
+            description = "把相关的聊天收在一起",
+            icon = XIcons.Folder,
+            confirmLabel = "保存",
+            confirmEnabled = valid,
+            onConfirm = {
                 original?.let { chat.renameWorkspace(it, name) } ?: chat.addWorkspace(name)
                 editing = false
-            }, Modifier.weight(1f))
-        }
-        original?.let { group ->
-            Text("删除分组后，对话保留在未分组中。", style = XType.Caption)
-            GhostPillButton("删除工作空间", { chat.deleteWorkspace(group); editing = false })
+            },
+            onDismiss = { editing = false },
+        ) {
+            TextBox(name, { name = it.take(40) }, Modifier.fillMaxWidth(), placeholder = "输入工作空间名称", filled = true)
+            original?.let { group ->
+                Spacer(Modifier.height(12.dp))
+                Text("删除分组后，对话保留在未分组中。", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                xyz.xiangban.xiaoban.common.ui.controls.OutlinePillButton("删除工作空间", { chat.deleteWorkspace(group); editing = false }, Modifier.fillMaxWidth(), danger = true)
+            }
         }
     }
     moving?.let { item ->
-        BottomSheet({ moving = null }) {
-            Text(item.title, style = XType.Title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("移动到工作空间", Modifier.padding(top = 8.dp, bottom = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        BottomSheet({ moving = null }, showHandle = true, cancelLabel = "取消") {
+            Text(item.title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("移动到工作空间", Modifier.padding(top = 4.dp, bottom = 10.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
-                (listOf<String?>(null) + cloud.workspaces).forEach { group ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                (listOf<String?>(null) + cloud.workspaces).forEachIndexed { idx, group ->
+                    if (idx > 0) Hairline()
+                    Row(Modifier.fillMaxWidth().heightIn(min = 50.dp).clickable {
                         chat.moveConversation(item.id, group); moving = null
-                    }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         XIcon(if (group == null) XIcons.Message else XIcons.Folder, size = 20.dp)
                         Text(group ?: "未分组", Modifier.weight(1f), style = XType.Body)
                         if (group == item.workspace) Text("当前", style = XType.Caption, color = MaterialTheme.colorScheme.primary)
@@ -198,19 +205,26 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
                 }
             }
             Hairline()
-            SheetAction(XIcons.Trash, "删除对话", "删除后无法恢复", { deleting = item; moving = null })
-            GhostPillButton("取消", { moving = null })
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 50.dp).clickable(role = Role.Button) { deleting = item; moving = null }.padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                XIcon(XIcons.Trash, tint = Danger, size = 20.dp)
+                Text("删除对话", style = XType.Body, fontWeight = FontWeight.Medium, color = Danger)
+            }
         }
     }
     deleting?.let { item ->
-        CenterDialog({ deleting = null }) {
-            Text("删除这个对话？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("“${item.title}”会从这台手机上删掉，删了就找不回来了。", Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GhostPillButton("取消", { deleting = null }, Modifier.weight(1f), height = 44.dp)
-                PillButton("删除", { chat.deleteConversation(item.id); deleting = null }, Modifier.weight(1f), height = 44.dp)
-            }
-        }
+        CommunityCardDialog(
+            title = "删除这个对话？",
+            description = "“${item.title}”会从这台手机上删掉，删了就找不回来了。",
+            icon = XIcons.Trash,
+            confirmLabel = "确认删除",
+            danger = true,
+            onConfirm = { chat.deleteConversation(item.id); deleting = null },
+            onDismiss = { deleting = null },
+        )
     }
 }
 
@@ -601,14 +615,15 @@ internal fun AiChatPage(
                 onOpen = { id -> historySheet = false; config = false; openConversation(id) },
                 onAllConversations = { historySheet = false; drawer = true })
         }
-        if (clearHistory) CenterDialog({ clearHistory = false }) {
-            Text("清空主线聊天记录？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("将删除本机保存的主线记录，作品与已发布内容会保留。", Modifier.padding(vertical = 12.dp), style = XType.Secondary)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GhostPillButton("取消", { clearHistory = false }, Modifier.weight(1f))
-                PillButton("清空", { clearHistory = false; chat.clearMainHistory() }, Modifier.weight(1f))
-            }
-        }
+        if (clearHistory) CommunityCardDialog(
+            title = "清空主线聊天记录？",
+            description = "将删除本机保存的主线记录，作品与已发布内容会保留。",
+            icon = XIcons.Trash,
+            confirmLabel = "确认清空",
+            danger = true,
+            onConfirm = { clearHistory = false; chat.clearMainHistory() },
+            onDismiss = { clearHistory = false },
+        )
         OverlayTransition(permissionSheet) { panel ->
             AgentSheet("本机操作权限", { permissionSheet = false }, panel) {
                 CloudPermissionSettings(chat, cloud) { permissionSheet = false }
@@ -985,12 +1000,21 @@ private fun ChatModelPickerSheet(
 ) {
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
-    BottomSheet(onDismiss, panel, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-        SheetDragHandle()
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("选择对话模型", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight(650))
-            SheetCloseCircle(onDismiss)
-        }
+    BottomSheet(
+        onDismiss = onDismiss,
+        panelModifier = panel,
+        flush = true,
+        topPadding = 0.dp,
+        scrim = ModelSheetScrim,
+        showHandle = true,
+        cancelLabel = "取消",
+    ) {
+        Text(
+            "选择对话模型",
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
+            style = XType.Section,
+            fontWeight = FontWeight(650),
+        )
         Column(Modifier.weight(1f, fill = false).heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
             val (free, other) = cloud.customProviders.partition { it.remoteType == "free" }
             val groups = free + listOf<CustomProviderView?>(null) + other

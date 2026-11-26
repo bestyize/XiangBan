@@ -337,35 +337,32 @@ private fun WorkMenu(
     work: OwnWork, onDismiss: () -> Unit, onOpen: () -> Unit, onEdit: (MobileGame) -> Unit,
     onPublish: () -> Unit, onRemove: () -> Unit, onDelete: () -> Unit,
 ) {
-    BottomSheet(onDismiss, flush = true, cornerRadius = 20.dp, topPadding = 0.dp, scrim = Color.Black.copy(alpha = .34f)) {
-        SheetDragHandle()
-        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp)) {
-                Text(work.title, style = XType.Section, fontWeight = FontWeight(650), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val detail = when (work) {
-                    is OwnWork.Draft -> "草稿 · 仅本机"
-                    is OwnWork.Published -> "v${work.pack.version} · ${work.statusLabel}"
-                }
-                Text("${kindLabel(work.kind)} · $detail", Modifier.padding(top = 2.dp),
-                    style = XType.Caption.copy(fontSize = 12.5.sp), color = LocalExtraColors.current.ink3)
-            }
-            if (work is OwnWork.Draft) {
-                val isGame = work.kind == "game"
-                SheetMenuRow(if (isGame) XIcons.Play else XIcons.Eye, if (isGame) "试玩作品" else "预览作品", first = true, onClick = onOpen)
-                SheetMenuRow(XIcons.Pen, "继续修改") { onEdit(work.game) }
-                SheetMenuRow(XIcons.Upload, "发布到社区", onClick = onPublish)
-                SheetMenuRow(XIcons.Trash, "删除草稿", danger = true, onClick = onDelete)
-            } else {
-                SheetMenuRow(XIcons.Eye, "查看作品详情", first = true, onClick = onOpen)
-                if (work.status != WorkFilter.Removed) {
-                    SheetMenuRow(XIcons.Upload, "发布新版本", onClick = onPublish)
-                    SheetMenuRow(XIcons.EyeOff, "下架作品", onClick = onRemove)
-                }
-                SheetMenuRow(XIcons.Trash, "删除作品", danger = true, onClick = onDelete)
-            }
-        }
-        SheetCancelFooter(onDismiss)
+    val detail = when (work) {
+        is OwnWork.Draft -> "草稿 · 仅本机"
+        is OwnWork.Published -> "v${work.pack.version} · ${work.statusLabel}"
     }
+    val items = buildList {
+        if (work is OwnWork.Draft) {
+            val isGame = work.kind == "game"
+            add(ActionSheetItem(if (isGame) "试玩作品" else "预览作品", if (isGame) XIcons.Play else XIcons.Eye, onClick = onOpen))
+            add(ActionSheetItem("继续修改", XIcons.Pen) { onEdit(work.game) })
+            add(ActionSheetItem("发布到社区", XIcons.Upload, onClick = onPublish))
+            add(ActionSheetItem("删除草稿", XIcons.Trash, danger = true, onClick = onDelete))
+        } else {
+            add(ActionSheetItem("查看作品详情", XIcons.Eye, onClick = onOpen))
+            if (work.status != WorkFilter.Removed) {
+                add(ActionSheetItem("发布新版本", XIcons.Upload, onClick = onPublish))
+                add(ActionSheetItem("下架作品", XIcons.EyeOff, onClick = onRemove))
+            }
+            add(ActionSheetItem("删除作品", XIcons.Trash, danger = true, onClick = onDelete))
+        }
+    }
+    ActionSheet(
+        items = items,
+        onDismiss = onDismiss,
+        title = work.title,
+        contextText = "${kindLabel(work.kind)} · $detail",
+    )
 }
 
 @Composable
@@ -379,34 +376,16 @@ private fun WorkConfirmationDialog(action: WorkConfirmation, busy: Boolean, erro
         work.status == WorkFilter.Removed -> "将从你的作品列表中永久移除。删除后无法恢复，本机源文件仍可使用。"
         else -> "将从社区和你的作品列表中永久移除。删除后无法恢复，本机源文件和已应用的副本仍可使用。"
     }
-    val colors = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
-    Dialog(onDismissRequest = { if (!busy) onDismiss() },
-        properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy, usePlatformDefaultWidth = false)) {
-        Column(
-            Modifier.padding(horizontal = 24.dp, vertical = 14.dp).widthIn(max = 318.dp).fillMaxWidth()
-                .dialogCardSurface(colors.surface).verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 14.dp),
-        ) {
-            Text("$verb「${work.title}」？", style = XType.Title.copy(fontSize = 17.sp), fontWeight = FontWeight(650))
-            Text(description, Modifier.padding(top = 8.dp), style = XType.Secondary.copy(fontSize = 13.5.sp, lineHeight = 20.sp),
-                color = colors.onSurfaceVariant)
-            error?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Secondary, color = Danger) }
-            Spacer(Modifier.height(20.dp))
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(CircleShape)
-                    .background(if (action.takeDown || busy) extra.fill else Danger)
-                    .clickable(enabled = !busy, role = Role.Button, onClick = onConfirm).padding(6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(if (busy) "处理中…" else if (action.takeDown) "确认下架" else if (local) "删除草稿" else "永久删除",
-                    style = XType.Body, fontWeight = FontWeight.SemiBold, color = if (action.takeDown || busy) colors.onSurface else Color.White)
-            }
-            Spacer(Modifier.height(6.dp))
-            Box(Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(CircleShape)
-                .clickable(enabled = !busy, role = Role.Button, onClick = onDismiss), contentAlignment = Alignment.Center) {
-                Text("取消", style = XType.Body.copy(fontSize = 14.5.sp), color = colors.onSurfaceVariant.copy(alpha = if (busy) .38f else 1f))
-            }
-        }
-    }
+    CommunityCardDialog(
+        title = "$verb「${work.title}」？",
+        description = description,
+        icon = if (action.takeDown) XIcons.EyeOff else XIcons.Trash,
+        confirmLabel = if (busy) "处理中…" else if (action.takeDown) "确认下架" else if (local) "删除草稿" else "永久删除",
+        confirmEnabled = !busy,
+        dismissEnabled = !busy,
+        danger = !action.takeDown,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        content = error?.let { msg -> { DialogNotice(msg, error = true) } },
+    )
 }

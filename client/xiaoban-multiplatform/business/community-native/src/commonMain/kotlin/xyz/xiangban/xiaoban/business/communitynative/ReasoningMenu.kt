@@ -127,30 +127,30 @@ internal fun ReasoningEffortBottomSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-        SheetDragHandle()
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("思考等级", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                Text(
-                    modelName,
-                    Modifier.padding(top = 2.dp),
-                    style = XType.Caption,
-                    color = extra.ink3,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            SheetCloseCircle(onDismiss)
+    BottomSheet(
+        onDismiss = onDismiss,
+        panelModifier = panelModifier,
+        flush = true,
+        topPadding = 0.dp,
+        scrim = ModelSheetScrim,
+        showHandle = true,
+        cancelLabel = "取消",
+    ) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp)) {
+            Text("思考等级", style = XType.Section, fontWeight = FontWeight.SemiBold)
+            Text(
+                modelName,
+                Modifier.padding(top = 2.dp),
+                style = XType.Caption,
+                color = extra.ink3,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp).verticalScroll(rememberScrollState()).selectableGroup()) {
             val allOptions: List<String?> = listOf(null) + ordered
             allOptions.forEachIndexed { idx, effort ->
-                if (idx > 0) Hairline(Modifier.padding(start = 16.dp))
+                if (idx > 0) Hairline(Modifier.padding(horizontal = 16.dp))
                 val isSelected = effort == current
                 Row(
                     modifier = Modifier
@@ -184,7 +184,6 @@ internal fun ReasoningEffortBottomSheet(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -200,10 +199,18 @@ internal fun CustomReasoningMultiSheet(
     val scheme = MaterialTheme.colorScheme
     val allSelected = ReasoningOptionSpecs.all { it.id in selected }
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-        SheetDragHandle()
+    BottomSheet(
+        onDismiss = onDismiss,
+        panelModifier = panelModifier,
+        flush = true,
+        topPadding = 0.dp,
+        scrim = ModelSheetScrim,
+        showHandle = true,
+        confirmLabel = "确定（已选 ${selected.size} 档）",
+        onConfirm = onDismiss,
+    ) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -228,11 +235,10 @@ internal fun CustomReasoningMultiSheet(
                 fontWeight = FontWeight.Medium,
                 color = scheme.onSurfaceVariant,
             )
-            SheetCloseCircle(onDismiss)
         }
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
             ReasoningOptionSpecs.forEachIndexed { idx, spec ->
-                if (idx > 0) Hairline(Modifier.padding(start = 16.dp))
+                if (idx > 0) Hairline(Modifier.padding(horizontal = 16.dp))
                 val checked = spec.id in selected
                 Row(
                     modifier = Modifier
@@ -274,35 +280,6 @@ internal fun CustomReasoningMultiSheet(
                 }
             }
         }
-        Hairline()
-        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp)) {
-            ModelPrimaryButton(
-                label = "确定（已选 ${selected.size} 档）",
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SheetDragHandle() {
-    Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(36.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
-    }
-}
-
-@Composable
-internal fun SheetCloseCircle(onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(LocalExtraColors.current.fill)
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        XIcon(XIcons.Close, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant, description = "关闭")
     }
 }
 

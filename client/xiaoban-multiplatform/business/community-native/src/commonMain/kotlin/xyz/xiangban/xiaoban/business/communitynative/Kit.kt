@@ -129,6 +129,18 @@ fun BottomSheet(
 fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) =
     UiCenterDialog(onDismiss, content)
 
+typealias ActionSheetItem = xyz.xiangban.xiaoban.common.ui.overlay.ActionSheetItem
+
+@Composable
+fun ActionSheet(
+    items: List<ActionSheetItem>,
+    onDismiss: () -> Unit,
+    panelModifier: Modifier = Modifier,
+    title: String? = "更多操作",
+    contextText: String? = null,
+    cancelLabel: String = "取消",
+) = xyz.xiangban.xiaoban.common.ui.overlay.ActionSheet(items, onDismiss, panelModifier, title, contextText, cancelLabel)
+
 @Composable
 fun Modifier.outlinedCard(corner: Dp): Modifier = uiOutlinedCard(corner)
 

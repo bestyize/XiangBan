@@ -277,42 +277,6 @@ internal fun AvatarFlowOverlays(flow: AvatarFlow, name: String?, avatarUrl: Stri
     if (flow.state.sheet) AvatarPickSheet(flow.state, onPick = flow.pick)
 }
 
-/** 底部菜单中的通栏单行操作（图标 + 文字）。 */
-@Composable
-internal fun SheetMenuRow(
-    icon: ImageVector,
-    label: String,
-    first: Boolean = false,
-    danger: Boolean = false,
-    onClick: () -> Unit,
-) {
-    val tint = if (danger) Danger else MaterialTheme.colorScheme.onSurfaceVariant
-    val textColor = if (danger) Danger else MaterialTheme.colorScheme.onSurface
-    Column(Modifier.fillMaxWidth()) {
-        if (!first) Hairline(Modifier.padding(start = 16.dp))
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 50.dp).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            XIcon(icon, tint = tint, size = 19.dp)
-            Text(label, Modifier.weight(1f), style = XType.Body, color = textColor)
-        }
-    }
-}
-
-@Composable
-internal fun SheetCancelFooter(onDismiss: () -> Unit) {
-    Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.background))
-    Text(
-        "取消",
-        Modifier.fillMaxWidth().clickable(onClick = onDismiss).padding(vertical = 15.dp),
-        style = XType.Body,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-    )
-}
-
 /** “我的”：通栏精修（一体化头部 + 收藏/作品/通知三宫格 + 两组核心入口）。 */
 @Composable
 fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
@@ -442,32 +406,23 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
         }
 
         if (avatarSheet && session.loggedIn) {
-            BottomSheet(onDismiss = { avatarSheet = false }, flush = true, cornerRadius = 20.dp) {
-                Text(
-                    (displayName ?: "账号") + (publicId?.let { " · ID $it" } ?: ""),
-                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                    style = XType.Secondary,
-                    color = extra.ink3,
-                )
-                SheetMenuRow(XIcons.Camera, "更换头像", first = true) {
-                    avatarSheet = false
-                    avatarFlow.start()
-                }
+            val items = buildList {
+                add(ActionSheetItem("更换头像", XIcons.Camera) { avatarFlow.start() })
                 session.accountId?.let { uid ->
-                    SheetMenuRow(XIcons.User, "查看个人主页") {
-                        avatarSheet = false
-                        open(Route.User(uid, "topics"))
-                    }
+                    add(ActionSheetItem("查看个人主页", XIcons.User) { open(Route.User(uid, "topics")) })
                 }
                 publicId?.let { id ->
-                    SheetMenuRow(XIcons.Copy, "复制账号 ID") {
-                        avatarSheet = false
+                    add(ActionSheetItem("复制账号 ID", XIcons.Copy) {
                         env.platform?.copy(id)
                         toast = "已复制账号 ID $id"
-                    }
+                    })
                 }
-                SheetCancelFooter { avatarSheet = false }
             }
+            ActionSheet(
+                items = items,
+                onDismiss = { avatarSheet = false },
+                title = (displayName ?: "账号") + (publicId?.let { " · ID $it" } ?: ""),
+            )
         }
 
         AvatarFlowOverlays(avatarFlow, session.user?.username, session.user?.avatarUrl)

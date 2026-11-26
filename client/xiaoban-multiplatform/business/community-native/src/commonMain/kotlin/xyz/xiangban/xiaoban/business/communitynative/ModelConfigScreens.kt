@@ -509,15 +509,21 @@ private fun AddProviderSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-        SheetDragHandle()
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("添加第三方服务", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
-            SheetCloseCircle(onDismiss)
-        }
+    BottomSheet(
+        onDismiss = onDismiss,
+        panelModifier = panelModifier,
+        flush = true,
+        topPadding = 0.dp,
+        scrim = ModelSheetScrim,
+        showHandle = true,
+        cancelLabel = "取消",
+    ) {
+        Text(
+            "添加第三方服务",
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
+            style = XType.Section,
+            fontWeight = FontWeight.SemiBold,
+        )
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
             presets.forEachIndexed { idx, preset ->
                 if (idx > 0) Hairline(Modifier.padding(start = 68.dp))
@@ -1076,22 +1082,21 @@ private fun CustomProviderEditorScreen(
 
         // 协议选择 BottomSheet（按协议联动对应预置地址）
         if (showProtoSheet) {
-            BottomSheet(onDismiss = { showProtoSheet = false }, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-                SheetDragHandle()
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("接口协议", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                        Text("切换协议时自动同步对应的预置 API 地址", Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
-                    }
-                    SheetCloseCircle { showProtoSheet = false }
+            BottomSheet(
+                onDismiss = { showProtoSheet = false },
+                flush = true,
+                topPadding = 0.dp,
+                scrim = ModelSheetScrim,
+                showHandle = true,
+                cancelLabel = "取消",
+            ) {
+                Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp)) {
+                    Text("接口协议", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    Text("切换协议时自动同步对应的预置 API 地址", Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
                 }
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).selectableGroup()) {
                   ProtocolOptions.forEachIndexed { idx, opt ->
-                    if (idx > 0) Hairline(Modifier.padding(start = 16.dp))
+                    if (idx > 0) Hairline(Modifier.padding(horizontal = 16.dp))
                     val on = protocol == opt.id
                     val suggestedBase = presetBase(opt)
                     val endpoint = CustomModelConfig(suggestedBase, "", "model", protocol = opt.id).chatUrl()
@@ -1120,7 +1125,6 @@ private fun CustomProviderEditorScreen(
                     }
                   }
                 }
-                Spacer(Modifier.height(8.dp))
             }
         }
 
@@ -1150,17 +1154,17 @@ private fun ManagedModelSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
-        SheetDragHandle()
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(providerName, style = XType.Section, fontWeight = FontWeight.SemiBold)
-                Text("服务地址和模型由服务端统一维护", Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
-            }
-            SheetCloseCircle(onDismiss)
+    BottomSheet(
+        onDismiss = onDismiss,
+        flush = true,
+        topPadding = 0.dp,
+        scrim = ModelSheetScrim,
+        showHandle = true,
+        cancelLabel = "取消",
+    ) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp)) {
+            Text(providerName, style = XType.Section, fontWeight = FontWeight.SemiBold)
+            Text("服务地址和模型由服务端统一维护", Modifier.padding(top = 2.dp), style = XType.Caption, color = extra.ink3)
         }
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
             models.forEachIndexed { idx, model ->

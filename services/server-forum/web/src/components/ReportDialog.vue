@@ -46,7 +46,7 @@ async function submit() {
 </script>
 
 <template>
-  <ModalDialog :open="!!target" :title="target?.type === 'post' ? '举报这条回复' : '举报这个帖子'" @close="emit('close')">
+  <ModalDialog :open="!!target" :title="target?.type === 'post' ? '举报这条回复' : '举报这个帖子'" mobile-mode="center" @close="emit('close')">
     <form class="form" @submit.prevent="submit">
       <fieldset class="reasons">
         <legend class="sr-only">举报原因</legend>

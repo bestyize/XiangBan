@@ -975,11 +975,8 @@ private fun NewPostEditor(
         // A. 一级分段槽 + 3 列紧凑网格板块选择面板
         OverlayTransition(choosingCategory) { panel ->
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                BottomSheet({ choosingCategory = false }, panel.heightIn(max = maxHeight * 0.78f)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("选择发布板块", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-                        IconTap(XIcons.Close, "关闭分类", { choosingCategory = false })
-                    }
+                BottomSheet({ choosingCategory = false }, panel.heightIn(max = maxHeight * 0.78f), showHandle = true, cancelLabel = "取消") {
+                    Text("选择发布板块", style = XType.Section, fontWeight = FontWeight.SemiBold)
                     when {
                         loadError != null -> Banner(loadError.orEmpty(), warn = true, actionText = "重试", onAction = { attempt++ })
                         catalog == null -> Spinner(Modifier.fillMaxWidth().height(120.dp))
@@ -1098,11 +1095,13 @@ private fun NewPostEditor(
         // B. 统一单作品面板（上传 V2 ZIP / HTML·HTM 转 V2 + 关联我的创作）
         OverlayTransition(choosingWork) { panel ->
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                BottomSheet({ if (!workPicking) choosingWork = false }, panel.heightIn(max = maxHeight * 0.78f)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("添加作品", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-                        IconTap(XIcons.Close, "关闭作品选择", { if (!workPicking) choosingWork = false })
-                    }
+                BottomSheet(
+                    { if (!workPicking) choosingWork = false },
+                    panel.heightIn(max = maxHeight * 0.78f),
+                    showHandle = true,
+                    cancelLabel = if (workPicking) null else "取消",
+                ) {
+                    Text("添加作品", style = XType.Section, fontWeight = FontWeight.SemiBold)
                     Text(
                         "每篇帖子最多附带 1 个可运行作品（切换方式或重新选择将替换当前作品）",
                         Modifier.padding(top = 4.dp, bottom = 10.dp),
@@ -1235,11 +1234,8 @@ private fun NewPostEditor(
 
         // C. 话题标签弹层
         OverlayTransition(choosingTags) { panel ->
-            BottomSheet({ choosingTags = false }, panel) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("添加话题标签", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-                    IconTap(XIcons.Close, "关闭话题", { choosingTags = false })
-                }
+            BottomSheet({ choosingTags = false }, panel, showHandle = true, cancelLabel = "完成") {
+                Text("添加话题标签", style = XType.Section, fontWeight = FontWeight.SemiBold)
                 Row(
                     Modifier.fillMaxWidth().padding(top = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1315,26 +1311,29 @@ private fun NewPostEditor(
 
         // D. 封面选择与文字封面
         OverlayTransition(choosingCover) { panel ->
-            BottomSheet({ choosingCover = false }, panel) {
-                Text("帖子封面", style = XType.Title, fontWeight = FontWeight.SemiBold)
-                SheetAction(XIcons.Image, "从相册选择", "使用自己的图片") {
-                    choosingCover = false
-                    val platform = env.platform ?: return@SheetAction
-                    val account = session.accountId
-                    uploading = true; error = null
-                    scope.launch {
-                        try {
-                            val file = platform.pickForumFile(true, FORUM_IMAGE_MAX_BYTES) ?: return@launch
-                            val preview = platform.previewForumCover(file) ?: kotlin.error("无法读取封面")
-                            check(currentAccount == account) { "账号已切换，请重新选择" }
-                            selectCover(preview, null)
-                        } catch (e: CancellationException) { throw e }
-                        catch (e: Exception) { error = messageOf(e) }
-                        finally { uploading = false }
-                    }
-                }
-                SheetAction(XIcons.File, "文字封面", "选择模板，用文字做封面") { choosingCover = false; editingCover = true }
-            }
+            ActionSheet(
+                title = "帖子封面",
+                panelModifier = panel,
+                onDismiss = { choosingCover = false },
+                items = listOf(
+                    ActionSheetItem("从相册选择", XIcons.Image) {
+                        val platform = env.platform ?: return@ActionSheetItem
+                        val account = session.accountId
+                        uploading = true; error = null
+                        scope.launch {
+                            try {
+                                val file = platform.pickForumFile(true, FORUM_IMAGE_MAX_BYTES) ?: return@launch
+                                val preview = platform.previewForumCover(file) ?: kotlin.error("无法读取封面")
+                                check(currentAccount == account) { "账号已切换，请重新选择" }
+                                selectCover(preview, null)
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = messageOf(e) }
+                            finally { uploading = false }
+                        }
+                    },
+                    ActionSheetItem("文字封面", XIcons.File) { editingCover = true },
+                ),
+            )
         }
         if (editingCover) env.platform?.let { platform ->
             ForumCoverEditor(
@@ -1344,12 +1343,16 @@ private fun NewPostEditor(
                 onUse = { spec, image -> selectCover(image, spec); editingCover = false },
             )
         }
-        if (confirmingLeave) CenterDialog({ confirmingLeave = false }) {
-            Text("放弃这次编辑？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("尚未发布的内容不会保留。", Modifier.padding(top = 8.dp, bottom = 20.dp), style = XType.Secondary, color = extra.ink3)
-            PillButton("继续编辑", { confirmingLeave = false }, Modifier.fillMaxWidth())
-            GhostPillButton("放弃编辑", { confirmingLeave = false; cancelDraft() }, Modifier.fillMaxWidth().padding(top = 8.dp), textColor = Danger)
-        }
+        if (confirmingLeave) CommunityCardDialog(
+            title = "放弃这次编辑？",
+            description = "尚未发布的内容不会保留。",
+            icon = XIcons.Trash,
+            confirmLabel = "放弃编辑",
+            dismissLabel = "继续编辑",
+            danger = true,
+            onConfirm = { confirmingLeave = false; cancelDraft() },
+            onDismiss = { confirmingLeave = false },
+        )
     }
 }
 

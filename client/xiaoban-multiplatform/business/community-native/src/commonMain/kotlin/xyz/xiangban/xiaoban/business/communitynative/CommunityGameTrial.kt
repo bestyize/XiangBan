@@ -129,16 +129,14 @@ internal fun IdeaRuntimeScreen(env: CommunityEnv, id: String, title: String, bac
 @Composable
 private fun RuntimeDownloadConfirmation(size: Long, decision: CompletableDeferred<Boolean>) {
     val dismiss = { decision.complete(false); Unit }
-    Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        CenterDialog(dismiss) {
-            Text("使用移动网络下载？", style = XType.Title, fontWeight = FontWeight.SemiBold)
-            Text("作品包大小为 ${formatSize(size)}。", Modifier.padding(top = 8.dp), style = XType.Body)
-            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostPillButton("取消", dismiss, Modifier.weight(1f), height = 44.dp)
-                AppActionButton("下载", { decision.complete(true) }, Modifier.weight(1f), primary = true, height = 44.dp)
-            }
-        }
-    }
+    CommunityCardDialog(
+        title = "使用移动网络下载？",
+        description = "作品包大小为 ${formatSize(size)}。",
+        icon = XIcons.Download,
+        confirmLabel = "下载",
+        onConfirm = { decision.complete(true) },
+        onDismiss = dismiss,
+    )
 }
 
 /** Shared by the in-app launch buttons and Android desktop shortcuts. */

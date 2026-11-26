@@ -690,21 +690,25 @@ fun NativeProfileScreen(env: CommunityEnv, uid: String, initialTab: String, back
         }
 
         if (moreSheet && readyProfile != null && !isSelf) {
-            BottomSheet(onDismiss = { moreSheet = false }, flush = true, cornerRadius = 20.dp) {
-                Text(readyProfile.nickname, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp), style = XType.Secondary, color = extra.ink3)
-                SheetMenuRow(XIcons.Share, "分享主页", first = true) {
-                    moreSheet = false
-                    env.platform?.copy("$site/u/${readyProfile.uid}")
-                    toast = "已复制该用户主页链接"
-                }
-                SheetMenuRow(XIcons.Block, if (readyProfile.blocked) "取消屏蔽该用户" else "屏蔽该用户", danger = !readyProfile.blocked) {
-                    moreSheet = false
-                    if (!session.loggedIn) open(Route.Login)
-                    else if (readyProfile.blocked) setBlocked(false)
-                    else blockConfirmation = true
-                }
-                SheetCancelFooter { moreSheet = false }
-            }
+            ActionSheet(
+                title = readyProfile.nickname,
+                onDismiss = { moreSheet = false },
+                items = listOf(
+                    ActionSheetItem("分享主页", XIcons.Share) {
+                        env.platform?.copy("$site/u/${readyProfile.uid}")
+                        toast = "已复制该用户主页链接"
+                    },
+                    ActionSheetItem(
+                        if (readyProfile.blocked) "取消屏蔽该用户" else "屏蔽该用户",
+                        XIcons.Block,
+                        danger = !readyProfile.blocked,
+                    ) {
+                        if (!session.loggedIn) open(Route.Login)
+                        else if (readyProfile.blocked) setBlocked(false)
+                        else blockConfirmation = true
+                    },
+                ),
+            )
         }
 
         AvatarFlowOverlays(avatarFlow, session.user?.username, session.user?.avatarUrl)

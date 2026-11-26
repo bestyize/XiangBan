@@ -258,8 +258,13 @@ internal fun AvatarPendingRow(onDiscard: () -> Unit, onResume: () -> Unit) {
 /** 选图弹层：从相册选择 + 取消。不提供拍照。 */
 @Composable
 internal fun AvatarPickSheet(state: AvatarEditorState, onPick: () -> Unit) {
-    BottomSheet(onDismiss = { if (!state.picking) state.sheet = false }, flush = true) {
-        Text("更换头像", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
+    BottomSheet(
+        onDismiss = { if (!state.picking) state.sheet = false },
+        flush = true,
+        showHandle = true,
+        cancelLabel = if (state.picking) null else "取消",
+    ) {
+        Text("更换头像", Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
         Row(
             Modifier.fillMaxWidth().clickable(enabled = !state.picking, onClick = onPick).padding(horizontal = 16.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -268,9 +273,6 @@ internal fun AvatarPickSheet(state: AvatarEditorState, onPick: () -> Unit) {
             Text("从相册选择", Modifier.weight(1f), style = XType.Body)
             if (state.picking) Text("正在读取…", style = XType.Secondary, color = LocalExtraColors.current.ink3)
         }
-        Box(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.background))
-        Text("取消", Modifier.fillMaxWidth().clickable(enabled = !state.picking) { state.sheet = false }.padding(vertical = 15.dp),
-            style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 

@@ -49,7 +49,7 @@ watch(() => [props.kind, props.id, props.enabled, session.user?.uid], load, { im
       <span v-if="error && !reportOpen" class="error" role="alert">{{ error }} <button type="button" class="btn btn-sm" :disabled="busy || loading" @click="load">重新读取</button></span>
     </div>
   </slot>
-  <ModalDialog :open="reportOpen" title="举报社区内容" @close="!busy && (reportOpen = false)">
+  <ModalDialog :open="reportOpen" title="举报社区内容" mobile-mode="center" @close="!busy && (reportOpen = false)">
     <form class="report" @submit.prevent="submitReport">
       <p>说明仅供管理员审核，不会向内容作者公开。</p>
       <label class="field"><span>举报原因</span><select v-model="reason" class="input" required :disabled="busy"><option disabled value="">请选择</option><option v-for="[key, text] in CONTENT_REPORT_REASONS" :key="key" :value="key">{{ text }}</option></select></label>
