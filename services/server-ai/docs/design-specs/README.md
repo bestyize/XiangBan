@@ -6,7 +6,7 @@
 
 | 设计稿 | 状态 | 说明 | 预览方式 |
 | --- | --- | --- | --- |
-| [AI 网关管理后台极简重设计原型](prototypes/gateway-admin-redesign.html) | 已合入 | 对齐小伴暖白极简 + 墨黑中性基调（支持浅/深色切换、`$ + 小伴点` 双单位对照、`⌘K` 全局检索），重构全部 8 个页面、双域档位路由、可搜索模型选择器、跨页直达用户抽屉与统一确认弹层；已落地至 `services/server-ai/web` 与 `src/handlers/admin.rs` | 直接打开 HTML 或运行 `python3 docs/design-preview/serve.py --open` |
+| [AI 网关管理后台 · 官方设计规范版原型](prototypes/gateway-admin-redesign.html) | 已合入 | 严格遵循小伴全端统一设计规范：无色偏纯中性画布（浅 `#FAFAFA/#FFFFFF/#F2F2F2`、深 `#111111/#1C1C1E/#2C2C2E`）、6 套官方主题色（默认小伴红）+ 日夜切换、中性底 + 6px 语义圆点状态标签、236px 纯白左侧栏 + 52px 面包屑顶栏、16px 无阴影静态卡片、24px 弹窗、0 原生下拉/复选框与一项一行悬停提示规范 | 直接打开 HTML 或运行 `python3 docs/design-preview/serve.py --open` |
 
 ## 拟同步微调的后端管理接口（落地阶段待确认）
 
