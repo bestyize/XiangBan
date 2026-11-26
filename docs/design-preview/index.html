@@ -1231,6 +1231,27 @@
         { label: '从 V2 标题栏打开', query: '?scene=work&work=whale-girl&view=run' },
       ]
     },
+    {
+      id: 'gateway-admin-redesign',
+      title: 'AI 网关管理后台 · 极简现代控制台重设计',
+      domains: ['web'],
+      subcat: 'AI 网关后台',
+      status: 'pending',
+      statusNote: '高保真交互稿已出，评审通过后合入 services/server-ai/web',
+      runtime: 'static',
+      path: 'services/server-ai/docs/design-specs/prototypes/gateway-admin-redesign.html',
+      summary: '彻底重设计 server-ai 管理后台：对齐小伴暖白极简 + 墨黑中性基调（支持浅/深色切换、$ + 小伴点双单位对照、⌘K 全局检索），移除厚重幕布条纹改为清晰双域档位路由与可搜索模型选择器，打通异常/兑换码直达用户账本抽屉与网关模型定价自检。',
+      presets: [
+        { label: '概览（浅色）', query: '?page=overview&theme=light' },
+        { label: '产品与档位', query: '?page=products' },
+        { label: '档位配置窗', query: '?page=products&modal=tier' },
+        { label: '用户额度 + 抽屉', query: '?page=users&drawer=user' },
+        { label: '兑换码工作台', query: '?page=codes' },
+        { label: '网关与定价自检', query: '?page=gateway' },
+        { label: '极夜深色', query: '?page=overview&theme=dark' },
+        { label: '首次上线引导', query: '?page=overview&scene=onboarding' },
+      ]
+    },
 
     // ==================== 3. 桌面版（小伴桌面客户端） ====================
     {
