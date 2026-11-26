@@ -23,24 +23,29 @@ function loaded(event:Event) {
         :class="{ contain: !plaza && (pack.kind === 'game' || pack.kind === 'widget' || presentation === 'directory') }"
         @load="loaded" @error="imageFailed = true">
       <span v-else class="placeholder" aria-hidden="true">{{ kindLabel(pack.kind).slice(0, 2) }}</span>
-      <div v-if="plaza" class="plaza-shot-foot">
-        <span class="plaza-shot-stats">
-          <span v-if="pack.view_count != null" :aria-label="`${pack.view_count} 次浏览`">👁 {{ pack.view_count }}</span>
-          <span v-if="pack.reply_count != null" :aria-label="`${pack.reply_count} 条评论`">💬 {{ pack.reply_count }}</span>
-        </span>
-        <span class="plaza-shot-badge">{{ pack.featured ? '精选' : kindLabel(pack.kind) }}</span>
-      </div>
-      <span v-else-if="presentation !== 'directory'" class="cover-kind">{{ kindLabel(pack.kind) }}</span>
+      <span v-if="!plaza && presentation !== 'directory'" class="cover-kind">{{ kindLabel(pack.kind) }}</span>
     </div>
     <div class="copy">
       <span v-if="presentation === 'directory'" class="kind">{{ kindLabel(pack.kind) }}</span>
       <span v-if="discussion" class="kind">创作 · {{ kindLabel(pack.kind) }}</span>
-      <h3>{{ pack.title }}</h3>
+      <div v-if="plaza" class="plaza-title-row">
+        <h3>{{ pack.title }}</h3>
+        <span class="plaza-inline-badge" :class="{ 'plaza-inline-badge--featured': pack.featured }">
+          {{ pack.featured ? '精选' : kindLabel(pack.kind) }}
+        </span>
+      </div>
+      <h3 v-else>{{ pack.title }}</h3>
       <span v-if="discussion" class="work-action">{{ pack.kind === 'game' ? '查看试玩' : '查看导入' }}</span>
       <p v-if="!plaza && pack.summary && (presentation === 'directory' || !cover)" class="summary">{{ pack.summary }}</p>
-      <div v-if="plaza && pack.author?.nickname" class="plaza-author">
-        <span class="plaza-avatar" :class="{ 'plaza-avatar--wancisou': pack.slug === 'wancisou' }" aria-hidden="true">{{ Array.from(pack.author.nickname.trim())[0] ?? '?' }}</span>
-        {{ pack.author.nickname }}
+      <div v-if="plaza" class="plaza-foot">
+        <span v-if="pack.author?.nickname" class="plaza-author">
+          <span class="plaza-avatar" :class="{ 'plaza-avatar--wancisou': pack.slug === 'wancisou' }" aria-hidden="true">{{ Array.from(pack.author.nickname.trim())[0] ?? '?' }}</span>
+          <span class="plaza-author-name">{{ pack.author.nickname }}</span>
+        </span>
+        <span v-else class="plaza-author"><span class="plaza-author-name">社区作品</span></span>
+        <span v-if="pack.view_count != null || pack.reply_count != null" class="plaza-stats">
+          <span v-if="pack.view_count != null" :aria-label="`${pack.view_count} 次浏览`">{{ pack.view_count }} 浏览</span>
+        </span>
       </div>
       <div v-else-if="!plaza && (pack.author?.nickname || pack.apply_count > 0)" class="author">
         <UserAvatar v-if="pack.author?.nickname" :name="pack.author.nickname" :size="18" />
@@ -56,56 +61,94 @@ function loaded(event:Event) {
 .work-action{display:inline-block;background:var(--brand-soft);color:var(--brand);border-radius:6px;padding:3px 6px;margin-top:5px;font-size:11px}
 .plaza-card {
   border-color: var(--community-divider);
-  border-radius: 18px;
-  box-shadow: var(--shadow-card);
-  transition: transform 0.18s, box-shadow 0.18s;
+  border-radius: 16px;
+  box-shadow: none;
+  transition: border-color 0.16s, transform 0.16s;
 }
-.plaza-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -10px rgba(15, 23, 42, 0.14); }
+.plaza-card:hover { border-color: var(--line-strong, var(--line)); transform: translateY(-1px); }
 .plaza-card:hover h3 { color: var(--brand); }
-.plaza-card .cover { aspect-ratio: 3 / 2; }
-.plaza-shot-foot {
-  position: absolute;
-  inset: auto 0 0;
-  padding: 16px 8px 6px;
-  background: linear-gradient(to top, rgba(12, 16, 24, 0.72), rgba(12, 16, 24, 0));
+.plaza-card .cover {
+  aspect-ratio: 3 / 2;
+  border-bottom: 1px solid var(--community-divider);
+}
+.plaza-card .copy {
+  padding: 10px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plaza-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  color: #fff;
-  font-size: 10.5px;
+  gap: 6px;
+  min-width: 0;
 }
-.plaza-shot-stats { display: flex; gap: 6px; }
-.plaza-shot-badge {
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  font-size: 10px;
-  font-weight: 600;
-}
-.plaza-card .copy { padding: 9px 10px 10px; }
 .plaza-card h3 {
   display: block;
   min-height: 0;
-  margin-top: 1px;
+  flex: 1;
+  min-width: 0;
   font-size: 13.5px;
   font-weight: 600;
-  line-height: inherit;
+  line-height: 19px;
   white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
-.plaza-author { margin-top: 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plaza-inline-badge {
+  flex: none;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  line-height: 19px;
+  font-weight: 500;
+}
+.plaza-inline-badge--featured {
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 600;
+}
+.plaza-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--community-muted);
+}
+.plaza-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.plaza-author-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plaza-stats {
+  flex: none;
+  font-size: 11.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .plaza-avatar {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
+  flex: none;
   display: inline-grid;
   place-items: center;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--brand-ink);
   background: var(--brand-fill);
 }
 .plaza-avatar--wancisou { color: #fff; background: #d9a726; }
-@media (width < 960px) { .plaza-card { border-radius: 12px; } }
 </style>

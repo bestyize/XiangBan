@@ -210,8 +210,23 @@ internal fun GamesScreen(
                     .semantics { if (featuredVisible) hideFromAccessibility() }
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                HomeBar("广场", modifier = headerDrag)
-                AppPlazaScreen(env, official, loading, errors, { reload++ }, recent, showLibrary, { openRecent(it) },
+                HomeBar("广场", modifier = headerDrag, trailing = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(
+                            Modifier.height(32.dp).clip(CircleShape)
+                                .background(LocalExtraColors.current.fill)
+                                .clickable(role = Role.Button, onClick = showLibrary)
+                                .padding(horizontal = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            XIcon(XIcons.Clock, size = 14.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("最近", style = XType.Caption, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconTap(XIcons.Search, "搜索", { open(Route.Search) })
+                    }
+                })
+                AppPlazaScreen(env, official, loading, errors, { reload++ },
                     featuredShortcuts = featuredShortcuts, featuredTools = featuredTools, retryFeaturedTools = featuredToolsLoader::reload,
                     onOfficial = ::openOfficial, onOfficialDetails = ::showOfficialDetails,
                     onAllGames = { featuredPage = FeaturedPage.Games },

@@ -1,0 +1,1534 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 「广场」视觉重设计三方案对比</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+img { display: block; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1320px; margin: 0 auto; padding: 22px 20px 54px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 20px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.title-block p { margin-top: 3px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg { display: inline-flex; align-items: center; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .seg { background: rgba(255, 255, 255, .07); }
+.seg button { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: #5b5e66; transition: background .15s, color .15s; white-space: nowrap; }
+body.studio-dark .seg button { color: #a3a6b0; }
+.seg button.active { background: #ffffff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+body.studio-dark .seg button.active { background: #27282d; color: #f3f3f6; }
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .84);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── 3-Scheme Comparison Stage ─── */
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px 26px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 26px; }
+.board-head h2 { font-size: 14px; font-weight: 650; display: inline-flex; align-items: center; gap: 6px; }
+.board-head .rec-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #fff3f4;
+  color: #e3203c;
+}
+body.studio-dark .board-head .rec-tag { background: #3a2225; color: #ff8c91; }
+.board-head .neutral-tag {
+  font-size: 10.5px;
+  font-weight: 550;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(0,0,0,.06);
+  color: #5b5e66;
+}
+body.studio-dark .board-head .neutral-tag { background: rgba(255,255,255,.09); color: #a3a6b0; }
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0,0,0,.055); gap: 2px; }
+body.studio-dark .board-mini-seg { background: rgba(255,255,255,.08); }
+.board-mini-seg button { height: 22px; padding: 0 7px; border-radius: 6px; font-size: 11px; color: #666; white-space: nowrap; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+.board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #6b6e75; }
+body.studio-dark .board-caption { color: #9497a0; }
+
+/* ─── Comparison Matrix Card ─── */
+.diff-card {
+  margin: 34px auto 0;
+  max-width: 1222px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 20px;
+}
+body.studio-dark .diff-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.diff-card h3 { font-size: 14px; font-weight: 650; margin-bottom: 12px; }
+.diff-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.diff-item { padding: 13px 14px; border-radius: 12px; background: #f7f7f9; display: flex; flex-direction: column; gap: 6px; }
+body.studio-dark .diff-item { background: #1f2025; }
+.diff-item strong { font-size: 13px; font-weight: 650; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.diff-item p { font-size: 12px; line-height: 1.55; color: #666970; }
+body.studio-dark .diff-item p { color: #989ba4; }
+.diff-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.diff-meta span {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0,0,0,.055);
+  color: #4b4e57;
+}
+body.studio-dark .diff-meta span { background: rgba(255,255,255,.08); color: #b4b7c0; }
+@media (max-width: 900px) { .diff-grid { grid-template-columns: 1fr; } }
+
+/* ─── Phone Tokens (docs/product/手机端设计规范.md) ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9a9a9a;
+  --hairline: #ededed;
+  --fill: #f2f2f2;
+  --line: #dfdfdf;
+  --icon-ring: rgba(0, 0, 0, .08);
+  --accent: #e3203c;
+  --accent-soft: #fff3f4;
+  --accent-soft-line: #f5c7cd;
+  --accent-ink: #e3203c;
+  --sheet-shadow: 0 -8px 32px rgba(0, 0, 0, .12);
+  --drawer-shadow: 0 12px 32px rgba(0, 0, 0, .12);
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --ink: #ececec;
+  --ink2: #a1a1a8;
+  --ink3: #86868d;
+  --hairline: #2a2a2d;
+  --fill: #2c2c2e;
+  --line: #3a3a3c;
+  --icon-ring: rgba(255, 255, 255, .12);
+  --sheet-shadow: 0 -10px 36px rgba(0, 0, 0, .58);
+  --drawer-shadow: 0 14px 36px rgba(0, 0, 0, .56);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status Bar & AppBar */
+.status-bar {
+  height: 36px;
+  flex: none;
+  padding: 10px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+}
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 82%; height: 100%; border-radius: 1.5px; background: var(--ink); }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+.appbar {
+  height: 46px;
+  padding: 0 8px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  flex: none;
+}
+.appbar h3 { font-size: 18px; line-height: 24px; font-weight: 650; letter-spacing: -0.01em; }
+.appbar-actions { display: flex; align-items: center; gap: 2px; }
+.icon-tap {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: background .14s;
+}
+.icon-tap:hover { background: var(--fill); }
+.icon-tap svg { width: 20px; height: 20px; stroke-width: 1.75; }
+.recent-hdr-pill {
+  height: 30px;
+  padding: 0 9px 0 7px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background .14s, color .14s;
+}
+.recent-hdr-pill:hover { color: var(--ink); }
+.recent-hdr-pill svg { width: 14px; height: 14px; stroke-width: 1.85; }
+.recent-stack {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 1px;
+}
+.recent-stack img {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  object-fit: cover;
+  border: 1px solid var(--surface);
+}
+.recent-stack img + img { margin-left: -5px; }
+
+/* Scrollable Screen Body */
+.screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding-bottom: 18px;
+}
+.screen-body::-webkit-scrollbar { display: none; }
+
+/* Section Headers */
+.sec-head {
+  padding: 16px 10px 9px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sec-head.first { padding-top: 12px; }
+.sec-title {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 650;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.sec-action {
+  height: 28px;
+  padding: 0 6px 0 8px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--ink3);
+}
+.sec-action:hover { background: var(--fill); color: var(--ink2); }
+.sec-action svg { width: 13px; height: 13px; stroke-width: 1.9; }
+.sec-count { padding-right: 6px; font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+
+/* Unified 1:1 Icon Container */
+.app-ico {
+  position: relative;
+  overflow: hidden;
+  background: var(--fill);
+  flex: none;
+}
+.app-ico img { width: 100%; height: 100%; object-fit: cover; }
+.app-ico::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 0.5px var(--icon-ring);
+  pointer-events: none;
+}
+.app-ico.sz-24 { width: 24px; height: 24px; border-radius: 7px; }
+.app-ico.sz-42 { width: 42px; height: 42px; border-radius: 11px; }
+.app-ico.sz-44 { width: 44px; height: 44px; border-radius: 12px; }
+.app-ico.sz-48 { width: 48px; height: 48px; border-radius: 13px; }
+.app-ico.sz-52 { width: 52px; height: 52px; border-radius: 14px; }
+.app-ico.sz-58 { width: 58px; height: 58px; border-radius: 15px; }
+.app-ico.sz-64 { width: 64px; height: 64px; border-radius: 16px; }
+
+/* ═══════════════════════════════════════════════
+   SCHEME A: App Store Curated List Rail (1:1 Icons Only)
+   ═══════════════════════════════════════════════ */
+.rank-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.rank-rail::-webkit-scrollbar { display: none; }
+.rank-col-card {
+  width: 304px;
+  flex: none;
+  scroll-snap-align: start;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 4px 12px;
+}
+body.compact .rank-col-card { width: 278px; }
+.rank-row {
+  width: 100%;
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  position: relative;
+}
+.rank-row + .rank-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 63px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.rank-copy { flex: 1; min-width: 0; }
+.rank-name {
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rank-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.open-pill {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  flex: none;
+  transition: background .14s;
+}
+.open-pill.accent {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* 2×2 Tool Grid */
+.tools-grid {
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.tool-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.tool-card:active { transform: scale(.98); }
+.tool-info { flex: 1; min-width: 0; }
+.tool-name {
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tool-desc {
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════════
+   SCHEME B: Compact Recent Pill Rail + Icon Portrait Cards + Tool List
+   ═══════════════════════════════════════════════ */
+.recent-pill-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.recent-pill-bar::-webkit-scrollbar { display: none; }
+.recent-tag-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink3);
+  white-space: nowrap;
+  flex: none;
+}
+.recent-chip {
+  height: 36px;
+  padding: 0 11px 0 6px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--ink);
+  transition: transform .13s;
+}
+.recent-chip:active { transform: scale(.96); }
+
+/* Portrait Icon Cards (1:1 Icon Hero with ultra-subtle tinted stage) */
+.icon-card-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.icon-card-rail::-webkit-scrollbar { display: none; }
+.icon-portrait-card {
+  width: 114px;
+  flex: none;
+  scroll-snap-align: start;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: center;
+  transition: transform .13s;
+}
+body.compact .icon-portrait-card { width: 106px; }
+.icon-portrait-card:active { transform: scale(.97); }
+.icon-stage {
+  height: 84px;
+  display: grid;
+  place-items: center;
+  background: var(--stage-tint, var(--fill));
+  border-bottom: 0.5px solid var(--hairline);
+}
+.phone.dark .icon-stage {
+  background: var(--stage-tint-dark, var(--fill));
+}
+.icon-stage .app-ico {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .10);
+}
+.icon-portrait-body {
+  padding: 9px 8px 10px;
+}
+.icon-portrait-name {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.icon-portrait-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ink3);
+}
+
+/* Single Grouped Tool Card List */
+.grouped-card {
+  margin: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 2px 12px;
+}
+.tool-list-row {
+  width: 100%;
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  position: relative;
+}
+.tool-list-row + .tool-list-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 55px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.tool-list-copy { flex: 1; min-width: 0; }
+.tool-list-name { font-size: 14px; line-height: 19px; font-weight: 600; color: var(--ink); }
+.tool-list-desc { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══════════════════════════════════════════════
+   SCHEME C: Hero Pick + 4-Grid Composite Card & Crosshair 2×2 Tool Card
+   ═══════════════════════════════════════════════ */
+.composite-card {
+  margin: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.hero-pick {
+  padding: 13px 13px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+}
+.hero-pick-copy { flex: 1; min-width: 0; }
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  margin-bottom: 2px;
+}
+.hero-pick-name {
+  font-size: 15.5px;
+  line-height: 21px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.hero-pick-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composite-divider {
+  height: 0.5px;
+  margin: 0 13px;
+  background: var(--hairline);
+}
+.composite-grid-4 {
+  padding: 10px 8px 11px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.mini-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-radius: 10px;
+}
+.mini-tile:hover { background: var(--paper); }
+.mini-tile span {
+  width: 100%;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Unified 2×2 Crosshair Tool Card (Single card, zero visual clutter) */
+.crosshair-card {
+  margin: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+.crosshair-cell {
+  padding: 11px 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  position: relative;
+}
+.crosshair-cell:hover { background: var(--paper); }
+.crosshair-cell:nth-child(odd) { border-right: 0.5px solid var(--hairline); }
+.crosshair-cell:nth-child(1), .crosshair-cell:nth-child(2) { border-bottom: 0.5px solid var(--hairline); }
+
+/* ═══════════════════════════════════════════════
+   SHARED: Purified Community Works (Existing 3:2 Cover Ratio)
+   ═══════════════════════════════════════════════ */
+.chips-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 11px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.chips-row::-webkit-scrollbar { display: none; }
+.chip-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--ink2);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  white-space: nowrap;
+  flex: none;
+}
+.chip-pill.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-line);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.works-grid {
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.work-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.work-cover {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: var(--fill);
+  overflow: hidden;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.work-cover img { width: 100%; height: 100%; object-fit: cover; }
+.work-body {
+  padding: 9px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+}
+.work-title-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.work-title {
+  font-size: 13.5px;
+  line-height: 19px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.work-inline-badge {
+  flex: none;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 10.5px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.work-kind-pill {
+  flex: none;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+  font-size: 10.5px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.work-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+.work-author { display: inline-flex; align-items: center; gap: 5px; min-width: 0; flex: 1; }
+.mini-av {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 650;
+  color: #ffffff;
+}
+.work-author span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink3);
+  font-variant-numeric: tabular-nums;
+}
+.like-btn.liked { color: var(--accent-ink); }
+.like-btn svg { width: 13.5px; height: 13.5px; stroke-width: 1.85; }
+.like-btn.liked svg { fill: currentColor; }
+
+.create-slot-card {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 7px;
+  min-height: 168px;
+}
+.create-slot-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--fill);
+  color: var(--ink2);
+  display: grid;
+  place-items: center;
+}
+.create-slot-ico svg { width: 18px; height: 18px; }
+.create-slot-card strong { font-size: 13px; font-weight: 600; color: var(--ink); }
+.create-slot-card p { font-size: 11.5px; line-height: 15px; color: var(--ink3); max-width: 120px; }
+
+/* Pull-down Recent Drawer Overlay */
+.drawer-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .38);
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+}
+.recent-drawer {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 0 0 20px 20px;
+  padding: 44px 16px 20px;
+  box-shadow: var(--drawer-shadow);
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.drawer-head h4 { font-size: 16px; font-weight: 650; }
+.drawer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 8px;
+}
+.drawer-tip {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+/* Bottom Tab Bar (Spec 4.2 Exact) */
+.tabbar {
+  flex: none;
+  height: 56px;
+  background: var(--surface);
+  border-top: 0.5px solid var(--hairline);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+.tab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--ink3);
+}
+.tab svg { width: 21px; height: 21px; stroke-width: 1.75; }
+.tab.active { color: var(--ink); font-weight: 650; }
+.tab.active svg { stroke-width: 2; }
+.tab-plus {
+  width: 44px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+.tab-plus svg { width: 20px; height: 20px; stroke-width: 2.2; }
+.home-bar {
+  flex: none;
+  height: 16px;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+}
+.home-bar::after {
+  content: "";
+  width: 112px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--ink);
+  opacity: .18;
+}
+
+/* Toast inside Phone */
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 80px;
+  transform: translate(-50%, 8px);
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(24, 24, 28, .92);
+  color: #ffffff;
+  font-size: 12.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.phone.dark .phone-toast { background: rgba(240, 240, 244, .94); color: #161618; }
+.phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 440px) {
+  .studio { padding: 14px 10px 28px; }
+  .board { width: calc(100vw - 20px) !important; }
+  .phone { height: 760px; border-radius: 30px; border-width: 4px; }
+}
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 「广场」零额外封面三方案对比</h1>
+      <p>游戏与工具全部复用现有 1:1 图标 · 社区作品沿用 3:2 封面 · 「最近用过」去重且大幅收紧高度</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="作品数场景" id="scene-seg">
+        <button class="active" data-scene="normal">多作品态</button>
+        <button data-scene="single">单作品对照（同截图）</button>
+      </div>
+      <div class="swatches" role="group" aria-label="六套主题色" id="swatches"></div>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- ==================== SCHEME A ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <h2>方案 A · 精装榜单流 <span class="rec-tag">质感最稳</span></h2>
+        <span style="font-size:11.5px;color:#888">点右上「最近」拉出抽屉</span>
+      </div>
+      <div class="phone" id="phone-a"></div>
+      <p class="board-caption"><strong>最近用过：只留顶栏入口 / 下拉抽屉（首页 0 占位）。</strong>游戏用 App Store 三行横滑榜单卡，仅需 1:1 图标就能展示玩法简介与「打开」按钮；工具用 2×2 卡片，信息效率高。</p>
+    </section>
+
+    <!-- ==================== SCHEME B ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <h2>方案 B · 轻卡立式流 <span class="neutral-tag">取消下拉抽屉</span></h2>
+        <span style="font-size:11.5px;color:#888">顶部 36px 胶囊条</span>
+      </div>
+      <div class="phone" id="phone-b"></div>
+      <p class="board-caption"><strong>最近用过：取消下拉抽屉，改为顶部单行 36px 迷你胶囊条。</strong>游戏以 1:1 图标做视觉主角（浅色韵底托起 58px 大图标）；工具收进单张白底精修列表，形成「横卡 × 纵列」节奏。</p>
+    </section>
+
+    <!-- ==================== SCHEME C ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <h2>方案 C · 焦点复合卡 <span class="rec-tag">首屏最全</span></h2>
+        <span style="font-size:11.5px;color:#888">一屏直达社区作品</span>
+      </div>
+      <div class="phone" id="phone-c"></div>
+      <p class="board-caption"><strong>最近用过：只留顶栏微缩叠图入口 / 下拉抽屉（首页 0 占位）。</strong>游戏用「1 主推 + 4 快捷」单卡建立主次，工具用十字细线 2×2 单卡，首屏直接完整露出一排社区作品。</p>
+    </section>
+  </main>
+
+  <section class="diff-card">
+    <h3>三套方案核心对比（均只需现有 1:1 图标 + 社区 3:2 封面，零新素材维护成本）</h3>
+    <div class="diff-grid">
+      <div class="diff-item">
+        <strong>方案 A · 精装榜单流 <span style="color:#e3203c;font-size:11px">最耐看</span></strong>
+        <p>借鉴 App Store 经典三行横滑卡：每个游戏有清晰名字、一句话简介和「打开」胶囊，AI 新生成的小游戏只给一个 1:1 图标就能自动排版得极工整。</p>
+        <div class="diff-meta">
+          <span>素材：仅 1:1 图标</span>
+          <span>最近：仅保留下拉抽屉</span>
+          <span>改动成本：低</span>
+        </div>
+      </div>
+      <div class="diff-item">
+        <strong>方案 B · 轻卡立式流 <span style="color:#666;font-size:11px">最直观</span></strong>
+        <p>彻底去掉隐蔽的下拉抽屉，把「最近用过」压成顶部 36px 横滑胶囊条（高度缩减 70%）；游戏立卡把精致 1:1 图标放大展示，工具改紧凑列表。</p>
+        <div class="diff-meta">
+          <span>素材：仅 1:1 图标</span>
+          <span>最近：仅保留 36px 胶囊条</span>
+          <span>手势更少</span>
+        </div>
+      </div>
+      <div class="diff-item">
+        <strong>方案 C · 焦点复合卡 <span style="color:#e3203c;font-size:11px">首屏效率最高</span></strong>
+        <p>把游戏收成「1 款主推 + 4 快捷」单卡、工具收成「十字分隔 2×2」单卡，页面从四五屏压紧，打开广场第一眼就能同时看到游戏、工具和社区作品。</p>
+        <div class="diff-meta">
+          <span>素材：仅 1:1 图标</span>
+          <span>最近：仅保留顶栏叠图抽屉</span>
+          <span>首屏露社区卡</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const ASSET = 'app-plaza-assets/plaza/';
+
+  const ACCENTS = [
+    { id: 'red',      name: '小伴红', light: { btn: '#e3203c', soft: '#fff3f4', line: '#f5c7cd', ink: '#e3203c' }, dark: { btn: '#ee4b5f', soft: '#3a2225', line: '#5a2b33', ink: '#ff8c91' } },
+    { id: 'green',    name: '薄荷绿', light: { btn: '#2e8b5e', soft: '#e3f2e9', line: '#b8dfc8', ink: '#1e6a45' }, dark: { btn: '#34a36d', soft: '#1d3328', line: '#2e5240', ink: '#72d6a2' } },
+    { id: 'blue',     name: '海湾蓝', light: { btn: '#2f6fdb', soft: '#e6eefc', line: '#bcd1f8', ink: '#1d53ae' }, dark: { btn: '#3b7be8', soft: '#1e2a42', line: '#31476e', ink: '#8db6ff' } },
+    { id: 'purple',   name: '暮紫',   light: { btn: '#7152d8', soft: '#ede8fc', line: '#cfc3f6', ink: '#5537b8' }, dark: { btn: '#8466e6', soft: '#2a2342', line: '#45396e', ink: '#bba8ff' } },
+    { id: 'amber',    name: '琥珀',   light: { btn: '#a8640c', soft: '#faeedb', line: '#ebd0a6', ink: '#87500a' }, dark: { btn: '#c27a1a', soft: '#3a2c17', line: '#5c4523', ink: '#f0b65a' } },
+    { id: 'graphite', name: '石墨',   light: { btn: '#2b2b30', soft: '#e9e9ec', line: '#cfcfd4', ink: '#2b2b30' }, dark: { btn: '#636368', soft: '#3a3a3d', line: '#525256', ink: '#e5e5ea' } },
+  ];
+
+  const svgUri = s => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s.trim());
+
+  const COVER_WANCISOU = svgUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 214">
+      <defs><linearGradient id="wb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4f5"/><stop offset=".42" stop-color="#ffffff"/><stop offset="1" stop-color="#fafafa"/></linearGradient></defs>
+      <rect width="320" height="214" fill="url(#wb)"/>
+      <text x="18" y="30" font-family="-apple-system,PingFang SC,sans-serif" font-size="15" font-weight="700" fill="#222">万磁搜</text>
+      <rect x="18" y="42" width="284" height="30" rx="15" fill="#ffffff" stroke="#ededed" stroke-width="1.2"/>
+      <circle cx="35" cy="57" r="4.5" fill="none" stroke="#999" stroke-width="1.5"/>
+      <line x1="38.5" y1="60.5" x2="41.5" y2="63.5" stroke="#999" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="48" y="61" font-family="-apple-system,PingFang SC,sans-serif" font-size="10.5" fill="#9a9a9a">搜索公开磁力资源…</text>
+      <rect x="248" y="47.5" width="48" height="19" rx="9.5" fill="#ef6b6b"/>
+      <text x="272" y="60.5" text-anchor="middle" font-family="-apple-system,PingFang SC,sans-serif" font-size="9.5" font-weight="600" fill="#fff">搜索</text>
+      <rect x="18" y="84" width="284" height="58" rx="11" fill="#ffffff" stroke="#ededed"/>
+      <text x="30" y="103" font-family="-apple-system,PingFang SC,sans-serif" font-size="11.5" font-weight="650" fill="#222">Ubuntu 24.04 LTS Desktop</text>
+      <rect x="30" y="112" width="42" height="15" rx="7.5" fill="#eef5ff"/><text x="51" y="122.5" text-anchor="middle" font-family="sans-serif" font-size="8.5" fill="#3a75d6">BTDig</text>
+      <rect x="78" y="112" width="42" height="15" rx="7.5" fill="#fff1f2"/><text x="99" y="122.5" text-anchor="middle" font-family="sans-serif" font-size="8.5" fill="#d9485f">5.7 GB</text>
+      <rect x="126" y="112" width="58" height="15" rx="7.5" fill="#f3f4f6"/><text x="155" y="122.5" text-anchor="middle" font-family="sans-serif" font-size="8.5" fill="#666">2026-07-11</text>
+      <rect x="238" y="111" width="52" height="18" rx="9" fill="#fff3f4"/><text x="264" y="123" text-anchor="middle" font-family="sans-serif" font-size="9" font-weight="600" fill="#e3203c">复制磁力</text>
+      <rect x="18" y="152" width="284" height="48" rx="11" fill="#ffffff" stroke="#ededed"/>
+      <text x="30" y="170" font-family="-apple-system,PingFang SC,sans-serif" font-size="11" font-weight="600" fill="#333">Blender 4.3 Open Movie 4K</text>
+      <rect x="30" y="178" width="46" height="14" rx="7" fill="#eef8f2"/><text x="53" y="188" text-anchor="middle" font-family="sans-serif" font-size="8.5" fill="#2fa36b">健康 52</text>
+      <rect x="82" y="178" width="44" height="14" rx="7" fill="#f3f4f6"/><text x="104" y="188" text-anchor="middle" font-family="sans-serif" font-size="8.5" fill="#666">2.1 GB</text>
+    </svg>
+  `);
+
+  const COVER_POMODORO = svgUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 214">
+      <rect width="320" height="214" fill="#fcf7f2"/>
+      <circle cx="160" cy="100" r="60" fill="#ffffff" stroke="#efe4da" stroke-width="2"/>
+      <circle cx="160" cy="100" r="50" fill="none" stroke="#f5e6dc" stroke-width="5.5"/>
+      <path d="M160 50 A50 50 0 1 1 115 122" fill="none" stroke="#e45a4f" stroke-width="5.5" stroke-linecap="round"/>
+      <text x="160" y="98" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="24" font-weight="700" fill="#2b2623">24:18</text>
+      <text x="160" y="116" text-anchor="middle" font-family="-apple-system,PingFang SC,sans-serif" font-size="10.5" fill="#8f7e73">深度专注 · 第 2 轮</text>
+      <rect x="108" y="172" width="104" height="24" rx="12" fill="#fff0ee"/>
+      <text x="160" y="188" text-anchor="middle" font-family="-apple-system,PingFang SC,sans-serif" font-size="10.5" font-weight="600" fill="#d94a3f">暂停计时</text>
+    </svg>
+  `);
+
+  const COVER_TRAVEL = svgUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 214">
+      <rect width="320" height="214" fill="#eef6f3"/>
+      <rect x="22" y="18" width="276" height="178" rx="14" fill="#ffffff" stroke="#dcebe5"/>
+      <text x="38" y="44" font-family="-apple-system,PingFang SC,sans-serif" font-size="13" font-weight="700" fill="#1f3b33">东京秋日 5 日清单</text>
+      <rect x="238" y="31" width="42" height="17" rx="8.5" fill="#e2f3ec"/><text x="259" y="42.5" text-anchor="middle" font-family="sans-serif" font-size="9.5" font-weight="600" fill="#237a57">6 / 8</text>
+      <rect x="38" y="58" width="244" height="30" rx="9" fill="#f7fbf9"/>
+      <circle cx="53" cy="73" r="6.5" fill="#2fa36b"/><path d="M50 73l2 2 4-4" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+      <text x="68" y="77" font-family="-apple-system,PingFang SC,sans-serif" font-size="11" fill="#4f665f" text-decoration="line-through">护照与纸质行程单</text>
+      <rect x="38" y="96" width="244" height="30" rx="9" fill="#f7fbf9"/>
+      <circle cx="53" cy="111" r="6.5" fill="#2fa36b"/><path d="M50 111l2 2 4-4" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+      <text x="68" y="115" font-family="-apple-system,PingFang SC,sans-serif" font-size="11" fill="#4f665f" text-decoration="line-through">便携充电宝 &amp; 转接头</text>
+      <rect x="38" y="134" width="244" height="30" rx="9" fill="#ffffff" stroke="#e4efea"/>
+      <circle cx="53" cy="149" r="6.5" fill="none" stroke="#9ab8ae" stroke-width="1.5"/>
+      <text x="68" y="153" font-family="-apple-system,PingFang SC,sans-serif" font-size="11" font-weight="500" fill="#22332d">西瓜卡余额充值</text>
+      <rect x="38" y="176" width="160" height="5" rx="2.5" fill="#e6f2ed"/>
+      <rect x="38" y="176" width="120" height="5" rx="2.5" fill="#2fa36b"/>
+    </svg>
+  `);
+
+  /* ALL Games use ONLY their existing 1:1 icon! Zero wide cover assets required. */
+  const GAMES = [
+    { id: 'block-puzzle',       name: '方块爆破',   genre: '益智', orient: '竖屏', tagline: '8×8 经典消除连击', icon: ASSET + 'block-puzzle.webp',      tint: '#fdf2f6', tintDark: '#2b1e24' },
+    { id: 'dusk-glider',        name: '暮色滑翔',   genre: '冒险', orient: '竖屏', tagline: '乘日落气流收集微光', icon: ASSET + 'dusk-glider.png',        tint: '#f5f2fa', tintDark: '#241f2d' },
+    { id: 'ink-blade',          name: '水墨剑客',   genre: '冒险', orient: '竖屏', tagline: '极简水墨一击必杀', icon: ASSET + 'ink-blade.png',          tint: '#f6f4ee', tintDark: '#262420' },
+    { id: 'painting-adventure', name: '画框马里奥', genre: '冒险', orient: '横屏', tagline: '跃入油画横版冒险', icon: ASSET + 'painting-adventure.png', tint: '#f1f4fa', tintDark: '#1c222e' },
+    { id: 'water-sort',         name: '倒杯快乐',   genre: '解压', orient: '竖屏', tagline: '45 关调饮分类手帐', icon: ASSET + 'water-sort.webp',        tint: '#fdf6ec', tintDark: '#2b241c' },
+    { id: 'pro-cube',           name: '三阶魔方',   genre: '益智', orient: '竖屏', tagline: '3D 真实手感计时',   icon: ASSET + 'pro-cube.png',           tint: '#f2f4f7', tintDark: '#20232a' },
+  ];
+
+  /* ALL Tools use ONLY their existing 1:1 icon! */
+  const TOOLS = [
+    { id: 'mbti',            name: 'MBTI 性格测评', desc: '48 题人格报告',     icon: ASSET + 'mbti.webp' },
+    { id: 'remote-control',  name: '遥控器',        desc: '电视空调红外遥控', icon: ASSET + 'remote-control.webp' },
+    { id: 'quick-launch',    name: '轻启',          desc: '桌面快捷启动',     icon: ASSET + 'quick-launch.webp' },
+    { id: 'live-wallpapers', name: '动态壁纸',      desc: '水下花园与星河',   icon: ASSET + 'live-wallpapers.webp' },
+  ];
+
+  const RECENT_LIST = [
+    { id: 'water-sort',     title: '倒杯快乐',  icon: ASSET + 'water-sort.webp' },
+    { id: 'dusk-glider',    title: '暮色滑翔',  icon: ASSET + 'dusk-glider.png' },
+    { id: 'mbti',           title: 'MBTI 测评', icon: ASSET + 'mbti.webp' },
+    { id: 'remote-control', title: '遥控器',    icon: ASSET + 'remote-control.webp' },
+    { id: 'block-puzzle',   title: '方块爆破',  icon: ASSET + 'block-puzzle.webp' },
+    { id: 'wancisou',       title: '万磁搜',    icon: ASSET + 'wancisou-icon.webp' },
+    { id: 'ink-blade',      title: '水墨剑客',  icon: ASSET + 'ink-blade.png' },
+    { id: 'quick-launch',   title: '轻启',      icon: ASSET + 'quick-launch.webp' },
+  ];
+
+  /* Community Works keep their existing 3:2 cover */
+  const WORKS = [
+    { id: 58, title: '万磁搜',         kind: '工具', featured: true,  cover: COVER_WANCISOU,              author: '林澈', avBg: '#d9534f', likes: 14, liked: false },
+    { id: 61, title: '番茄专注钟',     kind: '工具', featured: true,  cover: COVER_POMODORO,              author: '阿木', avBg: '#e07a5f', likes: 36, liked: true  },
+    { id: 62, title: '旅行清单 Pro',   kind: '工具', featured: true,  cover: COVER_TRAVEL,                author: '苏晚', avBg: '#3b8c6e', likes: 22, liked: false },
+    { id: 63, title: '深海微光水族箱', kind: '游戏', featured: true,  cover: ASSET + 'aquarium-cover.webp', author: '青禾', avBg: '#2e6f95', likes: 49, liked: false },
+  ];
+
+  const FILTERS = ['精选', '最新', '游戏', '工具'];
+
+  const state = {
+    dark: false,
+    compact: false,
+    accentId: 'red',
+    scene: 'normal', // 'normal' | 'single'
+    filters: { a: '精选', b: '精选', c: '精选' },
+    drawerOpen: { a: false, c: false },
+  };
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const chev = `<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>`;
+  const clockIco = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v4.8l3.2 1.8"/></svg>`;
+  const searchIco = `<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
+  const heartSvg = `<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.7-9.2-9.2C1.6 8.1 3.7 5 7 5c1.9 0 3.6 1 5 2.7C13.4 6 15.1 5 17 5c3.3 0 5.4 3.1 4.2 6.3-1.7 4.5-9.2 9.2-9.2 9.2z"/></svg>`;
+
+  const toastTimers = {};
+  function showToast(key, text) {
+    const el = $('toast-' + key);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimers[key]);
+    toastTimers[key] = setTimeout(() => el.classList.remove('show'), 1600);
+  }
+
+  function statusHtml() {
+    return `
+      <div class="status-bar">
+        <span>9:09</span>
+        <div class="status-right">
+          <svg viewBox="0 0 24 24"><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg>
+          <i class="bat"></i>
+        </div>
+      </div>
+    `;
+  }
+
+  function tabbarHtml() {
+    return `
+      <nav class="tabbar" aria-label="底部导航">
+        <button class="tab" data-toast="切换到「小伴 AI」">
+          <svg viewBox="0 0 24 24"><path d="M12 3l2.2 6.2L20.5 11.5l-6.3 2.3L12 20l-2.2-6.2-6.3-2.3 6.3-2.3z"/></svg>
+          <span>小伴 AI</span>
+        </button>
+        <button class="tab active">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>
+          <span>应用</span>
+        </button>
+        <button class="tab" data-toast="打开创作面板" aria-label="发布">
+          <span class="tab-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+        </button>
+        <button class="tab" data-toast="切换到「社区」">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><polygon points="15.8 8.2 13.6 13.6 8.2 15.8 10.4 10.4 15.8 8.2" stroke-width="1.6"/></svg>
+          <span>社区</span>
+        </button>
+        <button class="tab" data-toast="切换到「我的」">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M5 19.5a7 7 0 0 1 14 0"/></svg>
+          <span>我的</span>
+        </button>
+      </nav>
+      <div class="home-bar"></div>
+    `;
+  }
+
+  function communitySectionHtml(schemeKey) {
+    const active = state.filters[schemeKey];
+    let list = state.scene === 'single' ? WORKS.slice(0, 1) : WORKS.slice();
+    if (state.scene !== 'single') {
+      if (active === '游戏') list = list.filter(w => w.kind === '游戏');
+      else if (active === '工具') list = list.filter(w => w.kind === '工具');
+    }
+    return `
+      <div class="sec-head">
+        <span class="sec-title">社区作品</span>
+        <span class="sec-count">${list.length} 件</span>
+      </div>
+      <div class="chips-row">
+        ${FILTERS.map(f => `<button class="chip-pill${f === active ? ' active' : ''}" data-filter="${f}">${f}</button>`).join('')}
+      </div>
+      <div class="works-grid">
+        ${list.map(w => `
+          <div class="work-card" data-toast="查看作品《${esc(w.title)}》">
+            <div class="work-cover"><img src="${w.cover}" alt="${esc(w.title)}"></div>
+            <div class="work-body">
+              <div class="work-title-row">
+                <div class="work-title">${esc(w.title)}</div>
+                ${w.featured ? `<span class="work-inline-badge">精选</span>` : `<span class="work-kind-pill">${esc(w.kind)}</span>`}
+              </div>
+              <div class="work-foot">
+                <div class="work-author">
+                  <span class="mini-av" style="background:${w.avBg}">${esc(w.author.slice(0, 1))}</span>
+                  <span>${esc(w.author)}</span>
+                </div>
+                <button class="like-btn${w.liked ? ' liked' : ''}" data-like="${w.id}">${heartSvg}<span>${w.likes}</span></button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+        ${list.length === 1 ? `
+          <button class="create-slot-card" data-toast="和小伴 AI 创作你的新作品">
+            <div class="create-slot-ico"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+            <strong>发布你的作品</strong>
+            <p>用小伴 AI 制作小游戏或工具分享到广场</p>
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function drawerOverlayHtml() {
+    return `
+      <div class="drawer-mask" data-close-drawer="1">
+        <div class="recent-drawer">
+          <div class="drawer-head">
+            <h4>最近用过</h4>
+            <button class="icon-tap" data-close-drawer="1" aria-label="收起">
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="drawer-grid">
+            ${RECENT_LIST.map(r => `
+              <button class="mini-tile" data-close-drawer="1" data-toast="快速启动《${esc(r.title)}》">
+                <div class="app-ico sz-52"><img src="${r.icon}" alt=""></div>
+                <span>${esc(r.title)}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div class="drawer-tip">
+            <span>共 ${RECENT_LIST.length} 个最近记录</span>
+            <span>顶栏下拉亦可随时呼出</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ─── Render Scheme A: App Store Curated List Rail ─── */
+  function renderA() {
+    const col1 = GAMES.slice(0, 3);
+    const col2 = GAMES.slice(3, 6);
+    $('phone-a').innerHTML = `
+      ${statusHtml()}
+      <div class="appbar">
+        <h3>广场</h3>
+        <div class="appbar-actions">
+          <button class="recent-hdr-pill" data-open-drawer="1">${clockIco}最近</button>
+          <button class="icon-tap" data-toast="搜索广场应用与作品" aria-label="搜索">${searchIco}</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="sec-head first">
+          <span class="sec-title">精选游戏</span>
+          <button class="sec-action" data-toast="查看全部 9 款官方游戏">全部${chev}</button>
+        </div>
+        <div class="rank-rail">
+          ${[col1, col2].map(group => `
+            <div class="rank-col-card">
+              ${group.map(g => `
+                <div class="rank-row">
+                  <div class="app-ico sz-52"><img src="${g.icon}" alt=""></div>
+                  <div class="rank-copy">
+                    <div class="rank-name">${esc(g.name)}</div>
+                    <div class="rank-sub">${esc(g.genre)} · ${esc(g.tagline)}</div>
+                  </div>
+                  <button class="open-pill" data-toast="打开《${esc(g.name)}》">打开</button>
+                </div>
+              `).join('')}
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="sec-head">
+          <span class="sec-title">精选工具</span>
+          <button class="sec-action" data-toast="查看全部精选工具">全部${chev}</button>
+        </div>
+        <div class="tools-grid">
+          ${TOOLS.map(t => `
+            <button class="tool-card" data-toast="打开《${esc(t.name)}》">
+              <div class="app-ico sz-42"><img src="${t.icon}" alt=""></div>
+              <div class="tool-info">
+                <div class="tool-name">${esc(t.name)}</div>
+                <div class="tool-desc">${esc(t.desc)}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+
+        ${communitySectionHtml('a')}
+      </div>
+      ${tabbarHtml()}
+      <div class="phone-toast" id="toast-a"></div>
+      ${state.drawerOpen.a ? drawerOverlayHtml() : ''}
+    `;
+  }
+
+  /* ─── Render Scheme B: Compact 36px Recent Strip + Portrait 1:1 Icon Cards + Grouped Tool List ─── */
+  function renderB() {
+    $('phone-b').innerHTML = `
+      ${statusHtml()}
+      <div class="appbar">
+        <h3>广场</h3>
+        <div class="appbar-actions">
+          <button class="icon-tap" data-toast="搜索广场应用与作品" aria-label="搜索">${searchIco}</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="recent-pill-bar">
+          <span class="recent-tag-label">最近</span>
+          ${RECENT_LIST.slice(0, 5).map(r => `
+            <button class="recent-chip" data-toast="快速启动《${esc(r.title)}》">
+              <div class="app-ico sz-24"><img src="${r.icon}" alt=""></div>
+              <span>${esc(r.title)}</span>
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="sec-head first">
+          <span class="sec-title">精选游戏</span>
+          <button class="sec-action" data-toast="查看全部 9 款官方游戏">全部${chev}</button>
+        </div>
+        <div class="icon-card-rail">
+          ${GAMES.map(g => `
+            <button class="icon-portrait-card" data-toast="打开《${esc(g.name)}》">
+              <div class="icon-stage" style="--stage-tint:${g.tint};--stage-tint-dark:${g.tintDark}">
+                <div class="app-ico sz-58"><img src="${g.icon}" alt=""></div>
+              </div>
+              <div class="icon-portrait-body">
+                <div class="icon-portrait-name">${esc(g.name)}</div>
+                <div class="icon-portrait-meta">${esc(g.genre)} · ${esc(g.orient)}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="sec-head">
+          <span class="sec-title">精选工具</span>
+          <button class="sec-action" data-toast="查看全部精选工具">全部${chev}</button>
+        </div>
+        <div class="grouped-card">
+          ${TOOLS.map(t => `
+            <div class="tool-list-row">
+              <div class="app-ico sz-44"><img src="${t.icon}" alt=""></div>
+              <div class="tool-list-copy">
+                <div class="tool-list-name">${esc(t.name)}</div>
+                <div class="tool-list-desc">${esc(t.desc)}</div>
+              </div>
+              <button class="open-pill" data-toast="打开《${esc(t.name)}》">打开</button>
+            </div>
+          `).join('')}
+        </div>
+
+        ${communitySectionHtml('b')}
+      </div>
+      ${tabbarHtml()}
+      <div class="phone-toast" id="toast-b"></div>
+    `;
+  }
+
+  /* ─── Render Scheme C: Hero Pick + 4-Grid Composite Card + Crosshair Tool Card (Max First-Screen Density) ─── */
+  function renderC() {
+    const hero = GAMES[1]; // 暮色滑翔
+    const others = [GAMES[0], GAMES[2], GAMES[3], GAMES[4]];
+    $('phone-c').innerHTML = `
+      ${statusHtml()}
+      <div class="appbar">
+        <h3>广场</h3>
+        <div class="appbar-actions">
+          <button class="recent-hdr-pill" data-open-drawer="1" title="展开最近用过">
+            <span class="recent-stack">
+              <img src="${RECENT_LIST[0].icon}" alt="">
+              <img src="${RECENT_LIST[1].icon}" alt="">
+              <img src="${RECENT_LIST[2].icon}" alt="">
+            </span>
+            <span>最近</span>
+          </button>
+          <button class="icon-tap" data-toast="搜索广场应用与作品" aria-label="搜索">${searchIco}</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="sec-head first">
+          <span class="sec-title">精选游戏</span>
+          <button class="sec-action" data-toast="查看全部 9 款官方游戏">全部${chev}</button>
+        </div>
+        <div class="composite-card">
+          <div class="hero-pick">
+            <div class="app-ico sz-58"><img src="${hero.icon}" alt=""></div>
+            <div class="hero-pick-copy">
+              <div class="hero-kicker">本期推荐 · ${esc(hero.genre)}</div>
+              <div class="hero-pick-name">${esc(hero.name)}</div>
+              <div class="hero-pick-desc">${esc(hero.tagline)}</div>
+            </div>
+            <button class="open-pill accent" data-toast="立即试玩《${esc(hero.name)}》">试玩</button>
+          </div>
+          <div class="composite-divider"></div>
+          <div class="composite-grid-4">
+            ${others.map(g => `
+              <button class="mini-tile" data-toast="打开《${esc(g.name)}》">
+                <div class="app-ico sz-48"><img src="${g.icon}" alt=""></div>
+                <span>${esc(g.name)}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="sec-head">
+          <span class="sec-title">精选工具</span>
+          <button class="sec-action" data-toast="查看全部精选工具">全部${chev}</button>
+        </div>
+        <div class="crosshair-card">
+          ${TOOLS.map(t => `
+            <button class="crosshair-cell" data-toast="打开《${esc(t.name)}》">
+              <div class="app-ico sz-42"><img src="${t.icon}" alt=""></div>
+              <div class="tool-info">
+                <div class="tool-name">${esc(t.name)}</div>
+                <div class="tool-desc">${esc(t.desc)}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+
+        ${communitySectionHtml('c')}
+      </div>
+      ${tabbarHtml()}
+      <div class="phone-toast" id="toast-c"></div>
+      ${state.drawerOpen.c ? drawerOverlayHtml() : ''}
+    `;
+  }
+
+  function renderAll() {
+    renderA();
+    renderB();
+    renderC();
+    applyTheme();
+  }
+
+  function applyTheme() {
+    document.body.classList.toggle('studio-dark', state.dark);
+    document.body.classList.toggle('compact', state.compact);
+    const accent = ACCENTS.find(a => a.id === state.accentId) || ACCENTS[0];
+    const pal = state.dark ? accent.dark : accent.light;
+    document.querySelectorAll('.phone').forEach(p => {
+      p.classList.toggle('dark', state.dark);
+      p.style.setProperty('--accent', pal.btn);
+      p.style.setProperty('--accent-soft', pal.soft);
+      p.style.setProperty('--accent-soft-line', pal.line);
+      p.style.setProperty('--accent-ink', pal.ink);
+    });
+    $('toggle-dark').textContent = state.dark ? '浅色模式' : '深色模式';
+    $('toggle-width').textContent = state.compact ? '360 → 390' : '390 → 360';
+    document.querySelectorAll('.swatch').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.accent === state.accentId);
+    });
+  }
+
+  function initSwatches() {
+    const wrap = $('swatches');
+    wrap.innerHTML = ACCENTS.map(a =>
+      `<button class="swatch${a.id === state.accentId ? ' active' : ''}" data-accent="${a.id}" title="${a.name}" aria-label="${a.name}" style="background:${a.light.btn};color:${a.light.btn}"></button>`
+    ).join('');
+    wrap.addEventListener('click', e => {
+      const btn = e.target.closest('.swatch');
+      if (!btn) return;
+      state.accentId = btn.dataset.accent;
+      applyTheme();
+    });
+  }
+
+  function bindPhone(key) {
+    $('phone-' + key).addEventListener('click', e => {
+      const closeD = e.target.closest('[data-close-drawer]');
+      if (closeD && (e.target === closeD || closeD.tagName === 'BUTTON')) {
+        state.drawerOpen[key] = false;
+        const msg = closeD.dataset.toast;
+        renderAll();
+        if (msg) showToast(key, msg);
+        return;
+      }
+      const openD = e.target.closest('[data-open-drawer]');
+      if (openD) {
+        state.drawerOpen[key] = true;
+        renderAll();
+        return;
+      }
+      const fBtn = e.target.closest('[data-filter]');
+      if (fBtn) {
+        state.filters[key] = fBtn.dataset.filter;
+        renderAll();
+        return;
+      }
+      const likeBtn = e.target.closest('[data-like]');
+      if (likeBtn) {
+        e.stopPropagation();
+        const w = WORKS.find(x => x.id === Number(likeBtn.dataset.like));
+        if (w) {
+          w.liked = !w.liked;
+          w.likes += w.liked ? 1 : -1;
+          renderAll();
+        }
+        return;
+      }
+      const toastEl = e.target.closest('[data-toast]');
+      if (toastEl) {
+        showToast(key, toastEl.dataset.toast);
+      }
+    });
+  }
+
+  $('scene-seg').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-scene]');
+    if (!btn) return;
+    state.scene = btn.dataset.scene;
+    $('scene-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    renderAll();
+  });
+  $('toggle-dark').addEventListener('click', () => { state.dark = !state.dark; applyTheme(); });
+  $('toggle-width').addEventListener('click', () => { state.compact = !state.compact; applyTheme(); });
+
+  initSwatches();
+  bindPhone('a');
+  bindPhone('b');
+  bindPhone('c');
+  renderAll();
+})();
+</script>
+</body>
+</html>

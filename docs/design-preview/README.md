@@ -6,7 +6,7 @@
 
 ## 总体设计稿导航网页（推荐入口）
 
-[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 39 个设计稿模块/状态入口（32 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
+[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 40 个设计稿模块/状态入口（33 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
 
 在仓库根目录一键启动统一预览服务（自动映射桌面 UI 升级画布的 `/_blob/` 图片资源）：
 
@@ -28,6 +28,7 @@ npm --prefix client/xiaoban-desktop run dev
 
 | 设计稿 | 模块 | 状态 | 内容 |
 | --- | --- | --- | --- |
+| [应用广场视觉重设计](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/app-plaza-redesign.html) | 应用与广场 | 已合入 | 零额外封面三方案对比（定稿方案 A · 精装榜单流，已合入手机与网页）：1:1 图标三行横滑游戏卡 × 2×2 工具矩阵 × 净化 3:2 社区双列卡 |
 | [实时语音通话页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/voice-call-redesign.html) | 核心 AI 与对话 | 已合入 | 同步「双星相伴 · 日落珊瑚」AppIcon，88dp 同心呼吸光球（回答态上收至 64dp 释放 224dp 渐隐歌词区），思考/聆听/回答三态与六套主题色 |
 | [小伴 AI 聊天窗口与全卡片体系](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-chat-ui.html) | 核心 AI 与对话 | 已合入 | 通栏流式排版、无底星标、思考/完成/过程三合一摘要卡，统一 16px 白底细框卡片语法覆盖交付/提醒/生图/代码块/文件变更与贴底审批/提问/方案确认卡 |
 | [小伴 AI 首页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-home.html) | 核心 AI 与对话 | 已合入 | 个人 Agent 连续主线 + 并行任务三屏定稿（默认态、键盘态、个人 Agent 配置页），极简顶栏与分离悬浮胶囊输入框 |

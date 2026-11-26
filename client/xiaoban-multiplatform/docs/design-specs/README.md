@@ -6,6 +6,7 @@
 
 | 设计稿 | 状态 | 内容与预览 |
 | --- | --- | --- |
+| [应用广场视觉重设计](prototypes/app-plaza-redesign.html) | 已合入 | 零额外封面三方案对比（定稿方案 A · 精装榜单流，已合入手机与网页）：游戏与工具仅复用 1:1 图标，社区沿用 3:2 封面，最近用过收口至顶栏「最近」+ 下拉抽屉，支持浅/深色、390/360px 与六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/app-plaza-redesign.html) |
 | [实时语音通话页](prototypes/voice-call-redesign.html) | 已合入 | 同步最新「双星相伴 · 日落珊瑚」AppIcon，88dp 同心呼吸光球（回答态上收至 64dp 释放 224dp 渐隐歌词字幕区），思考/聆听/回答三态与 390/360px、六套主题色。[本机预览](http://127.0.0.1:1421/prototypes/voice-call-redesign.html) |
 | [小伴 AI 聊天窗口视觉优化](prototypes/ai-chat-ui.html) | 已合入 | 通栏流式阅读排版与无底星标；思考/任务完成/执行过程三合一摘要卡；统一 16px 白底细框卡片语法覆盖作品交付、提醒、生图、代码块、文件变更撤销及贴底审批/提问/方案确认与续作卡，四屏覆盖全场景。[本机预览](http://127.0.0.1:1421/prototypes/ai-chat-ui.html) |
 | [小伴 AI 首页](prototypes/ai-home.html) | 已合入 | 个人 Agent 连续主线 + 并行任务三屏定稿（默认浏览态、键盘弹出态、个人 Agent 配置页），极简三段顶栏与分离悬浮胶囊输入框。[本机预览](http://127.0.0.1:1421/prototypes/ai-home.html) |
