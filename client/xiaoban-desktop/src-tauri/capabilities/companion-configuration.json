@@ -1,0 +1,6 @@
+{
+  "identifier": "companion-configuration",
+  "description": "Native companion settings windows receive settings and window state events. Companion operations use the authenticated configuration request queue.",
+  "windows": ["configuration-pet-*", "configuration-proactivity"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

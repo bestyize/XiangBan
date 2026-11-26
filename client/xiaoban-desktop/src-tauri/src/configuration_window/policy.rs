@@ -157,6 +157,12 @@ pub fn pet_scope(label: &str, command: &str, args: &serde_json::Value) -> bool {
         assert!(!cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"two"})));
     }
     #[test] fn pet_and_proactivity_windows_keep_minimal_scope() {
+        let capability: serde_json::Value = serde_json::from_str(include_str!(
+            "../../capabilities/companion-configuration.json"
+        )).unwrap();
+        assert_eq!(capability["windows"], serde_json::json!(["configuration-pet-*", "configuration-proactivity"]));
+        assert_eq!(capability["permissions"], serde_json::json!(["core:event:allow-listen", "core:event:allow-unlisten"]));
+
         let label = pet_label("pet-alpha");
         assert_eq!(kind(&label), Some("pet"));
         assert_eq!(kind("configuration-proactivity"), Some("proactivity"));
