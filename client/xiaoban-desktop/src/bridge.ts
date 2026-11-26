@@ -254,6 +254,7 @@ export interface AppInfo {
   platform: string;
   arch: string;
   updateTarget: string;
+  desktopLayers?: boolean;
   updateUrl: string;
   dataDirectory?: string;
   uiSmoke?: boolean;

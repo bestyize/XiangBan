@@ -174,6 +174,7 @@ fn ensure_writable(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 fn persist(app: &tauri::AppHandle, layout: &Layout) -> Result<(), String> {
+    crate::require_desktop_layers()?;
     validate(layout)?; ensure_writable(app)?;
     let folder = crate::storage::root(app)?.join("config"); fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     let bytes = serde_json::to_vec(layout).map_err(|e| e.to_string())?;
@@ -252,6 +253,7 @@ fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget)
     #[cfg(not(any(windows,target_os="macos")))] {window.set_size(tauri::LogicalSize::new(width/dpi,height/dpi)).and_then(|_|window.set_position(tauri::PhysicalPosition::new(x,y))).map_err(|e|e.to_string())}
 }
 pub fn sync(app: &tauri::AppHandle) {
+    if !crate::DESKTOP_LAYERS { return; }
     let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone(); let mut errors = vec![];
     state.resizes.lock().unwrap_or_else(|e| e.into_inner()).retain(|id,_|layout.widgets.iter().any(|w|&w.id==id));
     let enabled: Vec<_> = layout.widgets.iter().filter(|w| w.enabled && !crate::games::is_active(app)).collect();

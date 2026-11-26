@@ -72,6 +72,7 @@ pub fn render_payload(app: &tauri::AppHandle, area: &MonitorArea) -> Value {
 /// Brings the overlay in line with the settings without blocking the caller (commands may run on the
 /// UI thread, which must stay free to process the window being created or destroyed).
 pub fn sync(app: &tauri::AppHandle) {
+    if !crate::DESKTOP_LAYERS { return; }
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || reconcile(&app));
 }

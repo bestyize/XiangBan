@@ -42,6 +42,17 @@ beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.useRealTimers(); });
 
 describe('新建任务', () => {
+  it('keeps the text composer available on Linux without offering native recording or screenshots', async () => {
+    const { store } = await open();
+    Object.assign(store, { info: { platform: 'linux' } });
+    await flushPromises();
+    expect(textarea()).toBeTruthy();
+    expect(q('chat-asr-toggle')).toBeNull();
+    await click('chat-add-menu');
+    expect(q('chat-add-screenshot')).toBeNull();
+    expect(q('chat-pick-image')).toBeTruthy();
+  });
+
   it('keeps the shared composer pet hidden until enabled and responds to settings changes', async () => {
     const { store } = await open();
     expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(false);
@@ -99,8 +110,9 @@ describe('新建任务', () => {
     expect(q('chat-permission-toggle')!.textContent).toContain('默认权限');
     expect(q('chat-context')!.tagName).toBe('SPAN');
     expect(q('chat-context')!.getAttribute('aria-label')).toBe('开始对话后显示上下文用量');
-    expect(q('chat-workbench-model')!.textContent).toContain('deepseek-v4-pro');
-    expect(q('chat-workbench-model')!.textContent).toContain('DE');
+    const model = q('chat-workbench-model')!;
+    expect(model.getAttribute('aria-label')).toBe('切换模型 · DeepSeek / deepseek-v4-pro');
+    expect(model.title).toBe(model.getAttribute('aria-label'));
     expect(wrapper!.text()).toContain('内容由 AI 生成，请核对重要信息');
   });
 

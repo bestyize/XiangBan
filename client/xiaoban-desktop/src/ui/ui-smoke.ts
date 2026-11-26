@@ -29,27 +29,42 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
     const native = await invoke<Settings>('get_settings');
     if (typeof native.companionEnabled !== 'boolean' || native.fps !== store.settings.fps || native.size !== store.settings.size) throw new Error('Native settings were not bound to the Vue control store');
     if (!store.info.version || store.info.platform === 'preview') throw new Error('Native application identity missing');
-    // The studio kinds are tabs of 装扮 and "settings" is a dialog now; the old ids still route there.
-    for (const page of ['wallpapers', 'effects', 'companion', 'games', 'care', 'settings'] as ControlPage[]) {
-      if (page === 'settings') store.openSettings('general'); else store.navigate(page);
-      await wait(() => !!document.querySelector(`[data-testid="${page}-page"]`), `mount ${page}`);
-      mounted.push(page);
-      if (page === 'companion') {
-        await wait(() => document.querySelector('[data-testid="companion-enabled"]')?.getAttribute('aria-checked') === String(store.settings.companionEnabled), 'companion setting binding');
+    if (store.info.platform === 'linux') {
+      for (const page of ['new-task', 'chat', 'library'] as const) {
+        store.navigate(page);
+        await wait(() => !!document.querySelector(`[data-testid="${page}-page"]`), `mount ${page}`);
+        mounted.push(page);
       }
-      if (page === 'games') await wait(() => document.querySelectorAll('[data-testid="games-page"] .game-card').length === 10, 'ten official game cards');
-      if (page === 'settings') {
-        await wait(() => {
-          const switches = document.querySelectorAll('[data-testid="settings-page"] [role="switch"]');
-          return switches[0]?.getAttribute('aria-checked') === String(store.settings.autostart) && switches[1]?.getAttribute('aria-checked') === String(store.settings.paused);
-        }, 'startup and animation setting bindings');
+      const session = await invoke<{ id: string }>('chat_new_session', {});
+      if (!session.id) throw new Error('Native session was not created');
+      const remaining = await invoke<{ id: string }[]>('chat_delete_session', { sessionId: session.id });
+      if (remaining.some(item => item.id === session.id)) throw new Error('Native session was not removed');
+      const library = await invoke<{ docs: unknown[] }>('library_state');
+      if (!Array.isArray(library.docs)) throw new Error('Native library is unavailable');
+      report = { ok: true, platform: 'linux', pages: mounted, nativeSession: true, nativeLibrary: true };
+    } else {
+      // The studio kinds are tabs of 装扮 and "settings" is a dialog now; the old ids still route there.
+      for (const page of ['wallpapers', 'effects', 'companion', 'games', 'care', 'settings'] as ControlPage[]) {
+        if (page === 'settings') store.openSettings('general'); else store.navigate(page);
+        await wait(() => !!document.querySelector(`[data-testid="${page}-page"]`), `mount ${page}`);
+        mounted.push(page);
+        if (page === 'companion') {
+          await wait(() => document.querySelector('[data-testid="companion-enabled"]')?.getAttribute('aria-checked') === String(store.settings.companionEnabled), 'companion setting binding');
+        }
+        if (page === 'games') await wait(() => document.querySelectorAll('[data-testid="games-page"] .game-card').length === 10, 'ten official game cards');
+        if (page === 'settings') {
+          await wait(() => {
+            const switches = document.querySelectorAll('[data-testid="settings-page"] [role="switch"]');
+            return switches[0]?.getAttribute('aria-checked') === String(store.settings.autostart) && switches[1]?.getAttribute('aria-checked') === String(store.settings.paused);
+          }, 'startup and animation setting bindings');
+        }
       }
+      const care = await invoke<CareStatus>('get_care_settings');
+      if (!Array.isArray(care.rules) || !care.config || care.error) throw new Error(`Native care read failed: ${care.error || 'invalid response'}`);
+      const nativeContextMenuReady = await (await import('./wallpaper/context-menu')).probeWallpaperNativeMenu();
+      if (!nativeContextMenuReady) throw new Error('Native material context-menu API unavailable');
+      report = { ok: true, marker: 'vue-native-control-readonly', pages: mounted, gamePackCount: 10, careRuleCount: care.rules.length, localWallpaperCount: store.library.items.length, configBound: true, nativeContextMenuReady };
     }
-    const care = await invoke<CareStatus>('get_care_settings');
-    if (!Array.isArray(care.rules) || !care.config || care.error) throw new Error(`Native care read failed: ${care.error || 'invalid response'}`);
-    const nativeContextMenuReady = await (await import('./wallpaper/context-menu')).probeWallpaperNativeMenu();
-    if (!nativeContextMenuReady) throw new Error('Native material context-menu API unavailable');
-    report = { ok: true, marker: 'vue-native-control-readonly', pages: mounted, gamePackCount: 10, careRuleCount: care.rules.length, localWallpaperCount: store.library.items.length, configBound: true, nativeContextMenuReady };
   } catch (error) {
     report = { ok: false, marker: 'vue-native-control-readonly', pages: mounted, error: error instanceof Error ? error.message : String(error) };
   } finally {

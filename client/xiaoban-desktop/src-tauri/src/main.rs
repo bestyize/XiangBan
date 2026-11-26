@@ -111,12 +111,19 @@ struct DesktopState {
     reopen_count: std::sync::atomic::AtomicU32,
 }
 
+const DESKTOP_LAYERS: bool = cfg!(any(windows, target_os = "macos"));
+
+fn require_desktop_layers() -> Result<(), String> {
+    if DESKTOP_LAYERS { Ok(()) } else { Err("当前 Linux 工作台尚不支持桌面图层".into()) }
+}
+
 fn settings(app: &tauri::AppHandle) -> Settings {
     app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 fn ui_smoke_enabled(app: &tauri::AppHandle) -> bool {
-    app.state::<DesktopState>().isolated && std::env::var("XIAOBAN_UI_SMOKE").as_deref() == Ok("1")
+    app.state::<DesktopState>().isolated && (std::env::var("XIAOBAN_UI_SMOKE").as_deref() == Ok("1")
+        || cfg!(target_os = "linux") && std::env::args().any(|arg| arg == "--smoke-test"))
 }
 
 #[tauri::command]
@@ -220,7 +227,7 @@ fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
         let result = if !prefs.autostart_initialized {
             state.autostart_initialized.store(true, Ordering::Relaxed);
             startup::set(app, settings(app).autostart)
-        } else if settings(app).autostart {
+        } else if !cfg!(target_os = "linux") && settings(app).autostart {
             match startup::enabled(app) {
                 Ok(true) => startup::refresh(app),
                 Ok(false) => startup::set(app, true),
@@ -283,6 +290,7 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 }
 
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
+    require_desktop_layers()?;
     if pets::active(app) { pets::sync(app); return Ok(()); }
     if !settings(app).companion_enabled { return Ok(()); }
     if let Some(window) = app.get_webview_window("pet") {
@@ -401,6 +409,7 @@ fn update_settings(
 /// The desktop-wide particle effect: one effect at a time, applied at once and kept across restarts.
 #[tauri::command]
 fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Result<Settings, String> {
+    require_desktop_layers()?;
     let state = app.state::<DesktopState>();
     let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let previous = settings(&app);
@@ -417,6 +426,7 @@ fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Res
 
 #[tauri::command]
 async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settings,String>{
+    require_desktop_layers()?;
     if games::is_active(&app){return Err("请先退出游戏空间，再更改小伴显示".into());}
     let state=app.state::<DesktopState>(); let _update=state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let previous=settings(&app); let mut next=previous.clone(); next.companion_enabled=enabled;
@@ -778,7 +788,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let autostart = CheckMenuItem::with_id(app, "autostart", "开机自动启动",
         app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&control, &assistant, &games, &stop_desk, &poke, &autostart, &exit])?;
+    let menu = if DESKTOP_LAYERS {
+        Menu::with_items(app, &[&control, &assistant, &games, &stop_desk, &poke, &autostart, &exit])?
+    } else {
+        Menu::with_items(app, &[&control, &games, &autostart, &exit])?
+    };
     *app.state::<DesktopState>().startup_menu.lock().unwrap_or_else(|e| e.into_inner()) = Some(autostart);
     // The app icon at 64x64 as raw RGBA (icons/tray.rgba), so the tray needs no image decoder.
     const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.rgba");
@@ -865,7 +879,6 @@ fn main() {
             .build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(float_assistant::plugin())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             let mut opens_work = false;
             for arg in &arguments {
@@ -877,6 +890,7 @@ fn main() {
             }
             if !opens_work && !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
         }));
+    let builder = if DESKTOP_LAYERS { builder.plugin(float_assistant::plugin()) } else { builder };
     let builder = if updater_enabled { builder.plugin(tauri_plugin_updater::Builder::new().build()) } else { builder };
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
@@ -1064,26 +1078,31 @@ fn main() {
             phone_link::start(app.handle());
             voice_service::start(app.handle());
             design_mcp::start(app.handle());
-            float_assistant::start(app.handle());
-            asr::start(app.handle());
+            if DESKTOP_LAYERS { float_assistant::start(app.handle()); }
+            if inference::packaged_engine_available() { asr::start(app.handle()); }
             games::start(app.handle());
-            setup_tray(app)?;
+            if let Err(error) = setup_tray(app) {
+                if !cfg!(target_os = "linux") { return Err(error.into()); }
+                eprintln!("系统托盘不可用：{error}");
+            }
             website::start(app.handle());
             ai_catalogue::start(app.handle());
-            let initial_mode = settings(app.handle()).mode;
-            let _media_active = match content::restore(app.handle()) {
-                Ok(active) => active,
-                Err(error) => {
-                    *app.state::<DesktopState>().startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
-                    app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).wallpaper_id = "companion".into();
-                    false
-                }
-            };
-            pets::start(app.handle());
-            open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            if DESKTOP_LAYERS {
+                let initial_mode = settings(app.handle()).mode;
+                let _media_active = match content::restore(app.handle()) {
+                    Ok(active) => active,
+                    Err(error) => {
+                        *app.state::<DesktopState>().startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+                        app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).wallpaper_id = "companion".into();
+                        false
+                    }
+                };
+                pets::start(app.handle());
+                open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+                effects::sync(app.handle());
+                widgets::start(app.handle());
+            }
             apply_window_appearance(app.handle(), &settings(app.handle()).appearance);
-            effects::sync(app.handle());
-            widgets::start(app.handle());
             proactivity::start(app.handle());
             reminders::start(app.handle());
             let opens_work = startup_links.iter().any(|url| community_work::Work::parse(url.as_str()).is_some());
@@ -1100,6 +1119,15 @@ fn main() {
             if std::env::args().any(|a| a == "--smoke-test") {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
+                    if cfg!(target_os = "linux") {
+                        let result = wait_ui_smoke(&handle).await;
+                        if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
+                            let _ = std::fs::write(path, serde_json::to_vec(&result).unwrap());
+                        }
+                        if let Err(error) = &result { eprintln!("Linux workbench smoke: {error}"); }
+                        handle.exit(i32::from(result.is_err()));
+                        return;
+                    }
                     // Synchronize on the actual frontend handshake, including
                     // cold WKWebView startup on a CI Mac.
                     let startup_result = wait_for_scene(&handle, "pet");
@@ -1164,7 +1192,9 @@ fn main() {
             }
             if window.label() == "control" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close(); let _ = hide_control(window.app_handle().clone());
+                    api.prevent_close();
+                    if cfg!(target_os = "linux") { shutdown::request(window.app_handle()); }
+                    else { let _ = hide_control(window.app_handle().clone()); }
                 }
             }
         })

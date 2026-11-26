@@ -73,6 +73,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
       store.page = page;
     },
     openSettings(tab) {
+      if (tab === 'assistant' && store.info.desktopLayers === false) tab = 'general';
       if (tab) store.settingsTab = tab;
       if (desktop && !configurationScene()) { void openSettingsWindow(tab).catch(error => notify(error, 'error')); return; }
       store.settingsOpen = true;

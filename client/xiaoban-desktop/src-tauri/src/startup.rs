@@ -1,10 +1,12 @@
 //! Per-user startup registration; test entries have separate names and are cleaned up.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 use tauri::Manager;
 #[cfg(target_os = "macos")]
 use tauri_plugin_autostart::ManagerExt;
 
 pub fn enabled(app: &tauri::AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "linux")]
+    { linux::enabled(&linux::entry(&app.state::<crate::DesktopState>().startup_name)?) }
     #[cfg(windows)]
     {
         win::enabled(&app.state::<crate::DesktopState>().startup_name)
@@ -16,6 +18,8 @@ pub fn enabled(app: &tauri::AppHandle) -> Result<bool, String> {
 }
 
 pub fn set(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    { linux::set(&linux::entry(&app.state::<crate::DesktopState>().startup_name)?, enabled) }
     #[cfg(windows)]
     {
         let name = &app.state::<crate::DesktopState>().startup_name;
@@ -39,6 +43,8 @@ pub fn set(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
 
 // Refresh moved portable binaries without resetting a system-disabled startup item.
 pub fn refresh(app: &tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    { let _ = app; Ok(()) } // The installed desktop entry uses the executable on PATH.
     #[cfg(windows)]
     {
         win::refresh(&app.state::<crate::DesktopState>().startup_name)
@@ -65,6 +71,8 @@ pub fn cleanup_test_entry(name: &str) -> Result<(), String> {
     {
         return Err("不是本应用的隔离测试启动项".into());
     }
+    #[cfg(target_os = "linux")]
+    { linux::set(&linux::entry(name)?, false) }
     #[cfg(windows)]
     {
         win::disable(name)
@@ -85,6 +93,66 @@ pub fn cleanup_test_entry(name: &str) -> Result<(), String> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(error.to_string()),
         }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use std::{fs, io::{self, Write}, path::{Path, PathBuf}};
+
+    pub(super) fn entry(name: &str) -> Result<PathBuf, String> {
+        dirs::config_dir().map(|dir| dir.join("autostart").join(format!("{name}.desktop")))
+            .ok_or_else(|| "没有找到 XDG 用户配置目录".into())
+    }
+
+    pub(super) fn enabled(path: &Path) -> Result<bool, String> {
+        let text = match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.to_string()),
+        };
+        let mut desktop_entry = false;
+        let mut found = false;
+        for line in text.lines().map(str::trim) {
+            if line.starts_with('[') {
+                desktop_entry = line == "[Desktop Entry]";
+                found |= desktop_entry;
+            } else if desktop_entry && matches!(line, "Hidden=true" | "X-GNOME-Autostart-enabled=false") {
+                return Ok(false);
+            }
+        }
+        Ok(found)
+    }
+
+    pub(super) fn set(path: &Path, enabled: bool) -> Result<(), String> {
+        if !enabled {
+            return match fs::remove_file(path) {
+                Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+                result => result.map_err(|e| e.to_string()),
+            };
+        }
+        let dir = path.parent().ok_or("启动项目录无效")?;
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let mut file = tempfile::NamedTempFile::new_in(dir).map_err(|e| e.to_string())?;
+        file.write_all(b"[Desktop Entry]\nType=Application\nName=XiaoBan Desktop\nTryExec=xiaoban-desktop\nExec=xiaoban-desktop --autostart\n").map_err(|e| e.to_string())?;
+        file.persist(path).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[test]
+    fn registration_respects_session_disabling_and_can_be_removed_twice() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("autostart/XiaoBanDesktop.desktop");
+        assert!(!enabled(&path).unwrap());
+        set(&path, true).unwrap();
+        assert!(enabled(&path).unwrap());
+        let registered = fs::read_to_string(&path).unwrap();
+        assert!(registered.contains("Exec=xiaoban-desktop --autostart"));
+        fs::write(&path, format!("{registered}Hidden=true\n")).unwrap();
+        assert!(!enabled(&path).unwrap());
+        set(&path, false).unwrap();
+        set(&path, false).unwrap();
+        assert!(!path.exists());
     }
 }
 

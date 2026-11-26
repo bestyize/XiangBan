@@ -12,6 +12,7 @@
     "build": "node scripts/check-builtin-assets.mjs && node scripts/check-game-assets.mjs && vue-tsc --noEmit && vite build",
     "desktop": "node scripts/desktop.mjs dev",
     "desktop:build": "node scripts/desktop.mjs build --no-bundle",
+    "desktop:linux:build": "node scripts/desktop.mjs build --bundles deb",
     "desktop:macos:build": "node scripts/desktop.mjs build --target aarch64-apple-darwin --bundles app",
     "test:macos": "node scripts/smoke-test.mjs",
     "test": "vitest run && npm run test:scripts",

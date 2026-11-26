@@ -204,7 +204,7 @@ function checkComputerPermissions() {
     <div class="wb-anchor">
       <button type="button" class="wb-tool wb-plus" data-testid="chat-add-menu" aria-label="添加附件或能力" aria-haspopup="menu" :aria-expanded="panel === 'add'" :disabled="disabled" @mouseenter="openAddMenu" @focus="openAddMenu" @click="openAddMenu"><Plus :size="18" /></button>
       <div v-show="panel === 'add'" class="wb-menu xb-menu wb-main" role="menu" aria-label="添加" @mouseenter="cancelClose">
-        <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><i class="wb-tile" aria-hidden="true"><Camera :size="15" /></i><span>截图</span></button>
+        <button v-if="store.info?.platform !== 'linux'" type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><i class="wb-tile" aria-hidden="true"><Camera :size="15" /></i><span>截图</span></button>
         <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" :disabled="fileDisabled" @click="attachFile"><i class="wb-tile" aria-hidden="true"><Paperclip :size="15" /></i><span>添加文件或图片</span></button>
         <div class="wb-separator" />
         <button type="button" class="wb-menu-item" data-testid="chat-add-skills" role="menuitem" :class="{ selected: kind === 'skills' }" @mouseenter="chooseKind('skills')" @focus="chooseKind('skills')" @click="chooseKind('skills')"><i class="wb-tile cap" aria-hidden="true"><Zap :size="15" /></i><span>技能</span><small v-if="summary?.skills" class="wb-summary">{{ summary.skills }}</small><ChevronRight :size="14" /></button>

@@ -52,7 +52,11 @@ async fn find(app: &tauri::AppHandle) -> Result<Option<(Update, String)>, String
 }
 
 fn release_url(update: &Update) -> Result<String, String> {
-    let (platform, suffix) = if cfg!(windows) { ("windows-x86_64", ".exe") } else { ("darwin-aarch64", ".tar.gz") };
+    let (platform, suffix) = match std::env::consts::OS {
+        "windows" => ("windows-x86_64", ".exe"),
+        "macos" => ("darwin-aarch64", ".tar.gz"),
+        _ => return Err("请使用系统软件包管理器更新小伴桌面".into()),
+    };
     let url = &update.download_url;
     let tag = format!("xiaoban-wallpaper-v{}", update.version);
     let prefix = format!("/bestyize/XiangBan/releases/download/{tag}/XiaoBan-Update-{platform}-");

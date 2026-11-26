@@ -259,6 +259,7 @@ fn shortcut_label(shortcut: &str) -> String {
 
 /// Registers `shortcut` (and drops the one registered before). On failure the previous shortcut stays in force.
 pub fn apply(app: &tauri::AppHandle, enabled: bool, shortcut: &str) -> Result<(), String> {
+    if enabled { crate::require_desktop_layers()?; }
     let state = app.state::<AssistantState>();
     let mut current = state.registered.lock().unwrap_or_else(|e| e.into_inner());
     if enabled && current.as_deref() == Some(shortcut) {
@@ -791,6 +792,7 @@ pub fn collapse(app: &tauri::AppHandle) -> Result<(), String> {
 /// Makes the window match the settings: a ball when it is wanted and nothing else is showing, nothing when the
 /// assistant or the ball was turned off.
 pub fn sync(app: &tauri::AppHandle) -> Result<(), String> {
+    if !crate::DESKTOP_LAYERS { return Ok(()); }
     let settings = crate::settings(app);
     match mode(app) {
         Mode::Hidden if settings.assistant_enabled && settings.assistant_ball => show_ball(app),
@@ -801,6 +803,7 @@ pub fn sync(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 pub fn toggle(app: &tauri::AppHandle) {
+    if !crate::DESKTOP_LAYERS { return; }
     if app.state::<AssistantState>().capturing.load(Ordering::SeqCst) { return; }
     if !crate::settings(app).assistant_enabled {
         return;

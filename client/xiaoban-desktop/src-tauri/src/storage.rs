@@ -46,7 +46,7 @@ pub fn open_data_directory(window: tauri::WebviewWindow) -> Result<(), String> {
     show_in_file_manager(&directory)
 }
 
-/// Opens a directory in Explorer or Finder.
+/// Opens a directory in the default file manager.
 pub fn show_in_file_manager(directory: &Path) -> Result<(), String> {
     #[cfg(windows)]
     unsafe {
@@ -70,7 +70,11 @@ pub fn show_in_file_manager(directory: &Path) -> Result<(), String> {
         }
     }
     #[cfg(target_os = "macos")]
-    if !std::process::Command::new("/usr/bin/open")
+    let opener = "/usr/bin/open";
+    #[cfg(target_os = "linux")]
+    let opener = "xdg-open";
+    #[cfg(unix)]
+    if !std::process::Command::new(opener)
         .arg(directory)
         .status()
         .map_err(|e| e.to_string())?

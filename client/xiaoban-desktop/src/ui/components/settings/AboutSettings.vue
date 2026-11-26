@@ -11,7 +11,7 @@ const busy = ref('');
 const update = computed(() => props.store.website.update);
 const installation = computed(() => props.store.website.installation);
 const announcements = computed(() => props.store.website.announcements);
-const platform = computed(() => props.store.info.platform === 'windows' ? 'Windows · 64 位' : props.store.info.platform === 'macos' ? 'macOS' : '浏览器预览');
+const platform = computed(() => props.store.info.platform === 'windows' ? 'Windows · 64 位' : props.store.info.platform === 'macos' ? 'macOS' : props.store.info.platform === 'linux' ? `Linux · ${props.store.info.arch}` : '浏览器预览');
 async function act(key: string, action: () => Promise<unknown>) {
   busy.value = key;
   try { await action(); } catch (error) { props.store.notify(error, 'error'); } finally { busy.value = ''; }

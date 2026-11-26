@@ -1,0 +1,17 @@
+{
+  "productName": "xiaoban-desktop",
+  "mainBinaryName": "xiaoban-desktop",
+  "build": { "beforeBuildCommand": "npm run computer-use:prepare && npm run build" },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "category": "Productivity",
+    "icon": ["icons/icon.png"],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/xiaoban-desktop.desktop.hbs",
+        "depends": ["libc6 (>= 2.39)", "libxdo3", "xdg-utils", "libssl3"]
+      }
+    }
+  }
+}

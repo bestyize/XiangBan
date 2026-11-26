@@ -24,8 +24,14 @@ pub const SOURCE: &str = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-a
 pub const ENGINE_FALLBACK: &str = "https://wallpaper.xiangban.xyz/app-packages/";
 #[cfg(windows)]
 pub const ENGINE_NAME: &str = "xiaoban-infer.exe";
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
 pub const ENGINE_NAME: &str = "xiaoban-infer-macos-arm64";
+#[cfg(target_os = "linux")]
+pub const ENGINE_NAME: &str = "xiaoban-infer";
+
+pub const fn packaged_engine_available() -> bool {
+    cfg!(any(windows, target_os = "macos"))
+}
 
 /// A model file, pinned by size and SHA-256.
 pub struct ModelFile { pub name: &'static str, pub bytes: u64, pub sha256: &'static str }
@@ -50,6 +56,9 @@ pub fn present(directory: &Path, files: &[&ModelFile]) -> bool {
 /// Fetches whichever of `files` are missing or damaged, then the engine if it is missing. `progress` gets the file
 /// being fetched and the bytes done so far across all of `files`; `check` can stop the work between chunks.
 pub fn ensure(directory: &Path, files: &[&ModelFile], check: impl Fn() -> Result<(), String>, progress: impl Fn(&str, u64)) -> Result<(), String> {
+    if !packaged_engine_available() && engine(directory).is_none() {
+        return Err("此平台尚未提供本地语音推理引擎".into());
+    }
     fs::create_dir_all(directory).map_err(|e| format!("无法创建模型目录：{e}"))?;
     let client = crate::network::blocking_builder(reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 XiaoBan/1.0")

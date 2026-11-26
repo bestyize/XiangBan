@@ -1,7 +1,8 @@
 [package]
 name = "xiaoban-desktop"
 version = "3.1.8"
-description = "小伴：Windows / macOS 悬浮桌宠与动态壁纸"
+description = "小伴桌面 AI 工作台"
+authors = ["XiangBan"]
 edition = "2021"
 
 [features]
@@ -64,6 +65,9 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_Memory", "Win32_System_Threading", "Win32_System_StationsAndDesktops",
   "Win32_UI_Controls", "Win32_System_Diagnostics_Debug", "Win32_Graphics_Dwm"
 ] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tempfile = "3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-autostart = "2"

@@ -275,7 +275,7 @@ fn replace_windows(app: &tauri::AppHandle, windows: Vec<WallpaperWindow>) {
 }
 
 pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
-    if crate::games::is_active(app) { return Ok(false); }
+    if !crate::DESKTOP_LAYERS || crate::games::is_active(app) { return Ok(false); }
     let config = settings(app);
     if config.wallpaper_id == "companion" {
         return Ok(false);
@@ -495,6 +495,7 @@ pub async fn apply_wallpaper(
     preview: bool,
     monitor: Option<String>,
 ) -> Result<Value, String> {
+    crate::require_desktop_layers()?;
     let operation = app.state::<ContentState>();
     let _selection = operation.operation.lock().await;
     if crate::games::is_active(&app) {
@@ -589,12 +590,8 @@ pub async fn apply_wallpaper(
 
 #[tauri::command]
 pub fn get_app_info(app: tauri::AppHandle) -> Value {
-    let os = if cfg!(target_os = "macos") {
-        "darwin"
-    } else {
-        "windows"
-    };
-    let mut info = json!({"name":"小伴桌面","version":app.package_info().version.to_string(),"platform":std::env::consts::OS,
+    let os = if cfg!(target_os = "macos") { "darwin" } else { std::env::consts::OS };
+    let mut info = json!({"name":"小伴桌面","version":app.package_info().version.to_string(),"platform":std::env::consts::OS,"desktopLayers":crate::DESKTOP_LAYERS,
         "arch":std::env::consts::ARCH,"updateTarget":format!("{os}-{}",std::env::consts::ARCH),"updateUrl":settings(&app).update_url,
         "dataDirectory":crate::storage::root(&app).ok()});
     if crate::ui_smoke_enabled(&app) { info["uiSmoke"] = json!(true); }
@@ -623,11 +620,7 @@ pub async fn check_updates(app: tauri::AppHandle) -> Result<Value, String> {
         return Err("尚未配置更新服务".into());
     }
     let version = app.package_info().version.to_string();
-    let os = if cfg!(target_os = "macos") {
-        "darwin"
-    } else {
-        "windows"
-    };
+    let os = if cfg!(target_os = "macos") { "darwin" } else { std::env::consts::OS };
     let target = format!("{os}-{}", std::env::consts::ARCH);
     let mut url = library::network_url(&config.update_url)?;
     url.query_pairs_mut()
@@ -659,9 +652,13 @@ pub fn open_download_url(url: String) -> Result<(), String> {
             return Err("无法打开浏览器，请稍后重试".into());
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
-        if !std::process::Command::new("/usr/bin/open")
+        #[cfg(target_os = "macos")]
+        let opener = "/usr/bin/open";
+        #[cfg(target_os = "linux")]
+        let opener = "xdg-open";
+        if !std::process::Command::new(opener)
             .arg(url)
             .status()
             .map_err(|e| e.to_string())?

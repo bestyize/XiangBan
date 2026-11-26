@@ -1,5 +1,13 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## Linux 桌面工作台
+
+Linux 安装包与 Windows、macOS 共用 Vue 工作台、Tauri 宿主和本地 Rust Agent。支持文本聊天、会话、工作空间、模型配置和资料库。浏览器用户可以进入网站的 `/ai` 使用云端会话。两个入口分别使用本机存储和账号云端存储。
+
+原生首版提供 x86_64 的 `.deb`，目标为 Ubuntu 24.04、Debian 13 和兼容系统。下载后运行 `sudo apt install ./xiaoban-desktop_3.1.8_amd64.deb`，从应用菜单打开「小伴桌面」。关闭主窗口会退出程序。开机启动可在设置中开启，遵循 XDG 启动项。壁纸、锁屏、桌宠、贴桌面组件、悬浮助手与内置离线语音引擎暂未适配。
+
+开发机安装 Rust、Node.js 24、构建工具、`libwebkit2gtk-4.1-dev`、`libayatana-appindicator3-dev`、`librsvg2-dev`、`libxdo-dev` 和 `libssl-dev` 后，在本目录执行 `npm ci` 和 `npm run desktop:linux:build`。安装包位于 `src-tauri/target/release/bundle/deb/`。手动工作流「小伴桌面 Linux」在 Ubuntu 24.04 上构建，安装产物并分别用 Xvfb（X11）和 Weston（Wayland）检查前端渲染、本地 IPC 和会话读写。
+
 ## Agent 运行可靠性
 
 首次提交也先写入持久消息队列，再准备模型与账号令牌。准备失败后保留原输入、附件和提交编号；重试当前条时使用修正后的模型配置，其余排队消息保持暂停。输入“继续”、任务卡与目标面板共用目标恢复事务，保留目标合同、累计 token 和活跃时间；模型收到恢复合同，聊天仍显示用户原始输入。

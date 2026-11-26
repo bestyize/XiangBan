@@ -35,7 +35,8 @@ const tabs: { id: SettingsTab; label: string; icon: Component; keywords: string 
 const query = ref('');
 const shown = computed(() => {
   const q = query.value.trim().toLowerCase();
-  return q ? tabs.filter(tab => (tab.label + ' ' + tab.keywords).toLowerCase().includes(q)) : tabs;
+  return tabs.filter(tab => (props.store.info.desktopLayers !== false || tab.id !== 'assistant')
+    && (tab.label + ' ' + tab.keywords).toLowerCase().includes(q));
 });
 const groups = computed(() => [
   { label: '个性化', ids: ['general', 'appearance'] },

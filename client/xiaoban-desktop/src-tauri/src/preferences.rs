@@ -102,7 +102,7 @@ impl Default for Settings {
             theme: "night".into(),
             paused: false,
             fps: 60,
-            autostart: true,
+            autostart: !cfg!(target_os = "linux"),
             wallpaper_id: "companion".into(),
             wallpaper_monitor: String::new(),
             wallpaper_options: Default::default(),
@@ -111,13 +111,13 @@ impl Default for Settings {
             website_url: crate::website::DEFAULT_SITE.into(),
             automatic_updates: true,
             game_desktop_double_click: false,
-            companion_enabled: true,
+            companion_enabled: !cfg!(target_os = "linux"),
             chat_composer_pet_opt_in: false,
             companion_links: true,
             companion_skin: "pot".into(),
-            assistant_enabled: true,
+            assistant_enabled: !cfg!(target_os = "linux"),
             assistant_shortcut: crate::float_assistant::DEFAULT_SHORTCUT.into(),
-            assistant_ball: true,
+            assistant_ball: !cfg!(target_os = "linux"),
             assistant_hover: true,
             assistant_ball_dx: 0.0,
             assistant_ball_dy: 0.0,
@@ -233,9 +233,9 @@ pub fn save(path: &Path, value: &Preferences) -> io::Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn first_launch_defaults_to_autostart() {
+    fn first_launch_uses_the_platform_autostart_default() {
         let value = Preferences::default();
-        assert!(value.settings.autostart);
+        assert_eq!(value.settings.autostart, !cfg!(target_os = "linux"));
         assert!(!value.autostart_initialized);
     }
     #[test]
@@ -258,9 +258,9 @@ mod tests {
             serde_json::from_str(r#"{"settings":{"mode":"wallpaper","theme":"dawn","fps":30}}"#)
                 .unwrap();
         assert_eq!(value.settings.mode, "wallpaper");
-        assert!(value.settings.autostart);
+        assert_eq!(value.settings.autostart, !cfg!(target_os = "linux"));
         assert!(!value.settings.game_desktop_double_click);
-        assert!(value.settings.companion_enabled);
+        assert_eq!(value.settings.companion_enabled, !cfg!(target_os = "linux"));
         assert!(!value.settings.chat_composer_pet_opt_in);
         assert!(value.settings.companion_links);
         assert_eq!(value.settings.effects, Default::default());
@@ -276,7 +276,7 @@ mod tests {
             let saved = serde_json::to_string(&value).unwrap();
             let again: Preferences = serde_json::from_str(&saved).unwrap();
             assert_eq!(again.settings.chat_composer_pet_opt_in, enabled);
-            assert!(again.settings.companion_enabled);
+            assert_eq!(again.settings.companion_enabled, !cfg!(target_os = "linux"));
         }
     }
     #[test]
@@ -314,13 +314,13 @@ mod tests {
     }
 
     #[test]
-    fn the_assistant_is_on_by_default_and_an_unknown_shortcut_falls_back() {
+    fn assistant_defaults_follow_the_platform_and_unknown_shortcuts_fall_back() {
         let defaults = Settings::default();
-        assert!(defaults.assistant_enabled);
+        assert_eq!(defaults.assistant_enabled, !cfg!(target_os = "linux"));
         assert_eq!(defaults.assistant_shortcut, "Alt+Space");
         let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"wallpaper"}}"#).unwrap();
         older.settings.normalize();
-        assert!(older.settings.assistant_enabled);
+        assert_eq!(older.settings.assistant_enabled, !cfg!(target_os = "linux"));
         assert_eq!(older.settings.assistant_shortcut, "Alt+Space");
         let mut chosen: Preferences = serde_json::from_str(r#"{"settings":{"assistantEnabled":false,"assistantShortcut":"Ctrl+Alt+Space"}}"#).unwrap();
         chosen.settings.normalize();
@@ -360,9 +360,10 @@ mod tests {
     }
 
     #[test]
-    fn the_assistant_ball_and_its_voice_preferences_default_on_and_repair_bad_values() {
+    fn the_assistant_ball_and_voice_preferences_use_platform_defaults_and_repair_bad_values() {
         let defaults = Settings::default();
-        assert!(defaults.assistant_ball && defaults.assistant_hover && !defaults.assistant_hint_seen);
+        assert_eq!(defaults.assistant_ball, !cfg!(target_os = "linux"));
+        assert!(defaults.assistant_hover && !defaults.assistant_hint_seen);
         assert_eq!((defaults.assistant_open.as_str(), defaults.assistant_read.as_str()), ("type", "voice"));
         let mut chosen: Preferences = serde_json::from_str(
             r#"{"settings":{"assistantBall":false,"assistantBallDx":-120.5,"assistantBallDy":30,"assistantOpen":"type","assistantRead":"never"}}"#,

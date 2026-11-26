@@ -178,6 +178,7 @@ fn mutate(
     app: &tauri::AppHandle,
     change: impl FnOnce(&mut Layout) -> Result<(), String>,
 ) -> Result<Value, String> {
+    crate::require_desktop_layers()?;
     {
         let state = app.state::<PetState>();
         let _operation = state.operation.lock().unwrap_or_else(|e| e.into_inner());
@@ -302,6 +303,7 @@ fn place(
     }
 }
 pub fn sync(app: &tauri::AppHandle) {
+    if !crate::DESKTOP_LAYERS { return; }
     let state = app.state::<PetState>();
     if !active(app) || state.syncing.swap(true, Ordering::SeqCst) {
         return;
