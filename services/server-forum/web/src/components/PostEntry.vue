@@ -6,6 +6,7 @@ import ReplyExtrasEditor from './ReplyExtrasEditor.vue'
 import AttachmentList from './AttachmentList.vue'
 import CommentRow from './comments/CommentRow.vue'
 import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
+import { confirmDialog } from '@/ui'
 import { api } from '@/api/forum'
 import { useSession } from '@/stores/session'
 
@@ -66,8 +67,8 @@ function saveEdit() {
   })
 }
 
-function remove() {
-  if (!confirm('删除这条回复？删除后不能恢复。')) return
+async function remove() {
+  if (!await confirmDialog({ title: '删除这条回复？', description: '删除后不能恢复。', confirmLabel: '确认删除', danger: true })) return
   return run(async () => {
     await api.deletePost(props.post.id)
     props.post.status = 'deleted'

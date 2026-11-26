@@ -366,7 +366,7 @@ private fun CreationChips(values: List<String>, value: String, select: (String) 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CreationSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    BottomSheet(onDismiss, panelModifier, cornerRadius = 16.dp) {
+    BottomSheet(onDismiss, panelModifier) {
         Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
         Spacer(Modifier.height(16.dp))
         content()

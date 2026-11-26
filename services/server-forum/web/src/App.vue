@@ -6,7 +6,7 @@ import TabBar from '@/components/TabBar.vue'
 import LoginDialog from '@/components/LoginDialog.vue'
 import AppearanceDialog from '@/components/AppearanceDialog.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
-import ToastHost from '@/components/ToastHost.vue'
+import { ConfirmDialog, ToastHost } from '@/ui'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
 import { useTopicComposer } from '@/stores/topicComposer'
@@ -108,39 +108,39 @@ watch(() => session.loggedIn, v => {
     <TopicComposer v-if="composer.target" :key="composer.target.editId ?? 'new'" />
     <PackPublishDialog v-if="publisher.target" />
   </div>
-  <LoginDialog /><ToastHost /><AppearanceDialog />
+  <LoginDialog /><ConfirmDialog /><ToastHost /><AppearanceDialog />
 </template>
 <style>
 :root{--mobile-nav-offset:calc(56px + env(safe-area-inset-bottom));--brand-soft:color-mix(in srgb,var(--brand) 8%,var(--surface))}
 body:has(.site-layout) {
   --community-font: 'PingFang SC', 'HarmonyOS Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
     'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --paper: #f2f5fa;
-  --surface: #fff;
-  --surface-2: #ebeff7;
-  --ink: #111827;
-  --ink-2: #475569;
-  --ink-3: #627187;
-  --community-muted: #838e9f;
-  --community-divider: rgb(15 23 42 / 5.5%);
-  --line: #0f172a12;
-  --line-strong: #0f172a24;
-  --surface-glass: color-mix(in srgb, var(--surface) 80%, transparent);
-  --brand-soft: color-mix(in srgb, var(--brand-fill) 12%, var(--surface));
-  --shadow-card: 0 6px 24px -8px #0f172a15, 0 1px 3px #0f172a0a;
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f2f2f2;
+  --ink: #222222;
+  --ink-2: #666666;
+  --ink-3: #9a9a9a;
+  --community-muted: #8a8a8e;
+  --community-divider: #ededed;
+  --line: #ededed;
+  --line-strong: #cfcfcf;
+  --surface-glass: color-mix(in srgb, var(--surface) 84%, transparent);
+  --brand-soft: color-mix(in srgb, var(--brand-fill) 10%, var(--surface));
+  --shadow-card: 0 6px 24px -8px rgba(18, 18, 23, 0.08), 0 1px 3px rgba(18, 18, 23, 0.04);
 }
 html[data-theme="dark"] body:has(.site-layout) {
-  --paper: #0f1219;
-  --surface: #191f2c;
-  --surface-2: #232a3b;
-  --ink: #f8fafc;
-  --ink-2: #cbd5e1;
-  --ink-3: #9aa8bc;
-  --community-muted: #8895aa;
-  --community-divider: rgb(255 255 255 / 7.5%);
-  --line: #ffffff15;
-  --line-strong: #ffffff28;
-  --shadow-card: 0 8px 26px -8px #0007;
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --ink: #ececec;
+  --ink-2: #9a9aa0;
+  --ink-3: #6e6e73;
+  --community-muted: #7e7e84;
+  --community-divider: #2e2e30;
+  --line: #2e2e30;
+  --line-strong: #3a3a3c;
+  --shadow-card: 0 8px 26px -8px rgba(0, 0, 0, 0.45);
 }
 .site-layout {
   --page-w: 960px;

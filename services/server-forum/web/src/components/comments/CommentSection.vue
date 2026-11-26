@@ -6,6 +6,7 @@ import { MOBILE_SITE_QUERY, useNarrow } from '@/lib/viewport'
 import AppIcon from '@/components/AppIcon.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import RequestState from '@/components/community/RequestState.vue'
+import { confirmDialog } from '@/ui'
 import { useCommunityResource } from '@/components/community/resource'
 import CommentComposer from './CommentComposer.vue'
 import CommentRow from './CommentRow.vue'
@@ -126,8 +127,8 @@ async function act(work: () => Promise<unknown>, targetPage = page.value) {
 }
 
 const likes = (item: NewsComment) => void act(() => props.adapter.like(item.id, !item.liked))
-function remove(item: NewsComment) {
-  if (!window.confirm('删除这条评论？')) return
+async function remove(item: NewsComment) {
+  if (!await confirmDialog({ title: '删除这条评论？', description: '删除后其他人将看不到该内容，操作无法撤销。', confirmLabel: '确认删除', danger: true })) return
   if (reply.value?.id === item.id) reply.value = null
   const target = data.value?.items.length === 1 ? Math.max(1, page.value - 1) : page.value
   void act(() => props.adapter.remove(item.id), target)

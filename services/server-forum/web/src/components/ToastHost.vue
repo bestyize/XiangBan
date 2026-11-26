@@ -1,58 +1,7 @@
 <script setup lang="ts">
-import { useToast } from '@/stores/toast'
-
-const toast = useToast()
+import UiToastHost from '@/ui/overlay/ToastHost.vue'
 </script>
 
 <template>
-  <div class="toasts" role="status" aria-live="polite">
-    <div v-for="t in toast.items" :key="t.id" class="toast" :class="`is-${t.tone}`">
-      {{ t.text }}
-      <RouterLink v-if="t.action" class="action" :to="t.action.to">{{ t.action.label }}</RouterLink>
-    </div>
-  </div>
+  <UiToastHost />
 </template>
-
-<style scoped>
-.toasts {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
-  z-index: 60;
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-  pointer-events: none;
-}
-@media (max-width: 767px) {
-  .toasts { bottom: calc(72px + env(safe-area-inset-bottom)); }
-}
-.toast {
-  background: var(--ink);
-  color: var(--paper);
-  padding: 9px 16px;
-  border-radius: 20px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  box-shadow: var(--shadow);
-  animation: pop 0.2s ease-out;
-  max-width: calc(100vw - 32px);
-}
-.is-error {
-  background: var(--danger);
-  color: #fff;
-}
-.action { margin-inline-start: 8px; text-decoration: underline; text-underline-offset: 2px; pointer-events: auto; }
-@keyframes pop {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-@media (max-width: 767px) {
-  .toasts {
-    bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
-  }
-}
-</style>

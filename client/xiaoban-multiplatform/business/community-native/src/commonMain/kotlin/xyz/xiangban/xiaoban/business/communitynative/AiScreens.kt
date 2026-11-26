@@ -985,7 +985,7 @@ private fun ChatModelPickerSheet(
 ) {
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
-    BottomSheet(onDismiss, panel, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
+    BottomSheet(onDismiss, panel, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
         SheetDragHandle()
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("选择对话模型", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight(650))

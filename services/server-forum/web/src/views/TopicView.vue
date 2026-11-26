@@ -6,6 +6,7 @@ import AttachmentList from '@/components/AttachmentList.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
 import DetailLayout from '@/components/community/DetailLayout.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
+import { confirmDialog } from '@/ui'
 import AppIcon from '@/components/AppIcon.vue'
 import ActionSheet from '@/components/ActionSheet.vue'
 import ThreadComments from '@/components/comments/ThreadComments.vue'
@@ -268,7 +269,7 @@ const shareDeletion = computed<ShareDeletion | undefined>(() => {
 
 async function removeTopic() {
   const action = shareDeletion.value
-  if (!action || !confirm('删除这个帖子？删除后其他人将看不到它。')) return
+  if (!action || !await confirmDialog({ title: '删除这个帖子？', description: '删除后其他人将看不到它。', confirmLabel: '确认删除', danger: true })) return
   try { await action.run() } catch (e) { toast.error(e) }
 }
 
@@ -277,7 +278,7 @@ function changeReplyCount(delta: number) {
 }
 
 async function acceptAnswer(post: PostItem) {
-  if (!topic.value || helpBusy.value || !window.confirm(`采纳「${post.author.nickname}」的回答？悬赏将发放给对方，采纳后不能撤销。`)) return
+  if (!topic.value || helpBusy.value || !await confirmDialog({ title: `采纳「${post.author.nickname}」的回答？`, description: '悬赏将发放给对方，采纳后不能撤销。', confirmLabel: '确认采纳' })) return
   helpBusy.value = true
   try {
     await api.acceptHelp(topic.value.id, post.id)
@@ -288,7 +289,7 @@ async function acceptAnswer(post: PostItem) {
 }
 
 async function closeHelp() {
-  if (!topic.value || helpBusy.value || !window.confirm('关闭这次求助？尚未发放的悬赏积分将退还。')) return
+  if (!topic.value || helpBusy.value || !await confirmDialog({ title: '关闭这次求助？', description: '尚未发放的悬赏积分将退还。', confirmLabel: '确认关闭', danger: true })) return
   helpBusy.value = true
   try {
     const result = await api.closeHelp(topic.value.id)
@@ -412,7 +413,6 @@ function breadcrumbDestination(slug: string) {
             <button type="button" class="more-row danger" @click="fromMore(removeTopic)">删除</button>
           </template>
           <button v-else-if="session.user?.uid !== topic.author.uid" type="button" class="more-row" @click="fromMore(reportTopic)">举报</button>
-          <button type="button" class="more-row more-cancel" @click="moreOpen = false">取消</button>
         </div>
       </ActionSheet>
 
@@ -441,12 +441,10 @@ function breadcrumbDestination(slug: string) {
 .bar { height: 16px; margin-bottom: 12px; border-radius: 4px; background: var(--surface-2); }
 .w60 { width: 60%; height: 26px; }
 .w40 { width: 40%; }
-.more-row { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 54px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--community-divider); background: transparent; color: var(--ink); font-size: 16px; }
-.more-row.danger { color: var(--danger); }
+.more-row { position: relative; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 52px; padding: 12px 16px; border: 0; background: transparent; color: var(--ink); font-size: 15px; font-weight: 500; text-align: left; }
+.more-row + .more-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 0.5px; background: var(--line); }
+.more-row:hover { background: var(--surface-2); }
+.more-row.danger { color: var(--ui-danger); font-weight: 600; }
 .more-pin { justify-content: space-between; color: var(--ink-2); }
-.more-pin select { border: 0; background: transparent; text-align: right; }
-.more-cancel { border-bottom: 0; color: var(--ink-2); }
-@media (width >= 960px) {
-  :global(.action-sheet:has(.topic-more-actions)) { inset: auto max(0px, calc((100% - 400px) / 2)) 24px; border-radius: 16px; }
-}
+.more-pin select { border: 0; background: transparent; color: var(--ink); text-align: right; }
 </style>

@@ -258,7 +258,7 @@ internal fun AvatarPendingRow(onDiscard: () -> Unit, onResume: () -> Unit) {
 /** 选图弹层：从相册选择 + 取消。不提供拍照。 */
 @Composable
 internal fun AvatarPickSheet(state: AvatarEditorState, onPick: () -> Unit) {
-    BottomSheet(onDismiss = { if (!state.picking) state.sheet = false }, flush = true, cornerRadius = 16.dp) {
+    BottomSheet(onDismiss = { if (!state.picking) state.sheet = false }, flush = true) {
         Text("更换头像", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
         Row(
             Modifier.fillMaxWidth().clickable(enabled = !state.picking, onClick = onPick).padding(horizontal = 16.dp, vertical = 15.dp),

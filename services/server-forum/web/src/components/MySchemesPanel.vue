@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { schemesApi, type OwnScheme } from '@/api/schemes'
 import { timeAgo } from '@/lib/format'
+import { confirmDialog } from '@/ui'
 const items = ref<OwnScheme[]>([]), loading = ref(false), error = ref(''), removing = ref<number | null>(null)
 async function load() {
   loading.value = true; error.value = ''
@@ -10,7 +11,7 @@ async function load() {
   finally { loading.value = false }
 }
 async function remove(scheme: OwnScheme) {
-  if (removing.value !== null || !window.confirm(`确定下架「${scheme.title}」？方案公开链接将不可访问，原作品会保留。`)) return
+  if (removing.value !== null || !await confirmDialog({ title: `下架「${scheme.title}」？`, description: '方案公开链接将不可访问，原作品会保留。', confirmLabel: '确认下架', danger: true })) return
   removing.value = scheme.id; error.value = ''
   try { await schemesApi.remove(scheme.id); await load() }
   catch (e) { error.value = e instanceof Error ? e.message : '下架失败，请稍后重试' }

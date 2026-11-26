@@ -11,7 +11,7 @@ async function copy() {
 }
 </script>
 <template>
-  <ModalDialog :open="show" title="在小伴客户端创作" @close="emit('update:show', false)">
+  <ModalDialog :open="show" title="在小伴客户端创作" mobile-mode="center" @close="emit('update:show', false)">
     <div class="creation-prompt">
       <p>网页可以浏览和体验作品。创作{{ kind ? `或修改${kind}` : '' }}请使用客户端。</p>
       <label for="creation-idea">你的想法（可复制到客户端）</label>

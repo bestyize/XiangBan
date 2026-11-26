@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴基础组件库与弹层规范 · 手机 App + 社区网页</title>
+<style>
+  :root {
+    color-scheme: light;
+    /* Studio desk */
+    --desk: #f2f2f4;
+    --desk-card: #ffffff;
+    --desk-line: rgba(24, 24, 28, 0.08);
+    --desk-line-strong: rgba(24, 24, 28, 0.14);
+
+    /* Core semantic tokens (aligned with DesignTokens.kt & 手机端设计规范.md) */
+    --paper: #fafafa;
+    --surface: #ffffff;
+    --fill: #f2f2f2;
+    --ink: #222222;
+    --ink-2: #666666;
+    --ink-3: #9a9a9a;
+    --hairline: #ededed;
+    --line: #cfcfcf;
+
+    /* Fixed semantic colors (never follow accent) */
+    --success: #2fa36b;
+    --success-soft: #eaf7f0;
+    --danger: #e3203c;
+    --danger-soft: #fff3f4;
+    --warn: #825119;
+    --warn-soft: #fcf2df;
+    --info: #2563eb;
+    --info-soft: #eff6ff;
+
+    /* Accent tokens (updated dynamically for 6 official accents) */
+    --brand: #e3203c;
+    --brand-hi: #f0506a;
+    --brand-soft: #fff3f4;
+    --brand-ink: #e3203c;
+    --brand-on: #ffffff;
+
+    /* Overlay & elevation (shadows ONLY for floating layers) */
+    --scrim: rgba(18, 18, 23, 0.38);
+    --scrim-light: rgba(18, 18, 23, 0.30);
+    --shadow-dialog: 0 20px 56px rgba(22, 18, 28, 0.22);
+    --shadow-sheet: 0 -6px 28px rgba(18, 18, 23, 0.12);
+    --shadow-toast: 0 6px 22px rgba(18, 18, 23, 0.16);
+
+    /* Radii scale */
+    --r-inner: 8px;
+    --r-sm: 12px;
+    --r-card: 16px;
+    --r-sheet: 20px;
+    --r-dialog: 24px;
+    --r-pill: 999px;
+
+    /* Layout & Motion tokens */
+    --phone-w: 390px;
+    --font: 'PingFang SC', 'HarmonyOS Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --dur-fast: 140ms;
+    --dur-normal: 200ms;
+    --dur-medium: 260ms;
+    --motion-scale: 1;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --desk: #111114;
+    --desk-card: #19191d;
+    --desk-line: rgba(255, 255, 255, 0.08);
+    --desk-line-strong: rgba(255, 255, 255, 0.16);
+
+    --paper: #111111;
+    --surface: #1c1c1e;
+    --fill: #2c2c2e;
+    --ink: #ececec;
+    --ink-2: #9a9aa0;
+    --ink-3: #6e6e73;
+    --hairline: #2e2e30;
+    --line: #3a3a3c;
+
+    --success: #34c27c;
+    --success-soft: #1a3327;
+    --danger: #ff6369;
+    --danger-soft: #3a2225;
+    --warn: #f0c380;
+    --warn-soft: #392f21;
+    --info: #7ab3ff;
+    --info-soft: #1c2a40;
+
+    --scrim: rgba(0, 0, 0, 0.62);
+    --scrim-light: rgba(0, 0, 0, 0.50);
+    --shadow-dialog: 0 22px 60px rgba(0, 0, 0, 0.55);
+    --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.48);
+    --shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.50);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--desk);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: not-allowed; }
+  code { font-family: var(--mono); font-size: 0.9em; }
+  [hidden] { display: none !important; }
+
+  .icon {
+    width: 20px; height: 20px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+    display: block;
+  }
+
+  /* ==================== Studio Header ==================== */
+  .studio-bar {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--desk-card) 88%, transparent);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--desk-line);
+  }
+  .studio-bar-inner {
+    max-width: 1360px; margin: 0 auto;
+    padding: 10px 24px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .brand-head { display: flex; align-items: center; gap: 10px; }
+  .brand-badge {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, #ff5b7d 0%, #f9744b 100%);
+    color: #fff; display: grid; place-items: center; flex: none;
+  }
+  .brand-badge .icon { width: 17px; height: 17px; stroke-width: 2; }
+  .brand-title { font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+  .brand-sub { font-size: 11.5px; color: var(--ink-2); }
+
+  .tab-strip {
+    display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--fill); border-radius: 11px;
+  }
+  .tab-btn {
+    height: 30px; padding: 0 12px; border-radius: 8px;
+    font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+    transition: background 0.16s, color 0.16s;
+  }
+  .tab-btn:hover { color: var(--ink); }
+  .tab-btn[aria-selected="true"] {
+    background: var(--surface); color: var(--ink); font-weight: 650;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  .studio-controls {
+    margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .accent-dots {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 9px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--desk-line);
+  }
+  .accent-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    position: relative; transition: transform 0.14s;
+  }
+  .accent-dot:hover { transform: scale(1.12); }
+  .accent-dot[aria-pressed="true"]::after {
+    content: ''; position: absolute; inset: -3px;
+    border-radius: 50%; border: 2px solid var(--ink);
+  }
+
+  .seg-ctrl {
+    display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--fill); border-radius: 9px;
+  }
+  .seg-ctrl button {
+    height: 26px; padding: 0 9px; border-radius: 7px;
+    font-size: 12px; color: var(--ink-2);
+  }
+  .seg-ctrl button[aria-pressed="true"] {
+    background: var(--surface); color: var(--ink); font-weight: 600;
+  }
+
+  /* ==================== Main Canvas ==================== */
+  .canvas {
+    max-width: 1360px; margin: 0 auto;
+    padding: 24px 24px 64px;
+  }
+  .section-intro {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .section-intro h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .section-intro p { font-size: 13px; color: var(--ink-2); margin-top: 4px; max-width: 760px; }
+  .meta-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .meta-pill {
+    font-size: 11.5px; color: var(--ink-2); background: var(--surface);
+    border: 1px solid var(--desk-line); border-radius: 999px;
+    padding: 4px 10px;
+  }
+  .meta-pill code { color: var(--ink); font-weight: 600; }
+
+  /* ==================== Phone Board Grid ==================== */
+  .phone-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--phone-w), var(--phone-w)));
+    gap: 28px;
+    justify-content: center;
+    align-items: start;
+  }
+  .board { width: var(--phone-w); }
+  .board-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 0 4px 10px; min-height: 32px;
+  }
+  .board-title { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 7px; }
+  .board-tag {
+    font-size: 11px; font-weight: 500; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--desk-line);
+    padding: 1px 7px; border-radius: 999px;
+  }
+  .variant-select {
+    background: var(--surface); border: 1px solid var(--desk-line-strong);
+    border-radius: 8px; height: 28px; padding: 0 8px; font-size: 12px; color: var(--ink);
+  }
+
+  /* ==================== Phone Frame ==================== */
+  .phone {
+    position: relative; isolation: isolate;
+    width: var(--phone-w); height: 740px;
+    border-radius: 34px; overflow: hidden;
+    background: var(--paper);
+    border: 1px solid var(--desk-line-strong);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.09);
+    display: flex; flex-direction: column;
+  }
+  [data-theme="dark"] .phone { box-shadow: 0 22px 54px rgba(0, 0, 0, 0.48); }
+
+  .status-bar {
+    height: 36px; padding: 0 22px; flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: var(--surface); color: var(--ink);
+  }
+  .status-icons { display: flex; align-items: center; gap: 5px; opacity: 0.85; }
+  .status-icons .icon { width: 14px; height: 14px; }
+
+  .appbar {
+    height: 48px; padding: 0 8px; flex: none;
+    display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+    background: var(--surface); color: var(--ink);
+  }
+  .appbar-title { text-align: center; font-size: 17px; font-weight: 650; }
+  .appbar-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--ink);
+  }
+  .appbar-btn:hover { background: var(--fill); }
+
+  .phone-body {
+    flex: 1; overflow-y: auto; padding: 14px 16px 88px;
+    background: var(--paper);
+  }
+  .mock-post-card {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-card); padding: 14px;
+    margin-bottom: 12px;
+  }
+  .mock-post-card h4 { font-size: 15px; font-weight: 600; line-height: 22px; }
+  .mock-post-card p { font-size: 13px; color: var(--ink-2); margin-top: 6px; line-height: 19px; }
+  .mock-meta { font-size: 12px; color: var(--ink-3); margin-top: 10px; display: flex; gap: 12px; }
+  .mock-list {
+    background: var(--surface); border-block: 0.5px solid var(--hairline);
+    margin: 0 -16px;
+  }
+  .mock-list-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; font-size: 15px; border-bottom: 0.5px solid var(--hairline);
+  }
+  .mock-list-row:last-child { border-bottom: 0; }
+  .mock-list-row span:last-child { font-size: 13px; color: var(--ink-2); }
+
+  .reopen-bar {
+    position: absolute; left: 16px; right: 16px; bottom: 26px; z-index: 2;
+    display: flex; gap: 8px;
+  }
+  .reopen-btn {
+    flex: 1; height: 44px; border-radius: var(--r-pill);
+    background: var(--surface); border: 1px solid var(--hairline);
+    font-size: 14px; font-weight: 600; color: var(--ink);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .reopen-btn:hover { background: var(--fill); }
+
+  .gesture-pill {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    width: 112px; height: 4px; border-radius: 4px;
+    background: var(--ink); opacity: 0.32; pointer-events: none; z-index: 25;
+  }
+
+  /* ==================== OVERLAY PRIMITIVES ==================== */
+  .overlay-root {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; transition: opacity 0.2s var(--ease);
+  }
+  .overlay-root.is-hidden { opacity: 0; pointer-events: none; }
+  .overlay-scrim {
+    position: absolute; inset: 0;
+    background: var(--scrim);
+    backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px);
+  }
+
+  /* 1. CardDialog / ConfirmDialog (24px radius, centered on BOTH App & H5) */
+  .overlay-center {
+    align-items: center; justify-content: center;
+    padding: 20px 24px;
+  }
+  .xb-card-dialog {
+    position: relative; z-index: 1;
+    width: min(342px, 100%); max-height: 100%;
+    background: var(--surface); color: var(--ink);
+    border-radius: var(--r-dialog);
+    box-shadow: var(--shadow-dialog);
+    display: flex; flex-direction: column; overflow: hidden;
+    animation: popCard 0.2s var(--ease);
+  }
+  @keyframes popCard {
+    from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  }
+  .xb-dialog-close {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center;
+  }
+  .xb-dialog-close span {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: transparent; color: var(--ink-2);
+    display: grid; place-items: center;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .xb-dialog-close:hover span { background: var(--fill); color: var(--ink); }
+  .xb-dialog-close .icon { width: 17px; height: 17px; stroke-width: 2; }
+  .xb-dialog-scroll { padding: 22px 18px 0; overflow-y: auto; }
+  .xb-dialog-head {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding-right: 30px;
+  }
+  .xb-dialog-tile {
+    width: 24px; height: 24px; flex: none;
+    display: grid; place-items: center;
+    background: none; color: var(--ink);
+  }
+  .xb-dialog-tile.is-danger { background: none; color: var(--danger); }
+  .xb-dialog-tile.is-brand { background: none; color: var(--brand); }
+  .xb-dialog-tile .icon { width: 22px; height: 22px; }
+  .xb-dialog-title { font-size: 18px; line-height: 24px; font-weight: 650; }
+  .xb-dialog-desc { font-size: 13.5px; line-height: 20px; color: var(--ink-2); margin-top: 6px; }
+  .xb-dialog-quote {
+    margin-top: 14px; padding: 10px 12px; border-radius: var(--r-sm);
+    background: var(--fill); font-size: 13px; color: var(--ink); line-height: 19px;
+  }
+  .xb-dialog-notice {
+    margin-top: 12px; padding: 10px 12px; border-radius: var(--r-sm);
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12.5px; line-height: 18px;
+    background: var(--warn-soft); color: var(--warn);
+  }
+  .xb-dialog-notice.is-error { background: var(--danger-soft); color: var(--danger); }
+  .xb-dialog-notice .icon { width: 15px; height: 15px; margin-top: 1px; }
+  .xb-dialog-field { margin-top: 14px; }
+  .xb-dialog-field label { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+  .xb-dialog-actions {
+    padding: 16px 18px 12px;
+    display: grid; gap: 4px; flex: none;
+  }
+  .xb-btn-primary-full {
+    width: 100%; min-height: 48px; border-radius: var(--r-pill);
+    background: var(--brand); color: var(--brand-on);
+    font-size: 15px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .xb-btn-primary-full.is-danger { background: var(--danger); color: #fff; }
+  .xb-btn-primary-full:disabled { background: var(--fill); color: var(--ink-3); }
+  .xb-btn-text-full {
+    width: 100%; min-height: 44px; border-radius: var(--r-pill);
+    color: var(--ink-2); font-size: 14.5px; font-weight: 500;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .xb-btn-text-full:hover { background: var(--fill); }
+
+  /* 2. BottomSheet (Unified 20px top radius, optional drag handle, keyboard safe) */
+  .overlay-bottom {
+    align-items: flex-end; justify-content: center;
+  }
+  .xb-bottom-sheet {
+    position: relative; z-index: 1;
+    width: 100%; max-height: 80%;
+    background: var(--surface); color: var(--ink);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    box-shadow: var(--shadow-sheet);
+    display: flex; flex-direction: column; overflow: hidden;
+    animation: slideUp 0.22s var(--ease);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(24px); opacity: 0.7; }
+  }
+  .xb-sheet-handle {
+    padding: 10px 0 4px; display: flex; justify-content: center; flex: none;
+  }
+  .xb-sheet-handle::before {
+    content: ''; width: 36px; height: 4px; border-radius: 4px;
+    background: var(--line);
+  }
+  .xb-sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px 12px; gap: 12px; flex: none;
+  }
+  .xb-sheet-header.has-divider { border-bottom: 0.5px solid var(--hairline); }
+  .xb-sheet-title { font-size: 17px; line-height: 23px; font-weight: 650; }
+  .xb-sheet-sub { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  .xb-sheet-close {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: transparent; color: var(--ink-2);
+    display: grid; place-items: center; flex: none;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .xb-sheet-close:hover { background: var(--fill); color: var(--ink); }
+  .xb-sheet-close .icon { width: 17px; height: 17px; stroke-width: 2; }
+  .xb-sheet-body { overflow-y: auto; flex: 1; min-height: 0; }
+  .xb-sheet-pad { padding: 4px 16px 24px; }
+  .xb-sheet-footer {
+    padding: 12px 16px 24px; border-top: 0.5px solid var(--hairline);
+    display: flex; gap: 10px; flex: none;
+  }
+
+  /* Unified option rows inside BottomSheet (pure surface, 16px inset 0.5px divider, no tinted active fill) */
+  .xb-opt-row {
+    position: relative;
+    width: 100%; min-height: 54px; padding: 11px 16px;
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .xb-opt-row + .xb-opt-row::before {
+    content: ''; position: absolute; top: 0; left: 16px; right: 16px;
+    height: 0.5px; background: var(--hairline);
+  }
+  .xb-opt-row:hover { background: var(--fill); }
+  .xb-opt-row.is-active .xb-opt-title { font-weight: 650; }
+  .xb-opt-main { flex: 1; min-width: 0; }
+  .xb-opt-title { font-size: 15px; font-weight: 500; line-height: 21px; }
+  .xb-opt-desc { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  .xb-radio-ring {
+    width: 20px; height: 20px; border-radius: 50%; flex: none;
+    border: 2px solid var(--line); display: grid; place-items: center;
+  }
+  .xb-opt-row.is-active .xb-radio-ring { border-color: var(--brand); }
+  .xb-opt-row.is-active .xb-radio-ring::after {
+    content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--brand);
+  }
+
+  /* 3. ActionSheet (Scheme A: identical shell to BottomSheet — handle + light title + × close + inset 0.5px dividers) */
+  .xb-action-sheet {
+    position: relative; z-index: 1; width: 100%;
+    background: var(--surface); color: var(--ink);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    box-shadow: var(--shadow-sheet);
+    overflow: hidden;
+    animation: slideUp 0.22s var(--ease);
+  }
+  .xb-as-item {
+    position: relative;
+    width: 100%; min-height: 52px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+    font-size: 15px; font-weight: 500; color: var(--ink); text-align: left;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .xb-as-item + .xb-as-item::before {
+    content: ''; position: absolute; top: 0; left: 16px; right: 16px;
+    height: 0.5px; background: var(--hairline);
+  }
+  .xb-as-item:hover { background: var(--fill); }
+  .xb-as-item.is-danger { color: var(--danger); font-weight: 600; }
+  .xb-as-item .icon { width: 20px; height: 20px; }
+  .xb-sheet-cancel-row {
+    position: relative;
+    width: 100%; min-height: 54px; padding: 12px 16px 16px;
+    background: transparent; color: var(--ink-2);
+    font-size: 15px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .xb-sheet-cancel-row::before {
+    content: ''; position: absolute; top: 0; left: 16px; right: 16px;
+    height: 0.5px; background: var(--hairline);
+  }
+  .xb-sheet-cancel-row:hover { background: var(--fill); color: var(--ink); }
+  .xb-sheet-actions-2 {
+    position: relative;
+    display: grid; grid-template-columns: 1fr 1fr;
+    flex: none;
+  }
+  .xb-sheet-actions-2::before {
+    content: ''; position: absolute; top: 0; left: 16px; right: 16px;
+    height: 0.5px; background: var(--hairline);
+  }
+  .xb-sheet-actions-2 button {
+    position: relative;
+    min-height: 54px; padding: 12px 16px 16px;
+    background: transparent; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .xb-sheet-actions-2 button:hover { background: var(--fill); }
+  .xb-sheet-actions-2 .act-cancel { color: var(--ink-2); font-weight: 500; }
+  .xb-sheet-actions-2 .act-confirm { color: var(--ink); font-weight: 650; }
+  .xb-sheet-actions-2 .act-confirm::before {
+    content: ''; position: absolute; left: 0; top: 14px; bottom: 18px;
+    width: 0.5px; background: var(--hairline);
+  }
+
+  /* 4. Toast */
+  .xb-toast-stack {
+    position: absolute; left: 16px; right: 16px; bottom: 84px; z-index: 20;
+    display: grid; justify-items: center; gap: 8px; pointer-events: none;
+  }
+  .xb-toast {
+    pointer-events: auto;
+    display: inline-flex; align-items: center; gap: 8px;
+    max-width: 100%; padding: 10px 16px; border-radius: var(--r-pill);
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-toast);
+    font-size: 13.5px; font-weight: 550;
+    animation: popCard 0.18s var(--ease);
+  }
+  .xb-toast.is-error { background: var(--danger); color: #fff; border-color: transparent; }
+  .xb-toast-action {
+    color: var(--brand-ink); font-weight: 650; text-decoration: underline; text-underline-offset: 2px;
+  }
+  .xb-toast.is-error .xb-toast-action { color: #fff; }
+
+  /* Mock keyboard block */
+  .mock-kbd {
+    height: 214px; flex: none;
+    background: color-mix(in srgb, var(--fill) 92%, var(--line));
+    border-top: 0.5px solid var(--hairline);
+    display: grid; place-items: center; color: var(--ink-3); font-size: 12.5px;
+  }
+
+  /* ==================== Decision Table / Spec Cards ==================== */
+  .spec-card {
+    background: var(--desk-card); border: 1px solid var(--desk-line);
+    border-radius: 18px; padding: 20px 22px; margin-top: 28px;
+  }
+  .spec-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+  .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .spec-table th, .spec-table td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--desk-line); vertical-align: top;
+  }
+  .spec-table th { font-size: 12px; color: var(--ink-2); font-weight: 650; }
+  .spec-table tr:last-child td { border-bottom: 0; }
+  .badge-keep {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--fill); color: var(--ink-2);
+    border: 1px solid var(--hairline);
+  }
+  .badge-keep::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+  .badge-ui {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .badge-ui::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+
+  /* ==================== Tab 2: Controls Showcase ==================== */
+  .controls-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 18px;
+  }
+  .kit-box {
+    background: var(--paper); border: 1px solid var(--desk-line);
+    border-radius: 18px; padding: 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .kit-box-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .kit-box-head h3 { font-size: 15px; font-weight: 700; }
+  .kit-box-head span { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); }
+  .kit-surface {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-card); padding: 14px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .row-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .row-equal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+  /* Reusable UI Control Styles */
+  .xb-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: var(--r-pill); font-weight: 600; white-space: nowrap;
+    transition: opacity 0.14s, filter 0.14s, background 0.14s;
+  }
+  .xb-btn.h48 { height: 48px; padding: 0 20px; font-size: 15px; }
+  .xb-btn.h40 { height: 40px; padding: 0 16px; font-size: 14px; }
+  .xb-btn.h34 { height: 34px; padding: 0 14px; font-size: 13px; }
+  .xb-btn.primary { background: var(--brand); color: var(--brand-on); }
+  .xb-btn.primary:hover:not(:disabled) { filter: brightness(0.94); }
+  .xb-btn.outline { background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-weight: 550; }
+  .xb-btn.outline:hover:not(:disabled) { background: var(--fill); }
+  .xb-btn.secondary { background: var(--fill); color: var(--ink); font-weight: 550; }
+  .xb-btn.ghost { background: transparent; color: var(--ink-2); font-weight: 500; }
+  .xb-btn.ghost:hover:not(:disabled) { background: var(--fill); }
+  .xb-btn.danger { background: var(--danger); color: #fff; }
+  .xb-btn.danger-outline { background: var(--surface); color: var(--danger); border: 1px solid var(--hairline); font-weight: 600; }
+  .xb-btn.danger-outline:hover:not(:disabled) { background: var(--fill); }
+  .xb-btn:disabled { opacity: 0.45; }
+
+  .xb-input {
+    width: 100%; height: 48px; padding: 0 14px;
+    border-radius: var(--r-inner); border: 1.5px solid transparent;
+    background: var(--fill); color: var(--ink); font-size: 15px;
+    outline: none; transition: border-color 0.15s, background 0.15s;
+  }
+  .xb-input:focus { border-color: var(--brand); background: var(--surface); }
+  .xb-input::placeholder { color: var(--ink-3); }
+  .xb-textarea {
+    width: 100%; min-height: 88px; padding: 11px 14px;
+    border-radius: var(--r-inner); border: 1.5px solid transparent;
+    background: var(--fill); color: var(--ink); font-size: 14.5px; line-height: 21px;
+    resize: vertical; outline: none;
+  }
+  .xb-textarea:focus { border-color: var(--brand); background: var(--surface); }
+
+  /* Toggle & Checkbox */
+  .xb-toggle {
+    width: 48px; height: 28px; border-radius: var(--r-pill);
+    background: var(--line); padding: 2px;
+    display: flex; align-items: center; transition: background 0.16s;
+  }
+  .xb-toggle[aria-checked="true"] { background: var(--brand); justify-content: flex-end; }
+  .xb-toggle span { width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16); }
+
+  .xb-check {
+    width: 22px; height: 22px; border-radius: 7px;
+    border: 2px solid var(--line); background: var(--surface);
+    display: grid; place-items: center; color: #fff;
+  }
+  .xb-check[aria-checked="true"] { background: var(--brand); border-color: var(--brand); }
+  .xb-check .icon { width: 14px; height: 14px; stroke-width: 2.5; }
+
+  /* Chips & Tags (no same-hue tinted fills: solid accent for active filter pill, neutral fill + semantic dot for status tags) */
+  .xb-chip {
+    height: 34px; padding: 0 14px; border-radius: var(--r-pill);
+    background: var(--fill); color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: background 0.14s, color 0.14s;
+  }
+  .xb-chip:hover { color: var(--ink); }
+  .xb-chip[aria-pressed="true"] { background: var(--brand); color: var(--brand-on); font-weight: 600; }
+  .xb-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 550;
+    background: var(--fill); color: var(--ink);
+  }
+  .xb-tag.outline { background: var(--surface); color: var(--ink-2); border: 1px solid var(--hairline); }
+  .xb-tag.dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--ink-3); }
+  .xb-tag.ok::before { background: var(--success); }
+  .xb-tag.warn::before { background: #d97706; }
+  [data-theme="dark"] .xb-tag.warn::before { background: #fbbf24; }
+  .xb-tag.err::before { background: var(--danger); }
+  .xb-tag.info::before { background: var(--info); }
+
+  .xb-status-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+  .xb-status-dot i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+  .xb-status-dot.online i { background: var(--success); }
+  .xb-status-dot.offline i { border: 1.5px solid var(--ink-2); }
+
+  /* NavRow & Banner & Empty */
+  .xb-group-label { font-size: 12px; color: var(--ink-2); padding: 4px 2px 6px; }
+  .xb-nav-group { background: var(--surface); border-block: 0.5px solid var(--hairline); margin: 0 -18px; }
+  .xb-nav-row {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 13px 18px; font-size: 15px; text-align: left;
+    border-top: 0.5px solid var(--hairline);
+  }
+  .xb-nav-row:first-child { border-top: 0; }
+  .xb-nav-row:hover { background: var(--fill); }
+  .xb-nav-row .note { margin-left: auto; font-size: 12.5px; color: var(--ink-2); }
+  .xb-nav-row .icon { width: 16px; height: 16px; color: var(--ink-3); }
+
+  .xb-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; border-radius: var(--r-card);
+    background: var(--surface); border: 1px solid var(--hairline);
+  }
+  .xb-banner.warn { background: var(--brand-soft); border-color: transparent; }
+  .xb-banner-copy { flex: 1; min-width: 0; }
+  .xb-banner-copy strong { display: block; font-size: 14px; font-weight: 600; }
+  .xb-banner-copy span { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+
+  .xb-empty {
+    padding: 20px 16px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .xb-empty-icon {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--surface); border: 1px solid var(--hairline);
+    display: grid; place-items: center; color: var(--ink-2);
+  }
+  .xb-spinner {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2.2px solid var(--hairline); border-top-color: var(--brand);
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ==================== Tab 3: Responsive PC <-> H5 Comparison ==================== */
+  .resp-pair {
+    display: grid; grid-template-columns: minmax(0, 1.35fr) var(--phone-w);
+    gap: 24px; align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .resp-pair { grid-template-columns: 1fr; justify-items: center; }
+    .pc-stage { width: 100%; }
+  }
+  .pc-stage {
+    position: relative; height: 560px; border-radius: 18px; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--desk-line-strong);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+    display: flex; flex-direction: column;
+  }
+  .pc-chrome {
+    height: 36px; padding: 0 14px; background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2);
+  }
+  .pc-dots { display: flex; gap: 6px; }
+  .pc-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+  .pc-shell { flex: 1; display: grid; grid-template-columns: 180px 1fr; min-height: 0; }
+  .pc-rail {
+    background: var(--surface); border-right: 1px solid var(--hairline);
+    padding: 14px 12px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .pc-rail-item { padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--ink-2); }
+  .pc-rail-item.on { background: var(--fill); color: var(--ink); font-weight: 600; }
+  .pc-main { padding: 20px; }
+  .pc-dialog-box {
+    position: relative; z-index: 1;
+    width: min(440px, calc(100% - 48px));
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 16px; box-shadow: var(--shadow-dialog); overflow: hidden;
+  }
+  .pc-dialog-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; border-bottom: 1px solid var(--hairline);
+  }
+  .pc-dialog-head h4 { font-size: 16px; font-weight: 650; }
+  .pc-dialog-body { padding: 16px 20px 20px; }
+
+  /* ==================== Tab 4: Tokens & Module Architecture ==================== */
+  .token-section { margin-top: 22px; }
+  .token-section:first-of-type { margin-top: 0; }
+  .token-section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 12px;
+  }
+  .token-section-head h3 { font-size: 16px; font-weight: 700; }
+  .token-section-head span { font-size: 12px; color: var(--ink-2); }
+
+  .swatch-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px;
+  }
+  .swatch {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 14px; overflow: hidden;
+  }
+  .swatch-color { height: 54px; border-bottom: 1px solid var(--desk-line); }
+
+  .type-scale {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; overflow: hidden;
+  }
+  .type-row {
+    display: grid; grid-template-columns: 150px 110px 1fr 220px;
+    align-items: center; gap: 14px; padding: 14px 18px;
+    border-top: 1px solid var(--hairline);
+  }
+  .type-row:first-child { border-top: 0; }
+  .type-token { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+  .type-token small { display: block; font-weight: 400; color: var(--ink-3); margin-top: 2px; }
+  .type-metrics { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .type-usage { font-size: 12.5px; color: var(--ink-2); }
+  @media (max-width: 860px) {
+    .type-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  .radius-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px;
+  }
+  .radius-card {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .radius-preview {
+    height: 60px; background: var(--paper); border: 1.5px solid var(--line);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--ink);
+  }
+  .radius-meta { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+  .radius-meta strong { display: block; color: var(--ink); font-family: var(--mono); font-size: 12px; margin-bottom: 2px; }
+
+  .dim-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;
+  }
+  .dim-card {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; padding: 16px 18px;
+  }
+  .dim-card h4 { font-size: 14.5px; font-weight: 700; margin-bottom: 12px; }
+  .space-row {
+    display: grid; grid-template-columns: 74px 1fr 150px;
+    align-items: center; gap: 12px; padding: 7px 0;
+    border-top: 1px solid var(--hairline); font-size: 12.5px;
+  }
+  .space-row:first-of-type { border-top: 0; }
+  .space-bar-track { height: 10px; background: var(--fill); border-radius: 999px; overflow: hidden; }
+  .space-bar { height: 100%; background: var(--brand); border-radius: 999px; }
+  .dim-list { display: grid; gap: 0; }
+  .dim-item {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 13px;
+  }
+  .dim-item:first-child { border-top: 0; }
+  .dim-item span:first-child { color: var(--ink); font-weight: 550; }
+  .dim-item code { color: var(--ink-2); font-size: 12px; text-align: right; }
+
+  /* ==================== Tab 5: Motion Playgrounds ==================== */
+  .motion-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+  }
+  .motion-card {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 18px; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .motion-card-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .motion-card-head h3 { font-size: 14.5px; font-weight: 700; }
+  .motion-card-head code { font-size: 11px; color: var(--ink-2); }
+  .motion-stage {
+    position: relative; height: 224px; border-radius: 16px; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--hairline);
+    isolation: isolate;
+  }
+  .motion-desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+  .motion-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Demo 1: Dialog */
+  .m-scrim {
+    position: absolute; inset: 0; background: var(--scrim);
+    opacity: 0; pointer-events: none;
+    transition: opacity calc(200ms * var(--motion-scale)) var(--ease);
+  }
+  .m-scrim.open { opacity: 1; }
+  .m-dialog {
+    position: absolute; left: 50%; top: 50%; width: 226px;
+    background: var(--surface); border-radius: 20px; padding: 14px;
+    box-shadow: var(--shadow-dialog);
+    opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(0.95);
+    transition:
+      transform calc(160ms * var(--motion-scale)) var(--ease-exit),
+      opacity calc(160ms * var(--motion-scale)) var(--ease-exit);
+  }
+  .m-dialog.open {
+    opacity: 1; transform: translate(-50%, -50%) scale(1);
+    transition:
+      transform calc(220ms * var(--motion-scale)) var(--ease),
+      opacity calc(220ms * var(--motion-scale)) var(--ease);
+  }
+
+  /* Demo 2: Sheet */
+  .m-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: var(--surface); border-radius: 20px 20px 0 0;
+    padding: 10px 14px 16px; box-shadow: var(--shadow-sheet);
+    transform: translateY(100%);
+    transition: transform calc(200ms * var(--motion-scale)) var(--ease-exit);
+  }
+  .m-sheet.open {
+    transform: translateY(0);
+    transition: transform calc(260ms * var(--motion-scale)) var(--ease);
+  }
+
+  /* Demo 3: Page Push / Pop */
+  .m-page {
+    position: absolute; inset: 0; padding: 12px 14px;
+    background: var(--paper); display: flex; flex-direction: column; gap: 8px;
+  }
+  .m-page-base {
+    transition: transform calc(260ms * var(--motion-scale)) var(--ease);
+  }
+  .m-page-base.pushed { transform: translateX(-28%); }
+  .m-page-dim {
+    position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+    transition: opacity calc(260ms * var(--motion-scale)) var(--ease);
+  }
+  .m-page-dim.pushed { opacity: 0.08; }
+  .m-page-sub {
+    background: var(--surface); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
+    transform: translateX(100%);
+    transition: transform calc(240ms * var(--motion-scale)) var(--ease);
+  }
+  .m-page-sub.pushed {
+    transform: translateX(0);
+    transition: transform calc(260ms * var(--motion-scale)) var(--ease);
+  }
+
+  /* Demo 4: Drawer & Toast */
+  .m-drawer {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 176px;
+    background: var(--surface); padding: 14px; box-shadow: 6px 0 24px rgba(0, 0, 0, 0.12);
+    transform: translateX(-100%);
+    transition: transform calc(190ms * var(--motion-scale)) var(--ease-exit);
+  }
+  .m-drawer.open {
+    transform: translateX(0);
+    transition: transform calc(240ms * var(--motion-scale)) var(--ease);
+  }
+  .m-toast {
+    position: absolute; left: 50%; bottom: 18px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--hairline); box-shadow: var(--shadow-toast);
+    padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    white-space: nowrap; opacity: 0; transform: translate(-50%, 8px);
+    transition:
+      transform calc(150ms * var(--motion-scale)) var(--ease-exit),
+      opacity calc(150ms * var(--motion-scale)) var(--ease-exit);
+  }
+  .m-toast.open {
+    opacity: 1; transform: translate(-50%, 0);
+    transition:
+      transform calc(180ms * var(--motion-scale)) var(--ease),
+      opacity calc(180ms * var(--motion-scale)) var(--ease);
+  }
+
+  [data-reduced-motion="true"] .m-dialog,
+  [data-reduced-motion="true"] .m-sheet,
+  [data-reduced-motion="true"] .m-page-base,
+  [data-reduced-motion="true"] .m-page-sub,
+  [data-reduced-motion="true"] .m-drawer,
+  [data-reduced-motion="true"] .m-toast {
+    transition-property: opacity !important;
+    transition-duration: 90ms !important;
+  }
+  [data-reduced-motion="true"] .m-dialog { transform: translate(-50%, -50%) scale(1) !important; }
+  [data-reduced-motion="true"] .m-sheet { transform: translateY(0) !important; opacity: 0; }
+  [data-reduced-motion="true"] .m-sheet.open { opacity: 1; }
+  [data-reduced-motion="true"] .m-page-base.pushed { transform: none !important; }
+  [data-reduced-motion="true"] .m-page-sub { transform: none !important; opacity: 0; pointer-events: none; }
+  [data-reduced-motion="true"] .m-page-sub.pushed { opacity: 1; pointer-events: auto; }
+  [data-reduced-motion="true"] .m-drawer { transform: none !important; opacity: 0; pointer-events: none; }
+  [data-reduced-motion="true"] .m-drawer.open { opacity: 1; pointer-events: auto; }
+  [data-reduced-motion="true"] .m-toast { transform: translate(-50%, 0) !important; }
+
+  /* ==================== Tab 6: Icon Library ==================== */
+  .icon-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .icon-search {
+    width: min(260px, 100%); height: 34px; padding: 0 12px;
+    border-radius: 10px; border: 1px solid var(--desk-line-strong);
+    background: var(--surface); color: var(--ink); font-size: 13px; outline: none;
+  }
+  .icon-search:focus { border-color: var(--brand); }
+  .icon-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 10px;
+  }
+  .icon-tile {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 14px; padding: 14px 10px 11px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    text-align: center; transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  }
+  .icon-tile:hover { border-color: var(--desk-line-strong); background: var(--fill); }
+  .icon-tile-glyph {
+    width: 32px; height: 32px;
+    display: grid; place-items: center; color: var(--ink);
+  }
+  .icon-tile-name { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .icon-tile-sub { font-size: 11px; color: var(--ink-2); line-height: 1.25; }
+  .icon-toast-bar {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    z-index: 60; pointer-events: none;
+  }
+  .z-stack {
+    display: flex; flex-direction: column-reverse; gap: 6px;
+  }
+  .z-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; border-radius: 10px;
+    background: var(--paper); border: 1px solid var(--hairline);
+    font-size: 12.5px;
+  }
+  .z-row strong { font-weight: 650; }
+  .z-row code { font-size: 11.5px; color: var(--ink-2); }
+
+  /* ==================== Tab: Color Spec ==================== */
+  .ratio-bar {
+    height: 16px; border-radius: 999px; overflow: hidden;
+    display: flex; border: 1px solid var(--desk-line-strong);
+    margin: 10px 0 12px;
+  }
+  .ratio-seg { height: 100%; }
+  .ratio-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ink-2); }
+  .ratio-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .ratio-legend i { width: 10px; height: 10px; border-radius: 50%; display: block; border: 1px solid var(--desk-line-strong); }
+
+  .neutral-table {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; overflow: hidden;
+  }
+  .neutral-row {
+    display: grid; grid-template-columns: 170px 1fr 1fr 220px;
+    align-items: center; gap: 14px; padding: 12px 16px;
+    border-top: 1px solid var(--hairline); font-size: 13px;
+  }
+  .neutral-row:first-child { border-top: 0; }
+  .neutral-row.head { background: var(--paper); font-size: 12px; font-weight: 650; color: var(--ink-2); }
+  .chip-hex {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px;
+  }
+  .chip-hex i {
+    width: 24px; height: 24px; border-radius: 7px; flex: none;
+    border: 1px solid var(--desk-line-strong); display: block;
+  }
+  @media (max-width: 860px) {
+    .neutral-row { grid-template-columns: 1fr; gap: 6px; }
+    .neutral-row.head { display: none; }
+  }
+
+  .accent-matrix {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;
+  }
+  .accent-card {
+    background: var(--surface); border: 1.5px solid var(--desk-line);
+    border-radius: 16px; padding: 14px 16px; text-align: left;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .accent-card:hover { border-color: var(--desk-line-strong); transform: translateY(-1px); }
+  .accent-card.is-current { border-color: var(--brand); }
+  .accent-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .accent-card-head strong { font-size: 14.5px; font-weight: 700; }
+  .accent-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .accent-mode-box {
+    border-radius: 11px; padding: 9px 10px; font-size: 11.5px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .accent-mode-box.is-light { background: #fafafa; color: #222; border: 1px solid #ededed; }
+  .accent-mode-box.is-dark { background: #1c1c1e; color: #ececec; border: 1px solid #2e2e30; }
+  .accent-pill-mini {
+    height: 28px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 600;
+    display: grid; place-items: center;
+  }
+  .accent-codes { font-family: var(--mono); font-size: 11px; opacity: 0.78; display: flex; justify-content: space-between; }
+
+  .dodont-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .dodont-card {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; padding: 15px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .dodont-head { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; }
+  .dodont-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dodont-demo {
+    padding: 12px; border-radius: 12px; background: var(--paper); border: 1px solid var(--hairline);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .dodont-note { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+  .swatch-info { padding: 9px 11px; }
+  .swatch-name { font-size: 12.5px; font-weight: 650; }
+  .swatch-code { font-size: 11px; color: var(--ink-2); font-family: var(--mono); margin-top: 2px; }
+
+  .arch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; margin-top: 20px; }
+  .arch-tree {
+    background: var(--surface); border: 1px solid var(--desk-line);
+    border-radius: 16px; padding: 18px;
+  }
+  .arch-tree h4 { font-size: 15px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .arch-tree pre {
+    font-family: var(--mono); font-size: 12px; line-height: 1.7;
+    background: var(--paper); border: 1px solid var(--hairline);
+    border-radius: 12px; padding: 12px 14px; overflow-x: auto; color: var(--ink);
+  }
+
+  @media (max-width: 520px) {
+    .canvas { padding: 16px 12px 48px; }
+    .phone-grid { grid-template-columns: minmax(0, 100%); }
+    .board, .phone { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="studio-bar">
+  <div class="studio-bar-inner">
+    <div class="brand-head">
+      <div class="brand-badge" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">小伴基础组件库与弹层规范</div>
+        <div class="brand-sub">手机 App（:common:ui）+ 社区网页（services/server-forum/web/src/ui）</div>
+      </div>
+    </div>
+
+    <nav class="tab-strip" role="tablist" aria-label="规范分区">
+      <button type="button" class="tab-btn" role="tab" data-tab="overlays" aria-selected="true">弹层体系</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="controls" aria-selected="false">通用控件</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="responsive" aria-selected="false">PC ↔ H5 对照</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="motion" aria-selected="false">动效规范</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="icons" aria-selected="false">图标库</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="colors" aria-selected="false">配色规范</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="tokens" aria-selected="false">尺寸规范与模块</button>
+    </nav>
+
+    <div class="studio-controls">
+      <div class="accent-dots" role="group" aria-label="六套主题色" id="accent-dots"></div>
+      <div class="seg-ctrl" role="group" aria-label="屏宽">
+        <button type="button" data-width="390" aria-pressed="true">390px</button>
+        <button type="button" data-width="360" aria-pressed="false">360px</button>
+      </div>
+      <div class="seg-ctrl" role="group" aria-label="明暗主题">
+        <button type="button" data-theme-btn="light" aria-pressed="true">浅色</button>
+        <button type="button" data-theme-btn="dark" aria-pressed="false">深色</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="canvas">
+
+  <!-- ==================== TAB 1: OVERLAYS ==================== -->
+  <section id="panel-overlays" data-panel="overlays">
+    <div class="section-intro">
+      <div>
+        <h2>通用弹层体系（Overlay Primitives）</h2>
+        <p>收敛居中卡片、BottomSheet、ActionSheet 与 Toast 四类通用浮层参数：统一圆角（居中卡 24px / 底部弹层 20px 顶圆角）、遮罩、键盘与安全区避让；特殊业务形态（分享舞台、评论键盘面板、头像裁剪等）保留在业务层。</p>
+      </div>
+      <div class="meta-pills">
+        <span class="meta-pill">手机模块 <code>:common:ui/overlay</code></span>
+        <span class="meta-pill">社区模块 <code>src/ui/overlay</code></span>
+      </div>
+    </div>
+
+    <div class="phone-grid">
+      <!-- Board 1: CardDialog / ConfirmDialog -->
+      <article class="board">
+        <div class="board-head">
+          <div class="board-title">1. 居中卡片弹窗 <span class="board-tag">CardDialog · 24px</span></div>
+          <select class="variant-select" id="sel-dialog" aria-label="居中弹窗变体">
+            <option value="danger">危险确认（删除/下架）</option>
+            <option value="confirm">常规确认（购买/采纳）</option>
+            <option value="input">带单行输入（重命名）</option>
+            <option value="error">错误提示与加载态</option>
+          </select>
+        </div>
+        <div class="phone" id="phone-dialog">
+          <div class="status-bar"><span>9:41</span><div class="status-icons"><svg class="icon" viewBox="0 0 24 24"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8"/></svg><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg></div></div>
+          <div class="appbar"><button class="appbar-btn" type="button" aria-label="返回"><svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="appbar-title">帖子详情</div><button class="appbar-btn" type="button" aria-label="更多"><svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button></div>
+          <div class="phone-body">
+            <div class="mock-post-card">
+              <h4>分享一个自己用小伴做的桌面时钟小组件</h4>
+              <p>参考了极简暖白卡片风格，支持深浅色切换和整点轻提示，欢迎大家试试看并提建议。</p>
+              <div class="mock-meta"><span>林屿 · 18 分钟前</span><span>24 回复</span></div>
+            </div>
+            <div class="mock-post-card">
+              <h4>回复 · 陆远</h4>
+              <p>字体排版很舒服，已经装到桌面了！希望下一版能加上番茄钟切换。</p>
+            </div>
+          </div>
+          <div class="reopen-bar"><button type="button" class="reopen-btn" data-reopen="overlay-dialog">重新打开居中弹窗</button></div>
+
+          <div class="overlay-root overlay-center" id="overlay-dialog">
+            <div class="overlay-scrim" data-close="overlay-dialog"></div>
+            <div class="xb-card-dialog" role="dialog" aria-modal="true" id="dialog-content"></div>
+          </div>
+          <div class="xb-toast-stack" id="toast-dialog"></div>
+          <div class="gesture-pill"></div>
+        </div>
+      </article>
+
+      <!-- Board 2: BottomSheet -->
+      <article class="board">
+        <div class="board-head">
+          <div class="board-title">2. 底部弹层 <span class="board-tag">BottomSheet · 20px</span></div>
+          <select class="variant-select" id="sel-sheet" aria-label="底部弹层变体">
+            <option value="radio">单选列表（思考等级/协议）</option>
+            <option value="scroll">半屏滚动（选择发布板块）</option>
+            <option value="ime">带输入与键盘避让</option>
+          </select>
+        </div>
+        <div class="phone" id="phone-sheet">
+          <div class="status-bar"><span>9:41</span><div class="status-icons"><svg class="icon" viewBox="0 0 24 24"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8"/></svg><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg></div></div>
+          <div class="appbar"><button class="appbar-btn" type="button" aria-label="返回"><svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="appbar-title">模型与对话设置</div><div></div></div>
+          <div class="phone-body">
+            <div class="mock-list">
+              <div class="mock-list-row"><span>默认对话模型</span><span>小伴标准版 ›</span></div>
+              <div class="mock-list-row"><span>思考等级</span><span>平衡 ›</span></div>
+              <div class="mock-list-row"><span>服务商协议</span><span>OpenAI 兼容 ›</span></div>
+            </div>
+          </div>
+          <div class="reopen-bar"><button type="button" class="reopen-btn" data-reopen="overlay-sheet">重新打开 BottomSheet</button></div>
+
+          <div class="overlay-root overlay-bottom" id="overlay-sheet">
+            <div class="overlay-scrim" data-close="overlay-sheet"></div>
+            <div style="position:relative;z-index:1;width:100%;display:flex;flex-direction:column;max-height:86%;" id="sheet-content"></div>
+          </div>
+          <div class="xb-toast-stack" id="toast-sheet"></div>
+          <div class="gesture-pill"></div>
+        </div>
+      </article>
+
+      <!-- Board 3: ActionSheet & Toast -->
+      <article class="board">
+        <div class="board-head">
+          <div class="board-title">3. 操作菜单 & Toast <span class="board-tag">ActionSheet · 20px</span></div>
+          <select class="variant-select" id="sel-action" aria-label="操作菜单变体">
+            <option value="more">更多操作（含危险项）</option>
+            <option value="context">带顶部说明（选图/退出）</option>
+            <option value="toast">Toast 轻提示演示</option>
+          </select>
+        </div>
+        <div class="phone" id="phone-action">
+          <div class="status-bar"><span>9:41</span><div class="status-icons"><svg class="icon" viewBox="0 0 24 24"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8"/></svg><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg></div></div>
+          <div class="appbar"><button class="appbar-btn" type="button" aria-label="返回"><svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="appbar-title">个人主页</div><button class="appbar-btn" type="button" aria-label="更多" data-reopen="overlay-action"><svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button></div>
+          <div class="phone-body">
+            <div class="mock-post-card">
+              <h4>触发 Toast 轻提示</h4>
+              <p>轻提示悬浮于底栏上方（距底 84px / H5 为 <code>tabbar + 16px + safe-area</code>），默认白底细框轻阴影，出错态用固定危险红底白字。</p>
+              <div class="row-wrap" style="margin-top:12px;">
+                <button type="button" class="xb-btn h34 secondary" data-toast-demo="normal">普通提示</button>
+                <button type="button" class="xb-btn h34 outline" data-toast-demo="action">带跳转操作</button>
+                <button type="button" class="xb-btn h34 danger-outline" data-toast-demo="error">错误提示</button>
+              </div>
+            </div>
+          </div>
+          <div class="reopen-bar"><button type="button" class="reopen-btn" data-reopen="overlay-action">打开 ActionSheet</button></div>
+
+          <div class="overlay-root overlay-bottom" id="overlay-action">
+            <div class="overlay-scrim" data-close="overlay-action"></div>
+            <div class="xb-action-sheet" role="dialog" aria-modal="true" id="action-content"></div>
+          </div>
+          <div class="xb-toast-stack" id="toast-action"></div>
+          <div class="gesture-pill"></div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Decision Matrix -->
+    <div class="spec-card">
+      <h3>选型边界：什么时候用哪个通用弹层，哪些留在业务层？</h3>
+      <table class="spec-table">
+        <thead>
+          <tr>
+            <th style="width:18%;">组件</th>
+            <th style="width:14%;">归属</th>
+            <th style="width:26%;">统一视觉参数</th>
+            <th style="width:42%;">适用场景与边界</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>CardDialog / ConfirmDialog</strong></td>
+            <td><span class="badge-ui">通用 overlay</span></td>
+            <td>居中、<code>24px</code> 圆角、宽 <code>min(342px, 100%-48px)</code>、主钮 48px 全圆 + 取消 44px 透明字、右上角 32px 关闭圆钮</td>
+            <td>二次确认、危险操作（删除/下架/屏蔽）、简短信息确认、单字段输入（重命名）。<strong>手机 App 与社区 H5 均居中展示</strong>，替换社区前台全部 <code>window.confirm()</code>，收口手机旧 <code>CenterDialog</code>。</td>
+          </tr>
+          <tr>
+            <td><strong>BottomSheet</strong></td>
+            <td><span class="badge-ui">通用 overlay</span></td>
+            <td>底部贴边、仅顶角 <code>20px</code> 圆角、顶部拖拽条、最高 <code>80dvh</code>、左右 16px 内缩 <code>0.5px</code> 细线、底部同色无底色分割线 + 居中「取消」（多步表单配取消/确定双钮）</td>
+            <td>单选列表（思考等级/协议/模型）、半屏筛选/选择面板（发帖选板块/选作品）、多控件局部配置。统一解决手机端 16/18/20dp 圆角混用问题。</td>
+          </tr>
+          <tr>
+            <td><strong>ActionSheet</strong></td>
+            <td><span class="badge-ui">通用 overlay</span></td>
+            <td>与 <code>BottomSheet</code> 完全一致：<code>20px</code> 顶圆角 + 拖拽条 + 轻标题 + 左对齐 52px 行 + 左右 16px 内缩 <code>0.5px</code> 细线 + 底部细线分隔的透明底居中「取消」</td>
+            <td>2–6 项轻量动作菜单（帖子/主页右上角「更多」、更换头像）；与 <code>BottomSheet</code> 零视觉差异。</td>
+          </tr>
+          <tr>
+            <td><strong>ResponsiveDialog</strong>（社区站专用）</td>
+            <td><span class="badge-ui">Web overlay</span></td>
+            <td>PC（<code>≥768px</code>）居中 <code>16px</code> 圆角；H5（<code>≤767px</code>）按 <code>mobileMode</code> 显式选 <code>sheet</code>（20px 贴底）或 <code>center</code>（24px 居中）</td>
+            <td>登录、举报、外观设置、发布内容包等需要响应式形态切换的复杂弹窗；默认不再强制把所有小确认框在 H5 压到底部。</td>
+          </tr>
+          <tr>
+            <td><strong>Toast</strong></td>
+            <td><span class="badge-ui">通用 overlay</span></td>
+            <td>胶囊圆角、白底细框（错误态危险红底）、底栏上方居中悬浮、自动消失</td>
+            <td>非阻塞轻量反馈（已复制、已收藏、网络错误）。支持可选右侧单步链接操作。</td>
+          </tr>
+          <tr>
+            <td><strong>业务特例弹层</strong></td>
+            <td><span class="badge-keep">保留业务层</span></td>
+            <td>复用底层 Token / 遮罩，保留各自定制视觉</td>
+            <td>详情分享磨砂舞台（<code>NativeSharing / DetailShareDialog</code>）、评论键盘/表情/相册三态面板（<code>CommentComposer / CommentSheet</code>）、头像裁剪、App 更新/外链回流头图卡、协议 2 宿主菜单。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2: CONTROLS ==================== -->
+  <section id="panel-controls" data-panel="controls" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>通用基础控件（Controls Primitives）</h2>
+        <p>独立于弹层模块（<code>controls/</code>），遵循「极浅底 <code>#FAFAFA</code> + 纯白卡 <code>1px #EDEDED</code> 无阴影 + 白卡内次要控件 <code>#F2F2F2</code> 无描边 + 主题色克制点缀」原则。</p>
+      </div>
+      <div class="meta-pills">
+        <span class="meta-pill">手机模块 <code>:common:ui/controls</code></span>
+        <span class="meta-pill">社区模块 <code>src/ui/controls</code></span>
+      </div>
+    </div>
+
+    <div class="controls-grid">
+      <!-- Buttons -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>按钮体系 Buttons</h3><span>48 / 40 / 34px · Pill</span></div>
+        <div class="kit-surface">
+          <div class="row-wrap">
+            <button type="button" class="xb-btn h48 primary">主操作 48</button>
+            <button type="button" class="xb-btn h48 secondary">次要 48</button>
+            <button type="button" class="xb-btn h48 primary" disabled>禁用态</button>
+          </div>
+          <div class="row-wrap">
+            <button type="button" class="xb-btn h40 outline">白底描边 40</button>
+            <button type="button" class="xb-btn h40 secondary">浅灰次要 40</button>
+            <button type="button" class="xb-btn h40 ghost">弱操作 / 取消</button>
+          </div>
+          <div class="row-wrap">
+            <button type="button" class="xb-btn h34 danger">危险确认 34</button>
+            <button type="button" class="xb-btn h34 danger-outline">白底红字 34</button>
+            <button type="button" class="xb-btn h34 primary"><span class="xb-spinner" style="width:14px;height:14px;border-color:#ffffff55;border-top-color:#fff;"></span>提交中</button>
+          </div>
+          <div class="row-equal">
+            <button type="button" class="xb-btn h40 primary">允许一次</button>
+            <button type="button" class="xb-btn h40 secondary">本对话允许</button>
+            <button type="button" class="xb-btn h40 ghost">拒绝</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>输入框 TextBox / AreaBox</h3><span>r=8px · #F2F2F2 填充</span></div>
+        <div class="kit-surface">
+          <input class="xb-input" type="text" placeholder="单行输入（48px，无描边灰底，聚焦亮主题色）" />
+          <textarea class="xb-textarea" placeholder="多行文本域（最小 88px，适合补充说明与反馈）"></textarea>
+        </div>
+      </div>
+
+      <!-- Selection -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>开关、复选与单选</h3><span>Toggle / CheckBox / RadioRow</span></div>
+        <div class="kit-surface">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:15px;">开启消息提醒（可点切换）</span>
+            <button type="button" class="xb-toggle" role="switch" aria-checked="true" data-toggle><span></span></button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:15px;">仅在 Wi-Fi 下预下载</span>
+            <button type="button" class="xb-toggle" role="switch" aria-checked="false" data-toggle><span></span></button>
+          </div>
+          <div style="height:0.5px;background:var(--hairline);"></div>
+          <div class="row-wrap" style="gap:16px;">
+            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+              <button type="button" class="xb-check" role="checkbox" aria-checked="true" data-toggle>
+                <svg class="icon" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
+              </button>
+              <span>同步到社区</span>
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+              <button type="button" class="xb-check" role="checkbox" aria-checked="false" data-toggle>
+                <svg class="icon" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
+              </button>
+              <span>匿名提交</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chips & Tags -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>胶囊筛选与语义标签</h3><span>ChipPill / Tag / StatusDot</span></div>
+        <div class="kit-surface">
+          <div class="row-wrap">
+            <button type="button" class="xb-chip" aria-pressed="true" data-chip>全部</button>
+            <button type="button" class="xb-chip" aria-pressed="false" data-chip>创意作品</button>
+            <button type="button" class="xb-chip" aria-pressed="false" data-chip>开源精选</button>
+            <button type="button" class="xb-chip" aria-pressed="false" data-chip>讨论求助</button>
+          </div>
+          <div class="row-wrap">
+            <span class="xb-tag">默认标签</span>
+            <span class="xb-tag dot ok">已上线</span>
+            <span class="xb-tag dot warn">审核中</span>
+            <span class="xb-tag dot err">已拒绝</span>
+            <span class="xb-tag outline">协议 2</span>
+          </div>
+          <div class="row-wrap" style="gap:16px;">
+            <span class="xb-status-dot online"><i></i>桌面端在线</span>
+            <span class="xb-status-dot offline"><i></i>当前离线</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flush List & NavRow -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>通栏列表与分组</h3><span>GroupLabel + NavRow</span></div>
+        <div>
+          <div class="xb-group-label">账号与外观</div>
+          <div class="xb-nav-group">
+            <button type="button" class="xb-nav-row"><span>外观与主题色</span><span class="note">跟随系统 · 小伴红</span><svg class="icon" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+            <button type="button" class="xb-nav-row"><span>通知与提醒</span><span class="note">已开启</span><svg class="icon" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+            <button type="button" class="xb-nav-row"><span>关于小伴</span><span class="note">v3.1.8</span><svg class="icon" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feedback: Banner / EmptyState / Loading -->
+      <div class="kit-box">
+        <div class="kit-box-head"><h3>反馈提示与空态</h3><span>Banner / EmptyState / Spinner</span></div>
+        <div class="xb-banner warn">
+          <svg class="icon" style="color:var(--brand-ink);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg>
+          <div class="xb-banner-copy">
+            <strong>桌面连接已断开</strong>
+            <span>重新打开小伴桌面客户端即可恢复同步</span>
+          </div>
+          <button type="button" class="xb-btn h34 secondary">重试</button>
+        </div>
+        <div class="kit-surface" style="flex-direction:row;align-items:center;justify-content:space-around;">
+          <div class="xb-empty" style="padding:8px;">
+            <div class="xb-empty-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+            <strong style="font-size:14px;">暂无内容</strong>
+            <span style="font-size:12px;color:var(--ink-2);">发布你的第一条动态吧</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div class="xb-spinner"></div>
+            <span style="font-size:12px;color:var(--ink-2);">加载中…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 3: RESPONSIVE PC <-> H5 ==================== -->
+  <section id="panel-responsive" data-panel="responsive" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>社区网页响应式对照（PC ≥ 768px ↔ 移动 H5 ≤ 767px）</h2>
+        <p>解决当前 <code>ModalDialog.vue</code> 在窄屏一律强行贴底的问题：在 <code>services/server-forum/web/src/ui/overlay/</code> 中明确拆成 <strong>双端均居中的 ConfirmDialog</strong> 与 <strong>PC 居中 ↔ H5 贴底的 ResponsiveDialog</strong>（仅社区前台，管理后台不动）。</p>
+      </div>
+      <div class="seg-ctrl" role="group" aria-label="切换对照场景">
+        <button type="button" data-resp-mode="confirm" aria-pressed="true">场景 A：确认弹窗（双端居中）</button>
+        <button type="button" data-resp-mode="form" aria-pressed="false">场景 B：表单弹窗（PC 居中 ↔ H5 贴底）</button>
+      </div>
+    </div>
+
+    <div class="resp-pair">
+      <!-- PC Web Preview -->
+      <div>
+        <div class="board-head">
+          <div class="board-title">社区网页 · PC 端 <span class="board-tag">≥ 768px</span></div>
+          <span class="board-tag" id="resp-pc-note">居中卡片 · 400px</span>
+        </div>
+        <div class="pc-stage">
+          <div class="pc-chrome"><div class="pc-dots"><i></i><i></i><i></i></div><span>chat.xiangban.xyz</span></div>
+          <div class="pc-shell">
+            <aside class="pc-rail">
+              <div class="pc-rail-item on">发现</div>
+              <div class="pc-rail-item">讨论</div>
+              <div class="pc-rail-item">应用广场</div>
+              <div class="pc-rail-item">我的作品</div>
+            </aside>
+            <div class="pc-main">
+              <div class="mock-post-card">
+                <h4>潮汐书房 · 鲸鱼娘（已上线）</h4>
+                <p>支持桌面壁纸与手机协议 2 交互，点击下方操作按钮触发标准弹层。</p>
+              </div>
+            </div>
+          </div>
+          <div class="overlay-root overlay-center" id="resp-pc-layer">
+            <div class="overlay-scrim"></div>
+            <div id="resp-pc-modal"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- H5 Mobile Preview -->
+      <div class="board">
+        <div class="board-head">
+          <div class="board-title">社区网页 · 移动 H5 <span class="board-tag">≤ 767px</span></div>
+          <span class="board-tag" id="resp-h5-note">居中卡片 · 24px</span>
+        </div>
+        <div class="phone" style="height:560px;">
+          <div class="status-bar"><span>9:41</span><div class="status-icons"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></div></div>
+          <div class="appbar"><button class="appbar-btn" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="appbar-title">我的作品</div><div></div></div>
+          <div class="phone-body">
+            <div class="mock-post-card">
+              <h4>潮汐书房 · 鲸鱼娘</h4>
+              <p>已上线 · 312 次体验</p>
+            </div>
+          </div>
+          <div class="overlay-root" id="resp-h5-layer">
+            <div class="overlay-scrim"></div>
+            <div id="resp-h5-modal" style="position:relative;z-index:1;width:100%;display:flex;justify-content:center;"></div>
+          </div>
+          <div class="gesture-pill"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 4: MOTION SPEC ==================== -->
+  <section id="panel-motion" data-panel="motion" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>弹窗与页面切换动效规范（Motion）</h2>
+        <p>遵循「入场克制减速、退场更快收束、不做无意义弹性回弹、仅动画合成层属性」原则；支持慢放观察与 <code>prefers-reduced-motion</code> 无障碍降级验证。</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="seg-ctrl" role="group" aria-label="回放速度">
+          <button type="button" data-speed="1" aria-pressed="true">1× 正常</button>
+          <button type="button" data-speed="2.8" aria-pressed="false">0.35× 慢放</button>
+        </div>
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--desk-line);padding:4px 10px;border-radius:999px;cursor:pointer;">
+          <span>减弱动态效果</span>
+          <button type="button" class="xb-toggle" style="transform:scale(0.8);transform-origin:center;" role="switch" aria-checked="false" id="toggle-reduced"><span></span></button>
+        </label>
+      </div>
+    </div>
+
+    <div class="motion-grid">
+      <!-- 1. CardDialog Motion -->
+      <article class="motion-card">
+        <div class="motion-card-head"><h3>1. 居中弹窗（CardDialog）</h3><code>入 220ms · 出 160ms</code></div>
+        <div class="motion-stage">
+          <div style="padding:14px;"><div class="mock-post-card" style="padding:10px 12px;"><h4 style="font-size:13px;">页面底层内容</h4><p style="font-size:12px;">点击下方按钮反复观察缩放与淡入</p></div></div>
+          <div class="m-scrim open" id="m-dialog-scrim"></div>
+          <div class="m-dialog open" id="m-dialog-box">
+            <div style="font-size:14px;font-weight:650;">确认删除这条回复？</div>
+            <div style="font-size:12px;color:var(--ink-2);margin-top:4px;">删除后不可撤销。</div>
+            <div style="margin-top:12px;display:grid;gap:4px;">
+              <div style="height:34px;border-radius:999px;background:var(--danger);color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:600;">确认删除</div>
+              <div style="height:28px;display:grid;place-items:center;font-size:12px;color:var(--ink-2);">取消</div>
+            </div>
+          </div>
+        </div>
+        <div class="motion-desc">入场：<code>scale(0.95→1) + Y(8px→0) + opacity</code>，标准减速 220ms；退场：加速离场 160ms，遮罩同步淡出。</div>
+        <div class="motion-actions"><button type="button" class="xb-btn h34 primary" data-m-toggle="dialog">切换入场 / 退场</button></div>
+      </article>
+
+      <!-- 2. BottomSheet Motion -->
+      <article class="motion-card">
+        <div class="motion-card-head"><h3>2. 底部弹层（BottomSheet / ActionSheet）</h3><code>入 260ms · 出 200ms</code></div>
+        <div class="motion-stage">
+          <div style="padding:14px;"><div class="mock-post-card" style="padding:10px 12px;"><h4 style="font-size:13px;">模型与对话设置</h4><p style="font-size:12px;">底部贴边滑入，无弹性过冲不露底缝</p></div></div>
+          <div class="m-scrim open" id="m-sheet-scrim"></div>
+          <div class="m-sheet open" id="m-sheet-box">
+            <div class="xb-sheet-handle" style="padding:2px 0 8px;"></div>
+            <div style="font-size:14px;font-weight:650;margin-bottom:8px;">思考等级</div>
+            <div style="display:grid;gap:6px;font-size:12.5px;color:var(--ink-2);">
+              <div style="padding:7px 10px;border-radius:10px;background:var(--fill);color:var(--ink);font-weight:600;">平衡思考（当前）</div>
+              <div style="padding:7px 10px;">深度推理</div>
+            </div>
+          </div>
+        </div>
+        <div class="motion-desc">入场：<code>translateY(100%→0)</code> 260ms 标准减速；退场：200ms 加速滑出；手势拖拽复位用无过冲弹簧 <code>damping=1, stiffness=500</code>。</div>
+        <div class="motion-actions"><button type="button" class="xb-btn h34 primary" data-m-toggle="sheet">切换滑入 / 收起</button></div>
+      </article>
+
+      <!-- 3. Page Push / Pop -->
+      <article class="motion-card">
+        <div class="motion-card-head"><h3>3. 页面层级切换（Push / Pop）</h3><code>进 260ms · 退 240ms</code></div>
+        <div class="motion-stage">
+          <div class="m-page m-page-base" id="m-page-base">
+            <div style="font-size:14px;font-weight:700;">社区发现（一级页）</div>
+            <div class="mock-post-card" style="padding:10px 12px;margin:0;"><h4 style="font-size:13px;">潮汐书房 · 鲸鱼娘</h4><p style="font-size:11.5px;">推入详情时底层轻视差左移 -28%</p></div>
+            <div class="mock-post-card" style="padding:10px 12px;margin:0;"><h4 style="font-size:13px;">桌面时钟小组件</h4><p style="font-size:11.5px;">返回后保留列表原滚动位置</p></div>
+            <div class="m-page-dim" id="m-page-dim"></div>
+          </div>
+          <div class="m-page m-page-sub" id="m-page-sub">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;"><span>‹</span><span>作品详情（子页）</span></div>
+            <div class="mock-post-card" style="padding:10px 12px;margin:0;"><h4 style="font-size:13px;">新页从右侧 100% → 0 滑入</h4><p style="font-size:11.5px;">一级底栏 Tab 切换不滑页，直接切换保持空间稳定。</p></div>
+          </div>
+        </div>
+        <div class="motion-desc">子页 Push 260ms / Pop 240ms（<code>FastOutSlowInEasing</code>），仅作用于 <code>graphicsLayer</code> 位移；底栏一级 Tab 切换零位移直切；社区 PC 路由直切不加整页滑屏。</div>
+        <div class="motion-actions">
+          <button type="button" class="xb-btn h34 primary" data-m-page="push">进入子页 Push</button>
+          <button type="button" class="xb-btn h34 secondary" data-m-page="pop">返回上页 Pop</button>
+        </div>
+      </article>
+
+      <!-- 4. Drawer & Toast -->
+      <article class="motion-card">
+        <div class="motion-card-head"><h3>4. 侧边抽屉 & Toast 轻提示</h3><code>抽屉 240/190ms · Toast 180/150ms</code></div>
+        <div class="motion-stage">
+          <div style="padding:14px;"><div class="mock-post-card" style="padding:10px 12px;"><h4 style="font-size:13px;">小伴 AI 对话</h4><p style="font-size:12px;">左侧历史会话抽屉与底部轻提示演示</p></div></div>
+          <div class="m-scrim" id="m-drawer-scrim"></div>
+          <div class="m-drawer" id="m-drawer-box">
+            <div style="font-size:13.5px;font-weight:700;margin-bottom:10px;">历史会话</div>
+            <div style="display:grid;gap:6px;font-size:12px;color:var(--ink-2);">
+              <div style="padding:6px 8px;border-radius:8px;background:var(--fill);color:var(--ink);font-weight:600;">组件库梳理</div>
+              <div style="padding:6px 8px;">桌面壁纸打包</div>
+            </div>
+          </div>
+          <div class="m-toast" id="m-toast-box">链接已复制到剪贴板</div>
+        </div>
+        <div class="motion-desc">侧边抽屉 <code>translateX(-100%↔0)</code>（入 240ms / 出 190ms）；Toast 上浮 8px 淡入 180ms，停留 2.4s 后 150ms 淡出；按钮/开关微交互 140ms。</div>
+        <div class="motion-actions">
+          <button type="button" class="xb-btn h34 primary" data-m-toggle="drawer">切换侧边抽屉</button>
+          <button type="button" class="xb-btn h34 outline" data-m-toggle="toast">触发 Toast</button>
+        </div>
+      </article>
+    </div>
+
+    <div class="spec-card">
+      <h3>动效 Token 对照（<code>Motion.kt</code> ↔ <code>ui-tokens.css</code>）</h3>
+      <table class="spec-table">
+        <thead>
+          <tr><th style="width:18%;">场景</th><th style="width:16%;">入场 / 退场</th><th style="width:24%;">曲线（CSS / Compose）</th><th style="width:42%;">端侧落地要点</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>控件微交互</strong>（开关/按压/胶囊）</td><td><code>140ms</code></td><td><code>ease-out</code> / <code>FastOutSlowIn</code></td><td>即时响应，不做长拖尾动画。</td></tr>
+          <tr><td><strong>Toast 轻提示</strong></td><td><code>180ms / 150ms</code></td><td><code>--ease</code> / <code>--ease-exit</code></td><td>仅位移 <code>8px</code> + 透明度，自动消失（2200–2600ms）。</td></tr>
+          <tr><td><strong>CardDialog 居中卡</strong></td><td><code>220ms / 160ms</code></td><td><code>--ease</code> / <code>--ease-exit</code></td><td>缩放幅度克制在 <code>0.95 → 1</code>，退场更快减少阻塞感；遮罩 <code>200ms</code> 同步淡入淡出。</td></tr>
+          <tr><td><strong>BottomSheet / ActionSheet</strong></td><td><code>260ms / 200ms</code></td><td><code>--ease</code> / <code>--ease-exit</code></td><td>严禁使用弹性过冲（避免面板底部露白）；手势跟手松手回弹用临界阻尼 <code>damping=1</code>。</td></tr>
+          <tr><td><strong>子页 Push / Pop</strong></td><td><code>260ms / 240ms</code></td><td><code>--ease</code> / <code>FastOutSlowIn</code></td><td>手机端仅在 <code>graphicsLayer</code> 做位移不重排；一级底栏 Tab 直切不滑页；社区 PC 路由直切。</td></tr>
+          <tr><td><strong>减弱动态效果</strong></td><td><code>≤ 90ms</code> 淡入淡出</td><td><code>linear</code></td><td>社区站全局遵守 <code>@media (prefers-reduced-motion: reduce)</code>，取消位移和缩放。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 5: ICON LIBRARY ==================== -->
+  <section id="panel-icons" data-panel="icons" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>通用 UI 图标库（XIcons ↔ UiIcon）</h2>
+        <p>统一 <code>24×24</code> 画板、<code>1.8px</code> 线宽、圆头圆角、<code>currentColor</code> 继承语义色；四档尺寸 <code>14 / 16 / 20 / 24px</code>（独立按钮热区仍 ≥ <code>44×44px</code>）。点击任意图标即可复制图标名；第三方品牌 Logo 与业务插画留在业务层。</p>
+      </div>
+      <div class="meta-pills">
+        <span class="meta-pill">手机 <code>:common:ui/theme/Icons.kt</code></span>
+        <span class="meta-pill">社区 <code>src/ui/icons/UiIcon.vue</code></span>
+      </div>
+    </div>
+
+    <div class="icon-toolbar">
+      <input type="search" class="icon-search" id="icon-search" placeholder="搜索图标名或中文用途（如 删除、分享）" />
+      <div class="row-wrap" id="icon-cats">
+        <button type="button" class="xb-chip" aria-pressed="true" data-icon-cat="all">全部</button>
+        <button type="button" class="xb-chip" aria-pressed="false" data-icon-cat="nav">导航与方向</button>
+        <button type="button" class="xb-chip" aria-pressed="false" data-icon-cat="action">操作与编辑</button>
+        <button type="button" class="xb-chip" aria-pressed="false" data-icon-cat="status">状态与反馈</button>
+        <button type="button" class="xb-chip" aria-pressed="false" data-icon-cat="social">社区与互动</button>
+        <button type="button" class="xb-chip" aria-pressed="false" data-icon-cat="media">媒体与设备</button>
+      </div>
+      <div class="seg-ctrl" style="margin-left:auto;" role="group" aria-label="预览尺寸">
+        <button type="button" data-icon-size="14" aria-pressed="false">14px</button>
+        <button type="button" data-icon-size="16" aria-pressed="false">16px</button>
+        <button type="button" data-icon-size="20" aria-pressed="true">20px</button>
+        <button type="button" data-icon-size="24" aria-pressed="false">24px</button>
+      </div>
+    </div>
+
+    <div class="icon-grid" id="icon-grid"></div>
+    <div class="icon-toast-bar" id="icon-copy-toast"></div>
+  </section>
+
+  <!-- ==================== TAB: COLOR SPEC ==================== -->
+  <section id="panel-colors" data-panel="colors" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>双端统一配色规范（纯中性画布 + 6 套官方主题色 + 固定语义色）</h2>
+        <p>手机 App（<code>DesignTokens.kt</code>）与社区前台（<code>accentPalette.ts</code> / <code>App.vue</code>）统一使用无色偏纯中性灰画布与克制六色主题板；仅 PC 宽屏顶部保留极淡呼吸微光，不染脏卡片与图片原色。</p>
+      </div>
+      <div class="meta-pills">
+        <span class="meta-pill">占比原则 <code>90% 中性 · 8% 文字细线 · ≤2% 强调</code></span>
+        <span class="meta-pill">对比度 <code>正文 ≥7:1 · 次要 ≥4.5:1</code></span>
+      </div>
+    </div>
+
+    <!-- 1. Ratio Bar -->
+    <div class="dim-card" style="margin-bottom:20px;">
+      <h4>用色占比预算（克制工作风）</h4>
+      <div class="ratio-bar" aria-label="90% 中性画布、8% 文字细线、2% 主题色与语义色">
+        <div class="ratio-seg" style="width:90%;background:var(--surface);"></div>
+        <div class="ratio-seg" style="width:8%;background:var(--ink-2);"></div>
+        <div class="ratio-seg" style="width:2%;background:var(--brand);"></div>
+      </div>
+      <div class="ratio-legend">
+        <span><i style="background:var(--surface);"></i><strong>90%</strong> 页面底 / 纯白卡片 / 浅灰次要块（绝不随主题色染色）</span>
+        <span><i style="background:var(--ink-2);"></i><strong>8%</strong> 墨灰文字层级、0.5px 分隔线、1px 卡片细描边</span>
+        <span><i style="background:var(--brand);"></i><strong>≤ 2%</strong> 唯一实心主按钮、选中胶囊、开关、发送键与状态圆点</span>
+      </div>
+    </div>
+
+    <!-- 2. Neutral Hierarchy -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>1. 中性画布与文字阶梯（Light ↔ Dark 双栏对照）</h3>
+        <span>手机 App 与社区前台 1:1 统一 · 不用纯黑 #000000 实心块</span>
+      </div>
+      <div class="neutral-table">
+        <div class="neutral-row head"><div>语义角色</div><div>浅色模式（Light）</div><div>深色模式（Dark）</div><div>用途说明</div></div>
+        <div class="neutral-row"><div><strong>Paper</strong><div class="type-token"><small>--paper / Paper*</small></div></div><div><span class="chip-hex"><i style="background:#fafafa;"></i>#FAFAFA</span></div><div><span class="chip-hex"><i style="background:#111111;"></i>#111111</span></div><div class="type-usage">整页画布底色、ActionSheet 隔断槽</div></div>
+        <div class="neutral-row"><div><strong>Surface</strong><div class="type-token"><small>--surface / Surface*</small></div></div><div><span class="chip-hex"><i style="background:#ffffff;"></i>#FFFFFF</span></div><div><span class="chip-hex"><i style="background:#1c1c1e;"></i>#1C1C1E</span></div><div class="type-usage">卡片、弹层、通栏列表、顶栏底栏</div></div>
+        <div class="neutral-row"><div><strong>Fill</strong><div class="type-token"><small>--surface-2 / Fill*</small></div></div><div><span class="chip-hex"><i style="background:#f2f2f2;"></i>#F2F2F2</span></div><div><span class="chip-hex"><i style="background:#2c2c2e;"></i>#2C2C2E</span></div><div class="type-usage">白卡内的次要按钮、输入框、未选胶囊、引用块</div></div>
+        <div class="neutral-row"><div><strong>Hairline</strong><div class="type-token"><small>--line / Hairline*</small></div></div><div><span class="chip-hex"><i style="background:#ededed;"></i>#EDEDED</span></div><div><span class="chip-hex"><i style="background:#2e2e30;"></i>#2E2E30</span></div><div class="type-usage">静态卡片 1px 外描边、0.5px 列表分隔线</div></div>
+        <div class="neutral-row"><div><strong>Line</strong><div class="type-token"><small>--line-strong / Line*</small></div></div><div><span class="chip-hex"><i style="background:#cfcfcf;"></i>#CFCFCF</span></div><div><span class="chip-hex"><i style="background:#3a3a3c;"></i>#3A3A3C</span></div><div class="type-usage">白底描边按钮框、未选中开关底、单选空心圈</div></div>
+        <div class="neutral-row"><div><strong>Ink 1（主文字）</strong><div class="type-token"><small>--ink / Ink*</small></div></div><div><span class="chip-hex"><i style="background:#222222;"></i>#222222</span></div><div><span class="chip-hex"><i style="background:#ececec;"></i>#ECECEC</span></div><div class="type-usage">标题、正文、主要图标（对比度 ≥ 13:1）</div></div>
+        <div class="neutral-row"><div><strong>Ink 2（次要文字）</strong><div class="type-token"><small>--ink-2 / Ink2*</small></div></div><div><span class="chip-hex"><i style="background:#666666;"></i>#666666</span></div><div><span class="chip-hex"><i style="background:#9a9aa0;"></i>#9A9AA0</span></div><div class="type-usage">弹窗说明、取消按钮、作者与时间（≥ 5.4:1）</div></div>
+        <div class="neutral-row"><div><strong>Ink 3（弱化/占位）</strong><div class="type-token"><small>--ink-3 / Ink3*</small></div></div><div><span class="chip-hex"><i style="background:#9a9a9a;"></i>#9A9A9A</span></div><div><span class="chip-hex"><i style="background:#6e6e73;"></i>#6E6E73</span></div><div class="type-usage">输入框占位字、右箭头、未选底栏图标</div></div>
+        <div class="neutral-row"><div><strong>Scrim（浮层遮罩）</strong><div class="type-token"><small>--ui-scrim / OverlayScrim</small></div></div><div><span class="chip-hex"><i style="background:rgba(18,18,23,0.38);"></i>rgba(18,18,23,.38)</span></div><div><span class="chip-hex"><i style="background:rgba(0,0,0,0.62);"></i>rgba(0,0,0,.62)</span></div><div class="type-usage">居中弹窗、BottomSheet、ActionSheet 统一遮罩</div></div>
+      </div>
+    </div>
+
+    <!-- 3. 6 Official Accents Matrix -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>2. 六套官方主题色矩阵（浅色 × 深色 · 点击整卡实时切换全页预览）</h3>
+        <span>仅作用于主按钮、选中胶囊、开关、单选/复选与文本链接；默认第一套「小伴红」</span>
+      </div>
+      <div class="accent-matrix" id="accent-matrix"></div>
+    </div>
+
+    <!-- 4. Fixed Semantic Colors -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>3. 固定语义色（永不随主题色切换）</h3>
+        <span>仅用于状态圆点、危险主按钮与错误文案，禁止做彩色糖果底</span>
+      </div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="swatch-color" style="background:var(--success);"></div><div class="swatch-info"><div class="swatch-name">Success 成功 / 已上线</div><div class="swatch-code">浅 #2FA36B · 深 #34C27C</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--danger);"></div><div class="swatch-info"><div class="swatch-name">Danger 危险 / 报错</div><div class="swatch-code">浅 #E3203C · 深 #FF6369</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#d97706;"></div><div class="swatch-info"><div class="swatch-name">Warn 审核中 / 警示点</div><div class="swatch-code">浅 #D97706 · 深 #FBBF24</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--info);"></div><div class="swatch-info"><div class="swatch-name">Info 信息 / 协议圆点</div><div class="swatch-code">浅 #2563EB · 深 #7AB3FF</div></div></div>
+      </div>
+    </div>
+
+    <!-- 5. Do / Don't Color Rules -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>4. 用色正误红线（Do / Don't）</h3>
+        <span>保证界面安静耐看，不被彩色块和同色浅底破坏层次</span>
+      </div>
+      <div class="dodont-grid">
+        <div class="dodont-card">
+          <div class="dodont-head"><i class="dodont-dot" style="background:var(--success);"></i>推荐：中性底 + 6px 语义圆点 / 实心主题主钮</div>
+          <div class="dodont-demo">
+            <button type="button" class="xb-btn h34 primary">发布作品</button>
+            <button type="button" class="xb-btn h34 outline">存草稿</button>
+            <span class="xb-tag dot ok">已上线</span>
+            <span class="xb-tag dot warn">审核中</span>
+          </div>
+          <div class="dodont-note">一屏只留 1 个实心主题色主按钮；次要操作退回白底细描边或浅灰底；状态标签统一中性底配语义圆点。</div>
+        </div>
+        <div class="dodont-card">
+          <div class="dodont-head"><i class="dodont-dot" style="background:var(--danger);"></i>禁止：同色系深浅糖果底 & 多实心主钮打架</div>
+          <div class="dodont-demo">
+            <span style="padding:6px 12px;border-radius:999px;background:#fff0f2;color:#e3203c;font-size:12.5px;font-weight:600;">浅粉底配红字</span>
+            <span style="padding:4px 10px;border-radius:999px;background:#e6f4ea;color:#2e6b47;font-size:12px;font-weight:600;">浅绿底配绿字</span>
+            <span style="padding:6px 12px;border-radius:999px;background:#07c160;color:#000;font-size:12.5px;font-weight:600;">高饱和绿配黑字</span>
+          </div>
+          <div class="dodont-note">按钮、筛选胶囊和状态标签一律不用同色系浅底深字；不使用对比度不足导致被迫翻黑字的荧光亮色。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 6: TOKENS & ARCHITECTURE ==================== -->
+  <section id="panel-tokens" data-panel="tokens" hidden>
+    <div class="section-intro">
+      <div>
+        <h2>尺寸、字号、圆角、颜色规范与模块边界</h2>
+        <p>把字号阶梯、圆角、间距网格、触控高度、描边阴影与颜色语义统一收敛进两端的 <code>theme / tokens</code> 层，避免页面手写散落数值。</p>
+      </div>
+    </div>
+
+    <!-- 1. Typography Scale -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>1. 文字字号阶梯（Typography）</h3>
+        <span>六档正文字号 + 底部导航特例 · 不加字距（letterSpacing = 0）</span>
+      </div>
+      <div class="type-scale">
+        <div class="type-row">
+          <div class="type-token">XType.Headline<small>--fs-headline</small></div>
+          <div class="type-metrics">22 / 30 · 600</div>
+          <div style="font-size:22px;line-height:30px;font-weight:600;">你好，今天想做什么</div>
+          <div class="type-usage">首页问候语、「我的」昵称、醒目数字</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Title<small>--fs-title</small></div>
+          <div class="type-metrics">18 / 24 · 600</div>
+          <div style="font-size:18px;line-height:24px;font-weight:600;">确认下架这个作品？</div>
+          <div class="type-usage">一级页顶栏标题、居中弹窗标题</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Section<small>--fs-section</small></div>
+          <div class="type-metrics">16 / 22 · 600</div>
+          <div style="font-size:16px;line-height:22px;font-weight:600;">思考等级与模型配置</div>
+          <div class="type-usage">子页顶栏、分区标题、卡片标题、Sheet 标题</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Body<small>--fs-body</small></div>
+          <div class="type-metrics">15 / 22 · 400/500</div>
+          <div style="font-size:15px;line-height:22px;">列表主文字、输入框内容与正文摘要</div>
+          <div class="type-usage">正文、列表行主文案、输入框、48px 主按钮</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Secondary<small>--fs-secondary</small></div>
+          <div class="type-metrics">13 / 18 · 400</div>
+          <div style="font-size:13px;line-height:18px;color:var(--ink-2);">删除后其他人将看不到该内容，操作无法撤销。</div>
+          <div class="type-usage">弹窗说明、作者与时间、次要按钮文字</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Caption<small>--fs-caption</small></div>
+          <div class="type-metrics">12 / 16 · 400/500</div>
+          <div style="font-size:12px;line-height:16px;color:var(--ink-2);">已上线 · 312 次体验 · 18 分钟前</div>
+          <div class="type-usage">状态标签、分组小标题、计数与角标（正文最小字号）</div>
+        </div>
+        <div class="type-row">
+          <div class="type-token">XType.Nav<small>--fs-nav</small></div>
+          <div class="type-metrics">10 / 13 · 400/650</div>
+          <div style="font-size:10px;line-height:13px;font-weight:650;">小伴 AI · 广场 · 社区 · 我的</div>
+          <div class="type-usage">仅限底部主导航文字（唯一 12 以下例外）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Border Radius Scale -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>2. 圆角阶梯（Border Radius）</h3>
+        <span>全局 6 档，消除页面 10/14/16/18/20 混用</span>
+      </div>
+      <div class="radius-grid">
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:8px;">8px</div>
+          <div class="radius-meta"><strong>RadiusInner / --r-inner</strong>输入框、卡片内嵌小块、封面缩略图</div>
+        </div>
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:12px;">12px</div>
+          <div class="radius-meta"><strong>RadiusSmall / --r-sm</strong>提示块、引用块、弹窗内图标块</div>
+        </div>
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:16px;">16px</div>
+          <div class="radius-meta"><strong>RadiusCard / --r-card</strong>大卡片、Banner、PC 普通表单弹窗</div>
+        </div>
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:20px 20px 0 0;">20px 顶角</div>
+          <div class="radius-meta"><strong>RadiusSheet / --r-sheet</strong>BottomSheet / ActionSheet（仅顶角圆）</div>
+        </div>
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:24px;">24px</div>
+          <div class="radius-meta"><strong>RadiusDialog / --r-dialog</strong>居中卡片弹窗（CardDialog / ConfirmDialog）</div>
+        </div>
+        <div class="radius-card">
+          <div class="radius-preview" style="border-radius:999px;">999px</div>
+          <div class="radius-meta"><strong>RadiusPill / --r-pill</strong>按钮、筛选胶囊、状态标签、Toast、头像</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Spacing, Touch Targets & Elevation -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>3. 间距、触控尺寸与层次（Spacing & Dimensions）</h3>
+        <span>间距严格 4px 倍数 · 阴影只给浮层</span>
+      </div>
+      <div class="dim-grid">
+        <div class="dim-card">
+          <h4>间距网格（Spacing · 4px 基准）</h4>
+          <div class="space-row"><code>4px</code><div class="space-bar-track"><div class="space-bar" style="width:14%;"></div></div><span class="type-usage">图标与紧凑文字间距</span></div>
+          <div class="space-row"><code>8px</code><div class="space-bar-track"><div class="space-bar" style="width:28%;"></div></div><span class="type-usage">按钮组、胶囊与小块间距</span></div>
+          <div class="space-row"><code>12px</code><div class="space-bar-track"><div class="space-bar" style="width:45%;"></div></div><span class="type-usage">卡片内区块、列表图标与文案</span></div>
+          <div class="space-row"><code>16px</code><div class="space-bar-track"><div class="space-bar" style="width:66%;"></div></div><span class="type-usage">页面标准左右边距 GutterX、卡片内边距</span></div>
+          <div class="space-row"><code>24px</code><div class="space-bar-track"><div class="space-bar" style="width:100%;"></div></div><span class="type-usage">弹窗左右安全留白、大区块间距</span></div>
+        </div>
+
+        <div class="dim-card">
+          <h4>控件高度、触控与图标尺寸</h4>
+          <div class="dim-list">
+            <div class="dim-item"><span>最小可点触控热区</span><code>44 × 44px（图标视觉 16–20px）</code></div>
+            <div class="dim-item"><span>按钮高度三档</span><code>48px 弹层主钮 · 40px 常规 · 34px 胶囊</code></div>
+            <div class="dim-item"><span>输入框 / 列表行 / ActionSheet 行</span><code>48px · 48–52px · 52px</code></div>
+            <div class="dim-item"><span>顶栏 / 底部主导航</span><code>48px 子页 · 52px 一级页 · 56px 底栏</code></div>
+            <div class="dim-item"><span>图标四档与线宽</span><code>14 / 16 / 20 / 24px · 线宽 1.8px 圆头</code></div>
+            <div class="dim-item"><span>头像尺寸阶梯（正圆）</span><code>24 / 32 / 44 / 68px</code></div>
+            <div class="dim-item"><span>媒体画幅白名单</span><code>1:1 应用图标 · 3:2 社区卡 · 16:9 详情头图</code></div>
+            <div class="dim-item"><span>描边与阴影规则</span><code>静态卡 1px #EDEDED 无阴影 · 分隔线 0.5px · 阴影仅给浮层</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3.5 Z-Index, Interaction States & Content Stress -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>3.5 层叠顺序（Z-Index）、交互态与内容兜底规则</h3>
+        <span>Toast 永远在最顶层 · 异步提交锁宽防重入 · 数字等宽对齐</span>
+      </div>
+      <div class="dim-grid">
+        <div class="dim-card">
+          <h4>全局层叠栈（<code>XZIndex</code> ↔ <code>--z-*</code>）</h4>
+          <div class="z-stack">
+            <div class="z-row"><span>1. 吸顶顶栏 / 底栏</span><code>--z-sticky: 20 / Sticky: 10</code></div>
+            <div class="z-row"><span>2. 底部评论 Dock / 输入栏</span><code>--z-dock: 25 / Dock: 20</code></div>
+            <div class="z-row"><span>3. 气泡菜单 Popover</span><code>--z-popover: 32 / Popover: 30</code></div>
+            <div class="z-row"><span>4. 侧边抽屉 Drawer</span><code>--z-drawer: 38 / Drawer: 40</code></div>
+            <div class="z-row"><span>5. 底部弹层 BottomSheet / ActionSheet</span><code>--z-sheet: 45 / Sheet: 50</code></div>
+            <div class="z-row"><span>6. 居中弹窗 CardDialog / ConfirmDialog</span><code>--z-dialog: 52 / Dialog: 60</code></div>
+            <div class="z-row"><strong>7. 轻提示 Toast（最高层）</strong><code>--z-toast: 60 / Toast: 70</code></div>
+          </div>
+        </div>
+        <div class="dim-card">
+          <h4>交互态、表单与极端内容约束</h4>
+          <div class="dim-list">
+            <div class="dim-item"><span>一屏焦点预算</span><code>最多 1 个实心主题色主按钮</code></div>
+            <div class="dim-item"><span>提交中防重入</span><code>锁定点击与关闭钮、保持原宽度不跳动</code></div>
+            <div class="dim-item"><span>文本截断与折行</span><code>昵称/标签 1 行 · 摘要 2 行 · 长链 anywhere</code></div>
+            <div class="dim-item"><span>数字等宽对齐</span><code>倒计时/积分/计数启用 tabular-nums</code></div>
+            <div class="dim-item"><span>异步状态选型</span><code>首屏用骨架屏 · 局部提交用 Spinner · 报错必给重试</code></div>
+            <div class="dim-item"><span>表单错误与按钮动词</span><code>错误就近展示 · 危险钮写明确动作（确认删除/下架）</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Color Tokens -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>4. 颜色语义（Colors · 浅/深色 + 6 套主题色）</h3>
+        <span>按钮/胶囊/标签禁止同色系深浅搭配 · 成功绿与危险红固定不随主题色变</span>
+      </div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="swatch-color" style="background:var(--paper);"></div><div class="swatch-info"><div class="swatch-name">页面底 Paper</div><div class="swatch-code">#FAFAFA / #111111</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--surface);"></div><div class="swatch-info"><div class="swatch-name">卡片/弹层 Surface</div><div class="swatch-code">#FFFFFF / #1C1C1E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--fill);"></div><div class="swatch-info"><div class="swatch-name">次要块 Fill</div><div class="swatch-code">#F2F2F2 / #2C2C2E</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--hairline);"></div><div class="swatch-info"><div class="swatch-name">描边/细线 Hairline</div><div class="swatch-code">#EDEDED / #2E2E30</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--brand);"></div><div class="swatch-info"><div class="swatch-name">当前主题色 Brand</div><div class="swatch-code">6 套官色动态切换</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--ink);"></div><div class="swatch-info"><div class="swatch-name">主/次/弱文字 Ink</div><div class="swatch-code">#222 / #666 / #9A9A9A</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--success);"></div><div class="swatch-info"><div class="swatch-name">成功绿（固定）</div><div class="swatch-code">#2FA36B / #34C27C</div></div></div>
+        <div class="swatch"><div class="swatch-color" style="background:var(--danger);"></div><div class="swatch-info"><div class="swatch-name">危险红（固定）</div><div class="swatch-code">#E3203C / #FF6369</div></div></div>
+      </div>
+    </div>
+
+    <!-- 5. Module Boundary -->
+    <div class="token-section">
+      <div class="token-section-head">
+        <h3>5. 分端模块边界（不建跨端大杂烩）</h3>
+        <span>手机端 :common:ui 与社区前台 src/ui/ 同心智分层、各自独立演进</span>
+      </div>
+      <div class="arch-grid" style="margin-top:0;">
+        <div class="arch-tree">
+          <h4>手机 App · 独立模块 <code>:common:ui</code></h4>
+          <pre>client/xiaoban-multiplatform/common/ui/
+├─ theme/
+│  ├─ XiaobanTheme.kt        # 深浅色、6 套主题色、ExtraColors
+│  ├─ Typography.kt          # XType 七档字号（22/18/16/15/13/12/10）
+│  ├─ Dimens.kt              # 圆角（8/12/16/20/24）、间距（4–24）、触控与高度
+│  ├─ Motion.kt              # 时长（140/200/260ms）、曲线、弹窗与页面转场规格
+│  └─ Icons.kt               # 基础线条图标（16/20/24 · 1.8 线宽）
+├─ controls/
+│  ├─ Buttons.kt             # PillButton / OutlinePillButton / GhostPillButton
+│  ├─ Inputs.kt              # TextBox / AreaBox / Toggle / CheckBox / RadioRow
+│  ├─ ChipsAndTags.kt        # ChipPill / Tag（中性底+语义圆点）/ StatusDot
+│  └─ SurfaceAndList.kt      # OutlinedCard / Hairline / NavRow / Banner / EmptyState
+├─ layout/
+│  └─ TopBars.kt             # HomeBar / ScreenBar / RefinedScreenBar
+└─ overlay/
+   ├─ OverlayTransition.kt   # 统一遮罩淡入淡出 + 方向滑入
+   ├─ CardDialog.kt          # 24dp 居中卡（收口 CommunityCardDialog + CenterDialog）
+   ├─ BottomSheet.kt         # 20dp 顶圆角底部弹层（含拖拽条/安全区/IME 避让）
+   ├─ ActionSheet.kt         # 20dp 操作菜单（含危险项 + 隔断 + 取消）
+   └─ Toast.kt               # 轻量悬浮提示
+
+# 留在 business:community-native（不进 :common:ui）
+- MainBottomNav / ChatComposer / UserBubble / AttachSheet
+- NativeSharing 磨砂舞台 / CommentComposer 三态面板 / AvatarEditor / 协议 2 宿主菜单</pre>
+        </div>
+
+        <div class="arch-tree">
+          <h4>社区网页 · 站内模块 <code>src/ui/</code>（前台专用）</h4>
+          <pre>services/server-forum/web/src/ui/
+├─ tokens/
+│  └─ ui-tokens.css          # 字号 --fs-*、圆角 --r-*、间距 --sp-*、动效 --dur/--ease 与 --z-* 层叠变量
+├─ icons/
+│  ├─ icons.ts               # 强类型通用 UI 图标路径表（UiIconName，与手机 XIcons 对齐）
+│  └─ UiIcon.vue             # 24×24 · 1.8 线宽 · 14/16/20/24px 统一图标组件
+├─ controls/
+│  ├─ UiButton.vue           # primary / outline / secondary / ghost / danger / danger-outline
+│  ├─ UiTag.vue              # 中性底 + 语义圆点 / 白底细描边
+│  ├─ UiEmptyState.vue       # 统一空态与重试
+│  └─ UiSpinner.vue          # 统一加载指示器
+└─ overlay/
+   ├─ CenterDialog.vue       # 24px 居中卡（PC & H5 均居中）
+   ├─ ConfirmDialog.vue      # 标准确认/危险弹窗（替代前台 window.confirm）
+   ├─ confirm.ts             # 命令式 confirmDialog() 调用封装
+   ├─ BottomSheet.vue        # 20px 顶圆角底部抽屉（安全区 + visualViewport）
+   ├─ ActionSheet.vue        # 底部操作菜单（危险项 + 隔断 + 取消）
+   ├─ ResponsiveDialog.vue   # PC 居中 ↔ H5 显式选 sheet 或 center（升级原 ModalDialog）
+   └─ ToastHost.vue          # 统一轻提示
+
+# 留在 src/components/ 或不改动
+- DetailShareDialog / CommentSheet / AvatarEditor（业务特例保留）
+- views/admin/*（管理后台本次不动）</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const ACCENTS = [
+  { id: 'red', name: '小伴红', light: { btn: '#e3203c', hi: '#f0506a', soft: '#fff3f4', ink: '#e3203c' }, dark: { btn: '#ee4b5f', hi: '#f76b7d', soft: '#3a2225', ink: '#ff8c91' } },
+  { id: 'green', name: '薄荷绿', light: { btn: '#2e8b5e', hi: '#3fa172', soft: '#e3f2e9', ink: '#1e6a45' }, dark: { btn: '#34a36d', hi: '#48b981', soft: '#1d3328', ink: '#72d6a2' } },
+  { id: 'blue', name: '海湾蓝', light: { btn: '#2f6fdb', hi: '#4a84e6', soft: '#e6eefc', ink: '#1d53ae' }, dark: { btn: '#3b7be8', hi: '#5a92f0', soft: '#1e2a42', ink: '#8db6ff' } },
+  { id: 'purple', name: '暮紫', light: { btn: '#7152d8', hi: '#8669e3', soft: '#ede8fc', ink: '#5537b8' }, dark: { btn: '#8466e6', hi: '#9a80ee', soft: '#2a2342', ink: '#bba8ff' } },
+  { id: 'amber', name: '琥珀', light: { btn: '#a8640c', hi: '#bd7a1c', soft: '#faeedb', ink: '#87500a' }, dark: { btn: '#c27a1a', hi: '#d69130', soft: '#3a2c17', ink: '#f0b65a' } },
+  { id: 'graphite', name: '石墨', light: { btn: '#2b2b30', hi: '#4a4a50', soft: '#e9e9ec', ink: '#2b2b30' }, dark: { btn: '#636368', hi: '#7c7c82', soft: '#3a3a3d', ink: '#e5e5ea' } },
+];
+
+const state = {
+  tab: 'overlays',
+  theme: 'light',
+  accent: 'red',
+  width: 390,
+  dialogVariant: 'danger',
+  sheetVariant: 'radio',
+  sheetRadio: 'balanced',
+  sheetBoard: '创意分享',
+  actionVariant: 'more',
+  respMode: 'confirm',
+  iconCat: 'all',
+  iconQuery: '',
+  iconSize: 20,
+};
+
+const ICON_GALLERY = [
+  { name: 'chevron-left', kt: 'ChevronLeft', zh: '返回 / 左箭头', cat: 'nav', d: 'M15 5l-7 7 7 7' },
+  { name: 'chevron-right', kt: 'ChevronRight', zh: '前进 / 详情', cat: 'nav', d: 'M9 5l7 7-7 7' },
+  { name: 'chevron-down', kt: 'ChevronDown', zh: '展开 / 下拉', cat: 'nav', d: 'M6 9l6 6 6-6' },
+  { name: 'chevron-up', kt: 'ChevronUp', zh: '收起', cat: 'nav', d: 'M6 15l6-6 6 6' },
+  { name: 'arrow-right', kt: 'ArrowRight', zh: '发送 / 跳转', cat: 'nav', d: 'M5 12h13M13 6l6 6-6 6' },
+  { name: 'compass', kt: 'NavCompass', zh: '社区发现', cat: 'nav', d: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z' },
+  { name: 'grid', kt: 'Grid', zh: '应用广场', cat: 'nav', d: 'M4 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM15 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM4 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1ZM15 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z' },
+  { name: 'search', kt: 'Search', zh: '搜索', cat: 'nav', d: 'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Zm-2 5 6 6' },
+  { name: 'sort', kt: 'DetailSort', zh: '排序 / 筛选', cat: 'nav', d: 'M4 7h16M7 12h10M10 17h4' },
+  { name: 'more', kt: 'More', zh: '更多（横三点）', cat: 'nav', d: 'M5 12h.01M12 12h.01M19 12h.01' },
+  { name: 'more-vertical', kt: 'MoreVertical', zh: '宿主菜单（竖三点）', cat: 'nav', d: 'M12 5h.01M12 12h.01M12 19h.01' },
+  { name: 'external', kt: 'ExternalLink', zh: '外部链接', cat: 'nav', d: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3' },
+  { name: 'close', kt: 'Close', zh: '关闭', cat: 'action', d: 'm6 6 12 12M18 6 6 18' },
+  { name: 'plus', kt: 'Plus', zh: '新增 / 发布', cat: 'action', d: 'M12 5v14M5 12h14' },
+  { name: 'check', kt: 'Check', zh: '选中 / 确认', cat: 'action', d: 'M20 6 9 17l-5-5' },
+  { name: 'edit', kt: 'Pen', zh: '编辑 / 重命名', cat: 'action', d: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' },
+  { name: 'trash', kt: 'Trash', zh: '删除', cat: 'action', d: 'M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2' },
+  { name: 'copy', kt: 'Copy', zh: '复制', cat: 'action', d: 'M11 9h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM5 15V6a2 2 0 0 1 2-2h9' },
+  { name: 'share', kt: 'Share', zh: '分享', cat: 'action', d: 'M12 15V3m-4 4 4-4 4 4M5 11v9h14v-9' },
+  { name: 'link', kt: 'Link', zh: '复制链接', cat: 'action', d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
+  { name: 'download', kt: 'Download', zh: '下载', cat: 'action', d: 'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5' },
+  { name: 'upload', kt: 'Upload', zh: '上传', cat: 'action', d: 'M12 16V4m-5 5 5-5 5 5M4 16v5h16v-5' },
+  { name: 'refresh', kt: 'Refresh', zh: '刷新 / 重试', cat: 'action', d: 'M20 7v5h-5M20 12a8 8 0 1 0-2.4 5.7' },
+  { name: 'sliders', kt: 'Sliders', zh: '参数调节', cat: 'action', d: 'M4 7h16M4 17h16M8 4v6M16 14v6' },
+  { name: 'settings', kt: 'Settings', zh: '设置', cat: 'action', d: 'M9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z' },
+  { name: 'info', kt: 'Info', zh: '说明 / 提示', cat: 'status', d: 'M3.5 12a8.5 8.5 0 1 0 17 0 8.5 8.5 0 1 0-17 0M12 11v5M12 7.8v.4' },
+  { name: 'warning', kt: 'Warning', zh: '警告 / 高危', cat: 'status', d: 'M12 4l9 16H3ZM12 10v4M12 17h.01' },
+  { name: 'help', kt: 'Question', zh: '帮助 / 求助', cat: 'status', d: 'M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0M9.5 9.2a2.6 2.6 0 0 1 5 1c0 1.6-2.5 2-2.5 3.3M12 17h.01' },
+  { name: 'block', kt: 'Block', zh: '屏蔽 / 禁止', cat: 'status', d: 'M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0M5.6 5.6 18.4 18.4' },
+  { name: 'shield', kt: 'Shield', zh: '安全 / 权限', cat: 'status', d: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6' },
+  { name: 'flag', kt: 'Flag', zh: '举报', cat: 'status', d: 'M5 21V4M5 4h11l-2 4 2 4H5' },
+  { name: 'eye', kt: 'Eye', zh: '查看 / 预览', cat: 'status', d: 'M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12ZM9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0' },
+  { name: 'bell', kt: 'Bell', zh: '通知提醒', cat: 'status', d: 'M6 17v-6a6 6 0 0 1 12 0v6l2 2H4ZM10 22h4' },
+  { name: 'sun', kt: 'Sun', zh: '浅色模式', cat: 'status', d: 'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5' },
+  { name: 'moon', kt: 'Moon', zh: '深色模式', cat: 'status', d: 'M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z' },
+  { name: 'spark', kt: 'NavSpark', zh: '小伴 AI', cat: 'social', d: 'm12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z' },
+  { name: 'message', kt: 'DetailComment', zh: '评论 / 回复', cat: 'social', d: 'M20.8 12a8.8 8.8 0 0 1-8.8 8.8H3.4l1.7-3.4A8.8 8.8 0 1 1 20.8 12Z' },
+  { name: 'heart', kt: 'Heart', zh: '点赞 / 喜欢', cat: 'social', d: 'M12 20L5.9 14.3C4.2 12.7 3 11.1 3 8.9A4.9 4.9 0 0 1 7.9 4c1.6 0 3 .8 4.1 2.1C13.1 4.8 14.5 4 16.1 4A4.9 4.9 0 0 1 21 8.9c0 2.2-1.2 3.8-2.9 5.4Z' },
+  { name: 'star', kt: 'Star', zh: '精选 / 收藏', cat: 'social', d: 'M12 3.3l2.7 5.6 6.3.9-4.6 4.4 1.1 6.3-5.5-3-5.5 3 1.1-6.3L3 9.8l6.3-.9Z' },
+  { name: 'bookmark', kt: 'Bookmark', zh: '书签收藏', cat: 'social', d: 'M6 3h12v18l-6-4-6 4Z' },
+  { name: 'user', kt: 'User', zh: '个人 / 我的', cat: 'social', d: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2' },
+  { name: 'users', kt: 'Users', zh: '关注 / 粉丝', cat: 'social', d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M5.5 7a3.5 3.5 0 1 0 7 0 3.5 3.5 0 1 0-7 0M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a3.5 3.5 0 0 1 0 6.74' },
+  { name: 'smile', kt: 'Smile', zh: '表情', cat: 'social', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2M9 9.5h.01M15 9.5h.01' },
+  { name: 'at', kt: 'AtSign', zh: '提及 @', cat: 'social', d: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM16 8v5a2.5 2.5 0 0 0 5 0v-1a9 9 0 1 0-4 7.5' },
+  { name: 'play', kt: 'Play', zh: '运行 / 播放', cat: 'media', d: 'M8 5v14l11-7Z' },
+  { name: 'image', kt: 'Image', zh: '图片 / 相册', cat: 'media', d: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM9 10a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm12 6-5-5-9 9' },
+  { name: 'folder', kt: 'Folder', zh: '文件夹', cat: 'media', d: 'M3 6h6l2 3h10v11H3Z' },
+  { name: 'document', kt: 'File', zh: '文档 / 附件', cat: 'media', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6M8 13h8M8 17h5' },
+  { name: 'keyboard', kt: 'Keyboard', zh: '键盘输入', cat: 'media', d: 'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2ZM6 10h.01m4 0h.01m4 0h.01m4 0h.01M8 14h8' },
+  { name: 'monitor', kt: 'Monitor', zh: '电脑桌面端', cat: 'media', d: 'M3 4h18v13H3ZM12 17v4M8 21h8' },
+  { name: 'cpu', kt: 'Cpu', zh: '模型 / 算力', cat: 'media', d: 'M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2ZM10 10h4v4h-4ZM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4' },
+  { name: 'gamepad', kt: 'Gamepad', zh: '游戏作品', cat: 'media', d: 'M8 7.5h8a5 5 0 0 1 5 5 5 5 0 0 1-5 5H8a5 5 0 0 1-5-5 5 5 0 0 1 5-5ZM8 10.5v4M6 12.5h4M15.5 11.5h.01M17.8 13.5h.01' },
+  { name: 'qr', kt: 'QrCode', zh: '二维码', cat: 'media', d: 'M3 3h7v7H3ZM14 3h7v7h-7ZM3 14h7v7H3ZM14 14h3v3h-3ZM19 14h2v2h-2ZM14 19h2v2h-2ZM18 18h3v3h-3Z' },
+];
+
+function renderIcons() {
+  const grid = document.getElementById('icon-grid');
+  if (!grid) return;
+  const q = state.iconQuery.trim().toLowerCase();
+  const list = ICON_GALLERY.filter(it =>
+    (state.iconCat === 'all' || it.cat === state.iconCat) &&
+    (!q || it.name.includes(q) || it.kt.toLowerCase().includes(q) || it.zh.includes(q))
+  );
+  grid.innerHTML = list.map(it => `
+    <button type="button" class="icon-tile" data-copy-icon="${it.name} / XIcons.${it.kt}">
+      <span class="icon-tile-glyph">
+        <svg class="icon" style="width:${state.iconSize}px;height:${state.iconSize}px;" viewBox="0 0 24 24"><path d="${it.d}"/></svg>
+      </span>
+      <span class="icon-tile-name">${it.name}</span>
+      <span class="icon-tile-sub">${it.zh}</span>
+    </button>
+  `).join('') || '<div style="grid-column:1/-1;text-align:center;color:var(--ink-2);padding:32px;">没有匹配的图标</div>';
+}
+
+const root = document.documentElement;
+
+function applyThemeAndAccent() {
+  root.dataset.theme = state.theme;
+  root.dataset.accent = state.accent;
+  const item = ACCENTS.find(a => a.id === state.accent) || ACCENTS[0];
+  const p = item[state.theme];
+  root.style.setProperty('--brand', p.btn);
+  root.style.setProperty('--brand-hi', p.hi);
+  root.style.setProperty('--brand-soft', p.soft);
+  root.style.setProperty('--brand-ink', p.ink);
+  document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.themeBtn === state.theme));
+  });
+  document.querySelectorAll('.accent-dot').forEach(dot => {
+    dot.setAttribute('aria-pressed', String(dot.dataset.accentId === state.accent));
+  });
+  document.querySelectorAll('.accent-card').forEach(card => {
+    card.classList.toggle('is-current', card.dataset.accentPick === state.accent);
+  });
+}
+
+function buildAccentMatrix() {
+  const wrap = document.getElementById('accent-matrix');
+  if (!wrap) return;
+  wrap.innerHTML = ACCENTS.map(a => `
+    <button type="button" class="accent-card ${a.id === state.accent ? 'is-current' : ''}" data-accent-pick="${a.id}">
+      <div class="accent-card-head">
+        <strong>${a.name}${a.id === 'red' ? '（默认）' : ''}</strong>
+        <code>${a.id}</code>
+      </div>
+      <div class="accent-pair">
+        <div class="accent-mode-box is-light">
+          <div class="accent-pill-mini" style="background:${a.light.btn};">浅色主按钮</div>
+          <div class="accent-codes"><span>btn ${a.light.btn.toUpperCase()}</span><span>ink ${a.light.ink.toUpperCase()}</span></div>
+        </div>
+        <div class="accent-mode-box is-dark">
+          <div class="accent-pill-mini" style="background:${a.dark.btn};">深色主按钮</div>
+          <div class="accent-codes"><span>btn ${a.dark.btn.toUpperCase()}</span><span>ink ${a.dark.ink.toUpperCase()}</span></div>
+        </div>
+      </div>
+    </button>
+  `).join('');
+  wrap.addEventListener('click', e => {
+    const card = e.target.closest('[data-accent-pick]');
+    if (!card) return;
+    state.accent = card.dataset.accentPick;
+    applyThemeAndAccent();
+  });
+}
+
+function buildAccentDots() {
+  const wrap = document.getElementById('accent-dots');
+  wrap.innerHTML = ACCENTS.map(a =>
+    `<button type="button" class="accent-dot" data-accent-id="${a.id}" title="${a.name}" aria-label="主题色：${a.name}" aria-pressed="${a.id === state.accent}" style="background:${a.light.btn}"></button>`
+  ).join('');
+  wrap.addEventListener('click', e => {
+    const btn = e.target.closest('.accent-dot');
+    if (!btn) return;
+    state.accent = btn.dataset.accentId;
+    applyThemeAndAccent();
+  });
+}
+
+function switchTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
+  });
+  document.querySelectorAll('[data-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.panel !== tab;
+  });
+}
+
+function showToast(stackId, text, opts = {}) {
+  const stack = document.getElementById(stackId);
+  if (!stack) return;
+  const el = document.createElement('div');
+  el.className = 'xb-toast' + (opts.error ? ' is-error' : '');
+  el.innerHTML = `<span>${text}</span>${opts.action ? `<button type="button" class="xb-toast-action">${opts.action}</button>` : ''}`;
+  stack.innerHTML = '';
+  stack.appendChild(el);
+  clearTimeout(stack._timer);
+  stack._timer = setTimeout(() => { el.remove(); }, 2600);
+}
+
+/* ---------- Board 1: CardDialog ---------- */
+function renderDialog() {
+  const host = document.getElementById('dialog-content');
+  const closeBtn = `<button type="button" class="xb-dialog-close" data-close="overlay-dialog" aria-label="关闭"><span><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></button>`;
+  if (state.dialogVariant === 'danger') {
+    host.innerHTML = `${closeBtn}
+      <div class="xb-dialog-scroll">
+        <div class="xb-dialog-head">
+          <div class="xb-dialog-tile is-danger"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg></div>
+          <div><div class="xb-dialog-title">删除这条回复？</div><div class="xb-dialog-desc">删除后其他人将看不到该内容，操作无法撤销。</div></div>
+        </div>
+        <div class="xb-dialog-quote">“字体排版很舒服，已经装到桌面了！希望下一版能加上番茄钟切换。”</div>
+      </div>
+      <div class="xb-dialog-actions">
+        <button type="button" class="xb-btn-primary-full is-danger" data-dialog-ok="已删除回复">确认删除</button>
+        <button type="button" class="xb-btn-text-full" data-close="overlay-dialog">取消</button>
+      </div>`;
+  } else if (state.dialogVariant === 'confirm') {
+    host.innerHTML = `${closeBtn}
+      <div class="xb-dialog-scroll">
+        <div class="xb-dialog-head">
+          <div class="xb-dialog-tile is-brand"><svg class="icon" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></svg></div>
+          <div><div class="xb-dialog-title">采纳这条回答？</div><div class="xb-dialog-desc">悬赏积分将立即发放给作者「陆远」，采纳后不可更改。</div></div>
+        </div>
+        <div class="xb-dialog-notice"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg><span>采纳同时会将本求助标记为已解决。</span></div>
+      </div>
+      <div class="xb-dialog-actions">
+        <button type="button" class="xb-btn-primary-full" data-dialog-ok="已采纳回答">确认采纳</button>
+        <button type="button" class="xb-btn-text-full" data-close="overlay-dialog">取消</button>
+      </div>`;
+  } else if (state.dialogVariant === 'input') {
+    host.innerHTML = `${closeBtn}
+      <div class="xb-dialog-scroll">
+        <div class="xb-dialog-head">
+          <div class="xb-dialog-tile"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+          <div><div class="xb-dialog-title">重命名对话</div><div class="xb-dialog-desc">仅影响侧栏显示名称，不改动上下文内容。</div></div>
+        </div>
+        <div class="xb-dialog-field">
+          <label for="rename-demo">新名称</label>
+          <input id="rename-demo" class="xb-input" value="桌面时钟组件方案" />
+        </div>
+      </div>
+      <div class="xb-dialog-actions">
+        <button type="button" class="xb-btn-primary-full" data-dialog-ok="名称已保存">保存名称</button>
+        <button type="button" class="xb-btn-text-full" data-close="overlay-dialog">取消</button>
+      </div>`;
+  } else {
+    host.innerHTML = `${closeBtn}
+      <div class="xb-dialog-scroll">
+        <div class="xb-dialog-head">
+          <div class="xb-dialog-tile is-danger"><svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+          <div><div class="xb-dialog-title">下架「潮汐书房」？</div><div class="xb-dialog-desc">下架后公开链接不再可访问，已经安装过的用户不受影响。</div></div>
+        </div>
+        <div class="xb-dialog-notice is-error"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg><span>网络连接超时，请稍后重试。</span></div>
+      </div>
+      <div class="xb-dialog-actions">
+        <button type="button" class="xb-btn-primary-full" disabled><span class="xb-spinner" style="width:15px;height:15px;"></span>正在提交…</button>
+        <button type="button" class="xb-btn-text-full" disabled>取消</button>
+      </div>`;
+  }
+}
+
+/* ---------- Board 2: BottomSheet ---------- */
+function renderSheet() {
+  const host = document.getElementById('sheet-content');
+  if (state.sheetVariant === 'radio') {
+    const opts = [
+      { id: 'fast', title: '快速响应', desc: '直接回答，适合日常问答与查资料' },
+      { id: 'balanced', title: '平衡思考（推荐）', desc: '兼顾推理质量与回复速度' },
+      { id: 'deep', title: '深度推理', desc: '适合复杂排错、代码架构与长文规划' },
+    ];
+    host.innerHTML = `<div class="xb-bottom-sheet" role="dialog" aria-modal="true">
+      <div class="xb-sheet-handle"></div>
+      <div class="xb-sheet-header">
+        <div><div class="xb-sheet-title">思考等级</div><div class="xb-sheet-sub">仅对当前会话生效</div></div>
+      </div>
+      <div class="xb-sheet-body">
+        ${opts.map(o => `<button type="button" class="xb-opt-row ${state.sheetRadio === o.id ? 'is-active' : ''}" data-pick-radio="${o.id}">
+          <div class="xb-opt-main"><div class="xb-opt-title">${o.title}</div><div class="xb-opt-desc">${o.desc}</div></div>
+          <span class="xb-radio-ring"></span>
+        </button>`).join('')}
+      </div>
+      <button type="button" class="xb-sheet-cancel-row" data-close="overlay-sheet">取消</button>
+    </div>`;
+  } else if (state.sheetVariant === 'scroll') {
+    const boards = ['创意分享', '使用技巧', '桌面装扮', '求助问答', '开源讨论', '模型配置', '产品建议', '闲聊灌水'];
+    host.innerHTML = `<div class="xb-bottom-sheet" role="dialog" aria-modal="true" style="height:460px;">
+      <div class="xb-sheet-handle"></div>
+      <div class="xb-sheet-header has-divider">
+        <div class="xb-sheet-title">选择发布板块</div>
+      </div>
+      <div class="xb-sheet-body">
+        ${boards.map(b => `<button type="button" class="xb-opt-row ${state.sheetBoard === b ? 'is-active' : ''}" data-pick-board="${b}">
+          <div class="xb-opt-main"><div class="xb-opt-title">${b}</div></div>
+          <span class="xb-radio-ring"></span>
+        </button>`).join('')}
+      </div>
+      <div class="xb-sheet-actions-2">
+        <button type="button" class="act-cancel" data-close="overlay-sheet">取消</button>
+        <button type="button" class="act-confirm" data-sheet-ok="已选板块：${state.sheetBoard}">确定</button>
+      </div>
+    </div>`;
+  } else {
+    host.innerHTML = `<div class="xb-bottom-sheet" role="dialog" aria-modal="true" style="border-radius:var(--r-sheet) var(--r-sheet) 0 0;">
+      <div class="xb-sheet-handle"></div>
+      <div class="xb-sheet-header">
+        <div class="xb-sheet-title">添加自定义标签</div>
+      </div>
+      <div class="xb-sheet-pad" style="padding-bottom:14px;">
+        <input class="xb-input" placeholder="输入标签名，最多 12 字" value="极简桌面" />
+      </div>
+      <div class="xb-sheet-actions-2">
+        <button type="button" class="act-cancel" data-close="overlay-sheet">取消</button>
+        <button type="button" class="act-confirm" data-sheet-ok="已添加标签「极简桌面」">添加</button>
+      </div>
+      <div class="mock-kbd">系统软键盘区域（BottomSheet 自动 imePadding / visualViewport 避让）</div>
+    </div>`;
+  }
+}
+
+/* ---------- Board 3: ActionSheet ---------- */
+function renderActionSheet() {
+  const layer = document.getElementById('overlay-action');
+  const host = document.getElementById('action-content');
+  if (state.actionVariant === 'toast') {
+    layer.classList.add('is-hidden');
+    showToast('toast-action', '链接已复制到剪贴板', { action: '查看' });
+    return;
+  }
+  layer.classList.remove('is-hidden');
+  if (state.actionVariant === 'more') {
+    host.innerHTML = `
+      <div class="xb-sheet-handle"></div>
+      <div class="xb-sheet-header">
+        <div class="xb-sheet-title">更多操作</div>
+      </div>
+      <div>
+        <button type="button" class="xb-as-item" data-as-pick="已复制帖子链接"><svg class="icon" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1m2 3.7a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>复制链接</button>
+        <button type="button" class="xb-as-item" data-as-pick="将减少此类推荐"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m4.9 4.9 14.2 14.2"/></svg>不感兴趣</button>
+        <button type="button" class="xb-as-item" data-as-pick="已打开举报弹窗"><svg class="icon" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>举报内容</button>
+        <button type="button" class="xb-as-item is-danger" data-as-pick="将弹出二次确认：屏蔽该用户"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></svg>屏蔽该用户</button>
+      </div>
+      <button type="button" class="xb-sheet-cancel-row" data-close="overlay-action">取消</button>`;
+  } else {
+    host.innerHTML = `
+      <div class="xb-sheet-handle"></div>
+      <div class="xb-sheet-header">
+        <div><div class="xb-sheet-title">更换头像</div><div class="xb-sheet-sub">支持 JPG / PNG / WebP，最大 10MB</div></div>
+      </div>
+      <div>
+        <button type="button" class="xb-as-item" data-as-pick="正在打开相机">拍照</button>
+        <button type="button" class="xb-as-item" data-as-pick="正在打开系统相册">从相册选择</button>
+        <button type="button" class="xb-as-item is-danger" data-as-pick="已恢复默认头像">恢复默认头像</button>
+      </div>
+      <button type="button" class="xb-sheet-cancel-row" data-close="overlay-action">取消</button>`;
+  }
+}
+
+/* ---------- Tab 3: Responsive PC <-> H5 ---------- */
+function renderResponsive() {
+  const pcModal = document.getElementById('resp-pc-modal');
+  const h5Layer = document.getElementById('resp-h5-layer');
+  const h5Modal = document.getElementById('resp-h5-modal');
+  const pcNote = document.getElementById('resp-pc-note');
+  const h5Note = document.getElementById('resp-h5-note');
+
+  if (state.respMode === 'confirm') {
+    pcNote.textContent = 'ConfirmDialog · 居中 24px（宽 380px）';
+    h5Note.textContent = 'ConfirmDialog · 同样居中 24px';
+    const cardHtml = `
+      <div class="xb-card-dialog" style="width:min(360px,100%);">
+        <button type="button" class="xb-dialog-close" aria-label="关闭"><span><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></button>
+        <div class="xb-dialog-scroll">
+          <div class="xb-dialog-head">
+            <div class="xb-dialog-tile is-danger"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg></div>
+            <div><div class="xb-dialog-title">下架「潮汐书房」？</div><div class="xb-dialog-desc">下架后公开链接不再可访问，已经应用过的用户不受影响。</div></div>
+          </div>
+        </div>
+        <div class="xb-dialog-actions">
+          <button type="button" class="xb-btn-primary-full is-danger">确认下架</button>
+          <button type="button" class="xb-btn-text-full">取消</button>
+        </div>
+      </div>`;
+    pcModal.innerHTML = cardHtml;
+    h5Layer.className = 'overlay-root overlay-center';
+    h5Modal.innerHTML = cardHtml;
+  } else {
+    pcNote.textContent = 'ResponsiveDialog · PC 居中 16px（宽 440px）';
+    h5Note.textContent = 'ResponsiveDialog · H5 自动贴底 20px';
+    const formFields = `
+      <div style="display:grid;gap:12px;">
+        <div><div style="font-size:12.5px;color:var(--ink-2);margin-bottom:6px;">举报原因</div>
+          <div class="row-wrap"><span class="xb-chip" aria-pressed="true">广告引流</span><span class="xb-chip">不实信息</span><span class="xb-chip">侵权抄袭</span><span class="xb-chip">其他</span></div>
+        </div>
+        <textarea class="xb-textarea" style="min-height:72px;" placeholder="补充说明（选填）"></textarea>
+        <div class="row-wrap" style="justify-content:flex-end;">
+          <button type="button" class="xb-btn h40 secondary">取消</button>
+          <button type="button" class="xb-btn h40 primary">提交举报</button>
+        </div>
+      </div>`;
+    pcModal.innerHTML = `
+      <div class="pc-dialog-box">
+        <div class="pc-dialog-head"><h4>举报这个帖子</h4><button type="button" class="xb-sheet-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+        <div class="pc-dialog-body">${formFields}</div>
+      </div>`;
+    h5Layer.className = 'overlay-root overlay-bottom';
+    h5Modal.innerHTML = `
+      <div class="xb-bottom-sheet">
+        <div class="xb-sheet-handle"></div>
+        <div class="xb-sheet-header has-divider"><div class="xb-sheet-title">举报这个帖子</div><button type="button" class="xb-sheet-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+        <div class="xb-sheet-pad" style="padding-top:12px;">${formFields}</div>
+      </div>`;
+  }
+}
+
+/* ---------- Global Event Wiring ---------- */
+document.addEventListener('click', e => {
+  const tabBtn = e.target.closest('[data-tab]');
+  if (tabBtn) { switchTab(tabBtn.dataset.tab); return; }
+
+  const themeBtn = e.target.closest('[data-theme-btn]');
+  if (themeBtn) { state.theme = themeBtn.dataset.themeBtn; applyThemeAndAccent(); return; }
+
+  const wBtn = e.target.closest('[data-width]');
+  if (wBtn) {
+    state.width = Number(wBtn.dataset.width);
+    root.style.setProperty('--phone-w', state.width + 'px');
+    document.querySelectorAll('[data-width]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.width) === state.width)));
+    return;
+  }
+
+  const closeEl = e.target.closest('[data-close]');
+  if (closeEl) { document.getElementById(closeEl.dataset.close)?.classList.add('is-hidden'); return; }
+
+  const reopenEl = e.target.closest('[data-reopen]');
+  if (reopenEl) {
+    const id = reopenEl.dataset.reopen;
+    if (id === 'overlay-action' && state.actionVariant === 'toast') {
+      state.actionVariant = 'more';
+      document.getElementById('sel-action').value = 'more';
+      renderActionSheet();
+    }
+    document.getElementById(id)?.classList.remove('is-hidden');
+    return;
+  }
+
+  const okDialog = e.target.closest('[data-dialog-ok]');
+  if (okDialog) {
+    document.getElementById('overlay-dialog')?.classList.add('is-hidden');
+    showToast('toast-dialog', okDialog.dataset.dialogOk);
+    return;
+  }
+
+  const pickRadio = e.target.closest('[data-pick-radio]');
+  if (pickRadio) {
+    state.sheetRadio = pickRadio.dataset.pickRadio;
+    renderSheet();
+    showToast('toast-sheet', '已切换思考等级');
+    return;
+  }
+
+  const pickBoard = e.target.closest('[data-pick-board]');
+  if (pickBoard) {
+    state.sheetBoard = pickBoard.dataset.pickBoard;
+    renderSheet();
+    return;
+  }
+
+  const sheetOk = e.target.closest('[data-sheet-ok]');
+  if (sheetOk) {
+    document.getElementById('overlay-sheet')?.classList.add('is-hidden');
+    showToast('toast-sheet', sheetOk.dataset.sheetOk);
+    return;
+  }
+
+  const asPick = e.target.closest('[data-as-pick]');
+  if (asPick) {
+    document.getElementById('overlay-action')?.classList.add('is-hidden');
+    showToast('toast-action', asPick.dataset.asPick);
+    return;
+  }
+
+  const toastDemo = e.target.closest('[data-toast-demo]');
+  if (toastDemo) {
+    const kind = toastDemo.dataset.toastDemo;
+    if (kind === 'normal') showToast('toast-action', '已保存到收藏');
+    if (kind === 'action') showToast('toast-action', '已移到回收站', { action: '撤销' });
+    if (kind === 'error') showToast('toast-action', '网络请求失败，请稍后重试', { error: true });
+    return;
+  }
+
+  const toggle = e.target.closest('[data-toggle]');
+  if (toggle) {
+    toggle.setAttribute('aria-checked', String(toggle.getAttribute('aria-checked') !== 'true'));
+    return;
+  }
+
+  const chip = e.target.closest('[data-chip]');
+  if (chip) {
+    chip.parentElement.querySelectorAll('[data-chip]').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+    return;
+  }
+
+  const respBtn = e.target.closest('[data-resp-mode]');
+  if (respBtn) {
+    state.respMode = respBtn.dataset.respMode;
+    document.querySelectorAll('[data-resp-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.respMode === state.respMode)));
+    renderResponsive();
+    return;
+  }
+
+  const speedBtn = e.target.closest('[data-speed]');
+  if (speedBtn) {
+    root.style.setProperty('--motion-scale', speedBtn.dataset.speed);
+    document.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', String(b === speedBtn)));
+    return;
+  }
+
+  if (e.target.closest('#toggle-reduced')) {
+    const t = document.getElementById('toggle-reduced');
+    const next = t.getAttribute('aria-checked') !== 'true';
+    t.setAttribute('aria-checked', String(next));
+    root.dataset.reducedMotion = String(next);
+    return;
+  }
+
+  const mToggle = e.target.closest('[data-m-toggle]');
+  if (mToggle) {
+    const kind = mToggle.dataset.mToggle;
+    if (kind === 'dialog') {
+      document.getElementById('m-dialog-scrim').classList.toggle('open');
+      document.getElementById('m-dialog-box').classList.toggle('open');
+    } else if (kind === 'sheet') {
+      document.getElementById('m-sheet-scrim').classList.toggle('open');
+      document.getElementById('m-sheet-box').classList.toggle('open');
+    } else if (kind === 'drawer') {
+      document.getElementById('m-drawer-scrim').classList.toggle('open');
+      document.getElementById('m-drawer-box').classList.toggle('open');
+    } else if (kind === 'toast') {
+      const box = document.getElementById('m-toast-box');
+      box.classList.add('open');
+      clearTimeout(box._t);
+      const scale = Number(getComputedStyle(root).getPropertyValue('--motion-scale')) || 1;
+      box._t = setTimeout(() => box.classList.remove('open'), 1800 * scale);
+    }
+    return;
+  }
+
+  const mPage = e.target.closest('[data-m-page]');
+  if (mPage) {
+    const pushed = mPage.dataset.mPage === 'push';
+    document.getElementById('m-page-base').classList.toggle('pushed', pushed);
+    document.getElementById('m-page-dim').classList.toggle('pushed', pushed);
+    document.getElementById('m-page-sub').classList.toggle('pushed', pushed);
+    return;
+  }
+
+  const iconCat = e.target.closest('[data-icon-cat]');
+  if (iconCat) {
+    state.iconCat = iconCat.dataset.iconCat;
+    document.querySelectorAll('[data-icon-cat]').forEach(b => b.setAttribute('aria-pressed', String(b === iconCat)));
+    renderIcons();
+    return;
+  }
+
+  const iconSize = e.target.closest('[data-icon-size]');
+  if (iconSize) {
+    state.iconSize = Number(iconSize.dataset.iconSize);
+    document.querySelectorAll('[data-icon-size]').forEach(b => b.setAttribute('aria-pressed', String(b === iconSize)));
+    renderIcons();
+    return;
+  }
+
+  const copyIcon = e.target.closest('[data-copy-icon]');
+  if (copyIcon) {
+    const val = copyIcon.dataset.copyIcon;
+    navigator.clipboard?.writeText(val).catch(() => {});
+    const host = document.getElementById('icon-copy-toast');
+    host.innerHTML = `<div class="xb-toast">已复制图标标识：<code>${val}</code></div>`;
+    clearTimeout(host._t);
+    host._t = setTimeout(() => { host.innerHTML = ''; }, 2000);
+  }
+});
+
+document.getElementById('icon-search')?.addEventListener('input', e => {
+  state.iconQuery = e.target.value;
+  renderIcons();
+});
+
+document.getElementById('sel-dialog').addEventListener('change', e => {
+  state.dialogVariant = e.target.value;
+  renderDialog();
+  document.getElementById('overlay-dialog').classList.remove('is-hidden');
+});
+document.getElementById('sel-sheet').addEventListener('change', e => {
+  state.sheetVariant = e.target.value;
+  renderSheet();
+  document.getElementById('overlay-sheet').classList.remove('is-hidden');
+});
+document.getElementById('sel-action').addEventListener('change', e => {
+  state.actionVariant = e.target.value;
+  renderActionSheet();
+});
+
+// Query preset support (?tab=overlays|controls|responsive|motion|icons|colors|tokens&theme=dark&accent=blue)
+const params = new URLSearchParams(location.search);
+if (['overlays', 'controls', 'responsive', 'motion', 'icons', 'colors', 'tokens'].includes(params.get('tab'))) state.tab = params.get('tab');
+if (params.get('theme') === 'dark') state.theme = 'dark';
+if (ACCENTS.some(a => a.id === params.get('accent'))) state.accent = params.get('accent');
+
+buildAccentDots();
+buildAccentMatrix();
+applyThemeAndAccent();
+switchTab(state.tab);
+renderDialog();
+renderSheet();
+renderActionSheet();
+renderResponsive();
+renderIcons();
+</script>
+</body>
+</html>

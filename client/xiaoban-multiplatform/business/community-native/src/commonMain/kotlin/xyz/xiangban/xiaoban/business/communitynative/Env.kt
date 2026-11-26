@@ -136,9 +136,9 @@ interface PlatformActions : VoicePlatform {
 }
 
 /** 界面偏好（外观、主题色）的存放处；平台用自己的轻量存储实现，不提供就只在本次运行里记着。 */
-interface AppPrefs {
-    fun get(key: String): String?
-    fun put(key: String, value: String)
+interface AppPrefs : xyz.xiangban.xiaoban.common.ui.theme.ThemePrefs {
+    override fun get(key: String): String?
+    override fun put(key: String, value: String)
 }
 
 class InMemoryPrefs : AppPrefs {

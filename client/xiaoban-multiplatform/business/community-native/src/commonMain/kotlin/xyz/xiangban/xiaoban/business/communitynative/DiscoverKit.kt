@@ -38,9 +38,8 @@ import xyz.xiangban.xiaoban.common.community.ModelVendor
 
 /** 页面底上的白底卡片，带一圈细描边。 */
 @Composable
-fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, horizontalPadding: Dp = padding, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().outlinedCard(12.dp).padding(horizontal = horizontalPadding, vertical = padding), content = content)
-}
+fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, horizontalPadding: Dp = padding, content: @Composable ColumnScope.() -> Unit) =
+    xyz.xiangban.xiaoban.common.ui.controls.WhiteCard(modifier, padding, horizontalPadding, content)
 
 /** 卡片标题：左边标题加一行小字，右边一个「更多 ›」之类的入口。 */
 @Composable
@@ -79,24 +78,25 @@ fun Tag(text: String, fg: Color, bg: Color, modifier: Modifier = Modifier, compa
     )
 }
 
-/** 蓝色标签（进行中、修复）：稿子里是 #3E5C8A 字、#E8EEF8 底。 */
+/** 信息语义标签：中性灰底 + 6dp 蓝色小圆点（不使用同色系浅底深字搭配）。 */
 @Composable
 fun BlueTag(text: String, modifier: Modifier = Modifier) =
-    Tag(text, if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A), if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.16f) else Color(0xFFE8EEF8), modifier)
+    xyz.xiangban.xiaoban.common.ui.controls.StatusTag(text, modifier, tone = xyz.xiangban.xiaoban.common.ui.controls.StatusTagTone.Info)
 
-/** 绿色标签（已采纳、开源、新增）：#2E6B47 字、#E6F4EA 底。 */
+/** 成功语义标签：中性灰底 + 6dp 绿色小圆点。 */
 @Composable
 fun GreenTag(text: String, modifier: Modifier = Modifier) =
-    Tag(text, if (ThemeState.dark) Color(0xFF7BD39A) else Color(0xFF2E6B47), if (ThemeState.dark) Color(0xFF7BD39A).copy(alpha = 0.16f) else Color(0xFFE6F4EA), modifier)
+    xyz.xiangban.xiaoban.common.ui.controls.StatusTag(text, modifier, tone = xyz.xiangban.xiaoban.common.ui.controls.StatusTagTone.Success)
 
-/** 灰色标签（已到期、闭源、类型）：#666 字、#F5F5F5 底。 */
+/** 中性灰色标签。 */
 @Composable
-fun GrayTag(text: String, modifier: Modifier = Modifier, compact: Boolean = false) = Tag(text, MaterialTheme.colorScheme.onSurfaceVariant, LocalExtraColors.current.fill, modifier, compact)
+fun GrayTag(text: String, modifier: Modifier = Modifier, compact: Boolean = false) =
+    xyz.xiangban.xiaoban.common.ui.controls.StatusTag(text, modifier, tone = xyz.xiangban.xiaoban.common.ui.controls.StatusTagTone.Neutral, compact = compact)
 
-/** 琥珀色标签（优化、待确认）：#8A5B00 字、#FBF0DA 底。 */
+/** 警告 / 审核中语义标签：中性灰底 + 6dp 琥珀色小圆点。 */
 @Composable
 fun AmberTag(text: String, modifier: Modifier = Modifier) =
-    Tag(text, if (ThemeState.dark) Color(0xFFE0A03A) else Color(0xFF8A5B00), if (ThemeState.dark) Color(0xFFE0A03A).copy(alpha = 0.16f) else Color(0xFFFBF0DA), modifier)
+    xyz.xiangban.xiaoban.common.ui.controls.StatusTag(text, modifier, tone = xyz.xiangban.xiaoban.common.ui.controls.StatusTagTone.Warn)
 
 /** 图标块：没有图标图片时，用名字的首字放在品牌色的浅底上。 */
 @Composable
@@ -132,15 +132,20 @@ fun rememberPrefFlag(env: CommunityEnv, key: String): Pair<Boolean, (Boolean) ->
     return on to { value -> on = value; env.prefs.put(key, if (value) "1" else "0") }
 }
 
-/** 灰色页面上的筛选胶囊：未选中白底，选中用主题色浅底。 */
+/** 筛选胶囊：未选中白底，选中为主题色实心底 + 白字（不使用同色系浅底深字搭配）。 */
 @Composable
 fun PageChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val extra = LocalExtraColors.current
-    Box(Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(10.dp))
-        .background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface)
-        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-        Text(text, style = XType.Secondary, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+    Box(
+        Modifier.heightIn(min = 34.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (selected) Brand else MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text, style = XType.Secondary, maxLines = 1,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+        )
     }
 }
 

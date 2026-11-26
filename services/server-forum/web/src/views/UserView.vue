@@ -6,6 +6,7 @@ import AvatarEditor from '@/components/AvatarEditor.vue'
 import ForumShell from '@/components/ForumShell.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import TopicList from '@/components/TopicList.vue'
+import { confirmDialog } from '@/ui'
 import UserAvatar from '@/components/UserAvatar.vue'
 import UserConnections from '@/components/UserConnections.vue'
 import { api, ApiError } from '@/api/forum'
@@ -96,7 +97,7 @@ async function toggleBlock() {
   moreOpen.value = false
   if (!session.requireLogin() || blockBusy.value || !profile.value) return
   const current = profile.value
-  if (!current.blocked && !window.confirm(`屏蔽 ${current.nickname}？他的帖子不会再出现在你的列表和搜索里，回复会被折叠，你们会互相取消关注。对方不会收到提示。`)) return
+  if (!current.blocked && !await confirmDialog({ title: `屏蔽 ${current.nickname}？`, description: '他的帖子不会再出现在你的列表和搜索里，回复会被折叠，你们会互相取消关注。对方不会收到提示。', confirmLabel: '确认屏蔽', danger: true })) return
   blockBusy.value = true
   try {
     const res = await api.block(current.uid, !current.blocked)

@@ -34,6 +34,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":common:community-core"))
+            api(project(":common:ui"))
             api(project(":common:link-core"))
             api(project(":common:share"))
             implementation(project(":common:webview"))

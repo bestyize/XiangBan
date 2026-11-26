@@ -2,54 +2,36 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import xyz.xiangban.xiaoban.common.ui.overlay.CardDialog as UiCardDialog
+import xyz.xiangban.xiaoban.common.ui.overlay.DialogCardClose as UiDialogCardClose
+import xyz.xiangban.xiaoban.common.ui.overlay.DialogChoice as UiDialogChoice
+import xyz.xiangban.xiaoban.common.ui.overlay.DialogNotice as UiDialogNotice
+import xyz.xiangban.xiaoban.common.ui.overlay.dialogCardSurface as uiDialogCardSurface
 
-private val CardShape = RoundedCornerShape(24.dp)
-
-internal fun Modifier.dialogCardSurface(surface: Color): Modifier =
-    dropShadow(CardShape, Shadow(radius = 60.dp, color = Color.Black.copy(alpha = .25f), offset = DpOffset(0.dp, 20.dp)))
-        .clip(CardShape).background(surface)
+internal fun Modifier.dialogCardSurface(surface: Color): Modifier = uiDialogCardSurface(surface)
 
 @Composable
-internal fun BoxScope.DialogCardClose(onDismiss: () -> Unit, enabled: Boolean, fill: Color, ink: Color) {
-    Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(44.dp).clip(CircleShape)
-        .clickable(enabled = enabled, role = Role.Button, onClick = onDismiss), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(32.dp).background(fill, CircleShape), contentAlignment = Alignment.Center) {
-            XIcon(XIcons.Close, size = 15.dp, tint = ink, description = "关闭")
-        }
-    }
-}
+internal fun BoxScope.DialogCardClose(onDismiss: () -> Unit, enabled: Boolean, fill: Color, ink: Color) =
+    UiDialogCardClose(onDismiss, enabled, fill, ink)
 
-/** Modal window for both inline and lazy-list callers. Only the body scrolls above the actions. */
+/** 社区业务居中卡片弹窗：底层委托给 `:common:ui` 的 [UiCardDialog]。 */
 @Composable
 internal fun CommunityCardDialog(
     title: String,
@@ -62,114 +44,42 @@ internal fun CommunityCardDialog(
     dismissLabel: String = "取消",
     confirmEnabled: Boolean = true,
     dismissEnabled: Boolean = true,
+    danger: Boolean = false,
     actionIcon: ImageVector? = null,
     cover: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null,
-) {
-    val colors = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
-    val dismiss by rememberUpdatedState(onDismiss)
-    Dialog(onDismissRequest = { if (dismissEnabled) dismiss() },
-        properties = DialogProperties(dismissOnBackPress = dismissEnabled, dismissOnClickOutside = dismissEnabled, usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Box(Modifier.matchParentSize().pointerInput(dismissEnabled) {
-                detectTapGestures { if (dismissEnabled) dismiss() }
-            })
-            Box(Modifier.safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 14.dp)
-                .widthIn(max = 342.dp).fillMaxWidth().dialogCardSurface(colors.surface)
-                .pointerInput(Unit) { detectTapGestures {} }) {
-                Column(Modifier.fillMaxWidth()) {
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                        cover?.invoke()
-                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = if (cover == null) 21.dp else 15.dp)) {
-                            Row(Modifier.fillMaxWidth().padding(end = if (cover == null) 24.dp else 0.dp),
-                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                                if (cover == null) Box(Modifier.size(44.dp).background(iconColor, RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                                    XIcon(icon, size = 24.dp, tint = Color.White)
-                                }
-                                Column {
-                                    Text(title, color = colors.onSurface, style = XType.Title)
-                                    if (!description.isNullOrBlank()) {
-                                        Spacer(Modifier.height(6.dp))
-                                        Text(description, color = colors.onSurfaceVariant, style = XType.Secondary)
-                                    }
-                                }
-                            }
-                            if (content != null) {
-                                Spacer(Modifier.height(15.dp))
-                                content()
-                            }
-                        }
-                    }
-                    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 11.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        if (confirmLabel != null) {
-                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(CircleShape)
-                                .background(if (confirmEnabled) Brand else extra.fill)
-                                .clickable(enabled = confirmEnabled, role = Role.Button, onClick = onConfirm).padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-                                val ink = if (confirmEnabled) Color.White else colors.onSurfaceVariant
-                                Text(confirmLabel, color = ink, style = XType.Body)
-                                actionIcon?.let { XIcon(it, tint = ink, size = 16.dp) }
-                            }
-                        }
-                        Box(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(CircleShape)
-                            .clickable(enabled = dismissEnabled, role = Role.Button, onClick = onDismiss).padding(6.dp),
-                            contentAlignment = Alignment.Center) {
-                            Text(dismissLabel, color = colors.onSurfaceVariant.copy(alpha = if (dismissEnabled) 1f else .55f), style = XType.Body)
-                        }
-                    }
-                }
-                DialogCardClose(onDismiss, dismissEnabled, if (cover == null) extra.fill else Color.Black.copy(alpha = .4f),
-                    if (cover == null) colors.onSurfaceVariant else Color.White)
-            }
-        }
-    }
-}
+) = UiCardDialog(
+    title = title,
+    confirmLabel = confirmLabel,
+    onConfirm = onConfirm,
+    onDismiss = onDismiss,
+    icon = icon,
+    iconColor = iconColor,
+    description = description,
+    dismissLabel = dismissLabel,
+    confirmEnabled = confirmEnabled,
+    dismissEnabled = dismissEnabled,
+    danger = danger,
+    actionIcon = actionIcon,
+    cover = cover,
+    content = content,
+)
 
 @Composable
-internal fun DialogNotice(text: String, error: Boolean = false) {
-    val dark = ThemeState.dark
-    val fill = if (error) DangerSoft else if (dark) Color(0xFF392F21) else Color(0xFFFCF2DF)
-    val ink = if (error) Danger else if (dark) Color(0xFFF0C380) else Color(0xFF825119)
-    Row(Modifier.fillMaxWidth().background(fill, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        XIcon(XIcons.Info, Modifier.padding(top = 1.dp), tint = ink, size = 15.dp)
-        Text(text, style = XType.Secondary, color = ink)
-    }
-}
+internal fun DialogNotice(text: String, error: Boolean = false) = UiDialogNotice(text, error)
 
 @Composable
 internal fun DialogChoice(
-    label: String, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier,
-    caption: String? = null, icon: ImageVector? = null, enabled: Boolean = true,
-) {
-    val extra = LocalExtraColors.current
-    val chip = icon == null
-    val shape = RoundedCornerShape(10.dp)
-    val ink = MaterialTheme.colorScheme.onSurfaceVariant
-    Row(modifier.heightIn(min = if (chip) 44.dp else 49.dp).alpha(if (enabled) 1f else .55f).clip(shape)
-        .then(if (chip) Modifier.background(if (selected) extra.brandSoft else extra.fill) else Modifier)
-        .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
-        .padding(horizontal = if (chip) 9.dp else 2.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (chip) ChoiceIndicator(selected, compact = true)
-        if (icon != null) Box(Modifier.size(32.dp).background(extra.fill, RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
-            XIcon(icon, tint = ink, size = 17.dp)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(label, style = if (chip) XType.Caption else XType.Body, color = MaterialTheme.colorScheme.onSurface)
-            if (caption != null) Text(caption, style = XType.Caption, color = ink)
-        }
-        if (!chip) ChoiceIndicator(selected, compact = false)
-    }
-}
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+    caption: String? = null,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+) = UiDialogChoice(label, selected, onSelect, modifier, caption, icon, enabled)
 
-@Composable
-private fun ChoiceIndicator(selected: Boolean, compact: Boolean) {
-    Box(Modifier.size(if (compact) 14.dp else 18.dp)
-        .border(if (selected) 4.dp else 1.dp, if (selected) Brand else LocalExtraColors.current.ink3, CircleShape))
-}
+// 以下为业务定制插画头图，保留在 business:community-native。
 
 @Composable
 internal fun AttachmentDialogCover(filename: String) {

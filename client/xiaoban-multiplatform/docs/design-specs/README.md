@@ -15,6 +15,7 @@
 | [模型配置全链路](prototypes/model-config-redesign.html) | 已合入 | 模型配置主页、小伴 AI 官方配置、添加第三方服务、第三方服务商配置及对话模型+思考等级五屏统一重设计，严格控色与贴底思考等级 BottomSheet。[本机预览](http://127.0.0.1:1421/prototypes/model-config-redesign.html) |
 | [详情页分享面板](prototypes/detail-share-sheet.html) | 已合入 | 全站详情页统一分享面板：单行预览条 + 单行可横滑图标轨（主态末尾删除单次内联确认）+ 沉浸式磨砂分享卡片舞台（极简白 / 暖纸笺 / 墨夜）。[本机预览](http://127.0.0.1:1421/prototypes/detail-share-sheet.html) |
 | [分享回流弹窗](prototypes/share-link-landing.html) | 已合入 | 外部分享链接拉起 App 后的居中预览确认卡，覆盖有封面/无封面横排卡、骨架屏加载、电脑端内容琥珀提示及已下架/网络失败空态。[本机预览](http://127.0.0.1:1421/prototypes/share-link-landing.html) |
+| [基础组件库与通用弹层规范（手机 + 社区网页）](prototypes/ui-kit-overlays.html) | 已合入 | 手机 `:common:ui` 与社区前台 `src/ui/` 分层规范：24px 居中卡、20px 顶圆角 BottomSheet、ActionSheet、Toast、通用控件与模块边界（业务特例保留在业务层），支持深浅色、六套主题色与 390/360px 预览。[本机预览](http://127.0.0.1:1421/prototypes/ui-kit-overlays.html) |
 | [统一弹层](prototypes/mobile-dialogs.html) | 已合入 | 八个手机高频弹窗场景（评论删除、附件购买、求助关闭、作品投稿、屏蔽、举报、工具环境移除与 App 更新），统一 24px 圆角居中卡片。[八场景总览](prototypes/mobile-dialog-cards-preview.png) · [本机预览](http://127.0.0.1:1421/prototypes/mobile-dialogs.html) |
 | [评论组件](prototypes/comment-composer.html) | 已合入 | 评论列表、吸底入口与键盘/表情/相册三态面板，支持单字/单表情发布、回复、展开编辑与图片预览。[本机预览](http://127.0.0.1:1421/prototypes/comment-composer.html) |
 | [发帖页（手机 + 网页双端）](prototypes/post-composer.html) | 已合入 | 写作优先无框结构：手机端三态 + 网页 PC 820px 级联弹窗与 H5 16px 抽屉，每帖限 1 个可运行作品（V2 ZIP / `.html`·`.htm` 自动转 V2 / 关联创作）。[手机预览](http://127.0.0.1:1421/prototypes/post-composer.html) · [网页预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web) |

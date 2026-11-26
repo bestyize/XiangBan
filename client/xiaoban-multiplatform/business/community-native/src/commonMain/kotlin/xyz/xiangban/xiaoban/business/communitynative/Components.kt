@@ -43,26 +43,14 @@ import xyz.xiangban.xiaoban.common.community.Load
 private val CardShape = RoundedCornerShape(Tokens.RadiusCard.dp)
 
 @Composable
-fun Hairline(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier, thickness = Tokens.Hairline.dp, color = LocalExtraColors.current.hairline)
-}
+fun Hairline(modifier: Modifier = Modifier) = xyz.xiangban.xiaoban.common.ui.controls.Hairline(modifier)
 
 @Composable
-fun CenterMessage(text: String, action: String? = null, onAction: (() -> Unit)? = null, modifier: Modifier = Modifier.fillMaxSize()) {
-    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-            XIcon(XIcons.File, size = 22.dp, tint = LocalExtraColors.current.ink3)
-        }
-        Text(text, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = XType.Secondary)
-        if (action != null && onAction != null) OutlinedButton(onClick = onAction, Modifier.padding(top = 12.dp)) { Text(action) }
-    }
-}
+fun CenterMessage(text: String, action: String? = null, onAction: (() -> Unit)? = null, modifier: Modifier = Modifier.fillMaxSize()) =
+    xyz.xiangban.xiaoban.common.ui.controls.CenterMessage(text, action, onAction, modifier)
 
 @Composable
-fun Spinner(modifier: Modifier = Modifier.fillMaxSize()) {
-    Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator(strokeWidth = 2.dp, color = Brand) }
-}
+fun Spinner(modifier: Modifier = Modifier.fillMaxSize()) = xyz.xiangban.xiaoban.common.ui.controls.Spinner(modifier)
 
 /** 详情页的统一加载外壳：加载中、失败（可重试）、成功三态。 */
 @Composable

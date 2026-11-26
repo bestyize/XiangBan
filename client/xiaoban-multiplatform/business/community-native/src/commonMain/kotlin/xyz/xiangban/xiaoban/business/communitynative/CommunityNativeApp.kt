@@ -49,7 +49,7 @@ import kotlinx.coroutines.isActive
  * 打开子页面时一级页仍留在下面（只是被盖住），返回后滚动位置和已加载的数据都在。
  */
 /** 页面进入、返回的转场时长。 */
-internal const val PageMillis = 260
+internal const val PageMillis = xyz.xiangban.xiaoban.common.ui.theme.XMotion.PagePush
 
 private fun Modifier.layoutVisiblePage(visible: () -> Boolean): Modifier =
     layout { measurable, constraints ->

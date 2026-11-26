@@ -51,7 +51,7 @@ watch([resolved, accent], ([value, selected]) => {
   document.documentElement.dataset.accent = selected
   const p = paletteFor(selected, value === 'dark')
   for (const [name, color] of Object.entries({ brand:accentInk(p, value === 'dark'), 'brand-fill':p.btn, 'brand-hover':p.btnHi, 'brand-ink':buttonInk(p.btn) })) document.documentElement.style.setProperty(`--${name}`, color)
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value === 'dark' ? '#3b3e45' : '#ededed')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value === 'dark' ? '#111111' : '#fafafa')
 }, { immediate: true })
 
 export function setPreference(value: ThemePreference) {

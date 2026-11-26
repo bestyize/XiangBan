@@ -1,0 +1,92 @@
+/*
+ * 超级小伴社区前台通用 UI Token（与手机端 :common:ui / Dimens.kt / Motion.kt 对齐）
+ * - 圆角 6 档：8 / 12 / 16 / 20（顶角）/ 24 / 999
+ * - 间距 4px 网格：4 / 8 / 12 / 16 / 24
+ * - 动效：入场标准减速（0.22, 1, 0.36, 1），退场更快收束（0.4, 0, 1, 1）
+ */
+:root {
+  /* 字号阶梯 */
+  --fs-headline: 22px;
+  --fs-title: 18px;
+  --fs-section: 16px;
+  --fs-body: 15px;
+  --fs-secondary: 13px;
+  --fs-caption: 12px;
+  --fs-nav: 10px;
+
+  /* 圆角阶梯 */
+  --r-inner: 8px;
+  --r-card: 16px;
+  --r-sheet: 20px;
+  --r-dialog: 24px;
+  --r-pill: 999px;
+
+  /* 间距网格 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+
+  /* 控件尺寸与头像阶梯 */
+  --h-touch: 44px;
+  --h-btn-lg: 48px;
+  --h-btn-md: 40px;
+  --h-btn-sm: 34px;
+  --h-sheet-row: 52px;
+  --avatar-xs: 24px;
+  --avatar-sm: 32px;
+  --avatar-md: 44px;
+  --avatar-lg: 68px;
+
+  /* 图标四档尺寸 */
+  --icon-xs: 14px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+
+  /* 全局层叠顺序（Z-Index 栈：Toast 永远在最顶层） */
+  --z-sticky: 20;
+  --z-dock: 25;
+  --z-popover: 32;
+  --z-drawer: 38;
+  --z-sheet: 45;
+  --z-dialog: 52;
+  --z-toast: 60;
+
+  /* 固定语义圆点色（不随主题色变化） */
+  --ui-success: #2fa36b;
+  --ui-warn: #d97706;
+  --ui-info: #2563eb;
+  --ui-danger: #e3203c;
+
+  /* 浮层遮罩与阴影（阴影仅给浮层） */
+  --ui-scrim: rgba(18, 18, 23, 0.38);
+  --ui-shadow-dialog: 0 20px 56px rgba(22, 18, 28, 0.22);
+  --ui-shadow-sheet: 0 -6px 28px rgba(18, 18, 23, 0.12);
+  --ui-shadow-toast: 0 6px 22px rgba(18, 18, 23, 0.16);
+
+  /* 动效时长与曲线 */
+  --dur-fast: 140ms;
+  --dur-normal: 200ms;
+  --dur-dialog-in: 220ms;
+  --dur-dialog-out: 160ms;
+  --dur-sheet-in: 260ms;
+  --dur-sheet-out: 200ms;
+  --dur-toast-in: 180ms;
+  --dur-toast-out: 150ms;
+  --ease-ui: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-ui-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+:root[data-theme="dark"] {
+  --ui-success: #34c27c;
+  --ui-warn: #fbbf24;
+  --ui-info: #7ab3ff;
+  --ui-danger: #ff6369;
+
+  --ui-scrim: rgba(0, 0, 0, 0.62);
+  --ui-shadow-dialog: 0 22px 60px rgba(0, 0, 0, 0.55);
+  --ui-shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.48);
+  --ui-shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

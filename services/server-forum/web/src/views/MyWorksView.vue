@@ -6,6 +6,7 @@ import ContentShell from '@/components/ContentShell.vue'
 import MySchemesPanel from '@/components/MySchemesPanel.vue'
 import { contentApi, type MyPack } from '@/api/content'
 import { kindLabel } from '@/lib/content'
+import { confirmDialog } from '@/ui'
 import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { usePackPublisher } from '@/stores/packPublisher'
@@ -69,7 +70,7 @@ async function load() {
 
 async function remove(p: MyPack) {
   openMenuId.value = null
-  if (!window.confirm(`确定下架「${p.title}」？已经应用过它的人不受影响。`)) return
+  if (!await confirmDialog({ title: `下架「${p.title}」？`, description: '下架后公开链接不再可访问，已经应用过它的人不受影响。', confirmLabel: '确认下架', danger: true })) return
   try {
     await contentApi.removeOwn(p.id)
     toast.show('已下架')

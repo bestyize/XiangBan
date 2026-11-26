@@ -39,5 +39,6 @@ python3 -m http.server 1450 --bind 127.0.0.1 --directory services/server-forum/d
 
 ## 跨端共享单页参考稿（手机 + 网页双端）
 
+- [基础组件库与通用弹层规范](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ui-kit-overlays.html)：覆盖手机 `:common:ui` 与社区站前台 `src/ui/` 的分层规范（弹层体系、通用控件、PC↔H5 响应式对照与模块边界；管理后台不动）。[弹层预览](http://127.0.0.1:1421/prototypes/ui-kit-overlays.html?tab=overlays) · [PC ↔ H5 对照](http://127.0.0.1:1421/prototypes/ui-kit-overlays.html?tab=responsive)。
 - [发帖页设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html)：覆盖网页版 PC 820px 级联弹窗、H5 窄屏 16px 底部抽屉与手机端三态交互。[网页预览](http://127.0.0.1:1421/prototypes/post-composer.html?view=web) · [手机预览](http://127.0.0.1:1421/prototypes/post-composer.html)。
 - [更换头像设计稿](../../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/avatar-editor.html)：覆盖「我的设置 → 资料」PC 820px 居中裁剪预览弹窗与手机/H5 选图裁剪流。[本机预览](http://127.0.0.1:1421/prototypes/avatar-editor.html)。

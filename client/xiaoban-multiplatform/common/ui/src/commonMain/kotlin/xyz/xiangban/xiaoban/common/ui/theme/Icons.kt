@@ -1,0 +1,176 @@
+package xyz.xiangban.xiaoban.common.ui.theme
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+/** 设计稿里用到的基础线条图标（24×24，描边 1.8，圆头圆角）。 */
+object XIcons {
+    val Brain: ImageVector by lazy { strokeIcon("Brain", "M12 18V5 M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4 M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5 M17.997 5.125a4 4 0 0 1 2.526 5.77 M18 18a4 4 0 0 0 2-7.464 M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517 M6 18a4 4 0 0 1-2-7.464 M6.003 5.125a4 4 0 0 0-2.526 5.77") }
+    val Trash: ImageVector by lazy { strokeIcon("Trash", "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7") }
+    val Phone: ImageVector by lazy { strokeIcon("Phone", "M8 2h8a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2zM10 18h4") }
+    val ArrowRight: ImageVector by lazy { strokeIcon("ArrowRight", "M5 12h13M13 6l6 6-6 6") }
+    val ArrowUp: ImageVector by lazy { strokeIcon("ArrowUp", "M12 19V5M6 11l6-6 6 6") }
+    val Bell: ImageVector by lazy { strokeIcon("Bell", "M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4") }
+    val Block: ImageVector by lazy { strokeIcon("Block", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM5.6 5.6L18.4 18.4") }
+    val Bolt: ImageVector by lazy { strokeIcon("Bolt", "M13 3L5 14h6l-1 7 8-11h-6z") }
+    val Book: ImageVector by lazy { strokeIcon("Book", "M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h10") }
+    val Bookmark: ImageVector by lazy { strokeIcon("Bookmark", "M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z") }
+    val Camera: ImageVector by lazy { strokeIcon("Camera", "M4 8h3l1.5-2h7L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1zM8.5 13a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0z") }
+    val Check: ImageVector by lazy { strokeIcon("Check", "M5 12l5 5 9-10") }
+    val CheckBold: ImageVector by lazy { strokeIcon("CheckBold", "M5 12.5l4.5 4.5L19 7") }
+    val ChevronDown: ImageVector by lazy { strokeIcon("ChevronDown", "M6 9l6 6 6-6") }
+    val ChevronLeft: ImageVector by lazy { strokeIcon("ChevronLeft", "M15 5l-7 7 7 7") }
+    val ChevronRight: ImageVector by lazy { strokeIcon("ChevronRight", "M9 5l7 7-7 7") }
+    val Cube: ImageVector by lazy { strokeIcon("Cube", "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5") }
+    val Play: ImageVector by lazy { strokeIcon("Play", "M8 5v14l11-7z") }
+    val PlaySolid: ImageVector by lazy { filledIcon("PlaySolid", "M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z") }
+    val Code: ImageVector by lazy { strokeIcon("Code", "M8 8l-4 4 4 4M16 8l4 4-4 4") }
+    val Terminal: ImageVector by lazy { strokeIcon("Terminal", "M4 5h16v14H4zM7 9l3 3-3 3M12 15h5") }
+    val ChevronUp: ImageVector by lazy { strokeIcon("ChevronUp", "M6 15l6-6 6 6") }
+    val Download: ImageVector by lazy { strokeIcon("Download", "M12 4v11M8 11l4 4 4-4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
+    val Eye: ImageVector by lazy { strokeIcon("Eye", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM9.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0z") }
+    val EyeOff: ImageVector by lazy { strokeIcon("EyeOff", "M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.2 0-10-7-10-7a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c6.2 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M3 3l18 18") }
+    val ExternalLink: ImageVector by lazy { strokeIcon("ExternalLink", "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5") }
+    val Fullscreen: ImageVector by lazy { strokeIcon("Fullscreen", "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5") }
+    val Expand: ImageVector by lazy { strokeIcon("Expand", "M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6") }
+    val Collapse: ImageVector by lazy { strokeIcon("Collapse", "M20 4l-6 6M14 4v6h6M4 20l6-6M10 20v-6H4") }
+    val Info: ImageVector by lazy { strokeIcon("Info", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 11v5M12 7.8v.4") }
+    val Coin: ImageVector by lazy { strokeIcon("Coin", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM14.5 9.5h-3.2a1.5 1.5 0 000 3h1.4a1.5 1.5 0 010 3H9.5M12 7.5v1.5M12 15.5V17") }
+    val Pin: ImageVector by lazy { strokeIcon("Pin", "M9 4h6l-1 6 3 3H7l3-3zM12 13v7") }
+    val Clock: ImageVector by lazy { strokeIcon("Clock", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 7.5V12l3 2") }
+    val Copy: ImageVector by lazy { strokeIcon("Copy", "M11 9h7a2 2 0 012 2v7a2 2 0 01-2 2h-7a2 2 0 01-2-2v-7a2 2 0 012-2zM5 15V6a2 2 0 012-2h9") }
+    val Cpu: ImageVector by lazy { strokeIcon("Cpu", "M9 7h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2zM10 3v3M14 3v3M10 18v3M14 18v3M3 10h3M3 14h3M18 10h3M18 14h3") }
+    val Close: ImageVector by lazy { strokeIcon("Close", "M6 6l12 12M18 6L6 18") }
+    val File: ImageVector by lazy { strokeIcon("File", "M7 3h7l5 5v13H7zM14 3v5h5") }
+    val Flag: ImageVector by lazy { strokeIcon("Flag", "M5 21V4M5 4h11l-2 4 2 4H5") }
+    val Folder: ImageVector by lazy { strokeIcon("Folder", "M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2z") }
+    val Gamepad: ImageVector by lazy { strokeIcon("Gamepad", "M8 8h8a5 5 0 0 1 5 5v0a5 5 0 0 1 -5 5h-8a5 5 0 0 1 -5 -5v-0a5 5 0 0 1 5 -5zM8 11v4M6 13h4M15.2 12a0.8 0.8 0 1 0 1.6 0a0.8 0.8 0 1 0 -1.6 0zM17.2 14a0.8 0.8 0 1 0 1.6 0a0.8 0.8 0 1 0 -1.6 0z") }
+    val Globe: ImageVector by lazy { strokeIcon("Globe", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18") }
+    val Grid: ImageVector by lazy { strokeIcon("Grid", "M6 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM6 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z") }
+    val Hash: ImageVector by lazy { strokeIcon("Hash", "M5 9h14M5 15h14M10 4L8 20M16 4l-2 16") }
+    val Hangup: ImageVector by lazy { handsetIcon("Hangup") }
+    val Heart: ImageVector by lazy { strokeIcon("Heart", "M12 20L5.9 14.3C4.2 12.7 3 11.1 3 8.9A4.9 4.9 0 0 1 7.9 4c1.6 0 3 .8 4.1 2.1C13.1 4.8 14.5 4 16.1 4A4.9 4.9 0 0 1 21 8.9c0 2.2-1.2 3.8-2.9 5.4Z") }
+    val Image: ImageVector by lazy { strokeIcon("Image", "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM7.4 10a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM4 18l5-5 4 4 3-3 4 4") }
+    val Keyboard: ImageVector by lazy { strokeIcon("Keyboard", "M5.5 6h13A2.5 2.5 0 0121 8.5v7a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 15.5v-7A2.5 2.5 0 015.5 6zM7 10h.01M11 10h.01M15 10h.01M7 14h10") }
+    val Smile: ImageVector by lazy { strokeIcon("Smile", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0zM8 13.5c1.8 2.8 6.2 2.8 8 0M9 9.5h.01M15 9.5h.01") }
+    val AtSign: ImageVector by lazy { strokeIcon("AtSign", "M16 12v1a2 2 0 0 0 4 0v-1a8 8 0 1 0-3.5 6.6M16 12a4 4 0 1 0-8 0a4 4 0 0 0 8 0z") }
+    val Laptop: ImageVector by lazy { strokeIcon("Laptop", "M5 6h14a1 1 0 011 1v9H4V7a1 1 0 011-1zM2 19h20") }
+    val Link: ImageVector by lazy { strokeIcon("Link", "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1") }
+    val Lock: ImageVector by lazy { strokeIcon("Lock", "M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3") }
+    val Menu: ImageVector by lazy { strokeIcon("Menu", "M4 7h16M4 12h16M4 17h10") }
+    val DetailComment: ImageVector by lazy { strokeIcon("DetailComment", "M20.8 12a8.8 8.8 0 0 1-8.8 8.8H3.4l1.7-3.4A8.8 8.8 0 1 1 20.8 12Z") }
+    val DetailSort: ImageVector by lazy { strokeIcon("DetailSort", "M4 7h16M7 12h10M10 17h4") }
+    val Message: ImageVector by lazy { strokeIcon("Message", "M5 6h14a1 1 0 011 1v9a1 1 0 01-1 1h-7l-4 3v-3H5a1 1 0 01-1-1V7a1 1 0 011-1z") }
+    val Mic: ImageVector by lazy { strokeIcon("Mic", "M12 3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h-0a3 3 0 0 1 -3 -3v-5a3 3 0 0 1 3 -3zM5 11a7 7 0 0014 0M12 18v3") }
+    val MicOff: ImageVector by lazy { strokeIcon("MicOff", "M5 5l14 14M9 9v2a3 3 0 005.1 2.1M15 9.6V6a3 3 0 00-5.9-.8M5 11a7 7 0 0011.5 5.3M19 11a7 7 0 01-.6 2.8M12 18v3") }
+    val Monitor: ImageVector by lazy { strokeIcon("Monitor", "M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2zM8 21h8M12 17v4") }
+    val More: ImageVector by lazy { strokeIcon("More", "M3.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM17.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
+    val MoreVertical: ImageVector by lazy { strokeIcon("MoreVertical", "M10.4 5a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 19a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
+    val NavSpark: ImageVector by lazy { strokeIcon("NavSpark", "m12 3 2.2 6.3L20.5 11.5l-6.3 2.2L12 20l-2.2-6.3L3.5 11.5l6.3-2.2Z") }
+    val NavGrid: ImageVector by lazy { strokeIcon("NavGrid", "M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4ZM14 14h6v6h-6Z") }
+    val NavCompass: ImageVector by lazy { strokeIcon("NavCompass", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM16.2 7.8l-2.1 6.3-6.3 2.1 2.1-6.3Z") }
+    val NavUser: ImageVector by lazy { strokeIcon("NavUser", "M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2") }
+    val NavSearch: ImageVector by lazy { strokeIcon("NavSearch", "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14ZM16.2 16.2l4.3 4.3") }
+    val NavBell: ImageVector by lazy { strokeIcon("NavBell", "M6 17v-6a6 6 0 0 1 12 0v6l2 2H4ZM10 21h4") }
+    val NewChat: ImageVector by lazy { strokeIcon("NewChat", "M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2 2 0 013 3L12 15l-4 1 1-4z") }
+    val Poll: ImageVector by lazy { strokeIcon("Poll", "M4 20h16M7 16V9M12 16V4M17 16v-5") }
+    val Pen: ImageVector by lazy { strokeIcon("Pen", "M4 20l4-1 11-11a2 2 0 00-3-3L5 16l-1 4z") }
+    val Pause: ImageVector by lazy { strokeIcon("Pause", "M9 6v12M15 6v12") }
+    val Plan: ImageVector by lazy { strokeIcon("Plan", "M5 4v16M5 5h12l-2.5 4 2.5 4H5") }
+    val Plus: ImageVector by lazy { strokeIcon("Plus", "M12 5v14M5 12h14") }
+    val Question: ImageVector by lazy { strokeIcon("Question", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17v.5") }
+    val Refresh: ImageVector by lazy { strokeIcon("Refresh", "M20 12a8 8 0 10-2.3 5.6M20 5v5h-5") }
+    val RotateCw: ImageVector by lazy { strokeIcon("RotateCw", "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7") }
+    val ResetCrop: ImageVector by lazy { strokeIcon("ResetCrop", "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4") }
+    val ZoomOut: ImageVector by lazy { strokeIcon("ZoomOut", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M20 20l-4-4") }
+    val ZoomIn: ImageVector by lazy { strokeIcon("ZoomIn", "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0zM8 11h6M11 8v6M20 20l-4-4") }
+    val Search: ImageVector by lazy { strokeIcon("Search", "M4.5 11a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0zM16 16l4.5 4.5") }
+    val Settings: ImageVector by lazy { strokeIcon("Settings", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z") }
+    val Share: ImageVector by lazy { strokeIcon("Share", "M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6") }
+    val Shield: ImageVector by lazy { strokeIcon("Shield", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z") }
+    val Sliders: ImageVector by lazy { strokeIcon("Sliders", "M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0zM6 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
+    val SkipNext: ImageVector by lazy { strokeIcon("SkipNext", "M5 5l9 7-9 7zM18 5v14") }
+    val Sparkle: ImageVector by lazy { strokeIcon("Sparkle", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z") }
+    val Sparkles: ImageVector by lazy { strokeIcon("Sparkles", "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594zM20 2v4M22 4h-4M2 20a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
+    val SparkleSmall: ImageVector by lazy { strokeIcon("SparkleSmall", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z") }
+    val Star: ImageVector by lazy { strokeIcon("Star", "M12 3.3l2.7 5.6 6.3.9-4.6 4.4 1.1 6.3-5.5-3-5.5 3 1.1-6.3L3 9.8l6.3-.9Z") }
+    val Stop: ImageVector by lazy { strokeIcon("Stop", "M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z") }
+    val Swap: ImageVector by lazy { strokeIcon("Swap", "M7 10l5-5 5 5M7 14l5 5 5-5") }
+    val Target: ImageVector by lazy { strokeIcon("Target", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0zM12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5") }
+    val Tool: ImageVector by lazy { strokeIcon("Tool", "M14.5 6.5a4 4 0 00-5 5L4 17l3 3 5.5-5.5a4 4 0 005-5l-2.5 2.5-2.5-.5-.5-2.5z") }
+    val Upload: ImageVector by lazy { strokeIcon("Upload", "M12 16V5M8 9l4-4 4 4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
+    val User: ImageVector by lazy { strokeIcon("User", "M8.5 8.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5") }
+    val Users: ImageVector by lazy { strokeIcon("Users", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M5.5 7a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a3.5 3.5 0 0 1 0 6.74") }
+    val Volume: ImageVector by lazy { strokeIcon("Volume", "M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 010 6") }
+    val Warning: ImageVector by lazy { strokeIcon("Warning", "M12 4l9 16H3zM12 10v4M12 17v.5") }
+    val Wave: ImageVector by lazy { strokeIcon("Wave", "M4 11v2M8 8v8M12 5v14M16 8v8M20 11v2") }
+    val Wechat: ImageVector by lazy { strokeIcon("Wechat", "M9.5 4C5.9 4 3 6.3 3 9.2c0 1.6.9 3 2.3 4L4.8 15l2.2-1.2c.8.2 1.7.4 2.5.4M15 10c-3 0-5.5 2-5.5 4.5S12 19 15 19c.7 0 1.4-.1 2-.3l2 1-.5-1.8c1.2-.8 2-2 2-3.4C20.5 12 18 10 15 10z") }
+}
+
+@Composable
+fun XIcon(icon: ImageVector, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = XDimens.IconLarge, description: String? = null) {
+    Icon(icon, description, modifier.size(size), tint)
+}
+
+/** 44×44 最小触控热区的圆形图标按钮。 */
+@Composable
+fun IconTap(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = XDimens.IconLarge) {
+    Box(modifier.size(XDimens.TouchTarget).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        XIcon(icon, tint = tint, size = size, description = description)
+    }
+}
+
+@Composable
+fun IconBox(icon: ImageVector, box: Dp = XDimens.TouchTarget, corner: Dp = XDimens.RadiusCard, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = XDimens.IconLarge) {
+    Box(Modifier.size(box).clip(RoundedCornerShape(corner)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+        XIcon(icon, tint = tint, size = iconSize)
+    }
+}
+
+private fun strokeIcon(name: String, path: String): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes(path),
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.8f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+        )
+        .build()
+
+private fun filledIcon(name: String, path: String): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))
+        .build()
+
+private fun handsetIcon(name: String): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addGroup(rotate = 135f, pivotX = 12f, pivotY = 12f)
+        .addPath(
+            pathData = addPathNodes("M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"),
+            fill = SolidColor(Color.Black),
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.4f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+        )
+        .clearGroup()
+        .build()

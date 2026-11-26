@@ -1,16 +1,16 @@
 /* 中性明暗底色；主题色由 theme.ts 应用客户端官方配色。 */
 :root {
-  --paper: #ededed;
+  --paper: #fafafa;
   --surface: #ffffff;
   --surface-2: #f2f2f2;
   --ink: #222222;
   --ink-2: #666666;
-  --ink-3: #737373;
-  --line: #ebebeb;
-  --line-strong: #d6d6d6;
-  --brand: #B42A33;
-  --brand-fill: #D93A44;
-  --brand-hover: #E8565F;
+  --ink-3: #9a9a9a;
+  --line: #ededed;
+  --line-strong: #cfcfcf;
+  --brand: #e3203c;
+  --brand-fill: #e3203c;
+  --brand-hover: #f0506a;
   --brand-ink: #ffffff;
   --valid: var(--ink-2);
   --valid-soft: var(--surface-2);
@@ -18,7 +18,7 @@
   --suspect-soft: var(--surface-2);
   --expired: var(--ink-3);
   --expired-soft: var(--surface-2);
-  --danger: #B42A33;
+  --danger: #e3203c;
   --focus: var(--brand);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 6px 18px -10px rgba(0, 0, 0, 0.18);
 
@@ -44,16 +44,16 @@
 }
 
 :root[data-theme="dark"] {
-  --danger: #ff9da4;
-  --paper: #3b3e45;
-  --surface: #464a53;
-  --surface-2: #50555f;
-  --ink: #f1f2f5;
-  --ink-2: #dce0e7;
-  --ink-3: #c8cdd7;
-  --line: #5d626e;
-  --line-strong: #7b8290;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 22px -12px rgba(0, 0, 0, 0.2);
+  --danger: #ff6369;
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --ink: #ececec;
+  --ink-2: #9a9aa0;
+  --ink-3: #6e6e73;
+  --line: #2e2e30;
+  --line-strong: #3a3a3c;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 22px -12px rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 

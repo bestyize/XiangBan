@@ -1,20 +1,20 @@
-// The website uses the desktop presets with its own green palette.
+// Unified 6 official accent palettes (aligned 1:1 with mobile DesignTokens.kt).
 export type AccentId = 'red' | 'green' | 'blue' | 'purple' | 'amber' | 'graphite';
 /**
  * The six roles of a theme colour.
- * btn: primary fill · btnHi: gradient highlight · soft: selected/light fill · ink: text on soft / links
- * tint: sidebar & window background · dot: status markers.
+ * btn: primary fill · btnHi: hover/gradient highlight · soft: subtle accent wash · ink: text/link
+ * tint: subtle surface tint · dot: status markers.
  */
 export interface AccentPalette { btn: string; btnHi: string; soft: string; ink: string; tint: string; dot: string }
 export interface AccentOption { id: AccentId; name: string; light: AccentPalette; dark: AccentPalette }
 
 export const accents: readonly AccentOption[] = [
   { id: 'red', name: '小伴红',
-    light: { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
-    dark: { btn: '#E5484D', btnHi: '#F06A6F', soft: '#3A2225', ink: '#FF8C91', tint: '#1E1C1D', dot: '#FF6369' } },
+    light: { btn: '#E3203C', btnHi: '#F0506A', soft: '#FFF3F4', ink: '#E3203C', tint: '#F5F1F1', dot: '#E3203C' },
+    dark: { btn: '#EE4B5F', btnHi: '#F76B7D', soft: '#3A2225', ink: '#FF8C91', tint: '#1E1C1D', dot: '#FF6369' } },
   { id: 'green', name: '薄荷绿',
-    light: { btn: '#07C160', btnHi: '#06AE56', soft: '#E4F8ED', ink: '#007A3E', tint: '#EFF7F2', dot: '#07C160' },
-    dark: { btn: '#07C160', btnHi: '#06AE56', soft: '#143625', ink: '#8FE6B3', tint: '#1A231E', dot: '#07C160' } },
+    light: { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EFF5F1', dot: '#2E8B5E' },
+    dark: { btn: '#34A36D', btnHi: '#48B981', soft: '#1D3328', ink: '#72D6A2', tint: '#1A231E', dot: '#34C27C' } },
   { id: 'blue', name: '海湾蓝',
     light: { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
     dark: { btn: '#3B7BE8', btnHi: '#5A92F0', soft: '#1E2A42', ink: '#8DB6FF', tint: '#1B1D21', dot: '#4C8DF6' } },
@@ -40,13 +40,12 @@ function luminance(hex: string) {
   return values[0]*.2126 + values[1]*.7152 + values[2]*.0722
 }
 export function buttonInk(fill: string) { return 1.05/(luminance(fill)+.05) >= 4.5 ? '#ffffff' : '#000000' }
-// Keep the client's hue legible on the brighter web night surfaces.
 export function accentInk(palette: AccentPalette, dark: boolean): string {
   if (!dark) return palette.ink
   const channels = [1,3,5].map(i => parseInt(palette.ink.slice(i,i+2),16))
   for (let percent=0; percent<=100; percent+=5) {
     const color = '#' + channels.map(c => Math.round(c+(255-c)*percent/100).toString(16).padStart(2,'0')).join('')
-    if ((luminance(color)+.05)/(luminance('#50555f')+.05) >= 4.8) return color
+    if ((luminance(color)+.05)/(luminance('#1c1c1e')+.05) >= 4.8) return color
   }
   return '#ffffff'
 }

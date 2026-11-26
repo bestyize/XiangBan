@@ -6,6 +6,7 @@ import {schemeBackups,type SchemeBackup} from '@/api/schemeBackups'
 import {schemesApi,type OwnScheme,type SchemeInput} from '@/api/schemes'
 import {useSession} from '@/stores/session'
 import {useHead} from '@/lib/head'
+import {confirmDialog} from '@/ui'
 useHead(()=>({title:'账号方案备份'}))
 const session=useSession(),enabled=ref(false),status=ref('active'),items=ref<SchemeBackup[]>([]),own=ref<OwnScheme[]>([]),page=ref(1),total=ref(0),loading=ref(false),busy=ref(false),error=ref(''),message=ref(''),selected=ref(''),publish=ref<SchemeBackup|null>(null),ack=ref(false)
 let sequence=0,disposed=false
@@ -19,7 +20,7 @@ async function load(){if(!enabled.value)return;const mine=++sequence;loading.val
 async function act(fn:()=>Promise<void>){if(busy.value)return;busy.value=true;error.value='';message.value='';try{await fn()}catch(e){error.value=text(e)}finally{busy.value=false}}
 async function toggle(){enabled.value=!enabled.value;publish.value=null;ack.value=false;if(enabled.value){await load();const mine=sequence;try{const data=await schemesApi.mine();if(!disposed&&enabled.value&&mine===sequence)own.value=data.items.filter(v=>v.status==='published')}catch(e){if(mine===sequence)error.value=text(e)}}else{++sequence;items.value=[];own.value=[];loading.value=false}}
 async function backup(){const row=own.value.find(v=>String(v.id)===selected.value);if(!row)return;await act(async()=>{let target=staged.get(row.id);if(!target){target={id:crypto.randomUUID(),revision:0};staged.set(row.id,target)}const saved=await schemeBackups.save(target.id,input(row),target.revision);target.revision=saved.revision;status.value='active';page.value=1;await load();message.value='已备份选中方案的引用，备份仅自己可见。'})}
-async function remove(row:SchemeBackup){if(!window.confirm(`将「${row.title}」移到云端回收站？本地副本和公开方案会保留。`))return;await act(async()=>{await schemeBackups.remove(row);await load();message.value='已移到回收站。'})}
+async function remove(row:SchemeBackup){if(!await confirmDialog({title:`将「${row.title}」移到云端回收站？`,description:'本地副本和公开方案会保留。',confirmLabel:'移到回收站',danger:true}))return;await act(async()=>{await schemeBackups.remove(row);await load();message.value='已移到回收站。'})}
 async function restore(row:SchemeBackup){await act(async()=>{await schemeBackups.save(row.id,input(row),row.revision);await load();message.value='已恢复云端方案。'})}
 async function publishNow(){const row=publish.value;if(!row||!ack.value)return;await act(async()=>{const saved=await schemesApi.publish(input(row));publish.value=null;ack.value=false;message.value=`已发布为公开方案 #${saved.id}。备份仍保留在账号中。`})}
 watch([status,page],()=>{publish.value=null;ack.value=false;void load()})

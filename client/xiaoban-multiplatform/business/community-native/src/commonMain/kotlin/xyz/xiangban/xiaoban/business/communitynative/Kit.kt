@@ -1,15 +1,6 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,148 +11,201 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import xyz.xiangban.xiaoban.common.ui.controls.AreaBox as UiAreaBox
+import xyz.xiangban.xiaoban.common.ui.controls.Banner as UiBanner
+import xyz.xiangban.xiaoban.common.ui.controls.CheckBox as UiCheckBox
+import xyz.xiangban.xiaoban.common.ui.controls.ChipPill as UiChipPill
+import xyz.xiangban.xiaoban.common.ui.controls.EmptyState as UiEmptyState
+import xyz.xiangban.xiaoban.common.ui.controls.GhostPillButton as UiGhostPillButton
+import xyz.xiangban.xiaoban.common.ui.controls.GroupLabel as UiGroupLabel
+import xyz.xiangban.xiaoban.common.ui.controls.LinkText as UiLinkText
+import xyz.xiangban.xiaoban.common.ui.controls.NavRow as UiNavRow
+import xyz.xiangban.xiaoban.common.ui.controls.PillButton as UiPillButton
+import xyz.xiangban.xiaoban.common.ui.controls.RadioRow as UiRadioRow
+import xyz.xiangban.xiaoban.common.ui.controls.RoundIconButton as UiRoundIconButton
+import xyz.xiangban.xiaoban.common.ui.controls.StatusDot as UiStatusDot
+import xyz.xiangban.xiaoban.common.ui.controls.TextBox as UiTextBox
+import xyz.xiangban.xiaoban.common.ui.controls.Toggle as UiToggle
+import xyz.xiangban.xiaoban.common.ui.controls.outlinedCard as uiOutlinedCard
+import xyz.xiangban.xiaoban.common.ui.layout.HomeBar as UiHomeBar
+import xyz.xiangban.xiaoban.common.ui.layout.NavInset as UiNavInset
+import xyz.xiangban.xiaoban.common.ui.layout.RefinedBarAction as UiRefinedBarAction
+import xyz.xiangban.xiaoban.common.ui.layout.RefinedScreenBar as UiRefinedScreenBar
+import xyz.xiangban.xiaoban.common.ui.layout.ScreenBar as UiScreenBar
+import xyz.xiangban.xiaoban.common.ui.overlay.BottomSheet as UiBottomSheet
+import xyz.xiangban.xiaoban.common.ui.overlay.CenterDialog as UiCenterDialog
+import xyz.xiangban.xiaoban.common.ui.overlay.OverlayTransition as UiOverlayTransition
+import xyz.xiangban.xiaoban.common.ui.theme.IconBox as UiIconBox
+import xyz.xiangban.xiaoban.common.ui.theme.IconTap as UiIconTap
+import xyz.xiangban.xiaoban.common.ui.theme.OverlayScrim
+import xyz.xiangban.xiaoban.common.ui.theme.XDimens
+import xyz.xiangban.xiaoban.common.ui.theme.XIcon as UiXIcon
 
 /*
- * 按设计稿（“社区与小伴AI 手机原型”）搭的一套基础部件：线条图标、顶栏、悬浮胶囊导航、底部弹层、按钮、输入框、开关、提示条。
- * 所有页面都用这些，样式只在这里改。
+ * 通用基础 UI 原语已抽离至 `:common:ui`（theme / controls / layout / overlay）；
+ * 本文件仅保留包内薄转发以及社区/小伴 AI 专属业务部件（主底栏、聊天气泡、输入卡片、添加内容面板）。
  */
 
-/** 底部导航占用的高度（导航 56 + 系统手势条余量）。滚动列表要在底部留出这么多。 */
-val NavInset = 72.dp
+val NavInset: Dp = UiNavInset
 
-// ───────────── 图标 ─────────────
-
-@Composable
-fun XIcon(icon: ImageVector, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = 24.dp, description: String? = null) {
-    Icon(icon, description, modifier.size(size), tint)
-}
-
-/** 44×44 的点击区域里放一个图标（设计稿里所有图标按钮的尺寸）。 */
-@Composable
-fun IconTap(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = 24.dp) {
-    Box(modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        XIcon(icon, tint = tint, size = size, description = description)
-    }
-}
-
-// ───────────── 顶栏 ─────────────
-
-/** 子页面顶栏：返回、居中标题（可带一行小字）、右侧操作。 */
-@Composable
-fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null, leading: (@Composable () -> Unit)? = null, subtitleContent: (@Composable () -> Unit)? = null) {
-    Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (leading != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { leading() }
-            else if (onBack != null) IconTap(XIcons.ChevronLeft, "返回", onBack) else Spacer(Modifier.width(44.dp))
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (subtitleContent != null) subtitleContent()
-                else if (subtitle != null) Text(subtitle, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (trailing != null) Box(Modifier.widthIn(min = 44.dp).height(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
-        }
-    }
-}
+// ───────────── 委托到 `:common:ui` 的通用原语转发 ─────────────
 
 @Composable
-internal fun RefinedScreenBar(
-    title: String,
-    onBack: () -> Unit,
-    divider: Boolean = true,
-    titleSize: Float = 17f,
-    trailing: @Composable BoxScope.() -> Unit = {},
-) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp)) {
-            Text(
-                title,
-                Modifier.align(Alignment.Center).padding(horizontal = 82.dp),
-                style = XType.Section.copy(fontSize = titleSize.sp),
-                fontWeight = FontWeight(650),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            IconTap(XIcons.ChevronLeft, "返回", onBack, Modifier.align(Alignment.CenterStart), size = 20.dp)
-            Box(Modifier.align(Alignment.CenterEnd), content = trailing)
-        }
-        if (divider) Hairline()
-    }
-}
+fun XIcon(icon: ImageVector, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = 24.dp, description: String? = null) =
+    UiXIcon(icon, modifier, tint, size, description)
 
 @Composable
-internal fun RefinedBarAction(label: String, onClick: () -> Unit, accent: Boolean = false, enabled: Boolean = true) {
-    val tint = if (accent) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        Modifier.height(32.dp).clip(CircleShape).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            style = XType.Secondary.copy(fontSize = 13.5.sp),
-            fontWeight = if (accent) FontWeight.SemiBold else FontWeight.Medium,
-            color = tint.copy(alpha = if (enabled) 1f else .38f),
-            maxLines = 1,
-        )
-    }
-}
+fun IconTap(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface, size: Dp = 24.dp) =
+    UiIconTap(icon, description, onClick, modifier, tint, size)
 
-/** 一级页面顶栏：标题靠左，右侧操作。 */
 @Composable
-fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
-    Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
-            trailing?.invoke()
-        }
-    }
-}
+fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 16.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) =
+    UiIconBox(icon, box, corner, tint, iconSize)
 
-// ───────────── 悬浮胶囊导航与发布弹层 ─────────────
+@Composable
+fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null, leading: (@Composable () -> Unit)? = null, subtitleContent: (@Composable () -> Unit)? = null) =
+    UiScreenBar(title, onBack, modifier, subtitle, trailing, leading, subtitleContent)
 
-internal val MainBottomNavHeight = 56.dp
+@Composable
+internal fun RefinedScreenBar(title: String, onBack: () -> Unit, divider: Boolean = true, titleSize: Float = 17f, trailing: @Composable BoxScope.() -> Unit = {}) =
+    UiRefinedScreenBar(title, onBack, divider, titleSize, trailing)
+
+@Composable
+internal fun RefinedBarAction(label: String, onClick: () -> Unit, accent: Boolean = false, enabled: Boolean = true) =
+    UiRefinedBarAction(label, onClick, accent, enabled)
+
+@Composable
+fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) =
+    UiHomeBar(title, modifier, trailing)
+
+@Composable
+fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @Composable (Modifier) -> Unit) =
+    UiOverlayTransition(visible, direction, content)
+
+@Composable
+fun BottomSheet(
+    onDismiss: () -> Unit,
+    panelModifier: Modifier = Modifier,
+    flush: Boolean = false,
+    cornerRadius: Dp = XDimens.RadiusSheet,
+    onBack: () -> Unit = onDismiss,
+    topPadding: Dp = if (flush) 16.dp else 20.dp,
+    scrim: Color = OverlayScrim,
+    showHandle: Boolean = false,
+    cancelLabel: String? = null,
+    confirmLabel: String? = null,
+    onConfirm: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) = UiBottomSheet(onDismiss, panelModifier, flush, cornerRadius, onBack, topPadding, scrim, showHandle, cancelLabel, confirmLabel, onConfirm, content)
+
+@Composable
+fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) =
+    UiCenterDialog(onDismiss, content)
+
+@Composable
+fun Modifier.outlinedCard(corner: Dp): Modifier = uiOutlinedCard(corner)
+
+@Composable
+fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, icon: ImageVector? = null) =
+    UiPillButton(text, onClick, modifier, enabled, height, icon)
+
+@Composable
+fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, fontSize: Int = 15, textColor: Color = MaterialTheme.colorScheme.onSurface, onPage: Boolean = false) =
+    UiGhostPillButton(text, onClick, modifier, enabled, height, fontSize, textColor, onPage)
+
+@Composable
+fun LinkText(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) =
+    UiLinkText(text, onClick, modifier)
+
+@Composable
+fun TextBox(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String = "",
+    password: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
+    filled: Boolean = false,
+    fontSize: Int = 16,
+) = UiTextBox(value, onValueChange, modifier, label, placeholder, password, keyboardType, enabled, leadingIcon, filled, fontSize)
+
+@Composable
+fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", minHeight: Dp = 120.dp, enabled: Boolean = true, filled: Boolean = false) =
+    UiAreaBox(value, onValueChange, modifier, placeholder, minHeight, enabled, filled)
+
+@Composable
+fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) =
+    UiToggle(checked, onChange, modifier)
+
+@Composable
+fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) =
+    UiCheckBox(checked, onChange, modifier)
+
+@Composable
+fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) =
+    UiStatusDot(online, label, fontSize)
+
+@Composable
+fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, icon: ImageVector? = null, warn: Boolean = false, actionText: String? = null, onAction: (() -> Unit)? = null) =
+    UiBanner(title, modifier, desc, icon, warn, actionText, onAction)
+
+@Composable
+fun GroupLabel(text: String, modifier: Modifier = Modifier) =
+    UiGroupLabel(text, modifier)
+
+@Composable
+fun NavRow(title: String, note: String? = null, first: Boolean = false, onClick: () -> Unit) =
+    UiNavRow(title, note, first, onClick)
+
+@Composable
+fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifier = Modifier) =
+    UiEmptyState(icon, title, desc, modifier)
+
+@Composable
+fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit, background: Color, tint: Color, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    UiRoundIconButton(icon, description, onClick, background, tint, modifier, enabled)
+
+@Composable
+fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, trailingIcon: ImageVector? = null, onClick: (() -> Unit)? = null, selected: Boolean = false) =
+    UiChipPill(text, modifier, icon, trailingIcon, onClick, selected)
+
+@Composable
+fun RadioRow(selected: Boolean, title: String, desc: String?, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    UiRadioRow(selected, title, desc, onClick, modifier, enabled)
+
+// ───────────── 业务部件（保留在 business:community-native） ─────────────
+
+internal val MainBottomNavHeight = XDimens.BottomNavHeight
 
 /** 应用一级页面共用的五格底栏。 */
 @Composable
@@ -175,13 +219,18 @@ internal fun MainBottomNav(current: Tab, onSelect: (Tab) -> Unit, onPublish: () 
             tabs.forEachIndexed { index, (tab, icon) ->
                 if (index == 2) BottomPublishButton(onPublish, Modifier.weight(1f))
                 val active = tab == current
-                Column(Modifier.weight(1f).fillMaxHeight()
+                Column(
+                    Modifier.weight(1f).fillMaxHeight()
                         .selectable(active, interactionSource = null, indication = null, role = Role.Tab) { onSelect(tab) },
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+                ) {
                     val tint = if (active) colors.onBackground else ink3
                     XIcon(icon, size = 21.dp, tint = tint)
-                    Text(if (tab == Tab.Ai) "小伴 AI" else tab.label,
-                        style = XType.Nav, color = tint, fontWeight = if (active) FontWeight(650) else FontWeight.Normal)
+                    Text(
+                        if (tab == Tab.Ai) "小伴 AI" else tab.label,
+                        style = XType.Nav, color = tint, fontWeight = if (active) FontWeight(650) else FontWeight.Normal,
+                    )
                 }
             }
         }
@@ -197,64 +246,6 @@ private fun BottomPublishButton(onClick: () -> Unit, modifier: Modifier = Modifi
     }
 }
 
-/** 遮罩淡入淡出，面板按方向滑动；退出动画结束后才移除内容。 */
-@Composable
-fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @Composable (Modifier) -> Unit) {
-    AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-        val panel = when (direction) {
-            "left" -> Modifier.animateEnterExit(enter = slideInHorizontally(tween(200)) { -it }, exit = slideOutHorizontally(tween(200)) { -it })
-            "top" -> Modifier.animateEnterExit(enter = slideInVertically(tween(200)) { -it }, exit = slideOutVertically(tween(200)) { -it })
-            "bottom" -> Modifier.animateEnterExit(enter = slideInVertically(tween(200)) { it }, exit = slideOutVertically(tween(200)) { it })
-            else -> Modifier
-        }
-        content(panel)
-    }
-}
-
-/** 遮罩覆盖整页，面板统一避让键盘，避免聊天页的同级覆盖层落在 IME 后面。[flush] 为真时选项通栏接边。 */
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-fun BottomSheet(
-    onDismiss: () -> Unit,
-    panelModifier: Modifier = Modifier,
-    flush: Boolean = false,
-    cornerRadius: Dp = 20.dp,
-    onBack: () -> Unit = onDismiss,
-    topPadding: Dp = if (flush) 16.dp else 20.dp,
-    scrim: Color = Color.Black.copy(alpha = 0.45f),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    BackHandler(onBack = onBack)
-    Box(
-        Modifier.fillMaxSize().background(scrim).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Column(
-            panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)).background(MaterialTheme.colorScheme.surface)
-                .clickable(indication = null, interactionSource = null) {}
-                .navigationBarsPadding().let { if (flush) it.padding(top = topPadding) else it.padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = 24.dp) },
-            content = content,
-        )
-    }
-}
-
-/** 居中的小对话框（遮罩更淡）。 */
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    BackHandler(onBack = onDismiss)
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(indication = null, interactionSource = null) { onDismiss() }.statusBarsPadding().navigationBarsPadding().imePadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier.padding(horizontal = 32.dp).widthIn(max = 320.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface)
-                .clickable(indication = null, interactionSource = null) {}.padding(horizontal = 16.dp, vertical = 16.dp),
-            content = content,
-        )
-    }
-}
-
 /** 发布弹层里的一行：左图标方块，右标题与说明。 */
 @Composable
 fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> Unit) {
@@ -264,210 +255,6 @@ fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> U
             Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold)
             Text(desc, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
-    }
-}
-
-@Composable
-fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 16.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) {
-    Box(Modifier.size(box).clip(RoundedCornerShape(corner)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-        XIcon(icon, tint = tint, size = iconSize)
-    }
-}
-
-/** 页面底很浅时，白色卡片靠一圈细描边和底色分开。 */
-@Composable
-fun Modifier.outlinedCard(corner: Dp): Modifier {
-    val shape = RoundedCornerShape(corner)
-    return clip(shape).background(MaterialTheme.colorScheme.surface).border(1.dp, LocalExtraColors.current.hairline, shape)
-}
-
-// ───────────── 按钮 ─────────────
-
-/** 品牌红实心胶囊按钮。 */
-@Composable
-fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, icon: ImageVector? = null) {
-    Row(
-        modifier.height(height).clip(CircleShape).background(if (enabled) Brand else LocalExtraColors.current.line).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) XIcon(icon, tint = Color.White, size = 20.dp)
-        Text(text, color = Color.White, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1)
-    }
-}
-
-/** 次要胶囊按钮：浅灰底深色字，不描边。直接放在灰色页面上时（[onPage]）用白底。 */
-@Composable
-fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, fontSize: Int = 15, textColor: Color = MaterialTheme.colorScheme.onSurface, onPage: Boolean = false) {
-    Box(
-        modifier.height(height).alpha(if (enabled) 1f else 0.5f).clip(CircleShape).background(if (onPage) MaterialTheme.colorScheme.surface else LocalExtraColors.current.fill)
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, color = textColor, fontSize = fontSize.sp, maxLines = 1)
-    }
-}
-
-/** 文字链接样式的小按钮（“全部 ›”这类）。 */
-@Composable
-fun LinkText(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Text(text, modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
-}
-
-// ───────────── 输入与开关 ─────────────
-
-@Composable
-fun TextBox(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    label: String? = null,
-    placeholder: String = "",
-    password: Boolean = false,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    enabled: Boolean = true,
-    leadingIcon: ImageVector? = null,
-    filled: Boolean = false,
-    fontSize: Int = 16,
-) {
-    Column(modifier) {
-        if (label != null) Text(label, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            textStyle = TextStyle(fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurface),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            singleLine = true,
-            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-            cursorBrush = SolidColor(Brand),
-            decorationBox = { inner ->
-                Row(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (leadingIcon != null) {
-                        XIcon(leadingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = fontSize.sp, maxLines = 1)
-                        inner()
-                    }
-                }
-            },
-        )
-    }
-}
-
-/** 多行输入框：和 [TextBox] 同样的无描边样式，高度随内容增长，至少 [minHeight]。 */
-@Composable
-fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", minHeight: Dp = 120.dp, enabled: Boolean = true, filled: Boolean = false) {
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth(),
-        enabled = enabled,
-        textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(Brand),
-        decorationBox = { inner ->
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-            ) {
-                if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, style = XType.Body)
-                inner()
-            }
-        },
-    )
-}
-
-/** 开关：48×28，开启时品牌红。 */
-@Composable
-fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier.size(width = 48.dp, height = 28.dp).clip(CircleShape).background(if (checked) Brand else LocalExtraColors.current.line).clickable { onChange(!checked) }.padding(2.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
-    ) {
-        Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White))
-    }
-}
-
-/** 勾选框：22×22 圆角方块。 */
-@Composable
-fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier.size(22.dp).clip(shape).background(if (checked) Brand else MaterialTheme.colorScheme.surface)
-            .border(2.dp, if (checked) Brand else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) XIcon(XIcons.Check, tint = Color.White, size = 16.dp)
-    }
-}
-
-// ───────────── 状态与提示 ─────────────
-
-/** 在线用实心点，离线用空心点，不只靠颜色区分。 */
-@Composable
-fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (online) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Success))
-        } else {
-            Box(Modifier.size(8.dp).clip(CircleShape).border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
-        }
-        Text(label, fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** 页面顶部的提示条。[warn] 为真时用主题色浅底，否则白底。 */
-@Composable
-fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, icon: ImageVector? = null, warn: Boolean = false, actionText: String? = null, onAction: (() -> Unit)? = null) {
-    val extra = LocalExtraColors.current
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        modifier.fillMaxWidth().clip(shape).background(if (warn) extra.brandSoft else MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (icon != null) XIcon(icon, size = 22.dp)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = XType.Body, fontWeight = if (desc != null) FontWeight.SemiBold else FontWeight.Normal)
-            if (desc != null) Text(desc, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-        }
-        if (actionText != null && onAction != null) GhostPillButton(actionText, onAction, height = 32.dp, fontSize = 14)
-    }
-}
-
-/** 一组白底列表的小标题（“账号”“关于”）。 */
-@Composable
-fun GroupLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-/** 白底通栏的一行：标题、右侧说明、箭头；[first] 为真时不画上边线。 */
-@Composable
-fun NavRow(title: String, note: String? = null, first: Boolean = false, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        if (!first) Hairline(Modifier.padding(start = 16.dp))
-        Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (note != null) Text(note, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
-            XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-        }
-    }
-}
-
-/** 居中的说明文字块（空状态用）。 */
-@Composable
-fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
-            XIcon(icon, size = 32.dp)
-        }
-        Text(title, Modifier.padding(top = 16.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
-        Text(desc, Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
@@ -493,7 +280,6 @@ fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
     }
 }
 
-/** 小伴的回复：通栏流式排版，不再用左侧常驻头像挤占阅读宽度。 */
 @Composable
 fun AssistantRow(modifier: Modifier = Modifier, avatar: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp), content = content)
@@ -508,7 +294,6 @@ fun AssistantBubble(text: String, modifier: Modifier = Modifier, muted: Boolean 
     )
 }
 
-/** 输入卡片：上面一个多行输入框（语音模式下换成 [voiceBar]），下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */
 @Composable
 fun ComposerCard(
     value: String,
@@ -543,10 +328,6 @@ fun ComposerCard(
     }
 }
 
-/**
- * 聊天输入卡片（设计稿 6 号和 35–39 号画板）：输入框，下面一行只有图标——左边 + 添加内容、模型、权限（锁，设备聊天才有），
- * 右边语音输入、实时对话、发送或停止。点麦克风切到“按住 说话”条（左边变成键盘图标，没有发送键）。联网一直开着，不放按钮。没有对应功能的按钮由调用方在回调里提示“即将支持”。
- */
 @Composable
 fun ChatComposer(
     value: String,
@@ -560,13 +341,9 @@ fun ChatComposer(
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    /** 按下说话条时先做的事（比如小伴正在回答就先停下）。 */
     onVoicePress: () -> Unit = {},
-    /** 模型图标：云端小伴是芯片，跟随电脑的设备聊天是电脑。 */
     modelIcon: ImageVector = XIcons.Brain,
-    /** 指定了模型时图标右上角一个小红点。 */
     modelPinned: Boolean = false,
-    /** 不为空就显示权限（锁）图标；[fullTrust] 为真时锁变红。 */
     onPermission: (() -> Unit)? = null,
     fullTrust: Boolean = false,
     sending: Boolean = false,
@@ -601,7 +378,6 @@ fun ChatComposer(
     }
 }
 
-/** 工具栏里的图标：36dp 的点击区域，不加圆形底，也不描边。 */
 @Composable
 private fun ToolbarIcon(icon: ImageVector, description: String, onClick: () -> Unit, enabled: Boolean, tint: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Box(Modifier.size(36.dp).alpha(if (enabled) 1f else 0.4f).clip(CircleShape).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
@@ -609,10 +385,10 @@ private fun ToolbarIcon(icon: ImageVector, description: String, onClick: () -> U
     }
 }
 
-/** “添加内容”底部面板：相机、相册、文件、资料库（设计稿 6 号画板）。 */
+/** “添加内容”底部面板：相机、相册、文件、资料库。 */
 @Composable
 fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier = Modifier, showImageGeneration: Boolean = false) {
-    BottomSheet(onDismiss, panelModifier) {
+    BottomSheet(onDismiss, panelModifier, showHandle = true, cancelLabel = "取消") {
         Text("添加内容", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             listOf(XIcons.Camera to "相机", XIcons.Image to "相册", XIcons.File to "文件", XIcons.Book to "资料库").forEach { (icon, label) ->
@@ -624,46 +400,6 @@ fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: 
         }
         if (showImageGeneration) {
             GhostPillButton("生成图片", { onPick("生成图片") }, Modifier.padding(top = 16.dp).fillMaxWidth())
-        }
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 20.dp).fillMaxWidth())
-    }
-}
-
-/** 圆形图标按钮（发送、停止）。 */
-@Composable
-fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit, background: Color, tint: Color, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Box(
-        modifier.size(36.dp).clip(CircleShape).background(background).clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        XIcon(icon, tint = tint, size = 20.dp, description = description)
-    }
-}
-
-/** 浅灰底的小胶囊（快捷建议、状态入口），不描边；选中时用主题色浅底。 */
-@Composable
-fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, trailingIcon: ImageVector? = null, onClick: (() -> Unit)? = null, selected: Boolean = false) {
-    val extra = LocalExtraColors.current
-    Row(
-        modifier.height(34.dp).clip(CircleShape).background(if (selected) extra.brandSoft else extra.fill).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (icon != null) XIcon(icon, tint = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-        Text(text, style = XType.Body, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
-        if (trailingIcon != null) XIcon(trailingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-    }
-}
-
-/** 单选行：圆圈、标题和说明（模型选择、思考强度）。 */
-@Composable
-fun RadioRow(selected: Boolean, title: String, desc: String?, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Row(modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f).clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(20.dp).clip(CircleShape).border(2.dp, if (selected) Brand else LocalExtraColors.current.line, CircleShape), contentAlignment = Alignment.Center) {
-            if (selected) Box(Modifier.size(10.dp).clip(CircleShape).background(Brand))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold)
-            if (desc != null) Text(desc, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

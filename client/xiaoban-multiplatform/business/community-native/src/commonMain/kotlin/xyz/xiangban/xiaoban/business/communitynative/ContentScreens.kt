@@ -139,15 +139,10 @@ internal fun LoadMoreFooter(hasMore: Boolean, error: String?, count: Int, onMore
     }
 }
 
-/** 底部短暂提示（“链接已复制”）。 */
+/** 底部短暂提示（委托给 `:common:ui` 统一 Toast）。 */
 @Composable
-fun Toast(text: String?, onGone: () -> Unit) {
-    if (text == null) return
-    LaunchedEffect(text) { delay(1600); onGone() }
-    Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
-        Text(text, Modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, style = XType.Body)
-    }
-}
+fun Toast(text: String?, onGone: () -> Unit) =
+    xyz.xiangban.xiaoban.common.ui.overlay.Toast(text = text, onGone = onGone)
 
 /** 分享弹层：把必要展示数据交给 `:common:share` 统一渲染。 */
 @Composable

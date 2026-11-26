@@ -509,7 +509,7 @@ private fun AddProviderSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
+    BottomSheet(onDismiss = onDismiss, panelModifier = panelModifier, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
         SheetDragHandle()
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),
@@ -1076,7 +1076,7 @@ private fun CustomProviderEditorScreen(
 
         // 协议选择 BottomSheet（按协议联动对应预置地址）
         if (showProtoSheet) {
-            BottomSheet(onDismiss = { showProtoSheet = false }, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
+            BottomSheet(onDismiss = { showProtoSheet = false }, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
                 SheetDragHandle()
                 Row(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 12.dp),
@@ -1150,7 +1150,7 @@ private fun ManagedModelSheet(
     val extra = LocalExtraColors.current
     val scheme = MaterialTheme.colorScheme
 
-    BottomSheet(onDismiss = onDismiss, flush = true, cornerRadius = 18.dp, topPadding = 0.dp, scrim = ModelSheetScrim) {
+    BottomSheet(onDismiss = onDismiss, flush = true, topPadding = 0.dp, scrim = ModelSheetScrim) {
         SheetDragHandle()
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 14.dp, bottom = 10.dp),

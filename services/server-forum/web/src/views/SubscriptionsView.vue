@@ -4,6 +4,7 @@ import { subscriptions, type Subscription, type EditionCursor, type Edition } fr
 import { parseSubscriptionDraft, subscriptionInput, newSubscriptionDraft } from '@/lib/subscriptionDraft'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
+import { confirmDialog } from '@/ui'
 useHead(()=>({title:'资讯订阅'}))
 const session=useSession(), rows=ref<Subscription[]>([]), history=ref<Edition[]>([]), selected=ref<Edition|null>(null)
 const busy=ref(false), error=ref(''), message=ref(''), editor=ref(false), confirmed=ref(false), configured=ref(false), enabled=ref(false), code=ref(''), verifyId=ref(''), cursor=ref<EditionCursor|null>(null)
@@ -17,7 +18,7 @@ async function load(){const mine=++generation;const [a,b]=await Promise.all([sub
 async function act(fn:()=>Promise<void>){if(busy.value)return;busy.value=true;error.value='';message.value='';try{await fn()}catch(e){error.value=e instanceof Error?e.message:String(e)}finally{busy.value=false}}
 async function save(){if(!confirmed.value)return;await act(async()=>{draft.value.schedule=kind.value==='once'?{kind:'once',at:once.value}:kind.value==='weekly'?{kind:'weekly',time:time.value,weekday:weekday.value}:{kind:'daily',time:time.value};const saved=await subscriptions.save(subscriptionInput(draft.value,draft.value.active,true));editor.value=false;await load();message.value=saved.verified_at?'订阅已保存。':'订阅已保存，请验证收件邮箱后启动。'})}
 async function toggle(row:Subscription){await act(async()=>{await subscriptions.save(subscriptionInput(row,row.status!=='active',true));await load()})}
-async function remove(row:Subscription){if(!window.confirm(`删除「${row.title}」？停止后续发送，历史期刊仍保留。`))return;await act(async()=>{await subscriptions.remove(row);await load()})}
+async function remove(row:Subscription){if(!await confirmDialog({title:`删除「${row.title}」？`,description:'停止后续发送，历史期刊仍保留。',confirmLabel:'确认删除',danger:true}))return;await act(async()=>{await subscriptions.remove(row);await load()})}
 async function requestCode(row:Subscription){await act(async()=>{await subscriptions.verification(row.id);verifyId.value=row.id;code.value='';message.value='确认邮件已提交，请在邮箱中复制确认码。'})}
 async function verify(){await act(async()=>{await subscriptions.verify(verifyId.value,code.value);verifyId.value='';code.value='';await load();message.value='邮箱已确认。已设置预算的订阅现已启动；其余请先编辑预算。'})}
 async function openEdition(id:string){await act(async()=>{const mine=generation;const result=await subscriptions.edition(id);if(mine===generation&&!disposed)selected.value=result})}

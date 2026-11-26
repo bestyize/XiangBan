@@ -35,7 +35,7 @@ internal fun OfficialAppSheet(env: CommunityEnv, game: MobileGame, cover: ByteAr
     var message by remember { mutableStateOf<String?>(null) }
     val shortcut = AppShortcut("builtin", game.id, game.name)
     val favorite = env.appLibrary.favorites.any { it.key == shortcut.key }
-    BottomSheet(dismiss, cornerRadius = 16.dp) {
+    BottomSheet(dismiss) {
         Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -123,7 +123,7 @@ internal fun AppRemixSheet(env: CommunityEnv, chat: CloudChatController, title: 
     var message by remember { mutableStateOf<String?>(null) }
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
-    BottomSheet(dismiss, panel, cornerRadius = 16.dp) {
+    BottomSheet(dismiss, panel) {
         Column(Modifier.fillMaxWidth().heightIn(max = 540.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("做一个我的版本", style = XType.Title, fontWeight = FontWeight.SemiBold)

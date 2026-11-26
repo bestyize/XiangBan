@@ -5,6 +5,7 @@ import type { Attachment } from '@/api/types'
 import { formatSize } from '@/lib/format'
 import { useToast } from '@/stores/toast'
 import { useSession } from '@/stores/session'
+import { confirmDialog } from '@/ui'
 
 /** restricted：帖子有阅读等级限制，链接带不上登录令牌，改为带令牌取回后保存。 */
 defineProps<{ items: Attachment[]; restricted: boolean }>()
@@ -15,7 +16,7 @@ const busy = ref<string | null>(null)
 async function save(att: Attachment) {
   if (busy.value) return
   if (att.price > 0 && !session.requireLogin()) return
-  if (att.price > 0 && !att.purchased && !window.confirm(`购买「${att.name}」需要 ${att.price} 积分，重复下载免费。确认购买？`)) return
+  if (att.price > 0 && !att.purchased && !await confirmDialog({ title: `购买「${att.name}」？`, description: `需要消耗 ${att.price} 积分，购买后重复下载免费。`, confirmLabel: '确认购买' })) return
   busy.value = att.id
   try {
     if (att.price > 0 && !att.purchased) {

@@ -216,7 +216,7 @@ function go(page: number) {
     </template>
   </section>
 
-  <ModalDialog :open="Boolean(mobileTool)" :title="mobileTool?.name ?? '在手机 App 使用'" @close="mobileTool = null">
+  <ModalDialog :open="Boolean(mobileTool)" :title="mobileTool?.name ?? '在手机 App 使用'" mobile-mode="center" @close="mobileTool = null">
     <div v-if="mobileTool" class="tool-note">
       <p>{{ mobileTool.note }}</p>
       <a class="btn btn-primary" :href="ANDROID_DOWNLOAD_URL">下载 Android 版</a>

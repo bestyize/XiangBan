@@ -6,6 +6,7 @@ import ContentSocialActions from '@/components/ContentSocialActions.vue'
 import SchemeReferences from '@/components/SchemeReferences.vue'
 import WorkDiscussion from '@/components/creation/WorkDiscussion.vue'
 import { schemesApi, type CommunityScheme } from '@/api/schemes'
+import { confirmDialog } from '@/ui'
 import { ApiError } from '@/api/forum'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
@@ -33,7 +34,7 @@ function back() {
 }
 async function copy() { try { await navigator.clipboard.writeText(link.value); copied.value = true; copyError.value = false } catch { copyError.value = true } }
 async function remove() {
-  if (!scheme.value || !window.confirm(`确定下架「${scheme.value.title}」？下架后公开链接不再可访问，引用的原作品会保留。`)) return
+  if (!scheme.value || !await confirmDialog({ title: `下架「${scheme.value.title}」？`, description: '下架后公开链接不再可访问，引用的原作品会保留。', confirmLabel: '确认下架', danger: true })) return
   busy.value = true; error.value = ''
   try { await schemesApi.remove(scheme.value.id); await router.replace('/me/works?tab=schemes') }
   catch (e) { error.value = e instanceof Error ? e.message : '下架失败，请稍后重试' }

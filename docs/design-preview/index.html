@@ -1048,6 +1048,26 @@
 
     // ==================== 跨端共享（手机 App + 社区网页） ====================
     {
+      id: 'ui-kit-overlays',
+      title: '基础组件库与通用弹层规范（手机 + 社区网页）',
+      domains: ['mobile', 'web'],
+      subcat: '系统与弹层',
+      status: 'merged',
+      statusNote: '已合入手机 :common:ui（theme/controls/layout/overlay）与社区前台 src/ui/（管理后台不动）',
+      runtime: 'static',
+      path: 'client/xiaoban-multiplatform/docs/design-specs/prototypes/ui-kit-overlays.html',
+      summary: '手机 App 与超级小伴社区网页共用的分层组件与弹层规范：独立区分弹层（24px 居中卡 CardDialog/ConfirmDialog、20px 顶圆角 BottomSheet、ActionSheet、Toast、Web 响应式弹窗）与通用控件（按钮/输入/开关/标签/列表行/空态），支持浅深色、6 套主题色与 390/360px 预览。',
+      presets: [
+        { label: '弹层体系', query: '?tab=overlays' },
+        { label: '通用控件', query: '?tab=controls' },
+        { label: 'PC ↔ H5 对照', query: '?tab=responsive' },
+        { label: '动效规范', query: '?tab=motion' },
+        { label: '图标库', query: '?tab=icons' },
+        { label: '配色规范', query: '?tab=colors' },
+        { label: '尺寸规范与模块', query: '?tab=tokens' },
+      ]
+    },
+    {
       id: 'post-composer',
       title: '发帖页（手机 + 网页双端）',
       domains: ['mobile', 'web'],
