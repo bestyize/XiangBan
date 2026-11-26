@@ -2,8 +2,6 @@ package xyz.xiangban.xiaoban
 
 import android.Manifest
 import android.app.AlarmManager
-import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -12,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 import java.util.UUID
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
@@ -19,8 +18,11 @@ import xyz.xiangban.xiaoban.common.community.ReminderScheduleResult
 import xyz.xiangban.xiaoban.common.community.LocalReminder
 import xyz.xiangban.xiaoban.common.community.ReminderWriteResult
 
-private const val CHANNEL_ID = "reminders"
+private const val CHANNEL_ID = XiaobanNotificationChannels.REMINDERS
 private const val ACTION_FIRE = "xyz.xiangban.xiaoban.REMINDER_FIRE"
+private const val ACTION_SNOOZE = "xyz.xiangban.xiaoban.REMINDER_SNOOZE"
+private const val ACTION_DONE = "xyz.xiangban.xiaoban.REMINDER_DONE"
+private const val SNOOZE_MS = 10 * 60 * 1000L
 private val reminderLock = Any()
 
 private enum class Status { WaitingForPermission, Scheduled, Fired, Failed }
@@ -71,16 +73,13 @@ private fun notificationsEnabled(context: Context): Boolean {
     val manager = notificationManager(context)
     if (!manager.areNotificationsEnabled()) return false
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
-    if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "提醒", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "小伴帮你设的提醒"
-        })
-    }
+    XiaobanNotificationChannels.ensureAll(context)
     return manager.getNotificationChannel(CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
 }
 
-private fun alarmIntent(context: Context, id: String): Intent = Intent(context, ReminderReceiver::class.java)
-        .setAction(ACTION_FIRE)
+private fun alarmIntent(context: Context, id: String, action: String = ACTION_FIRE): Intent =
+    Intent(context, ReminderReceiver::class.java)
+        .setAction(action)
         .setData(Uri.Builder().scheme("xiaoban-reminder").authority("alarm").appendPath(id).build())
 
 private fun registerAlarm(context: Context, reminder: Reminder) {
@@ -97,7 +96,11 @@ private fun cancelAlarm(context: Context, id: String) {
 }
 
 /** The reminder is committed before requesting permission or registering its system alarm. */
-class AndroidReminders(context: Context, private val askForNotifications: () -> Unit) : ReminderScheduler {
+class AndroidReminders(
+    context: Context,
+    private val askForNotifications: () -> Unit,
+    private val onNotificationsDisabled: () -> Unit = {},
+) : ReminderScheduler {
     private val app = context.applicationContext
     private val store = ReminderStore(app)
     override val supportsManagement = true
@@ -115,7 +118,11 @@ class AndroidReminders(context: Context, private val askForNotifications: () -> 
             } ?: Reminder(UUID.randomUUID().toString(), title, atEpochMs, Status.Scheduled)
             saveAndSchedule(reminder)
         }
-        if (result.status == ReminderScheduleResult.AwaitingPermission) askForNotifications()
+        when (result.status) {
+            ReminderScheduleResult.AwaitingPermission -> askForNotifications()
+            ReminderScheduleResult.NotificationsDisabled -> onNotificationsDisabled()
+            else -> Unit
+        }
         return result
     }
 
@@ -129,7 +136,11 @@ class AndroidReminders(context: Context, private val askForNotifications: () -> 
             val existing = store.read(id) ?: return@synchronized ReminderWriteResult(ReminderScheduleResult.NotFound)
             saveAndSchedule(existing.copy(title = title ?: existing.title, at = atEpochMs ?: existing.at))
         }
-        if (result.status == ReminderScheduleResult.AwaitingPermission) askForNotifications()
+        when (result.status) {
+            ReminderScheduleResult.AwaitingPermission -> askForNotifications()
+            ReminderScheduleResult.NotificationsDisabled -> onNotificationsDisabled()
+            else -> Unit
+        }
         return result
     }
 
@@ -195,8 +206,10 @@ class ReminderReceiver : BroadcastReceiver() {
         Thread {
             try {
                 when (action) {
-                    Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> AndroidReminders(app) {}.restore()
+                    Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> AndroidReminders(app, {}) .restore()
                     ACTION_FIRE -> intent.data?.lastPathSegment?.let { fire(app, it) }
+                    ACTION_SNOOZE -> intent.data?.lastPathSegment?.let { snooze(app, it) }
+                    ACTION_DONE -> intent.data?.lastPathSegment?.let { done(app, it) }
                     null -> intent.getStringExtra("title")?.let { title ->
                         // Alarms registered by the previous app version can still arrive after an update.
                         if (notificationsEnabled(app)) notifyReminder(app, "legacy-" + title.hashCode(), title)
@@ -221,14 +234,67 @@ class ReminderReceiver : BroadcastReceiver() {
         store.save(reminder.copy(status = if (delivered) Status.Fired else Status.Failed))
         Unit
     }
+
+    private fun snooze(context: Context, id: String) = synchronized(reminderLock) {
+        runCatching { notificationManager(context).cancel(id, 0) }
+        val store = ReminderStore(context)
+        val reminder = store.read(id) ?: return@synchronized
+        if (!notificationsEnabled(context)) return@synchronized
+        val next = reminder.copy(at = System.currentTimeMillis() + SNOOZE_MS, status = Status.Scheduled)
+        if (store.save(next)) {
+            runCatching { registerAlarm(context, next) }
+        }
+    }
+
+    private fun done(context: Context, id: String) = synchronized(reminderLock) {
+        runCatching { notificationManager(context).cancel(id, 0) }
+    }
 }
 
 private fun notifyReminder(context: Context, id: String, title: String) {
-    val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
-    @Suppress("DEPRECATION")
-    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, CHANNEL_ID) else Notification.Builder(context)
-    val notification = builder.setSmallIcon(android.R.drawable.ic_popup_reminder)
-        .setContentTitle("小伴提醒").setContentText(title).setContentIntent(open)
-        .setAutoCancel(true).setOnlyAlertOnce(true).build()
-    notificationManager(context).notify(id, 0, notification)
+    XiaobanNotificationChannels.ensureAll(context)
+    val openIntent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        putExtra(XiaobanNotificationChannels.EXTRA_TARGET, XiaobanNotificationChannels.TARGET_AI)
+    }
+    val open = PendingIntent.getActivity(context, id.hashCode(), openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    val snooze = PendingIntent.getBroadcast(
+        context,
+        ("snooze:$id").hashCode(),
+        alarmIntent(context, id, ACTION_SNOOZE),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val done = PendingIntent.getBroadcast(
+        context,
+        ("done:$id").hashCode(),
+        alarmIntent(context, id, ACTION_DONE),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val lockPreview = XiaobanNotificationChannels.readLockPreviewPref(context)
+    val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_stat_xiaoban)
+        .setContentTitle("小伴提醒")
+        .setContentText(title)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(title))
+        .setContentIntent(open)
+        .setAutoCancel(true)
+        .setOnlyAlertOnce(true)
+        .setCategory(NotificationCompat.CATEGORY_REMINDER)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .addAction(0, "延迟 10 分钟", snooze)
+        .addAction(0, "已完成", done)
+
+    if (lockPreview) {
+        builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+    } else {
+        val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_xiaoban)
+            .setContentTitle("小伴提醒")
+            .setContentText("解锁后查看 1 条提醒内容")
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+        builder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        builder.setPublicVersion(publicVersion)
+    }
+    notificationManager(context).notify(id, 0, builder.build())
 }

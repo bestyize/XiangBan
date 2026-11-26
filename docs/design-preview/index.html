@@ -1035,6 +1035,24 @@
       summary: '统一 24px 圆角居中卡片弹层规范，覆盖评论删除、附件购买、求助关闭、作品投稿、屏蔽用户、内容举报、工具环境移除和 App 更新八个高频手机场景，支持深浅色与交互模拟。'
     },
     {
+      id: 'mobile-notifications',
+      title: '系统通知栏与通知设置（Android + iOS）',
+      domains: ['mobile'],
+      subcat: '系统与弹层',
+      status: 'merged',
+      statusNote: '已合入 AndroidNotifications.kt / Reminders.kt / IOSNotifications.kt / NotificationSettingsScreen.kt（iOS 灵动岛 Widget 与服务端远程推送待后续扩展）',
+      runtime: 'static',
+      path: 'client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-notifications.html',
+      summary: '覆盖 Android 14 / iOS 18 系统通知栏与锁屏聚合、顶部横幅与锁屏隐藏详情、24px 权限引导弹层、通栏「设置 → 通知与提醒」页，以及 AI 任务进度/灵动岛实时活动、方案确认/高危审批/快捷回复/交付大图与中断通知和 5 通知渠道规划。',
+      presets: [
+        { label: 'Android 14', query: '?os=android' },
+        { label: 'iOS 18', query: '?os=ios' },
+        { label: '任务进度与灵动岛', query: '?focus=task-progress' },
+        { label: '审批与交付通知', query: '?focus=task-events' },
+        { label: '通知设置页', query: '?focus=settings' },
+      ]
+    },
+    {
       id: 'comment-composer',
       title: '评论组件（键盘 / 表情 / 相册）',
       domains: ['mobile'],

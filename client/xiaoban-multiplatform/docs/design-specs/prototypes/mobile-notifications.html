@@ -1,0 +1,2718 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>小伴手机 App · 系统通知栏与通知设置设计稿</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  margin: 0;
+  background: #eff0f2;
+  color: #1f2024;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  transition: background .25s ease, color .25s ease;
+}
+body.studio-dark { background: #0c0c0e; color: #ececef; }
+button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid #e3203c; outline-offset: 2px; }
+h1, h2, h3, h4, p { margin: 0; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ─── Studio Shell ─── */
+.studio { max-width: 1680px; margin: 0 auto; padding: 22px 20px 56px; }
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin-bottom: 22px;
+}
+.title-block h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+.title-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #ffffff;
+  color: #555860;
+  border: 1px solid rgba(0, 0, 0, .09);
+}
+body.studio-dark .title-badge { background: #1d1e22; color: #b4b7c0; border-color: rgba(255, 255, 255, .10); }
+.title-block p { margin-top: 4px; font-size: 12.5px; color: #6b6e75; }
+body.studio-dark .title-block p { color: #9698a0; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .055);
+  gap: 2px;
+}
+body.studio-dark .seg { background: rgba(255, 255, 255, .07); }
+.seg button {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f626a;
+  transition: background .15s, color .15s;
+}
+body.studio-dark .seg button { color: #9ca0aa; }
+.seg button.active {
+  background: #fff;
+  color: #1c1d21;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+body.studio-dark .seg button.active { background: #2c2d33; color: #f5f5f7; }
+
+.swatches { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 10px; background: rgba(0, 0, 0, .055); height: 34px; }
+body.studio-dark .swatches { background: rgba(255, 255, 255, .07); }
+.swatch { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.pill-btn {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .88);
+  color: #32343a;
+  border: 1px solid rgba(0, 0, 0, .07);
+}
+body.studio-dark .pill-btn { background: #1d1e22; color: #dcdee4; border-color: rgba(255, 255, 255, .09); }
+
+/* ─── 4-Board Stage ─── */
+.boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 26px 24px; }
+.board { width: 390px; flex: none; transition: width .2s ease; }
+body.compact .board { width: 360px; }
+.board.focused .phone { box-shadow: 0 24px 64px rgba(227, 32, 60, .18), 0 0 0 2px var(--focus-ring, #e3203c); }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px 10px; min-height: 28px; }
+.board-head h2 { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.board-num { font-size: 11px; font-weight: 600; color: #8c8f96; font-variant-numeric: tabular-nums; }
+.board-mini-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .055); gap: 2px; }
+body.studio-dark .board-mini-seg { background: rgba(255, 255, 255, .08); }
+.board-mini-seg button { height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; color: #666; }
+body.studio-dark .board-mini-seg button { color: #a3a6b0; }
+.board-mini-seg button.active { background: #fff; color: #1c1d21; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+body.studio-dark .board-mini-seg button.active { background: #2c2d33; color: #f3f3f6; }
+
+/* ─── Phone Tokens (docs/product/手机端设计规范.md) ─── */
+.phone {
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --ink: #222222;
+  --ink2: #666666;
+  --ink3: #9a9a9a;
+  --hairline: #ededed;
+  --fill: #f2f2f2;
+  --line: #e4e4e4;
+  --accent: #e3203c;
+  --accent-ink: #e3203c;
+  --success: #2fa36b;
+  --warn: #c77710;
+  --danger: #e3203c;
+  --scrim: rgba(18, 18, 23, .38);
+
+  position: relative;
+  height: 800px;
+  border-radius: 38px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 6px solid #ffffff;
+  box-shadow: 0 22px 58px rgba(15, 18, 25, .11), 0 0 0 1px rgba(0, 0, 0, .06);
+  isolation: isolate;
+}
+.phone.dark {
+  --paper: #111111;
+  --surface: #1c1c1e;
+  --ink: #ececec;
+  --ink2: #9a9aa0;
+  --ink3: #6e6e73;
+  --hairline: #2a2a2d;
+  --fill: #2c2c2e;
+  --line: #363639;
+  --success: #45be83;
+  --warn: #eba446;
+  --danger: #ff6369;
+  --scrim: rgba(3, 3, 6, .64);
+
+  border-color: #242428;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* Status Bar */
+.status-bar {
+  height: 36px;
+  flex: none;
+  padding: 10px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--surface);
+  z-index: 2;
+}
+.status-bar.transparent { background: transparent; color: #fff; }
+.status-left { display: flex; align-items: center; gap: 6px; }
+.status-small-icon { width: 13px; height: 13px; display: inline-flex; align-items: center; justify-content: center; opacity: .94; }
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.bat { display: inline-flex; align-items: center; padding: 1.5px; width: 22px; height: 11px; border: 1.2px solid currentColor; border-radius: 3px; position: relative; }
+.bat::before { content: ""; display: block; width: 78%; height: 100%; border-radius: 1.5px; background: currentColor; }
+.bat::after { content: ""; position: absolute; right: -3px; top: 2.5px; width: 2px; height: 4px; border-radius: 1px; background: currentColor; opacity: .5; }
+
+.gesture-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 112px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--ink);
+  opacity: .22;
+  pointer-events: none;
+  z-index: 15;
+}
+.gesture-bar.light { background: #fff; opacity: .52; }
+
+/* App Icon & Small Icon */
+.xb-app-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 28% 22%, #ff937b 0%, transparent 48%), linear-gradient(140deg, #ff5d7d 0%, #f9744b 100%);
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+.xb-app-icon.sm { width: 22px; height: 22px; border-radius: 6px; }
+.xb-app-icon.md { width: 34px; height: 34px; border-radius: 9px; }
+.xb-app-icon.lg { width: 44px; height: 44px; border-radius: 12px; }
+
+.android-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.android-badge.ai { background: #e3203c; }
+.android-badge.remind { background: var(--accent); }
+.android-badge.social { background: #3b7de8; }
+.android-badge.link { background: #2fa36b; }
+
+/* ─── Board 01: System Shade & Lock Screen ─── */
+.wallpaper-bg {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 14%, rgba(255, 160, 140, .42), transparent 62%),
+    radial-gradient(ellipse 70% 55% at 88% 28%, rgba(122, 162, 245, .36), transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 92%, rgba(92, 74, 148, .55), transparent 65%),
+    linear-gradient(168deg, #2b2938 0%, #1d2130 52%, #171822 100%);
+  color: #fff;
+}
+.phone:not(.dark) .wallpaper-bg.shade-android {
+  background:
+    radial-gradient(ellipse 80% 45% at 18% 6%, rgba(255, 186, 174, .22), transparent 65%),
+    linear-gradient(180deg, #e9ebf0 0%, #eff1f5 100%);
+  color: #1f2024;
+}
+.phone.dark .wallpaper-bg.shade-android {
+  background: linear-gradient(180deg, #131417 0%, #0d0e11 100%);
+  color: #ececec;
+}
+.wallpaper-bg.shade-ios {
+  background:
+    radial-gradient(ellipse 75% 48% at 24% 16%, rgba(255, 146, 128, .48), transparent 64%),
+    radial-gradient(ellipse 70% 52% at 85% 32%, rgba(110, 152, 236, .42), transparent 62%),
+    linear-gradient(165deg, #2d2c40 0%, #1d2233 56%, #181a27 100%);
+  color: #fff;
+}
+
+.shade-qs {
+  padding: 8px 16px 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.qs-pill {
+  height: 36px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .75);
+  color: #2b2d33;
+}
+.phone.dark .qs-pill { background: rgba(255, 255, 255, .10); color: #dcdee4; }
+.qs-pill.on { background: var(--accent); color: #fff; }
+.qs-pill svg { width: 14px; height: 14px; }
+
+.lock-clock {
+  padding: 20px 24px 16px;
+  text-align: center;
+  color: #fff;
+}
+.lock-date { font-size: 13px; font-weight: 500; opacity: .88; letter-spacing: .01em; }
+.lock-time { font-size: 62px; font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+.shade-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 12px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  scrollbar-width: none;
+}
+.shade-scroll::-webkit-scrollbar { display: none; }
+
+.shade-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: .72;
+}
+.shade-clear-btn {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(128, 128, 138, .18);
+  color: inherit;
+}
+
+/* System Notification Card (Android & iOS) */
+.sys-notif {
+  border-radius: 20px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: #1e2024;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+  transition: transform .16s ease, background .2s ease;
+  position: relative;
+}
+.phone.dark .sys-notif {
+  background: #222328;
+  color: #f0f0f3;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+.sys-notif.ios-glass {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #1c1c1e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+.phone.dark .sys-notif.ios-glass {
+  background: rgba(34, 35, 42, .80);
+  color: #f2f2f5;
+  border: 1px solid rgba(255, 255, 255, .09);
+}
+
+.notif-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: #6a6d75;
+}
+.phone.dark .notif-meta { color: #9ea0a8; }
+.notif-meta-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.notif-app-name { font-weight: 600; color: inherit; }
+.notif-dot { opacity: .55; }
+.notif-expand-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(128, 128, 138, .12);
+  display: grid;
+  place-items: center;
+  color: inherit;
+}
+.notif-expand-btn svg { width: 12px; height: 12px; transition: transform .18s; }
+.sys-notif.expanded .notif-expand-btn svg { transform: rotate(180deg); }
+
+.notif-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.notif-body { flex: 1; min-width: 0; }
+.notif-title {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: inherit;
+}
+.notif-text {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #5a5d66;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.phone.dark .notif-text { color: #b4b6be; }
+.sys-notif.expanded .notif-text { -webkit-line-clamp: 5; }
+
+.notif-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 650;
+  color: #fff;
+  flex: none;
+}
+
+.notif-actions {
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 0.5px solid rgba(128, 128, 138, .16);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.notif-act-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: transparent;
+  transition: background .15s;
+}
+.notif-act-btn:hover { background: rgba(128, 128, 138, .10); }
+.notif-act-btn.secondary {
+  color: #555860;
+  font-weight: 500;
+  background: transparent;
+}
+.phone.dark .notif-act-btn.secondary { color: #b8bac2; }
+
+/* Grouped Stack Visual */
+.stack-wrap { position: relative; }
+.stack-wrap.collapsed { padding-bottom: 8px; }
+.stack-wrap.collapsed::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 1px;
+  height: 16px;
+  border-radius: 0 0 16px 16px;
+  background: rgba(255, 255, 255, .62);
+  z-index: 0;
+}
+.phone.dark .stack-wrap.collapsed::after { background: rgba(34, 35, 42, .56); }
+.stack-wrap > .sys-notif { position: relative; z-index: 1; }
+.stack-sublist {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid rgba(128, 128, 138, .18);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.stack-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.stack-mini-av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 650;
+  color: #fff;
+  flex: none;
+}
+.stack-row span { flex: 1; min-width: 0; color: inherit; }
+.stack-row time { font-size: 11px; color: #8c8f98; flex: none; }
+
+.shade-empty {
+  margin: auto 12px;
+  padding: 28px 18px;
+  border-radius: 20px;
+  text-align: center;
+  background: rgba(255, 255, 255, .14);
+  backdrop-filter: blur(12px);
+  color: inherit;
+}
+.phone:not(.dark) .shade-android .shade-empty { background: rgba(255, 255, 255, .75); }
+.shade-empty p { font-size: 13px; opacity: .76; margin-bottom: 12px; }
+.shade-reset-btn {
+  height: 34px;
+  padding: 0 15px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: #ffffff;
+  color: #1f2024;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+}
+.phone.dark .shade-reset-btn { background: #2c2d33; color: #f2f2f5; }
+
+/* ─── Board 02: Heads-up Banner & Lock Privacy ─── */
+.app-backdrop {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  position: relative;
+}
+.mock-plaza-head {
+  padding: 10px 18px 12px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mock-plaza-head h3 { font-size: 18px; font-weight: 700; }
+.mock-plaza-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.mock-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 14px;
+}
+.mock-card-title { font-size: 14px; font-weight: 650; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+.mock-card-sub { font-size: 12px; color: var(--ink3); font-weight: 400; }
+.sim-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sim-btn {
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: var(--fill);
+  text-align: left;
+  transition: background .15s, border-color .15s;
+  border: 1.5px solid transparent;
+}
+.sim-btn.active { background: var(--surface); border-color: var(--accent); }
+.sim-btn strong { display: block; font-size: 12.5px; font-weight: 650; color: var(--ink); }
+.sim-btn span { display: block; margin-top: 2px; font-size: 11px; color: var(--ink2); }
+
+.skeleton-row { display: flex; gap: 10px; align-items: center; }
+.sk-box { width: 46px; height: 46px; border-radius: 12px; background: var(--fill); flex: none; }
+.sk-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.sk-line { height: 10px; border-radius: 99px; background: var(--fill); }
+.sk-line.w70 { width: 70%; }
+.sk-line.w45 { width: 45%; }
+
+.headsup-slot {
+  position: absolute;
+  top: 40px;
+  left: 10px;
+  right: 10px;
+  z-index: 12;
+  animation: bannerDrop .28s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes bannerDrop {
+  from { opacity: 0; transform: translateY(-16px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.headsup-card {
+  border-radius: 20px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, .96);
+  color: #1f2024;
+  border: 1px solid rgba(0, 0, 0, .06);
+  box-shadow: 0 12px 32px rgba(15, 18, 25, .18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.phone.dark .headsup-card {
+  background: rgba(32, 33, 38, .95);
+  color: #f0f0f4;
+  border-color: rgba(255, 255, 255, .10);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .55);
+}
+.headsup-handle {
+  width: 34px;
+  height: 3.5px;
+  border-radius: 99px;
+  background: rgba(128, 128, 138, .32);
+  margin: 8px auto 0;
+}
+
+.privacy-hint {
+  margin: 0 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .14);
+  backdrop-filter: blur(12px);
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, .86);
+}
+
+/* ─── Board 03: Permission Dialog (24px Unified Card) ─── */
+.chat-bg {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+.appbar {
+  height: 48px;
+  flex: none;
+  padding: 0 8px;
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+}
+.appbar.has-sep { border-bottom: 0.5px solid var(--hairline); }
+.appbar h3 { text-align: center; font-size: 17px; font-weight: 650; color: var(--ink); }
+.icon-tap { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
+.icon-tap svg { width: 20px; height: 20px; }
+
+.chat-feed { padding: 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.chat-user {
+  align-self: flex-end;
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--fill);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.chat-ai-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 13px 14px;
+}
+.chat-ai-row { display: flex; align-items: center; gap: 10px; }
+.chat-ai-title { font-size: 14px; font-weight: 650; }
+.chat-ai-sub { font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--fill);
+  color: var(--ink2);
+}
+.pill-tag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.pill-tag.ok::before { background: var(--success); }
+
+.modal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px 24px;
+}
+.modal-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+}
+.dialog-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 54px rgba(15, 18, 25, .24);
+  overflow: hidden;
+  padding: 22px 20px 14px;
+}
+.dialog-head { display: flex; align-items: center; gap: 12px; }
+.dialog-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--fill);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.dialog-tile.warn { background: var(--fill); color: var(--warn); }
+.dialog-tile svg { width: 22px; height: 22px; }
+.dialog-card h4 { font-size: 18px; line-height: 1.35; font-weight: 700; }
+.dialog-desc { margin-top: 8px; font-size: 13.5px; line-height: 1.6; color: var(--ink2); }
+
+.perm-list {
+  margin-top: 14px;
+  background: var(--fill);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.perm-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+.perm-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: none; }
+
+.dialog-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.55;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.dialog-note svg { width: 15px; height: 15px; margin-top: 2px; color: var(--warn); }
+.dialog-path {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 12px;
+  color: var(--ink2);
+}
+
+.dialog-footer {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.btn-primary {
+  height: 46px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.btn-primary:hover { filter: brightness(.95); }
+.btn-ghost {
+  height: 42px;
+  border-radius: 99px;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 500;
+}
+.btn-ghost:hover { background: var(--fill); }
+
+/* Simulated OS System Permission Dialog */
+.os-prompt {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  border-radius: 22px;
+  background: var(--surface);
+  padding: 20px 18px 14px;
+  text-align: center;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .32);
+}
+.os-prompt-icon {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 10px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+}
+.os-prompt h5 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.4; }
+.os-prompt p { margin-top: 6px; font-size: 12.5px; color: var(--ink2); }
+.os-prompt-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.os-prompt-btn {
+  height: 42px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.os-prompt-btn.allow { background: var(--accent); color: #ffffff; }
+
+.reopen-fab {
+  margin: auto 16px 26px;
+  height: 44px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ─── Board 04: Settings Page (Full-bleed List) ─── */
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 36px;
+  scrollbar-width: none;
+}
+.settings-scroll::-webkit-scrollbar { display: none; }
+
+.sys-off-banner {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--hairline);
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sys-off-text { font-size: 12.5px; line-height: 1.45; color: var(--ink2); }
+.sys-off-text strong { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink); margin-bottom: 2px; }
+.sys-off-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+.sys-off-btn {
+  flex: none;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.group-label {
+  padding: 16px 16px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+.full-list {
+  background: var(--surface);
+  border-top: 0.5px solid var(--hairline);
+  border-bottom: 0.5px solid var(--hairline);
+}
+.full-list.disabled-group { opacity: .48; pointer-events: none; }
+.list-row {
+  min-height: 58px;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+}
+.list-row + .list-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
+}
+.row-text { flex: 1; min-width: 0; }
+.row-title { font-size: 15px; line-height: 21px; font-weight: 500; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.row-desc { font-size: 12.5px; line-height: 18px; color: var(--ink2); margin-top: 1px; }
+.row-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--fill);
+  color: var(--ink2);
+}
+.row-value { display: flex; align-items: center; gap: 4px; font-size: 13.5px; color: var(--ink2); flex: none; }
+.row-value svg { width: 16px; height: 16px; color: var(--ink3); }
+
+/* Toggle Switch */
+.switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 99px;
+  background: #d8d9de;
+  padding: 2px;
+  transition: background .18s ease;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.phone.dark .switch { background: #3a3a40; }
+.switch.on { background: var(--accent); }
+.switch-knob {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  transform: translateX(0);
+  transition: transform .18s ease;
+}
+.switch.on .switch-knob { transform: translateX(18px); }
+
+/* Toast inside phone */
+.phone-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 10px);
+  max-width: calc(100% - 36px);
+  padding: 9px 14px;
+  border-radius: 99px;
+  background: rgba(28, 29, 34, .92);
+  color: #fff;
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 20;
+}
+.phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ─── Bottom Spec & Channel Reference ─── */
+.spec-section {
+  margin: 36px auto 0;
+  max-width: 1220px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 960px) { .spec-section { grid-template-columns: 1fr; } }
+
+.spec-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, .06);
+  padding: 18px 20px;
+}
+body.studio-dark .spec-card { background: #16171a; border-color: rgba(255, 255, 255, .07); }
+.spec-card h3 { font-size: 14.5px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.spec-tag { font-size: 11px; font-weight: 600; color: #6b6e75; background: #f2f3f5; padding: 2px 8px; border-radius: 99px; }
+body.studio-dark .spec-tag { background: #26272d; color: #a1a4ad; }
+
+.icon-specimen-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.specimen {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f7f9;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+body.studio-dark .specimen { background: #1f2026; }
+.specimen-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.specimen-box.dark-bar { background: #1c1d22; color: #ffffff; }
+.specimen-box.light-bar { background: #ffffff; color: #1c1d22; border: 1px solid #e4e5e9; }
+.specimen-meta strong { display: block; font-size: 12.5px; font-weight: 650; }
+.specimen-meta span { font-size: 11.5px; color: #6e717a; }
+body.studio-dark .specimen-meta span { color: #9699a3; }
+
+.channel-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.channel-table th, .channel-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eceef1; }
+body.studio-dark .channel-table th, body.studio-dark .channel-table td { border-bottom-color: #26272e; }
+.channel-table th { font-weight: 600; color: #6c6f78; font-size: 11.5px; }
+body.studio-dark .channel-table th { color: #9699a2; }
+.channel-table code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: #f2f3f5; padding: 1px 5px; border-radius: 5px; }
+body.studio-dark .channel-table code { background: #262830; }
+.st-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #f2f3f5;
+  color: #4b4e57;
+  vertical-align: middle;
+}
+.st-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #9a9da6; }
+.st-chip.done::before { background: #2fa36b; }
+.st-chip.todo::before { background: #e3203c; }
+body.studio-dark .st-chip { background: #26272d; color: #c4c7d0; }
+body.studio-dark .st-chip.done::before { background: #45be83; }
+body.studio-dark .st-chip.todo::before { background: #ff6369; }
+
+.rule-list { display: flex; flex-direction: column; gap: 9px; font-size: 12.5px; line-height: 1.55; color: #545760; }
+body.studio-dark .rule-list { color: #a4a7b0; }
+.rule-list strong { color: #1f2024; font-weight: 650; }
+body.studio-dark .rule-list strong { color: #ececef; }
+
+/* ─── Task Progress, Live Activity & Rich Delivery ─── */
+.island-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 14px 4px;
+}
+.dynamic-island {
+  background: #0d0e11;
+  color: #ffffff;
+  border-radius: 99px;
+  padding: 6px 12px;
+  min-width: 174px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35), inset 0 0 0 0.5px rgba(255, 255, 255, .14);
+  transition: all .22s ease;
+  cursor: pointer;
+}
+.dynamic-island.expanded {
+  width: 100%;
+  border-radius: 24px;
+  padding: 13px 15px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.di-left { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; }
+.di-pct { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .92); display: flex; align-items: center; gap: 5px; }
+.di-ring {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--p, 72) * 1%), rgba(255, 255, 255, .20) 0);
+  display: grid;
+  place-items: center;
+}
+.di-ring::after { content: ""; width: 11px; height: 11px; border-radius: 50%; background: #0d0e11; }
+
+.task-prog-track {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(128, 128, 138, .18);
+  overflow: hidden;
+  margin-top: 9px;
+}
+.phone.dark .task-prog-track { background: rgba(255, 255, 255, .12); }
+.task-prog-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width .35s cubic-bezier(.22, 1, .36, 1);
+}
+.task-prog-fill.indeterminate {
+  width: 42%;
+  animation: progSlide 1.4s ease-in-out infinite;
+}
+@keyframes progSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+.task-prog-meta {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #6a6d75;
+  font-variant-numeric: tabular-nums;
+}
+.phone.dark .task-prog-meta { color: #9ea0a8; }
+
+.task-state-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.task-state-dot.run { background: var(--accent); }
+.task-state-dot.wait { background: var(--warn); }
+.task-state-dot.ok { background: var(--success); }
+.task-state-dot.err { background: var(--danger); }
+
+.notif-thumb-app {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: #f2f3f5;
+  color: #1f2024;
+  border: 1px solid rgba(0, 0, 0, .06);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.phone.dark .notif-thumb-app { background: #2c2d34; color: #f0f0f4; border-color: rgba(255, 255, 255, .08); }
+.notif-thumb-app svg { width: 20px; height: 20px; }
+
+.notif-big-pic {
+  margin-top: 9px;
+  height: 98px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at 78% 28%, rgba(255, 212, 152, .72), transparent 32%),
+    radial-gradient(ellipse 90% 60% at 24% 80%, rgba(74, 108, 178, .65), transparent 65%),
+    linear-gradient(150deg, #1b2236 0%, #27324e 52%, #171b28 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 9px 11px;
+  color: #fff;
+}
+.notif-big-pic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(108deg, rgba(255, 255, 255, .09) 0 1px, transparent 1px 16px);
+  opacity: .55;
+}
+.notif-big-pic span {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(15, 17, 24, .56);
+  backdrop-filter: blur(8px);
+}
+
+.inline-reply-box {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 0.5px solid rgba(128, 128, 138, .16);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inline-reply-input {
+  flex: 1;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 99px;
+  background: rgba(128, 128, 138, .12);
+  color: inherit;
+  font-size: 12.5px;
+}
+.inline-reply-input::placeholder { color: #8c8f98; }
+.inline-reply-send {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.task-sim-bar {
+  margin-top: auto;
+  padding: 10px 12px 18px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.task-sim-chip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, .86);
+  color: #1f2024;
+  border: 1px solid rgba(0, 0, 0, .07);
+  backdrop-filter: blur(10px);
+}
+.phone.dark .task-sim-chip { background: rgba(38, 39, 46, .88); color: #ececef; border-color: rgba(255, 255, 255, .10); }
+.task-sim-chip.primary { background: var(--accent); color: #ffffff; border-color: transparent; }
+</style>
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="title-block">
+      <h1>小伴手机 App · 系统通知栏与通知设置 <span class="title-badge">设计稿 · 已合入</span></h1>
+      <p>覆盖 Android / iOS 系统通知栏、顶部横幅与隐私态、权限引导弹层、通知设置页，以及 AI 任务进度、审批、交付与异常全生命周期通知</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="系统风格">
+        <button data-os="android" class="active">Android 14</button>
+        <button data-os="ios">iOS 18</button>
+      </div>
+      <div class="swatches" id="swatches" aria-label="主题色"></div>
+      <button class="pill-btn" id="toggle-width">390 → 360</button>
+      <button class="pill-btn" id="toggle-dark">深色模式</button>
+    </div>
+  </header>
+
+  <main class="boards">
+    <!-- ═══ Board 01: System Notification Shade / Lock Screen ═══ -->
+    <section class="board" id="board-shade">
+      <div class="board-head">
+        <h2><span class="board-num">01</span> 系统通知栏 · 聚合与操作</h2>
+        <div class="board-mini-seg">
+          <button data-shade-mode="drawer" class="active">通知抽屉</button>
+          <button data-shade-mode="lock">锁屏视图</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-shade"></div>
+    </section>
+
+    <!-- ═══ Board 02: Heads-up Banner & Lock Screen Privacy ═══ -->
+    <section class="board" id="board-banner">
+      <div class="board-head">
+        <h2><span class="board-num">02</span> 顶部横幅 · 隐私态</h2>
+        <div class="board-mini-seg">
+          <button data-banner-mode="headsup" class="active">顶部横幅</button>
+          <button data-banner-mode="privacy">锁屏隐藏详情</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-banner"></div>
+    </section>
+
+    <!-- ═══ Board 03: Notification Permission Dialog ═══ -->
+    <section class="board" id="board-permission">
+      <div class="board-head">
+        <h2><span class="board-num">03</span> 通知权限引导弹层</h2>
+        <div class="board-mini-seg">
+          <button data-perm-mode="first" class="active">首次触发</button>
+          <button data-perm-mode="denied">已被拒绝</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-permission"></div>
+    </section>
+
+    <!-- ═══ Board 04: Notification Settings ═══ -->
+    <section class="board" id="board-settings">
+      <div class="board-head">
+        <h2><span class="board-num">04</span> 设置 · 通知与提醒</h2>
+        <div class="board-mini-seg">
+          <button data-set-mode="enabled" class="active">已开启</button>
+          <button data-set-mode="disabled">权限关闭</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-settings"></div>
+    </section>
+
+    <!-- ═══ Board 05: Task Running / Progress & Live Activity ═══ -->
+    <section class="board" id="board-task-progress">
+      <div class="board-head">
+        <h2><span class="board-num">05</span> 任务执行中 · 进度与实时活动</h2>
+        <div class="board-mini-seg">
+          <button data-tp-mode="single" class="active">进行中</button>
+          <button data-tp-mode="multi">多任务并发</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-task-progress"></div>
+    </section>
+
+    <!-- ═══ Board 06: Task Milestones (Approval / Delivery / Error) ═══ -->
+    <section class="board" id="board-task-events">
+      <div class="board-head">
+        <h2><span class="board-num">06</span> 任务节点 · 审批、交付与异常</h2>
+        <div class="board-mini-seg">
+          <button data-te-mode="blocked" class="active">待你确认</button>
+          <button data-te-mode="result">交付与异常</button>
+        </div>
+      </div>
+      <div class="phone" id="phone-task-events"></div>
+    </section>
+  </main>
+
+  <!-- ─── Spec & Engineering Alignment ─── -->
+  <section class="spec-section">
+    <article class="spec-card">
+      <h3>状态栏单色小图标 &amp; 通知图标规范 <span class="spec-tag">替代系统默认铃铛</span></h3>
+      <div class="icon-specimen-row">
+        <div class="specimen">
+          <div class="specimen-box dark-bar" title="Android 24dp 单色状态栏图标">
+            <svg width="22" height="22" viewBox="0 0 120 120" stroke="none">
+              <g transform="translate(54 64) scale(0.98)"><path fill="currentColor" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z"/></g>
+              <g transform="translate(84 34) scale(0.48)"><path fill="currentColor" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z"/></g>
+            </svg>
+          </div>
+          <div class="specimen-meta">
+            <strong>Android 24dp 单色双星</strong>
+            <span>纯白矢量剪影（无底色），用于状态栏与通知头</span>
+          </div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-box light-bar">
+            <div class="xb-app-icon md">
+              <svg width="24" height="24" viewBox="0 0 120 120" stroke="none">
+                <g transform="translate(55.5 62.5) scale(0.96)"><path fill="#fff" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z"/></g>
+                <g transform="translate(82.5 35.5) scale(0.47)"><path fill="#fff" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z"/></g>
+              </svg>
+            </div>
+          </div>
+          <div class="specimen-meta">
+            <strong>iOS AppIcon / 大图标</strong>
+            <span>iOS 自动复用应用图标；Android 社区通知右侧放发件人头像</span>
+          </div>
+        </div>
+      </div>
+      <div class="rule-list" style="margin-top:14px;">
+        <div><strong>权限申请时机：</strong>冷启动绝不弹通知权限；仅在用户首次设置提醒、打开 AI 通知或于设置页开启时，先展示 24px 前置说明卡，再拉起系统权限框。</div>
+        <div><strong>操作按钮克制：</strong>每条通知最多 2 个快捷按钮（如提醒用「延迟 10 分钟 / 已完成」，AI 审批用「打开查看」），高危操作不直接在锁屏静默放行。</div>
+      </div>
+    </article>
+
+    <article class="spec-card">
+      <h3>Android NotificationChannel 通道规划 <span class="spec-tag">5 渠道分组</span></h3>
+      <table class="channel-table">
+        <thead>
+          <tr><th>Channel ID</th><th>展示名</th><th>重要度</th><th>行为与状态</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>reminders</code></td>
+            <td>提醒</td>
+            <td>HIGH</td>
+            <td>横幅 + 响铃，支持延迟/完成 <span class="st-chip done">已合入</span></td>
+          </tr>
+          <tr>
+            <td><code>ai_progress</code></td>
+            <td>任务进度</td>
+            <td>LOW</td>
+            <td>常驻细进度条、静默更新不响铃 <span class="st-chip done">已合入</span></td>
+          </tr>
+          <tr>
+            <td><code>ai_tasks</code></td>
+            <td>任务确认与交付</td>
+            <td>HIGH</td>
+            <td>待审批、提问、交付完成与异常中断 <span class="st-chip done">已合入</span></td>
+          </tr>
+          <tr>
+            <td><code>community</code></td>
+            <td>社区互动</td>
+            <td>DEFAULT</td>
+            <td>评论/回复/点赞未读汇总 <span class="st-chip done">已合入</span></td>
+          </tr>
+          <tr>
+            <td><code>link_transfer</code></td>
+            <td>互联与下载</td>
+            <td>LOW</td>
+            <td>电脑互传文件、下载完成通道已注册 <span class="st-chip done">已合入</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="rule-list" style="margin-top:12px;">
+        <div><strong>任务通知「过程静默、节点提醒」：</strong>后台执行期走 <code>ai_progress</code> 静默进度条（iOS 走灵动岛 / Live Activity），只在「待确认 / 审批 / 交付完成 / 异常中断」四个关键节点升级为高优横幅。</div>
+        <div><strong>安全边界：</strong>高危操作（如遥控电脑执行删除/清理命令）通知不提供锁屏一键放行，点击后拉起 App 内审批卡单次确认；小伴提问支持通知内快捷回复。</div>
+      </div>
+    </article>
+  </section>
+</div>
+
+<script>
+const ACCENTS = [
+  { id: 'crimson', name: '品牌红', light: { btn: '#e3203c', ink: '#e3203c' }, dark: { btn: '#ff5268', ink: '#ff7b8a' } },
+  { id: 'coral',   name: '日落珊瑚', light: { btn: '#f05a42', ink: '#d9452e' }, dark: { btn: '#ff7860', ink: '#ff907a' } },
+  { id: 'ocean',   name: '海洋蓝', light: { btn: '#2b6ee6', ink: '#245ec7' }, dark: { btn: '#5c94ff', ink: '#82aeff' } },
+  { id: 'jade',    name: '翠林绿', light: { btn: '#249460', ink: '#1e7e52' }, dark: { btn: '#45be83', ink: '#68d49e' } },
+  { id: 'violet',  name: '星辰紫', light: { btn: '#6d40d8', ink: '#5e34c2' }, dark: { btn: '#9570ff', ink: '#b194ff' } },
+  { id: 'amber',   name: '琥珀金', light: { btn: '#c77710', ink: '#a86209' }, dark: { btn: '#eba446', ink: '#f5bc6c' } },
+];
+
+const TWIN_STARS_SVG = (size = 13, fill = 'currentColor') => `
+  <svg width="${size}" height="${size}" viewBox="0 0 120 120" stroke="none">
+    <g transform="translate(55 63) scale(0.96)"><path fill="${fill}" d="M -3.2 -30.2 Q 0 -34 3.2 -30.2 C 7.6 -15.6 15.6 -7.6 30.2 -3.2 Q 34 0 30.2 3.2 C 15.6 7.6 7.6 15.6 3.2 30.2 Q 0 34 -3.2 30.2 C -7.6 15.6 -15.6 7.6 -30.2 3.2 Q -34 0 -30.2 -3.2 C -15.6 -7.6 -7.6 -15.6 -3.2 -30.2 Z"/></g>
+    <g transform="translate(83 35) scale(0.47)"><path fill="${fill}" d="M -3.8 -29.8 Q 0 -34 3.8 -29.8 C 8.5 -15 15 -8.5 29.8 -3.8 Q 34 0 29.8 3.8 C 15 8.5 8.5 15 3.8 29.8 Q 0 34 -3.8 29.8 C -8.5 15 -15 8.5 -29.8 3.8 Q -34 0 -29.8 -3.8 C -15 -8.5 -8.5 -15 -3.8 -29.8 Z"/></g>
+  </svg>`;
+
+const INITIAL_NOTIFS = () => ([
+  {
+    id: 'remind-1',
+    channel: '提醒',
+    kind: 'remind',
+    time: '刚刚',
+    title: '开产品评审会',
+    body: '小伴按约定提醒你：14:30 评审手机版通知栏方案，会议室 3B。',
+    expanded: true,
+    actions: [
+      { id: 'snooze', label: '延迟 10 分钟', primary: true },
+      { id: 'done', label: '已完成', primary: false },
+    ],
+  },
+  {
+    id: 'ai-1',
+    channel: '小伴 AI',
+    kind: 'ai',
+    time: '3 分钟前',
+    title: '文档整理已完成',
+    body: '已将本周 12 条用户反馈归类为 3 个优先级清单，可直接导出或继续追问。',
+    expanded: false,
+    actions: [
+      { id: 'open-ai', label: '打开查看', primary: true },
+    ],
+  },
+  {
+    id: 'social-group',
+    channel: '社区互动',
+    kind: 'social',
+    time: '12 分钟前',
+    title: '3 条新社区互动',
+    body: '林澈 回复了你的作品《潮汐书房 · 鲸鱼娘》：“深色锁屏下光影层次很舒服！”',
+    expanded: false,
+    grouped: [
+      { name: '林', color: '#4c7be0', text: '林澈 评论了你的作品《潮汐书房》：“光影层次很舒服！”', time: '12 分钟前' },
+      { name: '九', color: '#d96a53', text: '阿九 等 2 人赞了你的帖子《协议 2 胶囊避让心得》', time: '26 分钟前' },
+      { name: '伴', color: '#2fa36b', text: '你的作品《轻启 v1.2》已通过社区审核并上架', time: '1 小时前' },
+    ],
+    actions: [
+      { id: 'reply-social', label: '查看互动', primary: true },
+      { id: 'read-social', label: '标为已读', primary: false },
+    ],
+  },
+  {
+    id: 'link-1',
+    channel: '互联与下载',
+    kind: 'link',
+    time: '28 分钟前',
+    title: '收到 MacBook Pro 发来的文件',
+    body: '发布清单-v3.2.md（48 KB）已保存至手机工作空间，点击立即预览。',
+    expanded: false,
+    actions: [
+      { id: 'open-link', label: '打开文件', primary: true },
+    ],
+  },
+]);
+
+const BANNER_PRESETS = {
+  remind: {
+    channel: '提醒',
+    kind: 'remind',
+    time: '现在',
+    title: '记得下楼取快递',
+    body: '15 分钟前由小伴 AI 设定的本机提醒，点击回到对话查看。',
+    actions: [
+      { id: 'snooze', label: '延迟 10 分钟', primary: true },
+      { id: 'done', label: '已完成', primary: false },
+    ],
+  },
+  ai: {
+    channel: '小伴 AI',
+    kind: 'ai',
+    time: '现在',
+    title: '需要你的确认 · 取消 1 条提醒',
+    body: '小伴请求执行写入操作，为安全起见需打开 App 后单次确认。',
+    actions: [
+      { id: 'open-ai', label: '去确认', primary: true },
+    ],
+  },
+  social: {
+    channel: '社区互动',
+    kind: 'social',
+    time: '现在',
+    title: '林澈 回复了你的评论',
+    body: '“这个深色通知渠道配色很克制，期待下个版本合入！”',
+    avatar: { text: '林', color: '#4c7be0' },
+    actions: [
+      { id: 'open-social', label: '查看回复', primary: true },
+      { id: 'mark-read', label: '标为已读', primary: false },
+    ],
+  },
+  link: {
+    channel: '互联与下载',
+    kind: 'link',
+    time: '现在',
+    title: '电脑端发来 1 条链接',
+    body: '来自 MacBook Pro：wallpaper.xiangban.xyz 预览地址',
+    actions: [
+      { id: 'open-link', label: '立即打开', primary: true },
+    ],
+  },
+};
+
+const state = {
+  os: 'android',
+  accent: 'crimson',
+  dark: false,
+  compact: false,
+  shadeMode: 'drawer',
+  bannerMode: 'headsup',
+  bannerPreset: 'remind',
+  bannerVisible: true,
+  permMode: 'first',
+  permStep: 'pre', // 'pre' | 'os' | 'done'
+  permGranted: null,
+  setMode: 'enabled',
+  tpMode: 'single',
+  teMode: 'blocked',
+  taskStepIdx: 1, // 0: 35%, 1: 72%, 2: 100%
+  islandExpanded: false,
+  taskPaused: false,
+  inlineReplyOpen: false,
+  inlineReplySent: '',
+  blockedDismissed: [],
+  notifs: INITIAL_NOTIFS(),
+  settings: {
+    reminders: true,
+    aiTasks: true,
+    community: true,
+    linkTransfer: true,
+    lockPreview: true,
+    soundVibrate: true,
+    dnd: true,
+    dndRange: '23:00 – 08:00',
+  },
+};
+
+function statusBarHtml(transparent = false, showSmallIcon = false) {
+  return `
+    <div class="status-bar ${transparent ? 'transparent' : ''}">
+      <div class="status-left">
+        <span>14:30</span>
+        ${showSmallIcon ? `<span class="status-small-icon" title="小伴单色状态栏小图标">${TWIN_STARS_SVG(13, 'currentColor')}</span>` : ''}
+      </div>
+      <div class="status-right">
+        <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+        <span class="bat"></span>
+      </div>
+    </div>
+  `;
+}
+
+function renderNotifIcon(kind, isIos, avatar) {
+  if (isIos) {
+    return `<div class="xb-app-icon">${TWIN_STARS_SVG(24, '#ffffff')}</div>`;
+  }
+  if (avatar) {
+    return `<div class="notif-avatar" style="background:${avatar.color}">${avatar.text}</div>`;
+  }
+  return `<div class="xb-app-icon md">${TWIN_STARS_SVG(21, '#ffffff')}</div>`;
+}
+
+function renderShadeCard(n) {
+  const isIos = state.os === 'ios';
+  const cardCls = `sys-notif ${isIos ? 'ios-glass' : ''} ${n.expanded ? 'expanded' : ''}`;
+  const isGroup = Array.isArray(n.grouped) && n.grouped.length > 0;
+
+  const inner = `
+    <div class="${cardCls}" data-toggle-notif="${n.id}">
+      ${!isIos ? `
+        <div class="notif-meta">
+          <div class="notif-meta-left">
+            <span class="android-badge ${n.kind}">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+            <span class="notif-app-name">小伴</span>
+            <span class="notif-dot">·</span>
+            <span>${n.channel}</span>
+            <span class="notif-dot">·</span>
+            <span>${n.time}</span>
+          </div>
+          <button class="notif-expand-btn" type="button" aria-label="展开或收起">
+            <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+      ` : ''}
+      <div class="notif-main">
+        ${isIos ? renderNotifIcon(n.kind, true) : ''}
+        <div class="notif-body">
+          ${isIos ? `
+            <div class="notif-meta" style="margin-bottom:3px;">
+              <div class="notif-meta-left"><span class="notif-app-name">小伴 · ${n.channel}</span></div>
+              <span>${n.time}</span>
+            </div>
+          ` : ''}
+          <div class="notif-title">${n.title}</div>
+          <div class="notif-text">${n.body}</div>
+        </div>
+        ${!isIos && n.kind === 'social' ? `<div class="notif-avatar" style="background:#4c7be0">林</div>` : ''}
+        ${!isIos && n.kind === 'ai' ? `<div class="xb-app-icon md">${TWIN_STARS_SVG(21, '#ffffff')}</div>` : ''}
+      </div>
+      ${isGroup && n.expanded ? `
+        <div class="stack-sublist">
+          ${n.grouped.map(g => `
+            <div class="stack-row">
+              <div class="stack-mini-av" style="background:${g.color}">${g.name}</div>
+              <span>${g.text}</span>
+              <time>${g.time}</time>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${n.expanded && n.actions && n.actions.length ? `
+        <div class="notif-actions">
+          ${n.actions.map(a => `
+            <button type="button" class="notif-act-btn ${a.primary ? '' : 'secondary'}" data-notif-act="${n.id}:${a.id}">${a.label}</button>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  if (isGroup) {
+    return `<div class="stack-wrap ${n.expanded ? '' : 'collapsed'}">${inner}</div>`;
+  }
+  return inner;
+}
+
+function renderBoardShade() {
+  const isIos = state.os === 'ios';
+  const isLock = state.shadeMode === 'lock';
+  const bgCls = isLock ? 'wallpaper-bg shade-ios' : (isIos ? 'wallpaper-bg shade-ios' : 'wallpaper-bg shade-android');
+  const transparentBar = isLock || isIos || state.dark;
+
+  return `
+    <div class="${bgCls}">
+      ${statusBarHtml(transparentBar, !isIos && state.notifs.length > 0)}
+      ${isLock ? `
+        <div class="lock-clock">
+          <div class="lock-date">11 月 26 日 · 星期四</div>
+          <div class="lock-time">14:30</div>
+        </div>
+      ` : (!isIos ? `
+        <div class="shade-qs">
+          <div class="qs-pill on"><svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>Wi-Fi</div>
+          <div class="qs-pill on"><svg viewBox="0 0 24 24"><path d="M6.5 6.5 17.5 17.5 12 23V1l5.5 5.5-11 11"/></svg>蓝牙</div>
+          <div class="qs-pill"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>勿扰</div>
+          <div class="qs-pill"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>响铃</div>
+        </div>
+      ` : `
+        <div class="lock-clock" style="padding:12px 24px 10px;">
+          <div class="lock-date">通知中心 · 11 月 26 日</div>
+        </div>
+      `)}
+      <div class="shade-scroll">
+        ${state.notifs.length ? `
+          <div class="shade-section-row">
+            <span>小伴通知（${state.notifs.length}）</span>
+            <button type="button" class="shade-clear-btn" data-clear-all="1">全部清除</button>
+          </div>
+          ${state.notifs.map(renderShadeCard).join('')}
+        ` : `
+          <div class="shade-empty">
+            <p>暂无新通知</p>
+            <button type="button" class="shade-reset-btn" data-reset-notifs="1">恢复 4 条示例通知</button>
+          </div>
+        `}
+      </div>
+      <div class="phone-toast" id="toast-shade"></div>
+      <div class="gesture-bar ${isLock || isIos ? 'light' : ''}"></div>
+    </div>
+  `;
+}
+
+function renderBoardBanner() {
+  const isIos = state.os === 'ios';
+  if (state.bannerMode === 'privacy') {
+    return `
+      <div class="wallpaper-bg shade-ios">
+        ${statusBarHtml(true, !isIos)}
+        <div class="lock-clock">
+          <div class="lock-date">11 月 26 日 · 星期四</div>
+          <div class="lock-time">14:30</div>
+        </div>
+        <div class="shade-scroll">
+          <div class="privacy-hint">已关闭「锁屏显示通知详情」：锁屏状态仅提示来源与条数，解锁后自动展开正文与操作按钮。</div>
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('remind', true) : `<span class="android-badge remind" style="margin-top:2px;">${TWIN_STARS_SVG(12, '#ffffff')}</span>`}
+              <div class="notif-body">
+                <div class="notif-meta" style="margin-bottom:2px;">
+                  <div class="notif-meta-left"><span class="notif-app-name">小伴 · 提醒</span></div>
+                  <span>刚刚</span>
+                </div>
+                <div class="notif-title">小伴提醒</div>
+                <div class="notif-text">解锁后查看 1 条提醒内容</div>
+              </div>
+            </div>
+          </div>
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('social', true) : `<span class="android-badge social" style="margin-top:2px;">${TWIN_STARS_SVG(12, '#ffffff')}</span>`}
+              <div class="notif-body">
+                <div class="notif-meta" style="margin-bottom:2px;">
+                  <div class="notif-meta-left"><span class="notif-app-name">小伴 · 社区互动</span></div>
+                  <span>12 分钟前</span>
+                </div>
+                <div class="notif-title">收到 3 条新消息</div>
+                <div class="notif-text">通知内容已隐藏</div>
+              </div>
+            </div>
+          </div>
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('ai', true) : `<span class="android-badge ai" style="margin-top:2px;">${TWIN_STARS_SVG(12, '#ffffff')}</span>`}
+              <div class="notif-body">
+                <div class="notif-meta" style="margin-bottom:2px;">
+                  <div class="notif-meta-left"><span class="notif-app-name">小伴 · AI</span></div>
+                  <span>3 分钟前</span>
+                </div>
+                <div class="notif-title">有 1 条任务动态</div>
+                <div class="notif-text">解锁后查看详情</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-toast" id="toast-banner"></div>
+        <div class="gesture-bar light"></div>
+      </div>
+    `;
+  }
+
+  const p = BANNER_PRESETS[state.bannerPreset];
+  return `
+    <div class="app-backdrop">
+      ${statusBarHtml(false, !isIos)}
+      <div class="mock-plaza-head">
+        <h3>发现</h3>
+        <span style="font-size:12px;color:var(--ink3);">模拟前台使用中</span>
+      </div>
+      ${state.bannerVisible ? `
+        <div class="headsup-slot" id="headsup-card">
+          <div class="headsup-card">
+            ${!isIos ? `
+              <div class="notif-meta">
+                <div class="notif-meta-left">
+                  <span class="android-badge ${p.kind}">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+                  <span class="notif-app-name">小伴</span>
+                  <span class="notif-dot">·</span>
+                  <span>${p.channel}</span>
+                  <span class="notif-dot">·</span>
+                  <span>${p.time}</span>
+                </div>
+                <button type="button" style="font-size:11px;color:var(--ink3);" data-dismiss-banner="1">收起</button>
+              </div>
+            ` : ''}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon(p.kind, true) : ''}
+              <div class="notif-body">
+                ${isIos ? `
+                  <div class="notif-meta" style="margin-bottom:2px;">
+                    <div class="notif-meta-left"><span class="notif-app-name">小伴 · ${p.channel}</span></div>
+                    <span>${p.time}</span>
+                  </div>
+                ` : ''}
+                <div class="notif-title">${p.title}</div>
+                <div class="notif-text">${p.body}</div>
+              </div>
+              ${!isIos && p.avatar ? `<div class="notif-avatar" style="background:${p.avatar.color}">${p.avatar.text}</div>` : ''}
+            </div>
+            <div class="notif-actions">
+              ${p.actions.map(a => `
+                <button type="button" class="notif-act-btn ${a.primary ? '' : 'secondary'}" data-banner-act="${a.label}">${a.label}</button>
+              `).join('')}
+            </div>
+            <div class="headsup-handle"></div>
+          </div>
+        </div>
+      ` : ''}
+      <div class="mock-plaza-body" style="padding-top:${state.bannerVisible ? '156px' : '16px'};transition:padding-top .2s ease;">
+        <div class="mock-card">
+          <div class="mock-card-title">
+            <span>触发顶部横幅预览</span>
+            <span class="mock-card-sub">点击切换来信场景</span>
+          </div>
+          <div class="sim-grid">
+            <button type="button" class="sim-btn ${state.bannerPreset === 'remind' && state.bannerVisible ? 'active' : ''}" data-sim-banner="remind">
+              <strong>定时提醒</strong><span>带延迟与完成操作</span>
+            </button>
+            <button type="button" class="sim-btn ${state.bannerPreset === 'ai' && state.bannerVisible ? 'active' : ''}" data-sim-banner="ai">
+              <strong>AI 等待确认</strong><span>高危操作回 App 确认</span>
+            </button>
+            <button type="button" class="sim-btn ${state.bannerPreset === 'social' && state.bannerVisible ? 'active' : ''}" data-sim-banner="social">
+              <strong>社区回复</strong><span>附发件人头像</span>
+            </button>
+            <button type="button" class="sim-btn ${state.bannerPreset === 'link' && state.bannerVisible ? 'active' : ''}" data-sim-banner="link">
+              <strong>电脑互传</strong><span>静默/横幅到达</span>
+            </button>
+          </div>
+        </div>
+        <div class="mock-card">
+          <div class="skeleton-row">
+            <div class="sk-box"></div>
+            <div class="sk-lines"><div class="sk-line w70"></div><div class="sk-line w45"></div></div>
+          </div>
+          <div class="skeleton-row" style="margin-top:12px;">
+            <div class="sk-box"></div>
+            <div class="sk-lines"><div class="sk-line w70"></div><div class="sk-line w45"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-toast" id="toast-banner"></div>
+      <div class="gesture-bar"></div>
+    </div>
+  `;
+}
+
+function renderBoardPermission() {
+  const isFirst = state.permMode === 'first';
+  const isIos = state.os === 'ios';
+  const statusTag = state.permGranted === true
+    ? `<span class="pill-tag ok">已安排 · 14:45 提醒</span>`
+    : `<span class="pill-tag">等待通知权限</span>`;
+
+  let modalHtml = '';
+  if (state.permStep === 'pre') {
+    if (isFirst) {
+      modalHtml = `
+        <div class="modal-layer">
+          <div class="modal-scrim"></div>
+          <div class="dialog-card" role="dialog" aria-modal="true" aria-label="开启通知权限">
+            <div class="dialog-head">
+              <div class="dialog-tile">
+                <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </div>
+              <h4>开启通知，按时收到提醒</h4>
+            </div>
+            <p class="dialog-desc">小伴会在以下场景通过系统通知栏提醒你，随时可在设置里按类型开关：</p>
+            <div class="perm-list">
+              <div class="perm-item"><span class="perm-dot"></span><span>你让小伴设定的定时提醒到点弹出</span></div>
+              <div class="perm-item"><span class="perm-dot"></span><span>AI 后台长任务完成或需要你确认时通知</span></div>
+              <div class="perm-item"><span class="perm-dot"></span><span>社区回复、作品审核与电脑发来的文件</span></div>
+            </div>
+            <div class="dialog-footer">
+              <button type="button" class="btn-primary" data-perm-next="os">开启通知</button>
+              <button type="button" class="btn-ghost" data-perm-next="later">暂不开启</button>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      modalHtml = `
+        <div class="modal-layer">
+          <div class="modal-scrim"></div>
+          <div class="dialog-card" role="dialog" aria-modal="true" aria-label="前往系统设置开启通知">
+            <div class="dialog-head">
+              <div class="dialog-tile warn">
+                <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="m2 2 20 20"/></svg>
+              </div>
+              <h4>通知权限已关闭</h4>
+            </div>
+            <div class="dialog-note">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              <span>当前有 1 条已保存的提醒因系统通知或「提醒」渠道被关闭，无法到点弹出。</span>
+            </div>
+            <div class="dialog-path">开启路径：系统设置 → 应用 → 小伴 → 通知${isIos ? '' : ' → 提醒'}</div>
+            <div class="dialog-footer">
+              <button type="button" class="btn-primary" data-perm-next="sys-settings">前往系统设置</button>
+              <button type="button" class="btn-ghost" data-perm-next="later">稍后再说</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  } else if (state.permStep === 'os') {
+    modalHtml = `
+      <div class="modal-layer">
+        <div class="modal-scrim"></div>
+        <div class="os-prompt" role="alertdialog" aria-modal="true">
+          <div class="os-prompt-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <h5>${isIos ? '“小伴”想给你发送通知' : '要允许“小伴”向你发送通知吗？'}</h5>
+          <p>${isIos ? '通知可能包括提醒、声音和图标标记。这些可在“设置”中配置。' : '可在系统设置中随时修改通知权限'}</p>
+          <div class="os-prompt-actions">
+            <button type="button" class="os-prompt-btn allow" data-perm-os="allow">允许</button>
+            <button type="button" class="os-prompt-btn" data-perm-os="deny">${isIos ? '不允许' : '拒绝'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="chat-bg">
+      ${statusBarHtml(false, state.permGranted === true && !isIos)}
+      <div class="appbar has-sep">
+        <div class="icon-tap"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+        <h3>小伴 AI</h3>
+        <div></div>
+      </div>
+      <div class="chat-feed">
+        <div class="chat-user">15 分钟后提醒我下楼取快递</div>
+        <div class="chat-ai-card">
+          <div class="chat-ai-row">
+            <div class="xb-app-icon sm">${TWIN_STARS_SVG(14, '#ffffff')}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="chat-ai-title">下楼取快递</div>
+              <div class="chat-ai-sub">今天 14:45 · 本机提醒</div>
+            </div>
+            ${statusTag}
+          </div>
+        </div>
+      </div>
+      ${state.permStep === 'done' ? `
+        <button type="button" class="reopen-fab" data-perm-reopen="1">重新演示权限引导弹窗</button>
+      ` : ''}
+      ${modalHtml}
+      <div class="phone-toast" id="toast-permission"></div>
+      <div class="gesture-bar"></div>
+    </div>
+  `;
+}
+
+function renderSwitch(key, checked) {
+  return `
+    <button type="button" class="switch ${checked ? 'on' : ''}" role="switch" aria-checked="${checked}" data-toggle-setting="${key}">
+      <span class="switch-knob"></span>
+    </button>
+  `;
+}
+
+function renderBoardSettings() {
+  const sysEnabled = state.setMode === 'enabled';
+  const isIos = state.os === 'ios';
+  const s = state.settings;
+
+  return `
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0;background:var(--paper);">
+      ${statusBarHtml(false, sysEnabled && !isIos)}
+      <div class="appbar has-sep">
+        <div class="icon-tap"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+        <h3>通知与提醒</h3>
+        <div></div>
+      </div>
+      <div class="settings-scroll">
+        ${!sysEnabled ? `
+          <div class="sys-off-banner">
+            <div class="sys-off-text">
+              <strong><span class="sys-off-dot"></span>系统通知未开启</strong>
+              <span>开启后才能在锁屏与通知栏收到提醒和互动消息</span>
+            </div>
+            <button type="button" class="sys-off-btn" data-enable-sys="1">去开启</button>
+          </div>
+        ` : ''}
+
+        <div class="group-label">通知类型</div>
+        <div class="full-list ${sysEnabled ? '' : 'disabled-group'}">
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">定时提醒 <span class="row-badge">高优先级</span></div>
+              <div class="row-desc">小伴帮你设定的本机定时提醒</div>
+            </div>
+            ${renderSwitch('reminders', s.reminders)}
+          </div>
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">小伴 AI 动态</div>
+              <div class="row-desc">后台长任务完成或需要操作确认时通知</div>
+            </div>
+            ${renderSwitch('aiTasks', s.aiTasks)}
+          </div>
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">社区互动</div>
+              <div class="row-desc">评论、回复、点赞与作品审核进度</div>
+            </div>
+            ${renderSwitch('community', s.community)}
+          </div>
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">设备互联与下载</div>
+              <div class="row-desc">电脑端发来文件链接、应用包下载完成</div>
+            </div>
+            ${renderSwitch('linkTransfer', s.linkTransfer)}
+          </div>
+        </div>
+
+        <div class="group-label">隐私与打扰控制</div>
+        <div class="full-list ${sysEnabled ? '' : 'disabled-group'}">
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">锁屏显示通知详情</div>
+              <div class="row-desc">关闭时锁屏仅显示“收到一条新通知”</div>
+            </div>
+            ${renderSwitch('lockPreview', s.lockPreview)}
+          </div>
+          <div class="list-row">
+            <div class="row-text">
+              <div class="row-title">声音与振动</div>
+              <div class="row-desc">关闭后通知静默送达状态栏</div>
+            </div>
+            ${renderSwitch('soundVibrate', s.soundVibrate)}
+          </div>
+          <div class="list-row" style="cursor:pointer;" data-cycle-dnd="1">
+            <div class="row-text">
+              <div class="row-title">夜间免打扰</div>
+              <div class="row-desc">时段内仅保留高优先级定时提醒</div>
+            </div>
+            <div class="row-value">
+              <span>${s.dnd ? s.dndRange : '已关闭'}</span>
+              <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="group-label">系统级设置</div>
+        <div class="full-list">
+          <div class="list-row" style="cursor:pointer;" data-sys-channel-tip="1">
+            <div class="row-text">
+              <div class="row-title">${isIos ? '系统通知样式设置' : '系统通知渠道管理'}</div>
+              <div class="row-desc">${isIos ? '前往 iOS 设置调整横幅、角标与时间敏感通知' : '自定义 4 个通道的铃声、横幅与锁屏策略'}</div>
+            </div>
+            <div class="row-value">
+              <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-toast" id="toast-settings"></div>
+      <div class="gesture-bar"></div>
+    </div>
+  `;
+}
+
+function renderBoardTaskProgress() {
+  const isIos = state.os === 'ios';
+  const isMulti = state.tpMode === 'multi';
+  const steps = [
+    { pct: 35, step: '步骤 2/4 · 生成界面与本地存档', eta: '约剩 1 分钟', done: false },
+    { pct: 72, step: '步骤 3/4 · 校验竖屏安全区与返回逻辑', eta: '约剩 25 秒', done: false },
+    { pct: 100, step: '制作完成 · 已安装到我的作品', eta: '刚刚完成', done: true },
+  ];
+  const cur = steps[state.taskStepIdx] || steps[1];
+  const bgCls = isIos ? 'wallpaper-bg shade-ios' : 'wallpaper-bg shade-android';
+  const transparentBar = isIos || state.dark;
+
+  return `
+    <div class="${bgCls}">
+      ${statusBarHtml(transparentBar, !isIos)}
+      ${isIos ? `
+        <div class="island-wrap">
+          <div class="dynamic-island ${state.islandExpanded ? 'expanded' : ''}" data-toggle-island="1" title="点击展开或收起灵动岛">
+            ${!state.islandExpanded ? `
+              <div class="di-left">
+                <div class="xb-app-icon sm">${TWIN_STARS_SVG(13, '#ffffff')}</div>
+                <span>${cur.done ? '制作完成' : (isMulti ? '2 个任务' : '制作中')}</span>
+              </div>
+              <div class="di-pct">
+                <span>${cur.pct}%</span>
+                <span class="di-ring" style="--p:${cur.pct}"></span>
+              </div>
+            ` : `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <div class="di-left">
+                  <div class="xb-app-icon sm">${TWIN_STARS_SVG(13, '#ffffff')}</div>
+                  <div>
+                    <div style="font-size:13px;font-weight:650;">极简番茄钟小游戏</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,.68);">${cur.step}</div>
+                  </div>
+                </div>
+                <span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;">${cur.pct}%</span>
+              </div>
+              <div class="task-prog-track" style="margin-top:2px;background:rgba(255,255,255,.16);">
+                <div class="task-prog-fill" style="width:${cur.pct}%;"></div>
+              </div>
+            `}
+          </div>
+        </div>
+        <div class="lock-clock" style="padding:10px 24px 12px;">
+          <div class="lock-date">实时活动 · Live Activity</div>
+          <div class="lock-time" style="font-size:48px;">14:32</div>
+        </div>
+      ` : `
+        <div class="shade-section-row" style="padding:10px 18px 4px;">
+          <span>正在运行（静默常驻 · 不响铃）</span>
+          <span>ai_progress</span>
+        </div>
+      `}
+      <div class="shade-scroll">
+        <!-- Main Ongoing Task Notification -->
+        <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+          ${!isIos ? `
+            <div class="notif-meta">
+              <div class="notif-meta-left">
+                <span class="android-badge ai">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+                <span class="notif-app-name">小伴</span>
+                <span class="notif-dot">·</span>
+                <span>任务进度</span>
+                <span class="notif-dot">·</span>
+                <span>${state.taskPaused ? '已暂停' : (cur.done ? '已完成' : '进行中')}</span>
+              </div>
+              <span style="font-variant-numeric:tabular-nums;font-weight:600;">${cur.pct}%</span>
+            </div>
+          ` : ''}
+          <div class="notif-main">
+            ${isIos ? renderNotifIcon('ai', true) : ''}
+            <div class="notif-body">
+              ${isIos ? `
+                <div class="notif-meta" style="margin-bottom:2px;">
+                  <div class="notif-meta-left"><span class="notif-app-name">小伴 · 后台任务</span></div>
+                  <span style="font-variant-numeric:tabular-nums;font-weight:600;">${cur.pct}%</span>
+                </div>
+              ` : ''}
+              <div class="notif-title">
+                <span class="task-state-dot ${cur.done ? 'ok' : (state.taskPaused ? 'wait' : 'run')}"></span>极简番茄钟小游戏
+              </div>
+              <div class="notif-text">${state.taskPaused ? '任务已手动暂停，随时可回到小伴继续执行' : cur.step}</div>
+            </div>
+          </div>
+          <div class="task-prog-track">
+            <div class="task-prog-fill" style="width:${cur.pct}%;${cur.done ? 'background:var(--success);' : ''}"></div>
+          </div>
+          <div class="task-prog-meta">
+            <span>${isIos ? '点击上方灵动岛可展开胶囊' : '正在后台运行'}</span>
+            <span>${state.taskPaused ? '已暂停' : cur.eta}</span>
+          </div>
+          <div class="notif-actions">
+            ${cur.done ? `
+              <button type="button" class="notif-act-btn" data-tp-act="open-work">打开体验</button>
+              <button type="button" class="notif-act-btn secondary" data-tp-act="reset-prog">重播进度</button>
+            ` : `
+              <button type="button" class="notif-act-btn" data-tp-act="view-prog">查看进度</button>
+              <button type="button" class="notif-act-btn secondary" data-tp-act="toggle-pause">${state.taskPaused ? '继续' : '暂停'}</button>
+            `}
+          </div>
+        </div>
+
+        ${isMulti ? `
+          <!-- Secondary Image Generation Task -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            ${!isIos ? `
+              <div class="notif-meta">
+                <div class="notif-meta-left">
+                  <span class="android-badge ai">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+                  <span class="notif-app-name">小伴</span>
+                  <span class="notif-dot">·</span>
+                  <span>创作图片</span>
+                </div>
+                <span style="font-variant-numeric:tabular-nums;font-weight:600;">45%</span>
+              </div>
+            ` : ''}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('ai', true) : ''}
+              <div class="notif-body">
+                ${isIos ? `<div class="notif-meta" style="margin-bottom:2px;"><span class="notif-app-name">小伴 · 创作图片</span><span>45%</span></div>` : ''}
+                <div class="notif-title"><span class="task-state-dot run"></span>雨夜窗台动态壁纸</div>
+                <div class="notif-text">正在生成第 2 / 4 张候选图 · 预计 15 秒</div>
+              </div>
+            </div>
+            <div class="task-prog-track"><div class="task-prog-fill" style="width:45%;"></div></div>
+          </div>
+
+          <!-- Remote PC Running Task (Indeterminate) -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            ${!isIos ? `
+              <div class="notif-meta">
+                <div class="notif-meta-left">
+                  <span class="android-badge link">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+                  <span class="notif-app-name">小伴</span>
+                  <span class="notif-dot">·</span>
+                  <span>遥控电脑</span>
+                </div>
+                <span>MacBook Pro</span>
+              </div>
+            ` : ''}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('link', true) : ''}
+              <div class="notif-body">
+                ${isIos ? `<div class="notif-meta" style="margin-bottom:2px;"><span class="notif-app-name">小伴 · MacBook Pro</span><span>运行中</span></div>` : ''}
+                <div class="notif-title"><span class="task-state-dot run"></span>整理下载目录</div>
+                <div class="notif-text">正在电脑端扫描 128 个文件并按类型归档…</div>
+              </div>
+            </div>
+            <div class="task-prog-track"><div class="task-prog-fill indeterminate"></div></div>
+          </div>
+        ` : `
+          <!-- Ongoing Quiet Explanation Card -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}" style="opacity:.92;">
+            <div class="notif-title" style="font-size:13px;">后台执行策略</div>
+            <div class="notif-text" style="margin-top:4px;-webkit-line-clamp:4;">
+              执行过程中通知保持静默，不弹出横幅、不响铃；仅当出现「待确认 / 审批 / 完成交付 / 异常中断」时升级为高优提醒。
+            </div>
+          </div>
+        `}
+      </div>
+
+      <div class="task-sim-bar">
+        <button type="button" class="task-sim-chip primary" data-tp-step="next">${cur.done ? '重新开始演示' : '推进下一步进度'}</button>
+        ${isIos ? `<button type="button" class="task-sim-chip" data-toggle-island="1">${state.islandExpanded ? '收起灵动岛' : '展开灵动岛'}</button>` : ''}
+      </div>
+      <div class="phone-toast" id="toast-task-progress"></div>
+      <div class="gesture-bar ${isIos ? 'light' : ''}"></div>
+    </div>
+  `;
+}
+
+function renderBoardTaskEvents() {
+  const isIos = state.os === 'ios';
+  const isBlocked = state.teMode === 'blocked';
+  const bgCls = isIos ? 'wallpaper-bg shade-ios' : 'wallpaper-bg shade-android';
+  const transparentBar = isIos || state.dark;
+
+  const metaHead = (channel, time, badgeKind = 'ai') => !isIos ? `
+    <div class="notif-meta">
+      <div class="notif-meta-left">
+        <span class="android-badge ${badgeKind}">${TWIN_STARS_SVG(12, '#ffffff')}</span>
+        <span class="notif-app-name">小伴</span>
+        <span class="notif-dot">·</span>
+        <span>${channel}</span>
+        <span class="notif-dot">·</span>
+        <span>${time}</span>
+      </div>
+    </div>
+  ` : '';
+
+  const iosHead = (channel, time) => isIos ? `
+    <div class="notif-meta" style="margin-bottom:2px;">
+      <div class="notif-meta-left"><span class="notif-app-name">小伴 · ${channel}</span></div>
+      <span>${time}</span>
+    </div>
+  ` : '';
+
+  return `
+    <div class="${bgCls}">
+      ${statusBarHtml(transparentBar, !isIos)}
+      <div class="shade-section-row" style="padding:10px 18px 4px;">
+        <span>${isBlocked ? '等待你的确认（高优先级）' : '任务结果与异常'}</span>
+        <span>ai_tasks</span>
+      </div>
+      <div class="shade-scroll">
+        ${isBlocked ? `
+          <!-- 1. Plan Confirmation -->
+          ${!state.blockedDismissed.includes('plan') ? `
+            <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+              ${metaHead('方案待确认', '刚刚')}
+              <div class="notif-main">
+                ${isIos ? renderNotifIcon('ai', true) : ''}
+                <div class="notif-body">
+                  ${iosHead('方案待确认', '刚刚')}
+                  <div class="notif-title"><span class="task-state-dot wait"></span>《极简番茄钟》方案已就绪</div>
+                  <div class="notif-text">包含 25 分钟专注计时、白噪音与今日统计；确认后将开始编写并安装到手机。</div>
+                </div>
+              </div>
+              <div class="notif-actions">
+                <button type="button" class="notif-act-btn" data-te-act="plan:confirm">确认制作</button>
+                <button type="button" class="notif-act-btn secondary" data-te-act="plan:view">查看方案</button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 2. High-risk Approval (Remote PC) -->
+          ${!state.blockedDismissed.includes('approval') ? `
+            <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+              ${metaHead('高危审批', '2 分钟前')}
+              <div class="notif-main">
+                ${isIos ? renderNotifIcon('ai', true) : ''}
+                <div class="notif-body">
+                  ${iosHead('高危审批', '2 分钟前')}
+                  <div class="notif-title"><span class="task-state-dot err"></span>MacBook · 请求执行清理命令</div>
+                  <div class="notif-text">将删除「Downloads/旧安装包」下 14 个文件（共 1.2 GB）。涉及删除操作，需打开 App 确认。</div>
+                </div>
+              </div>
+              <div class="notif-actions">
+                <button type="button" class="notif-act-btn" data-te-act="approval:open">打开确认</button>
+                <button type="button" class="notif-act-btn secondary" data-te-act="approval:deny">拒绝</button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 3. Agent Question with Inline Quick Reply -->
+          ${!state.blockedDismissed.includes('ask') ? `
+            <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+              ${metaHead('小伴提问', '5 分钟前')}
+              <div class="notif-main">
+                ${isIos ? renderNotifIcon('ai', true) : ''}
+                <div class="notif-body">
+                  ${iosHead('小伴提问', '5 分钟前')}
+                  <div class="notif-title"><span class="task-state-dot wait"></span>需要你选一下壁纸色调</div>
+                  <div class="notif-text">${state.inlineReplySent ? `已回复：「${state.inlineReplySent}」，小伴已继续生成` : '《雨夜窗台》更想要暖黄台灯，还是清冷蓝灰雨夜？可直接回复。'}</div>
+                </div>
+              </div>
+              ${state.inlineReplyOpen ? `
+                <div class="inline-reply-box">
+                  <input type="text" class="inline-reply-input" id="quick-reply-field" placeholder="输入回复，如：暖黄台灯" value="暖黄台灯">
+                  <button type="button" class="inline-reply-send" data-send-quick-reply="1">发送</button>
+                </div>
+              ` : `
+                <div class="notif-actions">
+                  <button type="button" class="notif-act-btn" data-open-quick-reply="1">快捷回复</button>
+                  <button type="button" class="notif-act-btn secondary" data-te-act="ask:open">回到对话</button>
+                </div>
+              `}
+            </div>
+          ` : ''}
+
+          ${state.blockedDismissed.length === 3 ? `
+            <div class="shade-empty">
+              <p>所有待确认任务已处理</p>
+              <button type="button" class="shade-reset-btn" data-te-reset="1">恢复 3 条待确认通知</button>
+            </div>
+          ` : ''}
+        ` : `
+          <!-- 1. Mini-app / Game Delivery -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            ${metaHead('作品交付', '刚刚')}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('ai', true) : ''}
+              <div class="notif-body">
+                ${iosHead('作品交付', '刚刚')}
+                <div class="notif-title"><span class="task-state-dot ok"></span>《随记账本》制作完成</div>
+                <div class="notif-text">已通过安全区与返回校验并安装到我的作品，点击直接打开体验。</div>
+              </div>
+              ${!isIos ? `<div class="notif-thumb-app"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h5M8 16h6"/></svg></div>` : ''}
+            </div>
+            <div class="notif-actions">
+              <button type="button" class="notif-act-btn" data-te-toast="直接启动《随记账本》">打开体验</button>
+              <button type="button" class="notif-act-btn secondary" data-te-toast="回到对话查看交付说明">查看对话</button>
+            </div>
+          </div>
+
+          <!-- 2. Generated Image (BigPictureStyle) -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            ${metaHead('创作图片', '4 分钟前')}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('ai', true) : ''}
+              <div class="notif-body">
+                ${iosHead('创作图片', '4 分钟前')}
+                <div class="notif-title"><span class="task-state-dot ok"></span>《雨夜窗台》壁纸已生成</div>
+                <div class="notif-text">1170 × 2532 竖屏高清图已保存至对话资产。</div>
+              </div>
+            </div>
+            <div class="notif-big-pic"><span>展开大图预览 · 1170×2532</span></div>
+            <div class="notif-actions">
+              <button type="button" class="notif-act-btn" data-te-toast="打开壁纸预览并设为锁屏">设为壁纸</button>
+              <button type="button" class="notif-act-btn secondary" data-te-toast="已保存原图至系统相册">保存相册</button>
+            </div>
+          </div>
+
+          <!-- 3. Task Failed / Interrupted -->
+          <div class="sys-notif ${isIos ? 'ios-glass' : ''}">
+            ${metaHead('任务中断', '18 分钟前')}
+            <div class="notif-main">
+              ${isIos ? renderNotifIcon('ai', true) : ''}
+              <div class="notif-body">
+                ${iosHead('任务中断', '18 分钟前')}
+                <div class="notif-title"><span class="task-state-dot err"></span>《周报数据汇总》执行暂停</div>
+                <div class="notif-text">联网检索超时，已完成 3 / 5 步并保留断点，点击可从断点续作。</div>
+              </div>
+            </div>
+            <div class="notif-actions">
+              <button type="button" class="notif-act-btn" data-te-toast="已从步骤 4 继续执行">继续执行</button>
+              <button type="button" class="notif-act-btn secondary" data-te-toast="打开会话查看失败原因">查看原因</button>
+            </div>
+          </div>
+        `}
+      </div>
+      <div class="phone-toast" id="toast-task-events"></div>
+      <div class="gesture-bar ${isIos ? 'light' : ''}"></div>
+    </div>
+  `;
+}
+
+function applyAccent() {
+  const preset = ACCENTS.find(a => a.id === state.accent) || ACCENTS[0];
+  const palette = state.dark ? preset.dark : preset.light;
+  document.querySelectorAll('.phone').forEach(el => {
+    el.classList.toggle('dark', state.dark);
+    el.style.setProperty('--accent', palette.btn);
+    el.style.setProperty('--accent-ink', palette.ink);
+  });
+}
+
+const toastTimers = {};
+function showToast(board, text) {
+  const el = document.getElementById('toast-' + board);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimers[board]);
+  toastTimers[board] = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function render() {
+  document.body.classList.toggle('studio-dark', state.dark);
+  document.body.classList.toggle('compact', state.compact);
+  document.getElementById('phone-shade').innerHTML = renderBoardShade();
+  document.getElementById('phone-banner').innerHTML = renderBoardBanner();
+  document.getElementById('phone-permission').innerHTML = renderBoardPermission();
+  document.getElementById('phone-settings').innerHTML = renderBoardSettings();
+  document.getElementById('phone-task-progress').innerHTML = renderBoardTaskProgress();
+  document.getElementById('phone-task-events').innerHTML = renderBoardTaskEvents();
+  applyAccent();
+}
+
+/* Swatches */
+const swatchWrap = document.getElementById('swatches');
+ACCENTS.forEach(a => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (a.id === state.accent ? ' active' : '');
+  btn.style.background = a.light.btn;
+  btn.style.color = a.light.btn;
+  btn.title = a.name;
+  btn.setAttribute('aria-label', a.name);
+  btn.addEventListener('click', () => {
+    state.accent = a.id;
+    swatchWrap.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    applyAccent();
+  });
+  swatchWrap.appendChild(btn);
+});
+
+/* Top controls */
+document.querySelectorAll('[data-os]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.os = btn.dataset.os;
+    document.querySelectorAll('[data-os]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.getElementById('toggle-width').addEventListener('click', e => {
+  state.compact = !state.compact;
+  e.currentTarget.textContent = state.compact ? '360 → 390' : '390 → 360';
+  document.body.classList.toggle('compact', state.compact);
+});
+document.getElementById('toggle-dark').addEventListener('click', e => {
+  state.dark = !state.dark;
+  e.currentTarget.textContent = state.dark ? '浅色模式' : '深色模式';
+  render();
+});
+
+/* Board mini segments */
+document.querySelectorAll('[data-shade-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.shadeMode = btn.dataset.shadeMode;
+    document.querySelectorAll('[data-shade-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-banner-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.bannerMode = btn.dataset.bannerMode;
+    document.querySelectorAll('[data-banner-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-perm-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.permMode = btn.dataset.permMode;
+    state.permStep = 'pre';
+    state.permGranted = null;
+    document.querySelectorAll('[data-perm-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-set-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.setMode = btn.dataset.setMode;
+    document.querySelectorAll('[data-set-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-tp-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.tpMode = btn.dataset.tpMode;
+    document.querySelectorAll('[data-tp-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+document.querySelectorAll('[data-te-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.teMode = btn.dataset.teMode;
+    document.querySelectorAll('[data-te-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+});
+
+/* Delegated Phone Interactions */
+document.addEventListener('click', e => {
+  const actBtn = e.target.closest('[data-notif-act]');
+  if (actBtn) {
+    e.stopPropagation();
+    const [id, act] = actBtn.dataset.notifAct.split(':');
+    state.notifs = state.notifs.filter(n => n.id !== id);
+    render();
+    const tips = {
+      snooze: '已延后 10 分钟，14:40 再次提醒',
+      done: '已标记该提醒为完成',
+      'open-ai': '跳转至小伴 AI 对应会话',
+      'reply-social': '打开社区通知页查看 3 条互动',
+      'read-social': '已将社区通知全部标为已读',
+      'open-link': '打开《发布清单-v3.2.md》',
+    };
+    showToast('shade', tips[act] || '已处理该通知');
+    return;
+  }
+
+  const toggleNotif = e.target.closest('[data-toggle-notif]');
+  if (toggleNotif) {
+    const id = toggleNotif.dataset.toggleNotif;
+    const target = state.notifs.find(n => n.id === id);
+    if (target) {
+      target.expanded = !target.expanded;
+      render();
+    }
+    return;
+  }
+
+  if (e.target.closest('[data-clear-all]')) {
+    state.notifs = [];
+    render();
+    showToast('shade', '已清除全部小伴通知');
+    return;
+  }
+
+  if (e.target.closest('[data-reset-notifs]')) {
+    state.notifs = INITIAL_NOTIFS();
+    render();
+    return;
+  }
+
+  const simBanner = e.target.closest('[data-sim-banner]');
+  if (simBanner) {
+    state.bannerPreset = simBanner.dataset.simBanner;
+    state.bannerVisible = true;
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-dismiss-banner]')) {
+    state.bannerVisible = false;
+    render();
+    return;
+  }
+
+  const bannerAct = e.target.closest('[data-banner-act]');
+  if (bannerAct) {
+    state.bannerVisible = false;
+    render();
+    showToast('banner', `已执行「${bannerAct.dataset.bannerAct}」`);
+    return;
+  }
+
+  const permNext = e.target.closest('[data-perm-next]');
+  if (permNext) {
+    const next = permNext.dataset.permNext;
+    if (next === 'os') {
+      state.permStep = 'os';
+      render();
+    } else if (next === 'sys-settings') {
+      state.permStep = 'done';
+      state.permGranted = true;
+      render();
+      showToast('permission', '已模拟从系统设置开启通知，1 条提醒自动生效');
+    } else {
+      state.permStep = 'done';
+      state.permGranted = false;
+      render();
+      showToast('permission', '提醒已保留，开启通知后自动生效');
+    }
+    return;
+  }
+
+  const permOs = e.target.closest('[data-perm-os]');
+  if (permOs) {
+    const allow = permOs.dataset.permOs === 'allow';
+    state.permStep = 'done';
+    state.permGranted = allow;
+    render();
+    showToast('permission', allow ? '已允许通知，14:45 提醒已安排' : '已拒绝通知权限，提醒暂未生效');
+    return;
+  }
+
+  if (e.target.closest('[data-perm-reopen]')) {
+    state.permStep = 'pre';
+    state.permGranted = null;
+    render();
+    return;
+  }
+
+  const toggleSetting = e.target.closest('[data-toggle-setting]');
+  if (toggleSetting) {
+    const key = toggleSetting.dataset.toggleSetting;
+    state.settings[key] = !state.settings[key];
+    render();
+    if (key === 'lockPreview') {
+      showToast('settings', state.settings[key] ? '锁屏将展示通知正文' : '锁屏已隐藏通知详情');
+    }
+    return;
+  }
+
+  if (e.target.closest('[data-enable-sys]')) {
+    state.setMode = 'enabled';
+    document.querySelectorAll('[data-set-mode]').forEach(b => b.classList.toggle('active', b.dataset.setMode === 'enabled'));
+    render();
+    showToast('settings', '已开启系统通知权限');
+    return;
+  }
+
+  if (e.target.closest('[data-cycle-dnd]')) {
+    const ranges = ['23:00 – 08:00', '22:00 – 07:30', null];
+    const idx = state.settings.dnd ? ranges.indexOf(state.settings.dndRange) : 2;
+    const next = ranges[(idx + 1) % ranges.length];
+    state.settings.dnd = Boolean(next);
+    if (next) state.settings.dndRange = next;
+    render();
+    showToast('settings', next ? `免打扰时段已切换为 ${next}` : '已关闭夜间免打扰');
+    return;
+  }
+
+  if (e.target.closest('[data-sys-channel-tip]')) {
+    showToast('settings', state.os === 'ios' ? '跳转至 iOS 系统「设置 → 小伴 → 通知」' : '跳转至 Android 系统通知渠道设置页');
+    return;
+  }
+
+  /* Board 05: Task Progress & Dynamic Island */
+  if (e.target.closest('[data-toggle-island]')) {
+    state.islandExpanded = !state.islandExpanded;
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-tp-step]')) {
+    state.taskPaused = false;
+    state.taskStepIdx = (state.taskStepIdx + 1) % 3;
+    render();
+    const msgs = ['任务进度更新至 35%', '任务进度更新至 72%', '任务已完成 · 触发交付通知'];
+    showToast('task-progress', msgs[state.taskStepIdx]);
+    return;
+  }
+
+  const tpAct = e.target.closest('[data-tp-act]');
+  if (tpAct) {
+    const act = tpAct.dataset.tpAct;
+    if (act === 'toggle-pause') {
+      state.taskPaused = !state.taskPaused;
+      render();
+      showToast('task-progress', state.taskPaused ? '已暂停后台制作任务' : '已恢复后台制作');
+    } else if (act === 'reset-prog') {
+      state.taskStepIdx = 0;
+      state.taskPaused = false;
+      render();
+      showToast('task-progress', '已重置进度至 35%');
+    } else if (act === 'open-work') {
+      showToast('task-progress', '直接打开《极简番茄钟小游戏》');
+    } else {
+      showToast('task-progress', '打开小伴并行任务面板');
+    }
+    return;
+  }
+
+  /* Board 06: Task Milestones */
+  const teAct = e.target.closest('[data-te-act]');
+  if (teAct) {
+    const [key, action] = teAct.dataset.teAct.split(':');
+    if (action === 'confirm' || action === 'deny') {
+      if (!state.blockedDismissed.includes(key)) state.blockedDismissed.push(key);
+      render();
+      showToast('task-events', action === 'confirm' ? '已确认方案，小伴开始后台制作' : '已拒绝该电脑清理操作');
+    } else {
+      const map = { 'plan:view': '打开方案确认详情卡', 'approval:open': '打开高危审批弹窗进行确认', 'ask:open': '回到小伴对话继续回复' };
+      showToast('task-events', map[`${key}:${action}`] || '打开对应任务');
+    }
+    return;
+  }
+
+  if (e.target.closest('[data-open-quick-reply]')) {
+    state.inlineReplyOpen = true;
+    render();
+    const input = document.getElementById('quick-reply-field');
+    if (input) input.focus();
+    return;
+  }
+
+  if (e.target.closest('[data-send-quick-reply]')) {
+    const input = document.getElementById('quick-reply-field');
+    const val = (input ? input.value : '').trim() || '暖黄台灯';
+    state.inlineReplyOpen = false;
+    state.inlineReplySent = val;
+    render();
+    showToast('task-events', `已发送快捷回复「${val}」`);
+    return;
+  }
+
+  if (e.target.closest('[data-te-reset]')) {
+    state.blockedDismissed = [];
+    state.inlineReplyOpen = false;
+    state.inlineReplySent = '';
+    render();
+    return;
+  }
+
+  const teToast = e.target.closest('[data-te-toast]');
+  if (teToast) {
+    showToast('task-events', teToast.dataset.teToast);
+    return;
+  }
+});
+
+/* URL Query Presets */
+const params = new URLSearchParams(location.search);
+if (params.get('os') === 'ios') {
+  state.os = 'ios';
+  document.querySelectorAll('[data-os]').forEach(b => b.classList.toggle('active', b.dataset.os === 'ios'));
+}
+if (params.get('dark') === '1') {
+  state.dark = true;
+  document.getElementById('toggle-dark').textContent = '浅色模式';
+}
+const focusBoard = params.get('focus');
+render();
+if (focusBoard) {
+  const target = document.getElementById('board-' + focusBoard);
+  if (target) {
+    target.classList.add('focused');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+</script>
+</body>
+</html>

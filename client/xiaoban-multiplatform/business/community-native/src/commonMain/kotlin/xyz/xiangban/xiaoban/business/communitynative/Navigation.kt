@@ -59,6 +59,8 @@ sealed interface Route {
     data object Appearance : Route
     /** 设置里的声音：语音识别、朗读（来源、音色、语速）、通话。 */
     data object Voice : Route
+    /** 设置里的通知与提醒：系统权限状态、按类开关、锁屏隐私与免打扰。 */
+    data object NotificationSettings : Route
     data object ToolEnvironment : Route
     /** 云端小伴的对话页。 */
     data object AiChat : Route
@@ -111,6 +113,7 @@ sealed interface Route {
         Models -> "models"
         Appearance -> "appearance"
         Voice -> "voice"
+        NotificationSettings -> "notification-settings"
         ToolEnvironment -> "tool-environment"
         AiChat -> "aichat"
         is AiCreate -> localGameId?.let { "aicreate:$it" } ?: "aicreate"
@@ -179,6 +182,7 @@ sealed interface Route {
                 "models" -> Models
                 "appearance", "accent" -> Appearance
                 "voice" -> Voice
+                "notification-settings" -> NotificationSettings
                 "tool-environment" -> ToolEnvironment
                 "aichat" -> AiChat
                 "aicreate" -> if (value.isEmpty()) AiCreate()

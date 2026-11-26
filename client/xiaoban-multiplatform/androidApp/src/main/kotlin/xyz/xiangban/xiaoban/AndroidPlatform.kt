@@ -48,6 +48,7 @@ class AndroidPlatformActions(
     private val attachments: AndroidChatAttachments? = null,
     override val toolEnvironment: xyz.xiangban.xiaoban.business.communitynative.ToolEnvironmentController? = null,
     override val appUpdates: xyz.xiangban.xiaoban.business.communitynative.AppUpdates? = null,
+    override val notifications: xyz.xiangban.xiaoban.business.communitynative.SystemNotificationBridge? = null,
     requestMic: suspend () -> Boolean = { false },
 ) : PlatformActions {
     private val voice = AndroidVoice(context, requestMic)

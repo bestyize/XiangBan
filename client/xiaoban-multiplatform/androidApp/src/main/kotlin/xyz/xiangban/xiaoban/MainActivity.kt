@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
     private var pendingWebWork: String? = null
     private var webWorkRequest = 0L
     private lateinit var reminders: AndroidReminders
+    private var androidNotifications: AndroidNotifications? = null
     private var voicePlatform: AndroidPlatformActions? = null
     private var appUpdates: AndroidAppUpdates? = null
 
@@ -63,6 +64,31 @@ class MainActivity : ComponentActivity() {
             micWaiting = null
             waiting?.takeIf { it.isActive }?.resume(granted)
         }
+        var askingNotifications = false
+        val notificationsLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            askingNotifications = false
+            androidNotifications?.onPermissionResult()
+            lifecycleScope.launch {
+                val (scheduled, failed) = withContext(Dispatchers.IO) { reminders.permissionResult(granted) }
+                val message = when {
+                    scheduled > 0 && failed > 0 -> "已安排 $scheduled 条提醒，另有 $failed 条未能设置"
+                    scheduled > 0 -> "已安排 $scheduled 条提醒，系统可能延后送达"
+                    failed > 0 -> "提醒未设置，请检查小伴通知权限和提醒渠道"
+                    else -> null
+                }
+                message?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
+            }
+        }
+        val notificationsBridge = AndroidNotifications(this) {
+            if (Build.VERSION.SDK_INT >= 33) runOnUiThread {
+                if (!askingNotifications && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    askingNotifications = true
+                    try { notificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                    catch (_: IllegalStateException) { askingNotifications = false }
+                }
+            }
+        }
+        androidNotifications = notificationsBridge
         val app = application as XiaobanApplication
         val speech = app.speech
         appUpdates = if (BuildConfig.DEBUG) null else AndroidAppUpdates(this)
@@ -70,6 +96,7 @@ class MainActivity : ComponentActivity() {
             this, gate = speech::newGate, attachments = AndroidChatAttachments(this),
             toolEnvironment = app.toolEnvironment,
             appUpdates = appUpdates,
+            notifications = notificationsBridge,
         ) {
             withContext(Dispatchers.Main.immediate) {
                 suspendCancellableCoroutine { continuation ->
@@ -91,29 +118,19 @@ class MainActivity : ComponentActivity() {
         sharingPlatform = forumPlatform
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
-        var askingNotifications = false
-        val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            askingNotifications = false
-            lifecycleScope.launch {
-                val (scheduled, failed) = withContext(Dispatchers.IO) { reminders.permissionResult(granted) }
-                val message = when {
-                    scheduled > 0 && failed > 0 -> "已安排 $scheduled 条提醒，另有 $failed 条未能设置"
-                    scheduled > 0 -> "已安排 $scheduled 条提醒，系统可能延后送达"
-                    failed > 0 -> "提醒未设置，请检查小伴通知权限和提醒渠道"
-                    else -> null
+        reminders = AndroidReminders(
+            context = this,
+            askForNotifications = {
+                runOnUiThread {
+                    notificationsBridge.triggerPermissionGuide(xyz.xiangban.xiaoban.business.communitynative.PermissionGuideReason.Reminder)
                 }
-                message?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
-            }
-        }
-        reminders = AndroidReminders(this) {
-            if (Build.VERSION.SDK_INT >= 33) runOnUiThread {
-                if (!askingNotifications && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                    askingNotifications = true
-                    try { notifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
-                    catch (_: IllegalStateException) { askingNotifications = false }
+            },
+            onNotificationsDisabled = {
+                runOnUiThread {
+                    notificationsBridge.triggerPermissionGuide(xyz.xiangban.xiaoban.business.communitynative.PermissionGuideReason.Reminder)
                 }
-            }
-        }
+            },
+        )
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
         val prefs = AndroidPrefs(this)
@@ -148,11 +165,13 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         appUpdates?.checkOnStart()
         voicePlatform?.setVoiceForeground(true)
+        androidNotifications?.setForeground(true)
         if (::reminders.isInitialized) lifecycleScope.launch(Dispatchers.IO) { reminders.restore() }
     }
 
     override fun onStop() {
         voicePlatform?.setVoiceForeground(false)
+        androidNotifications?.setForeground(false)
         if (::communityEnv.isInitialized) communityEnv.reader.stop()
         super.onStop()
     }
@@ -169,6 +188,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIncoming(intent: Intent) {
+        if (androidNotifications?.acceptIntent(intent) == true) return
         val raw = intent.dataString
         val work = if (intent.action == Intent.ACTION_VIEW) WebWorkLink.parse(raw) else null
         if (work == null) {

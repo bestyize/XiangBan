@@ -39,6 +39,7 @@ npm --prefix client/xiaoban-desktop run dev
 | [分享回流弹窗](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/share-link-landing.html) | 社区与互动 | 已合入 | 外部分享链接拉起 App 后的居中预览确认卡，覆盖有封面/无封面、骨架屏加载、电脑端内容琥珀提示及已下架/网络失败态 |
 | [基础组件库与通用弹层规范（手机 + 社区网页）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ui-kit-overlays.html) | 系统与弹层 | 已合入 | 手机 `:common:ui` 与社区前台 `src/ui/` 分层组件规范：弹层（24px 居中卡、20px 顶圆角 BottomSheet、ActionSheet、Toast、PC↔H5 响应式对照）与通用控件（按钮/输入/开关/标签/通栏列表/空态）分开建设，支持浅深色、6 套主题色与 390/360px 预览 |
 | [统一弹层](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-dialogs.html) | 系统与弹层 | 已合入 | 八个手机高频场景统一 24px 圆角居中卡片弹层（评论删除、附件购买、求助关闭、作品投稿、屏蔽、举报、工具环境移除、App 更新） |
+| [系统通知栏与通知设置](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-notifications.html) | 系统与弹层 | 已合入 | Android 14 / iOS 18 系统通知栏与锁屏聚合、顶部横幅与锁屏隐私态、24px 权限引导弹层、通栏「设置 → 通知与提醒」页、AI 任务进度/灵动岛实时活动、审批/快捷回复/交付与异常通知及 5 通知渠道规划 |
 | [评论组件](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/comment-composer.html) | 社区与互动 | 已合入 | 评论列表、吸底入口与键盘/表情/相册三态输入面板，支持单字/单表情发布、回复与图片预览 |
 | [发帖页（手机 + 网页双端）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/post-composer.html) | 社区与互动 | 已合入 | 写作优先无框结构：手机端三态 + 网页 PC 820px 级联弹窗与 H5 16px 抽屉，每帖限 1 个可运行作品（V2 ZIP / HTML 自动转 V2 / 关联创作） |
 | [更换头像（手机 + 网页双端）](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/avatar-editor.html) | 个人与账号 | 已合入 | 手机 App 与网页窄屏共用底部选图弹层 + 390 方形裁剪页；网页 PC 采用 820px 居中弹窗并排预览 96/48/32/24 四尺寸 |

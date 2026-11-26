@@ -48,6 +48,7 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatController
 interface PlatformActions : VoicePlatform {
     val toolEnvironment: ToolEnvironmentController? get() = null
     val appUpdates: AppUpdates? get() = null
+    val notifications: SystemNotificationBridge? get() = null
     /** Public community links only; consumed after explicit confirmation or dismissal. */
     val communityLinks: kotlinx.coroutines.flow.StateFlow<String?> get() = EmptyCommunityLinks
     fun consumeCommunityLink() {}

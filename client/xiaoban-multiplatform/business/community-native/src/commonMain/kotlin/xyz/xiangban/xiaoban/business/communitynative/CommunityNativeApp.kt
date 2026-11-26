@@ -77,7 +77,7 @@ internal fun RetainedTabPage(
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
-    remember(env) { ThemeState.load(env.prefs); SpeechState.load(env.prefs) }
+    remember(env) { ThemeState.load(env.prefs); SpeechState.load(env.prefs); NotificationState.load(env.prefs) }
     XiaobanTheme {
       CompositionLocalProvider(
           LocalReplyReader provides env.reader,
@@ -110,6 +110,24 @@ fun CommunityNativeApp(env: CommunityEnv) {
         BackHandler(enabled = stack.isNotEmpty()) { pop() }
         // 回到最外面再按返回：由应用自己结束，用普通的关闭动画，不让系统播放“缩到右下角”的返回桌面动画。放在其它返回处理（弹层、侧栏）前面，优先级最低。
         BackHandler(enabled = env.platform != null && stack.isEmpty()) { env.platform?.exitApp() }
+
+        NotificationSystemObserver(
+            env = env,
+            chat = chat,
+            isAiTabVisible = mainAiVisible || stack.lastOrNull() == Route.AiChat,
+            isNotificationsScreenVisible = stack.lastOrNull() == Route.Notifications,
+            onOpenAiConversation = { convId ->
+                stackText = ""
+                tab = Tab.Ai.name
+                if (!convId.isNullOrBlank()) chat.openConversation(convId)
+            },
+            onOpenRemotePeer = { peer ->
+                push(Route.RemoteChat(peer))
+            },
+            onOpenCommunityNotifications = {
+                push(if (signedIn.loggedIn) Route.Notifications else Route.Login)
+            },
+        )
 
         CommunityLinkConfirmation(env, ::push, Modifier.background(MaterialTheme.colorScheme.background)) {
             val pages = stack.filter { it != Route.Login }
@@ -183,6 +201,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 }
             }
             env.platform?.appUpdates?.let { AppUpdateDialog(it) }
+            env.platform?.notifications?.let { NotificationPermissionDialog(it) }
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     onDismiss = { publishOpen = false },
@@ -250,6 +269,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
         Route.Appearance -> AppearanceScreen(back = pop)
         Route.Voice -> VoiceSettingsScreen(env, back = pop)
+        Route.NotificationSettings -> NotificationSettingsScreen(env, back = pop)
         Route.ToolEnvironment -> ToolEnvironmentScreen(env.platform?.toolEnvironment, back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
         is Route.AiCreate -> if (route.localGameId == null) {

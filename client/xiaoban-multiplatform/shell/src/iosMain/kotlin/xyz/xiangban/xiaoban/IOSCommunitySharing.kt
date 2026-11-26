@@ -23,6 +23,7 @@ import xyz.xiangban.xiaoban.business.communitynative.CommunityPosterResult
 @OptIn(ExperimentalForeignApi::class)
 class IOSCommunitySharing : PlatformActions {
     private val photoPicker = IOSForumPhotoPicker()
+    override val notifications = IOSNotifications()
     override val forumPhotoPickerSupported = true
     override suspend fun pickForumPhoto(maxBytes: Long) = photoPicker.pick(maxBytes)
 

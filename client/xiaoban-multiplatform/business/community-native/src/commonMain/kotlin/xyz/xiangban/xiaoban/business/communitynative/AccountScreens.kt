@@ -578,6 +578,15 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             GroupLabel("外观与声音")
             NavRow("主题", ThemeState.mode.label, first = true) { open(Route.Appearance) }
             NavRow("声音", SpeechState.settings.let { if (it.source == SpeechSource.Edge) "Edge · ${EdgeVoices.byId(it.voice).name}" else it.source.label }) { open(Route.Voice) }
+            val notifBridge = env.platform?.notifications
+            val notifPerm by (notifBridge?.permissionState ?: EmptyNotificationPermission).collectAsState()
+            val notifNote = when {
+                notifBridge == null -> null
+                notifPerm == NotificationPermissionState.Granted -> "已开启"
+                notifPerm == NotificationPermissionState.ChannelDisabled -> "提醒渠道关闭"
+                else -> "系统未开启"
+            }
+            NavRow("通知与提醒", notifNote) { open(Route.NotificationSettings) }
             env.platform?.toolEnvironment?.let { environment ->
                 val tools by environment.state.collectAsState()
                 GroupLabel("本机工具")
