@@ -587,8 +587,8 @@ onBeforeUnmount(() => {
 .pc.is-menu-open{z-index:40}
 .pc.off .card-stage{opacity:.46;filter:grayscale(.55)}
 
-.card-stage{position:relative;aspect-ratio:1.08;border-radius:12px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 72% 58% at 50% 42%,#fff 0%,#f4f4f6 66%,#ececef 100%);overflow:hidden}
-html[data-theme=dark] .card-stage{background:radial-gradient(ellipse 72% 58% at 50% 42%,#2b2c30 0%,#212226 68%,#1b1c20 100%)}
+.card-stage{position:relative;aspect-ratio:1.08;border-radius:12px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 76% 62% at 50% 34%,#fff 0%,#faf8f5 58%,#f1ede7 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.92),inset 0 0 0 1px rgba(120,106,92,.065);overflow:hidden}
+html[data-theme=dark] .card-stage{background:radial-gradient(ellipse 74% 58% at 50% 36%,#302e2c 0%,#242322 64%,#1c1b1a 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 0 0 1px rgba(255,255,255,.06)}
 .card-stage img,.card-stage :deep(.pet-actor){position:absolute!important;inset:10px;width:calc(100% - 20px)!important;height:calc(100% - 20px)!important;object-fit:contain;transition:transform .24s ease}
 .pc:hover .card-stage img,.pc:hover .card-stage :deep(.pet-actor){transform:translateY(-3px)}
 .card-stage .gone{font-size:12px;color:var(--ui-text-tertiary)}

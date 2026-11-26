@@ -60,8 +60,22 @@ describe('theme-based desktop pet library',()=>{
  it('shows official families and their members instead of a single active skin',async()=>{const {view}=setup();await flushPromises();for(const name of ['全部','在桌面上','我的'])expect(view.text()).toContain(name);for(const name of ['花朵心语','多肉点点'])expect(view.text()).toContain(name);expect(view.findAll('.pet-theme-card')).toHaveLength(0);expect(view.text()).not.toContain('新宠物放在');expect(view.find('h1').exists()).toBe(false);expect(view.findAll('.pet-theme-detail').map(s=>s.find('h2').text())).toEqual(['花朵心语','多肉点点']);expect(view.get('[data-testid="pet-theme-flower-whispers"]').text()).toContain('4 款');expect(view.find('[data-testid="pet-make-own"]').exists()).toBe(false);expect(view.find('[data-testid="pet-add-jade"]').exists()).toBe(true);expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(false);expect(view.findAll('.xb-seg button').map(t=>t.text())).toEqual(['全部','在桌面上 0','我的']);view.unmount();});
  it('waits for placement selection in lightweight menu and cancels without adding or showing pets',async()=>{const {view,store}=setup();await flushPromises();await view.get('[data-testid="pet-add-daisy"]').trigger('click');await flushPromises();expect(localStorage.getItem('xiaoban.pets.layout.v1')).toBeNull();expect(store.setCompanion).not.toHaveBeenCalled();const menu=view.get('[data-testid="pet-placement-menu"]');expect(menu.text()).toContain('始终置顶');expect(menu.text()).toContain('贴在桌面');await view.get('.menu-dismiss').trigger('click');await flushPromises();expect(localStorage.getItem('xiaoban.pets.layout.v1')).toBeNull();expect(view.find('[data-testid="pet-placement-menu"]').exists()).toBe(false);expect(view.find('[data-testid="pet-add-daisy"]').attributes('aria-expanded')).toBe('false');view.unmount();});
  it('adds duplicate pets and a second species as independent instances',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');await add(view,'daisy');await add(view,'jade','desktop');const layout=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!);expect(layout.instances).toHaveLength(3);expect(new Set(layout.instances.map((p:{id:string})=>p.id)).size).toBe(3);expect(layout.instances.map((p:{petId:string})=>p.petId)).toEqual(['daisy','daisy','jade']);expect(layout.instances.map((p:{layer:string})=>p.layer)).toEqual(['topmost','topmost','desktop']);expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);await tab(view,'桌面伙伴');expect(view.findAll('.pet-card.instance')).toHaveLength(3);expect(view.find('[data-testid="pet-card-daisy"]').exists()).toBe(false);view.unmount();});
- it('changes the top plant of one existing pot without creating another instance',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');await tab(view,'桌面伙伴');await manage(view);expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();const select=view.findAllComponents(NSelect).find(c=>c.attributes('data-testid')==='pet-change-plant')!;expect(select.exists()).toBe(true);select.vm.$emit('update:value','succulent-dots/jade');await flushPromises();expect(localStorage.getItem('xiaoban.pets.layout.v1')).toContain('daisy');body('[data-testid="pet-dialog-done"]')!.click();await flushPromises();const layout=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!);expect(layout.instances).toHaveLength(1);expect(layout.instances[0]).toMatchObject({themeId:'succulent-dots',petId:'jade',size:210,expression:'idle'});view.unmount();});
- it('opens the requested pot in the desktop tab from both native entry paths',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');const {id}=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!).instances[0];await view.setProps({settingsRequest:{id}});await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();expect(view.findAllComponents(NSelect).some(c=>c.attributes('data-testid')==='pet-change-plant')).toBe(true);expect(view.emitted('settingsOpened')).toHaveLength(1);body('[data-testid="pet-dialog-cancel"]')!.click();await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).toBeNull();window.dispatchEvent(new CustomEvent('pets-manage',{detail:{id}}));await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();view.unmount();});
+ it('focuses the management view on the single pet without species swapping, supporting inline rename and visibility toggle',async()=>{
+  const {view}=setup();await flushPromises();await add(view,'daisy');await tab(view,'桌面伙伴');await manage(view);
+  expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();
+  expect(body('[data-testid="pet-change-plant"]')).toBeNull();
+  const input=body('[data-testid="pet-dialog-name"]') as HTMLInputElement;
+  input.value='书桌雏菊';input.dispatchEvent(new Event('input'));await flushPromises();
+  const toggle=view.findAllComponents(NSwitch).find(c=>c.attributes('data-testid')==='pet-dialog-enabled')!;
+  toggle.vm.$emit('update:value',false);await flushPromises();
+  expect(localStorage.getItem('xiaoban.pets.layout.v1')).toContain('小雏菊');
+  body('[data-testid="pet-dialog-done"]')!.click();await flushPromises();
+  const layout=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!);
+  expect(layout.instances).toHaveLength(1);
+  expect(layout.instances[0]).toMatchObject({themeId:'flower-whispers',petId:'daisy',name:'书桌雏菊',enabled:false,size:210,expression:'idle'});
+  view.unmount();
+ });
+ it('opens the requested pot in the desktop tab from both native entry paths',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');const {id}=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!).instances[0];await view.setProps({settingsRequest:{id}});await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();expect(body('[data-testid="pet-tab-mood"]')).not.toBeNull();expect(view.emitted('settingsOpened')).toHaveLength(1);body('[data-testid="pet-dialog-cancel"]')!.click();await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).toBeNull();window.dispatchEvent(new CustomEvent('pets-manage',{detail:{id}}));await flushPromises();expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();view.unmount();});
  it('offers the official library from an empty desktop tab',async()=>{const {view}=setup();await flushPromises();await tab(view,'桌面伙伴');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(false);await view.get('.desktop-pets-empty button').trigger('click');await flushPromises();expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);view.unmount();});
  it('opens AI creation with a selected theme as context',async()=>{const {view,store}=setup();await flushPromises();await view.get('[data-testid="pet-create"]').trigger('click');await flushPromises();expect(store.startCreation).toHaveBeenCalledWith('pet');await view.get('[aria-label="花朵心语更多操作"]').trigger('click');await view.get('[data-testid="pet-theme-flower-whispers"] .theme-menu .xb-menu-item').trigger('click');await flushPromises();expect(store.creationDraft).toContain('flower-whispers');expect(store.creationDraft).toContain('现有主题');view.unmount();});
  it('shows explicit export and forum sharing for custom themes only, without a duplicate JSON export',async()=>{
@@ -103,7 +117,7 @@ describe('theme-based desktop pet library',()=>{
   view.unmount();
  });
  it('keeps the instance list in its own tab and the custom empty state in custom themes',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');await tab(view,'自定义主题');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(true);expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(false);await tab(view,'桌面伙伴');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(false);expect(view.findAll('.pet-card.instance')).toHaveLength(1);view.unmount();});
- it('edits one pet in a centred dialog: the mood list covers every expression, 取消 keeps the old values and 完成 saves them together',async()=>{
+ it('edits one pet in a two-tab workbench: the mood board covers every expression, 取消 keeps the old values and 完成 saves them together',async()=>{
   const {view}=setup();await flushPromises();await add(view,'daisy');
   await manage(view);
   const dialog=()=>body('[data-testid="pet-settings-dialog"]')!;
@@ -111,9 +125,9 @@ describe('theme-based desktop pet library',()=>{
   body('[data-testid="pet-dialog-mood"]')!.click();await flushPromises();
   const options=[...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
   expect(options).toHaveLength(EXPRESSION_NAMES.length);
-  expect([...document.body.querySelectorAll('.mood-list .xb-menu-label')].map(n=>n.textContent)).toEqual(['日常','情绪','状态']);
+  expect([...document.body.querySelectorAll('.mood-section-label')].map(n=>n.textContent)).toEqual(['日常','情绪','状态']);
   body('[data-testid="pet-mood-happy"]')!.click();await flushPromises();
-  expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+  body('[data-testid="pet-tab-general"]')!.click();await flushPromises();
   expect(body('[data-testid="pet-dialog-mood"]')!.textContent).toContain('开心');
   body('[data-testid="pet-layer-desktop"]')!.click();await flushPromises();
   const stored=()=>JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!).instances[0];
@@ -121,7 +135,7 @@ describe('theme-based desktop pet library',()=>{
   body('[data-testid="pet-dialog-cancel"]')!.click();await flushPromises();
   expect(body('[data-testid="pet-settings-dialog"]')).toBeNull();expect(stored()).toMatchObject({expression:'idle',layer:'topmost'});
   await manage(view);
-  body('[data-testid="pet-dialog-mood"]')!.click();await flushPromises();body('[data-testid="pet-mood-sleepy"]')!.click();await flushPromises();
+  body('[data-testid="pet-tab-mood"]')!.click();await flushPromises();body('[data-testid="pet-mood-sleepy"]')!.click();await flushPromises();
   body('[data-testid="pet-dialog-done"]')!.click();await flushPromises();
   expect(stored()).toMatchObject({expression:'sleepy',layer:'topmost'});expect(body('[data-testid="pet-settings-dialog"]')).toBeNull();
   view.unmount();
