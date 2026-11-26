@@ -284,31 +284,6 @@ const otherRecent = computed(() => props.store.recent.find(session => session.id
 const chipsShown = computed(() => props.store.open && !hasCard.value && !busy.value && !props.store.input && !props.store.attachments.length && Boolean(continueTitle.value || otherRecent.value));
 async function continueOther(id: string) { await props.store.switchSession(id); cardShown.value = true; void nextTick(() => field.value?.focus()); }
 
-/* ── 听写：说中文，文字直接出现在 Claude 等应用的输入框里 ─────────────── */
-const DICTATION_TARGETS = ['Claude', 'ChatGPT', 'Codex'];
-const DICTATION_TARGET_KEY = 'xiaoban.dictation.target';
-const dictationShown = computed(() => Boolean(props.dictation && props.store.open && !props.store.live && (props.store.voiceAvailable || props.dictation.active)));
-const dictationLabel = computed(() => {
-  const d = props.dictation;
-  if (!d) return '';
-  if (d.starting) return '正在准备…';
-  if (!d.active) return `听写到 ${d.target}`;
-  return d.partial ? `听写中：${d.partial.slice(-12)}` : `听写中 → ${d.target}，点此结束`;
-});
-async function toggleDictation() {
-  const d = props.dictation;
-  if (!d || d.starting) return;
-  if (d.active) { await d.stop(); return; }
-  closeMenus();
-  props.store.yieldVoice();
-  await d.start(d.target);
-}
-function cycleDictationTarget() {
-  const d = props.dictation;
-  if (!d || d.active) return;
-  d.target = DICTATION_TARGETS[(DICTATION_TARGETS.indexOf(d.target) + 1) % DICTATION_TARGETS.length];
-  try { localStorage.setItem(DICTATION_TARGET_KEY, d.target); } catch { /* the choice just is not remembered */ }
-}
 // A live conversation takes the microphone; dictation gives it up first.
 watch(() => props.store.live, live => { if (live) void props.dictation?.stop(); });
 
@@ -703,9 +678,7 @@ onBeforeUnmount(()=>{
             </div>
           </section>
         </Transition>
-        <div v-if="chipsShown || dictationShown || (Boolean(store.input.trim()) && store.open)" ref="chips" class="chips" data-testid="assistant-chips">
-          <button v-if="dictationShown" type="button" class="chip" :class="{ 'is-on': dictation?.active }" data-testid="assistant-chip-dictation" :disabled="dictation?.starting" @click="toggleDictation"><Mic :size="14" :stroke-width="1.75" /><span class="chip-text">{{ dictationLabel }}</span></button>
-          <button v-if="dictationShown && !dictation?.active" type="button" class="chip" data-testid="assistant-chip-dictation-target" title="换一个要送字的应用" @click="cycleDictationTarget"><span class="chip-text">换目标</span></button>
+        <div v-if="chipsShown || (Boolean(store.input.trim()) && store.open)" ref="chips" class="chips" data-testid="assistant-chips">
           <button v-if="store.input.trim() && store.open" type="button" class="chip" data-testid="assistant-chip-inject" @click="injectToDesktop"><ArrowUpRight :size="14" :stroke-width="1.75" /><span class="chip-text">送字到桌面版</span></button>
           <button v-if="continueTitle" type="button" class="chip" data-testid="assistant-chip-continue" @click="revealCard"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ continueTitle }}」</span></button>
           <button v-else-if="otherRecent" type="button" class="chip" data-testid="assistant-chip-recent" @click="continueOther(otherRecent.id)"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ otherRecent.title }}」</span></button>
@@ -842,8 +815,6 @@ button{font:inherit}
 .chips{pointer-events:none;display:flex;gap:8px;padding-left:4px}
 .chip{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;max-width:260px;height:30px;padding:0 12px;border:0;border-radius:15px;background:var(--glass);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.06),0 3px 8px rgba(0,0,0,.07);color:var(--text-2);font-size:12.5px;cursor:pointer}
 .chip svg{flex:none;color:var(--icon)}
-.chip.is-on{color:var(--accent)}
-.chip.is-on svg{color:var(--accent)}
 .chip:hover:not(:disabled){color:var(--text)}
 .chip:disabled{opacity:.5;cursor:default}
 .chip-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

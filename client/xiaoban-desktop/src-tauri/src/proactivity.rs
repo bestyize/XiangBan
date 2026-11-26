@@ -66,6 +66,7 @@ pub struct ProactivityState {
     engine: Mutex<Engine>,
     settings: Mutex<GreetingSettings>,
     active: Mutex<Option<Greeting>>,
+    presentation: Mutex<()>,
     /// Live context only. Never stored on disk; no raw personal, location or task identifiers.
     context: Mutex<ContextSnapshot>,
     /// Prevent concurrent read/modify/write snapshots for multiple pet windows.
@@ -79,6 +80,7 @@ impl Default for ProactivityState {
             engine: Mutex::new(Engine::new(Policy::default())),
             settings: Mutex::new(GreetingSettings::default()),
             active: Mutex::new(None),
+            presentation: Mutex::new(()),
             context: Mutex::new(ContextSnapshot::default()),
             operation: Mutex::new(()),
             read_error: AtomicBool::new(false),
@@ -242,7 +244,7 @@ pub fn get_proactivity_settings(window: tauri::WebviewWindow) -> Result<Greeting
     Ok(settings)
 }
 #[tauri::command]
-pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSettings) -> Result<GreetingSettings, String> {
+pub async fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSettings) -> Result<GreetingSettings, String> {
     if window.label() != "control" { return Err("只能从小伴控制台配置主动陪伴".into()); }
     settings.validate()?;
     let app = window.app_handle();
@@ -263,20 +265,27 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
     }
     if !settings.enabled {
         *state.context.lock().unwrap_or_else(|e| e.into_inner()) = ContextSnapshot::default();
-        close_bubble(app, &state);
+        drop(_op);
+        close_bubble(app, &state, |_| true)?;
     }
     Ok(settings)
 }
 
-fn close_bubble(app: &tauri::AppHandle, state: &ProactivityState) {
-    let previous = state.active.lock().unwrap_or_else(|e| e.into_inner()).take();
-    if let Some(key) = previous.and_then(|g| g.dialogue_key) { crate::companion_dialogue::cancel(app, &key); }
-    if let Some(window) = app.get_webview_window(BUBBLE_LABEL) { let _ = window.destroy(); }
+fn close_bubble(app: &tauri::AppHandle, state: &ProactivityState, matches: impl FnOnce(&Greeting) -> bool) -> Result<(), String> {
+    let previous = state.active.lock().unwrap_or_else(|e| e.into_inner()).take_if(|g| matches(g));
+    if let Some(greeting) = previous {
+        if let Some(key) = greeting.dialogue_key { crate::companion_dialogue::cancel(app, &key); }
+        sync_bubble(app, state)?;
+    }
+    Ok(())
 }
-pub(crate) fn close_dialogue(app: &tauri::AppHandle) {
-    let state = app.state::<ProactivityState>();
-    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|g| g.dialogue.is_some());
-    if active { close_bubble(app, &state); }
+pub(crate) fn close_dialogue(app: &tauri::AppHandle, key: &str, opening_id: u64) -> Result<(), String> {
+    close_bubble(app, &app.state::<ProactivityState>(), |g| g.dialogue_key.as_deref() == Some(key) && g.id == opening_id)
+}
+pub(crate) fn dialogue_opening_id(window: &tauri::WebviewWindow) -> Option<u64> {
+    if window.label() != BUBBLE_LABEL { return None; }
+    window.state::<ProactivityState>().active.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
+        .filter(|g| g.dialogue.is_some()).map(|g| g.id)
 }
 pub(crate) fn dialogue_identity(app: &tauri::AppHandle) -> Result<(String, String, String), String> {
     let state = app.state::<ProactivityState>();
@@ -287,12 +296,16 @@ pub(crate) fn dialogue_identity(app: &tauri::AppHandle) -> Result<(String, Strin
 pub(crate) fn show_dialogue(app: &tauri::AppHandle, pet: &tauri::WebviewWindow, key: String,
     reply: crate::companion_dialogue::core::Reply) -> Result<(), String> {
     let state = app.state::<ProactivityState>();
-    close_bubble(app, &state);
-    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(Greeting {
+    let id = reply.id;
+    let previous = state.active.lock().unwrap_or_else(|e| e.into_inner()).replace(Greeting {
         id: reply.id, pet_name: reply.pet_name.clone(), text: reply.text.clone(),
         appearance: crate::settings(app).appearance, pet_label: pet.label().into(), dialogue: Some(reply), dialogue_key: Some(key),
     });
-    if let Err(error) = show_bubble(app, pet) { close_bubble(app, &state); return Err(error); }
+    if let Some(key) = previous.and_then(|g| g.dialogue_key) { crate::companion_dialogue::cancel(app, &key); }
+    if let Err(error) = sync_bubble(app, &state) {
+        let _ = close_bubble(app, &state, |g| g.id == id && g.pet_label == pet.label());
+        return Err(error);
+    }
     Ok(())
 }
 fn greeting_text(id: u64) -> &'static str {
@@ -329,23 +342,42 @@ fn bubble_position(pet: &tauri::WebviewWindow, logical_width: f64, logical_heigh
     Ok(PhysicalPosition::new(x.clamp(m_origin.x, right.saturating_sub(width).max(m_origin.x)),
         y.clamp(m_origin.y, bottom.saturating_sub(height).max(m_origin.y))))
 }
-fn show_bubble(app: &tauri::AppHandle, pet: &tauri::WebviewWindow) -> Result<(), String> {
-    if let Some(previous) = app.get_webview_window(BUBBLE_LABEL) { let _ = previous.destroy(); }
-    let dialogue = app.state::<ProactivityState>().active.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|g| g.dialogue.is_some());
-    let (width, height) = if dialogue { (320.0, 240.0) } else { (WIDTH, HEIGHT) };
-    let pos = bubble_position(pet, width, height)?;
-    let builder = WebviewWindowBuilder::new(app, BUBBLE_LABEL, WebviewUrl::App("index.html?scene=pet-greeting".into()))
-        .title("小伴 · 轻声问候").decorations(false).shadow(false).transparent(true)
-        .resizable(false).skip_taskbar(true).always_on_top(true).visible(false).focused(false)
-        .inner_size(width, height);
-    #[cfg(windows)]
-    let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
-    #[cfg(target_os = "macos")]
-    let builder = builder.incognito(true)
-        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
-    let bubble = builder.build().map_err(|e| e.to_string())?;
-    #[cfg(target_os = "macos")]
-    crate::macos::configure_scene(&bubble, false, false)?;
+// Tauri releases destroyed webview labels asynchronously. Keep one greeting window
+// and reconcile it with the latest offer even when two companions are clicked together.
+fn sync_bubble(app: &tauri::AppHandle, state: &ProactivityState) -> Result<(), String> {
+    let _presentation = state.presentation.lock().unwrap_or_else(|e| e.into_inner());
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let existing = app.get_webview_window(BUBBLE_LABEL);
+    let Some(greeting) = active else {
+        if let Some(bubble) = existing {
+            bubble.hide().map_err(|e| e.to_string())?;
+            bubble.eval("window.dispatchEvent(new CustomEvent('companion-greeting-changed',{detail:null}))").map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    };
+    let pet = app.get_webview_window(&greeting.pet_label).ok_or("伙伴窗口已关闭")?;
+    let (width, height) = if greeting.dialogue.is_some() { (320.0, 240.0) } else { (WIDTH, HEIGHT) };
+    let pos = bubble_position(&pet, width, height)?;
+    let bubble = if let Some(bubble) = existing {
+        bubble.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+        let detail = serde_json::to_string(&greeting).map_err(|e| e.to_string())?;
+        bubble.eval(format!("window.dispatchEvent(new CustomEvent('companion-greeting-changed',{{detail:{detail}}}))")).map_err(|e| e.to_string())?;
+        bubble
+    } else {
+        let builder = WebviewWindowBuilder::new(app, BUBBLE_LABEL, WebviewUrl::App("index.html?scene=pet-greeting".into()))
+            .title("小伴 · 轻声问候").decorations(false).shadow(false).transparent(true)
+            .resizable(false).skip_taskbar(true).always_on_top(true).visible(false).focused(false)
+            .inner_size(width, height);
+        #[cfg(windows)]
+        let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
+        #[cfg(target_os = "macos")]
+        let builder = builder.incognito(true)
+            .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+        let bubble = builder.build().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        crate::macos::configure_scene(&bubble, false, false)?;
+        bubble
+    };
     let layer = crate::pets::window_layer(app, pet.label()).unwrap_or_else(|| "topmost".into());
     crate::window_control::apply_layer(&bubble, &layer)?;
     #[cfg(windows)]
@@ -398,9 +430,14 @@ pub async fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64)
         state.read_error.store(true, Ordering::Relaxed);
         return Err(format!("主动陪伴状态保存失败：{error}"));
     }
-    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(offer);
-    if let Err(error) = show_bubble(app, &window) {
-        close_bubble(app, &state);
+    {
+        let mut active = state.active.lock().unwrap_or_else(|e| e.into_inner());
+        if active.is_some() { return Ok(false); }
+        *active = Some(offer);
+    }
+    drop(_op);
+    if let Err(error) = sync_bubble(app, &state) {
+        let _ = close_bubble(app, &state, |g| g.id == action.id && g.dialogue.is_none());
         return Err(error);
     }
     Ok(true)
@@ -429,7 +466,7 @@ pub fn get_companion_greeting(window: tauri::WebviewWindow) -> Result<Greeting, 
         .ok_or("问候已经结束".into())
 }
 #[tauri::command]
-pub fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome: String) -> Result<(), String> {
+pub async fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome: String) -> Result<(), String> {
     if window.label() != BUBBLE_LABEL { return Err("只有陪伴气泡可提交反馈".into()); }
     let feedback = match outcome.as_str() {
         "dismissed" => Feedback::Dismissed, "ignored" => Feedback::Ignored,
@@ -440,16 +477,18 @@ pub fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome
     let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     let current = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("问候已经结束")?;
     if current.id != id { return Err("问候已经失效".into()); }
-    if current.dialogue.is_some() { close_bubble(app, &state); return Ok(()); }
+    if current.dialogue.is_some() { drop(_op); return close_bubble(app, &state, |g| g.id == id); }
     if !state.engine.lock().unwrap_or_else(|e| e.into_inner()).feedback(id, feedback, Local::now().timestamp_millis()) {
         return Err("重复的问候反馈".into());
     }
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
-        close_bubble(app, &state);
+        drop(_op);
+        let _ = close_bubble(app, &state, |g| g.id == id);
         return Err(error);
     }
-    close_bubble(app, &state);
+    drop(_op);
+    close_bubble(app, &state, |g| g.id == id)?;
     match outcome.as_str() {
         "chat" => crate::float_assistant::assistant_open_chat(app.clone(), None),
         "poke" => {

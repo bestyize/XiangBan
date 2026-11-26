@@ -1,7 +1,9 @@
 import official from './catalog.json';
+import mingyue from '../../../../assets/pet-packs/mingyue/pet.json';
 import { imageSource, validateImage } from './images.ts';
 const builtinImages = import.meta.glob<string>('./assets/*.webp', { eager: true, query: '?inline', import: 'default' });
 import { EXPRESSION_NAMES, type ExpressionName } from '../companion/expressions.ts';
+import { isPetMotion, type PetMotion } from './mingyue/actions.ts';
 
 export interface Shape {
   type: 'path' | 'ellipse' | 'rect' | 'image';
@@ -10,16 +12,30 @@ export interface Shape {
   fill?: string; stroke?: string; strokeWidth?: number; opacity?: number;
 }
 export interface Part { id: string; name: string; pivot: [number, number]; motion: 'none' | 'sway' | 'left' | 'right'; shapes: Shape[] }
+export type PetPoses = { idle: string } & Partial<Record<import('../companion/expressions').ExpressionName | 'blink', string>>;
 export interface PetDefinition {
   id: string; name: string; description: string; kind: string;
   builtinPlant?: 'pot' | 'pot-white-flower';
+  poses?: PetPoses;
   parts: Part[];
 }
 export interface PetTheme { schemaVersion: 1 | 2; id: string; name: string; description: string; color: string; pets: PetDefinition[] }
-export interface PetInstance { id: string; themeId: string; petId: string; name: string; size: number; x: number; y: number; layer: 'desktop' | 'topmost'; enabled: boolean; expression: ExpressionName; links: boolean; monitor?: string }
+export interface PetInstance { id: string; themeId: string; petId: string; name: string; size: number; x: number; y: number; layer: 'desktop' | 'topmost'; enabled: boolean; expression: ExpressionName; motion?: PetMotion; links: boolean; monitor?: string }
 export interface PetLayout { version: 1; instances: PetInstance[] }
 export interface PetCatalog { themes: (PetTheme & { source: 'builtin' | 'custom' })[]; layout: PetLayout; errors: string[] }
-export const OFFICIAL_THEMES = (official.themes as PetTheme[]).map(theme => ({...theme, pets: theme.pets.map(pet => ({...pet, parts: pet.parts.map(part => ({...part, shapes: part.shapes.map(shape => shape.type === 'image' ? {...shape, src: imageSource(builtinImages['./'+shape.src])} : shape)}))}))}));
+function withImages(theme: PetTheme, source: (path: string) => string): PetTheme {
+  return { ...theme, pets: theme.pets.map(pet => ({ ...pet, parts: pet.parts.map(part => ({
+    ...part, shapes: part.shapes.map(shape => shape.type === 'image' ? { ...shape, src: imageSource(source(shape.src!)) } : shape),
+  })) })) };
+}
+export const OFFICIAL_THEMES = (official.themes as PetTheme[]).map(theme => withImages(theme, path => builtinImages['./' + path]));
+const packImages = import.meta.glob<string>('../../../../assets/pet-packs/mingyue/assets/*.webp', { eager: true, query: '?inline&import', import: 'default' });
+const bundledMingyue = withImages(mingyue as PetTheme, path => packImages['../../../../assets/pet-packs/mingyue/' + path]);
+
+export function catalogThemes(custom: PetTheme[]): PetCatalog['themes'] {
+  const builtins = custom.some(theme => theme.id === bundledMingyue.id) ? OFFICIAL_THEMES : [...OFFICIAL_THEMES, bundledMingyue];
+  return [...builtins.map(theme => ({ ...theme, source: 'builtin' as const })), ...custom.map(theme => ({ ...theme, source: 'custom' as const }))];
+}
 export const definitionOf = (themes: PetTheme[], instance: PetInstance) => themes.find(t => t.id === instance.themeId)?.pets.find(p => p.id === instance.petId);
 export const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-z0-9][a-z0-9_-]{0,47}$/.test(id);
 const color = (value: unknown) => typeof value === 'string' && /^(#[\da-f]{6}|none)$/i.test(value);
@@ -54,13 +70,20 @@ export function validateTheme(value: unknown): PetTheme {
     if(!Array.isArray(pet.parts)||pet.parts.length>16||(!pet.builtinPlant&&!pet.parts.length)||(pet.builtinPlant&&pet.parts.length>0))throw Error('宠物部件数量无效');
     const parts=new Set<string>();
     for(const part of pet.parts){if(!validId(part.id)||parts.has(part.id)||!text(part.name,24)||!['none','sway','left','right'].includes(part.motion)||!Array.isArray(part.pivot)||part.pivot.length!==2||!part.pivot.every(n=>number(n,0,320)))throw Error('宠物部件无效');parts.add(part.id);shapes(part.shapes);}
+    if (pet.poses != null) {
+      const poses = pet.poses;
+      if (!parts.has(poses.idle) || Object.entries(poses).some(([key, id]) =>
+        !parts.has(id) || (key !== 'blink' && !EXPRESSION_NAMES.includes(key as ExpressionName)))) {
+        throw Error('全身伙伴需要 idle 姿态，每个姿态都要引用已有部件');
+      }
+    }
   }
   return theme;
 }
 export function validateLayout(value: unknown): PetLayout {
   const layout=value as PetLayout,ids=new Set<string>();
   if(!layout||layout.version!==1||!Array.isArray(layout.instances))throw Error('桌面宠物布局格式不正确');
-  for(const p of layout.instances){if(!p||!validId(p.id)||ids.has(p.id)||!validId(p.themeId)||!validId(p.petId)||!text(p.name,40)||!number(p.size,80,420)||!number(p.x,0,1)||!number(p.y,0,1)||!['desktop','topmost'].includes(p.layer)||typeof p.enabled!=='boolean'||typeof p.links!=='boolean'||!EXPRESSION_NAMES.includes(p.expression)||(p.monitor!==undefined&&!text(p.monitor,512)))throw Error('桌面宠物实例无效');ids.add(p.id);}
+  for(const p of layout.instances){if(!p||!validId(p.id)||ids.has(p.id)||!validId(p.themeId)||!validId(p.petId)||!text(p.name,40)||!number(p.size,80,420)||!number(p.x,0,1)||!number(p.y,0,1)||!['desktop','topmost'].includes(p.layer)||typeof p.enabled!=='boolean'||typeof p.links!=='boolean'||!EXPRESSION_NAMES.includes(p.expression)||(p.motion!==undefined&&!isPetMotion(p.motion))||(p.monitor!==undefined&&!text(p.monitor,512)))throw Error('桌面宠物实例无效');ids.add(p.id);}
   return layout;
 }
 

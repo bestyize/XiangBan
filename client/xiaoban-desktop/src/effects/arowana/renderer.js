@@ -1,8 +1,8 @@
 import {
   Color, DirectionalLight, Group, MathUtils, NeutralToneMapping, PerspectiveCamera, Scene, Spherical,
-  SRGBColorSpace, TextureLoader, WebGLRenderer,
+  SRGBColorSpace, WebGLRenderer,
 } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { disposeModels, embeddedModelLoader } from '../../three/embedded-model.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { cruiseRoute, vermilionCruiseDuration } from './cruise-route.js';
 import { createTankEnvironment } from './environment.js';
@@ -22,29 +22,8 @@ function modelBytes(species) {
   return bytesBySpecies.get(species);
 }
 
-function disposeModels(roots) {
-  const geometries = new Set(), skeletons = new Set(), materials = new Set(), textures = new Set();
-  for (const root of roots) root.traverse(object => {
-    if (object.geometry) geometries.add(object.geometry);
-    if (object.skeleton) skeletons.add(object.skeleton);
-    for (const material of [object.material].flat()) if (material) materials.add(material);
-  });
-  for (const material of materials) {
-    for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
-    material.dispose();
-  }
-  for (const geometry of geometries) geometry.dispose();
-  for (const skeleton of skeletons) skeleton.dispose();
-  for (const texture of textures) texture.dispose();
-}
-
 export function createAquariumRenderer(canvas, id) {
-  const loader = new GLTFLoader();
-  // Embedded GLB textures use blob URLs; route them through the image policy.
-  loader.register(parser => {
-    parser.textureLoader = new TextureLoader(loader.manager);
-    return { name: 'xiaoban-texture-loader' };
-  });
+  const loader = embeddedModelLoader();
   const roots = new Set();
   const loaded = new Map();
   const prepared = new Map();

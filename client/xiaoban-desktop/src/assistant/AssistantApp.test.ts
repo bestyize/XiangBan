@@ -561,37 +561,14 @@ it('accepts a document drop in the capsule and renders a removable named card', 
   await wrapper.get('[aria-label="移除附件 1"]').trigger('click');expect(store.attachments).toHaveLength(0);
 });
 
-describe('dictation chip', () => {
-  const fakeDictation = () => reactive({ active: false, starting: false, target: 'Claude', partial: '', last: '', start: vi.fn(async function (this: { active: boolean }) { return true; }), stop: vi.fn(async () => {}), micLost: vi.fn() });
-
-  it('starts dictation to the chosen app after taking the microphone from the assistant', async () => {
-    const dictation = fakeDictation();
-    const { store, wrapper } = setup({ voiceAvailable: true, phase: 'idle', items: [], input: '', yieldVoice: vi.fn() }, {}, { dictation });
-    await nextTick();
-    const chip = wrapper.get('[data-testid="assistant-chip-dictation"]');
-    expect(chip.text()).toContain('听写到 Claude');
-    await wrapper.get('[data-testid="assistant-chip-dictation-target"]').trigger('click');
-    expect(dictation.target).toBe('ChatGPT');
-    await chip.trigger('click');
-    expect((store as unknown as { yieldVoice: ReturnType<typeof vi.fn> }).yieldVoice).toHaveBeenCalledOnce();
-    expect(dictation.start).toHaveBeenCalledWith('ChatGPT');
-  });
-
-  it('ends dictation from the same chip and from the orb, and hides the target switch while it runs', async () => {
-    const dictation = fakeDictation(); dictation.active = true;
-    const { wrapper } = setup({ voiceAvailable: true, phase: 'idle', items: [], input: '', yieldVoice: vi.fn() }, {}, { dictation });
-    await nextTick();
-    expect(wrapper.find('[data-testid="assistant-chip-dictation-target"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="assistant-chip-dictation"]').text()).toContain('听写中');
-    await wrapper.get('[data-testid="assistant-chip-dictation"]').trigger('click');
-    expect(dictation.stop).toHaveBeenCalledTimes(1);
-    await wrapper.get('[data-testid="assistant-orb"]').trigger('click');
-    expect(dictation.stop).toHaveBeenCalledTimes(2);
-  });
-
-  it('is not offered when voice input is unavailable', async () => {
-    const { wrapper } = setup({ voiceAvailable: false, phase: 'idle', items: [], input: '' }, {}, { dictation: fakeDictation() });
+describe('assistant dictation shortcuts', () => {
+  it.each([false, true])('omits both chips with active dictation %s and keeps the orb usable', async active => {
+    const dictation = reactive({ active, starting: false, target: 'ChatGPT', partial: '', last: '', start: vi.fn(), stop: vi.fn(), micLost: vi.fn() });
+    const { store, wrapper } = setup({ voiceAvailable: true, phase: 'idle', items: [], input: '' }, {}, { dictation });
     await nextTick();
     expect(wrapper.find('[data-testid="assistant-chip-dictation"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="assistant-chip-dictation-target"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="assistant-orb"]').trigger('click');
+    expect(active ? dictation.stop : store.toggleListening).toHaveBeenCalledOnce();
   });
 });

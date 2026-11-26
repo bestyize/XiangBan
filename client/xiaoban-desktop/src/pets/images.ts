@@ -21,23 +21,25 @@ export function validateImage(value: unknown): number {
 
 interface Mask { width: number; height: number; pixels: Uint8ClampedArray }
 const masks = new WeakMap<SVGImageElement, Mask | null>();
-/** Transparent pixels remain click-through, including while the plant sways with its parent group. */
+export function prepareImageMask(element: SVGImageElement) {
+  if (masks.has(element)) return;
+  masks.set(element, null);
+  const image = new Image();
+  image.onload = () => {
+    const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    masks.set(element, { width: canvas.width, height: canvas.height, pixels: context.getImageData(0, 0, canvas.width, canvas.height).data });
+  };
+  image.src = imageSource(element.getAttribute('href'));
+}
+/** Transparent pixels remain click-through, including while a part moves. */
 export function hitImage(element: SVGImageElement, x: number, y: number): boolean {
-  if (!masks.has(element)) {
-    masks.set(element, null);
-    const image = new Image();
-    image.onload = () => {
-      const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      if (!context) return;
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      masks.set(element, { width: canvas.width, height: canvas.height, pixels: context.getImageData(0, 0, canvas.width, canvas.height).data });
-    };
-    image.src = imageSource(element.getAttribute('href'));
-  }
+  prepareImageMask(element);
   const mask = masks.get(element), matrix = element.getScreenCTM();
   if (!mask || !matrix || Number(element.getAttribute('opacity') ?? 1) === 0) return false;
   const point = new DOMPoint(x, y).matrixTransform(matrix.inverse());

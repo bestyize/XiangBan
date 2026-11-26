@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defaults } from './bridge.ts'
 import { PetView } from './pet.ts'
+import type { PetDefinition } from './pets/model.ts'
 
 describe('PetView animation lifecycle', () => {
   const frames = new Map<number, FrameRequestCallback>()
@@ -22,6 +23,41 @@ describe('PetView animation lifecycle', () => {
   afterEach(() => {
     document.body.replaceChildren()
     vi.unstubAllGlobals()
+  })
+
+  it('pokes a full-body companion and only hit-tests its visible pose', () => {
+    const definition: PetDefinition = {
+      id: 'actor', name: '溟月', description: '全身伙伴', kind: 'character',
+      poses: { idle: 'standing', happy: 'smile' },
+      parts: ['standing', 'smile'].map(id => ({
+        id, name: id, pivot: [160, 280], motion: 'none',
+        shapes: [{ type: 'rect', x: 100, y: 100, width: 60, height: 100, fill: '#123456' }],
+      })),
+    }
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // happy, then proud
+    const pet = new PetView(document.body, { ...defaults }, undefined, definition)
+    const active = () => pet.host.querySelector<SVGElement>('[data-pet-part]:not([display])')!
+    const standing = active()
+    expect(standing.dataset.petPart).toBe('standing')
+    pet.reactions.setEnabled(false)
+    try {
+      pet.poke()
+      const [id, frame] = [...frames][0]
+      frames.delete(id)
+      frame(100)
+      expect(active().dataset.petPart).toBe('smile')
+      expect(standing.getAttribute('display')).toBe('none')
+      const art = pet.host.querySelector<HTMLElement>('.pet-art')!
+      vi.spyOn(art, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 320, 320))
+      const hidden = standing.querySelector('rect')!
+      const visible = active().querySelector('rect')!
+      Object.defineProperty(hidden, 'getScreenCTM', { value: () => { throw Error('hidden pose was hit-tested') } })
+      Object.defineProperty(visible, 'getScreenCTM', { value: () => null })
+      expect(pet.hit(130, 150)).toBe(false)
+    } finally {
+      pet.destroy()
+      vi.restoreAllMocks()
+    }
   })
 
   it('does not keep scheduling frames while paused or hidden', () => {

@@ -6,24 +6,35 @@ import type {CompanionReply} from '../companion-dialogue/dialogue.ts';
 interface Greeting {id:number;petName:string;text:string;appearance:'system'|'light'|'dark';dialogue?:CompanionReply}
 const greeting=ref<Greeting|null>(null),error=ref('');
 let timeout:ReturnType<typeof setTimeout>|undefined;
+let revision=0;
+function display(value:Greeting|null) {
+ ++revision;
+ clearTimeout(timeout);
+ error.value='';
+ greeting.value=value;
+ if(value&&!value.dialogue)timeout=setTimeout(()=>void finish('ignored'),8000);
+}
+function changed(event:Event) { display((event as CustomEvent<Greeting|null>).detail); }
 async function finish(outcome:'chat'|'poke'|'dismissed'|'ignored'|'snoozed'){
- const active=greeting.value;if(!active)return;greeting.value=null;
- if(timeout)clearTimeout(timeout);
+ const active=greeting.value;if(!active)return;display(null);
+ const submitted=revision;
  try { await invoke('respond_companion_greeting',{id:active.id,outcome}); }
- catch(e) { error.value=String(e); }
+ catch(e) { if(submitted===revision)error.value=String(e); }
 }
 onMounted(async()=>{
  document.documentElement.style.background='transparent';document.body.className='pet-greeting-scene';
+ window.addEventListener('companion-greeting-changed',changed);
+ const initial=revision;
  try{
-  greeting.value=await invoke<Greeting>('get_companion_greeting');
-   if(!greeting.value.dialogue)timeout=setTimeout(()=>void finish('ignored'),8000);
- }catch(e){error.value=String(e);}
+  const first=await invoke<Greeting>('get_companion_greeting');
+  if(initial===revision)display(first);
+ }catch(e){if(initial===revision)error.value=String(e);}
 });
-onBeforeUnmount(()=>{if(timeout)clearTimeout(timeout);});
+onBeforeUnmount(()=>{++revision;clearTimeout(timeout);window.removeEventListener('companion-greeting-changed',changed);});
 </script>
 <template>
  <div class="greeting-shell" :data-appearance="greeting?.appearance||'system'">
-   <CompanionReplyCard v-if="greeting?.dialogue" class="greeting-dialogue" :initial="greeting.dialogue" @close="greeting=null"/>
+   <CompanionReplyCard v-if="greeting?.dialogue" :key="greeting.id" class="greeting-dialogue" :initial="greeting.dialogue" @close="display(null)"/>
    <section v-else-if="greeting" class="greeting-card" role="status" aria-live="polite">
    <header><span class="greeting-name">{{greeting.petName}}</span><button class="greeting-close" title="关闭问候" aria-label="关闭问候" @click="finish('dismissed')">×</button></header>
    <p>{{greeting.text}}</p>

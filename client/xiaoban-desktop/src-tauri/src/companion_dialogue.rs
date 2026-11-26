@@ -71,9 +71,9 @@ fn interact(window: &tauri::WebviewWindow, selected: Option<&str>, id: Option<u6
     Ok(reply)
 }
 #[tauri::command]
-pub fn companion_dialogue_click(window: tauri::WebviewWindow) -> Result<Reply, String> { interact(&window, None, None) }
+pub async fn companion_dialogue_click(window: tauri::WebviewWindow) -> Result<Reply, String> { interact(&window, None, None) }
 #[tauri::command]
-pub fn companion_dialogue_choose(window: tauri::WebviewWindow, id: u64, choice: String) -> Result<Reply, String> {
+pub async fn companion_dialogue_choose(window: tauri::WebviewWindow, id: u64, choice: String) -> Result<Reply, String> {
     if choice.len() > 32 { return Err("没有这个选项".into()); }
     interact(&window, Some(&choice), Some(id))
 }
@@ -115,24 +115,27 @@ pub async fn companion_dialogue_model(window: tauri::WebviewWindow, id: u64) -> 
 }
 
 #[tauri::command]
-pub fn companion_dialogue_continue(window: tauri::WebviewWindow, id: u64) -> Result<String, String> {
+pub async fn companion_dialogue_continue(window: tauri::WebviewWindow, id: u64) -> Result<String, String> {
+    let app = window.app_handle();
+    let opening = crate::proactivity::dialogue_opening_id(&window);
     let (key, name, tone) = identity(&window)?;
-    let app = window.app_handle(); cancel(app, &key);
+    cancel(app, &key);
     // Serialize handoffs with clicks, so a double click cannot create two sessions or duplicate the transcript.
     let session = edit(app, |data| {
         let record = data.records.get(&key).filter(|r| r.current.as_ref().is_some_and(|v| v.id == id)).ok_or("这句话已经过去了，再点一下伙伴吧")?;
         crate::chat::companion_session(app, &key, &name, &tone, id, &record.history)
     })?;
     crate::float_assistant::open_companion_session(app, session.clone())?;
-    if window.label() == "companion-greeting" { crate::proactivity::close_dialogue(app); }
+    if let Some(opening) = opening { crate::proactivity::close_dialogue(app, &key, opening)?; }
     Ok(session)
 }
 #[tauri::command]
-pub fn companion_dialogue_close(window: tauri::WebviewWindow, id: u64) -> Result<(), String> {
+pub async fn companion_dialogue_close(window: tauri::WebviewWindow, id: u64) -> Result<(), String> {
+    let opening = crate::proactivity::dialogue_opening_id(&window);
     let (key, _, _) = identity(&window)?;
     let current = edit(window.app_handle(), |data| Ok(data.records.get(&key).and_then(|r| r.current.as_ref()).is_some_and(|r| r.id == id)))?;
     if !current { return Ok(()); }
     cancel(window.app_handle(), &key);
-    if window.label() == "companion-greeting" { crate::proactivity::close_dialogue(window.app_handle()); }
+    if let Some(opening) = opening { crate::proactivity::close_dialogue(window.app_handle(), &key, opening)?; }
     Ok(())
 }

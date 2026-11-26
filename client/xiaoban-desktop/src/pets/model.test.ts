@@ -1,9 +1,41 @@
 import {describe,it,expect} from 'vitest';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { actionLabels } from './mingyue/actions.ts';
 import {OFFICIAL_THEMES,validateTheme,validateLayout} from './model.ts';
 import {robotMarkup} from '../companion/render.ts';
-import {petMarkup} from './render.ts';
+import {petMarkup,poseFor} from './render.ts';
 import {EXPRESSION_NAMES,stillFrame} from '../companion/expressions.ts';
+import mingyue from '../../../../assets/pet-packs/mingyue/pet.json';
+import type {PetTheme} from './model.ts';
 describe('pet works and expression rendering',()=>{
+ it('offers exactly the authored clips in the unmodified offline Mingyue model',()=>{
+   const bytes = readFileSync(new URL('../../public/pets/mingyue/dafeiyu-maid.glb', import.meta.url));
+   expect(createHash('sha256').update(bytes).digest('hex')).toBe('54f8e2b295f8a0998ae42ff8b1a1e13632ec24f715d1aba284461570eb1634ab');
+   const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
+   expect(gltf.animations.map((clip: {name:string})=>clip.name).sort()).toEqual(Object.keys(actionLabels).sort());
+ });
+ it('renders the current Mingyue pose on a square, transparent stage',()=>{
+   const theme = structuredClone(mingyue) as PetTheme;
+   const pet = theme.pets[0];
+   // The native import test covers the real WebP bytes. Keep this SVG test small.
+   const fixture = OFFICIAL_THEMES[0].pets.find(p=>p.parts[0]?.shapes[0].type === 'image')!;
+   for (const part of pet.parts) part.shapes[0].src = fixture.parts[0].shapes[0].src;
+   expect(validateTheme(theme)).toBe(theme);
+   for (const expression of EXPRESSION_NAMES) {
+     const frame = stillFrame(expression);
+     const svg = petMarkup(pet,frame,'preview',expression);
+     expect(svg).toContain('viewBox="0 0 320 320"');
+     expect(svg).toContain(`data-pet-part="${pet.poses![expression] ?? 'standing'}"`);
+     expect(svg.match(/<image /g)).toHaveLength(1);
+     expect(svg).not.toMatch(/plant-slot|screenClip|data-part="face"/);
+   }
+   const blinking = {...stillFrame('idle'),squashL:0.1,squashR:0.1};
+   expect(poseFor(pet.poses!,'idle',blinking)).toBe('blink');
+   expect(poseFor(pet.poses!,'thinking',blinking)).toBe('reading');
+   pet.poses!.happy = 'missing';
+   expect(()=>validateTheme(theme)).toThrow('姿态');
+ });
  it('ships two plant themes whose seven works validate and support every expression',()=>{expect(OFFICIAL_THEMES.map(t=>t.name)).toEqual(['花朵心语','多肉点点']);let count=0;for(const t of OFFICIAL_THEMES){expect(validateTheme(t)).toBe(t);for(const p of t.pets){count++;for(const expression of EXPRESSION_NAMES){const svg=petMarkup(p,stillFrame(expression),'one');expect(svg.replace(/data:image\/[^"']+/g,'')).not.toContain('NaN');expect(svg).toContain('data-part="face"');expect(svg).toContain('screenClip');}}}expect(count).toBe(7);});
  it('preserves both original pot designs exactly',()=>{for(const p of OFFICIAL_THEMES[0].pets.filter(p=>p.builtinPlant))for(const e of EXPRESSION_NAMES){const f=stillFrame(e);expect(petMarkup(p,f,'same')).toBe(robotMarkup(f,'same',undefined,p.builtinPlant));}});
  it('keeps legacy vectors and rejects executable artwork',()=>{const theme=structuredClone(OFFICIAL_THEMES[0]);theme.schemaVersion=1;theme.pets=[{id:'leaf',name:'嫩芽',description:'旧植物',kind:'plant',parts:[{id:'leaf',name:'叶子',pivot:[160,157],motion:'sway',shapes:[{type:'path',d:'M160 157L160 93',fill:'none',stroke:'#669944'}]}]}];expect(validateTheme(theme)).toBe(theme);theme.pets[0].kind='animal';expect(validateTheme(theme)).toBe(theme);theme.pets[0].parts[0].shapes[0].fill='url(https://example.com/a)';expect(()=>validateTheme(theme)).toThrow();theme.pets[0].parts[0].shapes[0].fill='#f4e9d8';theme.pets[0].parts[0].shapes[0].d='<script>alert(1)</script>';expect(()=>validateTheme(theme)).toThrow();});

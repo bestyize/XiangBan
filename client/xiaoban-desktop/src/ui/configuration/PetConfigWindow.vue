@@ -58,19 +58,19 @@ async function loadCatalog() {
   if (!disposed) catalog.value = data;
 }
 
-async function savePet(patch: PetSettingsPatch) {
+async function savePet(patch: PetSettingsPatch | { x: number; y: number }, center = false) {
   if (!instance.value || busy.value) return;
   busy.value = true;
   try {
-    await invoke('update_pet', { id: instance.value.id, patch });
-    await loadCatalog();
+    catalog.value = await invoke<PetCatalog>('update_pet', { id: instance.value.id, patch });
+    if (center) notify('已移到屏幕正中央');
+    else await closeConfigurationWindow();
   } catch (e) { notify(e); }
   finally { busy.value = false; }
 }
 
 async function centerPet() {
-  await savePet({ x: 0.5, y: 0.5 } as unknown as PetSettingsPatch);
-  notify('已移到屏幕正中央');
+  await savePet({ x: 0.5, y: 0.5 }, true);
 }
 
 async function removePet() {
@@ -107,7 +107,7 @@ async function inspectEnvironment() {
 }
 
 function onEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && !event.defaultPrevented) {
+  if (event.key === 'Escape' && !event.defaultPrevented && !busy.value) {
     event.preventDefault();
     void closeConfigurationWindow();
   }

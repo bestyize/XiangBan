@@ -2,13 +2,19 @@
 import { Animator } from './companion/animator.ts'
 import { Mind, type Beat } from './companion/mind.ts'
 import { Reactions } from './companion/reactions.ts'
-import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
+import { toSpec, stillFrame, type ExpressionName, type RobotInput } from './companion/expressions.ts'
 import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
 import { faceStyleOf, skinOf, type SkinId } from './companion/skins.ts'
 import type { Settings } from './bridge.ts'
 import type { PetDefinition } from './pets/model.ts'
-import { petMarkup, petPalette, partTransform } from './pets/render.ts'
-import { hitImage } from './pets/images.ts'
+import { petMarkup, petPalette, partTransform, poseFor } from './pets/render.ts'
+import { hitImage, prepareImageMask } from './pets/images.ts'
+
+export interface PetArtwork {
+  render(seconds: number, expression: ExpressionName): void
+  hit(x: number, y: number): boolean
+  poke(): void
+}
 
 export class PetView {
   readonly host: HTMLDivElement
@@ -25,6 +31,9 @@ export class PetView {
   private lastStatus = ''
   private interactUntil = 0
   private skin: SkinId
+  private partNodes = new Map<string, SVGElement>()
+  private visiblePose?: SVGElement
+  private artwork?: PetArtwork
   private parts!: { body: SVGElement | null; face: SVGElement | null; shadow: SVGElement | null; ears: { group: SVGElement | null; halo: Element | null | undefined; light: Element | null | undefined }[] }
   readonly reactions = new Reactions({
     play: beats => this.mind.play(beats),
@@ -59,6 +68,9 @@ export class PetView {
       this.last = now
       this.reactions.tick(dt)
       this.mind.tick(dt)
+      const current = toSpec(this.mind.current()).expression
+      if (current !== this.lastStatus) { this.lastStatus = current; this.status?.(current) }
+      if (this.artwork) { this.artwork.render(dt, current); return }
       const frame = this.animator.step(dt)
       const { body, face, shadow, ears } = this.parts
       body?.setAttribute('transform', bodyTransform(frame))
@@ -67,7 +79,13 @@ export class PetView {
         if (markup !== this.lastFaceMarkup) { face.innerHTML = markup; this.lastFaceMarkup = markup }
         face.setAttribute('opacity', faceOpacity(frame).toFixed(2))
       }
-      if(this.definition)for(const part of this.definition.parts)this.host.querySelector(`[data-pet-part="${part.id}"]`)?.setAttribute('transform',partTransform(part,frame))
+      if (this.definition) {
+        if (this.definition.poses) this.showPose(poseFor(this.definition.poses, current, frame))
+        for (const part of this.definition.parts) {
+          const node = this.partNodes.get(part.id)
+          if (!this.visiblePose || node === this.visiblePose) node?.setAttribute('transform', partTransform(part, frame))
+        }
+      }
       const light = earLight(frame)
       ears.forEach(({ group, halo, light: inner }, i) => {
         group?.setAttribute('transform', earTransform(frame, i === 0 ? -1 : 1, skinOf(this.skin).earPivot))
@@ -75,8 +93,6 @@ export class PetView {
         inner?.setAttribute('opacity', (0.25 + 0.75 * light).toFixed(2))
       })
       if (shadow) { const s = shadowAttrs(frame); shadow.setAttribute('rx', s.rx); shadow.setAttribute('opacity', s.opacity) }
-      const current = toSpec(this.mind.current()).expression
-      if (current !== this.lastStatus) { this.lastStatus = current; this.status?.(current) }
     }
     this.tick = tick
     document.addEventListener('visibilitychange', this.onVisibility)
@@ -99,9 +115,34 @@ export class PetView {
       return { group, halo: group?.querySelector('[data-part="halo"]'), light: group?.querySelector('[data-part="earLight"]') }
     })
     this.parts = { body: q('[data-part="body"]'), face: q('[data-part="face"]'), shadow: q('[data-part="shadow"]'), ears }
+    this.partNodes.clear()
+    for (const part of this.host.querySelectorAll<SVGElement>('[data-pet-part]')) this.partNodes.set(part.dataset.petPart!, part)
+    this.visiblePose = undefined
+    const initialPose = this.definition?.poses && q('[data-pet-part]:not([display="none"])')?.dataset.petPart
+    if (initialPose) this.showPose(initialPose)
+    this.host.querySelector('.pet-art')?.setAttribute('aria-label', this.definition?.name ?? '小伴')
   }
-  private markup(){return this.definition?petMarkup(this.definition,stillFrame('idle'),this.id):robotMarkup(stillFrame('idle'),this.id,undefined,this.skin)}
-  setDefinition(definition:PetDefinition){if(JSON.stringify(definition)===JSON.stringify(this.definition))return;this.definition=definition;this.host.querySelector('.pet-art')!.innerHTML=this.markup();this.bind()}
+  private showPose(id: string) {
+    const node = this.partNodes.get(id)
+    if (!node || this.visiblePose === node) return
+    this.visiblePose?.setAttribute('display', 'none')
+    node.removeAttribute('display')
+    this.visiblePose = node
+    // A click can be followed immediately by a drag while the reaction is on screen.
+    node.querySelectorAll<SVGImageElement>('image[data-pet-image]').forEach(prepareImageMask)
+  }
+  private markup() {
+    const expression = this.config.expression as ExpressionName
+    return this.definition ? petMarkup(this.definition, stillFrame(expression), this.id, expression, true)
+      : robotMarkup(stillFrame('idle'), this.id, undefined, this.skin)
+  }
+  setDefinition(definition:PetDefinition){if(definition===this.definition||JSON.stringify(definition)===JSON.stringify(this.definition))return;this.definition=definition;this.host.querySelector('.pet-art')!.innerHTML=this.markup();this.bind()}
+
+  setArtwork(artwork?: PetArtwork) {
+    this.artwork = artwork
+    this.redrawArtwork()
+  }
+  redrawArtwork() { this.artwork?.render(0, toSpec(this.mind.current()).expression) }
 
   update(settings: Settings) {
     this.config = settings
@@ -120,7 +161,9 @@ export class PetView {
       this.mind.play([])
       this.mind.setBase(settings.expression as RobotInput)
       this.mind.activity()
+      if (this.definition?.poses) this.showPose(this.definition.poses[settings.expression as ExpressionName] ?? this.definition.poses.idle)
     }
+    this.redrawArtwork()
   }
 
   look(x: number, y: number, moved = true) {
@@ -136,9 +179,11 @@ export class PetView {
   // Test actual transformed SVG fills. Glows/shadows stay click-through; the
   // breathing, ear movement and head tilt are included in the current CTMs.
   hit(x: number, y: number): boolean {
+    if (this.artwork) return this.artwork.hit(x, y)
     const bounds = this.host.querySelector('.pet-art')!.getBoundingClientRect()
     if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return false
-    return [...this.host.querySelectorAll<SVGImageElement>('svg image[data-pet-image]')].some(element => hitImage(element,x,y)) || [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon')].some(element => {
+    const artwork = this.visiblePose ?? this.host
+    return [...artwork.querySelectorAll<SVGImageElement>('image[data-pet-image]')].some(element => hitImage(element,x,y)) || [...artwork.querySelectorAll<SVGGeometryElement>('path, rect, ellipse, circle, polygon')].some(element => {
       if (element.closest('defs') || element.matches('[data-part="halo"], [data-part="shadow"], [data-part="aura"]')) return false
       const fill = getComputedStyle(element).fill
       if (fill === 'none' || fill === 'transparent') return false
@@ -159,6 +204,7 @@ export class PetView {
   }
 
   poke() {
+    if (this.artwork && !this.config.paused) this.artwork.poke()
     this.interact()
     if (!this.mind.dozing && this.reactions.wish()) { this.mind.activity(); this.animator.twitchEar(0, 0.8); return }
     this.mind.poke()

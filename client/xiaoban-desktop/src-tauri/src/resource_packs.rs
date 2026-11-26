@@ -284,6 +284,15 @@ fn clean_name(raw: &str) -> Result<String, String> {
 }
 
 /// Reads a zip into a pack. Sizes are counted while unpacking, so a small archive cannot expand without limit.
+pub(crate) fn bundled_mingyue() -> &'static pet_packs::Theme {
+    static THEME: std::sync::OnceLock<pet_packs::Theme> = std::sync::OnceLock::new();
+    THEME.get_or_init(|| {
+        let pack = from_zip(include_bytes!("../../../../assets/pet-packs/mingyue.zip"))
+            .expect("bundled Mingyue pet pack");
+        serde_json::from_value(pack.data).expect("bundled Mingyue theme")
+    })
+}
+
 fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     if bytes.len() as u64 > app_pack::MAX_PACK_BYTES { return Err("资源包不能超过 100 MB".into()); }
     let mut archive = ZipArchive::new(Cursor::new(bytes)).map_err(|_| "不是有效的 zip 资源包".to_string())?;
@@ -581,6 +590,30 @@ pub(crate) fn import_html(root: &Path, path: &Path, kind: HtmlKind) -> Result<Va
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mingyue_pet_imports_with_all_full_body_poses() {
+        let root = temp_root("mingyue-pet");
+        let bytes = include_bytes!("../../../../assets/pet-packs/mingyue.zip");
+        assert_eq!(import(&root, bytes).unwrap()["kind"], "pet");
+        let mut theme = pet_packs::load(&root.join("pets/themes")).unwrap().remove(0);
+        assert_eq!(theme.id, "tide-study-mingyue");
+        let bundled = pet_packs::catalog_themes(vec![]);
+        assert!(bundled.iter().any(|(t, source)| t.id == theme.id && *source == "builtin"));
+        theme.name = "我的潮汐书房".into();
+        let installed = pet_packs::catalog_themes(vec![theme.clone()]);
+        let copies: Vec<_> = installed.iter().filter(|(t, _)| t.id == theme.id).collect();
+        assert_eq!(copies.len(), 1);
+        assert_eq!(copies[0].0.name, "我的潮汐书房");
+        assert_eq!(copies[0].1, "custom");
+        let pet = &theme.pets[0];
+        assert!(pet.builtin_plant.is_none());
+        assert_eq!(pet.poses.as_ref().unwrap()["sleeping"], "sleeping");
+        assert_eq!(pet_packs::export_assets(&theme).unwrap().1.len(), 8);
+        theme.pets[0].poses.as_mut().unwrap().insert("happy".into(), "missing".into());
+        assert!(pet_packs::validate(&theme).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn pet_zip_preserves_images_and_never_imports_instance_layout() {

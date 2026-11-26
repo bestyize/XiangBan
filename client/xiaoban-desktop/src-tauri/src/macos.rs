@@ -499,7 +499,7 @@ pub fn apply_control_appearance(window: &tauri::WebviewWindow, appearance: &str)
                 ns.setBackgroundColor(Some(&bg));
             }
         }
-        if matches!(crate::configuration_window::kind(window.label()), Some("settings" | "model" | "store")) {
+        if matches!(crate::configuration_window::kind(window.label()), Some("settings" | "model" | "store" | "pet" | "proactivity")) {
             ns.setOpaque(false);
             ns.setBackgroundColor(Some(&NSColor::clearColor()));
             ns.setExcludedFromWindowsMenu(false);

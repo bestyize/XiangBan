@@ -8,13 +8,14 @@ import { computed, reactive, ref, watch } from 'vue';
 import { NModal, NPopconfirm, NSwitch } from 'naive-ui';
 import { Check, ChevronRight, Crosshair, Monitor, Pencil, Pin, Sparkles, X } from 'lucide-vue-next';
 import PetActor from '../../pets/PetActor.vue';
+import { actionLabels, isMingyue, type PetMotion } from '../../pets/mingyue/actions.ts';
 import { EXPRESSIONS, EXPRESSION_NAMES, type ExpressionName } from '../../companion/expressions.ts';
 import type { PetInstance, PetTheme } from '../../pets/model.ts';
 import WindowChrome from '../configuration/WindowChrome.vue';
 import { dragConfigurationWindow, zoomConfigurationWindow } from '../configuration/windows.ts';
 
 type Theme = PetTheme & { source: 'builtin' | 'custom' };
-export interface PetSettingsPatch extends Partial<Pick<PetInstance, 'name' | 'size' | 'expression' | 'layer' | 'links' | 'enabled'>> {}
+export interface PetSettingsPatch extends Partial<Pick<PetInstance, 'name' | 'size' | 'expression' | 'motion' | 'layer' | 'links' | 'enabled'>> {}
 
 const props = defineProps<{
   show: boolean;
@@ -63,6 +64,7 @@ const draft = reactive({
   name: '',
   size: 210,
   expression: 'idle' as ExpressionName,
+  motion: 'auto' as PetMotion,
   layer: 'topmost' as PetInstance['layer'],
   links: true,
   enabled: true,
@@ -80,6 +82,7 @@ function reset() {
     name: item.name,
     size: item.size,
     expression: item.expression,
+    motion: item.motion ?? 'auto',
     layer: item.layer,
     links: item.links,
     enabled: item.enabled,
@@ -88,13 +91,14 @@ function reset() {
   moodFilter.value = 'all';
   hoverMood.value = null;
 }
-watch(() => [props.show, props.instance?.id, props.detached], () => { if (props.show || props.detached) reset(); }, { immediate: true });
+watch([() => props.show, () => props.instance?.id, () => props.detached], () => { if (props.show || props.detached) reset(); }, { immediate: true });
 
 const theme = computed(() => props.themes.find(item => item.id === props.instance?.themeId));
 const definition = computed(() => theme.value?.pets.find(pet => pet.id === props.instance?.petId));
+const hasModel = computed(() => isMingyue(theme.value?.id, definition.value?.id));
 const visibleGroups = computed(() => moodFilter.value === 'all' ? groups.value : groups.value.filter(g => g.name === moodFilter.value));
 const activeExpression = computed<ExpressionName>(() => hoverMood.value ?? draft.expression);
-const previewSize = computed(() => Math.round(136 + (Math.min(420, Math.max(80, draft.size)) - 80) / 340 * 68));
+const previewSize = computed(() => Math.round(draft.size * 0.52));
 const sizeProgress = computed(() => `${((Math.min(420, Math.max(80, draft.size)) - 80) / 340) * 100}%`);
 const nameInvalid = computed(() => !draft.name.trim());
 const metaLine = computed(() => [theme.value?.name, definition.value?.name ?? '作品暂不可用', props.instance?.monitor].filter(Boolean).join(' · '));
@@ -147,14 +151,16 @@ function done() {
   if (name && name !== item.name) patch.name = name;
   if (draft.size !== item.size) patch.size = draft.size;
   if (draft.expression !== item.expression) patch.expression = draft.expression;
+  if (hasModel.value && draft.motion !== (item.motion ?? 'auto')) patch.motion = draft.motion;
   if (draft.layer !== item.layer) patch.layer = draft.layer;
   if (draft.links !== item.links) patch.links = draft.links;
   if (draft.enabled !== item.enabled) patch.enabled = draft.enabled;
   if (Object.keys(patch).length) emit('save', patch);
-  close();
+  else close();
 }
 
 function close() {
+  if (props.busy) return;
   hoverMood.value = null;
   emit('update:show', false);
   emit('close');
@@ -191,6 +197,8 @@ function close() {
             <PetActor
               v-if="definition"
               :definition="definition"
+              :theme-id="theme?.id"
+              :motion="hoverMood ? 'auto' : draft.motion"
               :size="previewSize"
               :expression="activeExpression"
               :links="draft.links"
@@ -299,6 +307,13 @@ function close() {
             </div>
 
             <div class="cfg-card">
+              <label v-if="hasModel" class="cfg-row">
+                <span class="cfg-lbl grow">原作动作</span>
+                <select v-model="draft.motion" class="pd-motion" data-testid="pet-motion">
+                  <option value="auto">跟随心情</option>
+                  <option v-for="(label, clip) in actionLabels" :key="clip" :value="clip">{{ label }}</option>
+                </select>
+              </label>
               <button type="button" class="jump-row" data-testid="pet-dialog-mood" @click="tab = 'mood'">
                 <span class="cfg-lbl">心情</span>
                 <span class="jump-val">{{ EXPRESSIONS[draft.expression].label }} · {{ groupOf(draft.expression) }}<ChevronRight :size="14" /></span>
@@ -364,7 +379,7 @@ function close() {
             <template #trigger><button type="button" class="remove" :disabled="busy" data-testid="pet-dialog-remove">从桌面移除</button></template>
             移除这只宠物？主题作品仍会保留。
           </NPopconfirm>
-          <button type="button" class="xb-btn-ghost" data-testid="pet-dialog-cancel" @click="close">取消</button>
+          <button type="button" class="xb-btn-ghost" :disabled="busy" data-testid="pet-dialog-cancel" @click="close">取消</button>
           <button type="button" class="xb-btn-primary is-sm" :disabled="busy || nameInvalid" data-testid="pet-dialog-done" @click="done">完成</button>
         </footer>
       </div>
@@ -431,6 +446,7 @@ html[data-theme=dark] .cfg-card{background:#28272b;box-shadow:0 0 0 1px rgba(255
 
 .size-head{display:flex;align-items:center;gap:8px}
 .size-presets{display:flex;gap:4px}
+.pd-motion{font:inherit;color:var(--ui-text-primary);background:var(--ui-configuration-control);border:0;border-radius:6px;padding:4px 6px;cursor:pointer}
 .size-presets button{height:22px;padding:0 8px;border:0;border-radius:6px;background:var(--ui-configuration-control);color:var(--ui-text-secondary);font-size:11px;cursor:pointer}
 .size-presets button.active{background:var(--ui-surface);color:var(--ui-text-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.1)}
 html[data-theme=dark] .size-presets button.active{background:#48484c}

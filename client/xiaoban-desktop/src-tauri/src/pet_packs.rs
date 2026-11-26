@@ -43,6 +43,8 @@ pub struct Pet {
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub builtin_plant: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub poses: Option<std::collections::BTreeMap<String, String>>,
     pub parts: Vec<Part>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -82,6 +84,17 @@ pub fn builtin() -> Vec<Theme> {
     }
     catalog
     }).clone()
+}
+
+pub fn catalog_themes(installed: Vec<Theme>) -> Vec<(Theme, &'static str)> {
+    let mut themes: Vec<_> = builtin().into_iter().map(|theme| (theme, "builtin")).collect();
+    let mingyue = crate::resource_packs::bundled_mingyue();
+    // Previously distributed as an importable pack. Keep edits and existing instance IDs.
+    if !installed.iter().any(|theme| theme.id == mingyue.id) {
+        themes.push((mingyue.clone(), "builtin"));
+    }
+    themes.extend(installed.into_iter().map(|theme| (theme, "custom")));
+    themes
 }
 
 fn image_extension(path: &str) -> Result<&str, String> {
@@ -297,6 +310,13 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
                     image_count += 1;
                     if image_bytes > 16 * 1024 * 1024 || image_count > 60 { return Err("宠物素材总量超过限制".into()); }
                 }
+            }
+        }
+        if let Some(poses) = &p.poses {
+            if !poses.contains_key("idle") || poses.iter().any(|(key, id)| {
+                !parts.contains(id) || (key != "blink" && !crate::preferences::EXPRESSIONS.contains(&key.as_str()))
+            }) {
+                return Err("全身伙伴需要 idle 姿态，每个姿态都要引用已有部件".into());
             }
         }
     }

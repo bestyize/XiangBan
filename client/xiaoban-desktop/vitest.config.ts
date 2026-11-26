@@ -7,6 +7,7 @@ import vue from '@vitejs/plugin-vue'
 // rejects file:///xiaoban.svg). Leaving absolute paths untouched avoids that while
 // keeping the rest of the build config the same as vite.config.ts.
 export default defineConfig({
+  server: { fs: { allow: ['.', '../../assets/pet-packs/mingyue'] } },
   plugins: [vue({ template: { transformAssetUrls: { includeAbsolute: false } } })],
   clearScreen: false,
   build: { target: 'es2022', sourcemap: false },

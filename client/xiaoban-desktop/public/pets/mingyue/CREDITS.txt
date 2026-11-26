@@ -1,0 +1,13 @@
+潮汐书房 · 溟月
+
+角色原型由上善无形创作，女仆鲸鱼娘由 ZipZipPipe 设计。
+Q 版模型、服装与动作由 PekolandBBQ 制作。部分造型和动作参考了 merzlin 的 shenshen 桌宠与 PC2005-cloud 的 dsh-pet。围裙上的 DeepSeek 标志归相应权利人所有。
+模型完整署名 https://github.com/PekolandBBQ/Deepseek-Dafeiyu-Chibi-3D-Model/blob/v1.0.2/THIRD_PARTY_NOTICES.md
+《潮汐书房》由 RealWorldBuilder 制作 https://github.com/bestyize/RealWorldBuilder/tree/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl
+
+小伴桌面逐字节沿用《潮汐书房》的 dafeiyu-maid.glb，重新布置桌面镜头、灯光与动作触发。
+眼睑画法、遮罩和着色器取自 RealWorldBuilder《潮汐书房》的 eyelids.js。桌面版按各动作的时间播放，保留笑眼，在睡眠时持续闭眼。此表情改编同样使用 CC BY-NC-SA 4.0。
+https://github.com/bestyize/RealWorldBuilder/blob/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl/eyelids.js
+模型 v1.0.2 SHA-256 54f8e2b295f8a0998ae42ff8b1a1e13632ec24f715d1aba284461570eb1634ab
+角色资产适用 CC BY-NC-SA 4.0，限非商业使用。完整许可见同目录 MODEL-LICENSE.txt。
+https://creativecommons.org/licenses/by-nc-sa/4.0/

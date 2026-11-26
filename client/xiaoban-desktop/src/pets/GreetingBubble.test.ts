@@ -35,4 +35,26 @@ describe('opted-in desktop pet greeting',()=>{
   expect(host.invoke).toHaveBeenCalledWith('respond_companion_greeting',{id:7,outcome:'snoozed'});
   wrapper.unmount();
  });
+ it('reuses the mounted bubble for a later greeting and cancels the previous timeout',async()=>{
+  vi.useFakeTimers();
+  let complete!: (value:unknown)=>void;
+  host.invoke.mockImplementationOnce(()=>new Promise(resolve=>{complete=resolve;}));
+  const wrapper=mount(GreetingBubble);
+  const change=(detail:unknown)=>window.dispatchEvent(new CustomEvent('companion-greeting-changed',{detail}));
+  try {
+   change({id:8,petName:'溟月',text:'一起看书吗？'});
+   complete({id:7,petName:'小花',text:'先前的消息'});
+   await flushPromises();
+   expect(wrapper.text()).toContain('一起看书吗？');
+   await vi.advanceTimersByTimeAsync(5000);
+   change({id:9,petName:'溟月',text:'又见面了。'});
+   await vi.advanceTimersByTimeAsync(3100);
+   expect(wrapper.text()).toContain('又见面了。');
+   expect(host.invoke).not.toHaveBeenCalledWith('respond_companion_greeting',expect.anything());
+   change(null);
+   await vi.advanceTimersByTimeAsync(8000);
+   expect(wrapper.text()).toBe('');
+   expect(host.invoke).not.toHaveBeenCalledWith('respond_companion_greeting',expect.anything());
+  } finally {wrapper.unmount();vi.useRealTimers();}
+ });
 });

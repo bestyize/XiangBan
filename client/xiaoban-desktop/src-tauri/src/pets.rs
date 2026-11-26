@@ -12,6 +12,18 @@ use std::{
 };
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Motion {
+    #[default]
+    Auto,
+    Idle, Walk, Read, BenchRead, Write, Listen, Look, Contact, Pet, Play,
+    Paint, Water, Swing, Fish, Bench, Sleep,
+}
+impl Motion {
+    fn is_auto(&self) -> bool { *self == Self::Auto }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Instance {
@@ -25,6 +37,8 @@ pub struct Instance {
     pub layer: String,
     pub enabled: bool,
     pub expression: String,
+    #[serde(default, skip_serializing_if = "Motion::is_auto")]
+    pub motion: Motion,
     pub links: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub monitor: Option<String>,
@@ -148,9 +162,7 @@ fn dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(crate::storage::root(app)?.join("pets/themes"))
 }
 pub fn themes(app: &tauri::AppHandle) -> Result<Vec<Theme>, String> {
-    let mut list = pet_packs::builtin();
-    list.extend(pet_packs::load(&dir(app)?)?);
-    Ok(list)
+    Ok(pet_packs::catalog_themes(pet_packs::load(&dir(app)?)?).into_iter().map(|(theme, _)| theme).collect())
 }
 fn definition(app: &tauri::AppHandle, p: &Instance) -> Result<Pet, String> {
     themes(app)?
@@ -207,22 +219,13 @@ pub fn catalog(app: &tauri::AppHandle) -> Result<Value, String> {
         .clone()
         .into_iter()
         .collect::<Vec<_>>();
-    let all = match themes(app) {
-        Ok(t) => t,
-        Err(e) => {
-            errors.push(e);
-            pet_packs::builtin()
-        }
-    };
-    let builtin = pet_packs::builtin();
-    let list: Vec<_> = all
+    let custom = dir(app).and_then(|path| pet_packs::load(&path)).unwrap_or_else(|error| {
+        errors.push(error);
+        vec![]
+    });
+    let list: Vec<_> = pet_packs::catalog_themes(custom)
         .into_iter()
-        .map(|t| {
-            let source = if builtin.iter().any(|b| b.id == t.id) {
-                "builtin"
-            } else {
-                "custom"
-            };
+        .map(|(t, source)| {
             let mut value = json!(t);
             value["source"] = json!(source);
             value
@@ -488,6 +491,7 @@ pub fn start(app: &tauri::AppHandle) {
                     .into(),
                     enabled: s.companion_enabled,
                     expression: s.expression.clone(),
+                    motion: Motion::Auto,
                     links: true,
                     monitor: None,
                 }],
@@ -575,6 +579,7 @@ pub fn add(
             layer: layer.unwrap_or("topmost".into()),
             enabled: true,
             expression: "idle".into(),
+            motion: Motion::Auto,
             links: true,
             monitor: None,
         });
@@ -592,6 +597,7 @@ pub struct Patch {
     pub layer: Option<String>,
     pub enabled: Option<bool>,
     pub expression: Option<String>,
+    pub motion: Option<Motion>,
     pub links: Option<bool>,
     pub monitor: Option<String>,
     pub theme_id: Option<String>,
@@ -636,6 +642,11 @@ pub fn update(app: &tauri::AppHandle, id: &str, patch: Patch) -> Result<Value, S
         }
         if let Some(v) = patch.pet_id {
             p.pet_id = v;
+        }
+        if p.theme_id == "tide-study-mingyue" && p.pet_id == "mingyue" {
+            if let Some(v) = patch.motion { p.motion = v; }
+        } else {
+            p.motion = Motion::Auto;
         }
         definition(app, p)?;
         Ok(())
@@ -845,6 +856,7 @@ mod tests {
             layer: "desktop".into(),
             enabled: true,
             expression: "idle".into(),
+            motion: Motion::Auto,
             links: true,
             monitor: None,
         };

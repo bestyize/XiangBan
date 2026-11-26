@@ -22,7 +22,7 @@ function petImage(pet: PetDefinition, expression: ExpressionName = 'happy') {
   let image = byExpr.get(expression);
   if (!image) {
     image = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-      petMarkup(pet, stillFrame(expression), 'gallery').replace(/viewBox="[^"]+"/, 'viewBox="0 -72 320 352"'),
+      petMarkup(pet, stillFrame(expression), 'gallery', expression).replace('viewBox="0 0 320 280"', 'viewBox="0 -72 320 352"'),
     )}`;
     byExpr.set(expression, image);
   }
@@ -60,6 +60,8 @@ const visibleCount = computed(() => instances.value.filter(p => p.enabled).lengt
 const current = computed(() => instances.value.find(p => p.id === editing.value));
 const currentTheme = computed(() => catalog.value.themes.find(t => t.id === current.value?.themeId));
 const onDeskOf = (themeId: string, petId: string) => instances.value.filter(p => p.themeId === themeId && p.petId === petId);
+const galleryMood = (themeId: string, pet: PetDefinition) =>
+  onDeskOf(themeId, pet.id)[0]?.expression ?? (pet.poses ? 'idle' : 'happy');
 
 const deskGroups = computed(() => {
   const groups = catalog.value.themes
@@ -177,10 +179,16 @@ function create(base?: PetTheme) {
   });
 }
 
-function update(patch: Partial<PetInstance>) { if (current.value) void act(() => client.update(current.value!.id, patch)); }
-function saveSettings(patch: PetSettingsPatch) { update(patch); }
+async function saveSettings(patch: PetSettingsPatch) {
+  const id = current.value?.id;
+  if (!id) return;
+  await act(async () => {
+    await client.update(id, patch);
+    if (editing.value === id) editing.value = null;
+  });
+}
 function removeCurrent() { const id = current.value?.id; editing.value = null; if (id) void act(() => client.remove(id)); }
-function centerCurrent() { update({ x: 0.5, y: 0.5 }); }
+function centerCurrent() { if (current.value) centerInstance(current.value.id); }
 function createFromCurrent() { const theme = currentTheme.value; editing.value = null; create(theme); }
 
 function instanceHint(item: PetInstance) {
@@ -327,12 +335,14 @@ onBeforeUnmount(() => {
                 <PetActor
                   v-if="hover === `${theme.id}/${p.id}`"
                   :definition="p"
+                  :theme-id="theme.id"
+                  :motion="onDeskOf(theme.id, p.id)[0]?.motion"
                   :size="180"
                   gallery
-                  :expression="onDeskOf(theme.id, p.id)[0]?.expression ?? 'happy'"
+                  :expression="galleryMood(theme.id, p)"
                   :paused="store.settings.paused"
                 />
-                <img v-else :src="petImage(p, onDeskOf(theme.id, p.id)[0]?.expression ?? 'happy')" :alt="p.name" width="150" height="150" />
+                <img v-else :src="petImage(p, galleryMood(theme.id, p))" :alt="p.name" width="150" height="150" />
               </div>
 
               <div class="card-foot">
@@ -467,7 +477,7 @@ onBeforeUnmount(() => {
                   <span class="stage-pill left">{{ EXPRESSIONS[p.expression].label }}</span>
                   <span v-if="!p.enabled || p.monitor" class="stage-pill right">{{ p.enabled ? p.monitor : '已隐藏' }}</span>
                   <template v-if="definitionOf(catalog.themes, p)">
-                    <PetActor v-if="hover === p.id" :definition="definitionOf(catalog.themes, p)!" :size="180" gallery :expression="p.expression" :links="p.links" :paused="store.settings.paused" />
+                    <PetActor v-if="hover === p.id" :definition="definitionOf(catalog.themes, p)!" :theme-id="p.themeId" :motion="p.motion" :size="180" gallery :expression="p.expression" :links="p.links" :paused="store.settings.paused" />
                     <img v-else :src="petImage(definitionOf(catalog.themes, p)!, p.expression)" :alt="p.name" width="150" height="150" />
                   </template>
                   <span v-else class="gone">作品暂不可用</span>
@@ -514,7 +524,8 @@ onBeforeUnmount(() => {
 
     <!-- 浏览器预览或降级时的内嵌伙伴设置弹窗 -->
     <PetSettingsDialog
-      :show="!!current"
+      v-if="current"
+      show
       :instance="current"
       :themes="catalog.themes"
       :busy="busy"

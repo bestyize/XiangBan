@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "id": "tide-study-mingyue",
+  "name": "潮汐书房",
+  "description": "溟月的桌面伙伴，可在支持此模型的小伴桌面播放《潮汐书房》的原作动作。原型由上善无形创作，女仆造型由 ZipZipPipe 设计，模型与动作由 PekolandBBQ 制作。角色素材沿用 CC BY-NC-SA 4.0。",
+  "color": "#576BAA",
+  "pets": [
+    {
+      "id": "mingyue",
+      "name": "溟月",
+      "description": "月湾书房的鲸鱼娘。点她会跟你打招呼，陪你看书时会捧起书本，困了就蜷起尾巴打个盹。",
+      "kind": "character",
+      "poses": {
+        "idle": "standing",
+        "blink": "blink",
+        "happy": "smile",
+        "shy": "smile",
+        "laughing": "smile",
+        "love": "plush",
+        "excited": "plush",
+        "greeting": "wave",
+        "proud": "wave",
+        "surprised": "wave",
+        "thinking": "reading",
+        "waiting": "reading",
+        "curious": "reading",
+        "sleepy": "dozing",
+        "sleeping": "sleeping"
+      },
+      "parts": [
+        {
+          "id": "standing", "name": "站立", "pivot": [150, 292], "motion": "sway",
+          "shapes": [{"type": "image", "src": "assets/standing.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "blink", "name": "眨眼", "pivot": [150, 292], "motion": "sway",
+          "shapes": [{"type": "image", "src": "assets/blink.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "smile", "name": "低头微笑", "pivot": [150, 292], "motion": "sway",
+          "shapes": [{"type": "image", "src": "assets/smile.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "plush", "name": "抱小鲸鱼", "pivot": [150, 292], "motion": "sway",
+          "shapes": [{"type": "image", "src": "assets/plush.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "wave", "name": "抬手招呼", "pivot": [150, 292], "motion": "sway",
+          "shapes": [{"type": "image", "src": "assets/wave.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "reading", "name": "翻书", "pivot": [150, 292], "motion": "none",
+          "shapes": [{"type": "image", "src": "assets/reading.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "dozing", "name": "坐着打盹", "pivot": [150, 292], "motion": "none",
+          "shapes": [{"type": "image", "src": "assets/dozing.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        },
+        {
+          "id": "sleeping", "name": "侧卧入睡", "pivot": [160, 292], "motion": "none",
+          "shapes": [{"type": "image", "src": "assets/sleeping.webp", "x": 2, "y": 5, "width": 310, "height": 310}]
+        }
+      ]
+    }
+  ]
+}

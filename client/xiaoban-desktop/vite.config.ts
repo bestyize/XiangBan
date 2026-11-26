@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { checkBuiltinDistribution } from './scripts/check-builtin-distribution.mjs'
 
 export default defineConfig({
+  server: { fs: { allow: ['.', '../../assets/pet-packs/mingyue'] } },
   plugins: [vue(), {
     name: 'external-built-in-models',
     apply: 'build',

@@ -2,11 +2,11 @@
 import { mount, flushPromises } from '@vue/test-utils';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import PetWindow from './PetWindow.vue';
-const host = vi.hoisted(() => ({ invoke: vi.fn(), poke: vi.fn(), hit: vi.fn(() => true) }));
+const host = vi.hoisted(() => ({ invoke: vi.fn(), poke: vi.fn(), setDragging: vi.fn(), hit: vi.fn(() => true) }));
 vi.mock('../bridge.ts', () => ({ invoke: host.invoke }));
 vi.mock('./PetActor.vue', async () => {
   const { defineComponent, h } = await import('vue');
-  return { default: defineComponent({ setup(_, { expose }) { expose({ hit: host.hit, poke: host.poke, look: vi.fn() }); return () => h('div'); } }) };
+  return { default: defineComponent({ setup(_, { expose }) { expose({ hit: host.hit, poke: host.poke, setDragging: host.setDragging, look: vi.fn() }); return () => h('div'); } }) };
 });
 beforeEach(() => {
   vi.useFakeTimers(); host.poke.mockClear(); host.hit.mockReturnValue(true); host.invoke.mockReset();
@@ -29,6 +29,7 @@ it('does not start a dialogue after dragging or clicking transparent space', asy
   await wrapper.trigger('pointerdown', { button: 0, clientX: 10, clientY: 10, screenX: 0, screenY: 0, pointerId: 1 });
   await wrapper.trigger('pointermove', { clientX: 40, clientY: 10, screenX: 30, screenY: 0 });
   await wrapper.trigger('pointerup', { clientX: 40, clientY: 10, screenX: 30, screenY: 0 });
+  expect(host.setDragging.mock.calls).toEqual([[true], [false]]);
   await wrapper.trigger('click', { clientX: 40, clientY: 10 });
   host.hit.mockReturnValue(false); await wrapper.trigger('click', { clientX: 80, clientY: 80 });
   vi.advanceTimersByTime(200); await flushPromises();
