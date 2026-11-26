@@ -435,7 +435,8 @@
   }
   .xb-sheet-close:hover { background: var(--fill); color: var(--ink); }
   .xb-sheet-close .icon { width: 17px; height: 17px; stroke-width: 2; }
-  .xb-sheet-body { overflow-y: auto; flex: 1; min-height: 0; }
+  .xb-sheet-body { overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: none; -ms-overflow-style: none; }
+  .xb-sheet-body::-webkit-scrollbar { display: none; }
   .xb-sheet-pad { padding: 4px 16px 24px; }
   .xb-sheet-footer {
     padding: 12px 16px 24px; border-top: 0.5px solid var(--hairline);

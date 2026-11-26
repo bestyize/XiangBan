@@ -167,7 +167,8 @@ onBeforeUnmount(() => { imeInset.value = 0 })
 }
 .ui-sheet-close:hover { background: var(--surface-2); color: var(--ink); }
 .ui-sheet-close svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; }
-.ui-sheet-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ui-sheet-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; }
+.ui-sheet-body::-webkit-scrollbar { display: none; }
 .ui-sheet-body.is-padded { padding: 4px 16px 20px; }
 .ui-sheet-footer {
   padding: 12px 16px 16px;
