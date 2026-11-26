@@ -14,9 +14,10 @@ const props = withDefaults(
     options: SelectOption[];
     placeholder?: string;
     size?: 'md' | 'sm';
+    outlined?: boolean;
     ariaLabel?: string;
   }>(),
-  { placeholder: '请选择', size: 'md' },
+  { placeholder: '请选择', size: 'md', outlined: false },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -52,7 +53,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
     <button
       type="button"
       class="cselect-btn"
-      :class="size"
+      :class="[size, { outlined }]"
       :aria-label="ariaLabel"
       :aria-expanded="open"
       aria-haspopup="listbox"
@@ -71,13 +72,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
         class="cselect-opt"
         :class="{ active: opt.value === modelValue }"
         :aria-selected="opt.value === modelValue"
+        :title="opt.desc || opt.label"
+        :aria-description="opt.desc"
         @click="pick(opt.value)"
       >
-        <span class="opt-txt">
-          <span class="truncate">{{ opt.label }}</span>
-          <small v-if="opt.desc" class="faint">{{ opt.desc }}</small>
-        </span>
-        <span class="chk"><Icon name="check" :size="13" :stroke="2.4" /></span>
+        <span class="truncate">{{ opt.label }}</span>
+        <span v-if="opt.value === modelValue" class="chk"><Icon name="check" :size="13" :stroke="2.4" /></span>
       </button>
     </div>
   </div>
@@ -92,64 +92,71 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 .cselect-btn {
   width: 100%;
   height: 36px;
-  padding: 0 11px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  color: var(--ink);
+  padding: 0 12px;
+  border-radius: var(--r-inner);
+  border: 1px solid transparent;
+  background: var(--subtle);
+  color: var(--ink-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
   text-align: left;
-  box-shadow: var(--shadow-xs);
-  transition: border-color 0.14s, box-shadow 0.14s, background 0.14s;
+  transition: background 140ms, border-color 140ms, box-shadow 140ms;
 }
 .cselect-btn.sm {
   height: 32px;
   font-size: 12.5px;
 }
+.cselect-btn.outlined {
+  background: var(--surface);
+  border-color: var(--line);
+}
 .cselect-btn:hover {
-  border-color: var(--line-focus);
-  background: var(--surface-hover);
+  background: var(--hover);
+}
+.cselect-btn.outlined:hover {
+  background: var(--subtle);
 }
 .cselect.open .cselect-btn {
-  border-color: var(--ink);
-  box-shadow: var(--ring);
+  background: var(--surface);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
 }
 .cselect-chev {
   color: var(--ink-3);
-  transition: transform 0.16s var(--ease);
+  transition: transform 160ms var(--ease);
   flex: none;
 }
 .cselect.open .cselect-chev {
   transform: rotate(180deg);
-  color: var(--ink);
+  color: var(--brand-ink);
 }
 .cselect-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  min-width: 180px;
+  min-width: 176px;
   z-index: 70;
-  padding: 5px;
-  border-radius: 12px;
+  padding: 4px;
+  border-radius: var(--r-md);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-menu);
   display: flex;
   flex-direction: column;
   gap: 2px;
   max-height: 240px;
   overflow-y: auto;
-  animation: dropIn 0.14s var(--ease);
+  animation: dropIn 140ms var(--ease);
 }
 .cselect-opt {
   width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-inner);
   text-align: left;
   display: flex;
   align-items: center;
@@ -157,33 +164,20 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   gap: 8px;
   font-size: 13px;
   color: var(--ink-2);
-  transition: background 0.1s, color 0.1s;
+  transition: background 100ms, color 100ms;
 }
 .cselect-opt:hover {
-  background: var(--canvas-soft);
-  color: var(--ink);
+  background: var(--subtle);
+  color: var(--ink-1);
 }
 .cselect-opt.active {
-  background: var(--surface-muted);
-  color: var(--ink);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
   font-weight: 600;
 }
-.opt-txt {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.opt-txt small {
-  font-size: 11px;
-  font-weight: 450;
-}
 .chk {
-  color: var(--coral);
-  opacity: 0;
+  color: var(--brand-ink);
   flex: none;
-}
-.cselect-opt.active .chk {
-  opacity: 1;
 }
 @keyframes dropIn {
   from { opacity: 0; transform: translateY(-4px); }

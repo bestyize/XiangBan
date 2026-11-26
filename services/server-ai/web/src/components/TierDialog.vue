@@ -99,100 +99,91 @@ async function submit() {
   <div class="scrim" @click="emit('close')"></div>
   <form ref="root" class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="tier-title" @submit.prevent="submit">
     <div class="dialog-head">
-      <div class="head-lead">
-        <span class="modal-head-ico"><Icon name="layers" :size="17" /></span>
-        <div>
-          <h2 id="tier-title">{{ isNew ? '添加档位' : '编辑档位' }} · {{ product.name }}</h2>
-          <p>左侧名称面向客户端展示，真实模型与倍率仅保存在网关服务端。</p>
-        </div>
-      </div>
+      <h2 id="tier-title">
+        <span>{{ isNew ? '添加档位' : '编辑档位' }}</span>
+        <span class="tag">{{ product.name }}</span>
+      </h2>
       <button type="button" class="btn icon sm ghost" aria-label="关闭" @click="emit('close')"><Icon name="x" :size="16" /></button>
     </div>
 
     <div class="dialog-body">
       <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
-      <div class="form-section">
-        <div class="form-section-title"><Icon name="eye" :size="13" />客户端展示信息</div>
-        <div class="pair-grid">
-          <div class="field">
-            <label for="t-name">档位名称</label>
-            <input id="t-name" v-model="displayName" class="input" maxlength="20" placeholder="如：日常 / 深入" required :autofocus="isNew" />
-          </div>
-          <div class="field">
-            <label for="t-slug">档位标识（slug）</label>
-            <input id="t-slug" v-model="slug" class="input mono" :readonly="!isNew" placeholder="如：standard" required />
-          </div>
+      <div class="pair-grid">
+        <div class="field">
+          <label for="t-name">档位名称</label>
+          <input id="t-name" v-model="displayName" class="input" maxlength="20" placeholder="如：日常 / 深入" required :autofocus="isNew" />
         </div>
-        <div class="pair-grid">
-          <div class="field">
-            <label for="t-desc">一句话说明</label>
-            <input id="t-desc" v-model="description" class="input" maxlength="100" placeholder="展示在客户端档位选择器下方" />
-          </div>
-          <div class="field">
-            <label for="t-sort">显示排序<span class="hint">越小越靠前</span></label>
-            <input id="t-sort" v-model.number="sortOrder" class="input num" type="number" step="1" />
-          </div>
+        <div class="field">
+          <label for="t-slug">标识（slug）</label>
+          <input id="t-slug" v-model="slug" class="input mono" :readonly="!isNew" placeholder="如：standard" required />
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="form-section-title"><Icon name="eye-off" :size="13" />幕后真实路由与能力</div>
+      <div class="pair-grid">
         <div class="field">
-          <label>实际调用模型<span class="hint">点击卡片展开搜索</span></label>
-          <ModelPicker v-model="model" :models="models" recommend="chat" placeholder="选择 AI 网关里已启用的模型…" />
+          <label for="t-desc">一句话说明</label>
+          <input id="t-desc" v-model="description" class="input" maxlength="100" placeholder="展示在客户端选择器下方" />
         </div>
-
-        <div v-if="picked?.ratio_warning" class="notice warn">
-          <Icon name="alert" :size="15" />
-          <span>该模型倍率与 New API 未配置默认值相同，继续保存可能导致计费偏差，建议先在 New API 核对真实定价。</span>
-        </div>
-        <div v-else-if="model && !picked && models.length" class="notice error">
-          <Icon name="circle-alert" :size="15" />
-          <span>AI 网关里已经找不到这个模型，请重新选择。</span>
-        </div>
-
         <div class="field">
-          <label>思考等级开放策略</label>
-          <div class="seg-pills full">
-            <button type="button" :class="{ active: reasoningMode === 'auto' }" @click="reasoningMode = 'auto'">按模型自动识别</button>
-            <button type="button" :class="{ active: reasoningMode === 'manual' }" @click="reasoningMode = 'manual'">手动声明等级</button>
-            <button type="button" :class="{ active: reasoningMode === 'off' }" @click="reasoningMode = 'off'">不开放调整</button>
+          <label for="t-sort">显示排序<span class="hint">越小越靠前</span></label>
+          <input id="t-sort" v-model.number="sortOrder" class="input num" type="number" step="1" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>实际调用模型</label>
+        <ModelPicker v-model="model" :models="models" recommend="chat" placeholder="选择 AI 网关里已启用的模型…" />
+      </div>
+
+      <div v-if="picked?.ratio_warning" class="notice warn">
+        <Icon name="alert" :size="15" />
+        <span>该模型仍为 New API 默认倍率，建议先核对真实定价。</span>
+      </div>
+      <div v-else-if="model && !picked && models.length" class="notice error">
+        <Icon name="circle-alert" :size="15" />
+        <span>AI 网关里未找到这个模型，请重新选择。</span>
+      </div>
+
+      <div class="field">
+        <label>思考等级策略</label>
+        <div class="seg-pills">
+          <button type="button" :class="{ active: reasoningMode === 'auto' }" @click="reasoningMode = 'auto'">自动识别</button>
+          <button type="button" :class="{ active: reasoningMode === 'manual' }" @click="reasoningMode = 'manual'">手动声明</button>
+          <button type="button" :class="{ active: reasoningMode === 'off' }" @click="reasoningMode = 'off'">不开放</button>
+        </div>
+      </div>
+
+      <div v-if="reasoningMode === 'manual'" class="field">
+        <label>允许的思考等级</label>
+        <div class="effort-pills">
+          <button
+            v-for="lv in ALL_LEVELS"
+            :key="lv"
+            type="button"
+            class="effort-pill"
+            :class="{ on: reasoningLevels.includes(lv) }"
+            @click="toggleLevel(lv)"
+          >
+            <Icon v-if="reasoningLevels.includes(lv)" name="check" :size="11" :stroke="2.5" />
+            {{ lv }}
+          </button>
+        </div>
+      </div>
+
+      <div class="pair-grid">
+        <div class="field">
+          <label for="t-ctx">上下文窗口（选填）</label>
+          <div class="affix-wrap">
+            <input id="t-ctx" v-model="contextWindow" class="input num" type="number" min="1" max="10000000" placeholder="如 200000" />
+            <span class="affix">tokens</span>
           </div>
         </div>
-
-        <div v-if="reasoningMode === 'manual'" class="field">
-          <label>允许客户端传入的思考等级</label>
-          <div class="effort-pills">
-            <button
-              v-for="lv in ALL_LEVELS"
-              :key="lv"
-              type="button"
-              class="effort-pill"
-              :class="{ on: reasoningLevels.includes(lv) }"
-              @click="toggleLevel(lv)"
-            >
-              <Icon v-if="reasoningLevels.includes(lv)" name="check" :size="11" :stroke="2.6" />
-              {{ lv }}
-            </button>
-          </div>
-          <span class="hint">只向客户端公开思考等级选项，不泄露真实模型名。</span>
-        </div>
-
-        <div class="pair-grid">
-          <div class="field">
-            <label for="t-ctx">上下文窗口（选填）</label>
-            <div class="affix-wrap">
-              <input id="t-ctx" v-model="contextWindow" class="input num" type="number" min="1" max="10000000" placeholder="如 200000" />
-              <span class="affix">tokens</span>
-            </div>
-          </div>
-          <div class="field">
-            <label for="t-out">最大输出（选填）</label>
-            <div class="affix-wrap">
-              <input id="t-out" v-model="maxOutput" class="input num" type="number" min="1" max="10000000" placeholder="如 16384" />
-              <span class="affix">tokens</span>
-            </div>
+        <div class="field">
+          <label for="t-out">最大输出（选填）</label>
+          <div class="affix-wrap">
+            <input id="t-out" v-model="maxOutput" class="input num" type="number" min="1" max="10000000" placeholder="如 16384" />
+            <span class="affix">tokens</span>
           </div>
         </div>
       </div>
@@ -219,36 +210,32 @@ async function submit() {
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="emit('close')">取消</button>
-      <button type="submit" class="btn primary" :disabled="busy || !model">{{ busy ? '保存中…' : '保存并立即生效' }}</button>
+      <button type="button" class="btn ghost" @click="emit('close')">取消</button>
+      <button type="submit" class="btn primary" :disabled="busy || !model">{{ busy ? '保存中…' : '保存' }}</button>
     </div>
   </form>
 </template>
 
 <style scoped>
-.head-lead { display: flex; align-items: center; gap: 11px; }
-.seg-pills.full { width: 100%; }
-.seg-pills.full button { flex: 1; justify-content: center; }
 .effort-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .effort-pill {
   height: 28px;
   padding: 0 11px;
-  border-radius: 7px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
+  border-radius: var(--r-pill);
+  background: var(--subtle);
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--ink-2);
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: 0.12s;
+  transition: background 120ms, color 120ms;
 }
-.effort-pill:hover { border-color: var(--line-focus); color: var(--ink); }
+.effort-pill:hover { background: var(--hover); color: var(--ink-1); }
 .effort-pill.on {
-  background: var(--btn-primary-bg);
-  border-color: var(--btn-primary-bg);
-  color: var(--btn-primary-ink);
+  background: var(--brand);
+  color: var(--brand-on);
+  font-weight: 600;
 }
 </style>

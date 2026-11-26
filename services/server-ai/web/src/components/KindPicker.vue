@@ -2,8 +2,8 @@
 const model = defineModel<'topup' | 'monthly'>({ required: true });
 
 const options = [
-  { value: 'topup', title: '加油包', desc: '长期有效（默认 365 天），按量消耗' },
-  { value: 'monthly', title: '月卡', desc: '限时额度（默认 30 天），到期未用完作废' },
+  { value: 'topup', title: '加油包', desc: '默认 365 天，按量消耗' },
+  { value: 'monthly', title: '月卡', desc: '默认 30 天，到期未用完作废' },
 ] as const;
 </script>
 
@@ -17,6 +17,7 @@ const options = [
       class="kind-opt"
       :class="{ on: model === o.value }"
       :aria-checked="model === o.value"
+      :title="o.desc"
       @click="model = o.value"
     >
       <div class="top">
@@ -32,26 +33,25 @@ const options = [
 .kind-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 .kind-opt {
-  padding: 11px 13px;
-  border-radius: 11px;
-  border: 1.5px solid var(--line-strong);
-  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1.5px solid transparent;
+  background: var(--subtle);
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
+  transition: border-color 140ms, background 140ms;
 }
 .kind-opt:hover {
-  border-color: var(--line-focus);
+  background: var(--hover);
 }
 .kind-opt.on {
-  border-color: var(--ink);
-  background: var(--surface-muted);
-  box-shadow: var(--shadow-xs);
+  border-color: var(--brand);
+  background: var(--surface);
 }
 .top {
   display: flex;
@@ -59,8 +59,8 @@ const options = [
   gap: 8px;
 }
 .top strong {
-  font-size: 13.5px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
 }
 .radio {
   width: 15px;
@@ -71,19 +71,19 @@ const options = [
   flex: none;
 }
 .radio.on {
-  border-color: var(--ink);
+  border-color: var(--brand);
 }
 .radio.on::after {
   content: '';
   position: absolute;
   inset: 3px;
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--brand);
 }
 small {
   color: var(--ink-3);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.4;
   padding-left: 23px;
 }
 @media (max-width: 520px) {

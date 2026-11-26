@@ -19,7 +19,7 @@ const props = withDefaults(
     busy: false,
     over: false,
     withNote: false,
-    noteLabel: '原因（选填，写入流水与审计）',
+    noteLabel: '原因（选填）',
     notePlaceholder: '例如：淘宝订单退款',
   },
 );
@@ -45,25 +45,31 @@ useModal(root, () => {
     @submit.prevent="emit('confirm', note.trim())"
   >
     <div class="dialog-head">
-      <div>
-        <h2 id="confirm-title">{{ title }}</h2>
-        <p>{{ desc }}</p>
-      </div>
+      <h2 id="confirm-title">{{ title }}</h2>
       <button type="button" class="btn icon sm ghost" :disabled="busy" aria-label="关闭" @click="emit('cancel')">
         <Icon name="x" :size="16" />
       </button>
     </div>
 
-    <div v-if="withNote" class="dialog-body">
-      <div class="field">
+    <div class="dialog-body">
+      <p class="desc">{{ desc }}</p>
+      <div v-if="withNote" class="field">
         <label for="confirm-note">{{ noteLabel }}</label>
         <input id="confirm-note" v-model="note" class="input" maxlength="100" :placeholder="notePlaceholder" data-autofocus />
       </div>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" :disabled="busy" @click="emit('cancel')">取消</button>
+      <button type="button" class="btn ghost" :disabled="busy" @click="emit('cancel')">取消</button>
       <button type="submit" class="btn danger-solid" :disabled="busy">{{ busy ? '处理中…' : confirmText }}</button>
     </div>
   </form>
 </template>
+
+<style scoped>
+.desc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+</style>

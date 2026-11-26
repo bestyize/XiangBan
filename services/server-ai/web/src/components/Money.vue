@@ -32,7 +32,7 @@ const ptsText = computed(() => `${parts.value.sign}${xiaobanPoints(props.points)
 .money-val {
   display: inline-flex;
   align-items: baseline;
-  gap: 5px;
+  gap: 6px;
   flex-wrap: wrap;
   line-height: 1.15;
 }
@@ -50,37 +50,20 @@ const ptsText = computed(() => `${parts.value.sign}${xiaobanPoints(props.points)
 .money-val.positive .money-usd {
   color: var(--ok);
 }
-.sign {
-  margin-right: 1px;
-}
-.cur {
-  font-size: 0.72em;
-  font-weight: 600;
-  opacity: 0.64;
-  margin-right: 1px;
-}
-.dec {
-  font-size: 0.76em;
-  font-weight: 600;
-  opacity: 0.68;
-}
+.sign { margin-right: 1px; }
+.cur { font-size: 0.72em; font-weight: 600; opacity: 0.6; margin-right: 1px; }
+.dec { font-size: 0.76em; font-weight: 600; opacity: 0.65; }
 
 .sm .money-usd { font-size: 13px; }
 .md .money-usd { font-size: 14.5px; }
-.lg .money-usd { font-size: 22px; }
-.xl .money-usd { font-size: 28px; letter-spacing: -0.03em; }
+.lg .money-usd { font-size: 20px; }
+.xl .money-usd { font-size: 24px; }
 
 .money-pts {
   font-size: 11.5px;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--ink-3);
-  padding: 0 5px;
-  border-radius: 5px;
-  background: var(--canvas-soft);
-  line-height: 1.55;
   white-space: nowrap;
 }
-.money-pts.compact {
-  font-size: 11px;
-}
+.money-pts.compact { font-size: 11px; }
 </style>

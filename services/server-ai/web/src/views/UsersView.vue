@@ -45,7 +45,7 @@ const filterTabs: readonly { key: '' | 'funded' | 'empty' | 'anomaly'; label: st
   { key: '', label: '全部' },
   { key: 'funded', label: '有余额' },
   { key: 'empty', label: '已用完' },
-  { key: 'anomaly', label: '对账异常/差额' },
+  { key: 'anomaly', label: '对账异常' },
 ];
 
 async function load() {
@@ -118,21 +118,21 @@ watch([productId, sort], () => search());
 
 <template>
   <div>
-    <PageHead title="用户额度" desc="额度按「账号 × 产品」隔离。点击任意行滑出右侧账本抽屉，查看额度桶、流水或执行补发/扣回。">
-      <span v-if="!loading" class="tag num">共 {{ total.toLocaleString('en-US') }} 个账号</span>
+    <PageHead title="用户额度">
+      <span v-if="!loading" class="tag outlined num">共 {{ total.toLocaleString('en-US') }} 个账号</span>
     </PageHead>
 
     <form class="toolbar" role="search" @submit.prevent="search">
       <div class="search-wrap grow">
         <Icon name="search" :size="15" />
         <label class="sr" for="user-q">查找用户</label>
-        <input id="user-q" v-model="q" class="input" placeholder="输入账号 UID（支持前缀）或绑定编号" autocomplete="off" />
+        <input id="user-q" v-model="q" class="input canvas-input" placeholder="输入 UID（支持前缀）或绑定编号" autocomplete="off" />
       </div>
       <div class="sel-prod">
-        <CustomSelect v-model="productId" :options="productOptions" aria-label="按产品筛选" />
+        <CustomSelect v-model="productId" :options="productOptions" outlined aria-label="按产品筛选" />
       </div>
       <div class="sel-sort">
-        <CustomSelect v-model="sort" :options="sortOptions" aria-label="排序方式" />
+        <CustomSelect v-model="sort" :options="sortOptions" outlined aria-label="排序方式" />
       </div>
       <button type="submit" class="btn primary">查找</button>
     </form>
@@ -161,7 +161,7 @@ watch([productId, sort], () => search());
               <th>账号 / 绑定编号</th>
               <th>产品</th>
               <th class="right">可用余额</th>
-              <th>对账同步</th>
+              <th>对账</th>
               <th>最近使用</th>
               <th>状态</th>
             </tr>
@@ -195,18 +195,20 @@ watch([productId, sort], () => search());
               <td>{{ productName(row.product_id) }}</td>
               <td class="right"><Money :points="row.balance" size="sm" :muted="row.balance <= 0" compact-pts /></td>
               <td>
-                <span v-if="row.open_anomalies && row.open_anomalies > 0" class="tag warn">
-                  <Icon name="alert" :size="11" />{{ row.open_anomalies }} 条未处理异常
+                <span v-if="row.open_anomalies && row.open_anomalies > 0" class="tag">
+                  <i class="dot warn"></i>{{ row.open_anomalies }} 条异常
                 </span>
-                <span v-else-if="row.synced_quota !== row.balance" class="tag warn">
-                  <Icon name="alert" :size="11" />差额 {{ money(row.synced_quota - row.balance) }}
+                <span v-else-if="row.synced_quota !== row.balance" class="tag">
+                  <i class="dot warn"></i>差额 {{ money(row.synced_quota - row.balance) }}
                 </span>
                 <span v-else class="faint sub">已对齐 · {{ relativeTime(row.last_synced_at) }}</span>
               </td>
               <td class="muted nowrap" :title="row.last_used_at ?? ''">{{ relativeTime(row.last_used_at) }}</td>
               <td>
-                <span v-if="row.status === 'active'" class="tag ok"><i class="dot"></i>已开通</span>
-                <span v-else class="tag">未开通</span>
+                <span class="tag">
+                  <i class="dot" :class="row.status === 'active' ? 'ok' : ''"></i>
+                  {{ row.status === 'active' ? '已开通' : '未开通' }}
+                </span>
               </td>
             </tr>
             <tr v-if="!loading && rows.length === 0">
@@ -226,23 +228,25 @@ watch([productId, sort], () => search());
     <div v-if="total > pageSize" class="pager">
       <span class="muted num">第 {{ page }} / {{ pages }} 页</span>
       <div class="row">
-        <button type="button" class="btn sm" :disabled="page <= 1" @click="go(page - 1)"><Icon name="chevron-left" :size="14" />上一页</button>
-        <button type="button" class="btn sm" :disabled="page >= pages" @click="go(page + 1)">下一页<Icon name="chevron-right" :size="14" /></button>
+        <button type="button" class="btn sm outline" :disabled="page <= 1" @click="go(page - 1)"><Icon name="chevron-left" :size="14" />上一页</button>
+        <button type="button" class="btn sm outline" :disabled="page >= pages" @click="go(page + 1)">下一页<Icon name="chevron-right" :size="14" /></button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .toolbar .grow { min-width: 220px; }
-.sel-prod { width: 200px; }
-.sel-sort { width: 136px; }
+.canvas-input { background: var(--surface); border-color: var(--line); }
+.canvas-input:hover { background: var(--surface); border-color: var(--line-strong); }
+.sel-prod { width: 184px; }
+.sel-sort { width: 132px; }
 .filter-row { margin-bottom: 14px; }
 .notice { margin-bottom: 14px; }
 .user-cell { display: flex; align-items: center; gap: 10px; }
 .uid-line { display: flex; align-items: center; gap: 5px; }
-.id { font-size: 12.5px; font-weight: 650; color: var(--ink); }
+.id { font-size: 12.5px; font-weight: 600; color: var(--ink-1); }
 .sub { font-size: 11.5px; }
 .nopad { padding: 0 !important; }
 .pager { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 12px; font-size: 12.5px; }

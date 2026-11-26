@@ -117,8 +117,8 @@ async function productSaved(id: string) {
 
 async function tierSaved(warnings: string[]) {
   editingTier.value = null;
-  if (warnings.length) notify(`档位已保存，但请注意：${warnings.join('；')}`, 'warn');
-  else notify('档位已保存，新请求立即生效');
+  if (warnings.length) notify(`档位已保存，注意：${warnings.join('；')}`, 'warn');
+  else notify('档位已保存，立即生效');
   await Promise.all([loadTiers(), loadModels()]);
   emit('changed');
 }
@@ -143,8 +143,8 @@ async function confirmRemoveTier() {
 
 async function mediaSaved(warnings: string[]) {
   editingMedia.value = null;
-  if (warnings.length) notify(`媒体能力已保存，但请注意：${warnings.join('；')}`, 'warn');
-  else notify('媒体能力已保存，新请求立即生效');
+  if (warnings.length) notify(`媒体能力已保存，注意：${warnings.join('；')}`, 'warn');
+  else notify('媒体能力已保存，立即生效');
   await Promise.all([loadMedia(), loadModels()]);
 }
 
@@ -165,10 +165,10 @@ async function confirmRemoveMedia() {
   }
 }
 
-function reasoningTag(t: Tier): { label: string; tone: string } {
-  if (t.reasoning_efforts == null) return { label: '思考: 自动识别', tone: '' };
-  if (t.reasoning_efforts.length === 0) return { label: '思考: 不开放', tone: '' };
-  return { label: `思考: ${t.reasoning_efforts.join(' · ')}`, tone: 'info' };
+function reasoningLabel(t: Tier): string {
+  if (t.reasoning_efforts == null) return '思考: 自动';
+  if (t.reasoning_efforts.length === 0) return '思考: 关';
+  return `思考: ${t.reasoning_efforts.join(' / ')}`;
 }
 
 function supportsGif(m: MediaSetting | null): boolean {
@@ -185,8 +185,8 @@ const capEndpoints: Record<string, string> = {
 
 <template>
   <div>
-    <PageHead title="产品与档位" desc="客户端只认档位标识与媒体能力，不暴露真实模型名；切换上游模型实时生效，无需客户端发版。">
-      <button v-if="selected" type="button" class="btn" @click="editingProduct = selected"><Icon name="pencil" :size="14" />编辑当前产品</button>
+    <PageHead title="产品与档位">
+      <button v-if="selected" type="button" class="btn outline" @click="editingProduct = selected"><Icon name="pencil" :size="14" />编辑产品</button>
       <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="14" />添加产品</button>
     </PageHead>
 
@@ -194,7 +194,7 @@ const capEndpoints: Record<string, string> = {
 
     <div v-if="!loading && products.length === 0" class="card">
       <EmptyState icon="layers" title="还没有产品" desc="先添加一个产品并关联它的账号中心客户端标识，用户才能使用 AI。">
-        <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="14" />添加第一个产品</button>
+        <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="14" />添加产品</button>
       </EmptyState>
     </div>
 
@@ -211,24 +211,21 @@ const capEndpoints: Record<string, string> = {
             @click="pickProduct(p.product_id)"
           >
             <span>{{ p.name }}</span>
-            <span v-if="!p.enabled" class="tag">停用</span>
+            <span v-if="!p.enabled" class="cnt">停用</span>
           </button>
         </div>
       </div>
 
-      <!-- 紧凑产品总览横卡 -->
       <section class="card product-summary">
         <div class="ps-main">
           <div class="ps-title">
             <h2>{{ selected.name }}</h2>
             <span class="tag mono">{{ selected.product_id }}</span>
-            <span class="tag" :class="selected.enabled ? 'ok' : 'danger'">
-              <i class="dot"></i>{{ selected.enabled ? '已启用' : '已停用' }}
-            </span>
+            <span class="tag"><i class="dot" :class="selected.enabled ? 'ok' : ''"></i>{{ selected.enabled ? '运行中' : '已停用' }}</span>
           </div>
           <div class="client-chips">
-            <span v-for="c in selected.client_ids" :key="c" class="client-chip">{{ c }}</span>
-            <span v-if="!selected.client_ids.length" class="hint">尚未关联客户端，用户暂时无法调用</span>
+            <span v-for="c in selected.client_ids" :key="c" class="tag mono">{{ c }}</span>
+            <span v-if="!selected.client_ids.length" class="hint">尚未关联客户端</span>
           </div>
         </div>
 
@@ -244,15 +241,19 @@ const capEndpoints: Record<string, string> = {
             </div>
           </div>
           <div class="ps-meta">
-            <span class="k">客户端「获取额度」链接</span>
+            <span class="k">获取额度链接</span>
             <div class="v">
-              <template v-if="selected.credit_purchase_url">
-                <Icon name="link" :size="13" />
-                <a class="ps-link" :href="selected.credit_purchase_url" target="_blank" rel="noopener noreferrer" :title="selected.credit_purchase_url">
-                  {{ selected.credit_purchase_url.replace(/^https?:\/\//, '') }}
-                </a>
-              </template>
-              <span v-else class="faint">未配置（入口关闭）</span>
+              <a
+                v-if="selected.credit_purchase_url"
+                class="ps-link"
+                :href="selected.credit_purchase_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                :title="selected.credit_purchase_url"
+              >
+                {{ selected.credit_purchase_url.replace(/^https?:\/\//, '') }}
+              </a>
+              <span v-else class="faint">未配置</span>
             </div>
           </div>
         </div>
@@ -260,22 +261,21 @@ const capEndpoints: Record<string, string> = {
 
       <div v-if="modelsError" class="notice warn">
         <Icon name="alert" :size="16" />
-        <span>读不到 AI 网关的模型列表，暂时无法新增或修改档位与媒体能力：{{ modelsError }}</span>
+        <span>读不到 AI 网关模型列表，暂时无法修改档位与媒体能力：{{ modelsError }}</span>
       </div>
 
-      <!-- 对话档位路由表（双域清晰流向，告别厚重黑幕布） -->
       <div class="section-head">
-        <h2>对话档位路由 <span class="tag num">{{ tiers.length }} 个档位</span></h2>
-        <button type="button" class="btn sm primary" :disabled="Boolean(modelsError)" @click="editingTier = 'new'">
+        <h2>对话档位 <span class="tag num">{{ tiers.length }}</span></h2>
+        <button type="button" class="btn sm outline" :disabled="Boolean(modelsError)" @click="editingTier = 'new'">
           <Icon name="plus" :size="13" />添加档位
         </button>
       </div>
 
       <section class="card route-board" aria-label="档位与实际模型的路由关系">
         <div v-if="tiers.length" class="route-header">
-          <div class="rh-col"><Icon name="eye" :size="14" /><span>客户端可见（档位展示）</span></div>
-          <div></div>
-          <div class="rh-col"><Icon name="eye-off" :size="14" /><span>幕后真实路由（仅服务端可见）</span><span class="rh-badge">倍率来自 New API</span></div>
+          <span>客户端展示</span>
+          <span></span>
+          <span>真实模型与倍率</span>
         </div>
 
         <div v-for="t in tiers" :key="t.tier" class="route-row" :class="{ disabled: !t.enabled }">
@@ -284,38 +284,35 @@ const capEndpoints: Record<string, string> = {
             <div class="tier-c-body">
               <div class="tier-c-top">
                 <strong>{{ t.display_name }}</strong>
-                <span v-if="t.is_default" class="tag ink">默认档</span>
-                <span v-if="t.requires_paid" class="tag warn"><Icon name="lock" :size="11" />需付费额度</span>
-                <span v-else class="tag ok">试用可用</span>
+                <span v-if="t.is_default" class="tag brand">默认</span>
+                <span class="tag"><i class="dot" :class="t.requires_paid ? 'warn' : 'ok'"></i>{{ t.requires_paid ? '需付费' : '试用可用' }}</span>
                 <span v-if="!t.enabled" class="tag">已停用</span>
               </div>
-              <div v-if="t.description" class="tier-c-desc">{{ t.description }}</div>
+              <div v-if="t.description" class="hint">{{ t.description }}</div>
               <div class="tier-c-foot">
-                <span>请求 model: <code>{{ t.tier }}</code></span>
-                <span class="tag" :class="reasoningTag(t).tone">{{ reasoningTag(t).label }}</span>
+                <span class="tag mono">{{ t.tier }}</span>
+                <span class="tag">{{ reasoningLabel(t) }}</span>
               </div>
             </div>
           </div>
 
-          <div class="route-arrow" aria-hidden="true">
-            <span class="route-arrow-pill"><Icon name="arrow-right" :size="13" /></span>
-          </div>
+          <div class="route-arrow" aria-hidden="true"><Icon name="arrow-right" :size="14" /></div>
 
           <div class="tier-upstream">
             <div class="tier-up-body">
               <div class="tier-model-name">{{ t.model }}</div>
               <div class="tier-up-tags">
                 <template v-if="modelInfo.get(t.model)">
-                  <span class="tag num">输入倍率 {{ modelInfo.get(t.model)!.model_ratio }}</span>
-                  <span class="tag num">输出 ×{{ modelInfo.get(t.model)!.completion_ratio }}</span>
-                  <span v-if="t.capabilities?.context_window_tokens" class="tag num">{{ formatTokens(t.capabilities.context_window_tokens) }} 上下文</span>
-                  <span v-if="t.capabilities?.max_output_tokens" class="tag num">{{ formatTokens(t.capabilities.max_output_tokens) }} 输出</span>
-                  <span v-if="modelInfo.get(t.model)!.ratio_warning" class="tag warn" title="倍率与 New API 未配置默认值一致">
-                    <Icon name="alert" :size="11" />默认倍率未定价
+                  <span class="tag outlined num">输入 {{ modelInfo.get(t.model)!.model_ratio }}</span>
+                  <span class="tag outlined num">输出 ×{{ modelInfo.get(t.model)!.completion_ratio }}</span>
+                  <span v-if="t.capabilities?.context_window_tokens" class="tag outlined num">{{ formatTokens(t.capabilities.context_window_tokens) }}</span>
+                  <span v-if="t.capabilities?.max_output_tokens" class="tag outlined num">输出 {{ formatTokens(t.capabilities.max_output_tokens) }}</span>
+                  <span v-if="modelInfo.get(t.model)!.ratio_warning" class="tag outlined" title="倍率与 New API 未配置默认值一致">
+                    <i class="dot warn"></i>默认倍率
                   </span>
                 </template>
-                <span v-else-if="models.length" class="tag danger" title="AI 网关里已经找不到这个模型">
-                  <Icon name="circle-alert" :size="11" />模型已不可用
+                <span v-else-if="models.length" class="tag outlined" title="AI 网关里找不到这个模型">
+                  <i class="dot danger"></i>模型不可用
                 </span>
               </div>
             </div>
@@ -330,20 +327,16 @@ const capEndpoints: Record<string, string> = {
           </div>
         </div>
 
-        <EmptyState v-if="!tiers.length" icon="layers" title="这个产品还没有档位" desc="至少添加一个不要求付费的默认档位，新用户才能直接使用。">
+        <EmptyState v-if="!tiers.length" icon="layers" title="还没有档位" desc="至少添加一个试用可用的默认档位，新用户才能直接使用。">
           <button type="button" class="btn primary" :disabled="Boolean(modelsError)" @click="editingTier = 'new'">
             <Icon name="plus" :size="14" />添加档位
           </button>
         </EmptyState>
       </section>
 
-      <p class="hint" style="margin-top: 10px">倍率决定每次调用的扣费成本。更换模型前，请先确认已在 New API 为该模型配置真实倍率。</p>
-
-      <!-- 媒体能力 2x2 矩阵 -->
       <section class="section" aria-labelledby="media-heading">
         <div class="section-head">
-          <h2 id="media-heading">媒体能力路由</h2>
-          <span class="hint">客户端仅获取已开放的能力与可选参数，不返回真实模型名</span>
+          <h2 id="media-heading">媒体能力</h2>
         </div>
 
         <div class="media-grid">
@@ -360,11 +353,12 @@ const capEndpoints: Record<string, string> = {
                 <span class="mono">{{ capEndpoints[c.id] }}</span>
               </div>
               <div class="mc-badges">
-                <span v-if="!mediaFor(c.id)" class="tag">未开放</span>
-                <span v-else-if="!mediaFor(c.id)!.enabled" class="tag">已停用</span>
-                <span v-else class="tag ok"><i class="dot"></i>已开放</span>
-                <span v-if="mediaFor(c.id)?.requires_paid" class="tag warn"><Icon name="lock" :size="11" />需付费</span>
-                <span v-if="supportsGif(mediaFor(c.id))" class="tag coral">支持 GIF</span>
+                <span class="tag">
+                  <i class="dot" :class="mediaFor(c.id)?.enabled ? 'ok' : ''"></i>
+                  {{ !mediaFor(c.id) ? '未开放' : mediaFor(c.id)!.enabled ? '已开放' : '已停用' }}
+                </span>
+                <span v-if="mediaFor(c.id)?.requires_paid" class="tag"><i class="dot warn"></i>需付费</span>
+                <span v-if="supportsGif(mediaFor(c.id))" class="tag"><i class="dot brand"></i>GIF</span>
               </div>
             </div>
 
@@ -372,27 +366,27 @@ const capEndpoints: Record<string, string> = {
               <div class="mc-model-row">
                 <span class="mono mc-model-name">{{ mediaFor(c.id)!.model }}</span>
                 <template v-if="modelInfo.get(mediaFor(c.id)!.model)">
-                  <span v-if="modelInfo.get(mediaFor(c.id)!.model)!.ratio_warning" class="tag warn"><Icon name="alert" :size="11" />默认倍率</span>
-                  <span v-else class="tag num">倍率 {{ modelInfo.get(mediaFor(c.id)!.model)!.model_ratio }}</span>
+                  <span v-if="modelInfo.get(mediaFor(c.id)!.model)!.ratio_warning" class="tag outlined"><i class="dot warn"></i>默认倍率</span>
+                  <span v-else class="tag outlined num">倍率 {{ modelInfo.get(mediaFor(c.id)!.model)!.model_ratio }}</span>
                 </template>
-                <span v-else-if="models.length" class="tag danger">模型不可用</span>
+                <span v-else-if="models.length" class="tag outlined"><i class="dot danger"></i>不可用</span>
               </div>
 
               <div v-if="c.id === 'speech' && mediaFor(c.id)!.voices.length" class="mc-chips">
-                <span v-for="(v, i) in mediaFor(c.id)!.voices" :key="v" class="mc-chip" :class="{ def: i === 0 }">{{ v }}{{ i === 0 ? ' (默认)' : '' }}</span>
+                <span v-for="(v, i) in mediaFor(c.id)!.voices" :key="v" class="mc-chip" :class="{ def: i === 0 }">{{ v }}</span>
               </div>
               <div v-if="c.id === 'image' && mediaFor(c.id)!.sizes.length" class="mc-chips">
-                <span v-for="(s, i) in mediaFor(c.id)!.sizes" :key="s" class="mc-chip" :class="{ def: i === 0 }">{{ s }}{{ i === 0 ? ' (默认)' : '' }}</span>
+                <span v-for="(s, i) in mediaFor(c.id)!.sizes" :key="s" class="mc-chip" :class="{ def: i === 0 }">{{ s }}</span>
               </div>
-              <div v-if="c.id === 'realtime'" class="hint">单次对话最长：<strong>{{ Math.round(mediaFor(c.id)!.max_secs / 60) }} 分钟</strong></div>
+              <div v-if="c.id === 'realtime'" class="hint">单次最长 {{ Math.round(mediaFor(c.id)!.max_secs / 60) }} 分钟</div>
             </div>
-            <p v-else class="hint" style="padding: 4px 0">{{ c.usedBy }}。未开放时客户端自动降级或隐藏入口。</p>
+            <p v-else class="hint">{{ c.usedBy }}</p>
 
             <div class="mc-foot">
               <button type="button" class="btn sm" :class="{ primary: !mediaFor(c.id) }" :disabled="Boolean(modelsError)" @click="editingMedia = c">
-                <Icon :name="mediaFor(c.id) ? 'pencil' : 'plus'" :size="13" />{{ mediaFor(c.id) ? '修改配置' : '配置并开放' }}
+                <Icon :name="mediaFor(c.id) ? 'pencil' : 'plus'" :size="13" />{{ mediaFor(c.id) ? '配置' : '开放' }}
               </button>
-              <button v-if="mediaFor(c.id)" type="button" class="btn sm ghost danger-text" @click="confirmingDeleteMedia = c">关闭能力</button>
+              <button v-if="mediaFor(c.id)" type="button" class="btn sm ghost danger-text" @click="confirmingDeleteMedia = c">关闭</button>
             </div>
           </article>
         </div>
@@ -425,8 +419,8 @@ const capEndpoints: Record<string, string> = {
     <ConfirmDialog
       v-if="confirmingDeleteTier"
       :title="`删除档位「${confirmingDeleteTier.display_name}」？`"
-      desc="删除后，客户端再次请求该档位标识会收到“未知的模型档位”错误。若线上仍有流量，建议先停用观察后再删。"
-      confirm-text="确认删除"
+      desc="删除后，客户端请求该档位标识会收到错误。若线上仍有流量，建议先停用观察。"
+      confirm-text="删除"
       :busy="deleting"
       @cancel="confirmingDeleteTier = null"
       @confirm="confirmRemoveTier"
@@ -434,8 +428,8 @@ const capEndpoints: Record<string, string> = {
     <ConfirmDialog
       v-if="confirmingDeleteMedia"
       :title="`关闭「${confirmingDeleteMedia.label}」？`"
-      desc="关闭后配置将被移除，客户端调用该能力会收到 503 暂未开放（语音朗读会自动降级为系统朗读）。"
-      confirm-text="确认关闭"
+      desc="关闭后配置将被移除，客户端调用该能力会收到 503 暂未开放。"
+      confirm-text="关闭"
       :busy="deleting"
       @cancel="confirmingDeleteMedia = null"
       @confirm="confirmRemoveMedia"
@@ -444,144 +438,112 @@ const capEndpoints: Record<string, string> = {
 </template>
 
 <style scoped>
-.notice { margin-bottom: 16px; }
-.tabs-row { margin-bottom: 16px; }
+.notice { margin-bottom: 14px; }
+.tabs-row { margin-bottom: 14px; }
 
 .product-summary {
-  padding: 16px 20px;
-  margin-bottom: 18px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 .ps-main { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 8px; }
 .ps-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ps-title h2 { font-size: 16px; font-weight: 700; }
+.ps-title h2 { font-size: 16px; font-weight: 680; }
 .client-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.client-chip {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--canvas-soft);
-  color: var(--ink-2);
-  border: 1px solid var(--line);
-}
 .ps-meta-grid { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
 .ps-meta { display: flex; flex-direction: column; gap: 2px; }
-.ps-meta .k { font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.ps-meta .k { font-size: 11.5px; color: var(--ink-3); }
 .ps-meta .v { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .ps-link { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .route-board { overflow: hidden; }
 .route-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.15fr);
-  padding: 10px 18px;
-  background: var(--surface-muted);
+  grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1.15fr);
+  padding: 10px 16px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ink-3);
-  align-items: center;
 }
-.rh-col { display: flex; align-items: center; gap: 6px; }
-.rh-badge { margin-left: auto; font-size: 11px; font-weight: 550; }
 
 .route-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.15fr);
-  padding: 14px 18px;
+  grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1.15fr);
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
   align-items: center;
-  transition: background 0.14s;
 }
 .route-row:last-child { border-bottom: 0; }
-.route-row:hover { background: var(--surface-hover); }
-.route-row.disabled { opacity: 0.6; }
+.route-row.disabled { opacity: 0.56; }
 
 .tier-client-card {
   padding: 12px 14px;
   border-radius: var(--r-md);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   background: var(--surface);
   display: flex;
   align-items: flex-start;
-  gap: 11px;
+  gap: 10px;
 }
-.tier-client-card.is-default { border-color: var(--ink); box-shadow: var(--shadow-xs); }
+.tier-client-card.is-default { border-color: var(--brand); }
 .tier-radio {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  margin-top: 3px;
+  margin-top: 2px;
   flex: none;
   border: 1.5px solid var(--line-strong);
   position: relative;
 }
-.tier-client-card.is-default .tier-radio { border-color: var(--ink); }
-.tier-client-card.is-default .tier-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--ink); }
+.tier-client-card.is-default .tier-radio { border-color: var(--brand); }
+.tier-client-card.is-default .tier-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--brand); }
 .tier-c-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .tier-c-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tier-c-top strong { font-size: 14px; font-weight: 680; }
-.tier-c-desc { font-size: 12.5px; color: var(--ink-2); }
-.tier-c-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
-.tier-c-foot code { padding: 1px 6px; border-radius: 5px; background: var(--canvas-soft); color: var(--ink-2); font-family: var(--mono); }
+.tier-c-top strong { font-size: 13.5px; font-weight: 650; }
+.tier-c-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 
-.route-arrow { display: flex; align-items: center; justify-content: center; position: relative; }
-.route-arrow::before { content: ''; position: absolute; left: 4px; right: 4px; height: 1px; background: var(--line-strong); }
-.route-arrow-pill {
-  position: relative;
-  z-index: 1;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  display: grid;
-  place-items: center;
-  color: var(--ink-2);
-}
+.route-arrow { display: grid; place-items: center; color: var(--ink-4); }
 
 .tier-upstream {
   padding: 12px 14px;
   border-radius: var(--r-md);
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  background: var(--subtle);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .tier-up-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.tier-model-name { font-family: var(--mono); font-size: 13px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.tier-model-name { font-family: var(--mono); font-size: 12.5px; font-weight: 650; color: var(--ink-1); overflow-wrap: anywhere; }
 .tier-up-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-.tier-up-acts { display: flex; gap: 4px; flex: none; }
+.tier-up-acts { display: flex; gap: 2px; flex: none; }
 
 .media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.media-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
-.media-card.off { border-style: dashed; background: transparent; box-shadow: none; }
-.mc-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.media-card { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.media-card.off { border-style: dashed; background: transparent; }
+.mc-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mc-ico {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--r-inner);
   flex: none;
-  background: var(--canvas-soft);
+  background: var(--subtle);
   color: var(--ink-2);
   display: grid;
   place-items: center;
 }
-.media-card.on .mc-ico { background: var(--coral-soft); color: var(--coral); }
+.media-card.on .mc-ico { background: var(--brand-soft); color: var(--brand-ink); }
 .mc-title { display: flex; flex-direction: column; line-height: 1.25; }
-.mc-title strong { font-size: 14px; }
+.mc-title strong { font-size: 13.5px; }
 .mc-title span { font-size: 11px; color: var(--ink-3); }
 .mc-badges { margin-left: auto; display: flex; gap: 5px; flex-wrap: wrap; }
 .mc-model-box {
-  padding: 9px 11px;
-  border-radius: 9px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--subtle);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -592,22 +554,20 @@ const capEndpoints: Record<string, string> = {
 .mc-chip {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 5px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--ink-2);
 }
-.mc-chip.def { border-color: var(--ink); color: var(--ink); font-weight: 650; }
-.mc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px; }
+.mc-chip.def { border-color: var(--brand); color: var(--brand-ink); font-weight: 600; }
+.mc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .danger-text { color: var(--danger); }
 
 @media (max-width: 820px) {
   .route-header { display: none; }
-  .route-row { grid-template-columns: 1fr; gap: 10px; }
-  .route-arrow { height: 22px; }
-  .route-arrow::before { width: 1px; height: 100%; left: 50%; right: auto; }
-  .route-arrow-pill :deep(svg) { transform: rotate(90deg); }
+  .route-row { grid-template-columns: 1fr; gap: 8px; }
+  .route-arrow :deep(svg) { transform: rotate(90deg); }
   .media-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -29,16 +29,16 @@ async function submit() {
 
 <template>
   <div class="login-page">
-    <button type="button" class="btn icon theme-toggle" :title="prefs.theme === 'dark' ? '切换暖白浅色' : '切换极夜深色'" @click="toggleTheme">
-      <Icon :name="prefs.theme === 'dark' ? 'sun' : 'moon'" :size="16" />
+    <button type="button" class="btn icon outline theme-toggle" :title="prefs.theme === 'dark' ? '切换浅色模式' : '切换深色模式'" @click="toggleTheme">
+      <Icon :name="prefs.theme === 'dark' ? 'sun' : 'moon'" :size="15" />
     </button>
 
     <form class="login-card" @submit.prevent="submit">
       <div class="login-head">
-        <BrandMark :size="42" />
+        <BrandMark :size="38" />
         <div>
-          <h1>登录小伴 AI 网关后台</h1>
-          <p>统一管理产品档位路由、用户额度账本、兑换码与上游网关。</p>
+          <h1>小伴 AI 网关后台</h1>
+          <p>管理产品档位、用户额度与上游网关</p>
         </div>
       </div>
 
@@ -70,10 +70,10 @@ async function submit() {
       </div>
 
       <button class="btn primary lg go" type="submit" :disabled="busy || !username || !password">
-        {{ busy ? '登录中…' : '进入控制台' }}
+        {{ busy ? '登录中…' : '登录' }}
       </button>
 
-      <div class="login-foot">独立管理员鉴权 · 连续错误 5 次自动锁定 15 分钟</div>
+      <div class="login-foot">独立管理员鉴权 · 连续错误 5 次锁定 15 分钟</div>
     </form>
   </div>
 </template>
@@ -85,7 +85,7 @@ async function submit() {
   display: grid;
   place-items: center;
   padding: 40px 20px;
-  background: radial-gradient(640px 360px at 50% 0%, var(--coral-soft), transparent 70%), var(--canvas);
+  background: var(--canvas);
 }
 .theme-toggle {
   position: fixed;
@@ -93,41 +93,41 @@ async function submit() {
   right: 18px;
 }
 .login-card {
-  width: min(400px, 100%);
-  padding: 32px 30px 26px;
+  width: min(380px, 100%);
+  padding: 28px 26px 24px;
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 20px;
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--line);
+  border-radius: var(--r-dialog);
   display: flex;
   flex-direction: column;
-  gap: 17px;
+  gap: 16px;
 }
 .login-head {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .login-head h1 {
-  font-size: 21px;
-  font-weight: 720;
-  letter-spacing: -0.02em;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
 .login-head p {
-  font-size: 13px;
-  color: var(--ink-2);
-  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
 }
 .pw-row {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 .go {
   width: 100%;
   margin-top: 2px;
 }
 .login-foot {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-3);
   text-align: center;
   padding-top: 10px;

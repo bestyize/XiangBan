@@ -52,14 +52,15 @@ function tipSide(index: number): string {
       </div>
 
       <div class="field">
-        <div
-          v-for="(g, gi) in grid"
-          :key="g.at"
-          class="line"
-          :class="{ base: gi === 0 }"
-          :style="{ bottom: `${g.at}%` }"
-          aria-hidden="true"
-        ></div>
+        <div class="grid-lines" aria-hidden="true">
+          <div
+            v-for="(g, gi) in grid"
+            :key="g.at"
+            class="line"
+            :class="{ base: gi === 0 }"
+            :style="{ bottom: `${g.at}%` }"
+          ></div>
+        </div>
 
         <div class="cols" @mouseleave="active = null">
           <div
@@ -73,7 +74,6 @@ function tipSide(index: number): string {
             @focus="active = i"
             @blur="active = null"
           >
-            <span v-if="mode === 'consumed' && d.granted > 0" class="mark" aria-hidden="true"></span>
             <div class="bars">
               <span class="bar used" :style="{ height: height(d.consumed) }"></span>
               <span v-if="mode === 'compare' && d.granted > 0" class="bar gave" :style="{ height: height(d.granted) }"></span>
@@ -81,11 +81,11 @@ function tipSide(index: number): string {
             <div v-if="active === i" class="tip" :class="tipSide(i)" role="tooltip">
               <strong class="num">{{ d.day.slice(5).replace('-', ' 月 ') }} 日{{ i === series.length - 1 ? '（今天）' : '' }}</strong>
               <span class="trow">
-                <span><i class="sw used" :class="{ today: i === series.length - 1 }"></i>消耗</span>
+                <span><i class="dot" :class="i === series.length - 1 ? 'brand' : ''"></i>消耗</span>
                 <strong class="num">{{ money(d.consumed) }} <em class="money-pts-inline">· {{ xiaobanPoints(d.consumed) }}</em></strong>
               </span>
               <span class="trow">
-                <span><i class="sw gave"></i>发放</span>
+                <span><i class="dot info"></i>发放</span>
                 <strong class="num">{{ money(d.granted) }} <em class="money-pts-inline">· {{ xiaobanPoints(d.granted) }}</em></strong>
               </span>
             </div>
@@ -104,13 +104,14 @@ function tipSide(index: number): string {
 
 <style scoped>
 .chart { display: flex; flex-direction: column; }
-.plot { display: grid; grid-template-columns: 46px 1fr; height: 224px; }
-.axis { position: relative; height: calc(100% - 26px); }
-.tick { position: absolute; right: 10px; transform: translateY(50%); font-size: 11px; color: var(--ink-3); font-weight: 550; }
+.plot { display: grid; grid-template-columns: 44px 1fr; height: 216px; }
+.axis { position: relative; height: calc(100% - 24px); }
+.tick { position: absolute; right: 8px; transform: translateY(50%); font-size: 11px; color: var(--ink-4); }
 .field { position: relative; }
+.grid-lines { position: absolute; inset: 0 0 24px 0; pointer-events: none; }
 .line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line); }
 .line.base { border-top-style: solid; border-top-color: var(--line-strong); }
-.cols { position: absolute; left: 0; right: 0; top: 0; bottom: 26px; display: flex; }
+.cols { position: absolute; inset: 0 0 24px 0; display: flex; }
 .col {
   position: relative;
   flex: 1;
@@ -121,45 +122,35 @@ function tipSide(index: number): string {
   border-radius: 6px 6px 0 0;
   outline-offset: -2px;
 }
-.col.on { background: var(--canvas-soft); }
-.mark {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
-  border-radius: 50%;
-  background: var(--info);
-  box-shadow: 0 0 0 3px var(--info-soft);
-}
-.bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 100%; width: 70%; max-width: 28px; }
+.col.on { background: var(--subtle); }
+.bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 100%; width: 68%; max-width: 24px; }
 .bar {
   flex: 1;
   border-radius: 4px 4px 0 0;
   transform-origin: bottom;
-  animation: rise 0.45s var(--ease) both;
+  animation: rise 400ms var(--ease) both;
 }
-.bar.used { background: var(--ink); }
-.col.today .bar.used { background: var(--coral-grad); }
-.bar.gave { background: var(--info); opacity: 0.45; }
+.bar.used { background: var(--ink-4); opacity: 0.45; }
+.col.today .bar.used, .col.on .bar.used { background: var(--brand); opacity: 1; }
+.bar.gave { background: var(--info); opacity: 0.4; }
 @keyframes rise { from { transform: scaleY(0); } }
 
-.xlabels { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; display: flex; align-items: flex-end; }
-.xl { flex: 1; text-align: center; font-size: 11px; color: var(--ink-3); font-weight: 550; white-space: nowrap; }
-.xl.today { color: var(--coral); font-weight: 700; }
+.xlabels { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; display: flex; align-items: flex-end; }
+.xl { flex: 1; text-align: center; font-size: 11px; color: var(--ink-4); white-space: nowrap; }
+.xl.today { color: var(--brand-ink); font-weight: 600; }
 
+/* 悬停气泡：白底细描边轻阴影（严禁实心黑块） */
 .tip {
   position: absolute;
   bottom: calc(100% + 8px);
-  z-index: 20;
-  min-width: 178px;
+  z-index: 25;
+  min-width: 176px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: #19171a;
-  color: #f3f1f5;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-menu);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -169,18 +160,15 @@ function tipSide(index: number): string {
 .tip.mid { left: 50%; transform: translateX(-50%); }
 .tip.start { left: 0; }
 .tip.end { right: 0; }
-.tip strong { color: #fff; font-weight: 650; }
-.trow { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: rgba(243, 241, 245, 0.78); }
-.trow em { font-style: normal; opacity: 0.75; font-weight: 500; }
+.tip > strong { font-weight: 650; }
+.trow { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--ink-2); }
+.trow > span { display: inline-flex; align-items: center; gap: 6px; }
+.trow em { font-style: normal; color: var(--ink-3); font-weight: 500; }
 :global([data-unit='usd']) .money-pts-inline { display: none; }
-.sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; }
-.sw.used { background: #e5e2e8; }
-.sw.used.today { background: var(--coral); }
-.sw.gave { background: #60a5fa; }
 
 .none {
   position: absolute;
-  inset: 0 0 26px;
+  inset: 0 0 24px;
   display: grid;
   place-items: center;
   text-align: center;
@@ -190,6 +178,6 @@ function tipSide(index: number): string {
 }
 
 @media (max-width: 560px) {
-  .plot { grid-template-columns: 40px 1fr; height: 196px; }
+  .plot { grid-template-columns: 38px 1fr; height: 192px; }
 }
 </style>

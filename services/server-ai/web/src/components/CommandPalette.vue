@@ -65,43 +65,44 @@ function submitFirst() {
 
     <div class="cmd-results">
       <template v-if="bindingId !== null">
-        <div class="cmd-group-h">直达用户账本</div>
         <button type="button" class="cmd-item" @click="emit('openBinding', bindingId)">
           <Icon name="users" :size="15" />
-          <span>打开绑定 <strong>#{{ bindingId }}</strong> 的额度明细抽屉</span>
+          <span>打开绑定 <strong>#{{ bindingId }}</strong> 账本</span>
           <span class="sub">回车直达</span>
         </button>
       </template>
 
       <template v-if="looksLikeCode">
-        <div class="cmd-group-h">快捷查码</div>
         <button type="button" class="cmd-item" @click="emit('lookupCode', trimmed)">
           <Icon name="ticket" :size="15" />
           <span>查询兑换码 <code class="mono">{{ trimmed.toUpperCase() }}</code></span>
-          <span class="sub">前往兑换码页</span>
+          <span class="sub">兑换码</span>
         </button>
       </template>
 
       <template v-if="looksLikeUid">
-        <div class="cmd-group-h">搜索账号</div>
         <button type="button" class="cmd-item" @click="emit('searchUser', trimmed)">
           <Icon name="search" :size="15" />
-          <span>在用户额度中查找 <code class="mono">{{ trimmed }}</code></span>
-          <span class="sub">回车检索</span>
+          <span>搜索账号 <code class="mono">{{ trimmed }}</code></span>
+          <span class="sub">用户额度</span>
         </button>
       </template>
 
-      <template v-if="matchedPages.length">
-        <div class="cmd-group-h">页面跳转</div>
-        <button v-for="p in matchedPages" :key="p.key" type="button" class="cmd-item" @click="emit('go', p.key)">
-          <Icon :name="p.icon" :size="15" />
-          <span>{{ p.label }}</span>
-          <span class="sub">{{ p.desc }}</span>
-        </button>
-      </template>
+      <button
+        v-for="p in matchedPages"
+        :key="p.key"
+        type="button"
+        class="cmd-item"
+        :title="p.desc"
+        @click="emit('go', p.key)"
+      >
+        <Icon :name="p.icon" :size="15" />
+        <span>{{ p.label }}</span>
+        <span class="sub">页面</span>
+      </button>
 
       <div v-if="!matchedPages.length && bindingId === null && !looksLikeCode && !looksLikeUid" class="cmd-empty">
-        未找到匹配页面，可输入绑定编号、UID 或兑换码直接检索。
+        无匹配结果
       </div>
     </div>
   </div>
@@ -114,19 +115,19 @@ function submitFirst() {
   left: 50%;
   transform: translateX(-50%);
   z-index: 62;
-  width: min(540px, calc(100vw - 28px));
+  width: min(500px, calc(100vw - 32px));
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-dialog);
+  box-shadow: var(--shadow-dialog);
   overflow: hidden;
-  animation: popCmd 0.16s var(--ease);
+  animation: popCmd 180ms var(--ease);
 }
 .cmd-input-wrap {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 15px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
   color: var(--ink-3);
 }
@@ -137,39 +138,34 @@ function submitFirst() {
   background: none;
   outline: none;
   font-size: 14px;
-  color: var(--ink);
+  color: var(--ink-1);
 }
 .cmd-results {
-  max-height: 360px;
+  max-height: 320px;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.cmd-group-h {
-  font-size: 11px;
-  font-weight: 650;
-  color: var(--ink-3);
-  padding: 6px 10px 4px;
-}
 .cmd-item {
   width: 100%;
-  padding: 9px 10px;
-  border-radius: 9px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-inner);
   text-align: left;
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: var(--ink);
-  transition: background 0.1s;
+  color: var(--ink-1);
+  transition: background 100ms;
 }
-.cmd-item:hover { background: var(--canvas-soft); }
+.cmd-item:hover { background: var(--subtle); }
 .cmd-item > svg { color: var(--ink-3); }
 .cmd-item .sub { margin-left: auto; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
 .cmd-empty { padding: 24px 16px; text-align: center; font-size: 12.5px; color: var(--ink-3); }
 @keyframes popCmd {
-  from { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+  from { opacity: 0; transform: translate(-50%, -8px) scale(0.97); }
 }
 </style>

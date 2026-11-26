@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-accent="red">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23ff5b7d'/><stop offset='1' stop-color='%23f9744b'/></linearGradient></defs><rect width='64' height='64' rx='18' fill='url(%23g)'/><path d='M25 12l4.5 12.5L42 29l-12.5 4.5L25 46l-4.5-12.5L8 29l12.5-4.5z' fill='white'/><path d='M46 34l2.4 6.6L55 43l-6.6 2.4L46 52l-2.4-6.6L37 43l6.6-2.4z' fill='rgba(255,255,255,0.85)'/></svg>" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23E3203C'/><stop offset='1' stop-color='%23F0506A'/></linearGradient></defs><rect width='64' height='64' rx='18' fill='url(%23g)'/><path d='M25 12l4.5 12.5L42 29l-12.5 4.5L25 46l-4.5-12.5L8 29l12.5-4.5z' fill='white'/><path d='M46 34l2.4 6.6L55 43l-6.6 2.4L46 52l-2.4-6.6L37 43l6.6-2.4z' fill='rgba(255,255,255,0.86)'/></svg>" />
     <title>小伴 AI 网关控制台</title>
     <script>
       try {
         var t = localStorage.getItem('ai_admin_theme');
         if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+        var a = localStorage.getItem('ai_admin_accent');
+        if (a) document.documentElement.dataset.accent = a;
       } catch (e) {}
     </script>
   </head>

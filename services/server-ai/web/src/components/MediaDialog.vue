@@ -70,16 +70,10 @@ async function submit() {
   <div class="scrim" @click="emit('close')"></div>
   <form ref="root" class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="media-title" @submit.prevent="submit">
     <div class="dialog-head">
-      <div class="head-lead">
-        <span class="modal-head-ico"><Icon :name="capability.icon" :size="17" /></span>
-        <div>
-          <h2 id="media-title" class="title-row">
-            <span>{{ setting ? '修改' : '开放' }}{{ capability.label }}</span>
-            <span class="tag mono">{{ capEndpoints[capability.id] }}</span>
-          </h2>
-          <p>客户端只见能力与选项、不见真实模型名，保存后新请求立即生效。</p>
-        </div>
-      </div>
+      <h2 id="media-title">
+        <span>配置{{ capability.label }}</span>
+        <span class="tag mono">{{ capEndpoints[capability.id] }}</span>
+      </h2>
       <button type="button" class="btn icon sm ghost" aria-label="关闭" @click="emit('close')"><Icon name="x" :size="16" /></button>
     </div>
 
@@ -87,33 +81,33 @@ async function submit() {
       <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
       <div class="field">
-        <label>上游实际模型<span class="hint">已自动将匹配该能力的模型排在前面</span></label>
+        <label>实际模型</label>
         <ModelPicker v-model="model" :models="models" :recommend="capability.id" placeholder="选择 AI 网关里已启用的模型…" />
       </div>
 
       <div v-if="picked?.ratio_warning" class="notice warn">
         <Icon name="alert" :size="15" />
-        <span>该模型倍率仍为 New API 默认值，建议先在 New API「同步价格」补齐真实倍率再对外开放。</span>
+        <span>该模型仍为默认倍率，建议先在 New API 核对真实定价。</span>
       </div>
       <div v-else-if="model && !picked && models.length" class="notice error">
         <Icon name="circle-alert" :size="15" />
-        <span>AI 网关里已经找不到这个模型，请换一个。</span>
+        <span>AI 网关里未找到这个模型，请重新选择。</span>
       </div>
 
       <div v-if="capability.id === 'speech'" class="field">
-        <label>可选音色<span class="hint">首个胶囊为默认音色，点击星标可切换默认</span></label>
-        <ChipEditor v-model="voices" :presets="VOICE_PRESETS" placeholder="输入上游音色 ID 后回车或点添加…" />
+        <label>可选音色<span class="hint">首个为默认</span></label>
+        <ChipEditor v-model="voices" :presets="VOICE_PRESETS" placeholder="输入音色 ID 后回车…" />
       </div>
 
       <div v-if="capability.id === 'image'" class="field">
-        <label>可选出图尺寸<span class="hint">首个胶囊为默认尺寸</span></label>
+        <label>可选尺寸<span class="hint">首个为默认</span></label>
         <ChipEditor v-model="sizes" :presets="SIZE_PRESETS" placeholder="如 1024x1024 或 auto…" />
       </div>
 
       <div v-if="capability.id === 'realtime'" class="field">
-        <label for="m-minutes">单次对话最长时长（1–240 分钟）</label>
+        <label for="m-minutes">单次最长时长（1–240 分钟）</label>
         <div class="rt-row">
-          <div class="affix-wrap" style="width: 140px">
+          <div class="affix-wrap" style="width: 132px">
             <input id="m-minutes" v-model.number="minutes" class="input num" type="number" min="1" max="240" step="1" required />
             <span class="affix">分钟</span>
           </div>
@@ -129,30 +123,25 @@ async function submit() {
         <SwitchRow
           v-model="requiresPaid"
           title="仅限付费额度使用"
-          desc="开启后试用额度无法调用该媒体能力，客户端会提示用户兑换额度"
+          desc="开启后试用额度无法调用，客户端会提示兑换额度"
         />
         <SwitchRow
           v-model="enabled"
           title="启用这项能力"
-          desc="关闭后保留配置参数，但向客户端返回 503 暂未开放"
+          desc="停用后保留参数，但向客户端返回 503 暂未开放"
         />
       </div>
 
-      <div class="notice info" style="padding: 9px 12px; font-size: 12px">
-        <Icon name="sparkles" :size="14" />
-        <span>{{ capability.caution }}</span>
-      </div>
+      <p class="hint">{{ capability.caution }}</p>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="emit('close')">取消</button>
-      <button type="submit" class="btn primary" :disabled="busy || !canSubmit">{{ busy ? '保存中…' : '保存并生效' }}</button>
+      <button type="button" class="btn ghost" @click="emit('close')">取消</button>
+      <button type="submit" class="btn primary" :disabled="busy || !canSubmit">{{ busy ? '保存中…' : '保存' }}</button>
     </div>
   </form>
 </template>
 
 <style scoped>
-.head-lead { display: flex; align-items: center; gap: 11px; }
-.title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 </style>

@@ -38,10 +38,7 @@ async function submit() {
   <div class="scrim" @click="emit('close')"></div>
   <form ref="root" class="dialog narrow" role="dialog" aria-modal="true" aria-labelledby="pw-title" @submit.prevent="submit">
     <div class="dialog-head">
-      <div>
-        <h2 id="pw-title">修改管理员密码</h2>
-        <p>修改后需要重新登录，其他设备上的管理员登录也会立即失效。</p>
-      </div>
+      <h2 id="pw-title">修改管理员密码</h2>
       <button type="button" class="btn icon sm ghost" aria-label="关闭" @click="emit('close')"><Icon name="x" :size="16" /></button>
     </div>
 
@@ -56,13 +53,14 @@ async function submit() {
         <input id="pw-next" v-model="next" class="input" type="password" autocomplete="new-password" minlength="8" required />
       </div>
       <div class="field">
-        <label for="pw-confirm">再输入一次新密码</label>
+        <label for="pw-confirm">确认新密码</label>
         <input id="pw-confirm" v-model="confirm" class="input" type="password" autocomplete="new-password" required />
       </div>
+      <p class="hint">修改后将退出当前及其他设备的管理员登录。</p>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="emit('close')">取消</button>
+      <button type="button" class="btn ghost" @click="emit('close')">取消</button>
       <button type="submit" class="btn primary" :disabled="busy">{{ busy ? '保存中…' : '保存新密码' }}</button>
     </div>
   </form>

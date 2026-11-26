@@ -73,17 +73,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   <div ref="root" class="mpicker" :class="{ open }" @keydown="onKeydown">
     <button type="button" class="mpicker-trigger" :aria-expanded="open" @click="toggle">
       <div class="mpicker-main">
-        <div class="mpicker-name" :class="{ placeholder: !modelValue }">{{ modelValue || placeholder }}</div>
-        <div v-if="modelValue" class="mpicker-meta">
-          <template v-if="picked">
-            <span class="tag num">输入 {{ picked.model_ratio }}</span>
-            <span class="tag num">输出 ×{{ picked.completion_ratio }}</span>
-            <span v-if="picked.ratio_warning" class="tag warn"><Icon name="alert" :size="11" />默认倍率预警</span>
-          </template>
-          <span v-else-if="models.length" class="tag danger"><Icon name="circle-alert" :size="11" />网关中未找到此模型</span>
-        </div>
+        <span class="mpicker-name" :class="{ placeholder: !modelValue }">{{ modelValue || placeholder }}</span>
+        <template v-if="modelValue && picked">
+          <span class="tag outlined num">{{ picked.model_ratio }} / ×{{ picked.completion_ratio }}</span>
+          <span v-if="picked.ratio_warning" class="tag outlined"><i class="dot warn"></i>默认倍率</span>
+        </template>
+        <span v-else-if="modelValue && models.length" class="tag outlined"><i class="dot danger"></i>未找到</span>
       </div>
-      <span class="chev"><Icon name="chevron-down" :size="15" /></span>
+      <span class="chev"><Icon name="chevron-down" :size="14" /></span>
     </button>
 
     <div v-if="open" class="mpicker-menu">
@@ -93,7 +90,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
           ref="searchEl"
           v-model="query"
           type="text"
-          placeholder="输入关键词搜索模型（如 claude / deepseek / image）…"
+          placeholder="搜索模型名…"
           autocomplete="off"
           spellcheck="false"
         />
@@ -110,15 +107,16 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
           class="mpicker-opt"
           :class="{ active: opt.model_name === modelValue }"
           :aria-selected="opt.model_name === modelValue"
+          :title="`${opt.model_name} · 输入 ${opt.model_ratio} / 输出 ×${opt.completion_ratio}`"
           @click="pick(opt.model_name)"
         >
           <span class="mn">{{ opt.model_name }}</span>
-          <span v-if="isRecommended(opt.model_name)" class="tag coral">推荐</span>
-          <span class="tag num">{{ opt.model_ratio }} / ×{{ opt.completion_ratio }}</span>
-          <span v-if="opt.ratio_warning" class="tag warn">默认倍率</span>
-          <span v-if="opt.model_name === modelValue" class="chk"><Icon name="check" :size="14" :stroke="2.5" /></span>
+          <span v-if="isRecommended(opt.model_name)" class="tag"><i class="dot brand"></i>推荐</span>
+          <span class="faint num ratio">{{ opt.model_ratio }}/×{{ opt.completion_ratio }}</span>
+          <i v-if="opt.ratio_warning" class="dot warn" title="默认倍率未定价"></i>
+          <span v-if="opt.model_name === modelValue" class="chk"><Icon name="check" :size="14" :stroke="2.3" /></span>
         </button>
-        <div v-if="filtered.length === 0" class="empty-msg">没有匹配的模型</div>
+        <div v-if="filtered.length === 0" class="empty-msg">无匹配模型</div>
       </div>
     </div>
   </div>
@@ -128,43 +126,45 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 .mpicker { position: relative; }
 .mpicker-trigger {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 11px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: var(--r-inner);
+  border: 1px solid transparent;
+  background: var(--subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   text-align: left;
-  box-shadow: var(--shadow-xs);
-  transition: border-color 0.14s, box-shadow 0.14s;
+  transition: background 140ms, border-color 140ms, box-shadow 140ms;
 }
-.mpicker-trigger:hover { border-color: var(--line-focus); }
-.mpicker.open .mpicker-trigger { border-color: var(--ink); box-shadow: var(--ring); }
-.mpicker-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-.mpicker-name { font-family: var(--mono); font-size: 13px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.mpicker-trigger:hover { background: var(--hover); }
+.mpicker.open .mpicker-trigger {
+  background: var(--surface);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+.mpicker-main { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; flex-wrap: wrap; }
+.mpicker-name { font-family: var(--mono); font-size: 13px; font-weight: 650; color: var(--ink-1); overflow-wrap: anywhere; }
 .mpicker-name.placeholder { font-family: var(--font); font-weight: 500; color: var(--ink-3); }
-.mpicker-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.chev { color: var(--ink-3); transition: transform 0.16s var(--ease); flex: none; }
-.mpicker.open .chev { transform: rotate(180deg); color: var(--ink); }
+.chev { color: var(--ink-3); transition: transform 160ms var(--ease); flex: none; }
+.mpicker.open .chev { transform: rotate(180deg); color: var(--brand-ink); }
 
 .mpicker-menu {
   margin-top: 6px;
-  border-radius: 13px;
-  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
   background: var(--surface);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-menu);
   overflow: hidden;
-  animation: dropIn 0.14s var(--ease);
+  animation: dropIn 140ms var(--ease);
 }
 .mpicker-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 11px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-muted);
   color: var(--ink-3);
 }
 .mpicker-search input {
@@ -175,32 +175,34 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   outline: none;
   font-size: 12.5px;
   font-family: var(--mono);
-  color: var(--ink);
+  color: var(--ink-1);
 }
 .mpicker-search input::placeholder { font-family: var(--font); color: var(--ink-4); }
 .mpicker-list {
-  max-height: 210px;
+  max-height: 204px;
   overflow-y: auto;
-  padding: 5px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .mpicker-opt {
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 9px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-inner);
   text-align: left;
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  transition: background 0.1s;
+  gap: 8px;
+  transition: background 100ms;
 }
-.mpicker-opt:hover { background: var(--canvas-soft); }
-.mpicker-opt.active { background: var(--coral-soft); }
-.mn { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1; min-width: 130px; overflow-wrap: anywhere; }
-.chk { color: var(--coral); flex: none; }
+.mpicker-opt:hover { background: var(--subtle); }
+.mpicker-opt.active { background: var(--brand-soft); }
+.mn { font-family: var(--mono); font-size: 12.5px; font-weight: 550; color: var(--ink-1); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpicker-opt.active .mn { color: var(--brand-ink); font-weight: 600; }
+.ratio { font-size: 11.5px; flex: none; }
+.chk { color: var(--brand-ink); flex: none; }
 .empty-msg { padding: 14px; text-align: center; font-size: 12.5px; color: var(--ink-3); }
 @keyframes dropIn {
   from { opacity: 0; transform: translateY(-4px); }

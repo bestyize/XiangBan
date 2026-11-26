@@ -67,10 +67,7 @@ async function submit() {
   <div class="scrim" @click="emit('close')"></div>
   <form ref="root" class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title" @submit.prevent="submit">
     <div class="dialog-head">
-      <div>
-        <h2 id="batch-title">生成兑换码批次</h2>
-        <p>一批对应淘宝上的一个商品规格；明文仅在生成后展示一次。</p>
-      </div>
+      <h2 id="batch-title">生成兑换码批次</h2>
       <button type="button" class="btn icon sm ghost" aria-label="关闭" @click="emit('close')"><Icon name="x" :size="16" /></button>
     </div>
 
@@ -80,7 +77,6 @@ async function submit() {
       <div class="field">
         <label>所属产品</label>
         <CustomSelect v-model="productId" :options="productOptions" aria-label="所属产品" />
-        <span class="hint">码只能在该产品关联的客户端里兑换。</span>
       </div>
 
       <KindPicker v-model="kind" />
@@ -94,7 +90,7 @@ async function submit() {
           </div>
         </div>
         <div class="field">
-          <label for="b-days">兑换后有效</label>
+          <label for="b-days">有效天数</label>
           <div class="affix-wrap">
             <input id="b-days" v-model.number="days" class="input num" type="number" min="1" max="3650" step="1" required />
             <span class="affix">天</span>
@@ -110,17 +106,17 @@ async function submit() {
       </div>
 
       <p v-if="ready" class="summary-hint num">
-        单码折合 <strong>{{ xiaobanPoints(points) }}</strong>，本批共 <strong>{{ count }}</strong> 个，合计发行 <strong>{{ money(totalPoints) }}</strong>（有效期从兑换当日计算）。
+        单码 <strong>{{ xiaobanPoints(points) }}</strong>，共 <strong>{{ count }}</strong> 个，合计 <strong>{{ money(totalPoints) }}</strong>。
       </p>
 
       <div class="field">
-        <label for="b-note">商品备注（选填）</label>
-        <input id="b-note" v-model="note" class="input" maxlength="100" placeholder="例如：淘宝「小伴 AI 500 点加油包」" />
+        <label for="b-note">备注（选填）</label>
+        <input id="b-note" v-model="note" class="input" maxlength="100" placeholder="例如：淘宝 500 点加油包" />
       </div>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="emit('close')">取消</button>
+      <button type="button" class="btn ghost" @click="emit('close')">取消</button>
       <button type="submit" class="btn primary" :disabled="busy || !ready">{{ busy ? '生成中…' : '立即生成' }}</button>
     </div>
   </form>
@@ -131,9 +127,8 @@ async function submit() {
   font-size: 12.5px;
   color: var(--ink-2);
   padding: 9px 12px;
-  border-radius: 9px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--subtle);
 }
-.summary-hint strong { color: var(--ink); }
+.summary-hint strong { color: var(--ink-1); }
 </style>

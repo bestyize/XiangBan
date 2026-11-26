@@ -44,19 +44,21 @@ function download() {
   <div class="scrim"></div>
   <div ref="root" class="dialog wide" role="alertdialog" aria-modal="true" aria-labelledby="reveal-title">
     <div class="dialog-head">
-      <div>
-        <h2 id="reveal-title">已生成 {{ codes.length }} 个兑换码（批次 #{{ batch.id }}）</h2>
-        <p class="sub num">
-          <span class="tag" :class="batch.kind === 'monthly' ? 'warn' : 'ok'">{{ kindLabels[batch.kind] }}</span>
-          单码 {{ money(batch.quota) }}（{{ xiaobanPoints(batch.quota) }}）· 兑换后 {{ batch.valid_days }} 天有效
-        </p>
-      </div>
+      <h2 id="reveal-title">
+        <span>已生成 {{ codes.length }} 个兑换码</span>
+        <span class="tag num">批次 #{{ batch.id }}</span>
+      </h2>
     </div>
 
     <div class="dialog-body">
       <div class="notice warn" role="status">
-        <Icon name="alert" :size="16" />
-        <span><strong>明文仅显示这一次。</strong>系统只保存 HMAC 校验摘要，关闭窗口后无法找回。请先下载或复制后再关闭。</span>
+        <Icon name="alert" :size="15" />
+        <span>明文仅显示这一次，关闭后无法找回，请先下载或复制。</span>
+      </div>
+
+      <div class="meta-row num">
+        <span class="tag"><i class="dot" :class="batch.kind === 'monthly' ? 'warn' : 'ok'"></i>{{ kindLabels[batch.kind] }}</span>
+        <span>单码 {{ money(batch.quota) }}（{{ xiaobanPoints(batch.quota) }}）· 兑换后 {{ batch.valid_days }} 天有效</span>
       </div>
 
       <ol ref="list" class="codes" aria-label="全部兑换码">
@@ -65,39 +67,45 @@ function download() {
           <code>{{ c }}</code>
         </li>
       </ol>
-
-      <p class="hint">导出的 .txt 文本文件为一行一个码，可直接导入淘宝自动发货（卡密）库存。</p>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="copy">
-        <Icon :name="copied ? 'check' : 'copy'" :size="14" />{{ copied ? '已复制全部' : '复制全部' }}
+      <button type="button" class="btn outline" @click="copy">
+        <Icon :name="copied ? 'check' : 'copy'" :size="14" />{{ copied ? '已复制' : '复制全部' }}
       </button>
-      <button type="button" class="btn" :class="{ primary: !safe }" @click="download">
-        <Icon name="download" :size="14" />{{ downloaded ? '已下载，再下一次' : '下载 .txt 卡密' }}
+      <button type="button" class="btn" :class="{ primary: !safe, outline: safe }" @click="download">
+        <Icon name="download" :size="14" />{{ downloaded ? '再次下载' : '下载 .txt' }}
       </button>
-      <button type="button" class="btn" :class="{ primary: safe }" @click="emit('close')">我已保存，关闭</button>
+      <button type="button" class="btn" :class="{ primary: safe, ghost: !safe }" @click="emit('close')">完成</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
 .codes {
   padding: 12px 14px;
-  max-height: 256px;
+  max-height: 240px;
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px 16px;
-  border-radius: 12px;
-  background: #141317;
-  color: #f3f1f5;
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  border: 1px solid var(--line);
+  color: var(--ink-1);
   user-select: text;
 }
-.codes li { display: flex; align-items: baseline; gap: 9px; padding: 3px 0; }
-.no { width: 2.5ch; text-align: right; font-size: 11px; color: #7a7682; flex: none; }
-code { font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em; }
+.codes li { display: flex; align-items: baseline; gap: 9px; padding: 2px 0; }
+.no { width: 2.5ch; text-align: right; font-size: 11px; color: var(--ink-4); flex: none; }
+code { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.05em; }
 @media (max-width: 520px) {
   .codes { grid-template-columns: 1fr; }
 }

@@ -149,7 +149,7 @@ function share(count: number, b: Batch): string {
   return b.total > 0 ? `${(count / b.total) * 100}%` : '0%';
 }
 
-const statusTone = (status: string) => (status === 'unused' ? 'ok' : status === 'void' ? 'danger' : 'info');
+const statusDot = (status: string) => (status === 'unused' ? 'ok' : status === 'void' ? 'danger' : 'info');
 
 onMounted(() => {
   load();
@@ -189,7 +189,7 @@ watch(() => props.refreshTick, () => {
 
 <template>
   <div>
-    <PageHead title="兑换码" desc="面向淘宝卡密发售的批次管理与售后查码退款工作台。明文仅在生成时展示一次，数据库仅存 HMAC 摘要。">
+    <PageHead title="兑换码">
       <button type="button" class="btn primary" :disabled="products.length === 0" @click="creating = true">
         <Icon name="plus" :size="14" />生成兑换码
       </button>
@@ -197,12 +197,8 @@ watch(() => props.refreshTick, () => {
 
     <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
-    <!-- 查码与售后工作台 -->
-    <section class="card lookup-card" aria-label="查询一个码">
-      <div>
-        <h2 class="sub-h">查询兑换码（客服与退款）</h2>
-        <p class="hint">粘贴买家提供的 16 位兑换码，查看归属账号与剩余额度，并可直接作废、扣回或打开用户账本。</p>
-      </div>
+    <section class="card lookup-card" aria-label="查码与退款">
+      <h2 class="sub-h">查码与退款</h2>
 
       <form class="lookup-row" role="search" @submit.prevent="search">
         <label class="sr" for="code-q">兑换码</label>
@@ -214,8 +210,8 @@ watch(() => props.refreshTick, () => {
           autocomplete="off"
           spellcheck="false"
         />
-        <button type="submit" class="btn primary lg" :disabled="looking || !query.trim()">
-          <Icon name="search" :size="15" />{{ looking ? '查询中…' : '查询状态' }}
+        <button type="submit" class="btn primary" :disabled="looking || !query.trim()">
+          <Icon name="search" :size="14" />{{ looking ? '查询中…' : '查询' }}
         </button>
         <button v-if="found || lookupError" type="button" class="btn ghost" @click="clearLookup">清空</button>
       </form>
@@ -226,21 +222,21 @@ watch(() => props.refreshTick, () => {
 
       <div v-if="found" class="lookup-result">
         <div class="lr-top">
-          <span class="tag" :class="statusTone(found.status)">{{ codeStatusLabels[found.status] }}</span>
+          <span class="tag outlined"><i class="dot" :class="statusDot(found.status)"></i>{{ codeStatusLabels[found.status] }}</span>
           <Money :points="found.quota" size="md" />
-          <span class="tag" :class="found.kind === 'monthly' ? 'warn' : 'ok'">{{ kindLabels[found.kind] }}</span>
+          <span class="tag outlined"><i class="dot" :class="found.kind === 'monthly' ? 'warn' : 'ok'"></i>{{ kindLabels[found.kind] }}</span>
           <span class="muted">{{ productName(found.product_id) }} · 批次 #{{ found.batch_id }}<template v-if="found.note">（{{ found.note }}）</template></span>
         </div>
 
         <div class="lr-grid">
           <template v-if="found.status === 'redeemed'">
-            <div class="lr-kv"><span>兑换账号 UID</span><strong class="mono">{{ found.redeemed_by }}</strong></div>
+            <div class="lr-kv"><span>兑换账号</span><strong class="mono">{{ found.redeemed_by }}</strong></div>
             <div class="lr-kv"><span>兑换时间</span><strong class="num">{{ formatTime(found.redeemed_at) }}（{{ relativeTime(found.redeemed_at) }}）</strong></div>
             <div class="lr-kv">
-              <span>对应额度桶状态</span>
+              <span>额度桶状态</span>
               <strong class="num">
                 <template v-if="found.bucket_closed_reason">{{ closedLabels[found.bucket_closed_reason] ?? '已结束' }}</template>
-                <template v-else>还剩 {{ money(found.bucket_remaining ?? 0) }}（{{ xiaobanPoints(found.bucket_remaining ?? 0) }}），{{ formatDate(found.bucket_expires_at) }} 到期</template>
+                <template v-else>余 {{ money(found.bucket_remaining ?? 0) }}（{{ xiaobanPoints(found.bucket_remaining ?? 0) }}）· {{ formatDate(found.bucket_expires_at) }} 到期</template>
               </strong>
             </div>
           </template>
@@ -248,16 +244,16 @@ watch(() => props.refreshTick, () => {
             <span>作废时间</span><strong class="num">{{ formatTime(found.voided_at) }}</strong>
           </div>
           <div v-else class="lr-kv">
-            <span>有效期规则</span><strong>用户兑换后 {{ found.valid_days }} 天内有效</strong>
+            <span>有效期</span><strong>兑换后 {{ found.valid_days }} 天有效</strong>
           </div>
         </div>
 
         <div class="lr-acts">
-          <button v-if="found.binding_id" type="button" class="btn sm" @click="emit('openBinding', found.binding_id)">
-            <Icon name="arrow-up-right" :size="13" />查看用户 #{{ found.binding_id }} 完整账本
+          <button v-if="found.binding_id" type="button" class="btn sm outline" @click="emit('openBinding', found.binding_id)">
+            <Icon name="arrow-up-right" :size="13" />查看用户 #{{ found.binding_id }} 账本
           </button>
           <button v-if="found.status === 'unused'" type="button" class="btn sm danger" :disabled="acting" @click="confirmAction = { type: 'voidCode', code: found }">
-            <Icon name="x" :size="13" />作废这个码
+            <Icon name="x" :size="13" />作废此码
           </button>
           <button
             v-if="found.status === 'redeemed' && !found.bucket_closed_reason && found.bucket_id"
@@ -266,28 +262,27 @@ watch(() => props.refreshTick, () => {
             :disabled="acting"
             @click="confirmAction = { type: 'clawback', code: found }"
           >
-            <Icon name="undo" :size="13" />退款并扣回剩余额度
+            <Icon name="undo" :size="13" />退款扣回
           </button>
-          <span v-if="found.status === 'redeemed' && found.bucket_closed_reason" class="hint">额度桶已结束，无可扣回余额。</span>
+          <span v-if="found.status === 'redeemed' && found.bucket_closed_reason" class="hint">额度桶已结束</span>
         </div>
       </div>
     </section>
 
-    <!-- 批次库存 -->
     <section class="section">
       <div class="section-head">
         <h2>
-          <span>已生成批次</span>
+          <span>批次库存</span>
           <span v-if="batches.length" class="tag num">待售 {{ totalUnused.toLocaleString('en-US') }}</span>
           <span v-if="batches.length" class="tag num">已兑 {{ totalRedeemed.toLocaleString('en-US') }}</span>
         </h2>
         <div v-if="batches.length" class="batch-filters">
-          <div v-if="products.length > 1" style="width: 180px">
-            <CustomSelect v-model="batchProduct" :options="productOptions" size="sm" aria-label="按产品筛选批次" />
+          <div v-if="products.length > 1" style="width: 170px">
+            <CustomSelect v-model="batchProduct" :options="productOptions" size="sm" outlined aria-label="按产品筛选批次" />
           </div>
           <div class="seg-pills">
             <button type="button" :class="{ active: batchFilter === 'all' }" @click="batchFilter = 'all'">全部</button>
-            <button type="button" :class="{ active: batchFilter === 'has_unused' }" @click="batchFilter = 'has_unused'">仍有待售</button>
+            <button type="button" :class="{ active: batchFilter === 'has_unused' }" @click="batchFilter = 'has_unused'">有待售</button>
             <button type="button" :class="{ active: batchFilter === 'exhausted' }" @click="batchFilter = 'exhausted'">已兑完</button>
           </div>
         </div>
@@ -298,10 +293,10 @@ watch(() => props.refreshTick, () => {
           <table class="table">
             <thead>
               <tr>
-                <th>批次 / 商品备注</th>
+                <th>批次</th>
                 <th>产品</th>
-                <th>面额与类型</th>
-                <th>库存与兑换进度</th>
+                <th>面额</th>
+                <th>库存进度</th>
                 <th class="right">操作</th>
               </tr>
             </thead>
@@ -314,13 +309,13 @@ watch(() => props.refreshTick, () => {
                 <td>{{ productName(b.product_id) }}</td>
                 <td>
                   <div class="what">
-                    <span class="tag" :class="b.kind === 'monthly' ? 'warn' : 'ok'">{{ kindLabels[b.kind] }}</span>
+                    <span class="tag"><i class="dot" :class="b.kind === 'monthly' ? 'warn' : 'ok'"></i>{{ kindLabels[b.kind] }}</span>
                     <Money :points="b.quota" size="sm" compact-pts />
                   </div>
-                  <div class="faint small">兑换后 {{ b.valid_days }} 天有效 · 共 {{ b.total }} 个</div>
+                  <div class="faint small">{{ b.valid_days }} 天 · 共 {{ b.total }} 个</div>
                 </td>
                 <td class="prog">
-                  <div class="bar" role="img" :aria-label="`待售 ${b.unused}，已兑换 ${b.redeemed}，作废 ${b.void}`">
+                  <div class="bar" role="img" :aria-label="`待售 ${b.unused}，已兑 ${b.redeemed}，作废 ${b.void}`">
                     <i class="r" :style="{ width: share(b.redeemed, b) }"></i>
                     <i class="u" :style="{ width: share(b.unused, b) }"></i>
                     <i class="v" :style="{ width: share(b.void, b) }"></i>
@@ -337,7 +332,7 @@ watch(() => props.refreshTick, () => {
                     type="button"
                     class="btn sm ghost danger-text"
                     @click="confirmAction = { type: 'voidBatch', batch: b }"
-                  >作废剩余 {{ b.unused }} 个</button>
+                  >作废剩余 {{ b.unused }}</button>
                   <span v-else class="faint small">已清空</span>
                 </td>
               </tr>
@@ -354,10 +349,10 @@ watch(() => props.refreshTick, () => {
                         ? '兑换码需绑定到具体产品，请先到「产品与档位」创建产品。'
                         : batches.length
                           ? '可切换产品或状态筛选查看全部批次。'
-                          : '点击右上角「生成兑换码」，导出 .txt 导入淘宝自动发货库存即可开售。'
+                          : '点击右上角「生成兑换码」，导出 .txt 导入自动发货库存。'
                     "
                   >
-                    <button v-if="products.length === 0" type="button" class="btn primary" @click="emit('go', 'products')">去添加产品</button>
+                    <button v-if="products.length === 0" type="button" class="btn primary" @click="emit('go', 'products')">添加产品</button>
                   </EmptyState>
                 </td>
               </tr>
@@ -376,11 +371,11 @@ watch(() => props.refreshTick, () => {
           ? `作废批次 #${confirmAction.batch.id} 剩余的 ${confirmAction.batch.unused} 个码？`
           : confirmAction.type === 'voidCode'
             ? '作废这个兑换码？'
-            : '退款并扣回这份额度？'
+            : '退款并扣回剩余额度？'
       "
       :desc="
         confirmAction.type === 'voidBatch'
-          ? '已经兑换的码和用户余额不受影响；未兑换的码作废后无法恢复。'
+          ? '已兑换的码和用户余额不受影响；未兑换的码作废后无法恢复。'
           : confirmAction.type === 'voidCode'
             ? '作废后无人能再兑换该码，此操作不可恢复。'
             : `将扣回该码对应额度桶里剩余的 ${money(confirmAction.code.bucket_remaining ?? 0)}（${xiaobanPoints(confirmAction.code.bucket_remaining ?? 0)}），已消耗部分不退回，此操作不可撤销。`
@@ -397,21 +392,20 @@ watch(() => props.refreshTick, () => {
 
 <style scoped>
 .notice { margin-bottom: 14px; }
-.lookup-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
-.sub-h { font-size: 15px; font-weight: 680; margin-bottom: 3px; }
-.lookup-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.lookup-input { flex: 1; min-width: 240px; max-width: 440px; height: 40px; font-family: var(--mono); font-size: 14.5px; letter-spacing: 0.06em; }
+.lookup-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.sub-h { font-size: 14.5px; font-weight: 650; }
+.lookup-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lookup-input { flex: 1; min-width: 240px; max-width: 420px; height: 38px; font-family: var(--mono); font-size: 14px; letter-spacing: 0.06em; }
 
 .lookup-result {
-  padding: 15px 16px;
+  padding: 14px;
   border-radius: var(--r-md);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-muted);
+  background: var(--subtle);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
-.lr-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.lr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .lr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 16px; }
 .lr-kv { display: flex; flex-direction: column; gap: 2px; }
 .lr-kv span { font-size: 11.5px; color: var(--ink-3); }
@@ -424,14 +418,14 @@ watch(() => props.refreshTick, () => {
 .note { color: var(--ink-2); font-size: 12px; margin-top: 2px; max-width: 34ch; overflow-wrap: anywhere; }
 .what { display: flex; align-items: center; gap: 7px; }
 .small { font-size: 11.5px; margin-top: 3px; }
-.prog { min-width: 190px; }
-.bar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--canvas-soft); gap: 1.5px; }
+.prog { min-width: 180px; }
+.bar { display: flex; height: 5px; border-radius: 99px; overflow: hidden; background: var(--subtle); gap: 1px; }
 .bar i { display: block; height: 100%; }
-.bar .r { background: var(--ink); }
-.bar .u { background: var(--ok); opacity: 0.6; }
+.bar .r { background: var(--brand); }
+.bar .u { background: var(--ok); opacity: 0.65; }
 .bar .v { background: var(--ink-4); opacity: 0.4; }
 .legend { display: flex; gap: 12px; margin-top: 6px; font-size: 11.5px; color: var(--ink-3); flex-wrap: wrap; }
-.legend b { color: var(--ink); }
+.legend b { color: var(--ink-1); }
 .danger-text { color: var(--danger); }
 .nopad { padding: 0 !important; }
 

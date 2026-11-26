@@ -21,13 +21,12 @@ function toggle() {
     class="switch-row"
     role="switch"
     :aria-checked="model"
+    :aria-description="desc"
+    :title="desc || title"
     :disabled="disabled"
     @click="toggle"
   >
-    <span class="switch-txt">
-      <strong>{{ title }}</strong>
-      <span v-if="desc">{{ desc }}</span>
-    </span>
+    <span class="switch-title">{{ title }}</span>
     <span class="switch-track"><i></i></span>
   </button>
 </template>
@@ -35,29 +34,31 @@ function toggle() {
 <style scoped>
 .switch-row {
   width: 100%;
-  padding: 11px 14px;
+  min-height: 40px;
+  padding: 0 14px;
   text-align: left;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-1);
   border-bottom: 1px solid var(--line);
-  transition: background 0.12s;
+  transition: background 120ms;
 }
 .switch-row:last-child { border-bottom: 0; }
-.switch-row:hover:not(:disabled) { background: var(--surface-hover); }
-.switch-row:disabled { opacity: 0.52; cursor: not-allowed; }
-.switch-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.switch-txt strong { font-size: 13px; font-weight: 600; color: var(--ink); }
-.switch-txt span { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
+.switch-row:hover:not(:disabled) { background: var(--hover); }
+.switch-row:disabled { opacity: 0.45; cursor: not-allowed; }
+.switch-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch-track {
-  width: 36px;
+  width: 34px;
   height: 20px;
-  border-radius: 99px;
+  border-radius: var(--r-pill);
   flex: none;
   padding: 2px;
   background: var(--line-strong);
-  transition: background 0.18s var(--ease);
+  transition: background 180ms var(--ease);
   display: flex;
   align-items: center;
 }
@@ -66,11 +67,9 @@ function toggle() {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: transform 0.18s var(--ease);
+  background: #ffffff;
+  transition: transform 180ms var(--ease);
 }
-.switch-row[aria-checked='true'] .switch-track { background: var(--btn-primary-bg); }
-:global([data-theme='dark']) .switch-row[aria-checked='true'] .switch-track { background: var(--coral); }
-.switch-row[aria-checked='true'] .switch-track i { transform: translateX(16px); }
+.switch-row[aria-checked='true'] .switch-track { background: var(--brand); }
+.switch-row[aria-checked='true'] .switch-track i { transform: translateX(14px); }
 </style>

@@ -44,10 +44,10 @@ async function submit() {
   <div class="scrim over" @click="emit('close')"></div>
   <form ref="root" class="dialog over" role="dialog" aria-modal="true" aria-labelledby="grant-title" @submit.prevent="submit">
     <div class="dialog-head">
-      <div>
-        <h2 id="grant-title">补发额度 · 绑定 #{{ id }}</h2>
-        <p>补发后立即计入用户可用余额并同步至 New API，同时写入流水和操作审计。</p>
-      </div>
+      <h2 id="grant-title">
+        <span>补发额度</span>
+        <span class="tag num">绑定 #{{ id }}</span>
+      </h2>
       <button type="button" class="btn icon sm ghost" aria-label="关闭" @click="emit('close')"><Icon name="x" :size="16" /></button>
     </div>
 
@@ -58,14 +58,14 @@ async function submit() {
 
       <div class="pair-grid">
         <div class="field">
-          <label for="g-amount">金额（$1 = 100 点）</label>
+          <label for="g-amount">金额<span class="hint">$1 = 100 点</span></label>
           <div class="affix-wrap">
             <input id="g-amount" v-model.number="dollars" class="input num" type="number" min="0.01" step="0.01" required autofocus />
             <span class="affix">美元</span>
           </div>
         </div>
         <div class="field">
-          <label for="g-days">有效期</label>
+          <label for="g-days">有效天数</label>
           <div class="affix-wrap">
             <input id="g-days" v-model.number="days" class="input num" type="number" min="1" max="3650" step="1" required />
             <span class="affix">天</span>
@@ -74,17 +74,17 @@ async function submit() {
       </div>
 
       <p v-if="points > 0" class="summary-hint num">
-        将补发 <strong>{{ money(points) }}</strong>（折合 <strong>{{ xiaobanPoints(points) }}</strong>），到期未用完部分自动作废。
+        补发 <strong>{{ money(points) }}</strong>（折合 <strong>{{ xiaobanPoints(points) }}</strong>），到期未用完自动作废。
       </p>
 
       <div class="field">
         <label for="g-note">备注（选填）</label>
-        <input id="g-note" v-model="note" class="input" maxlength="100" placeholder="例如：客服补偿 / 淘宝订单 1234567" />
+        <input id="g-note" v-model="note" class="input" maxlength="100" placeholder="例如：客服补偿" />
       </div>
     </div>
 
     <div class="dialog-foot">
-      <button type="button" class="btn" @click="emit('close')">取消</button>
+      <button type="button" class="btn ghost" @click="emit('close')">取消</button>
       <button type="submit" class="btn primary" :disabled="busy || points <= 0">{{ busy ? '补发中…' : '确认补发' }}</button>
     </div>
   </form>
@@ -95,9 +95,8 @@ async function submit() {
   font-size: 12.5px;
   color: var(--ink-2);
   padding: 9px 12px;
-  border-radius: 9px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--subtle);
 }
-.summary-hint strong { color: var(--ink); }
+.summary-hint strong { color: var(--ink-1); }
 </style>

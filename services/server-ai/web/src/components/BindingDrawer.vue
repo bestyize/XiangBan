@@ -88,6 +88,12 @@ const rowIcon: Record<string, IconName> = {
   void: 'undo',
 };
 
+function bucketDot(kind: string): string {
+  if (kind === 'trial') return 'info';
+  if (kind === 'monthly') return 'warn';
+  return 'ok';
+}
+
 async function load() {
   error.value = '';
   try {
@@ -154,7 +160,7 @@ async function confirmVoid(note: string) {
   <aside ref="root" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
     <div class="drawer-head">
       <div v-if="detail" class="who">
-        <Avatar :seed="detail.binding.uid" :size="38" />
+        <Avatar :seed="detail.binding.uid" :size="36" />
         <div class="who-txt">
           <div class="who-top">
             <h2 id="drawer-title">绑定 #{{ detail.binding.id }}</h2>
@@ -181,7 +187,7 @@ async function confirmVoid(note: string) {
             <div class="k">当前可用余额</div>
             <Money :points="detail.binding.balance" size="xl" />
             <div class="sub num">
-              其中付费额度 <strong>{{ money(paid) }}</strong> · 最近同步 {{ relativeTime(detail.binding.last_synced_at) }}
+              付费额度 <strong>{{ money(paid) }}</strong> · 同步 {{ relativeTime(detail.binding.last_synced_at) }}
             </div>
           </div>
           <button type="button" class="btn primary" :disabled="detail.binding.status !== 'active'" @click="granting = true">
@@ -198,13 +204,13 @@ async function confirmVoid(note: string) {
         <section>
           <div class="section-head">
             <h3>有效额度桶 <span class="tag num">{{ liveBuckets.length }}</span></h3>
-            <span class="hint">按到期时间先后自动扣费</span>
+            <span class="hint">按到期先后自动扣费</span>
           </div>
-          <p v-if="liveBuckets.length === 0" class="hint">现在没有可用额度桶。可点击上方「补发额度」。</p>
+          <p v-if="liveBuckets.length === 0" class="hint">暂无可用额度桶，可点击上方「补发额度」。</p>
           <ul v-else class="buckets">
             <li v-for="b in liveBuckets" :key="b.id" class="bucket-card" :class="b.kind">
               <div class="bucket-top">
-                <span class="tag" :class="b.kind === 'trial' ? 'info' : b.kind === 'monthly' ? 'warn' : 'ok'">{{ kindLabels[b.kind] ?? b.kind }}</span>
+                <span class="tag"><i class="dot" :class="bucketDot(b.kind)"></i>{{ kindLabels[b.kind] ?? b.kind }}</span>
                 <Money :points="b.remaining" size="md" compact-pts />
                 <span class="faint num" style="font-size: 12px">/ {{ money(b.total) }}</span>
                 <button type="button" class="btn sm danger void-btn" @click="voiding = b"><Icon name="undo" :size="12" />扣回</button>
@@ -223,13 +229,16 @@ async function confirmVoid(note: string) {
         <section v-if="closedBuckets.length">
           <button type="button" class="btn sm ghost fold-btn" @click="showClosed = !showClosed">
             <Icon :name="showClosed ? 'chevron-down' : 'chevron-right'" :size="14" />
-            <span>已结束的额度桶（{{ closedBuckets.length }}）</span>
+            <span>已结束额度桶（{{ closedBuckets.length }}）</span>
           </button>
           <ul v-if="showClosed" class="done-list">
             <li v-for="b in closedBuckets" :key="b.id">
-              <span class="tag">{{ kindLabels[b.kind] ?? b.kind }}</span>
+              <span class="tag outlined">{{ kindLabels[b.kind] ?? b.kind }}</span>
               <span class="num">{{ money(b.total) }}</span>
-              <span class="tag" :class="b.closed_reason === 'admin_void' ? 'danger' : ''">{{ closedLabels[b.closed_reason ?? ''] ?? '已结束' }}</span>
+              <span class="tag outlined">
+                <i v-if="b.closed_reason === 'admin_void'" class="dot danger"></i>
+                {{ closedLabels[b.closed_reason ?? ''] ?? '已结束' }}
+              </span>
               <span class="faint num end">{{ formatTime(b.closed_at) }}</span>
             </li>
           </ul>
@@ -281,7 +290,7 @@ async function confirmVoid(note: string) {
   <ConfirmDialog
     v-if="voiding"
     title="扣回这个额度桶？"
-    :desc="`将扣回这份${kindLabels[voiding.kind] ?? ''}额度里剩余的 ${money(voiding.remaining)}（${xiaobanPoints(voiding.remaining)}），用户将立即无法再用。已消耗部分不退回，此操作不可撤销。`"
+    :desc="`将扣回这份${kindLabels[voiding.kind] ?? ''}额度里剩余的 ${money(voiding.remaining)}（${xiaobanPoints(voiding.remaining)}），已消耗部分不退回，此操作不可撤销。`"
     confirm-text="确认扣回"
     over
     with-note
@@ -292,17 +301,17 @@ async function confirmVoid(note: string) {
 </template>
 
 <style scoped>
-.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .who-txt { min-width: 0; }
 .who-top { display: flex; align-items: center; gap: 7px; }
 .who-top h2 { font-size: 15px; font-weight: 700; }
 .uid-row { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
-.uid { color: var(--ink-3); font-size: 12px; max-width: 300px; }
+.uid { color: var(--ink-3); font-size: 12px; max-width: 280px; }
 
 .balance-hero {
-  padding: 16px 18px;
-  border-radius: var(--r-md);
-  background: var(--surface-muted);
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--canvas);
   border: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -310,25 +319,25 @@ async function confirmVoid(note: string) {
   gap: 12px;
   flex-wrap: wrap;
 }
-.k { color: var(--ink-3); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.k { color: var(--ink-3); font-size: 12px; font-weight: 500; margin-bottom: 4px; }
 .sub { color: var(--ink-3); font-size: 12px; margin-top: 5px; }
-.sub strong { color: var(--ink); }
+.sub strong { color: var(--ink-1); }
 
-section h3 { font-size: 14px; font-weight: 680; display: flex; align-items: center; gap: 7px; }
+section h3 { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 7px; }
 
 .buckets { display: flex; flex-direction: column; gap: 10px; }
 .bucket-card {
-  padding: 13px 15px;
+  padding: 12px 14px;
   border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
 }
 .bucket-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .void-btn { margin-left: auto; }
-.gauge { height: 7px; border-radius: 99px; background: var(--canvas-soft); overflow: hidden; }
+.gauge { height: 5px; border-radius: 99px; background: var(--subtle); overflow: hidden; }
 .gauge i { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
 .bucket-card.monthly .gauge i { background: var(--warn); }
 .bucket-card.trial .gauge i { background: var(--info); }
@@ -343,14 +352,14 @@ section h3 { font-size: 14px; font-weight: 680; display: flex; align-items: cent
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--surface-muted);
+  border-radius: var(--r-inner);
+  background: var(--subtle);
   font-size: 12px;
 }
 .done-list .end { margin-left: auto; }
 
 .day + .day { margin-top: 16px; }
-.dh { font-size: 12px; font-weight: 680; color: var(--ink-3); margin-bottom: 6px; }
+.dh { font-size: 12px; font-weight: 600; color: var(--ink-3); margin-bottom: 6px; }
 .ledger-item {
   display: flex;
   align-items: flex-start;
@@ -362,17 +371,17 @@ section h3 { font-size: 14px; font-weight: 680; display: flex; align-items: cent
 .ledger-dot {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: var(--r-inner);
   flex: none;
   display: grid;
   place-items: center;
-  background: var(--canvas-soft);
+  background: var(--subtle);
   color: var(--ink-2);
   margin-top: 1px;
 }
-.ledger-item.grant .ledger-dot { background: var(--ok-soft); color: var(--ok); }
-.ledger-item.expire .ledger-dot { background: var(--warn-soft); color: var(--warn); }
-.ledger-item.void .ledger-dot, .ledger-item.consume_overdraft .ledger-dot { background: var(--danger-soft); color: var(--danger); }
+.ledger-item.grant .ledger-dot { color: var(--ok); }
+.ledger-item.expire .ledger-dot { color: var(--warn); }
+.ledger-item.void .ledger-dot, .ledger-item.consume_overdraft .ledger-dot { color: var(--danger); }
 .what { flex: 1; min-width: 0; }
 .what strong { font-size: 13px; font-weight: 600; }
 .meta-line { font-size: 12px; margin-top: 1px; }

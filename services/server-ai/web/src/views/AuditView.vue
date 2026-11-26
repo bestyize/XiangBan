@@ -86,9 +86,9 @@ onMounted(async () => {
 
 <template>
   <div>
-    <PageHead title="操作日志" desc="记录最近 150 条管理员写操作，自动将参数结构化为易读标签，便于排障与财务审计。">
-      <button type="button" class="btn sm" :class="{ primary: showRaw }" @click="showRaw = !showRaw">
-        {{ showRaw ? '切回结构化标签' : '查看原始参数' }}
+    <PageHead title="操作日志">
+      <button type="button" class="btn sm" :class="showRaw ? 'primary' : 'outline'" @click="showRaw = !showRaw">
+        {{ showRaw ? '结构化标签' : '原始参数' }}
       </button>
     </PageHead>
 
@@ -107,19 +107,19 @@ onMounted(async () => {
       <div class="search-wrap search-box">
         <Icon name="search" :size="14" />
         <label class="sr" for="audit-q">筛选日志</label>
-        <input id="audit-q" v-model="query" class="input" placeholder="筛选操作人、目标或详情" autocomplete="off" />
+        <input id="audit-q" v-model="query" class="input canvas-input" placeholder="筛选操作人、目标或详情" autocomplete="off" />
       </div>
     </div>
 
     <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
-    <div v-if="loading" class="skels"><i v-for="n in 5" :key="n" class="skel" style="height: 52px"></i></div>
+    <div v-if="loading" class="skels"><i v-for="n in 5" :key="n" class="skel" style="height: 50px"></i></div>
 
     <div v-else-if="groups.length === 0" class="card">
       <EmptyState
         icon="scroll"
         :title="items.length === 0 ? '还没有操作记录' : '没有匹配的操作日志'"
-        :desc="items.length === 0 ? '你在后台做的每一次改动都会按时间记录在这里。' : '试试切换分类或清空搜索关键词。'"
+        :desc="items.length === 0 ? '后台的每一次写操作都会记录在这里。' : '试试切换分类或清空搜索关键词。'"
       />
     </div>
 
@@ -136,7 +136,7 @@ onMounted(async () => {
             <template v-if="r.detail">
               <p v-if="showRaw" class="raw mono faint">{{ r.detail }}</p>
               <div v-else class="kv-list">
-                <span v-for="(kv, ki) in parseAuditDetail(r.detail)" :key="ki" class="kv">{{ kv }}</span>
+                <span v-for="(kv, ki) in parseAuditDetail(r.detail)" :key="ki" class="tag outlined">{{ kv }}</span>
               </div>
             </template>
           </div>
@@ -151,13 +151,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-.search-box { width: 260px; max-width: 100%; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.search-box { width: 250px; max-width: 100%; }
+.canvas-input { background: var(--surface); border-color: var(--line); }
+.canvas-input:hover { background: var(--surface); border-color: var(--line-strong); }
 .notice { margin-bottom: 14px; }
 .skels { display: flex; flex-direction: column; gap: 10px; }
 
-.audit-day + .audit-day { margin-top: 22px; }
-.dh { font-size: 12px; font-weight: 680; color: var(--ink-3); margin-bottom: 10px; letter-spacing: 0.02em; }
+.audit-day + .audit-day { margin-top: 20px; }
+.dh { font-size: 12px; font-weight: 600; color: var(--ink-3); margin-bottom: 8px; }
 .audit-list { overflow: hidden; }
 .audit-row {
   display: flex;
@@ -170,9 +172,9 @@ onMounted(async () => {
 .audit-ico {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--r-inner);
   flex: none;
-  background: var(--canvas-soft);
+  background: var(--subtle);
   color: var(--ink-2);
   display: grid;
   place-items: center;
@@ -181,14 +183,6 @@ onMounted(async () => {
 .audit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .audit-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
 .kv-list { display: flex; flex-wrap: wrap; gap: 5px; }
-.kv {
-  font-size: 11.5px;
-  padding: 1px 7px;
-  border-radius: 5px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
-  color: var(--ink-2);
-}
 .raw { overflow-wrap: anywhere; max-width: 78ch; font-size: 12px; }
 .audit-right {
   flex: none;

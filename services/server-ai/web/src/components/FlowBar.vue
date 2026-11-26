@@ -32,51 +32,43 @@ function percent(points: number): string {
       <span v-else class="seg none" style="width: 100%"></span>
     </div>
     <ul class="legend">
-      <li v-for="s in segments" :key="s.key">
-        <i class="sw" :class="s.tone"></i>
-        <div class="body">
-          <div class="top">
-            <span class="title"><strong>{{ s.label }}</strong><span class="pct num">{{ percent(s.points) }}</span></span>
-            <Money :points="s.points" size="sm" compact-pts />
-          </div>
-          <span class="note">{{ s.note }}</span>
-        </div>
+      <li v-for="s in segments" :key="s.key" :title="s.note">
+        <i class="dot" :class="s.tone === 'left' ? 'brand' : s.tone === 'used' ? 'ink' : ''"></i>
+        <span class="title"><strong>{{ s.label }}</strong><span class="pct num">{{ percent(s.points) }}</span></span>
+        <Money :points="s.points" size="sm" compact-pts />
       </li>
     </ul>
   </div>
 </template>
 
 <style scoped>
-.flow { display: flex; flex-direction: column; gap: 16px; }
+.flow { display: flex; flex-direction: column; gap: 14px; }
 .track {
   display: flex;
-  height: 12px;
+  height: 10px;
   border-radius: 99px;
   overflow: hidden;
-  background: var(--canvas-soft);
+  background: var(--subtle);
   gap: 2px;
 }
-.seg { height: 100%; min-width: 3px; border-radius: 2px; transform-origin: left; animation: grow 0.6s var(--ease) both; }
-.seg.used, .sw.used { background: var(--ink); }
-.seg.left, .sw.left { background: var(--coral); }
-.seg.lapsed, .sw.lapsed { background: var(--ink-4); opacity: 0.5; }
-.seg.none { background: var(--canvas-soft); animation: none; }
+.seg { height: 100%; min-width: 3px; border-radius: 2px; transform-origin: left; animation: grow 500ms var(--ease) both; }
+.seg.used { background: var(--ink-2); }
+.seg.left { background: var(--brand); }
+.seg.lapsed { background: var(--ink-4); opacity: 0.45; }
+.seg.none { background: var(--subtle); animation: none; }
 @keyframes grow { from { transform: scaleX(0); } }
 
-.legend { display: flex; flex-direction: column; gap: 12px; }
+.legend { display: flex; flex-direction: column; }
 .legend li {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding-bottom: 12px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 .legend li:last-child { border-bottom: 0; padding-bottom: 0; }
-.sw { width: 10px; height: 10px; border-radius: 3px; margin-top: 4px; flex: none; }
-.body { flex: 1; min-width: 0; }
-.top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.title { display: inline-flex; align-items: baseline; gap: 6px; }
-.title strong { font-size: 13px; }
-.pct { font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
-.note { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.48; margin-top: 2px; }
+.dot.ink { background: var(--ink-2); }
+.title { flex: 1; display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.title strong { font-size: 13px; font-weight: 600; }
+.pct { font-size: 12px; color: var(--ink-3); }
 </style>
