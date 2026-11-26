@@ -6,7 +6,7 @@
 
 ## 总体设计稿导航网页（推荐入口）
 
-[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 40 个设计稿模块/状态入口（33 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
+[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 41 个设计稿模块/状态入口（34 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
 
 在仓库根目录一键启动统一预览服务（自动映射桌面 UI 升级画布的 `/_blob/` 图片资源）：
 
@@ -76,6 +76,7 @@ npm --prefix client/xiaoban-desktop run dev
 | [AI 插件页卡片与独立窗口重设计（定稿方案 A）](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-plugins-redesign.html) | 核心 AI 与对话 | 已合入 | 定稿方案 A 精装目录卡（克制主题色、2 行简介、低饱和分类图标、宽屏 3 列、整卡可点），覆盖专家 / 技能 / 连接器三页与 5 类安装/更新/连接器独立窗口；纯静态可直开 |
 | [关怀提醒与定时任务重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html) | 关怀与效率 | 已合入 | V2 单栏专注流重构（已合入 `CarePage.vue`、`care-bubble.ts` 与 `reminders.rs`）：移除右侧常驻设置栏，改为按条绑定提醒方式（行内直切响铃/朗读/常驻 + 编辑窗 3 格卡），全局免打扰与默认偏好收纳进页头浮层；新增一句话快建栏、下一条提醒焦点卡、定时任务结果卡片流与 4 态悬浮气泡（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html)） |
 | [内置小组件精修与组件页排版重设计](../../client/xiaoban-desktop/docs/design-specs/prototypes/widgets-redesign.html) | 装扮与桌面空间 | 已合入 | 8 款内置小组件矢量精修（暖白 / 深色 / 柔雾玻璃三材质、标题栏避让设置按钮、天气 6 态 + 3 日预报、待办快输、日程 Flex 徽章、股票昨收线与悬停读数、木鱼连击多气泡、月历农历 + 休/班、纪念日自定义短句）与组件页 Bento 跨列画廊、轻量层级菜单及统一主题设置浮窗；纯静态可直开（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/widgets-redesign.html)） |
+| [伙伴页卡片与独立配置窗口设计稿](../../client/xiaoban-desktop/docs/design-specs/prototypes/companion-redesign.html) | 装扮与桌面空间 | 待合入 | 保留原版 7 只官方伙伴真实形象并严格克制主题色（全页仅主按钮与开关用主题色）：纯净中性浅画框与中性柔光展台、底栏紧凑中性「+ 添加 / 管理」与轻量层级浮层、在桌面上两行清晰实例卡（表情/多屏角标 + 行内层级快切）、卡片 8 态解剖展板及伙伴设置/主动陪伴原生独立窗口；纯静态可直开（[本地预览](http://127.0.0.1:1455/client/xiaoban-desktop/docs/design-specs/prototypes/companion-redesign.html)） |
 
 ---
 

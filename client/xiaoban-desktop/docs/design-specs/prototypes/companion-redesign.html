@@ -1,0 +1,1682 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴桌面 · 伙伴页卡片与独立配置窗口设计稿</title>
+<style>
+  /* ── 小伴桌面设计令牌（6 套主题色 × 浅/深模式，对齐 src/ui/design-tokens.ts） ── */
+  :root,
+  html[data-theme="light"] {
+    --ui-surface: #FFFFFF;
+    --ui-surface-alt: #F2F2F4;
+    --ui-surface-sunken: #F5F5F7;
+    --ui-surface-hover: rgba(0, 0, 0, .045);
+    --ui-surface-raised: rgba(255, 255, 255, .97);
+    --ui-control: #F2F2F4;
+    --ui-control-hover: #EAEAED;
+    --ui-border: rgba(0, 0, 0, .075);
+    --ui-border-strong: rgba(0, 0, 0, .14);
+    --ui-line: rgba(0, 0, 0, .06);
+    --ui-text-primary: #1D1D1F;
+    --ui-text-secondary: #6E6E73;
+    --ui-text-tertiary: #8E8E93;
+    --ui-text-disabled: #A1A1A6;
+    --ui-window-close: #FF5F57;
+    --ui-window-minimize: #FEBC2E;
+    --ui-window-expand: #28C840;
+    --ui-configuration-canvas: #F6F7F8;
+    --ui-configuration-surface: #FFFFFF;
+    --ui-configuration-sidebar: #F5F5F7;
+    --ui-configuration-group: #FFFFFF;
+    --ui-configuration-control: #F0F1F3;
+    --ui-success: #34A36D;
+    --ui-success-text: #23784F;
+    --ui-warning: #E09A2B;
+    --ui-warning-text: #9A5410;
+    --ui-danger: #D93A44;
+    --ui-scrollbar: rgba(0, 0, 0, .18);
+    --ui-shadow-panel: 0 0 0 1px rgba(0, 0, 0, .05), 0 4px 16px rgba(0, 0, 0, .04);
+    --ui-shadow-card: 0 0 0 1px rgba(0, 0, 0, .06), 0 1px 3px rgba(0, 0, 0, .03);
+    --ui-shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, .09), 0 10px 26px rgba(0, 0, 0, .07);
+    --ui-shadow-menu: 0 0 0 1px rgba(0, 0, 0, .08), 0 14px 36px rgba(0, 0, 0, .18);
+    --ui-shadow-window: 0 0 0 1px rgba(0, 0, 0, .08), 0 26px 70px rgba(0, 0, 0, .18), 0 6px 18px rgba(0, 0, 0, .07);
+    --ui-shadow-btn: inset 0 1px 0 rgba(255, 255, 255, .28), 0 1px 2px rgba(0, 0, 0, .18);
+    --ui-shadow-btn-secondary: 0 0 0 1px rgba(0, 0, 0, .11), 0 1px 1.5px rgba(0, 0, 0, .04);
+  }
+  html[data-theme="dark"] {
+    --ui-surface: #232325;
+    --ui-surface-alt: #2C2C2E;
+    --ui-surface-sunken: #1C1C1F;
+    --ui-surface-hover: rgba(255, 255, 255, .06);
+    --ui-surface-raised: rgba(44, 44, 46, .97);
+    --ui-control: #2C2C2E;
+    --ui-control-hover: #363639;
+    --ui-border: rgba(255, 255, 255, .09);
+    --ui-border-strong: rgba(255, 255, 255, .16);
+    --ui-line: rgba(255, 255, 255, .07);
+    --ui-text-primary: #F5F5F7;
+    --ui-text-secondary: #A1A1A6;
+    --ui-text-tertiary: #7C7C82;
+    --ui-text-disabled: #5E5E63;
+    --ui-configuration-canvas: #1D1E22;
+    --ui-configuration-surface: #27282E;
+    --ui-configuration-sidebar: #191A1E;
+    --ui-configuration-group: #2B2D33;
+    --ui-configuration-control: #363840;
+    --ui-success: #3FB87A;
+    --ui-success-text: #6FD6A0;
+    --ui-warning: #F0A93A;
+    --ui-warning-text: #F0B65A;
+    --ui-danger: #E5484D;
+    --ui-scrollbar: rgba(255, 255, 255, .22);
+    --ui-shadow-panel: 0 0 0 1px rgba(255, 255, 255, .06), 0 4px 16px rgba(0, 0, 0, .30);
+    --ui-shadow-card: 0 0 0 1px rgba(255, 255, 255, .07);
+    --ui-shadow-card-hover: 0 0 0 1px rgba(255, 255, 255, .14), 0 12px 28px rgba(0, 0, 0, .40);
+    --ui-shadow-menu: 0 0 0 1px rgba(255, 255, 255, .10), 0 14px 36px rgba(0, 0, 0, .55);
+    --ui-shadow-window: 0 0 0 1px rgba(255, 255, 255, .10), 0 28px 72px rgba(0, 0, 0, .58);
+    --ui-shadow-btn: inset 0 1px 0 rgba(255, 255, 255, .18), 0 1px 2px rgba(0, 0, 0, .4);
+    --ui-shadow-btn-secondary: 0 0 0 1px rgba(255, 255, 255, .14);
+  }
+
+  /* 6 套主题色 */
+  html[data-theme="light"][data-accent="red"]      { --ui-btn:#D93A44; --ui-btn-hi:#E8565F; --ui-soft:#FCEBEC; --ui-ink:#B42A33; --ui-tint:#F5F1F1; --ui-dot:#E5484D; --ui-configuration-canvas:#F8F6F6; }
+  html[data-theme="light"][data-accent="green"]    { --ui-btn:#2E8B5E; --ui-btn-hi:#3FA172; --ui-soft:#E3F2E9; --ui-ink:#1E6A45; --ui-tint:#EEF4F0; --ui-dot:#34A36D; --ui-configuration-canvas:#F5F8F6; }
+  html[data-theme="light"][data-accent="blue"]     { --ui-btn:#2F6FDB; --ui-btn-hi:#4A84E6; --ui-soft:#E6EEFC; --ui-ink:#1D53AE; --ui-tint:#EFF3F9; --ui-dot:#3B7BE8; --ui-configuration-canvas:#F5F7FA; }
+  html[data-theme="light"][data-accent="purple"]   { --ui-btn:#7152D8; --ui-btn-hi:#8669E3; --ui-soft:#EDE8FC; --ui-ink:#5537B8; --ui-tint:#F3F1F9; --ui-dot:#7C5CE6; --ui-configuration-canvas:#F7F6FA; }
+  html[data-theme="light"][data-accent="amber"]    { --ui-btn:#A8640C; --ui-btn-hi:#BD7A1C; --ui-soft:#FAEEDB; --ui-ink:#87500A; --ui-tint:#F6F3ED; --ui-dot:#E09A2B; --ui-configuration-canvas:#F9F7F4; }
+  html[data-theme="light"][data-accent="graphite"] { --ui-btn:#2B2B30; --ui-btn-hi:#4A4A50; --ui-soft:#E9E9EC; --ui-ink:#2B2B30; --ui-tint:#F2F2F3; --ui-dot:#55555B; --ui-configuration-canvas:#F6F6F7; }
+
+  html[data-theme="dark"][data-accent="red"]      { --ui-btn:#E54D56; --ui-btn-hi:#F0646C; --ui-soft:rgba(229,77,86,.18);   --ui-ink:#FF868D; --ui-tint:#1C191A; --ui-dot:#F0646C; }
+  html[data-theme="dark"][data-accent="green"]    { --ui-btn:#38A16E; --ui-btn-hi:#49B680; --ui-soft:rgba(56,161,110,.18);  --ui-ink:#6FE0A8; --ui-tint:#181D1A; --ui-dot:#49B680; }
+  html[data-theme="dark"][data-accent="blue"]     { --ui-btn:#4481E8; --ui-btn-hi:#5E96F2; --ui-soft:rgba(68,129,232,.19);  --ui-ink:#87B5FF; --ui-tint:#181B20; --ui-dot:#5E96F2; }
+  html[data-theme="dark"][data-accent="purple"]   { --ui-btn:#8669E3; --ui-btn-hi:#9A80EC; --ui-soft:rgba(134,105,227,.20); --ui-ink:#B7A3F8; --ui-tint:#1B1921; --ui-dot:#9A80EC; }
+  html[data-theme="dark"][data-accent="amber"]    { --ui-btn:#C98220; --ui-btn-hi:#DC9636; --ui-soft:rgba(201,130,32,.20);  --ui-ink:#F2BA68; --ui-tint:#1E1B17; --ui-dot:#E8A543; }
+  html[data-theme="dark"][data-accent="graphite"] { --ui-btn:#6B6B73; --ui-btn-hi:#80808A; --ui-soft:rgba(255,255,255,.11); --ui-ink:#D4D4DA; --ui-tint:#1A1A1C; --ui-dot:#9A9AA3; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; }
+  body {
+    background: var(--ui-configuration-canvas);
+    color: var(--ui-text-primary);
+    font-family: -apple-system, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 20px 56px;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { border: 0; background: none; cursor: pointer; padding: 0; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ui-btn); outline-offset: 2px; }
+  button:disabled { opacity: .48; cursor: not-allowed; }
+  svg { flex-shrink: 0; display: block; }
+  [hidden] { display: none !important; }
+
+  /* ── 顶部设计评审条（非客户端 UI） ────────────────────────────────── */
+  .review-shell {
+    max-width: 1240px; margin: 14px auto 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .review-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 9px 14px; border-radius: 14px;
+    background: var(--ui-surface); box-shadow: var(--ui-shadow-card);
+  }
+  .review-title { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+  .review-badge {
+    height: 20px; padding: 0 8px; border-radius: 999px;
+    background: var(--ui-soft); color: var(--ui-ink);
+    font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap;
+  }
+  .review-title strong { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+  .review-group {
+    display: inline-flex; align-items: center; padding: 2px; border-radius: 9px;
+    background: var(--ui-control); gap: 2px;
+  }
+  .review-group button {
+    height: 27px; padding: 0 10px; border-radius: 7px; font-size: 12px;
+    color: var(--ui-text-secondary); white-space: nowrap;
+    transition: background .15s, color .15s, box-shadow .15s;
+  }
+  .review-group button:hover { color: var(--ui-text-primary); }
+  .review-group button[aria-pressed="true"] {
+    background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+  }
+  html[data-theme="dark"] .review-group button[aria-pressed="true"] { background: #48484C; }
+
+  .accent-dots {
+    display: inline-flex; align-items: center; gap: 5px; padding: 0 7px; height: 29px;
+    border-radius: 8px; background: var(--ui-control);
+  }
+  .accent-dot { width: 14px; height: 14px; border-radius: 50%; position: relative; transition: transform .15s; }
+  .accent-dot:hover { transform: scale(1.14); }
+  .accent-dot[aria-pressed="true"]::after {
+    content: ""; position: absolute; inset: -3px; border-radius: 50%;
+    border: 1.5px solid var(--ui-text-primary);
+  }
+
+  .sub-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 7px 14px; border-radius: 12px;
+    background: var(--ui-surface); box-shadow: inset 0 0 0 1px var(--ui-line);
+    font-size: 12px; color: var(--ui-text-secondary);
+  }
+  .sub-bar .lbl { font-weight: 500; color: var(--ui-text-primary); white-space: nowrap; }
+  .sub-bar .sep { width: 1px; height: 15px; background: var(--ui-border); }
+  .sub-bar .hint { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); }
+  .sub-toggle {
+    display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px;
+    border-radius: 7px; background: var(--ui-control); color: var(--ui-text-secondary); font-size: 11.5px;
+    transition: background .15s, color .15s;
+  }
+  .sub-toggle:hover { color: var(--ui-text-primary); background: var(--ui-control-hover); }
+  .sub-toggle[aria-pressed="true"] { background: var(--ui-soft); color: var(--ui-ink); font-weight: 500; }
+
+  /* ── 通用控制台控件（对齐 control.css & ui-conventions.md） ────────── */
+  .xb-btn-primary, .xb-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13px; font-weight: 500;
+    line-height: 1; white-space: nowrap; transition: background .15s, filter .15s, color .15s;
+  }
+  .xb-btn-primary {
+    color: #fff; background: linear-gradient(var(--ui-btn-hi), var(--ui-btn)); box-shadow: var(--ui-shadow-btn);
+  }
+  .xb-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+  .xb-btn-primary.flat { background: var(--ui-btn); box-shadow: none; }
+  .xb-btn {
+    color: var(--ui-text-primary); background: var(--ui-surface); box-shadow: var(--ui-shadow-btn-secondary);
+  }
+  .xb-btn:hover:not(:disabled) { background: var(--ui-surface-sunken); }
+  .xb-btn.is-sm, .xb-btn-primary.is-sm { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; }
+  .xb-btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px;
+    border-radius: 8px; background: transparent; color: var(--ui-text-secondary); font-size: 12.5px;
+    transition: background .15s, color .15s;
+  }
+  .xb-btn-ghost:hover:not(:disabled) { background: var(--ui-control); color: var(--ui-text-primary); }
+  .xb-btn-ghost.is-danger { color: var(--ui-danger); }
+  .xb-btn-ghost.is-danger:hover:not(:disabled) { background: rgba(217, 58, 68, .10); }
+  .xb-icon-btn {
+    width: 28px; height: 28px; border-radius: 7px; display: inline-grid; place-items: center;
+    color: var(--ui-text-secondary); transition: background .15s, color .15s;
+  }
+  .xb-icon-btn:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .xb-icon-btn.is-sm { width: 24px; height: 24px; border-radius: 6px; }
+  .xb-link { color: var(--ui-ink); font-size: inherit; font-weight: 500; }
+  .xb-link:hover { text-decoration: underline; }
+
+  .xb-seg {
+    display: inline-flex; align-items: center; padding: 2px; border-radius: 8px; background: var(--ui-control);
+  }
+  .xb-seg > button {
+    height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12.5px;
+    color: var(--ui-text-secondary); white-space: nowrap; transition: background .15s, color .15s;
+  }
+  .xb-seg > button:hover { color: var(--ui-text-primary); }
+  .xb-seg > button[aria-pressed="true"], .xb-seg > button[aria-checked="true"] {
+    background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .10);
+  }
+  html[data-theme="dark"] .xb-seg > button[aria-pressed="true"],
+  html[data-theme="dark"] .xb-seg > button[aria-checked="true"] { background: #48484C; }
+  .xb-seg.is-xs > button { height: 24px; padding: 0 8px; font-size: 11.5px; }
+
+  .xb-switch {
+    position: relative; width: 34px; height: 20px; border-radius: 999px;
+    background: var(--ui-border-strong); flex: none; transition: background .18s;
+  }
+  .xb-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+    transition: transform .18s;
+  }
+  .xb-switch[aria-checked="true"] { background: var(--ui-btn); }
+  .xb-switch[aria-checked="true"]::after { transform: translateX(14px); }
+  .xb-switch.is-sm { width: 28px; height: 16px; }
+  .xb-switch.is-sm::after { width: 12px; height: 12px; }
+  .xb-switch.is-sm[aria-checked="true"]::after { transform: translateX(12px); }
+
+  /* 统一悬浮菜单 xb-menu（一项一行、说明进 title + aria-description） */
+  .xb-menu {
+    min-width: 184px; padding: 5px; border-radius: 12px;
+    background: var(--ui-surface-raised); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    box-shadow: var(--ui-shadow-menu); color: var(--ui-text-primary); text-align: left; z-index: 60;
+  }
+  .xb-menu-item {
+    display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; padding: 0 10px;
+    border-radius: 8px; font-size: 13px; color: var(--ui-text-primary); text-align: left;
+    white-space: nowrap; transition: background .12s;
+  }
+  .xb-menu-item:hover, .xb-menu-item:focus-visible { background: var(--ui-surface-hover); outline: none; }
+  .xb-menu-item > svg:first-child { color: var(--ui-text-secondary); }
+  .xb-menu-item.is-active { background: var(--ui-soft); color: var(--ui-ink); font-weight: 500; }
+  .xb-menu-item.is-danger, .xb-menu-item.is-danger > svg:first-child { color: var(--ui-danger); }
+  .xb-menu-hint { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); padding-left: 10px; }
+  .xb-menu-sep { height: 1px; margin: 5px 6px; background: var(--ui-line); }
+  .xb-menu-label { padding: 5px 10px 3px; font-size: 11px; font-weight: 600; color: var(--ui-text-tertiary); }
+
+  /* ── 视图 1：伙伴页主画廊（聚焦卡片设计） ──────────────────────────── */
+  .stage-center { display: flex; justify-content: center; }
+  .console-shell {
+    width: 100%; max-width: 1200px; min-height: 780px; max-height: 880px;
+    display: grid; grid-template-columns: 216px minmax(0, 1fr);
+    border-radius: 16px; overflow: hidden; background: var(--ui-tint);
+    box-shadow: var(--ui-shadow-window); transition: max-width .24s ease, grid-template-columns .24s ease;
+  }
+  .console-shell[data-size="std"] { max-width: 960px; grid-template-columns: 196px minmax(0, 1fr); }
+  .console-shell[data-size="narrow"] { max-width: 560px; grid-template-columns: 56px minmax(0, 1fr); }
+
+  .sidebar {
+    padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; user-select: none; overflow: hidden;
+  }
+  .traffic-row { display: flex; align-items: center; gap: 7px; padding: 2px 6px 12px; }
+  .tl { width: 12px; height: 12px; border-radius: 50%; flex: none; cursor: pointer; }
+  .tl.c { background: var(--ui-window-close); }
+  .tl.m { background: var(--ui-window-minimize); }
+  .tl.e { background: var(--ui-window-expand); }
+  .nav-item {
+    height: 34px; padding: 0 10px; border-radius: 9px; display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--ui-text-secondary); white-space: nowrap; overflow: hidden;
+  }
+  .nav-item.active { background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .05); }
+  .console-shell[data-size="narrow"] .nav-item { justify-content: center; padding: 0; }
+  .console-shell[data-size="narrow"] .nav-item span { display: none; }
+  .console-shell[data-size="narrow"] .traffic-row { justify-content: center; gap: 5px; padding: 2px 0 12px; }
+  .console-shell[data-size="narrow"] .tl { width: 10px; height: 10px; }
+
+  .console-main {
+    margin: 8px 8px 8px 0; background: var(--ui-surface); border-radius: 12px;
+    box-shadow: var(--ui-shadow-panel); display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+    container-type: inline-size;
+  }
+
+  .studio-head { flex: none; display: flex; align-items: center; gap: 16px; padding: 20px 26px 0; }
+  .xb-tabs-lg { display: flex; align-items: center; gap: 20px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .xb-tabs-lg button { font-size: 19px; font-weight: 600; color: var(--ui-text-disabled); white-space: nowrap; }
+  .xb-tabs-lg button[aria-selected="true"] { color: var(--ui-text-primary); }
+  .studio-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+
+  .pt-toolbar {
+    flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 15px 26px 10px;
+  }
+  .pt-toolbar .cnt { font-weight: 500; color: var(--ui-text-secondary); margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .pt-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  .proactivity-pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+    border-radius: 999px; background: var(--ui-control); color: var(--ui-text-secondary);
+    font-size: 12px; font-weight: 500; transition: background .15s, color .15s;
+  }
+  .proactivity-pill:hover { background: var(--ui-control-hover); color: var(--ui-text-primary); }
+  .proactivity-pill.is-on { color: var(--ui-text-primary); }
+  .proactivity-pill .p-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ui-text-disabled); }
+  .proactivity-pill.is-on .p-dot { background: var(--ui-success); }
+  .master-switch-wrap { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ui-text-secondary); }
+
+  .pt-scroll {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 4px 26px 34px;
+    scrollbar-width: thin; scrollbar-color: var(--ui-scrollbar) transparent;
+  }
+  .pt-banner {
+    margin-top: 8px; padding: 9px 14px; border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; font-size: 12.5px;
+    background: var(--ui-surface-sunken); color: var(--ui-text-secondary);
+  }
+  .pt-banner.is-warn { background: rgba(224, 154, 43, .12); color: var(--ui-warning-text); }
+  .pt-banner .banner-act { margin-left: auto; }
+
+  .pet-theme-detail { margin-top: 24px; }
+  .pet-theme-detail:first-child { margin-top: 10px; }
+  .th-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .th-head .theme-swatch { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .th-head h2 { margin: 0; font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .th-head .sub { font-size: 12px; color: var(--ui-text-secondary); }
+  .th-head .tag-custom {
+    height: 18px; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 500;
+    background: var(--ui-control); color: var(--ui-text-secondary); display: inline-flex; align-items: center;
+  }
+  .theme-actions { margin-left: auto; position: relative; display: flex; align-items: center; gap: 6px; }
+
+  /* ── 核心升级：新一代伙伴卡片体系（4 → 3 → 2 列自适应） ────────────── */
+  .pet-cards {
+    margin-top: 13px;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px;
+  }
+  @container (max-width: 780px) { .pet-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+  @container (max-width: 540px) {
+    .pet-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .studio-head { padding: 16px 16px 0; }
+    .pt-toolbar { padding: 12px 16px 8px; }
+    .pt-scroll { padding: 4px 16px 24px; }
+  }
+
+  /* 卡片外壳：纯净中性画框 + 极简中性微光舞台 + 底部克制单行中性动作 */
+  .pet-card-v2 {
+    position: relative; min-width: 0;
+    border-radius: 16px; padding: 8px 8px 10px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+    display: flex; flex-direction: column; gap: 9px;
+    transition: transform .22s cubic-bezier(.22, 1, .36, 1), box-shadow .22s ease, background .2s ease;
+  }
+  .pet-card-v2:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ui-shadow-card-hover);
+  }
+  .pet-card-v2.is-menu-open { z-index: 40; }
+  .pet-card-v2.is-off .card-stage { opacity: .46; filter: grayscale(.55); }
+
+  /* 舞台区：纯中性柔光摄影棚底色，让花朵与多肉自然色彩成为唯一焦点 */
+  .card-stage {
+    position: relative; aspect-ratio: 1.08; border-radius: 12px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse 72% 58% at 50% 42%, #FFFFFF 0%, #F4F4F6 66%, #ECECEF 100%);
+    cursor: pointer;
+    transition: background .2s ease;
+  }
+  html[data-theme="dark"] .card-stage {
+    background: radial-gradient(ellipse 72% 58% at 50% 42%, #2B2C30 0%, #212226 68%, #1B1C20 100%);
+  }
+  .card-stage .pet-art-host {
+    width: 86%; height: 86%; display: flex; align-items: center; justify-content: center;
+    transition: transform .26s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  .pet-card-v2:hover .card-stage .pet-art-host { transform: translateY(-4px) scale(1.03); }
+  .card-stage.is-poked .pet-art-host { animation: petPoke .42s cubic-bezier(.34, 1.56, .64, 1); }
+
+  /* 舞台角标：精简克制毛玻璃微标 */
+  .stage-pill {
+    position: absolute; top: 8px; height: 21px; padding: 0 7px; border-radius: 999px;
+    background: color-mix(in srgb, var(--ui-surface) 90%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .06), inset 0 0 0 1px var(--ui-line);
+    font-size: 10.5px; font-weight: 500; color: var(--ui-text-secondary);
+    display: inline-flex; align-items: center; gap: 4px; z-index: 3; white-space: nowrap;
+  }
+  .stage-pill.left { left: 8px; }
+  .stage-pill.right { right: 8px; }
+  .stage-pill.is-clickable { cursor: pointer; transition: background .15s, color .15s; }
+  .stage-pill.is-clickable:hover { background: var(--ui-surface); color: var(--ui-text-primary); }
+  .stage-pill .live-dot { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--ui-success); }
+  .stage-pill.is-muted .live-dot { background: var(--ui-text-disabled); }
+
+  /* 图鉴卡底栏：全中性克制控件，不铺主题色色块 */
+  .card-foot {
+    display: flex; align-items: center; gap: 6px; padding: 0 3px; min-height: 28px; position: relative;
+  }
+  .card-name {
+    flex: 1; min-width: 0; font-size: 13px; font-weight: 550; color: var(--ui-text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card-cta-add {
+    height: 28px; padding: 0 10px; border-radius: 8px; flex: none;
+    background: var(--ui-control); color: var(--ui-text-primary);
+    font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;
+    transition: background .15s, color .15s;
+  }
+  .pet-card-v2:hover .card-cta-add, .card-cta-add:hover, .card-cta-add[aria-expanded="true"] {
+    background: var(--ui-control-hover);
+  }
+  .card-cta-manage {
+    height: 28px; padding: 0 9px; border-radius: 8px; flex: none;
+    background: var(--ui-control); color: var(--ui-text-primary);
+    font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;
+    transition: background .15s;
+  }
+  .card-cta-manage:hover { background: var(--ui-control-hover); }
+  .card-cta-plus {
+    width: 28px; height: 28px; border-radius: 8px; flex: none;
+    background: transparent; color: var(--ui-text-secondary);
+    display: inline-grid; place-items: center; transition: background .15s, color .15s;
+  }
+  .card-cta-plus:hover, .card-cta-plus[aria-expanded="true"] { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  /* 实例管理卡（在桌面上）：两层清晰结构，零截断 */
+  .inst-head {
+    display: flex; align-items: center; gap: 6px; padding: 0 3px;
+  }
+  .inst-head .card-name { font-size: 13px; }
+  .inst-sub {
+    padding: 0 3px; margin-top: -5px; font-size: 11px; color: var(--ui-text-tertiary);
+    display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden;
+  }
+  .inst-controls {
+    display: flex; align-items: center; gap: 5px; padding: 0 2px; position: relative;
+  }
+  .inst-controls .xb-seg { flex: 1; }
+  .inst-controls .xb-seg > button { flex: 1; padding: 0 4px; }
+
+  .desk-summary {
+    margin-top: 10px; display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 10px; background: var(--ui-surface-sunken);
+    font-size: 12px; color: var(--ui-text-secondary);
+  }
+  .desk-summary strong { color: var(--ui-text-primary); font-weight: 600; }
+  .desk-summary .spacer { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+  .pop-anchor { position: relative; }
+  .pop-menu { position: absolute; right: 0; top: calc(100% + 6px); }
+  .pop-menu.is-left { left: 0; right: auto; }
+  .pop-menu.is-up { top: auto; bottom: calc(100% + 6px); }
+
+  .xb-empty {
+    margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 44px 24px; border-radius: 16px; background: var(--ui-surface-sunken); text-align: center;
+  }
+  .xb-empty-icon {
+    width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center;
+    background: var(--ui-soft); color: var(--ui-ink);
+  }
+  .xb-empty h3 { margin: 2px 0 0; font-size: 15.5px; font-weight: 600; }
+  .xb-empty p { margin: 0; max-width: 360px; font-size: 12.5px; color: var(--ui-text-secondary); }
+
+  /* ── 视图 2：卡片全状态解剖展板（Design Spec） ──────────────────────── */
+  .spec-wrap { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .spec-section {
+    background: var(--ui-surface); border-radius: 16px; padding: 20px 24px 26px;
+    box-shadow: var(--ui-shadow-card);
+  }
+  .spec-section-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--ui-line);
+  }
+  .spec-section-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .spec-section-head span { font-size: 12px; color: var(--ui-text-secondary); }
+  .spec-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start;
+  }
+  @media (max-width: 960px) { .spec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .spec-slot { display: flex; flex-direction: column; gap: 10px; }
+  .spec-label {
+    font-size: 11.5px; font-weight: 600; color: var(--ui-text-secondary);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .spec-label .num {
+    width: 18px; height: 18px; border-radius: 5px; background: var(--ui-control); color: var(--ui-text-secondary);
+    font-size: 10.5px; display: inline-grid; place-items: center;
+  }
+  .spec-note { font-size: 11.5px; color: var(--ui-text-tertiary); line-height: 1.55; margin: 0; }
+  /* 强制展示悬停态的样卡 */
+  .pet-card-v2.force-hover { transform: translateY(-2px); box-shadow: var(--ui-shadow-card-hover); }
+  .pet-card-v2.force-hover .card-stage .pet-art-host { transform: translateY(-4px) scale(1.03); }
+  .pet-card-v2.force-hover .card-cta-add { background: var(--ui-control-hover); }
+  .static-menu-preview { position: static; width: 100%; margin-top: 6px; }
+
+  /* ── 视图 3 & 4：原生独立配置窗口（伙伴设置 / 主动陪伴） ────────────── */
+  .win-workspace {
+    max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px;
+  }
+  .native-win {
+    border-radius: 12px; overflow: hidden;
+    background: var(--ui-configuration-canvas);
+    box-shadow: var(--ui-shadow-window);
+    color: var(--ui-text-primary);
+  }
+  .pet-settings-win {
+    width: 656px; max-width: 100%; height: 556px;
+    display: grid; grid-template-columns: 224px minmax(0, 1fr);
+  }
+  @media (max-width: 700px) { .pet-settings-win { grid-template-columns: 1fr; height: auto; } }
+
+  .ps-left {
+    background: var(--ui-configuration-sidebar);
+    padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0;
+    border-right: 1px solid var(--ui-line);
+  }
+  .win-chrome { display: flex; align-items: center; gap: 7px; padding: 0 2px 2px; user-select: none; }
+  .win-chrome-title { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--ui-text-secondary); }
+
+  .ps-stage-box {
+    flex: 1; min-height: 240px; border-radius: 14px; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: radial-gradient(ellipse 72% 56% at 50% 42%, #FFFFFF 0%, #F4F4F6 68%, #ECECEF 100%);
+    padding: 12px; cursor: pointer; overflow: hidden;
+  }
+  html[data-theme="dark"] .ps-stage-box {
+    background: radial-gradient(ellipse 72% 56% at 50% 42%, #2B2C30 0%, #212226 68%, #1B1C20 100%);
+  }
+  .ps-meta-line { font-size: 11.5px; color: var(--ui-text-secondary); text-align: center; }
+  .ps-stage-hint { font-size: 11px; color: var(--ui-text-tertiary); }
+  .ps-left-acts { display: flex; flex-direction: column; gap: 3px; }
+  .ps-left-acts .xb-btn-ghost { width: 100%; justify-content: flex-start; height: 30px; font-size: 12px; }
+
+  .ps-right { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .ps-right-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 16px 22px 10px; }
+  .ps-right-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  .ps-live-chip {
+    margin-left: auto; height: 22px; padding: 0 8px; border-radius: 999px;
+    background: var(--ui-configuration-control); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .ps-live-chip i { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--ui-success); }
+
+  .ps-scroll {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 18px;
+    display: flex; flex-direction: column; gap: 12px;
+    scrollbar-width: thin; scrollbar-color: var(--ui-scrollbar) transparent;
+  }
+  .cfg-card { background: var(--ui-configuration-group); border-radius: 12px; padding: 2px 14px; }
+  .cfg-row {
+    display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 0;
+    border-top: 1px solid var(--ui-line);
+  }
+  .cfg-row:first-child { border-top: 0; }
+  .cfg-row.col { flex-direction: column; align-items: stretch; gap: 8px; padding: 11px 0; }
+  .cfg-lbl { font-size: 13px; font-weight: 500; color: var(--ui-text-primary); min-width: 76px; flex: none; }
+  .cfg-grow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .cfg-input {
+    width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 8px;
+    background: var(--ui-configuration-control); color: var(--ui-text-primary); font-size: 13px; outline: none;
+  }
+  .cfg-input:focus { box-shadow: 0 0 0 2px var(--ui-btn); background: var(--ui-configuration-surface); }
+  .cfg-input.is-err { box-shadow: 0 0 0 1.5px var(--ui-danger); }
+  .cfg-err { font-size: 11px; color: var(--ui-danger); }
+
+  .cfg-select-btn {
+    width: 100%; height: 32px; padding: 0 10px; border-radius: 8px;
+    background: var(--ui-configuration-control); color: var(--ui-text-primary);
+    display: flex; align-items: center; gap: 8px; font-size: 13px; text-align: left;
+  }
+  .cfg-select-btn:hover { background: var(--ui-control-hover); }
+  .cfg-select-btn .sub-grp { font-size: 11.5px; color: var(--ui-text-tertiary); }
+  .cfg-select-btn .chev { margin-left: auto; color: var(--ui-text-tertiary); }
+
+  .size-head { display: flex; align-items: center; gap: 8px; }
+  .size-val { font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 500; color: var(--ui-text-secondary); margin-left: auto; }
+  .size-presets { display: flex; gap: 4px; }
+  .size-presets button {
+    height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px;
+    background: var(--ui-configuration-control); color: var(--ui-text-secondary);
+  }
+  .size-presets button.active { background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .10); }
+  html[data-theme="dark"] .size-presets button.active { background: #48484C; }
+  .cfg-range { width: 100%; margin: 0; accent-color: var(--ui-btn); cursor: pointer; }
+
+  .mood-panel, .plant-panel {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 70;
+    max-height: 248px; overflow-y: auto; padding: 6px; border-radius: 12px;
+    background: var(--ui-surface-raised); box-shadow: var(--ui-shadow-menu);
+  }
+  .mood-panel.is-up, .plant-panel.is-up { top: auto; bottom: calc(100% + 6px); }
+  .mood-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin-bottom: 4px; }
+  .mood-opt {
+    height: 28px; padding: 0 8px; border-radius: 7px; font-size: 12.5px;
+    display: flex; align-items: center; gap: 5px; color: var(--ui-text-primary);
+  }
+  .mood-opt:hover { background: var(--ui-surface-hover); }
+  .mood-opt.on { background: var(--ui-control); color: var(--ui-text-primary); font-weight: 600; }
+  .plant-opt {
+    width: 100%; height: 36px; padding: 0 8px; border-radius: 8px;
+    display: flex; align-items: center; gap: 9px; font-size: 12.5px;
+  }
+  .plant-opt:hover { background: var(--ui-surface-hover); }
+  .plant-opt.on { background: var(--ui-control); color: var(--ui-text-primary); font-weight: 600; }
+  .plant-opt .thumb { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: var(--ui-configuration-control); flex: none; overflow: hidden; }
+
+  .ps-foot {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 11px 22px 13px; border-top: 1px solid var(--ui-line);
+    background: var(--ui-configuration-canvas);
+  }
+  .ps-foot .spacer { margin-right: auto; display: flex; align-items: center; gap: 6px; }
+
+  /* 主动陪伴独立窗口 */
+  .proactivity-win { width: 492px; max-width: 100%; display: flex; flex-direction: column; }
+  .pw-head { padding: 13px 16px 6px; display: flex; align-items: center; gap: 7px; }
+  .pw-title-row { padding: 4px 20px 12px; display: flex; align-items: center; gap: 10px; }
+  .pw-title-row h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .pw-body { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .pw-select {
+    height: 30px; padding: 0 10px; border: 0; border-radius: 8px;
+    background: var(--ui-configuration-control); color: var(--ui-text-primary); font-size: 12.5px; cursor: pointer;
+  }
+  .context-card {
+    background: var(--ui-configuration-group); border-radius: 12px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .context-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ui-text-secondary); }
+  .context-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ctx-chip {
+    height: 24px; padding: 0 9px; border-radius: 7px; font-size: 11.5px;
+    background: var(--ui-configuration-control); color: var(--ui-text-primary);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .pw-status-tag {
+    height: 21px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 500;
+    background: var(--ui-configuration-control); color: var(--ui-text-secondary);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .pw-status-tag i { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--ui-success); }
+  .pw-status-tag.off i { background: var(--ui-text-disabled); }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(10px);
+    padding: 8px 14px; border-radius: 10px; background: #1D1D1F; color: #fff;
+    font-size: 12.5px; box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 200;
+  }
+  html[data-theme="dark"] .toast { background: #3A3A3E; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @keyframes petPoke {
+    0% { transform: scale(1, 1); }
+    28% { transform: scale(1.06, .92) translateY(3px); }
+    62% { transform: scale(.97, 1.05) translateY(-5px); }
+    100% { transform: scale(1, 1); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── 顶部设计评审条 ── -->
+<div class="review-shell">
+  <div class="review-bar">
+    <div class="review-title">
+      <span class="review-badge">卡片升级稿</span>
+      <strong>小伴桌面 · 伙伴页卡片 &amp; 独立配置窗口</strong>
+    </div>
+    <div class="review-group" role="group" aria-label="视图切换">
+      <button type="button" data-view="page" aria-pressed="true">1. 伙伴页画廊</button>
+      <button type="button" data-view="spec" aria-pressed="false">2. 卡片全状态展板</button>
+      <button type="button" data-view="settings" aria-pressed="false">3. 伙伴设置独立窗</button>
+      <button type="button" data-view="proactivity" aria-pressed="false">4. 主动陪伴独立窗</button>
+    </div>
+    <div class="review-group" role="group" aria-label="外观模式">
+      <button type="button" data-theme-btn="light" aria-pressed="true">浅色</button>
+      <button type="button" data-theme-btn="dark" aria-pressed="false">深色</button>
+    </div>
+    <div class="accent-dots" role="group" aria-label="六套主题色">
+      <button type="button" class="accent-dot" data-accent-btn="red" aria-pressed="true" title="珊瑚红" style="background:#D93A44"></button>
+      <button type="button" class="accent-dot" data-accent-btn="green" aria-pressed="false" title="森屿绿" style="background:#2E8B5E"></button>
+      <button type="button" class="accent-dot" data-accent-btn="blue" aria-pressed="false" title="晴空蓝" style="background:#2F6FDB"></button>
+      <button type="button" class="accent-dot" data-accent-btn="purple" aria-pressed="false" title="星雾紫" style="background:#7152D8"></button>
+      <button type="button" class="accent-dot" data-accent-btn="amber" aria-pressed="false" title="暖琥珀" style="background:#A8640C"></button>
+      <button type="button" class="accent-dot" data-accent-btn="graphite" aria-pressed="false" title="石墨灰" style="background:#2B2B30"></button>
+    </div>
+  </div>
+  <div class="sub-bar" id="subBar"></div>
+</div>
+
+<!-- ── 视图 1：伙伴页主画廊 ── -->
+<section id="view-page" class="stage-center">
+  <div class="console-shell" id="consoleShell" data-size="wide">
+    <aside class="sidebar" aria-label="主侧栏示意">
+      <div class="traffic-row"><span class="tl c"></span><span class="tl m"></span><span class="tl e"></span></div>
+      <div class="nav-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M3 12h18"/></svg><span>新建任务</span></div>
+      <div class="nav-item active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.2 5.4L20 10.6l-5.8 2.2L12 18.2l-2.2-5.4L4 10.6l5.8-2.2z"/></svg><span>装扮</span></div>
+      <div class="nav-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg><span>资料库</span></div>
+      <div class="nav-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>关怀提醒</span></div>
+      <div class="nav-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v12H4z"/><path d="M9 7V4h6v3"/></svg><span>AI 插件</span></div>
+    </aside>
+
+    <main class="console-main">
+      <header class="studio-head">
+        <div class="xb-tabs-lg" role="tablist" aria-label="装扮类型">
+          <button type="button" role="tab" aria-selected="false" onclick="toast('设计稿聚焦「伙伴」页')">壁纸</button>
+          <button type="button" role="tab" aria-selected="false" onclick="toast('设计稿聚焦「伙伴」页')">特效</button>
+          <button type="button" role="tab" aria-selected="false" onclick="toast('设计稿聚焦「伙伴」页')">组件</button>
+          <button type="button" role="tab" aria-selected="true">伙伴</button>
+          <button type="button" role="tab" aria-selected="false" onclick="toast('设计稿聚焦「伙伴」页')">皮肤</button>
+        </div>
+        <div class="studio-actions">
+          <button type="button" class="xb-btn is-sm" title="导入 ZIP 宠物资源包" aria-description="导入别人分享的自定义宠物主题包" onclick="toast('已打开系统文件选择器（模拟导入 ZIP）')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导入
+          </button>
+          <button type="button" class="xb-btn-primary is-sm" onclick="toast('已打开新对话并填入宠物主题创作引导')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg>让小伴创作
+          </button>
+        </div>
+      </header>
+
+      <div class="pt-toolbar">
+        <div class="xb-seg" role="group" aria-label="伙伴筛选" id="pageFilterSeg">
+          <button type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter="desk" aria-pressed="false">在桌面上 <b class="cnt" id="deskCountBadge">3</b></button>
+          <button type="button" data-filter="mine" aria-pressed="false">我的</button>
+        </div>
+        <div class="pt-tools">
+          <button type="button" class="proactivity-pill is-on" id="proactivityPill" title="配置悬停问候与环境感知（打开独立窗口）" aria-description="配置悬停问候与环境感知，独立窗口不阻塞主界面" onclick="switchView('proactivity')">
+            <i class="p-dot"></i>
+            <span id="proactivityPillText">主动陪伴 · 自然</span>
+          </button>
+          <label class="master-switch-wrap" title="全局显示或暂时隐藏所有桌面伙伴">
+            <span>桌面伙伴</span>
+            <button type="button" role="switch" class="xb-switch" id="masterSwitch" aria-checked="true" aria-label="显示全部桌面伙伴"></button>
+          </label>
+        </div>
+      </div>
+
+      <div class="pt-scroll" id="pageScroll"></div>
+    </main>
+  </div>
+</section>
+
+<!-- ── 视图 2：卡片全状态解剖展板 ── -->
+<section id="view-spec" class="spec-wrap" hidden></section>
+
+<!-- ── 视图 3：伙伴设置 · 原生独立窗口 ── -->
+<section id="view-settings" class="win-workspace" hidden>
+  <div class="native-win pet-settings-win">
+    <aside class="ps-left">
+      <div class="win-chrome">
+        <span class="tl c" title="关闭窗口" onclick="switchView('page')"></span>
+        <span class="tl m" title="最小化"></span>
+        <span class="tl e" title="全屏 / 最大化"></span>
+        <span class="win-chrome-title">伙伴设置</span>
+      </div>
+      <div class="ps-stage-box" id="settingsStage" title="点击戳一戳互动">
+        <div id="settingsStageSvg" style="width:168px;height:168px;display:grid;place-items:center;transition:transform .2s"></div>
+        <span class="ps-meta-line" id="psMetaLine">花朵心语 · 小雏菊 · 主屏</span>
+        <span class="ps-stage-hint">戳一戳试试回应</span>
+      </div>
+      <div class="ps-left-acts">
+        <button type="button" class="xb-btn-ghost" title="将这只伙伴移回所在显示器正中央" onclick="toast('已将伙伴移到屏幕正中央')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>移到屏幕中间
+        </button>
+        <button type="button" class="xb-btn-ghost" title="以当前形象为参考让 AI 创作新主题" onclick="toast('已带入当前主题上下文进入创作对话')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg>让 AI 换个形象
+        </button>
+      </div>
+    </aside>
+
+    <div class="ps-right">
+      <header class="ps-right-head">
+        <h2 id="psHeadTitle">小雏菊</h2>
+        <span class="ps-live-chip" title="调整大小、心情与层级时桌面同步预览"><i></i>实时预览</span>
+      </header>
+      <div class="ps-scroll" id="settingsFormBody"></div>
+      <footer class="ps-foot" id="settingsFooter"></footer>
+    </div>
+  </div>
+</section>
+
+<!-- ── 视图 4：主动陪伴 · 原生独立窗口 ── -->
+<section id="view-proactivity" class="win-workspace" hidden>
+  <div class="native-win proactivity-win">
+    <div class="pw-head">
+      <span class="tl c" title="关闭窗口" onclick="switchView('page')"></span>
+      <span class="tl m" title="最小化"></span>
+      <span class="tl e" title="缩放"></span>
+    </div>
+    <div class="pw-title-row">
+      <h2>主动陪伴</h2>
+      <span class="pw-status-tag" id="pwStatusTag"><i></i>已开启 · 自然</span>
+    </div>
+    <div class="pw-body" id="proactivityBody"></div>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ── 原版 7 只官方伙伴与真实素材路径（严格保留原版伙伴形象，零改动） ── */
+const EXPRESSIONS = {
+  idle: '平静', happy: '开心', excited: '兴奋', laughing: '大笑', proud: '得意',
+  curious: '好奇', thinking: '思考', shy: '害羞', love: '喜爱',
+  confused: '困惑', surprised: '惊讶', sad: '难过', worried: '担心', angry: '生气',
+  annoyed: '不耐烦', crying: '哭泣', embarrassed: '尴尬',
+  sleepy: '困倦', sleeping: '睡眠', listening: '倾听', speaking: '说话',
+  greeting: '打招呼', waiting: '等待', offline: '离线', charging: '充电'
+};
+const MOOD_GROUPS = [
+  { name: '日常', items: ['idle', 'happy', 'excited', 'laughing', 'proud', 'curious', 'thinking', 'shy', 'love'] },
+  { name: '情绪', items: ['confused', 'surprised', 'sad', 'worried', 'angry', 'annoyed', 'crying', 'embarrassed'] },
+  { name: '状态', items: ['sleepy', 'sleeping', 'listening', 'speaking', 'greeting', 'waiting', 'offline', 'charging'] }
+];
+
+const THEMES = [
+  {
+    id: 'flower-whispers', name: '花朵心语', source: 'builtin', color: '#e8b7be',
+    description: '把一朵小花的心情，留在桌面上。',
+    pets: [
+      { id: 'green-sprout', name: '绿叶小伴', description: '保留原来的花盆与表情，换上绿叶小伴。', builtin: 'pot' },
+      { id: 'daisy', name: '小雏菊', description: '保留原来的花盆与表情，换上小雏菊。', builtin: 'pot-white-flower', img: '../../../src/companion/assets/white-flower/white_flower.webp', rect: [85, -82, 150, 150] },
+      { id: 'sunflower', name: '向日葵', description: '保留原来的花盆与表情，换上写实向日葵。', img: '../../../src/pets/assets/sunflower.webp', rect: [96, -29, 128, 185], slotShift: true },
+      { id: 'tulip', name: '郁金香', description: '保留原来的花盆与表情，换上写实郁金香。', img: '../../../src/pets/assets/tulip.webp', rect: [115.5, -34, 89, 190], slotShift: true }
+    ]
+  },
+  {
+    id: 'succulent-dots', name: '多肉点点', source: 'builtin', color: '#aabd9b',
+    description: '圆圆胖胖，安静生长的陪伴。',
+    pets: [
+      { id: 'echeveria', name: '石莲小点', description: '保留原来的花盆与表情，换上写实蜜桃石莲。', img: '../../../src/pets/assets/echeveria.webp', rect: [72, -1, 176, 158], slotShift: true },
+      { id: 'jade', name: '玉露团团', description: '保留原来的花盆与表情，换上写实翡翠玉露。', img: '../../../src/pets/assets/jade.webp', rect: [80, 5, 160, 151], slotShift: true },
+      { id: 'bear-paw', name: '熊童子', description: '保留原来的花盆与表情，换上写实熊童子。', img: '../../../src/pets/assets/bear-paw.webp', rect: [93.5, 1, 133, 155], slotShift: true }
+    ]
+  }
+];
+
+let nextId = 4;
+var state = {
+  view: 'page',
+  pageSize: 'wide',
+  filter: 'all',
+  masterEnabled: true,
+  showErrors: false,
+  instances: [
+    { id: 'pet-1', themeId: 'flower-whispers', petId: 'daisy', name: '小雏菊', size: 210, expression: 'happy', layer: 'topmost', enabled: true, links: true, monitor: '主屏' },
+    { id: 'pet-2', themeId: 'flower-whispers', petId: 'daisy', name: '书桌雏菊', size: 150, expression: 'sleepy', layer: 'desktop', enabled: true, links: true, monitor: '副屏' },
+    { id: 'pet-3', themeId: 'succulent-dots', petId: 'jade', name: '玉露团团', size: 180, expression: 'curious', layer: 'desktop', enabled: true, links: true, monitor: '主屏' },
+    { id: 'pet-4', themeId: 'flower-whispers', petId: 'sunflower', name: '向日葵', size: 220, expression: 'love', layer: 'topmost', enabled: false, links: true, monitor: '主屏' }
+  ],
+  editingId: 'pet-1',
+  editingSnapshot: null,
+  confirmRemoveId: null,
+  openMenu: null,
+  settingsDropdown: null,
+  proactivity: {
+    enabled: true,
+    frequency: 'natural',
+    contextEnabled: true,
+    calendarRegion: 'CN',
+    env: { date: '11 月 26 日 14:20', dayKind: '工作日', weather: '多云 · 19°C', activity: '当前空闲', task: '对话空闲' }
+  }
+};
+
+/* ── 1:1 复刻原版陶瓷花盆 + 原版 WebP 植物贴图 + 原版冰蓝发光表情屏 ── */
+function originalFaceMarkup(expr) {
+  const line = '#eaf9ff', pink = '#ff6f9a', blush = '#ff6f91';
+  const smileEyes = `<path d="M88 156A22 16 0 0 1 132 156M188 156A22 16 0 0 1 232 156" fill="none" stroke="${line}" stroke-width="8" stroke-linecap="round"/>`;
+  const solidEyes = `<ellipse cx="110" cy="151" rx="18" ry="20" fill="${line}"/><ellipse cx="210" cy="151" rx="18" ry="20" fill="${line}"/>`;
+  const catMouth = `<path d="M148 176Q154 183 160 176Q166 183 172 176" fill="none" stroke="${line}" stroke-width="4" stroke-linecap="round"/>`;
+  const openMouth = `<path d="M148 173Q160 192 172 173Z" fill="${pink}" stroke="${line}" stroke-width="3.2" stroke-linejoin="round"/>`;
+  const frownMouth = `<path d="M150 182Q160 174 170 182" fill="none" stroke="${line}" stroke-width="4" stroke-linecap="round"/>`;
+  const cheeks = `<ellipse cx="80" cy="178" rx="10" ry="5.5" fill="${blush}" opacity="0.72"/><ellipse cx="240" cy="178" rx="10" ry="5.5" fill="${blush}" opacity="0.72"/>`;
+
+  switch (expr) {
+    case 'happy': case 'greeting': case 'speaking':
+      return cheeks + smileEyes + (expr === 'happy' ? catMouth : openMouth);
+    case 'excited': case 'laughing':
+      return cheeks + `<path d="M95 140L123 151L95 162M225 140L197 151L225 162" fill="none" stroke="${line}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` + openMouth;
+    case 'love':
+      return cheeks +
+        `<path d="M110 166C92 153 86 138 98 132C105 129 110 137 110 140C110 137 115 129 122 132C134 138 128 153 110 166Z" fill="${pink}"/>` +
+        `<path d="M210 166C192 153 186 138 198 132C205 129 210 137 210 140C210 137 215 129 222 132C234 138 228 153 210 166Z" fill="${pink}"/>` + catMouth;
+    case 'sleepy': case 'sleeping':
+      return `<path d="M90 151A20 13 0 0 0 130 151M190 151A20 13 0 0 0 230 151" fill="none" stroke="${line}" stroke-width="7.5" stroke-linecap="round"/>` + catMouth +
+        `<text x="226" y="122" fill="${line}" font-size="16" font-weight="700" opacity="0.85">zZ</text>`;
+    case 'curious': case 'confused':
+      return solidEyes + `<circle cx="118" cy="147" r="7" fill="#050608"/><circle cx="218" cy="147" r="7" fill="#050608"/>` +
+        `<circle cx="162" cy="176" r="5" fill="none" stroke="${line}" stroke-width="3.6"/>` +
+        `<text x="230" y="124" fill="#ffd64d" font-size="18" font-weight="700">?</text>`;
+    case 'thinking':
+      return `<ellipse cx="110" cy="155" rx="18" ry="14" fill="${line}"/><ellipse cx="210" cy="155" rx="18" ry="14" fill="${line}"/>` +
+        `<circle cx="116" cy="158" r="6" fill="#050608"/><circle cx="216" cy="158" r="6" fill="#050608"/>` +
+        `<line x1="152" y1="176" x2="172" y2="176" stroke="${line}" stroke-width="4" stroke-linecap="round"/>`;
+    case 'surprised':
+      return `<circle cx="110" cy="151" r="20" fill="none" stroke="${line}" stroke-width="7"/><circle cx="210" cy="151" r="20" fill="none" stroke="${line}" stroke-width="7"/>` +
+        `<circle cx="160" cy="177" r="6.5" fill="${line}"/>`;
+    case 'shy': case 'embarrassed':
+      return cheeks + smileEyes + catMouth;
+    case 'sad': case 'worried': case 'crying':
+      return `<path d="M92 158L128 146M228 158L192 146" stroke="${line}" stroke-width="8" stroke-linecap="round"/>` + frownMouth +
+        (expr === 'crying' ? `<path d="M104 166V214M216 166V214" stroke="#5ec8ff" stroke-width="8" stroke-linecap="round" opacity="0.88"/>` : '');
+    case 'angry': case 'annoyed':
+      return `<path d="M92 144L128 158M228 144L192 158" stroke="${line}" stroke-width="8" stroke-linecap="round"/>` + frownMouth;
+    case 'proud':
+      return cheeks + `<ellipse cx="110" cy="151" rx="17" ry="19" fill="${line}"/><path d="M224 141L198 151L224 161" fill="none" stroke="${line}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` + catMouth;
+    case 'offline':
+      return `<line x1="92" y1="151" x2="128" y2="151" stroke="#5fb6ff" stroke-width="7" stroke-linecap="round"/><line x1="192" y1="151" x2="228" y2="151" stroke="#5fb6ff" stroke-width="7" stroke-linecap="round"/>` + catMouth;
+    case 'charging':
+      return smileEyes + catMouth + `<text x="228" y="124" fill="#7be07b" font-size="18" font-weight="700">⚡</text>`;
+    default: // idle / listening / waiting
+      return solidEyes + catMouth;
+  }
+}
+
+let uidSeq = 0;
+function renderOriginalPet(pet, expr = 'happy') {
+  const id = 'xbp' + (++uidSeq);
+  const pebbles = [[104, 57], [134, 61], [190, 61], [220, 57], [176, 54]]
+    .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="#c98b4a"/><circle cx="${x - 1}" cy="${y - 1}" r="1.1" fill="#e8b27a"/>`).join('');
+
+  /* 绿叶小伴原版双叶 + 茎干，或其余 6 款原版真实 WebP 素材 */
+  let plantFront = '';
+  let leaves = '';
+  if (pet.builtin === 'pot') {
+    const earPath = (mirror) => `<g ${mirror ? 'transform="translate(320 0) scale(-1 1)"' : ''}>
+      <ellipse cx="108" cy="-36" rx="64" ry="48" fill="url(#${id}halo)" opacity="0.72"/>
+      <path d="M160 6C150 -34 112 -66 64 -62C70 -18 112 24 160 6Z" fill="url(#${id}earShell)" stroke="#4a8f26" stroke-width="1.2"/>
+      <path d="M156 2C148 -26 118 -52 78 -52C84 -20 116 12 156 2Z" fill="url(#${id}earLight)"/>
+      <path d="M152 0C130 -18 104 -34 82 -48" fill="none" stroke="#fffbe8" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+    </g>`;
+    leaves = earPath(false) + earPath(true);
+    plantFront = `<ellipse cx="160" cy="57" rx="9" ry="2.6" fill="#3b2418" opacity="0.6"/>
+      <path d="M160 57C161 41 159 20 160 4" fill="none" stroke="#5aa92f" stroke-width="9" stroke-linecap="round"/>
+      <path d="M157.5 55C158.5 39 157 20 158 6" fill="none" stroke="#a6dd6b" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>`;
+  } else if (pet.builtin === 'pot-white-flower') {
+    const [x, y, w, h] = pet.rect;
+    plantFront = `<image href="${pet.img}" x="${x}" y="${y}" width="${w}" height="${h}" clip-path="url(#${id}wfClip)"/>`;
+  } else if (pet.img) {
+    const [x, y, w, h] = pet.rect;
+    plantFront = `<g transform="translate(0 -100)"><image href="${pet.img}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/></g>`;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -72 320 352" width="100%" height="100%" role="img" aria-label="${pet.name}">
+    <defs>
+      <radialGradient id="${id}shell" cx="0.36" cy="0.2" r="0.95"><stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="#fbf7f2"/><stop offset="0.82" stop-color="#ece3d9"/><stop offset="1" stop-color="#d3c6b8"/></radialGradient>
+      <linearGradient id="${id}shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stop-color="#6b4a30" stop-opacity="0"/><stop offset="1" stop-color="#6b4a30" stop-opacity="0.24"/></linearGradient>
+      <linearGradient id="${id}bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f0e8"/><stop offset="0.5" stop-color="#e4d9cb"/><stop offset="1" stop-color="#c9bba9"/></linearGradient>
+      <radialGradient id="${id}screen" cx="0.5" cy="0.18" r="0.95"><stop offset="0" stop-color="#1d222c"/><stop offset="0.55" stop-color="#090a0e"/><stop offset="1" stop-color="#020203"/></radialGradient>
+      <linearGradient id="${id}gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.09"/><stop offset="0.38" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <linearGradient id="${id}earShell" x1="0.3" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#b9e66c"/><stop offset="1" stop-color="#6cb62f"/></linearGradient>
+      <radialGradient id="${id}earLight" gradientUnits="userSpaceOnUse" cx="112" cy="-30" r="70"><stop offset="0" stop-color="#f6ffd8"/><stop offset="0.3" stop-color="#d4f58a"/><stop offset="0.62" stop-color="#8fd94a"/><stop offset="1" stop-color="#4fae2e"/></radialGradient>
+      <radialGradient id="${id}halo"><stop offset="0" stop-color="#b6f06a" stop-opacity="0.45"/><stop offset="1" stop-color="#b6f06a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}ground"><stop offset="0" stop-color="#000" stop-opacity="1"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <clipPath id="${id}headClip"><path d="M70 56A90 10 0 0 1 250 56C276 62 296 104 296 156C296 214 268 252 222 252H98C52 252 24 214 24 156C24 104 44 62 70 56Z"/></clipPath>
+      <clipPath id="${id}screenClip"><rect x="58" y="95" width="204" height="127" rx="45"/></clipPath>
+      <clipPath id="${id}wfClip"><rect x="64" y="-82" width="192" height="140"/></clipPath>
+      <filter id="${id}glow" filterUnits="userSpaceOnUse" x="58" y="95" width="204" height="127" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <g transform="translate(160 246) scale(0.76) translate(-160 -246)">
+      <ellipse cx="160" cy="250" rx="104" ry="11" fill="url(#${id}ground)" opacity="0.28"/>
+      ${leaves}
+      <path d="M70 56A90 10 0 0 1 250 56C276 62 296 104 296 156C296 214 268 252 222 252H98C52 252 24 214 24 156C24 104 44 62 70 56Z" fill="url(#${id}shell)" stroke="#d0c3b4" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M70 56A90 10 0 0 1 250 56C276 62 296 104 296 156C296 214 268 252 222 252H98C52 252 24 214 24 156C24 104 44 62 70 56Z" fill="url(#${id}shade)"/>
+      <g clip-path="url(#${id}headClip)">
+        <ellipse cx="160" cy="72" rx="94" ry="9" fill="#6b4a30" opacity="0.1"/>
+        <ellipse cx="160" cy="56" rx="90" ry="10" fill="#ece3d8"/>
+        <ellipse cx="160" cy="57" rx="81" ry="7.4" fill="#4b3022"/>
+        <ellipse cx="122" cy="56" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="150" cy="60" rx="4" ry="1.4" fill="#6b4730"/>
+        <ellipse cx="192" cy="58" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="214" cy="55" rx="4" ry="1.4" fill="#6b4730"/>
+        ${pebbles}
+        <ellipse cx="110" cy="50" rx="30" ry="1.8" fill="#fff" opacity="0.85"/>
+        <path d="M40 114C34 130 34 148 40 164" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+      </g>
+      ${plantFront}
+      <rect x="53" y="90" width="214" height="137" rx="50" fill="url(#${id}bezel)"/>
+      <rect x="58" y="95" width="204" height="127" rx="45" fill="url(#${id}screen)" stroke="#000" stroke-opacity="0.7" stroke-width="1.6"/>
+      <g clip-path="url(#${id}screenClip)"><g filter="url(#${id}glow)">${originalFaceMarkup(expr)}</g></g>
+      <rect x="58" y="95" width="204" height="127" rx="45" fill="url(#${id}gloss)" pointer-events="none"/>
+      <path d="M76 128Q78 104 106 100L146 99Q108 106 88 124Z" fill="#fff" opacity="0.07" pointer-events="none"/>
+    </g>
+  </svg>`;
+}
+
+/* ── 工具函数 ── */
+function findTheme(id) { return THEMES.find(t => t.id === id); }
+function findPet(themeId, petId) { return findTheme(themeId)?.pets.find(p => p.id === petId); }
+function onDeskOf(themeId, petId) { return state.instances.filter(i => i.themeId === themeId && i.petId === petId); }
+function freqLabel(f) { return f === 'quiet' ? '安静' : f === 'lively' ? '活泼' : '自然'; }
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ── 评审子栏 ── */
+function renderSubBar() {
+  const bar = document.getElementById('subBar');
+  if (state.view === 'page') {
+    bar.innerHTML = `
+      <span class="lbl">窗口宽度</span>
+      <div class="review-group">
+        <button type="button" onclick="setPageSize('wide')" aria-pressed="${state.pageSize==='wide'}">宽屏 · 4 列</button>
+        <button type="button" onclick="setPageSize('std')" aria-pressed="${state.pageSize==='std'}">标准 · 3 列</button>
+        <button type="button" onclick="setPageSize('narrow')" aria-pressed="${state.pageSize==='narrow'}">窄窗 · 2 列</button>
+      </div>
+      <span class="sep"></span>
+      <span class="lbl">卡片状态校验</span>
+      <button type="button" class="sub-toggle" aria-pressed="${!state.masterEnabled}" onclick="toggleMaster()">总开关关闭态</button>
+      <button type="button" class="sub-toggle" aria-pressed="${state.showErrors}" onclick="state.showErrors=!state.showErrors;renderAll()">主题损坏告警</button>
+      <span class="hint">100% 保留原版 7 只官方伙伴形象 · 聚焦优化卡片画框、动作收口与在桌面实例卡</span>`;
+  } else if (state.view === 'spec') {
+    bar.innerHTML = `
+      <span class="lbl">卡片解剖</span>
+      <span>并排检视图鉴卡（未添加 / 悬停态 / 已添单只 / 多实例菜单 / 轻量层级浮层）与实例管理卡（置顶 / 贴桌面 / 已隐藏）</span>
+      <span class="hint">切换顶部 6 套主题色与深浅色，可检验每张卡在不同配色下的和谐度</span>`;
+  } else if (state.view === 'settings') {
+    bar.innerHTML = `
+      <span class="lbl">当前审阅的伙伴</span>
+      <div class="review-group">
+        ${state.instances.map(i => `<button type="button" onclick="selectEditing('${i.id}')" aria-pressed="${i.id===state.editingId}">${i.name}</button>`).join('')}
+      </div>
+      <span class="hint">窗口只聚焦当前这一只伙伴（顶栏仅用于评审切换样本，不属于客户端界面）</span>`;
+  } else {
+    bar.innerHTML = `
+      <span class="lbl">主动陪伴 · 独立窗口</span>
+      <span>精简冗长说明进悬停提示 · 悬停问候与频率联动禁用 · 中文环境感知芯片</span>
+      <span class="hint">点击「完成」可返回伙伴页画廊</span>`;
+  }
+}
+
+function setPageSize(s) {
+  state.pageSize = s;
+  document.getElementById('consoleShell').dataset.size = s;
+  renderSubBar();
+}
+function toggleMaster() {
+  state.masterEnabled = !state.masterEnabled;
+  toast(state.masterEnabled ? '已恢复显示全部桌面伙伴' : '已暂时隐藏全部桌面伙伴');
+  renderAll();
+}
+
+/* ── 卡片 HTML 生成器（视图 1 与视图 2 共用） ── */
+function renderGalleryCard(theme, pet, opts = {}) {
+  const items = opts.items ?? onDeskOf(theme.id, pet.id);
+  const key = `${theme.id}/${pet.id}`;
+  const addOpen = opts.forceAddMenu || (state.openMenu?.type === 'add' && state.openMenu.key === key);
+  const manageOpen = opts.forceManageMenu || (state.openMenu?.type === 'manage' && state.openMenu.key === key);
+  const isUp = state.openMenu?.up && !opts.staticMenu;
+  const displayExpr = items[0]?.expression || 'happy';
+  const menuOpen = addOpen || manageOpen;
+
+  return `<article class="pet-card-v2 ${items.length ? 'is-on-desk' : ''} ${menuOpen ? 'is-menu-open' : ''} ${opts.forceHover ? 'force-hover' : ''}" style="--theme-color:${theme.color}">
+    <div class="card-stage" title="${pet.description}" aria-description="${pet.description}" onclick="pokeCard(this)">
+      ${items.length ? `<button type="button" class="stage-pill right is-clickable ${state.masterEnabled ? '' : 'is-muted'}" title="桌面上有 ${items.length} 只${pet.name}，点击管理" onclick="event.stopPropagation();handleCardManage(event,'${theme.id}','${pet.id}')">
+        <i class="live-dot"></i>${state.masterEnabled ? `${items.length} 只` : '已隐藏'}
+      </button>` : ''}
+      <div class="pet-art-host">${renderOriginalPet(pet, displayExpr)}</div>
+    </div>
+    <div class="card-foot">
+      <span class="card-name" title="${pet.description}" aria-description="${pet.description}">${pet.name}</span>
+      ${items.length ? `
+        <button type="button" class="card-cta-manage" aria-expanded="${manageOpen}" onclick="handleCardManage(event,'${theme.id}','${pet.id}')">
+          管理${items.length > 1 ? ' ▾' : ''}
+        </button>
+        <button type="button" class="card-cta-plus" title="再添加一只${pet.name}" aria-label="再添加一只${pet.name}" aria-expanded="${addOpen}" onclick="toggleMenu(event,'add','${key}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 5v14M5 12h14"/></svg>
+        </button>` : `
+        <button type="button" class="card-cta-add" aria-expanded="${addOpen}" onclick="toggleMenu(event,'add','${key}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>添加
+        </button>`}
+
+      ${addOpen ? `<div class="xb-menu ${opts.staticMenu ? 'static-menu-preview' : `pop-menu ${isUp ? 'is-up' : ''}`}" role="menu" aria-label="选择放置层级" onclick="event.stopPropagation()">
+        <div class="xb-menu-label">放到桌面</div>
+        <button type="button" role="menuitem" class="xb-menu-item" title="显示在其他窗口上方，随时陪着你" aria-description="显示在其他窗口上方，随时陪着你" onclick="addPet('${theme.id}','${pet.id}','topmost')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1h1V4H7v2h1a1 1 0 0 1 1 1z"/></svg>
+          始终置顶<span class="xb-menu-hint">推荐</span>
+        </button>
+        <button type="button" role="menuitem" class="xb-menu-item" title="放在桌面图标下方，不遮挡其他窗口" aria-description="放在桌面图标下方，不遮挡其他窗口" onclick="addPet('${theme.id}','${pet.id}','desktop')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          贴在桌面
+        </button>
+      </div>` : ''}
+
+      ${manageOpen ? `<div class="xb-menu ${opts.staticMenu ? 'static-menu-preview' : `pop-menu ${isUp ? 'is-up' : ''}`}" role="menu" aria-label="选择实例" onclick="event.stopPropagation()">
+        <div class="xb-menu-label">桌面上的实例（${items.length} 只）</div>
+        ${items.map(inst => `<button type="button" role="menuitem" class="xb-menu-item" onclick="closeMenu();openSettingsFor('${inst.id}')">
+          <span>${inst.name}</span>
+          <span class="xb-menu-hint">${inst.enabled ? `${inst.layer === 'topmost' ? '置顶' : '贴桌面'} · ${inst.monitor}` : '已隐藏'}</span>
+        </button>`).join('')}
+      </div>` : ''}
+    </div>
+  </article>`;
+}
+
+function renderInstanceCard(theme, pet, inst, opts = {}) {
+  const moreOpen = opts.forceMore || (state.openMenu?.type === 'deskMore' && state.openMenu.key === inst.id);
+  const off = !inst.enabled || !state.masterEnabled;
+  const isUp = state.openMenu?.up && !opts.staticMenu;
+
+  return `<article class="pet-card-v2 ${off ? 'is-off' : ''} ${moreOpen ? 'is-menu-open' : ''}" style="--theme-color:${theme.color}" oncontextmenu="event.preventDefault();openSettingsFor('${inst.id}')">
+    <div class="card-stage" title="点击戳一戳 · 右键打开伙伴设置" onclick="pokeCard(this)">
+      <span class="stage-pill left">${EXPRESSIONS[inst.expression]}</span>
+      <span class="stage-pill right">${inst.enabled ? inst.monitor : '已隐藏'}</span>
+      <div class="pet-art-host">${renderOriginalPet(pet, inst.expression)}</div>
+    </div>
+    <div class="inst-head">
+      <span class="card-name" title="${inst.name}（${pet.name}）">${inst.name}</span>
+      <button type="button" role="switch" class="xb-switch is-sm" aria-checked="${inst.enabled}" aria-label="显示 ${inst.name}" onclick="toggleInstance('${inst.id}')"></button>
+    </div>
+    <div class="inst-sub" title="尺寸 ${inst.size}px · 所在屏幕 ${inst.monitor}">
+      <span>${pet.name}</span><span>·</span><span>${inst.size}px</span>
+    </div>
+    <div class="inst-controls">
+      <div class="xb-seg is-xs" role="radiogroup" aria-label="显示层级">
+        <button type="button" role="radio" aria-checked="${inst.layer==='topmost'}" title="浮在所有窗口上方" onclick="setInstLayer('${inst.id}','topmost')">置顶</button>
+        <button type="button" role="radio" aria-checked="${inst.layer==='desktop'}" title="贴在桌面图标下方" onclick="setInstLayer('${inst.id}','desktop')">贴桌面</button>
+      </div>
+      <button type="button" class="xb-icon-btn" title="打开伙伴设置独立窗" onclick="openSettingsFor('${inst.id}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+      <div class="pop-anchor">
+        <button type="button" class="xb-icon-btn" aria-label="更多操作" onclick="toggleMenu(event,'deskMore','${inst.id}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+        ${moreOpen ? `<div class="xb-menu ${opts.staticMenu ? 'static-menu-preview' : `pop-menu ${isUp ? 'is-up' : ''}`}" role="menu" onclick="event.stopPropagation()">
+          <button type="button" class="xb-menu-item" onclick="closeMenu();openSettingsFor('${inst.id}')">伙伴设置<span class="xb-menu-hint">独立窗</span></button>
+          <button type="button" class="xb-menu-item" onclick="closeMenu();toast('已将「${inst.name}」移到${inst.monitor}中央')">移到屏幕中间</button>
+          <button type="button" class="xb-menu-item" onclick="addPet('${inst.themeId}','${inst.petId}','${inst.layer}')">再添加一只</button>
+          <div class="xb-menu-sep"></div>
+          <button type="button" class="xb-menu-item is-danger" onclick="removeInstance('${inst.id}')">从桌面移除</button>
+        </div>` : ''}
+      </div>
+    </div>
+  </article>`;
+}
+
+/* ── 视图 1：渲染伙伴页 ── */
+function renderPage() {
+  document.getElementById('deskCountBadge').textContent = state.instances.length;
+  document.querySelectorAll('#pageFilterSeg button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.filter === state.filter));
+  });
+  const pill = document.getElementById('proactivityPill');
+  pill.classList.toggle('is-on', state.proactivity.enabled);
+  document.getElementById('proactivityPillText').textContent = state.proactivity.enabled
+    ? `主动陪伴 · ${freqLabel(state.proactivity.frequency)}`
+    : '主动陪伴 · 已关';
+  document.getElementById('masterSwitch').setAttribute('aria-checked', String(state.masterEnabled));
+
+  const root = document.getElementById('pageScroll');
+  let html = '';
+
+  if (!state.masterEnabled) {
+    html += `<div class="pt-banner">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M1 1l22 22"/></svg>
+      <span>桌面伙伴总开关已关闭，当前 ${state.instances.length} 只伙伴均已暂时隐藏。</span>
+      <button type="button" class="xb-link banner-act" onclick="toggleMaster()">一键显示</button>
+    </div>`;
+  }
+  if (state.showErrors) {
+    html += `<div class="pt-banner is-warn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>1 个自定义主题「custom-demo.json」格式损坏，已跳过加载。</span>
+      <button type="button" class="xb-link banner-act" onclick="state.showErrors=false;renderAll()">知道了</button>
+    </div>`;
+  }
+
+  if (state.filter === 'desk') {
+    if (!state.instances.length) {
+      html += `<div class="xb-empty">
+        <span class="xb-empty-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg></span>
+        <h3>桌面上还没有小伙伴</h3>
+        <p>挑一只喜欢的伙伴放到桌面上，陪你一起工作和聊天。</p>
+        <button type="button" class="xb-btn-primary is-sm" onclick="state.filter='all';renderPage()">去挑选伙伴</button>
+      </div>`;
+    } else {
+      const visibleCount = state.instances.filter(i => i.enabled).length;
+      html += `<div class="desk-summary">
+        <span>共 <strong>${state.instances.length}</strong> 只在桌面上 · <strong>${visibleCount}</strong> 只显示中</span>
+        <div class="spacer">
+          <button type="button" class="xb-btn-ghost" onclick="toggleAllInstances(${visibleCount === 0})">${visibleCount === 0 ? '全部显示' : '全部隐藏'}</button>
+        </div>
+      </div>`;
+      const groups = THEMES.map(t => ({ theme: t, items: state.instances.filter(i => i.themeId === t.id) })).filter(g => g.items.length);
+      for (const g of groups) {
+        html += `<section class="pet-theme-detail">
+          <header class="th-head">
+            <h2>${g.theme.name}</h2>
+            <span class="sub">${g.items.length} 只</span>
+          </header>
+          <div class="pet-cards">
+            ${g.items.map(inst => renderInstanceCard(g.theme, findPet(g.theme.id, inst.petId), inst)).join('')}
+          </div>
+        </section>`;
+      }
+    }
+  } else if (state.filter === 'mine') {
+    html += `<div class="xb-empty">
+      <span class="xb-empty-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.8L19 9.7l-5.1 1.9L12 16.5l-1.9-4.9L5 9.7l5.1-1.9z"/></svg></span>
+      <h3>你想象中的小伙伴，在这里诞生。</h3>
+      <p>让 AI 创作你喜欢的自定义宠物主题，也可以导入别人分享的 ZIP 宠物资源包。</p>
+      <button type="button" class="xb-btn-primary is-sm" onclick="toast('已打开创作对话')">开始创作</button>
+    </div>`;
+  } else {
+    for (const theme of THEMES) {
+      const themeMenuOpen = state.openMenu?.type === 'theme' && state.openMenu.key === theme.id;
+      html += `<section class="pet-theme-detail">
+        <header class="th-head" title="${theme.description}" aria-description="${theme.description}">
+          <h2>${theme.name}</h2>
+          <span class="sub">${theme.pets.length} 款</span>
+          <div class="theme-actions">
+            <button type="button" class="xb-icon-btn is-sm" aria-label="${theme.name}更多操作" onclick="toggleMenu(event,'theme','${theme.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </button>
+            ${themeMenuOpen ? `<div class="xb-menu pop-menu" onclick="event.stopPropagation()">
+              <button type="button" class="xb-menu-item" title="以当前主题为参考让 AI 创作新主题" onclick="closeMenu();toast('已带入「${theme.name}」参考进入创作')">基于此主题创作</button>
+              <button type="button" class="xb-menu-item" title="导出此主题 JSON 结构作自定义参考" onclick="closeMenu();toast('已导出「${theme.name}」参考 JSON')">导出参考 JSON</button>
+            </div>` : ''}
+          </div>
+        </header>
+        <div class="pet-cards">
+          ${theme.pets.map(pet => renderGalleryCard(theme, pet)).join('')}
+        </div>
+      </section>`;
+    }
+  }
+  root.innerHTML = html;
+}
+
+/* ── 视图 2：渲染卡片全状态解剖展板 ── */
+function renderSpecBoard() {
+  const tFlower = THEMES[0];
+  const tSucculent = THEMES[1];
+  const daisy = tFlower.pets[1];
+  const tulip = tFlower.pets[3];
+  const echeveria = tSucculent.pets[0];
+  const jade = tSucculent.pets[1];
+  const bear = tSucculent.pets[2];
+
+  const sampleMulti = [
+    { id: 'pet-1', themeId: 'flower-whispers', petId: 'daisy', name: '小雏菊', size: 210, expression: 'happy', layer: 'topmost', enabled: true, monitor: '主屏' },
+    { id: 'pet-2', themeId: 'flower-whispers', petId: 'daisy', name: '书桌雏菊', size: 150, expression: 'sleepy', layer: 'desktop', enabled: true, monitor: '副屏' }
+  ];
+  const sampleSingle = [
+    { id: 'pet-3', themeId: 'succulent-dots', petId: 'jade', name: '玉露团团', size: 180, expression: 'curious', layer: 'desktop', enabled: true, monitor: '主屏' }
+  ];
+  const sampleHidden = { id: 'pet-4', themeId: 'flower-whispers', petId: 'sunflower', name: '向日葵', size: 220, expression: 'love', layer: 'topmost', enabled: false, monitor: '主屏' };
+
+  document.getElementById('view-spec').innerHTML = `
+    <div class="spec-section">
+      <div class="spec-section-head">
+        <h3>一、图鉴卡片状态（全部 / 我的）</h3>
+        <span>克制主题色：纯中性画框与柔光展台 + 全中性底栏操作，整页仅右上角主按钮用主题色</span>
+      </div>
+      <div class="spec-grid">
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">1</span>未添加 · 默认态</div>
+          ${renderGalleryCard(tFlower, tulip, { items: [] })}
+          <p class="spec-note">底栏仅保留名称与紧凑中性「+ 添加」按钮，去掉满屏彩色/灰条按钮，画面干净克制。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">2</span>未添加 · 悬停态</div>
+          ${renderGalleryCard(tSucculent, echeveria, { items: [], forceHover: true })}
+          <p class="spec-note">悬停卡片微浮、小伴轻抬，按钮保持中性浅灰加深，不滥用主题色抢夺植物本身色彩。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">3</span>点击「+ 添加」· 轻量层级浮层</div>
+          ${renderGalleryCard(tSucculent, bear, { items: [], forceAddMenu: true, staticMenu: true })}
+          <p class="spec-note">用就地 <code>xb-menu</code> 替代全屏遮罩 <code>NModal</code>，说明移入悬停提示，点选即落位。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">4</span>已添加多只 · 实例区分菜单</div>
+          ${renderGalleryCard(tFlower, daisy, { items: sampleMulti, forceManageMenu: true, staticMenu: true })}
+          <p class="spec-note">右上角毛玻璃绿点胶囊可直达管理；多只同款展开时右侧标注层级与主/副屏，同名也能一眼区分。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-section">
+      <div class="spec-section-head">
+        <h3>二、「在桌面上」实例管理卡片状态</h3>
+        <span>解决旧版单行三元素挤压截断：真实表情与主/副屏上移至角标，底栏直给高频层级快切</span>
+      </div>
+      <div class="spec-grid">
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">5</span>显示中 · 始终置顶</div>
+          ${renderInstanceCard(tFlower, daisy, sampleMulti[0])}
+          <p class="spec-note">左上角显示实时表情并同步渲染屏幕，右上角标明所在屏幕；第一行名称配开关，第二行尺寸配种类。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">6</span>显示中 · 贴在桌面</div>
+          ${renderInstanceCard(tSucculent, jade, sampleSingle[0])}
+          <p class="spec-note">底部「置顶 / 贴桌面」分段支持行内一键切换，无需进入独立设置窗口。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">7</span>已隐藏实例态</div>
+          ${renderInstanceCard(tFlower, tFlower.pets[2], sampleHidden)}
+          <p class="spec-note">单只关闭时舞台去色降不透明度，角标切为「已隐藏」，随时可拨回开启。</p>
+        </div>
+        <div class="spec-slot">
+          <div class="spec-label"><span class="num">8</span>实例「⋯」快捷菜单</div>
+          ${renderInstanceCard(tFlower, daisy, sampleMulti[1], { forceMore: true, staticMenu: true })}
+          <p class="spec-note">收纳移到屏幕中间、再添一只、独立设置窗与危险项「从桌面移除」，保持卡片紧凑克制。</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── 视图 3：伙伴设置独立窗口 ── */
+function openSettingsFor(id) {
+  state.editingId = id;
+  const inst = state.instances.find(i => i.id === id);
+  state.editingSnapshot = inst ? { ...inst } : null;
+  state.settingsDropdown = null;
+  state.confirmRemoveId = null;
+  switchView('settings');
+}
+
+function renderSettingsWindow() {
+  if (!state.instances.some(i => i.id === state.editingId)) state.editingId = state.instances[0]?.id || null;
+  const inst = state.instances.find(i => i.id === state.editingId);
+  renderSubBar();
+
+  const body = document.getElementById('settingsFormBody');
+  const footer = document.getElementById('settingsFooter');
+  if (!inst) {
+    document.getElementById('psHeadTitle').textContent = '暂无桌面伙伴';
+    document.getElementById('settingsStageSvg').innerHTML = '';
+    document.getElementById('psMetaLine').textContent = '';
+    body.innerHTML = `<div class="xb-empty" style="margin-top:8px"><h3>桌面上暂无伙伴</h3><button type="button" class="xb-btn-primary is-sm" onclick="switchView('page')">返回伙伴页</button></div>`;
+    footer.innerHTML = '';
+    return;
+  }
+
+  const theme = findTheme(inst.themeId);
+  const pet = findPet(inst.themeId, inst.petId);
+  document.getElementById('psHeadTitle').textContent = inst.name || pet?.name || '伙伴设置';
+  document.getElementById('psMetaLine').textContent = `${theme?.name ?? ''} · ${pet?.name ?? ''} · ${inst.monitor}`;
+  const previewPx = Math.round(112 + ((inst.size - 80) / 340) * 68);
+  const stageHost = document.getElementById('settingsStageSvg');
+  stageHost.style.width = `${previewPx}px`;
+  stageHost.style.height = `${previewPx}px`;
+  stageHost.innerHTML = renderOriginalPet(pet, inst.expression);
+
+  const moodGroupName = MOOD_GROUPS.find(g => g.items.includes(inst.expression))?.name || '日常';
+  const nameInvalid = !inst.name.trim();
+
+  body.innerHTML = `
+    <div class="cfg-card">
+      <div class="cfg-row">
+        <span class="cfg-lbl">名字</span>
+        <div class="cfg-grow" style="flex-direction:column;align-items:stretch;gap:3px">
+          <input type="text" class="cfg-input ${nameInvalid ? 'is-err' : ''}" maxlength="40" value="${inst.name.replace(/"/g, '&quot;')}" placeholder="输入伙伴昵称" oninput="updateEditing({name:this.value},true)" />
+          ${nameInvalid ? '<span class="cfg-err">请输入 1–40 个字符的昵称</span>' : ''}
+        </div>
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-lbl">形象</span>
+        <div class="cfg-grow pop-anchor">
+          <button type="button" class="cfg-select-btn" onclick="toggleSettingsDrop(event,'plant')">
+            <span>${theme?.name} · ${pet?.name}</span>
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
+          </button>
+          ${state.settingsDropdown === 'plant' ? `<div class="plant-panel" role="listbox" onclick="event.stopPropagation()">
+            ${THEMES.map(t => `<div class="xb-menu-label">${t.name}</div>` + t.pets.map(p => `
+              <button type="button" class="plant-opt ${inst.themeId===t.id && inst.petId===p.id ? 'on' : ''}" onclick="updateEditing({themeId:'${t.id}',petId:'${p.id}'});state.settingsDropdown=null;renderSettingsWindow()">
+                <span class="thumb">${renderOriginalPet(p, inst.expression)}</span>
+                <span>${p.name}</span>
+              </button>`).join('')).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+      <div class="cfg-row col">
+        <div class="size-head">
+          <span class="cfg-lbl">大小</span>
+          <div class="size-presets">
+            <button type="button" class="${inst.size===140?'active':''}" onclick="updateEditing({size:140})">小</button>
+            <button type="button" class="${inst.size===210?'active':''}" onclick="updateEditing({size:210})">标准</button>
+            <button type="button" class="${inst.size===300?'active':''}" onclick="updateEditing({size:300})">大</button>
+          </div>
+          <span class="size-val">${inst.size} px</span>
+        </div>
+        <input type="range" class="cfg-range" min="80" max="420" step="10" value="${inst.size}" aria-label="大小" oninput="updateEditing({size:Number(this.value)},true)" />
+      </div>
+    </div>
+
+    <div class="cfg-card">
+      <div class="cfg-row">
+        <span class="cfg-lbl">心情</span>
+        <div class="cfg-grow pop-anchor">
+          <button type="button" class="cfg-select-btn" onclick="toggleSettingsDrop(event,'mood')">
+            <i style="width:7px;height:7px;border-radius:50%;background:var(--ui-dot)"></i>
+            <span>${EXPRESSIONS[inst.expression]}</span>
+            <span class="sub-grp">${moodGroupName}</span>
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
+          </button>
+          ${state.settingsDropdown === 'mood' ? `<div class="mood-panel is-up" role="listbox" onclick="event.stopPropagation()">
+            ${MOOD_GROUPS.map(g => `<div class="xb-menu-label">${g.name}</div><div class="mood-grid">` + g.items.map(key => `
+              <button type="button" class="mood-opt ${inst.expression===key?'on':''}" onclick="updateEditing({expression:'${key}'});state.settingsDropdown=null;renderSettingsWindow()">${EXPRESSIONS[key]}</button>`).join('') + `</div>`).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-lbl" title="决定伙伴显示在其他窗口上方，还是贴在桌面图标下方">层级</span>
+        <div class="cfg-grow">
+          <div class="xb-seg" role="radiogroup" aria-label="层级">
+            <button type="button" role="radio" aria-checked="${inst.layer==='desktop'}" title="在桌面图标下方，不遮挡窗口" onclick="updateEditing({layer:'desktop'})">贴在桌面</button>
+            <button type="button" role="radio" aria-checked="${inst.layer==='topmost'}" title="浮在所有窗口上方，随时能戳到" onclick="updateEditing({layer:'topmost'})">始终置顶</button>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-row" title="开启后，伙伴会对桌面特效、问候和离开后的重逢做出回应">
+        <span class="cfg-lbl" style="flex:1">回应桌面状态</span>
+        <button type="button" role="switch" class="xb-switch" aria-checked="${inst.links}" onclick="updateEditing({links:!${inst.links}})"></button>
+      </div>
+    </div>`;
+
+  footer.innerHTML = `
+    <div class="spacer">
+      ${state.confirmRemoveId === inst.id
+        ? `<button type="button" class="xb-btn-ghost is-danger" onclick="removeInstance('${inst.id}')">确认从桌面移除</button>
+           <button type="button" class="xb-btn-ghost" onclick="state.confirmRemoveId=null;renderSettingsWindow()">保留</button>`
+        : `<button type="button" class="xb-btn-ghost is-danger" title="移除这只伙伴，主题作品仍保留" onclick="state.confirmRemoveId='${inst.id}';renderSettingsWindow()">从桌面移除</button>`}
+    </div>
+    <button type="button" class="xb-btn-ghost" onclick="revertEditing()">还原改动</button>
+    <button type="button" class="xb-btn-primary flat is-sm" ${nameInvalid ? 'disabled' : ''} onclick="toast('设置已保存并同步');switchView('page')">完成</button>`;
+}
+
+/* ── 视图 4：主动陪伴独立窗口 ── */
+function renderProactivityWindow() {
+  const p = state.proactivity;
+  const tag = document.getElementById('pwStatusTag');
+  tag.classList.toggle('off', !p.enabled);
+  tag.innerHTML = `<i></i>${p.enabled ? `已开启 · ${freqLabel(p.frequency)}` : '默认关闭'}`;
+  document.getElementById('proactivityBody').innerHTML = `
+    <div class="cfg-card">
+      <div class="cfg-row" title="鼠标停在宠物身上时，偶尔轻声打个招呼；不自动朗读、不读取屏幕、不主动调用 AI">
+        <span class="cfg-lbl" style="flex:1">悬停问候</span>
+        <button type="button" role="switch" class="xb-switch" aria-checked="${p.enabled}" onclick="pToggle('enabled')"></button>
+      </div>
+      <div class="cfg-row" title="限制每天主动打招呼的最大次数">
+        <span class="cfg-lbl" style="flex:1">陪伴频率</span>
+        <select class="pw-select" ${!p.enabled ? 'disabled' : ''} onchange="state.proactivity.frequency=this.value;renderProactivityWindow();toast('已更新陪伴频率')">
+          <option value="quiet" ${p.frequency==='quiet'?'selected':''}>安静 · 最多每天 1 次</option>
+          <option value="natural" ${p.frequency==='natural'?'selected':''}>自然 · 最多每天 2 次</option>
+          <option value="lively" ${p.frequency==='lively'?'selected':''}>活泼 · 最多每天 4 次</option>
+        </select>
+      </div>
+    </div>
+    <div class="cfg-card">
+      <div class="cfg-row" title="独立授权：让问候参考本地时间、日历、已有天气缓存与当前任务状态">
+        <span class="cfg-lbl" style="flex:1">环境上下文</span>
+        <button type="button" role="switch" class="xb-switch" aria-checked="${p.contextEnabled}" onclick="pToggle('contextEnabled')"></button>
+      </div>
+      <div class="cfg-row" title="用于区分工作日、休息日、法定节假日与调休">
+        <span class="cfg-lbl" style="flex:1">节假日地区</span>
+        <select class="pw-select" ${!p.contextEnabled ? 'disabled' : ''} onchange="state.proactivity.calendarRegion=this.value==='CN'?'CN':null;renderProactivityWindow()">
+          <option value="none" ${!p.calendarRegion?'selected':''}>未指定 · 不推断节假日</option>
+          <option value="CN" ${p.calendarRegion==='CN'?'selected':''}>中国大陆（含节假日与调休）</option>
+        </select>
+      </div>
+    </div>
+    ${p.contextEnabled ? `<div class="context-card">
+      <div class="context-head">
+        <span>最近感知状态</span>
+        <button type="button" class="xb-link" onclick="refreshEnv()">刷新</button>
+      </div>
+      <div class="context-chips">
+        <span class="ctx-chip">${p.env.date}</span>
+        <span class="ctx-chip">${p.calendarRegion ? p.env.dayKind : '未指定地区'}</span>
+        <span class="ctx-chip">${p.env.weather}</span>
+        <span class="ctx-chip">${p.env.activity}</span>
+        <span class="ctx-chip">${p.env.task}</span>
+      </div>
+    </div>` : ''}
+    <div style="display:flex;justify-content:flex-end;padding-top:2px">
+      <button type="button" class="xb-btn-primary flat is-sm" onclick="toast('主动陪伴设置已保存');switchView('page')">完成</button>
+    </div>`;
+}
+
+/* ── 交互事件 ── */
+function pokeCard(el) {
+  el.classList.remove('is-poked');
+  void el.offsetWidth;
+  el.classList.add('is-poked');
+}
+function toggleMenu(event, type, key) {
+  event.stopPropagation();
+  if (state.openMenu && state.openMenu.type === type && state.openMenu.key === key) { closeMenu(); return; }
+  const rect = event.currentTarget.getBoundingClientRect();
+  state.openMenu = { type, key, up: window.innerHeight - rect.bottom < 190 };
+  if (state.view === 'page') renderPage();
+}
+function closeMenu() { state.openMenu = null; if (state.view === 'page') renderPage(); }
+function handleCardManage(event, themeId, petId) {
+  const items = onDeskOf(themeId, petId);
+  if (items.length === 1) { openSettingsFor(items[0].id); return; }
+  toggleMenu(event, 'manage', `${themeId}/${petId}`);
+}
+function addPet(themeId, petId, layer) {
+  const pet = findPet(themeId, petId);
+  const existing = onDeskOf(themeId, petId).length;
+  const inst = {
+    id: 'pet-' + (++nextId), themeId, petId,
+    name: existing ? `${pet.name} ${existing + 1}` : pet.name,
+    size: 210, expression: 'happy', layer, enabled: true, links: true, monitor: '主屏'
+  };
+  state.instances.push(inst);
+  if (!state.masterEnabled) state.masterEnabled = true;
+  state.openMenu = null;
+  toast(`已将「${inst.name}」添加到桌面（${layer === 'topmost' ? '始终置顶' : '贴在桌面'}）`);
+  renderAll();
+}
+function toggleInstance(id) {
+  const inst = state.instances.find(i => i.id === id);
+  if (!inst) return;
+  inst.enabled = !inst.enabled;
+  renderAll();
+}
+function toggleAllInstances(show) {
+  state.instances.forEach(i => { i.enabled = show; });
+  toast(show ? '已显示全部桌面伙伴' : '已隐藏全部桌面伙伴');
+  renderAll();
+}
+function setInstLayer(id, layer) {
+  const inst = state.instances.find(i => i.id === id);
+  if (!inst || inst.layer === layer) return;
+  inst.layer = layer;
+  toast(`「${inst.name}」已切换为${layer === 'topmost' ? '始终置顶' : '贴在桌面'}`);
+  renderAll();
+}
+function removeInstance(id) {
+  const idx = state.instances.findIndex(i => i.id === id);
+  if (idx < 0) return;
+  const [removed] = state.instances.splice(idx, 1);
+  if (state.editingId === id) state.editingId = state.instances[0]?.id || null;
+  state.openMenu = null;
+  state.confirmRemoveId = null;
+  toast(`已从桌面移除「${removed.name}」`);
+  renderAll();
+}
+function selectEditing(id) {
+  state.editingId = id;
+  const inst = state.instances.find(i => i.id === id);
+  state.editingSnapshot = inst ? { ...inst } : null;
+  state.settingsDropdown = null;
+  state.confirmRemoveId = null;
+  renderSettingsWindow();
+}
+function toggleSettingsDrop(event, kind) {
+  event.stopPropagation();
+  state.settingsDropdown = state.settingsDropdown === kind ? null : kind;
+  renderSettingsWindow();
+}
+function updateEditing(patch, lightUpdate = false) {
+  const inst = state.instances.find(i => i.id === state.editingId);
+  if (!inst) return;
+  Object.assign(inst, patch);
+  if (lightUpdate) {
+    document.getElementById('psHeadTitle').textContent = inst.name || '伙伴设置';
+    const previewPx = Math.round(108 + ((inst.size - 80) / 340) * 68);
+    const stageHost = document.getElementById('settingsStageSvg');
+    stageHost.style.width = `${previewPx}px`;
+    stageHost.style.height = `${previewPx}px`;
+    const valEl = document.querySelector('.size-val');
+    if (valEl) valEl.textContent = `${inst.size} px`;
+  } else {
+    renderSettingsWindow();
+  }
+}
+function revertEditing() {
+  const inst = state.instances.find(i => i.id === state.editingId);
+  if (inst && state.editingSnapshot) {
+    Object.assign(inst, state.editingSnapshot);
+    toast('已还原本次改动');
+    renderSettingsWindow();
+  }
+}
+function pToggle(field) {
+  state.proactivity[field] = !state.proactivity[field];
+  renderProactivityWindow();
+  toast('感知与陪伴设置已保存');
+}
+function refreshEnv() {
+  const weathers = ['多云 · 19°C', '晴 · 22°C', '小雨 · 15°C'];
+  const idx = (weathers.indexOf(state.proactivity.env.weather) + 1) % weathers.length;
+  state.proactivity.env.weather = weathers[idx];
+  renderProactivityWindow();
+  toast('已读取最近一次本地感知状态');
+}
+document.getElementById('settingsStage').addEventListener('click', () => {
+  const box = document.getElementById('settingsStageSvg');
+  box.style.transform = 'scale(1.06, .92)';
+  setTimeout(() => { box.style.transform = ''; }, 180);
+});
+
+function switchView(view) {
+  state.view = view;
+  ['page', 'spec', 'settings', 'proactivity'].forEach(v => {
+    document.getElementById(`view-${v}`).hidden = v !== view;
+  });
+  document.querySelectorAll('[data-view]').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.view === view));
+  });
+  renderAll();
+}
+function renderAll() {
+  renderSubBar();
+  if (state.view === 'page') renderPage();
+  else if (state.view === 'spec') renderSpecBoard();
+  else if (state.view === 'settings') renderSettingsWindow();
+  else renderProactivityWindow();
+}
+
+document.querySelectorAll('[data-view]').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
+document.querySelectorAll('[data-theme-btn]').forEach(btn => btn.addEventListener('click', () => {
+  document.documentElement.dataset.theme = btn.dataset.themeBtn;
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+}));
+document.querySelectorAll('[data-accent-btn]').forEach(btn => btn.addEventListener('click', () => {
+  document.documentElement.dataset.accent = btn.dataset.accentBtn;
+  document.querySelectorAll('[data-accent-btn]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+}));
+document.querySelectorAll('#pageFilterSeg button').forEach(btn => btn.addEventListener('click', () => {
+  state.filter = btn.dataset.filter;
+  state.openMenu = null;
+  renderPage();
+}));
+document.getElementById('masterSwitch').addEventListener('click', toggleMaster);
+
+document.addEventListener('click', (e) => {
+  const el = e.target;
+  if (state.openMenu && !el?.closest?.('.xb-menu, .pop-anchor, .theme-actions, .card-foot, .inst-controls')) closeMenu();
+  if (state.settingsDropdown && !el?.closest?.('.pop-anchor, .mood-panel, .plant-panel')) { state.settingsDropdown = null; renderSettingsWindow(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (state.openMenu) closeMenu();
+    if (state.settingsDropdown) { state.settingsDropdown = null; renderSettingsWindow(); }
+  }
+});
+
+(function initFromQuery() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('theme') === 'dark') {
+    document.documentElement.dataset.theme = 'dark';
+    document.querySelectorAll('[data-theme-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === 'dark')));
+  }
+  if (q.get('accent')) {
+    document.documentElement.dataset.accent = q.get('accent');
+    document.querySelectorAll('[data-accent-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accentBtn === q.get('accent'))));
+  }
+  const tab = q.get('tab');
+  if (tab && ['all', 'desk', 'mine'].includes(tab)) state.filter = tab;
+  const view = q.get('view');
+  if (view && ['page', 'spec', 'settings', 'proactivity'].includes(view)) switchView(view);
+  else switchView('page');
+})();
+</script>
+</body>
+</html>
