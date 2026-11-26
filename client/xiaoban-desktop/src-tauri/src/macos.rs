@@ -114,15 +114,13 @@ pub fn interactive_frame(window: &tauri::WebviewWindow) -> Result<(f64,f64,f64,f
 pub fn set_interactive_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<(),String> {
     let window=window.clone();let layer=layer.to_string();let app=window.app_handle().clone();
     on_main(&app,move|_|{
-        // Tauri applies this synchronously when already on its event-loop thread.
-        // Do it first: false means Normal (0), not the desktop's negative level.
-        window.set_always_on_top(layer=="topmost").map_err(|e|e.to_string())?;
         let level=match layer.as_str(){
             "desktop"=>CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize+1,
             "topmost"=>CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize,
             _=>0,
         };
         let ns=native(&window)?;
+        // Tao queues its level write even on the main thread and would overwrite this value.
         ns.setLevel(level);
         if crate::widgets::is_widget(window.label()){
             let full_screen=if layer=="desktop"{NSWindowCollectionBehavior::FullScreenNone}else{NSWindowCollectionBehavior::FullScreenAuxiliary};
