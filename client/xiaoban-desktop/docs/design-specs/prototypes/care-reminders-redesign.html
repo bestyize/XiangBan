@@ -1,0 +1,2669 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴桌面 · 提醒页全新重设计（单栏专注流 · 按条绑定提醒方式）</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; }
+  body {
+    background: var(--ui-configuration-canvas);
+    color: var(--ui-text-primary);
+    font-family: -apple-system, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 20px 36px;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { border: 0; background: none; cursor: pointer; padding: 0; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--ui-btn);
+    outline-offset: 2px;
+  }
+  svg { flex-shrink: 0; display: block; }
+
+  /* ── 顶部预览控制条（不属于客户端界面） ───────────────────────────── */
+  .review-shell {
+    max-width: 1280px;
+    margin: 18px auto 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .review-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+  }
+  .review-title { display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
+  .review-badge {
+    height: 20px; padding: 0 8px; border-radius: 999px;
+    background: var(--ui-soft); color: var(--ui-ink);
+    font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap;
+  }
+  .review-title strong { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+  .review-group {
+    display: inline-flex; align-items: center; padding: 2px; border-radius: 9px;
+    background: var(--ui-control); gap: 2px;
+  }
+  .review-group button {
+    height: 27px; padding: 0 10px; border-radius: 7px; font-size: 12px;
+    color: var(--ui-text-secondary); white-space: nowrap; transition: all .15s;
+  }
+  .review-group button:hover { color: var(--ui-text-primary); }
+  .review-group button[aria-pressed="true"] {
+    background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+  }
+  html[data-theme="dark"] .review-group button[aria-pressed="true"] { background: #48484C; }
+  .review-btn {
+    height: 29px; padding: 0 10px; border-radius: 8px; background: var(--ui-control);
+    color: var(--ui-text-primary); font-size: 12px; display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap; transition: background .15s;
+  }
+  .review-btn:hover { background: var(--ui-control-hover); }
+  .review-btn[aria-pressed="true"] { background: var(--ui-text-primary); color: var(--ui-surface); font-weight: 500; }
+  .accent-dots {
+    display: inline-flex; align-items: center; gap: 5px; padding: 0 7px; height: 29px;
+    border-radius: 8px; background: var(--ui-control);
+  }
+  .accent-dot { width: 15px; height: 15px; border-radius: 50%; position: relative; transition: transform .15s; }
+  .accent-dot:hover { transform: scale(1.12); }
+  .accent-dot[aria-pressed="true"]::after {
+    content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid var(--ui-text-primary);
+  }
+  .launcher-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 14px;
+    border-radius: 12px; background: var(--ui-surface); box-shadow: inset 0 0 0 1px var(--ui-line);
+    font-size: 12px; color: var(--ui-text-secondary);
+  }
+  .launcher-bar > span { font-weight: 500; color: var(--ui-text-primary); white-space: nowrap; }
+  .launcher-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .launch-chip {
+    display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px;
+    border-radius: 7px; background: var(--ui-control); color: var(--ui-text-primary);
+    font-size: 11.5px; font-weight: 500; transition: all .15s;
+  }
+  .launch-chip:hover { background: var(--ui-text-primary); color: var(--ui-surface); }
+  .launcher-hint { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); }
+
+  /* ── 小伴桌面窗口外框 ──────────────────────────────────────────────── */
+  .desktop-stage { display: flex; justify-content: center; }
+  .window {
+    position: relative;
+    width: 100%; max-width: 1280px; height: 790px; max-height: calc(100dvh - 144px); min-height: 580px;
+    display: grid; grid-template-columns: 236px minmax(0, 1fr);
+    border-radius: 16px; overflow: hidden; background: var(--ui-tint);
+    box-shadow: var(--ui-shadow-panel), 0 18px 50px rgba(0, 0, 0, .09);
+    transition: max-width .24s cubic-bezier(.22, 1, .36, 1);
+  }
+  .window.w-std { max-width: 1040px; }
+  .window.w-narrow { max-width: 760px; grid-template-columns: 60px minmax(0, 1fr); }
+
+  /* 侧栏 */
+  .sidebar { display: flex; flex-direction: column; padding: 0 10px 12px; min-height: 0; overflow: hidden; user-select: none; }
+  .lights { height: 46px; display: flex; align-items: center; gap: 7px; padding-left: 8px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: var(--ui-window-close); }
+  .lights i:nth-child(2) { background: var(--ui-window-minimize); }
+  .lights i:nth-child(3) { background: var(--ui-window-expand); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(160deg, var(--ui-btn-hi), var(--ui-btn));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 6px rgba(0,0,0,.14); flex: none;
+  }
+  .brand strong { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+  .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow: hidden; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px; border-radius: 8px;
+    font-size: 13.5px; color: var(--ui-text-secondary); white-space: nowrap; transition: background .14s;
+  }
+  .nav-item:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+  .nav-item.is-active { background: var(--ui-soft); color: var(--ui-ink); font-weight: 600; }
+  .nav-item.is-active svg { color: var(--ui-ink); }
+  .nav-item .sub-hint { margin-left: auto; font-size: 11.5px; font-weight: 500; opacity: .88; font-variant-numeric: tabular-nums; }
+  .nav-sep { height: 1px; background: var(--ui-line); margin: 8px 10px; }
+  .account {
+    margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 10px 8px 0;
+    border-top: 1px solid var(--ui-line); font-size: 13px; font-weight: 500;
+  }
+  .account-av {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--ui-soft); color: var(--ui-ink);
+    display: grid; place-items: center; flex: none;
+  }
+  .window.w-narrow .sidebar { padding: 0 8px 12px; align-items: center; }
+  .window.w-narrow .lights { padding-left: 0; justify-content: center; gap: 5px; }
+  .window.w-narrow .lights i { width: 9px; height: 9px; }
+  .window.w-narrow .brand strong, .window.w-narrow .nav-item span,
+  .window.w-narrow .nav-item .sub-hint, .window.w-narrow .account span { display: none; }
+  .window.w-narrow .nav-item { justify-content: center; padding: 0; width: 38px; height: 34px; }
+  .window.w-narrow .account { justify-content: center; padding: 10px 0 0; }
+
+  /* ── 全新主内容面：释放右侧栏，单栏居中专注流 ──────────────────────── */
+  .main-panel {
+    position: relative;
+    margin: 8px 8px 8px 0;
+    background: var(--ui-surface);
+    border-radius: 12px;
+    box-shadow: var(--ui-shadow-panel);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    container: remind-stage / inline-size;
+
+    --c-blue-bg: #EBF3FC;   --c-blue-fg: #1F6AA8;
+    --c-green-bg: #ECF6EA;  --c-green-fg: #2E7A3E;
+    --c-purple-bg: #F2EEFC; --c-purple-fg: #5E43B8;
+    --c-amber-bg: #FEF3E2;  --c-amber-fg: #A35B0A;
+    --c-indigo-bg: #ECF0FC; --c-indigo-fg: #3451B2;
+  }
+  html[data-theme="dark"] .main-panel {
+    --c-blue-bg: #1D2D42;   --c-blue-fg: #8FC1F2;
+    --c-green-bg: #1E3526;  --c-green-fg: #8CD69F;
+    --c-purple-bg: #2B2544; --c-purple-fg: #BDB0F4;
+    --c-amber-bg: #3A2B16;  --c-amber-fg: #F2C07E;
+    --c-indigo-bg: #202945; --c-indigo-fg: #A2B8FF;
+  }
+
+  /* 居中可读容器：告别旧版撑满两栏的后台感 */
+  .stage-inner {
+    width: 100%;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* 顶部极简页头 */
+  .top-bar {
+    flex: none;
+    padding: 20px 0 12px;
+  }
+  .top-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .view-tabs { display: flex; align-items: center; gap: 22px; }
+  .view-tab {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    font-size: 20px; font-weight: 600; color: var(--ui-text-disabled);
+    transition: color .15s; padding: 2px 0;
+  }
+  .view-tab:hover { color: var(--ui-text-secondary); }
+  .view-tab[aria-selected="true"] { color: var(--ui-text-primary); }
+  .view-tab .cnt { font-size: 13px; font-weight: 500; color: var(--ui-text-tertiary); font-variant-numeric: tabular-nums; }
+
+  .top-controls {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+  }
+  .pill-status {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--ui-control);
+    color: var(--ui-text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: background .14s, color .14s;
+  }
+  .pill-status:hover { background: var(--ui-control-hover); color: var(--ui-text-primary); }
+  .pill-status.is-quiet { background: var(--c-purple-bg); color: var(--c-purple-fg); }
+  .pill-status.is-paused { background: var(--c-amber-bg); color: var(--c-amber-fg); }
+  .pill-status .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .icon-tool {
+    width: 32px; height: 32px; border-radius: 9px;
+    display: grid; place-items: center;
+    color: var(--ui-text-secondary);
+    background: transparent;
+    transition: background .14s, color .14s;
+  }
+  .icon-tool:hover, .icon-tool[aria-expanded="true"] { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  .btn-primary {
+    height: 32px; padding: 0 14px; border-radius: 9px;
+    background: linear-gradient(180deg, var(--ui-btn-hi), var(--ui-btn));
+    box-shadow: var(--ui-shadow-btn);
+    color: #fff; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    transition: filter .14s;
+  }
+  .btn-primary:hover { filter: brightness(1.04); }
+  .btn-soft {
+    height: 30px; padding: 0 11px; border-radius: 8px;
+    background: var(--ui-control); color: var(--ui-text-primary);
+    font-size: 12.5px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    transition: background .14s;
+  }
+  .btn-soft:hover { background: var(--ui-control-hover); }
+  .btn-ghost {
+    height: 30px; padding: 0 10px; border-radius: 8px;
+    color: var(--ui-text-secondary); font-size: 12.5px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    transition: background .14s, color .14s;
+  }
+  .btn-ghost:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  /* 全局偏好浮层（按需打开，不再霸占右侧常驻空间） */
+  .prefs-popover {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 312px;
+    border-radius: 14px;
+    background: var(--ui-surface-raised);
+    backdrop-filter: blur(22px);
+    box-shadow: var(--ui-shadow-dialog);
+    border: 1px solid var(--ui-border);
+    z-index: 45;
+    overflow: hidden;
+    animation: dropIn .16s cubic-bezier(.22, 1, .36, 1);
+  }
+  .prefs-popover[hidden] { display: none; }
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .pop-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 15px 9px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+  .pop-head strong { font-size: 13px; font-weight: 600; }
+  .pop-saved { font-size: 11px; color: var(--ui-success-text); opacity: 0; transition: opacity .2s; }
+  .pop-saved.is-show { opacity: 1; }
+  .pop-sec { padding: 10px 15px; border-top: 1px solid var(--ui-line); display: flex; flex-direction: column; gap: 9px; }
+  .pop-sec:first-of-type { border-top: 0; }
+  .pop-sec-label { font-size: 11px; font-weight: 600; color: var(--ui-text-tertiary); letter-spacing: .02em; }
+  .pop-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 26px; }
+  .pop-row-text { display: flex; flex-direction: column; min-width: 0; }
+  .pop-row-text span { font-size: 13px; font-weight: 500; color: var(--ui-text-primary); }
+  .pop-row-text small { font-size: 11px; color: var(--ui-text-tertiary); }
+  .pop-time-pair { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ui-text-secondary); }
+  .pop-time-pair input[type="time"] {
+    flex: 1; height: 28px; border: 0; border-radius: 7px; padding: 0 8px;
+    background: var(--ui-control); color: var(--ui-text-primary); font-variant-numeric: tabular-nums;
+  }
+  .pop-select {
+    width: 100%; height: 30px; border: 0; border-radius: 7px; padding: 0 9px;
+    background: var(--ui-control); color: var(--ui-text-primary); font-size: 12px;
+  }
+  .pop-channel-pills { display: flex; gap: 6px; }
+  .pop-ch {
+    flex: 1; height: 28px; border-radius: 7px; background: var(--ui-control); color: var(--ui-text-secondary);
+    font-size: 11.5px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    transition: all .14s;
+  }
+  .pop-ch[aria-pressed="true"] { background: var(--ui-soft); color: var(--ui-ink); font-weight: 600; }
+  .pop-foot {
+    padding: 9px 15px; background: var(--ui-surface-sunken); border-top: 1px solid var(--ui-line);
+    display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--ui-text-tertiary);
+  }
+  .pop-foot button { color: var(--ui-ink); font-weight: 500; }
+  .pop-foot button:hover { text-decoration: underline; }
+
+  /* 滚动主体 */
+  .stage-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 0 32px;
+  }
+  .stage-scroll::-webkit-scrollbar { width: 6px; }
+  .stage-scroll::-webkit-scrollbar-thumb { background: var(--ui-scrollbar); border-radius: 999px; }
+  .stage-stack { display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── 1. 一句话快建栏（Quick Capture） ──────────────────────────────── */
+  .quick-capture {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px 10px 14px;
+    border-radius: 14px;
+    background: var(--ui-surface-sunken);
+    border: 1px solid var(--ui-border);
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  .quick-capture:focus-within {
+    background: var(--ui-surface);
+    border-color: var(--ui-border-strong);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .05);
+  }
+  .qc-row { display: flex; align-items: center; gap: 10px; }
+  .qc-ico { color: var(--ui-ink); flex: none; }
+  .qc-input {
+    flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+    font-size: 13.5px; color: var(--ui-text-primary); padding: 4px 0;
+  }
+  .qc-input::placeholder { color: var(--ui-text-tertiary); }
+  .qc-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+  .qc-ch-btn {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: grid; place-items: center;
+    color: var(--ui-text-tertiary);
+    transition: background .13s, color .13s;
+  }
+  .qc-ch-btn:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+  .qc-ch-btn[aria-pressed="true"] { background: var(--ui-soft); color: var(--ui-ink); }
+  .qc-submit {
+    height: 28px; padding: 0 11px; border-radius: 7px;
+    background: var(--ui-text-primary); color: var(--ui-surface);
+    font-size: 12px; font-weight: 500; margin-left: 4px;
+    transition: opacity .14s;
+  }
+  .qc-submit:hover { opacity: .88; }
+  .qc-parsed {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding-top: 6px; border-top: 1px solid var(--ui-line);
+    font-size: 11.5px; color: var(--ui-text-secondary);
+  }
+  .qc-tag {
+    height: 21px; padding: 0 8px; border-radius: 6px;
+    background: var(--ui-soft); color: var(--ui-ink);
+    font-weight: 500; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .qc-tag.is-neutral { background: var(--ui-control); color: var(--ui-text-secondary); }
+
+  /* ── 2. 焦点卡片：下一条即将触发 / 全局状态 ───────────────────────── */
+  .spotlight {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 15px 18px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--ui-soft) 0%, var(--ui-surface-sunken) 65%);
+    border: 1px solid var(--ui-border);
+  }
+  html[data-theme="dark"] .spotlight {
+    background: linear-gradient(135deg, var(--ui-soft) 0%, var(--ui-surface-sunken) 70%);
+  }
+  .spotlight.is-quiet { background: var(--c-purple-bg); border-color: transparent; }
+  .spotlight.is-paused { background: var(--c-amber-bg); border-color: transparent; }
+  .spot-clock {
+    display: flex; flex-direction: column; align-items: flex-start; min-width: 82px; flex: none;
+    padding-right: 16px; border-right: 1px solid var(--ui-line);
+  }
+  .spot-clock strong {
+    font-size: 24px; font-weight: 700; line-height: 1.1; letter-spacing: -.02em;
+    color: var(--ui-ink); font-variant-numeric: tabular-nums;
+  }
+  .spot-clock span { font-size: 11.5px; color: var(--ui-text-secondary); margin-top: 3px; }
+  .spot-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .spot-eyebrow {
+    display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--ui-ink);
+  }
+  .spot-title {
+    font-size: 15px; font-weight: 600; color: var(--ui-text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .spot-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ui-text-secondary); flex-wrap: wrap; }
+  .spot-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+
+  /* ── 3. 轻筛选条 ───────────────────────────────────────────────────── */
+  .filter-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .filter-chip {
+    height: 27px; padding: 0 11px; border-radius: 999px;
+    background: transparent; color: var(--ui-text-secondary);
+    font-size: 12px; font-weight: 500; transition: all .14s;
+  }
+  .filter-chip:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+  .filter-chip[aria-pressed="true"] { background: var(--ui-text-primary); color: var(--ui-surface); }
+  .filter-meta { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); display: inline-flex; align-items: center; gap: 5px; }
+
+  /* ── 4. 提醒分组与精炼行（行内直接展示 & 切换绑定提醒方式！） ──────── */
+  .group-block { display: flex; flex-direction: column; gap: 8px; }
+  .group-title {
+    padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--ui-text-tertiary);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .group-card {
+    border-radius: 14px;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow-card);
+  }
+  html[data-theme="dark"] .group-card { background: var(--ui-surface-sunken); }
+
+  .r-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 16px;
+    border-top: 1px solid var(--ui-line);
+    cursor: pointer;
+    transition: background .13s;
+  }
+  .r-row:first-child { border-top: 0; border-radius: 13px 13px 0 0; }
+  .r-row:last-child { border-radius: 0 0 13px 13px; }
+  .r-row:only-child { border-radius: 13px; }
+  .r-row:hover { background: var(--ui-surface-hover); }
+  .r-row.is-muted .r-ico { opacity: .5; filter: saturate(.4); }
+  .r-row.is-muted .r-title { color: var(--ui-text-secondary); }
+
+  .r-ico {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center; flex: none;
+  }
+  .r-ico.is-custom   { background: var(--c-blue-bg);   color: var(--c-blue-fg); }
+  .r-ico.is-rest     { background: var(--c-green-bg);  color: var(--c-green-fg); }
+  .r-ico.is-off-work { background: var(--c-purple-bg); color: var(--c-purple-fg); }
+  .r-ico.is-weather  { background: var(--c-amber-bg);  color: var(--c-amber-fg); }
+  .r-ico.is-agent    { background: var(--c-indigo-bg); color: var(--c-indigo-fg); }
+
+  .r-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .r-title-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .r-title {
+    font-size: 14px; font-weight: 500; color: var(--ui-text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .r-sub {
+    font-size: 12px; color: var(--ui-text-secondary);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .weather-inline {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 7px; border-radius: 999px;
+    background: var(--c-amber-bg); color: var(--c-amber-fg);
+    font-size: 11px; font-weight: 500;
+  }
+
+  /* 每条提醒独立的「提醒方式」微胶囊组：默认只亮起已启用的，悬停可一键直切！ */
+  .channel-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px;
+    border-radius: 8px;
+    background: transparent;
+    flex: none;
+    transition: background .14s;
+  }
+  .r-row:hover .channel-strip, .channel-strip:focus-within { background: var(--ui-control); }
+  .ch-btn {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: grid; place-items: center;
+    color: var(--ui-text-tertiary);
+    opacity: 0;
+    transition: opacity .13s, background .13s, color .13s;
+  }
+  .r-row:hover .ch-btn, .channel-strip:focus-within .ch-btn { opacity: .65; }
+  .ch-btn:hover { opacity: 1 !important; background: var(--ui-surface); color: var(--ui-text-primary); }
+  .ch-btn.is-on {
+    opacity: 1 !important;
+    color: var(--ui-ink);
+    background: var(--ui-soft);
+  }
+  .ch-btn.is-on-neutral {
+    opacity: 1 !important;
+    color: var(--ui-text-secondary);
+    background: var(--ui-control);
+  }
+
+  .r-right { display: flex; align-items: center; gap: 10px; flex: none; }
+  .r-next {
+    font-size: 12px; color: var(--ui-text-secondary); white-space: nowrap;
+    font-variant-numeric: tabular-nums; min-width: 68px; text-align: right;
+  }
+  .r-next.is-paused { color: var(--ui-text-tertiary); }
+
+  .more-wrap { position: relative; }
+  .row-more-btn {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: grid; place-items: center; color: var(--ui-text-tertiary);
+    opacity: 0; transition: opacity .13s, background .13s, color .13s;
+  }
+  .r-row:hover .row-more-btn, .r-row:focus-within .row-more-btn, .r-row.menu-open .row-more-btn { opacity: 1; }
+  .row-more-btn:hover, .r-row.menu-open .row-more-btn { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  /* Switch */
+  .switch {
+    width: 34px; height: 19px; border-radius: 999px;
+    background: var(--ui-control-hover); position: relative; flex: none;
+    transition: background .18s;
+  }
+  html[data-theme="dark"] .switch { background: #3E3E42; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 2.5px rgba(0, 0, 0, .22);
+    transition: transform .18s cubic-bezier(.22, 1, .36, 1);
+  }
+  .switch[aria-checked="true"] { background: var(--ui-btn); }
+  .switch[aria-checked="true"]::after { transform: translateX(15px); }
+
+  /* xb-menu */
+  .xb-menu {
+    position: absolute; right: 0; top: calc(100% + 5px); min-width: 176px;
+    padding: 5px; border-radius: 12px;
+    background: var(--ui-surface-raised); backdrop-filter: blur(18px);
+    box-shadow: var(--ui-shadow-menu); z-index: 40;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .xb-menu[hidden] { display: none; }
+  .xb-menu-item {
+    display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px;
+    border-radius: 7px; font-size: 13px; color: var(--ui-text-primary); text-align: left; white-space: nowrap;
+  }
+  .xb-menu-item:hover { background: var(--ui-surface-hover); }
+  .xb-menu-item.is-danger { color: var(--ui-danger); }
+  .xb-menu-sep { height: 1px; background: var(--ui-line); margin: 4px 6px; }
+
+  /* ── 5. 定时任务专用卡片流（更舒展，直接可读上次产出） ──────────────── */
+  .task-grid { display: flex; flex-direction: column; gap: 12px; }
+  .task-card {
+    border-radius: 14px; background: var(--ui-surface); border: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow-card); overflow: hidden; transition: border-color .15s;
+  }
+  html[data-theme="dark"] .task-card { background: var(--ui-surface-sunken); }
+  .task-card:hover { border-color: var(--ui-border-strong); }
+  .task-top {
+    display: flex; align-items: center; gap: 13px; padding: 14px 16px; cursor: pointer;
+  }
+  .task-run-box {
+    margin: 0 16px 14px 65px;
+    padding: 10px 13px;
+    border-radius: 10px;
+    background: var(--ui-surface-sunken);
+    border: 1px solid var(--ui-line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  html[data-theme="dark"] .task-run-box { background: rgba(255, 255, 255, .03); }
+  .task-run-head {
+    display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ui-text-tertiary);
+  }
+  .run-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .run-dot.ok { background: var(--ui-success); }
+  .run-dot.running { background: var(--ui-btn); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  .task-run-summary { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ui-text-primary); }
+  .task-run-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .mini-link {
+    height: 24px; padding: 0 8px; border-radius: 6px;
+    font-size: 11.5px; font-weight: 500; color: var(--ui-ink);
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background .13s;
+  }
+  .mini-link:hover { background: var(--ui-soft); }
+  .mini-link.is-neutral { color: var(--ui-text-secondary); }
+  .mini-link.is-neutral:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  /* ── 6. 轻量化灵感模板行（有数据时不抢戏，空状态展开为 3 列卡） ──── */
+  .tpl-strip {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 4px 2px;
+  }
+  .tpl-strip-label { font-size: 12px; color: var(--ui-text-tertiary); margin-right: 2px; }
+  .tpl-pill {
+    height: 29px; padding: 0 11px; border-radius: 999px;
+    background: var(--ui-surface-sunken); border: 1px solid var(--ui-border);
+    color: var(--ui-text-secondary); font-size: 12px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all .14s;
+  }
+  .tpl-pill:hover { border-color: var(--ui-border-strong); color: var(--ui-text-primary); background: var(--ui-surface); }
+
+  .empty-stage {
+    padding: 40px 24px 24px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .empty-icon {
+    width: 48px; height: 48px; border-radius: 14px; background: var(--ui-soft); color: var(--ui-ink);
+    display: grid; place-items: center; margin-bottom: 4px;
+  }
+  .empty-stage h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .empty-stage p { margin: 0; max-width: 360px; font-size: 12.5px; color: var(--ui-text-secondary); }
+  .tpl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin-top: 14px; }
+  .tpl-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    padding: 14px; border-radius: 13px; background: var(--ui-surface-sunken);
+    border: 1px solid var(--ui-border); text-align: left; transition: all .15s;
+  }
+  .tpl-card:hover { background: var(--ui-surface); border-color: var(--ui-border-strong); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.05); }
+  .tpl-card strong { font-size: 13px; font-weight: 600; color: var(--ui-text-primary); }
+  .tpl-card span { font-size: 12px; color: var(--ui-text-secondary); line-height: 1.45; }
+  .tpl-card small { margin-top: auto; font-size: 11px; color: var(--ui-text-tertiary); }
+
+  /* 已完成折叠条 */
+  .done-bar { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+  .done-toggle {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500;
+    color: var(--ui-text-tertiary); padding: 3px 6px; border-radius: 6px;
+  }
+  .done-toggle:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+  .done-clear { margin-left: auto; font-size: 12px; color: var(--ui-text-tertiary); padding: 3px 7px; border-radius: 6px; }
+  .done-clear:hover { color: var(--ui-danger); background: var(--ui-control); }
+
+  /* ── 7. 独立窗口编辑器（核心：内置单条「如何提醒我」触达卡片） ────── */
+  .float-editor {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100vw - 32px)); max-height: min(710px, calc(100dvh - 44px));
+    border-radius: 16px; background: var(--ui-configuration-canvas);
+    box-shadow: var(--ui-shadow-dialog); display: flex; flex-direction: column;
+    overflow: hidden; z-index: 60; animation: popIn .18s cubic-bezier(.22, 1, .36, 1);
+  }
+  .float-editor[hidden] { display: none; }
+  @keyframes popIn { from { opacity: 0; transform: translate(-50%, -48%) scale(.97); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+  .win-chrome {
+    flex: none; height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 10px;
+    background: var(--ui-surface); border-bottom: 1px solid var(--ui-line); user-select: none;
+  }
+  .win-lights { display: flex; align-items: center; gap: 7px; }
+  .win-light {
+    width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center;
+    color: transparent; font-size: 9px; font-weight: 700;
+  }
+  .win-lights:hover .win-light { color: rgba(0,0,0,.55); }
+  .win-light.close { background: var(--ui-window-close); }
+  .win-light.min { background: var(--ui-window-minimize); }
+  .win-light.max { background: var(--ui-window-expand); }
+  .win-title { font-size: 13.5px; font-weight: 600; }
+  .win-tag { margin-left: auto; font-size: 11px; color: var(--ui-text-tertiary); padding: 2px 7px; border-radius: 6px; background: var(--ui-control); }
+
+  .ed-body { flex: 1; min-height: 0; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 13px; }
+  .ed-card { border-radius: 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); overflow: hidden; }
+  .ed-field { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--ui-line); }
+  .ed-field:first-child { border-top: 0; }
+  .ed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ed-label { font-size: 12px; font-weight: 500; color: var(--ui-text-secondary); }
+  .ed-hint { font-size: 11.5px; color: var(--ui-text-tertiary); line-height: 1.45; }
+
+  .kind-pills { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+  .kind-pill {
+    height: 30px; border-radius: 8px; background: var(--ui-control); color: var(--ui-text-secondary);
+    font-size: 12px; font-weight: 500; transition: all .14s;
+  }
+  .kind-pill:hover { background: var(--ui-control-hover); color: var(--ui-text-primary); }
+  .kind-pill[aria-pressed="true"] { background: var(--ui-soft); color: var(--ui-ink); font-weight: 600; }
+
+  .seg-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 9px; background: var(--ui-control); }
+  .seg-btn { height: 27px; border-radius: 7px; font-size: 12px; color: var(--ui-text-secondary); transition: all .14s; }
+  .seg-btn[aria-pressed="true"] { background: var(--ui-surface); color: var(--ui-text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  html[data-theme="dark"] .seg-btn[aria-pressed="true"] { background: #48484C; }
+
+  .ctrl-input, .ctrl-textarea, .ctrl-time, .ctrl-num {
+    border: 0; border-radius: 8px; padding: 7px 10px; background: var(--ui-control);
+    color: var(--ui-text-primary); font-size: 13px;
+  }
+  .ctrl-input, .ctrl-textarea { width: 100%; }
+  .ctrl-textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+  .ctrl-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ctrl-num { width: 72px; font-variant-numeric: tabular-nums; }
+  .weekday-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .day-pill {
+    width: 34px; height: 30px; border-radius: 8px; background: var(--ui-control);
+    color: var(--ui-text-secondary); font-size: 12px; font-weight: 500; display: grid; place-items: center;
+  }
+  .day-pill[aria-pressed="true"] { background: var(--ui-btn); color: #fff; }
+  .q-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .q-chip {
+    height: 25px; padding: 0 9px; border-radius: 7px; background: var(--ui-control);
+    color: var(--ui-text-secondary); font-size: 11.5px; transition: all .13s;
+  }
+  .q-chip:hover { background: var(--ui-soft); color: var(--ui-ink); }
+  .preset-link { font-size: 11.5px; color: var(--ui-ink); padding: 2px 6px; border-radius: 5px; }
+  .preset-link:hover { background: var(--ui-soft); }
+
+  /* 单条提醒专属：触达方式 3 格选择卡 */
+  .delivery-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .deliv-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+    padding: 10px 11px; border-radius: 10px;
+    background: var(--ui-control); color: var(--ui-text-secondary);
+    border: 1.5px solid transparent; text-align: left; transition: all .14s;
+  }
+  .deliv-card:hover { background: var(--ui-control-hover); color: var(--ui-text-primary); }
+  .deliv-card[aria-pressed="true"] {
+    background: var(--ui-soft); color: var(--ui-ink); border-color: var(--ui-btn);
+  }
+  .deliv-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .deliv-card strong { font-size: 12.5px; font-weight: 600; color: inherit; }
+  .deliv-card small { font-size: 11px; opacity: .82; line-height: 1.35; }
+
+  .ed-notice {
+    display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border-radius: 9px;
+    background: var(--c-indigo-bg); color: var(--c-indigo-fg); font-size: 11.5px; line-height: 1.5;
+  }
+  .ed-foot {
+    flex: none; display: flex; align-items: center; gap: 8px; padding: 11px 15px;
+    background: var(--ui-surface); border-top: 1px solid var(--ui-line);
+  }
+
+  /* ── 桌面悬浮气泡（精致原生质感 · 4 种业务形态 + 底部细进度条 + 声波） ── */
+  .desktop-bubble {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    width: 356px;
+    border-radius: 18px;
+    background: var(--ui-surface-raised);
+    backdrop-filter: blur(26px) saturate(1.4);
+    -webkit-backdrop-filter: blur(26px) saturate(1.4);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .65),
+      0 0 0 1px rgba(0, 0, 0, .07),
+      0 18px 44px rgba(0, 0, 0, .14),
+      0 4px 12px rgba(0, 0, 0, .06);
+    z-index: 80;
+    overflow: hidden;
+    animation: slideBubble .24s cubic-bezier(.22, 1, .36, 1);
+  }
+  html[data-theme="dark"] .desktop-bubble {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .1),
+      0 0 0 1px rgba(255, 255, 255, .12),
+      0 22px 54px rgba(0, 0, 0, .55),
+      0 6px 16px rgba(0, 0, 0, .35);
+  }
+  .desktop-bubble[hidden] { display: none; }
+  .desktop-bubble.is-sticky::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--ui-btn);
+  }
+  @keyframes slideBubble {
+    from { opacity: 0; transform: translateY(-10px) scale(.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .xb-bub-inner {
+    padding: 13px 14px 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .desktop-bubble.is-sticky .xb-bub-inner { padding-left: 16px; }
+
+  .xb-bub-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+  }
+  .xb-bub-ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    margin-top: 1px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .xb-bub-ico.is-custom   { background: #EBF3FC; color: #1F6AA8; }
+  .xb-bub-ico.is-rest     { background: #ECF6EA; color: #2E7A3E; }
+  .xb-bub-ico.is-off-work { background: #F2EEFC; color: #5E43B8; }
+  .xb-bub-ico.is-weather  { background: #FEF3E2; color: #A35B0A; }
+  .xb-bub-ico.is-agent    { background: #ECF0FC; color: #3451B2; }
+  html[data-theme="dark"] .xb-bub-ico.is-custom   { background: #1D2D42; color: #8FC1F2; }
+  html[data-theme="dark"] .xb-bub-ico.is-rest     { background: #1E3526; color: #8CD69F; }
+  html[data-theme="dark"] .xb-bub-ico.is-off-work { background: #2B2544; color: #BDB0F4; }
+  html[data-theme="dark"] .xb-bub-ico.is-weather  { background: #3A2B16; color: #F2C07E; }
+  html[data-theme="dark"] .xb-bub-ico.is-agent    { background: #202945; color: #A2B8FF; }
+
+  .xb-bub-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .xb-bub-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--ui-text-tertiary);
+    line-height: 1.2;
+  }
+  .xb-bub-kind { font-weight: 600; color: var(--ui-text-secondary); }
+  .xb-bub-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--ui-text-disabled); }
+  .xb-bub-time { font-variant-numeric: tabular-nums; }
+  .xb-bub-sticky-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ui-btn);
+    box-shadow: 0 0 0 3px var(--ui-soft); margin-left: 2px;
+  }
+  .xb-bub-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: var(--ui-text-tertiary);
+    flex: none;
+    margin: -3px -4px 0 0;
+    transition: background .13s, color .13s;
+  }
+  .xb-bub-close:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+
+  .xb-bub-text {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.48;
+    color: var(--ui-text-primary);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+  .xb-bub-extra {
+    margin-top: 2px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: var(--ui-control);
+    font-size: 11.5px;
+    color: var(--ui-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* 语音朗读动态声波条 */
+  .voice-wave-btn {
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+    font-size: 11px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: opacity .14s;
+  }
+  .voice-wave-btn:hover { opacity: .85; }
+  .voice-wave-btn.is-stopped { background: var(--ui-control); color: var(--ui-text-secondary); }
+  .wave-bars { display: inline-flex; align-items: center; gap: 2px; height: 11px; }
+  .wave-bars i {
+    width: 2px; border-radius: 2px; background: currentColor; display: block;
+    animation: waveBounce 0.9s ease-in-out infinite;
+  }
+  .wave-bars i:nth-child(1) { height: 5px; animation-delay: 0s; }
+  .wave-bars i:nth-child(2) { height: 10px; animation-delay: .18s; }
+  .wave-bars i:nth-child(3) { height: 6px; animation-delay: .36s; }
+  .voice-wave-btn.is-stopped .wave-bars i { animation: none; height: 3px; }
+  @keyframes waveBounce {
+    0%, 100% { transform: scaleY(.45); }
+    50% { transform: scaleY(1.15); }
+  }
+
+  .xb-bub-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-left: 47px;
+  }
+  .xb-bub-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--ui-text-tertiary);
+    min-width: 0;
+  }
+  .xb-bub-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .bub-btn {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: all .14s;
+  }
+  .bub-btn.is-ghost { color: var(--ui-text-secondary); }
+  .bub-btn.is-ghost:hover { background: var(--ui-control); color: var(--ui-text-primary); }
+  .bub-btn.is-soft { background: var(--ui-control); color: var(--ui-text-primary); }
+  .bub-btn.is-soft:hover { background: var(--ui-control-hover); }
+  .bub-btn.is-primary {
+    background: var(--ui-btn);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .bub-btn.is-primary:hover { filter: brightness(1.06); }
+
+  /* 紧贴底边的 2px 极细倒计时进度条（悬停暂停） */
+  .xb-bub-progress {
+    height: 2.5px;
+    width: 100%;
+    background: var(--ui-line);
+    overflow: hidden;
+  }
+  .xb-bub-progress[hidden] { display: none; }
+  .xb-bub-bar {
+    height: 100%;
+    width: 100%;
+    background: var(--ui-btn);
+    opacity: .65;
+    transform-origin: left center;
+    animation: shrinkBar var(--bub-dur, 10s) linear forwards;
+  }
+  .desktop-bubble:hover .xb-bub-bar { animation-play-state: paused; }
+  @keyframes shrinkBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  /* 气泡 4 态对照画廊浮层（评审专用，一眼对比四种桌面气泡） */
+  .gallery-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(15, 16, 20, .38);
+    backdrop-filter: blur(8px);
+  }
+  .gallery-modal[hidden] { display: none; }
+  .gallery-sheet {
+    width: min(820px, 100%);
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    border-radius: 20px;
+    background: var(--ui-configuration-canvas);
+    box-shadow: var(--ui-shadow-dialog);
+    border: 1px solid var(--ui-border);
+    padding: 18px 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .gallery-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .gallery-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .gallery-head p { margin: 2px 0 0; font-size: 12px; color: var(--ui-text-secondary); }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (max-width: 760px) { .gallery-grid { grid-template-columns: minmax(0, 1fr); } }
+  .gallery-cell {
+    border-radius: 16px;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background:
+      radial-gradient(circle at 18% 20%, var(--ui-soft), transparent 58%),
+      linear-gradient(145deg, var(--ui-tint), var(--ui-surface-sunken));
+    border: 1px solid var(--ui-line);
+  }
+  .gallery-cap {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11.5px; color: var(--ui-text-secondary);
+  }
+  .gallery-cap strong { color: var(--ui-text-primary); font-weight: 600; }
+  .gallery-cell .desktop-bubble {
+    position: relative; top: auto; right: auto; width: 100%; z-index: 1; animation: none;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 8px 14px; border-radius: 10px; background: var(--ui-text-primary); color: var(--ui-surface);
+    font-size: 12.5px; font-weight: 500; box-shadow: 0 10px 28px rgba(0,0,0,.22);
+    z-index: 90; pointer-events: none; opacity: 0; transition: opacity .18s, transform .18s;
+  }
+  .toast.is-show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+  /* 窄屏自适应 */
+  @container remind-stage (max-width: 660px) {
+    .stage-inner { padding: 0 16px; }
+    .spotlight { flex-wrap: wrap; gap: 12px; }
+    .spot-clock { border-right: 0; padding-right: 0; flex-direction: row; align-items: baseline; gap: 8px; }
+    .task-run-box { margin-left: 16px; }
+    .tpl-grid { grid-template-columns: minmax(0, 1fr); }
+    .row-more-btn { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+  <!-- 顶部评审控制条（不属于客户端界面） -->
+  <section class="review-shell" aria-label="设计稿评审控制">
+    <div class="review-bar">
+      <div class="review-title">
+        <span class="review-badge">全新方案 · V2</span>
+        <strong>提醒页重构：单栏专注流 · 按条绑定提醒方式</strong>
+      </div>
+      <div class="review-group" role="group" aria-label="运行状态">
+        <button type="button" data-state="normal" aria-pressed="true">正常态</button>
+        <button type="button" data-state="quiet" aria-pressed="false">免打扰中</button>
+        <button type="button" data-state="paused" aria-pressed="false">全局暂停</button>
+        <button type="button" data-state="empty" aria-pressed="false">空状态</button>
+      </div>
+      <div class="review-group" role="group" aria-label="窗口宽度">
+        <button type="button" data-width="wide" aria-pressed="true">宽 1280</button>
+        <button type="button" data-width="std" aria-pressed="false">标准 1040</button>
+        <button type="button" data-width="narrow" aria-pressed="false">窄 760</button>
+      </div>
+      <div class="accent-dots" role="group" aria-label="主题色" id="accentDots"></div>
+      <button type="button" class="review-btn" id="themeToggle" aria-pressed="false">深色模式</button>
+    </div>
+
+    <div class="launcher-bar">
+      <span>核心体验直达</span>
+      <div class="launcher-chips">
+        <button type="button" class="launch-chip" id="demoBubbleGallery">🫧 气泡 4 态对照</button>
+        <button type="button" class="launch-chip" data-bub="light">轻气泡</button>
+        <button type="button" class="launch-chip" data-bub="voice">语音天气气泡</button>
+        <button type="button" class="launch-chip" data-bub="sticky">常驻强提醒</button>
+        <button type="button" class="launch-chip" data-bub="agent">定时任务完成</button>
+        <button type="button" class="launch-chip" id="demoOpenPrefs">全局偏好浮层</button>
+        <button type="button" class="launch-chip" data-launch="once">编辑强提醒</button>
+      </div>
+      <span class="launcher-hint">悬停气泡自动暂停倒计时 · 行内可直接切换 🔔/🔊/📌</span>
+    </div>
+  </section>
+
+  <!-- 小伴桌面控制台 -->
+  <div class="desktop-stage">
+    <div class="window" id="desktopWindow">
+      <!-- 左侧导航 -->
+      <aside class="sidebar">
+        <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="brand">
+          <div class="brand-mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+          </div>
+          <strong>小伴桌面</strong>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <button type="button" class="nav-item" onclick="showToast('当前聚焦「提醒」设计稿')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/></svg>
+            <span>小伴 AI</span>
+          </button>
+          <button type="button" class="nav-item" onclick="showToast('当前聚焦「提醒」设计稿')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+            <span>资料库</span>
+          </button>
+          <button type="button" class="nav-item" onclick="showToast('当前聚焦「提醒」设计稿')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span>AI 插件</span>
+          </button>
+          <div class="nav-sep"></div>
+          <button type="button" class="nav-item" onclick="showToast('当前聚焦「提醒」设计稿')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="12" cy="7" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></svg>
+            <span>装扮</span>
+          </button>
+          <button type="button" class="nav-item" onclick="showToast('当前聚焦「提醒」设计稿')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r=".7" fill="currentColor"/><circle cx="18" cy="13.5" r=".7" fill="currentColor"/></svg>
+            <span>游玩</span>
+          </button>
+          <button type="button" class="nav-item is-active" aria-current="page">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+            <span>提醒</span>
+            <span class="sub-hint" id="sidebarNext">15:30</span>
+          </button>
+        </nav>
+        <div class="account">
+          <div class="account-av">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/></svg>
+          </div>
+          <span>小伴用户</span>
+        </div>
+      </aside>
+
+      <!-- 主面板（彻底移除右侧常驻 280px 设置栏） -->
+      <main class="main-panel">
+        <header class="top-bar">
+          <div class="stage-inner top-bar-row">
+            <div class="view-tabs" role="tablist" aria-label="提醒视图">
+              <button type="button" class="view-tab" id="tabReminders" role="tab" aria-selected="true">
+                提醒 <span class="cnt" id="cntReminders">0</span>
+              </button>
+              <button type="button" class="view-tab" id="tabTasks" role="tab" aria-selected="false">
+                定时任务 <span class="cnt" id="cntTasks">0</span>
+              </button>
+            </div>
+
+            <div class="top-controls">
+              <!-- 免打扰 / 暂停 轻量状态胶囊（点击直达设置） -->
+              <button type="button" class="pill-status" id="topStatusPill" title="点击调整免打扰或总开关">
+                <span class="dot"></span>
+                <span id="topStatusText">免打扰 22:00–08:00</span>
+              </button>
+
+              <!-- 全局偏好收敛按钮（平时隐藏，按需展开） -->
+              <button type="button" class="icon-tool" id="prefsBtn" aria-expanded="false" aria-label="全局提醒偏好" title="全局默认偏好、免打扰与天气来源">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+
+              <button type="button" class="btn-primary" id="btnNewMain">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span id="btnNewLabel">新建</span>
+              </button>
+
+              <!-- 全局默认偏好浮层 -->
+              <section class="prefs-popover" id="prefsPopover" aria-label="全局提醒偏好" hidden>
+                <div class="pop-head">
+                  <strong>全局提醒偏好</strong>
+                  <span class="pop-saved" id="popSaved">已自动保存</span>
+                </div>
+
+                <div class="pop-sec">
+                  <div class="pop-row">
+                    <div class="pop-row-text">
+                      <span>启用提醒调度</span>
+                      <small>关闭后暂停全部桌面气泡与定时任务</small>
+                    </div>
+                    <button type="button" class="switch" id="prefEnabled" role="switch" aria-checked="true"></button>
+                  </div>
+                </div>
+
+                <div class="pop-sec">
+                  <span class="pop-sec-label">新建提醒时的默认方式（单条可单独改）</span>
+                  <div class="pop-channel-pills">
+                    <button type="button" class="pop-ch" id="defSound" aria-pressed="false">🔔 提示音</button>
+                    <button type="button" class="pop-ch" id="defVoice" aria-pressed="false">🔊 语音</button>
+                    <button type="button" class="pop-ch" id="defSticky" aria-pressed="true" title="仅一次提醒默认常驻，直到手动关闭">📌 仅一次常驻</button>
+                  </div>
+                </div>
+
+                <div class="pop-sec">
+                  <div class="pop-row">
+                    <div class="pop-row-text">
+                      <span>免打扰时段</span>
+                      <small>支持跨午夜，期间有效提醒顺延</small>
+                    </div>
+                    <button type="button" class="switch" id="prefQuiet" role="switch" aria-checked="true"></button>
+                  </div>
+                  <div class="pop-time-pair" id="popQuietTimes">
+                    <input type="time" id="quietStart" value="22:00" aria-label="免打扰开始" />
+                    <span>至</span>
+                    <input type="time" id="quietEnd" value="08:00" aria-label="免打扰结束" />
+                  </div>
+                </div>
+
+                <div class="pop-sec">
+                  <span class="pop-sec-label">天气数据来源</span>
+                  <select class="pop-select" id="weatherSourceSelect" aria-label="天气来源">
+                    <option value="open-meteo">Open-Meteo（默认 · 个人非商业）</option>
+                    <option value="custom">自定义兼容 HTTPS 来源</option>
+                    <option value="disabled">关闭（不访问天气网络）</option>
+                  </select>
+                </div>
+
+                <div class="pop-foot">
+                  <span>按本机时间运行 · 锁屏/游戏暂缓</span>
+                  <button type="button" id="popPreviewBubble">试看气泡</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </header>
+
+        <div class="stage-scroll">
+          <div class="stage-inner stage-stack" id="stageBody"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 独立窗口编辑器（三段式：提醒什么 · 什么时候 · 如何提醒我） -->
+  <section class="float-editor" id="editorWin" role="dialog" aria-modal="false" aria-labelledby="editorTitle" hidden>
+    <header class="win-chrome">
+      <div class="win-lights">
+        <button type="button" class="win-light close" id="editorCloseDot" aria-label="关闭窗口">×</button>
+        <span class="win-light min" aria-hidden="true">−</span>
+        <span class="win-light max" aria-hidden="true">+</span>
+      </div>
+      <span class="win-title" id="editorTitle">新建提醒</span>
+      <span class="win-tag">独立窗口</span>
+    </header>
+
+    <div class="ed-body">
+      <!-- 1. 提醒什么 -->
+      <div class="ed-card">
+        <div class="ed-field">
+          <span class="ed-label">类型</span>
+          <div class="kind-pills" id="editorKindPills">
+            <button type="button" class="kind-pill" data-kind="custom">常规</button>
+            <button type="button" class="kind-pill" data-kind="rest">休息</button>
+            <button type="button" class="kind-pill" data-kind="off-work">下班</button>
+            <button type="button" class="kind-pill" data-kind="weather">天气</button>
+            <button type="button" class="kind-pill" data-kind="agent">定时任务</button>
+          </div>
+        </div>
+
+        <div class="ed-field">
+          <div class="ed-row">
+            <span class="ed-label" id="edTextLabel">提醒内容</span>
+            <span class="ed-hint" id="edTextCount">0 / 240</span>
+          </div>
+          <textarea class="ctrl-textarea" id="edText" placeholder="写下想被提醒的话…"></textarea>
+          <div class="ed-notice" id="agentSafetyNote" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>到点后台自动运行，结果写入聊天「定时任务」会话并按下方方式通知你。执行时仅限只读查看文件与网页，不改文件不跑命令；每次运行消耗模型额度。</span>
+          </div>
+        </div>
+
+        <!-- 天气城市（仅天气类型） -->
+        <div class="ed-field" id="edWeatherField" hidden>
+          <span class="ed-label">城市</span>
+          <div class="ctrl-inline" style="flex-wrap:nowrap">
+            <input type="text" class="ctrl-input" id="edCityQuery" placeholder="输入城市名，如 杭州 / Shanghai" />
+            <button type="button" class="btn-soft" id="btnSearchCity">搜索</button>
+          </div>
+          <div class="q-chips" id="cityResults" hidden></div>
+          <div class="ed-row">
+            <span class="ed-hint" id="edCityState" style="color:var(--ui-text-primary)">已选择：杭州 · 浙江 · 中国</span>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="q-chip" id="btnLocateCity">自动定位</button>
+              <button type="button" class="q-chip" id="btnTestWeather">查当前天气</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 什么时候 -->
+      <div class="ed-card">
+        <div class="ed-field" id="fieldRest" hidden>
+          <span class="ed-label">有效使用电脑间隔</span>
+          <div class="ctrl-inline">
+            <span>累计</span>
+            <input type="number" class="ctrl-num" id="edRestMinutes" min="5" max="480" value="60" />
+            <span>分钟后提醒</span>
+            <div class="q-chips" style="margin-left:auto">
+              <button type="button" class="q-chip" data-rest="20">20 分</button>
+              <button type="button" class="q-chip" data-rest="45">45 分</button>
+              <button type="button" class="q-chip" data-rest="60">60 分</button>
+            </div>
+          </div>
+          <span class="ed-hint">锁屏、休眠或连续空闲超过 1 分钟自动暂停计时。</span>
+        </div>
+
+        <div id="fieldStandardSchedule">
+          <div class="ed-field">
+            <span class="ed-label">重复频率</span>
+            <div class="seg-bar" id="repeatSeg">
+              <button type="button" class="seg-btn" data-repeat="once">仅一次</button>
+              <button type="button" class="seg-btn" data-repeat="daily">每天</button>
+              <button type="button" class="seg-btn" data-repeat="weekdays">指定星期</button>
+              <button type="button" class="seg-btn" data-repeat="interval">时段间隔</button>
+            </div>
+          </div>
+
+          <div class="ed-field" id="fieldClock">
+            <span class="ed-label">提醒时间</span>
+            <div class="ctrl-inline">
+              <input type="time" class="ctrl-time" id="edTime" value="15:00" />
+              <div class="q-chips">
+                <button type="button" class="q-chip" data-clock="09:00">09:00</button>
+                <button type="button" class="q-chip" data-clock="15:00">15:00</button>
+                <button type="button" class="q-chip" data-clock="18:30">18:30</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ed-field" id="fieldInterval" hidden>
+            <span class="ed-label">周期与生效时段</span>
+            <div class="ctrl-inline">
+              <span>每</span>
+              <input type="number" class="ctrl-num" id="edEveryMin" min="15" max="360" value="90" />
+              <span>分钟，在</span>
+              <input type="time" class="ctrl-time" id="edWinStart" value="09:00" />
+              <span>至</span>
+              <input type="time" class="ctrl-time" id="edWinEnd" value="18:00" />
+            </div>
+          </div>
+
+          <div class="ed-field" id="fieldWeekdays" hidden>
+            <div class="ed-row">
+              <span class="ed-label">重复星期</span>
+              <div>
+                <button type="button" class="preset-link" id="presetWorkdays">工作日</button>
+                <button type="button" class="preset-link" id="presetWeekend">周末</button>
+                <button type="button" class="preset-link" id="presetAllDays">每天</button>
+              </div>
+            </div>
+            <div class="weekday-bar" id="weekdayPills"></div>
+          </div>
+
+          <div class="ed-field" id="fieldOnce" hidden>
+            <span class="ed-label">日期与时间</span>
+            <input type="datetime-local" class="ctrl-time" id="edOnceAt" style="width:224px" />
+            <div class="q-chips">
+              <button type="button" class="q-chip" data-once-offset="15">15 分钟后</button>
+              <button type="button" class="q-chip" data-once-offset="60">1 小时后</button>
+              <button type="button" class="q-chip" data-once-preset="tonight">今晚 20:00</button>
+              <button type="button" class="q-chip" data-once-preset="tomorrow">明天 09:00</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 如何提醒我（绑定到当前这条提醒！） -->
+      <div class="ed-card">
+        <div class="ed-field">
+          <div class="ed-row">
+            <span class="ed-label">这条提醒的方式</span>
+            <span class="ed-hint">默认弹出桌面气泡，按需叠加</span>
+          </div>
+          <div class="delivery-cards">
+            <button type="button" class="deliv-card" id="edChSound" aria-pressed="false">
+              <div class="deliv-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                <span class="ed-hint" id="edChSoundState">关闭</span>
+              </div>
+              <strong>提示音</strong>
+              <small>到点轻响一声</small>
+            </button>
+
+            <button type="button" class="deliv-card" id="edChVoice" aria-pressed="false" title="使用「设置 → 声音」的音色朗读；在线音色失败时回退系统朗读">
+              <div class="deliv-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                <span class="ed-hint" id="edChVoiceState">关闭</span>
+              </div>
+              <strong>语音朗读</strong>
+              <small>用小伴音色念出</small>
+            </button>
+
+            <button type="button" class="deliv-card" id="edChSticky" aria-pressed="false">
+              <div class="deliv-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                <span class="ed-hint" id="edChStickyState">自动收起</span>
+              </div>
+              <strong>常驻强提醒</strong>
+              <small>手动关闭前不消失</small>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="ed-foot">
+      <button type="button" class="btn-soft" id="editorPreviewBtn">试看气泡效果</button>
+      <button type="button" class="btn-ghost" id="editorCancelBtn" style="margin-left:auto">取消</button>
+      <button type="button" class="btn-primary" id="editorSaveBtn">保存</button>
+    </footer>
+  </section>
+
+  <!-- 桌面悬浮气泡（原生透明窗 356px 级精致形态） -->
+  <aside class="desktop-bubble" id="desktopBubble" role="status" aria-live="polite" hidden></aside>
+
+  <!-- 气泡 4 态对照画廊（评审专用） -->
+  <div class="gallery-modal" id="bubbleGalleryModal" hidden>
+    <div class="gallery-sheet" role="dialog" aria-label="桌面悬浮气泡四态对照">
+      <div class="gallery-head">
+        <div>
+          <h3>桌面悬浮气泡 · 4 种业务形态</h3>
+          <p>356px 紧凑原生质感 · 悬停自动暂停倒计时 · 按提醒类型与绑定方式自适应结构</p>
+        </div>
+        <button type="button" class="btn-soft" id="closeGalleryBtn">关闭</button>
+      </div>
+      <div class="gallery-grid" id="bubbleGalleryGrid"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  /* ── 主题色与令牌 ── */
+  const ACCENTS = [
+    { id: 'red', name: '小伴红',
+      light: { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+      dark:  { btn: '#E5484D', btnHi: '#F06A6F', soft: '#3A2225', ink: '#FF8C91', tint: '#1E1C1D', dot: '#FF6369' } },
+    { id: 'green', name: '薄荷绿',
+      light: { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+      dark:  { btn: '#34A36D', btnHi: '#48B981', soft: '#1D3328', ink: '#72D6A2', tint: '#1B1E1C', dot: '#3FB87A' } },
+    { id: 'blue', name: '海湾蓝',
+      light: { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+      dark:  { btn: '#3B7BE8', btnHi: '#5A92F0', soft: '#1E2A42', ink: '#8DB6FF', tint: '#1B1D21', dot: '#4C8DF6' } },
+    { id: 'purple', name: '暮紫',
+      light: { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+      dark:  { btn: '#8466E6', btnHi: '#9A80EE', soft: '#2A2342', ink: '#BBA8FF', tint: '#1D1C21', dot: '#9273F0' } },
+    { id: 'amber', name: '琥珀',
+      light: { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+      dark:  { btn: '#C27A1A', btnHi: '#D69130', soft: '#3A2C17', ink: '#F0B65A', tint: '#1F1D1A', dot: '#F0A93A' } },
+    { id: 'graphite', name: '石墨',
+      light: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' },
+      dark:  { btn: '#636368', btnHi: '#7C7C82', soft: '#3A3A3D', ink: '#E5E5EA', tint: '#1C1C1E', dot: '#9A9AA0' } }
+  ];
+
+  const LIGHT_BASE = {
+    'surface': '#FFFFFF', 'surface-alt': '#F2F2F4', 'surface-sunken': '#F7F7F9',
+    'surface-hover': 'rgba(0,0,0,.038)', 'surface-raised': 'rgba(255,255,255,.97)',
+    'control': '#F0F0F3', 'control-hover': '#E5E5EA',
+    'border': 'rgba(0,0,0,.075)', 'border-strong': 'rgba(0,0,0,.14)', 'line': 'rgba(0,0,0,.055)',
+    'text-primary': '#1D1D1F', 'text-secondary': '#6E6E73', 'text-tertiary': '#8E8E93', 'text-disabled': '#A1A1A6',
+    'window-close': '#FF5F57', 'window-minimize': '#FEBC2E', 'window-expand': '#28C840',
+    'configuration-canvas': '#F4F5F7',
+    'success': '#34A36D', 'success-text': '#23784F', 'warning': '#E09A2B', 'danger': '#D93A44',
+    'scrollbar': 'rgba(0,0,0,.18)',
+    'shadow-panel': '0 0 0 1px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04)',
+    'shadow-card': '0 1px 2px rgba(0,0,0,.025)',
+    'shadow-menu': '0 0 0 1px rgba(0,0,0,.08), 0 14px 36px rgba(0,0,0,.16)',
+    'shadow-dialog': '0 0 0 1px rgba(0,0,0,.08), 0 24px 64px rgba(0,0,0,.22), 0 6px 18px rgba(0,0,0,.08)',
+    'shadow-btn': 'inset 0 1px 0 rgba(255,255,255,.28), 0 1px 2px rgba(0,0,0,.16)'
+  };
+  const DARK_BASE = {
+    'surface': '#232325', 'surface-alt': '#2C2C2E', 'surface-sunken': '#1C1C1E',
+    'surface-hover': 'rgba(255,255,255,.055)', 'surface-raised': 'rgba(40,40,44,.97)',
+    'control': '#2C2C2E', 'control-hover': '#36363A',
+    'border': 'rgba(255,255,255,.085)', 'border-strong': 'rgba(255,255,255,.16)', 'line': 'rgba(255,255,255,.065)',
+    'text-primary': '#F5F5F7', 'text-secondary': '#A1A1A6', 'text-tertiary': '#7C7C82', 'text-disabled': '#5E5E63',
+    'window-close': '#FF5F57', 'window-minimize': '#FEBC2E', 'window-expand': '#28C840',
+    'configuration-canvas': '#18191D',
+    'success': '#3FB87A', 'success-text': '#6FD6A0', 'warning': '#F0A93A', 'danger': '#E5484D',
+    'scrollbar': 'rgba(255,255,255,.2)',
+    'shadow-panel': '0 0 0 1px rgba(255,255,255,.06), 0 4px 16px rgba(0,0,0,.35)',
+    'shadow-card': '0 0 0 1px rgba(255,255,255,.03)',
+    'shadow-menu': '0 0 0 1px rgba(255,255,255,.1), 0 14px 36px rgba(0,0,0,.55)',
+    'shadow-dialog': '0 0 0 1px rgba(255,255,255,.12), 0 28px 70px rgba(0,0,0,.6)',
+    'shadow-btn': 'inset 0 1px 0 rgba(255,255,255,.18), 0 1px 2px rgba(0,0,0,.4)'
+  };
+
+  const ICONS = {
+    custom: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>',
+    rest: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>',
+    'off-work': '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    weather: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    agent: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/></svg>',
+    sound: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+    voice: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
+    sticky: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>',
+    more: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg>',
+    spark: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/></svg>',
+    play: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+    arrow: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
+  };
+
+  let dark = false;
+  let accentId = 'red';
+  let activeTab = 'reminders';
+  let viewState = 'normal'; // normal | quiet | paused | empty
+  let activeFilter = 'all';
+  let openMenuId = null;
+  let showCompleted = false;
+  let editingId = null;
+  let editorDirtyText = false;
+  let bubbleTimer = null;
+
+  /* 快建条状态 */
+  const qc = { text: '', sound: false, voice: false, sticky: false };
+
+  /* 全局默认偏好（收纳在右上角浮层） */
+  const prefs = {
+    enabled: true,
+    defaultSound: false,
+    defaultVoice: false,
+    defaultOnceSticky: true,
+    quietEnabled: true,
+    quietStart: '22:00',
+    quietEnd: '08:00',
+    weatherProvider: 'open-meteo'
+  };
+
+  const DEFAULT_TEXT = {
+    custom: '记得喝杯温水，放松一下肩膀。',
+    rest: '专注很久啦，起来走走眺望远处。',
+    'off-work': '到点啦，今天也辛苦了，早点收工。',
+    weather: '早安！今日天气：',
+    agent: '检查工作目录里昨天新增或修改的文件，用三句话总结重点。'
+  };
+  const DAY_SHORT = ['一', '二', '三', '四', '五', '六', '日'];
+  const DAY_FULL = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+  /* 每条提醒独立绑定 notify: { sound, voice, sticky } */
+  let rules = [
+    {
+      id: 'r1', kind: 'custom', enabled: true, repeat: 'interval',
+      everyMinutes: 90, winStart: '09:00', winEnd: '18:00', weekdays: [1,2,3,4,5],
+      time: '15:30', onceAt: '', intervalMinutes: 60, city: null,
+      text: '喝杯温水，顺便活动一下手腕',
+      notify: { sound: false, voice: false, sticky: false },
+      nextClock: '15:30', nextCountdown: '28 分钟后', nextLabel: '今天 15:30', bucket: 'today', order: 10
+    },
+    {
+      id: 'r3', kind: 'custom', enabled: true, repeat: 'once',
+      time: '19:30', onceAt: '2026-11-26T19:30', weekdays: [], intervalMinutes: 60, city: null,
+      text: '下班路过驿站取快递（货架 3-18）',
+      notify: { sound: true, voice: true, sticky: true },
+      nextClock: '19:30', nextCountdown: '4 小时后', nextLabel: '今天 19:30', bucket: 'today', order: 20
+    },
+    {
+      id: 'r2', kind: 'rest', enabled: true, repeat: 'daily',
+      time: '', onceAt: '', weekdays: [], intervalMinutes: 60, city: null,
+      text: '已经专注一小时了，起身走两步看看远处',
+      notify: { sound: false, voice: false, sticky: false },
+      nextClock: '', nextCountdown: '', nextLabel: '累计 60 分钟', bucket: 'routine', order: 30
+    },
+    {
+      id: 'r4', kind: 'weather', enabled: true, repeat: 'daily',
+      time: '08:00', onceAt: '', weekdays: [], intervalMinutes: 60,
+      city: { name: '杭州', admin1: '浙江', country: '中国' },
+      weatherSnap: '多云 14°–21°',
+      text: '早安天气播报',
+      notify: { sound: false, voice: true, sticky: false },
+      nextClock: '08:00', nextCountdown: '明天', nextLabel: '明天 08:00', bucket: 'routine', order: 40
+    },
+    {
+      id: 'r5', kind: 'off-work', enabled: false, repeat: 'weekdays',
+      time: '18:30', onceAt: '', weekdays: [1,2,3,4,5], intervalMinutes: 60, city: null,
+      text: '下班啦，保存文档准备收工',
+      notify: { sound: true, voice: false, sticky: false },
+      nextLabel: '已暂停', bucket: 'paused', order: 90
+    },
+    {
+      id: 'r6', kind: 'custom', enabled: true, repeat: 'once', completed: true,
+      time: '11:00', onceAt: '2026-11-25T11:00', weekdays: [], intervalMinutes: 60, city: null,
+      text: '给物业确认门禁卡续期',
+      notify: { sound: true, voice: false, sticky: true },
+      nextLabel: '已完成', bucket: 'done', order: 100
+    },
+    {
+      id: 't1', kind: 'agent', enabled: true, repeat: 'weekdays',
+      time: '09:15', onceAt: '', weekdays: [1,2,3,4,5], intervalMinutes: 60, city: null,
+      text: '梳理当前工作目录昨天新增和修改的文件，按模块用三句话汇总重点。',
+      notify: { sound: false, voice: false, sticky: false },
+      nextLabel: '明天 09:15', order: 15,
+      agentRun: {
+        at: '今天 09:15', ok: true, tokens: '1.8k', count: 14, session: 'sess-daily-diff',
+        summary: '昨日共修改 6 个文件：桌面端提醒页完成重构草案，总导航补充快捷预设入口；未发现构建错误。'
+      }
+    },
+    {
+      id: 't2', kind: 'agent', enabled: true, repeat: 'weekdays',
+      time: '17:00', onceAt: '', weekdays: [5], intervalMinutes: 60, city: null,
+      text: '汇总本周已完成的里程碑与下周待办事项，生成一版简明周报草稿。',
+      notify: { sound: true, voice: false, sticky: false },
+      nextLabel: '周五 17:00', order: 25,
+      agentRun: {
+        at: '上周五 17:00', ok: true, tokens: '3.2k', count: 6, session: 'sess-weekly-report',
+        summary: '已整理 4 项已完成功能与 2 项下周验收事项，完整 Markdown 周报已保存在对话中。'
+      }
+    }
+  ];
+
+  const REMINDER_TPLS = [
+    { kind: 'custom', title: '工作日定时喝水', desc: '09:00–18:00 每 90 分钟静音气泡', tag: '静音气泡',
+      preset: { kind: 'custom', repeat: 'interval', everyMinutes: 90, winStart: '09:00', winEnd: '18:00', weekdays: [1,2,3,4,5], text: '喝杯温水，放松眼睛～', notify: { sound: false, voice: false, sticky: false } } },
+    { kind: 'rest', title: '护眼 20-20-20', desc: '累计用电脑 20 分钟眺望远处', tag: '久坐累计',
+      preset: { kind: 'rest', intervalMinutes: 20, text: '看屏幕满 20 分钟啦，抬头看远处 20 秒。', notify: { sound: false, voice: false, sticky: false } } },
+    { kind: 'weather', title: '早安语音天气', desc: '每天 08:00 朗读所在城市天气', tag: '语音朗读',
+      preset: { kind: 'weather', repeat: 'daily', time: '08:00', city: { name: '杭州', admin1: '浙江', country: '中国' }, text: '早安天气播报', notify: { sound: false, voice: true, sticky: false } } }
+  ];
+
+  const TASK_TPLS = [
+    { kind: 'agent', title: '每日文件变动总结', desc: '工作日 09:15 自动梳理昨日改动', tag: '静默汇报',
+      preset: { kind: 'agent', repeat: 'weekdays', weekdays: [1,2,3,4,5], time: '09:15', text: '查看工作目录昨天新增或修改的文件，用 3 句话总结。', notify: { sound: false, voice: false, sticky: false } } },
+    { kind: 'agent', title: '每周五写周报', desc: '周五 17:00 汇总本周成果草稿', tag: '提示音',
+      preset: { kind: 'agent', repeat: 'weekdays', weekdays: [5], time: '17:00', text: '整理本周完成的功能与待验收项，生成一份简明周报草稿。', notify: { sound: true, voice: false, sticky: false } } },
+    { kind: 'agent', title: '关注网页动态简报', desc: '每天 10:00 检查发布页更新要点', tag: '静音气泡',
+      preset: { kind: 'agent', repeat: 'daily', time: '10:00', text: '查看我关注的更新日志网页，如有新版本则提炼核心变化。', notify: { sound: false, voice: false, sticky: false } } }
+  ];
+
+  /* ── 主题应用 ── */
+  function applyTokens() {
+    const root = document.documentElement;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.dataset.accent = accentId;
+    const base = dark ? DARK_BASE : LIGHT_BASE;
+    const pal = (ACCENTS.find(a => a.id === accentId) || ACCENTS[0])[dark ? 'dark' : 'light'];
+    for (const [k, v] of Object.entries(base)) root.style.setProperty(`--ui-${k}`, v);
+    root.style.setProperty('--ui-btn', pal.btn);
+    root.style.setProperty('--ui-btn-hi', pal.btnHi);
+    root.style.setProperty('--ui-soft', pal.soft);
+    root.style.setProperty('--ui-ink', pal.ink);
+    root.style.setProperty('--ui-tint', pal.tint);
+    root.style.setProperty('--ui-dot', pal.dot);
+    document.getElementById('themeToggle').setAttribute('aria-pressed', String(dark));
+    document.querySelectorAll('.accent-dot').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accent === accentId)));
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('is-show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('is-show'), 2200);
+  }
+  window.showToast = showToast;
+
+  function flashSaved() {
+    const el = document.getElementById('popSaved');
+    el.classList.add('is-show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('is-show'), 1500);
+  }
+
+  function formatDays(days) {
+    const s = [...new Set(days || [])].sort((a, b) => a - b);
+    if (!s.length || s.length === 7) return '每天';
+    if (s.join(',') === '1,2,3,4,5') return '工作日';
+    if (s.join(',') === '6,7') return '周末';
+    return s.map(d => DAY_FULL[d - 1]).join('、');
+  }
+
+  function describeRule(r) {
+    if (r.kind === 'rest') return `有效使用电脑累计 ${r.intervalMinutes} 分钟`;
+    if (r.repeat === 'once') return `仅一次 · ${(r.onceAt || '').replace('T', ' ')}`;
+    if (r.repeat === 'interval') return `${formatDays(r.weekdays)} ${r.winStart}–${r.winEnd} · 每 ${r.everyMinutes} 分钟`;
+    const prefix = r.repeat === 'daily' ? '每天' : formatDays(r.weekdays);
+    return `${prefix} ${r.time}${r.kind === 'weather' && r.city ? ` · ${r.city.name}` : ''}`;
+  }
+
+  function describeNotify(n) {
+    const parts = [];
+    if (n.sound) parts.push('提示音');
+    if (n.voice) parts.push('语音朗读');
+    if (n.sticky) parts.push('常驻气泡');
+    return parts.length ? parts.join(' + ') : '静音轻气泡';
+  }
+
+  /* ── 自然语言快建解析 ── */
+  function parseQuickInput(raw, isTask) {
+    const text = raw.trim();
+    if (!text) return null;
+    if (isTask) {
+      const mTime = text.match(/(\d{1,2}:\d{2})/);
+      return {
+        kind: 'agent', repeat: text.includes('周五') ? 'weekdays' : 'daily',
+        weekdays: text.includes('周五') ? [5] : [1,2,3,4,5],
+        time: mTime ? mTime[1].padStart(5, '0') : '09:00',
+        label: text.includes('周五') ? `每周五 ${mTime ? mTime[1] : '17:00'}` : `每天 ${mTime ? mTime[1] : '09:00'}`,
+        cleanText: text
+      };
+    }
+    const mMin = text.match(/(\d+)\s*分钟后/);
+    if (mMin) {
+      const mins = Number(mMin[1]);
+      return {
+        kind: 'custom', repeat: 'once', onceOffset: mins,
+        label: `${mins} 分钟后 · 仅一次`, stickyHint: prefs.defaultOnceSticky,
+        cleanText: text.replace(mMin[0], '').trim() || text
+      };
+    }
+    const mEvery = text.match(/每\s*(\d+)\s*分钟/);
+    if (mEvery) {
+      const every = Number(mEvery[1]);
+      return {
+        kind: 'custom', repeat: 'interval', everyMinutes: every,
+        winStart: '09:00', winEnd: '18:00', weekdays: [1,2,3,4,5],
+        label: `工作日 09:00–18:00 · 每 ${every} 分钟`,
+        cleanText: text.replace(mEvery[0], '').replace(/工作日/g, '').trim() || text
+      };
+    }
+    const mClock = text.match(/(明天|今晚|每天)?\s*(\d{1,2})[:点](\d{2})?/);
+    if (mClock) {
+      const hh = String(Math.min(23, Number(mClock[2]))).padStart(2, '0');
+      const mm = mClock[3] || '00';
+      const isOnce = mClock[1] === '明天' || mClock[1] === '今晚';
+      return {
+        kind: 'custom', repeat: isOnce ? 'once' : 'daily', time: `${hh}:${mm}`,
+        label: `${mClock[1] || '每天'} ${hh}:${mm}`, stickyHint: isOnce && prefs.defaultOnceSticky,
+        cleanText: text.replace(mClock[0], '').trim() || text
+      };
+    }
+    return { kind: 'custom', repeat: 'once', onceOffset: 60, label: '1 小时后 · 仅一次', stickyHint: prefs.defaultOnceSticky, cleanText: text };
+  }
+
+  /* ── 顶部状态同步 ── */
+  function syncTopStatus() {
+    const pill = document.getElementById('topStatusPill');
+    const txt = document.getElementById('topStatusText');
+    const isPaused = !prefs.enabled || viewState === 'paused';
+    const isQuiet = !isPaused && viewState === 'quiet';
+    pill.classList.toggle('is-paused', isPaused);
+    pill.classList.toggle('is-quiet', isQuiet);
+    if (isPaused) txt.textContent = '已全局暂停';
+    else if (isQuiet) txt.textContent = `免打扰生效中 · ${prefs.quietStart}–${prefs.quietEnd}`;
+    else if (prefs.quietEnabled) txt.textContent = `免打扰 ${prefs.quietStart}–${prefs.quietEnd}`;
+    else txt.textContent = '全天候提醒';
+
+    document.getElementById('sidebarNext').textContent = isPaused ? '已暂停' : (viewState === 'empty' ? '' : '15:30');
+
+    // 浮层内控件同步
+    document.getElementById('prefEnabled').setAttribute('aria-checked', String(prefs.enabled));
+    document.getElementById('defSound').setAttribute('aria-pressed', String(prefs.defaultSound));
+    document.getElementById('defVoice').setAttribute('aria-pressed', String(prefs.defaultVoice));
+    document.getElementById('defSticky').setAttribute('aria-pressed', String(prefs.defaultOnceSticky));
+    document.getElementById('prefQuiet').setAttribute('aria-checked', String(prefs.quietEnabled));
+    document.getElementById('popQuietTimes').hidden = !prefs.quietEnabled;
+    document.getElementById('quietStart').value = prefs.quietStart;
+    document.getElementById('quietEnd').value = prefs.quietEnd;
+    document.getElementById('weatherSourceSelect').value = prefs.weatherProvider;
+  }
+
+  /* ── 渲染主舞台 ── */
+  function render() {
+    syncTopStatus();
+    const isRem = activeTab === 'reminders';
+    const allRem = viewState === 'empty' ? [] : rules.filter(r => r.kind !== 'agent');
+    const allTasks = viewState === 'empty' ? [] : rules.filter(r => r.kind === 'agent');
+    const activeRem = allRem.filter(r => !r.completed);
+    const doneRem = allRem.filter(r => r.completed);
+
+    document.getElementById('cntReminders').textContent = activeRem.length;
+    document.getElementById('cntTasks').textContent = allTasks.length;
+    document.getElementById('tabReminders').setAttribute('aria-selected', String(isRem));
+    document.getElementById('tabTasks').setAttribute('aria-selected', String(!isRem));
+    document.getElementById('btnNewLabel').textContent = isRem ? '新建提醒' : '新建任务';
+
+    const body = document.getElementById('stageBody');
+    let html = '';
+
+    // 1. 快建栏（随时一句话创建）
+    html += renderQuickCapture(isRem);
+
+    // 2. 焦点卡片（全局暂停 / 免打扰生效 / 下一条即将到来）
+    const isPaused = !prefs.enabled || viewState === 'paused';
+    const isQuiet = !isPaused && viewState === 'quiet';
+    const nextRule = activeRem.filter(r => r.enabled).sort((a, b) => (a.order || 50) - (b.order || 50))[0];
+
+    if (isPaused) {
+      html += `
+        <section class="spotlight is-paused">
+          <div class="spot-body">
+            <span class="spot-eyebrow" style="color:var(--c-amber-fg)">提醒调度已全局暂停</span>
+            <span class="spot-title">所有桌面提醒气泡与定时任务均已暂缓</span>
+            <span class="spot-meta">你可以随时恢复，或继续在下方编辑和管理规则。</span>
+          </div>
+          <div class="spot-actions">
+            <button type="button" class="btn-primary" id="spotResumeBtn">立即恢复</button>
+          </div>
+        </section>`;
+    } else if (isQuiet) {
+      html += `
+        <section class="spotlight is-quiet">
+          <div class="spot-body">
+            <span class="spot-eyebrow" style="color:var(--c-purple-fg)">免打扰生效中 · ${prefs.quietStart} – ${prefs.quietEnd}</span>
+            <span class="spot-title">关怀提醒将在免打扰结束后补发摘要</span>
+            <span class="spot-meta">定时任务仍会按时在后台完成并写入聊天记录。</span>
+          </div>
+          <div class="spot-actions">
+            <button type="button" class="btn-soft" id="spotExitQuietBtn">退出免打扰演示</button>
+          </div>
+        </section>`;
+    } else if (isRem && nextRule) {
+      html += `
+        <section class="spotlight" aria-label="下一条提醒">
+          <div class="spot-clock">
+            <strong>${nextRule.nextClock || '15:30'}</strong>
+            <span>${nextRule.nextCountdown || '即将到来'}</span>
+          </div>
+          <div class="spot-body">
+            <span class="spot-eyebrow">下一条提醒</span>
+            <span class="spot-title">${escapeHtml(nextRule.text)}</span>
+            <span class="spot-meta">
+              <span>${describeRule(nextRule)}</span>
+              <span>·</span>
+              <span>${describeNotify(nextRule.notify)}</span>
+            </span>
+          </div>
+          <div class="spot-actions">
+            <button type="button" class="btn-soft" id="spotPreviewBtn">试看气泡</button>
+            <button type="button" class="btn-ghost" id="spotSnoozeBtn">推迟 10 分</button>
+          </div>
+        </section>`;
+    }
+
+    // 3. 主列表区
+    if (isRem) {
+      if (!activeRem.length) {
+        html += renderEmptyState(true);
+      } else {
+        // 轻筛选栏
+        html += `
+          <div class="filter-bar" role="group" aria-label="筛选提醒">
+            <button type="button" class="filter-chip" data-filter="all" aria-pressed="${activeFilter === 'all'}">全部 (${activeRem.length})</button>
+            <button type="button" class="filter-chip" data-filter="today" aria-pressed="${activeFilter === 'today'}">今日待触发</button>
+            <button type="button" class="filter-chip" data-filter="routine" aria-pressed="${activeFilter === 'routine'}">周期与天气</button>
+            <button type="button" class="filter-chip" data-filter="paused" aria-pressed="${activeFilter === 'paused'}">已暂停</button>
+            <span class="filter-meta">悬停行可直切 🔔 提示音 / 🔊 朗读 / 📌 常驻</span>
+          </div>`;
+
+        const list = activeRem.filter(r => {
+          if (activeFilter === 'today') return r.enabled && (r.bucket === 'today' || r.repeat === 'once' || r.repeat === 'interval');
+          if (activeFilter === 'routine') return r.enabled && (r.kind === 'rest' || r.kind === 'weather' || r.repeat === 'daily' || r.repeat === 'interval');
+          if (activeFilter === 'paused') return !r.enabled;
+          return true;
+        });
+
+        if (activeFilter === 'all') {
+          const enabledItems = list.filter(r => r.enabled).sort((a, b) => (a.order || 50) - (b.order || 50));
+          const pausedItems = list.filter(r => !r.enabled);
+          if (enabledItems.length) {
+            html += `<div class="group-block"><div class="group-title">进行中 · ${enabledItems.length}</div><section class="group-card">${enabledItems.map(renderReminderRow).join('')}</section></div>`;
+          }
+          if (pausedItems.length) {
+            html += `<div class="group-block"><div class="group-title">已暂停 · ${pausedItems.length}</div><section class="group-card">${pausedItems.map(renderReminderRow).join('')}</section></div>`;
+          }
+        } else if (list.length) {
+          html += `<section class="group-card">${list.map(renderReminderRow).join('')}</section>`;
+        } else {
+          html += `<div class="group-card" style="padding:28px;text-align:center;color:var(--ui-text-tertiary)">该筛选条件下暂无提醒</div>`;
+        }
+
+        // 已完成折叠
+        if (doneRem.length) {
+          html += `
+            <div class="group-block">
+              <div class="done-bar">
+                <button type="button" class="done-toggle" id="toggleDoneBtn">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="transform:rotate(${showCompleted ? 90 : 0}deg);transition:transform .14s"><path d="m9 6 6 6-6 6"/></svg>
+                  已完成（${doneRem.length}）
+                </button>
+                <button type="button" class="done-clear" id="clearDoneBtn">清空</button>
+              </div>
+              ${showCompleted ? `<section class="group-card">${doneRem.map(renderReminderRow).join('')}</section>` : ''}
+            </div>`;
+        }
+
+        // 轻量模板条（列表非空时不占大面积）
+        html += `
+          <div class="tpl-strip">
+            <span class="tpl-strip-label">快捷模板</span>
+            ${REMINDER_TPLS.map((t, i) => `<button type="button" class="tpl-pill" data-tpl="${i}">＋ ${t.title}</button>`).join('')}
+          </div>`;
+      }
+    } else {
+      // 定时任务 Tab：舒展卡片流
+      if (!allTasks.length) {
+        html += renderEmptyState(false);
+      } else {
+        html += `<section class="task-grid">${allTasks.map(renderTaskCard).join('')}</section>`;
+        html += `
+          <div class="tpl-strip">
+            <span class="tpl-strip-label">快捷任务模板</span>
+            ${TASK_TPLS.map((t, i) => `<button type="button" class="tpl-pill" data-tpl="${i}">＋ ${t.title}</button>`).join('')}
+          </div>`;
+      }
+    }
+
+    body.innerHTML = html;
+    bindStageEvents(isRem, nextRule);
+  }
+
+  function renderQuickCapture(isRem) {
+    const parsed = parseQuickInput(qc.text, !isRem);
+    const placeholder = isRem
+      ? '一句话添加提醒，例如「30分钟后关火」「工作日每90分钟喝水」「明天9点交材料」…'
+      : '一句话新建定时任务，例如「每天 9:15 总结昨天改动的文件」「周五 17:00 写周报」…';
+    return `
+      <form class="quick-capture" id="qcForm">
+        <div class="qc-row">
+          <span class="qc-ico">${ICONS.spark}</span>
+          <input type="text" class="qc-input" id="qcInput" value="${escapeAttr(qc.text)}" placeholder="${placeholder}" autocomplete="off" />
+          <div class="qc-actions">
+            <button type="button" class="qc-ch-btn" data-qc-ch="sound" aria-pressed="${qc.sound}" title="这条提醒带提示音">${ICONS.sound}</button>
+            <button type="button" class="qc-ch-btn" data-qc-ch="voice" aria-pressed="${qc.voice}" title="这条提醒语音朗读">${ICONS.voice}</button>
+            <button type="button" class="qc-ch-btn" data-qc-ch="sticky" aria-pressed="${qc.sticky}" title="这条提醒常驻不自动消失">${ICONS.sticky}</button>
+            <button type="submit" class="qc-submit">添加</button>
+          </div>
+        </div>
+        ${parsed ? `
+          <div class="qc-parsed">
+            <span>识别为</span>
+            <span class="qc-tag">${parsed.label}</span>
+            <span class="qc-tag is-neutral">${describeNotify({ sound: qc.sound, voice: qc.voice, sticky: qc.sticky || !!parsed.stickyHint })}</span>
+            <span style="margin-left:auto;color:var(--ui-text-tertiary)">按 Enter 快速添加</span>
+          </div>` : ''}
+      </form>`;
+  }
+
+  function renderReminderRow(r) {
+    const muted = !r.enabled || r.completed;
+    const menuOpen = openMenuId === r.id;
+    const n = r.notify || { sound: false, voice: false, sticky: false };
+    return `
+      <article class="r-row ${muted ? 'is-muted' : ''} ${menuOpen ? 'menu-open' : ''}" data-row="${r.id}">
+        <span class="r-ico is-${r.kind}" aria-hidden="true">${ICONS[r.kind]}</span>
+        <div class="r-body">
+          <div class="r-title-line">
+            <span class="r-title">${escapeHtml(r.text)}</span>
+          </div>
+          <div class="r-sub">
+            <span>${describeRule(r)}</span>
+            ${r.kind === 'weather' && r.weatherSnap ? `<span class="weather-inline">☀ ${r.weatherSnap}</span>` : ''}
+          </div>
+        </div>
+
+        <!-- 绑定到当前提醒的触达方式微标（悬停可一键直切） -->
+        ${r.completed ? '' : `
+          <div class="channel-strip" aria-label="这条提醒的方式">
+            <button type="button" class="ch-btn ${n.sound ? 'is-on' : ''}" data-ch="sound" data-id="${r.id}" title="${n.sound ? '提示音已开（点击关闭）' : '开启这条提醒的提示音'}">${ICONS.sound}</button>
+            <button type="button" class="ch-btn ${n.voice ? 'is-on' : ''}" data-ch="voice" data-id="${r.id}" title="${n.voice ? '语音朗读已开（点击关闭）' : '开启这条提醒的语音朗读'}">${ICONS.voice}</button>
+            <button type="button" class="ch-btn ${n.sticky ? 'is-on-neutral' : ''}" data-ch="sticky" data-id="${r.id}" title="${n.sticky ? '常驻强提醒已开（点击改为自动收起）' : '设为常驻强提醒'}">${ICONS.sticky}</button>
+          </div>`}
+
+        <div class="r-right">
+          <span class="r-next ${muted ? 'is-paused' : ''}">${r.completed ? '已完成' : (r.enabled ? r.nextLabel : '已暂停')}</span>
+          ${r.completed ? '' : `<button type="button" class="switch" data-toggle="${r.id}" role="switch" aria-checked="${r.enabled}" aria-label="启用"></button>`}
+          <div class="more-wrap">
+            <button type="button" class="row-more-btn" data-more="${r.id}" aria-label="更多">${ICONS.more}</button>
+            <div class="xb-menu" role="menu" ${menuOpen ? '' : 'hidden'}>
+              <button type="button" class="xb-menu-item" data-act="edit" data-id="${r.id}">编辑提醒</button>
+              <button type="button" class="xb-menu-item" data-act="preview" data-id="${r.id}">试看气泡效果</button>
+              <button type="button" class="xb-menu-item" data-act="dup" data-id="${r.id}">创建副本</button>
+              <div class="xb-menu-sep"></div>
+              <button type="button" class="xb-menu-item is-danger" data-act="del" data-id="${r.id}">删除</button>
+            </div>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function renderTaskCard(r) {
+    const ar = r.agentRun;
+    const n = r.notify || { sound: false, voice: false, sticky: false };
+    const menuOpen = openMenuId === r.id;
+    return `
+      <article class="task-card" data-row="${r.id}">
+        <div class="task-top">
+          <span class="r-ico is-agent">${ICONS.agent}</span>
+          <div class="r-body">
+            <span class="r-title">${escapeHtml(r.text)}</span>
+            <div class="r-sub">
+              <span>${describeRule(r)}</span>
+              <span>·</span>
+              <span>完成后：${describeNotify(n)}</span>
+            </div>
+          </div>
+          <div class="channel-strip">
+            <button type="button" class="ch-btn ${n.sound ? 'is-on' : ''}" data-ch="sound" data-id="${r.id}" title="完成后播放提示音">${ICONS.sound}</button>
+            <button type="button" class="ch-btn ${n.voice ? 'is-on' : ''}" data-ch="voice" data-id="${r.id}" title="完成后语音播报摘要">${ICONS.voice}</button>
+            <button type="button" class="ch-btn ${n.sticky ? 'is-on-neutral' : ''}" data-ch="sticky" data-id="${r.id}" title="结果气泡常驻">${ICONS.sticky}</button>
+          </div>
+          <div class="r-right">
+            <span class="r-next ${r.enabled ? '' : 'is-paused'}">${r.enabled ? r.nextLabel : '已暂停'}</span>
+            <button type="button" class="switch" data-toggle="${r.id}" role="switch" aria-checked="${r.enabled}"></button>
+            <div class="more-wrap">
+              <button type="button" class="row-more-btn" style="opacity:1" data-more="${r.id}" aria-label="更多">${ICONS.more}</button>
+              <div class="xb-menu" role="menu" ${menuOpen ? '' : 'hidden'}>
+                <button type="button" class="xb-menu-item" data-act="edit" data-id="${r.id}">编辑任务</button>
+                <button type="button" class="xb-menu-item" data-act="run" data-id="${r.id}">立即试跑一次</button>
+                <div class="xb-menu-sep"></div>
+                <button type="button" class="xb-menu-item is-danger" data-act="del" data-id="${r.id}">删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${ar ? `
+          <div class="task-run-box">
+            <div class="task-run-head">
+              <span class="run-dot ${ar.running ? 'running' : 'ok'}"></span>
+              <span>${ar.running ? '正在后台只读执行…' : `上次运行：${ar.at} · 消耗 ${ar.tokens} token · 共 ${ar.count} 次`}</span>
+              <div class="task-run-actions">
+                <button type="button" class="mini-link is-neutral" data-run-now="${r.id}">${ICONS.play} 立即试跑</button>
+                ${ar.running ? '' : `<button type="button" class="mini-link" data-open-chat="${r.id}">查看完整对话 ${ICONS.arrow}</button>`}
+              </div>
+            </div>
+            <p class="task-run-summary">${ar.running ? '小伴正在检查目录变动并整理摘要…' : escapeHtml(ar.summary)}</p>
+          </div>` : ''}
+      </article>`;
+  }
+
+  function renderEmptyState(isRem) {
+    const tpls = isRem ? REMINDER_TPLS : TASK_TPLS;
+    return `
+      <section class="empty-stage">
+        <span class="empty-icon">${isRem ? ICONS.custom : ICONS.agent}</span>
+        <h2>${isRem ? '还没有设置提醒' : '还没有定时任务'}</h2>
+        <p>${isRem ? '在上方直接输入一句话即可秒建，或挑选一个常用模板开始；每条提醒都能单独设定静音、响铃或语音朗读。' : '到点让小伴按你的说明自动整理信息，完整结果自动沉淀到聊天「定时任务」会话中。'}</p>
+        <div class="tpl-grid">
+          ${tpls.map((t, i) => `
+            <button type="button" class="tpl-card" data-tpl="${i}">
+              <strong>${t.title}</strong>
+              <span>${t.desc}</span>
+              <small>默认方式：${t.tag}</small>
+            </button>`).join('')}
+        </div>
+      </section>`;
+  }
+
+  function bindStageEvents(isRem, nextRule) {
+    // 快建栏
+    const qcInput = document.getElementById('qcInput');
+    if (qcInput) {
+      qcInput.oninput = (e) => {
+        qc.text = e.target.value;
+        const pos = qcInput.selectionStart;
+        render();
+        const fresh = document.getElementById('qcInput');
+        if (fresh) { fresh.focus(); fresh.setSelectionRange(pos, pos); }
+      };
+    }
+    document.querySelectorAll('[data-qc-ch]').forEach(btn => {
+      btn.onclick = () => {
+        const k = btn.dataset.qcCh;
+        qc[k] = !qc[k];
+        render();
+      };
+    });
+    const qcForm = document.getElementById('qcForm');
+    if (qcForm) {
+      qcForm.onsubmit = (e) => {
+        e.preventDefault();
+        const parsed = parseQuickInput(qc.text, !isRem);
+        if (!parsed) { showToast('先输入你想被提醒的内容吧'); return; }
+        const notify = {
+          sound: qc.sound || prefs.defaultSound,
+          voice: qc.voice || prefs.defaultVoice,
+          sticky: qc.sticky || !!parsed.stickyHint
+        };
+        rules.unshift({
+          id: 'r-' + Date.now(),
+          kind: parsed.kind,
+          enabled: true,
+          repeat: parsed.repeat,
+          time: parsed.time || '15:00',
+          everyMinutes: parsed.everyMinutes || 90,
+          winStart: parsed.winStart || '09:00',
+          winEnd: parsed.winEnd || '18:00',
+          weekdays: parsed.weekdays || [1,2,3,4,5],
+          onceAt: defaultOnceTime(parsed.onceOffset || 60),
+          intervalMinutes: 60,
+          city: null,
+          text: parsed.cleanText,
+          notify,
+          nextClock: parsed.time || '即将',
+          nextCountdown: parsed.onceOffset ? `${parsed.onceOffset} 分钟后` : '已安排',
+          nextLabel: parsed.onceOffset ? `${parsed.onceOffset} 分钟后` : (parsed.time || `每 ${parsed.everyMinutes} 分`),
+          bucket: 'today',
+          order: 5,
+          ...(parsed.kind === 'agent' ? { agentRun: { at: '尚未运行', ok: true, tokens: '0', count: 0, session: 'sess-new', summary: '已创建，可点击右侧「立即试跑」测试效果。' } } : {})
+        });
+        qc.text = ''; qc.sound = false; qc.voice = false; qc.sticky = false;
+        if (viewState === 'empty') setViewState('normal');
+        else render();
+        showToast(`已添加（${describeNotify(notify)}）`);
+      };
+    }
+
+    // 焦点卡按钮
+    const resumeBtn = document.getElementById('spotResumeBtn');
+    if (resumeBtn) resumeBtn.onclick = () => { prefs.enabled = true; setViewState('normal'); showToast('已恢复全部提醒'); };
+    const exitQuiet = document.getElementById('spotExitQuietBtn');
+    if (exitQuiet) exitQuiet.onclick = () => setViewState('normal');
+    const spotPreview = document.getElementById('spotPreviewBtn');
+    if (spotPreview && nextRule) spotPreview.onclick = () => showBubble({ kind: nextRule.kind, text: nextRule.text, notify: nextRule.notify });
+    const spotSnooze = document.getElementById('spotSnoozeBtn');
+    if (spotSnooze && nextRule) spotSnooze.onclick = () => { nextRule.nextClock = '15:40'; nextRule.nextCountdown = '已推迟 10 分'; nextRule.nextLabel = '稍后 15:40'; render(); showToast('已将下一条提醒推迟 10 分钟'); };
+
+    // 筛选
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.onclick = () => { activeFilter = btn.dataset.filter; render(); };
+    });
+
+    // 已完成折叠
+    const tDone = document.getElementById('toggleDoneBtn');
+    if (tDone) tDone.onclick = () => { showCompleted = !showCompleted; render(); };
+    const cDone = document.getElementById('clearDoneBtn');
+    if (cDone) cDone.onclick = () => { rules = rules.filter(r => !r.completed); showCompleted = false; render(); showToast('已清空已完成的提醒'); };
+
+    // 模板
+    const tpls = isRem ? REMINDER_TPLS : TASK_TPLS;
+    document.querySelectorAll('[data-tpl]').forEach(btn => {
+      btn.onclick = () => { const t = tpls[Number(btn.dataset.tpl)]; if (t) openEditor(t.preset, false); };
+    });
+
+    // 行内直接切换单条提醒的 提示音 / 语音 / 常驻！
+    document.querySelectorAll('[data-ch]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const r = rules.find(x => x.id === btn.dataset.id);
+        if (!r) return;
+        const ch = btn.dataset.ch;
+        r.notify[ch] = !r.notify[ch];
+        render();
+        const names = { sound: '提示音', voice: '语音朗读', sticky: '常驻强提醒' };
+        showToast(`已为这条提醒${r.notify[ch] ? '开启' : '关闭'}${names[ch]}`);
+      };
+    });
+
+    // 整行点击编辑
+    document.querySelectorAll('[data-row]').forEach(el => {
+      el.onclick = (e) => {
+        if (e.target.closest('button') || e.target.closest('.task-run-box')) return;
+        const r = rules.find(x => x.id === el.dataset.row);
+        if (r) openEditor(r, true);
+      };
+    });
+
+    // 启用开关
+    document.querySelectorAll('[data-toggle]').forEach(sw => {
+      sw.onclick = (e) => {
+        e.stopPropagation();
+        const r = rules.find(x => x.id === sw.dataset.toggle);
+        if (!r) return;
+        r.enabled = !r.enabled;
+        render();
+        showToast(r.enabled ? '已启用' : '已暂停');
+      };
+    });
+
+    // 更多菜单
+    document.querySelectorAll('[data-more]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        openMenuId = openMenuId === btn.dataset.more ? null : btn.dataset.more;
+        render();
+      };
+    });
+
+    document.querySelectorAll('[data-act]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const { act, id } = btn.dataset;
+        const r = rules.find(x => x.id === id);
+        if (!r) return;
+        if (act === 'del') {
+          if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.textContent = '确认删除？'; return; }
+          rules = rules.filter(x => x.id !== id);
+          openMenuId = null;
+          render();
+          showToast('已删除');
+          return;
+        }
+        openMenuId = null;
+        if (act === 'edit') openEditor(r, true);
+        if (act === 'preview') showBubble({ kind: r.kind, text: r.kind === 'weather' && r.weatherSnap ? `${r.text}：${r.city?.name || '杭州'} ${r.weatherSnap}，微风舒适。` : r.text, notify: r.notify });
+        if (act === 'run') runAgentDemo(id);
+        if (act === 'dup') {
+          const cp = JSON.parse(JSON.stringify(r));
+          cp.id = 'r-' + Date.now();
+          cp.text += '（副本）';
+          cp.order = 55;
+          rules.push(cp);
+          render();
+          showToast('已创建副本');
+        }
+      };
+    });
+
+    document.querySelectorAll('[data-run-now]').forEach(btn => {
+      btn.onclick = (e) => { e.stopPropagation(); runAgentDemo(btn.dataset.runNow); };
+    });
+    document.querySelectorAll('[data-open-chat]').forEach(btn => {
+      btn.onclick = (e) => { e.stopPropagation(); showToast('已跳转到聊天「定时任务」对应会话'); };
+    });
+  }
+
+  function runAgentDemo(id) {
+    const r = rules.find(x => x.id === id);
+    if (!r) return;
+    r.agentRun = { ...(r.agentRun || { count: 0 }), running: true };
+    render();
+    setTimeout(() => {
+      r.agentRun = {
+        at: '刚刚', ok: true, tokens: '1.5k', count: (r.agentRun.count || 0) + 1,
+        session: 'sess-live', running: false,
+        summary: '已完成最新扫描：检测到 3 处新改动，重点集中在提醒页单栏交互与按条触达配置，完整报告已发至对话。'
+      };
+      render();
+      showBubble({ kind: 'agent', text: r.agentRun.summary, notify: r.notify, session: r.agentRun.session });
+    }, 1000);
+  }
+
+  /* ── 独立编辑器逻辑 ── */
+  const ed = {
+    kind: 'custom', enabled: true, repeat: 'daily',
+    time: '15:00', everyMinutes: 90, winStart: '09:00', winEnd: '18:00',
+    weekdays: [1,2,3,4,5], onceAt: '', intervalMinutes: 60,
+    city: { name: '杭州', admin1: '浙江', country: '中国' },
+    text: '',
+    notify: { sound: false, voice: false, sticky: false }
+  };
+
+  function defaultOnceTime(offsetMin = 60) {
+    const d = new Date(Date.now() + offsetMin * 60_000);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openEditor(preset = {}, isEdit = false) {
+    editingId = isEdit ? preset.id : null;
+    editorDirtyText = isEdit;
+    const kind = preset.kind || 'custom';
+    const repeat = preset.repeat || (kind === 'off-work' ? 'weekdays' : 'daily');
+    Object.assign(ed, {
+      kind, enabled: preset.enabled ?? true, repeat,
+      time: preset.time || (kind === 'off-work' ? '18:30' : (kind === 'weather' || kind === 'agent') ? '08:00' : '15:00'),
+      everyMinutes: preset.everyMinutes || 90,
+      winStart: preset.winStart || '09:00',
+      winEnd: preset.winEnd || '18:00',
+      weekdays: preset.weekdays?.length ? [...preset.weekdays] : [1,2,3,4,5],
+      onceAt: preset.onceAt || defaultOnceTime(60),
+      intervalMinutes: preset.intervalMinutes || 60,
+      city: preset.city || { name: '杭州', admin1: '浙江', country: '中国' },
+      text: preset.text ?? DEFAULT_TEXT[kind],
+      notify: preset.notify
+        ? { ...preset.notify }
+        : { sound: prefs.defaultSound, voice: prefs.defaultVoice, sticky: repeat === 'once' && prefs.defaultOnceSticky }
+    });
+    document.getElementById('editorTitle').textContent = isEdit
+      ? (kind === 'agent' ? '编辑定时任务' : '编辑提醒')
+      : (kind === 'agent' ? '新建定时任务' : '新建提醒');
+    document.getElementById('editorSaveBtn').textContent = isEdit ? '保存修改' : '创建';
+    document.getElementById('editorWin').hidden = false;
+    syncEditor();
+  }
+
+  function syncEditor() {
+    document.querySelectorAll('#editorKindPills .kind-pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === ed.kind)));
+    const isRest = ed.kind === 'rest';
+    document.getElementById('fieldRest').hidden = !isRest;
+    document.getElementById('fieldStandardSchedule').hidden = isRest;
+    document.getElementById('edRestMinutes').value = ed.intervalMinutes;
+
+    document.querySelectorAll('#repeatSeg .seg-btn').forEach(b => {
+      b.hidden = (ed.kind === 'agent' && b.dataset.repeat === 'interval');
+      b.setAttribute('aria-pressed', String(b.dataset.repeat === ed.repeat));
+    });
+    if (ed.kind === 'agent' && ed.repeat === 'interval') ed.repeat = 'daily';
+
+    document.getElementById('fieldClock').hidden = !(ed.repeat === 'daily' || ed.repeat === 'weekdays');
+    document.getElementById('fieldInterval').hidden = ed.repeat !== 'interval';
+    document.getElementById('fieldWeekdays').hidden = !(ed.repeat === 'weekdays' || ed.repeat === 'interval');
+    document.getElementById('fieldOnce').hidden = ed.repeat !== 'once';
+
+    document.getElementById('edTime').value = ed.time;
+    document.getElementById('edEveryMin').value = ed.everyMinutes;
+    document.getElementById('edWinStart').value = ed.winStart;
+    document.getElementById('edWinEnd').value = ed.winEnd;
+    document.getElementById('edOnceAt').value = ed.onceAt;
+
+    const wp = document.getElementById('weekdayPills');
+    wp.innerHTML = DAY_SHORT.map((l, i) => `<button type="button" class="day-pill" data-day="${i + 1}" aria-pressed="${ed.weekdays.includes(i + 1)}">${l}</button>`).join('');
+    wp.querySelectorAll('.day-pill').forEach(b => {
+      b.onclick = () => {
+        const d = Number(b.dataset.day);
+        if (ed.weekdays.includes(d)) { if (ed.weekdays.length > 1) ed.weekdays = ed.weekdays.filter(x => x !== d); }
+        else ed.weekdays.push(d);
+        syncEditor();
+      };
+    });
+
+    document.getElementById('edWeatherField').hidden = ed.kind !== 'weather';
+    document.getElementById('edCityState').textContent = ed.city ? `已选择：${[ed.city.name, ed.city.admin1, ed.city.country].filter(Boolean).join(' · ')}` : '尚未选择城市';
+
+    const limit = ed.kind === 'agent' ? 1000 : 240;
+    document.getElementById('edTextLabel').textContent = ed.kind === 'agent' ? '要小伴做什么' : ed.kind === 'weather' ? '提醒开头（可选）' : '提醒内容';
+    const ta = document.getElementById('edText');
+    ta.maxLength = limit; ta.value = ed.text;
+    document.getElementById('edTextCount').textContent = `${ed.text.length} / ${limit}`;
+    document.getElementById('agentSafetyNote').hidden = ed.kind !== 'agent';
+
+    // 绑定触达方式 3 格卡
+    document.getElementById('edChSound').setAttribute('aria-pressed', String(ed.notify.sound));
+    document.getElementById('edChSoundState').textContent = ed.notify.sound ? '开启' : '关闭';
+    document.getElementById('edChVoice').setAttribute('aria-pressed', String(ed.notify.voice));
+    document.getElementById('edChVoiceState').textContent = ed.notify.voice ? '开启' : '关闭';
+    document.getElementById('edChSticky').setAttribute('aria-pressed', String(ed.notify.sticky));
+    document.getElementById('edChStickyState').textContent = ed.notify.sticky ? '常驻' : '自动收起';
+  }
+
+  /* ── 桌面悬浮气泡渲染（4 种业务形态统一引擎） ── */
+  const KIND_LABEL = { custom: '关怀提醒', rest: '久坐休息', 'off-work': '下班提醒', weather: '今日天气', agent: '定时任务完成' };
+
+  function buildBubbleInner(opts) {
+    const kind = opts.kind || 'custom';
+    const notify = opts.notify || { sound: false, voice: false, sticky: false };
+    const text = opts.text || '记得喝杯温水，放松一下～';
+    const timeStr = opts.time || new Date().toTimeString().slice(0, 5);
+    const extraCount = opts.extraCount || 0;
+    const durSec = notify.voice ? 30 : 10;
+
+    const statusLeft = notify.voice
+      ? `<button type="button" class="voice-wave-btn" data-bub-voice="1" title="点击暂停或继续朗读"><span class="wave-bars"><i></i><i></i><i></i></span><span data-voice-lbl>朗读中</span></button>`
+      : notify.sticky
+        ? `<span>常驻强提醒${notify.sound ? ' · 已响铃' : ''}</span>`
+        : `<span>${notify.sound ? '提示音 · ' : ''}悬停暂停收起</span>`;
+
+    let actionsHtml = '';
+    if (kind === 'agent') {
+      actionsHtml = `
+        <button type="button" class="bub-btn is-ghost" data-bub-close>稍后</button>
+        <button type="button" class="bub-btn is-primary" data-bub-chat>查看完整结果 ${ICONS.arrow}</button>`;
+    } else if (notify.sticky) {
+      actionsHtml = `
+        <button type="button" class="bub-btn is-soft" data-bub-snooze>10 分钟后</button>
+        <button type="button" class="bub-btn is-primary" data-bub-close>知道了</button>`;
+    } else {
+      actionsHtml = `
+        <button type="button" class="bub-btn is-soft" data-bub-snooze>10 分钟后</button>`;
+    }
+
+    return `
+      <div class="xb-bub-inner">
+        <div class="xb-bub-main">
+          <span class="xb-bub-ico is-${kind}" aria-hidden="true">${ICONS[kind] || ICONS.custom}</span>
+          <div class="xb-bub-body">
+            <div class="xb-bub-head">
+              <span class="xb-bub-kind">${KIND_LABEL[kind] || '小伴提醒'}</span>
+              <span class="xb-bub-dot"></span>
+              <span class="xb-bub-time">${timeStr}</span>
+              ${notify.sticky ? '<span class="xb-bub-sticky-dot" title="常驻强提醒"></span>' : ''}
+            </div>
+            <p class="xb-bub-text">${escapeHtml(text)}</p>
+            ${extraCount > 0 ? `<div class="xb-bub-extra"><span>另有 ${extraCount} 条同时到期的提醒</span><span style="color:var(--ui-ink);font-weight:500">合并展示</span></div>` : ''}
+          </div>
+          <button type="button" class="xb-bub-close" data-bub-close aria-label="关闭提醒">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="xb-bub-foot">
+          <div class="xb-bub-status">${statusLeft}</div>
+          <div class="xb-bub-actions">${actionsHtml}</div>
+        </div>
+      </div>
+      <div class="xb-bub-progress" ${notify.sticky ? 'hidden' : ''}>
+        <div class="xb-bub-bar" style="--bub-dur:${durSec}s"></div>
+      </div>`;
+  }
+
+  function bindBubbleActions(container, isFloating) {
+    container.querySelectorAll('[data-bub-close]').forEach(b => {
+      b.onclick = () => {
+        if (isFloating) { container.hidden = true; clearTimeout(bubbleTimer); }
+        else showToast('演示卡片：实际点击将关闭气泡');
+      };
+    });
+    container.querySelectorAll('[data-bub-snooze]').forEach(b => {
+      b.onclick = () => {
+        if (isFloating) { container.hidden = true; clearTimeout(bubbleTimer); }
+        showToast('已设为 10 分钟后再次提醒');
+      };
+    });
+    container.querySelectorAll('[data-bub-chat]').forEach(b => {
+      b.onclick = () => {
+        if (isFloating) { container.hidden = true; clearTimeout(bubbleTimer); }
+        showToast('已打开聊天「定时任务」查看完整报告');
+      };
+    });
+    container.querySelectorAll('[data-bub-voice]').forEach(b => {
+      b.onclick = () => {
+        const stopped = b.classList.toggle('is-stopped');
+        b.querySelector('[data-voice-lbl]').textContent = stopped ? '已静音' : '朗读中';
+      };
+    });
+  }
+
+  function showBubble(opts) {
+    const el = document.getElementById('desktopBubble');
+    const notify = opts.notify || { sound: false, voice: false, sticky: false };
+    el.classList.toggle('is-sticky', !!notify.sticky);
+    el.innerHTML = buildBubbleInner(opts);
+    el.hidden = false;
+    bindBubbleActions(el, true);
+
+    clearTimeout(bubbleTimer);
+    if (!notify.sticky) {
+      const ms = (notify.voice ? 14 : 9) * 1000;
+      const startAutoHide = () => {
+        clearTimeout(bubbleTimer);
+        bubbleTimer = setTimeout(() => { el.hidden = true; }, ms);
+      };
+      startAutoHide();
+      el.onmouseenter = () => clearTimeout(bubbleTimer);
+      el.onmouseleave = () => { if (!el.hidden) startAutoHide(); };
+    } else {
+      el.onmouseenter = null;
+      el.onmouseleave = null;
+    }
+  }
+
+  const BUBBLE_SAMPLES = [
+    {
+      title: '1. 轻提醒气泡（默认）',
+      note: '静音 · 10 秒自动收起 · 底边 2px 进度条',
+      opts: { kind: 'custom', time: '15:30', text: '喝杯温水，顺便活动一下手腕和肩膀吧～', notify: { sound: false, voice: false, sticky: false } }
+    },
+    {
+      title: '2. 语音播报气泡（天气 / 朗读）',
+      note: '动态声波条 · 可一键静音 · 30 秒收起',
+      opts: { kind: 'weather', time: '08:00', text: '早安！杭州今天多云转晴，14°C – 21°C，东北风 2 级，午后体感舒适。', notify: { sound: false, voice: true, sticky: false } }
+    },
+    {
+      title: '3. 常驻强提醒气泡（重要事项）',
+      note: '左侧主题色条 · 脉冲点 · 需点「知道了」',
+      opts: { kind: 'custom', time: '19:30', text: '下班路过驿站取快递（货架 3-18），别忘了拿生鲜包裹。', notify: { sound: true, voice: true, sticky: true }, extraCount: 1 }
+    },
+    {
+      title: '4. 定时任务完成气泡',
+      note: '展示 AI 摘要 · 一键直达聊天完整报告',
+      opts: { kind: 'agent', time: '09:15', text: '昨日工作目录共改动 6 个文件，主要集中在提醒页单栏重构与气泡组件升级。', notify: { sound: true, voice: false, sticky: false } }
+    }
+  ];
+
+  function openBubbleGallery() {
+    const grid = document.getElementById('bubbleGalleryGrid');
+    grid.innerHTML = BUBBLE_SAMPLES.map((s, i) => `
+      <div class="gallery-cell">
+        <div class="gallery-cap">
+          <strong>${s.title}</strong>
+          <span>${s.note}</span>
+        </div>
+        <aside class="desktop-bubble ${s.opts.notify.sticky ? 'is-sticky' : ''}" data-g-bub="${i}">
+          ${buildBubbleInner(s.opts)}
+        </aside>
+      </div>`).join('');
+    grid.querySelectorAll('[data-g-bub]').forEach(el => bindBubbleActions(el, false));
+    document.getElementById('bubbleGalleryModal').hidden = false;
+  }
+
+  function setViewState(next) {
+    viewState = next;
+    document.querySelectorAll('[data-state]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.state === next)));
+    prefs.enabled = next !== 'paused';
+    render();
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  /* ── 事件绑定 ── */
+  const accentWrap = document.getElementById('accentDots');
+  ACCENTS.forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'accent-dot'; b.dataset.accent = a.id; b.title = a.name; b.style.background = a.light.btn;
+    b.onclick = () => { accentId = a.id; applyTokens(); };
+    accentWrap.appendChild(b);
+  });
+
+  document.getElementById('themeToggle').onclick = () => { dark = !dark; applyTokens(); };
+  document.querySelectorAll('[data-state]').forEach(b => { b.onclick = () => setViewState(b.dataset.state); });
+  document.querySelectorAll('[data-width]').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('[data-width]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      const w = document.getElementById('desktopWindow');
+      w.classList.toggle('w-std', b.dataset.width === 'std');
+      w.classList.toggle('w-narrow', b.dataset.width === 'narrow');
+    };
+  });
+
+  // 顶部 Tabs 与按钮
+  document.getElementById('tabReminders').onclick = () => { activeTab = 'reminders'; openMenuId = null; render(); };
+  document.getElementById('tabTasks').onclick = () => { activeTab = 'tasks'; openMenuId = null; render(); };
+  document.getElementById('btnNewMain').onclick = () => openEditor({ kind: activeTab === 'tasks' ? 'agent' : 'custom' }, false);
+
+  // 全局偏好浮层开关
+  const prefsPopover = document.getElementById('prefsPopover');
+  const prefsBtn = document.getElementById('prefsBtn');
+  const togglePrefs = (e) => {
+    if (e) e.stopPropagation();
+    const open = prefsPopover.hidden;
+    prefsPopover.hidden = !open;
+    prefsBtn.setAttribute('aria-expanded', String(open));
+  };
+  prefsBtn.onclick = togglePrefs;
+  document.getElementById('topStatusPill').onclick = togglePrefs;
+  document.getElementById('demoOpenPrefs').onclick = (e) => { e.stopPropagation(); prefsPopover.hidden = false; prefsBtn.setAttribute('aria-expanded', 'true'); };
+  prefsPopover.onclick = (e) => e.stopPropagation();
+
+  document.getElementById('prefEnabled').onclick = () => { prefs.enabled = !prefs.enabled; viewState = prefs.enabled ? 'normal' : 'paused'; render(); flashSaved(); };
+  document.getElementById('defSound').onclick = () => { prefs.defaultSound = !prefs.defaultSound; syncTopStatus(); flashSaved(); };
+  document.getElementById('defVoice').onclick = () => { prefs.defaultVoice = !prefs.defaultVoice; syncTopStatus(); flashSaved(); };
+  document.getElementById('defSticky').onclick = () => { prefs.defaultOnceSticky = !prefs.defaultOnceSticky; syncTopStatus(); flashSaved(); };
+  document.getElementById('prefQuiet').onclick = () => { prefs.quietEnabled = !prefs.quietEnabled; syncTopStatus(); flashSaved(); };
+  document.getElementById('quietStart').onchange = (e) => { prefs.quietStart = e.target.value; syncTopStatus(); flashSaved(); };
+  document.getElementById('quietEnd').onchange = (e) => { prefs.quietEnd = e.target.value; syncTopStatus(); flashSaved(); };
+  document.getElementById('weatherSourceSelect').onchange = (e) => { prefs.weatherProvider = e.target.value; syncTopStatus(); flashSaved(); };
+  document.getElementById('popPreviewBubble').onclick = () => showBubble({ kind: 'custom', text: '该喝杯水啦，起来伸个懒腰吧～', notify: { sound: prefs.defaultSound, voice: prefs.defaultVoice, sticky: false } });
+
+  // 演示快捷芯片
+  document.getElementById('demoBubbleGallery').onclick = (e) => { e.stopPropagation(); openBubbleGallery(); };
+  document.getElementById('closeGalleryBtn').onclick = () => { document.getElementById('bubbleGalleryModal').hidden = true; };
+  document.getElementById('bubbleGalleryModal').onclick = (e) => { if (e.target.id === 'bubbleGalleryModal') e.currentTarget.hidden = true; };
+
+  document.querySelectorAll('[data-bub]').forEach(b => {
+    b.onclick = () => {
+      const map = { light: 0, voice: 1, sticky: 2, agent: 3 };
+      const sample = BUBBLE_SAMPLES[map[b.dataset.bub]];
+      if (sample) showBubble(sample.opts);
+    };
+  });
+
+  document.querySelectorAll('[data-launch]').forEach(b => {
+    b.onclick = () => {
+      const m = b.dataset.launch;
+      if (m === 'interval') openEditor(rules.find(x => x.id === 'r1'), true);
+      if (m === 'once') openEditor(rules.find(x => x.id === 'r3'), true);
+      if (m === 'weather') openEditor(rules.find(x => x.id === 'r4'), true);
+      if (m === 'agent') openEditor({ kind: 'agent' }, false);
+    };
+  });
+
+  // 编辑器事件
+  document.querySelectorAll('#editorKindPills .kind-pill').forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.kind;
+      if (!editorDirtyText || Object.values(DEFAULT_TEXT).includes(ed.text)) ed.text = DEFAULT_TEXT[k];
+      ed.kind = k;
+      if (k === 'off-work' && ed.repeat === 'daily') ed.repeat = 'weekdays';
+      syncEditor();
+    };
+  });
+  document.querySelectorAll('#repeatSeg .seg-btn').forEach(b => {
+    b.onclick = () => {
+      ed.repeat = b.dataset.repeat;
+      if (ed.repeat === 'once' && prefs.defaultOnceSticky) ed.notify.sticky = true;
+      syncEditor();
+    };
+  });
+  document.querySelectorAll('[data-rest]').forEach(b => { b.onclick = () => { ed.intervalMinutes = Number(b.dataset.rest); syncEditor(); }; });
+  document.querySelectorAll('[data-clock]').forEach(b => { b.onclick = () => { ed.time = b.dataset.clock; syncEditor(); }; });
+  document.getElementById('presetWorkdays').onclick = () => { ed.weekdays = [1,2,3,4,5]; syncEditor(); };
+  document.getElementById('presetWeekend').onclick = () => { ed.weekdays = [6,7]; syncEditor(); };
+  document.getElementById('presetAllDays').onclick = () => { ed.weekdays = [1,2,3,4,5,6,7]; syncEditor(); };
+  document.querySelectorAll('[data-once-offset]').forEach(b => { b.onclick = () => { ed.onceAt = defaultOnceTime(Number(b.dataset.onceOffset)); syncEditor(); }; });
+  document.querySelectorAll('[data-once-preset]').forEach(b => {
+    b.onclick = () => {
+      const d = new Date();
+      if (b.dataset.oncePreset === 'tomorrow') d.setDate(d.getDate() + 1);
+      const pad = n => String(n).padStart(2, '0');
+      ed.onceAt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${b.dataset.oncePreset === 'tomorrow' ? '09:00' : '20:00'}`;
+      syncEditor();
+    };
+  });
+
+  document.getElementById('edChSound').onclick = () => { ed.notify.sound = !ed.notify.sound; syncEditor(); };
+  document.getElementById('edChVoice').onclick = () => { ed.notify.voice = !ed.notify.voice; syncEditor(); };
+  document.getElementById('edChSticky').onclick = () => { ed.notify.sticky = !ed.notify.sticky; syncEditor(); };
+
+  document.getElementById('edText').oninput = (e) => {
+    ed.text = e.target.value; editorDirtyText = true;
+    document.getElementById('edTextCount').textContent = `${ed.text.length} / ${ed.kind === 'agent' ? 1000 : 240}`;
+  };
+  document.getElementById('edTime').onchange = (e) => { ed.time = e.target.value; };
+  document.getElementById('edRestMinutes').onchange = (e) => { ed.intervalMinutes = Number(e.target.value) || 60; };
+  document.getElementById('edEveryMin').onchange = (e) => { ed.everyMinutes = Number(e.target.value) || 90; };
+  document.getElementById('edWinStart').onchange = (e) => { ed.winStart = e.target.value; };
+  document.getElementById('edWinEnd').onchange = (e) => { ed.winEnd = e.target.value; };
+  document.getElementById('edOnceAt').onchange = (e) => { ed.onceAt = e.target.value; };
+
+  document.getElementById('btnSearchCity').onclick = () => {
+    const q = document.getElementById('edCityQuery').value.trim() || '上海';
+    const box = document.getElementById('cityResults');
+    const items = [{ name: q, admin1: '中国', country: '' }, { name: '杭州', admin1: '浙江', country: '中国' }, { name: '北京', admin1: '北京', country: '中国' }];
+    box.hidden = false;
+    box.innerHTML = items.map((c, i) => `<button type="button" class="q-chip" data-ci="${i}">${c.name} ${c.admin1}</button>`).join('');
+    box.querySelectorAll('[data-ci]').forEach(b => { b.onclick = () => { ed.city = items[Number(b.dataset.ci)]; box.hidden = true; syncEditor(); }; });
+  };
+  document.getElementById('btnLocateCity').onclick = () => { ed.city = { name: '杭州', admin1: '浙江', country: '中国' }; syncEditor(); showToast('已自动定位：杭州'); };
+  document.getElementById('btnTestWeather').onclick = () => showToast('杭州当前多云 19°C');
+
+  const closeEd = () => { document.getElementById('editorWin').hidden = true; };
+  document.getElementById('editorCloseDot').onclick = closeEd;
+  document.getElementById('editorCancelBtn').onclick = closeEd;
+  document.getElementById('editorPreviewBtn').onclick = () => showBubble({
+    kind: ed.kind,
+    text: ed.kind === 'weather' ? `${ed.text || '今日天气'} ${ed.city?.name || '杭州'} 多云 14°–21°，微风舒适。` : ed.text,
+    notify: ed.notify
+  });
+  document.getElementById('editorSaveBtn').onclick = () => {
+    if (ed.kind !== 'weather' && !ed.text.trim()) { showToast('请填写提醒内容'); return; }
+    const nextLabel = ed.kind === 'rest' ? `累计 ${ed.intervalMinutes} 分钟` : ed.repeat === 'once' ? '即将到期' : ed.repeat === 'interval' ? `每 ${ed.everyMinutes} 分` : `今天 ${ed.time}`;
+    if (editingId) {
+      const t = rules.find(x => x.id === editingId);
+      if (t) Object.assign(t, JSON.parse(JSON.stringify(ed)), { nextLabel, completed: false });
+      showToast('已保存修改');
+    } else {
+      rules.unshift({
+        ...JSON.parse(JSON.stringify(ed)),
+        id: 'r-' + Date.now(), nextLabel, nextClock: ed.time || '即将', nextCountdown: '已安排', bucket: 'today', order: 5,
+        ...(ed.kind === 'agent' ? { agentRun: { at: '尚未运行', ok: true, tokens: '0', count: 0, session: 'sess-new', summary: '已创建，可点右侧「立即试跑」预览结果。' } } : {})
+      });
+      activeTab = ed.kind === 'agent' ? 'tasks' : 'reminders';
+      if (viewState === 'empty') setViewState('normal');
+      showToast('已创建');
+    }
+    closeEd();
+    render();
+  };
+
+  document.addEventListener('click', () => {
+    if (!prefsPopover.hidden) { prefsPopover.hidden = true; prefsBtn.setAttribute('aria-expanded', 'false'); }
+    if (openMenuId) { openMenuId = null; render(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeEd();
+      document.getElementById('bubbleGalleryModal').hidden = true;
+      prefsPopover.hidden = true; prefsBtn.setAttribute('aria-expanded', 'false');
+      if (openMenuId) { openMenuId = null; render(); }
+    }
+  });
+
+  // URL 预设参数
+  const params = new URLSearchParams(location.search);
+  if (params.get('tab') === 'tasks') activeTab = 'tasks';
+  if (['normal', 'quiet', 'paused', 'empty'].includes(params.get('state'))) viewState = params.get('state');
+  if (params.get('theme') === 'dark') dark = true;
+  if (ACCENTS.some(a => a.id === params.get('accent'))) accentId = params.get('accent');
+
+  applyTokens();
+  setViewState(viewState);
+
+  const modal = params.get('modal');
+  if (modal === 'interval') openEditor(rules.find(x => x.id === 'r1'), true);
+  else if (modal === 'once') openEditor(rules.find(x => x.id === 'r3'), true);
+  else if (modal === 'task') openEditor({ kind: 'agent' }, false);
+  else if (modal === 'prefs') { prefsPopover.hidden = false; prefsBtn.setAttribute('aria-expanded', 'true'); }
+  else if (modal === 'bubbles') openBubbleGallery();
+})();
+</script>
+</body>
+</html>

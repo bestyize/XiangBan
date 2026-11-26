@@ -1416,16 +1416,17 @@
       domains: ['desktop'],
       subcat: '关怀与效率',
       status: 'pending',
-      statusNote: '待确认（正式 CarePage 尚未改造）',
+      statusNote: 'V2 单栏专注流（正式 CarePage 尚未改造）',
       runtime: 'static',
       path: 'client/xiaoban-desktop/docs/design-specs/prototypes/care-reminders-redesign.html',
-      summary: '精简右侧提醒方式（单行即开即存 + 伙伴迷你气泡预览）、规则行点击编辑与悬停 ⋯ 菜单、最近触发高亮与已完成折叠、定时任务直达聊天与立即试跑、双 Tab 三列场景模板及独立窗口表单（含时段间隔、星期 pill 与强提醒气泡修正）。',
+      summary: '跳出旧版左右双栏，重构为 860px 单栏专注流：移除常驻右侧偏好栏，将响铃/语音/常驻改为按条绑定（行内一键切换 + 独立窗 3 格卡），全局免打扰与默认偏好收进页头浮层；新增自然语言一句话快建栏、下一条提醒焦点卡及定时任务结果卡片流。',
       presets: [
-        { label: '关怀提醒', query: '?tab=reminders' },
+        { label: '提醒主页', query: '?tab=reminders' },
         { label: '定时任务', query: '?tab=tasks' },
-        { label: '免打扰态', query: '?state=quiet' },
-        { label: '时段间隔窗', query: '?modal=interval' },
-        { label: '新建任务窗', query: '?modal=task' },
+        { label: '气泡 4 态', query: '?modal=bubbles' },
+        { label: '全局偏好浮层', query: '?modal=prefs' },
+        { label: '强提醒编辑窗', query: '?modal=once' },
+        { label: '空状态', query: '?state=empty' },
       ]
     },
     {
