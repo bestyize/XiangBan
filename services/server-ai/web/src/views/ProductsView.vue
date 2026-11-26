@@ -1,22 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, errorMessage } from '../api';
+import { formatTokens } from '../format';
+import { CAPABILITIES, type CapabilityInfo } from '../media';
 import { notify } from '../toast';
 import type { MediaSetting, ModelOption, Product, Tier } from '../types';
-import { CAPABILITIES, type CapabilityInfo } from '../media';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
+import MediaDialog from '../components/MediaDialog.vue';
 import Money from '../components/Money.vue';
 import PageHead from '../components/PageHead.vue';
 import ProductDialog from '../components/ProductDialog.vue';
-import MediaDialog from '../components/MediaDialog.vue';
 import TierDialog from '../components/TierDialog.vue';
 
-const emit = defineEmits<{ go: [string]; changed: [] }>();
+const props = defineProps<{ initialProductId?: string }>();
+const emit = defineEmits<{ changed: []; selectProduct: [productId: string] }>();
 
 const products = ref<Product[]>([]);
 const selectedId = ref('');
 const tiers = ref<Tier[]>([]);
+const media = ref<MediaSetting[]>([]);
 const models = ref<ModelOption[]>([]);
 const modelsError = ref('');
 const loading = ref(true);
@@ -24,21 +28,33 @@ const error = ref('');
 
 const editingProduct = ref<Product | 'new' | null>(null);
 const editingTier = ref<Tier | 'new' | null>(null);
-const media = ref<MediaSetting[]>([]);
 const editingMedia = ref<CapabilityInfo | null>(null);
+const confirmingDeleteTier = ref<Tier | null>(null);
+const confirmingDeleteMedia = ref<CapabilityInfo | null>(null);
+const deleting = ref(false);
 
 const selected = computed(() => products.value.find((p) => p.product_id === selectedId.value) ?? null);
 const modelInfo = computed(() => new Map(models.value.map((m) => [m.model_name, m])));
-const span = computed(() => Math.max(tiers.value.length, 1) + 1);
 const mediaFor = (id: string) => media.value.find((m) => m.capability === id) ?? null;
+
+function pickProduct(id: string) {
+  selectedId.value = id;
+  emit('selectProduct', id);
+}
 
 async function loadProducts(keep?: string) {
   loading.value = true;
   error.value = '';
   try {
     products.value = (await api.products()).items;
-    const has = (id: string) => products.value.some((p) => p.product_id === id);
-    selectedId.value = keep && has(keep) ? keep : has(selectedId.value) ? selectedId.value : (products.value[0]?.product_id ?? '');
+    const has = (id?: string) => !!id && products.value.some((p) => p.product_id === id);
+    const next =
+      (keep && has(keep) ? keep : null) ??
+      (has(props.initialProductId) ? props.initialProductId! : null) ??
+      (has(selectedId.value) ? selectedId.value : null) ??
+      products.value[0]?.product_id ??
+      '';
+    pickProduct(next);
   } catch (e) {
     error.value = errorMessage(e);
   } finally {
@@ -66,32 +82,6 @@ async function loadMedia() {
   }
 }
 
-/** 卡片上那一行：语音的音色、图片的尺寸、实时语音的时长，识别没有额外选项。 */
-function mediaDetail(m: MediaSetting): string {
-  if (m.capability === 'speech') return `音色：${m.voices.join('、')}（默认 ${m.voices[0] ?? '—'}）`;
-  if (m.capability === 'image') return `尺寸：${m.sizes.join('、')}`;
-  if (m.capability === 'realtime') return `单次最长 ${Math.round(m.max_secs / 60)} 分钟`;
-  return '';
-}
-
-async function mediaSaved(warnings: string[]) {
-  editingMedia.value = null;
-  if (warnings.length) notify(`已保存，但请注意：${warnings.join('；')}`, 'warn');
-  else notify('已保存，新请求立即生效');
-  await Promise.all([loadMedia(), loadModels()]);
-}
-
-async function removeMedia(capability: CapabilityInfo) {
-  if (!window.confirm(`关闭「${capability.label}」？客户端再使用会收到“暂未开放”。`)) return;
-  try {
-    await api.deleteMedia(selectedId.value, capability.id);
-    notify(`${capability.label}已关闭`);
-    await loadMedia();
-  } catch (e) {
-    error.value = errorMessage(e);
-  }
-}
-
 async function loadModels() {
   modelsError.value = '';
   try {
@@ -106,11 +96,21 @@ onMounted(async () => {
   await loadProducts();
   loadModels();
 });
+
+watch(
+  () => props.initialProductId,
+  (id) => {
+    if (id && products.value.some((p) => p.product_id === id) && id !== selectedId.value) {
+      selectedId.value = id;
+    }
+  },
+);
+
 watch(selectedId, () => Promise.all([loadTiers(), loadMedia()]), { immediate: true });
 
 async function productSaved(id: string) {
   editingProduct.value = null;
-  notify('产品已保存');
+  notify('产品配置已保存');
   await loadProducts(id);
   emit('changed');
 }
@@ -120,163 +120,299 @@ async function tierSaved(warnings: string[]) {
   if (warnings.length) notify(`档位已保存，但请注意：${warnings.join('；')}`, 'warn');
   else notify('档位已保存，新请求立即生效');
   await Promise.all([loadTiers(), loadModels()]);
+  emit('changed');
 }
 
-async function removeTier(tier: Tier) {
-  if (!window.confirm(`删除档位「${tier.display_name}」？客户端再请求这个档位会收到“未知的模型档位”。`)) return;
+async function confirmRemoveTier() {
+  const tier = confirmingDeleteTier.value;
+  if (!tier) return;
+  deleting.value = true;
+  error.value = '';
   try {
     await api.deleteTier(tier.product_id, tier.tier);
+    confirmingDeleteTier.value = null;
     notify('档位已删除');
     await loadTiers();
+    emit('changed');
   } catch (e) {
     error.value = errorMessage(e);
+  } finally {
+    deleting.value = false;
   }
 }
+
+async function mediaSaved(warnings: string[]) {
+  editingMedia.value = null;
+  if (warnings.length) notify(`媒体能力已保存，但请注意：${warnings.join('；')}`, 'warn');
+  else notify('媒体能力已保存，新请求立即生效');
+  await Promise.all([loadMedia(), loadModels()]);
+}
+
+async function confirmRemoveMedia() {
+  const cap = confirmingDeleteMedia.value;
+  if (!cap || !selectedId.value) return;
+  deleting.value = true;
+  error.value = '';
+  try {
+    await api.deleteMedia(selectedId.value, cap.id);
+    confirmingDeleteMedia.value = null;
+    notify(`${cap.label}已关闭`);
+    await loadMedia();
+  } catch (e) {
+    error.value = errorMessage(e);
+  } finally {
+    deleting.value = false;
+  }
+}
+
+function reasoningTag(t: Tier): { label: string; tone: string } {
+  if (t.reasoning_efforts == null) return { label: '思考: 自动识别', tone: '' };
+  if (t.reasoning_efforts.length === 0) return { label: '思考: 不开放', tone: '' };
+  return { label: `思考: ${t.reasoning_efforts.join(' · ')}`, tone: 'info' };
+}
+
+function supportsGif(m: MediaSetting | null): boolean {
+  return !!m && m.capability === 'image' && /^gpt-image-2\.6-(sunburst|flare)$/.test(m.model);
+}
+
+const capEndpoints: Record<string, string> = {
+  speech: '/v1/audio/speech',
+  image: '/v1/images/generations',
+  transcribe: '/v1/audio/transcriptions',
+  realtime: '/v1/realtime (WS)',
+};
 </script>
 
 <template>
   <div>
-    <PageHead title="产品与档位" desc="用户在客户端只会看到档位名称，背后实际调用哪个模型由你决定，随时可换，不用给客户端发版。">
-      <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="16" />添加产品</button>
+    <PageHead title="产品与档位" desc="客户端只认档位标识与媒体能力，不暴露真实模型名；切换上游模型实时生效，无需客户端发版。">
+      <button v-if="selected" type="button" class="btn" @click="editingProduct = selected"><Icon name="pencil" :size="14" />编辑当前产品</button>
+      <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="14" />添加产品</button>
     </PageHead>
 
-    <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="17" /><span>{{ error }}</span></div>
+    <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
-    <div v-if="!loading && products.length === 0" class="panel">
-      <EmptyState icon="layers" title="还没有产品" desc="先添加一个产品（例如小伴壁纸），并关联它的客户端，用户才能使用 AI。">
-        <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="16" />添加第一个产品</button>
+    <div v-if="!loading && products.length === 0" class="card">
+      <EmptyState icon="layers" title="还没有产品" desc="先添加一个产品并关联它的账号中心客户端标识，用户才能使用 AI。">
+        <button type="button" class="btn primary" @click="editingProduct = 'new'"><Icon name="plus" :size="14" />添加第一个产品</button>
       </EmptyState>
     </div>
 
     <template v-if="selected">
-      <div class="tabs" role="tablist" aria-label="产品">
-        <button
-          v-for="p in products"
-          :key="p.product_id"
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ active: p.product_id === selectedId }"
-          :aria-selected="p.product_id === selectedId"
-          @click="selectedId = p.product_id"
-        >{{ p.name }}<span v-if="!p.enabled" class="tag">已停用</span></button>
+      <div v-if="products.length > 1" class="tabs-row">
+        <div class="seg-pills" role="tablist" aria-label="切换产品">
+          <button
+            v-for="p in products"
+            :key="p.product_id"
+            type="button"
+            role="tab"
+            :class="{ active: p.product_id === selectedId }"
+            :aria-selected="p.product_id === selectedId"
+            @click="pickProduct(p.product_id)"
+          >
+            <span>{{ p.name }}</span>
+            <span v-if="!p.enabled" class="tag">停用</span>
+          </button>
+        </div>
       </div>
 
-      <section class="summary">
-        <div class="who">
-          <h2>{{ selected.name }}</h2>
-          <div class="chips">
-            <span v-for="c in selected.client_ids" :key="c" class="chip mono">{{ c }}</span>
-            <span v-if="!selected.client_ids.length" class="muted">还没有关联客户端，用户暂时无法使用</span>
+      <!-- 紧凑产品总览横卡 -->
+      <section class="card product-summary">
+        <div class="ps-main">
+          <div class="ps-title">
+            <h2>{{ selected.name }}</h2>
+            <span class="tag mono">{{ selected.product_id }}</span>
+            <span class="tag" :class="selected.enabled ? 'ok' : 'danger'">
+              <i class="dot"></i>{{ selected.enabled ? '已启用' : '已停用' }}
+            </span>
+          </div>
+          <div class="client-chips">
+            <span v-for="c in selected.client_ids" :key="c" class="client-chip">{{ c }}</span>
+            <span v-if="!selected.client_ids.length" class="hint">尚未关联客户端，用户暂时无法调用</span>
           </div>
         </div>
-        <div class="trial">
-          <span class="k">新用户试用</span>
-          <template v-if="selected.trial_quota > 0"><Money :points="selected.trial_quota" size="lg" /><span class="muted">{{ selected.trial_days }} 天内有效</span></template>
-          <span v-else class="muted">不送试用额度</span>
+
+        <div class="ps-meta-grid">
+          <div class="ps-meta">
+            <span class="k">新用户试用</span>
+            <div class="v">
+              <template v-if="selected.trial_quota > 0">
+                <Money :points="selected.trial_quota" size="sm" compact-pts />
+                <span class="faint" style="font-weight: 500">· {{ selected.trial_days }} 天</span>
+              </template>
+              <span v-else class="faint">不发放</span>
+            </div>
+          </div>
+          <div class="ps-meta">
+            <span class="k">客户端「获取额度」链接</span>
+            <div class="v">
+              <template v-if="selected.credit_purchase_url">
+                <Icon name="link" :size="13" />
+                <a class="ps-link" :href="selected.credit_purchase_url" target="_blank" rel="noopener noreferrer" :title="selected.credit_purchase_url">
+                  {{ selected.credit_purchase_url.replace(/^https?:\/\//, '') }}
+                </a>
+              </template>
+              <span v-else class="faint">未配置（入口关闭）</span>
+            </div>
+          </div>
         </div>
-        <button type="button" class="btn small" @click="editingProduct = selected"><Icon name="pencil" :size="14" />编辑产品</button>
       </section>
 
-      <div v-if="modelsError" class="notice warn"><Icon name="alert" :size="17" /><span>读不到 AI 网关的模型列表，暂时无法新增或修改档位：{{ modelsError }}</span></div>
+      <div v-if="modelsError" class="notice warn">
+        <Icon name="alert" :size="16" />
+        <span>读不到 AI 网关的模型列表，暂时无法新增或修改档位与媒体能力：{{ modelsError }}</span>
+      </div>
 
-      <section class="stage" :style="{ '--span': span }" aria-label="档位与实际模型的对应关系">
-        <div class="bg phone"></div>
-        <div class="bg curtain" aria-hidden="true"></div>
-        <div class="bg backstage"></div>
+      <!-- 对话档位路由表（双域清晰流向，告别厚重黑幕布） -->
+      <div class="section-head">
+        <h2>对话档位路由 <span class="tag num">{{ tiers.length }} 个档位</span></h2>
+        <button type="button" class="btn sm primary" :disabled="Boolean(modelsError)" @click="editingTier = 'new'">
+          <Icon name="plus" :size="13" />添加档位
+        </button>
+      </div>
 
-        <header class="h front"><Icon name="eye" :size="16" />用户在客户端看到的</header>
-        <header class="h back"><Icon name="eye-off" :size="16" />幕后实际调用的<span class="hide">用户看不到</span></header>
+      <section class="card route-board" aria-label="档位与实际模型的路由关系">
+        <div v-if="tiers.length" class="route-header">
+          <div class="rh-col"><Icon name="eye" :size="14" /><span>客户端可见（档位展示）</span></div>
+          <div></div>
+          <div class="rh-col"><Icon name="eye-off" :size="14" /><span>幕后真实路由（仅服务端可见）</span><span class="rh-badge">倍率来自 New API</span></div>
+        </div>
 
-        <template v-for="(t, i) in tiers" :key="t.tier">
-          <div class="cell front" :style="{ '--r': i + 2 }">
-            <div class="opt" :class="{ sel: t.is_default, off: !t.enabled, paid: t.requires_paid }">
-              <span class="radio" :class="{ on: t.is_default }" aria-hidden="true"></span>
-              <div class="txt">
-                <div class="nm">
-                  <strong>{{ t.display_name }}</strong>
-                  <span v-if="t.is_default" class="tag green">默认</span>
-                  <span v-if="!t.enabled" class="tag">已停用</span>
-                </div>
-                <div v-if="t.description" class="ds">{{ t.description }}</div>
+        <div v-for="t in tiers" :key="t.tier" class="route-row" :class="{ disabled: !t.enabled }">
+          <div class="tier-client-card" :class="{ 'is-default': t.is_default }">
+            <span class="tier-radio" aria-hidden="true"></span>
+            <div class="tier-c-body">
+              <div class="tier-c-top">
+                <strong>{{ t.display_name }}</strong>
+                <span v-if="t.is_default" class="tag ink">默认档</span>
+                <span v-if="t.requires_paid" class="tag warn"><Icon name="lock" :size="11" />需付费额度</span>
+                <span v-else class="tag ok">试用可用</span>
+                <span v-if="!t.enabled" class="tag">已停用</span>
               </div>
-              <span v-if="t.requires_paid" class="lock" title="需要先兑换额度才能使用"><Icon name="lock" :size="14" />需兑换额度</span>
+              <div v-if="t.description" class="tier-c-desc">{{ t.description }}</div>
+              <div class="tier-c-foot">
+                <span>请求 model: <code>{{ t.tier }}</code></span>
+                <span class="tag" :class="reasoningTag(t).tone">{{ reasoningTag(t).label }}</span>
+              </div>
             </div>
           </div>
 
-          <div class="cell wire" :class="{ off: !t.enabled }" :style="{ '--r': i + 2 }" aria-hidden="true"><i></i></div>
+          <div class="route-arrow" aria-hidden="true">
+            <span class="route-arrow-pill"><Icon name="arrow-right" :size="13" /></span>
+          </div>
 
-          <div class="cell back" :class="{ off: !t.enabled }" :style="{ '--r': i + 2 }">
-            <div class="model">
-              <div class="mn mono">{{ t.model }}</div>
-              <div class="mm">
+          <div class="tier-upstream">
+            <div class="tier-up-body">
+              <div class="tier-model-name">{{ t.model }}</div>
+              <div class="tier-up-tags">
                 <template v-if="modelInfo.get(t.model)">
-                  <span class="tag">输入倍率 {{ modelInfo.get(t.model)!.model_ratio }}</span>
-                  <span class="tag">输出 ×{{ modelInfo.get(t.model)!.completion_ratio }}</span>
-                  <span v-if="modelInfo.get(t.model)!.ratio_warning" class="tag amber" title="倍率与 New API 未配置时的默认值相同，可能还没设置真实定价"><Icon name="alert" :size="12" />倍率可能未配置</span>
+                  <span class="tag num">输入倍率 {{ modelInfo.get(t.model)!.model_ratio }}</span>
+                  <span class="tag num">输出 ×{{ modelInfo.get(t.model)!.completion_ratio }}</span>
+                  <span v-if="t.capabilities?.context_window_tokens" class="tag num">{{ formatTokens(t.capabilities.context_window_tokens) }} 上下文</span>
+                  <span v-if="t.capabilities?.max_output_tokens" class="tag num">{{ formatTokens(t.capabilities.max_output_tokens) }} 输出</span>
+                  <span v-if="modelInfo.get(t.model)!.ratio_warning" class="tag warn" title="倍率与 New API 未配置默认值一致">
+                    <Icon name="alert" :size="11" />默认倍率未定价
+                  </span>
                 </template>
-                <span v-else-if="models.length" class="tag rose" title="AI 网关里已经找不到这个模型"><Icon name="circle-alert" :size="12" />模型已不可用</span>
+                <span v-else-if="models.length" class="tag danger" title="AI 网关里已经找不到这个模型">
+                  <Icon name="circle-alert" :size="11" />模型已不可用
+                </span>
               </div>
-              <div class="slug">客户端请求里 model 填 <code>{{ t.tier }}</code></div>
             </div>
-            <div class="acts">
-              <button type="button" class="btn icon small quiet" :aria-label="`修改档位 ${t.display_name}`" title="修改" @click="editingTier = t"><Icon name="pencil" :size="15" /></button>
-              <button type="button" class="btn icon small quiet" :aria-label="`删除档位 ${t.display_name}`" title="删除" @click="removeTier(t)"><Icon name="trash" :size="15" /></button>
+            <div class="tier-up-acts">
+              <button type="button" class="btn icon sm ghost" :disabled="Boolean(modelsError)" :aria-label="`编辑档位 ${t.display_name}`" title="编辑" @click="editingTier = t">
+                <Icon name="pencil" :size="14" />
+              </button>
+              <button type="button" class="btn icon sm ghost" :aria-label="`删除档位 ${t.display_name}`" title="删除" @click="confirmingDeleteTier = t">
+                <Icon name="trash" :size="14" />
+              </button>
             </div>
           </div>
-        </template>
-
-        <div v-if="!tiers.length" class="none">
-          <EmptyState icon="layers" title="这个产品还没有档位" desc="至少添加一个不要求付费的默认档位，新用户才能直接使用。">
-            <button type="button" class="btn primary" @click="editingTier = 'new'"><Icon name="plus" :size="16" />添加档位</button>
-          </EmptyState>
         </div>
+
+        <EmptyState v-if="!tiers.length" icon="layers" title="这个产品还没有档位" desc="至少添加一个不要求付费的默认档位，新用户才能直接使用。">
+          <button type="button" class="btn primary" :disabled="Boolean(modelsError)" @click="editingTier = 'new'">
+            <Icon name="plus" :size="14" />添加档位
+          </button>
+        </EmptyState>
       </section>
 
-      <div class="below">
-        <p class="hint">倍率决定每次调用扣多少额度。换模型前，先到 New API 确认新模型的倍率已经设置，否则会按默认倍率多扣或少扣。</p>
-        <button v-if="tiers.length" type="button" class="btn" @click="editingTier = 'new'"><Icon name="plus" :size="16" />添加档位</button>
-      </div>
+      <p class="hint" style="margin-top: 10px">倍率决定每次调用的扣费成本。更换模型前，请先确认已在 New API 为该模型配置真实倍率。</p>
 
-      <section class="media" aria-labelledby="media-heading">
-        <div class="media-head">
-          <h2 id="media-heading">媒体能力</h2>
-          <p class="hint">语音、图片、识别和实时语音各用哪个模型。客户端只知道开放了哪些能力、能选哪些音色和尺寸，看不到模型名；没开放的能力会收到“暂未开放”。</p>
+      <!-- 媒体能力 2x2 矩阵 -->
+      <section class="section" aria-labelledby="media-heading">
+        <div class="section-head">
+          <h2 id="media-heading">媒体能力路由</h2>
+          <span class="hint">客户端仅获取已开放的能力与可选参数，不返回真实模型名</span>
         </div>
+
         <div class="media-grid">
-          <article v-for="c in CAPABILITIES" :key="c.id" class="panel media-card" :class="{ off: !mediaFor(c.id)?.enabled }">
-            <div class="mc-head">
-              <span class="mc-icon"><Icon :name="c.icon" :size="17" /></span>
-              <strong>{{ c.label }}</strong>
-              <span v-if="!mediaFor(c.id)" class="tag">未开放</span>
-              <span v-else-if="!mediaFor(c.id)!.enabled" class="tag">已停用</span>
-              <span v-else class="tag green">已开放</span>
-              <span v-if="mediaFor(c.id)?.requires_paid" class="tag amber" title="需要先兑换额度才能使用"><Icon name="lock" :size="12" />需兑换额度</span>
-            </div>
-            <template v-if="mediaFor(c.id)">
-              <div class="mn mono">{{ mediaFor(c.id)!.model }}</div>
-              <div class="mm">
-                <template v-if="modelInfo.get(mediaFor(c.id)!.model)">
-                  <span class="tag">倍率 {{ modelInfo.get(mediaFor(c.id)!.model)!.model_ratio }}</span>
-                  <span v-if="modelInfo.get(mediaFor(c.id)!.model)!.ratio_warning" class="tag amber" title="倍率与 New API 未配置时的默认值相同，可能还没设置真实定价"><Icon name="alert" :size="12" />倍率可能未配置</span>
-                </template>
-                <span v-else-if="models.length" class="tag rose" title="AI 网关里已经找不到这个模型"><Icon name="circle-alert" :size="12" />模型已不可用</span>
+          <article
+            v-for="c in CAPABILITIES"
+            :key="c.id"
+            class="card media-card"
+            :class="mediaFor(c.id)?.enabled ? 'on' : 'off'"
+          >
+            <div class="mc-top">
+              <span class="mc-ico"><Icon :name="c.icon" :size="16" /></span>
+              <div class="mc-title">
+                <strong>{{ c.label }}</strong>
+                <span class="mono">{{ capEndpoints[c.id] }}</span>
               </div>
-              <div v-if="mediaDetail(mediaFor(c.id)!)" class="mc-detail">{{ mediaDetail(mediaFor(c.id)!) }}</div>
-            </template>
-            <p v-else class="mc-detail muted">{{ c.usedBy }}</p>
-            <div class="mc-acts">
-              <button type="button" class="btn small" :disabled="Boolean(modelsError)" @click="editingMedia = c">
-                <Icon :name="mediaFor(c.id) ? 'pencil' : 'plus'" :size="14" />{{ mediaFor(c.id) ? '修改' : '开放' }}
+              <div class="mc-badges">
+                <span v-if="!mediaFor(c.id)" class="tag">未开放</span>
+                <span v-else-if="!mediaFor(c.id)!.enabled" class="tag">已停用</span>
+                <span v-else class="tag ok"><i class="dot"></i>已开放</span>
+                <span v-if="mediaFor(c.id)?.requires_paid" class="tag warn"><Icon name="lock" :size="11" />需付费</span>
+                <span v-if="supportsGif(mediaFor(c.id))" class="tag coral">支持 GIF</span>
+              </div>
+            </div>
+
+            <div v-if="mediaFor(c.id)" class="mc-model-box">
+              <div class="mc-model-row">
+                <span class="mono mc-model-name">{{ mediaFor(c.id)!.model }}</span>
+                <template v-if="modelInfo.get(mediaFor(c.id)!.model)">
+                  <span v-if="modelInfo.get(mediaFor(c.id)!.model)!.ratio_warning" class="tag warn"><Icon name="alert" :size="11" />默认倍率</span>
+                  <span v-else class="tag num">倍率 {{ modelInfo.get(mediaFor(c.id)!.model)!.model_ratio }}</span>
+                </template>
+                <span v-else-if="models.length" class="tag danger">模型不可用</span>
+              </div>
+
+              <div v-if="c.id === 'speech' && mediaFor(c.id)!.voices.length" class="mc-chips">
+                <span v-for="(v, i) in mediaFor(c.id)!.voices" :key="v" class="mc-chip" :class="{ def: i === 0 }">{{ v }}{{ i === 0 ? ' (默认)' : '' }}</span>
+              </div>
+              <div v-if="c.id === 'image' && mediaFor(c.id)!.sizes.length" class="mc-chips">
+                <span v-for="(s, i) in mediaFor(c.id)!.sizes" :key="s" class="mc-chip" :class="{ def: i === 0 }">{{ s }}{{ i === 0 ? ' (默认)' : '' }}</span>
+              </div>
+              <div v-if="c.id === 'realtime'" class="hint">单次对话最长：<strong>{{ Math.round(mediaFor(c.id)!.max_secs / 60) }} 分钟</strong></div>
+            </div>
+            <p v-else class="hint" style="padding: 4px 0">{{ c.usedBy }}。未开放时客户端自动降级或隐藏入口。</p>
+
+            <div class="mc-foot">
+              <button type="button" class="btn sm" :class="{ primary: !mediaFor(c.id) }" :disabled="Boolean(modelsError)" @click="editingMedia = c">
+                <Icon :name="mediaFor(c.id) ? 'pencil' : 'plus'" :size="13" />{{ mediaFor(c.id) ? '修改配置' : '配置并开放' }}
               </button>
-              <button v-if="mediaFor(c.id)" type="button" class="btn icon small quiet" :aria-label="`关闭${c.label}`" title="关闭" @click="removeMedia(c)"><Icon name="trash" :size="15" /></button>
+              <button v-if="mediaFor(c.id)" type="button" class="btn sm ghost danger-text" @click="confirmingDeleteMedia = c">关闭能力</button>
             </div>
           </article>
         </div>
       </section>
     </template>
 
-    <ProductDialog v-if="editingProduct" :product="editingProduct === 'new' ? null : editingProduct" @close="editingProduct = null" @saved="productSaved" />
+    <ProductDialog
+      v-if="editingProduct"
+      :product="editingProduct === 'new' ? null : editingProduct"
+      @close="editingProduct = null"
+      @saved="productSaved"
+    />
+    <TierDialog
+      v-if="editingTier && selected"
+      :product="selected"
+      :tier="editingTier === 'new' ? null : editingTier"
+      :models="models"
+      @close="editingTier = null"
+      @saved="tierSaved"
+    />
     <MediaDialog
       v-if="editingMedia && selected"
       :product="selected"
@@ -286,110 +422,192 @@ async function removeTier(tier: Tier) {
       @close="editingMedia = null"
       @saved="mediaSaved"
     />
-    <TierDialog v-if="editingTier && selected" :product="selected" :tier="editingTier === 'new' ? null : editingTier" :models="models" @close="editingTier = null" @saved="tierSaved" />
+    <ConfirmDialog
+      v-if="confirmingDeleteTier"
+      :title="`删除档位「${confirmingDeleteTier.display_name}」？`"
+      desc="删除后，客户端再次请求该档位标识会收到“未知的模型档位”错误。若线上仍有流量，建议先停用观察后再删。"
+      confirm-text="确认删除"
+      :busy="deleting"
+      @cancel="confirmingDeleteTier = null"
+      @confirm="confirmRemoveTier"
+    />
+    <ConfirmDialog
+      v-if="confirmingDeleteMedia"
+      :title="`关闭「${confirmingDeleteMedia.label}」？`"
+      desc="关闭后配置将被移除，客户端调用该能力会收到 503 暂未开放（语音朗读会自动降级为系统朗读）。"
+      confirm-text="确认关闭"
+      :busy="deleting"
+      @cancel="confirmingDeleteMedia = null"
+      @confirm="confirmRemoveMedia"
+    />
   </div>
 </template>
 
 <style scoped>
 .notice { margin-bottom: 16px; }
+.tabs-row { margin-bottom: 16px; }
 
-.tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 18px; background: #e6ecec; border-radius: 12px; max-width: 100%; overflow-x: auto; }
-.tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: none; border-radius: 9px; background: none; color: var(--muted); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background-color 0.14s, color 0.14s; }
-.tab:hover { color: var(--text); }
-.tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1), 0 0 0 1px rgba(16, 28, 34, 0.05); }
+.product-summary {
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.ps-main { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 8px; }
+.ps-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ps-title h2 { font-size: 16px; font-weight: 700; }
+.client-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.client-chip {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--canvas-soft);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.ps-meta-grid { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.ps-meta { display: flex; flex-direction: column; gap: 2px; }
+.ps-meta .k { font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.ps-meta .v { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.ps-link { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.summary { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; margin-bottom: 20px; }
-.who { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 9px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { padding: 3px 9px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--muted); font-size: 12px; }
-.trial { display: flex; align-items: baseline; gap: 10px; }
-.k { color: var(--muted); font-weight: 600; font-size: 13px; }
+.route-board { overflow: hidden; }
+.route-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.15fr);
+  padding: 10px 18px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink-3);
+  align-items: center;
+}
+.rh-col { display: flex; align-items: center; gap: 6px; }
+.rh-badge { margin-left: auto; font-size: 11px; font-weight: 550; }
 
-/* ---- 舞台 ---- */
-.stage { --curtain-w: 148px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--curtain-w) minmax(0, 1fr); border-radius: 20px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow-1), 0 0 0 1px var(--line-strong); isolation: isolate; }
-.bg { grid-row: 1 / span var(--span); z-index: 0; }
-.phone { grid-column: 1; background: linear-gradient(180deg, #fff, #fafcfc); }
-.curtain { grid-column: 2; background: var(--curtain-dark); box-shadow: inset 14px 0 22px -14px rgba(0, 0, 0, 0.7), inset -14px 0 22px -14px rgba(0, 0, 0, 0.7); }
-.backstage { grid-column: 3; background: var(--curtain-light); box-shadow: inset 16px 0 22px -16px rgba(16, 28, 34, 0.35); }
+.route-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.15fr);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+  transition: background 0.14s;
+}
+.route-row:last-child { border-bottom: 0; }
+.route-row:hover { background: var(--surface-hover); }
+.route-row.disabled { opacity: 0.6; }
 
-.h { position: relative; z-index: 1; grid-row: 1; display: flex; align-items: center; gap: 8px; padding: 18px 24px 14px; font-weight: 700; font-size: 13.5px; }
-.h.front { grid-column: 1; border-bottom: 1px solid var(--line); color: var(--text); }
-.h.back { grid-column: 3; border-bottom: 1px solid rgba(16, 28, 34, 0.1); color: #34464c; }
-.hide { margin-left: auto; font-weight: 600; font-size: 12px; color: var(--muted); }
+.tier-client-card {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.tier-client-card.is-default { border-color: var(--ink); box-shadow: var(--shadow-xs); }
+.tier-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-top: 3px;
+  flex: none;
+  border: 1.5px solid var(--line-strong);
+  position: relative;
+}
+.tier-client-card.is-default .tier-radio { border-color: var(--ink); }
+.tier-client-card.is-default .tier-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--ink); }
+.tier-c-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tier-c-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tier-c-top strong { font-size: 14px; font-weight: 680; }
+.tier-c-desc { font-size: 12.5px; color: var(--ink-2); }
+.tier-c-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
+.tier-c-foot code { padding: 1px 6px; border-radius: 5px; background: var(--canvas-soft); color: var(--ink-2); font-family: var(--mono); }
 
-.cell { position: relative; z-index: 1; grid-row: var(--r); display: flex; align-items: center; min-height: 92px; }
-.cell.front { grid-column: 1; padding: 14px 22px; border-bottom: 1px solid var(--line); }
-.cell.back { grid-column: 3; padding: 14px 14px 14px 24px; gap: 8px; border-bottom: 1px solid rgba(16, 28, 34, 0.09); }
-.cell.wire { grid-column: 2; }
+.route-arrow { display: flex; align-items: center; justify-content: center; position: relative; }
+.route-arrow::before { content: ''; position: absolute; left: 4px; right: 4px; height: 1px; background: var(--line-strong); }
+.route-arrow-pill {
+  position: relative;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
 
-/* 穿过幕布的线：两端各一个节点 */
-.wire i { position: relative; display: block; width: 100%; height: 2px; background: var(--mint); box-shadow: 0 0 14px rgba(111, 216, 194, 0.55); }
-.wire i::before, .wire i::after { content: ''; position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: var(--mint); transform: translateY(-50%); box-shadow: 0 0 0 4px rgba(111, 216, 194, 0.22); }
-.wire i::before { left: -5px; }
-.wire i::after { right: -5px; }
-.wire.off i { background: repeating-linear-gradient(90deg, #5f7a76 0 6px, transparent 6px 11px); box-shadow: none; }
-.wire.off i::before, .wire.off i::after { background: #5f7a76; box-shadow: none; }
+.tier-upstream {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tier-up-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tier-model-name { font-family: var(--mono); font-size: 13px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.tier-up-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tier-up-acts { display: flex; gap: 4px; flex: none; }
 
-/* 前台：像客户端里的一个可选项 */
-.opt { width: 100%; display: flex; align-items: center; gap: 13px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-1); }
-.opt.sel { border-color: var(--tide); background: var(--tide-soft); box-shadow: 0 0 0 3px rgba(10, 107, 94, 0.1); }
-.opt.off { border-style: dashed; background: transparent; box-shadow: none; opacity: 0.65; }
-.radio { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-strong); background: #fff; position: relative; }
-.radio.on { border-color: var(--tide); }
-.radio.on::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--tide); }
-.txt { flex: 1; min-width: 0; }
-.nm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.nm strong { font-size: 15px; }
-.ds { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.lock { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 12px; font-weight: 700; }
+.media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.media-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.media-card.off { border-style: dashed; background: transparent; box-shadow: none; }
+.mc-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.mc-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex: none;
+  background: var(--canvas-soft);
+  color: var(--ink-2);
+  display: grid;
+  place-items: center;
+}
+.media-card.on .mc-ico { background: var(--coral-soft); color: var(--coral); }
+.mc-title { display: flex; flex-direction: column; line-height: 1.25; }
+.mc-title strong { font-size: 14px; }
+.mc-title span { font-size: 11px; color: var(--ink-3); }
+.mc-badges { margin-left: auto; display: flex; gap: 5px; flex-wrap: wrap; }
+.mc-model-box {
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.mc-model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.mc-model-name { font-weight: 650; font-size: 12.5px; overflow-wrap: anywhere; }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.mc-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.mc-chip.def { border-color: var(--ink); color: var(--ink); font-weight: 650; }
+.mc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px; }
+.danger-text { color: var(--danger); }
 
-/* 幕后：真实的模型 */
-.model { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
-.mn { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; letter-spacing: -0.005em; }
-.mm { display: flex; flex-wrap: wrap; gap: 5px; }
-.mm .tag { background: rgba(255, 255, 255, 0.72); }
-.mm .tag.amber { background: var(--amber-soft); }
-.mm .tag.rose { background: var(--rose-soft); }
-.slug { color: var(--muted); font-size: 12.5px; }
-.slug code { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.75); color: var(--text); }
-.cell.back.off .mn { color: var(--faint); }
-.acts { flex: none; display: flex; flex-direction: column; gap: 2px; }
-
-.none { grid-column: 1 / -1; grid-row: 2; position: relative; z-index: 1; background: var(--surface); }
-
-.below { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
-.below .hint { max-width: 66ch; }
-
-/* ---- 媒体能力 ---- */
-.media { margin-top: 34px; }
-.media-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-.media-head .hint { max-width: 76ch; }
-.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-.media-card { display: flex; flex-direction: column; gap: 9px; padding: 16px; min-width: 0; }
-.media-card.off { background: transparent; box-shadow: none; border-style: dashed; }
-.mc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.mc-icon { display: inline-flex; padding: 6px; border-radius: 9px; background: var(--tide-soft); color: var(--tide); }
-.media-card.off .mc-icon { background: #eaeff0; color: var(--muted); }
-.mc-detail { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
-.mc-acts { margin-top: auto; display: flex; align-items: center; gap: 6px; padding-top: 4px; }
-
-@media (max-width: 860px) {
-  .stage { grid-template-columns: 1fr; border-radius: 16px; }
-  .bg { display: none; }
-  .h { display: none; }
-  .cell { grid-row: auto; min-height: 0; }
-  .cell.front, .cell.wire, .cell.back { grid-column: 1; }
-  .cell.front { border-bottom: none; padding: 16px 16px 0; }
-  .cell.front::before { content: '用户看到的'; position: absolute; top: 3px; left: 18px; font-size: 11.5px; font-weight: 700; color: var(--faint); }
-  .cell.front { padding-top: 26px; }
-  .cell.wire { height: 34px; background: var(--curtain-dark); margin-top: 16px; }
-  .wire i { width: 2px; height: 100%; margin: 0 auto; }
-  .wire i::before, .wire i::after { left: 50%; top: auto; transform: translateX(-50%); }
-  .wire i::before { top: -5px; }
-  .wire i::after { bottom: -5px; right: auto; }
-  .cell.back { background: var(--curtain-light); padding: 26px 16px 16px; border-bottom: 6px solid var(--paper); }
-  .cell.back::before { content: '幕后实际调用（用户看不到）'; position: absolute; top: 5px; left: 18px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
-  .none { grid-row: auto; }
-  .summary { gap: 14px; }
+@media (max-width: 820px) {
+  .route-header { display: none; }
+  .route-row { grid-template-columns: 1fr; gap: 10px; }
+  .route-arrow { height: 22px; }
+  .route-arrow::before { width: 1px; height: 100%; left: 50%; right: auto; }
+  .route-arrow-pill :deep(svg) { transform: rotate(90deg); }
+  .media-grid { grid-template-columns: 1fr; }
 }
 </style>

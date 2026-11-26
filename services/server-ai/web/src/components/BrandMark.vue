@@ -3,10 +3,25 @@ withDefaults(defineProps<{ size?: number }>(), { size: 32 });
 </script>
 
 <template>
-  <svg :width="size" :height="size" viewBox="0 0 32 32" role="img" aria-label="相伴 AI">
-    <rect width="32" height="32" rx="9" fill="#0d181d" />
-    <rect x="0.5" y="0.5" width="31" height="31" rx="8.5" fill="none" stroke="#2c4a50" />
-    <path d="M9.2 8.6h13.6l-1.5 14.1a2.3 2.3 0 0 1-2.3 2h-6a2.3 2.3 0 0 1-2.3-2z" fill="none" stroke="#dff5ef" stroke-width="1.6" stroke-linejoin="round" />
-    <path d="M10.5 16.4c1.7-1.2 3.4 1.1 5.5 0s3.8 1.1 5.5 0l-.6 6.1a1.4 1.4 0 0 1-1.4 1.2h-7.6a1.4 1.4 0 0 1-1.4-1.2z" fill="#6fd8c2" />
-  </svg>
+  <span
+    class="brand-mark"
+    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${Math.round(size * 0.28)}px` }"
+    role="img"
+    aria-label="小伴 AI"
+  >
+    <svg :width="Math.round(size * 0.64)" :height="Math.round(size * 0.64)" viewBox="0 0 24 24" fill="none">
+      <path d="M9.5 3.8l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6 1.6-4.4z" fill="#fff" />
+      <path d="M17.4 12.6l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z" fill="rgba(255,255,255,0.84)" />
+    </svg>
+  </span>
 </template>
+
+<style scoped>
+.brand-mark {
+  flex: none;
+  background: var(--coral-grad);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(238, 79, 109, 0.28);
+}
+</style>

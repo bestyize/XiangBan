@@ -10,8 +10,16 @@ export interface Product {
   updated_at: string;
 }
 
+export interface TierCapabilities {
+  context_window_tokens?: number | null;
+  max_output_tokens?: number | null;
+  supports_tools?: boolean | null;
+  supports_vision?: boolean | null;
+}
+
 export interface Tier {
   reasoning_efforts?: string[] | null;
+  capabilities?: TierCapabilities | null;
   product_id: string;
   tier: string;
   display_name: string;
@@ -61,6 +69,8 @@ export interface FlowSegment {
 export interface ProductOverview {
   product_id: string;
   name: string;
+  enabled?: boolean;
+  client_count?: number;
   bindings: number;
   balance: number;
   consumed_7d: number;
@@ -91,6 +101,7 @@ export interface BindingRow {
   status: string;
   balance: number;
   synced_quota: number;
+  open_anomalies?: number;
   created_at: string;
   last_used_at: string | null;
   last_synced_at: string | null;

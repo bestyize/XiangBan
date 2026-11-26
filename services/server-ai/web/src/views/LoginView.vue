@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { api, errorMessage } from '../api';
+import { prefs, toggleTheme } from '../prefs';
 import { signIn } from '../session';
 import BrandMark from '../components/BrandMark.vue';
 import Icon from '../components/Icon.vue';
-
-const emit = defineEmits<{ entered: [] }>();
 
 const username = ref('');
 const password = ref('');
@@ -19,7 +18,6 @@ async function submit() {
   error.value = '';
   try {
     const result = await api.login(username.value, password.value);
-    emit('entered');
     signIn(result.token, result.admin.username);
   } catch (e) {
     error.value = errorMessage(e);
@@ -30,66 +28,109 @@ async function submit() {
 </script>
 
 <template>
-  <div class="login">
-    <section class="stage" aria-hidden="true">
-      <div class="brand"><BrandMark :size="36" /><span>相伴 AI</span></div>
-      <div class="pitch">
-        <p class="big">用户看到档位，</p>
-        <p class="big dim">你决定背后用哪个模型。</p>
-      </div>
-    </section>
+  <div class="login-page">
+    <button type="button" class="btn icon theme-toggle" :title="prefs.theme === 'dark' ? '切换暖白浅色' : '切换极夜深色'" @click="toggleTheme">
+      <Icon :name="prefs.theme === 'dark' ? 'sun' : 'moon'" :size="16" />
+    </button>
 
-    <section class="panel-side">
-      <form class="form" @submit.prevent="submit">
-        <div class="mark-m"><BrandMark :size="40" /></div>
+    <form class="login-card" @submit.prevent="submit">
+      <div class="login-head">
+        <BrandMark :size="42" />
         <div>
-          <h1>登录控制台</h1>
-          <p class="muted">管理产品档位、用户额度和兑换码。</p>
+          <h1>登录小伴 AI 网关后台</h1>
+          <p>统一管理产品档位路由、用户额度账本、兑换码与上游网关。</p>
         </div>
+      </div>
 
-        <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="17" /><span>{{ error }}</span></div>
+      <div v-if="error" class="notice error" role="alert">
+        <Icon name="circle-alert" :size="16" />
+        <span>{{ error }}</span>
+      </div>
 
-        <div class="field">
-          <label for="login-user">管理员用户名</label>
-          <input id="login-user" v-model="username" class="input" autocomplete="username" required autofocus />
+      <div class="field">
+        <label for="login-user">管理员用户名</label>
+        <input id="login-user" v-model="username" class="input" autocomplete="username" required autofocus />
+      </div>
+
+      <div class="field">
+        <label for="login-pass">密码</label>
+        <div class="pw-row">
+          <input
+            id="login-pass"
+            v-model="password"
+            class="input"
+            :type="reveal ? 'text' : 'password'"
+            autocomplete="current-password"
+            required
+          />
+          <button type="button" class="btn icon" :aria-label="reveal ? '隐藏密码' : '显示密码'" @click="reveal = !reveal">
+            <Icon :name="reveal ? 'eye-off' : 'eye'" :size="15" />
+          </button>
         </div>
-        <div class="field">
-          <label for="login-pass">密码</label>
-          <div class="pw">
-            <input id="login-pass" v-model="password" class="input" :type="reveal ? 'text' : 'password'" autocomplete="current-password" required />
-            <button type="button" class="eye" :aria-label="reveal ? '隐藏密码' : '显示密码'" @click="reveal = !reveal"><Icon :name="reveal ? 'eye-off' : 'eye'" :size="17" /></button>
-          </div>
-        </div>
-        <button class="btn primary go" type="submit" :disabled="busy || !username || !password">{{ busy ? '登录中…' : '登录' }}</button>
-      </form>
-    </section>
+      </div>
+
+      <button class="btn primary lg go" type="submit" :disabled="busy || !username || !password">
+        {{ busy ? '登录中…' : '进入控制台' }}
+      </button>
+
+      <div class="login-foot">独立管理员鉴权 · 连续错误 5 次自动锁定 15 分钟</div>
+    </form>
   </div>
 </template>
 
 <style scoped>
-.login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(380px, 1fr); }
-.stage { position: relative; background: var(--curtain-dark); color: #e6f5f1; padding: 44px 56px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-.stage::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 70% at 30% 100%, rgba(111, 216, 194, 0.14), transparent 60%), linear-gradient(180deg, rgba(13, 24, 29, 0.55), transparent 28%); pointer-events: none; }
-.brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 17px; letter-spacing: -0.005em; }
-.pitch { position: relative; z-index: 1; }
-.big { font-size: clamp(26px, 2.9vw, 38px); line-height: 1.45; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
-.big.dim { color: var(--mint); }
-
-.panel-side { display: grid; place-items: center; padding: 40px 24px; }
-.form { width: min(372px, 100%); display: flex; flex-direction: column; gap: 18px; }
-.mark-m { display: none; }
-.form h1 { font-size: 26px; }
-.form .muted { margin-top: 6px; }
-.pw { position: relative; }
-.pw .input { padding-right: 44px; }
-.eye { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: grid; place-items: center; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; }
-.eye:hover { color: var(--text); background: rgba(16, 28, 34, 0.06); }
-.go { min-height: 42px; margin-top: 2px; font-size: 14.5px; }
-
-@media (max-width: 820px) {
-  .login { grid-template-columns: 1fr; }
-  .stage { display: none; }
-  .mark-m { display: block; }
-  .panel-side { align-items: start; padding-top: 64px; }
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+  background: radial-gradient(640px 360px at 50% 0%, var(--coral-soft), transparent 70%), var(--canvas);
+}
+.theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+}
+.login-card {
+  width: min(400px, 100%);
+  padding: 32px 30px 26px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.login-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login-head h1 {
+  font-size: 21px;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+.login-head p {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-top: 3px;
+}
+.pw-row {
+  display: flex;
+  gap: 8px;
+}
+.go {
+  width: 100%;
+  margin-top: 2px;
+}
+.login-foot {
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 </style>

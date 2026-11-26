@@ -58,7 +58,7 @@ npm --prefix client/xiaoban-desktop run dev
 | [社区个人中心四页套件（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-profile-suite.html) | chat.xiangban.xyz | 部分合入 | 1:1 对齐手机 App 方案 1 通栏精修，独立覆盖「我的 / 个人主页 / 我的作品 / 通知」四页（我的/通知已合入，我的作品草稿与居中删除确认待补齐） |
 | [社区详情页分享面板（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/web-detail-share.html) | chat.xiangban.xyz | 已合入 | 纯黑白灰中性配色、仅分享图保留品牌主题色：H5 1:1 对齐手机 App，PC 端 716px 居中双栏弹窗与内联删除确认。可运行作品支持从分享面板和 V2 标题栏打开客户端。[作品分享](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl) · [V2 运行页](http://127.0.0.1:1450/prototypes/web-detail-share.html?scene=work&work=whale-girl&view=run) |
 | [社区管理后台 UI 重设计](../../services/server-forum/docs/design-specs/prototypes/admin-redesign.html) | chat.xiangban.xyz/admin | 已合入 | 现代极简运营工作台重设计：将 23 个平铺导航收口为 4 大域 × 12 入口（100% 兼容旧路由），覆盖工作台待办行动中心、主从双栏审核中心、侧滑抽屉编辑与 Diff 核对、精选项目四步发布流、采编健康闭环、⌘K 快捷跳转、日夜模式与 6 套主题色 |
-| [AI 网关管理后台 · 极简现代控制台重设计](../../services/server-ai/docs/design-specs/prototypes/gateway-admin-redesign.html) | server-ai `/admin/` | 待合入 | 对齐小伴暖白极简 + 墨黑中性基调（浅/深色切换、`$ + 小伴点` 双单位对照、`⌘K` 全局检索），覆盖概览、双域档位路由与可搜索模型选择器、用户账本抽屉、兑换码查码/生成全链路、对账异常直达查账、网关模型定价自检、结构化操作日志与极简登录页；纯静态可直开（[本地预览](http://127.0.0.1:1455/services/server-ai/docs/design-specs/prototypes/gateway-admin-redesign.html)） |
+| [AI 网关管理后台 · 极简现代控制台重设计](../../services/server-ai/docs/design-specs/prototypes/gateway-admin-redesign.html) | server-ai `/admin/` | 已合入 | 对齐小伴暖白极简 + 墨黑中性基调（浅/深色切换、`$ + 小伴点` 双单位对照、`⌘K` 全局检索），覆盖概览、双域档位路由与可搜索模型选择器、用户账本抽屉、兑换码查码/生成全链路、对账异常直达查账、网关模型定价自检、结构化操作日志与极简登录页；已落地至 `services/server-ai/web`（[本地预览](http://127.0.0.1:1455/services/server-ai/docs/design-specs/prototypes/gateway-admin-redesign.html)） |
 
 ---
 

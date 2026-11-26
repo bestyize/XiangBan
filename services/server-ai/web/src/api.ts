@@ -1,5 +1,19 @@
 import { session, signOut } from './session';
-import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, Capability, CodeLookup, GatewaySettings, MediaSetting, ModelOption, Overview, Product, Tier } from './types';
+import type {
+  Anomaly,
+  AuditRow,
+  Batch,
+  BindingDetail,
+  BindingRow,
+  Capability,
+  CodeLookup,
+  GatewaySettings,
+  MediaSetting,
+  ModelOption,
+  Overview,
+  Product,
+  Tier,
+} from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -30,6 +44,14 @@ export type TierInput = Omit<Tier, 'product_id' | 'tier'>;
 export type MediaInput = Pick<MediaSetting, 'model' | 'enabled' | 'requires_paid' | 'voices' | 'sizes' | 'max_secs'>;
 export type ProductInput = Pick<Product, 'name' | 'client_ids' | 'trial_quota' | 'trial_days' | 'enabled' | 'credit_purchase_url'>;
 
+export interface BindingListParams {
+  q: string;
+  productId: string;
+  filter?: '' | 'funded' | 'empty' | 'anomaly';
+  sort?: 'last_used' | 'balance' | 'created';
+  page: number;
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ token: string; admin: { username: string } }>('POST', '/admin/login', { username, password }),
@@ -47,10 +69,12 @@ export const api = {
     request<{ ok: true; warnings: string[] }>('PUT', `/admin/products/${productId}/media/${capability}`, body),
   deleteMedia: (productId: string, capability: Capability) => request<{ ok: true }>('DELETE', `/admin/products/${productId}/media/${capability}`),
   models: () => request<{ items: ModelOption[]; default_ratio: number }>('GET', '/admin/models'),
-  bindings: (params: { q: string; productId: string; page: number }) => {
+  bindings: (params: BindingListParams) => {
     const query = new URLSearchParams({ page: String(params.page), page_size: '20' });
     if (params.q) query.set('q', params.q);
     if (params.productId) query.set('product_id', params.productId);
+    if (params.filter) query.set('filter', params.filter);
+    if (params.sort && params.sort !== 'last_used') query.set('sort', params.sort);
     return request<{ items: BindingRow[]; total: number; page: number; page_size: number }>('GET', `/admin/bindings?${query}`);
   },
   binding: (id: number) => request<BindingDetail>('GET', `/admin/bindings/${id}`),
@@ -59,7 +83,7 @@ export const api = {
   voidBucket: (id: number, note: string) => request<{ ok: true; voided: number }>('POST', `/admin/buckets/${id}/void`, { note }),
   anomalies: () => request<{ items: Anomaly[] }>('GET', '/admin/anomalies'),
   resolveAnomaly: (id: number) => request<{ ok: true }>('POST', `/admin/anomalies/${id}/resolve`),
-  audit: () => request<{ items: AuditRow[] }>('GET', '/admin/audit?limit=100'),
+  audit: () => request<{ items: AuditRow[] }>('GET', '/admin/audit?limit=150'),
   batches: () => request<{ items: Batch[] }>('GET', '/admin/batches'),
   createBatch: (body: { product_id: string; kind: string; quota: number; valid_days: number; count: number; note: string }) =>
     request<{ batch: Batch; codes: string[] }>('POST', '/admin/batches', body),

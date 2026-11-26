@@ -21,41 +21,62 @@ function percent(points: number): string {
   <div class="flow">
     <div class="track" role="img" :aria-label="segments.map((s) => `${s.label} ${percent(s.points)}`).join('，')">
       <template v-if="total > 0">
-        <span v-for="s in segments" :key="s.key" class="seg" :class="s.tone" :style="{ width: `${share(s.points)}%` }"></span>
+        <span
+          v-for="s in segments"
+          :key="s.key"
+          class="seg"
+          :class="s.tone"
+          :style="{ width: `${share(s.points)}%` }"
+        ></span>
       </template>
       <span v-else class="seg none" style="width: 100%"></span>
     </div>
     <ul class="legend">
       <li v-for="s in segments" :key="s.key">
         <i class="sw" :class="s.tone"></i>
-        <span class="name">{{ s.label }}</span>
-        <Money :points="s.points" size="md" />
-        <span class="pct num">{{ percent(s.points) }}</span>
-        <span class="note">{{ s.note }}</span>
+        <div class="body">
+          <div class="top">
+            <span class="title"><strong>{{ s.label }}</strong><span class="pct num">{{ percent(s.points) }}</span></span>
+            <Money :points="s.points" size="sm" compact-pts />
+          </div>
+          <span class="note">{{ s.note }}</span>
+        </div>
       </li>
     </ul>
   </div>
 </template>
 
 <style scoped>
-.flow { display: flex; flex-direction: column; gap: 18px; }
-.track { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--line); gap: 2px; }
-.seg { height: 100%; min-width: 3px; transform-origin: left; animation: grow 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.seg:first-child { border-radius: 8px 0 0 8px; }
-.seg:last-child { border-radius: 0 8px 8px 0; }
-.seg.used, .sw.used { background: var(--tide); }
-.seg.lapsed, .sw.lapsed { background: #c3cdd1; }
-.seg.left, .sw.left { background: var(--mint); }
-.seg.none { background: var(--line); animation: none; }
+.flow { display: flex; flex-direction: column; gap: 16px; }
+.track {
+  display: flex;
+  height: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--canvas-soft);
+  gap: 2px;
+}
+.seg { height: 100%; min-width: 3px; border-radius: 2px; transform-origin: left; animation: grow 0.6s var(--ease) both; }
+.seg.used, .sw.used { background: var(--ink); }
+.seg.left, .sw.left { background: var(--coral); }
+.seg.lapsed, .sw.lapsed { background: var(--ink-4); opacity: 0.5; }
+.seg.none { background: var(--canvas-soft); animation: none; }
 @keyframes grow { from { transform: scaleX(0); } }
 
-.legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 28px; }
-.legend li { display: grid; grid-template-columns: auto 1fr auto; column-gap: 8px; row-gap: 2px; align-items: baseline; }
-.sw { width: 10px; height: 10px; border-radius: 3px; align-self: center; }
-.name { font-weight: 600; }
-.pct { color: var(--faint); font-size: 12.5px; font-weight: 600; }
-.note { grid-column: 2 / -1; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
-.legend li :deep(.money) { grid-column: 3; grid-row: 1; }
-.legend li .pct { display: none; }
-@media (max-width: 760px) { .legend { grid-template-columns: 1fr; } }
+.legend { display: flex; flex-direction: column; gap: 12px; }
+.legend li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.legend li:last-child { border-bottom: 0; padding-bottom: 0; }
+.sw { width: 10px; height: 10px; border-radius: 3px; margin-top: 4px; flex: none; }
+.body { flex: 1; min-width: 0; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.title { display: inline-flex; align-items: baseline; gap: 6px; }
+.title strong { font-size: 13px; }
+.pct { font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.note { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.48; margin-top: 2px; }
 </style>

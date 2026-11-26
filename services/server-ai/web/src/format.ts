@@ -32,6 +32,14 @@ export function money(points: number): string {
   return `${sign}$${int}${dec}`;
 }
 
+/** 用户侧统一使用小伴点（1 美元 = 100 点，向下取整，非零不足 1 点显示 <1 点）。 */
+export function xiaobanPoints(points: number): string {
+  const raw = (Math.abs(points) / units.perDollar) * 100;
+  if (raw === 0) return '0 点';
+  if (raw < 1) return '<1 点';
+  return `${Math.floor(raw).toLocaleString('en-US')} 点`;
+}
+
 export function formatTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -81,19 +89,86 @@ export const closedLabels: Record<string, string> = {
 
 export const auditLabels: Record<string, string> = {
   'admin.password_change': '修改管理员密码',
-  'product.save': '保存产品',
-  'tier.save': '保存档位',
+  'product.save': '保存产品配置',
+  'tier.save': '更新档位配置',
   'tier.delete': '删除档位',
-  'media.save': '保存媒体能力',
+  'media.save': '更新媒体能力',
   'media.delete': '关闭媒体能力',
-  'binding.grant': '补发额度',
-  'bucket.void': '扣回额度',
-  'anomaly.resolve': '处理异常',
+  'binding.grant': '手动补发额度',
+  'bucket.void': '扣回额度桶',
+  'anomaly.resolve': '确认对账异常',
   'batch.create': '生成兑换码批次',
-  'batch.void': '作废批次剩余的码',
-  'code.void': '作废兑换码',
+  'batch.void': '作废批次余码',
+  'code.void': '作废单个兑换码',
   'settings.newapi_token': '更新网关令牌',
 };
+
+export type AuditCategory = 'product' | 'quota' | 'code' | 'system';
+
+export function auditCategory(action: string): AuditCategory {
+  if (action.startsWith('product.') || action.startsWith('tier.') || action.startsWith('media.')) return 'product';
+  if (action.startsWith('binding.') || action.startsWith('bucket.')) return 'quota';
+  if (action.startsWith('batch.') || action.startsWith('code.')) return 'code';
+  return 'system';
+}
+
+/** 把后台审计日志里的 key=value 结构化解析为易读标签胶囊。 */
+export function parseAuditDetail(raw: string | null): string[] {
+  if (!raw) return [];
+  if (!raw.includes('=')) return [raw];
+  const labels: Record<string, string> = {
+    model: '模型',
+    paid: '付费要求',
+    default: '默认档',
+    enabled: '状态',
+    kind: '类型',
+    quota: '额度',
+    remaining: '扣回',
+    trial: '试用额度',
+    days: '有效期',
+    note: '备注',
+    product: '产品',
+    count: '数量',
+    binding: '绑定',
+    voided: '作废数量',
+    clients: '客户端',
+  };
+  // 匹配 key=[...] 或 key=value（兼容 note= 后含空格的尾段）
+  const tokens: string[] = [];
+  let rest = raw.trim();
+  const noteIdx = rest.search(/\bnote=/);
+  let notePart = '';
+  if (noteIdx >= 0) {
+    notePart = rest.slice(noteIdx + 5).trim();
+    rest = rest.slice(0, noteIdx).trim();
+  }
+  const matches = rest.match(/[\w.-]+=(?:\[[^\]]*\]|\S+)/g) ?? [];
+  for (const part of matches) {
+    const eq = part.indexOf('=');
+    const k = part.slice(0, eq);
+    const v = part.slice(eq + 1);
+    if (!v) continue;
+    if ((k === 'quota' || k === 'remaining' || k === 'trial') && /^-?\d+$/.test(v)) {
+      tokens.push(`${labels[k] ?? k}: ${money(Number(v))}`);
+    } else if (k === 'days') {
+      tokens.push(`有效期: ${v} 天`);
+    } else if (k === 'paid') {
+      tokens.push(v === 'true' ? '需付费额度' : '试用可用');
+    } else if (k === 'default') {
+      tokens.push(v === 'true' ? '默认档' : '非默认');
+    } else if (k === 'enabled') {
+      tokens.push(v === 'true' ? '已启用' : '已停用');
+    } else if (k === 'kind') {
+      tokens.push(`类型: ${kindLabels[v] ?? v}`);
+    } else if (k === 'binding') {
+      tokens.push(`绑定 #${v}`);
+    } else {
+      tokens.push(`${labels[k] ?? k}: ${v}`);
+    }
+  }
+  if (notePart) tokens.push(`备注: ${notePart}`);
+  return tokens.length ? tokens : [raw];
+}
 
 export const codeStatusLabels: Record<string, string> = {
   unused: '未兑换',
@@ -112,7 +187,8 @@ export function relativeTime(value: string | null): string {
 }
 
 export function shortUid(uid: string): string {
-  return uid.slice(0, 8);
+  if (uid.length <= 14) return uid;
+  return `${uid.slice(0, 8)}…${uid.slice(-4)}`;
 }
 
 function localKey(date: Date): string {
@@ -136,4 +212,11 @@ export function dayTitle(key: string): string {
 
 export function clock(value: string): string {
   return new Date(value).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+}
+
+export function formatTokens(n?: number | null): string {
+  if (!n) return '';
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1000) return `${Math.round(n / 1000)}K`;
+  return String(n);
 }

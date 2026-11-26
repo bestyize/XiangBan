@@ -161,9 +161,10 @@ pub async fn overview(State(state): State<AppState>, _admin: AuthAdmin) -> Resul
     .fetch_all(&state.pool)
     .await?;
     let (anomalies,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sync_anomalies WHERE resolved_at IS NULL").fetch_one(&state.pool).await?;
-    let per_product: Vec<(String, String, i64)> = sqlx::query_as(
-        "SELECT p.product_id, p.name, COUNT(b.id) FROM products p LEFT JOIN bindings b ON b.product_id = p.product_id
-         GROUP BY p.product_id, p.name, p.created_at ORDER BY p.created_at, p.product_id",
+    let per_product: Vec<(String, String, bool, i64, i64)> = sqlx::query_as(
+        "SELECT p.product_id, p.name, p.enabled, COALESCE(array_length(p.client_ids, 1), 0)::BIGINT, COUNT(b.id)
+         FROM products p LEFT JOIN bindings b ON b.product_id = p.product_id
+         GROUP BY p.product_id, p.name, p.enabled, p.client_ids, p.created_at ORDER BY p.created_at, p.product_id",
     )
     .fetch_all(&state.pool)
     .await?;
@@ -199,9 +200,11 @@ pub async fn overview(State(state): State<AppState>, _admin: AuthAdmin) -> Resul
         "newapi_configured": state.newapi.is_configured(),
         "products": per_product
             .into_iter()
-            .map(|(id, name, count)| json!({
+            .map(|(id, name, enabled, client_count, count)| json!({
                 "product_id": id,
                 "name": name,
+                "enabled": enabled,
+                "client_count": client_count,
                 "bindings": count,
                 "balance": balances.get(&id).copied().unwrap_or(0),
                 "consumed_7d": consumed_7d.get(&id).copied().unwrap_or(0),
@@ -545,6 +548,8 @@ pub async fn models(State(state): State<AppState>, _admin: AuthAdmin) -> Result<
 pub struct BindingQuery {
     q: Option<String>,
     product_id: Option<String>,
+    filter: Option<String>,
+    sort: Option<String>,
     page: Option<i64>,
     page_size: Option<i64>,
 }
@@ -557,6 +562,7 @@ struct BindingRow {
     status: String,
     balance: i64,
     synced_quota: i64,
+    open_anomalies: i64,
     created_at: DateTime<Utc>,
     last_used_at: Option<DateTime<Utc>>,
     last_synced_at: Option<DateTime<Utc>>,
@@ -565,14 +571,37 @@ struct BindingRow {
 pub async fn list_bindings(State(state): State<AppState>, _admin: AuthAdmin, Query(query): Query<BindingQuery>) -> Result<Json<Value>, AppError> {
     let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
     let page = query.page.unwrap_or(1).max(1);
-    let keyword = query.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+    let keyword = query
+        .q
+        .as_deref()
+        .map(|s| s.trim().trim_start_matches('#'))
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
     let product = query.product_id.as_deref().filter(|s| !s.is_empty()).map(str::to_string);
-    let filter = "($1::TEXT IS NULL OR b.uid::TEXT = $1 OR b.id::TEXT = $1) AND ($2::TEXT IS NULL OR b.product_id = $2)";
+    let status_filter = match query.filter.as_deref() {
+        Some("funded") => "t.balance > 0",
+        Some("empty") => "t.balance <= 0",
+        Some("anomaly") => "(t.open_anomalies > 0 OR t.synced_quota <> t.balance)",
+        _ => "TRUE",
+    };
+    let order_by = match query.sort.as_deref() {
+        Some("balance") => "t.balance DESC, t.id DESC",
+        Some("created") => "t.created_at DESC, t.id DESC",
+        _ => "t.last_used_at DESC NULLS LAST, t.id DESC",
+    };
+    let base_where = "($1::TEXT IS NULL OR b.uid::TEXT = $1 OR b.id::TEXT = $1 OR (length($1) >= 4 AND b.uid::TEXT ILIKE $1 || '%')) AND ($2::TEXT IS NULL OR b.product_id = $2)";
+    let cte = format!(
+        "WITH t AS (
+            SELECT b.id, b.uid, b.product_id, b.status, b.synced_quota, b.created_at, b.last_used_at, b.last_synced_at,
+                   COALESCE((SELECT SUM(remaining) FROM quota_buckets WHERE binding_id = b.id AND {LIVE}), 0)::BIGINT AS balance,
+                   (SELECT COUNT(*) FROM sync_anomalies sa WHERE sa.binding_id = b.id AND sa.resolved_at IS NULL)::BIGINT AS open_anomalies
+            FROM bindings b WHERE {base_where}
+        )"
+    );
 
     let rows: Vec<BindingRow> = sqlx::query_as(&format!(
-        "SELECT b.id, b.uid, b.product_id, b.status, b.synced_quota, b.created_at, b.last_used_at, b.last_synced_at,
-                COALESCE((SELECT SUM(remaining) FROM quota_buckets WHERE binding_id = b.id AND {LIVE}), 0)::BIGINT AS balance
-         FROM bindings b WHERE {filter} ORDER BY b.last_used_at DESC NULLS LAST, b.id DESC LIMIT $3 OFFSET $4"
+        "{cte} SELECT id, uid, product_id, status, balance, synced_quota, open_anomalies, created_at, last_used_at, last_synced_at
+         FROM t WHERE {status_filter} ORDER BY {order_by} LIMIT $3 OFFSET $4"
     ))
     .bind(&keyword)
     .bind(&product)
@@ -580,7 +609,7 @@ pub async fn list_bindings(State(state): State<AppState>, _admin: AuthAdmin, Que
     .bind((page - 1) * page_size)
     .fetch_all(&state.pool)
     .await?;
-    let (total,): (i64,) = sqlx::query_as(&format!("SELECT COUNT(*) FROM bindings b WHERE {filter}"))
+    let (total,): (i64,) = sqlx::query_as(&format!("{cte} SELECT COUNT(*) FROM t WHERE {status_filter}"))
         .bind(&keyword)
         .bind(&product)
         .fetch_one(&state.pool)
@@ -591,7 +620,8 @@ pub async fn list_bindings(State(state): State<AppState>, _admin: AuthAdmin, Que
 pub async fn get_binding(State(state): State<AppState>, _admin: AuthAdmin, Path(id): Path<i64>) -> Result<Json<Value>, AppError> {
     let row: Option<BindingRow> = sqlx::query_as(&format!(
         "SELECT b.id, b.uid, b.product_id, b.status, b.synced_quota, b.created_at, b.last_used_at, b.last_synced_at,
-                COALESCE((SELECT SUM(remaining) FROM quota_buckets WHERE binding_id = b.id AND {LIVE}), 0)::BIGINT AS balance
+                COALESCE((SELECT SUM(remaining) FROM quota_buckets WHERE binding_id = b.id AND {LIVE}), 0)::BIGINT AS balance,
+                (SELECT COUNT(*) FROM sync_anomalies sa WHERE sa.binding_id = b.id AND sa.resolved_at IS NULL)::BIGINT AS open_anomalies
          FROM bindings b WHERE b.id = $1"
     ))
     .bind(id)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { api, errorMessage } from '../api';
 import { formatTime, relativeTime } from '../format';
 import { notify } from '../toast';
@@ -8,7 +8,8 @@ import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import PageHead from '../components/PageHead.vue';
 
-const emit = defineEmits<{ changed: [] }>();
+const props = defineProps<{ refreshTick?: number }>();
+const emit = defineEmits<{ changed: []; openBinding: [id: number] }>();
 
 const items = ref<Anomaly[]>([]);
 const error = ref('');
@@ -18,6 +19,7 @@ const open = computed(() => items.value.filter((i) => !i.resolved_at));
 const done = computed(() => items.value.filter((i) => i.resolved_at));
 
 async function load() {
+  error.value = '';
   try {
     items.value = (await api.anomalies()).items;
   } catch (e) {
@@ -26,13 +28,15 @@ async function load() {
     loading.value = false;
   }
 }
+
 onMounted(load);
+watch(() => props.refreshTick, () => load());
 
 async function resolve(item: Anomaly) {
   error.value = '';
   try {
     await api.resolveAnomaly(item.id);
-    notify('已标记为处理');
+    notify('已标记为已处理');
     await load();
     emit('changed');
   } catch (e) {
@@ -40,44 +44,80 @@ async function resolve(item: Anomaly) {
   }
 }
 
-const kindLabel: Record<string, string> = { external_credit: '网关里的额度比预期多' };
+const kindLabel: Record<string, string> = { external_credit: 'New API 钱包余额高于预期（外部调额）' };
 </script>
 
 <template>
   <div>
-    <PageHead title="对账异常" desc="系统每分钟会核对 AI 网关里的用户额度。核对不上时记在这里。系统已经按我们的账本把网关里的额度改回了正确的数，处理只是确认你知道了。" />
+    <PageHead
+      title="对账异常"
+      desc="系统每分钟自动核对 New API 钱包与本地账本。检测到上游被手工加额时，系统已自动按本地账本纠偏，此处用于人工复核与确认。"
+    >
+      <span class="tag num" :class="open.length ? 'warn' : 'ok'">待处理 {{ open.length }}</span>
+      <span class="tag num">已处理 {{ done.length }}</span>
+    </PageHead>
 
-    <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="17" /><span>{{ error }}</span></div>
+    <div v-if="error" class="notice error" role="alert"><Icon name="circle-alert" :size="16" /><span>{{ error }}</span></div>
 
-    <div v-if="loading" class="list"><i class="skel" style="height: 74px; border-radius: 12px"></i></div>
+    <div v-if="loading" class="issue-list"><i class="skel" style="height: 76px"></i><i class="skel" style="height: 76px"></i></div>
 
     <template v-else>
-      <div v-if="items.length === 0" class="panel"><EmptyState icon="shield" title="账目是对的" desc="系统没有发现网关里的额度和我们的账本对不上。" /></div>
+      <div v-if="items.length === 0" class="card">
+        <EmptyState icon="shield" title="账目全部对齐，无待处理异常" desc="New API 用户钱包与本地额度桶账本完全一致。" />
+      </div>
 
-      <section v-if="open.length" aria-label="待处理">
-        <h2 class="gh">待处理 <span class="tag amber num">{{ open.length }}</span></h2>
-        <ul class="list">
-          <li v-for="i in open" :key="i.id" class="item open">
-            <span class="ic"><Icon name="alert" :size="18" /></span>
-            <div class="mid">
+      <template v-if="open.length">
+        <div class="section-head"><h2>待确认复核</h2></div>
+        <ul class="issue-list">
+          <li v-for="i in open" :key="i.id" class="card issue-card open">
+            <span class="issue-ico"><Icon name="alert" :size="17" /></span>
+            <div class="issue-body">
               <strong>{{ kindLabel[i.kind] ?? i.kind }}</strong>
               <p>{{ i.detail }}</p>
-              <span class="meta faint num" :title="formatTime(i.created_at)">绑定 #{{ i.binding_id }}，{{ relativeTime(i.created_at) }}发现</span>
+              <div class="issue-meta num">
+                <span>异常 #{{ i.id }}</span>
+                <span>·</span>
+                <span>绑定账号 #{{ i.binding_id }}</span>
+                <span>·</span>
+                <span :title="formatTime(i.created_at)">{{ relativeTime(i.created_at) }}发现</span>
+              </div>
             </div>
-            <button type="button" class="btn small" @click="resolve(i)"><Icon name="check" :size="15" />标记为已处理</button>
+            <div class="issue-acts">
+              <button type="button" class="btn sm" @click="emit('openBinding', i.binding_id)">
+                <Icon name="arrow-up-right" :size="13" />查看用户 #{{ i.binding_id }} 账本
+              </button>
+              <button type="button" class="btn sm primary" @click="resolve(i)">
+                <Icon name="check" :size="13" />标记已处理
+              </button>
+            </div>
           </li>
         </ul>
-      </section>
+      </template>
 
-      <section v-if="done.length" class="past" aria-label="已处理">
-        <h2 class="gh">已处理 <span class="tag num">{{ done.length }}</span></h2>
-        <ul class="list">
-          <li v-for="i in done" :key="i.id" class="item">
-            <span class="ic ok"><Icon name="circle-check" :size="18" /></span>
-            <div class="mid">
+      <div v-else-if="items.length > 0" class="card ok-card">
+        <span class="ok-ico"><Icon name="shield" :size="20" /></span>
+        <div>
+          <strong>当前没有待处理异常</strong>
+          <p class="hint">以下为历史已确认的对账异常记录。</p>
+        </div>
+      </div>
+
+      <section v-if="done.length" class="section">
+        <div class="section-head"><h2>已处理记录</h2></div>
+        <ul class="issue-list">
+          <li v-for="i in done" :key="i.id" class="card issue-card resolved">
+            <span class="issue-ico ok"><Icon name="circle-check" :size="17" /></span>
+            <div class="issue-body">
               <strong>{{ kindLabel[i.kind] ?? i.kind }}</strong>
               <p>{{ i.detail }}</p>
-              <span class="meta faint num">绑定 #{{ i.binding_id }}，{{ formatTime(i.resolved_at) }} 处理</span>
+              <div class="issue-meta num">
+                <span>绑定 #{{ i.binding_id }}</span>
+                <span>·</span>
+                <span>{{ formatTime(i.resolved_at) }} 已确认</span>
+              </div>
+            </div>
+            <div class="issue-acts">
+              <button type="button" class="btn sm ghost" @click="emit('openBinding', i.binding_id)">查账</button>
             </div>
           </li>
         </ul>
@@ -88,21 +128,45 @@ const kindLabel: Record<string, string> = { external_credit: '网关里的额度
 
 <style scoped>
 .notice { margin-bottom: 14px; }
-.gh { display: flex; align-items: center; gap: 9px; font-size: 14px; margin: 0 0 12px; }
-.past { margin-top: 30px; }
-.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.item { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.item.open { border-color: var(--amber-line); background: linear-gradient(90deg, var(--amber-soft), var(--surface) 38%); }
-.ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--amber-soft); color: var(--amber); }
-.ic.ok { background: var(--tide-soft); color: var(--tide); }
-.item:not(.open) { background: transparent; }
-.item:not(.open) strong { color: var(--muted); }
-.mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.mid p { color: var(--muted); max-width: 72ch; }
-.meta { font-size: 12.5px; margin-top: 2px; }
+.issue-list { display: flex; flex-direction: column; gap: 10px; }
+.issue-card {
+  padding: 15px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.issue-card.open { border-color: var(--warn-line); }
+.issue-card.resolved { opacity: 0.72; background: var(--surface-muted); }
+.issue-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.issue-ico.ok { background: var(--ok-soft); color: var(--ok); }
+.issue-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.issue-body p { font-size: 13px; color: var(--ink-2); max-width: 72ch; }
+.issue-meta { font-size: 12px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.issue-acts { display: flex; align-items: center; gap: 7px; flex: none; flex-wrap: wrap; }
 
-@media (max-width: 640px) {
-  .item { flex-wrap: wrap; }
-  .item .btn { margin-left: 50px; }
+.ok-card { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
+.ok-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+@media (max-width: 680px) {
+  .issue-card { flex-wrap: wrap; }
+  .issue-acts { width: 100%; padding-left: 48px; }
 }
 </style>
