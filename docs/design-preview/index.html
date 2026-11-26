@@ -1272,6 +1272,26 @@
         { label: '首次上线引导', query: '?page=overview&scene=onboarding' },
       ]
     },
+    {
+      id: 'account-admin-redesign',
+      title: '相伴账号中心管理后台 · 极简控制台重设计',
+      domains: ['web'],
+      subcat: '账号中心后台',
+      status: 'merged',
+      statusNote: '已合入 services/server-account/web 全部页面、抽屉与弹窗组件',
+      runtime: 'static',
+      path: 'services/server-account/docs/design-specs/prototypes/account-admin-redesign.html',
+      summary: '对齐小伴暖白极简 + 墨黑中性基调 + 双星日落珊瑚徽标（浅/深色双主题、⌘K 全局跳转与用户检索），重构登录页、概览与验证码来源 IP 监控、用户管理与侧滑抽屉、接入应用、SMTP/PNVS 发信与注册开关、按日分组结构化操作日志，彻底替换浏览器原生 alert/confirm/prompt。',
+      presets: [
+        { label: '概览（浅色）', query: '?page=dashboard&theme=light' },
+        { label: '用户管理 + 抽屉', query: '?page=users&drawer=user' },
+        { label: '接入应用', query: '?page=clients' },
+        { label: '发信与注册', query: '?page=sender' },
+        { label: '操作日志', query: '?page=audit' },
+        { label: '极夜深色', query: '?page=dashboard&theme=dark' },
+        { label: '登录页', query: '?view=login' },
+      ]
+    },
 
     // ==================== 3. 桌面版（小伴桌面客户端） ====================
     {
