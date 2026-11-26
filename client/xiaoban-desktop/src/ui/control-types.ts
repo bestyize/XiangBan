@@ -66,6 +66,7 @@ export interface ControlStore {
   ready: boolean;
   initialError: string;
   desktop: boolean;
+  webWorkbench?: import('./web-workbench/cloud-chat.ts').WebWorkbenchState;
   notify(message: unknown, type?: "success" | "error" | "info"): void;
   /** Goes to a page. Legacy ids are mapped (see `ControlPage`); "settings"/"assistant" open the dialog and leave the page as it is. */
   navigate(page: ControlPage): void;

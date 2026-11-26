@@ -96,7 +96,7 @@ watch(() => session.loggedIn, v => {
       <section v-if="route.meta.auth && !protectedReady" class="session-locked"><template v-if="session.loggedIn"><p>正在确认账号信息…</p><button class="btn" @click="session.loadSession()">重新读取</button></template><template v-else><p>登录已过期，重新登录后可以继续。</p><button class="btn btn-primary" @click="session.loginOpen = true">重新登录</button></template></section>
       <RouterView v-slot="{ Component }"><component :is="Component" v-if="!route.meta.auth || viewIdentity !== 'guest'" :key="viewIdentity" v-show="!route.meta.auth || protectedReady" /></RouterView>
     </main>
-    <footer v-if="route.name !== 'ai' && !detailLayout" class="app-footer" :class="{'footer-hide-narrow':hasOwnHeader || hasCommentDock || route.name === 'discuss'}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><RouterLink to="/contact">联系我们</RouterLink><RouterLink to="/ai">下载客户端</RouterLink></nav></footer>
+    <footer v-if="route.name !== 'ai' && !detailLayout" class="app-footer" :class="{'footer-hide-narrow':hasOwnHeader || hasCommentDock || route.name === 'discuss'}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><RouterLink to="/contact">联系我们</RouterLink><RouterLink to="/ai/download">下载客户端</RouterLink></nav></footer>
     <TabBar :section="section" :community-links="communityLinks" :search-open="searchOpen" :comment-dock="hasCommentDock" @search="openSearch" />
     <ModalDialog :open="searchOpen" title="搜索社区内容" :width="540" @close="searchOpen = false">
       <form class="site-search-form" role="search" @submit.prevent="submitSearch">

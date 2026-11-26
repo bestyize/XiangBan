@@ -1,7 +1,7 @@
 import { createSpeechStore } from './speech/store.ts';
 import { createAsrStore } from './asr/store.ts';
 import { reactive } from "vue";
-import { desktop, defaults, emit, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type SignupMethods, type LoginResult } from "../bridge.ts";
+import { desktop as nativeDesktop, defaults, emit, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type SignupMethods, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
@@ -39,7 +39,8 @@ function mockLogin(username: string, isNewUser: boolean): LoginResult {
 const studioTabs: Partial<Record<ControlPage, StudioTab>> = { wallpapers: "wallpapers", effects: "effects", widgets: "widgets", companion: "pets" };
 /** The new-task page and an open conversation share the composer, so going between them is not leaving the chat. */
 const chatLike = (page: ControlPage) => page === "chat" || page === "new-task";
-export function createControlStore(notify: ControlStore["notify"], options: { configuration?: boolean } = {}): ControlStore {
+export function createControlStore(notify: ControlStore["notify"], options: { configuration?: boolean; web?: { chat: ControlStore["chat"]; state: NonNullable<ControlStore["webWorkbench"]> } } = {}): ControlStore {
+  const desktop = !options.web && nativeDesktop;
   let disposed = false;
   let aiConfigVersion = 0;
   const unsubscribers: (() => void)[] = [];
@@ -60,7 +61,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
     account: null,
     gatewayEnabled: true,
     showLoginModal: false,
-    page: "new-task", creationDraft: null, goalTemplate: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, goalTemplate: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), webWorkbench: options.web?.state, chat: options.web?.chat ?? createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (!store.chat.sentHere(session)) return; if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,

@@ -9,7 +9,8 @@ import { trackRoute } from '@/lib/analytics'
 const routes: RouteRecordRaw[] = [
   { path: '/me/subscriptions', name: 'subscriptions', component: () => import('@/views/SubscriptionsView.vue'), meta: { auth: true } },
   { path: '/', name: 'home', component: HomeView },
-  { path: '/ai', name: 'ai', component: () => import('@/views/AiDownloadView.vue') },
+  { path: '/ai/download', name: 'client-download', component: () => import('@/views/AiDownloadView.vue') },
+  { path: '/ai', name: 'ai', component: () => import('@/views/AiChatView.vue') },
   { path: '/create', name: 'create', component: () => import('@/views/CreateView.vue') },
   { path: '/create/works', name: 'app-works', component: () => import('@/views/CreateView.vue') },
   { path: '/create/run/ideas/:slug', name: 'idea-run', component: () => import('@/views/RunAppView.vue'), meta: { bare: true } },

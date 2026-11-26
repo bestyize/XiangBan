@@ -138,7 +138,7 @@ function publishWork() {
         <button type="button" :aria-label="`外观与配色，当前${THEME_LABEL[preference]}`" @click="openAppearance">
           <AppIcon :name="resolved === 'dark' ? 'sun' : 'moon'" :size="15" /> 外观
         </button>
-        <RouterLink to="/ai" aria-label="下载客户端"><AppIcon name="download" :size="15" /> 客户端</RouterLink>
+        <RouterLink to="/ai/download" aria-label="下载客户端"><AppIcon name="download" :size="15" /> 客户端</RouterLink>
       </div>
     </div>
   </nav>

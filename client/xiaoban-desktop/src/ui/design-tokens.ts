@@ -71,8 +71,7 @@ export function tokensFor(dark = false, id: AccentId = currentAccent.value): UiT
 /** @deprecated read CSS variables instead; kept for older imports. */
 export const uiTokens: UiTokens = lightTokens;
 const kebab = (name: string) => name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-export function applyUiTokens(dark = false, id: AccentId = currentAccent.value) {
-  const root = document.documentElement;
+export function applyUiTokens(dark = false, id: AccentId = currentAccent.value, root = document.documentElement) {
   for (const [name, value] of Object.entries(tokensFor(dark, id))) root.style.setProperty(`--ui-${kebab(name)}`, value);
   root.dataset.accent = id;
 }

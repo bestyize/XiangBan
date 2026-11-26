@@ -49,7 +49,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ sending: []; sent: []; settings: []; preview: [url: string] }>();
 
 const chat = props.store.chat;
-const asr = props.store.asr;
+const asr = props.store.webWorkbench ? undefined : props.store.asr;
 const draft = computed({ get: () => chat.draft.text, set: text => { chat.draft.text = text; } });
 const composing = ref(false);
 const shown = computed(() => props.store.page === props.page);
@@ -115,7 +115,7 @@ watch(() => chat.completedReply, async reply => {
   } catch { /* Predictions are optional and do not affect the reply. */ }
 });
 onUnmounted(clearPrediction);
-const canSend = computed(() => chat.configured && !chat.sending && !compacting.value && !attachmentReading.value && !capturing.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
+const canSend = computed(() => (!props.store.webWorkbench || (!running.value && props.store.webWorkbench.connected && !props.store.webWorkbench.sending)) && chat.configured && !chat.sending && !compacting.value && !attachmentReading.value && !capturing.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
 const voiceHasText = ref(false);
@@ -125,7 +125,7 @@ function updateVisibility() { foreground.value = document.visibilityState !== 'h
 function blurWindow() { if (document.visibilityState === 'hidden') foreground.value = false; }
 const microphoneAllowed = computed(() => shown.value && foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
 /** 实时对话 owns the microphone and the voice while it runs, across the new-task and chat pages. */
-const live = props.store.live;
+const live = props.store.webWorkbench ? undefined : props.store.live;
 const liveActive = computed(() => Boolean(live?.active));
 watch(() => chat.currentId, (id, before) => {
   // Another conversation was opened; the first message of a new one only gives it an id.
@@ -216,7 +216,7 @@ async function submit(mode: 'queue' | 'steer' | 'replace' = 'queue') {
   selectedTool.value = null;
   emit('sending');
   const message = withSkills(withBuiltinTool(text, tool), chosen.map(s => s.name));
-  const sent = chat.currentId
+  const sent = chat.currentId && !props.store.webWorkbench
     ? await chat.enqueue(message, images, references.map(({ kind, id }) => ({ kind, id })), mode, props.designId, props.previewTarget)
     : await chat.send(message, images, undefined, references.map(({ kind, id }) => ({ kind, id })), props.designId, props.previewTarget);
   if (!sent) {
@@ -281,7 +281,7 @@ function onKeydown(event: KeyboardEvent) {
 
 /* ── Attachments ─────────────────────────────────────────────────────── */
 async function addFiles(files: File[]) {
-  if (!files.length || attachmentReading.value) return;
+  if (props.store.webWorkbench || !files.length || attachmentReading.value) return;
   const version = attachmentVersion;
   attachmentReading.value = true;
   try {
@@ -300,6 +300,7 @@ async function addFiles(files: File[]) {
 }
 /** Images on the clipboard arrive as files; anything else is left to the normal paste. */
 function onPaste(event: ClipboardEvent) {
+  if (props.store.webWorkbench) return;
   const files = Array.from(event.clipboardData?.files ?? []);
   if (!files.length) return;
   event.preventDefault();
@@ -397,13 +398,13 @@ watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, c
   for (const item of handed) if (attachments.value.length < MAX_IMAGES) attachments.value.push(item);
 }, { immediate: true });
 
-const placeholderText = computed(() => prediction.value ? `${prediction.value}  ·  Tab 接受` : !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');
+const placeholderText = computed(() => prediction.value ? `${prediction.value}  ·  Tab 接受` : props.store.webWorkbench ? '发送消息给小伴' : !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');
 defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </script>
 
 <template>
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
-    <ChatMessageQueue :chat="chat" :running="running" />
+    <ChatMessageQueue v-if="!store.webWorkbench" :chat="chat" :running="running" />
     <div class="composer-content">
     <ChatComposerPet v-if="pet && store.settings?.chatComposerPetOptIn === true" :size="pet" :paused="store.settings.paused" :attention="attention" />
     <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
@@ -423,7 +424,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         </div>
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
-      <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
+      <input v-if="!store.webWorkbench" ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
       <div v-if="skills.length || selectedTool || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
         <ul class="skill-chips" aria-label="这条消息用的技能和工具">
           <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
@@ -437,21 +438,24 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
       <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
       <ChatMentionMenu v-if="mentions.open.value" :items="mentions.items.value" :active="mentions.index.value" :loading="mentions.loading.value" @pick="mentions.pick" @hover="mentions.index.value = $event" />
       <div class="composer-editor" :style="{ '--composer-min-rows': Math.max(1, minRows) }">
-        <NInput ref="input" v-model:value="draft" type="textarea" autosize :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
+        <NInput ref="input" v-model:value="draft" type="textarea" autosize :disabled="(!store.desktop && !store.webWorkbench) || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :summary="addSummary" :selected-connector-ids="mentions.selected.value.map(item => item.id)" :selected-skill-ids="skills.map(skill => skill.name)" :selected-expert="chat.currentExpert" :expert-locked="!!chat.currentId" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @clear-expert="chat.pendingExpert = null" @toggle-skill="toggleSkill" @toggle-connector="toggleConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
+        <ChatWorkbenchTools v-if="!store.webWorkbench" :store="store" :summary="addSummary" :selected-connector-ids="mentions.selected.value.map(item => item.id)" :selected-skill-ids="skills.map(skill => skill.name)" :selected-expert="chat.currentExpert" :expert-locked="!!chat.currentId" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @clear-expert="chat.pendingExpert = null" @toggle-skill="toggleSkill" @toggle-connector="toggleConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
-        <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
+        <ChatPermissionMenu v-if="!store.webWorkbench" :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
         <ChatContextRing :session-id="chat.currentId" v-if="store.desktop" :inert="!chat.currentId && page === 'new-task'" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="(tokens, id) => chat.setContextSize(tokens, id)" />
-        <ChatComposerModel :chat="chat" :label="modelLabel" :provider="modelProvider" :disabled="!store.desktop || running || chat.sending" @switched="modelSwitched" @settings="emit('settings')" />
+        <select v-if="store.webWorkbench" v-model="store.webWorkbench.tier" aria-label="模型档位" class="cloud-tier" :disabled="running || store.webWorkbench.sending">
+          <option v-for="tier in store.webWorkbench.tiers" :key="tier.id" :value="tier.id">{{ tier.label }}</option>
+        </select>
+        <ChatComposerModel v-else :chat="chat" :label="modelLabel" :provider="modelProvider" :disabled="!store.desktop || running || chat.sending" @switched="modelSwitched" @settings="emit('settings')" />
         <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在转写</button>
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束录音' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始录音" aria-pressed="false" title="录音：说完转成文字，留在输入框，由你确认后发送" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
         <button v-if="offersLive" type="button" class="xb-icon-btn live-start" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
-        <button v-if="running" type="button" class="xb-icon-btn stop-run" data-testid="chat-stop" aria-label="停止" title="停止当前任务并暂停队列" @click="chat.cancel()"><Square :size="13" fill="currentColor" /></button>
-        <div class="delivery-control" @focusout="deliveryBlur" @keydown.esc="deliveryMenu = false">
+        <button v-if="running" type="button" class="xb-icon-btn stop-run" data-testid="chat-stop" aria-label="停止" :title="store.webWorkbench ? '停止回答' : '停止当前任务并暂停队列'" @click="chat.cancel()"><Square :size="13" fill="currentColor" /></button>
+        <div v-if="!store.webWorkbench || !running" class="delivery-control" @focusout="deliveryBlur" @keydown.esc="deliveryMenu = false">
           <div v-if="deliveryMenu && running" class="delivery-menu" role="menu" aria-label="消息发送方式">
             <button type="button" role="menuitem" @click="submit('queue')">加入队列<span>当前任务结束后发送</span></button>
             <button type="button" role="menuitem" @click="submit('steer')">补充当前任务<span>下一次模型请求时接收</span></button>
@@ -467,6 +471,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </template>
 
 <style scoped>
+.cloud-tier{border:0;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:13px;max-width:60%;padding:5px;cursor:pointer}
+
 .delivery-control{position:relative;display:flex;align-items:center;gap:2px}.delivery-toggle{display:grid;place-items:center;border:0;border-radius:5px;background:none;color:var(--ui-text-secondary);width:16px;height:28px;padding:0;cursor:pointer}.delivery-toggle:disabled{opacity:.35;cursor:default}.delivery-toggle:hover:not(:disabled){background:var(--ui-surface-hover)}.delivery-menu{position:absolute;bottom:44px;right:0;width:205px;padding:5px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:35}.delivery-menu button{display:block;width:100%;border:0;border-radius:8px;padding:9px 10px;text-align:left;background:none;color:var(--ui-text-primary);font:inherit;font-size:12px;cursor:pointer}.delivery-menu button:hover{background:var(--ui-surface-hover)}.delivery-menu span{display:block;margin-top:3px;color:var(--ui-text-tertiary);font-size:10px}.stop-run{flex:none}
 
 .composer-content{position:relative;container:chat-composer / inline-size}

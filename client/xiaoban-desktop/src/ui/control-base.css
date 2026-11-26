@@ -1,0 +1,17 @@
+/*
+ * Console global styles (方案四). Colours come only from the CSS variables set by design-tokens.ts:
+ *   theme colour  --ui-btn --ui-btn-hi --ui-soft --ui-ink --ui-tint --ui-dot
+ *   neutrals      --ui-text-primary/secondary/tertiary/disabled --ui-border --ui-border-strong --ui-line
+ *                 --ui-surface --ui-surface-alt --ui-surface-sunken --ui-surface-hover --ui-surface-raised --ui-control --ui-app-bg
+ *   legacy        --ui-primary* (= theme colour), --ui-sidebar-bg (= tint), --ui-accent (= success green)
+ * Shared utility classes are prefixed `xb-` and listed in docs/ui-design.md.
+ */
+:root{--ui-text:var(--ui-text-primary);--ui-muted:var(--ui-text-secondary);--ui-background:var(--ui-app-bg)}
+html,body,#app{margin:0;width:100%;height:100%;font-family:var(--ui-font-family)}
+html[data-theme=dark]{color-scheme:dark}
+body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);overflow:hidden;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.desktop-control *,.desktop-control *::before,.desktop-control *::after{box-sizing:border-box}
+.desktop-control button{font:inherit;transition:background-color 160ms,border-color 160ms,color 160ms,opacity 160ms,box-shadow 160ms,transform 160ms}
+.desktop-control button:focus-visible,.desktop-control a:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
+.desktop-control button:disabled{cursor:not-allowed;opacity:.5}
+.desktop-control{overscroll-behavior:none}

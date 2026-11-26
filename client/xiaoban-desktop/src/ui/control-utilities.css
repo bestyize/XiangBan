@@ -1,0 +1,88 @@
+/* ── Shared utility classes (xb-*) ─────────────────────────────────────── */
+
+/* Buttons. Primary: gradient theme colour, white text. Secondary: white with a hairline. Disabled is grey, never pale red. */
+.xb-btn-primary,.xb-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border:0;border-radius:var(--ui-radius-button);font-size:13px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;text-decoration:none}
+.xb-btn-primary{color:#fff;background:linear-gradient(var(--ui-btn-hi),var(--ui-btn));box-shadow:var(--ui-shadow-btn)}
+.xb-btn-primary:hover:not(:disabled){filter:brightness(1.06)}
+.xb-btn-primary:active:not(:disabled){filter:brightness(.96)}
+.desktop-control .xb-btn-primary:disabled,.xb-btn-primary.is-disabled{background:var(--ui-control);color:var(--ui-text-disabled);box-shadow:none;opacity:1}
+.xb-btn{color:var(--ui-text-primary);background:var(--ui-surface);box-shadow:var(--ui-shadow-btn-secondary)}
+.xb-btn:hover:not(:disabled){background:var(--ui-surface-sunken)}
+.xb-btn.is-danger{color:var(--ui-danger)}
+.xb-btn.is-sm,.xb-btn-primary.is-sm{height:28px;padding:0 11px;border-radius:7px}
+.xb-btn.is-lg,.xb-btn-primary.is-lg{height:38px;padding:0 18px;border-radius:10px;font-size:14px}
+.xb-btn-ghost{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font-size:12.5px;cursor:pointer}
+.xb-btn-ghost:hover{background:var(--ui-control);color:var(--ui-text-primary)}
+.xb-link{border:0;background:none;padding:0;color:var(--ui-ink);font-size:inherit;cursor:pointer;text-decoration:none}
+.xb-link:hover{text-decoration:underline}
+.xb-icon-btn{width:30px;height:30px;flex-shrink:0;display:inline-grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);cursor:pointer;position:relative}
+.xb-icon-btn:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.xb-icon-btn.is-sm{width:24px;height:24px;border-radius:6px}
+.xb-icon-btn[aria-pressed=true],.xb-icon-btn.is-active{background:var(--ui-control);color:var(--ui-text-primary)}
+
+/* Cards and panels. */
+.xb-card{background:var(--ui-surface);border-radius:var(--ui-radius-card);box-shadow:var(--ui-shadow-card)}
+.xb-card.is-hover:hover,.xb-card.is-interactive:hover{box-shadow:0 0 0 1px var(--ui-border-strong),0 6px 18px var(--ui-shadow-hover)}
+.xb-card.is-selected{box-shadow:0 0 0 2px var(--ui-btn)}
+.xb-page{padding:22px 28px;min-width:0}
+.xb-page-title{margin:0;font-size:20px;font-weight:600;line-height:1.3;color:var(--ui-text-primary)}
+.xb-page-head{display:flex;align-items:center;gap:22px;min-height:32px}
+.xb-page-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.xb-caption{font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
+.xb-sub{font-size:12px;color:var(--ui-text-secondary)}
+.xb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:48px 24px;text-align:center;color:var(--ui-text-secondary)}
+.xb-empty-icon{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(--ui-soft);color:var(--ui-ink)}
+.xb-empty h2,.xb-empty h3{margin:4px 0 0;font-size:16px;font-weight:600;color:var(--ui-text-primary)}
+.xb-empty p{margin:0;max-width:380px;font-size:13px;line-height:1.7}
+
+/* Page-top large tabs (装扮: 壁纸 / 特效 / 组件 / 伙伴). */
+.xb-tabs-lg{display:flex;align-items:center;gap:22px}
+.xb-tabs-lg>button,.xb-tabs-lg>a{border:0;background:transparent;padding:0;font-size:20px;font-weight:600;line-height:1.3;color:#A1A1A6;cursor:pointer;text-decoration:none}
+.xb-tabs-lg>button:hover,.xb-tabs-lg>a:hover{color:var(--ui-text-secondary)}
+.xb-tabs-lg>[aria-selected=true],.xb-tabs-lg>.is-active{color:var(--ui-text-primary)}
+html[data-theme=dark] .xb-tabs-lg>button,html[data-theme=dark] .xb-tabs-lg>a{color:#6E6E73}
+html[data-theme=dark] .xb-tabs-lg>[aria-selected=true],html[data-theme=dark] .xb-tabs-lg>.is-active{color:var(--ui-text-primary)}
+
+/* Segmented control. Put .is-active / aria-pressed / aria-selected / aria-checked on the chosen button. */
+.xb-seg{display:inline-flex;align-items:center;gap:0;padding:2px;border-radius:8px;background:var(--ui-control)}
+.xb-seg>button{height:26px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-secondary);font-size:12.5px;cursor:pointer;white-space:nowrap}
+.xb-seg>button:hover{color:var(--ui-text-primary)}
+.xb-seg>button.is-active,.xb-seg>button[aria-pressed=true],.xb-seg>button[aria-selected=true],.xb-seg>button[aria-checked=true]{background:var(--ui-surface);color:var(--ui-text-primary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+html[data-theme=dark] .xb-seg>button.is-active,html[data-theme=dark] .xb-seg>button[aria-pressed=true],html[data-theme=dark] .xb-seg>button[aria-selected=true],html[data-theme=dark] .xb-seg>button[aria-checked=true]{background:#48484C}
+
+/* Floating menu (dropdowns, account menu, popovers). */
+.xb-menu{min-width:200px;padding:5px;border-radius:var(--ui-radius-menu);background:var(--ui-surface-raised);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:var(--ui-shadow-menu);color:var(--ui-text-primary);text-align:left;z-index:40}
+.xb-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-primary);font-size:13.5px;text-align:left;cursor:pointer;text-decoration:none}
+.xb-menu-item:hover,.xb-menu-item:focus-visible{background:var(--ui-surface-hover)}
+.desktop-control .xb-menu-item:focus-visible{outline:none}
+.xb-menu-item>svg:first-child{flex-shrink:0;color:var(--ui-text-secondary)}
+.xb-menu-item.is-active,.xb-menu-item[aria-checked=true]{background:var(--ui-soft);color:var(--ui-ink)}
+.xb-menu-item.is-danger,.xb-menu-item.is-danger>svg:first-child{color:var(--ui-danger)}
+.xb-menu-item .xb-menu-hint{margin-left:auto;font-size:12px;color:var(--ui-text-tertiary);white-space:nowrap}
+.xb-menu-item .xb-menu-check{margin-left:auto;color:var(--ui-ink)}
+.xb-menu-sep{height:1px;margin:5px 6px;background:var(--ui-line)}
+.xb-menu-label{padding:6px 10px 4px;font-size:12px;font-weight:500;color:var(--ui-text-tertiary)}
+
+/* Settings-style grouped rows: white rounded group, left title + description, right control, hairline between rows. */
+.xb-group-title{margin:22px 4px 8px;font-size:12px;font-weight:600;color:var(--ui-text-secondary)}
+.xb-group-title:first-child{margin-top:0}
+.xb-group{background:var(--ui-surface);border-radius:12px;box-shadow:var(--ui-shadow-card)}
+.xb-group+.xb-group{margin-top:12px}
+.xb-row{display:flex;align-items:center;gap:14px;min-height:50px;padding:9px 16px;border-top:1px solid var(--ui-line)}
+.xb-row:first-child{border-top:0}
+.xb-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.xb-row-text>b,.xb-row-title{font-size:13.5px;font-weight:500;color:var(--ui-text-primary)}
+.xb-row-text>span,.xb-row-desc{font-size:12px;line-height:1.45;color:var(--ui-text-secondary)}
+.xb-row>.n-select{width:160px;flex-shrink:0}
+
+/* Small marks. */
+.xb-dot{display:inline-block;width:7px;height:7px;flex-shrink:0;border-radius:50%;background:var(--ui-dot)}
+.xb-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;background:var(--ui-btn);color:#fff;font-size:10.5px;font-weight:600;font-style:normal;line-height:1;white-space:nowrap}
+.xb-chip{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;background:var(--ui-soft);color:var(--ui-ink);font-size:12px;font-weight:500}
+.xb-ok{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-success-text)}
+.xb-ok::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ui-success)}
+.xb-kbd{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 6px;border-radius:6px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-border-strong),0 1.5px 0 var(--ui-border);font-size:12px;font-weight:500;color:var(--ui-text-primary)}
+.xb-mark{width:34px;height:34px;flex-shrink:0;border-radius:10px;display:grid;place-items:center;color:#fff;background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)}
+.xb-search{display:flex;align-items:center;gap:6px;height:30px;padding:0 9px;border-radius:8px;background:var(--ui-surface-hover);color:var(--ui-text-secondary)}
+.xb-search input{flex:1;min-width:0;border:0;background:transparent;outline:none;font:inherit;font-size:13px;color:var(--ui-text-primary)}
+.xb-scroll{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}

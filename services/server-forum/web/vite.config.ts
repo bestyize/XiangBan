@@ -13,8 +13,9 @@ export default defineConfig(({ command }) => ({
   base: command === 'build' ? 'https://res.xiangban.xyz/forum-web/' : '/',
   plugins: [vue()],
   // Preserve the codec module's relative URLs for its WebAssembly binaries in development.
-  optimizeDeps: { exclude: ['@jsquash/webp'] },
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  optimizeDeps: { exclude: ['@jsquash/webp', 'xiaoban-desktop/web-workbench'] },
+  // Resolve the linked workbench against the website's Vue and UI dependencies.
+  resolve: { preserveSymlinks: true, dedupe: ['vue'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port,
     strictPort: true,

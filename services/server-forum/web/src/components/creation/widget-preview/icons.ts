@@ -112,3 +112,5 @@ export const List = icon([
   ["path", { d: "M8 12h13", key: "1za7za" }],
   ["path", { d: "M8 19h13", key: "m83p4d" }]
 ])
+
+export { CalendarDays, Flag, Moon, Sparkles, Sun, Sunset } from 'lucide-vue-next'
