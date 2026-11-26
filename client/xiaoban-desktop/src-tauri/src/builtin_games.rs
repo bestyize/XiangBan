@@ -1,11 +1,15 @@
 //! Verified, content-addressed official game and app packages.
 use crate::{app_runtime::pack, library::{self, Resource}};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, fs, io::{Read, Write}, path::{Path, PathBuf}, sync::{atomic::{AtomicU64, Ordering}, Mutex, OnceLock}, time::Duration};
 
-#[derive(Clone, Deserialize)]
+use crate::games::FEATURED_WHALE_GIRL;
+
+const WHALE_GIRL_DESCRIPTOR: &str = "https://res.xiangban.xyz/idea-players/v1/packages/whale-girl.json";
+
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
 struct Game {
     id: String,
     #[serde(rename = "packId")]
@@ -15,13 +19,22 @@ struct Game {
     sha256: String,
     bytes: u64,
     #[serde(rename = "sourceSha256")]
-    source_sha256: String,
+    source_sha256: Option<String>,
+    version: Option<String>,
 }
 impl Game {
     fn pack_id(&self) -> &str { self.pack_id.as_deref().unwrap_or(&self.id) }
 
     fn matches_manifest(&self, manifest: &Value) -> bool {
         manifest["id"] == self.pack_id() && manifest["kind"] == self.kind
+            && self.version.as_deref().is_none_or(|version| manifest["version"] == version)
+    }
+
+    fn valid_resource(&self) -> bool {
+        let md5 = self.url.strip_prefix("https://res.xiangban.xyz/files/")
+            .and_then(|url| url.strip_suffix(".zip"));
+        md5.is_some_and(|hash| hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+            && library::hash_name(&self.sha256) && (1..=pack::MAX_PACK_BYTES).contains(&self.bytes)
     }
 }
 #[derive(Deserialize)]
@@ -46,9 +59,8 @@ fn distribution() -> Result<Vec<Game>, String> {
         data.games.push(game);
     }
     for game in &data.games {
-        let md5 = game.url.strip_prefix("https://res.xiangban.xyz/files/").and_then(|url| url.strip_suffix(".zip"));
-        if !md5.is_some_and(|hash| hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
-            || !pack::valid_id(game.pack_id()) || !library::hash_name(&game.sha256) || !library::hash_name(&game.source_sha256) || !(1..=pack::MAX_PACK_BYTES).contains(&game.bytes) || !["game", "app"].contains(&game.kind.as_str()) {
+        if !game.valid_resource() || !pack::valid_id(game.pack_id())
+            || !game.source_sha256.as_deref().is_some_and(library::hash_name) || !["game", "app"].contains(&game.kind.as_str()) {
             return Err("内置游戏资源信息无效".into());
         }
     }
@@ -59,11 +71,70 @@ fn game(id: &str) -> Result<Game, String> {
     distribution()?.into_iter().find(|game| game.id == id).ok_or_else(|| "没有找到内置游戏".into())
 }
 
+#[derive(Deserialize)]
+struct IdeaRelease {
+    kind: String,
+    version: String,
+    url: String,
+    sha256: String,
+    size: u64,
+}
+
+fn whale_girl_release(json: &str) -> Result<Game, String> {
+    let release: IdeaRelease = serde_json::from_str(json).map_err(|_| "作品下载清单无效")?;
+    let game = Game {
+        id: FEATURED_WHALE_GIRL.into(),
+        pack_id: Some("whale-girl".into()),
+        kind: release.kind,
+        version: Some(release.version),
+        url: release.url,
+        sha256: release.sha256,
+        bytes: release.size,
+        source_sha256: None,
+    };
+    if !valid_whale_girl(&game) { return Err("作品下载清单无效".into()); }
+    Ok(game)
+}
+
+fn valid_whale_girl(game: &Game) -> bool {
+    game.id == FEATURED_WHALE_GIRL && game.pack_id() == "whale-girl" && game.kind == "game"
+        && game.version.as_deref().is_some_and(|version| (1..=32).contains(&version.len())
+            && version.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')))
+        && game.valid_resource()
+}
+
+fn installed_whale_girl_path(root: &Path) -> PathBuf {
+    root.join("games/builtin/featured-whale-girl.json")
+}
+
+fn installed_whale_girl(root: &Path) -> Option<Game> {
+    let game: Game = serde_json::from_slice(&fs::read(installed_whale_girl_path(root)).ok()?).ok()?;
+    (valid_whale_girl(&game) && game.source_sha256.as_deref().is_some_and(library::hash_name)).then_some(game)
+}
+
+fn fetch_whale_girl() -> Result<Game, String> {
+    let client = crate::network::blocking_builder(reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none()))?.build().map_err(|e| e.to_string())?;
+    let response = client.get(WHALE_GIRL_DESCRIPTOR).header("Cache-Control", "no-cache")
+        .send().map_err(|e| e.to_string())?;
+    if !response.status().is_success() { return Err("作品下载清单暂时无法读取".into()); }
+    let mut data = String::new();
+    response.take(8193).read_to_string(&mut data).map_err(|e| e.to_string())?;
+    if data.len() > 8192 { return Err("作品下载清单过大".into()); }
+    whale_girl_release(&data)
+}
+
 fn target(root: &Path, game: &Game) -> PathBuf { root.join("games/builtin").join(format!("{}-{}", game.id, game.sha256)) }
 
 pub fn cached_dir(root: &Path, id: &str) -> Option<PathBuf> {
-    let game = game(id).ok()?;
-    let path = target(root, &game);
+    let installed = if id == FEATURED_WHALE_GIRL { installed_whale_girl(root) } else { None };
+    let game = installed.or_else(|| game(id).ok())?;
+    cached_dir_for(root, &game)
+}
+
+fn cached_dir_for(root: &Path, game: &Game) -> Option<PathBuf> {
+    let path = target(root, game);
     if fs::read_to_string(path.join(".complete")).ok()?.trim() != game.sha256 { return None; }
     let manifest: Value = serde_json::from_slice(&fs::read(path.join("manifest.json")).ok()?).ok()?;
     if !game.matches_manifest(&manifest) { return None; }
@@ -75,7 +146,7 @@ pub fn cached_dir(root: &Path, id: &str) -> Option<PathBuf> {
 static LOCKS: OnceLock<Vec<Mutex<()>>> = OnceLock::new();
 static STAGING: AtomicU64 = AtomicU64::new(0);
 
-fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
+fn tree_sha256(dir: &Path) -> Result<String, String> {
     fn collect(base: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<(), String> {
         for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -99,7 +170,7 @@ fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
     for (name, path) in files {
         let size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
         total = total.saturating_add(size);
-        if size > pack::MAX_FILE_BYTES || total > pack::MAX_PACK_BYTES { return Ok(false); }
+        if size > pack::MAX_FILE_BYTES || total > pack::MAX_PACK_BYTES { return Err("游戏缓存体积超出限制".into()); }
         let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
         let mut digest = Sha256::new();
         let mut buffer = [0u8; 65536];
@@ -112,7 +183,12 @@ fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
         tree.update([0]);
         tree.update(digest.finalize());
     }
-    Ok(format!("{:x}", tree.finalize()) == game.source_sha256)
+    Ok(format!("{:x}", tree.finalize()))
+}
+
+fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
+    let Some(expected) = game.source_sha256.as_deref() else { return Ok(false); };
+    Ok(tree_sha256(dir)? == expected)
 }
 
 pub fn ensure(root: &Path, id: &str) -> Result<PathBuf, String> {
@@ -120,47 +196,64 @@ pub fn ensure(root: &Path, id: &str) -> Result<PathBuf, String> {
     let index = games.iter().position(|item| item.id == id).ok_or("没有找到内置游戏")?;
     let locks = LOCKS.get_or_init(|| games.iter().map(|_| Mutex::new(())).collect());
     let _lock = locks[index].lock().map_err(|_| "游戏缓存暂不可用")?;
-    let game = &games[index];
-    if let Some(cached) = cached_dir(root, id) {
+    let mut game = games[index].clone();
+    if id == FEATURED_WHALE_GIRL {
+        if let Some(installed) = installed_whale_girl(root) { game = installed; }
+        if let Ok(mut latest) = fetch_whale_girl() {
+            // A known ZIP digest also identifies the previously verified file tree.
+            if let Some(known) = [&game, &games[index]].into_iter()
+                .find(|known| known.sha256 == latest.sha256 && known.bytes == latest.bytes) {
+                latest.source_sha256.clone_from(&known.source_sha256);
+            }
+            game = latest;
+        }
+    }
+    install_package(root, game)
+}
+
+fn install_package(root: &Path, mut game: Game) -> Result<PathBuf, String> {
+    let dest = ensure_package(root, &mut game)?;
+    if game.id == FEATURED_WHALE_GIRL && game.version.is_some()
+        && installed_whale_girl(root).as_ref() != Some(&game) {
+        library::save_json(&installed_whale_girl_path(root), &game)?;
+    }
+    if let Ok(entries) = fs::read_dir(root.join("games/builtin")) {
+        let prefix = format!("{}-", game.id);
+        for entry in entries.flatten() {
+            if entry.path() != dest && entry.file_name().to_string_lossy().starts_with(&prefix) && entry.path().is_dir() {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    }
+    Ok(dest)
+}
+
+fn ensure_package(root: &Path, game: &mut Game) -> Result<PathBuf, String> {
+    if let Some(cached) = cached_dir_for(root, game) {
         if verify_cached(&cached, game).unwrap_or(false) { return Ok(cached); }
     }
     let resource = Resource { url: game.url.clone(), sha256: game.sha256.clone(), bytes: game.bytes, mime: "application/octet-stream".into() };
     let archive = root.join("cache").join(&game.sha256);
-    if archive.exists() {
-        let valid = (|| -> Result<bool, String> {
-            let mut file = fs::File::open(&archive).map_err(|e| e.to_string())?;
-            if file.metadata().map_err(|e| e.to_string())?.len() != game.bytes { return Ok(false); }
-            let mut digest = Sha256::new();
-            let mut buffer = [0u8; 65536];
-            loop {
-                let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
-                if n == 0 { break; }
-                digest.update(&buffer[..n]);
-            }
-            Ok(format!("{:x}", digest.finalize()) == game.sha256)
-        })().unwrap_or(false);
+    if archive.exists() && !library::verify_file(&archive, &resource)? {
         // Windows cannot atomically rename over an existing corrupt file.
-        if !valid { fs::remove_file(&archive).map_err(|e| e.to_string())?; }
+        fs::remove_file(&archive).map_err(|e| e.to_string())?;
     }
     library::download(root, &resource, |_| {})?;
     let parent = root.join("games/builtin");
     fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
-    let staging = parent.join(format!(".unpack-{}-{}-{}", id, std::process::id(), STAGING.fetch_add(1, Ordering::Relaxed)));
+    let staging = parent.join(format!(".unpack-{}-{}-{}", game.id, std::process::id(), STAGING.fetch_add(1, Ordering::Relaxed)));
     fs::create_dir(&staging).map_err(|e| e.to_string())?;
     let result = (|| {
         extract(&archive, &staging, game)?;
+        let source_sha256 = tree_sha256(&staging)?;
+        if game.source_sha256.as_ref().is_some_and(|expected| expected != &source_sha256) {
+            return Err("游戏解包校验失败".into());
+        }
+        game.source_sha256 = Some(source_sha256);
         fs::write(staging.join(".complete"), &game.sha256).map_err(|e| e.to_string())?;
         let dest = target(root, game);
         if dest.exists() { fs::remove_dir_all(&dest).map_err(|e| e.to_string())?; }
         fs::rename(&staging, &dest).map_err(|e| e.to_string())?;
-        if let Ok(entries) = fs::read_dir(&parent) {
-            let prefix = format!("{}-", game.id);
-            for entry in entries.flatten() {
-                if entry.path() != dest && entry.file_name().to_string_lossy().starts_with(&prefix) && entry.path().is_dir() {
-                    let _ = fs::remove_dir_all(entry.path());
-                }
-            }
-        }
         Ok(dest)
     })();
     let _ = fs::remove_dir_all(&staging);
@@ -204,11 +297,10 @@ fn extract(archive_path: &Path, staging: &Path, game: &Game) -> Result<(), Strin
     Ok(())
 }
 
-pub async fn ensure_async(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+pub async fn ensure_async(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> {
     let root = crate::storage::root(app)?;
     let id = id.to_string();
-    tauri::async_runtime::spawn_blocking(move || ensure(&root, &id)).await.map_err(|e| e.to_string())??;
-    Ok(())
+    tauri::async_runtime::spawn_blocking(move || ensure(&root, &id)).await.map_err(|e| e.to_string())?
 }
 
 pub fn start(app: &tauri::AppHandle) {
@@ -226,9 +318,12 @@ pub fn start(app: &tauri::AppHandle) {
 #[cfg(debug_assertions)]
 pub async fn smoke(app: &tauri::AppHandle) -> Result<Vec<String>, String> {
     use tauri::Manager;
+    let selected = std::env::var("XIAOBAN_BUILTIN_GAMES_SMOKE").ok()
+        .filter(|id| crate::game_packs::is_builtin(id));
     let mut ready = Vec::new();
     for game in crate::games::builtin_catalog()? {
         let id = game["id"].as_str().ok_or("游戏编号无效")?;
+        if selected.as_deref().is_some_and(|only| only != id) { continue; }
         crate::app_runtime::window::open_app(app, id, game["name"].as_str().unwrap_or(""), game["orientation"].as_str(), game["entry"].as_str()).await?;
         let deadline = std::time::Instant::now() + Duration::from_secs(30);
         loop {
@@ -260,6 +355,55 @@ mod tests {
     }
 
     #[test]
+    fn whale_girl_descriptor_requires_an_official_zip_and_checks_the_manifest_version() {
+        let mut descriptor = serde_json::json!({
+            "kind": "game", "version": "1.2.0", "size": 100,
+            "url": format!("https://res.xiangban.xyz/files/{}.zip", "a".repeat(32)),
+            "sha256": "b".repeat(64)
+        });
+        let game = whale_girl_release(&descriptor.to_string()).unwrap();
+        assert!(game.matches_manifest(&serde_json::json!({"id": "whale-girl", "kind": "game", "version": "1.2.0"})));
+        assert!(!game.matches_manifest(&serde_json::json!({"id": "whale-girl", "kind": "game", "version": "1.1.0"})));
+        descriptor["url"] = serde_json::json!(format!("https://example.org/files/{}.zip", "a".repeat(32)));
+        assert!(whale_girl_release(&descriptor.to_string()).is_err());
+    }
+
+    #[test]
+    fn verified_online_whale_girl_release_is_served_after_its_archive_is_removed() {
+        let root = std::env::temp_dir().join(format!("xiaoban-featured-release-{}-{}", std::process::id(), STAGING.fetch_add(1, Ordering::Relaxed)));
+        fs::create_dir_all(root.join("cache")).unwrap();
+        let manifest = serde_json::json!({
+            "schemaVersion": 3, "runtimeProtocol": 2, "id": "whale-girl", "kind": "game",
+            "name": "潮汐书房", "description": "窗边听潮", "version": "1.2.0", "category": "casual",
+            "entry": "study.html", "icon": "icon.webp", "cover": "cover.webp", "input": ["mouse"]
+        }).to_string();
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, bytes) in [("manifest.json", manifest.as_bytes()), ("study.html", b"<html>new study</html>"),
+            ("icon.webp", include_bytes!("../../public/game-packs/featured-whale-girl/icon.webp").as_slice()),
+            ("cover.webp", include_bytes!("../../public/game-packs/featured-whale-girl/cover.webp").as_slice())] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        let bytes = zip.finish().unwrap().into_inner();
+        let descriptor = serde_json::json!({
+            "kind": "game", "version": "1.2.0", "size": bytes.len(),
+            "url": format!("https://res.xiangban.xyz/files/{}.zip", "a".repeat(32)),
+            "sha256": format!("{:x}", Sha256::digest(&bytes))
+        });
+        let game = whale_girl_release(&descriptor.to_string()).unwrap();
+        let archive = root.join("cache").join(&game.sha256);
+        fs::write(&archive, bytes).unwrap();
+        let installed = install_package(&root, game).unwrap();
+        fs::remove_file(archive).unwrap();
+        let release = installed_whale_girl(&root).unwrap();
+        assert_eq!(release.version.as_deref(), Some("1.2.0"));
+        assert_eq!(install_package(&root, release).unwrap(), installed);
+        let served = crate::app_runtime::protocol::serve_for(&root, "app-runtime-featured-whale-girl", "/featured-whale-girl/study.html", None);
+        assert_eq!(served.body, b"<html>new study</html>");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn cached_packages_are_revalidated_and_can_be_repaired() {
         let Some(bundle_dir) = std::env::var_os("XIAOBAN_BUILTIN_LOCAL_TEST") else { return; };
         let root = std::env::temp_dir().join(format!("xiaoban-builtin-repair-{}", std::process::id()));
@@ -268,7 +412,7 @@ mod tests {
             let filename = game.url.rsplit('/').next().unwrap();
             let archive = root.join("cache").join(&game.sha256);
             fs::copy(Path::new(&bundle_dir).join(filename), &archive).unwrap();
-            let cached = ensure(&root, &game.id).unwrap();
+            let cached = install_package(&root, game.clone()).unwrap();
             assert!(verify_cached(&cached, &game).unwrap());
             if game.id == "merge-2048" {
                 fs::write(cached.join("index.html"), b"corrupt").unwrap();
@@ -280,7 +424,7 @@ mod tests {
                 assert!(verify_cached(&cached, &game).unwrap());
             }
             fs::remove_file(archive).unwrap();
-            assert_eq!(ensure(&root, &game.id).unwrap(), cached);
+            assert_eq!(install_package(&root, game.clone()).unwrap(), cached);
         }
         fs::remove_dir_all(root).unwrap();
     }

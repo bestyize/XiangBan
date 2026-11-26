@@ -9,6 +9,8 @@ use std::{
 };
 
 pub const MAX_SERVED_BYTES: u64 = 64 * 1024 * 1024; // 64 MB per file limit
+pub(super) const LAUNCH_LOADING: &str = ".xb-loading";
+pub(super) const LAUNCH_FAILED: &str = ".xb-load-failed";
 
 pub fn base_url(app_id: &str) -> String {
     if cfg!(windows) {
@@ -295,6 +297,24 @@ pub fn serve_for(root: &Path, window_label: &str, raw_path: &str, range_header: 
     let Some(app_id) = super::window::app_id_from_label(window_label) else {
         return Served::status(403);
     };
+    // Dot-prefixed paths are reserved for the host and are never taken from works.
+    if crate::game_packs::is_builtin(app_id) {
+        let file = raw_path.strip_prefix('/').and_then(|path| path.split_once('/'));
+        let status = match file {
+            Some((id, LAUNCH_LOADING)) if id == app_id => Some(("正在加载作品", "<progress aria-hidden=\"true\"></progress>")),
+            Some((id, LAUNCH_FAILED)) if id == app_id => Some(("作品加载失败", "<p>关闭窗口后，可以从应用页重新打开。</p>")),
+            _ => None,
+        };
+        if let Some((title, detail)) = status {
+            return Served {
+                status: 200,
+                mime: "text/html; charset=utf-8",
+                body: include_str!("../../resources/runtime-v2/loading.html")
+                    .replace("{{title}}", title).replace("{{detail}}", detail).into_bytes(),
+                range: None,
+            };
+        }
+    }
     let Some(segments) = safe_segments(raw_path) else {
         return Served::status(400);
     };
@@ -365,6 +385,20 @@ pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn launch_feedback_can_be_served_before_the_bundle_exists() {
+        let root = Path::new("missing-application-cache");
+        let label = "app-runtime-featured-whale-girl";
+        for (page, title) in [(LAUNCH_LOADING, "正在加载作品"), (LAUNCH_FAILED, "作品加载失败")] {
+            let path = format!("/featured-whale-girl/{page}");
+            let served = serve_for(root, label, &path, None);
+            assert_eq!(served.status, 200);
+            assert!(String::from_utf8(served.body).unwrap().contains(title));
+            assert_ne!(serve_for(root, "app-runtime-mbti", &path, None).status, 200);
+            assert_eq!(serve_for(root, "control", &path, None).status, 403);
+        }
+    }
 
     #[test]
     fn frame_policy_allows_only_https_when_network_is_available() {

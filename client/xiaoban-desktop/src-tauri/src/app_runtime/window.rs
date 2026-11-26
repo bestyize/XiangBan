@@ -69,12 +69,42 @@ pub async fn open_app(
     orientation: Option<&str>,
     entry: Option<&str>,
 ) -> Result<WebviewWindow, String> {
+    let (window, pending_entry) = show_app_window(app, app_id, title, orientation, entry)?;
+    if let Some(entry_url) = pending_entry {
+        let result = async {
+            let directory = crate::builtin_games::ensure_async(app, app_id).await?;
+            let entry_url = if app_id == crate::games::FEATURED_WHALE_GIRL {
+                let bytes = std::fs::read(directory.join("manifest.json")).map_err(|e| e.to_string())?;
+                let manifest = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                let [entry, _, _] = super::pack::check_manifest(&manifest)?;
+                app_url(app_id, &entry)?
+            } else { entry_url };
+            window.navigate(entry_url).map_err(|e| e.to_string())
+        }.await;
+        if let Err(error) = result {
+            if app.get_webview_window(window.label()).is_some() {
+                let _ = window.navigate(app_url(app_id, super::protocol::LAUNCH_FAILED)?);
+                return Err(error);
+            }
+        }
+    }
+    Ok(window)
+}
+
+fn app_url(app_id: &str, entry: &str) -> Result<url::Url, String> {
+    url::Url::parse(&format!("{}{entry}", super::protocol::base_url(app_id)))
+        .map_err(|e| format!("URL 解析错误: {e}"))
+}
+
+fn show_app_window(
+    app: &AppHandle,
+    app_id: &str,
+    title: &str,
+    orientation: Option<&str>,
+    entry: Option<&str>,
+) -> Result<(WebviewWindow, Option<url::Url>), String> {
     if !super::storage::valid_app_id(app_id) {
         return Err("非法应用编号".into());
-    }
-
-    if crate::game_packs::is_builtin(app_id) {
-        crate::builtin_games::ensure_async(app, app_id).await?;
     }
 
     let state = app.state::<AppRuntimeState>();
@@ -87,11 +117,12 @@ pub async fn open_app(
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-        return Ok(window);
+        return Ok((window, None));
     }
 
+    let builtin = crate::game_packs::is_builtin(app_id);
     let installed;
-    let (title, orientation, entry) = if crate::game_packs::is_builtin(app_id) {
+    let (title, orientation, entry) = if builtin {
         (title, orientation, entry)
     } else {
         installed = crate::game_packs::find_user_game(&crate::storage::root(app)?, app_id)?;
@@ -99,18 +130,17 @@ pub async fn open_app(
         (installed["name"].as_str().unwrap_or(title), installed["orientation"].as_str(), installed["entry"].as_str())
     };
     let (width, height) = default_dimensions(orientation);
-    let entry_file = entry.unwrap_or("index.html");
     let allow_network = network_allowed();
-    let entry_url = url::Url::parse(&format!("{}{entry_file}", super::protocol::base_url(app_id)))
-        .map_err(|e| format!("URL 解析错误: {e}"))?;
+    let entry_url = app_url(app_id, entry.unwrap_or("index.html"))?;
+    let first_url = if builtin { app_url(app_id, super::protocol::LAUNCH_LOADING)? } else { entry_url.clone() };
 
     let webview_url = if cfg!(windows) {
-        WebviewUrl::External(entry_url.clone())
+        WebviewUrl::External(first_url.clone())
     } else if cfg!(target_os = "macos") && allow_network {
         // Start the package only after WebKit's frame-aware navigation policy is installed.
         WebviewUrl::External(url::Url::parse("about:blank").expect("valid blank URL"))
     } else {
-        WebviewUrl::CustomProtocol(entry_url.clone())
+        WebviewUrl::CustomProtocol(first_url.clone())
     };
 
     let display_title = if title.trim().is_empty() {
@@ -166,14 +196,14 @@ pub async fn open_app(
     let window = builder.build().map_err(|e| format!("创建应用窗口失败: {e}"))?;
     #[cfg(target_os = "macos")]
     if allow_network {
-        if let Err(error) = macos_navigation::open(&window, entry_url) {
+        if let Err(error) = macos_navigation::open(&window, first_url) {
             let _ = window.close();
             return Err(error);
         }
     }
     let _ = window.set_focus();
 
-    Ok(window)
+    Ok((window, builtin.then_some(entry_url)))
 }
 
 pub fn close_app(app: &AppHandle, app_id: &str) -> Result<(), String> {

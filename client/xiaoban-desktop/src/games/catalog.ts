@@ -3,6 +3,54 @@ import { generatedCover } from './cover.ts';
 
 export interface GameCatalog { games: GameManifest[]; errors: string[]; directory: string | null }
 
+export const FEATURED_WHALE_GIRL = 'featured-whale-girl';
+const RESOURCE_ORIGIN = 'https://res.xiangban.xyz';
+const WHALE_GIRL_CACHE = 'xiaoban:featured-whale-girl';
+
+interface WhaleGirlCard { title: string; description: string; cover: string | null }
+
+function readWhaleGirlCard(item: Record<string, unknown>): WhaleGirlCard {
+  if (typeof item.title !== 'string' || !item.title.trim() || typeof item.description !== 'string') {
+    throw new Error('作品卡片格式无效');
+  }
+  let cover = null;
+  if (typeof item.cover === 'string' && item.cover) {
+    try {
+      const url = new URL(item.cover, RESOURCE_ORIGIN);
+      if (url.origin === RESOURCE_ORIGIN && !url.username && !url.password) cover = url.href;
+    } catch { /* the bundled cover is still available */ }
+  }
+  return { title: item.title, description: item.description, cover };
+}
+
+export function cachedWhaleGirlCard(): WhaleGirlCard | null | undefined {
+  try {
+    const cached = localStorage.getItem(WHALE_GIRL_CACHE);
+    if (cached === null) return undefined;
+    const item = JSON.parse(cached);
+    return item === null ? null : readWhaleGirlCard(item);
+  } catch { return undefined; }
+}
+
+export function cacheWhaleGirlCard(card: WhaleGirlCard | null) {
+  try { localStorage.setItem(WHALE_GIRL_CACHE, JSON.stringify(card)); } catch { /* storage is optional */ }
+}
+
+export async function loadWhaleGirlCard(): Promise<WhaleGirlCard | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${RESOURCE_ORIGIN}/forum-web/ideas-catalog.json`, {
+      cache: 'no-cache', credentials: 'omit', redirect: 'error', signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('精选作品目录暂时无法读取');
+    const { items } = await response.json();
+    if (!Array.isArray(items)) throw new Error('精选作品目录格式无效');
+    const item = items.find(entry => entry?.id === 'whale-girl' && entry.kind === 'work' && entry.player === 'whale-girl');
+    return item ? readWhaleGirlCard(item) : null;
+  } finally { clearTimeout(timeout); }
+}
+
 /** Shown when a game ships no cover image. */
 export const DEFAULT_COVER = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#cfe3df"/><stop offset="1" stop-color="#8fb0ad"/></linearGradient></defs><rect width="320" height="180" fill="url(#g)"/><g fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".9"><rect x="112" y="64" width="96" height="56" rx="26"/><path d="M138 92h20M148 82v20"/></g><circle cx="182" cy="88" r="4.5" fill="#fff"/><circle cx="194" cy="98" r="4.5" fill="#fff"/></svg>')}`;
 

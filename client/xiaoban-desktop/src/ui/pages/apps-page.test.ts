@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { mount, flushPromises } from '@vue/test-utils';
-import { it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, it, expect, vi } from 'vitest';
 import { invoke } from '../../bridge.ts';
 import aquariumManifest from '../../../public/game-packs/featured-aquarium/manifest.json';
 import whaleGirlManifest from '../../../public/game-packs/featured-whale-girl/manifest.json';
@@ -10,6 +10,12 @@ import AppsPage from './AppsPage.vue';
 import type { ControlStore } from '../control-types';
 
 vi.mock('../../bridge.ts', () => ({ invoke: vi.fn() }));
+
+beforeEach(() => {
+  localStorage.clear();
+  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+});
+afterEach(() => vi.restoreAllMocks());
 
 const mbti = {
   id: 'mbti',
@@ -110,6 +116,52 @@ it('opens Whale Girl from the official games page in landscape', async () => {
     });
   } finally {
     wrapper.unmount();
+  }
+});
+
+it('renders the local game list while the shared Whale Girl card loads, then uses the published title and cover', async () => {
+  const [whaleGirl] = readGames([whaleGirlManifest]);
+  let finish!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const { wrapper, openApp } = setupApps([game2048, whaleGirl], 'games');
+  try {
+    await flushPromises();
+    expect(wrapper.find('[aria-label="开始2048"]').exists()).toBe(true);
+    finish(Response.json({ items: [{
+      id: 'whale-girl', kind: 'work', player: 'whale-girl', title: '月湾书房',
+      description: '在窗边等末班船回灯。', cover: '/ideas-covers/whale-girl.webp',
+    }] }));
+    await flushPromises();
+    expect(fetch).toHaveBeenCalledWith('https://res.xiangban.xyz/forum-web/ideas-catalog.json', expect.objectContaining({ credentials: 'omit' }));
+    const card = wrapper.get('[aria-label="开始月湾书房"]');
+    expect(card.text()).toContain('在窗边等末班船回灯。');
+    expect(card.get('img').attributes('src')).toBe('https://res.xiangban.xyz/ideas-covers/whale-girl.webp');
+    await card.get('img').trigger('error');
+    expect(card.get('img').attributes('src')).toBe('/game-packs/featured-whale-girl/cover.webp');
+    await card.trigger('click');
+    expect(openApp).toHaveBeenCalledWith(whaleGirl.id, expect.objectContaining({ title: '月湾书房' }));
+  } finally {
+    wrapper.unmount();
+  }
+});
+
+it('keeps an unlisted Whale Girl entry hidden when the desktop is next opened offline', async () => {
+  const [whaleGirl] = readGames([whaleGirlManifest]);
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ items: [] }));
+  const online = setupApps([game2048, whaleGirl], 'games');
+  try {
+    await flushPromises();
+    expect(online.wrapper.find('[aria-label="开始潮汐书房 · 鲸鱼娘"]').exists()).toBe(false);
+  } finally {
+    online.wrapper.unmount();
+  }
+  const offline = setupApps([game2048, whaleGirl], 'games');
+  try {
+    await flushPromises();
+    expect(offline.wrapper.find('[aria-label="开始潮汐书房 · 鲸鱼娘"]').exists()).toBe(false);
+    expect(offline.wrapper.find('[aria-label="开始2048"]').exists()).toBe(true);
+  } finally {
+    offline.wrapper.unmount();
   }
 });
 

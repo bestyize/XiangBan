@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --ui-bg: Canvas;
+      --ui-ink: CanvasText;
+      --ui-muted: color-mix(in srgb, CanvasText 76%, Canvas);
+      --ui-btn: AccentColor;
+      color: var(--ui-ink);
+      background: var(--ui-bg);
+      font: 14px/1.5 system-ui, sans-serif;
+    }
+    body { min-height: 100vh; box-sizing: border-box; margin: 0; padding: 24px; display: grid; place-items: center; }
+    main { max-width: 26rem; text-align: center; }
+    h1 { margin: 0; font-size: 16px; font-weight: 600; }
+    p { margin: 8px 0 0; color: var(--ui-muted); }
+    progress { display: block; width: 8rem; height: .5rem; margin: 14px auto 0; accent-color: var(--ui-btn); }
+  </style>
+</head>
+<body>
+  <main role="status">
+    <h1>{{title}}</h1>
+    {{detail}}
+  </main>
+</body>
+</html>

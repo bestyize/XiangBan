@@ -4,7 +4,7 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from "vue
 import { Compass, Ellipsis, Gamepad2, LayoutGrid, Save, Search, Sparkles, Square, Trash2, Wrench } from "lucide-vue-next";
 import { NAlert, NPopconfirm, NPopover, NSkeleton } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
-import { coverUrl, fallbackCoverUrl, iconUrl } from "../../games/catalog.ts";
+import { cacheWhaleGirlCard, cachedWhaleGirlCard, coverUrl, fallbackCoverUrl, FEATURED_WHALE_GIRL, iconUrl, loadWhaleGirlCard } from "../../games/catalog.ts";
 import type { GameManifest } from "../../games/protocol.ts";
 
 defineOptions({ name: 'AppsPage' });
@@ -21,6 +21,7 @@ const showFeaturedApps = computed(() => !isGamesMode.value && primaryTab.value =
 const activeFilter = ref<CategoryFilter>('all');
 const searchQuery = ref('');
 const games = ref<GameManifest[]>([]);
+const whaleGirlCard = ref(cachedWhaleGirlCard());
 const loading = ref(true);
 const catalogError = ref("");
 const folderErrors = ref<string[]>([]);
@@ -68,7 +69,13 @@ function kindBadge(app: GameManifest): string {
   return app.orientation === 'landscape' ? '横屏游戏' : app.orientation === 'portrait' ? '竖屏游戏' : '休闲游戏';
 }
 
-const builtinApps = computed(() => games.value.filter(g => g.source !== 'user' && (!isGamesMode.value || !g.featuredOnly)));
+const builtinApps = computed(() => games.value.flatMap(game => {
+  if (game.source === 'user' || (isGamesMode.value && game.featuredOnly)) return [];
+  if (game.id !== FEATURED_WHALE_GIRL) return [game];
+  const card = whaleGirlCard.value;
+  if (card === null) return [];
+  return [card ? { ...game, name: card.title, description: card.description } : game];
+}));
 const userApps = computed(() => games.value.filter(g => g.source === 'user'));
 const isPlazaOrBuiltin = computed(() => primaryTab.value === 'plaza' || primaryTab.value === 'builtin');
 
@@ -120,9 +127,13 @@ function descriptionFor(app: GameManifest) {
   return app.description;
 }
 
+function onlineCover(app: GameManifest) {
+  return app.id === FEATURED_WHALE_GIRL ? whaleGirlCard.value?.cover : undefined;
+}
+
 function onCoverError(event: Event, app: GameManifest) {
   const image = event.currentTarget as HTMLImageElement;
-  const fallback = fallbackCoverUrl(app);
+  const fallback = image.getAttribute('src') === onlineCover(app) ? coverUrl(app) : fallbackCoverUrl(app);
   if (image.getAttribute('src') !== fallback) image.src = fallback;
 }
 
@@ -137,17 +148,27 @@ function onIconError(event: Event, app: GameManifest) {
 const message = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : typeof error === 'string' ? error : fallback;
 
+let catalogRequest = 0;
 async function loadApps() {
+  const request = ++catalogRequest;
   loading.value = games.value.length === 0;
   catalogError.value = "";
   try {
     const catalog = await props.store.listGames();
+    if (request !== catalogRequest) return;
     games.value = catalog.games;
     folderErrors.value = catalog.errors;
+    if (catalog.games.some(game => game.id === FEATURED_WHALE_GIRL && game.source !== 'user')) {
+      void loadWhaleGirlCard().then(card => {
+        if (request !== catalogRequest) return;
+        whaleGirlCard.value = card;
+        cacheWhaleGirlCard(card);
+      }, () => { /* keep the last published card while offline */ });
+    }
   } catch (error) {
-    catalogError.value = message(error, "应用资料暂时无法读取。");
+    if (request === catalogRequest) catalogError.value = message(error, "应用资料暂时无法读取。");
   } finally {
-    loading.value = false;
+    if (request === catalogRequest) loading.value = false;
   }
 }
 
@@ -384,7 +405,7 @@ onActivated(() => {
               @keydown.space.prevent="launchApp(app)"
             >
               <div class="app-cover">
-                <img :src="coverUrl(app)" :alt="`${app.name}封面`" loading="lazy" @error="onCoverError($event, app)" />
+                <img :src="onlineCover(app) ?? coverUrl(app)" :alt="`${app.name}封面`" loading="lazy" @error="onCoverError($event, app)" />
                 <span class="app-kind" :class="{ 'v2-badge': app.id === 'mbti' }">{{ kindBadge(app) }}</span>
               </div>
               <div class="app-content">
