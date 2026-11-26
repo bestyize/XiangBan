@@ -117,6 +117,10 @@ pub(crate) fn download_access_token(app: &tauri::AppHandle) -> Result<String, St
 #[tauri::command]
 pub async fn ai_connector_baidu_start(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
     super::super::store::control(&window)?;
+    start(app, &window, id)
+}
+
+pub(crate) fn start(app: tauri::AppHandle, owner: &tauri::WebviewWindow, id: String) -> Result<Value, String> {
     let e = super::find(&Dirs::of(&app)?.plugins(), &id)?;
     if e.plugin.name != "baidu-netdisk" || !e.plugin.server(&e.server)?.is_baidu_netdisk_personal() { return Err("此连接器不支持百度个人授权".into()); }
     let key = random()?;
@@ -135,7 +139,7 @@ pub async fn ai_connector_baidu_start(app: tauri::AppHandle, window: tauri::Webv
     url.query_pairs_mut().extend_pairs([("client_id", CLIENT_ID), ("redirect_uri", "oob"), ("response_type", "token"), ("scope", "basic,netdisk"), ("state", state.as_str())]);
     let nav_app = app.clone(); let nav_flow = flow.clone(); let nav_label = label.clone();
     let load_app = app.clone(); let load_flow = flow.clone(); let load_label = label.clone();
-    let built = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
+    let built = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url)).parent(owner).and_then(|builder| builder
         .title("百度网盘授权").inner_size(760., 720.).min_inner_size(360., 480.)
         .incognito(true)
         .on_navigation(move |url| {
@@ -144,7 +148,7 @@ pub async fn ai_connector_baidu_start(app: tauri::AppHandle, window: tauri::Webv
         })
         .on_page_load(move |_, payload| { handle_callback(load_app.clone(), load_flow.clone(), load_label.clone(), payload.url()); })
         .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-        .build();
+        .build());
     let auth_window = match built { Ok(w) => w, Err(_) => { flows().lock().unwrap_or_else(|e| e.into_inner()).remove(&key); return Err("无法打开百度授权窗口，请使用手动方式。".into()); } };
     let event_flow = flow.clone();
     auth_window.on_window_event(move |event| if matches!(event, tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. }) {

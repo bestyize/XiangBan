@@ -46,6 +46,7 @@ onMounted(async () => {
       listen<AccountSession | null>('account-changed', value => { accountVersion++; store.account = value; }),
       listen<AiConfigView>('ai-config-changed', value => { configVersion++; config.value = value; }),
       listen<unknown>('configuration-tab', pickTab),
+      ...(role === 'settings' ? [listen('configuration-login', () => store.openLogin())] : []),
     ]);
     if (disposed) { subscriptions.forEach(off => off()); return; }
     offs.push(...subscriptions);

@@ -61,7 +61,7 @@ pub fn window_level(window: &tauri::WebviewWindow) -> Result<i64, String> {
     on_main(&app, move |_| Ok(native(&window)?.level() as i64))
 }
 
-fn native(window: &tauri::WebviewWindow) -> Result<&NSWindow, String> {
+pub(crate) fn native(window: &tauri::WebviewWindow) -> Result<&NSWindow, String> {
     // Caller holds the live Tauri window and invokes this only on the main
     // thread. The reference never leaves the enclosing AppKit operation.
     if MainThreadMarker::new().is_none() {

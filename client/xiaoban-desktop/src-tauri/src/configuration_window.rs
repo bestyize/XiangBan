@@ -25,6 +25,14 @@ fn cancel_store_authorization(app: &tauri::AppHandle, flow_id: String, baidu: bo
         let _ = app.emit("ai-store-changed", ());
     });
 }
+fn remember_store_authorization(app: &tauri::AppHandle, label: &str, value: &Value, baidu: bool) {
+    let Some(flow) = value.get("flowId").and_then(Value::as_str) else { return; };
+    let state = app.state::<ConfigurationState>();
+    let mut owners = state.authorizations.lock().unwrap_or_else(|e| e.into_inner());
+    // Use the same lock as the close handler so a late result still gets cancelled.
+    if app.get_webview_window(label).is_some() { owners.insert(flow.into(), (label.into(), baidu)); }
+    else { cancel_store_authorization(app, flow.into(), baidu); }
+}
 static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 static OPEN_LOCK: Mutex<()> = Mutex::new(());
 pub fn is_gateway(label: &str) -> bool {
@@ -64,6 +72,10 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Webview, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
     if target=="preview" && window.label()!="control" {return Err("请从聊天页打开作品预览".into());}
+    open(app, window, target, tab, provider)
+}
+
+pub(crate) fn open(app: tauri::AppHandle, window: tauri::Webview, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if !matches!(target.as_str(), "settings" | "model" | "community" | "store" | "cloud" | "preview" | "pet" | "proactivity") { return Err("配置窗口类型无效".into()); }
     if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "agent", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
     let provider = provider.unwrap_or_else(|| "__new__".into());
@@ -75,8 +87,10 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;
     let preview_label = if target == "preview" { let label=crate::chat_preview::identity(&provider)?; let target:crate::chat_preview::Target=serde_json::from_str(&provider).map_err(|_|"预览参数无效")?; crate::chat::assets::resolve(&app,&target.session_id,&target.id,&target.relative)?; Some(label) }else{None};
     let label = if let Some(label)=preview_label {label} else if target == "pet" { policy::pet_label(&provider) } else if target == "proactivity" { "configuration-proactivity".into() } else if target == "cloud" { policy::cloud_label(&provider) } else if let Some(identity) = store_identity { format!("configuration-store-{:x}", Sha256::digest(identity.as_bytes()))[..44].to_string() } else if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
-    let monitor = window.window().current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
+    let source = app.get_webview_window(window.label()).ok_or("来源窗口已关闭")?;
+    let monitor = source.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     if let Some(existing) = app.get_webview_window(&label) {
+        crate::window_ownership::set_owner(&existing, &source)?;
         existing.unminimize().map_err(|e| e.to_string())?;
         keep_visible(&existing, monitor)?;
         if target == "settings" { if let Some(tab) = tab { existing.emit("configuration-tab", tab).map_err(|e| e.to_string())?; } }
@@ -93,6 +107,7 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     let (width, height, min_width) = if target == "pet" { (704f64, 504f64, 580f64) } else if target == "proactivity" { (492f64, 468f64, 420f64) } else if connector_surface { (600f64, 420f64, 420f64) } else if target == "store" { (680f64, 720f64, 420f64) } else if target == "community" { (960f64, 760f64, 540f64) } else if target == "settings" { (940f64, 700f64, 560f64) } else if gateway { (360., 620., 360.) } else { (900., 720., 640.) };
     let (max_w, max_h) = monitor.as_ref().map(|m| { let a=m.work_area(); let s=m.scale_factor(); ((a.size.width as f64/s-32.).max(1.), (a.size.height as f64/s-64.).max(1.)) }).unwrap_or((width, height));
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?{query}").into()))
+        .parent(&source).map_err(|e| e.to_string())?
         .title(if target == "pet" { "伙伴设置 · 小伴桌面" } else if target == "proactivity" { "主动陪伴 · 小伴桌面" } else if target == "preview" { "作品预览 · 小伴桌面" } else if target == "cloud" { "云文档 · 小伴桌面" } else if target == "store" { "插件配置 · 小伴桌面" } else if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
         .inner_size(width.min(max_w), height.min(max_h)).min_inner_size(min_width.min(max_w), 360f64.min(max_h))
         .resizable(true).decorations(target == "community").transparent(target != "community").shadow(true).theme(theme).visible(false);
@@ -117,6 +132,9 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
             if let Ok(state) = frame_state(&own) { let _ = own.emit("configuration-window-state", state); }
         }
         if matches!(event,tauri::WindowEvent::CloseRequested{..}) {
+            if kind(own.label()) == Some("settings") {
+                crate::window_ownership::preserve_children(&own);
+            }
             if let (Some(path),Ok(p),Ok(s))=(&path,own.outer_position(),own.inner_size()) {
                 if !own.is_maximized().unwrap_or(false) && !own.is_minimized().unwrap_or(false) && !own.is_fullscreen().unwrap_or(false) {
                     let state=Placement{x:p.x,y:p.y,width:s.width,height:s.height};
@@ -203,7 +221,14 @@ pub fn configuration_window_resize(window: tauri::Window, direction: String) -> 
 #[tauri::command]
 pub fn configuration_window_login(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
     if kind(window.label()).is_none() { return Err("只能从配置窗口打开登录".into()); }
+    if kind(window.label()) == Some("model") {
+        if let Some(settings) = app.get_webview_window("configuration-settings").filter(|w| w.is_visible().unwrap_or(false)) {
+            settings.set_focus().map_err(|e| e.to_string())?;
+            return app.emit_to(settings.label(), "configuration-login", ()).map_err(|e| e.to_string());
+        }
+    }
     crate::present_control(&app)?;
+    window.hide().map_err(|e| e.to_string())?;
     app.emit_to("control", "configuration-login", ()).map_err(|e|e.to_string())
 }
 #[tauri::command]
@@ -215,6 +240,15 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
     if !args.is_object() || args.to_string().len()>1_000_000 { return Err(json!("配置参数无效或过大")); }
     if !policy::cloud_scope(window.label(), &command, &args) { return Err(json!("此窗口只能读取当前云文档")); }
     if !policy::pet_scope(window.label(), &command, &args) { return Err(json!("此窗口只能管理当前桌面伙伴")); }
+    if command == "ai_connector_baidu_start" {
+        // This command creates a native window, so use the authenticated caller as its owner.
+        let id = args["id"].as_str().ok_or_else(|| json!("连接器编号无效"))?;
+        let value = crate::chat::connectors::baidu::start(app.clone(), &window, id.into())
+            .map_err(|error| json!(error))?;
+        remember_store_authorization(&app, window.label(), &value, true);
+        return Ok(value);
+    }
+    let opening_skins = command == "open_application_skins";
     let wait_timeout=Duration::from_secs(if role == "cloud" && command == "library_cloud_download" { 660 } else { 180 });
     let id=SEQUENCE.fetch_add(1,Ordering::Relaxed).to_string(); let (tx,rx)=mpsc::channel();
     {
@@ -228,6 +262,9 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
         Err(_) => Err(json!("主窗口不可用，无法保存配置")),
     };
     app.state::<ConfigurationState>().pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
+    if opening_skins && result.is_ok() {
+        window.hide().map_err(|error| json!(error.to_string()))?;
+    }
     result
 }
 #[tauri::command]
@@ -244,14 +281,7 @@ pub fn configuration_window_reply(app: tauri::AppHandle, window: tauri::Webview,
     let p=app.state::<ConfigurationState>().pending.lock().map_err(|_|"配置请求锁不可用")?.remove(&id).ok_or("配置请求已过期")?;
     if !p.taken { return Err("配置请求尚未处理".into()); }
     if ok && kind(&p.label) == Some("store") {
-        if let Some(flow) = value.get("flowId").and_then(Value::as_str) {
-            let baidu = p.request.command == "ai_connector_baidu_start";
-            let state = app.state::<ConfigurationState>();
-            let mut owners = state.authorizations.lock().unwrap_or_else(|e|e.into_inner());
-            // Keep registration and window-existence checking under the same lock as destruction.
-            if app.get_webview_window(&p.label).is_some() { owners.insert(flow.into(), (p.label.clone(), baidu)); }
-            else { cancel_store_authorization(&app, flow.into(), baidu); }
-        }
+        remember_store_authorization(&app, &p.label, &value, false);
         if matches!(p.request.command.as_str(), "ai_store_connector_auth_cancel" | "ai_connector_baidu_cancel") || value.get("status").and_then(Value::as_str).is_some_and(|s| ["connected", "cancelled", "error"].contains(&s)) {
             if let Some(flow) = p.request.args.get("flowId").and_then(Value::as_str) {
                 app.state::<ConfigurationState>().authorizations.lock().unwrap_or_else(|e|e.into_inner()).remove(flow);

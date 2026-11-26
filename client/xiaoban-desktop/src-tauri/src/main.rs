@@ -71,6 +71,7 @@ mod assistant_hit_test;
 mod data_library;
 mod design;
 mod window_control;
+mod window_ownership;
 mod design_window;
 mod chat_preview;
 mod design_mcp;

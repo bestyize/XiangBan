@@ -49,6 +49,7 @@ pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow
     let appearance=crate::settings(&app).appearance;
     let theme=match appearance.as_str(){"dark"=>Some(tauri::Theme::Dark),"light"=>Some(tauri::Theme::Light),_=>None};
     let mut builder=WebviewWindowBuilder::new(&app,&name,WebviewUrl::App(format!("index.html?scene=design&id={id}").into()))
+        .parent(&window).map_err(|e|e.to_string())?
         .title(format!("{} · 小伴设计",project.title)).inner_size(1280.,840.).min_inner_size(640.,480.).resizable(true).decorations(true).theme(theme).visible(false);
     if let Some(m)=&fallback{let a=m.work_area();let f=m.scale_factor();let w=(a.size.width as f64/f-32.).max(1.);let h=(a.size.height as f64/f-64.).max(1.);builder=builder.inner_size(1280f64.min(w),840f64.min(h)).min_inner_size(640f64.min(w),480f64.min(h));}
     let monitor=app.available_monitors().map_err(|e|e.to_string())?.into_iter().find(|m|{
@@ -63,6 +64,9 @@ pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow
     keep_visible(&child,fallback)?;
     let own=child.clone();let remembered=Arc::new(Mutex::new(placement.clone()));
     child.on_window_event(move|event|{
+        if matches!(event,tauri::WindowEvent::CloseRequested{..}) {
+            crate::window_ownership::preserve_children(&own);
+        }
         if let Ok(mut state)=remembered.lock(){
             if !own.is_maximized().unwrap_or(false)&&!own.is_fullscreen().unwrap_or(false){
                 if let Ok(p)=own.outer_position(){state.x=p.x;state.y=p.y;}
