@@ -8,6 +8,12 @@ export function openSettingsWindow(tab?: SettingsTab) {
 export function openModelWindow(provider: string) {
   return invoke<void>('configuration_window_open', { target: 'model', tab: null, provider });
 }
+export function openPetSettingsWindow(id: string) {
+  return invoke<void>('configuration_window_open', { target: 'pet', tab: null, provider: id });
+}
+export function openProactivityWindow() {
+  return invoke<void>('configuration_window_open', { target: 'proactivity', tab: null, provider: null });
+}
 export function closeConfigurationWindow() { return invoke<void>('configuration_window_close'); }
 export function dragConfigurationWindow(event: MouseEvent) {
   if (event.button || event.detail > 1 || (event.target as HTMLElement).closest('button,input,select,a')) return;
@@ -20,7 +26,12 @@ export function zoomConfigurationWindow(event: MouseEvent) {
 }
 /** The event is only a wake-up. Command and arguments must be taken from the native queue,
  * never from an event payload that another webview could forge. */
-export function serveConfigurationWindows(openStoreTask?: (args: Record<string, unknown>) => Promise<void>, openCloudTask?: (args: Record<string, unknown>) => Promise<void>, openApplicationSkins?: () => void) {
+export function serveConfigurationWindows(
+  openStoreTask?: (args: Record<string, unknown>) => Promise<void>,
+  openCloudTask?: (args: Record<string, unknown>) => Promise<void>,
+  openApplicationSkins?: () => void,
+  openPetCreation?: (args: Record<string, unknown>) => Promise<void>,
+) {
   return listen<{ id: string }>('configuration-command', async ({ id }) => {
     let request: { id: string; command: string; args: Record<string, unknown> };
     try { request = await invoke('configuration_window_take', { id }); } catch { return; }
@@ -29,6 +40,9 @@ export function serveConfigurationWindows(openStoreTask?: (args: Record<string, 
       if (request.command === 'open_application_skins') {
         if (!openApplicationSkins) throw new Error('皮肤入口尚未就绪');
         openApplicationSkins();
+      } else if (request.command === 'pet_open_creation') {
+        if (!openPetCreation) throw new Error('伙伴创作入口尚未就绪');
+        await openPetCreation(request.args);
       } else if (request.command === 'ai_store_open_task') {
         if (!openStoreTask) throw new Error('插件任务入口尚未就绪');
         await openStoreTask(request.args);
@@ -41,6 +55,7 @@ export function serveConfigurationWindows(openStoreTask?: (args: Record<string, 
       const authFinished = ['ai_store_connector_auth_status', 'ai_connector_baidu_status'].includes(request.command)
         && !!value && typeof value === 'object' && 'status' in value && ['connected', 'cancelled', 'error'].includes(String(value.status));
       if (mutation || authFinished) await emit('ai-store-changed').catch(() => {});
+      if (request.command === 'configure_proactivity') await emit('proactivity-changed', value ?? null).catch(() => {});
     }
     catch (error) { ok = false; value = error instanceof Error ? error.message : error; }
     await invoke('configuration_window_reply', { id: request.id, ok, value: value ?? null }).catch(() => {});

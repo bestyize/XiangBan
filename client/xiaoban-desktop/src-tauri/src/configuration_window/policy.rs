@@ -5,12 +5,25 @@ pub fn kind(label: &str) -> Option<&'static str> {
     }
     if let Some(suffix) = label.strip_prefix("configuration-cloud-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("cloud"); }
     if let Some(suffix) = label.strip_prefix("configuration-preview-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("preview"); }
+    if let Some(suffix) = label.strip_prefix("configuration-pet-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("pet"); }
+    if label == "configuration-proactivity" { return Some("proactivity"); }
     if label == "configuration-community" { return Some("community"); }
     if label == "configuration-settings" { return Some("settings"); }
     let suffix = label.strip_prefix("configuration-model-")?;
     (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("model")
 }
 pub fn command_allowed(role: &str, command: &str) -> bool {
+    if role == "pet" {
+        return [
+            "get_settings", "get_app_info", "get_pet_catalog", "update_pet", "remove_pet",
+            "export_resource_pack", "open_download_url", "pet_open_creation",
+        ].contains(&command);
+    }
+    if role == "proactivity" {
+        return [
+            "get_settings", "get_app_info", "get_proactivity_settings", "configure_proactivity", "get_proactivity_context",
+        ].contains(&command);
+    }
     if role == "cloud" { return ["get_settings", "library_cloud_item", "library_cloud_open_source", "library_cloud_download", "library_cloud_download_cancel", "library_cloud_read", "library_cloud_open_task"].contains(&command); }
     if role == "store" { return [
         "get_settings", "get_app_info", "open_download_url", "ai_store_open_task",
@@ -119,6 +132,16 @@ pub fn cloud_label(id: &str) -> String {
 pub fn cloud_scope(label: &str, command: &str, args: &serde_json::Value) -> bool {
     kind(label) != Some("cloud") || command == "get_settings" || args["id"].as_str().is_some_and(|id| cloud_label(id) == label)
 }
+/// A pet configuration window may only modify or remove its own desktop pet instance.
+pub fn pet_label(id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("configuration-pet-{:x}", Sha256::digest(id.as_bytes()))[..42].into()
+}
+pub fn pet_scope(label: &str, command: &str, args: &serde_json::Value) -> bool {
+    if kind(label) != Some("pet") { return true; }
+    if !matches!(command, "update_pet" | "remove_pet") { return true; }
+    args["id"].as_str().is_some_and(|id| pet_label(id) == label)
+}
 #[cfg(test)] mod cloud_tests {
     use super::*;
     #[test] fn document_windows_cannot_cross_scope_or_send_chat() {
@@ -132,5 +155,23 @@ pub fn cloud_scope(label: &str, command: &str, args: &serde_json::Value) -> bool
         assert!(!command_allowed("cloud","open_download_url"));
         assert!(cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"one"})));
         assert!(!cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"two"})));
+    }
+    #[test] fn pet_and_proactivity_windows_keep_minimal_scope() {
+        let label = pet_label("pet-alpha");
+        assert_eq!(kind(&label), Some("pet"));
+        assert_eq!(kind("configuration-proactivity"), Some("proactivity"));
+        assert!(command_allowed("pet", "get_pet_catalog"));
+        assert!(command_allowed("pet", "update_pet"));
+        assert!(command_allowed("pet", "remove_pet"));
+        assert!(!command_allowed("pet", "chat_send"));
+        assert!(!command_allowed("pet", "configure_proactivity"));
+        assert!(pet_scope(&label, "update_pet", &serde_json::json!({"id": "pet-alpha"})));
+        assert!(!pet_scope(&label, "update_pet", &serde_json::json!({"id": "pet-beta"})));
+        assert!(!pet_scope(&label, "remove_pet", &serde_json::json!({"id": "pet-beta"})));
+        assert!(command_allowed("proactivity", "get_proactivity_settings"));
+        assert!(command_allowed("proactivity", "configure_proactivity"));
+        assert!(command_allowed("proactivity", "get_proactivity_context"));
+        assert!(!command_allowed("proactivity", "update_pet"));
+        assert!(!command_allowed("proactivity", "chat_send"));
     }
 }

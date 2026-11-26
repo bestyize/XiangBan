@@ -736,10 +736,25 @@ pub fn set_pet_hit_test(window: tauri::WebviewWindow, hit: bool) -> Result<(), S
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
-pub fn manage_pet_instance(window: tauri::WebviewWindow) -> Result<(), String> {
+pub async fn manage_pet_instance(window: tauri::WebviewWindow) -> Result<(), String> {
     let p = own(&window)?;
-    crate::present_control(window.app_handle())?;
-    if let Some(control) = window.app_handle().get_webview_window("control") {
+    let app = window.app_handle().clone();
+    if let Some(control) = app.get_webview("control") {
+        if crate::configuration_window::configuration_window_open(
+            app.clone(),
+            control,
+            "pet".into(),
+            None,
+            Some(p.id.clone()),
+        )
+        .await
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
+    crate::present_control(&app)?;
+    if let Some(control) = app.get_webview_window("control") {
         control
             .eval(format!(
                 "window.dispatchEvent(new CustomEvent('pets-manage',{{detail:{}}}));",

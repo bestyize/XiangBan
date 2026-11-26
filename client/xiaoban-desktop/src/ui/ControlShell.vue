@@ -503,7 +503,17 @@ onMounted(() => {
     };
   }
   if (store.desktop) void listen('configuration-login', () => store.openLogin()).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); });
-  if (store.desktop) void serveConfigurationWindows(args => acceptStoreTask(store, args), args => acceptCloudTask(store, args), () => { store.studioTab = 'skins'; navigate('studio'); }).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
+  if (store.desktop) void serveConfigurationWindows(
+    args => acceptStoreTask(store, args),
+    args => acceptCloudTask(store, args),
+    () => { store.studioTab = 'skins'; navigate('studio'); },
+    async args => {
+      await store.startCreation('pet');
+      if (typeof args.themeId === 'string' && typeof args.themeName === 'string') {
+        store.creationDraft = `请以宠物主题「${args.themeName}」（${args.themeId}）为参考，创作我的自定义宠物主题。先读取 pet_read_format 和现有主题，按我的要求调整：`;
+      }
+    },
+  ).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);

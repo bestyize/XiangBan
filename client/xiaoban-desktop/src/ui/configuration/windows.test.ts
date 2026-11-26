@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { emit, invoke, listen } from '../../bridge.ts';
-import { openModelWindow, openSettingsWindow, serveConfigurationWindows } from './windows.ts';
+import { openModelWindow, openPetSettingsWindow, openProactivityWindow, openSettingsWindow, serveConfigurationWindows } from './windows.ts';
 vi.mock('../../bridge.ts', () => ({ emit: vi.fn(), invoke: vi.fn(), listen: vi.fn() }));
 const ipc = vi.mocked(invoke), subscribe = vi.mocked(listen);
 beforeEach(() => { vi.resetAllMocks(); ipc.mockResolvedValue(null); subscribe.mockResolvedValue(() => {}); vi.mocked(emit).mockResolvedValue(undefined); });
@@ -47,10 +47,23 @@ describe('native configuration handoff', () => {
   });
   it('passes only the selected category or provider identity to window creation', async () => {
     await openSettingsWindow('network'); await openModelWindow('custom_test');
+    await openPetSettingsWindow('pet-1'); await openProactivityWindow();
     expect(ipc.mock.calls).toEqual([
       ['configuration_window_open', { target: 'settings', tab: 'network', provider: null }],
       ['configuration_window_open', { target: 'model', tab: null, provider: 'custom_test' }],
+      ['configuration_window_open', { target: 'pet', tab: null, provider: 'pet-1' }],
+      ['configuration_window_open', { target: 'proactivity', tab: null, provider: null }],
     ]);
+  });
+  it('handles pet creation handoff and broadcasts proactivity changes', async () => {
+    const openPetCreation = vi.fn().mockResolvedValue(undefined);
+    ipc.mockImplementation(async command => command === 'configuration_window_take' ? { id: 'p1', command: 'pet_open_creation', args: { themeId: 'flower-whispers', themeName: '花朵心语' } } as never : null);
+    await serveConfigurationWindows(undefined, undefined, undefined, openPetCreation);
+    await subscribe.mock.calls[0][1]({ id: 'p1' });
+    expect(openPetCreation).toHaveBeenCalledWith({ themeId: 'flower-whispers', themeName: '花朵心语' });
+    ipc.mockImplementation(async command => command === 'configuration_window_take' ? { id: 'p2', command: 'configure_proactivity', args: { settings: { enabled: true, frequency: 'quiet' } } } as never : command === 'configure_proactivity' ? { enabled: true, frequency: 'quiet' } as never : null);
+    await subscribe.mock.calls[0][1]({ id: 'p2' });
+    expect(emit).toHaveBeenCalledWith('proactivity-changed', { enabled: true, frequency: 'quiet' });
   });
   it('takes the authenticated command from native state instead of trusting an event payload', async () => {
     ipc.mockImplementation(async command => {
