@@ -134,10 +134,20 @@ fn countdown(widget: &Value, obj: &Map<String, Value>) -> Result<Value, String> 
     let (title, date) = (pick("title", "值得期待的日子")?, pick("date", "")?);
     let mode = one_of(Some(&pick("mode", "countdown")?), &["countdown", "elapsed"], "countdown", "mode")?;
     let repeat = one_of(Some(&pick("repeat", "none")?), &["none", "yearly"], "none", "repeat")?;
+    let quote = pick("quote", "")?;
+    let icon = one_of(Some(&pick("icon", "")?), &["", "heart", "flag", "sparkle", "calendar"], "", "icon")?;
     if title.is_empty() || units(&title) > 40 { return Err("title 需要 1 到 40 字".into()); }
+    if units(&quote) > 60 { return Err("quote 最多 60 字".into()); }
     if !date_ok(&date) { return Err("date 要是 YYYY-MM-DD（1900 到 2100 年）".into()); }
     if mode == "elapsed" && repeat != "none" { return Err("已过去天数（elapsed）不能每年重复".into()); }
-    Ok(json!({"countdown": {"title": title, "date": date, "mode": mode, "repeat": repeat}}))
+    let mut out = Map::new();
+    out.insert("title".into(), json!(title));
+    out.insert("date".into(), json!(date));
+    out.insert("mode".into(), json!(mode));
+    out.insert("repeat".into(), json!(repeat));
+    if !quote.is_empty() { out.insert("quote".into(), json!(quote)); }
+    if !icon.is_empty() { out.insert("icon".into(), json!(icon)); }
+    Ok(json!({"countdown": Value::Object(out)}))
 }
 
 /// The living data of 日程 / 股票 / 木鱼, keeping what the caller did not touch.
@@ -189,7 +199,7 @@ pub(super) fn patch(widget: &Value, content: &Value) -> Result<Value, String> {
     let kind = widget["kind"].as_str().unwrap_or_default();
     let allowed: &[&str] = match kind {
         "notes" => &["title", "items", "append"],
-        "countdown" => &["title", "date", "mode", "repeat"],
+        "countdown" => &["title", "date", "mode", "repeat", "quote", "icon"],
         "reminders" => &["items", "append"],
         "stocks" => &["symbols", "symbol"],
         _ => return Err("只有待办（notes）、纪念日（countdown）、今日日程（reminders）、股票（stocks）组件有可设置的内容".into()),

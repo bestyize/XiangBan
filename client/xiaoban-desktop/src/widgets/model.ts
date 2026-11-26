@@ -1,11 +1,12 @@
 import { validateNote, validateCountdown, validateReminder } from './content.ts';
 export type WidgetKind = 'clock' | 'weather' | 'notes' | 'reminders' | 'stocks' | 'woodfish' | 'calendar' | 'countdown' | 'custom';
-export type WidgetTheme = 'ivory';
+export type WidgetTheme = 'ivory' | 'dark' | 'glass';
+export type CountdownIcon = '' | 'heart' | 'flag' | 'sparkle' | 'calendar';
 export interface City { name: string; country: string; admin1: string; latitude: number; longitude: number }
 export type ItemRepeat = 'none' | 'daily' | 'weekdays' | 'weekly';
 export interface TodoItem { id: string; text: string; done: boolean; time?:string; date?:string; notify?:boolean; repeat?:ItemRepeat; completedOn?:string }
 export interface NoteData { title: string; mode: 'note' | 'todo'; text: string; items: TodoItem[] }
-export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly' }
+export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly'; quote?: string; icon?: CountdownIcon }
 export interface ReminderItem { id: string; title: string; at: string; done: boolean; end?:string; location?:string; notify?:boolean; repeat?:ItemRepeat; completedOn?:string }
 export const validStockSymbol = (symbol:string) => /^(?:116\.\d{5}|1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
 export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string; symbols?:string[]; sound?:boolean }
@@ -40,7 +41,7 @@ export function validateLayout(value: unknown): WidgetLayout {
     if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !kindValid
       || typeof widget.enabled !== 'boolean' || !Number.isFinite(widget.scale) || widget.scale < .5 || widget.scale > 1.5 || !Number.isFinite(widget.x) || widget.x < 0 || widget.x > 1 || !Number.isFinite(widget.y) || widget.y < 0 || widget.y > 1) throw new Error('组件布局无效，原记录已保留');
     if (isCustom && !widget.customId) throw new Error('自定义组件缺少模板标识');
-    if (!isCustom && widget.theme !== 'ivory') throw new Error('内置组件材质必须为 ivory');
+    if (!isCustom && !['ivory', 'dark', 'glass'].includes(widget.theme)) throw new Error('内置组件材质无效');
     if (widget.city && (widget.kind !== 'weather' || typeof widget.city.name !== 'string' || !widget.city.name.trim() || widget.city.name.length > 160 || !Number.isFinite(widget.city.latitude) || Math.abs(widget.city.latitude) > 90 || !Number.isFinite(widget.city.longitude) || Math.abs(widget.city.longitude) > 180)) throw new Error('天气城市配置无效');
     if(widget.layer!==undefined&&!['desktop','topmost'].includes(widget.layer))throw Error('组件层级无效');
     if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');

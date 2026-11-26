@@ -40,7 +40,7 @@ export function scheduleLabel(date:string,time:string,repeat?:ItemRepeat,day=new
  return [label,time].filter(Boolean).join(' ');
 }
 export function validateCountdown(data: CountdownData) {
-  if(!data||typeof data.title!=='string'||!data.title.trim()||data.title.length>40||!validDate(data.date)||!['countdown','elapsed'].includes(data.mode)||!['none','yearly'].includes(data.repeat)||(data.mode==='elapsed'&&data.repeat!=='none'))throw new Error('纪念日配置无效');
+  if(!data||typeof data.title!=='string'||!data.title.trim()||data.title.length>40||!validDate(data.date)||!['countdown','elapsed'].includes(data.mode)||!['none','yearly'].includes(data.repeat)||(data.mode==='elapsed'&&data.repeat!=='none')||(data.quote!==undefined&&(typeof data.quote!=='string'||data.quote.length>60))||(data.icon!==undefined&&!['','heart','flag','sparkle','calendar'].includes(data.icon)))throw new Error('纪念日配置无效');
 }
 const dayNumber=(date:Date)=>Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000;
 export function countdownValue(data: CountdownData, now = new Date()) {

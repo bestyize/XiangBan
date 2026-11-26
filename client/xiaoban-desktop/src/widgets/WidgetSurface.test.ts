@@ -20,7 +20,35 @@ describe('reference widget interaction',()=>{
   try{expect(view.get('.clock-time').text()).toBe('12:34');vi.advanceTimersByTime(45030);await nextTick();expect(view.get('.clock-time').text()).toBe('12:35');}
   finally{view.unmount();vi.useRealTimers();}
  });
- it('keeps illustrative weather and stocks separate from actual readings',()=>{for(const kind of ['weather','stocks'] as const){const real=mount(WidgetSurface,{props:{widget:one(kind),preview:true}});expect(real.text()).toContain('—');expect(real.text()).not.toContain('309.600');real.unmount();}const demo=mount(WidgetSurface,{props:{widget:one('stocks'),preview:true,demo:true}});expect(demo.text()).toContain('309.600');expect(demo.findAll('.stock-periods button')).toHaveLength(4);demo.unmount();});
+ it('keeps illustrative weather and stocks separate from actual readings',()=>{for(const kind of ['weather','stocks'] as const){const real=mount(WidgetSurface,{props:{widget:one(kind),preview:true}});expect(real.text()).toContain('—');expect(real.text()).not.toContain('309.60');real.unmount();}const demo=mount(WidgetSurface,{props:{widget:one('stocks'),preview:true,demo:true}});expect(demo.text()).toContain('309.60');expect(demo.findAll('.stock-periods button')).toHaveLength(4);demo.unmount();});
+ it('renders calendar lunar labels, holiday badges and selected day detail',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-14T10:00:00'));
+  const v=mount(WidgetSurface,{props:{widget:one('calendar'),preview:true}});
+  try{
+   expect(v.text()).toContain('国庆节');
+   expect(v.text()).toContain('休');
+   expect(v.text()).toContain('班');
+   await v.get('[aria-label="2026-10-01"]').trigger('click');
+   expect(v.get('.calendar-detail').text()).toContain('国庆节放假');
+  }finally{v.unmount();vi.useRealTimers();}
+ });
+ it('adds a quick todo inline and renders countdown today state without zero',async()=>{
+  const save=vi.fn().mockResolvedValue(undefined);
+  const notesView=mount(WidgetSurface,{props:{widget:{...one('notes'),note:{title:'待办',mode:'todo',text:'',items:[]}},save}});
+  await notesView.get('[aria-label="快速添加待办"]').setValue('买咖啡');
+  await notesView.get('.todo-quick').trigger('submit');
+  await flushPromises();
+  expect(save.mock.calls[0][0].note.items[0].text).toBe('买咖啡');
+  notesView.unmount();
+
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-26T10:00:00'));
+  const cdView=mount(WidgetSurface,{props:{widget:{...one('countdown'),countdown:{title:'发布日',date:'2026-11-26',mode:'countdown',repeat:'none',icon:'flag',quote:'顺利上线'}},preview:true}});
+  try{
+   expect(cdView.find('.countdown-today').text()).toContain('就是今天');
+   expect(cdView.find('.countdown-value').exists()).toBe(false);
+   expect(cdView.text()).toContain('顺利上线');
+  }finally{cdView.unmount();vi.useRealTimers();}
+ });
  it('saves todo completion and keeps the original content on failure',async()=>{const save=vi.fn().mockRejectedValue(Error('磁盘不可写'));const widget={...one('notes'),note:{title:'待办',mode:'todo' as const,text:'',items:[{id:'first',text:'写周报',done:false,time:'09:00'}]}};const view=mount(WidgetSurface,{props:{widget,save}});await view.get('.check-circle').trigger('click');await flushPromises();expect(save.mock.calls[0][0].note.items[0].done).toBe(true);expect(widget.note.items[0].done).toBe(false);expect(view.get('[role="alert"]').text()).toContain('磁盘不可写');view.unmount();});
  it('adds dated events with start, end and location',async()=>{const save=vi.fn().mockResolvedValue(undefined);const view=mount(WidgetSurface,{props:{widget:one('reminders'),save}});await view.get('.agenda-date').trigger('click');await view.get('[aria-label="事项名称"]').setValue('设计评审');await view.get('[aria-label="日程日期"]').setValue('2026-10-20');await view.get('[aria-label="开始时间"]').setValue('14:00');await view.get('[aria-label="结束时间"]').setValue('15:30');await view.get('[aria-label="日程地点"]').setValue('A302');await view.get('form').trigger('submit');expect(save.mock.calls[0][0].living.reminders[0]).toMatchObject({title:'设计评审',at:'2026-10-20T14:00',end:'15:30',location:'A302'});view.unmount();});
  it('keeps rapid woodfish taps while an earlier count is being saved',async()=>{const pending:Array<()=>void>=[];const save=vi.fn((_content:unknown)=>new Promise<void>(resolve=>pending.push(resolve)));const view=mount(WidgetSurface,{props:{widget:{...one('woodfish'),living:{count:108,symbol:'1.000001',reminders:[]}},save}});await view.get('.sound-toggle').trigger('click');pending.shift()!();await flushPromises();save.mockClear();await view.get('.fish-knock').trigger('click');await view.get('.fish-knock').trigger('click');await view.get('.fish-knock').trigger('click');expect(view.get('.fish-footer strong').text()).toContain('111');expect(save).toHaveBeenCalledTimes(1);pending.shift()!();await flushPromises();expect(save).toHaveBeenCalledTimes(2);expect(save.mock.calls[1][0]).toMatchObject({living:{count:111}});pending.shift()!();await flushPromises();view.unmount();});

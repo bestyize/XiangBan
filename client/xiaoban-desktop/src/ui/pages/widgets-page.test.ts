@@ -68,16 +68,18 @@ describe('replacement widget library',()=>{
   expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets[0]).toMatchObject({kind:'clock',theme:'ivory',layer:'desktop'});
   v.unmount();
  });
- it('asks for the layer before adding, and keeps the widget off the desktop until one is picked',async()=>{
+ it('asks for the layer in a lightweight menu before adding, and keeps the widget off the desktop until picked',async()=>{
   const s=store(),v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
   await flushPromises();
+  expect(v.get('.xb-widget-slot.clock').classes()).toContain('is-wide');
+  expect(v.get('.xb-widget-slot.countdown').classes()).toContain('is-wide');
   await v.get('[data-testid="add-clock"]').trigger('click');await flushPromises();
-  const dialog=document.body.querySelector('[data-testid="widget-layer-dialog"]');
-  expect(dialog).not.toBeNull();
-  expect(dialog!.textContent).toContain('贴在桌面');
-  expect(dialog!.textContent).toContain('始终置顶');
+  const menu=document.body.querySelector('[data-testid="widget-layer-menu"]');
+  expect(menu).not.toBeNull();
+  expect(menu!.textContent).toContain('贴在桌面');
+  expect(menu!.textContent).toContain('始终置顶');
   expect(localStorage.getItem('xiaoban.widgets.v2')).toBeNull();
-  (document.body.querySelector('[data-testid="widget-layer-dialog"] .layer-cancel') as HTMLElement).click();
+  window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   await flushPromises();
   expect(localStorage.getItem('xiaoban.widgets.v2')).toBeNull();
   expect(v.find('[data-testid="add-clock"]').attributes('aria-expanded')).toBe('false');

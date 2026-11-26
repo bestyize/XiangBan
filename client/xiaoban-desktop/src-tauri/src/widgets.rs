@@ -37,7 +37,16 @@ fn default_true()->bool{true}
 pub struct NoteData { pub title: String, pub mode: String, pub text: String, pub items: Vec<TodoItem> }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct CountdownData { pub title: String, pub date: String, pub mode: String, pub repeat: String }
+pub struct CountdownData {
+    pub title: String,
+    pub date: String,
+    pub mode: String,
+    pub repeat: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub quote: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
 pub struct ReminderItem {pub id:String,pub title:String,pub at:String,pub done:bool,#[serde(default)] pub end:String,#[serde(default)] pub location:String,
@@ -74,7 +83,8 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
     }
     if let Some(data)=&widget.countdown {
         let valid_date=chrono::NaiveDate::parse_from_str(&data.date,"%Y-%m-%d").is_ok_and(|date|date.format("%Y-%m-%d").to_string()==data.date && data.date.as_str()>="1900-01-01" && data.date.as_str()<="2100-12-31");
-        if widget.kind!="countdown" || !short_text(&data.title,40) || !valid_date || !["countdown","elapsed"].contains(&data.mode.as_str()) || !["none","yearly"].contains(&data.repeat.as_str()) || (data.mode=="elapsed"&&data.repeat!="none") {return Err("纪念日配置无效".into());}
+        let valid_icon=["","heart","flag","sparkle","calendar"].contains(&data.icon.as_str());
+        if widget.kind!="countdown" || !short_text(&data.title,40) || !valid_date || !["countdown","elapsed"].contains(&data.mode.as_str()) || !["none","yearly"].contains(&data.repeat.as_str()) || (data.mode=="elapsed"&&data.repeat!="none") || data.quote.encode_utf16().count()>60 || !valid_icon {return Err("纪念日配置无效".into());}
     }
     if let Some(data)=&widget.living {
         if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !valid_stock_symbol(&data.symbol) || data.reminders.len()>12 || data.symbols.len()>8 || (!data.symbols.is_empty()&&(!data.symbols.contains(&data.symbol)||data.symbols.iter().any(|s|!valid_stock_symbol(s))||data.symbols.iter().collect::<std::collections::HashSet<_>>().len()!=data.symbols.len())){return Err("生活组件配置无效".into());}
@@ -140,7 +150,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
         if widget.id.is_empty() || widget.id.len() > 32 || !widget.id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) || !ids.insert(&widget.id)
             || !KINDS.contains(&widget.kind.as_str())
             || !["desktop","topmost"].contains(&widget.layer.as_str())
-            || widget.theme!="ivory"
+            || !["ivory","dark","glass"].contains(&widget.theme.as_str())
             || !widget.scale.is_finite() || !(0.5..=1.5).contains(&widget.scale)
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
             || !widget.y.is_finite() || !(0.0..=1.0).contains(&widget.y) { return Err("组件配置无效，原布局已保留".into()); }
@@ -346,7 +356,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Opti
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"今日待办".into(),mode:"todo".into(),text:String::new(),items:vec![]})}else{None};
-    let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
+    let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into(),quote:String::new(),icon:String::new()})}else{None};
     let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){let mut d=LivingData::default();if kind=="stocks"{d.symbol="116.00700".into();}Some(d)}else{None};
     let theme="ivory".to_string();
     let scale=crate::widget_geometry::resolve(&monitors(&app).unwrap_or_default(),None).map_or(0.5,|m|crate::widget_geometry::default_scale(m.width/m.scale,m.height/m.scale)).clamp(0.5,1.5);
@@ -729,7 +739,7 @@ mod tests {
   // Adding writes the chosen layer straight into the widget; the frontend no longer needs a second call.
   for layer in ["desktop","topmost"]{let mut l=one();l.widgets[0].layer=layer.into();assert!(validate(&l).is_ok());let restored:Layout=serde_json::from_slice(&serde_json::to_vec(&l).unwrap()).unwrap();assert_eq!(restored.widgets[0].layer,layer);}
  }
- #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
+ #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}for theme in ["ivory","dark","glass"]{let mut l=one();l.widgets[0].theme=theme.into();assert!(validate(&l).is_ok());}let mut l=one();l.widgets[0].theme="paper".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
  #[test] fn only_eight_reference_components_and_custom_are_available(){
   for k in BUILTIN_KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}
   let mut l=one();l.widgets[0].kind="custom".into();l.widgets[0].custom_id=Some("my-widget".into());assert!(validate(&l).is_ok());
