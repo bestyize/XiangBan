@@ -1,12 +1,41 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { EvaluatedResult, ResultProfile, TestDefinition } from '../engine/types';
 import ArtIcons from './ArtIcons.vue';
 
-defineProps<{
+const props = defineProps<{
   test: TestDefinition;
   result: EvaluatedResult;
   profile: ResultProfile;
 }>();
+
+// 大五人格五边形 SVG 动态雷达顶点计算
+const bigFivePolygon = computed(() => {
+  const keys = ['open', 'consc', 'extra', 'agree', 'calm'];
+  const cx = 100;
+  const cy = 78;
+  const maxR = 56;
+  return keys
+    .map((k, idx) => {
+      const score = props.result.scores[k] ?? 50;
+      const r = Math.max(12, (score / 100) * maxR);
+      const angle = (-90 + idx * 72) * (Math.PI / 180);
+      const x = (cx + r * Math.cos(angle)).toFixed(1);
+      const y = (cy + r * Math.sin(angle)).toFixed(1);
+      return `${x},${y}`;
+    })
+    .join(' ');
+});
+
+// ECR 依恋四象限落点坐标（X=回避 10..90%, Y=焦虑 10..90%）
+const attachCoords = computed(() => {
+  const avoid = props.result.scores.avoidance ?? 50;
+  const anx = props.result.scores.anxiety ?? 50;
+  return {
+    left: `${Math.max(12, Math.min(88, avoid))}%`,
+    top: `${Math.max(12, Math.min(88, anx))}%`
+  };
+});
 </script>
 
 <template>
@@ -176,7 +205,7 @@ defineProps<{
   </div>
 
   <!-- 皮肤 6：16 型人格速测（电光紫新波普） -->
-  <div v-else class="poster-classic16">
+  <div v-else-if="test.id === 'classic16'" class="poster-classic16">
     <div class="c16-top">
       <span>16 型人格速测 · 荣格八维</span>
       <span class="sticker" style="background: var(--pop-lime)">{{ profile.rarity }}</span>
@@ -197,6 +226,179 @@ defineProps<{
     <div class="c16-note">
       <b v-if="profile.extra?.jungFunctions">荣格主导功能：{{ profile.extra.jungFunctions }}。</b>
       {{ profile.quote }}
+    </div>
+  </div>
+
+  <!-- 皮肤 7：性格成分配料表（仿超市营养表） -->
+  <div v-else-if="test.id === 'ingredients'" class="poster-ing">
+    <div class="ing-head">
+      <div>
+        <h3>性格营养成分表</h3>
+        <span class="mono" style="font-size: 10.5px; font-weight: 800">
+          {{ profile.avatarEmoji }} {{ profile.title }} · {{ profile.rarity }}
+        </span>
+      </div>
+      <b class="mono" style="font-size: 20px">{{ profile.extra?.netWeight || profile.code }}</b>
+    </div>
+    <div class="ing-meta">
+      <span>品名：限定版人类灵魂</span>
+      <span>保质期：{{ profile.extra?.shelfLife || '长期有效' }}</span>
+    </div>
+    <div v-if="profile.extra?.formula" class="ing-rows">
+      <div v-for="item in profile.extra.formula" :key="item.name" class="ing-row">
+        <span>{{ item.name }}</span>
+        <div class="ing-bar">
+          <i :style="{ width: `${Math.min(100, item.pct * 2)}%`, background: item.color }" />
+        </div>
+        <span class="num">{{ item.pct }}%</span>
+      </div>
+    </div>
+    <div class="ing-quote">“{{ profile.quote }}”</div>
+    <div v-if="profile.extra?.storageTip" class="ing-foot">
+      <b>储存条件：</b>{{ profile.extra.storageTip }}
+    </div>
+  </div>
+
+  <!-- 皮肤 8：中式修仙灵根录（新中式朱砂符箓） -->
+  <div v-else-if="test.id === 'xianxia'" class="poster-xianxia">
+    <div class="xx-frame">
+      <div class="xx-seal">{{ profile.extra?.sealText || '天品\n灵根' }}</div>
+      <div class="xx-kicker">中式修仙录 · 宗门命格</div>
+      <div class="xx-title">{{ profile.avatarEmoji }} {{ profile.title }}</div>
+      <div class="xx-sub">{{ profile.extra?.linggen || profile.subtitle }} · {{ profile.rarity }}</div>
+      <div class="xx-grid">
+        <div class="xx-box">
+          <small>本命法宝</small>
+          <b>{{ profile.extra?.artifact || '神秘灵器' }}</b>
+        </div>
+        <div class="xx-box">
+          <small>修为境界</small>
+          <b>{{ profile.extra?.realm || '化神境' }}</b>
+        </div>
+        <div class="xx-box">
+          <small>渡劫心魔</small>
+          <b>{{ profile.extra?.tribulation || '早会' }}</b>
+        </div>
+        <div class="xx-box">
+          <small>洞府福地</small>
+          <b>{{ profile.extra?.cave || '清静峰' }}</b>
+        </div>
+      </div>
+      <p class="xx-quote">“{{ profile.quote }}”</p>
+    </div>
+  </div>
+
+  <!-- 皮肤 9：人生 RPG 像素角色卡 -->
+  <div v-else-if="test.id === 'rpg'" class="poster-rpg">
+    <div class="rpg-top">
+      <span class="mono">PLAYER CARD // {{ profile.extra?.rpgLevel || profile.code }}</span>
+      <span class="sticker" style="background: var(--pop-lime)">{{ profile.rarity }}</span>
+    </div>
+    <div class="rpg-class">{{ profile.avatarEmoji }} {{ profile.title }}</div>
+    <p class="rpg-sub">{{ profile.subtitle }}</p>
+    <div class="rpg-stats">
+      <div v-for="(dim, idx) in test.dimensions" :key="dim.id" class="rpg-stat">
+        <div class="rpg-stat-top">
+          <span>{{ dim.label }}</span>
+          <span class="num">{{ result.scores[dim.id] ?? 50 }}</span>
+        </div>
+        <div class="rpg-bar">
+          <i
+            :style="{
+              width: `${result.scores[dim.id] ?? 50}%`,
+              background: ['#FF914D', '#E4F857', '#8DD3FF', '#6BE5A8'][idx % 4]
+            }"
+          />
+        </div>
+      </div>
+    </div>
+    <div v-if="profile.extra?.passiveName" class="rpg-skill">
+      <b style="color: #e4f857">★ 被动技能【{{ profile.extra.passiveName }}】：</b>
+      {{ profile.extra.passiveDesc }}
+    </div>
+    <div v-if="profile.extra?.debuffName" class="rpg-debuff">
+      ⚡ 致命 Debuff【{{ profile.extra.debuffName }}】：{{ profile.extra.debuffDesc }}
+    </div>
+  </div>
+
+  <!-- 皮肤 10：大五人格科学画像（五维动态雷达图） -->
+  <div v-else-if="test.id === 'bigfive'" class="poster-bigfive">
+    <div class="c16-top">
+      <span>大五人格 OCEAN · 科学模型</span>
+      <span class="sticker" style="background: var(--pop-lime)">{{ profile.rarity }}</span>
+    </div>
+    <div class="bf-title">{{ profile.avatarEmoji }} {{ profile.title }}</div>
+    <div class="bf-sub">{{ profile.subtitle }}</div>
+    <div class="bf-radar-wrap">
+      <svg viewBox="0 0 200 156" width="210" height="162" aria-label="大五人格五维雷达图">
+        <polygon points="100,22 153,61 133,123 67,123 47,61" fill="#FFFDF8" stroke="#18181B" stroke-width="1.6" />
+        <polygon points="100,45 132,68 120,105 80,105 68,68" fill="none" stroke="#C5D9CD" stroke-width="1.2" />
+        <polygon :points="bigFivePolygon" fill="rgba(107,229,168,0.6)" stroke="#18181B" stroke-width="2.4" />
+        <text x="100" y="14" text-anchor="middle" font-size="10.5" font-weight="800" fill="#18181B">开放性</text>
+        <text x="163" y="64" font-size="10.5" font-weight="800" fill="#18181B">尽责</text>
+        <text x="142" y="140" font-size="10.5" font-weight="800" fill="#18181B">外向</text>
+        <text x="58" y="140" text-anchor="end" font-size="10.5" font-weight="800" fill="#18181B">宜人</text>
+        <text x="38" y="64" text-anchor="end" font-size="10.5" font-weight="800" fill="#18181B">稳定</text>
+      </svg>
+    </div>
+    <div class="bf-pills">
+      <div v-for="dim in test.dimensions" :key="dim.id" class="bf-pill">
+        <small>{{ dim.label.slice(0, 2) }}</small>
+        <b class="num">{{ result.scores[dim.id] ?? 50 }}</b>
+      </div>
+    </div>
+    <p class="bf-quote">“{{ profile.quote }}”</p>
+  </div>
+
+  <!-- 皮肤 11：亲密关系依恋象限图（ECR 四象限动态落点） -->
+  <div v-else-if="test.id === 'attachment'" class="poster-attach">
+    <div class="c16-top">
+      <span>ECR 亲密关系依恋象限</span>
+      <span class="sticker" style="background: var(--pop-lime)">{{ profile.rarity }}</span>
+    </div>
+    <div class="bf-title">{{ profile.avatarEmoji }} {{ profile.title }}</div>
+    <div class="bf-sub">{{ profile.subtitle }}</div>
+    <div class="att-quad">
+      <span class="att-q-lbl" :class="{ hit: profile.extra?.quadrant === 'secure' }" style="left: 0; top: 0">
+        安全稳态
+      </span>
+      <span class="att-q-lbl" :class="{ hit: profile.extra?.quadrant === 'avoidant' }" style="right: 0; top: 0">
+        独立回避
+      </span>
+      <span class="att-q-lbl" :class="{ hit: profile.extra?.quadrant === 'anxious' }" style="left: 0; bottom: 0">
+        高敏焦虑
+      </span>
+      <span class="att-q-lbl" :class="{ hit: profile.extra?.quadrant === 'fearful' }" style="right: 0; bottom: 0">
+        矛盾恐惧
+      </span>
+      <span class="att-dot" :style="attachCoords" />
+    </div>
+    <div class="att-scores">
+      <span class="num">依恋焦虑 {{ result.scores.anxiety ?? 50 }}%</span>
+      <span class="num">亲密回避 {{ result.scores.avoidance ?? 50 }}%</span>
+    </div>
+    <p class="bf-quote">“{{ profile.quote }}”</p>
+  </div>
+
+  <!-- 皮肤 12：人格暗面·黑暗三联征（黑红警示卡） -->
+  <div v-else class="poster-dark">
+    <div class="c16-top" style="color: #ff7885">
+      <span>DARK TRIAD · {{ profile.extra?.darkBadge || profile.code }}</span>
+      <span class="sticker" style="background: var(--pop-red); color: #fff">{{ profile.rarity }}</span>
+    </div>
+    <div class="dt-title">{{ profile.avatarEmoji }} {{ profile.title }}</div>
+    <div class="dt-sub">{{ profile.subtitle }}</div>
+    <div class="dt-quote">“{{ profile.quote }}”</div>
+    <div class="dt-bar-box">
+      <div v-for="dim in test.dimensions" :key="dim.id" class="dt-row">
+        <div class="axis-lbl">
+          <span>{{ dim.label }}</span>
+          <span class="num">{{ result.scores[dim.id] ?? 50 }}%</span>
+        </div>
+        <div class="dt-rail">
+          <i :style="{ width: `${result.scores[dim.id] ?? 50}%` }" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -729,5 +931,410 @@ defineProps<{
   font-size: 12px;
   font-weight: 650;
   line-height: 1.55;
+}
+
+/* 皮肤 7：配料表 */
+.poster-ing {
+  border-radius: 20px;
+  padding: 15px;
+  background: #fffdf8;
+  color: #18181b;
+  border: 2.2px solid #18181b;
+  box-shadow: 4px 4px 0 #18181b;
+}
+.ing-head {
+  border-bottom: 4px solid #18181b;
+  padding-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.ing-head h3 {
+  font-size: 21px;
+  font-weight: 950;
+  letter-spacing: -0.4px;
+}
+.ing-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 6px 0;
+  border-bottom: 1.5px solid #18181b;
+}
+.ing-row {
+  display: grid;
+  grid-template-columns: 1fr 78px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #e5dfd2;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ing-row:last-child {
+  border-bottom: 0;
+}
+.ing-bar {
+  height: 9px;
+  border-radius: 99px;
+  background: #efe9dc;
+  border: 1.2px solid #18181b;
+  overflow: hidden;
+}
+.ing-bar i {
+  display: block;
+  height: 100%;
+}
+.ing-quote {
+  margin-top: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.55;
+  color: #3c3934;
+}
+.ing-foot {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: var(--pop-lime);
+  border: 1.5px solid #18181b;
+  font-size: 11.5px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+/* 皮肤 8：中式修仙符箓 */
+.poster-xianxia {
+  border-radius: 20px;
+  padding: 15px;
+  background: linear-gradient(180deg, #f9efd8 0%, #f2dfb8 100%);
+  color: #2a1d12;
+  border: 2px solid #2a1d12;
+  box-shadow: 4px 4px 0 #8e231c;
+}
+.xx-frame {
+  border: 1.5px solid #8e231c;
+  border-radius: 14px;
+  padding: 13px;
+  position: relative;
+}
+.xx-seal {
+  position: absolute;
+  right: 11px;
+  top: 11px;
+  width: 44px;
+  height: 44px;
+  border: 2px solid #b5241c;
+  border-radius: 8px;
+  color: #b5241c;
+  font-size: 11px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.15;
+  transform: rotate(6deg);
+  background: rgba(249, 239, 216, 0.9);
+}
+.xx-kicker {
+  font-size: 10.5px;
+  font-weight: 850;
+  color: #8e231c;
+  letter-spacing: 1.2px;
+}
+.xx-title {
+  font-size: 23px;
+  font-weight: 950;
+  margin-top: 6px;
+  padding-right: 52px;
+}
+.xx-sub {
+  font-size: 11.5px;
+  font-weight: 750;
+  color: #6e4d31;
+  margin-top: 3px;
+}
+.xx-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.xx-box {
+  background: rgba(255, 253, 248, 0.8);
+  border: 1.3px solid #8e231c;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.xx-box small {
+  display: block;
+  font-size: 10px;
+  color: #8e231c;
+  font-weight: 800;
+}
+.xx-box b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+.xx-quote {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 650;
+  color: #3e2a19;
+}
+
+/* 皮肤 9：RPG 像素风 */
+.poster-rpg {
+  border-radius: 20px;
+  padding: 16px;
+  background: #19231e;
+  color: #e4f857;
+  border: 2px solid #18181b;
+  box-shadow: 4px 4px 0 #6be5a8;
+}
+.rpg-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 900;
+  border-bottom: 1.5px dashed rgba(228, 248, 87, 0.4);
+  padding-bottom: 8px;
+}
+.rpg-class {
+  font-size: 23px;
+  font-weight: 950;
+  color: #fffdf8;
+  margin-top: 10px;
+}
+.rpg-sub {
+  font-size: 11.5px;
+  color: #b7d3c4;
+  margin-top: 3px;
+  font-weight: 650;
+}
+.rpg-stats {
+  margin-top: 11px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.rpg-stat {
+  font-size: 11px;
+  font-weight: 850;
+  color: #d8f5e5;
+}
+.rpg-stat-top {
+  display: flex;
+  justify-content: space-between;
+}
+.rpg-bar {
+  height: 8px;
+  background: #293931;
+  border: 1px solid #6be5a8;
+  border-radius: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.rpg-bar i {
+  display: block;
+  height: 100%;
+}
+.rpg-skill {
+  margin-top: 11px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(228, 248, 87, 0.35);
+  font-size: 11.5px;
+  color: #fffdf8;
+  line-height: 1.55;
+}
+.rpg-debuff {
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: rgba(255, 77, 94, 0.2);
+  border: 1px solid #ff4d5e;
+  font-size: 11.5px;
+  color: #ffd3d8;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+/* 皮肤 10 & 11：大五雷达 & 依恋象限 */
+.poster-bigfive {
+  border-radius: 20px;
+  padding: 16px;
+  background: #e9fbf1;
+  color: #18181b;
+  border: 2px solid #18181b;
+  box-shadow: 4px 4px 0 #18181b;
+}
+.poster-attach {
+  border-radius: 20px;
+  padding: 16px;
+  background: #ffe8ee;
+  color: #18181b;
+  border: 2px solid #18181b;
+  box-shadow: 4px 4px 0 #18181b;
+}
+.bf-title {
+  font-size: 22px;
+  font-weight: 950;
+  margin-top: 6px;
+}
+.bf-sub {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #5e5a53;
+  margin-top: 2px;
+}
+.bf-radar-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0 4px;
+}
+.bf-pills {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  text-align: center;
+}
+.bf-pill {
+  background: #fffdf8;
+  border: 1.3px solid #18181b;
+  border-radius: 10px;
+  padding: 5px 2px;
+}
+.bf-pill small {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #5e5a53;
+}
+.bf-pill b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 950;
+}
+.bf-quote {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+.att-quad {
+  margin: 11px auto 9px;
+  width: 226px;
+  height: 154px;
+  border: 1.8px solid #18181b;
+  border-radius: 14px;
+  background: #fffdf8;
+  position: relative;
+  overflow: hidden;
+}
+.att-quad::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 1.3px dashed #b5aeb0;
+}
+.att-quad::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1.3px dashed #b5aeb0;
+}
+.att-q-lbl {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 800;
+  color: #7c7478;
+  padding: 5px 7px;
+}
+.att-q-lbl.hit {
+  color: #e0243c;
+  font-weight: 950;
+}
+.att-dot {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--pop-red);
+  border: 2.5px solid #18181b;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 6px rgba(255, 77, 94, 0.22);
+}
+.att-scores {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+/* 皮肤 12：暗面三联征 */
+.poster-dark {
+  border-radius: 20px;
+  padding: 16px;
+  background: #18181b;
+  color: #fffdf8;
+  border: 2px solid #18181b;
+  box-shadow: 4px 4px 0 var(--pop-red);
+}
+.dt-title {
+  font-size: 23px;
+  font-weight: 950;
+  margin-top: 6px;
+}
+.dt-sub {
+  font-size: 11.5px;
+  color: #b7b3c4;
+  margin-top: 3px;
+  font-weight: 650;
+}
+.dt-quote {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  color: #f3eff8;
+  line-height: 1.55;
+}
+.dt-bar-box {
+  margin-top: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.dt-row {
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.dt-rail {
+  height: 9px;
+  background: #2c2a34;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 99px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.dt-rail i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff4d5e, #ff914d);
+  border-radius: 99px;
 }
 </style>

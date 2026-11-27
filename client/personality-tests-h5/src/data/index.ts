@@ -5,6 +5,12 @@ import { animalPersonaTest } from './animalPersona.ts';
 import { loveManualTest } from './loveManual.ts';
 import { mentalCheckupTest } from './mentalCheckup.ts';
 import { classic16Test } from './classic16.ts';
+import { ingredientsTest } from './ingredients.ts';
+import { xianxiaTest } from './xianxia.ts';
+import { rpgCardTest } from './rpgCard.ts';
+import { bigFiveTest } from './bigFive.ts';
+import { attachmentTest } from './attachment.ts';
+import { darkTriadTest } from './darkTriad.ts';
 
 export const ALL_TESTS: TestDefinition[] = [
   sbtiMaskTest,
@@ -12,7 +18,13 @@ export const ALL_TESTS: TestDefinition[] = [
   animalPersonaTest,
   loveManualTest,
   mentalCheckupTest,
-  classic16Test
+  classic16Test,
+  ingredientsTest,
+  xianxiaTest,
+  rpgCardTest,
+  bigFiveTest,
+  attachmentTest,
+  darkTriadTest
 ];
 
 export const TEST_MAP: Record<TestId, TestDefinition> = {
@@ -21,7 +33,13 @@ export const TEST_MAP: Record<TestId, TestDefinition> = {
   animal: animalPersonaTest,
   manual: loveManualTest,
   checkup: mentalCheckupTest,
-  classic16: classic16Test
+  classic16: classic16Test,
+  ingredients: ingredientsTest,
+  xianxia: xianxiaTest,
+  rpg: rpgCardTest,
+  bigfive: bigFiveTest,
+  attachment: attachmentTest,
+  darktriad: darkTriadTest
 };
 
 export function getTestById(id: TestId): TestDefinition {
@@ -36,7 +54,7 @@ export function buildSoulInsight(
 ): string {
   const entries = Object.values(results).filter((r): r is EvaluatedResult => Boolean(r));
   if (entries.length === 0) {
-    return '拆开任意 1 个盲盒即可点亮你的第一枚灵魂贴纸，集齐 3 枚自动解锁跨测评共性洞察。';
+    return '投币测完任意 1 个盲盒即可点亮你的第一枚灵魂贴纸，集齐 3 枚自动解锁跨测评共性洞察。';
   }
   if (entries.length < 3) {
     return `已点亮 ${entries.length} 枚贴纸！再测 ${3 - entries.length} 个不同维度的盲盒，系统将横向比对你的外在面具与底层底色，生成专属跨测评洞察。`;
@@ -53,9 +71,20 @@ export function buildSoulInsight(
     else if ((results.animal.scores.sharp ?? 50) >= 65) traits.push('骨子里自带破局锐度');
     else traits.push('极度护短又慢热');
   }
-  if (results.manual) {
-    if ((results.manual.scores.space ?? 50) >= 60) traits.push('重视独立呼吸感');
-    else traits.push('渴望高浓度双向偏爱');
+  if (results.bigfive) {
+    if ((results.bigfive.scores.open ?? 50) >= 65) traits.push('高开放好奇心');
+    else if ((results.bigfive.scores.consc ?? 50) >= 65) traits.push('高尽责稳健秩序');
+  }
+  if (results.darktriad) {
+    if ((results.darktriad.scores.mach ?? 50) >= 65 || (results.darktriad.scores.cold ?? 50) >= 65) {
+      traits.push('边界锋利难被拿捏');
+    } else {
+      traits.push('保留稀缺纯白真诚');
+    }
+  }
+  if (results.attachment) {
+    if (results.attachment.profileCode === 'SC') traits.push('亲密关系内核稳态');
+    else if (results.attachment.profileCode === 'AV') traits.push('外冷内热自我保护');
   }
   if (results.classic16) {
     const code = results.classic16.profileCode;

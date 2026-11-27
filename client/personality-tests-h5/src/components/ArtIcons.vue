@@ -51,6 +51,45 @@ defineProps<{
     <circle cx="48" cy="38" r="4.5" fill="#18181B" />
   </svg>
 
+  <!-- 二期 6 款全新波普封面插画 -->
+  <svg v-else-if="kind === 'ingredients'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <rect x="20" y="8" width="56" height="60" rx="9" fill="#FFFDF8" stroke="#18181B" stroke-width="3.2" />
+    <rect x="27" y="16" width="42" height="10" rx="2" fill="#18181B" />
+    <path d="M27 35 H69 M27 45 H60 M27 55 H50" stroke="#18181B" stroke-width="3.2" stroke-linecap="round" />
+    <circle cx="67" cy="54" r="8" fill="#FF4D5E" stroke="#18181B" stroke-width="2.4" />
+  </svg>
+
+  <svg v-else-if="kind === 'xianxia'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <rect x="29" y="7" width="38" height="62" rx="6" fill="#FFF8E7" stroke="#8E231C" stroke-width="3.2" />
+    <circle cx="48" cy="28" r="9.5" fill="#E3203C" stroke="#2A1D12" stroke-width="2.2" />
+    <path d="M37 46 H59 M40 55 H56" stroke="#8E231C" stroke-width="3.2" stroke-linecap="round" />
+  </svg>
+
+  <svg v-else-if="kind === 'rpg'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <rect x="13" y="15" width="70" height="46" rx="14" fill="#19231E" stroke="#18181B" stroke-width="3.2" />
+    <path d="M30 31 V45 M23 38 H37" stroke="#E4F857" stroke-width="3.6" stroke-linecap="round" />
+    <circle cx="61" cy="34" r="4.5" fill="#FF4D5E" />
+    <circle cx="69" cy="42" r="4.5" fill="#6BE5A8" />
+  </svg>
+
+  <svg v-else-if="kind === 'bigfive'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <polygon points="48,9 78,31 67,65 29,65 18,31" fill="#FFFDF8" stroke="#18181B" stroke-width="3" stroke-linejoin="round" />
+    <polygon points="48,19 69,34 60,55 36,53 29,34" fill="#6BE5A8" stroke="#18181B" stroke-width="2.4" stroke-linejoin="round" />
+    <circle cx="48" cy="39" r="3.5" fill="#18181B" />
+  </svg>
+
+  <svg v-else-if="kind === 'attachment'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <rect x="17" y="10" width="62" height="56" rx="11" fill="#FFFDF8" stroke="#18181B" stroke-width="3.2" />
+    <path d="M48 10 V66 M17 38 H79" stroke="#18181B" stroke-width="2.2" stroke-dasharray="4 3" />
+    <circle cx="62" cy="25" r="7" fill="#FF4D5E" stroke="#18181B" stroke-width="2.4" />
+    <circle cx="34" cy="51" r="5" fill="#8DD3FF" stroke="#18181B" stroke-width="2.2" />
+  </svg>
+
+  <svg v-else-if="kind === 'darktriad'" viewBox="0 0 96 76" width="78" height="62" aria-hidden="true">
+    <polygon points="48,10 80,62 16,62" fill="#18181B" stroke="#FFFDF8" stroke-width="3" stroke-linejoin="round" />
+    <circle cx="48" cy="43" r="9.5" fill="#FF4D5E" stroke="#FFFDF8" stroke-width="2.2" />
+  </svg>
+
   <!-- 动物塑结果页大尺寸萌系插画（按动物原型自动换色与细节） -->
   <svg v-else viewBox="0 0 150 118" width="144" height="114" aria-label="动物塑插画">
     <ellipse cx="75" cy="105" rx="46" ry="7" fill="#EFE0CC" />

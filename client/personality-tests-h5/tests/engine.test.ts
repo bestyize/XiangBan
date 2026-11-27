@@ -5,18 +5,21 @@ import { computeCompatibility, evaluateTest } from '../src/engine/scoring.ts';
 import { encodePeerShareUrl, parseHashRoute } from '../src/engine/shareCodec.ts';
 import { triggerSystemShare } from '../src/engine/systemShare.ts';
 
-test('全部 6 套首发测评题库结构完整、无重复题号、无空选项', () => {
-  assert.equal(ALL_TESTS.length, 6);
+test('全部 12 套首发与二期测评题库结构完整、无重复题号、无空选项', () => {
+  assert.equal(ALL_TESTS.length, 12);
   for (const t of ALL_TESTS) {
     assert.ok(t.questions.length >= 16, `${t.id} 题量应不少于 16 题`);
-    assert.ok(t.dimensions.length >= 4, `${t.id} 维度应不少于 4 个`);
-    assert.ok(t.profiles.length >= 6, `${t.id} 结果原型应不少于 6 个`);
+    assert.ok(t.dimensions.length >= 2, `${t.id} 维度应不少于 2 个`);
+    assert.ok(t.profiles.length >= 4, `${t.id} 结果原型应不少于 4 个`);
     const ids = new Set<string>();
     for (const q of t.questions) {
       assert.ok(!ids.has(q.id), `${t.id} 存在重复题号 ${q.id}`);
       ids.add(q.id);
       assert.equal(q.options.length, 4, `${q.id} 应有 4 个选项`);
     }
+    const allA = Object.fromEntries(t.questions.map((q) => [q.id, 'A']));
+    const res = evaluateTest(t, allA);
+    assert.ok(res.profileCode.length > 0, `${t.id} 应返回有效结果码`);
   }
 });
 

@@ -19,9 +19,9 @@ const emit = defineEmits<{
 const activeCat = ref<'all' | TestCategory>('all');
 
 const filters: Array<{ key: 'all' | TestCategory; label: string }> = [
-  { key: 'all', label: '全部 6 款' },
+  { key: 'all', label: `全部 ${ALL_TESTS.length} 款` },
   { key: 'viral', label: '爆款梗' },
-  { key: 'aesthetic', label: '小红书出片' },
+  { key: 'aesthetic', label: '颜值/国风' },
   { key: 'relation', label: '情侣合盘' },
   { key: 'classic', label: '性格深度' }
 ];

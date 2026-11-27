@@ -13,7 +13,13 @@ const VALID_IDS = new Set<TestId>([
   'animal',
   'manual',
   'checkup',
-  'classic16'
+  'classic16',
+  'ingredients',
+  'xianxia',
+  'rpg',
+  'bigfive',
+  'attachment',
+  'darktriad'
 ]);
 
 export function encodePeerShareUrl(

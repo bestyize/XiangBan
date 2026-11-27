@@ -4,7 +4,13 @@ export type TestId =
   | 'animal'
   | 'manual'
   | 'checkup'
-  | 'classic16';
+  | 'classic16'
+  | 'ingredients'
+  | 'xianxia'
+  | 'rpg'
+  | 'bigfive'
+  | 'attachment'
+  | 'darktriad';
 
 export type TestCategory = 'viral' | 'aesthetic' | 'relation' | 'classic';
 
@@ -71,6 +77,28 @@ export interface ProfileExtra {
   /* sbti */
   stampText?: string;
   eggHint?: string;
+  /* ingredients */
+  netWeight?: string;
+  shelfLife?: string;
+  formula?: Array<{ name: string; pct: number; color: string }>;
+  storageTip?: string;
+  /* xianxia */
+  sealText?: string;
+  linggen?: string;
+  artifact?: string;
+  realm?: string;
+  tribulation?: string;
+  cave?: string;
+  /* rpg */
+  rpgLevel?: string;
+  passiveName?: string;
+  passiveDesc?: string;
+  debuffName?: string;
+  debuffDesc?: string;
+  /* attachment */
+  quadrant?: 'secure' | 'anxious' | 'avoidant' | 'fearful';
+  /* darktriad */
+  darkBadge?: string;
 }
 
 export interface ResultProfile {

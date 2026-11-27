@@ -74,7 +74,7 @@ function buildTotalCardDataUrl(): string {
   ctx.fillText(`已点亮 ${completedItems.value.length} / ${ALL_TESTS.length} 枚潮玩盲盒贴纸`, 96, 314);
 
   let y = 390;
-  completedItems.value.forEach((item) => {
+  completedItems.value.slice(0, 6).forEach((item) => {
     ctx.fillStyle = item.test.posterBg;
     ctx.fillRect(96, y, 888, 118);
     ctx.fillStyle = '#18181B';
