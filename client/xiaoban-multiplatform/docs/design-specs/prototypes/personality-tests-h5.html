@@ -1,0 +1,1813 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>人格贩卖机 VEND·ME · 潮玩盲盒风趣味测评 H5 设计稿</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  /* 方案 A · 潮玩盲盒 / 潮流杂志风 */
+  --studio-bg:#EDE6D8;
+  --studio-card:#FFFDF8;
+  --studio-ink:#18181B;
+  --studio-muted:#5E5A53;
+  --studio-line:#18181B;
+
+  --bg:#FBF6EE;
+  --paper-dot:rgba(24,24,27,.06);
+  --surface:#FFFFFF;
+  --sub:#F3ECE0;
+  --ink:#18181B;
+  --ink-2:#3C3934;
+  --muted:#6E6960;
+  --border:#18181B;
+  --shadow:3px 3px 0 #18181B;
+  --shadow-sm:2px 2px 0 #18181B;
+  --shadow-lg:4px 4px 0 #18181B;
+
+  /* 潮玩多巴胺撞色盘 */
+  --pop-red:#FF4D5E;
+  --pop-lime:#E4F857;
+  --pop-orange:#FF914D;
+  --pop-peach:#FFD89B;
+  --pop-pink:#FFB5C8;
+  --pop-purple:#CBB8FF;
+  --pop-blue:#8DD3FF;
+  --pop-mint:#6BE5A8;
+  --pop-cream:#FFF7DF;
+
+  --phone-w:390px;
+}
+.dark{
+  --studio-bg:#0D0C10;
+  --studio-card:#1A1820;
+  --studio-ink:#FAF7F0;
+  --studio-muted:#A49F97;
+  --studio-line:#3A3644;
+
+  --bg:#15141A;
+  --paper-dot:rgba(255,255,255,.05);
+  --surface:#201E27;
+  --sub:#2A2733;
+  --ink:#FAF7F0;
+  --ink-2:#D5D0C8;
+  --muted:#9A958E;
+  --border:#FAF7F0;
+  --shadow:3px 3px 0 #000000;
+  --shadow-sm:2px 2px 0 #000000;
+  --shadow-lg:4px 4px 0 #000000;
+}
+html,body{margin:0;padding:0}
+body{
+  background:var(--studio-bg);
+  background-image:radial-gradient(var(--paper-dot) 1px,transparent 1px);
+  background-size:18px 18px;
+  color:var(--studio-ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","SF Pro Display","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.4;
+}
+button,input{font:inherit;color:inherit}
+button{
+  cursor:pointer;border:0;background:none;padding:0;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:transform .12s cubic-bezier(.22,1,.36,1),box-shadow .12s,background-color .14s;
+}
+button:focus-visible{outline:2.5px solid var(--pop-red);outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ========== 工作台顶栏 ========== */
+.studio{max-width:1440px;margin:0 auto;padding:22px 26px 52px}
+.studio-bar{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;
+  padding:13px 18px;border-radius:18px;background:var(--studio-card);
+  border:2px solid var(--studio-line);box-shadow:var(--shadow);
+  margin-bottom:16px;position:sticky;top:12px;z-index:40;
+}
+.brand-row{display:flex;align-items:center;gap:12px}
+.brand-mark{
+  width:38px;height:38px;border-radius:12px;background:var(--pop-lime);color:#18181B;
+  border:2px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  display:grid;place-items:center;font-weight:900;font-size:18px;transform:rotate(-4deg);flex-shrink:0;
+}
+.brand-title{font-size:16px;font-weight:850;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+.brand-tag{
+  font-size:10px;font-weight:800;padding:2px 7px;border-radius:99px;
+  background:var(--pop-red);color:#fff;border:1.5px solid #18181B;letter-spacing:.4px;
+}
+.brand-sub{font-size:12px;color:var(--studio-muted);margin-top:2px;font-weight:500}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.seg{
+  display:inline-flex;background:var(--sub);padding:3px;border-radius:999px;gap:2px;
+  border:1.5px solid var(--studio-line);
+}
+.seg button{
+  padding:5px 12px;border-radius:999px;font-size:12px;color:var(--studio-muted);font-weight:650;
+}
+.seg button.active{background:#18181B;color:#FFFDF8}
+.dark .seg button.active{background:var(--pop-lime);color:#18181B}
+.pill-btn{
+  padding:7px 13px;border-radius:999px;font-size:12px;font-weight:750;
+  border:1.5px solid var(--studio-line);background:var(--studio-card);color:var(--studio-ink);
+  box-shadow:var(--shadow-sm);
+}
+.pill-btn:active{transform:translate(1.5px,1.5px);box-shadow:none}
+.pill-btn.active{background:var(--pop-lime);color:#18181B;border-color:#18181B}
+
+.skin-bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:22px;
+  padding:10px 14px;border-radius:16px;background:var(--studio-card);
+  border:1.5px solid var(--studio-line);
+}
+.skin-bar-label{font-size:12px;color:var(--studio-muted);font-weight:750;margin-right:4px}
+.skin-chip{
+  padding:6px 12px;border-radius:999px;font-size:12px;background:var(--sub);color:var(--ink-2);
+  font-weight:700;border:1.5px solid transparent;
+}
+.skin-chip.active{
+  background:var(--pop-lime);color:#18181B;border-color:#18181B;box-shadow:2px 2px 0 #18181B;
+}
+
+/* ========== 多画板布局 ========== */
+.boards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(370px,var(--phone-w)));
+  justify-content:center;
+  gap:28px 26px;
+}
+.single-mode .boards{grid-template-columns:var(--phone-w)}
+.single-mode .board:not(.is-live){display:none}
+.board{display:flex;flex-direction:column;align-items:center}
+.board-head{
+  width:var(--phone-w);display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;padding:0 4px;font-size:12px;color:var(--studio-muted);
+}
+.board-head b{color:var(--studio-ink);font-weight:800;font-size:13px}
+.board-head span{
+  font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;
+  background:var(--studio-card);border:1px solid var(--studio-line);
+}
+
+/* ========== 手机壳层（390 / 360px 基准） ========== */
+.phone{
+  width:var(--phone-w);height:816px;border-radius:42px;
+  background:var(--bg);
+  background-image:radial-gradient(var(--paper-dot) 1px,transparent 1px);
+  background-size:14px 14px;
+  color:var(--ink);
+  border:5px solid #18181B;
+  box-shadow:0 22px 46px rgba(24,24,27,.16),6px 6px 0 rgba(24,24,27,.12);
+  position:relative;overflow:hidden;display:flex;flex-direction:column;
+}
+.dark .phone{border-color:#383544;box-shadow:0 24px 54px rgba(0,0,0,.6)}
+.narrow{--phone-w:360px}
+.narrow .phone{height:764px;border-radius:36px}
+
+.statusbar{
+  height:36px;padding:8px 22px 0;display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;font-weight:750;flex-shrink:0;z-index:6;
+}
+.sb-icons{display:flex;align-items:center;gap:5px}
+.sb-bat{width:20px;height:10px;border:1.5px solid currentColor;border-radius:3px;padding:1.5px;position:relative}
+.sb-bat::before{content:'';display:block;width:13px;height:100%;background:currentColor;border-radius:1px}
+.sb-bat::after{content:'';position:absolute;right:-3px;top:2.5px;width:2px;height:4px;background:currentColor;border-radius:0 1px 1px 0}
+.home-bar{
+  position:absolute;left:50%;bottom:6px;transform:translateX(-50%);
+  width:116px;height:4px;border-radius:99px;background:var(--ink);opacity:.26;pointer-events:none;z-index:30;
+}
+.viewport{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:none;overscroll-behavior:contain;position:relative;
+}
+.viewport::-webkit-scrollbar{display:none}
+
+/* ========== 潮玩杂志风通用控件 ========== */
+.topbar{
+  height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:10;flex-shrink:0;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
+}
+.topbar-title{font-size:16px;font-weight:800;letter-spacing:-.2px}
+.icon-btn{
+  width:36px;height:36px;border-radius:12px;background:var(--surface);
+  border:1.6px solid var(--border);box-shadow:var(--shadow-sm);
+  display:grid;place-items:center;color:var(--ink);
+}
+.icon-btn:active{transform:translate(1.5px,1.5px);box-shadow:none}
+.icon-btn svg,.svg-ico{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* 潮玩实体按键 */
+.btn-pop{
+  height:46px;padding:0 18px;border-radius:14px;
+  background:#18181B;color:var(--pop-lime);
+  border:1.8px solid #18181B;box-shadow:3px 3px 0 var(--pop-red);
+  font-size:14.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+.dark .btn-pop{background:var(--pop-lime);color:#18181B;border-color:#18181B;box-shadow:3px 3px 0 var(--pop-red)}
+.btn-pop:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--pop-red)}
+
+.btn-pop-light{
+  height:46px;padding:0 16px;border-radius:14px;
+  background:var(--surface);color:var(--ink);
+  border:1.8px solid var(--border);box-shadow:var(--shadow);
+  font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-pop-light:active{transform:translate(2px,2px);box-shadow:none}
+
+.sticker{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;
+  border:1.5px solid #18181B;font-size:10.5px;font-weight:800;color:#18181B;
+  box-shadow:1.5px 1.5px 0 #18181B;
+}
+
+/* 潮玩风底部导航 */
+.tabbar{
+  height:62px;padding:6px 14px 12px;background:var(--surface);border-top:1.8px solid var(--border);
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex-shrink:0;z-index:12;
+}
+.tab-item{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  border-radius:12px;color:var(--muted);font-size:12px;font-weight:750;border:1.5px solid transparent;
+}
+.tab-item svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.tab-item.active{
+  background:var(--pop-lime);color:#18181B;border-color:#18181B;box-shadow:2px 2px 0 #18181B;
+}
+
+/* ========== 画板 01：发现首页（潮玩盲盒墙） ========== */
+.home-pad{padding:4px 16px 24px}
+.home-brand{display:flex;align-items:center;gap:8px}
+.home-logo{
+  width:30px;height:30px;border-radius:10px;background:var(--pop-red);color:#fff;
+  border:1.8px solid #18181B;box-shadow:2px 2px 0 #18181B;transform:rotate(-5deg);
+  display:grid;place-items:center;font-size:15px;font-weight:900;
+}
+.home-brand h2{font-size:18px;font-weight:900;letter-spacing:-.4px}
+.home-brand small{
+  font-size:9px;font-weight:900;padding:1px 5px;border-radius:5px;
+  background:#18181B;color:var(--pop-lime);letter-spacing:.6px;
+}
+.archive-pill{
+  height:32px;padding:0 11px;border-radius:99px;background:var(--pop-lime);color:#18181B;
+  border:1.6px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  font-size:11.5px;font-weight:850;display:inline-flex;align-items:center;gap:5px;
+}
+
+/* 主推炸裂盲盒大卡 */
+.hero-box{
+  margin-top:6px;padding:16px;border-radius:20px;
+  background:linear-gradient(135deg,#FF5864 0%,#FF7A45 100%);
+  color:#FFFFFF;border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;
+  position:relative;overflow:hidden;
+}
+.hero-box::before{
+  content:'';position:absolute;inset:0;
+  background-image:radial-gradient(rgba(255,255,255,.22) 1.2px,transparent 1.2px);
+  background-size:12px 12px;opacity:.55;pointer-events:none;
+}
+.hero-art{
+  position:absolute;right:10px;top:14px;width:96px;height:96px;
+  transform:rotate(6deg);pointer-events:none;
+}
+.hero-stickers{display:flex;gap:6px;flex-wrap:wrap;position:relative;z-index:1}
+.hero-title{
+  font-size:24px;font-weight:950;line-height:1.2;margin-top:11px;letter-spacing:-.5px;
+  text-shadow:2px 2px 0 rgba(24,24,27,.28);position:relative;z-index:1;max-width:74%;
+}
+.hero-desc{
+  font-size:12.5px;margin-top:7px;line-height:1.5;opacity:.96;font-weight:600;
+  position:relative;z-index:1;max-width:78%;
+}
+.hero-foot{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:14px;position:relative;z-index:1;
+}
+.hero-meta{
+  font-size:11px;font-weight:750;padding:5px 10px;border-radius:99px;
+  background:rgba(24,24,27,.22);backdrop-filter:blur(4px);
+}
+.hero-cta{
+  height:40px;padding:0 16px;border-radius:99px;background:var(--pop-lime);color:#18181B;
+  border:1.8px solid #18181B;box-shadow:2.5px 2.5px 0 #18181B;
+  font-size:13.5px;font-weight:900;display:inline-flex;align-items:center;gap:4px;
+}
+.hero-cta:active{transform:translate(2px,2px);box-shadow:none}
+
+/* 筛选胶囊 */
+.filter-row{
+  display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:15px 0 12px;
+}
+.filter-row::-webkit-scrollbar{display:none}
+.f-chip{
+  flex-shrink:0;height:32px;padding:0 13px;border-radius:99px;
+  background:var(--surface);color:var(--ink);border:1.5px solid var(--border);
+  font-size:12px;font-weight:750;
+}
+.f-chip.active{
+  background:#18181B;color:var(--pop-lime);box-shadow:2px 2px 0 var(--pop-red);
+}
+.dark .f-chip.active{background:var(--pop-lime);color:#18181B;border-color:#18181B}
+
+/* 双列彩色盲盒封面卡 */
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.blind-card{
+  border-radius:18px;border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;
+  overflow:hidden;display:flex;flex-direction:column;text-align:left;
+  background:var(--surface);color:var(--ink);position:relative;
+}
+.blind-card:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #18181B}
+.bc-cover{
+  height:92px;padding:10px;position:relative;display:flex;align-items:center;justify-content:center;
+  border-bottom:1.6px solid #18181B;overflow:hidden;
+}
+.bc-badge{
+  position:absolute;left:8px;top:8px;padding:2px 7px;border-radius:99px;
+  background:#FFFDF8;color:#18181B;border:1.3px solid #18181B;
+  font-size:9.5px;font-weight:850;z-index:2;transform:rotate(-2deg);
+}
+.bc-done{
+  position:absolute;right:8px;top:8px;width:20px;height:20px;border-radius:50%;
+  background:#18181B;color:var(--pop-lime);font-size:11px;font-weight:900;
+  display:grid;place-items:center;z-index:2;
+}
+.bc-body{padding:10px 11px 11px;flex:1;display:flex;flex-direction:column}
+.bc-title{font-size:14.5px;font-weight:850;line-height:1.25}
+.bc-sub{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;flex:1}
+.bc-foot{
+  display:flex;align-items:center;justify-content:space-between;margin-top:9px;
+  font-size:10.5px;font-weight:750;color:var(--ink-2);
+}
+.bc-go{
+  padding:2px 8px;border-radius:99px;background:var(--sub);border:1px solid var(--border);
+  font-size:10px;font-weight:800;
+}
+
+.free-marquee{
+  margin-top:14px;padding:10px 12px;border-radius:14px;
+  background:#18181B;color:var(--pop-lime);border:1.8px solid #18181B;
+  display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:750;
+}
+
+/* ========== 画板 02：沉浸盲盒答题页 ========== */
+.quiz-wrap{display:flex;flex-direction:column;min-height:100%;padding:4px 16px 24px}
+.q-prog-box{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+}
+.q-num-badge{
+  padding:4px 10px;border-radius:10px;background:#18181B;color:var(--pop-lime);
+  font-size:12px;font-weight:900;flex-shrink:0;
+}
+.q-track{
+  flex:1;height:12px;border-radius:99px;background:var(--surface);
+  border:1.8px solid var(--border);overflow:hidden;padding:1.5px;
+}
+.q-fill{
+  height:100%;border-radius:99px;
+  background:repeating-linear-gradient(-45deg,var(--pop-red),var(--pop-red) 7px,#FF785A 7px,#FF785A 14px);
+  transition:width .28s cubic-bezier(.22,1,.36,1);
+}
+.q-bubble{
+  align-self:flex-start;margin-top:2px;padding:5px 11px;border-radius:12px 12px 12px 2px;
+  background:var(--pop-lime);color:#18181B;border:1.5px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  font-size:11.5px;font-weight:800;transform:rotate(-1deg);
+}
+.q-card{
+  margin-top:14px;padding:18px 16px;border-radius:20px;
+  background:var(--surface);border:2px solid var(--border);box-shadow:var(--shadow-lg);
+  position:relative;
+}
+.q-card-tag{
+  display:inline-block;padding:3px 9px;border-radius:99px;background:var(--pop-purple);
+  color:#18181B;border:1.4px solid #18181B;font-size:10.5px;font-weight:850;margin-bottom:10px;
+}
+.q-title{font-size:20px;font-weight:900;line-height:1.4;letter-spacing:-.3px}
+.q-sub{font-size:12px;color:var(--muted);margin-top:8px;font-weight:550}
+
+.q-opts{display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:18px}
+.q-opt{
+  width:100%;min-height:58px;padding:12px 13px;border-radius:16px;
+  background:var(--surface);border:1.8px solid var(--border);box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:11px;text-align:left;
+}
+.q-opt:active{transform:translate(2px,2px);box-shadow:none}
+.q-opt-letter{
+  width:28px;height:28px;border-radius:10px;background:var(--sub);color:var(--ink);
+  border:1.5px solid var(--border);font-size:12.5px;font-weight:900;
+  display:grid;place-items:center;flex-shrink:0;
+}
+.q-opt-body{flex:1}
+.q-opt-body strong{display:block;font-size:13.5px;font-weight:750;line-height:1.38}
+.q-opt-body small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.q-opt.selected{
+  background:var(--pop-lime);color:#18181B;border-color:#18181B;
+  box-shadow:3px 3px 0 var(--pop-red);
+}
+.q-opt.selected .q-opt-letter{background:#18181B;color:var(--pop-lime);border-color:#18181B}
+.q-opt.selected small{color:#3F3D34}
+
+.q-foot{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.q-prev{
+  padding:6px 12px;border-radius:99px;background:var(--surface);border:1.5px solid var(--border);
+  font-size:12px;font-weight:750;
+}
+.q-safe{font-size:11px;color:var(--muted);font-weight:650}
+
+/* 解析过渡层 */
+.analyzing-layer{
+  position:absolute;inset:0;background:var(--pop-lime);color:#18181B;z-index:20;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;
+}
+.star-spin{
+  width:76px;height:76px;animation:spin 2.2s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.analyzing-layer h3{font-size:22px;font-weight:950;margin-top:18px}
+.analyzing-layer p{font-size:13px;font-weight:700;margin-top:8px;opacity:.8}
+
+/* ========== 画板 03：爆款结果页 × 6 套极致皮肤 ========== */
+.res-pad{padding:4px 16px 88px}
+.mini-skins{
+  display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px;
+}
+.mini-skins::-webkit-scrollbar{display:none}
+.mini-skins button{
+  flex-shrink:0;height:28px;padding:0 11px;border-radius:99px;
+  background:var(--surface);color:var(--ink-2);border:1.5px solid var(--border);
+  font-size:11px;font-weight:800;
+}
+.mini-skins button.active{background:#18181B;color:var(--pop-lime);box-shadow:2px 2px 0 var(--pop-red)}
+
+/* 皮肤 1：人类真实面具（SBTI 潮玩大字报） */
+.poster-sbti{
+  border-radius:22px;padding:18px;background:var(--pop-lime);color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;position:relative;overflow:hidden;
+}
+.sbti-top{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10px;font-weight:900;letter-spacing:1px;
+  border-bottom:2px solid #18181B;padding-bottom:8px;
+}
+.sbti-stamp{
+  position:absolute;right:14px;top:46px;transform:rotate(9deg);
+  background:var(--pop-red);color:#fff;border:2px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  border-radius:99px;padding:4px 10px;font-size:10.5px;font-weight:900;
+}
+.sbti-code{font-size:54px;font-weight:950;letter-spacing:-3px;line-height:1;margin-top:12px}
+.sbti-name{font-size:21px;font-weight:900;margin-top:4px;display:flex;align-items:center;gap:8px}
+.sbti-quote{
+  margin-top:11px;padding:11px 12px;background:#18181B;color:#FFFDF8;border-radius:14px;
+  font-size:12.5px;line-height:1.55;font-weight:650;
+}
+.sbti-bars{
+  margin-top:12px;padding:12px;border-radius:14px;background:#FFFDF8;border:1.8px solid #18181B;
+  display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;
+}
+.sbti-bar-item{font-size:11px;font-weight:800}
+.sbti-bar-top{display:flex;justify-content:space-between;margin-bottom:4px}
+.sbti-track{height:8px;background:#ECE7DA;border:1.2px solid #18181B;border-radius:99px;overflow:hidden}
+.sbti-track i{display:block;height:100%;background:#18181B;border-radius:99px}
+.sbti-track i.hot{background:var(--pop-red)}
+.sbti-egg{
+  margin-top:10px;padding:8px 11px;border-radius:12px;background:#FFF7DF;
+  border:1.5px dashed #18181B;font-size:11px;font-weight:750;
+  display:flex;justify-content:space-between;align-items:center;
+}
+
+/* 皮肤 2：人格双色主导色（潮玩艺术色卡） */
+.poster-pantone{
+  border-radius:22px;overflow:hidden;background:#FFFDF8;color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;
+}
+.pantone-swatch{
+  height:212px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;
+  background:linear-gradient(145deg,#FFB085 0%,#F78FA7 42%,#6C63AC 78%,#2B3A67 100%);
+  color:#FFFFFF;border-bottom:2px solid #18181B;position:relative;overflow:hidden;
+}
+.pantone-orb{
+  position:absolute;right:-18px;top:-18px;width:130px;height:130px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,244,180,.55),transparent 68%);
+}
+.pantone-top{display:flex;justify-content:space-between;font-size:11px;font-weight:800;position:relative;z-index:1}
+.pantone-center{position:relative;z-index:1}
+.pantone-center h3{font-size:27px;font-weight:900;letter-spacing:-.3px;text-shadow:0 2px 10px rgba(0,0,0,.18)}
+.pantone-center p{font-size:12px;font-weight:700;margin-top:4px;opacity:.95}
+.pantone-meta{padding:15px}
+.pantone-codes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.p-chip{
+  padding:9px;border-radius:12px;background:#FBF6EE;border:1.5px solid #18181B;
+  display:flex;align-items:center;gap:8px;
+}
+.p-dot{width:24px;height:24px;border-radius:8px;border:1.4px solid #18181B;flex-shrink:0}
+.p-chip b{display:block;font-size:11.5px;font-weight:850}
+.p-chip small{display:block;font-size:10px;color:#6E6960;font-weight:700}
+.pantone-poem{margin-top:11px;font-size:12.5px;line-height:1.6;font-weight:650;color:#333}
+
+/* 皮肤 3：动物塑深度版（波普暖橘画框） */
+.poster-animal{
+  border-radius:22px;padding:16px;background:var(--pop-peach);color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;text-align:center;
+}
+.animal-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:900}
+.animal-frame{
+  margin:10px auto 8px;padding:10px;border-radius:18px;background:#FFFDF8;
+  border:2px solid #18181B;box-shadow:3px 3px 0 #18181B;
+  display:flex;flex-direction:column;align-items:center;position:relative;
+}
+.animal-name{font-size:25px;font-weight:950;letter-spacing:-.4px;margin-top:2px}
+.animal-en{font-size:10.5px;letter-spacing:2px;font-weight:850;color:#9A5B25}
+.animal-pills{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}
+.animal-pills span{
+  padding:4px 10px;border-radius:99px;background:var(--pop-lime);color:#18181B;
+  border:1.4px solid #18181B;font-size:11px;font-weight:850;
+}
+.animal-guide{
+  margin-top:12px;padding:11px 12px;border-radius:14px;background:#FFFDF8;
+  border:1.6px solid #18181B;text-align:left;font-size:12px;line-height:1.6;font-weight:600;
+}
+
+/* 皮肤 4：避雷说明书（草莓粉×警示带） */
+.poster-manual{
+  border-radius:20px;overflow:hidden;background:#FFFDF8;color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;
+}
+.manual-stripe{
+  height:14px;background:repeating-linear-gradient(-45deg,#18181B,#18181B 10px,var(--pop-lime) 10px,var(--pop-lime) 20px);
+  border-bottom:2px solid #18181B;
+}
+.manual-inner{padding:15px}
+.manual-head{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  border-bottom:2px solid #18181B;padding-bottom:10px;
+}
+.manual-head h3{font-size:20px;font-weight:950}
+.manual-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.m-cell{
+  padding:9px 10px;border-radius:12px;background:var(--pop-pink);border:1.5px solid #18181B;
+}
+.m-cell:nth-child(2){background:var(--pop-lime)}
+.m-cell:nth-child(3){background:var(--pop-blue)}
+.m-cell:nth-child(4){background:var(--pop-purple)}
+.m-cell small{display:block;font-size:10px;font-weight:800;opacity:.8}
+.m-cell strong{display:block;font-size:16px;font-weight:950;margin-top:2px}
+.manual-list{margin-top:11px;font-size:12px;line-height:1.6;font-weight:650}
+.manual-warn{
+  margin-top:10px;padding:9px 11px;border-radius:12px;background:var(--pop-red);color:#fff;
+  border:1.6px solid #18181B;font-size:11.5px;font-weight:800;
+}
+
+/* 皮肤 5：精神电量体检单（冰蓝×荧光黄化验单） */
+.poster-checkup{
+  border-radius:20px;padding:16px;background:var(--pop-blue);color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;
+}
+.chk-head{
+  display:flex;justify-content:space-between;align-items:center;
+  border-bottom:2px solid #18181B;padding-bottom:8px;
+}
+.chk-head b{font-size:15px;font-weight:950}
+.chk-ages{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px}
+.chk-box{
+  background:#FFFDF8;border:1.8px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  border-radius:14px;padding:10px 12px;
+}
+.chk-box small{font-size:11px;font-weight:750;color:#5E5A53;display:block}
+.chk-box strong{font-size:28px;font-weight:950;display:block;margin-top:1px}
+.chk-bat{
+  margin-top:10px;background:#18181B;color:#FFFDF8;border-radius:14px;padding:11px 12px;
+}
+.chk-bat-top{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:7px}
+.chk-bat-bar{height:12px;border-radius:99px;background:#34323D;overflow:hidden;padding:2px}
+.chk-bat-bar i{display:block;width:27%;height:100%;background:var(--pop-red);border-radius:99px}
+.chk-table{
+  margin-top:10px;font-size:12px;background:#FFFDF8;border-radius:14px;
+  border:1.8px solid #18181B;overflow:hidden;font-weight:750;
+}
+.chk-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1.2px solid #E8E4DA}
+.chk-row:last-child{border-bottom:0}
+.chk-row .flag{color:#E0243C;font-weight:900}
+.chk-row .ok{color:#158F53;font-weight:900}
+
+/* 皮肤 6：16型人格速测（电光紫新波普） */
+.poster-classic16{
+  border-radius:22px;padding:18px;background:var(--pop-purple);color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;
+}
+.c16-top{display:flex;justify-content:space-between;font-size:11px;font-weight:900}
+.c16-code{font-size:50px;font-weight:950;letter-spacing:-2.5px;margin-top:6px;line-height:1}
+.c16-role{font-size:18px;font-weight:900;margin-top:3px}
+.c16-axes{
+  margin-top:12px;padding:12px;border-radius:14px;background:#FFFDF8;border:1.8px solid #18181B;
+  display:flex;flex-direction:column;gap:9px;
+}
+.axis-row{font-size:11px;font-weight:800}
+.axis-lbl{display:flex;justify-content:space-between;margin-bottom:4px}
+.axis-bar{height:8px;background:#EEEAF8;border:1.2px solid #18181B;border-radius:99px;overflow:hidden}
+.axis-bar i{display:block;height:100%;background:#7C4DFF;border-radius:99px}
+.c16-note{margin-top:10px;font-size:12px;font-weight:650;line-height:1.55}
+
+/* 搭子与宿敌双撞色卡 */
+.match-pair{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mp-box{
+  padding:12px;border-radius:16px;border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;
+  color:#18181B;
+}
+.mp-box.buddy{background:var(--pop-mint)}
+.mp-box.rival{background:var(--pop-pink)}
+.mp-box small{display:inline-block;padding:2px 7px;border-radius:99px;background:#FFFDF8;border:1.2px solid #18181B;font-size:10px;font-weight:850}
+.mp-box strong{display:block;font-size:14px;font-weight:900;margin-top:7px}
+.mp-box p{font-size:11.5px;margin-top:3px;line-height:1.45;font-weight:600;opacity:.88}
+
+.next-quest{
+  margin-top:12px;padding:12px 14px;border-radius:16px;background:#18181B;color:#FFFDF8;
+  border:1.8px solid #18181B;box-shadow:3px 3px 0 var(--pop-lime);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.next-quest b{font-size:13px;font-weight:850;color:var(--pop-lime);display:block}
+.next-quest small{font-size:11px;opacity:.82;display:block;margin-top:2px}
+.nq-go{
+  flex-shrink:0;height:32px;padding:0 12px;border-radius:99px;background:var(--pop-lime);
+  color:#18181B;font-size:11.5px;font-weight:900;
+}
+
+.sticky-actions{
+  position:absolute;left:0;right:0;bottom:0;padding:10px 16px 20px;
+  background:linear-gradient(180deg,transparent 0%,var(--bg) 32%);
+  display:grid;grid-template-columns:1.15fr 1fr;gap:10px;z-index:10;
+}
+
+/* ========== 画板 04：双人合盘对比页（撞色火花感） ========== */
+.compat-pad{padding:4px 16px 28px}
+.invite-banner{
+  padding:9px 12px;border-radius:14px;background:var(--pop-lime);color:#18181B;
+  border:1.8px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:750;margin-bottom:12px;
+}
+.compat-stage{
+  padding:16px 14px;border-radius:22px;background:var(--surface);
+  border:2px solid var(--border);box-shadow:var(--shadow-lg);text-align:center;position:relative;
+}
+.duo-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.duo-unit{
+  flex:1;padding:12px 8px;border-radius:16px;border:1.8px solid #18181B;box-shadow:2px 2px 0 #18181B;
+  color:#18181B;
+}
+.duo-unit.left{background:var(--pop-peach);transform:rotate(-1.5deg)}
+.duo-unit.right{background:var(--pop-blue);transform:rotate(1.5deg)}
+.duo-ava{
+  width:46px;height:46px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;
+  font-size:22px;background:#FFFDF8;border:1.8px solid #18181B;
+}
+.duo-unit b{display:block;font-size:13.5px;font-weight:900}
+.duo-unit small{display:block;font-size:11px;font-weight:750;margin-top:2px;opacity:.85}
+.duo-badge{
+  width:78px;height:78px;border-radius:50%;flex-shrink:0;
+  background:var(--pop-red);color:#FFFDF8;border:2px solid #18181B;box-shadow:3px 3px 0 #18181B;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-6deg);
+}
+.duo-badge strong{font-size:26px;font-weight:950;line-height:1}
+.duo-badge span{font-size:9.5px;font-weight:850;margin-top:2px}
+.compat-title{font-size:18px;font-weight:900;margin-top:15px}
+.compat-sub{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.5;font-weight:550}
+
+.dual-axes{
+  margin-top:12px;padding:14px;border-radius:18px;background:var(--surface);
+  border:1.8px solid var(--border);box-shadow:var(--shadow);
+}
+.da-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:850;margin-bottom:12px}
+.da-legend{display:flex;gap:10px;font-size:11px;font-weight:750}
+.da-legend span{display:inline-flex;align-items:center;gap:4px}
+.da-legend i{width:9px;height:9px;border-radius:50%;border:1.2px solid #18181B;display:inline-block}
+.da-item+.da-item{margin-top:12px}
+.da-lbl{display:flex;justify-content:space-between;font-size:11.5px;font-weight:750;margin-bottom:6px}
+.da-rail{height:8px;border-radius:99px;background:var(--sub);border:1.3px solid var(--border);position:relative}
+.da-dot{
+  position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:15px;height:15px;border-radius:50%;border:2px solid #18181B;
+}
+.da-dot.me{background:var(--pop-red)}
+.da-dot.ta{background:var(--pop-blue)}
+
+.insight-list{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.ins-card{
+  padding:13px 14px;border-radius:16px;border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;color:#18181B;
+}
+.ins-card.good{background:var(--pop-mint)}
+.ins-card.warn{background:var(--pop-pink)}
+.ins-card h4{font-size:13.5px;font-weight:900;margin-bottom:6px}
+.ins-card ul{margin:0;padding-left:16px;font-size:12px;line-height:1.65;font-weight:650}
+
+/* ========== 画板 05：海报保存 BottomSheet ========== */
+.sheet-backdrop{
+  position:absolute;inset:36px 0 0;background:rgba(24,24,27,.48);backdrop-filter:blur(4px);
+  display:flex;align-items:flex-end;z-index:18;
+}
+.bottom-sheet{
+  width:100%;max-height:89%;background:var(--bg);border-radius:24px 24px 0 0;
+  border-top:2.2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;
+}
+.bs-handle{width:40px;height:4.5px;border-radius:99px;background:var(--ink);opacity:.3;margin:9px auto 4px;flex-shrink:0}
+.bs-head{padding:6px 16px 10px;display:flex;align-items:center;justify-content:space-between}
+.bs-head h3{font-size:16px;font-weight:900}
+.ratio-seg{display:inline-flex;background:var(--surface);padding:2px;border-radius:99px;border:1.5px solid var(--border)}
+.ratio-seg button{padding:4px 10px;border-radius:99px;font-size:11px;color:var(--muted);font-weight:750}
+.ratio-seg button.active{background:#18181B;color:var(--pop-lime)}
+.bs-stage{
+  padding:6px 20px 14px;display:flex;flex-direction:column;align-items:center;overflow-y:auto;
+}
+.poster-preview-box{
+  width:248px;border-radius:18px;overflow:hidden;border:2px solid #18181B;box-shadow:5px 5px 0 #18181B;
+  transition:width .2s;
+}
+.poster-preview-box.r34{width:264px}
+.pp-inner{
+  padding:16px;display:flex;flex-direction:column;min-height:392px;color:#18181B;
+  transition:background .2s;
+}
+.poster-preview-box.r34 .pp-inner{min-height:336px}
+.pp-qr-row{
+  margin-top:auto;padding-top:12px;border-top:1.5px dashed rgba(24,24,27,.35);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.pp-qr-box{
+  width:46px;height:46px;background:#fff;padding:4px;border-radius:8px;border:1.5px solid #18181B;
+  display:grid;grid-template-columns:repeat(5,1fr);gap:1.5px;flex-shrink:0;
+}
+.pp-qr-box span{background:#18181B;border-radius:.5px}
+.pp-qr-box span.w{background:transparent}
+.bs-tip{font-size:11px;color:var(--muted);margin-top:10px;text-align:center;font-weight:650}
+.bs-actions{padding:10px 16px 8px;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--surface);border-top:1.5px solid var(--border)}
+.bs-footer-cancel{
+  border-top:1px solid rgba(24,24,27,.12);height:46px;font-size:13.5px;color:var(--muted);font-weight:750;background:var(--surface);padding-bottom:6px;
+}
+
+/* ========== 画板 06：多维灵魂档案（黑金潮玩集卡册） ========== */
+.arch-pad{padding:4px 16px 24px}
+.soul-holo{
+  padding:18px;border-radius:22px;background:#18181B;color:#FFFDF8;
+  border:2px solid #18181B;box-shadow:4px 4px 0 var(--pop-purple);
+  position:relative;overflow:hidden;
+}
+.soul-holo::before{
+  content:'';position:absolute;right:-35px;top:-35px;width:160px;height:160px;border-radius:50%;
+  background:radial-gradient(circle,rgba(228,248,87,.32) 0%,rgba(255,77,94,.18) 45%,transparent 72%);
+  pointer-events:none;
+}
+.soul-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.soul-user{display:flex;align-items:center;gap:10px}
+.soul-ava{
+  width:46px;height:46px;border-radius:14px;background:var(--pop-peach);
+  border:2px solid #FFFDF8;display:grid;place-items:center;font-size:22px;transform:rotate(-4deg);
+}
+.soul-user b{display:block;font-size:16px;font-weight:900}
+.soul-user small{display:block;font-size:11px;color:#B8B4C2;margin-top:2px}
+.soul-prog{
+  padding:4px 10px;border-radius:99px;background:var(--pop-lime);color:#18181B;
+  font-size:12px;font-weight:950;
+}
+.soul-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;position:relative;z-index:1}
+.soul-tag{
+  padding:5px 10px;border-radius:99px;color:#18181B;font-size:11.5px;font-weight:850;
+  border:1.4px solid #18181B;
+}
+.soul-insight{
+  margin-top:12px;padding:11px 12px;border-radius:14px;background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.14);font-size:12px;color:#EDEAE3;line-height:1.6;
+  position:relative;z-index:1;
+}
+.stamp-grid{margin-top:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.stamp-item{
+  padding:13px;border-radius:16px;border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;
+  text-align:left;color:#18181B;position:relative;
+}
+.stamp-item:active{transform:translate(2px,2px);box-shadow:none}
+.stamp-item.locked{
+  background:var(--surface);color:var(--muted);border:2px dashed var(--muted);box-shadow:none;
+}
+.stamp-top{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:800;opacity:.8}
+.stamp-item strong{display:block;font-size:15.5px;font-weight:900;margin-top:8px}
+.stamp-item p{font-size:11px;margin-top:3px;font-weight:700;opacity:.8}
+.local-note{
+  margin-top:14px;padding:11px 13px;border-radius:14px;background:var(--surface);
+  border:1.5px solid var(--border);font-size:11.5px;color:var(--muted);font-weight:650;
+}
+
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);opacity:0;
+  background:#18181B;color:var(--pop-lime);border:2px solid var(--pop-lime);
+  padding:10px 18px;border-radius:999px;font-size:13px;font-weight:800;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);pointer-events:none;transition:opacity .18s,transform .18s;z-index:80;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.studio-foot{
+  margin-top:34px;padding-top:16px;border-top:1.5px solid var(--studio-line);
+  display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:12px;color:var(--studio-muted);font-weight:600;
+}
+
+@media(max-width:720px){
+  .studio{padding:14px 10px 36px}
+  .studio-bar{position:static}
+  .boards{grid-template-columns:1fr;justify-items:center}
+  .phone,.board-head{width:min(100%,390px)}
+}
+</style>
+</head>
+<body>
+<div class="studio" id="app">
+  <header class="studio-bar">
+    <div class="brand-row">
+      <div class="brand-mark">贩</div>
+      <div>
+        <div class="brand-title">人格贩卖机 VEND·ME <span class="brand-tag">方案 A · 潮玩盲盒风</span></div>
+        <div class="brand-sub">暖米杂志纸底 × 撞色盲盒封面 × 贴纸大字报 · 一期全免费拉新 H5 设计稿 v2.1</div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="seg" role="tablist" aria-label="画布模式">
+        <button class="active" data-mode="grid">全画板总览 (6 屏)</button>
+        <button data-mode="single">单机可试玩</button>
+      </div>
+      <div class="seg" role="tablist" aria-label="屏宽切换">
+        <button class="active" data-width="390">390px</button>
+        <button data-width="360">360px</button>
+      </div>
+      <button class="pill-btn" id="themeToggle">暗夜潮玩版</button>
+    </div>
+  </header>
+
+  <div class="skin-bar">
+    <span class="skin-bar-label">切换 6 大爆款皮肤：</span>
+    <button class="skin-chip active" data-skin="sbti">C1 真实面具 (SBTI风)</button>
+    <button class="skin-chip" data-skin="pantone">C2 双色主导色</button>
+    <button class="skin-chip" data-skin="animal">C3 动物塑</button>
+    <button class="skin-chip" data-skin="manual">C4 避雷说明书</button>
+    <button class="skin-chip" data-skin="checkup">C5 精神电量体检</button>
+    <button class="skin-chip" data-skin="classic16">P1 16型速测</button>
+  </div>
+
+  <main class="boards" id="boards">
+
+    <!-- ==================== 画板 01：发现首页（潮玩盲盒墙） ==================== -->
+    <section class="board is-live" data-board="home">
+      <div class="board-head"><b>01 · 发现首页</b><span>潮玩盲盒墙</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:41</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <div class="home-brand">
+            <div class="home-logo">贩</div>
+            <h2>人格贩卖机</h2>
+            <small>VEND</small>
+          </div>
+          <button class="archive-pill" data-goto="archive">
+            <span>★</span>
+            <span class="num" id="homeArchiveCount">集卡 3/6</span>
+          </button>
+        </div>
+
+        <div class="viewport">
+          <div class="home-pad">
+            <!-- 当期刷屏主推盲盒大卡 -->
+            <div class="hero-box">
+              <!-- 波普微笑假面插画 -->
+              <svg class="hero-art" viewBox="0 0 100 100" aria-hidden="true">
+                <rect x="14" y="16" width="72" height="68" rx="22" fill="#E4F857" stroke="#18181B" stroke-width="3.5"/>
+                <circle cx="37" cy="45" r="5" fill="#18181B"/>
+                <circle cx="63" cy="45" r="5" fill="#18181B"/>
+                <path d="M34 61 Q50 72 66 61" stroke="#18181B" stroke-width="3.8" fill="none" stroke-linecap="round"/>
+                <path d="M16 26 L8 18 M84 26 L92 18" stroke="#FFFDF8" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="80" cy="76" r="11" fill="#FFB5C8" stroke="#18181B" stroke-width="3"/>
+                <text x="80" y="80" text-anchor="middle" font-size="11" font-weight="900" fill="#18181B">?</text>
+              </svg>
+              <div class="hero-stickers">
+                <span class="sticker" style="background:var(--pop-lime);transform:rotate(-2deg)">HOT · 12.8w 已测</span>
+                <span class="sticker" style="background:#FFFDF8;transform:rotate(1deg)">0元全免费</span>
+              </div>
+              <h3 class="hero-title">人类真实面具测试</h3>
+              <p class="hero-desc">撕掉正经人格滤镜！测出你是「体面伪人」「摸鱼圣体」还是 1% 隐藏彩蛋款？</p>
+              <div class="hero-foot">
+                <span class="hero-meta num">22 题 · 2 分钟出图</span>
+                <button class="hero-cta" data-start="sbti">0元投币开测 →</button>
+              </div>
+            </div>
+
+            <!-- 筛选胶囊 -->
+            <div class="filter-row" id="homeFilters">
+              <button class="f-chip active" data-cat="all">全部 6 款</button>
+              <button class="f-chip" data-cat="viral">爆款梗</button>
+              <button class="f-chip" data-cat="aesthetic">小红书出片</button>
+              <button class="f-chip" data-cat="relation">情侣合盘</button>
+              <button class="f-chip" data-cat="classic">性格深度</button>
+            </div>
+
+            <!-- 双列彩色盲盒封面卡 -->
+            <div class="grid-2" id="homeGrid"></div>
+
+            <div class="free-marquee">
+              <span>✦ 零付费墙 · 免登录直接出高清无水印海报</span>
+              <span class="mono">FREE</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar">
+          <button class="tab-item active" data-goto="home">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="10 10 16 8 14 14 8 16 10 10"/></svg>
+            <span>发现</span>
+          </button>
+          <button class="tab-item" data-goto="compat">
+            <svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5"/><circle cx="18" cy="7" r="2.5"/></svg>
+            <span>合盘</span>
+          </button>
+          <button class="tab-item" data-goto="archive">
+            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10h8M8 14h5"/></svg>
+            <span>集卡</span>
+          </button>
+        </nav>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 02：沉浸盲盒答题页 ==================== -->
+    <section class="board" data-board="quiz">
+      <div class="board-head"><b>02 · 沉浸盲盒答题</b><span>实体按键 · 点选自动切题</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:41</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <button class="icon-btn" data-goto="home" aria-label="返回">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="topbar-title" id="quizTopTitle">人类真实面具测试</span>
+          <button class="sticker" id="quizSkipBtn" style="background:var(--pop-cream)">直达结果</button>
+        </div>
+
+        <div class="viewport">
+          <div class="quiz-wrap">
+            <div class="q-prog-box">
+              <span class="q-num-badge num mono" id="quizCount">02/05</span>
+              <div class="q-track"><div class="q-fill" id="quizFill" style="width:40%"></div></div>
+            </div>
+            <div class="q-bubble" id="quizMicroHint">✦ 已看穿你 40% 的体面伪装…</div>
+
+            <div class="q-card">
+              <span class="q-card-tag" id="quizTag">生活场景 · 第 2 题</span>
+              <h3 class="q-title" id="quizQuestion"></h3>
+              <p class="q-sub" id="quizSub"></p>
+            </div>
+
+            <div class="q-opts" id="quizOpts"></div>
+
+            <div class="q-foot">
+              <button class="q-prev" id="quizPrevBtn">‹ 上一题</button>
+              <span class="q-safe">免登录 · 答完秒出海报</span>
+            </div>
+          </div>
+
+          <div class="analyzing-layer" id="analyzingLayer" hidden>
+            <svg class="star-spin" viewBox="0 0 80 80">
+              <path d="M40 4 L49 28 L76 40 L49 52 L40 76 L31 52 L4 40 L31 28 Z" fill="#FF4D5E" stroke="#18181B" stroke-width="3.5" stroke-linejoin="round"/>
+              <circle cx="40" cy="40" r="10" fill="#FFFDF8" stroke="#18181B" stroke-width="3"/>
+            </svg>
+            <h3>正在撕开你的表层滤镜…</h3>
+            <p>正在比对 8 个行为维度与 1% 隐藏彩蛋</p>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 03：爆款结果页 × 6 套皮肤 ==================== -->
+    <section class="board" data-board="result">
+      <div class="board-head"><b>03 · 结果页（6 套皮肤）</b><span>直接截屏即小红书封面</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:42</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <button class="icon-btn" data-goto="home" aria-label="返回首页">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="topbar-title" id="resTopTitle">测评结果</span>
+          <div style="display:flex;align-items:center;gap:7px">
+            <button class="sticker" id="retestBtn" style="background:var(--surface)">重测</button>
+            <button class="icon-btn" id="resSysShareBtn" aria-label="系统分享" style="background:var(--pop-lime);color:#18181B;border-color:#18181B">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 7.5 12 3l4.5 4.5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="viewport">
+          <div class="res-pad">
+            <div class="mini-skins" id="phoneSkinTabs">
+              <button class="active" data-skin="sbti">真实面具</button>
+              <button data-skin="pantone">双色卡</button>
+              <button data-skin="animal">动物塑</button>
+              <button data-skin="manual">说明书</button>
+              <button data-skin="checkup">体检单</button>
+              <button data-skin="classic16">16型</button>
+            </div>
+
+            <div id="resultPosterMount"></div>
+            <div class="match-pair" id="resultMatchPair"></div>
+
+            <div class="next-quest">
+              <div>
+                <b class="num" id="nextQuestTitle">已集齐 3/6 枚灵魂贴纸</b>
+                <small>再拆 1 个盲盒升级你的《黑金灵魂总卡》</small>
+              </div>
+              <button class="nq-go" data-goto="archive">去集卡 ›</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sticky-actions">
+          <button class="btn-pop" data-goto="share">存高清海报 ✦</button>
+          <button class="btn-pop-light" data-goto="compat">拉 TA 合盘</button>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 04：双人合盘对比页 ==================== -->
+    <section class="board" data-board="compat">
+      <div class="board-head"><b>04 · 双人合盘 / 撞击报告</b><span>1 带 1 私域裂变</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:44</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <button class="icon-btn" data-goto="home" aria-label="返回">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="topbar-title">双人灵魂合盘</span>
+          <button class="sticker" id="copyInviteBtn" style="background:var(--pop-lime)">复制链接</button>
+        </div>
+
+        <div class="viewport">
+          <div class="compat-pad">
+            <div class="invite-banner">
+              <span>✦ <b>林小满</b> 发来同款挑战 · 免加好友</span>
+              <span class="mono">VS</span>
+            </div>
+
+            <div class="compat-stage">
+              <div class="duo-row">
+                <div class="duo-unit left">
+                  <div class="duo-ava">🍊</div>
+                  <b>你</b>
+                  <small>松弛水豚</small>
+                </div>
+                <div class="duo-badge">
+                  <strong class="num">89%</strong>
+                  <span>灵魂绝配</span>
+                </div>
+                <div class="duo-unit right">
+                  <div class="duo-ava">🦊</div>
+                  <b>林小满</b>
+                  <small>嘴硬藏狐</small>
+                </div>
+              </div>
+              <h3 class="compat-title">灵魂松弛搭子 · 外冷内热组合</h3>
+              <p class="compat-sub">一个情绪稳如泰山，一个嘴硬心软。待在一起哪怕各刷各的手机也完全不尴尬。</p>
+            </div>
+
+            <div class="dual-axes">
+              <div class="da-head">
+                <span>四维碰撞坐标</span>
+                <div class="da-legend">
+                  <span><i style="background:var(--pop-red)"></i>你</span>
+                  <span><i style="background:var(--pop-blue)"></i>林小满</span>
+                </div>
+              </div>
+              <div class="da-item">
+                <div class="da-lbl"><span>边界感</span><span class="num">84% vs 78%</span></div>
+                <div class="da-rail"><span class="da-dot me" style="left:84%"></span><span class="da-dot ta" style="left:78%"></span></div>
+              </div>
+              <div class="da-item">
+                <div class="da-lbl"><span>情绪稳定性</span><span class="num">91% vs 62%</span></div>
+                <div class="da-rail"><span class="da-dot me" style="left:91%"></span><span class="da-dot ta" style="left:62%"></span></div>
+              </div>
+              <div class="da-item">
+                <div class="da-lbl"><span>直球表达度</span><span class="num">46% vs 34%</span></div>
+                <div class="da-rail"><span class="da-dot me" style="left:46%"></span><span class="da-dot ta" style="left:34%"></span></div>
+              </div>
+              <div class="da-item">
+                <div class="da-lbl"><span>周末宅家度</span><span class="num">88% vs 82%</span></div>
+                <div class="da-rail"><span class="da-dot me" style="left:88%"></span><span class="da-dot ta" style="left:82%"></span></div>
+              </div>
+            </div>
+
+            <div class="insight-list">
+              <div class="ins-card good">
+                <h4>★ 3 个高频默契点</h4>
+                <ul>
+                  <li>都不爱无效社交，互相放鸽子反而双倍快乐。</li>
+                  <li>你稳得住的情绪能自然托住对方偶尔的嘴硬。</li>
+                  <li>吐槽频率完全同频，聊天不用解释前提就能秒懂。</li>
+                </ul>
+              </div>
+              <div class="ins-card warn">
+                <h4>⚡ 2 条相处避雷提醒</h4>
+                <ul>
+                  <li>两人都偏被动，闹别扭容易同时开启“礼貌冷处理”。</li>
+                  <li>对方说“没事”通常有事，记得多追问半句。</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+              <button class="btn-pop" id="saveCompatPosterBtn">存合照海报</button>
+              <button class="btn-pop-light" id="inviteAnotherBtn">换位 TA 测</button>
+            </div>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 05：海报保存 BottomSheet ==================== -->
+    <section class="board" data-board="share">
+      <div class="board-head"><b>05 · 海报保存弹层</b><span>随当前皮肤动态换色</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:42</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar" style="opacity:.4">
+          <span class="topbar-title">测评结果</span>
+        </div>
+
+        <div class="sheet-backdrop">
+          <div class="bottom-sheet">
+            <div class="bs-handle"></div>
+            <div class="bs-head">
+              <h3>保存高清海报</h3>
+              <div class="ratio-seg" id="ratioSeg">
+                <button class="active" data-ratio="916">9:16 朋友圈</button>
+                <button data-ratio="34">3:4 小红书</button>
+              </div>
+            </div>
+
+            <div class="bs-stage">
+              <div class="poster-preview-box" id="posterPreviewBox">
+                <div class="pp-inner" id="sharePosterInner" style="background:var(--pop-lime)">
+                  <div class="sbti-top"><span id="spHeader">人格贩卖机 · 041</span><span>免费无水印</span></div>
+                  <div class="sbti-code mono" style="font-size:40px;margin-top:12px" id="spCode">FAKE</div>
+                  <div class="sbti-name" style="font-size:17px" id="spName">体面伪人</div>
+                  <div class="sbti-quote" style="font-size:11.5px;margin-top:10px" id="spQuote"></div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="spTags"></div>
+                  <div class="pp-qr-row">
+                    <div>
+                      <div style="font-size:11.5px;font-weight:900">扫码拆你的盲盒人格</div>
+                      <div style="font-size:9.5px;font-weight:700;opacity:.72;margin-top:2px">0 元全免费 · 2 分钟出图</div>
+                    </div>
+                    <div class="pp-qr-box" aria-hidden="true">
+                      <span></span><span></span><span></span><span class="w"></span><span></span>
+                      <span></span><span class="w"></span><span></span><span></span><span class="w"></span>
+                      <span></span><span></span><span class="w"></span><span></span><span></span>
+                      <span class="w"></span><span></span><span></span><span class="w"></span><span></span>
+                      <span></span><span class="w"></span><span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="bs-tip">微信内长按图片即可保存 · 点下方直接导出真实高清 PNG</div>
+            </div>
+
+            <div style="padding:10px 16px 8px;background:var(--surface);border-top:1.5px solid var(--border);display:flex;flex-direction:column;gap:8px">
+              <button class="btn-pop" id="sheetSysShareBtn" style="width:100%;height:44px;font-size:14px">
+                <svg viewBox="0 0 24 24" class="svg-ico" style="width:16px;height:16px"><path d="M12 3v12"/><path d="M7.5 7.5 12 3l4.5 4.5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
+                <span>系统分享海报 &amp; 链接</span>
+              </button>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+                <button class="btn-pop-light" id="exportPngBtn" style="height:38px;font-size:12.5px">下载高清 PNG</button>
+                <button class="btn-pop-light" id="copyShareLinkBtn" style="height:38px;font-size:12.5px">复制合盘链接</button>
+              </div>
+            </div>
+            <button class="bs-footer-cancel" data-goto="result">取消</button>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 06：多维灵魂集卡档案 ==================== -->
+    <section class="board" data-board="archive">
+      <div class="board-head"><b>06 · 灵魂集卡档案</b><span>黑金收藏卡 · 刺激连测</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:45</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <span class="topbar-title">我的灵魂集卡册</span>
+          <button class="sticker" id="exportSoulCardBtn" style="background:var(--pop-lime)">晒总卡 ★</button>
+        </div>
+
+        <div class="viewport">
+          <div class="arch-pad">
+            <div class="soul-holo">
+              <div class="soul-top">
+                <div class="soul-user">
+                  <div class="soul-ava">🍊</div>
+                  <div>
+                    <b>VEND 灵魂收藏卡</b>
+                    <small>本地免费建档 · 集齐 3 张解锁洞察</small>
+                  </div>
+                </div>
+                <span class="soul-prog num" id="soulProgText">3 / 6</span>
+              </div>
+              <div class="soul-tags" id="soulTags"></div>
+              <div class="soul-insight">
+                <b style="color:var(--pop-lime)">✦ 跨盲盒共性洞察：</b>你在多套测试里反复出现「外松内紧、高边界、拒绝无效社交」的稳定底色——表面情绪稳如水豚，内里藏着清醒的观察者。
+              </div>
+            </div>
+
+            <div class="stamp-grid" id="stampGrid"></div>
+
+            <div class="local-note">
+              ✦ 集卡进度自动保存在当前浏览器，收藏网址下次继续拆盲盒
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar">
+          <button class="tab-item" data-goto="home">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="10 10 16 8 14 14 8 16 10 10"/></svg>
+            <span>发现</span>
+          </button>
+          <button class="tab-item" data-goto="compat">
+            <svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5"/><circle cx="18" cy="7" r="2.5"/></svg>
+            <span>合盘</span>
+          </button>
+          <button class="tab-item active" data-goto="archive">
+            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10h8M8 14h5"/></svg>
+            <span>集卡</span>
+          </button>
+        </nav>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="studio-foot">
+    <span>方案 A · 潮玩盲盒 / 潮流杂志风（v2.0）· 暖米纸底 × 多巴胺撞色封面 × 实体描边按键 × 6 套专属出片海报</span>
+    <span>配套文档：docs/product/PRD_趣味与人格测评H5.md</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const TESTS = [
+    {
+      id:'sbti', title:'人类真实面具', sub:'SBTI 毒舌解构 · 含隐藏彩蛋',
+      cat:'viral', count:22, mins:2, badge:'本周爆款',
+      cardBg:'#E4F857', posterBg:'#E4F857', tagColor:'#E4F857',
+      resultCode:'FAKE', resultTitle:'体面伪人', rarity:'仅 4.1% 测出',
+      quote:'白天情绪稳定到像 AI，凌晨两点在脑内演完三季甄嬛传。',
+      buddy:{ name:'MONK · 赛博苦行僧', desc:'同样低欲望高边界，互不打扰就是最好的陪伴' },
+      rival:{ name:'CTRL · 隐形拿捏者', desc:'对方越想控场，你越想立刻原地装死离线' },
+      art:`<svg viewBox="0 0 90 72" width="76" height="60"><rect x="14" y="10" width="62" height="52" rx="18" fill="#FFFDF8" stroke="#18181B" stroke-width="3"/><circle cx="34" cy="33" r="4" fill="#18181B"/><circle cx="56" cy="33" r="4" fill="#18181B"/><path d="M32 46 Q45 54 58 46" stroke="#18181B" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="72" cy="18" r="9" fill="#FF4D5E" stroke="#18181B" stroke-width="2.5"/></svg>`
+    },
+    {
+      id:'pantone', title:'人格双色主导色', sub:'表层社交色 × 底层灵魂色',
+      cat:'aesthetic', count:16, mins:2, badge:'小红书热',
+      cardBg:'linear-gradient(135deg,#FFB085 0%,#F78FA7 48%,#6C63AC 100%)', posterBg:'#F7B299', tagColor:'#FFB5C8',
+      resultCode:'NO.047', resultTitle:'暖雾杏×暮海靛', rarity:'仅 6.8% 测出',
+      quote:'别人只看见你恰到好处的礼貌暖意，只有深夜才露出深水区的清醒与克制。',
+      buddy:{ name:'薄荷烟灰 × 松林绿', desc:'低饱和高级感同频，聊天像一起看一场慢电影' },
+      rival:{ name:'电光柠 × 烈焰橙', desc:'高分贝能量场太耀眼，相处半小时电量掉 60%' },
+      art:`<svg viewBox="0 0 90 72" width="76" height="60"><circle cx="36" cy="36" r="22" fill="#FFD89B" stroke="#18181B" stroke-width="3"/><circle cx="56" cy="36" r="22" fill="#5468A8" fill-opacity=".86" stroke="#18181B" stroke-width="3"/></svg>`
+    },
+    {
+      id:'animal', title:'动物塑深度版', sub:'16 种反差萌动物 + 饲养须知',
+      cat:'viral', count:18, mins:2, badge:'全民热测',
+      cardBg:'#FFD89B', posterBg:'#FFD89B', tagColor:'#FFD89B',
+      resultCode:'CAPYBARA', resultTitle:'松弛水豚', rarity:'仅 7.4% 测出',
+      quote:'天塌下来先看看橘子掉没掉，情绪稳定是你最顶级的防御武器。',
+      buddy:{ name:'嘴硬藏狐', desc:'外冷内热超合拍，各自安静刷手机也能待一天' },
+      rival:{ name:'卷王边牧', desc:'对方每小时都在做规划，你只想原地泡温泉' },
+      art:`<svg viewBox="0 0 96 76" width="80" height="64"><path d="M18 56 C18 34, 30 24, 48 24 C66 24, 78 34, 78 56 C78 66, 66 70, 48 70 C30 70, 18 66, 18 56 Z" fill="#C48F5F" stroke="#18181B" stroke-width="3"/><circle cx="48" cy="16" r="8.5" fill="#FF8C2A" stroke="#18181B" stroke-width="2.5"/><path d="M35 44 Q39 41 43 44 M53 44 Q57 41 61 44" stroke="#18181B" stroke-width="2.6" fill="none" stroke-linecap="round"/><ellipse cx="48" cy="51" rx="5" ry="3" fill="#18181B"/></svg>`
+    },
+    {
+      id:'manual', title:'相处避雷说明书', sub:'哄好耗时、吃醋隐蔽度与合盘',
+      cat:'relation', count:18, mins:2, badge:'情侣必测',
+      cardBg:'#FFB5C8', posterBg:'#FFB5C8', tagColor:'#FFB5C8',
+      resultCode:'XB-09', resultTitle:'高边界慢热型', rarity:'仅 5.9% 测出',
+      quote:'嘴上说着“随便都行”，心里其实早给你悄悄打好了 100 分细节表。',
+      buddy:{ name:'直球治愈系', desc:'不玩猜心游戏，一句明确偏爱就能让你瞬间回血' },
+      rival:{ name:'已读乱回冷战王', desc:'一旦开始比谁更沉默，两个人能冷到下个世纪' },
+      art:`<svg viewBox="0 0 90 72" width="74" height="60"><rect x="18" y="8" width="54" height="56" rx="10" fill="#FFFDF8" stroke="#18181B" stroke-width="3"/><path d="M30 24 H60 M30 35 H56 M30 46 H46" stroke="#18181B" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="52" r="10" fill="#FF4D5E" stroke="#18181B" stroke-width="2.5"/><text x="66" y="56" text-anchor="middle" font-size="11" font-weight="900" fill="#fff">!</text></svg>`
+    },
+    {
+      id:'checkup', title:'精神电量体检单', sub:'测精神年龄、班味与内耗指数',
+      cat:'viral', count:16, mins:2, badge:'打工人戳',
+      cardBg:'#8DD3FF', posterBg:'#8DD3FF', tagColor:'#8DD3FF',
+      resultCode:'68岁', resultTitle:'提前退休圣体', rarity:'仅 9.2% 测出',
+      quote:'生理年龄风华正茂，精神状态只想在江南水乡找个摇椅晒太阳。',
+      buddy:{ name:'带薪发呆大师', desc:'一拍即合的摸鱼战友，共享工位续命奶茶清单' },
+      rival:{ name:'鸡血早八战神', desc:'周一早上八点充满干劲的样子，让你呼吸微滞' },
+      art:`<svg viewBox="0 0 96 72" width="78" height="60"><rect x="12" y="18" width="64" height="36" rx="9" fill="#FFFDF8" stroke="#18181B" stroke-width="3"/><rect x="76" y="29" width="8" height="14" rx="3" fill="#18181B"/><rect x="19" y="25" width="16" height="22" rx="4" fill="#FF4D5E" stroke="#18181B" stroke-width="2"/><path d="M52 24 L45 37 H53 L47 49" stroke="#18181B" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    },
+    {
+      id:'classic16', title:'16型人格速测版', sub:'原创场景题 · 荣格八维解读',
+      cat:'classic', count:24, mins:3, badge:'经典常青',
+      cardBg:'#CBB8FF', posterBg:'#CBB8FF', tagColor:'#CBB8FF',
+      resultCode:'INFJ', resultTitle:'提倡者·洞察派', rarity:'仅 2.8% 测出',
+      quote:'擅长一眼看穿人心和趋势，却总在深夜反复复盘自己刚才那句话。',
+      buddy:{ name:'ENFP · 竞选者', desc:'对方把新鲜世界带到眼前，你帮对方把灵感落地' },
+      rival:{ name:'ESTJ · 总经理', desc:'高强度催进度式沟通，会迅速消耗你的隐性电量' },
+      art:`<svg viewBox="0 0 90 72" width="74" height="60"><polygon points="45,8 78,36 45,64 12,36" fill="#FFFDF8" stroke="#18181B" stroke-width="3" stroke-linejoin="round"/><circle cx="45" cy="36" r="11" fill="#E4F857" stroke="#18181B" stroke-width="3"/><circle cx="45" cy="36" r="4" fill="#18181B"/></svg>`
+    }
+  ];
+
+  const SAMPLE_QUESTIONS = [
+    {
+      tag:'职场防线 · 第 1 题',
+      title:'周五下班前 10 分钟，工作群突然 @ 你“方便拉个小会吗”，你内心第一反应是？',
+      sub:'选最贴近你真实反应的一项，不必维持体面',
+      hint:'✦ 刚开始热身，放心说真话',
+      opts:[
+        { k:'A', t:'表面秒回“好的马上”，心里已写好 3 版辞职信', s:'礼貌外壳极厚，内心弹幕满屏' },
+        { k:'B', t:'先假装没看见，拖到 17:58 再问“下周一聊行吗”', s:'深谙职场时间管理与冷处理艺术' },
+        { k:'C', t:'直接反问会议议题和预计时长，速战速决', s:'高边界实用主义，拒绝模糊拉扯' },
+        { k:'D', t:'其实有点好奇是什么瓜，顺手点开听听', s:'自带吃瓜属性，顺便完成任务' }
+      ]
+    },
+    {
+      tag:'社交电量 · 第 2 题',
+      title:'原本约好周末出门聚餐，结果当天早上朋友发来“今天有点累要不改天”，你会？',
+      sub:'想象自己正躺在被窝里看到这条消息',
+      hint:'✦ 已看穿你 40% 的体面伪装…',
+      opts:[
+        { k:'A', t:'内心放烟花，回一句“太理解了，好好休息！”', s:'被放鸽子反而是最高级的多巴胺' },
+        { k:'B', t:'松了口气，立刻切到点外卖 + 追剧模式', s:'独自充电比热闹聚会更回血' },
+        { k:'C', t:'有点小失落，顺手问问另一位搭子出不出门', s:'已经打扮好了不想浪费好天气' },
+        { k:'D', t:'有点介意临时改期，但嘴上还是说“没事的”', s:'重计划且嘴硬心软' }
+      ]
+    },
+    {
+      tag:'情绪暗面 · 第 3 题',
+      title:'和很在意的人闹了点小别扭，对方明显没察觉你生气了，你通常会？',
+      sub:'回忆最近一次类似的小情绪',
+      hint:'✦ 正在捕捉你的边界感与嘴硬指数…',
+      opts:[
+        { k:'A', t:'语气立刻降三度，从“哈哈哈”变成“嗯嗯好的”', s:'隐形降温，等对方自己发现端倪' },
+        { k:'B', t:'先自己消化两小时，实在过不去再认真聊开', s:'需要缓冲期，不喜欢在气头上说话' },
+        { k:'C', t:'当场直球吐槽：“你刚才那句话我有点不开心”', s:'拒绝内耗，情绪不过夜' },
+        { k:'D', t:'算了懒得解释，默默在心里给关系扣 5 分', s:'看似大度，实则自带记分板' }
+      ]
+    },
+    {
+      tag:'深夜剧场 · 第 4 题',
+      title:'凌晨 1 点准备睡觉，大脑却突然自动播放起你三年前的一次社死瞬间，你会？',
+      sub:'当代人类高频精神内耗测试',
+      hint:'✦ 已定位 80% 底层特质，马上出图…',
+      opts:[
+        { k:'A', t:'在床上脚趾抠地翻身三圈，顺便反思一整夜', s:'高敏感复盘选手，细节记忆力过剩' },
+        { k:'B', t:'自我安慰“反正没人记得”，5 分钟后香甜入睡', s:'顶级情绪钝感，水豚附体' },
+        { k:'C', t:'越想越精神，干脆起来刷手机逃避思考', s:'熬夜冠军的经典自救路径' },
+        { k:'D', t:'在脑内重新排练一遍当时怎么帅气反击回去', s:'迟到三年的完美台词导演' }
+      ]
+    },
+    {
+      tag:'彩蛋触发题 · 第 5 题',
+      title:'如果现在凭空给你一张“免打扰 48 小时通行证”，你最想拿它干嘛？',
+      sub:'最后一题，选完立刻拆出专属结果海报',
+      hint:'✦ 即将揭晓你的隐藏稀有度…',
+      opts:[
+        { k:'A', t:'关掉所有消息红点，睡到自然醒再发呆看云', s:'极致松弛与低电量回血' },
+        { k:'B', t:'去一个没人认识我的陌生城市漫无目的乱逛', s:'渴望新鲜空气与短暂出逃' },
+        { k:'C', t:'一口气做完搁置已久的个人小项目或心愿清单', s:'内在掌控欲与心流体验' },
+        { k:'D', t:'约最懂我的 1 个朋友吃顿宵夜聊到天亮', s:'高质量一对一深度连接' }
+      ]
+    }
+  ];
+
+  let state = {
+    mode:'grid', width:'390', dark:false, activeBoard:'home',
+    filterCat:'all', currentSkin:'sbti', quizTestId:'sbti',
+    quizStep:1, answers:{}, posterRatio:'916',
+    unlocked: new Set(['sbti','pantone','animal'])
+  };
+
+  const $ = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  function getTest(id){ return TESTS.find(t=>t.id===id) || TESTS[0]; }
+  function toast(msg){
+    const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(()=>el.classList.remove('show'), 2200);
+  }
+
+  function renderHomeGrid(){
+    const list = state.filterCat==='all' ? TESTS : TESTS.filter(t=>t.cat===state.filterCat);
+    $('#homeGrid').innerHTML = list.map(t=>`
+      <button class="blind-card" data-start="${t.id}">
+        <div class="bc-cover" style="background:${t.cardBg}">
+          <span class="bc-badge">${t.badge}</span>
+          ${state.unlocked.has(t.id)?'<span class="bc-done">✓</span>':''}
+          ${t.art}
+        </div>
+        <div class="bc-body">
+          <div class="bc-title">${t.title}</div>
+          <div class="bc-sub">${t.sub}</div>
+          <div class="bc-foot">
+            <span class="num">${t.count}题·${t.mins}min</span>
+            <span class="bc-go">${state.unlocked.has(t.id)?'看图':'开测'}</span>
+          </div>
+        </div>
+      </button>
+    `).join('');
+    $('#homeArchiveCount').textContent = `集卡 ${state.unlocked.size}/${TESTS.length}`;
+  }
+
+  function renderQuiz(){
+    const t = getTest(state.quizTestId);
+    const q = SAMPLE_QUESTIONS[state.quizStep];
+    $('#quizTopTitle').textContent = t.title;
+    $('#quizTag').textContent = q.tag;
+    $('#quizCount').textContent = `${String(state.quizStep+1).padStart(2,'0')}/0${SAMPLE_QUESTIONS.length}`;
+    $('#quizFill').style.width = `${((state.quizStep+1)/SAMPLE_QUESTIONS.length)*100}%`;
+    $('#quizMicroHint').textContent = q.hint;
+    $('#quizQuestion').textContent = q.title;
+    $('#quizSub').textContent = q.sub;
+    const picked = state.answers[state.quizStep];
+    $('#quizOpts').innerHTML = q.opts.map(o=>`
+      <button class="q-opt ${picked===o.k?'selected':''}" data-pick="${o.k}">
+        <span class="q-opt-letter">${o.k}</span>
+        <span class="q-opt-body"><strong>${o.t}</strong><small>${o.s}</small></span>
+      </button>
+    `).join('');
+    $('#quizPrevBtn').style.visibility = state.quizStep===0 ? 'hidden' : 'visible';
+  }
+
+  function renderResultSkin(){
+    const skin = state.currentSkin;
+    const t = getTest(skin);
+    $('#resTopTitle').textContent = t.title;
+    $$('[data-skin]').forEach(b=>b.classList.toggle('active', b.dataset.skin===skin));
+
+    let html = '';
+    if(skin==='sbti'){
+      html = `
+        <div class="poster-sbti">
+          <div class="sbti-top"><span>VEND·ME · NO.041</span><span>SBTI 毒舌版</span></div>
+          <div class="sbti-stamp">${t.rarity}</div>
+          <div class="sbti-code mono">FAKE</div>
+          <div class="sbti-name">体面伪人 <span class="sticker" style="background:#FFFDF8">高危真实</span></div>
+          <div class="sbti-quote">“${t.quote}”</div>
+          <div class="sbti-bars">
+            <div class="sbti-bar-item"><div class="sbti-bar-top"><span>嘴硬心软</span><span class="num">95%</span></div><div class="sbti-track"><i class="hot" style="width:95%"></i></div></div>
+            <div class="sbti-bar-item"><div class="sbti-bar-top"><span>班味防御</span><span class="num">92%</span></div><div class="sbti-track"><i style="width:92%"></i></div></div>
+            <div class="sbti-bar-item"><div class="sbti-bar-top"><span>已读不回</span><span class="num">88%</span></div><div class="sbti-track"><i style="width:88%"></i></div></div>
+            <div class="sbti-bar-item"><div class="sbti-bar-top"><span>社交电量</span><span class="num">24%</span></div><div class="sbti-track"><i class="hot" style="width:24%"></i></div></div>
+          </div>
+          <div class="sbti-egg"><span>🎁 隐藏彩蛋：距「1% 绝版酒鬼」仅差 1 项</span><b>1 / 2</b></div>
+        </div>`;
+    } else if(skin==='pantone'){
+      html = `
+        <div class="poster-pantone">
+          <div class="pantone-swatch">
+            <div class="pantone-orb"></div>
+            <div class="pantone-top"><span>VEND·ME COLOR SYSTEM</span><span class="mono">NO.047</span></div>
+            <div class="pantone-center"><h3>暖雾杏 × 暮海靛</h3><p>温柔克制的深水区 · ${t.rarity}</p></div>
+          </div>
+          <div class="pantone-meta">
+            <div class="pantone-codes">
+              <div class="p-chip"><span class="p-dot" style="background:#FFB085"></span><div><b>表层色 62%</b><small>#FFB085</small></div></div>
+              <div class="p-chip"><span class="p-dot" style="background:#2B3A67"></span><div><b>灵魂色 38%</b><small>#2B3A67</small></div></div>
+            </div>
+            <p class="pantone-poem">${t.quote}</p>
+          </div>
+        </div>`;
+    } else if(skin==='animal'){
+      html = `
+        <div class="poster-animal">
+          <div class="animal-top"><span>ANIMAL BLIND BOX</span><span class="sticker" style="background:var(--pop-lime)">${t.rarity}</span></div>
+          <div class="animal-frame">
+            <svg viewBox="0 0 140 112" width="136" height="108" aria-label="松弛水豚">
+              <ellipse cx="70" cy="100" rx="44" ry="7" fill="#F3E2CE"/>
+              <path d="M28 78 C26 48, 44 33, 70 33 C96 33, 114 48, 112 78 C110 94, 96 99, 70 99 C44 99, 30 94, 28 78 Z" fill="#C48F5F" stroke="#18181B" stroke-width="3.2"/>
+              <ellipse cx="46" cy="40" rx="7" ry="9" transform="rotate(-24 46 40)" fill="#A87448" stroke="#18181B" stroke-width="2.8"/>
+              <ellipse cx="94" cy="40" rx="7" ry="9" transform="rotate(24 94 40)" fill="#A87448" stroke="#18181B" stroke-width="2.8"/>
+              <ellipse cx="70" cy="70" rx="22" ry="14" fill="#D4A373"/>
+              <path d="M50 61 Q55 57 60 61 M80 61 Q85 57 90 61" stroke="#18181B" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <ellipse cx="70" cy="67" rx="5.5" ry="3.5" fill="#18181B"/>
+              <path d="M65 74 Q70 78 75 74" stroke="#18181B" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <circle cx="44" cy="69" r="5.5" fill="#FF8C8C" opacity=".6"/>
+              <circle cx="96" cy="69" r="5.5" fill="#FF8C8C" opacity=".6"/>
+              <circle cx="70" cy="23" r="11" fill="#FF8C2A" stroke="#18181B" stroke-width="2.8"/>
+              <ellipse cx="75" cy="12" rx="6" ry="3" transform="rotate(-20 75 12)" fill="#4ECB71" stroke="#18181B" stroke-width="2"/>
+            </svg>
+            <div class="animal-name">松弛水豚</div>
+            <div class="animal-en">ZEN CAPYBARA</div>
+          </div>
+          <div class="animal-pills"><span>情绪稳定天花板</span><span>拒绝内耗</span><span>隐性宅家</span></div>
+          <div class="animal-guide"><b>🍊 饲养须知：</b>${t.quote} 投喂冰美式与独处时间即可满血复活。</div>
+        </div>`;
+    } else if(skin==='manual'){
+      html = `
+        <div class="poster-manual">
+          <div class="manual-stripe"></div>
+          <div class="manual-inner">
+            <div class="manual-head">
+              <div><h3>高边界慢热型 · 说明书</h3><span class="mono" style="font-size:10px;font-weight:700">MODEL XB-09 · ${t.rarity}</span></div>
+              <span class="sticker" style="background:var(--pop-lime)">必读</span>
+            </div>
+            <div class="manual-grid">
+              <div class="m-cell"><small>平均哄好耗时</small><strong class="num">15 分钟</strong></div>
+              <div class="m-cell"><small>吃醋隐蔽度</small><strong class="num">92%</strong></div>
+              <div class="m-cell"><small>社交续航电量</small><strong class="num">2.5 小时</strong></div>
+              <div class="m-cell"><small>直球偏爱加成</small><strong class="num">+200%</strong></div>
+            </div>
+            <div class="manual-list"><b>主要成分：</b>45% 嘴硬心软 + 35% 细节雷达 + 20% 极度护短。</div>
+            <div class="manual-warn">⚠ 严禁画大饼、严禁已读不回后装作无事发生！</div>
+          </div>
+        </div>`;
+    } else if(skin==='checkup'){
+      html = `
+        <div class="poster-checkup">
+          <div class="chk-head"><b>精神状态与电量体检单</b><span class="sticker" style="background:var(--pop-lime)">急需充电</span></div>
+          <div class="chk-ages">
+            <div class="chk-box"><small>生理参考年龄</small><strong class="num">25 岁</strong></div>
+            <div class="chk-box" style="background:var(--pop-lime)"><small>实测精神年龄</small><strong class="num" style="color:#E0243C">68 岁</strong></div>
+          </div>
+          <div class="chk-bat">
+            <div class="chk-bat-top"><span>⚡ 剩余心理电量</span><span class="num" style="color:var(--pop-lime)">27% · 残血警告</span></div>
+            <div class="chk-bat-bar"><i></i></div>
+          </div>
+          <div class="chk-table">
+            <div class="chk-row"><span>班味浓度指标</span><span class="flag">偏高 ↑</span></div>
+            <div class="chk-row"><span>深夜内耗指数</span><span class="flag num">84 / 100</span></div>
+            <div class="chk-row"><span>电子榨菜依赖</span><span class="flag">阳性 (+)</span></div>
+            <div class="chk-row"><span>独处自愈能力</span><span class="ok">优秀 ✓</span></div>
+          </div>
+        </div>`;
+    } else {
+      html = `
+        <div class="poster-classic16">
+          <div class="c16-top"><span>16 型人格速测 · 荣格八维</span><span class="sticker" style="background:var(--pop-lime)">${t.rarity}</span></div>
+          <div class="c16-code mono">INFJ</div>
+          <div class="c16-role">提倡者 · 深度洞察派</div>
+          <div class="c16-axes">
+            <div class="axis-row"><div class="axis-lbl"><span>内倾 I 78%</span><span>外倾 E 22%</span></div><div class="axis-bar"><i style="width:78%"></i></div></div>
+            <div class="axis-row"><div class="axis-lbl"><span>直觉 N 84%</span><span>实感 S 16%</span></div><div class="axis-bar"><i style="width:84%"></i></div></div>
+            <div class="axis-row"><div class="axis-lbl"><span>情感 F 69%</span><span>思考 T 31%</span></div><div class="axis-bar"><i style="width:69%"></i></div></div>
+            <div class="axis-row"><div class="axis-lbl"><span>判断 J 64%</span><span>感知 P 36%</span></div><div class="axis-bar"><i style="width:64%"></i></div></div>
+          </div>
+          <div class="c16-note"><b>荣格主导功能：Ni + Fe。</b>${t.quote}</div>
+        </div>`;
+    }
+
+    $('#resultPosterMount').innerHTML = html;
+    $('#resultMatchPair').innerHTML = `
+      <div class="mp-box buddy">
+        <small>★ 天选搭子</small>
+        <strong>${t.buddy.name}</strong>
+        <p>${t.buddy.desc}</p>
+      </div>
+      <div class="mp-box rival">
+        <small>⚡ 相处宿敌</small>
+        <strong>${t.rival.name}</strong>
+        <p>${t.rival.desc}</p>
+      </div>`;
+    $('#nextQuestTitle').textContent = `已集齐 ${state.unlocked.size}/${TESTS.length} 枚灵魂贴纸`;
+
+    // 同步画板 05 分享弹层皮肤色
+    $('#sharePosterInner').style.background = t.posterBg;
+    $('#spHeader').textContent = `人格贩卖机 · ${t.title}`;
+    $('#spCode').textContent = t.resultCode;
+    $('#spName').textContent = t.resultTitle;
+    $('#spQuote').textContent = `“${t.quote}”`;
+    $('#spTags').innerHTML = `
+      <span class="sticker" style="background:#FFFDF8">${t.rarity}</span>
+      <span class="sticker" style="background:var(--pop-mint)">搭子:${t.buddy.name.split(' ')[0]}</span>`;
+  }
+
+  function renderArchive(){
+    const done = TESTS.filter(t=>state.unlocked.has(t.id));
+    $('#soulProgText').textContent = `${done.length} / ${TESTS.length}`;
+    $('#soulTags').innerHTML = done.map(t=>`<span class="soul-tag" style="background:${t.tagColor}">${t.resultTitle}</span>`).join('');
+    $('#stampGrid').innerHTML = TESTS.map((t,idx)=>{
+      const ok = state.unlocked.has(t.id);
+      const tilt = ok ? (idx%2===0 ? 'transform:rotate(-1deg)' : 'transform:rotate(1deg)') : '';
+      return `
+        <button class="stamp-item ${ok?'':'locked'}" data-stamp="${t.id}" style="${ok?`background:${t.posterBg};${tilt}`:''}">
+          <div class="stamp-top"><span>${t.title}</span><span>${ok?'★':'?'}</span></div>
+          <strong>${ok ? t.resultTitle : '待拆盲盒'}</strong>
+          <p>${ok ? `${t.resultCode} · 点看海报` : `${t.count} 题 · 去解锁 ›`}</p>
+        </button>`;
+    }).join('');
+  }
+
+  function switchBoard(name){
+    state.activeBoard = name;
+    $$('.board').forEach(b=>b.classList.toggle('is-live', b.dataset.board===name));
+    if(state.mode==='single'){
+      const target = $(`.board[data-board="${name}"]`);
+      if(target) target.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+  }
+
+  function startTest(id){
+    state.quizTestId = id; state.currentSkin = id; state.quizStep = 0; state.answers = {};
+    renderQuiz(); renderResultSkin();
+    if(state.mode==='single') switchBoard('quiz');
+    else toast(`已切换答题画板至「${getTest(id).title}」`);
+  }
+
+  function exportPosterPng(){
+    const t = getTest(state.currentSkin);
+    const is34 = state.posterRatio==='34';
+    const w = 1080, h = is34 ? 1440 : 1920;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+
+    ctx.fillStyle = t.posterBg;
+    ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = '#18181B';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(46,46,w-92,h-92);
+
+    ctx.fillStyle = '#18181B';
+    ctx.font = '900 36px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText(`人格贩卖机 · ${t.title}`, 96, 138);
+
+    ctx.fillStyle = '#FF4D5E';
+    ctx.fillRect(w-350, 92, 254, 62);
+    ctx.strokeStyle = '#18181B'; ctx.lineWidth = 5; ctx.strokeRect(w-350, 92, 254, 62);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '800 30px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText(t.rarity, w-325, 134);
+
+    ctx.beginPath(); ctx.moveTo(96,184); ctx.lineTo(w-96,184); ctx.lineWidth=6; ctx.strokeStyle='#18181B'; ctx.stroke();
+
+    ctx.fillStyle = '#18181B';
+    ctx.font = '900 138px ui-monospace,Menlo,monospace';
+    ctx.fillText(t.resultCode, 96, 370);
+    ctx.font = '900 68px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText(t.resultTitle, 96, 466);
+
+    ctx.fillStyle = '#18181B';
+    ctx.fillRect(96, 530, w-192, 230);
+    ctx.fillStyle = '#FFFDF8';
+    ctx.font = '600 38px -apple-system,PingFang SC,sans-serif';
+    const q = `“${t.quote}”`;
+    ctx.fillText(q.slice(0,18), 136, 625);
+    if(q.length>18) ctx.fillText(q.slice(18,36), 136, 692);
+
+    ctx.fillStyle = '#FFFDF8';
+    ctx.fillRect(96, 810, w-192, 190);
+    ctx.strokeStyle = '#18181B'; ctx.lineWidth = 6; ctx.strokeRect(96, 810, w-192, 190);
+    ctx.fillStyle = '#18181B';
+    ctx.font = '800 34px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText(`★ 天选搭子：${t.buddy.name}`, 136, 888);
+    ctx.fillText(`⚡ 相处宿敌：${t.rival.name}`, 136, 956);
+
+    ctx.fillStyle = '#18181B';
+    ctx.font = '900 38px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText('扫码拆同款盲盒 · 0 元全免费', 96, h - 165);
+    ctx.font = '600 28px -apple-system,PingFang SC,sans-serif';
+    ctx.fillText('人格贩卖机 VEND·ME · 支持双人合盘与灵魂集卡', 96, h - 112);
+
+    const a = document.createElement('a');
+    a.download = `vendme-${t.id}-${is34?'3x4':'9x16'}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+    toast(`已导出 ${w}×${h} 潮玩撞色 PNG 海报`);
+  }
+
+  $$('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.mode = btn.dataset.mode;
+    $$('[data-mode]').forEach(b=>b.classList.toggle('active', b===btn));
+    document.body.classList.toggle('single-mode', state.mode==='single');
+    if(state.mode==='single') switchBoard(state.activeBoard);
+  }));
+  $$('[data-width]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.width = btn.dataset.width;
+    $$('[data-width]').forEach(b=>b.classList.toggle('active', b===btn));
+    document.body.classList.toggle('narrow', state.width==='360');
+  }));
+  $('#themeToggle').addEventListener('click', function(){
+    state.dark = !state.dark;
+    document.documentElement.classList.toggle('dark', state.dark);
+    this.classList.toggle('active', state.dark);
+    this.textContent = state.dark ? '暖纸潮玩版' : '暗夜潮玩版';
+  });
+
+  document.addEventListener('click', e=>{
+    const skinBtn = e.target.closest('[data-skin]');
+    if(skinBtn){
+      state.currentSkin = skinBtn.dataset.skin;
+      renderResultSkin();
+      if(state.mode==='single' && state.activeBoard!=='result' && state.activeBoard!=='share') switchBoard('result');
+      return;
+    }
+    const startBtn = e.target.closest('[data-start]');
+    if(startBtn){ startTest(startBtn.dataset.start); return; }
+    const filterBtn = e.target.closest('[data-cat]');
+    if(filterBtn){
+      state.filterCat = filterBtn.dataset.cat;
+      $$('[data-cat]').forEach(b=>b.classList.toggle('active', b===filterBtn));
+      renderHomeGrid(); return;
+    }
+    const pickBtn = e.target.closest('[data-pick]');
+    if(pickBtn){
+      state.answers[state.quizStep] = pickBtn.dataset.pick;
+      renderQuiz();
+      setTimeout(()=>{
+        if(state.quizStep < SAMPLE_QUESTIONS.length - 1){
+          state.quizStep++; renderQuiz();
+        } else {
+          $('#analyzingLayer').hidden = false;
+          setTimeout(()=>{
+            $('#analyzingLayer').hidden = true;
+            state.unlocked.add(state.quizTestId);
+            state.currentSkin = state.quizTestId;
+            renderHomeGrid(); renderResultSkin(); renderArchive();
+            if(state.mode==='single') switchBoard('result');
+            else toast(`拆盒成功！已解锁「${getTest(state.quizTestId).resultTitle}」`);
+          }, 820);
+        }
+      }, 250);
+      return;
+    }
+    const stampBtn = e.target.closest('[data-stamp]');
+    if(stampBtn){
+      const id = stampBtn.dataset.stamp;
+      if(state.unlocked.has(id)){
+        state.currentSkin = id; renderResultSkin();
+        if(state.mode==='single') switchBoard('result');
+        else toast(`已在画板 03 展示「${getTest(id).title}」结果`);
+      } else { startTest(id); }
+      return;
+    }
+    const gotoBtn = e.target.closest('[data-goto]');
+    if(gotoBtn){
+      if(state.mode==='single') switchBoard(gotoBtn.dataset.goto);
+      else {
+        const el = $(`.board[data-board="${gotoBtn.dataset.goto}"]`);
+        if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+      return;
+    }
+    const ratioBtn = e.target.closest('[data-ratio]');
+    if(ratioBtn){
+      state.posterRatio = ratioBtn.dataset.ratio;
+      $$('[data-ratio]').forEach(b=>b.classList.toggle('active', b===ratioBtn));
+      $('#posterPreviewBox').classList.toggle('r34', state.posterRatio==='34');
+      return;
+    }
+  });
+
+  $('#quizPrevBtn').addEventListener('click', ()=>{ if(state.quizStep>0){ state.quizStep--; renderQuiz(); } });
+  $('#quizSkipBtn').addEventListener('click', ()=>{
+    state.unlocked.add(state.quizTestId); state.currentSkin = state.quizTestId;
+    renderHomeGrid(); renderResultSkin(); renderArchive();
+    if(state.mode==='single') switchBoard('result');
+    else toast('已跳转至结果画板');
+  });
+  $('#retestBtn').addEventListener('click', ()=> startTest(state.currentSkin));
+  $('#exportPngBtn').addEventListener('click', exportPosterPng);
+  function demoSystemShare(){
+    const t = getTest(state.currentSkin);
+    const payload = { title:`我在「${t.title}」测出：${t.resultTitle}`, text:`“${t.quote}” 快来测同款看合拍度！`, url:location.href };
+    if(navigator.share){
+      navigator.share(payload).catch(()=>{});
+    } else {
+      toast('已拉起系统分享（当前浏览器不支持 Web Share 时自动复制文案与链接）');
+    }
+  }
+  $('#resSysShareBtn').addEventListener('click', demoSystemShare);
+  $('#sheetSysShareBtn').addEventListener('click', demoSystemShare);
+  $('#saveCompatPosterBtn').addEventListener('click', ()=> toast('双人合照海报已生成（演示态）'));
+  $('#exportSoulCardBtn').addEventListener('click', ()=> toast('黑金灵魂总卡长图已生成'));
+  $('#copyInviteBtn').addEventListener('click', ()=> toast('已复制合盘链接：vendme.app/#/t/animal?peer=CAPYBARA'));
+  $('#copyShareLinkBtn').addEventListener('click', ()=>{
+    const t = getTest(state.currentSkin);
+    toast(`已复制合盘链接：vendme.app/#/t/${t.id}?peer=${t.resultCode}`);
+  });
+  $('#inviteAnotherBtn').addEventListener('click', ()=> toast('邀请链接已复制，发给微信好友测完即出合盘'));
+
+  renderHomeGrid(); renderQuiz(); renderResultSkin(); renderArchive();
+})();
+</script>
+</body>
+</html>

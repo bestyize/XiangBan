@@ -28,6 +28,7 @@
 | --- | --- | --- |
 | [小游戏与小程序 暂停 / 存档 / 翻页退出](prototypes/game-pause-save-exit.html) | 已合入 | 覆盖无大厅直开《方块爆破》、有大厅多层《水墨剑客》与多页翻页小程序：32px 自适应单入口融合胶囊、残局自动恢复、侧滑逐层回退与「重新加载」语义规范。[本机预览](http://127.0.0.1:1421/prototypes/game-pause-save-exit.html) |
 | [MBTI · 向内看](prototypes/mbti-native.html) | 已合入 | 原生 iOS 质感第四版（珊瑚橙红 + 暖白 + 墨灰）：首页、6 题缩略流程、六章报告、16 型角色与分享卡，已合入内置 MBTI 1.3.0。[本机预览](http://127.0.0.1:1421/prototypes/mbti-native.html) |
+| [人格贩卖机 · 趣味与人格测评 H5](prototypes/personality-tests-h5.html) | 设计评审中 | 移动端 H5 一期纯免费拉新设计稿（6 画板总览 + 单机试玩 + 390/360px + 深浅色）：发现首页、单手自动切题答题流、6 大专属视觉皮肤结果页（真实面具 SBTI 风 / 双色主导色 / 动物塑 / 避雷说明书 / 精神电量体检单 / 16 型速测）、零门槛双人合盘、系统分享与 9:16 / 3:4 高清 PNG 海报导出弹层及多维灵魂档案。[本机预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/personality-tests-h5.html) |
 | [轻启](prototypes/quick-launch.html) | 已合入 | Android 桌面快捷方式设计稿，256×256 WebP 图标网格、搜索筛选与添加到桌面演示，已合入内置 `quick-launch` 包。[本机预览](http://127.0.0.1:1421/prototypes/quick-launch.html) |
 | [遥控器](prototypes/universal-remote.html) | 已合入 | 协议 2 电视与空调红外工具：按市场份额排序的 19 电视 / 21 空调品牌试码、四点方向盘、大字温控与无圆底竖三点宿主菜单，已合入内置 `remote-control` 包。[本机预览](http://127.0.0.1:1421/prototypes/universal-remote.html) |
 | [万磁搜](prototypes/torrent-search.html) | 已合入 | 协议 2 独立搜索工具设计稿，首屏、跨站搜索结果、来源筛选、无结果/失败态与磁力操作弹层，已合入 `wancisou` v1.0.2。[本机预览](http://127.0.0.1:1421/prototypes/torrent-search.html) |
