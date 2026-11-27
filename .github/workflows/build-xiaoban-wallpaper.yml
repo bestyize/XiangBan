@@ -272,6 +272,8 @@ jobs:
       - name: Build app and dmg
         # tauri.macos.conf.json -> beforeBundleCommand runs the Swift AppKit renderer.
         env:
+          # Run the Finder layout script so the generated guide is shown on mount.
+          TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
           XIAOBAN_UPDATER_PUBLIC_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && vars.XIAOBAN_UPDATER_PUBLIC_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ github.repository == 'bestyize/XiangBan' && github.ref == 'refs/heads/main' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -297,6 +299,14 @@ jobs:
           dmg="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' -print -quit)"
           test -n "$dmg"
           hdiutil verify "$dmg"
+          mount_point="$(mktemp -d "$RUNNER_TEMP/xiaoban-dmg.XXXXXX")"
+          hdiutil attach -readonly -nobrowse -noautoopen -noverify -mountpoint "$mount_point" "$dmg"
+          trap 'hdiutil detach "$mount_point" >/dev/null' EXIT
+          if ! test -s "$mount_point/.DS_Store"; then
+            echo "::error::DMG is missing the Finder layout for the Chinese installation guide."
+            exit 1
+          fi
+          cmp "$background" "$mount_point/.background/background.png"
 
       - name: Verify stable macOS signature
         shell: bash
