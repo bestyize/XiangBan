@@ -24,7 +24,7 @@
 
 本地与正式发布均默认使用同一张固定证书，不再回退到 ad-hoc。`identity.mjs` 在构建机准备签名身份：优先使用已有有效身份，缺失时从本目录固定归档导入专用钥匙串；本地文件位于 `~/Library/Application Support/XiaoBanBuildSigning`，目录权限 0700、密码文件 0600。只在当前用户域为代码签名用途信任证书，不添加系统根或 TLS 信任。专用钥匙串解锁后优先搜索，保留原有搜索列表条目，避免同一证书的旧私钥副本造成签名弹窗或卡住。脚本不随安装包分发，最终用户无需导入证书。
 
-`npm run desktop:macos:build` 为主应用、内置引擎及辅助程序使用稳定证书；`npm run desktop:build` 在 macOS 也会为未打包二进制签名。`npm run desktop` 通过 Cargo target runner 在每次重编译后生成并签名 `<二进制目录>/xiaoban-dev/小伴.app` 再启动，保持原有开发数据目录和热更新。直接运行 `cargo run` / `npx tauri dev` 不经过这个开发启动器，不能代替上述命令验证权限身份。证书缺失、钥匙串失败或签名仍绑定 `cdhash` 时中止构建。`APPLE_SIGNING_IDENTITY=-` 被明确拒绝；CI 可以继续提供固定证书指纹。这份证书不应在每次构建时重新生成。
+`npm run desktop:macos:build` 为主应用使用稳定证书。按需下载的电脑控制引擎和辅助程序在准备资源包时使用同一签名身份。`npm run desktop:build` 在 macOS 也会为未打包二进制签名。`npm run desktop` 通过 Cargo target runner 在每次重编译后生成并签名 `<二进制目录>/xiaoban-dev/小伴.app` 再启动，保持原有开发数据目录和热更新。直接运行 `cargo run` / `npx tauri dev` 不经过这个开发启动器，不能代替上述命令验证权限身份。证书缺失、钥匙串失败或签名仍绑定 `cdhash` 时中止构建。`APPLE_SIGNING_IDENTITY=-` 被明确拒绝；CI 可以继续提供固定证书指纹。这份证书不应在每次构建时重新生成。
 
 针对性验证：`XIAOBAN_TEST_SIGNING=1 npm --prefix client/xiaoban-desktop run test:computer-use`，其中真实签名测试会替换测试 App 的原生二进制，核对前后 designated requirement 一致；不读取用户屏幕、不更改 TCC。默认不带此变量时跳过真实签名测试，纯平台打包测试仍可在其他系统运行。
 

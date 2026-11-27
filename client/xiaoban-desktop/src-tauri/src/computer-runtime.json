@@ -1,0 +1,23 @@
+{
+  "version": "1.1.5",
+  "targets": {
+    "darwin-arm64": {
+      "resource": {
+        "url": "https://res.xiangban.xyz/files/f4d8cc8d1d6b21622c6c29f17b285422.zip",
+        "sha256": "8e38ba9697e3a0366db6340a087fabc9ba16c16084a9b84181f7079321e69a20",
+        "bytes": 6270698,
+        "mime": "application/octet-stream"
+      },
+      "treeSha256": "c5eaa1111ea60e9e62b1cb5c96142f5ccdf4929501e6c75d1fec0b45244fca57"
+    },
+    "win32-x64": {
+      "resource": {
+        "url": "https://res.xiangban.xyz/files/9f9d6ef4eac65d34c4242e6400867b40.zip",
+        "sha256": "70e6f3a7fe065fa0bdb3374b51c96a9e0414569a0a071ea228202844a8c05ffc",
+        "bytes": 1083547,
+        "mime": "application/octet-stream"
+      },
+      "treeSha256": "1a35bc89dd29e7eca165a9653f8ccaca0d8af669e3917f2bb03ca412af6192a2"
+    }
+  }
+}

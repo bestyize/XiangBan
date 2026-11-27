@@ -1,10 +1,11 @@
 //! Package rules for the V2 window runtime, shared by authoring and ZIP exchange.
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet},
     fs,
     io::Read,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 pub const SCHEMA_VERSION: u64 = 3;
@@ -30,6 +31,48 @@ pub const CAPABILITIES: &[&str] = &[
 ];
 
 pub type Files = Vec<(String, Vec<u8>)>;
+
+pub(crate) fn tree_sha256(dir: &Path, ignored_file: Option<&str>) -> Result<String, String> {
+    fn collect(
+        base: &Path, dir: &Path, ignored_file: Option<&str>, files: &mut Vec<(String, PathBuf)>,
+    ) -> Result<(), String> {
+        for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let kind = entry.file_type().map_err(|e| e.to_string())?;
+            if kind.is_dir() {
+                collect(base, &path, ignored_file, files)?;
+            } else if kind.is_file() {
+                let name = path.strip_prefix(base).map_err(|e| e.to_string())?
+                    .to_str().ok_or("缓存路径无效")?.replace('\\', "/");
+                if Some(name.as_str()) != ignored_file { files.push((name, path)); }
+                if files.len() > MAX_FILES { return Err("缓存文件过多".into()); }
+            } else {
+                return Err("缓存包含符号链接或其他不支持的文件".into());
+            }
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    collect(dir, dir, ignored_file, &mut files)?;
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut tree = Sha256::new();
+    let mut total = 0u64;
+    for (name, path) in files {
+        let size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
+        total = total.saturating_add(size);
+        if size > MAX_FILE_BYTES || total > MAX_PACK_BYTES { return Err("缓存体积超出限制".into()); }
+        let mut digest = Sha256::new();
+        let mut file = fs::File::open(path).map_err(|e| e.to_string())?.take(size + 1);
+        if std::io::copy(&mut file, &mut digest).map_err(|e| e.to_string())? != size {
+            return Err("缓存文件大小在校验期间发生变化".into());
+        }
+        tree.update(name.as_bytes());
+        tree.update([0]);
+        tree.update(digest.finalize());
+    }
+    Ok(format!("{:x}", tree.finalize()))
+}
 
 fn valid_segment(segment: &str) -> bool {
     if segment.is_empty()

@@ -20,7 +20,7 @@ pub const SKILL: &str = include_str!("../skills/open-computer-use/SKILL.md");
 pub const SKILL_ORIGIN_MARKER: &str = "iFurySt/open-codex-computer-use";
 pub const RUNTIME_VERSION: &str = "1.1.5";
 
-fn runtime_target() -> String {
+pub fn runtime_target() -> String {
     let platform = match std::env::consts::OS {
         "macos" => "darwin",
         "windows" => "win32",
@@ -48,23 +48,23 @@ fn config_error(message: impl Into<String>) -> HarnessError {
     HarnessError::Config(message.into())
 }
 
-/// Resolve only the host's bundled runtime. No PATH lookup, npm or network fallback.
+/// Resolve the native runtime in the host-provided directory.
 pub fn executable(root: &Path) -> Result<PathBuf, HarnessError> {
     let manifest = root.join("runtime.json");
-    let contents = fs::read_to_string(&manifest).map_err(|e| config_error(format!("内置电脑控制引擎缺失（{}）：{e}。请重新安装完整的小伴安装包；开发环境先运行 npm run computer-use:prepare。", manifest.display())))?;
+    let contents = fs::read_to_string(&manifest).map_err(|e| config_error(format!("电脑控制引擎清单读取失败（{}）：{e}", manifest.display())))?;
     let metadata: serde_json::Value = serde_json::from_str(&contents)
-        .map_err(|e| config_error(format!("内置电脑控制引擎清单损坏：{e}")))?;
+        .map_err(|e| config_error(format!("电脑控制引擎清单损坏：{e}")))?;
     if metadata["version"].as_str() != Some(RUNTIME_VERSION)
         || metadata["target"].as_str() != Some(runtime_target().as_str())
     {
-        return Err(config_error(format!("内置电脑控制引擎版本或平台不匹配，需要 {RUNTIME_VERSION} / {}，请重新安装对应平台的小伴安装包。", runtime_target())));
+        return Err(config_error(format!("电脑控制引擎版本或平台不匹配，需要 {RUNTIME_VERSION} / {}。", runtime_target())));
     }
     let path = root
         .join(executable_relative())
         .canonicalize()
-        .map_err(|e| config_error(format!("内置电脑控制程序缺失（{}）：{e}", root.display())))?;
+        .map_err(|e| config_error(format!("电脑控制程序缺失（{}）：{e}", root.display())))?;
     if !path.is_file() {
-        return Err(config_error("内置电脑控制程序不是普通文件"));
+        return Err(config_error("电脑控制程序路径无效"));
     }
     #[cfg(unix)]
     {
@@ -77,7 +77,7 @@ pub fn executable(root: &Path) -> Result<PathBuf, HarnessError> {
             == 0
         {
             return Err(config_error(
-                "内置电脑控制程序没有执行权限，请重新安装完整的小伴安装包。",
+                "电脑控制程序缺少执行权限。",
             ));
         }
     }
@@ -88,7 +88,7 @@ pub fn config(root: &Path) -> Result<McpConfig, HarnessError> {
     let executable = executable(root)?;
     let command = executable
         .to_str()
-        .ok_or_else(|| config_error("内置电脑控制程序路径不是有效 UTF-8"))?;
+        .ok_or_else(|| config_error("电脑控制程序路径需要使用 UTF-8"))?;
     let config = McpConfig::new(command, &["mcp"])
         .default_risk(Risk::Exec)
         .timeout(Duration::from_secs(60));

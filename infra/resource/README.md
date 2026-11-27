@@ -18,4 +18,8 @@
 
 桌面和 Android 的 9 款官方作品共用另一组 ZIP 包。修改源文件后，在仓库根目录运行 `python3 infra/resource/build-builtin-game-bundles.py --output /path/to/staging`，生成 `/files/<md5>.zip` 和更新 [`distribution.json`](../../assets/game-packs/distribution.json)。先将 ZIP 同步到 `/var/www/res.xiangban.xyz/files/` 并逐个核对 SHA-256、HTTPS 下载，再发布包含新清单的客户端；构建时源文件与清单不符会报错。同步时使用 `rsync -a --no-perms --no-owner --no-group --ignore-existing`，不要让临时目录的权限覆盖公开目录；已存在的同名文件必须核对内容。
 
+小伴桌面从同一公开目录下载溟月、锦鲤模型和电脑控制引擎。模型文件及哈希见[桌面模型清单](../../client/xiaoban-desktop/builtin-models.json)。引擎使用 [prepare-runtime.mjs](../../libs/agent-tools/computer-use/scripts/prepare-runtime.mjs) 分别准备 macOS ARM64 和 Windows x64，再打包为 ZIP。包根放 `runtime.json`、许可和第三方声明，以及对应的 `Open Computer Use.app` 或 `open-computer-use.exe`，保留 macOS App 签名及执行权限。
+
+上传后从公开 HTTPS 地址逐一回读，核对字节数及 SHA-256，再发布携带新清单的客户端。更新[引擎清单](../../client/xiaoban-desktop/src-tauri/src/computer-runtime.json)时，`treeSha256` 按 ZIP 内普通文件的路径排序，依次对「UTF-8 相对路径、一个 NUL 字节、文件 SHA-256 的 32 字节原始值」计算 SHA-256。资源目录保留旧哈希文件供已发布的客户端使用。
+
 论坛公开网页资源更新后，同样对 `forum-web/` 运行索引脚本；不要对包含私有附件的 `forum-content/` 建立公开索引。更换网页产物时先同步资源机，再更新论坛的 HTML 并重启论坛，保留旧的带哈希文件以供已打开的页面使用。

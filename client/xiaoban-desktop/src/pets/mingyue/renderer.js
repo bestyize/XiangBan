@@ -1,12 +1,12 @@
 import { AnimationMixer, DirectionalLight, HemisphereLight, OrthographicCamera, Scene, WebGLRenderer } from 'three';
 import { disposeModels, embeddedModelLoader } from '../../three/embedded-model.js';
+import { loadBuiltinModel } from '../../three/builtin-models.ts';
 import { clipForMood } from './actions.ts';
 import { installEyelids } from './eyelids.js';
 
 export async function loadMingyue(canvas, signal) {
-  const response = await fetch('/pets/mingyue/dafeiyu-maid.glb', { signal });
-  if (!response.ok) throw new Error('溟月模型读取失败');
-  const { scene: model, animations } = await embeddedModelLoader().parseAsync(await response.arrayBuffer(), '');
+  const bytes = await loadBuiltinModel('mingyue', signal);
+  const { scene: model, animations } = await embeddedModelLoader().parseAsync(bytes, '');
   let renderer, eyelids;
   try {
     signal.throwIfAborted();

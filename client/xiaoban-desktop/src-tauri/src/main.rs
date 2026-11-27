@@ -66,6 +66,7 @@ mod effects_smoke;
 mod float_assistant;
 mod assistant_capture;
 mod computer_permissions;
+mod computer_runtime;
 mod capture_editor;
 mod assistant_hit_test;
 mod data_library;
@@ -432,8 +433,9 @@ async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settin
 }
 
 #[tauri::command]
-fn request_system_permissions(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    computer_permissions::request(&app)
+async fn request_system_permissions(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || computer_permissions::request(&app))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -954,6 +956,9 @@ fn main() {
                 let app = context.app_handle().clone();
                 let label = context.webview_label().to_string();
                 tauri::async_runtime::spawn_blocking(move || responder.respond(widgets::serve_html(&app, &label, request)));
+            } else if builtin_assets::is_on_demand(request.uri().path().trim_start_matches('/')) {
+                let app = context.app_handle().clone();
+                tauri::async_runtime::spawn_blocking(move || responder.respond(library::serve(&app, request)));
             } else {
                 responder.respond(library::serve(context.app_handle(), request));
             }

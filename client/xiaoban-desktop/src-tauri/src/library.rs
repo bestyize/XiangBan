@@ -521,7 +521,7 @@ pub fn download(root: &Path, resource: &Resource, progress: impl FnMut(u64)) -> 
     download_cancellable(root, resource, &NEVER, progress)
 }
 
-fn download_cancellable(
+pub(crate) fn download_cancellable(
     root: &Path,
     resource: &Resource,
     cancel: &AtomicBool,
@@ -789,6 +789,10 @@ pub fn serve(
         }
     }
     let builtin_resource = crate::builtin_assets::find(name);
+    if let Err(reason) = crate::builtin_assets::ensure_on_demand(&root, name) {
+        eprintln!("内置模型下载失败：{reason}");
+        return error(503);
+    }
     let resource = items
         .iter()
         .flat_map(|item| assets(item).into_iter().chain(item.cover.iter()))

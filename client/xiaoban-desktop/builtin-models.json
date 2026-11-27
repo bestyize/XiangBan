@@ -1,0 +1,20 @@
+{
+  "mingyue": {
+    "file": "pets/mingyue/dafeiyu-maid.glb",
+    "resource": {
+      "url": "https://res.xiangban.xyz/files/d7c12b77273cd415a8247878d4be3eed.glb",
+      "sha256": "54f8e2b295f8a0998ae42ff8b1a1e13632ec24f715d1aba284461570eb1634ab",
+      "bytes": 24565076,
+      "mime": "application/octet-stream"
+    }
+  },
+  "koi": {
+    "file": "effects/koi/kohaku-koi.glb",
+    "resource": {
+      "url": "https://res.xiangban.xyz/files/93f93a2e24bea2ce4a3c30757adcf848.glb",
+      "sha256": "27f3155d04e3baffda550b996a9d4b5aad47826ecc2ee5246114da14f9630b86",
+      "bytes": 5527116,
+      "mime": "application/octet-stream"
+    }
+  }
+}

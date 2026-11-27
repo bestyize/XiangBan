@@ -2,6 +2,7 @@
 use crate::{app_runtime::pack, library::{self, Resource}};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(test)]
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, fs, io::{Read, Write}, path::{Path, PathBuf}, sync::{atomic::{AtomicU64, Ordering}, Mutex, OnceLock}, time::Duration};
 
@@ -146,49 +147,9 @@ fn cached_dir_for(root: &Path, game: &Game) -> Option<PathBuf> {
 static LOCKS: OnceLock<Vec<Mutex<()>>> = OnceLock::new();
 static STAGING: AtomicU64 = AtomicU64::new(0);
 
-fn tree_sha256(dir: &Path) -> Result<String, String> {
-    fn collect(base: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<(), String> {
-        for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() { return Err("游戏缓存包含符号链接".into()); }
-            if kind.is_dir() { collect(base, &path, files)?; }
-            else if kind.is_file() {
-                let name = path.strip_prefix(base).map_err(|e| e.to_string())?.to_str().ok_or("游戏缓存路径无效")?.replace('\\', "/");
-                if name != ".complete" { files.push((name, path)); }
-                if files.len() > pack::MAX_FILES { return Err("游戏缓存文件过多".into()); }
-            } else { return Err("游戏缓存包含不支持的文件".into()); }
-        }
-        Ok(())
-    }
-    let mut files = Vec::new();
-    collect(dir, dir, &mut files)?;
-    files.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut tree = Sha256::new();
-    let mut total = 0u64;
-    for (name, path) in files {
-        let size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
-        total = total.saturating_add(size);
-        if size > pack::MAX_FILE_BYTES || total > pack::MAX_PACK_BYTES { return Err("游戏缓存体积超出限制".into()); }
-        let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
-        let mut digest = Sha256::new();
-        let mut buffer = [0u8; 65536];
-        loop {
-            let read = file.read(&mut buffer).map_err(|e| e.to_string())?;
-            if read == 0 { break; }
-            digest.update(&buffer[..read]);
-        }
-        tree.update(name.as_bytes());
-        tree.update([0]);
-        tree.update(digest.finalize());
-    }
-    Ok(format!("{:x}", tree.finalize()))
-}
-
 fn verify_cached(dir: &Path, game: &Game) -> Result<bool, String> {
     let Some(expected) = game.source_sha256.as_deref() else { return Ok(false); };
-    Ok(tree_sha256(dir)? == expected)
+    Ok(pack::tree_sha256(dir, Some(".complete"))? == expected)
 }
 
 pub fn ensure(root: &Path, id: &str) -> Result<PathBuf, String> {
@@ -245,7 +206,7 @@ fn ensure_package(root: &Path, game: &mut Game) -> Result<PathBuf, String> {
     fs::create_dir(&staging).map_err(|e| e.to_string())?;
     let result = (|| {
         extract(&archive, &staging, game)?;
-        let source_sha256 = tree_sha256(&staging)?;
+        let source_sha256 = pack::tree_sha256(&staging, Some(".complete"))?;
         if game.source_sha256.as_ref().is_some_and(|expected| expected != &source_sha256) {
             return Err("游戏解包校验失败".into());
         }

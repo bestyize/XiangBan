@@ -4,7 +4,7 @@
 
 新版小伴桌面内置《潮汐书房》的女仆版 GLB，在透明窗口里实时播放模型自带的 16 段动作。点击她会打招呼，按住拖动时会迈步。默认会跟随心情，在「思考」时捧书，闲置后坐下，再侧卧入睡。右键溟月，在「常规 → 原作动作」中可以选定写字、坐着读书、玩游戏等动作循环播放。全局暂停会定格当前动作。
 
-伙伴 ZIP 提供八张透明姿态图，用于缩略图以及 WebGL 2 不可用时的显示。睁眼和闭眼使用同一姿势。桌面版沿用 RealWorldBuilder 绘制的眼睑和保护刘海的遮罩，按原动作的时机眨眼，睡眠时持续闭眼。原始模型和许可文件随客户端提供，可以离线播放。[书房眼睑源码](https://github.com/bestyize/RealWorldBuilder/blob/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl/eyelids.js) · [模型与许可](../../../client/xiaoban-desktop/public/pets/mingyue/)
+伙伴 ZIP 提供八张透明姿态图，用于缩略图以及 WebGL 2 不可用时的显示。睁眼和闭眼使用同一姿势。桌面版沿用 RealWorldBuilder 绘制的眼睑和保护刘海的遮罩，按原动作的时机眨眼，睡眠时持续闭眼。桌面客户端首次展示 3D 形象时从资源机下载模型，校验缓存后可离线播放。下载期间或失败时显示平面姿态。许可文件随客户端提供。[书房眼睑源码](https://github.com/bestyize/RealWorldBuilder/blob/037ef10fbe6c368eb931c0c958b6283d25ef0fa2/games/whale-girl/eyelids.js) · [模型与许可](../../../client/xiaoban-desktop/public/pets/mingyue/)
 
 ![溟月站立、抱鲸与捧书的平面姿态](preview.webp)
 

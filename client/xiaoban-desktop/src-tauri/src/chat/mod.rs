@@ -913,13 +913,8 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         if let Some(client) = slot.as_ref().filter(|client| client.is_connected()) {
             return Ok(client.clone());
         }
-        // Development resources live in the source tree; installed apps use Tauri's resource root.
-        #[cfg(debug_assertions)]
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/computer-use");
-        #[cfg(not(debug_assertions))]
-        let root = app.path().resource_dir()
-            .map_err(|e| agent_kernel::HarnessError::Config(format!("无法定位内置电脑控制资源：{e}")))?
-            .join("agent-tools/computer-use");
+        let root = crate::computer_runtime::ensure(app, cancel)
+            .map_err(agent_kernel::HarnessError::Config)?;
         let client = agent_computer_use_tools::spawn_cancellable(&root,cancel.clone())?;
         *slot = Some(client.clone());
         Ok(client)

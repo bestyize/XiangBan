@@ -1,6 +1,31 @@
 //! Large built-in models are delivered by the resource server and cached locally.
 use crate::library::{self, Resource};
+use serde::Deserialize;
+use std::{collections::BTreeMap, path::Path, sync::{LazyLock, Mutex}};
 use std::time::Duration;
+
+#[derive(Deserialize)]
+struct Model {
+    resource: Resource,
+}
+
+static ON_DEMAND: LazyLock<Vec<(Resource, Mutex<()>)>> = LazyLock::new(|| {
+    let models: BTreeMap<String, Model> =
+        serde_json::from_str(include_str!("../../builtin-models.json")).expect("valid built-in model manifest");
+    models.into_values().map(|model| (model.resource, Mutex::new(()))).collect()
+});
+
+pub fn is_on_demand(hash: &str) -> bool {
+    ON_DEMAND.iter().any(|(resource, _)| resource.sha256 == hash)
+}
+
+pub fn ensure_on_demand(root: &Path, hash: &str) -> Result<(), String> {
+    let Some((resource, lock)) = ON_DEMAND.iter().find(|(resource, _)| resource.sha256 == hash) else {
+        return Ok(());
+    };
+    let _guard = lock.lock().map_err(|_| "模型缓存暂不可用")?;
+    library::download(root, resource, |_| {})
+}
 
 fn resources() -> [Resource; 2] {
     [
@@ -20,7 +45,8 @@ fn resources() -> [Resource; 2] {
 }
 
 pub fn find(hash: &str) -> Option<Resource> {
-    resources().into_iter().find(|resource| resource.sha256 == hash)
+    ON_DEMAND.iter().find(|(resource, _)| resource.sha256 == hash).map(|(resource, _)| resource.clone())
+        .or_else(|| resources().into_iter().find(|resource| resource.sha256 == hash))
 }
 
 pub fn start(app: &tauri::AppHandle) {
@@ -38,4 +64,18 @@ pub fn start(app: &tauri::AppHandle) {
             attempt += 1;
         }
     });
+}
+
+#[cfg(test)]
+#[test]
+#[ignore = "downloads the published on-demand models"]
+fn published_models_download_to_the_verified_cache() {
+    let root = std::env::temp_dir().join(format!("xiaoban-published-models-{}", std::process::id()));
+    for (resource, _) in ON_DEMAND.iter() {
+        let path = root.join("cache").join(&resource.sha256);
+        assert!(!path.exists());
+        ensure_on_demand(&root, &resource.sha256).unwrap();
+        assert!(library::verify_file(&path, resource).unwrap());
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }

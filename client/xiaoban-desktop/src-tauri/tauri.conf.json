@@ -4,8 +4,8 @@
   "version": "3.1.8",
   "identifier": "xyz.xiaban.desktop-wallpaper",
   "build": {
-    "beforeDevCommand": "npm run computer-use:prepare && npm run dev",
-    "beforeBuildCommand": "node scripts/generate-icon.mjs && npm run computer-use:prepare && npm run build",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "node scripts/generate-icon.mjs && npm run build",
     "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../dist"
   },
@@ -25,9 +25,6 @@
   },
   "bundle": {
     "active": false,
-    "resources": {
-      "resources/computer-use/": "agent-tools/computer-use/"
-    },
     "icon": ["icons/icon.png", "icons/icon.ico"],
     "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" } }
   }

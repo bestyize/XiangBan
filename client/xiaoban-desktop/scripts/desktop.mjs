@@ -32,7 +32,6 @@ try {
         else {
           const app = path.join(output, 'bundle/macos/小伴.app');
           verifyStableSignature(app);
-          verifyStableSignature(path.join(app, 'Contents/Resources/agent-tools/computer-use/Open Computer Use.app'));
         }
       }
       process.exitCode = code ?? 1;

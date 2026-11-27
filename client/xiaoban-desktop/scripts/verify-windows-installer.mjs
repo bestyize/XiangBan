@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const source = (relative) => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
+const baseConfig = JSON.parse(source('../src-tauri/tauri.conf.json'));
 const config = JSON.parse(source('../src-tauri/tauri.windows.conf.json'));
 const nsis = source('../src-tauri/windows/one-click-installer.nsi');
 const workflow = source('../../../.github/workflows/build-xiaoban-wallpaper.yml');
@@ -14,6 +15,10 @@ assert.deepEqual(config.bundle.targets, ['nsis']);
 assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
 assert.equal(config.bundle.windows.nsis.displayLanguageSelector, false);
 assert.equal(config.bundle.windows.nsis.template, 'windows/one-click-installer.nsi');
+for (const { bundle, build } of [baseConfig, config]) {
+  assert.doesNotMatch(JSON.stringify(bundle.resources ?? {}), /computer-use/);
+  assert.doesNotMatch(build?.beforeBuildCommand ?? '', /computer-use:prepare/);
+}
 
 assert.match(nsis, /RequestExecutionLevel user/);
 assert.match(nsis, /MUI_WELCOMEPAGE_TITLE "欢迎使用小伴桌面"/);
