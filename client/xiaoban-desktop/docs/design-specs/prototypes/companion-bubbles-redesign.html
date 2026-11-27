@@ -1,0 +1,1414 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-accent="red">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴桌面 · 伙伴双态气泡设计稿（暖感对话泡泡定稿）</title>
+<style>
+  :root,
+  html[data-theme="light"] {
+    --ui-canvas: #F6F6F7;
+    --ui-surface: #FFFFFF;
+    --ui-surface-warm: #FFFDFB;
+    --ui-control: #F2F2F4;
+    --ui-control-hover: #E7E7EB;
+    --ui-border: rgba(140, 108, 86, 0.13);
+    --ui-border-strong: rgba(0, 0, 0, 0.13);
+    --ui-line: rgba(0, 0, 0, 0.06);
+    --ui-text-primary: #1D1D1F;
+    --ui-text-secondary: #68686E;
+    --ui-text-tertiary: #8E8E95;
+    --ui-danger: #D93A44;
+    --ui-shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.055), 0 2px 6px rgba(0, 0, 0, 0.035);
+    --ui-shadow-warm:
+      0 0 0 1px rgba(140, 108, 86, 0.13),
+      0 14px 30px rgba(72, 48, 34, 0.12),
+      0 3px 8px rgba(72, 48, 34, 0.05);
+    --ui-warm-pill: rgba(164, 132, 110, 0.10);
+    --ui-warm-pill-hover: rgba(164, 132, 110, 0.17);
+  }
+
+  html[data-theme="dark"] {
+    --ui-canvas: #16171A;
+    --ui-surface: #232428;
+    --ui-surface-warm: #292624;
+    --ui-control: #2E3036;
+    --ui-control-hover: #3A3C44;
+    --ui-border: rgba(255, 224, 198, 0.11);
+    --ui-border-strong: rgba(255, 255, 255, 0.16);
+    --ui-line: rgba(255, 255, 255, 0.07);
+    --ui-text-primary: #F4F4F6;
+    --ui-text-secondary: #A5A6AE;
+    --ui-text-tertiary: #7C7D85;
+    --ui-danger: #E8555E;
+    --ui-shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 4px 16px rgba(0, 0, 0, 0.35);
+    --ui-shadow-warm:
+      inset 0 1px 0 rgba(255, 236, 220, 0.08),
+      0 0 0 1px rgba(255, 224, 198, 0.11),
+      0 18px 40px rgba(0, 0, 0, 0.54);
+    --ui-warm-pill: rgba(255, 224, 198, 0.08);
+    --ui-warm-pill-hover: rgba(255, 224, 198, 0.14);
+  }
+
+  /* 六套主题色 */
+  html[data-theme="light"][data-accent="red"]      { --ui-btn:#D93A44; --ui-btn-hi:#E8565F; --ui-soft:#FCEBEC; --ui-ink:#B42A33; --ui-dot:#E5484D; }
+  html[data-theme="light"][data-accent="green"]    { --ui-btn:#2E8B5E; --ui-btn-hi:#3FA172; --ui-soft:#E3F2E9; --ui-ink:#1E6A45; --ui-dot:#34A36D; }
+  html[data-theme="light"][data-accent="blue"]     { --ui-btn:#2F6FDB; --ui-btn-hi:#4A84E6; --ui-soft:#E6EEFC; --ui-ink:#1D53AE; --ui-dot:#3B7BE8; }
+  html[data-theme="light"][data-accent="purple"]   { --ui-btn:#7152D8; --ui-btn-hi:#8669E3; --ui-soft:#EDE8FC; --ui-ink:#5537B8; --ui-dot:#7C5CE6; }
+  html[data-theme="light"][data-accent="amber"]    { --ui-btn:#A8640C; --ui-btn-hi:#BD7A1C; --ui-soft:#FAEEDB; --ui-ink:#87500A; --ui-dot:#E09A2B; }
+  html[data-theme="light"][data-accent="graphite"] { --ui-btn:#2B2B30; --ui-btn-hi:#4A4A50; --ui-soft:#E9E9EC; --ui-ink:#2B2B30; --ui-dot:#55555B; }
+
+  html[data-theme="dark"][data-accent="red"]      { --ui-btn:#E5484D; --ui-btn-hi:#F06A6F; --ui-soft:#3A2225; --ui-ink:#FF8C91; --ui-dot:#FF6369; }
+  html[data-theme="dark"][data-accent="green"]    { --ui-btn:#34A36D; --ui-btn-hi:#48B981; --ui-soft:#1D3328; --ui-ink:#72D6A2; --ui-dot:#3FB87A; }
+  html[data-theme="dark"][data-accent="blue"]     { --ui-btn:#3B7BE8; --ui-btn-hi:#5A92F0; --ui-soft:#1E2A42; --ui-ink:#8DB6FF; --ui-dot:#4C8DF6; }
+  html[data-theme="dark"][data-accent="purple"]   { --ui-btn:#8466E6; --ui-btn-hi:#9A80EE; --ui-soft:#2A2342; --ui-ink:#BBA8FF; --ui-dot:#9273F0; }
+  html[data-theme="dark"][data-accent="amber"]    { --ui-btn:#C27A1A; --ui-btn-hi:#D69130; --ui-soft:#3A2C17; --ui-ink:#F0B65A; --ui-dot:#F0A93A; }
+  html[data-theme="dark"][data-accent="graphite"] { --ui-btn:#636368; --ui-btn-hi:#7C7C82; --ui-soft:#3A3A3D; --ui-ink:#E5E5EA; --ui-dot:#9A9AA0; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; }
+  body {
+    background: var(--ui-canvas);
+    color: var(--ui-text-primary);
+    font-family: -apple-system, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 20px 64px;
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; padding: 0; }
+  button:focus-visible { outline: 2px solid var(--ui-btn); outline-offset: 2px; }
+  svg { display: block; flex-shrink: 0; }
+
+  /* ── 顶部评审条（非客户端 UI） ── */
+  .review-wrap {
+    max-width: 1200px;
+    margin: 14px auto 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .review-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 14px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+  }
+  .review-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+  }
+  .review-pill {
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+  }
+  .review-brand strong { font-size: 13.5px; font-weight: 600; }
+
+  .seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--ui-control);
+  }
+  .seg button {
+    height: 27px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 12px;
+    color: var(--ui-text-secondary);
+    white-space: nowrap;
+    transition: background .15s, color .15s, box-shadow .15s;
+  }
+  .seg button:hover { color: var(--ui-text-primary); }
+  .seg button[aria-pressed="true"] {
+    background: var(--ui-surface);
+    color: var(--ui-text-primary);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+  html[data-theme="dark"] .seg button[aria-pressed="true"] { background: #464852; }
+
+  .accent-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 31px;
+    padding: 0 8px;
+    border-radius: 9px;
+    background: var(--ui-control);
+  }
+  .accent-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    position: relative;
+    transition: transform .15s;
+  }
+  .accent-swatch:hover { transform: scale(1.16); }
+  .accent-swatch[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ui-text-primary);
+  }
+
+  .sub-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+    font-size: 12px;
+    color: var(--ui-text-secondary);
+  }
+  .sub-bar .sep { width: 1px; height: 14px; background: var(--ui-border-strong); }
+  .sub-bar .lbl { font-size: 11.5px; color: var(--ui-text-tertiary); font-weight: 500; }
+  .sub-bar .hint { margin-left: auto; font-size: 11.5px; color: var(--ui-text-tertiary); }
+
+  .stage-root { max-width: 1200px; margin: 0 auto; }
+
+  /* ── 模拟壁纸背景集合 ── */
+  .wp-day {
+    background:
+      radial-gradient(circle at 18% 20%, rgba(255, 224, 194, 0.75), transparent 52%),
+      radial-gradient(circle at 82% 76%, rgba(203, 226, 255, 0.72), transparent 54%),
+      linear-gradient(145deg, #EEF3FA 0%, #F7F1EB 55%, #E7EEF5 100%);
+    color: #3B404C;
+  }
+  .wp-dusk {
+    background:
+      radial-gradient(circle at 20% 25%, rgba(246, 152, 128, 0.55), transparent 50%),
+      radial-gradient(circle at 80% 72%, rgba(114, 134, 214, 0.58), transparent 52%),
+      linear-gradient(150deg, #3D3B63 0%, #6D5477 48%, #B77C7C 100%);
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .wp-night {
+    background:
+      radial-gradient(circle at 75% 22%, rgba(72, 118, 198, 0.34), transparent 46%),
+      radial-gradient(circle at 22% 80%, rgba(122, 86, 168, 0.28), transparent 48%),
+      linear-gradient(160deg, #111623 0%, #192235 55%, #111520 100%);
+    color: rgba(236, 240, 248, 0.86);
+  }
+  .wp-clean {
+    background: #ECEEF2;
+    color: #555963;
+  }
+  html[data-theme="dark"] .wp-clean {
+    background: #1C1D22;
+    color: #9A9DA8;
+  }
+
+  /* ==========================================================================
+     核心组件：暖感对话泡泡（定稿视觉）
+     ========================================================================== */
+  .xb-bubble {
+    position: relative;
+    width: 100%;
+    max-width: 304px;
+    border-radius: 22px;
+    background: var(--ui-surface-warm);
+    box-shadow: var(--ui-shadow-warm);
+    color: var(--ui-text-primary);
+    text-align: left;
+  }
+  .xb-bubble--greeting { max-width: 288px; }
+  .xb-bubble--dialogue { max-width: 304px; }
+  .xb-bubble--composer { max-width: 284px; }
+
+  .xb-bubble[data-tail]::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: inherit;
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+  .xb-bubble[data-tail="left"]::after {
+    left: -5px;
+    top: 28px;
+    border-radius: 0 0 0 2.5px;
+    box-shadow: -1px 1px 0 var(--ui-border);
+  }
+  .xb-bubble[data-tail="right"]::after {
+    right: -5px;
+    top: 28px;
+    border-radius: 0 2.5px 0 0;
+    box-shadow: 1px -1px 0 var(--ui-border);
+  }
+  .xb-bubble[data-tail="bottom-right"]::after {
+    right: 26px;
+    bottom: -5px;
+    border-radius: 0 0 2.5px 0;
+    box-shadow: 1px 1px 0 var(--ui-border);
+  }
+
+  .xb-bubble-inner {
+    position: relative;
+    z-index: 1;
+    padding: 14px 15px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .xb-b-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+  }
+  .xb-b-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ui-dot);
+    flex: none;
+    box-shadow: 0 0 0 3px var(--ui-soft);
+  }
+  .xb-b-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ui-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .xb-b-meta {
+    font-size: 10.5px;
+    color: var(--ui-text-tertiary);
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--ui-warm-pill);
+    white-space: nowrap;
+  }
+  .xb-b-meta.is-ai {
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+    font-weight: 500;
+  }
+  .xb-b-close {
+    margin-left: auto;
+    margin-right: -4px;
+    margin-top: -2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: var(--ui-text-tertiary);
+    transition: background .15s, color .15s;
+  }
+  .xb-b-close:hover {
+    background: var(--ui-warm-pill-hover);
+    color: var(--ui-text-primary);
+  }
+
+  .xb-b-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.56;
+    color: var(--ui-text-primary);
+    overflow-wrap: anywhere;
+  }
+  .xb-b-text--clamp2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .xb-b-text-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.58;
+    color: var(--ui-text-primary);
+    max-height: 88px;
+    overflow-y: auto;
+    border-radius: 6px;
+    transition: color .15s;
+  }
+  .xb-b-text-btn:hover { color: var(--ui-ink); }
+
+  .xb-b-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .xb-b-choice {
+    height: 26px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--ui-warm-pill);
+    color: var(--ui-text-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    transition: background .15s, color .15s, transform .12s;
+  }
+  .xb-b-choice:hover {
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+  }
+  .xb-b-choice:active { transform: scale(0.97); }
+
+  .xb-b-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 2px;
+  }
+  .xb-b-btn {
+    height: 26px;
+    padding: 0 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .xb-b-btn--primary {
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+    font-weight: 600;
+  }
+  .xb-b-btn--primary:hover {
+    background: var(--ui-btn);
+    color: #fff;
+  }
+  .xb-b-btn--secondary {
+    background: var(--ui-warm-pill);
+    color: var(--ui-text-secondary);
+  }
+  .xb-b-btn--secondary:hover {
+    background: var(--ui-warm-pill-hover);
+    color: var(--ui-text-primary);
+  }
+  .xb-b-btn--ghost {
+    margin-left: auto;
+    padding: 0 4px;
+    color: var(--ui-text-tertiary);
+    font-weight: 400;
+  }
+  .xb-b-btn--ghost:hover { color: var(--ui-text-primary); }
+
+  .xb-b-continue {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 8px 0 6px;
+    margin-left: -6px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ui-ink);
+    transition: background .15s;
+  }
+  .xb-b-continue:hover { background: var(--ui-soft); }
+
+  .xb-b-thinking {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--ui-text-tertiary);
+  }
+  .xb-dots {
+    display: inline-flex;
+    gap: 2.5px;
+    align-items: center;
+  }
+  .xb-dots i {
+    width: 3.5px;
+    height: 3.5px;
+    border-radius: 50%;
+    background: var(--ui-dot);
+    animation: xb-pulse 1.2s infinite ease-in-out;
+  }
+  .xb-dots i:nth-child(2) { animation-delay: .18s; }
+  .xb-dots i:nth-child(3) { animation-delay: .36s; }
+  @keyframes xb-pulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1.1); }
+  }
+
+  .xb-b-error {
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(217, 58, 68, 0.08);
+    color: var(--ui-danger);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  html[data-theme="dark"] .xb-b-error { background: rgba(229, 72, 77, 0.14); }
+  .xb-b-paused-pill {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: var(--ui-text-tertiary);
+  }
+
+  /* ── 视图一：桌面实机交互场景 ── */
+  .desktop-stage {
+    position: relative;
+    min-height: 500px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--ui-shadow-card);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 24px 28px;
+  }
+  .desk-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: 0.88;
+  }
+  .desk-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+  .wp-night .desk-pill { background: rgba(255, 255, 255, 0.10); }
+
+  .desk-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0;
+  }
+  .pet-rig {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .pet-rig.is-left { flex-direction: row-reverse; }
+
+  .pet-actor-btn {
+    position: relative;
+    width: 176px;
+    height: 196px;
+    display: grid;
+    place-items: center;
+    border-radius: 24px;
+    transition: transform .22s cubic-bezier(.22, 1, .36, 1);
+  }
+  .pet-actor-btn:hover { transform: translateY(-2px); }
+  .pet-actor-btn.is-poked { animation: pet-hop .42s cubic-bezier(.22, 1, .36, 1); }
+  @keyframes pet-hop {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    35% { transform: translateY(-10px) rotate(-3deg); }
+    70% { transform: translateY(-3px) rotate(2.5deg); }
+  }
+  .pet-hover-ring {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+  }
+  .pet-actor-btn:hover .pet-hover-ring { opacity: 1; }
+
+  .bubble-slot {
+    width: 310px;
+    min-height: 156px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .pet-rig.is-left .bubble-slot { justify-content: flex-end; }
+  .bubble-enter { animation: bubble-pop .22s cubic-bezier(.22, 1, .36, 1); }
+  @keyframes bubble-pop {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .bubble-empty-hint {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px dashed currentColor;
+    opacity: 0.45;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .desk-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .desk-trigger {
+    height: 32px;
+    padding: 0 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--ui-surface);
+    color: var(--ui-text-primary);
+    box-shadow: var(--ui-shadow-card);
+    transition: transform .12s;
+  }
+  .desk-trigger:hover { transform: translateY(-1px); }
+  .desk-trigger.is-accent { background: var(--ui-btn); color: #fff; }
+
+  /* ── 视图二：聊天输入框小伴场景 ── */
+  .chat-shell {
+    border-radius: 20px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 520px;
+    margin: 0 auto;
+    transition: max-width .2s ease;
+  }
+  .chat-shell.is-wide { max-width: 960px; }
+  .chat-shell.is-narrow { max-width: 440px; }
+
+  .chat-head {
+    height: 48px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--ui-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .chat-head span { font-size: 11.5px; font-weight: 400; color: var(--ui-text-tertiary); }
+  .chat-body {
+    flex: 1;
+    padding: 22px 24px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--ui-canvas);
+  }
+  .chat-msg {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .chat-msg--user {
+    align-self: flex-end;
+    background: var(--ui-soft);
+    color: var(--ui-text-primary);
+  }
+  .chat-msg--ai {
+    align-self: flex-start;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+  }
+  .composer-zone {
+    padding: 68px 22px 22px;
+    background: var(--ui-canvas);
+  }
+  .composer-box {
+    position: relative;
+    border-radius: 16px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+    padding: 13px 15px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .composer-placeholder {
+    font-size: 13px;
+    color: var(--ui-text-tertiary);
+    min-height: 22px;
+  }
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .composer-tools { display: flex; gap: 6px; }
+  .composer-chip {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+    background: var(--ui-control);
+    color: var(--ui-text-secondary);
+    font-size: 11.5px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .composer-send {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--ui-btn);
+    color: #fff;
+    display: grid;
+    place-items: center;
+  }
+  .composer-pet-anchor {
+    position: absolute;
+    right: 12px;
+    bottom: 100%;
+    width: 92px;
+    z-index: 4;
+  }
+  .composer-pet-anchor.is-hidden { opacity: 0; pointer-events: none; }
+  .composer-pet-btn {
+    width: 92px;
+    height: 92px;
+    display: block;
+    transition: transform .18s;
+  }
+  .composer-pet-btn:hover { transform: translateY(-2px); }
+  .composer-pet-btn.is-poked { animation: pet-hop .42s ease-out; }
+  .composer-bubble-wrap {
+    position: absolute;
+    right: 8px;
+    bottom: calc(100% + 4px);
+    width: 284px;
+    max-width: calc(100vw - 64px);
+    z-index: 6;
+  }
+
+  /* ── 视图三：全状态解剖展板 ── */
+  .spec-section {
+    margin-bottom: 22px;
+    padding: 18px 20px 20px;
+    border-radius: 18px;
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-card);
+  }
+  .spec-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .spec-desc { margin: 0 0 16px; font-size: 12px; color: var(--ui-text-secondary); }
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (max-width: 980px) { .spec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 660px) { .spec-grid { grid-template-columns: 1fr; } }
+  .spec-tile {
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    justify-content: space-between;
+  }
+  .spec-cap {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.78;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .spec-note { font-size: 11px; opacity: 0.74; line-height: 1.45; }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 820px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .metric-card {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--ui-control);
+  }
+  .metric-card small { display: block; font-size: 11px; color: var(--ui-text-tertiary); }
+  .metric-card strong { display: block; margin-top: 3px; font-size: 13.5px; color: var(--ui-text-primary); }
+  .metric-card span { display: block; margin-top: 3px; font-size: 11px; color: var(--ui-text-secondary); }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translate(-50%, 14px);
+    opacity: 0;
+    pointer-events: none;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #1D1D1F;
+    color: #fff;
+    font-size: 12px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+    transition: opacity .18s, transform .18s;
+    z-index: 40;
+  }
+  html[data-theme="dark"] .toast { background: #F4F4F6; color: #16171A; }
+  .toast.is-show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="review-wrap">
+  <header class="review-bar" aria-label="设计稿评审栏">
+    <div class="review-brand">
+      <span class="review-pill">定稿 · 暖感泡泡</span>
+      <strong>小伴桌面 · 伙伴双态气泡 UI 设计稿</strong>
+    </div>
+
+    <div class="seg" role="group" aria-label="视图切换">
+      <button type="button" data-view="desktop" onclick="setView('desktop')" aria-pressed="true">桌面实机试玩</button>
+      <button type="button" data-view="composer" onclick="setView('composer')" aria-pressed="false">输入框小伴</button>
+      <button type="button" data-view="states" onclick="setView('states')" aria-pressed="false">全状态解剖</button>
+    </div>
+
+    <div class="seg" role="group" aria-label="外观模式">
+      <button type="button" data-theme-btn="light" onclick="setTheme('light')" aria-pressed="true">浅色</button>
+      <button type="button" data-theme-btn="dark" onclick="setTheme('dark')" aria-pressed="false">深色</button>
+    </div>
+
+    <div class="accent-bar" role="group" aria-label="主题色">
+      <button type="button" class="accent-swatch" data-accent-btn="red" title="小伴红" style="background:#D93A44" onclick="setAccent('red')" aria-pressed="true"></button>
+      <button type="button" class="accent-swatch" data-accent-btn="green" title="薄荷绿" style="background:#2E8B5E" onclick="setAccent('green')" aria-pressed="false"></button>
+      <button type="button" class="accent-swatch" data-accent-btn="blue" title="海湾蓝" style="background:#2F6FDB" onclick="setAccent('blue')" aria-pressed="false"></button>
+      <button type="button" class="accent-swatch" data-accent-btn="purple" title="暮紫" style="background:#7152D8" onclick="setAccent('purple')" aria-pressed="false"></button>
+      <button type="button" class="accent-swatch" data-accent-btn="amber" title="琥珀" style="background:#C27A19" onclick="setAccent('amber')" aria-pressed="false"></button>
+      <button type="button" class="accent-swatch" data-accent-btn="graphite" title="石墨" style="background:#3A3A40" onclick="setAccent('graphite')" aria-pressed="false"></button>
+    </div>
+  </header>
+
+  <div id="subBar" class="sub-bar"></div>
+</div>
+
+<main id="stage" class="stage-root"></main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+const PETS = [
+  { id: 'sunflower', name: '向日葵', img: '../../../src/pets/assets/sunflower.webp', rect: [96, -29, 128, 185], shift: true },
+  { id: 'daisy',     name: '小雏菊', img: '../../../src/companion/assets/white-flower/white_flower.webp', rect: [85, -82, 150, 150], shift: false },
+  { id: 'tulip',     name: '郁金香', img: '../../../src/pets/assets/tulip.webp', rect: [115, -34, 89, 190], shift: true },
+  { id: 'jade',      name: '玉露团团', img: '../../../src/pets/assets/jade.webp', rect: [80, 5, 160, 151], shift: true }
+];
+
+const DIALOGUE_FLOW = {
+  start: {
+    local: '嘿嘿，收到一次摸摸头。今天想轻松聊聊，还是让我安静陪你？',
+    ai: '刚抬头就看见你点了我一下，手头忙完这段，要不要先喘口气？',
+    choices: [
+      { id: 'happy', label: '今天还不错' },
+      { id: 'tired', label: '有点累了' }
+    ]
+  },
+  happy: {
+    local: '听起来今天挺顺心的，好心情也可以分我一点呀。',
+    ai: '状态不错真好，趁着顺手把下一件小事也轻松拿下吧。',
+    choices: [
+      { id: 'curious', label: '聊点有趣的' },
+      { id: 'plan', label: '先做一件小事' }
+    ]
+  },
+  tired: {
+    local: '辛苦啦。把肩膀松下来，先离开屏幕看一眼远处吧。',
+    ai: '累了就不用硬撑着，我在这儿安静陪你发三分钟呆也行。',
+    choices: [
+      { id: 'quiet', label: '陪我待会儿' },
+      { id: 'encourage', label: '给我打打气' }
+    ]
+  },
+  curious: {
+    local: '我刚才在想，向日葵如果戴上耳机，会听雨声还是Lo-Fi？',
+    ai: '突然好奇，你今天最想早点结束的那件事是什么？',
+    choices: [
+      { id: 'happy', label: '挺有意思的' },
+      { id: 'tired', label: '先歇一小会儿' }
+    ]
+  },
+  plan: {
+    local: '挑一件五分钟就能收尾的小事开始，节奏一下就顺了。',
+    ai: '先把最小的那一步勾掉，剩下的我们慢慢来。',
+    choices: [
+      { id: 'encourage', label: '给我打打气' },
+      { id: 'quiet', label: '就这样待着' }
+    ]
+  },
+  quiet: {
+    local: '嗯，我就在这儿。不用找话题，安静待着也很好。',
+    ai: '收到，切到静音陪伴模式，需要我的时候再点点我就好。',
+    choices: [
+      { id: 'happy', label: '今天还不错' },
+      { id: 'curious', label: '换个轻松话题' }
+    ]
+  },
+  encourage: {
+    local: '你已经推进了不少进度啦，这一步也一定能稳稳搞定！',
+    ai: '元气补给已送达！不用一次做完所有事，往前走一格就算赢。',
+    choices: [
+      { id: 'plan', label: '先做一件小事' },
+      { id: 'quiet', label: '谢谢小伴' }
+    ]
+  }
+};
+
+const GREETINGS = [
+  '刚刚在发呆，看到你就精神了一点。',
+  '嘿，今天有空陪我待一会儿吗？',
+  '我正打算伸个懒腰，你就来了。',
+  '路过的话，摸摸我也可以呀。'
+];
+
+const state = {
+  view: 'desktop',
+  theme: 'light',
+  accent: 'red',
+  wallpaper: 'day',
+  petId: 'sunflower',
+  side: 'right',
+  deskMode: 'dialogue',
+  deskGreetingIdx: 0,
+  deskNode: 'start',
+  deskAiPhase: 'ready',
+  deskPoked: false,
+  composerWidth: 'wide',
+  composerAttention: false,
+  composerOpen: true,
+  composerNode: 'start',
+  composerAiPhase: 'ready',
+  composerPoked: false,
+  hoverTimer: null,
+  aiTimer: null
+};
+
+const CLOSE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+const ARROW_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
+const SEND_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+
+let petUid = 0;
+function renderPetSvg(pet, expr = 'happy') {
+  const id = 'p' + (++petUid);
+  const [x, y, w, h] = pet.rect;
+  const plant = pet.shift
+    ? `<g transform="translate(0 -100)"><image href="${pet.img}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/></g>`
+    : `<image href="${pet.img}" x="${x}" y="${y}" width="${w}" height="${h}" clip-path="url(#${id}c)"/>`;
+
+  const face = expr === 'excited'
+    ? `<ellipse cx="86" cy="176" rx="10" ry="5" fill="#ff7496" opacity=".7"/>
+       <ellipse cx="234" cy="176" rx="10" ry="5" fill="#ff7496" opacity=".7"/>
+       <path d="M96 142L122 152L96 162M224 142L198 152L224 162" fill="none" stroke="#ebfaff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+       <path d="M148 172Q160 190 172 172Z" fill="#ff7496" stroke="#ebfaff" stroke-width="3"/>`
+    : `<ellipse cx="86" cy="176" rx="10" ry="5" fill="#ff7496" opacity=".68"/>
+       <ellipse cx="234" cy="176" rx="10" ry="5" fill="#ff7496" opacity=".68"/>
+       <path d="M92 155A20 15 0 0 1 132 155M188 155A20 15 0 0 1 228 155" fill="none" stroke="#ebfaff" stroke-width="8" stroke-linecap="round"/>
+       <path d="M148 175Q154 182 160 175Q166 182 172 175" fill="none" stroke="#ebfaff" stroke-width="4" stroke-linecap="round"/>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -72 320 340" width="100%" height="100%" aria-hidden="true">
+    <defs>
+      <radialGradient id="${id}b" cx="0.35" cy="0.2" r="0.9">
+        <stop offset="0" stop-color="#ffffff"/><stop offset="0.55" stop-color="#f7f1ea"/><stop offset="1" stop-color="#d8ccc0"/>
+      </radialGradient>
+      <radialGradient id="${id}s" cx="0.5" cy="0.2" r="0.9">
+        <stop offset="0" stop-color="#202632"/><stop offset="1" stop-color="#050609"/>
+      </radialGradient>
+      <clipPath id="${id}c"><rect x="64" y="-82" width="192" height="140"/></clipPath>
+    </defs>
+    <g transform="translate(160 244) scale(0.76) translate(-160 -244)">
+      <ellipse cx="160" cy="252" rx="96" ry="11" fill="#000" opacity="0.22"/>
+      <path d="M72 58A88 10 0 0 1 248 58C274 64 294 106 294 156C294 212 266 250 220 250H100C54 250 26 212 26 156C26 106 46 64 72 58Z" fill="url(#${id}b)" stroke="#cfc2b4" stroke-width="1.5"/>
+      <ellipse cx="160" cy="58" rx="86" ry="9" fill="#ebe2d7"/>
+      <ellipse cx="160" cy="59" rx="76" ry="6.5" fill="#4f3324"/>
+      ${plant}
+      <rect x="55" y="92" width="210" height="134" rx="48" fill="#e5dacd"/>
+      <rect x="60" y="97" width="200" height="124" rx="43" fill="url(#${id}s)"/>
+      ${face}
+    </g>
+  </svg>`;
+}
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('is-show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('is-show'), 2200);
+}
+
+function renderGreetingBubble(opts) {
+  const {
+    petName = '向日葵',
+    text = GREETINGS[0],
+    tail = 'left',
+    interactive = false,
+    meta = '轻声问候'
+  } = opts;
+
+  const actChat = interactive ? `onclick="onGreetingAction('chat')"` : `onclick="showToast('演示：打开聊天并带上问候上下文')"`;
+  const actPoke = interactive ? `onclick="onGreetingAction('poke')"` : `onclick="showToast('演示：摸摸这只伙伴并记录正向反馈')"`;
+  const actSnooze = interactive ? `onclick="onGreetingAction('snoozed')"` : `onclick="showToast('演示：暂不打扰，进入本轮静默期')"`;
+  const actClose = interactive ? `onclick="onGreetingAction('dismissed')"` : `onclick="showToast('演示：关闭问候并记一次显式关闭反馈')"`;
+
+  return `
+    <section class="xb-bubble xb-bubble--greeting" ${tail ? `data-tail="${tail}"` : ''} role="status" aria-live="polite">
+      <div class="xb-bubble-inner">
+        <header class="xb-b-head">
+          <span class="xb-b-dot" aria-hidden="true"></span>
+          <span class="xb-b-name">${petName}</span>
+          ${meta ? `<span class="xb-b-meta">${meta}</span>` : ''}
+          <button type="button" class="xb-b-close" title="关闭问候" aria-label="关闭问候" ${actClose}>${CLOSE_SVG}</button>
+        </header>
+        <p class="xb-b-text xb-b-text--clamp2">${text}</p>
+        <footer class="xb-b-foot">
+          <button type="button" class="xb-b-btn xb-b-btn--primary" ${actChat}>聊两句</button>
+          <button type="button" class="xb-b-btn xb-b-btn--secondary" ${actPoke}>摸摸头</button>
+          <button type="button" class="xb-b-btn xb-b-btn--ghost" title="短时间内不再主动弹出问候" ${actSnooze}>暂不打扰</button>
+        </footer>
+      </div>
+    </section>
+  `;
+}
+
+function renderDialogueBubble(opts) {
+  const {
+    petName = '向日葵',
+    text = DIALOGUE_FLOW.start.local,
+    choices = DIALOGUE_FLOW.start.choices,
+    tail = 'left',
+    thinking = false,
+    modelBadge = false,
+    error = '',
+    paused = false,
+    composer = false,
+    context = 'static'
+  } = opts;
+
+  const onChoice = (id) => context === 'desktop'
+    ? `onclick="onDeskChoice('${id}')"`
+    : context === 'composer'
+      ? `onclick="onComposerChoice('${id}')"`
+      : `onclick="showToast('演示：选择快捷回应，即时切换本地短句并触发模型润色')"`;
+
+  const onContinue = context === 'desktop'
+    ? `onclick="onDeskContinue()"`
+    : context === 'composer'
+      ? `onclick="onComposerContinue()"`
+      : `onclick="showToast('演示：交接气泡记录到该伙伴的专属聊天会话')"`;
+
+  const onClose = context === 'desktop'
+    ? `onclick="closeDeskBubble()"`
+    : context === 'composer'
+      ? `onclick="closeComposerBubble()"`
+      : `onclick="showToast('演示：收起伙伴对话气泡')"`;
+
+  return `
+    <section class="xb-bubble ${composer ? 'xb-bubble--composer' : 'xb-bubble--dialogue'}" ${tail ? `data-tail="${tail}"` : ''} aria-label="伙伴回复">
+      <div class="xb-bubble-inner">
+        <header class="xb-b-head">
+          <span class="xb-b-dot" aria-hidden="true"></span>
+          <span class="xb-b-name">${petName}</span>
+          ${modelBadge ? `<span class="xb-b-meta is-ai" title="已由当前对话模型自然润色">已润色</span>` : ''}
+          <button type="button" class="xb-b-close" title="关闭伙伴回复" aria-label="关闭伙伴回复" ${onClose}>${CLOSE_SVG}</button>
+        </header>
+        <button type="button" class="xb-b-text-btn" title="点击进入专属对话接着聊" ${onContinue}>${text}</button>
+        <div class="xb-b-choices" aria-label="回应伙伴">
+          ${choices.map(c => `<button type="button" class="xb-b-choice" ${onChoice(c.id)}>${c.label}</button>`).join('')}
+        </div>
+        <footer class="xb-b-foot">
+          <button type="button" class="xb-b-continue" ${onContinue}>接着聊 ${ARROW_SVG}</button>
+          ${thinking
+            ? `<span class="xb-b-thinking" role="status"><span class="xb-dots" aria-hidden="true"><i></i><i></i><i></i></span>想一想…</span>`
+            : paused
+              ? `<span class="xb-b-paused-pill">悬停已暂停收起</span>`
+              : ''}
+        </footer>
+        ${error ? `<p class="xb-b-error" role="alert">${error}</p>` : ''}
+      </div>
+    </section>
+  `;
+}
+
+function renderSubBar() {
+  const el = document.getElementById('subBar');
+  const wpGroup = `
+    <span class="lbl">背景壁纸</span>
+    <div class="seg">
+      <button type="button" onclick="setWallpaper('day')" aria-pressed="${state.wallpaper === 'day'}">暖昼浅色</button>
+      <button type="button" onclick="setWallpaper('dusk')" aria-pressed="${state.wallpaper === 'dusk'}">暮色渐变</button>
+      <button type="button" onclick="setWallpaper('night')" aria-pressed="${state.wallpaper === 'night'}">深夜星空</button>
+      <button type="button" onclick="setWallpaper('clean')" aria-pressed="${state.wallpaper === 'clean'}">纯色画布</button>
+    </div>`;
+
+  if (state.view === 'desktop') {
+    el.innerHTML = `
+      ${wpGroup}
+      <span class="sep"></span>
+      <span class="lbl">伙伴形象</span>
+      <div class="seg">
+        ${PETS.map(p => `<button type="button" onclick="setPet('${p.id}')" aria-pressed="${state.petId === p.id}">${p.name}</button>`).join('')}
+      </div>
+      <span class="sep"></span>
+      <span class="lbl">边缘方位</span>
+      <div class="seg">
+        <button type="button" onclick="setSide('right')" aria-pressed="${state.side === 'right'}">气泡在右</button>
+        <button type="button" onclick="setSide('left')" aria-pressed="${state.side === 'left'}">气泡在左</button>
+      </div>`;
+  } else if (state.view === 'composer') {
+    el.innerHTML = `
+      <span class="lbl">主窗宽度</span>
+      <div class="seg">
+        <button type="button" onclick="setComposerWidth('wide')" aria-pressed="${state.composerWidth === 'wide'}">标准宽窗</button>
+        <button type="button" onclick="setComposerWidth('narrow')" aria-pressed="${state.composerWidth === 'narrow'}">窄窗口</button>
+      </div>
+      <span class="sep"></span>
+      <div class="seg">
+        <button type="button" onclick="toggleAttention()" aria-pressed="${state.composerAttention}">模拟注意力避让态</button>
+      </div>
+      <span class="hint">点右下角小伴可呼出/刷新气泡；气泡底尾对齐伙伴头顶</span>`;
+  } else {
+    el.innerHTML = `${wpGroup}<span class="hint">定稿暖感对话泡泡（22px 圆角 · 全圆胶囊按钮 · 无底部倒计时条）全状态与窗口边界</span>`;
+  }
+}
+
+function renderStage() {
+  const stage = document.getElementById('stage');
+  const wpClass = 'wp-' + state.wallpaper;
+  const pet = PETS.find(p => p.id === state.petId) || PETS[0];
+
+  if (state.view === 'desktop') {
+    const node = DIALOGUE_FLOW[state.deskNode] || DIALOGUE_FLOW.start;
+    const tail = state.side === 'right' ? 'left' : 'right';
+    let bubbleHtml = `<div class="bubble-empty-hint">悬停在伙伴上 0.9 秒触发<strong>主动问候</strong>，<br/>直接点击伙伴触发<strong>点击对话</strong>。</div>`;
+    if (state.deskMode === 'greeting') {
+      bubbleHtml = `<div class="bubble-enter">${renderGreetingBubble({
+        petName: pet.name,
+        text: GREETINGS[state.deskGreetingIdx % GREETINGS.length],
+        tail,
+        interactive: true
+      })}</div>`;
+    } else if (state.deskMode === 'dialogue') {
+      const thinking = state.deskAiPhase === 'thinking';
+      bubbleHtml = `<div class="bubble-enter">${renderDialogueBubble({
+        petName: pet.name,
+        text: thinking ? node.local : node.ai,
+        choices: node.choices,
+        tail,
+        thinking,
+        modelBadge: !thinking,
+        context: 'desktop'
+      })}</div>`;
+    }
+
+    stage.innerHTML = `
+      <section class="desktop-stage ${wpClass}">
+        <div class="desk-topbar">
+          <span class="desk-pill">暖感对话泡泡 · 独立透明窗口 companion-greeting</span>
+          <span class="desk-pill">悬停 0.9s 触发问候 · 点击触发对话</span>
+        </div>
+
+        <div class="desk-center">
+          <div class="pet-rig ${state.side === 'left' ? 'is-left' : ''}">
+            <button type="button"
+              class="pet-actor-btn ${state.deskPoked ? 'is-poked' : ''}"
+              aria-label="点击与${pet.name}对话，悬停触发主动问候"
+              onpointerenter="onPetHoverStart()"
+              onpointerleave="onPetHoverEnd()"
+              onclick="onPetClick()">
+              ${renderPetSvg(pet, state.deskPoked ? 'excited' : 'happy')}
+              <span class="pet-hover-ring">点我聊两句 · 停留 0.9s 轻声问候</span>
+            </button>
+            <div class="bubble-slot">${bubbleHtml}</div>
+          </div>
+        </div>
+
+        <div class="desk-actions">
+          <button type="button" class="desk-trigger is-accent" onclick="onPetClick()">模拟点击伙伴（对话卡）</button>
+          <button type="button" class="desk-trigger" onclick="triggerGreeting()">模拟悬停 0.9s（主动问候）</button>
+          <button type="button" class="desk-trigger" onclick="closeDeskBubble()">收起当前气泡</button>
+        </div>
+      </section>`;
+    return;
+  }
+
+  if (state.view === 'composer') {
+    const sunflower = PETS[0];
+    const node = DIALOGUE_FLOW[state.composerNode] || DIALOGUE_FLOW.start;
+    const thinking = state.composerAiPhase === 'thinking';
+    stage.innerHTML = `
+      <section class="chat-shell ${state.composerWidth === 'narrow' ? 'is-narrow' : 'is-wide'}">
+        <header class="chat-head">
+          <div>日常工作台 · 输入框小伴场景</div>
+          <span>复用 CompanionReplyCard · 宽度 284px</span>
+        </header>
+        <div class="chat-body">
+          <div class="chat-msg chat-msg--user">帮我整理一下今天下午的三项待办，按轻重缓急排个序。</div>
+          <div class="chat-msg chat-msg--ai">好的，已经按截止时间排好序：先确认设计稿评审意见，再同步接口字段，最后更新发布说明。</div>
+        </div>
+        <div class="composer-zone">
+          <div class="composer-box">
+            <div class="composer-pet-anchor ${state.composerAttention ? 'is-hidden' : ''}">
+              ${state.composerOpen ? `<div class="composer-bubble-wrap bubble-enter">${renderDialogueBubble({
+                petName: '小伴',
+                text: thinking ? node.local : node.ai,
+                choices: node.choices,
+                tail: 'bottom-right',
+                thinking,
+                modelBadge: !thinking,
+                composer: true,
+                context: 'composer'
+              })}</div>` : ''}
+              <button type="button" class="composer-pet-btn ${state.composerPoked ? 'is-poked' : ''}" title="点一下，摸摸小伴" aria-label="摸摸小伴" onclick="onComposerPetClick()">
+                ${renderPetSvg(sunflower, state.composerPoked ? 'excited' : 'happy')}
+              </button>
+            </div>
+            <div class="composer-placeholder">给小伴发消息，或点击右上角小伴闲聊两句…</div>
+            <div class="composer-bar">
+              <div class="composer-tools">
+                <span class="composer-chip">＋ 工具</span>
+                <span class="composer-chip">日常模式</span>
+              </div>
+              <button type="button" class="composer-send" aria-label="发送" onclick="showToast('演示：发送主聊天消息，不打断伙伴独立会话')">${SEND_SVG}</button>
+            </div>
+          </div>
+        </div>
+      </section>`;
+    return;
+  }
+
+  stage.innerHTML = `
+    <section class="spec-section">
+      <h2 class="spec-title">一、主动陪伴问候气泡（GreetingBubble · 3 态）</h2>
+      <p class="spec-desc">暖瓷白 / 暖炭表面、22px 大圆角、全圆胶囊动作与指向尾尖；8 秒无操作自动收起，悬停或聚焦暂停，无底部倒计时条。</p>
+      <div class="spec-grid">
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>1. 标准问候态（气泡在右）</span><span>8s 自动收起</span></div>
+          ${renderGreetingBubble({ petName: '向日葵', text: GREETINGS[0], tail: 'left' })}
+          <div class="spec-note">主操作「聊两句」使用柔和主题底；「暂不打扰」收于右侧弱化文字按钮。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>2. 屏幕右侧边缘镜像（气泡在左）</span><span>tail="right"</span></div>
+          ${renderGreetingBubble({ petName: '玉露团团', text: GREETINGS[2], tail: 'right' })}
+          <div class="spec-note">当伙伴靠近屏幕右边缘时，窗口自动切到伙伴左侧并镜像尾尖方向。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>3. 长文案两行截断</span><span>line-clamp: 2</span></div>
+          ${renderGreetingBubble({ petName: '书桌上的小雏菊', text: '我一直在这里，偶尔也会想些奇怪的小问题，比如窗外的云今天飘得这么慢，要不要一起看两秒？', tail: 'left' })}
+          <div class="spec-note">超长昵称单行省略，正文最多 2 行，避免撑爆无滚动条的固定高度问候窗。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="spec-section">
+      <h2 class="spec-title">二、伙伴点击对话卡片（CompanionReplyCard · 6 态）</h2>
+      <p class="spec-desc">桌面伙伴点击与输入框小伴共用同一暖感对话泡泡；先即时返回本地短句，再异步尝试模型润色，默认 12 秒收起，悬停或聚焦暂停。</p>
+      <div class="spec-grid">
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>1. 本地即时回复 + 模型润色中</span><span>thinking</span></div>
+          ${renderDialogueBubble({ petName: '小雏菊', text: DIALOGUE_FLOW.start.local, choices: DIALOGUE_FLOW.start.choices, tail: 'left', thinking: true })}
+          <div class="spec-note">右下角三点呼吸指示「想一想…」，不阻塞快捷回应或「接着聊」。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>2. 模型润色完成态</span><span>model = true</span></div>
+          ${renderDialogueBubble({ petName: '向日葵', text: DIALOGUE_FLOW.start.ai, choices: DIALOGUE_FLOW.start.choices, tail: 'left', modelBadge: true })}
+          <div class="spec-note">顶栏轻徽章标示已润色，正文悬停切换主题文字色提示可点击直达会话。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>3. 悬停 / 键盘聚焦暂停态</span><span>paused</span></div>
+          ${renderDialogueBubble({ petName: '郁金香', text: DIALOGUE_FLOW.tired.ai, choices: DIALOGUE_FLOW.tired.choices, tail: 'left', paused: true })}
+          <div class="spec-note">指针进入或键盘 Tab 聚焦时自动暂停 12s 自动收起计时，离开后恢复。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>4. 长文本内部滚动态</span><span>max-height: 88px</span></div>
+          ${renderDialogueBubble({ petName: '向日葵', text: '今天确实排得挺满的，不过你刚才已经把最难的那一块啃下来了。接下来先喝口温水、活动一下手腕，剩下的收尾步骤我们一条一条慢慢过，不用着急。', choices: DIALOGUE_FLOW.plan.choices, tail: 'left', modelBadge: true })}
+          <div class="spec-note">正文区内部轻量滚动，全圆胶囊选项与底栏始终固定可见。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>5. 接话 / 打开会话失败降级态</span><span>role="alert"</span></div>
+          ${renderDialogueBubble({ petName: '小雏菊', text: DIALOGUE_FLOW.happy.local, choices: DIALOGUE_FLOW.happy.choices, tail: 'left', error: '这一句没接上，再点一下试试吧。' })}
+          <div class="spec-note">保留当前本地回复，底部显示克制柔和错误条，不清空气泡内容。</div>
+        </div>
+        <div class="spec-tile ${wpClass}">
+          <div class="spec-cap"><span>6. 输入框小伴上方形态</span><span>tail="bottom-right"</span></div>
+          ${renderDialogueBubble({ petName: '小伴', text: DIALOGUE_FLOW.curious.local, choices: DIALOGUE_FLOW.curious.choices, tail: 'bottom-right', composer: true })}
+          <div class="spec-note">宽度 284px，底部右侧尾尖直指输入框上方的伙伴，避免遮挡发送按钮。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="spec-section">
+      <h2 class="spec-title">三、落地参数与窗口边界（已对齐桌面代码）</h2>
+      <p class="spec-desc">对应 <code>proactivity.rs</code>、<code>GreetingBubble.vue</code>、<code>CompanionReplyCard.vue</code> 与 <code>ChatComposerPet.vue</code>。</p>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <small>主动问候窗口（含阴影安全留白）</small>
+          <strong>314 × 166 px</strong>
+          <span>四周留 13–16px 透明缓冲，完整呈现暖感投影与尾尖</span>
+        </div>
+        <div class="metric-card">
+          <small>点击对话窗口（含阴影安全留白）</small>
+          <strong>332 × 260 px</strong>
+          <span>容纳 2 行正文 + 2 枚全圆胶囊选项 + 可选错误条</span>
+        </div>
+        <div class="metric-card">
+          <small>尾尖方位与主题色下发</small>
+          <strong>tail + accent</strong>
+          <span><code>bubble_placement()</code> 判定左右尾尖，同步 6 套主题色与深浅色</span>
+        </div>
+        <div class="metric-card">
+          <small>无干扰自动收起</small>
+          <strong>8s / 12s · 无进度条</strong>
+          <span>鼠标悬停或键盘聚焦均暂停自动收起，离开后恢复计时</span>
+        </div>
+      </div>
+    </section>`;
+}
+
+function syncButtons() {
+  document.documentElement.dataset.theme = state.theme;
+  document.documentElement.dataset.accent = state.accent;
+  document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === state.theme)));
+  document.querySelectorAll('[data-accent-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accentBtn === state.accent)));
+}
+
+function renderAll() {
+  syncButtons();
+  renderSubBar();
+  renderStage();
+}
+
+function setView(v) { state.view = v; renderAll(); }
+function setTheme(t) { state.theme = t; renderAll(); }
+function setAccent(a) { state.accent = a; renderAll(); }
+function setWallpaper(w) { state.wallpaper = w; renderAll(); }
+function setPet(id) { state.petId = id; renderAll(); }
+function setSide(side) { state.side = side; renderAll(); }
+function setComposerWidth(w) { state.composerWidth = w; renderAll(); }
+function toggleAttention() {
+  state.composerAttention = !state.composerAttention;
+  if (state.composerAttention) state.composerOpen = false;
+  renderAll();
+}
+
+function triggerGreeting() {
+  clearTimeout(state.aiTimer);
+  state.deskMode = 'greeting';
+  state.deskGreetingIdx = (state.deskGreetingIdx + 1) % GREETINGS.length;
+  renderStage();
+}
+function onPetHoverStart() {
+  clearTimeout(state.hoverTimer);
+  state.hoverTimer = setTimeout(() => {
+    if (state.deskMode === 'none') {
+      triggerGreeting();
+      showToast('已触发 0.9s 悬停主动问候');
+    }
+  }, 900);
+}
+function onPetHoverEnd() { clearTimeout(state.hoverTimer); }
+
+function startAiRefine(target) {
+  clearTimeout(state.aiTimer);
+  if (target === 'desktop') state.deskAiPhase = 'thinking';
+  else state.composerAiPhase = 'thinking';
+  renderStage();
+  state.aiTimer = setTimeout(() => {
+    if (target === 'desktop') state.deskAiPhase = 'ready';
+    else state.composerAiPhase = 'ready';
+    renderStage();
+  }, 1150);
+}
+
+function onPetClick() {
+  clearTimeout(state.hoverTimer);
+  state.deskPoked = true;
+  state.deskMode = 'dialogue';
+  state.deskNode = 'start';
+  startAiRefine('desktop');
+  setTimeout(() => { state.deskPoked = false; renderStage(); }, 500);
+}
+function onDeskChoice(id) { state.deskNode = DIALOGUE_FLOW[id] ? id : 'start'; startAiRefine('desktop'); }
+function onDeskContinue() { showToast('已打开该伙伴的专属聊天会话并带入当前气泡对话'); state.deskMode = 'none'; renderStage(); }
+function closeDeskBubble() { clearTimeout(state.aiTimer); state.deskMode = 'none'; renderStage(); }
+function onGreetingAction(outcome) {
+  const labels = {
+    chat: '已打开聊天页并带上这句问候',
+    poke: '摸了摸伙伴，已记录正向互动反馈',
+    snoozed: '已设为暂不打扰，一段时间内不再主动弹出',
+    dismissed: '已关闭问候并记录关闭反馈'
+  };
+  if (outcome === 'poke') {
+    state.deskPoked = true;
+    setTimeout(() => { state.deskPoked = false; renderStage(); }, 500);
+  }
+  state.deskMode = 'none';
+  renderStage();
+  showToast(labels[outcome] || '已完成操作');
+}
+
+function onComposerPetClick() {
+  if (state.composerAttention) return;
+  state.composerPoked = true;
+  state.composerOpen = true;
+  state.composerNode = 'start';
+  startAiRefine('composer');
+  setTimeout(() => { state.composerPoked = false; renderStage(); }, 500);
+}
+function onComposerChoice(id) { state.composerNode = DIALOGUE_FLOW[id] ? id : 'start'; startAiRefine('composer'); }
+function onComposerContinue() { showToast('已在超级小伴 / 主聊天页打开小伴专属会话'); state.composerOpen = false; renderStage(); }
+function closeComposerBubble() { clearTimeout(state.aiTimer); state.composerOpen = false; renderStage(); }
+
+(function initFromQuery() {
+  const q = new URLSearchParams(location.search);
+  const view = q.get('view');
+  const theme = q.get('theme');
+  const accent = q.get('accent');
+  const wp = q.get('wp');
+  if (['desktop', 'composer', 'states'].includes(view)) state.view = view;
+  if (['light', 'dark'].includes(theme)) state.theme = theme;
+  if (['red', 'green', 'blue', 'purple', 'amber', 'graphite'].includes(accent)) state.accent = accent;
+  if (['day', 'dusk', 'night', 'clean'].includes(wp)) state.wallpaper = wp;
+  renderAll();
+})();
+</script>
+</body>
+</html>
