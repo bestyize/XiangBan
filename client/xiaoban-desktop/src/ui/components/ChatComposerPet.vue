@@ -71,7 +71,7 @@ async function poke() {
       <img :src="image" class="composer-pet-picture" :class="{ 'is-hidden': reacting && actorComponent }" alt="" aria-hidden="true" draggable="false" />
       <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="petSize" :paused="paused" :interactive="false" />
     </button>
-    <CompanionReplyCard v-if="response" class="composer-pet-reply" :initial="response" data-testid="composer-pet-reply" @close="response = null" />
+    <CompanionReplyCard v-if="response" class="composer-pet-reply" :initial="response" tail="bottom-right" data-testid="composer-pet-reply" @close="response = null" />
   </div>
 </template>
 
@@ -88,7 +88,7 @@ async function poke() {
 .composer-pet-live :deep(.pet-stage),.composer-pet-live :deep(.pet-art){pointer-events:none}
 .composer-pet.is-attention{visibility:hidden;pointer-events:none}
 .composer-pet.is-reacting .composer-pet-touch{animation:pet-touch-response .4s ease-out}
-.composer-pet-reply{position:absolute;bottom:calc(100% - 14px);right:calc(100% - 5px);width:280px;max-width:calc(100vw - 44px);z-index:3;animation:pet-reply-in .2s ease-out}
+.composer-pet-reply{position:absolute;bottom:calc(100% + 4px);right:8px;width:284px;max-width:calc(100vw - 44px);z-index:3;animation:pet-reply-in .2s cubic-bezier(.22,1,.36,1)}
 @keyframes pet-touch-response{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-5px) rotate(-4deg)}65%{transform:translateY(-2px) rotate(3deg)}}
 @keyframes pet-reply-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.composer-pet-touch,.composer-pet.is-reacting .composer-pet-touch,.composer-pet-reply{animation:none;transition:none}}

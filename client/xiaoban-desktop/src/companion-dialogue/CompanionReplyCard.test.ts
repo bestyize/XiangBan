@@ -60,6 +60,13 @@ describe('companion conversation card', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
     expect(host.invoke).toHaveBeenCalledWith('companion_dialogue_close', { id: 41 }); wrapper.unmount();
   });
+  it('renders tail direction and polished badge when model reply is active', async () => {
+    const wrapper = mount(CompanionReplyCard, { props: { initial: { ...initial, model: true }, tail: 'bottom-right' } });
+    await flushPromises();
+    expect(wrapper.get('[data-testid="companion-reply-card"]').attributes('data-tail')).toBe('bottom-right');
+    expect(wrapper.get('.reply-badge').text()).toBe('已润色');
+    wrapper.unmount();
+  });
   it('ships distinct authored replies and every local branch has content', () => {
     const lines = Object.values(corpus.scenes).flat();
     expect(lines).toHaveLength(336); expect(new Set(lines).size).toBe(336);

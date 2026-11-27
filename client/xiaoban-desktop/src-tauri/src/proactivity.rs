@@ -12,8 +12,10 @@ use std::{
 use tauri::{Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 const BUBBLE_LABEL: &str = "companion-greeting";
-const WIDTH: f64 = 282.0;
-const HEIGHT: f64 = 138.0;
+const WIDTH: f64 = 314.0;
+const HEIGHT: f64 = 166.0;
+const DIALOGUE_WIDTH: f64 = 332.0;
+const DIALOGUE_HEIGHT: f64 = 260.0;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -54,6 +56,8 @@ pub struct Greeting {
     pet_name: String,
     text: String,
     appearance: String,
+    accent: String,
+    tail: String,
     #[serde(skip_serializing)]
     pet_label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -296,10 +300,12 @@ pub(crate) fn dialogue_identity(app: &tauri::AppHandle) -> Result<(String, Strin
 pub(crate) fn show_dialogue(app: &tauri::AppHandle, pet: &tauri::WebviewWindow, key: String,
     reply: crate::companion_dialogue::core::Reply) -> Result<(), String> {
     let state = app.state::<ProactivityState>();
+    let settings = crate::settings(app);
     let id = reply.id;
     let previous = state.active.lock().unwrap_or_else(|e| e.into_inner()).replace(Greeting {
         id: reply.id, pet_name: reply.pet_name.clone(), text: reply.text.clone(),
-        appearance: crate::settings(app).appearance, pet_label: pet.label().into(), dialogue: Some(reply), dialogue_key: Some(key),
+        appearance: settings.appearance, accent: settings.accent, tail: "left".into(),
+        pet_label: pet.label().into(), dialogue: Some(reply), dialogue_key: Some(key),
     });
     if let Some(key) = previous.and_then(|g| g.dialogue_key) { crate::companion_dialogue::cancel(app, &key); }
     if let Err(error) = sync_bubble(app, &state) {
@@ -321,7 +327,29 @@ fn greeting_text(id: u64) -> &'static str {
     ];
     TEXTS[(id as usize).wrapping_sub(1) % TEXTS.len()]
 }
-fn bubble_position(pet: &tauri::WebviewWindow, logical_width: f64, logical_height: f64) -> Result<PhysicalPosition<i32>, String> {
+fn bubble_placement(
+    pet_x: i32, pet_y: i32, pet_w: i32, pet_h: i32,
+    mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32,
+    width: i32, height: i32, edge: i32,
+) -> (PhysicalPosition<i32>, &'static str) {
+    let right = mon_x.saturating_add(mon_w);
+    let bottom = mon_y.saturating_add(mon_h);
+    let preferred = pet_x.saturating_add(pet_w).saturating_add(edge);
+    let (x, tail) = if preferred.saturating_add(width) <= right {
+        (preferred, "left")
+    } else {
+        (pet_x.saturating_sub(width).saturating_sub(edge), "right")
+    };
+    let y = pet_y.saturating_add((pet_h / 3).max(0)).saturating_sub(height / 2);
+    (
+        PhysicalPosition::new(
+            x.clamp(mon_x, right.saturating_sub(width).max(mon_x)),
+            y.clamp(mon_y, bottom.saturating_sub(height).max(mon_y)),
+        ),
+        tail,
+    )
+}
+fn bubble_position(pet: &tauri::WebviewWindow, logical_width: f64, logical_height: f64) -> Result<(PhysicalPosition<i32>, &'static str), String> {
     let origin = pet.outer_position().map_err(|e| e.to_string())?;
     let size = pet.outer_size().map_err(|e| e.to_string())?;
     let monitor = pet.current_monitor().map_err(|e| e.to_string())?
@@ -331,16 +359,12 @@ fn bubble_position(pet: &tauri::WebviewWindow, logical_width: f64, logical_heigh
     let scale = monitor.scale_factor();
     let width = (logical_width * scale).round() as i32;
     let height = (logical_height * scale).round() as i32;
-    let edge = (10.0 * scale).round() as i32;
-    let right = m_origin.x.saturating_add(m_size.width as i32);
-    let bottom = m_origin.y.saturating_add(m_size.height as i32);
-    let preferred = origin.x.saturating_add(size.width as i32).saturating_add(edge);
-    let x = if preferred.saturating_add(width) <= right {
-        preferred
-    } else { origin.x.saturating_sub(width).saturating_sub(edge) };
-    let y = origin.y.saturating_add((size.height as i32 / 3).max(0)).saturating_sub(height / 2);
-    Ok(PhysicalPosition::new(x.clamp(m_origin.x, right.saturating_sub(width).max(m_origin.x)),
-        y.clamp(m_origin.y, bottom.saturating_sub(height).max(m_origin.y))))
+    let edge = (4.0 * scale).round() as i32;
+    Ok(bubble_placement(
+        origin.x, origin.y, size.width as i32, size.height as i32,
+        m_origin.x, m_origin.y, m_size.width as i32, m_size.height as i32,
+        width, height, edge,
+    ))
 }
 // Tauri releases destroyed webview labels asynchronously. Keep one greeting window
 // and reconcile it with the latest offer even when two companions are clicked together.
@@ -348,7 +372,7 @@ fn sync_bubble(app: &tauri::AppHandle, state: &ProactivityState) -> Result<(), S
     let _presentation = state.presentation.lock().unwrap_or_else(|e| e.into_inner());
     let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let existing = app.get_webview_window(BUBBLE_LABEL);
-    let Some(greeting) = active else {
+    let Some(mut greeting) = active else {
         if let Some(bubble) = existing {
             bubble.hide().map_err(|e| e.to_string())?;
             bubble.eval("window.dispatchEvent(new CustomEvent('companion-greeting-changed',{detail:null}))").map_err(|e| e.to_string())?;
@@ -356,8 +380,12 @@ fn sync_bubble(app: &tauri::AppHandle, state: &ProactivityState) -> Result<(), S
         return Ok(());
     };
     let pet = app.get_webview_window(&greeting.pet_label).ok_or("伙伴窗口已关闭")?;
-    let (width, height) = if greeting.dialogue.is_some() { (320.0, 240.0) } else { (WIDTH, HEIGHT) };
-    let pos = bubble_position(&pet, width, height)?;
+    let (width, height) = if greeting.dialogue.is_some() { (DIALOGUE_WIDTH, DIALOGUE_HEIGHT) } else { (WIDTH, HEIGHT) };
+    let (pos, tail) = bubble_position(&pet, width, height)?;
+    greeting.tail = tail.into();
+    if let Some(current) = state.active.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+        if current.id == greeting.id { current.tail = tail.into(); }
+    }
     let bubble = if let Some(bubble) = existing {
         bubble.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
         let detail = serde_json::to_string(&greeting).map_err(|e| e.to_string())?;
@@ -424,7 +452,11 @@ pub async fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64)
     let _ = engine.observe(&event);
     let Decision::Allowed(action) = engine.consider(candidate, &context, now.timestamp_millis()) else { return Ok(false); };
     if action.kind != ActionKind::CompanionGreeting || action.channel != Channel::Bubble { return Ok(false); }
-    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), appearance: settings.appearance, pet_label: window.label().into(), dialogue: None, dialogue_key: None };
+    let offer = Greeting {
+        id: action.id, pet_name: p.name, text: greeting_text(action.id).into(),
+        appearance: settings.appearance, accent: settings.accent, tail: "left".into(),
+        pet_label: window.label().into(), dialogue: None, dialogue_key: None,
+    };
     drop(engine);
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
@@ -531,5 +563,15 @@ mod tests {
     #[test]
     fn greeting_is_short_and_non_deceptive() {
         for id in 1..=30 { assert!(greeting_text(id).chars().count() < 65); }
+    }
+    #[test]
+    fn bubble_placement_flips_tail_near_right_edge() {
+        let (right_pos, right_tail) = bubble_placement(200, 300, 180, 180, 0, 0, 1920, 1080, 314, 166, 4);
+        assert_eq!(right_tail, "left");
+        assert_eq!(right_pos.x, 384);
+
+        let (left_pos, left_tail) = bubble_placement(1700, 300, 180, 180, 0, 0, 1920, 1080, 314, 166, 4);
+        assert_eq!(left_tail, "right");
+        assert_eq!(left_pos.x, 1382);
     }
 }

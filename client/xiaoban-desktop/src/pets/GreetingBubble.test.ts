@@ -57,4 +57,25 @@ describe('opted-in desktop pet greeting',()=>{
    expect(host.invoke).not.toHaveBeenCalledWith('respond_companion_greeting',expect.anything());
   } finally {wrapper.unmount();vi.useRealTimers();}
  });
+ it('applies host theme tokens, tail direction, and pauses auto-dismiss while hovered',async()=>{
+  vi.useFakeTimers();
+  host.invoke.mockImplementation(async (command:string)=>{
+   if(command==='get_companion_greeting')return {id:10,petName:'向日葵',text:'嘿，陪我待会儿吗？',appearance:'dark',accent:'green',tail:'right'};
+  });
+  const wrapper=mount(GreetingBubble,{attachTo:document.body});
+  try {
+   await flushPromises();
+   expect(document.documentElement.dataset.theme).toBe('dark');
+   expect(document.documentElement.dataset.accent).toBe('green');
+   const card=wrapper.get('.greeting-card');
+   expect(card.attributes('data-tail')).toBe('right');
+   await card.trigger('pointerenter');
+   await vi.advanceTimersByTimeAsync(15_000);
+   expect(host.invoke).not.toHaveBeenCalledWith('respond_companion_greeting',expect.anything());
+   await card.trigger('pointerleave');
+   await vi.advanceTimersByTimeAsync(8_000);
+   await flushPromises();
+   expect(host.invoke).toHaveBeenCalledWith('respond_companion_greeting',{id:10,outcome:'ignored'});
+  } finally {wrapper.unmount();vi.useRealTimers();}
+ });
 });
