@@ -52,7 +52,7 @@ test('wancisou V2 assets stay in sync and run without inline CSP exceptions', as
   const source = new URL('assets/app-packs/wancisou/', root)
   const bundled = new URL('wancisou/', publicDir)
   const manifest = JSON.parse(await readFile(new URL('manifest.json', source), 'utf8'))
-  assert.equal(manifest.version, '2.0.0')
+  assert.equal(manifest.version, '2.0.1')
   assert.equal(manifest.schemaVersion, 3)
   assert.equal(manifest.runtimeProtocol, 2)
   assert.deepEqual(manifest.capabilities, ['clipboard'])
