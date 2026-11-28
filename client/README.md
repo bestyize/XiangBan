@@ -6,6 +6,6 @@
 - [xiaoban-games-h5](xiaoban-games-h5/README.md)：小伴游戏厅（`game.xiaban.xyz`）移动端小游戏合集站（Vue 3 + Vite + PWA 纯静态前端，同步内置 8 款小伴官方游戏、双协议运行时宿主、免登录本机存档/导出备份与相伴统一账号登录弹窗）。
 - [xiaban-portal](xiaban-portal/README.md)：小伴产品矩阵总站与双端独立下载页（`xiaban.xyz`、`/desktop`、`/app`，Vue 3 + Vite 纯静态前端，图片托管于资源机、反代版本接口）。
 
-- [aireset-web](aireset-web/README.md)：AI额度监控 QuotaReset（`aireset.xiangban.xyz`）静态站（零依赖，构建期预渲染以利 SEO；御三家额度重置雷达与订阅额度实测，重置记录目前为演示数据）。
+- [aireset-web](aireset-web/README.md)：AI额度监控 QuotaReset（`aireset.xiaban.xyz`）静态站（零依赖，构建期预渲染以利 SEO；御三家额度重置雷达与订阅额度实测，重置记录目前为演示数据）。
 
 应用自行维护依赖、内部公共代码和构建发布。允许重复代码，不通过相对路径依赖另一个客户端的源码。需要跨端同步时明确范围并分别验证。

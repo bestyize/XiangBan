@@ -1,6 +1,6 @@
 # AI额度监控 QuotaReset（aireset-web）
 
-状态：已实现首版（静态站），域名 `aireset.xiangban.xyz`，部署到香港云服务器，见 [infra/aireset/README.md](../../infra/aireset/README.md)。
+状态：已实现首版（静态站），域名 `aireset.xiaban.xyz`，部署到香港云服务器，见 [infra/aireset/README.md](../../infra/aireset/README.md)。
 
 御三家（ChatGPT/Codex、反重力 Antigravity、Claude）额度重置雷达与订阅额度实测对比站。视觉与交互按设计稿 [ai-quota-monitor.html](../../docs/design-preview/prototypes/ai-quota-monitor.html) 落地，PC 与移动端共用同一份响应式页面（容器查询）。
 

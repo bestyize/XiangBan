@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src', 'index.html');
 const DIST = path.join(ROOT, 'dist');
-const ORIGIN = (process.env.SITE_ORIGIN || 'https://aireset.xiangban.xyz').replace(/\/$/, '');
+const ORIGIN = (process.env.SITE_ORIGIN || 'https://aireset.xiaban.xyz').replace(/\/$/, '');
 const NO_PRERENDER = process.argv.includes('--no-prerender');
 
 const PAGES = [
@@ -78,7 +78,7 @@ function applyMeta(html, page) {
   html = sub(html, /<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(page.ogDescription)}" />`, 'og:description');
   html = sub(html, /<body data-initial-tab="\w+">/, `<body data-initial-tab="${page.tab}">`, 'body data-initial-tab');
   // JSON-LD 与 canonical 域名保持一致
-  html = html.replace(/https:\/\/aireset\.xiangban\.xyz\//g, `${ORIGIN}/`);
+  html = html.replace(/https:\/\/aireset\.xiaban\.xyz\//g, `${ORIGIN}/`);
   return html;
 }
 

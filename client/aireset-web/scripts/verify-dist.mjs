@@ -23,8 +23,8 @@ check('index.html 存在', home.length > 20_000);
 check('benchmark/index.html 存在', bench.length > 20_000);
 
 for (const [name, html, canonical] of [
-  ['首页', home, 'https://aireset.xiangban.xyz/'],
-  ['实测页', bench, 'https://aireset.xiangban.xyz/benchmark/'],
+  ['首页', home, 'https://aireset.xiaban.xyz/'],
+  ['实测页', bench, 'https://aireset.xiaban.xyz/benchmark/'],
 ]) {
   check(`${name} canonical 正确`, html.includes(`<link rel="canonical" href="${canonical}"`));
   check(`${name} 含 description`, /<meta name="description" content="[^"]{40,}"/.test(html));
@@ -41,7 +41,7 @@ check('实测页含 ModelDial 来源声明', bench.includes('modeldial.com/subsc
 check('实测页 title 独立', /<title>AI订阅额度实测对比/.test(bench));
 check('首页 title 独立', /<title>AI额度监控 QuotaReset — ChatGPT Codex/.test(home));
 
-check('robots.txt 含 sitemap', read('robots.txt').includes('Sitemap: https://aireset.xiangban.xyz/sitemap.xml'));
+check('robots.txt 含 sitemap', read('robots.txt').includes('Sitemap: https://aireset.xiaban.xyz/sitemap.xml'));
 check('sitemap.xml 含两个页面', count(read('sitemap.xml'), '<loc>') === 2);
 check('favicon.svg 存在', read('favicon.svg').includes('<svg'));
 check('404.html 存在', read('404.html').includes('页面不存在'));
