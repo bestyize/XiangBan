@@ -493,6 +493,20 @@ onUnmounted(() => {
             <img :src="activeLiveTab.img" :alt="activeLiveTab.tab" loading="lazy">
           </div>
           <p class="live-caption">{{ activeLiveTab.caption }}</p>
+          <a
+            class="desktop-case"
+            href="https://chat.xiangban.xyz/?tab=gallery&amp;exhibit=arowana"
+            target="_top"
+            rel="noreferrer"
+            aria-labelledby="desktop-case-title desktop-case-action"
+            aria-describedby="desktop-case-description"
+          >
+            <div>
+              <h4 id="desktop-case-title">龙鱼巡游</h4>
+              <p id="desktop-case-description">让 3D 朱红龙鱼游过桌面，也可以和孔雀鱼同游。</p>
+            </div>
+            <span id="desktop-case-action" class="desktop-case-action">查看社区展品 <span aria-hidden="true">↗</span></span>
+          </a>
         </div>
       </section>
 
@@ -1189,6 +1203,30 @@ onUnmounted(() => {
   color: rgba(245, 244, 248, 0.78);
   text-align: center;
 }
+.desktop-case {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-top: 16px;
+  padding: 14px 2px 0;
+  border-top: 1px solid rgba(245, 244, 248, 0.2);
+}
+.desktop-case h4 { font-size: 15px; }
+.desktop-case p {
+  margin-top: 3px;
+  font-size: 13px;
+  color: rgba(245, 244, 248, 0.8);
+}
+.desktop-case-action {
+  color: #ffd0dc;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.desktop-case:hover .desktop-case-action { text-decoration: underline; text-underline-offset: 3px; }
+.desktop-case:focus-visible { outline: 2px solid #ffd0dc; outline-offset: 4px; }
 
 /* FAQ & 生态 */
 .faq-box {
