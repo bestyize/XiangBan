@@ -1733,11 +1733,18 @@
       title: '万磁搜 · 跨站磁力搜索',
       domains: ['miniapp'],
       subcat: '实用小程序',
-      status: 'merged',
-      statusNote: '已合入独立应用包 wancisou v1.0.2',
+      status: 'pending',
+      statusNote: 'V2「赤磁引力」设计已定稿待落地（线上现役 wancisou v1.0.2）',
       runtime: 'static',
       path: 'client/xiaoban-multiplatform/docs/design-specs/prototypes/torrent-search.html',
-      summary: '协议 2 独立搜索工具设计稿：展示首屏、跨站搜索结果、来源筛选、无结果态、服务异常态及磁力复制操作弹层，支持浅色与深色模式。'
+      summary: 'V2「赤磁引力」重设计定稿（单机试玩 / 6 态总览 / 16:9 封面 / 390·360px / 浅深双色 / 手机宿主与网页嵌入）：顶部赤磁柔光与渐变磁铁徽标、深绯墨 Hero 卡与 4 格场景入口、两色语义结果卡（热种标、体积粗标、翡翠绿做种徽章与一键直复制）、双段式 BTIH 磁力与带定位副标来源 BottomSheet。',
+      presets: [
+        { label: '多态总览', query: '?view=overview' },
+        { label: '单机试玩', query: '?view=results' },
+        { label: '磁力弹层', query: '?view=dialog' },
+        { label: '16:9 封面', query: '?view=cover' },
+        { label: '深色模式', query: '?view=results&theme=dark' },
+      ]
     },
     {
       id: 'shoupan-biewen',
