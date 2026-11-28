@@ -4,78 +4,132 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
   <title>动态壁纸</title>
   <link rel="stylesheet" href="gallery.css">
   <script defer src="scenes.js"></script>
   <script defer src="gallery.js"></script>
 </head>
 <body>
-  <main>
-    <section class="library" id="library" aria-labelledby="library-title">
-      <header class="topbar"><h1 id="library-title">动态壁纸</h1></header>
-      <div class="gallery" aria-label="内置壁纸">
-        <button class="wallpaper-card" type="button" data-scene="aquarium" aria-label="预览水下花园">
-          <span class="poster-frame">
-            <img class="poster" src="aquarium.webp" width="360" height="600" alt="">
-            <span class="applied-badge" hidden></span>
-          </span>
-          <span class="card-caption">
-            <span><strong>水下花园</strong><small>互动涟漪</small></span>
-            <i class="play-mark" aria-hidden="true"></i>
-          </span>
-        </button>
-        <button class="wallpaper-card" type="button" data-scene="galaxy" aria-label="预览银河">
-          <span class="poster-frame">
-            <img class="poster" src="galaxy.webp" width="360" height="600" alt="">
-            <span class="applied-badge" hidden></span>
-          </span>
-          <span class="card-caption">
-            <span><strong>银河</strong><small>实时星系</small></span>
-            <i class="play-mark" aria-hidden="true"></i>
-          </span>
-        </button>
+  <main class="app-viewport">
+    <section class="page page-home" id="library" aria-labelledby="library-title">
+      <header class="home-topbar">
+        <h1 id="library-title">动态壁纸</h1>
+      </header>
+      <div class="home-body">
+        <div class="slot-strip" id="slot-strip" hidden>
+          <div class="slot-strip-list">
+            <div class="slot-row" data-slot="home" hidden>
+              <i class="status-dot" aria-hidden="true"></i><span>桌面 · 雨窗天光 <em></em></span>
+            </div>
+            <div class="slot-row" data-slot="lock" hidden>
+              <i class="status-dot" aria-hidden="true"></i><span>锁屏 · 雨窗天光 <em></em></span>
+            </div>
+          </div>
+          <button class="slot-action" type="button" data-open-preview>去调整</button>
+        </div>
+
+        <article class="hero-frame" aria-labelledby="hero-title">
+          <canvas class="hero-canvas" aria-hidden="true"></canvas>
+          <div class="hero-scrim"></div>
+          <div class="hero-top-row">
+            <span class="glass-badge" id="applied-badge" hidden>
+              <i class="status-dot" aria-hidden="true"></i><span></span>
+            </span>
+            <span class="glass-badge">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3.5c-3.5 4.8-6 7.8-6 11a6 6 0 0 0 12 0c0-3.2-2.5-6.2-6-11Z"/></svg>
+              <span id="hero-preset">可拭雾 · 暮雨</span>
+            </span>
+          </div>
+          <div class="hero-bottom">
+            <div>
+              <h2 class="hero-title" id="hero-title">雨窗天光</h2>
+              <p class="hero-sub">实时天光 · 轻点落雨与滑动拭雾</p>
+            </div>
+            <button class="hero-enter" type="button" data-open-preview>
+              <span>预览</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>
+            </button>
+          </div>
+        </article>
+
+        <div class="preset-rail" role="group" aria-label="天光氛围"></div>
+        <div class="sec-head">
+          <h3>更多壁纸</h3>
+          <span class="sec-note">后续扩展位</span>
+        </div>
+        <div class="more-grid">
+          <article class="future-card">
+            <div class="future-art ink"><svg aria-hidden="true" viewBox="0 0 48 48"><circle cx="24" cy="24" r="16" opacity=".45"/><circle cx="24" cy="24" r="10" opacity=".75"/><circle cx="24" cy="24" r="4"/></svg></div>
+            <div class="future-meta">
+              <strong>水墨池境</strong>
+              <span class="neutral-tag"><i class="status-dot muted" aria-hidden="true"></i>制作中</span>
+            </div>
+          </article>
+          <article class="future-card">
+            <div class="future-art ferro"><svg aria-hidden="true" viewBox="0 0 48 48"><path d="M10 28c4-10 8-10 14 0s10 10 14 0" opacity=".8"/><path d="M10 20c4-7 8-7 14 0s10 7 14 0" opacity=".45"/></svg></div>
+            <div class="future-meta">
+              <strong>磁流体场</strong>
+              <span class="neutral-tag"><i class="status-dot muted" aria-hidden="true"></i>制作中</span>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
-    <section class="preview" id="preview" aria-labelledby="preview-title" hidden>
-      <div class="preview-visual" aria-hidden="true">
-        <div class="preview-scrim"></div>
-        <div class="overlays"></div>
-      </div>
-      <header class="preview-bar">
-        <button class="back-button" type="button" id="back" aria-label="返回壁纸库"><i class="back-mark" aria-hidden="true"></i></button>
-        <h1 id="preview-title"></h1>
+    <section class="page page-preview is-hidden" id="preview" aria-labelledby="preview-title" data-mode="wallpaper" inert>
+      <canvas class="preview-canvas" aria-hidden="true"></canvas>
+      <div class="preview-scrim"></div>
+      <button class="preview-back" type="button" id="back" aria-label="返回壁纸库"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
+      <header class="preview-topbar">
+        <h2 id="preview-title">雨窗天光</h2>
+        <small id="preview-preset">暮雨 · 暮色深蓝与暖金窗灯散景</small>
       </header>
-      <footer class="preview-footer">
-        <div class="preview-modes" role="group" aria-label="预览模式">
-          <button type="button" data-mode="wallpaper" aria-pressed="true">壁纸</button>
-          <button type="button" data-mode="home" aria-pressed="false">桌面</button>
-          <button type="button" data-mode="lock" aria-pressed="false">锁屏</button>
+      <p class="gesture-hint" id="gesture-hint">轻点落雨滴 · 手指滑动拭开雾气</p>
+
+      <div class="sim-overlays" aria-hidden="true">
+        <div class="sim-lock" data-overlay="lock" hidden>
+          <svg class="sim-lock-ico" aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <span class="sim-date" data-date></span>
+          <span class="sim-clock-lg" data-time></span>
+          <div class="sim-lock-shortcuts">
+            <span class="sim-round-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8.5 4h7l-1 4.5v10a1.5 1.5 0 0 1-1.5 1.5h-2a1.5 1.5 0 0 1-1.5-1.5v-10L8.5 4Z"/><path d="M12 11.5v2"/></svg></span>
+            <span class="sim-round-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4.5 8.5h2.7l1.4-2h6.8l1.4 2h2.7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13.5" r="3.2"/></svg></span>
+          </div>
         </div>
-        <button type="button" id="apply" disabled>设为壁纸</button>
-        <p id="status" role="status" hidden></p>
+        <div class="sim-home" data-overlay="home" hidden>
+          <div class="sim-widget">
+            <span class="sim-clock-md" data-time></span>
+            <span class="sim-weather"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6.5 16.5A4 4 0 0 1 7 8.6a5.5 5.5 0 0 1 10.6 1.5A3.5 3.5 0 0 1 17.5 16.5H6.5Z"/><path d="M9 19.5l-1 2M13 19.5l-1 2M17 19.5l-1 2"/></svg><span><span data-date></span> · 小雨 14°</span></span>
+          </div>
+          <div>
+            <div class="sim-apps">
+              <div class="sim-app"><span class="sim-app-tile"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="M4.5 17l4.8-4.5 3.4 3.2 2.8-2.6 4 3.9"/></svg></span><span>相册</span></div>
+              <div class="sim-app"><span class="sim-app-tile"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8.5h7M8.5 12.5h7M8.5 16.5h4.5"/></svg></span><span>便签</span></div>
+              <div class="sim-app"><span class="sim-app-tile"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span>时钟</span></div>
+              <div class="sim-app"><span class="sim-app-tile"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4.5 8.5h2.7l1.4-2h6.8l1.4 2h2.7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13.5" r="3.2"/></svg></span><span>相机</span></div>
+            </div>
+            <div class="sim-dots"><i class="on"></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="preview-dock">
+        <div class="dock-presets" role="group" aria-label="天光氛围"></div>
+        <div class="dock-controls">
+          <div class="mode-tabs" role="group" aria-label="预览模式">
+            <button type="button" data-mode="wallpaper" aria-pressed="true">壁纸</button>
+            <button type="button" data-mode="home" aria-pressed="false">桌面</button>
+            <button type="button" data-mode="lock" aria-pressed="false">锁屏</button>
+          </div>
+          <button class="dock-reset-mist" type="button" id="reset-mist" title="重新起雾">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.6L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.6L20 15.5"/><path d="M20 20v-4.5h-4.5"/></svg><span>起雾</span>
+          </button>
+        </div>
+        <button class="dock-apply" id="apply" type="button" disabled>设为壁纸</button>
+        <p class="dock-status" id="status" role="status" hidden></p>
       </footer>
     </section>
-    <div class="toast" id="toast" role="status" hidden></div>
+    <div class="toast-pill" id="toast" role="status" hidden></div>
   </main>
-
-  <template id="home-overlay">
-    <div class="home-screen">
-      <div><span class="home-time" data-time></span><span class="demo-date" data-date></span></div>
-      <div class="mock-apps">
-        <span class="mock-app"><i class="mock-badge photos"><i class="mock-symbol"></i></i>相册</span>
-        <span class="mock-app"><i class="mock-badge notes"><i class="mock-symbol"></i></i>便签</span>
-        <span class="mock-app"><i class="mock-badge clock"><i class="mock-symbol"></i></i>时钟</span>
-        <span class="mock-app"><i class="mock-badge camera"><i class="mock-symbol"></i></i>相机</span>
-      </div>
-    </div>
-  </template>
-  <template id="lock-overlay">
-    <div class="lock-screen">
-      <i class="outline-lock"></i>
-      <span class="demo-date" data-date></span>
-      <span class="lock-time" data-time></span>
-    </div>
-  </template>
 </body>
 </html>

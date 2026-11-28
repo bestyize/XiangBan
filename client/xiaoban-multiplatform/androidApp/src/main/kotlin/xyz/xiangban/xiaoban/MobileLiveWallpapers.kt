@@ -1,5 +1,6 @@
 package xyz.xiangban.xiaoban
 
+import android.app.ActivityManager
 import android.app.WallpaperInfo
 import android.app.WallpaperManager
 import android.content.ComponentName
@@ -7,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import android.widget.Toast
 import java.io.File
@@ -15,20 +17,28 @@ import org.json.JSONObject
 
 internal object MobileLiveWallpapers {
     const val SCENE_CHANGED = "xyz.xiangban.xiaoban.action.WALLPAPER_SCENE_CHANGED"
+    private val presets = setOf("dusk", "morning", "moss", "neon", "snow")
 
-    // Keep the existing Android component names so an upgrade does not clear the user's wallpaper.
-    enum class Slot(val defaultScene: String, val service: Class<*>, val label: Int) {
-        PRIMARY("aquarium", AquariumWallpaperService::class.java, R.string.live_wallpaper_aquarium),
-        SECONDARY("galaxy", GalaxyWallpaperService::class.java, R.string.live_wallpaper_galaxy),
+    // Both the component names and the on-disk filenames predate Rain Window.
+    enum class Slot(val fileName: String, val defaultPreset: String, val service: Class<*>, val label: Int) {
+        PRIMARY("wallpaper-aquarium", "dusk", AquariumWallpaperService::class.java, R.string.live_wallpaper_aquarium),
+        SECONDARY("wallpaper-galaxy", "neon", GalaxyWallpaperService::class.java, R.string.live_wallpaper_galaxy);
+
+        fun presetFromStored(value: String?) = value?.takeIf(::isPreset) ?: defaultPreset
     }
 
-    fun isScene(scene: String) = Slot.entries.any { it.defaultScene == scene }
+    fun isPreset(id: String) = id in presets
+
+    fun renderingFps(context: Context) = if (context.getSystemService(PowerManager::class.java).isPowerSaveMode ||
+        context.getSystemService(ActivityManager::class.java).isLowRamDevice
+    ) 15 else 30
 
     data class Selection(private val homeSlot: Slot?, private val lockSlot: Slot?, val home: String?, val lock: String?) {
         fun hasNewWallpaper(previous: Selection) =
-            (home != null && home != previous.home) || (lock != null && lock != previous.lock)
+            (homeSlot != null && (homeSlot != previous.homeSlot || home != previous.home)) ||
+                (lockSlot != null && (lockSlot != previous.lockSlot || lock != previous.lock))
 
-        private fun switchTarget(mode: String): String? = when {
+        fun switchTarget(mode: String): String? = when {
             homeSlot != null && homeSlot == lockSlot -> if (mode == "wallpaper") "both" else null
             mode == "home" -> if (homeSlot != null) "home" else null
             mode == "lock" -> if (lockSlot != null) "lock" else null
@@ -43,9 +53,9 @@ internal object MobileLiveWallpapers {
             else -> null
         }
 
-        fun unusedSlot(scene: String): Slot? {
+        fun unusedSlot(preset: String): Slot? {
             val available = Slot.entries.filter { it != homeSlot && it != lockSlot }
-            return available.firstOrNull { it.defaultScene == scene } ?: available.firstOrNull()
+            return available.firstOrNull { it.defaultPreset == preset } ?: available.firstOrNull()
         }
 
         fun toJson() = JSONObject()
@@ -74,34 +84,35 @@ internal object MobileLiveWallpapers {
             val info = if (Build.VERSION.SDK_INT >= 34) manager.getWallpaperInfo(WallpaperManager.FLAG_LOCK) else null
             if (info == null && manager.getWallpaperId(WallpaperManager.FLAG_LOCK) < 0) home else slot(info)
         }.getOrNull()
-        val homeScene = home?.let { sceneFor(context, it) }
-        val lockScene = if (lock == home) homeScene else lock?.let { sceneFor(context, it) }
-        return Selection(home, lock, homeScene, lockScene)
+        val homePreset = home?.let { presetFor(context, it) }
+        val lockPreset = if (lock == home) homePreset else lock?.let { presetFor(context, it) }
+        return Selection(home, lock, homePreset, lockPreset)
     }
 
-    private fun sceneFile(context: Context, slot: Slot) = File(context.filesDir, "wallpaper-${slot.defaultScene}")
-
-    fun sceneFor(context: Context, slot: Slot): String = try {
-        sceneFile(context, slot).readText().takeIf(::isScene) ?: slot.defaultScene
+    private fun readPreset(file: File): String? = try {
+        file.readText()
     } catch (_: IOException) {
-        slot.defaultScene
+        null
     }
 
-    fun setScene(context: Context, slot: Slot, scene: String): Boolean {
-        if (!isScene(scene)) return false
-        if (sceneFor(context, slot) == scene) return true
+    fun presetFor(context: Context, slot: Slot): String =
+        slot.presetFromStored(readPreset(File(context.filesDir, slot.fileName)))
+
+    fun setPreset(context: Context, slot: Slot, preset: String): Boolean {
+        if (!isPreset(preset)) return false
+        val file = File(context.filesDir, slot.fileName)
+        if (readPreset(file) == preset) return true
         // The WebView service runs in another process. Rename in place so readers see a complete value.
-        val file = sceneFile(context, slot)
         try {
             val pending = File.createTempFile(file.name, ".tmp", context.filesDir)
             try {
-                pending.writeText(scene)
+                pending.writeText(preset)
                 if (!pending.renameTo(file)) return false
             } finally {
                 pending.delete()
             }
         } catch (error: IOException) {
-            Log.w("XiaobanLiveWallpaper", "Unable to save wallpaper scene", error)
+            Log.w("XiaobanLiveWallpaper", "Unable to save wallpaper preset", error)
             return false
         }
         context.sendBroadcast(Intent(SCENE_CHANGED).setPackage(context.packageName))

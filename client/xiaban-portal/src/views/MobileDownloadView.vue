@@ -49,7 +49,7 @@ const GAMES = [
 const TOOLS = [
   { name: '万能遥控器', icon: assetUrl('plaza/remote-control.webp'), desc: '内置电视空调离线红外码库' },
   { name: '轻启', icon: assetUrl('plaza/quick-launch.webp'), desc: '桌面闪电直达，跳过应用开屏广告' },
-  { name: '动态壁纸', icon: assetUrl('plaza/live-wallpapers.webp'), desc: '水下花园与银河，锁屏可分设' },
+  { name: '动态壁纸', icon: assetUrl('plaza/live-wallpapers.webp'), desc: '雨窗天光五套氛围，锁屏可分设' },
   { name: 'MBTI 向内看', icon: assetUrl('plaza/mbti.webp'), desc: '48 题六章报告与分享海报' },
 ]
 

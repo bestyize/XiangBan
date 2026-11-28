@@ -1,47 +1,81 @@
 (() => {
   const host = window.xb;
+  const wallpapers = host?.liveWallpapers;
+  const rain = window.RainWindow;
   const library = document.getElementById('library');
   const preview = document.getElementById('preview');
-  const visual = preview.querySelector('.preview-visual');
-  const overlays = preview.querySelector('.overlays');
-  const title = document.getElementById('preview-title');
   const back = document.getElementById('back');
   const apply = document.getElementById('apply');
   const status = document.getElementById('status');
   const toast = document.getElementById('toast');
-  const cards = new Map([...library.querySelectorAll('[data-scene]')].map(card => [card.dataset.scene, card]));
-  const modes = [...preview.querySelectorAll('[data-mode]')];
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const hint = document.getElementById('gesture-hint');
+  const dock = preview.querySelector('.preview-dock');
+  const presetButtons = [];
+  const modeButtons = preview.querySelectorAll('button[data-mode]');
+  const overlays = preview.querySelectorAll('[data-overlay]');
   const darkTheme = matchMedia('(prefers-color-scheme: dark)');
-  const timeFormat = new Intl.DateTimeFormat('zh-CN', {hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
-  const dateFormat = new Intl.DateTimeFormat('zh-CN', {month: 'numeric', day: 'numeric', weekday: 'short'});
+  const timeFormat = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const weekdayFormat = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' });
 
-  let selection = {home: null, lock: null, switchTargets: {}};
-  let supported = null;
-  let selected = null;
+  let preset = rain.presets[0];
   let mode = 'wallpaper';
-  let canvas;
-  let scene;
-  let ready = false;
+  let previewOpen = false;
+  let visit = 0;
+  let opener;
   let shown = true;
+  let ready = false;
+  let supported = false;
   let applying = false;
+  let statusRequest = 0;
+  let switchTargets = {};
+  let availability = wallpapers ? '正在检查系统壁纸设置…' : '在小伴 Android App 内可设为壁纸。';
+  let feedback = '';
   let toastTimer;
+
+  const galleryScene = {
+    canvas: library.querySelector('.hero-canvas'),
+    sim: rain.createSim(preset.id, 7, true),
+  };
+  const previewScene = {
+    canvas: preview.querySelector('.preview-canvas'),
+    sim: rain.createSim(preset.id, 8, true),
+  };
+
+  const player = rain.createPlayer((renderer, dt, still) => {
+    const { canvas, sim } = previewOpen ? previewScene : galleryScene;
+    const { width, height } = canvas.getBoundingClientRect();
+    if (width < 1 || height < 1) return;
+    const scale = Math.min(1, 390 / width, 812 / height);
+    const w = Math.max(1, Math.round(width * scale));
+    const h = Math.max(1, Math.round(height * scale));
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const frame = renderer.draw(sim, w, h, dt, still);
+    canvas.getContext('2d', { alpha: false })?.drawImage(frame, 0, 0);
+  }, navigator.deviceMemory && navigator.deviceMemory <= 2 ? 15 : 30);
+
+  const resize = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      if (entry.target === dock) preview.style.setProperty('--dock-height', dock.offsetHeight + 'px');
+    }
+    player.invalidate();
+  });
+  for (const element of [galleryScene.canvas, previewScene.canvas, dock]) resize.observe(element);
 
   function setTheme(theme = host?.info?.theme) {
     document.documentElement.dataset.theme = theme || (darkTheme.matches ? 'dark' : 'light');
   }
 
-  function setStatus(message) {
-    status.textContent = message;
-    status.hidden = !message;
-    preview.classList.toggle('has-status', Boolean(message));
-  }
-
-  function updateApply() {
+  function updateControls() {
+    const label = {
+      home: '切换桌面壁纸',
+      lock: '切换锁屏壁纸',
+      both: '切换桌面和锁屏壁纸',
+    }[switchTargets[mode]];
+    apply.textContent = applying ? '正在应用…' : label || '设为壁纸';
     apply.disabled = applying || !supported;
-    const target = selection.switchTargets[mode];
-    const switchLabel = {home: '切换桌面壁纸', lock: '切换锁屏壁纸', both: '切换桌面和锁屏壁纸'}[target];
-    apply.textContent = applying ? '正在应用…' : switchLabel || '设为壁纸';
+    status.textContent = feedback || availability;
+    status.hidden = !status.textContent;
   }
 
   function notify(message) {
@@ -52,160 +86,210 @@
   }
 
   function updateSelection(current) {
-    selection = {home: current.home, lock: current.lock, switchTargets: current.switchTargets || {}};
-    for (const [id, card] of cards) {
-      const onHome = selection.home === id;
-      const onLock = selection.lock === id;
-      let label = '';
-      if (onHome && onLock) label = '桌面和锁屏使用中';
-      else if (onHome) label = '桌面使用中';
-      else if (onLock) label = '锁屏使用中';
-      const badge = card.querySelector('.applied-badge');
-      badge.textContent = label;
-      badge.hidden = !label;
-      const name = card.querySelector('strong').textContent;
-      card.setAttribute('aria-label', ['预览' + name, label].filter(Boolean).join('，'));
+    switchTargets = current.switchTargets || {};
+    for (const row of library.querySelectorAll('[data-slot]')) {
+      const selected = current[row.dataset.slot];
+      row.hidden = !selected;
+      row.querySelector('em').textContent = selected ? '(' + rain.getPreset(selected).name + ')' : '';
     }
+
+    let label = '';
+    if (current.home && current.lock) {
+      label = switchTargets.wallpaper === 'both' ? '桌面和锁屏使用中' : '桌面与锁屏各自使用中';
+    } else if (current.home) label = '桌面使用中';
+    else if (current.lock) label = '锁屏使用中';
+
+    document.getElementById('slot-strip').hidden = !label;
+    const badge = document.getElementById('applied-badge');
+    badge.hidden = !label;
+    badge.querySelector('span').textContent = label;
   }
 
   async function refreshStatus() {
     if (!ready || applying) return;
+    const request = ++statusRequest;
     try {
-      const current = await host.liveWallpapers.status();
-      if (applying) return;
-      if (current.supported && !supported) setStatus('');
+      const current = await wallpapers.status();
+      if (request !== statusRequest) return;
       supported = current.supported;
+      availability = supported ? '' : '此设备当前无法应用动态壁纸。';
       updateSelection(current);
-      if (!supported) setStatus('此设备当前无法应用动态壁纸。');
+      if (current.fps) player.setFps(current.fps);
     } catch (_) {
+      if (request !== statusRequest) return;
       supported = false;
-      setStatus('暂时无法读取系统壁纸状态，请重新打开再试。');
+      availability = '暂时无法读取系统壁纸状态，请重新打开再试。';
     }
-    updateApply();
+    updateControls();
+  }
+
+  function setPreset(id) {
+    preset = rain.getPreset(id);
+    rain.setPreset(galleryScene.sim, preset.id);
+    rain.setPreset(previewScene.sim, preset.id);
+    for (const button of presetButtons) button.setAttribute('aria-pressed', String(button.dataset.preset === preset.id));
+    document.getElementById('hero-preset').textContent = '可拭雾 · ' + preset.name;
+    document.getElementById('preview-preset').textContent = preset.name + ' · ' + preset.desc;
+    player.invalidate();
+  }
+
+  for (const rail of document.querySelectorAll('.preset-rail, .dock-presets')) {
+    for (const item of rain.presets) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = rail.classList.contains('preset-rail') ? 'preset-chip' : 'dock-preset';
+      button.dataset.preset = item.id;
+      button.setAttribute('aria-pressed', String(item === preset));
+      const orb = document.createElement('span');
+      orb.className = 'orb';
+      orb.style.background = item.swatch;
+      orb.setAttribute('aria-hidden', 'true');
+      const name = document.createElement('span');
+      name.textContent = item.name;
+      button.append(orb, name);
+      button.addEventListener('click', () => setPreset(item.id));
+      rail.append(button);
+      presetButtons.push(button);
+    }
   }
 
   function updateMotion() {
-    scene?.setActive(shown && !document.hidden && !reducedMotion.matches);
-    if (canvas) canvas.hidden = reducedMotion.matches;
+    player.setActive(shown && !document.hidden);
   }
 
-  function showMode(next) {
+  function setMode(next) {
     mode = next;
-    updateApply();
-    for (const button of modes) button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
-    overlays.replaceChildren();
-    const template = document.getElementById(mode + '-overlay');
-    if (template) {
-      overlays.append(template.content.cloneNode(true));
+    preview.dataset.mode = mode;
+    for (const button of modeButtons) button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
+    for (const overlay of overlays) {
+      overlay.hidden = overlay.dataset.overlay !== mode;
+      if (overlay.hidden) continue;
       const now = new Date();
-      overlays.querySelector('[data-time]').textContent = timeFormat.format(now);
-      overlays.querySelector('[data-date]').textContent = dateFormat.format(now);
+      overlay.querySelector('[data-time]').textContent = timeFormat.format(now);
+      overlay.querySelector('[data-date]').textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdayFormat.format(now)}`;
     }
+    updateControls();
   }
 
-  function showScene(id) {
-    const card = cards.get(id);
-    const previous = selected;
-    scene?.destroy();
-    scene = undefined;
-    canvas?.remove();
-    canvas = undefined;
-    selected = card ? id : null;
-    library.hidden = Boolean(card);
-    preview.hidden = !card;
-    host?.liveWallpapers.previewing(Boolean(card)).catch(() => {});
-
-    if (!card) {
-      cards.get(previous)?.focus({preventScroll: true});
-      return;
+  function setPage(open) {
+    if (open === previewOpen) return;
+    previewOpen = open;
+    visit++;
+    if (open) {
+      feedback = '';
+      toast.hidden = true;
+      setMode(mode);
     }
+    library.classList.toggle('pushed', open);
+    library.inert = open;
+    preview.classList.toggle('is-hidden', !open);
+    preview.inert = !open;
+    wallpapers?.previewing(open).catch(() => {});
+    player.invalidate();
 
-    toast.hidden = true;
-    title.textContent = card.querySelector('strong').textContent;
-    preview.style.setProperty('--poster', 'url("' + card.querySelector('.poster').src + '")');
-    if (!host) setStatus('在小伴 Android App 内可设为壁纸。');
-    else if (supported === false) setStatus('此设备当前无法应用动态壁纸。');
-    else if (supported === null) setStatus('正在检查系统壁纸设置…');
-    else setStatus('');
-
-    let initialMode = 'wallpaper';
-    if (selection.switchTargets.wallpaper !== 'both') {
-      if (selection.home === id) initialMode = 'home';
-      else if (selection.lock === id) initialMode = 'lock';
-    }
-    showMode(initialMode);
-
-    canvas = document.createElement('canvas');
-    visual.prepend(canvas);
-    try {
-      scene = window.createWallpaperScene(canvas, id, 30);
-      canvas.addEventListener('pointerup', event => {
-        if (mode === 'lock') return;
-        const bounds = canvas.getBoundingClientRect();
-        scene.tap((event.clientX - bounds.left) / bounds.width, (event.clientY - bounds.top) / bounds.height);
-      });
-    } catch (_) {
-      canvas.remove();
-      canvas = undefined;
-    }
-    updateMotion();
-    back.focus({preventScroll: true});
+    const focus = open ? back : opener && !opener.closest('[hidden]') ? opener : library.querySelector('.hero-enter');
+    focus.focus({ preventScroll: true });
   }
 
-  for (const [id, card] of cards) card.addEventListener('click', () => {
-    history.pushState({wallpaper: id}, '');
-    showScene(id);
-  });
-  for (const button of modes) button.addEventListener('click', () => showMode(button.dataset.mode));
+  for (const button of library.querySelectorAll('[data-open-preview]')) {
+    button.addEventListener('click', () => {
+      if (previewOpen) return;
+      opener = button;
+      history.pushState({ rainWindowPreview: true }, '');
+      setPage(true);
+    });
+  }
+  for (const button of modeButtons) button.addEventListener('click', () => setMode(button.dataset.mode));
   back.addEventListener('click', () => history.back());
-  window.addEventListener('popstate', event => showScene(event.state?.wallpaper));
-  document.addEventListener('visibilitychange', updateMotion);
-  reducedMotion.addEventListener('change', updateMotion);
-  darkTheme.addEventListener('change', () => setTheme());
-  setTheme();
+  window.addEventListener('popstate', event => setPage(event.state?.rainWindowPreview === true));
+
+  const unbind = [galleryScene, previewScene].map(({ canvas, sim }) => {
+    const isPreview = sim === previewScene.sim;
+    function changed() {
+      if (isPreview) hint.classList.add('faded');
+      player.invalidate();
+    }
+    return rain.bindPointer(canvas, {
+      enabled: () => shown && !document.hidden && isPreview === previewOpen && (!isPreview || mode !== 'lock'),
+      tap(x, y) { rain.tap(sim, x, y); changed(); },
+      wipe(x, y, prevX, prevY) { rain.wipe(sim, x, y, prevX, prevY); changed(); },
+    });
+  });
+
+  document.getElementById('reset-mist').addEventListener('click', () => {
+    rain.resetMist(previewScene.sim);
+    player.invalidate();
+  });
 
   apply.addEventListener('click', async () => {
-    if (applying || !supported || !selected) return;
-    const requested = selected;
+    if (applying || !supported || !previewOpen) return;
+    const requested = preset;
+    const requestedVisit = visit;
     applying = true;
-    updateApply();
-    setStatus('');
+    statusRequest++;
+    feedback = '';
+    updateControls();
     try {
-      const result = await host.liveWallpapers.preview(requested, mode);
+      const result = await wallpapers.preview(requested.id, mode);
       updateSelection(result);
-      if (requested !== selected) return;
+      if (visit !== requestedVisit) return;
       if (result.outcome === 'applied') {
+        const switched = {
+          home: '已切换桌面壁纸为',
+          lock: '已切换锁屏壁纸为',
+          both: '已原地切换桌面与锁屏为',
+        }[result.switchedTarget];
         history.back();
-        notify('壁纸已应用');
+        notify(switched ? switched + '「' + requested.name + '」' : '壁纸已应用');
       } else if (result.outcome === 'unverified') {
-        setStatus('系统已确认，暂时无法核实壁纸的使用位置。');
+        feedback = '系统已确认，暂时无法核实壁纸的使用位置。';
       } else {
-        setStatus('没有检测到新的小伴壁纸。请在系统壁纸预览中确认应用。');
+        feedback = '没有检测到新的小伴壁纸。请在系统壁纸预览中确认应用。';
       }
     } catch (error) {
-      if (error.code === 'gesture') setStatus('请再点一次按钮。');
-      else if (error.code === 'save_failed') setStatus('未能保存壁纸，请重试。');
-      else setStatus('未能打开系统动态壁纸预览，请重试。');
+      if (visit !== requestedVisit) return;
+      if (error.code === 'gesture') feedback = '请再点一次按钮。';
+      else if (error.code === 'save_failed') feedback = '未能保存壁纸，请重试。';
+      else feedback = '未能打开系统动态壁纸预览，请重试。';
     } finally {
       applying = false;
-      updateApply();
+      updateControls();
     }
   });
 
-  if (host) {
+  document.addEventListener('visibilitychange', updateMotion);
+  window.addEventListener('pageshow', updateMotion);
+  window.addEventListener('pagehide', event => {
+    player.setActive(false);
+    if (event.persisted) return;
+    resize.disconnect();
+    unbind.forEach(dispose => dispose());
+    player.destroy();
+  });
+  darkTheme.addEventListener('change', () => setTheme());
+  setTheme();
+  setPage(history.state?.rainWindowPreview === true);
+  updateControls();
+  updateMotion();
+
+  if (wallpapers) {
     host.on('theme', setTheme);
     host.on('show', () => {
       shown = true;
       updateMotion();
+      if (previewOpen) setMode(mode);
       refreshStatus();
     });
     host.on('hide', () => { shown = false; updateMotion(); });
-    host.ready().then(() => {
-      ready = true;
-      refreshStatus();
-    }).catch(() => {
-      supported = false;
-      setStatus('暂时无法连接系统壁纸设置。');
+    requestAnimationFrame(() => {
+      host.ready().then(() => {
+        ready = true;
+        refreshStatus();
+      }).catch(() => {
+        supported = false;
+        availability = '暂时无法连接系统壁纸设置。';
+        updateControls();
+      });
     });
   }
 })();

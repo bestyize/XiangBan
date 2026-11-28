@@ -1,7 +1,6 @@
 package xyz.xiangban.xiaoban
 
 import android.annotation.SuppressLint
-import android.app.ActivityManager
 import android.app.Presentation
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -19,6 +18,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.RenderProcessGoneDetail
@@ -44,7 +44,6 @@ abstract class XiaobanLiveWallpaperService internal constructor(
 ) : WallpaperService() {
     private val power by lazy { getSystemService(PowerManager::class.java) }
     private val displays by lazy { getSystemService(DisplayManager::class.java) }
-    private val lowMemory by lazy { getSystemService(ActivityManager::class.java).isLowRamDevice }
 
     override fun onCreateEngine(): Engine = SceneEngine()
 
@@ -59,6 +58,8 @@ abstract class XiaobanLiveWallpaperService internal constructor(
         private var visible = false
         private var retried = false
         private var listening = false
+        private val touchSlop = ViewConfiguration.get(this@XiaobanLiveWallpaperService).scaledTouchSlop
+        private var touch: Touch? = null
 
         private val powerChanges = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -112,11 +113,43 @@ abstract class XiaobanLiveWallpaperService internal constructor(
 
         override fun onTouchEvent(event: MotionEvent) {
             super.onTouchEvent(event)
+            val action = event.actionMasked
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_POINTER_DOWN) {
+                touch = null
+            }
             val current = renderer ?: return
-            if (!current.playing || !current.loaded || event.actionMasked != MotionEvent.ACTION_UP || width <= 0 || height <= 0) return
-            val x = (event.x / width).coerceIn(0f, 1f)
-            val y = (event.y / height).coerceIn(0f, 1f)
-            if (x.isFinite() && y.isFinite()) {
+            if (!current.playing || !current.loaded || width <= 0 || height <= 0) return
+            if (action == MotionEvent.ACTION_DOWN) {
+                val x = (event.x / width).coerceIn(0f, 1f)
+                val y = (event.y / height).coerceIn(0f, 1f)
+                if (x.isFinite() && y.isFinite()) touch = Touch(event.getPointerId(0), x, y)
+                return
+            }
+            if (action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) return
+            val gesture = touch ?: return
+            val finished = action == MotionEvent.ACTION_UP
+            if (finished) touch = null
+            val index = event.findPointerIndex(gesture.pointerId)
+            if (index < 0) return
+            val x = (event.getX(index) / width).coerceIn(0f, 1f)
+            val y = (event.getY(index) / height).coerceIn(0f, 1f)
+            if (!x.isFinite() || !y.isFinite()) return
+            if (!gesture.dragging) {
+                val dx = (x - gesture.lastX) * width
+                val dy = (y - gesture.lastY) * height
+                gesture.dragging = dx * dx + dy * dy >= touchSlop * touchSlop
+            }
+            if (gesture.dragging) {
+                // Join the last forwarded point to this one, including the tail on release.
+                if ((x != gesture.lastX || y != gesture.lastY) &&
+                    (finished || event.eventTime - gesture.lastWipeAt >= 30)
+                ) {
+                    current.view.evaluateJavascript("window.xbWallpaper?.wipe($x,$y,${gesture.lastX},${gesture.lastY})", null)
+                    gesture.lastX = x
+                    gesture.lastY = y
+                    gesture.lastWipeAt = event.eventTime
+                }
+            } else if (finished && event.eventTime - event.downTime < ViewConfiguration.getLongPressTimeout()) {
                 current.view.evaluateJavascript("window.xbWallpaper?.tap($x,$y)", null)
             }
         }
@@ -128,15 +161,17 @@ abstract class XiaobanLiveWallpaperService internal constructor(
                 releaseRenderer()
                 return
             }
-            val powerSaver = power.isPowerSaveMode || lowMemory
+            val fps = MobileLiveWallpapers.renderingFps(this@XiaobanLiveWallpaperService)
+            val powerSaver = fps == 15
             if (!visible || !power.isInteractive) {
+                touch = null
                 if (!power.isInteractive || powerSaver) {
                     releaseRenderer()
                 } else {
                     renderer?.let {
                         if (it.playing) {
                             it.playing = false
-                            it.updateScene()
+                            it.updatePlayback()
                             it.view.onPause()
                             it.display.setSurface(null)
                         }
@@ -151,24 +186,25 @@ abstract class XiaobanLiveWallpaperService internal constructor(
             val profile = Profile(
                 (width * scale).roundToInt().coerceAtLeast(1),
                 (height * scale).roundToInt().coerceAtLeast(1),
-                if (powerSaver) 15 else 30,
-                MobileLiveWallpapers.sceneFor(this@XiaobanLiveWallpaperService, slot),
+                fps,
             )
+            val preset = MobileLiveWallpapers.presetFor(this@XiaobanLiveWallpaperService, slot)
             val current = renderer
             if (current?.profile == profile) {
                 if (!current.playing) {
                     current.display.setSurface(target)
                     current.view.onResume()
                     current.playing = true
-                    current.updateScene()
+                    current.updatePlayback()
                 }
+                current.setPreset(preset)
                 return
             }
             releaseRenderer()
-            startRenderer(target, profile)
+            startRenderer(target, profile, preset)
         }
 
-        private fun startRenderer(target: Surface, profile: Profile) {
+        private fun startRenderer(target: Surface, profile: Profile, preset: String) {
             var display: VirtualDisplay? = null
             var window: Presentation? = null
             var view: WebView? = null
@@ -196,9 +232,9 @@ abstract class XiaobanLiveWallpaperService internal constructor(
                 presentation.setContentView(web)
                 presentation.show()
                 presentation.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-                renderer = Renderer(profile, virtual, presentation, web)
+                renderer = Renderer(profile, virtual, presentation, web, preset)
                 val wallpaperUrl = "https://appassets.androidplatform.net/assets/game-packs-v2/${BuiltinMobileGames.LIVE_WALLPAPERS}/wallpaper.html"
-                web.loadUrl("$wallpaperUrl?scene=${profile.scene}&fps=${profile.fps}&width=${profile.width}&height=${profile.height}")
+                web.loadUrl("$wallpaperUrl?preset=$preset&fps=${profile.fps}&width=${profile.width}&height=${profile.height}&paused=1")
             } catch (error: RuntimeException) {
                 Log.w(TAG, "Unable to start wallpaper renderer", error)
                 renderer = null
@@ -226,10 +262,7 @@ abstract class XiaobanLiveWallpaperService internal constructor(
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
 
                 override fun onPageFinished(view: WebView, url: String) {
-                    renderer?.takeIf { it.view === view }?.let {
-                        it.loaded = true
-                        it.updateScene()
-                    }
+                    renderer?.takeIf { it.view === view }?.onLoaded()
                 }
 
                 override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
@@ -246,6 +279,7 @@ abstract class XiaobanLiveWallpaperService internal constructor(
         }
 
         private fun releaseRenderer() {
+            touch = null
             handler.removeCallbacks(retryRenderer)
             handler.removeCallbacks(releaseHidden)
             val current = renderer ?: return
@@ -262,18 +296,36 @@ abstract class XiaobanLiveWallpaperService internal constructor(
         }
     }
 
-    private data class Profile(val width: Int, val height: Int, val fps: Int, val scene: String)
+    private class Touch(val pointerId: Int, var lastX: Float, var lastY: Float) {
+        var lastWipeAt = -30L
+        var dragging = false
+    }
+
+    private data class Profile(val width: Int, val height: Int, val fps: Int)
 
     private class Renderer(
         val profile: Profile,
         val display: VirtualDisplay,
         val window: Presentation,
         val view: WebView,
+        private var preset: String,
     ) {
         var loaded = false
+            private set
         var playing = true
 
-        fun updateScene() {
+        fun onLoaded() {
+            loaded = true
+            view.evaluateJavascript("window.xbWallpaper?.setPreset('$preset'); window.xbWallpaper?.setActive($playing)", null)
+        }
+
+        fun setPreset(id: String) {
+            if (preset == id) return
+            preset = id
+            if (loaded) view.evaluateJavascript("window.xbWallpaper?.setPreset('$preset')", null)
+        }
+
+        fun updatePlayback() {
             if (loaded) view.evaluateJavascript("window.xbWallpaper?.setActive($playing)", null)
         }
     }

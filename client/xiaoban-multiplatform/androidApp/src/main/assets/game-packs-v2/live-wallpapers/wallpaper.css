@@ -1,3 +1,4 @@
-html, body, canvas { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-body { background: #07191d; }
-canvas { display: block; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { background: #0a101d; }
+#wallpaper { width: 100%; height: 100vh; height: 100dvh; overflow: hidden; touch-action: none; }
+#wallpaper canvas { display: block; width: 100%; height: 100%; }

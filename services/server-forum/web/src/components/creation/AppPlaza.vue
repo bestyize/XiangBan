@@ -157,7 +157,7 @@ function go(page: number) {
         <span class="plaza-app-icon sz-42"><img :src="wallpaperIcon" alt="" decoding="async" /></span>
         <span class="tool-info">
           <span class="tool-name">动态壁纸</span>
-          <small class="tool-desc">水下花园与星河</small>
+          <small class="tool-desc">浏览动态壁纸作品</small>
         </span>
       </RouterLink>
       <RouterLink v-for="tool in featuredTools" :key="tool.id" class="tool-card tool-card--community" :to="appRunLocation(tool.id, tool.version)">
@@ -195,7 +195,7 @@ function go(page: number) {
           <span class="plaza-app-icon sz-44"><img :src="wallpaperIcon" alt="" decoding="async" /></span>
           <span class="rank-copy">
             <span class="rank-name">动态壁纸</span>
-            <small class="rank-sub">壁纸 · 水下花园与星河</small>
+            <small class="rank-sub">壁纸 · 浏览社区作品</small>
           </span>
           <span class="open-pill" aria-hidden="true">打开</span>
         </RouterLink>

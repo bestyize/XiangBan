@@ -651,7 +651,9 @@ class RuntimeV2Activity : ComponentActivity() {
                 when (method) {
                     "builtin.wallpaper.supported" -> { result(MobileLiveWallpapers.supported(this)); return }
                     "builtin.wallpaper.status" -> {
-                        result(MobileLiveWallpapers.selection(this).toJson().put("supported", MobileLiveWallpapers.supported(this)))
+                        result(MobileLiveWallpapers.selection(this).toJson()
+                            .put("supported", MobileLiveWallpapers.supported(this))
+                            .put("fps", MobileLiveWallpapers.renderingFps(this)))
                         return
                     }
                     "builtin.wallpaper.previewing" -> { setWallpaperPreviewing(params.optBoolean("active")); result(); return }
@@ -663,8 +665,8 @@ class RuntimeV2Activity : ComponentActivity() {
                 }
                 if (wallpaperResult != null) { error("busy"); return }
                 lastUserGesture = 0L
-                val scene = params.optString("scene")
-                if (!MobileLiveWallpapers.isScene(scene) || !MobileLiveWallpapers.supported(this)) {
+                val preset = params.optString("scene")
+                if (!MobileLiveWallpapers.isPreset(preset) || !MobileLiveWallpapers.supported(this)) {
                     error("unavailable")
                     return
                 }
@@ -673,13 +675,14 @@ class RuntimeV2Activity : ComponentActivity() {
                 val before = MobileLiveWallpapers.selection(this)
                 val activeSlot = before.switchSlot(mode)
                 if (activeSlot != null) {
-                    if (MobileLiveWallpapers.setScene(this, activeSlot, scene)) {
-                        result(MobileLiveWallpapers.selection(this).toJson().put("outcome", "applied"))
+                    if (MobileLiveWallpapers.setPreset(this, activeSlot, preset)) {
+                        result(MobileLiveWallpapers.selection(this).toJson()
+                            .put("outcome", "applied").put("switchedTarget", before.switchTarget(mode)))
                     } else error("save_failed")
                     return
                 }
-                val slot = before.unusedSlot(scene)
-                if (slot == null || !MobileLiveWallpapers.setScene(this, slot, scene)) {
+                val slot = before.unusedSlot(preset)
+                if (slot == null || !MobileLiveWallpapers.setPreset(this, slot, preset)) {
                     error("save_failed")
                     return
                 }

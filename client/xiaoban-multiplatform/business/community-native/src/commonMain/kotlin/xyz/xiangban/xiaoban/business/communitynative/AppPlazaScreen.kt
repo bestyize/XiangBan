@@ -282,7 +282,7 @@ private fun toolSubtitle(shortcut: AppShortcut, tools: List<MobileGame>): String
         "mbti" -> "48 题人格报告"
         BuiltinMobileGames.REMOTE_CONTROL -> "电视空调红外遥控"
         BuiltinMobileGames.QUICK_LAUNCH -> "桌面快捷启动"
-        BuiltinMobileGames.LIVE_WALLPAPERS -> "水下花园与星河"
+        BuiltinMobileGames.LIVE_WALLPAPERS -> "雨窗天光 · 五套氛围"
         else -> tools.firstOrNull { it.id == shortcut.id }?.description?.trim().orEmpty().ifBlank { "内置实用工具" }
     }
     shortcut.slug == "wancisou" -> "公开资源检索"
