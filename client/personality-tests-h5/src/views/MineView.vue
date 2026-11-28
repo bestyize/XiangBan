@@ -224,7 +224,7 @@ async function submitChangePassword() {
 
         <a
           class="mine-portal portal-game"
-          href="https://game.xiangban.xyz"
+          href="https://game.xiaban.xyz"
           target="_blank"
           rel="noopener noreferrer"
         >
