@@ -365,7 +365,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <RouterLink to="/download" class="pc-desk-tip">
+          <RouterLink to="/desktop" class="pc-desk-tip">
             <span>需要电脑端？</span>
             <b>下载小伴桌面（macOS / Windows）↗</b>
           </RouterLink>
@@ -430,7 +430,7 @@ onUnmounted(() => {
 
           <div class="ios-sub-actions">
             <button type="button" class="btn-secondary sm" @click="copyText(shareUrl, '已复制链接，发给安卓手机即可下载')">发给安卓手机</button>
-            <RouterLink to="/download" class="btn-secondary sm">macOS 桌面版</RouterLink>
+            <RouterLink to="/desktop" class="btn-secondary sm">macOS 桌面版</RouterLink>
           </div>
         </div>
 
@@ -653,7 +653,7 @@ onUnmounted(() => {
               <span>小伴全端生态</span>
             </div>
             <div class="eco-grid">
-              <RouterLink class="eco-link" to="/download">
+              <RouterLink class="eco-link" to="/desktop">
                 <strong>小伴桌面端</strong>
                 <span>macOS / Windows</span>
               </RouterLink>

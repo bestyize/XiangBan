@@ -7,7 +7,7 @@ export const router = createRouter({
   // Scroll is restored per page in the guards below, because pages are kept alive between tabs.
   scrollBehavior: () => false,
   routes: [
-    { path: '/desktop', redirect: to => ({ path: '/', query: to.query, hash: to.hash }) },
+    { path: '/desktop', alias: '/pc', name: 'desktop-app', component: () => import('./views/DesktopAppDownload.vue'), meta: { tab: 'product', standalone: true } },
     { path: '/', name: 'desktop', component: () => import('./views/ProductHome.vue'), meta: { tab: 'desktop' } },
     { path: '/features', name: 'features', component: () => import('./views/ProductFeatures.vue'), meta: { tab: 'product' } },
     { path: '/download', name: 'download', component: () => import('./views/ProductDownload.vue'), meta: { tab: 'product' } },
