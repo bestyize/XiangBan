@@ -11,6 +11,7 @@ export const router = createRouter({
     { path: '/', name: 'desktop', component: () => import('./views/ProductHome.vue'), meta: { tab: 'desktop' } },
     { path: '/features', name: 'features', component: () => import('./views/ProductFeatures.vue'), meta: { tab: 'product' } },
     { path: '/download', name: 'download', component: () => import('./views/ProductDownload.vue'), meta: { tab: 'product' } },
+    { path: '/app', alias: '/mobile', name: 'mobile-app', component: () => import('./views/MobileAppDownload.vue'), meta: { tab: 'product', standalone: true } },
     { path: '/desktop-experience', name: 'desktop-experience', component: () => import('./views/DesktopView.vue'), meta: { tab: 'product' } },
     { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
     { path: '/plugins', name: 'plugins', component: () => import('./views/PluginsView.vue'), meta: { tab: 'plugins' } },

@@ -20,14 +20,16 @@ watch(() => route.meta.tab, tab => {
 }, { immediate: true })
 
 const isAdmin = computed(() => route.meta.admin === true)
+const isStandalone = computed(() => route.meta.standalone === true)
+const hidePublicChrome = computed(() => isAdmin.value || isStandalone.value)
 
 const glow = computed(() => ({ '--ambient': ambientColor.value ?? '#2b2b33' }))
 
 let publicDataLoaded = false
 watch(
-  isAdmin,
-  (admin) => {
-    if (admin || publicDataLoaded) return
+  [() => route.matched.length, hidePublicChrome],
+  ([matched, hidden]) => {
+    if (!matched || hidden || publicDataLoaded) return
     publicDataLoaded = true
     catalog.load()
     account.restore()
@@ -37,7 +39,7 @@ watch(
 </script>
 
 <template>
-  <RouterView v-if="isAdmin" />
+  <RouterView v-if="hidePublicChrome" />
   <template v-else>
     <div class="ambient" :style="glow" aria-hidden="true" />
     <TopBar />

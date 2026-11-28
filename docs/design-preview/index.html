@@ -925,6 +925,25 @@
   const DESIGNS = [
     // ==================== 1. 手机版（小伴手机 App） ====================
     {
+      id: 'mobile-download-h5',
+      title: '小伴手机版 · 独立移动端下载落地页',
+      domains: ['mobile', 'web'],
+      subcat: '分发与拉新',
+      status: 'merged',
+      statusNote: '已合入 services/server-xiaoban/web/src/views/MobileAppDownload.vue（路由 /app，别名 /mobile）',
+      runtime: 'static',
+      badgeExtra: '6 画板',
+      path: 'client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-download-h5.html',
+      summary: '面向扫码、社交分享与 H5 生态引流的独立手机版下载落地页（6 画板总览 + 单机试玩 + 真机全屏 + 390/360px + 暖瓷浅色/曜石深色）：首屏 3 秒转化与 4 场景实机切换、端侧造 3D 游戏与实时语音、手机电脑互联审批、百宝箱与游乐场实装图标矩阵、原生社区与免登录多模型，以及微信拦截遮罩、iOS 网页生态导流、下载后安装指引抽屉与 PC 扫码直下。',
+      presets: [
+        { label: '全部 6 画板', query: '?mode=all' },
+        { label: '单机试玩 (Android)', query: '?mode=live&env=android' },
+        { label: '微信内拦截态', query: '?mode=live&env=wechat' },
+        { label: 'iOS 访客态', query: '?mode=live&env=ios' },
+        { label: '曜石深色', query: '?mode=all&theme=dark' },
+      ]
+    },
+    {
       id: 'app-plaza-redesign',
       title: '应用广场视觉重设计',
       domains: ['mobile'],
