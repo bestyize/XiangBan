@@ -3,12 +3,18 @@ import { ref, watch } from 'vue';
 import type { EvaluatedResult, ResultProfile, TestDefinition } from '../engine/types';
 import { renderResultPosterDataUrl, type PosterRatio } from '../engine/posterCanvas';
 
-const props = defineProps<{
-  open: boolean;
-  test: TestDefinition;
-  result: EvaluatedResult;
-  profile: ResultProfile;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    test: TestDefinition;
+    result: EvaluatedResult;
+    profile: ResultProfile;
+    defaultRatio?: PosterRatio;
+  }>(),
+  {
+    defaultRatio: '916'
+  }
+);
 
 const emit = defineEmits<{
   close: [];
@@ -17,8 +23,17 @@ const emit = defineEmits<{
   downloaded: [msg: string];
 }>();
 
-const ratio = ref<PosterRatio>('916');
+const ratio = ref<PosterRatio>(props.defaultRatio);
 const previewDataUrl = ref('');
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      ratio.value = props.defaultRatio;
+    }
+  }
+);
 
 function currentFilename() {
   return `vendme-${props.test.id}-${props.profile.code}-${ratio.value === '34' ? '3x4' : '9x16'}.png`;

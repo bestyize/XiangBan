@@ -225,14 +225,14 @@ h1,h2,h3,h4,p{margin:0}
   box-shadow:1.5px 1.5px 0 #18181B;
 }
 
-/* 潮玩风底部导航 */
+/* 潮玩风底部导航（4 项：发现 / 合盘 / 集卡 / 我的） */
 .tabbar{
-  height:62px;padding:6px 14px 12px;background:var(--surface);border-top:1.8px solid var(--border);
-  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex-shrink:0;z-index:12;
+  height:62px;padding:6px 10px 12px;background:var(--surface);border-top:1.8px solid var(--border);
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex-shrink:0;z-index:12;
 }
 .tab-item{
-  display:flex;align-items:center;justify-content:center;gap:5px;
-  border-radius:12px;color:var(--muted);font-size:12px;font-weight:750;border:1.5px solid transparent;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border-radius:12px;color:var(--muted);font-size:11.5px;font-weight:750;border:1.5px solid transparent;
 }
 .tab-item svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
 .tab-item.active{
@@ -668,6 +668,124 @@ h1,h2,h3,h4,p{margin:0}
 .dt-rail{height:9px;background:#2C2A34;border:1px solid rgba(255,255,255,.22);border-radius:99px;margin-top:4px;overflow:hidden}
 .dt-rail i{display:block;height:100%;background:linear-gradient(90deg,#FF4D5E,#FF914D)}
 
+/* ========== 画板 07 & 08：我的页与登录注册 ========== */
+.mine-pad{padding:4px 16px 20px;display:flex;flex-direction:column;gap:10px}
+.state-seg{display:flex;gap:6px;background:var(--surface);padding:4px;border-radius:14px;border:1.6px solid var(--border)}
+.state-seg button{flex:1;height:30px;border-radius:10px;font-size:11.5px;font-weight:800;color:var(--muted)}
+.state-seg button.active{background:#18181B;color:var(--pop-lime)}
+.dark .state-seg button.active{background:var(--pop-lime);color:#18181B}
+
+.mine-hero{
+  padding:14px 15px;border-radius:20px;background:var(--pop-peach);color:#18181B;
+  border:2px solid #18181B;box-shadow:4px 4px 0 #18181B;position:relative;overflow:hidden;
+}
+.mine-hero.guest{background:linear-gradient(135deg,#FFF2C2 0%,#FFD89B 100%)}
+.mine-row{display:flex;align-items:center;gap:12px}
+.mine-ava{
+  width:52px;height:52px;border-radius:16px;background:#FFFDF8;border:2px solid #18181B;
+  box-shadow:2.5px 2.5px 0 #18181B;display:grid;place-items:center;font-size:27px;
+  transform:rotate(-4deg);flex-shrink:0;
+}
+.mine-name-line{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.mine-name-line b{font-size:18px;font-weight:950}
+.mine-sub{font-size:11.5px;font-weight:700;opacity:.82;margin-top:3px;line-height:1.45}
+.mine-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.ms-box{
+  background:#FFFDF8;border:1.5px solid #18181B;border-radius:12px;padding:7px 6px;text-align:center;
+}
+.ms-box b{display:block;font-size:16.5px;font-weight:950;line-height:1.15}
+.ms-box small{display:block;font-size:10px;font-weight:800;color:#6E6960;margin-top:2px}
+.guest-merge-tip{
+  margin-top:10px;padding:8px 10px;border-radius:12px;background:#FFFDF8;border:1.5px dashed #18181B;
+  font-size:11.5px;font-weight:750;line-height:1.45;
+}
+
+.mine-portals{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.mine-portal{
+  display:flex;flex-direction:column;padding:10px 11px;border-radius:16px;text-decoration:none;color:#18181B;
+  border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;transition:transform .12s ease,box-shadow .12s ease;min-width:0;
+}
+.mine-portal:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #18181B}
+.portal-comm{background:linear-gradient(135deg,#ECE4FF 0%,#DCF3FF 100%)}
+.portal-game{background:linear-gradient(135deg,#D9F9E6 0%,#FFF3B0 100%)}
+.portal-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.portal-ico{
+  width:32px;height:32px;border-radius:10px;background:#FFFDF8;border:1.6px solid #18181B;
+  box-shadow:2px 2px 0 #18181B;display:grid;place-items:center;font-size:17px;flex-shrink:0;
+}
+.portal-arrow{
+  padding:3px 7px;border-radius:999px;background:#18181B;color:var(--pop-lime);
+  font-size:10px;font-weight:900;white-space:nowrap;
+}
+.portal-title{margin-top:8px;font-size:13.5px;font-weight:950;line-height:1.2}
+.portal-desc{margin-top:2px;font-size:10.5px;font-weight:700;color:#3F3A4D;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mine-app-dl{
+  grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;gap:9px;
+  padding:9px 11px;border-radius:16px;text-decoration:none;color:#18181B;
+  background:linear-gradient(135deg,#FFE4EC 0%,#FFEAD2 100%);
+  border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;transition:transform .12s ease,box-shadow .12s ease;
+}
+.mine-app-dl:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #18181B}
+.app-dl-left{display:flex;align-items:center;gap:9px;min-width:0;flex:1}
+.app-dl-body{min-width:0;display:flex;flex-direction:column}
+.app-dl-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.app-dl-title b{font-size:13px;font-weight:950;line-height:1.2}
+.app-dl-cta{
+  flex-shrink:0;padding:4px 9px;border-radius:999px;background:#18181B;color:var(--pop-lime);
+  font-size:10.5px;font-weight:900;border:1.5px solid #18181B;
+}
+
+.mine-list{
+  border-radius:18px;background:var(--surface);border:1.8px solid var(--border);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.mine-item{
+  width:100%;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-bottom:1.2px solid rgba(24,24,27,.09);font-size:13px;font-weight:800;text-align:left;
+}
+.dark .mine-item{border-bottom-color:rgba(255,255,255,.08)}
+.mine-item:last-child{border-bottom:0}
+.mine-item small{font-size:11px;color:var(--muted);font-weight:650}
+
+/* 画板 08：登录 / 注册页 */
+.auth-pad{padding:6px 16px 26px;display:flex;flex-direction:column;gap:13px}
+.auth-hero{
+  padding:16px;border-radius:20px;background:#18181B;color:#FFFDF8;
+  border:2px solid #18181B;box-shadow:4px 4px 0 var(--pop-lime);position:relative;overflow:hidden;
+}
+.auth-hero::after{
+  content:'';position:absolute;right:-26px;top:-26px;width:110px;height:110px;border-radius:50%;
+  background:radial-gradient(circle,rgba(228,248,87,.34),transparent 70%);pointer-events:none;
+}
+.auth-hero h3{font-size:21px;font-weight:950;margin-top:8px;letter-spacing:-.3px}
+.auth-hero p{font-size:12px;color:#CFCBD8;margin-top:5px;line-height:1.5}
+
+.auth-card{
+  padding:16px;border-radius:20px;background:var(--surface);border:2px solid var(--border);
+  box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:12px;
+}
+.field-lbl{display:block;font-size:11.5px;font-weight:850;color:var(--ink-2);margin-bottom:6px}
+.pop-input{
+  width:100%;height:44px;padding:0 13px;border-radius:13px;
+  background:var(--bg);color:var(--ink);border:1.8px solid var(--border);
+  font-size:14px;font-weight:650;
+}
+.pop-input:focus{background:var(--surface);box-shadow:2.5px 2.5px 0 var(--pop-lime)}
+.code-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+.code-btn{
+  height:44px;padding:0 13px;border-radius:13px;background:var(--pop-lime);color:#18181B;
+  border:1.8px solid #18181B;box-shadow:2px 2px 0 #18181B;font-size:12px;font-weight:900;white-space:nowrap;
+}
+.code-btn:disabled{opacity:.65;cursor:default;box-shadow:none}
+.field-hint{font-size:11px;color:var(--muted);line-height:1.5;margin-top:5px;font-weight:600}
+.auth-links{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:750;color:var(--muted)}
+.auth-links button{color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:800}
+.auth-sync-note{
+  padding:10px 12px;border-radius:14px;background:var(--pop-mint);color:#18181B;
+  border:1.5px solid #18181B;font-size:11.5px;font-weight:750;line-height:1.5;
+}
+.auth-foot-note{text-align:center;font-size:11px;color:var(--muted);line-height:1.6;font-weight:600}
+
 /* 搭子与宿敌双撞色卡 */
 .match-pair{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mp-box{
@@ -888,7 +1006,7 @@ h1,h2,h3,h4,p{margin:0}
     </div>
     <div class="controls">
       <div class="seg" role="tablist" aria-label="画布模式">
-        <button class="active" data-mode="grid">全画板总览 (6 屏)</button>
+        <button class="active" data-mode="grid">全画板总览 (8 屏)</button>
         <button data-mode="single">单机可试玩</button>
       </div>
       <div class="seg" role="tablist" aria-label="屏宽切换">
@@ -994,6 +1112,10 @@ h1,h2,h3,h4,p{margin:0}
           <button class="tab-item" data-goto="archive">
             <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10h8M8 14h5"/></svg>
             <span>集卡</span>
+          </button>
+          <button class="tab-item" data-goto="mine">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
+            <span>我的</span>
           </button>
         </nav>
         <div class="home-bar"></div>
@@ -1327,7 +1449,261 @@ h1,h2,h3,h4,p{margin:0}
             <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10h8M8 14h5"/></svg>
             <span>集卡</span>
           </button>
+          <button class="tab-item" data-goto="mine">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
+            <span>我的</span>
+          </button>
         </nav>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 07：「我的」个人中心页（未登录 / 已登录双态） ==================== -->
+    <section class="board" data-board="mine">
+      <div class="board-head"><b>07 · 「我的」个人中心</b><span>游客态 / 已登录态切换</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:46</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <span class="topbar-title">我的</span>
+          <button class="sticker" id="mineShareSiteBtn" style="background:var(--pop-lime)">安利给好友 ✦</button>
+        </div>
+
+        <div class="viewport">
+          <div class="mine-pad">
+            <!-- 画板内切换：未登录游客态 vs 已登录态 -->
+            <div class="state-seg" id="mineStateSeg">
+              <button class="active" data-mine-state="logged">已登录态</button>
+              <button data-mine-state="guest">未登录游客态</button>
+            </div>
+
+            <!-- 状态 A：已登录身份卡 -->
+            <div class="mine-hero" id="mineLoggedCard">
+              <div class="mine-row">
+                <div class="mine-ava">🍊</div>
+                <div style="flex:1;min-width:0">
+                  <div class="mine-name-line">
+                    <b>林小满</b>
+                    <span class="sticker mono" style="background:#FFFDF8">#13842</span>
+                    <span class="sticker" style="background:var(--pop-mint)">云端已同步</span>
+                  </div>
+                  <div class="mine-sub">lin***@gmail.com · 相伴统一账号通用</div>
+                </div>
+              </div>
+              <div class="mine-stats">
+                <div class="ms-box"><b class="num">3/12</b><small>已集贴纸</small></div>
+                <div class="ms-box"><b class="num">1</b><small>隐藏彩蛋</small></div>
+                <div class="ms-box"><b class="num">4</b><small>合盘互动</small></div>
+              </div>
+            </div>
+
+            <!-- 状态 B：未登录游客引导卡 -->
+            <div class="mine-hero guest" id="mineGuestCard" hidden>
+              <div class="mine-row">
+                <div class="mine-ava">🎭</div>
+                <div style="flex:1;min-width:0">
+                  <div class="mine-name-line">
+                    <b>未登录游客</b>
+                    <span class="sticker" style="background:#FFFDF8">仅存本机</span>
+                  </div>
+                  <div class="mine-sub">登录相伴账号，跨设备永久同步全部 12 枚贴纸与合盘记录</div>
+                </div>
+              </div>
+              <div class="guest-merge-tip">✦ 当前本机已点亮 <b>3/12</b> 枚贴纸，登录后自动合并进云端档案，绝不丢失</div>
+              <button class="btn-pop" style="width:100%;height:42px;margin-top:11px;font-size:13.5px" data-goto="auth">登录 / 注册相伴账号 →</button>
+            </div>
+
+            <!-- 断点草稿提醒 -->
+            <div style="padding:10px 13px;border-radius:16px;background:var(--pop-lime);color:#18181B;border:1.8px solid #18181B;box-shadow:3px 3px 0 #18181B;display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div><b style="font-size:13px;font-weight:900;display:block">有 1 份未答完的盲盒草稿</b><small style="font-size:11px;font-weight:700">中式修仙灵根录 · 已答 9/16 题</small></div>
+              <button class="sticker" style="background:#18181B;color:var(--pop-lime)" data-goto="quiz">继续答 ›</button>
+            </div>
+
+            <!-- 小伴生态双入口：小伴社区 + 小伴游戏厅 -->
+            <div class="mine-portals">
+              <a class="mine-portal portal-comm" id="mineCommunityCard" href="https://chat.xiangban.xyz" target="_blank" rel="noopener">
+                <div class="portal-top">
+                  <div class="portal-ico">🫧</div>
+                  <span class="portal-arrow">去逛逛 ↗</span>
+                </div>
+                <b class="portal-title">小伴社区</b>
+                <span class="portal-desc">晒贴纸 · 找同频搭子</span>
+              </a>
+              <a class="mine-portal portal-game" id="mineGameCard" href="https://game.xiangban.xyz" target="_blank" rel="noopener">
+                <div class="portal-top">
+                  <div class="portal-ico">🕹️</div>
+                  <span class="portal-arrow">开一局 ↗</span>
+                </div>
+                <b class="portal-title">小伴游戏厅</b>
+                <span class="portal-desc">点开即玩休闲小游戏</span>
+              </a>
+              <a class="mine-app-dl" id="mineAppDlCard" href="https://wallpaper.xiangban.xyz/download" target="_blank" rel="noopener">
+                <div class="app-dl-left">
+                  <div class="portal-ico">📱</div>
+                  <div class="app-dl-body">
+                    <div class="app-dl-title">
+                      <b>下载小伴 App</b>
+                      <span class="sticker" style="background:#FFFDF8">手机 / 电脑</span>
+                    </div>
+                    <span class="portal-desc">社区、AI 伙伴与高清壁纸一站体验</span>
+                  </div>
+                </div>
+                <span class="app-dl-cta">去下载 ↗</span>
+              </a>
+            </div>
+
+            <!-- 偏好设置 -->
+            <div class="mine-list">
+              <div class="mine-item">
+                <span>外观主题</span>
+                <span class="sticker" style="background:var(--pop-cream)">暖纸 / 暗夜</span>
+              </div>
+              <div class="mine-item">
+                <span>选完自动切下一题</span>
+                <span class="sticker" style="background:var(--pop-mint)">已开启</span>
+              </div>
+              <div class="mine-item">
+                <span>默认海报比例</span>
+                <span class="sticker" style="background:var(--pop-blue)">9:16 朋友圈</span>
+              </div>
+            </div>
+
+            <!-- 账号与档案管理 -->
+            <div class="mine-list">
+              <button class="mine-item" data-goto="auth">
+                <span>账号与安全（邮箱 / 密码）</span>
+                <small id="mineAuthSub">已绑定邮箱 ›</small>
+              </button>
+              <div class="mine-item">
+                <span>关于人格贩卖机</span>
+                <small>0元全免费承诺</small>
+              </div>
+              <button class="mine-item" id="mineLogoutRow" style="color:var(--pop-red)">
+                <span>退出当前账号</span>
+                <small style="color:var(--pop-red)">本地缓存保留 ›</small>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar">
+          <button class="tab-item" data-goto="home">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="10 10 16 8 14 14 8 16 10 10"/></svg>
+            <span>发现</span>
+          </button>
+          <button class="tab-item" data-goto="compat">
+            <svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5"/><circle cx="18" cy="7" r="2.5"/></svg>
+            <span>合盘</span>
+          </button>
+          <button class="tab-item" data-goto="archive">
+            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10h8M8 14h5"/></svg>
+            <span>集卡</span>
+          </button>
+          <button class="tab-item active" data-goto="mine">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
+            <span>我的</span>
+          </button>
+        </nav>
+        <div class="home-bar"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 画板 08：登录 / 注册（对接相伴统一账号中心） ==================== -->
+    <section class="board" data-board="auth">
+      <div class="board-head"><b>08 · 登录 / 注册</b><span>验证码 · 密码 · 新用户建号</span></div>
+      <div class="phone">
+        <div class="statusbar">
+          <span class="num">09:47</span>
+          <div class="sb-icons"><span>5G</span><div class="sb-bat"></div></div>
+        </div>
+        <div class="topbar">
+          <button class="icon-btn" data-goto="mine" aria-label="返回">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="topbar-title">相伴统一账号</span>
+          <span style="width:36px"></span>
+        </div>
+
+        <div class="viewport">
+          <div class="auth-pad">
+            <div class="auth-hero">
+              <span class="sticker" style="background:var(--pop-lime)">ONE ACCOUNT · 全端通用</span>
+              <h3 id="authHeadline">登录人格贩卖机</h3>
+              <p id="authDesc">验证邮箱即可登录；未注册邮箱验证后一步设用户名与密码建号。</p>
+            </div>
+
+            <!-- 三态切换：验证码登录 / 密码登录 / 完善注册 -->
+            <div class="state-seg" id="authModeSeg">
+              <button class="active" data-auth-mode="code">验证码登录</button>
+              <button data-auth-mode="pwd">密码登录</button>
+              <button data-auth-mode="register">新号建档</button>
+            </div>
+
+            <!-- 表单 1：邮箱/手机验证码登录（新标识自动进入建号） -->
+            <div class="auth-card" id="authPaneCode">
+              <div>
+                <label class="field-lbl">邮箱 / 手机号（按账号中心开放方式）</label>
+                <input class="pop-input" value="linxiaoman@gmail.com" placeholder="输入邮箱地址" />
+              </div>
+              <div>
+                <label class="field-lbl">6 位验证码</label>
+                <div class="code-row">
+                  <input class="pop-input mono" value="482916" placeholder="输入验证码" maxlength="6" />
+                  <button class="code-btn" id="sendCodeDemoBtn">获取验证码</button>
+                </div>
+                <div class="field-hint">已有账号直接登录；首次使用的邮箱验证后进入「设置用户名与密码」</div>
+              </div>
+              <button class="btn-pop" id="authSubmitCodeBtn" style="width:100%">验证并登录 →</button>
+              <div class="auth-links">
+                <span>默认支持邮箱验证码</span>
+                <button data-auth-mode="pwd">改用密码登录</button>
+              </div>
+            </div>
+
+            <!-- 表单 2：用户名/邮箱/手机 + 密码登录 -->
+            <div class="auth-card" id="authPanePwd" hidden>
+              <div>
+                <label class="field-lbl">用户名 / 邮箱 / 手机号</label>
+                <input class="pop-input" value="林小满" placeholder="输入用户名、邮箱或手机号" />
+              </div>
+              <div>
+                <label class="field-lbl">登录密码</label>
+                <input class="pop-input" type="password" value="••••••••••" placeholder="输入密码" />
+              </div>
+              <button class="btn-pop" id="authSubmitPwdBtn" style="width:100%">立即登录 →</button>
+              <div class="auth-links">
+                <button data-auth-mode="code">忘记密码 / 验证码重置</button>
+                <button data-auth-mode="register">去注册新号</button>
+              </div>
+            </div>
+
+            <!-- 表单 3：验证码通过后的新用户建号（契合 server-account 15 分钟注册凭证流） -->
+            <div class="auth-card" id="authPaneReg" hidden>
+              <div class="auth-sync-note">✓ 邮箱 <b>lin***@gmail.com</b> 验证通过（注册凭证 15 分钟内有效）</div>
+              <div>
+                <label class="field-lbl">设置唯一用户名（展示名 · 注册后不可修改）</label>
+                <input class="pop-input" value="松弛水豚君" placeholder="中英文开头，2~10 汉字或 3~20 字符" />
+                <div class="field-hint">将作为你在人格贩卖机、双人合盘与小伴社区的唯一展示名</div>
+              </div>
+              <div>
+                <label class="field-lbl">设置登录密码</label>
+                <input class="pop-input" type="password" value="••••••••••" placeholder="至少 8 位字符" />
+              </div>
+              <button class="btn-pop" id="authSubmitRegBtn" style="width:100%">完成建号并同步 3 枚贴纸 →</button>
+            </div>
+
+            <div class="auth-sync-note">
+              ✦ 游客模式随时可测，登录后自动将本机已集齐的 <b>3 枚贴纸</b>合并至云端，换设备不丢失。
+            </div>
+
+            <div class="auth-foot-note">
+              由相伴统一账号中心（account.xiangban.xyz）提供安全鉴权<br>
+              登录即表示同意《用户协议》与《隐私说明》
+            </div>
+          </div>
+        </div>
         <div class="home-bar"></div>
       </div>
     </section>
@@ -2028,6 +2404,55 @@ h1,h2,h3,h4,p{margin:0}
     toast(`已复制合盘链接：vendme.app/#/t/${t.id}?peer=${t.resultCode}`);
   });
   $('#inviteAnotherBtn').addEventListener('click', ()=> toast('邀请链接已复制，发给微信好友测完即出合盘'));
+
+  // 画板 07（我的页双态）与画板 08（登录/注册三态）交互
+  function setMineState(st){
+    $$('[data-mine-state]').forEach(b=>b.classList.toggle('active', b.dataset.mineState===st));
+    $('#mineLoggedCard').hidden = st!=='logged';
+    $('#mineGuestCard').hidden = st!=='guest';
+    $('#mineLogoutRow').hidden = st!=='logged';
+    $('#mineAuthSub').textContent = st==='logged' ? '已绑定邮箱 ›' : '去登录 / 注册 ›';
+  }
+  function setAuthMode(m){
+    $$('#authModeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.authMode===m));
+    $('#authPaneCode').hidden = m!=='code';
+    $('#authPanePwd').hidden = m!=='pwd';
+    $('#authPaneReg').hidden = m!=='register';
+    const heads = {
+      code:['登录人格贩卖机','验证邮箱即可登录；未注册邮箱验证后一步设用户名与密码建号。'],
+      pwd:['密码登录','支持输入相伴用户名、已绑定邮箱或手机号加密码登录。'],
+      register:['完善你的唯一身份','为新账号设置唯一用户名与密码，本机 3 枚贴纸将自动合并上云。']
+    };
+    $('#authHeadline').textContent = heads[m][0];
+    $('#authDesc').textContent = heads[m][1];
+  }
+  document.addEventListener('click', e=>{
+    const ms = e.target.closest('[data-mine-state]');
+    if(ms){ setMineState(ms.dataset.mineState); return; }
+    const am = e.target.closest('[data-auth-mode]');
+    if(am){ setAuthMode(am.dataset.authMode); return; }
+  });
+  let codeCd = 0, codeTimer = null;
+  $('#sendCodeDemoBtn').addEventListener('click', function(){
+    if(codeCd>0) return;
+    codeCd = 60;
+    this.disabled = true;
+    this.textContent = '60s 后重发';
+    toast('验证码已发送至邮箱（设计稿演示态）');
+    codeTimer = setInterval(()=>{
+      codeCd--;
+      if(codeCd<=0){ clearInterval(codeTimer); this.disabled=false; this.textContent='获取验证码'; }
+      else { this.textContent = codeCd + 's 后重发'; }
+    }, 1000);
+  });
+  $('#authSubmitCodeBtn').addEventListener('click', ()=>{ setMineState('logged'); toast('验证通过！已登录相伴账号并同步 3 枚贴纸'); if(state.mode==='single') switchBoard('mine'); });
+  $('#authSubmitPwdBtn').addEventListener('click', ()=>{ setMineState('logged'); toast('密码登录成功！'); if(state.mode==='single') switchBoard('mine'); });
+  $('#authSubmitRegBtn').addEventListener('click', ()=>{ setMineState('logged'); toast('建号成功（#13842）！本机贴纸已合并上云'); if(state.mode==='single') switchBoard('mine'); });
+  $('#mineLogoutRow').addEventListener('click', ()=>{ setMineState('guest'); toast('已退出账号，本机已测贴纸仍保留'); });
+  $('#mineShareSiteBtn').addEventListener('click', ()=> toast('已调起系统分享：https://people.xiaban.xyz/'));
+  $('#mineCommunityCard').addEventListener('click', ()=> toast('正在前往小伴社区：https://chat.xiangban.xyz'));
+  $('#mineGameCard').addEventListener('click', ()=> toast('正在前往小伴游戏厅：https://game.xiangban.xyz'));
+  $('#mineAppDlCard').addEventListener('click', ()=> toast('正在前往下载小伴 App：https://wallpaper.xiangban.xyz/download'));
 
   renderHomeGrid(); renderQuiz(); renderResultSkin(); renderArchive();
 })();

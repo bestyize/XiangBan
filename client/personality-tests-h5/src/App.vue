@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getTestById } from './data';
+import {
+  AccountApiError,
+  getMe,
+  logoutSession,
+  refreshSession,
+  type AuthSessionResponse
+} from './engine/accountApi';
 import { findProfileByCode } from './engine/scoring';
 import {
   buildHashPath,
@@ -8,7 +15,12 @@ import {
   parseHashRoute,
   type RouteView
 } from './engine/shareCodec';
-import { localStorageAdapter } from './engine/storage';
+import {
+  localStorageAdapter,
+  type QuizDraft,
+  type StoredAuthSession,
+  type UserPrefs
+} from './engine/storage';
 import { triggerSystemShare } from './engine/systemShare';
 import type { EvaluatedResult, PeerPayload, TestId } from './engine/types';
 import HomeView from './views/HomeView.vue';
@@ -16,11 +28,21 @@ import QuizView from './views/QuizView.vue';
 import ResultView from './views/ResultView.vue';
 import CompatView from './views/CompatView.vue';
 import ArchiveView from './views/ArchiveView.vue';
+import MineView from './views/MineView.vue';
+import AuthView from './views/AuthView.vue';
 import PosterSheet from './components/PosterSheet.vue';
 
 const route = ref<RouteView>({ name: 'home' });
-const results = ref<Partial<Record<TestId, EvaluatedResult>>>(localStorageAdapter.getResults());
-const nickname = ref<string>(localStorageAdapter.getNickname());
+const authSession = ref<StoredAuthSession | null>(localStorageAdapter.getAuthSession());
+const currentUid = computed(() => authSession.value?.user.uid);
+const results = ref<Partial<Record<TestId, EvaluatedResult>>>(
+  localStorageAdapter.getResults(authSession.value?.user.uid)
+);
+const drafts = ref<QuizDraft[]>(localStorageAdapter.listDrafts());
+const prefs = ref<UserPrefs>(localStorageAdapter.getPrefs());
+const compatCount = ref<number>(localStorageAdapter.getCompatCount());
+const guestNickname = ref<string>(localStorageAdapter.getNickname());
+const nickname = computed(() => authSession.value?.user.username || guestNickname.value);
 const dark = ref<boolean>(localStorageAdapter.getTheme() === 'dark');
 const posterOpen = ref(false);
 const toastMsg = ref('');
@@ -36,11 +58,18 @@ function showToast(msg: string) {
   if (toastTimer) window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
     toastMsg.value = '';
-  }, 2400);
+  }, 2600);
+}
+
+function refreshDrafts() {
+  drafts.value = localStorageAdapter.listDrafts();
 }
 
 function navigate(next: RouteView) {
   route.value = next;
+  if (next.name === 'mine') {
+    refreshDrafts();
+  }
   const targetHash = buildHashPath(next);
   if (window.location.hash !== targetHash) {
     window.location.hash = targetHash;
@@ -58,13 +87,52 @@ function syncFromHash() {
     route.value = { name: 'quiz', testId: parsed.testId, peer: parsed.peer };
     return;
   }
+  if (parsed.name === 'mine') {
+    refreshDrafts();
+  }
   route.value = parsed;
+}
+
+async function hydrateAuthSession() {
+  const stored = authSession.value;
+  if (!stored) return;
+
+  let accessToken = stored.accessToken;
+  let refreshToken = stored.refreshToken;
+  let expiresAt = stored.expiresAt;
+
+  try {
+    if (expiresAt <= Date.now() + 60_000) {
+      const tokens = await refreshSession(refreshToken);
+      accessToken = tokens.access_token;
+      refreshToken = tokens.refresh_token;
+      expiresAt = Date.now() + tokens.expires_in * 1000;
+    }
+    const freshUser = await getMe(accessToken);
+    const updated: StoredAuthSession = {
+      accessToken,
+      refreshToken,
+      expiresAt,
+      user: freshUser
+    };
+    authSession.value = updated;
+    localStorageAdapter.saveAuthSession(updated);
+    localStorageAdapter.mergeGuestResultsToAccount(freshUser.uid);
+    results.value = localStorageAdapter.getResults(freshUser.uid);
+  } catch (e) {
+    if (e instanceof AccountApiError && (e.status === 401 || e.status === 403)) {
+      authSession.value = null;
+      localStorageAdapter.clearAuthSession();
+      results.value = localStorageAdapter.getResults();
+    }
+  }
 }
 
 onMounted(() => {
   applyThemeClass();
   syncFromHash();
   window.addEventListener('hashchange', syncFromHash);
+  void hydrateAuthSession();
 });
 
 onBeforeUnmount(() => {
@@ -78,9 +146,51 @@ function toggleTheme() {
   applyThemeClass();
 }
 
+function handleUpdatePrefs(partial: Partial<UserPrefs>) {
+  prefs.value = localStorageAdapter.savePrefs(partial);
+  if (partial.autoAdvance !== undefined) {
+    showToast(partial.autoAdvance ? '已开启选完自动切下一题' : '已切换为手动点击下一题');
+  } else if (partial.defaultPosterRatio) {
+    showToast(
+      `默认海报比例已切换为 ${partial.defaultPosterRatio === '916' ? '9:16 朋友圈' : '3:4 小红书'}`
+    );
+  }
+}
+
+function handleAuthenticated(session: AuthSessionResponse) {
+  const stored: StoredAuthSession = {
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+    expiresAt: Date.now() + session.expires_in * 1000,
+    user: session.user
+  };
+  authSession.value = stored;
+  localStorageAdapter.saveAuthSession(stored);
+  const merged = localStorageAdapter.mergeGuestResultsToAccount(session.user.uid);
+  results.value = localStorageAdapter.getResults(session.user.uid);
+
+  const welcome = session.is_new_user
+    ? `欢迎加入相伴，${session.user.username} (#${session.user.account_id})！`
+    : `欢迎回来，${session.user.username}！`;
+  showToast(merged > 0 ? `${welcome} 已关联 ${merged} 枚贴纸` : welcome);
+  navigate({ name: 'mine' });
+}
+
+async function handleLogout() {
+  const token = authSession.value?.refreshToken;
+  authSession.value = null;
+  localStorageAdapter.clearAuthSession();
+  results.value = localStorageAdapter.getResults();
+  if (token) {
+    void logoutSession(token);
+  }
+  showToast('已退出相伴账号，本机已测贴纸仍保留');
+}
+
 function startTest(testId: TestId, clearOldDraft = false) {
   if (clearOldDraft) {
     localStorageAdapter.clearDraft(testId);
+    refreshDrafts();
   }
   navigate({ name: 'quiz', testId });
 }
@@ -98,12 +208,16 @@ function openCompat(testId?: TestId, peer?: PeerPayload) {
     testId ||
     (Object.keys(results.value)[0] as TestId | undefined) ||
     'animal';
+  if (peer) {
+    compatCount.value = localStorageAdapter.incrementCompatCount();
+  }
   navigate({ name: 'compat', testId: picked, peer });
 }
 
 function handleQuizCompleted(result: EvaluatedResult, peer?: PeerPayload) {
-  localStorageAdapter.saveResult(result);
+  localStorageAdapter.saveResult(result, currentUid.value);
   results.value = { ...results.value, [result.testId]: result };
+  refreshDrafts();
   if (result.isHiddenEgg) {
     showToast(`🎉 触发 1% 隐藏彩蛋：${result.profileTitle}！`);
   }
@@ -111,7 +225,7 @@ function handleQuizCompleted(result: EvaluatedResult, peer?: PeerPayload) {
 }
 
 function handleUpdateNickname(name: string) {
-  nickname.value = name;
+  guestNickname.value = name;
   localStorageAdapter.saveNickname(name);
 }
 
@@ -128,8 +242,14 @@ const activeProfile = computed(() =>
 );
 
 const showBottomTabs = computed(
-  () => route.value.name === 'home' || route.value.name === 'compat' || route.value.name === 'archive'
+  () =>
+    route.value.name === 'home' ||
+    route.value.name === 'compat' ||
+    route.value.name === 'archive' ||
+    route.value.name === 'mine'
 );
+
+const localStickerCount = computed(() => Object.keys(results.value).length);
 
 async function copyCurrentShareLink() {
   if (!activeResult.value) return;
@@ -139,6 +259,7 @@ async function copyCurrentShareLink() {
     activeResult.value,
     nickname.value
   );
+  compatCount.value = localStorageAdapter.incrementCompatCount();
   try {
     await navigator.clipboard.writeText(url);
     showToast('合盘链接已复制！发给微信好友测完即看合拍度');
@@ -186,7 +307,8 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
           v-else-if="route.name === 'quiz'"
           :test="activeTest"
           :peer="route.peer"
-          @back="navigate({ name: 'home' })"
+          :auto-advance="prefs.autoAdvance"
+          @back="refreshDrafts(); navigate({ name: 'home' })"
           @completed="handleQuizCompleted"
         />
 
@@ -217,7 +339,7 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
         />
 
         <ArchiveView
-          v-else
+          v-else-if="route.name === 'archive'"
           :results="results"
           :nickname="nickname"
           @start-test="(id) => startTest(id, false)"
@@ -225,9 +347,35 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
           @update-nickname="handleUpdateNickname"
           @toast="showToast"
         />
+
+        <MineView
+          v-else-if="route.name === 'mine'"
+          :user="authSession?.user || null"
+          :access-token="authSession?.accessToken || null"
+          :results="results"
+          :drafts="drafts"
+          :prefs="prefs"
+          :dark="dark"
+          :compat-count="compatCount"
+          @goto-auth="(m) => navigate({ name: 'auth', mode: m })"
+          @resume-draft="(id) => startTest(id, false)"
+          @toggle-theme="toggleTheme"
+          @update-prefs="handleUpdatePrefs"
+          @logout="handleLogout"
+          @toast="showToast"
+        />
+
+        <AuthView
+          v-else-if="route.name === 'auth'"
+          :initial-mode="route.mode"
+          :local-sticker-count="localStickerCount"
+          @back="navigate({ name: 'mine' })"
+          @authenticated="handleAuthenticated"
+          @toast="showToast"
+        />
       </main>
 
-      <!-- 底部三栏潮玩通栏导航 -->
+      <!-- 底部四栏潮玩通栏导航 -->
       <nav v-if="showBottomTabs" class="tabbar" aria-label="主导航">
         <button
           class="tab-item"
@@ -265,6 +413,18 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
           </svg>
           <span>集卡</span>
         </button>
+
+        <button
+          class="tab-item"
+          :class="{ active: route.name === 'mine' }"
+          @click="navigate({ name: 'mine' })"
+        >
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
+          </svg>
+          <span>我的</span>
+        </button>
       </nav>
 
       <!-- 高清海报保存 BottomSheet -->
@@ -274,6 +434,7 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
         :test="activeTest"
         :result="activeResult"
         :profile="activeProfile"
+        :default-ratio="prefs.defaultPosterRatio"
         @close="posterOpen = false"
         @copy-link="copyCurrentShareLink"
         @system-share="(img, file) => handleResultSystemShare(img, file)"

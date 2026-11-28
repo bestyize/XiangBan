@@ -1,11 +1,15 @@
 import type { EvaluatedResult, PeerPayload, TestDefinition, TestId } from './types.ts';
 
+export type AuthRouteMode = 'code' | 'pwd' | 'register' | 'reset';
+
 export type RouteView =
   | { name: 'home' }
   | { name: 'quiz'; testId: TestId; peer?: PeerPayload }
   | { name: 'result'; testId: TestId; peer?: PeerPayload }
   | { name: 'compat'; testId: TestId; peer?: PeerPayload }
-  | { name: 'archive' };
+  | { name: 'archive' }
+  | { name: 'mine' }
+  | { name: 'auth'; mode?: AuthRouteMode };
 
 const VALID_IDS = new Set<TestId>([
   'sbti',
@@ -73,6 +77,13 @@ export function parseHashRoute(
   const query = new URLSearchParams(queryPart);
 
   if (segs[0] === 'archive') return { name: 'archive' };
+  if (segs[0] === 'mine') return { name: 'mine' };
+  if (segs[0] === 'auth') {
+    const m = query.get('mode');
+    const mode: AuthRouteMode | undefined =
+      m === 'code' || m === 'pwd' || m === 'register' || m === 'reset' ? m : undefined;
+    return mode ? { name: 'auth', mode } : { name: 'auth' };
+  }
 
   if ((segs[0] === 't' || segs[0] === 'result' || segs[0] === 'compat') && segs[1]) {
     const id = segs[1] as TestId;
@@ -90,6 +101,8 @@ export function parseHashRoute(
 export function buildHashPath(view: RouteView): string {
   if (view.name === 'home') return '#/';
   if (view.name === 'archive') return '#/archive';
+  if (view.name === 'mine') return '#/mine';
+  if (view.name === 'auth') return view.mode ? `#/auth?mode=${view.mode}` : '#/auth';
   const prefix =
     view.name === 'quiz' ? 't' : view.name === 'result' ? 'result' : 'compat';
   if (!view.peer) return `#/${prefix}/${view.testId}`;

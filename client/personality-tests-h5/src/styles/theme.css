@@ -281,7 +281,7 @@ p {
   white-space: nowrap;
 }
 
-/* ========== 底部三栏通栏导航（移动端 fixed 吸底，PC 端跟随手机框） ========== */
+/* ========== 底部四栏通栏导航（移动端 fixed 吸底，PC 端跟随手机框） ========== */
 .tabbar {
   position: fixed;
   left: 50%;
@@ -289,12 +289,12 @@ p {
   width: 100%;
   max-width: 430px;
   bottom: 0;
-  padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1.8px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   flex-shrink: 0;
   z-index: 25;
 }
@@ -313,22 +313,24 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   border-radius: 12px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 750;
   border: 1.5px solid transparent;
+  white-space: nowrap;
 }
 
 .tab-item svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
   fill: none;
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
+  flex-shrink: 0;
 }
 
 .tab-item.active {

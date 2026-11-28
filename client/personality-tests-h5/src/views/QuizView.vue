@@ -5,10 +5,16 @@ import { evaluateTest, findProfileByCode } from '../engine/scoring';
 import { localStorageAdapter } from '../engine/storage';
 import ArtIcons from '../components/ArtIcons.vue';
 
-const props = defineProps<{
-  test: TestDefinition;
-  peer?: PeerPayload;
-}>();
+const props = withDefaults(
+  defineProps<{
+    test: TestDefinition;
+    peer?: PeerPayload;
+    autoAdvance?: boolean;
+  }>(),
+  {
+    autoAdvance: true
+  }
+);
 
 const emit = defineEmits<{
   back: [];
@@ -75,19 +81,26 @@ function pickOption(optKey: string) {
   });
 
   if (advanceTimer) window.clearTimeout(advanceTimer);
-  advanceTimer = window.setTimeout(() => {
-    if (step.value < total.value - 1) {
-      step.value += 1;
-      localStorageAdapter.saveDraft({
-        testId: props.test.id,
-        step: step.value,
-        answers: answers.value,
-        updatedAt: Date.now()
-      });
-    } else {
-      finishTest();
-    }
-  }, 230);
+  if (props.autoAdvance) {
+    advanceTimer = window.setTimeout(() => {
+      goNextOrFinish();
+    }, 230);
+  }
+}
+
+function goNextOrFinish() {
+  if (analyzing.value || !currentQ.value || !answers.value[currentQ.value.id]) return;
+  if (step.value < total.value - 1) {
+    step.value += 1;
+    localStorageAdapter.saveDraft({
+      testId: props.test.id,
+      step: step.value,
+      answers: answers.value,
+      updatedAt: Date.now()
+    });
+  } else {
+    finishTest();
+  }
 }
 
 function goPrev() {
@@ -199,7 +212,14 @@ function finishTest() {
         >
           ‹ 上一题
         </button>
-        <span class="q-safe">纯免费 · 自动保存进度</span>
+        <button
+          v-if="!autoAdvance && currentQ && answers[currentQ.id]"
+          class="q-next"
+          @click="goNextOrFinish"
+        >
+          {{ step < total - 1 ? '下一题 ›' : '揭晓结果 →' }}
+        </button>
+        <span v-else class="q-safe">纯免费 · 自动保存进度</span>
       </div>
     </div>
 
@@ -463,6 +483,16 @@ function finishTest() {
   border: 1.5px solid var(--border);
   font-size: 12px;
   font-weight: 750;
+}
+.q-next {
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: #18181b;
+  color: var(--pop-lime);
+  border: 1.5px solid #18181b;
+  box-shadow: 2px 2px 0 var(--pop-red);
+  font-size: 12px;
+  font-weight: 850;
 }
 .q-safe {
   font-size: 11px;

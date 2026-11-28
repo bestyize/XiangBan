@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ALL_TESTS, buildSoulInsight, getTestById } from '../src/data/index.ts';
+import { validatePasswordLocal, validateUsernameLocal } from '../src/engine/accountApi.ts';
 import { computeCompatibility, evaluateTest } from '../src/engine/scoring.ts';
-import { encodePeerShareUrl, parseHashRoute } from '../src/engine/shareCodec.ts';
+import { buildHashPath, encodePeerShareUrl, parseHashRoute } from '../src/engine/shareCodec.ts';
+import { localStorageAdapter } from '../src/engine/storage.ts';
 import { triggerSystemShare } from '../src/engine/systemShare.ts';
 
 test('全部 12 套首发与二期测评题库结构完整、无重复题号、无空选项', () => {
@@ -101,4 +103,38 @@ test('无 Web Share 环境调用系统分享时优雅降级不抛错', async () 
   });
   assert.ok(outcome.status === 'unsupported' || outcome.status === 'fallback-copied');
   assert.ok(outcome.message.length > 0);
+});
+
+test('我的页与登录注册路由编解码、用户名密码本地校验及游客贴纸合并正确', () => {
+  assert.deepEqual(parseHashRoute('#/mine', getTestById), { name: 'mine' });
+  assert.deepEqual(parseHashRoute('#/auth?mode=pwd', getTestById), { name: 'auth', mode: 'pwd' });
+  assert.equal(buildHashPath({ name: 'mine' }), '#/mine');
+  assert.equal(buildHashPath({ name: 'auth', mode: 'register' }), '#/auth?mode=register');
+
+  // 与 server-account/src/username.rs 规则对齐
+  assert.equal(validateUsernameLocal('林小满'), null);
+  assert.equal(validateUsernameLocal('Alice_01'), null);
+  assert.ok(validateUsernameLocal('1abc') !== null);
+  assert.ok(validateUsernameLocal('ab') !== null);
+  assert.ok(validateUsernameLocal('admin01') !== null);
+  assert.ok(validateUsernameLocal('小伴官方') !== null);
+
+  assert.equal(validatePasswordLocal('pass1234', 'Alice_01'), null);
+  assert.ok(validatePasswordLocal('short', 'Alice_01') !== null);
+  assert.ok(validatePasswordLocal('Alice_01', 'Alice_01') !== null);
+
+  // 偏好与游客贴纸合并至登录账号
+  const prefs = localStorageAdapter.savePrefs({ autoAdvance: false, defaultPosterRatio: '34' });
+  assert.equal(prefs.autoAdvance, false);
+  assert.equal(prefs.defaultPosterRatio, '34');
+
+  const sbti = getTestById('sbti');
+  const sampleRes = evaluateTest(
+    sbti,
+    Object.fromEntries(sbti.questions.map((q) => [q.id, 'A']))
+  );
+  localStorageAdapter.saveResult(sampleRes);
+  const merged = localStorageAdapter.mergeGuestResultsToAccount('uid-test-001');
+  assert.ok(merged >= 1);
+  assert.equal(localStorageAdapter.getResults('uid-test-001').sbti?.profileCode, sampleRes.profileCode);
 });
