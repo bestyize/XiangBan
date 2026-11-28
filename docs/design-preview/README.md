@@ -6,7 +6,7 @@
 
 ## 总体设计稿导航网页（推荐入口）
 
-[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 45 个设计稿模块/状态入口（38 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
+[小伴全端设计稿总导航](index.html) 统一收录 **手机版、网页版、桌面版、小游戏与小程序** 四大分类共 46 个设计稿模块/状态入口（39 份独立原型，其中社区详情页按作品/帖子/开源三态拆出、桌面 UI 升级画布按 5 大模块拆出直达；已剔除被替代旧稿、冗余静态 PDF/ZIP 归档及已淘汰老样式对照），支持关键词检索、模块与落地状态筛选、快捷预设跳转、深浅色切换与内置工作台即时预览。
 
 在仓库根目录一键启动统一预览服务（自动映射桌面 UI 升级画布的 `/_blob/` 图片资源）：
 
@@ -102,5 +102,6 @@ npm --prefix client/xiaoban-desktop run dev
 | [小伴游戏厅 · game.xiaban.xyz 移动端游戏站](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/xiaoban-games-h5.html) | 独立 H5 / 游戏合集 | 设计评审中 | 香港纯静态移动端游戏站 8+1 画板可交互设计稿（支持总览/单机试玩/真机全屏、390/360px、暖瓷浅色/掌机深色与 6 套主题色）：精装掌机展厅风，收录小伴现役 8+1 款官方游戏，覆盖「继续上次」断点续玩、今日主打大片轮播、单手竖屏筛选与随机摇号、卡带预览抽屉、竖屏沉浸运行与透明三点宿主菜单、横屏旋转引导与右侧窄抽屉、免登录战绩档案、通栏精修「我的」页、统一相伴账号 4 态登录注册弹窗及分享直达页（[本地预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/xiaoban-games-h5.html)） |
 | [轻启](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/quick-launch.html) | 实用小程序 | 已合入 | Android 桌面快捷方式工具原型，256×256 WebP 图标网格、搜索筛选与添加到桌面交互 |
 | [遥控器](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/universal-remote.html) | 实用小程序 | 已合入 | 协议 2 电视与空调红外工具，按市场份额排序的 19 电视 / 21 空调品牌搜索试码、四点方向盘、大字温控与无圆底竖三点宿主菜单 |
+| [动态壁纸 · 雨窗天光与画廊重设计](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers-redesign.html) | 实用小程序 | 设计评审中 | 协议 2 动态壁纸小程序重设计（6 画板总览 + 单机试玩 + 全屏壁纸 + 390/360px + 深浅色 + 6 套主题色）：画廊首页与「雨窗天光」WebGL 实时雨滴折射/触控拭雾壁纸，含暮雨/晴岚/梅雨/霓虹夜/微雪 5 套天光氛围、桌面/锁屏模拟预览与双槽位独立切换（[本地预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers-redesign.html)） |
 | [万磁搜](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/torrent-search.html) | 实用小程序 | 已合入 | 协议 2 独立搜索工具设计稿，覆盖首屏、跨站搜索结果、来源筛选、失败态与磁力操作弹层（已合入 `wancisou` v1.0.2） |
 | [收盘别问](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/shoupan-biewen.html) | 休闲小游戏 | 概念试玩 | 390×800 竖屏 H5 单页，100 个真实创业板交易日、可横滑 K 线、提前收手结算与带二维码的 PNG 成绩海报（尚未合入内置应用包） |

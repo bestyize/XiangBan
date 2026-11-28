@@ -1,0 +1,2283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>动态壁纸 · 雨窗天光 &amp; 小程序 UI 重设计稿</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scrollbar-width: thin;
+  }
+  ::selection { background: rgba(227, 32, 60, 0.16); color: inherit; }
+  body {
+    margin: 0;
+    background: #efefef;
+    color: #1c1c1e;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    transition: background .2s ease, color .2s ease;
+  }
+  body.studio-dark { background: #0c0c0e; color: #ececef; }
+  body.mode-wallpaper { overflow: hidden; }
+  button, input { border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+  button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: default; opacity: .45; }
+  button:focus-visible { outline: 2px solid var(--focus, #e3203c); outline-offset: 2px; }
+  h1, h2, h3, h4, p, ul, li, figure { margin: 0; padding: 0; }
+  ul, li { list-style: none; }
+  svg { display: block; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg:not([fill]) { fill: none; stroke: currentColor; }
+  .num { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  /* ========== Studio Chrome ========== */
+  .studio { max-width: 1520px; margin: 0 auto; padding: 18px 22px 64px; }
+  body.mode-wallpaper .studio { display: none; }
+
+  .studio-bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px;
+    padding: 12px 16px; border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    margin-bottom: 22px; position: sticky; top: 12px; z-index: 50;
+  }
+  body.studio-dark .studio-bar {
+    background: rgba(26, 26, 30, 0.9);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+  }
+  .studio-brand { display: flex; align-items: center; gap: 11px; }
+  .studio-logo {
+    width: 34px; height: 34px; border-radius: 10px; flex: none;
+    background: linear-gradient(135deg, #ff5b7d 0%, #f9744b 100%);
+    display: grid; place-items: center;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  }
+  .studio-brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .proto-pill {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.06); color: #4a4d55;
+  }
+  body.studio-dark .proto-pill { background: rgba(255, 255, 255, 0.1); color: #c4c6cf; }
+  .studio-brand p { font-size: 12px; color: #5c5f68; margin-top: 2px; }
+  body.studio-dark .studio-brand p { color: #a0a3ad; }
+
+  .studio-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .seg { display: inline-flex; align-items: center; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, 0.06); gap: 2px; }
+  body.studio-dark .seg { background: rgba(255, 255, 255, 0.08); }
+  .seg button {
+    height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: #52555e;
+    white-space: nowrap; transition: background .15s, color .15s;
+  }
+  body.studio-dark .seg button { color: #b0b3bd; }
+  .seg button.active {
+    background: #fff; color: #18191c; font-weight: 650;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.09);
+  }
+  body.studio-dark .seg button.active { background: #2e3038; color: #f4f4f7; }
+
+  .swatches { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.06); }
+  body.studio-dark .swatches { background: rgba(255, 255, 255, 0.08); }
+  .swatch { width: 14px; height: 14px; border-radius: 50%; position: relative; transition: transform .14s; }
+  .swatch:hover { transform: scale(1.16); }
+  .swatch.active::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+  /* ========== Boards Grid ========== */
+  .boards {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+    gap: 30px 26px;
+  }
+  .board { width: 390px; flex: none; transition: width .2s ease; }
+  body.compact .board { width: 360px; }
+  body.mode-live .boards .board:not(.board-live) { display: none; }
+  body.mode-overview .boards .board-live { display: none; }
+
+  .board-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 0 4px 10px; min-height: 26px; flex-wrap: wrap;
+  }
+  .board-title { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 650; }
+  .board-num {
+    font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+    background: rgba(0, 0, 0, 0.07); color: #43464f; font-variant-numeric: tabular-nums;
+  }
+  body.studio-dark .board-num { background: rgba(255, 255, 255, 0.11); color: #cfd1da; }
+  .board-tag {
+    font-size: 11px; font-weight: 550; padding: 2px 8px; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.055); color: #52555e;
+  }
+  body.studio-dark .board-tag { background: rgba(255, 255, 255, 0.09); color: #b0b3bd; }
+  .board-caption { margin: 10px 6px 0; font-size: 12px; line-height: 1.6; color: #595c66; }
+  body.studio-dark .board-caption { color: #9c9fa9; }
+
+  /* ========== Phone Shell & Official Neutral Tokens ========== */
+  .phone {
+    --paper: #fafafa;
+    --surface: #ffffff;
+    --fill: #f2f2f2;
+    --fill-hover: #e7e7ea;
+    --hairline: #ededed;
+    --ink: #1c1c1e;
+    --ink2: #59595e;
+    --ink3: #6e6e73;
+    --accent: #e3203c;
+    --accent-ink: #ffffff;
+    --accent-soft: #fff3f4;
+    --accent-soft-ink: #c61731;
+    --ok: #2fa36b;
+    --danger: #e3203c;
+    --safe-top: 32px;
+    --safe-bottom: 20px;
+    --capsule-top: 32px;
+    --capsule-right: 6px;
+    --capsule-w: 48px;
+    --capsule-h: 48px;
+
+    position: relative;
+    height: 812px;
+    border-radius: 36px;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.11);
+    --focus: var(--accent);
+  }
+  .phone.dark {
+    color-scheme: dark;
+    --paper: #111111;
+    --surface: #1c1c1e;
+    --fill: #2c2c2e;
+    --fill-hover: #38383b;
+    --hairline: #2c2c2e;
+    --ink: #ececec;
+    --ink2: #a8a8b0;
+    --ink3: #909098;
+    --accent-soft: rgba(255, 255, 255, 0.08);
+    --accent-soft-ink: #ff6b81;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.48);
+  }
+  body.compact .phone { height: 760px; }
+
+  /* Status Bar & Home Indicator */
+  .sys-status {
+    position: absolute; inset: 0 0 auto; height: var(--safe-top); z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 22px; font-size: 12px; font-weight: 650; pointer-events: none;
+    color: var(--ink);
+  }
+  .sys-status.on-media { color: #ffffff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
+  .sys-icons { display: flex; align-items: center; gap: 5px; }
+  .sys-icons svg { width: 15px; height: 15px; }
+  .sys-home-bar {
+    position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); z-index: 35;
+    width: 118px; height: 4px; border-radius: 999px; pointer-events: none;
+    background: rgba(28, 28, 30, 0.22);
+  }
+  .phone.dark .sys-home-bar, .sys-home-bar.on-media { background: rgba(255, 255, 255, 0.46); }
+
+  /* Protocol 2 Host Menu Button (4.3 Spec: transparent, no circle, 48x48 target) */
+  .host-more {
+    position: absolute; top: var(--capsule-top); right: var(--capsule-right); z-index: 24;
+    width: var(--capsule-w); height: var(--capsule-h);
+    display: grid; place-items: center;
+    color: var(--ink);
+  }
+  .host-more.on-media { color: #ffffff; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5)); }
+  .host-more svg { width: 18px; height: 18px; }
+
+  /* Subpage Stack */
+  .app-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  .page {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    background: var(--paper);
+    transition: transform .26s cubic-bezier(0.22, 1, 0.36, 1), filter .26s ease;
+  }
+  .page::-webkit-scrollbar { display: none; }
+  .page-home.pushed { transform: translateX(-28%); filter: brightness(0.92); pointer-events: none; }
+  .page-preview {
+    background: #0d1526; color: #ffffff; overflow: hidden; z-index: 15;
+    transform: translateX(0);
+  }
+  .page-preview.is-hidden { transform: translateX(100%); pointer-events: none; }
+
+  /* ========== Home Gallery Page ========== */
+  .home-topbar {
+    flex: none;
+    padding: calc(var(--safe-top) + 10px) 62px 10px 18px;
+    display: flex; align-items: center; justify-content: space-between; min-height: calc(var(--safe-top) + 52px);
+  }
+  .home-topbar h2 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .home-body {
+    flex: 1; padding: 4px 16px calc(var(--safe-bottom) + 18px);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Active Slot Summary Strip (Board 05 & Live after apply) */
+  .slot-strip {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--hairline);
+  }
+  .slot-strip-list { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .slot-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; line-height: 18px; color: var(--ink); min-width: 0; }
+  .slot-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-row em { font-style: normal; color: var(--ink2); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--ok); }
+  .status-dot.muted { background: var(--ink3); }
+  .slot-action {
+    flex: none; height: 32px; padding: 0 12px; border-radius: 999px;
+    background: var(--fill); color: var(--ink); font-size: 12px; font-weight: 600;
+  }
+  .slot-action:hover { background: var(--fill-hover); }
+
+  /* Hero Featured Interactive Wallpaper Card */
+  .hero-frame {
+    position: relative; width: 100%; height: 382px; border-radius: 20px; overflow: hidden;
+    background: #10192d; cursor: pointer;
+    border: 1px solid var(--hairline);
+    isolation: isolate;
+  }
+  body.compact .hero-frame { height: 344px; }
+  .hero-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    touch-action: none;
+  }
+  .hero-scrim {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(10, 14, 24, 0.2) 0%, transparent 32%, transparent 56%, rgba(8, 12, 22, 0.72) 100%);
+  }
+  .hero-top-row {
+    position: absolute; top: 12px; left: 12px; right: 12px; z-index: 3;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none;
+  }
+  .glass-badge {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px;
+    background: rgba(18, 22, 32, 0.56); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: #ffffff; font-size: 11.5px; line-height: 16px; font-weight: 550;
+    white-space: nowrap; flex: none;
+  }
+  .glass-badge svg { width: 13px; height: 13px; flex: none; }
+  .hero-bottom {
+    position: absolute; inset: auto 0 0; z-index: 3; padding: 14px 14px 14px 16px;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+    color: #ffffff; pointer-events: none;
+  }
+  .hero-title { font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.02em; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
+  .hero-sub { font-size: 12.5px; line-height: 18px; color: rgba(255, 255, 255, 0.88); margin-top: 2px; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45); }
+  .hero-enter {
+    pointer-events: auto; flex: none; height: 34px; padding: 0 14px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92); color: #16181d; font-size: 12.5px; font-weight: 650;
+    display: inline-flex; align-items: center; gap: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    transition: transform .14s ease;
+  }
+  .hero-enter:active { transform: scale(0.97); }
+  .hero-enter svg { width: 14px; height: 14px; }
+
+  /* 5 Atmosphere Preset Rail */
+  .preset-rail {
+    display: flex; align-items: center; justify-content: space-between; gap: 5px;
+    padding: 2px 0;
+  }
+  .preset-chip {
+    flex: 1 1 auto; height: 32px; padding: 0 7px 0 6px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    background: var(--surface); border: 1px solid var(--hairline);
+    color: var(--ink2); font-size: 11.5px; font-weight: 550; white-space: nowrap;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .preset-chip .orb { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .preset-chip[aria-pressed="true"] {
+    border-color: var(--accent); color: var(--ink); font-weight: 650;
+    background: var(--surface);
+  }
+
+  /* More Wallpapers Extension Section */
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .sec-head h3 { font-size: 16px; line-height: 22px; font-weight: 670; }
+  .sec-note { font-size: 12px; color: var(--ink2); }
+  .more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .future-card {
+    border-radius: 16px; overflow: hidden; background: var(--surface); border: 1px solid var(--hairline);
+    display: flex; flex-direction: column;
+  }
+  .future-art {
+    position: relative; height: 104px; overflow: hidden;
+    display: grid; place-items: center;
+  }
+  .future-art.ink { background: linear-gradient(155deg, #273032 0%, #4b5c5b 55%, #8da09a 100%); }
+  .future-art.ferro { background: linear-gradient(155deg, #1b1c24 0%, #343747 52%, #555970 100%); }
+  .future-art svg { width: 78px; height: 78px; color: rgba(255, 255, 255, 0.72); stroke-width: 1.4; }
+  .future-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .future-meta strong { font-size: 14px; line-height: 20px; font-weight: 650; color: var(--ink); }
+  .neutral-tag {
+    display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+    padding: 2px 8px; border-radius: 999px; background: var(--fill);
+    font-size: 11px; line-height: 16px; color: var(--ink2); font-weight: 550;
+  }
+
+  /* ========== Fullscreen Preview Page ========== */
+  .preview-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    touch-action: none;
+  }
+  .preview-scrim {
+    position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background: linear-gradient(180deg, rgba(10, 14, 24, 0.42) 0%, transparent 24%, transparent 60%, rgba(8, 11, 20, 0.56) 100%);
+  }
+  .preview-topbar {
+    position: absolute; top: var(--safe-top); left: 0; right: 0; z-index: 18;
+    height: 48px; padding: 0 56px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+  }
+  .preview-topbar h3 { font-size: 16px; line-height: 20px; font-weight: 670; color: #ffffff; }
+  .preview-topbar small { font-size: 11.5px; line-height: 15px; color: rgba(255, 255, 255, 0.85); }
+  .preview-back {
+    position: absolute; top: var(--safe-top); left: 6px; z-index: 24;
+    width: 48px; height: 48px; display: grid; place-items: center; color: #ffffff;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+  }
+  .preview-back svg { width: 20px; height: 20px; }
+
+  .gesture-hint {
+    position: absolute; top: calc(var(--safe-top) + 58px); left: 50%; transform: translateX(-50%); z-index: 12;
+    padding: 5px 12px; border-radius: 999px;
+    background: rgba(18, 22, 32, 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: rgba(255, 255, 255, 0.94); font-size: 12px; line-height: 16px; white-space: nowrap;
+    pointer-events: none; transition: opacity .35s ease;
+  }
+  .gesture-hint.faded { opacity: 0; }
+
+  /* Simulated Lock Screen & Home Screen Overlays */
+  .sim-overlays {
+    position: absolute; inset: 0; z-index: 6; pointer-events: none;
+    color: #ffffff; text-shadow: 0 2px 14px rgba(8, 12, 22, 0.45);
+  }
+  .sim-lock {
+    position: absolute; inset: 0; padding: calc(var(--safe-top) + 74px) 24px 230px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  }
+  .sim-lock-ico { width: 16px; height: 16px; margin-bottom: 4px; opacity: 0.92; }
+  .sim-date { font-size: 14px; line-height: 20px; font-weight: 550; letter-spacing: 0.01em; }
+  .sim-clock-lg {
+    font-size: 76px; line-height: 1.02; font-weight: 300; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .sim-lock-shortcuts {
+    position: absolute; left: 26px; right: 26px; bottom: 206px;
+    display: flex; justify-content: space-between;
+  }
+  .sim-round-btn {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(18, 22, 32, 0.42); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .sim-round-btn svg { width: 18px; height: 18px; }
+
+  .sim-home {
+    position: absolute; inset: 0;
+    padding: calc(var(--safe-top) + 76px) 22px 206px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .sim-widget { display: flex; flex-direction: column; gap: 2px; }
+  .sim-clock-md {
+    font-size: 46px; line-height: 1.05; font-weight: 350; letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+  }
+  .sim-weather { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 18px; opacity: 0.94; }
+  .sim-weather svg { width: 15px; height: 15px; }
+  .sim-apps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .sim-app { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11.5px; line-height: 16px; }
+  .sim-app-tile {
+    width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+    background: rgba(255, 255, 255, 0.22); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .sim-app-tile svg { width: 22px; height: 22px; color: #ffffff; }
+  .sim-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+  .sim-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.42); }
+  .sim-dots i.on { width: 14px; border-radius: 999px; background: #ffffff; }
+
+  /* Floating Glass Preview Dock (No 1px border + shadow ghost card; shadow only) */
+  .preview-dock {
+    position: absolute; left: 12px; right: 12px; bottom: calc(var(--safe-bottom) + 2px); z-index: 16;
+    padding: 12px; border-radius: 22px;
+    background: rgba(18, 20, 28, 0.68);
+    backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    display: flex; flex-direction: column; gap: 10px;
+    color: #ffffff;
+  }
+  .dock-presets {
+    display: flex; align-items: center; justify-content: space-between; gap: 3px;
+  }
+  .dock-preset {
+    flex: 1 1 auto; min-width: 0; height: 30px; border-radius: 999px; padding: 0 6px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 11.5px; color: rgba(255, 255, 255, 0.8); white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .dock-preset .orb { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28); }
+  .dock-preset[aria-pressed="true"] {
+    background: rgba(255, 255, 255, 0.2); color: #ffffff; font-weight: 650;
+  }
+
+  .dock-controls {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .mode-tabs {
+    flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.12);
+  }
+  .mode-tabs button {
+    height: 34px; border-radius: 999px; font-size: 12.5px; color: rgba(255, 255, 255, 0.84);
+    transition: background .15s, color .15s;
+  }
+  .mode-tabs button[aria-pressed="true"] {
+    background: #ffffff; color: #181a20; font-weight: 650;
+  }
+  .dock-reset-mist {
+    flex: none; height: 40px; padding: 0 12px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12); color: #ffffff; font-size: 12px; font-weight: 550;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .dock-reset-mist:hover { background: rgba(255, 255, 255, 0.2); }
+  .dock-reset-mist svg { width: 14px; height: 14px; }
+
+  .dock-apply {
+    width: 100%; height: 46px; border-radius: 999px;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 14.5px; font-weight: 670; letter-spacing: 0.01em;
+    transition: transform .14s ease, opacity .15s ease;
+  }
+  .dock-apply:active { transform: scale(0.985); }
+
+  .dock-status {
+    text-align: center; font-size: 12px; line-height: 17px; color: rgba(255, 255, 255, 0.92);
+    padding: 0 4px;
+  }
+
+  /* ========== Overlays: Host BottomSheet, System Picker, Toast ========== */
+  .scrim {
+    position: absolute; inset: 0; z-index: 28;
+    background: rgba(16, 16, 20, 0.44);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    transition: opacity .2s ease;
+  }
+  .scrim.is-hidden { opacity: 0; pointer-events: none; }
+  .sheet {
+    background: var(--surface); color: var(--ink);
+    border-radius: 20px 20px 0 0;
+    padding: 8px 0 calc(var(--safe-bottom) + 6px);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.16);
+    transform: translateY(0);
+    transition: transform .24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .scrim.is-hidden .sheet { transform: translateY(100%); }
+  .sheet-grab { width: 36px; height: 4px; border-radius: 999px; background: var(--fill-hover); margin: 0 auto 12px; }
+  .sheet-app {
+    display: flex; align-items: center; gap: 12px; padding: 4px 18px 14px;
+  }
+  .sheet-app-icon {
+    width: 40px; height: 40px; border-radius: 12px; flex: none;
+    background: linear-gradient(145deg, #274469 0%, #19253f 100%);
+    display: grid; place-items: center; color: #ffffff;
+  }
+  .sheet-app-icon svg { width: 22px; height: 22px; }
+  .sheet-app-text strong { display: block; font-size: 15px; line-height: 20px; font-weight: 670; }
+  .sheet-app-text small { display: block; font-size: 12px; line-height: 16px; color: var(--ink2); margin-top: 2px; }
+
+  .sheet-actions {
+    display: flex; gap: 12px; padding: 6px 18px 14px;
+  }
+  .sheet-act {
+    flex: 1; min-height: 62px; border-radius: 14px; background: var(--fill);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    font-size: 12px; font-weight: 550; color: var(--ink);
+  }
+  .sheet-act:hover { background: var(--fill-hover); }
+  .sheet-act svg { width: 20px; height: 20px; }
+
+  .sheet-list { padding: 0 16px 6px; }
+  .sheet-row {
+    width: 100%; min-height: 48px; padding: 0 8px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 14.5px; color: var(--ink); text-align: left;
+  }
+  .sheet-row + .sheet-row { border-top: 0.5px solid var(--hairline); }
+  .sheet-row small { font-size: 12px; color: var(--ink2); }
+
+  .sheet-divider { height: 0.5px; background: var(--hairline); margin: 4px 16px 0; }
+  .sheet-cancel {
+    width: 100%; height: 48px; display: grid; place-items: center;
+    font-size: 15px; font-weight: 600; color: var(--ink);
+  }
+
+  .toast-pill {
+    position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 12px); transform: translateX(-50%);
+    z-index: 32; padding: 9px 16px; border-radius: 999px;
+    background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
+    white-space: nowrap; pointer-events: none;
+  }
+  .toast-pill.on-dark { background: #26272c; color: #ffffff; }
+
+  /* ========== Fullscreen Wallpaper Showcase Mode ========== */
+  .wallpaper-stage {
+    display: none; position: fixed; inset: 0; z-index: 90; background: #0a101d;
+  }
+  body.mode-wallpaper .wallpaper-stage { display: block; }
+  .wallpaper-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .wallpaper-hud {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 95;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+    padding: 8px 10px; border-radius: 999px; max-width: calc(100vw - 24px);
+    background: rgba(18, 20, 28, 0.72); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42); color: #ffffff;
+  }
+  .hud-btn {
+    height: 32px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 550;
+    display: inline-flex; align-items: center; gap: 5px; color: rgba(255, 255, 255, 0.86);
+    white-space: nowrap;
+  }
+  .hud-btn .orb { width: 11px; height: 11px; border-radius: 50%; }
+  .hud-btn[aria-pressed="true"] { background: rgba(255, 255, 255, 0.2); color: #ffffff; font-weight: 650; }
+  .hud-sep { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.18); }
+  .hud-btn.exit { background: #ffffff; color: #16181d; font-weight: 650; }
+</style>
+</head>
+<body>
+  <div class="studio">
+    <header class="studio-bar">
+      <div class="studio-brand">
+        <div class="studio-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff" stroke="none">
+            <path d="M11.6 3.8c.2-.6 1-.6 1.2 0l1.1 3.2c.2.6.6 1 1.2 1.2l3.2 1.1c.6.2.6 1 0 1.2l-3.2 1.1c-.6.2-1 .6-1.2 1.2l-1.1 3.2c-.2.6-1 .6-1.2 0l-1.1-3.2c-.2-.6-.6-1-1.2-1.2L6.1 10.5c-.6-.2-.6-1 0-1.2l3.2-1.1c.6-.2 1-.6 1.2-1.2l1.1-3.2Z"/>
+            <path d="M18.6 14.8c.18-.5.88-.5 1.06 0l.48 1.38c.1.28.32.5.6.6l1.38.48c.5.18.5.88 0 1.06l-1.38.48c-.28.1-.5.32-.6.6l-.48 1.38c-.18.5-.88.5-1.06 0l-.48-1.38a1.02 1.02 0 0 0-.6-.6l-1.38-.48c-.5-.18-.5-.88 0-1.06l1.38-.48c.28-.1.5-.32.6-.6l.48-1.38Z" opacity=".9"/>
+          </svg>
+        </div>
+        <div>
+          <h1>动态壁纸 · 协议 2 小程序 UI &amp; 实时壁纸设计稿 <span class="proto-pill">Rain Window v2</span></h1>
+          <p>画廊首页 + 全屏沉浸预览 · 全新 WebGL「雨窗天光」可轻点落雨与手指拭雾 · 5 套天光氛围预设</p>
+        </div>
+      </div>
+      <div class="studio-controls">
+        <div class="seg" role="group" aria-label="视图模式" id="viewModeSeg">
+          <button type="button" class="active" data-view="overview">画板总览</button>
+          <button type="button" data-view="live">单机试玩</button>
+          <button type="button" data-view="wallpaper">全屏壁纸</button>
+        </div>
+        <div class="seg" role="group" aria-label="设备宽度" id="widthSeg">
+          <button type="button" class="active" data-width="390">390px</button>
+          <button type="button" data-width="360">360px</button>
+        </div>
+        <div class="seg" role="group" aria-label="外观主题" id="themeSeg">
+          <button type="button" class="active" data-theme="light">浅色</button>
+          <button type="button" data-theme="dark">深色</button>
+        </div>
+        <div class="swatches" role="group" aria-label="6 套官方主题色" id="accentSwatches"></div>
+      </div>
+    </header>
+
+    <main class="boards" id="boardsContainer"></main>
+  </div>
+
+  <!-- Fullscreen Wallpaper Showcase Mode -->
+  <div class="wallpaper-stage" id="wallpaperStage">
+    <canvas id="fullscreenCanvas"></canvas>
+    <div class="wallpaper-hud" id="fullscreenHud"></div>
+  </div>
+
+<script>
+(() => {
+  // ==================== Shared SVG Icon Set (24x24, stroke 1.8) ====================
+  const ICONS = {
+    moreVert: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor" stroke="none"/></svg>',
+    back: '<svg viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>',
+    arrowRight: '<svg viewBox="0 0 24 24"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>',
+    lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    droplet: '<svg viewBox="0 0 24 24"><path d="M12 3.5c-3.5 4.8-6 7.8-6 11a6 6 0 0 0 12 0c0-3.2-2.5-6.2-6-11Z"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.6L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.6L20 15.5"/><path d="M20 20v-4.5h-4.5"/></svg>',
+    share: '<svg viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>',
+    cloudRain: '<svg viewBox="0 0 24 24"><path d="M6.5 16.5A4 4 0 0 1 7 8.6a5.5 5.5 0 0 1 10.6 1.5A3.5 3.5 0 0 1 17.5 16.5H6.5Z"/><path d="M9 19.5l-1 2M13 19.5l-1 2M17 19.5l-1 2"/></svg>',
+    photos: '<svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="M4.5 17l4.8-4.5 3.4 3.2 2.8-2.6 4 3.9"/></svg>',
+    notes: '<svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8.5h7M8.5 12.5h7M8.5 16.5h4.5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+    camera: '<svg viewBox="0 0 24 24"><path d="M4.5 8.5h2.7l1.4-2h6.8l1.4 2h2.7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13.5" r="3.2"/></svg>',
+    torch: '<svg viewBox="0 0 24 24"><path d="M8.5 4h7l-1 4.5v10a1.5 1.5 0 0 1-1.5 1.5h-2a1.5 1.5 0 0 1-1.5-1.5v-10L8.5 4Z"/><path d="M12 11.5v2"/></svg>',
+    wifi: '<svg viewBox="0 0 24 24"><path d="M4 9.5a12 12 0 0 1 16 0M7.5 13a7.2 7.2 0 0 1 9 0M11 16.5a2 2 0 0 1 2 0"/></svg>',
+    battery: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><rect x="5.5" y="9.5" width="9.5" height="5" rx="0.8" fill="currentColor" stroke="none"/><path d="M21 10.5v3"/></svg>',
+    inkWave: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16" opacity=".45"/><circle cx="24" cy="24" r="10" opacity=".75"/><circle cx="24" cy="24" r="4"/></svg>',
+    ferroWave: '<svg viewBox="0 0 48 48"><path d="M10 28c4-10 8-10 14 0s10 10 14 0" opacity=".8"/><path d="M10 20c4-7 8-7 14 0s10 7 14 0" opacity=".45"/></svg>',
+    windowMark: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 4v16M4 12h16" opacity=".6"/><circle cx="16" cy="8.5" r="1.5" fill="currentColor" stroke="none"/></svg>'
+  };
+
+  // ==================== Official 6 Accent Palettes ====================
+  const ACCENTS = [
+    { id: 'red', name: '小伴红', light: '#E3203C', dark: '#EE4B5F', soft: '#FFF3F4', softInk: '#C61731', inkOn: '#FFFFFF' },
+    { id: 'mint', name: '薄荷绿', light: '#2E8B5E', dark: '#34A36D', soft: '#EEF8F2', softInk: '#216B48', inkOn: '#FFFFFF' },
+    { id: 'blue', name: '海湾蓝', light: '#2563EB', dark: '#60A5FA', soft: '#EFF6FF', softInk: '#1D4ED8', inkOn: '#FFFFFF' },
+    { id: 'purple', name: '暮紫', light: '#7C3AED', dark: '#A78BFA', soft: '#F5F3FF', softInk: '#6D28D9', inkOn: '#FFFFFF' },
+    { id: 'amber', name: '琥珀', light: '#D97706', dark: '#FBBF24', soft: '#FFFBEB', softInk: '#B45309', inkOn: '#FFFFFF' },
+    { id: 'graphite', name: '石墨', light: '#3F3F46', dark: '#E4E4E7', soft: '#F4F4F5', softInk: '#27272A', inkOn: '#FFFFFF', darkInkOn: '#18181B' }
+  ];
+
+  // ==================== Rain Window Presets ====================
+  const PRESETS = [
+    {
+      id: 'dusk',
+      name: '暮雨',
+      desc: '暮色深蓝与暖金窗灯散景',
+      swatch: 'linear-gradient(135deg, #27406f 0%, #f19a52 100%)',
+      skyTop: [0.047, 0.086, 0.169],
+      skyMid: [0.118, 0.176, 0.290],
+      skyBot: [0.235, 0.227, 0.329],
+      cloudCol: [0.36, 0.42, 0.56],
+      bokehA: [1.0, 0.72, 0.42],
+      bokehB: [1.0, 0.49, 0.37],
+      bokehC: [0.48, 0.66, 1.0],
+      mistTint: [0.22, 0.28, 0.38],
+      rainAmt: 0.78,
+      mistDensity: 0.74,
+      snowMode: 0.0
+    },
+    {
+      id: 'morning',
+      name: '晴岚',
+      desc: '清透晨曦雾蓝与柔白微光',
+      swatch: 'linear-gradient(135deg, #6491b4 0%, #e9d2c4 100%)',
+      skyTop: [0.290, 0.451, 0.592],
+      skyMid: [0.545, 0.694, 0.788],
+      skyBot: [0.875, 0.808, 0.761],
+      cloudCol: [0.96, 0.94, 0.92],
+      bokehA: [1.0, 0.93, 0.82],
+      bokehB: [1.0, 0.81, 0.66],
+      bokehC: [0.76, 0.90, 1.0],
+      mistTint: [0.76, 0.82, 0.86],
+      rainAmt: 0.46,
+      mistDensity: 0.58,
+      snowMode: 0.0
+    },
+    {
+      id: 'moss',
+      name: '梅雨',
+      desc: '江南烟青与温润凝露水痕',
+      swatch: 'linear-gradient(135deg, #243b3c 0%, #7d9b8e 100%)',
+      skyTop: [0.118, 0.192, 0.196],
+      skyMid: [0.235, 0.345, 0.337],
+      skyBot: [0.435, 0.525, 0.490],
+      cloudCol: [0.64, 0.73, 0.69],
+      bokehA: [0.95, 0.92, 0.80],
+      bokehB: [0.68, 0.86, 0.79],
+      bokehC: [0.85, 0.90, 0.88],
+      mistTint: [0.42, 0.51, 0.49],
+      rainAmt: 0.90,
+      mistDensity: 0.82,
+      snowMode: 0.0
+    },
+    {
+      id: 'neon',
+      name: '霓虹夜',
+      desc: '午夜墨蓝与电影感珊瑚光斑',
+      swatch: 'linear-gradient(135deg, #0d1633 0%, #ff4d6d 100%)',
+      skyTop: [0.027, 0.043, 0.094],
+      skyMid: [0.067, 0.102, 0.200],
+      skyBot: [0.110, 0.114, 0.216],
+      cloudCol: [0.24, 0.26, 0.45],
+      bokehA: [1.0, 0.30, 0.43],
+      bokehB: [1.0, 0.62, 0.27],
+      bokehC: [0.22, 0.74, 0.97],
+      mistTint: [0.16, 0.20, 0.32],
+      rainAmt: 0.95,
+      mistDensity: 0.72,
+      snowMode: 0.0
+    },
+    {
+      id: 'snow',
+      name: '微雪',
+      desc: '冬夜暮蓝与窗外轻盈飘雪',
+      swatch: 'linear-gradient(135deg, #1b283f 0%, #ffd28a 100%)',
+      skyTop: [0.090, 0.129, 0.200],
+      skyMid: [0.161, 0.224, 0.314],
+      skyBot: [0.290, 0.353, 0.439],
+      cloudCol: [0.68, 0.74, 0.84],
+      bokehA: [1.0, 0.84, 0.56],
+      bokehB: [1.0, 0.92, 0.75],
+      bokehC: [0.70, 0.84, 1.0],
+      mistTint: [0.48, 0.56, 0.66],
+      rainAmt: 0.54,
+      mistDensity: 0.78,
+      snowMode: 1.0
+    }
+  ];
+
+  const PRESET_MAP = Object.fromEntries(PRESETS.map(p => [p.id, p]));
+
+  // ==================== Physics & Mist Simulation State ====================
+  function createSimState(presetId, seedOffset = 0, preWiped = false) {
+    const p = PRESET_MAP[presetId] || PRESETS[0];
+    const mistCanvas = document.createElement('canvas');
+    mistCanvas.width = 160;
+    mistCanvas.height = 284;
+    const mistCtx = mistCanvas.getContext('2d');
+    const fillAlpha = p.mistDensity;
+    mistCtx.fillStyle = `rgba(255,255,255,${fillAlpha})`;
+    mistCtx.fillRect(0, 0, mistCanvas.width, mistCanvas.height);
+
+    // Carve an inviting initial streak or soft wiped heart-area if requested
+    if (preWiped) {
+      mistCtx.save();
+      mistCtx.globalCompositeOperation = 'destination-out';
+      const g = mistCtx.createRadialGradient(84, 128, 6, 84, 128, 52);
+      g.addColorStop(0, 'rgba(0,0,0,0.88)');
+      g.addColorStop(0.55, 'rgba(0,0,0,0.45)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      mistCtx.fillStyle = g;
+      mistCtx.beginPath();
+      mistCtx.arc(84, 128, 52, 0, Math.PI * 2);
+      mistCtx.fill();
+      mistCtx.restore();
+    }
+
+    let s = (1337 + seedOffset * 97) >>> 0;
+    const rng = () => {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+
+    const drops = Array.from({ length: 24 }, (_, i) => ({
+      x: 0.06 + rng() * 0.88,
+      y: rng() * 0.96,
+      r: 0.011 + rng() * 0.014,
+      vy: 0.018 + rng() * 0.048,
+      wobble: rng() * Math.PI * 2,
+      stall: rng() * 2.0,
+      active: i < 18
+    }));
+
+    return {
+      presetId,
+      current: clonePresetParams(p),
+      target: clonePresetParams(p),
+      mistCanvas,
+      mistCtx,
+      mistDirty: true,
+      drops,
+      ripples: [],
+      elapsed: seedOffset * 3.7,
+      recondenseAcc: 0,
+      rng
+    };
+  }
+
+  function clonePresetParams(p) {
+    return {
+      skyTop: [...p.skyTop],
+      skyMid: [...p.skyMid],
+      skyBot: [...p.skyBot],
+      cloudCol: [...p.cloudCol],
+      bokehA: [...p.bokehA],
+      bokehB: [...p.bokehB],
+      bokehC: [...p.bokehC],
+      mistTint: [...p.mistTint],
+      rainAmt: p.rainAmt,
+      mistDensity: p.mistDensity,
+      snowMode: p.snowMode
+    };
+  }
+
+  function setSimPreset(sim, presetId) {
+    const p = PRESET_MAP[presetId];
+    if (!p) return;
+    sim.presetId = presetId;
+    sim.target = clonePresetParams(p);
+  }
+
+  function resetSimMist(sim) {
+    const { mistCanvas, mistCtx } = sim;
+    mistCtx.globalCompositeOperation = 'source-over';
+    mistCtx.clearRect(0, 0, mistCanvas.width, mistCanvas.height);
+    mistCtx.fillStyle = `rgba(255,255,255,${sim.target.mistDensity})`;
+    mistCtx.fillRect(0, 0, mistCanvas.width, mistCanvas.height);
+    sim.mistDirty = true;
+  }
+
+  function wipeSimMist(sim, nx, ny, prevNx, prevNy) {
+    const { mistCanvas, mistCtx } = sim;
+    const w = mistCanvas.width;
+    const h = mistCanvas.height;
+    const x0 = (prevNx ?? nx) * w;
+    const y0 = (prevNy ?? ny) * h;
+    const x1 = nx * w;
+    const y1 = ny * h;
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const steps = Math.max(1, Math.ceil(dist / 3));
+    const brushR = 16;
+
+    mistCtx.save();
+    mistCtx.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const cx = x0 + (x1 - x0) * t;
+      const cy = y0 + (y1 - y0) * t;
+      const g = mistCtx.createRadialGradient(cx, cy, 1, cx, cy, brushR);
+      g.addColorStop(0, 'rgba(0,0,0,0.82)');
+      g.addColorStop(0.55, 'rgba(0,0,0,0.38)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      mistCtx.fillStyle = g;
+      mistCtx.beginPath();
+      mistCtx.arc(cx, cy, brushR, 0, Math.PI * 2);
+      mistCtx.fill();
+    }
+    mistCtx.restore();
+    sim.mistDirty = true;
+
+    // Disturb nearby raindrops so they accelerate when touched
+    for (const d of sim.drops) {
+      if (!d.active) continue;
+      if (Math.hypot(d.x - nx, d.y - ny) < 0.11) {
+        d.vy = Math.max(d.vy, 0.08 + sim.rng() * 0.06);
+        d.stall = 0;
+      }
+    }
+  }
+
+  function tapSimDrop(sim, nx, ny) {
+    // Spawn or recycle a tactile large drop at tap position
+    let slot = sim.drops.find(d => !d.active);
+    if (!slot) {
+      slot = sim.drops[Math.floor(sim.rng() * 6) + 18];
+    }
+    slot.x = Math.min(0.95, Math.max(0.05, nx));
+    slot.y = Math.min(0.95, Math.max(0.05, ny));
+    slot.r = 0.021 + sim.rng() * 0.009;
+    slot.vy = 0.025;
+    slot.stall = 0.18;
+    slot.active = true;
+
+    // Carve small clear droplet spot in mist
+    wipeSimMist(sim, nx, ny, nx, ny);
+    sim.ripples.push({ x: nx, y: ny, age: 0 });
+    if (sim.ripples.length > 4) sim.ripples.shift();
+  }
+
+  function stepSim(sim, dt) {
+    sim.elapsed += dt;
+    const c = sim.current;
+    const t = sim.target;
+    const k = Math.min(1, dt * 4.5);
+    for (const key of ['skyTop', 'skyMid', 'skyBot', 'cloudCol', 'bokehA', 'bokehB', 'bokehC', 'mistTint']) {
+      for (let i = 0; i < 3; i++) c[key][i] += (t[key][i] - c[key][i]) * k;
+    }
+    c.rainAmt += (t.rainAmt - c.rainAmt) * k;
+    c.mistDensity += (t.mistDensity - c.mistDensity) * k;
+    c.snowMode += (t.snowMode - c.snowMode) * k;
+
+    const { mistCanvas, mistCtx } = sim;
+    const mw = mistCanvas.width;
+    const mh = mistCanvas.height;
+
+    // Very subtle re-condensation so wiped areas softly heal over ~45 seconds
+    sim.recondenseAcc += dt;
+    if (sim.recondenseAcc > 0.25) {
+      const addAlpha = Math.min(0.02, sim.recondenseAcc * 0.011 * c.mistDensity);
+      mistCtx.save();
+      mistCtx.globalCompositeOperation = 'source-over';
+      mistCtx.fillStyle = `rgba(255,255,255,${addAlpha.toFixed(4)})`;
+      mistCtx.fillRect(0, 0, mw, mh);
+      mistCtx.restore();
+      sim.recondenseAcc = 0;
+      sim.mistDirty = true;
+    }
+
+    // Update physical drops with stick-slip & mist trail carving
+    mistCtx.save();
+    mistCtx.globalCompositeOperation = 'destination-out';
+    const speedScale = 0.55 + c.rainAmt * 0.75;
+    for (const d of sim.drops) {
+      if (!d.active) continue;
+      if (d.stall > 0) {
+        d.stall -= dt;
+        continue;
+      }
+      // Occasional surface-tension pause or sudden release
+      if (sim.rng() < dt * 0.35) {
+        d.stall = 0.25 + sim.rng() * 0.75;
+        d.vy = 0.014 + sim.rng() * 0.03;
+      } else {
+        d.vy = Math.min(0.16, d.vy + dt * (0.028 * (d.r / 0.016)) * speedScale);
+      }
+      d.x += Math.sin(sim.elapsed * 2.1 + d.wobble) * dt * 0.008;
+      d.y += d.vy * dt * speedScale;
+
+      // Carve slim clear wake behind moving drop
+      const px = d.x * mw;
+      const py = d.y * mh;
+      const pr = Math.max(1.4, d.r * mw * 0.55);
+      const wg = mistCtx.createRadialGradient(px, py, 0, px, py, pr * 1.45);
+      wg.addColorStop(0, 'rgba(0,0,0,0.65)');
+      wg.addColorStop(1, 'rgba(0,0,0,0)');
+      mistCtx.fillStyle = wg;
+      mistCtx.beginPath();
+      mistCtx.arc(px, py, pr * 1.45, 0, Math.PI * 2);
+      mistCtx.fill();
+      sim.mistDirty = true;
+
+      if (d.y > 1.08) {
+        d.y = -0.04 - sim.rng() * 0.12;
+        d.x = 0.06 + sim.rng() * 0.88;
+        d.r = 0.011 + sim.rng() * 0.014;
+        d.vy = 0.02 + sim.rng() * 0.035;
+        d.stall = sim.rng() * 1.4;
+      }
+    }
+    mistCtx.restore();
+
+    for (let i = sim.ripples.length - 1; i >= 0; i--) {
+      sim.ripples[i].age += dt;
+      if (sim.ripples[i].age > 0.9) sim.ripples.splice(i, 1);
+    }
+  }
+
+  // ==================== RainWindowEngine (WebGL1 4-Pass + 2D Fallback) ====================
+  function createRainWindowEngine(canvas) {
+    const gl = canvas.getContext('webgl', {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: true
+    });
+    if (!gl) return createRainWindowFallback(canvas);
+
+    const VS = `
+      attribute vec2 aPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = aPos * 0.5 + 0.5;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+
+    const FS_SCENE = `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform float uAspect;
+      uniform vec3 uSkyTop;
+      uniform vec3 uSkyMid;
+      uniform vec3 uSkyBot;
+      uniform vec3 uCloudCol;
+      uniform vec3 uBokehA;
+      uniform vec3 uBokehB;
+      uniform vec3 uBokehC;
+      uniform float uRainAmt;
+      uniform float uSnowMode;
+
+      float hash(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+      }
+
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 4; i++) {
+          v += a * noise(p);
+          p = p * 2.03 + vec2(17.1, 9.2);
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float y = uv.y;
+
+        // Multi-stop vertical sky gradient
+        vec3 sky = mix(uSkyBot, uSkyMid, smoothstep(0.0, 0.48, y));
+        sky = mix(sky, uSkyTop, smoothstep(0.45, 1.0, y));
+
+        // Soft drifting clouds in upper sky
+        vec2 cloudUv = vec2(uv.x * uAspect * 1.4 + uTime * 0.015, y * 2.2 - uTime * 0.004);
+        float c1 = fbm(cloudUv);
+        float c2 = fbm(cloudUv * 1.8 - vec2(uTime * 0.022, 0.0));
+        float cloudMask = smoothstep(0.42, 0.85, c1 * 0.65 + c2 * 0.35) * smoothstep(0.18, 0.86, y);
+        sky = mix(sky, uCloudCol, cloudMask * 0.42);
+
+        // Soft atmospheric horizon glow
+        float horizonGlow = exp(-pow((y - 0.24) * 4.2, 2.0));
+        sky += mix(uSkyBot, uBokehA, 0.35) * horizonGlow * 0.22;
+
+        // Distant mountain / skyline silhouette near lower quarter
+        float ridge = 0.14 + 0.055 * sin(uv.x * 5.2 + 0.6) + 0.028 * cos(uv.x * 13.0) + 0.014 * fbm(vec2(uv.x * 8.0, 2.0));
+        float cityStep = 0.11 + 0.04 * step(0.55, hash(vec2(floor(uv.x * 26.0), 3.0)));
+        float silhouetteH = mix(ridge, max(ridge * 0.9, cityStep), 0.35);
+        float hillMask = 1.0 - smoothstep(silhouetteH - 0.018, silhouetteH + 0.018, y);
+        vec3 hillCol = uSkyTop * 0.55 + uSkyBot * 0.12;
+        sky = mix(sky, hillCol, hillMask * 0.72);
+
+        // 24 out-of-focus cinematic bokeh lights in middle/lower field
+        vec2 p = vec2((uv.x - 0.5) * uAspect, uv.y - 0.5);
+        for (int i = 0; i < 24; i++) {
+          float fi = float(i);
+          float h1 = hash(vec2(fi, 1.7));
+          float h2 = hash(vec2(fi, 5.3));
+          float h3 = hash(vec2(fi, 9.1));
+          vec2 center = vec2((h1 - 0.5) * uAspect * 0.92, -0.44 + h2 * 0.62);
+          center.x += sin(uTime * 0.2 + fi) * 0.012;
+          float rad = 0.028 + h3 * 0.068;
+          float d = length(p - center);
+          float disc = smoothstep(rad, rad * 0.66, d);
+          float ring = smoothstep(rad * 0.98, rad * 0.80, d) - smoothstep(rad * 0.76, rad * 0.55, d);
+          float flicker = 0.78 + 0.22 * sin(uTime * (0.9 + h3 * 1.4) + fi * 2.1);
+          vec3 bCol = (mod(fi, 3.0) < 1.0) ? uBokehA : ((mod(fi, 3.0) < 2.0) ? uBokehB : uBokehC);
+          float intensity = (disc * 0.42 + ring * 0.22) * flicker * (0.35 + 0.65 * (1.0 - h3));
+          sky += bCol * intensity;
+        }
+
+        // Exterior rain streaks or snow flakes
+        if (uSnowMode < 0.5) {
+          vec2 rUv = vec2(uv.x * uAspect * 14.0 + uv.y * 1.8, uv.y * 4.5 + uTime * (1.8 + uRainAmt * 1.4));
+          vec2 rid = floor(rUv);
+          vec2 rf = fract(rUv);
+          float rh = hash(rid);
+          float streak = smoothstep(0.08, 0.0, abs(rf.x - 0.5 - (rh - 0.5) * 0.4))
+                       * smoothstep(0.0, 0.25, rf.y) * smoothstep(1.0, 0.35, rf.y)
+                       * step(0.68 - uRainAmt * 0.25, rh);
+          sky += vec3(0.75, 0.84, 0.96) * streak * 0.10 * uRainAmt;
+        } else {
+          for (int j = 0; j < 2; j++) {
+            float scale = (j == 0) ? 9.0 : 15.0;
+            vec2 sUv = vec2(uv.x * uAspect * scale + sin(uTime * 0.6 + uv.y * 4.0) * 0.35, uv.y * scale + uTime * (0.38 + float(j) * 0.2));
+            vec2 sid = floor(sUv);
+            vec2 sf = fract(sUv) - 0.5;
+            float sh = hash(sid + float(j) * 19.0);
+            vec2 offset = vec2(hash(sid + 3.1) - 0.5, hash(sid + 7.7) - 0.5) * 0.5;
+            float flake = smoothstep(0.16, 0.04, length(sf - offset)) * step(0.58, sh);
+            sky += vec3(0.92, 0.95, 1.0) * flake * (0.28 - float(j) * 0.1);
+          }
+        }
+
+        gl_FragColor = vec4(clamp(sky, 0.0, 1.0), 1.0);
+      }
+    `;
+
+    const FS_BLUR = `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform sampler2D uTex;
+      uniform vec2 uDir;
+      void main() {
+        vec4 sum = texture2D(uTex, vUv) * 0.204164;
+        sum += texture2D(uTex, vUv + uDir * 1.407333) * 0.304005;
+        sum += texture2D(uTex, vUv - uDir * 1.407333) * 0.304005;
+        sum += texture2D(uTex, vUv + uDir * 3.294215) * 0.093913;
+        sum += texture2D(uTex, vUv - uDir * 3.294215) * 0.093913;
+        gl_FragColor = sum;
+      }
+    `;
+
+    const FS_COMPOSITE = `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform sampler2D uSharpTex;
+      uniform sampler2D uBlurTex;
+      uniform sampler2D uMistTex;
+      uniform float uTime;
+      uniform float uAspect;
+      uniform vec3 uMistTint;
+      uniform float uRainAmt;
+      uniform vec4 uDrops[24];
+      uniform vec3 uRipples[4];
+
+      float hash21(vec2 p) {
+        p = fract(p * vec2(234.34, 435.345));
+        p += dot(p, p + 34.23);
+        return fract(p.x * p.y);
+      }
+
+      // Returns vec3(nx, ny, mask) for procedural static micro-droplets layer
+      vec3 microLayer(vec2 uv, float scale, float seed) {
+        vec2 p = vec2(uv.x * uAspect, uv.y) * scale;
+        vec2 id = floor(p);
+        vec2 f = fract(p) - 0.5;
+        float rnd = hash21(id + seed);
+        if (rnd < 0.32) return vec3(0.0);
+        vec2 off = vec2(hash21(id + seed + 11.3) - 0.5, hash21(id + seed + 29.7) - 0.5) * 0.52;
+        vec2 d = f - off;
+        float r = 0.14 + 0.16 * fract(rnd * 17.3);
+        float len = length(d);
+        if (len > r) return vec3(0.0);
+        float mask = smoothstep(r, r * 0.72, len);
+        vec2 n = d / max(r, 0.001);
+        return vec3(n, mask);
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float mist = texture2D(uMistTex, vec2(uv.x, 1.0 - uv.y)).a;
+
+        // Combine static micro droplets (2 scales) + interactive physics drops
+        vec3 m1 = microLayer(uv, 26.0, 3.0);
+        vec3 m2 = microLayer(uv, 46.0, 41.0);
+        vec2 normal = m1.xy * m1.z * 0.65 + m2.xy * m2.z * 0.45;
+        float dropMask = max(m1.z * 0.72, m2.z * 0.55);
+        float highlight = 0.0;
+        float caustic = 0.0;
+
+        vec2 pAspect = vec2((uv.x - 0.5) * uAspect, uv.y - 0.5);
+        for (int i = 0; i < 24; i++) {
+          vec4 dr = uDrops[i];
+          if (dr.z <= 0.001) continue;
+          // dr.xy in screen top-left [0..1], convert y to GL bottom-up
+          vec2 dc = vec2((dr.x - 0.5) * uAspect, (1.0 - dr.y) - 0.5);
+          vec2 delta = pAspect - dc;
+          // Teardrop elongation along Y
+          vec2 scaled = vec2(delta.x, delta.y * 0.82);
+          float dist = length(scaled);
+          if (dist < dr.z) {
+            float m = smoothstep(dr.z, dr.z * 0.78, dist);
+            vec2 n = scaled / max(dr.z, 0.0001);
+            normal = mix(normal, n * 1.45, m);
+            dropMask = max(dropMask, m);
+            // Specular highlight top-left & caustic crescent bottom
+            float spec = smoothstep(0.28, 0.0, length(n - vec2(-0.36, 0.42)));
+            float rimGlow = smoothstep(0.45, 0.92, -n.y) * smoothstep(0.35, 0.85, length(n));
+            highlight += spec * m * 0.92;
+            caustic += rimGlow * m * 0.48;
+          }
+        }
+
+        // Tactile tap ripple distortion
+        vec2 rippleOffset = vec2(0.0);
+        for (int r = 0; r < 4; r++) {
+          vec3 rp = uRipples[r];
+          if (rp.z <= 0.0 || rp.z >= 0.9) continue;
+          vec2 rc = vec2((rp.x - 0.5) * uAspect, (1.0 - rp.y) - 0.5);
+          float d = length(pAspect - rc);
+          float ringR = rp.z * 0.24;
+          float wave = exp(-pow((d - ringR) * 28.0, 2.0)) * (1.0 - rp.z);
+          rippleOffset += normalize(pAspect - rc + 0.0001) * wave * 0.018;
+        }
+
+        // Convex lens refraction: inverted/magnified sample from sharp scene
+        vec2 refractedUv = clamp(uv - normal * 0.048 * dropMask + rippleOffset, 0.002, 0.998);
+        vec3 sharp = texture2D(uSharpTex, uv + rippleOffset).rgb;
+        vec3 refracted = texture2D(uSharpTex, refractedUv).rgb;
+        vec3 blurred = texture2D(uBlurTex, clamp(uv + rippleOffset * 0.4, 0.002, 0.998)).rgb;
+
+        // Frosted mist layer mixes blurred scene + cool/warm condensation veil
+        vec3 mistyGlass = mix(blurred, blurred * 0.78 + uMistTint * 0.28, 0.62);
+        vec3 baseGlass = mix(sharp, mistyGlass, clamp(mist, 0.0, 0.94));
+
+        // Drops cut cleanly through mist and refract the crisp scene behind
+        vec3 dropColor = refracted * (0.94 + caustic * 0.45) + vec3(0.95, 0.98, 1.0) * highlight;
+        // Subtle edge shadow on large drops for 3D meniscus volume
+        float rimShadow = smoothstep(0.55, 0.98, length(normal)) * dropMask * 0.14;
+        dropColor *= (1.0 - rimShadow);
+
+        vec3 col = mix(baseGlass, dropColor, clamp(dropMask, 0.0, 1.0));
+        // Add small micro-speckle highlights on micro droplets when light hits
+        float microSpec = smoothstep(0.32, 0.0, length(m1.xy - vec2(-0.35, 0.40))) * m1.z * (1.0 - mist * 0.55);
+        col += vec3(0.92, 0.96, 1.0) * microSpec * 0.42;
+
+        // Soft filmic vignette
+        float vig = smoothstep(1.25, 0.35, length((uv - 0.5) * vec2(1.0, 1.15)));
+        col *= (0.86 + 0.14 * vig);
+
+        gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      }
+    `;
+
+    function compile(type, src) {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        const log = gl.getShaderInfoLog(sh);
+        gl.deleteShader(sh);
+        throw new Error('Shader compile failed: ' + log);
+      }
+      return sh;
+    }
+
+    function link(vsSrc, fsSrc) {
+      const vs = compile(gl.VERTEX_SHADER, vsSrc);
+      const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        throw new Error('Program link failed: ' + gl.getProgramInfoLog(prog));
+      }
+      return prog;
+    }
+
+    function makeFbo(w, h) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      return { fbo, tex, w, h };
+    }
+
+    let pScene, pBlur, pComp, vbo, fboScene, fboBlurA, fboBlurB, mistTex;
+    try {
+      pScene = link(VS, FS_SCENE);
+      pBlur = link(VS, FS_BLUR);
+      pComp = link(VS, FS_COMPOSITE);
+
+      vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+      fboScene = makeFbo(320, 568);
+      fboBlurA = makeFbo(128, 224);
+      fboBlurB = makeFbo(128, 224);
+
+      mistTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, mistTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    } catch (err) {
+      console.warn('WebGL pipeline fallback to Canvas2D:', err);
+      return createRainWindowFallback(canvas);
+    }
+
+    function bindQuad(prog) {
+      gl.useProgram(prog);
+      const loc = gl.getAttribLocation(prog, 'aPos');
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    }
+
+    const dropsBuf = new Float32Array(24 * 4);
+    const ripplesBuf = new Float32Array(4 * 3);
+
+    return {
+      isWebGL: true,
+      render(sim, width, height) {
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        const aspect = width / Math.max(1, height);
+        const c = sim.current;
+
+        // Upload mist texture if dirty
+        if (sim.mistDirty || true) {
+          gl.activeTexture(gl.TEXTURE2);
+          gl.bindTexture(gl.TEXTURE_2D, mistTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sim.mistCanvas);
+          sim.mistDirty = false;
+        }
+
+        // Pass 1: Scene -> fboScene
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboScene.fbo);
+        gl.viewport(0, 0, fboScene.w, fboScene.h);
+        bindQuad(pScene);
+        gl.uniform1f(gl.getUniformLocation(pScene, 'uTime'), sim.elapsed);
+        gl.uniform1f(gl.getUniformLocation(pScene, 'uAspect'), aspect);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uSkyTop'), c.skyTop);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uSkyMid'), c.skyMid);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uSkyBot'), c.skyBot);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uCloudCol'), c.cloudCol);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uBokehA'), c.bokehA);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uBokehB'), c.bokehB);
+        gl.uniform3fv(gl.getUniformLocation(pScene, 'uBokehC'), c.bokehC);
+        gl.uniform1f(gl.getUniformLocation(pScene, 'uRainAmt'), c.rainAmt);
+        gl.uniform1f(gl.getUniformLocation(pScene, 'uSnowMode'), c.snowMode);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // Pass 2: Horizontal Blur -> fboBlurA
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboBlurA.fbo);
+        gl.viewport(0, 0, fboBlurA.w, fboBlurA.h);
+        bindQuad(pBlur);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, fboScene.tex);
+        gl.uniform1i(gl.getUniformLocation(pBlur, 'uTex'), 0);
+        gl.uniform2f(gl.getUniformLocation(pBlur, 'uDir'), 1.8 / fboBlurA.w, 0.0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // Pass 3: Vertical Blur -> fboBlurB
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboBlurB.fbo);
+        gl.viewport(0, 0, fboBlurB.w, fboBlurB.h);
+        gl.bindTexture(gl.TEXTURE_2D, fboBlurA.tex);
+        gl.uniform2f(gl.getUniformLocation(pBlur, 'uDir'), 0.0, 1.8 / fboBlurB.h);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // Pass 4: Composite -> screen
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, width, height);
+        bindQuad(pComp);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, fboScene.tex);
+        gl.uniform1i(gl.getUniformLocation(pComp, 'uSharpTex'), 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, fboBlurB.tex);
+        gl.uniform1i(gl.getUniformLocation(pComp, 'uBlurTex'), 1);
+
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, mistTex);
+        gl.uniform1i(gl.getUniformLocation(pComp, 'uMistTex'), 2);
+
+        gl.uniform1f(gl.getUniformLocation(pComp, 'uTime'), sim.elapsed);
+        gl.uniform1f(gl.getUniformLocation(pComp, 'uAspect'), aspect);
+        gl.uniform3fv(gl.getUniformLocation(pComp, 'uMistTint'), c.mistTint);
+        gl.uniform1f(gl.getUniformLocation(pComp, 'uRainAmt'), c.rainAmt);
+
+        dropsBuf.fill(0);
+        for (let i = 0; i < 24; i++) {
+          const d = sim.drops[i];
+          if (d && d.active) {
+            dropsBuf[i * 4] = d.x;
+            dropsBuf[i * 4 + 1] = d.y;
+            dropsBuf[i * 4 + 2] = d.r;
+            dropsBuf[i * 4 + 3] = 1.0;
+          }
+        }
+        gl.uniform4fv(gl.getUniformLocation(pComp, 'uDrops'), dropsBuf);
+
+        ripplesBuf.fill(0);
+        for (let i = 0; i < 4; i++) {
+          const rp = sim.ripples[i];
+          if (rp) {
+            ripplesBuf[i * 3] = rp.x;
+            ripplesBuf[i * 3 + 1] = rp.y;
+            ripplesBuf[i * 3 + 2] = rp.age;
+          }
+        }
+        gl.uniform3fv(gl.getUniformLocation(pComp, 'uRipples'), ripplesBuf);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    };
+  }
+
+  function createRainWindowFallback(canvas) {
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const rgb = arr => `rgb(${arr.map(v => Math.round(v * 255)).join(',')})`;
+    return {
+      isWebGL: false,
+      render(sim, width, height) {
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        const c = sim.current;
+        const g = ctx.createLinearGradient(0, 0, 0, height);
+        g.addColorStop(0, rgb(c.skyTop));
+        g.addColorStop(0.55, rgb(c.skyMid));
+        g.addColorStop(1, rgb(c.skyBot));
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+
+        // Simple soft bokeh fallback
+        for (let i = 0; i < 16; i++) {
+          const x = ((i * 73) % 100) / 100 * width;
+          const y = (0.45 + ((i * 37) % 50) / 100) * height;
+          const r = 18 + (i % 4) * 12;
+          const bCol = i % 3 === 0 ? c.bokehA : i % 3 === 1 ? c.bokehB : c.bokehC;
+          const bg = ctx.createRadialGradient(x, y, 2, x, y, r);
+          bg.addColorStop(0, `rgba(${bCol.map(v => Math.round(v * 255)).join(',')},0.34)`);
+          bg.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = bg;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 0.25;
+        ctx.drawImage(sim.mistCanvas, 0, 0, width, height);
+        ctx.globalAlpha = 1;
+        for (const d of sim.drops) {
+          if (!d.active) continue;
+          const x = d.x * width;
+          const y = d.y * height;
+          const r = d.r * Math.min(width, height);
+          ctx.fillStyle = 'rgba(255,255,255,0.22)';
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.75)';
+          ctx.beginPath();
+          ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.25, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    };
+  }
+
+  // ==================== Global State ====================
+  const state = {
+    view: 'overview',
+    width: 390,
+    theme: 'light',
+    accentId: 'red',
+    // Live playable phone state
+    live: {
+      page: 'home', // 'home' | 'preview'
+      preset: 'dusk',
+      mode: 'wallpaper', // 'wallpaper' | 'home' | 'lock'
+      homeApplied: null, // null | { scene: 'rain-window', preset: 'dusk' }
+      lockApplied: null,
+      menuOpen: false,
+      pickerOpen: false,
+      toastText: '',
+      toastTimer: null,
+      hintFaded: false
+    },
+    fullscreen: {
+      preset: 'dusk',
+      fps: 30
+    }
+  };
+
+  // ==================== Overview Boards Definitions ====================
+  const OVERVIEW_BOARDS = [
+    {
+      num: '01',
+      title: '画廊首页 · 首发主打态',
+      tag: '可切换 5 套天光',
+      caption: '纯中性 `#FAFAFA` 画布，20px 实时「雨窗天光」主画框支持直触拭雾与氛围快选；下方双列扩展卡使用 1px 细描边与中性灰点标签，为后续壁纸留出生长位。',
+      render: (idx) => renderHomeBoardHtml({ id: `b${idx}`, preset: state.live.preset, applied: null, interactivePresets: true })
+    },
+    {
+      num: '02',
+      title: '全屏沉浸预览 · 暮雨',
+      tag: '实时交互预览',
+      caption: '画面铺满状态栏与手势条后方，顶栏严格对称避让右侧无圆底竖三点；轻浮深色磨砂控制坞内切换 5 套天光、预览模式与主操作按钮。',
+      render: (idx) => renderPreviewBoardHtml({ id: `b${idx}`, preset: 'dusk', mode: 'wallpaper', showHint: true })
+    },
+    {
+      num: '03',
+      title: '桌面模拟预览 · 晴岚',
+      tag: '高亮度可读性',
+      caption: '明亮晨曦天光下验证白色时间天气组件、半透明方圆桌面图标（1.8px 线性 SVG）与深色玻璃控制坞的清晰层次。',
+      render: (idx) => renderPreviewBoardHtml({ id: `b${idx}`, preset: 'morning', mode: 'home', showHint: false })
+    },
+    {
+      num: '04',
+      title: '锁屏模拟预览 · 霓虹夜',
+      tag: '双槽位独立切换',
+      caption: '电影感夜雨散景搭配细体锁屏时钟（tabular-nums）与底部快捷圆钮；已分别启用双槽位时主按钮直接显示「切换锁屏壁纸」，无需重复进系统页。',
+      render: (idx) => renderPreviewBoardHtml({ id: `b${idx}`, preset: 'neon', mode: 'lock', ctaOverride: '切换锁屏壁纸', showHint: false })
+    },
+    {
+      num: '05',
+      title: '画廊首页 · 双槽位已启用态',
+      tag: '桌面 / 锁屏独立状态',
+      caption: '设置后顶部出现紧凑状态条，以 6px 绿色语义圆点标明桌面与锁屏各自使用的氛围，画框左上角以中性磨砂胶囊展示使用中位置。',
+      render: (idx) => renderHomeBoardHtml({
+        id: `b${idx}`,
+        preset: 'dusk',
+        applied: { home: 'dusk', lock: 'neon' },
+        interactivePresets: false
+      })
+    },
+    {
+      num: '06',
+      title: '协议 2 宿主菜单 & 系统确认态',
+      tag: '20px 顶角 BottomSheet',
+      caption: '点击右上角竖三点打开宿主菜单（应用信息、重新加载、分享与底部居中退出），并展示轻提示「壁纸已应用」与无硬件/未核实状态反馈。',
+      render: (idx) => renderHostMenuBoardHtml(`b${idx}`)
+    }
+  ];
+
+  // ==================== HTML Templates ====================
+  function statusBarHtml(onMedia) {
+    return `
+      <div class="sys-status ${onMedia ? 'on-media' : ''}">
+        <span class="num">09:41</span>
+        <span class="sys-icons" aria-hidden="true">
+          ${ICONS.wifi}
+          ${ICONS.battery}
+        </span>
+      </div>
+    `;
+  }
+
+  function renderHomeBoardHtml({ id, preset, applied, interactivePresets, isLive = false }) {
+    const badgeText = applied
+      ? (applied.home && applied.lock
+        ? (applied.home === applied.lock ? '桌面和锁屏使用中' : '桌面与锁屏各自使用中')
+        : applied.home ? '桌面使用中' : '锁屏使用中')
+      : '';
+    const pObj = PRESET_MAP[preset] || PRESETS[0];
+    const slotStrip = applied ? `
+      <div class="slot-strip">
+        <div class="slot-strip-list">
+          ${applied.home ? `<div class="slot-row"><i class="status-dot"></i><span>桌面 · 雨窗天光 <em>(${PRESET_MAP[applied.home].name})</em></span></div>` : ''}
+          ${applied.lock ? `<div class="slot-row"><i class="status-dot"></i><span>锁屏 · 雨窗天光 <em>(${PRESET_MAP[applied.lock].name})</em></span></div>` : ''}
+        </div>
+        <button type="button" class="slot-action" ${isLive ? 'data-live-open-preview' : ''}>去调整</button>
+      </div>
+    ` : '';
+
+    const onMedia = isLive && state.live.page === 'preview';
+    return `
+      <div class="phone ${state.theme === 'dark' ? 'dark' : ''}" data-phone="${id}">
+        ${statusBarHtml(onMedia)}
+        <button type="button" class="host-more ${onMedia ? 'on-media' : ''}" aria-label="更多操作" ${isLive ? 'data-live-host-menu' : ''}>${ICONS.moreVert}</button>
+        <div class="app-viewport">
+          <div class="page page-home ${onMedia ? 'pushed' : ''}">
+            <header class="home-topbar">
+              <h2>动态壁纸</h2>
+            </header>
+            <div class="home-body">
+              ${slotStrip}
+              <div class="hero-frame" data-sim-host="${id}-home" ${isLive ? 'data-live-hero' : ''}>
+                <canvas class="hero-canvas" data-canvas="${id}-home" data-preset="${preset}" data-prewiped="1"></canvas>
+                <div class="hero-scrim"></div>
+                <div class="hero-top-row">
+                  ${badgeText ? `<span class="glass-badge"><i class="status-dot"></i>${badgeText}</span>` : '<span></span>'}
+                  <span class="glass-badge">${ICONS.droplet}<span>可拭雾 · ${pObj.name}</span></span>
+                </div>
+                <div class="hero-bottom">
+                  <div>
+                    <div class="hero-title">雨窗天光</div>
+                    <div class="hero-sub">实时天光 · 轻点落雨与滑动拭雾</div>
+                  </div>
+                  <button type="button" class="hero-enter" ${isLive ? 'data-live-open-preview' : ''}>
+                    <span>预览</span>${ICONS.arrowRight}
+                  </button>
+                </div>
+              </div>
+
+              <div class="preset-rail" role="group" aria-label="天光氛围">
+                ${PRESETS.map(item => `
+                  <button type="button" class="preset-chip" aria-pressed="${item.id === preset}"
+                    ${interactivePresets ? `data-switch-preset="${item.id}" data-target-sim="${id}-home"` : ''}
+                    ${isLive ? `data-live-preset="${item.id}"` : ''}>
+                    <span class="orb" style="background:${item.swatch}"></span>
+                    <span>${item.name}</span>
+                  </button>
+                `).join('')}
+              </div>
+
+              <div class="sec-head">
+                <h3>更多壁纸</h3>
+                <span class="sec-note">后续扩展位</span>
+              </div>
+
+              <div class="more-grid">
+                <article class="future-card">
+                  <div class="future-art ink" aria-hidden="true">${ICONS.inkWave}</div>
+                  <div class="future-meta">
+                    <strong>水墨池境</strong>
+                    <span class="neutral-tag"><i class="status-dot muted"></i>制作中</span>
+                  </div>
+                </article>
+                <article class="future-card">
+                  <div class="future-art ferro" aria-hidden="true">${ICONS.ferroWave}</div>
+                  <div class="future-meta">
+                    <strong>磁流体场</strong>
+                    <span class="neutral-tag"><i class="status-dot muted"></i>制作中</span>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+          ${isLive ? renderLivePreviewLayerHtml() : ''}
+        </div>
+        ${isLive ? renderLiveOverlaysHtml() : ''}
+        <div class="sys-home-bar ${onMedia ? 'on-media' : ''}"></div>
+      </div>
+    `;
+  }
+
+  function renderPreviewInnerHtml({ id, preset, mode, ctaLabel, statusText, showHint, isLive = false }) {
+    const pObj = PRESET_MAP[preset] || PRESETS[0];
+    return `
+      <canvas class="preview-canvas" data-canvas="${id}-preview" data-preset="${preset}" data-prewiped="1"></canvas>
+      <div class="preview-scrim"></div>
+      <button type="button" class="preview-back" aria-label="返回" ${isLive ? 'data-live-back' : ''}>${ICONS.back}</button>
+      <div class="preview-topbar">
+        <h3>雨窗天光</h3>
+        <small>${pObj.name} · ${pObj.desc}</small>
+      </div>
+      ${showHint ? `<div class="gesture-hint ${isLive && state.live.hintFaded ? 'faded' : ''}" id="${isLive ? 'liveGestureHint' : ''}">轻点落雨滴 · 手指滑动拭开雾气</div>` : ''}
+      <div class="sim-overlays" aria-hidden="true">
+        ${mode === 'lock' ? `
+          <div class="sim-lock">
+            <span class="sim-lock-ico">${ICONS.lock}</span>
+            <span class="sim-date">11月28日 周六</span>
+            <span class="sim-clock-lg num">09:41</span>
+          </div>
+          <div class="sim-lock-shortcuts">
+            <span class="sim-round-btn">${ICONS.torch}</span>
+            <span class="sim-round-btn">${ICONS.camera}</span>
+          </div>
+        ` : mode === 'home' ? `
+          <div class="sim-home">
+            <div class="sim-widget">
+              <span class="sim-clock-md num">09:41</span>
+              <span class="sim-weather">${ICONS.cloudRain}<span>11月28日 周六 · 小雨 14°</span></span>
+            </div>
+            <div>
+              <div class="sim-apps">
+                <div class="sim-app"><span class="sim-app-tile">${ICONS.photos}</span><span>相册</span></div>
+                <div class="sim-app"><span class="sim-app-tile">${ICONS.notes}</span><span>便签</span></div>
+                <div class="sim-app"><span class="sim-app-tile">${ICONS.clock}</span><span>时钟</span></div>
+                <div class="sim-app"><span class="sim-app-tile">${ICONS.camera}</span><span>相机</span></div>
+              </div>
+              <div class="sim-dots"><i class="on"></i><i></i><i></i></div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <footer class="preview-dock">
+        <div class="dock-presets" role="group" aria-label="天光氛围">
+          ${PRESETS.map(item => `
+            <button type="button" class="dock-preset" aria-pressed="${item.id === preset}"
+              ${isLive ? `data-live-preset="${item.id}"` : `data-switch-preset="${item.id}" data-target-sim="${id}-preview"`}>
+              <span class="orb" style="background:${item.swatch}"></span>
+              <span>${item.name}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="dock-controls">
+          <div class="mode-tabs" role="group" aria-label="预览模式">
+            ${[['wallpaper', '壁纸'], ['home', '桌面'], ['lock', '锁屏']].map(([val, label]) => `
+              <button type="button" aria-pressed="${mode === val}"
+                ${isLive ? `data-live-mode="${val}"` : ''}>${label}</button>
+            `).join('')}
+          </div>
+          <button type="button" class="dock-reset-mist" title="重新起雾"
+            data-reset-mist="${id}-preview">
+            ${ICONS.refresh}<span>起雾</span>
+          </button>
+        </div>
+        <button type="button" class="dock-apply" ${isLive ? 'data-live-apply' : ''}>${ctaLabel}</button>
+        ${statusText ? `<p class="dock-status">${statusText}</p>` : ''}
+      </footer>
+    `;
+  }
+
+  function renderPreviewBoardHtml({ id, preset, mode, ctaOverride, showHint }) {
+    const ctaLabel = ctaOverride || (mode === 'home' ? '设为桌面壁纸' : mode === 'lock' ? '设为锁屏壁纸' : '设为壁纸');
+    return `
+      <div class="phone ${state.theme === 'dark' ? 'dark' : ''}" data-phone="${id}">
+        ${statusBarHtml(true)}
+        <button type="button" class="host-more on-media" aria-label="更多操作">${ICONS.moreVert}</button>
+        <div class="app-viewport">
+          <div class="page page-preview">
+            ${renderPreviewInnerHtml({ id, preset, mode, ctaLabel, statusText: '', showHint })}
+          </div>
+        </div>
+        <div class="sys-home-bar on-media"></div>
+      </div>
+    `;
+  }
+
+  function renderHostMenuBoardHtml(id) {
+    return `
+      <div class="phone ${state.theme === 'dark' ? 'dark' : ''}" data-phone="${id}">
+        ${statusBarHtml(true)}
+        <button type="button" class="host-more on-media" aria-label="更多操作">${ICONS.moreVert}</button>
+        <div class="app-viewport">
+          <div class="page page-preview">
+            ${renderPreviewInnerHtml({
+              id,
+              preset: 'moss',
+              mode: 'wallpaper',
+              ctaLabel: '设为壁纸',
+              statusText: '没有检测到新的小伴壁纸，请在系统壁纸预览中确认应用。',
+              showHint: false
+            })}
+          </div>
+        </div>
+        <div class="toast-pill on-dark" style="bottom: 244px;">壁纸已应用</div>
+        <div class="scrim">
+          <div class="sheet" role="dialog" aria-label="小伴宿主菜单">
+            <div class="sheet-grab"></div>
+            <div class="sheet-app">
+              <div class="sheet-app-icon">${ICONS.windowMark}</div>
+              <div class="sheet-app-text">
+                <strong>动态壁纸 · 协议 2</strong>
+                <small>v2.0.0 · 离线运行 · 省电自适应帧率</small>
+              </div>
+            </div>
+            <div class="sheet-actions">
+              <button type="button" class="sheet-act">${ICONS.refresh}<span>重新加载</span></button>
+              <button type="button" class="sheet-act">${ICONS.share}<span>分享作品</span></button>
+            </div>
+            <div class="sheet-divider"></div>
+            <button type="button" class="sheet-cancel">退出</button>
+          </div>
+        </div>
+        <div class="sys-home-bar"></div>
+      </div>
+    `;
+  }
+
+  function computeLiveCta() {
+    const { homeApplied, lockApplied, mode } = state.live;
+    if (homeApplied && lockApplied && homeApplied === lockApplied && mode === 'wallpaper') return '切换桌面和锁屏壁纸';
+    if (mode === 'home' && homeApplied) return '切换桌面壁纸';
+    if (mode === 'lock' && lockApplied) return '切换锁屏壁纸';
+    if (mode === 'wallpaper' && homeApplied && !lockApplied) return '切换桌面壁纸';
+    if (mode === 'wallpaper' && !homeApplied && lockApplied) return '切换锁屏壁纸';
+    return '设为壁纸';
+  }
+
+  function renderLivePreviewLayerHtml() {
+    const hiddenCls = state.live.page === 'preview' ? '' : 'is-hidden';
+    return `
+      <div class="page page-preview ${hiddenCls}" id="livePreviewPage">
+        ${renderPreviewInnerHtml({
+          id: 'live',
+          preset: state.live.preset,
+          mode: state.live.mode,
+          ctaLabel: computeLiveCta(),
+          statusText: '',
+          showHint: true,
+          isLive: true
+        })}
+      </div>
+    `;
+  }
+
+  function renderLiveOverlaysHtml() {
+    const { menuOpen, pickerOpen, toastText, page, preset } = state.live;
+    const pName = PRESET_MAP[preset].name;
+    return `
+      ${toastText ? `<div class="toast-pill ${page === 'preview' ? 'on-dark' : ''}">${toastText}</div>` : ''}
+      <div class="scrim ${menuOpen ? '' : 'is-hidden'}" data-live-scrim="menu">
+        <div class="sheet" role="dialog" aria-label="宿主菜单">
+          <div class="sheet-grab"></div>
+          <div class="sheet-app">
+            <div class="sheet-app-icon">${ICONS.windowMark}</div>
+            <div class="sheet-app-text">
+              <strong>动态壁纸 · 协议 2</strong>
+              <small>v2.0.0 · 离线 WebGL 渲染（当前 ${pName}）</small>
+            </div>
+          </div>
+          <div class="sheet-actions">
+            <button type="button" class="sheet-act" data-live-reload>${ICONS.refresh}<span>重新加载</span></button>
+            <button type="button" class="sheet-act" data-live-share>${ICONS.share}<span>分享作品</span></button>
+          </div>
+          <div class="sheet-divider"></div>
+          <button type="button" class="sheet-cancel" data-live-exit>退出</button>
+        </div>
+      </div>
+
+      <div class="scrim ${pickerOpen ? '' : 'is-hidden'}" data-live-scrim="picker">
+        <div class="sheet" role="dialog" aria-label="系统壁纸位置确认">
+          <div class="sheet-grab"></div>
+          <div class="sheet-app">
+            <div class="sheet-app-icon">${ICONS.droplet}</div>
+            <div class="sheet-app-text">
+              <strong>应用「雨窗天光 · ${pName}」</strong>
+              <small>模拟 Android 系统动态壁纸确认页</small>
+            </div>
+          </div>
+          <div class="sheet-list">
+            <button type="button" class="sheet-row" data-live-confirm="home">
+              <span>设为主屏幕壁纸</span><small>桌面</small>
+            </button>
+            <button type="button" class="sheet-row" data-live-confirm="lock">
+              <span>设为锁定屏幕壁纸</span><small>锁屏</small>
+            </button>
+            <button type="button" class="sheet-row" data-live-confirm="both">
+              <span>同时设为主屏幕和锁定屏幕</span><small>双屏同步</small>
+            </button>
+          </div>
+          <div class="sheet-divider"></div>
+          <button type="button" class="sheet-cancel" data-live-close-picker>取消</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==================== Engine Management (Max 2 WebGL Contexts!) ====================
+  const sims = new Map(); // canvasKey -> simState
+  const visibleCanvasKeys = new Set();
+
+  let sharedGlCanvas = document.createElement('canvas');
+  let sharedEngine = createRainWindowEngine(sharedGlCanvas);
+  let fullscreenEngine = null;
+  let fullscreenSim = createSimState('dusk', 19, true);
+
+  const visibilityObserver = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      const key = e.target.dataset.canvas;
+      if (!key) continue;
+      if (e.isIntersecting) visibleCanvasKeys.add(key);
+      else visibleCanvasKeys.delete(key);
+    }
+  }, { threshold: 0.02 });
+
+  function attachInteractivePointer(canvas, key) {
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let movedDist = 0;
+
+    const toNorm = ev => {
+      const rect = canvas.getBoundingClientRect();
+      return [
+        Math.min(1, Math.max(0, (ev.clientX - rect.left) / Math.max(1, rect.width))),
+        Math.min(1, Math.max(0, (ev.clientY - rect.top) / Math.max(1, rect.height)))
+      ];
+    };
+
+    canvas.addEventListener('pointerdown', ev => {
+      const sim = sims.get(key);
+      if (!sim) return;
+      dragging = true;
+      movedDist = 0;
+      const [nx, ny] = toNorm(ev);
+      lastX = nx;
+      lastY = ny;
+      canvas.setPointerCapture?.(ev.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', ev => {
+      if (!dragging) return;
+      const sim = sims.get(key);
+      if (!sim) return;
+      const [nx, ny] = toNorm(ev);
+      movedDist += Math.hypot(nx - lastX, ny - lastY);
+      wipeSimMist(sim, nx, ny, lastX, lastY);
+      lastX = nx;
+      lastY = ny;
+      if (key === 'live-preview' && !state.live.hintFaded && movedDist > 0.04) {
+        state.live.hintFaded = true;
+        document.getElementById('liveGestureHint')?.classList.add('faded');
+      }
+    });
+
+    const endDrag = ev => {
+      if (!dragging) return;
+      dragging = false;
+      const sim = sims.get(key);
+      if (!sim) return;
+      if (movedDist < 0.025) {
+        const [nx, ny] = toNorm(ev);
+        tapSimDrop(sim, nx, ny);
+        if (key === 'live-preview' && !state.live.hintFaded) {
+          state.live.hintFaded = true;
+          document.getElementById('liveGestureHint')?.classList.add('faded');
+        }
+      }
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', () => { dragging = false; });
+  }
+
+  function registerCanvases() {
+    visibilityObserver.disconnect();
+    visibleCanvasKeys.clear();
+    document.querySelectorAll('canvas[data-canvas]').forEach((canvas, idx) => {
+      const key = canvas.dataset.canvas;
+      const preset = canvas.dataset.preset || 'dusk';
+      const preWiped = canvas.dataset.prewiped === '1';
+      let sim = sims.get(key);
+      if (!sim) {
+        sim = createSimState(preset, idx + 1, preWiped);
+        sims.set(key, sim);
+      } else if (sim.presetId !== preset) {
+        setSimPreset(sim, preset);
+      }
+      visibilityObserver.observe(canvas);
+      visibleCanvasKeys.add(key);
+      if (!canvas.dataset.boundPointer) {
+        canvas.dataset.boundPointer = '1';
+        attachInteractivePointer(canvas, key);
+      }
+    });
+  }
+
+  // ==================== Build & Render Boards ====================
+  function buildAllBoards() {
+    const container = document.getElementById('boardsContainer');
+    const overviewHtml = OVERVIEW_BOARDS.map((b, i) => `
+      <figure class="board">
+        <figcaption class="board-head">
+          <div class="board-title"><span class="board-num">${b.num}</span>${b.title}</div>
+          <span class="board-tag">${b.tag}</span>
+        </figcaption>
+        ${b.render(i)}
+        <p class="board-caption">${b.caption}</p>
+      </figure>
+    `).join('');
+
+    const liveHtml = `
+      <figure class="board board-live">
+        <figcaption class="board-head">
+          <div class="board-title"><span class="board-num">LIVE</span>交互式手机试玩</div>
+          <span class="board-tag">全闭环可操作</span>
+        </figcaption>
+        <div id="livePhoneMount">${renderLivePhoneHtml()}</div>
+        <p class="board-caption">可在画廊切换 5 套天光、点击卡片推入全屏预览、直接拭雾与点雨、模拟双槽位应用与宿主菜单。</p>
+      </figure>
+    `;
+
+    container.innerHTML = overviewHtml + liveHtml;
+    applyAccentVars();
+    registerCanvases();
+  }
+
+  function renderLivePhoneHtml() {
+    const applied = (state.live.homeApplied || state.live.lockApplied)
+      ? { home: state.live.homeApplied, lock: state.live.lockApplied }
+      : null;
+    return renderHomeBoardHtml({
+      id: 'live',
+      preset: state.live.preset,
+      applied,
+      interactivePresets: false,
+      isLive: true
+    });
+  }
+
+  function rerenderLivePhone() {
+    const mount = document.getElementById('livePhoneMount');
+    if (!mount) return;
+    mount.innerHTML = renderLivePhoneHtml();
+    applyAccentVars();
+    registerCanvases();
+  }
+
+  function showLiveToast(msg) {
+    state.live.toastText = msg;
+    clearTimeout(state.live.toastTimer);
+    rerenderLivePhone();
+    state.live.toastTimer = setTimeout(() => {
+      state.live.toastText = '';
+      rerenderLivePhone();
+    }, 2400);
+  }
+
+  // ==================== Studio Controls & Event Delegation ====================
+  function applyAccentVars() {
+    const acc = ACCENTS.find(a => a.id === state.accentId) || ACCENTS[0];
+    const isDark = state.theme === 'dark';
+    const color = isDark ? acc.dark : acc.light;
+    const inkOn = (isDark && acc.darkInkOn) ? acc.darkInkOn : acc.inkOn;
+    document.querySelectorAll('.phone').forEach(el => {
+      el.classList.toggle('dark', isDark);
+      el.style.setProperty('--accent', color);
+      el.style.setProperty('--accent-ink', inkOn);
+      el.style.setProperty('--accent-soft', isDark ? 'rgba(255,255,255,0.08)' : acc.soft);
+      el.style.setProperty('--accent-soft-ink', isDark ? acc.dark : acc.softInk);
+    });
+  }
+
+  function buildAccentSwatches() {
+    const wrap = document.getElementById('accentSwatches');
+    wrap.innerHTML = ACCENTS.map(a => `
+      <button type="button" class="swatch ${a.id === state.accentId ? 'active' : ''}"
+        data-accent-id="${a.id}" title="${a.name}" aria-label="主题色 ${a.name}"
+        style="background:${a.light};color:${a.light}"></button>
+    `).join('');
+  }
+
+  function setStudioView(view) {
+    state.view = view;
+    document.body.classList.remove('mode-overview', 'mode-live', 'mode-wallpaper');
+    document.body.classList.add(`mode-${view}`);
+    document.querySelectorAll('#viewModeSeg button').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
+    if (view === 'wallpaper') {
+      initFullscreenShowcase();
+    }
+  }
+
+  function initFullscreenShowcase() {
+    const fsCanvas = document.getElementById('fullscreenCanvas');
+    if (!fullscreenEngine) {
+      fullscreenEngine = createRainWindowEngine(fsCanvas);
+      attachInteractivePointer(fsCanvas, '__fullscreen__');
+      sims.set('__fullscreen__', fullscreenSim);
+    }
+    renderFullscreenHud();
+  }
+
+  function renderFullscreenHud() {
+    const hud = document.getElementById('fullscreenHud');
+    hud.innerHTML = `
+      ${PRESETS.map(p => `
+        <button type="button" class="hud-btn" aria-pressed="${state.fullscreen.preset === p.id}" data-fs-preset="${p.id}">
+          <span class="orb" style="background:${p.swatch}"></span><span>${p.name}</span>
+        </button>
+      `).join('')}
+      <span class="hud-sep"></span>
+      <button type="button" class="hud-btn" aria-pressed="${state.fullscreen.fps === 15}" data-fs-fps>
+        <span class="num">${state.fullscreen.fps} FPS</span>
+      </button>
+      <button type="button" class="hud-btn" data-fs-mist>${ICONS.refresh}<span>起雾</span></button>
+      <button type="button" class="hud-btn exit" data-fs-exit>返回设计稿</button>
+    `;
+  }
+
+  // Event listeners
+  document.getElementById('viewModeSeg').addEventListener('click', e => {
+    const btn = e.target.closest('[data-view]');
+    if (btn) setStudioView(btn.dataset.view);
+  });
+  document.getElementById('widthSeg').addEventListener('click', e => {
+    const btn = e.target.closest('[data-width]');
+    if (!btn) return;
+    state.width = Number(btn.dataset.width);
+    document.body.classList.toggle('compact', state.width === 360);
+    document.querySelectorAll('#widthSeg button').forEach(b => b.classList.toggle('active', b === btn));
+  });
+  document.getElementById('themeSeg').addEventListener('click', e => {
+    const btn = e.target.closest('[data-theme]');
+    if (!btn) return;
+    state.theme = btn.dataset.theme;
+    document.body.classList.toggle('studio-dark', state.theme === 'dark');
+    document.querySelectorAll('#themeSeg button').forEach(b => b.classList.toggle('active', b === btn));
+    applyAccentVars();
+  });
+  document.getElementById('accentSwatches').addEventListener('click', e => {
+    const btn = e.target.closest('[data-accent-id]');
+    if (!btn) return;
+    state.accentId = btn.dataset.accentId;
+    document.querySelectorAll('#accentSwatches .swatch').forEach(b => b.classList.toggle('active', b === btn));
+    applyAccentVars();
+  });
+
+  document.getElementById('boardsContainer').addEventListener('click', e => {
+    // Overview Board 01/02 preset switcher
+    const swBtn = e.target.closest('[data-switch-preset]');
+    if (swBtn) {
+      const presetId = swBtn.dataset.switchPreset;
+      const targetKey = swBtn.dataset.targetSim;
+      const sim = sims.get(targetKey);
+      if (sim) setSimPreset(sim, presetId);
+      const rail = swBtn.parentElement;
+      rail.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === swBtn)));
+      const phone = swBtn.closest('.phone');
+      const canvasEl = phone?.querySelector(`canvas[data-canvas="${targetKey}"]`);
+      if (canvasEl) canvasEl.dataset.preset = presetId;
+      if (targetKey.endsWith('-home')) {
+        const badge = phone.querySelector('.hero-top-row .glass-badge:last-child span');
+        if (badge) badge.textContent = `可拭雾 · ${PRESET_MAP[presetId].name}`;
+      } else if (targetKey.endsWith('-preview')) {
+        const sub = phone.querySelector('.preview-topbar small');
+        if (sub) sub.textContent = `${PRESET_MAP[presetId].name} · ${PRESET_MAP[presetId].desc}`;
+      }
+      return;
+    }
+
+    // Reset mist button on any preview board
+    const mistBtn = e.target.closest('[data-reset-mist]');
+    if (mistBtn) {
+      const sim = sims.get(mistBtn.dataset.resetMist);
+      if (sim) resetSimMist(sim);
+      return;
+    }
+
+    // Live phone interactions
+    if (e.target.closest('[data-live-open-preview]')) {
+      state.live.page = 'preview';
+      rerenderLivePhone();
+      return;
+    }
+    if (e.target.closest('[data-live-back]')) {
+      state.live.page = 'home';
+      rerenderLivePhone();
+      return;
+    }
+    const livePresetBtn = e.target.closest('[data-live-preset]');
+    if (livePresetBtn) {
+      state.live.preset = livePresetBtn.dataset.livePreset;
+      for (const k of ['live-home', 'live-preview']) {
+        const s = sims.get(k);
+        if (s) setSimPreset(s, state.live.preset);
+      }
+      rerenderLivePhone();
+      return;
+    }
+    const liveModeBtn = e.target.closest('[data-live-mode]');
+    if (liveModeBtn) {
+      state.live.mode = liveModeBtn.dataset.liveMode;
+      rerenderLivePhone();
+      return;
+    }
+    if (e.target.closest('[data-live-apply]')) {
+      const { homeApplied, lockApplied, mode, preset } = state.live;
+      // Direct in-place switch if active slot already holds Xiaoban Live Wallpaper
+      if (homeApplied && lockApplied && homeApplied === lockApplied && mode === 'wallpaper') {
+        state.live.homeApplied = preset;
+        state.live.lockApplied = preset;
+        state.live.page = 'home';
+        showLiveToast(`已原地切换桌面与锁屏为「${PRESET_MAP[preset].name}」`);
+        return;
+      }
+      if ((mode === 'home' && homeApplied) || (mode === 'wallpaper' && homeApplied && !lockApplied)) {
+        state.live.homeApplied = preset;
+        state.live.page = 'home';
+        showLiveToast(`已切换桌面壁纸为「${PRESET_MAP[preset].name}」`);
+        return;
+      }
+      if ((mode === 'lock' && lockApplied) || (mode === 'wallpaper' && !homeApplied && lockApplied)) {
+        state.live.lockApplied = preset;
+        state.live.page = 'home';
+        showLiveToast(`已切换锁屏壁纸为「${PRESET_MAP[preset].name}」`);
+        return;
+      }
+      state.live.pickerOpen = true;
+      rerenderLivePhone();
+      return;
+    }
+    const confirmBtn = e.target.closest('[data-live-confirm]');
+    if (confirmBtn) {
+      const target = confirmBtn.dataset.liveConfirm;
+      if (target === 'home' || target === 'both') state.live.homeApplied = state.live.preset;
+      if (target === 'lock' || target === 'both') state.live.lockApplied = state.live.preset;
+      state.live.pickerOpen = false;
+      state.live.page = 'home';
+      showLiveToast('壁纸已应用');
+      return;
+    }
+    if (e.target.closest('[data-live-close-picker]') || e.target.matches('[data-live-scrim="picker"]')) {
+      state.live.pickerOpen = false;
+      rerenderLivePhone();
+      return;
+    }
+    if (e.target.closest('[data-live-host-menu]')) {
+      state.live.menuOpen = true;
+      rerenderLivePhone();
+      return;
+    }
+    if (e.target.closest('[data-live-exit]') || e.target.matches('[data-live-scrim="menu"]')) {
+      state.live.menuOpen = false;
+      rerenderLivePhone();
+      return;
+    }
+    if (e.target.closest('[data-live-reload]')) {
+      state.live.menuOpen = false;
+      for (const k of ['live-home', 'live-preview']) {
+        const s = sims.get(k);
+        if (s) resetSimMist(s);
+      }
+      showLiveToast('已重新加载壁纸画布');
+      return;
+    }
+    if (e.target.closest('[data-live-share]')) {
+      state.live.menuOpen = false;
+      showLiveToast('已生成「雨窗天光」分享卡片');
+      return;
+    }
+  });
+
+  document.getElementById('fullscreenHud').addEventListener('click', e => {
+    const pBtn = e.target.closest('[data-fs-preset]');
+    if (pBtn) {
+      state.fullscreen.preset = pBtn.dataset.fsPreset;
+      setSimPreset(fullscreenSim, state.fullscreen.preset);
+      renderFullscreenHud();
+      return;
+    }
+    if (e.target.closest('[data-fs-fps]')) {
+      state.fullscreen.fps = state.fullscreen.fps === 30 ? 15 : 30;
+      renderFullscreenHud();
+      return;
+    }
+    if (e.target.closest('[data-fs-mist]')) {
+      resetSimMist(fullscreenSim);
+      return;
+    }
+    if (e.target.closest('[data-fs-exit]')) {
+      setStudioView('overview');
+    }
+  });
+
+  // ==================== Animation Loop ====================
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let lastTs = 0;
+  let fsLastDraw = 0;
+
+  function tick(ts) {
+    requestAnimationFrame(tick);
+    if (!lastTs) lastTs = ts;
+    const rawDt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+    const dt = reducedMotion.matches ? rawDt * 0.05 : rawDt;
+
+    if (state.view === 'wallpaper') {
+      const interval = 1000 / state.fullscreen.fps;
+      if (ts - fsLastDraw + 0.5 >= interval) {
+        fsLastDraw = ts;
+        stepSim(fullscreenSim, Math.max(dt, interval / 1000));
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.max(1, Math.round(window.innerWidth * dpr));
+        const h = Math.max(1, Math.round(window.innerHeight * dpr));
+        fullscreenEngine?.render(fullscreenSim, w, h);
+      }
+      return;
+    }
+
+    // Drive visible board canvases via the single shared WebGL renderer
+    for (const key of visibleCanvasKeys) {
+      const canvas = document.querySelector(`canvas[data-canvas="${key}"]`);
+      const sim = sims.get(key);
+      if (!canvas || !sim) continue;
+      stepSim(sim, dt);
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const w = Math.min(390, Math.round(rect.width));
+      const h = Math.min(812, Math.round(rect.height));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      sharedEngine.render(sim, w, h);
+      const ctx2d = canvas.getContext('2d', { alpha: false });
+      ctx2d.drawImage(sharedGlCanvas, 0, 0, w, h);
+    }
+  }
+
+  // ==================== Boot & URL Params ====================
+  buildAccentSwatches();
+  buildAllBoards();
+
+  const qs = new URLSearchParams(location.search);
+  const qMode = qs.get('mode');
+  const qTheme = qs.get('theme');
+  const qWidth = qs.get('width');
+  if (qTheme === 'dark') document.querySelector('#themeSeg [data-theme="dark"]')?.click();
+  if (qWidth === '360') document.querySelector('#widthSeg [data-width="360"]')?.click();
+  if (qMode === 'live' || qMode === 'wallpaper') setStudioView(qMode);
+  else setStudioView('overview');
+
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
