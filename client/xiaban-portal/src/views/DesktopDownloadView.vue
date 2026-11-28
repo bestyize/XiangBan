@@ -130,7 +130,7 @@ const sheetMode = ref<'none' | 'download' | 'changelog'>('none')
 const pastHero = ref(false)
 
 const visibleTargets = computed<TargetMeta[]>(() => {
-  const list: TargetMeta[] = [TARGET_METAS['darwin-aarch64'], TARGET_METAS['windows-x86_64']]
+  const list: TargetMeta[] = [TARGET_METAS['windows-x86_64'], TARGET_METAS['darwin-aarch64']]
   if (downloads.value['darwin-x86_64']) {
     list.push(TARGET_METAS['darwin-x86_64'])
   }
@@ -241,8 +241,9 @@ async function load() {
     const product = await getDesktopProduct()
     downloads.value = product.downloads || {}
     if (!downloads.value[selectedId.value]) {
-      const avail = visibleTargets.value.find(t => Boolean(downloads.value[t.id]))
-      if (avail) selectedId.value = avail.id
+      const fallbackTargets: DesktopTargetId[] = ['darwin-aarch64', 'windows-x86_64', 'darwin-x86_64']
+      const fallbackId = fallbackTargets.find(id => downloads.value[id])
+      if (fallbackId) selectedId.value = fallbackId
     }
   } catch {
     error.value = '版本信息加载失败，请重试'

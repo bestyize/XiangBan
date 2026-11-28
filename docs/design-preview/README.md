@@ -54,6 +54,7 @@ npm --prefix client/xiaoban-desktop run dev
 | 设计稿 | 站点 | 状态 | 内容 |
 | --- | --- | --- | --- |
 | [小伴产品门户 · 产品矩阵](../../services/server-xiaoban/docs/design-specs/prototypes/xiaban-matrix-portal.html) | xiaban.xyz | 已合入 | v2.1 在首页产品列表和页脚末尾增加「AI 订阅测评」，归入「网站」筛选。封面取自 AI 额度监控原型。[本地预览](http://127.0.0.1:1455/services/server-xiaoban/docs/design-specs/prototypes/xiaban-matrix-portal.html) |
+| [小伴桌面独立下载页 · 平台顺序](../../client/xiaban-portal/docs/design-specs/prototypes/desktop-download-order.html) | xiaban.xyz/desktop | 已合入 | 首屏平台选项按 Windows、macOS 的顺序展示，预览需运行门户 Vite。[浏览器预览](http://127.0.0.1:5179/docs/design-specs/prototypes/desktop-download-order.html) |
 | [小伴桌面官网 · 功能页 & 下载页](../../services/server-xiaoban/docs/design-specs/prototypes/features-download-redesign.html) | wallpaper.xiangban.xyz | 已合入 | v2.3 重设计：极简暖白 · 墨黑与日落珊瑚点缀，首屏 8 场景双端实机展台、电脑与手机核心能力 Bento、当前设备推荐下载卡与更新日志弹窗 |
 | [小伴官网 · 管理后台全模块重设计](../../services/server-xiaoban/docs/design-specs/prototypes/admin-console-redesign.html) | wallpaper.xiangban.xyz/admin | 已合入 | v2.0 规范对齐版：方案四浮起白面板壳层、无描边浅底白卡控件、6 套官方主题色 × 明暗模式、说明收进悬停提示、标准 `xb-menu` / `⋯` 菜单，覆盖运营总览、壁纸图库、快采工作台、自定义上架、四端 App 发版、Android 公告实时预览、AI 模型目录与图源密钥（已合入 `services/server-xiaoban/web` 管理后台） |
 | [超级小伴社区 · 主站浏览（PC + H5）](../../services/server-forum/docs/design-specs/prototypes/community-redesign/index.html) | chat.xiangban.xyz | 已合入 | 现代活力社区风主站，覆盖 PC 左导轨壳层与 390px 移动 H5，包含首页五栏目、讨论、资源、应用与小伴 AI |

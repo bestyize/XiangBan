@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小伴桌面独立下载页 · 平台顺序设计稿</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    iframe { display: block; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="desktop-preview" title="小伴桌面独立下载页预览"></iframe>
+  <script>
+    const preview = document.getElementById('desktop-preview');
+    preview.addEventListener('load', () => {
+      const tabs = preview.contentDocument?.querySelector('.os-seg');
+      if (!tabs) return;
+
+      const windowsTab = Array.from(tabs.children).find(tab => tab.textContent.trim() === 'Windows');
+      if (windowsTab) tabs.prepend(windowsTab);
+    });
+    preview.src = '/desktop';
+  </script>
+</body>
+</html>
