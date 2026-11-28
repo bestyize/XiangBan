@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>AI额度监控 QuotaReset — ChatGPT Codex、反重力 Antigravity、Claude 额度重置雷达</title>
+<meta name="description" content="AI额度监控（QuotaReset）实时追踪 ChatGPT/Codex、反重力 Antigravity 与 Claude 的官方额度全局重置与重置卡动态，并对比各档 AI 订阅的 Token 容量与官方 API 等值。" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<meta name="theme-color" content="#F5F6F8" />
+<link rel="canonical" href="https://aireset.xiangban.xyz/" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="AI额度监控 QuotaReset" />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:url" content="https://aireset.xiangban.xyz/" />
+<meta property="og:title" content="AI额度监控 QuotaReset — ChatGPT Codex、反重力、Claude 额度重置雷达" />
+<meta property="og:description" content="一站追踪 ChatGPT/Codex、反重力 Antigravity、Claude 额度重置动态与主流 AI 订阅套餐实测性价比。" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"AI额度监控 QuotaReset","alternateName":"QuotaReset","url":"https://aireset.xiangban.xyz/","inLanguage":"zh-CN","description":"追踪 ChatGPT/Codex、反重力 Antigravity、Claude 的额度重置动态，并对比各档 AI 订阅的额度与 API 等值。"}</script>
+<style>
+/* ==========================================================================
+   QuotaReset Design System — Operate Mode (Light Default + Dark Mode)
+   Single-elevation hairline cards, tabular numerals, container-query responsive
+   ========================================================================== */
+:root {
+  --bg-page: #F5F6F8;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #ECEFF3;
+  --bg-hover: #E6EAF0;
+  --bg-header: rgba(255, 255, 255, 0.92);
+  --bg-code: #F1F4F8;
+
+  --border-default: #E2E6EC;
+  --border-strong: #CBD3DF;
+
+  --text-primary: #0F172A;
+  --text-secondary: #3E4C5E;
+  --text-muted: #4B596D;
+  --text-inverse: #FFFFFF;
+
+  --accent: #1D4ED8;
+  --accent-hover: #1E40AF;
+  --accent-soft: #EFF6FF;
+  --accent-border: #BFDBFE;
+
+  /* Platform functional hues (WCAG AA >= 4.5:1 on soft chips) */
+  --brand-gpt: #047857;
+  --brand-gpt-soft: #ECFDF5;
+  --brand-gpt-border: #A7F3D0;
+
+  --brand-ag: #1D4ED8;
+  --brand-ag-soft: #EFF6FF;
+  --brand-ag-border: #BFDBFE;
+
+  --brand-claude: #B0471E;
+  --brand-claude-soft: #FFF5F0;
+  --brand-claude-border: #FCD2BF;
+
+  /* Semantic state tokens */
+  --state-ok: #047857;
+  --state-ok-bg: #ECFDF5;
+  --state-warn: #B45309;
+  --state-warn-bg: #FFFBEB;
+  --state-alert: #BE123C;
+  --state-alert-bg: #FFF1F2;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --shadow-overlay: 0 18px 48px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
+
+  --font-sans: "PingFang SC", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --sticky-top: 0px;
+}
+
+[data-theme="dark"] {
+  --bg-page: #0B0E14;
+  --bg-surface: #121721;
+  --bg-subtle: #1A2130;
+  --bg-hover: #222B3E;
+  --bg-header: rgba(18, 23, 33, 0.92);
+  --bg-code: #0E131C;
+
+  --border-default: #222B3B;
+  --border-strong: #334155;
+
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #7C8BA1;
+  --text-inverse: #0B0E14;
+
+  --accent: #60A5FA;
+  --accent-hover: #93C5FD;
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --accent-border: rgba(96, 165, 250, 0.32);
+
+  --brand-gpt: #34D399;
+  --brand-gpt-soft: rgba(16, 185, 129, 0.14);
+  --brand-gpt-border: rgba(52, 211, 153, 0.3);
+
+  --brand-ag: #60A5FA;
+  --brand-ag-soft: rgba(59, 130, 246, 0.14);
+  --brand-ag-border: rgba(96, 165, 250, 0.3);
+
+  --brand-claude: #F08A5D;
+  --brand-claude-soft: rgba(240, 138, 93, 0.14);
+  --brand-claude-border: rgba(240, 138, 93, 0.32);
+
+  --state-ok: #34D399;
+  --state-ok-bg: rgba(16, 185, 129, 0.14);
+  --state-warn: #FBBF24;
+  --state-warn-bg: rgba(245, 158, 11, 0.14);
+  --state-alert: #FB7185;
+  --state-alert-bg: rgba(244, 63, 94, 0.14);
+
+  --shadow-overlay: 0 24px 56px rgba(0, 0, 0, 0.55);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+
+button, input, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; }
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   App shell (container for container-query responsive layout)
+   ========================================================================== */
+.app-shell {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg-page);
+  container-type: inline-size;
+  container-name: app;
+  position: relative;
+}
+
+.site-header {
+  position: sticky;
+  top: var(--sticky-top);
+  z-index: 40;
+  background: var(--bg-header);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.header-inner {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.header-top-row {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.brand-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Desktop inline tabs inside header row */
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.nav-tab {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: color 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+}
+
+.nav-tab[aria-selected="true"] {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: var(--bg-subtle);
+}
+
+.nav-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -11px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tab-dot.gpt { background: var(--brand-gpt); }
+.tab-dot.ag { background: var(--brand-ag); }
+.tab-dot.claude { background: var(--brand-claude); }
+
+.tab-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--state-ok-bg);
+  color: var(--state-ok);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+
+.btn:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #FFFFFF;
+}
+
+.btn-icon {
+  width: 34px;
+  padding: 0;
+}
+
+.btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+/* Mobile secondary scrollable tab bar (hidden on PC, shown <= 880px container) */
+.mobile-tab-bar {
+  display: none;
+  border-top: 1px solid var(--border-default);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 12px 2px;
+}
+.mobile-tab-bar::-webkit-scrollbar { display: none; }
+
+.mobile-tab-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+}
+
+.mobile-tab-list .nav-tab {
+  padding: 8px 12px 10px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13.5px;
+}
+.mobile-tab-list .nav-tab[aria-selected="true"] {
+  background: transparent;
+  color: var(--accent);
+}
+.mobile-tab-list .nav-tab[aria-selected="true"]::after {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+}
+
+/* ==========================================================================
+   Main Content Layout
+   ========================================================================== */
+.main-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 56px;
+}
+
+.tab-panel { display: none; }
+.tab-panel.active {
+  display: block;
+  animation: panelReveal 180ms var(--ease-out);
+}
+
+@keyframes panelReveal {
+  from { opacity: 0.4; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Top page title row */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.page-desc {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 68ch;
+}
+
+.head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state-ok);
+  flex-shrink: 0;
+}
+
+.tz-switch {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-subtle);
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.tz-switch button {
+  border: none;
+  background: transparent;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.tz-switch button.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Surfaces & Cards (Single Elevation: 1px hairline border, no shadow clutter)
+   ========================================================================== */
+.surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.surface-padded {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+
+.section-block {
+  margin-top: 28px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.section-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Overview Tab: 3-Platform Live Reset Summary Grid
+   ========================================================================== */
+.radar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.radar-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 160ms var(--ease-out);
+  cursor: pointer;
+  text-align: left;
+}
+
+.radar-card:hover {
+  border-color: var(--border-strong);
+}
+
+.radar-card.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.radar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plat-ident {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.plat-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.plat-badge.gpt { background: var(--brand-gpt-soft); color: var(--brand-gpt); }
+.plat-badge.ag { background: var(--brand-ag-soft); color: var(--brand-ag); }
+.plat-badge.claude { background: var(--brand-claude-soft); color: var(--brand-claude); }
+
+.plat-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.plat-handle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-chip.ok { background: var(--state-ok-bg); color: var(--state-ok); }
+.status-chip.warn { background: var(--state-warn-bg); color: var(--state-warn); }
+.status-chip.alert { background: var(--state-alert-bg); color: var(--state-alert); }
+.status-chip.neutral { background: var(--bg-subtle); color: var(--text-secondary); }
+
+.elapsed-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.elapsed-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.elapsed-clock {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.radar-quote {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.radar-foot {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.radar-link {
+  color: var(--accent);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ==========================================================================
+   Signature Move: 30-Day Synchronized 3-Track Reset Timeline
+   ========================================================================== */
+.timeline-card {
+  padding: 18px 20px;
+}
+
+.timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.legend-swatch.global { background: var(--accent); }
+.legend-swatch.banked { background: var(--state-warn); }
+.legend-swatch.policy { background: var(--text-muted); border-radius: 50%; }
+
+.timeline-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.timeline-matrix {
+  min-width: 720px;
+  display: grid;
+  grid-template-columns: 128px 1fr;
+  row-gap: 12px;
+  column-gap: 14px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.track-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.track-cells {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.day-cell {
+  height: 28px;
+  border-radius: 5px;
+  background: var(--bg-subtle);
+  border: 1px solid transparent;
+  padding: 0;
+  position: relative;
+  transition: transform 120ms var(--ease-out), border-color 120ms var(--ease-out);
+}
+
+.day-cell:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.day-cell.has-event { cursor: pointer; }
+.day-cell.ev-gpt { background: var(--brand-gpt); }
+.day-cell.ev-ag { background: var(--brand-ag); }
+.day-cell.ev-claude { background: var(--brand-claude); }
+.day-cell.ev-banked {
+  background: var(--state-warn);
+}
+.day-cell.is-selected {
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--text-primary);
+  z-index: 2;
+}
+
+.timeline-axis {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: -4px;
+}
+
+.timeline-inspector {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inspector-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.inspector-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Overview Bottom Split: Quick Benchmark Snapshot + Live Feed
+   ========================================================================== */
+.split-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.compact-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.compact-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.compact-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.compact-table tr:last-child td { border-bottom: none; }
+.compact-table tbody tr:hover { background: var(--bg-page); }
+
+.ratio-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--state-ok-bg);
+  color: var(--state-ok);
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-item {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.feed-item:last-child { border-bottom: none; }
+
+.feed-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.feed-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.feed-body {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Per-Platform Reset Detail Views (ChatGPT / Antigravity / Claude)
+   ========================================================================== */
+.platform-hero {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 16px;
+}
+
+.hero-clock-card {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.big-clock {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+.announcement-box {
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.announcement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lang-toggle {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+.lang-toggle:hover { color: var(--text-primary); }
+
+.kpi-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-cell {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.kpi-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kpi-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Filter & Search Bar */
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pill-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: all 140ms var(--ease-out);
+}
+.pill-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.pill-btn.active {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--text-inverse);
+}
+
+.search-input {
+  height: 32px;
+  padding: 0 12px 0 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  font-size: 13px;
+  min-width: 210px;
+}
+
+.search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-wrap svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* API Preview Box */
+.api-box {
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.endpoint-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  border: 1px solid var(--border-default);
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.code-block {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-code);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-x: auto;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Subscription Benchmark Tab (Inspired by modeldial.com)
+   ========================================================================== */
+.calc-banner {
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.calc-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.calc-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  font-size: 13px;
+}
+
+.bench-table-wrap {
+  overflow-x: auto;
+}
+
+.bench-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.bench-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.bench-table th.sortable { cursor: pointer; user-select: none; }
+.bench-table th.sortable:hover { color: var(--text-primary); }
+.bench-table th.is-sorted { color: var(--accent); }
+
+.bench-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.bench-row { cursor: pointer; transition: background 120ms var(--ease-out); }
+.bench-row:hover { background: var(--bg-page); }
+.bench-row.is-recommended { background: var(--accent-soft); }
+
+.bench-detail-row { display: none; }
+.bench-detail-row.open { display: table-row; }
+.bench-detail-row td {
+  background: var(--bg-page);
+  padding: 16px 18px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-kv {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.detail-kv-label { font-size: 11.5px; color: var(--text-muted); }
+.detail-kv-val { font-size: 13.5px; font-weight: 600; margin-top: 3px; }
+
+.meter-bar {
+  width: 88px;
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 99px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+/* Mobile Card Deck for Benchmark (hidden on desktop, shown <= 760px container) */
+.mobile-bench-list {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.m-bench-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.m-bench-card.is-recommended {
+  border-color: var(--accent);
+}
+
+.m-bench-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-metric-box {
+  background: var(--bg-page);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+/* Mobile History Card List */
+.mobile-history-list {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.m-hist-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   Drawers / Modals (Personal Local Timer & Alert Subscription)
+   Responsive: Centered Dialog on PC, Bottom Sheet on Mobile
+   ========================================================================== */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(15, 23, 42, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.overlay-backdrop.open { display: flex; }
+
+.modal-card {
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 18px;
+  box-shadow: var(--shadow-overlay);
+  padding: 22px 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--border-default);
+  margin-top: 40px;
+  padding: 20px 24px 32px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Toast feedback */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: #0F172A;
+  color: #F8FAFC;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ==========================================================================
+   Container-Query Responsive Breakpoints (Works for BOTH real resize & 390px Frame!)
+   ========================================================================== */
+@container app (max-width: 900px) {
+  .brand-sub { display: none; }
+}
+
+@container app (max-width: 760px) {
+  .header-inner { padding: 0 16px; }
+  .header-top-row .nav-tabs { display: none; }
+  .mobile-tab-bar { display: block; }
+  .radar-grid { grid-template-columns: 1fr; }
+  .split-grid { grid-template-columns: 1fr; }
+  .platform-hero { grid-template-columns: 1fr; }
+  .api-box { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container app (max-width: 640px) {
+  .main-wrap { padding: 16px 14px 44px; }
+  .header-top-row { height: 52px; }
+  .brand-sub { display: none; }
+  .btn-label-hide-sm { display: none; }
+  .header-actions { gap: 6px; }
+  .header-actions .btn { padding: 0 9px; min-width: 34px; }
+  .page-title { font-size: 20px; }
+  .big-clock { font-size: 26px; }
+  .elapsed-clock { font-size: 21px; }
+  .radar-card { padding: 15px 16px; }
+  .timeline-card { padding: 14px 15px; }
+  .hero-clock-card { padding: 16px; }
+  .kpi-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi-cell { padding: 12px; }
+  .kpi-value { font-size: 17px; }
+  .desktop-table-only { display: none; }
+  .mobile-bench-list { display: flex; }
+  .mobile-history-list { display: flex; }
+  .search-input { width: 100%; min-width: 0; }
+  .search-wrap { width: 100%; }
+  .calc-banner { padding: 14px 15px; }
+  .site-footer { padding: 18px 14px 28px; }
+}
+
+@media (max-width: 640px) {
+  .overlay-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-card {
+    border-radius: 20px 20px 0 0;
+    max-width: 100%;
+    padding: 20px 18px 28px;
+  }
+}
+
+/* ==========================================================================
+   Production additions
+   ========================================================================== */
+a.nav-tab, a.brand { text-decoration: none; }
+a.nav-tab { font-family: inherit; }
+
+.notice {
+  display: block;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.notice strong { color: var(--text-primary); }
+.notice a { color: var(--accent); }
+
+.site-footer a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.site-footer a:hover { color: var(--text-primary); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
+</head>
+<body data-initial-tab="overview">
+
+<!-- ========================================================================
+     Application Shell
+     ======================================================================== -->
+<div class="app-shell" id="appShell">
+
+    <!-- Sticky Header with Top Multi-Tab Bar -->
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="header-top-row">
+          <a class="brand" href="/" data-go-tab="overview" aria-label="AI额度监控 首页">
+            <span class="brand-mark" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 20 9 4 6 12 2 12"></polyline>
+              </svg>
+            </span>
+            <span class="brand-name">AI额度监控 <span class="brand-sub">QuotaReset</span></span>
+          </a>
+
+          <!-- PC Top Multi-Tabs -->
+          <nav class="nav-tabs" role="tablist" aria-label="主导航">
+            <a class="nav-tab" role="tab" href="/" data-tab="overview" aria-selected="true">
+              重置雷达
+            </a>
+            <a class="nav-tab" role="tab" href="/benchmark/" data-tab="benchmark" aria-selected="false">
+              订阅额度实测
+            </a>
+          </nav>
+
+          <!-- Right Actions -->
+          <div class="header-actions">
+            <a class="btn" id="openGroupBtn" href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer" title="前往小伴社区联系我们（加入交流群）" aria-label="交流群">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="10" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span class="btn-label-hide-sm">交流群</span>
+            </a>
+            <a class="btn btn-primary" id="openPortalBtn" href="https://xiaban.xyz" target="_blank" rel="noopener noreferrer" title="前往小伴产品门户（xiaban.xyz）" aria-label="小伴产品门户">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+              </svg>
+              <span class="btn-label-hide-sm">小伴产品门户</span>
+            </a>
+            <button type="button" class="btn btn-icon" id="themeToggleBtn" aria-label="切换深浅色">
+              <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+              </svg>
+              <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Scrollable Top Multi-Tab Bar -->
+      <div class="mobile-tab-bar" role="tablist" aria-label="移动端主导航">
+        <div class="mobile-tab-list">
+          <a class="nav-tab" role="tab" href="/" data-tab="overview" aria-selected="true">重置雷达</a>
+          <a class="nav-tab" role="tab" href="/benchmark/" data-tab="benchmark" aria-selected="false">订阅额度实测</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ====================================================================
+         Main View Panels
+         ==================================================================== -->
+    <main class="main-wrap">
+
+      <!-- ==================== TAB 1: OVERVIEW RADAR ==================== -->
+      <section class="tab-panel active" id="panel-overview" role="tabpanel">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">御三家重置雷达与实测速览</h1>
+            <p class="page-desc">实时追踪 ChatGPT / Codex、反重力（Antigravity）与 Claude 的官方额度重置、重置卡动态及各档订阅等效 API 实测。</p>
+          </div>
+          <div class="head-meta">
+            <span class="live-pill"><span class="live-dot"></span>自动轮询正常 · 60s</span>
+            <div class="tz-switch" role="group" aria-label="时区切换">
+              <button type="button" data-tz="UTC+8" class="active">北京时间</button>
+              <button type="button" data-tz="UTC">UTC</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="notice"><strong>数据说明：</strong>下方重置时间轴与历史记录目前为<strong>演示数据</strong>，官方信源自动接入与人工核验上线前，请勿作为真实重置时间依据；官方公告以 OpenAI、Google、Anthropic 为准。</p>
+
+        <!-- 3-Platform Live Reset Summary Cards -->
+        <div class="radar-grid">
+          <button type="button" class="radar-card" data-filter-log="chatgpt">
+            <div class="radar-top">
+              <div class="plat-ident">
+                <span class="plat-badge gpt">GPT</span>
+                <div>
+                  <div class="plat-name">ChatGPT / Codex</div>
+                  <div class="plat-handle">信源 @thsottiaux · OpenAI</div>
+                </div>
+              </div>
+              <span class="status-chip" data-status-chip="chatgpt"></span>
+            </div>
+            <div class="elapsed-block">
+              <span class="elapsed-label">距上次全局重置已过</span>
+              <span class="elapsed-clock mono" data-live-since="chatgpt">00天 18时 24分 11秒</span>
+            </div>
+            <p class="radar-quote">「已为 Plus / Pro 订阅触发一次全局 Codex 用量重置，外加 1 张 30 天内可手动激活的重置卡。」</p>
+            <div class="radar-foot">
+              <span class="num">近 30 天重置 4 次 · 平均 7.2 天</span>
+              <span class="radar-link" data-card-hint="chatgpt">筛选记录 ↓</span>
+            </div>
+          </button>
+
+          <button type="button" class="radar-card" data-filter-log="antigravity">
+            <div class="radar-top">
+              <div class="plat-ident">
+                <span class="plat-badge ag">AGY</span>
+                <div>
+                  <div class="plat-name">反重力 Antigravity</div>
+                  <div class="plat-handle">信源 @varunmohan · Google</div>
+                </div>
+              </div>
+              <span class="status-chip" data-status-chip="antigravity"></span>
+            </div>
+            <div class="elapsed-block">
+              <span class="elapsed-label">距上次全局重置已过</span>
+              <span class="elapsed-clock mono" data-live-since="antigravity">04天 09时 12分 44秒</span>
+            </div>
+            <p class="radar-quote">「针对 Gemini 池与 Claude 共享池的 429 抖动完成扩容，已清空受影响账号的周限冷却。」</p>
+            <div class="radar-foot">
+              <span class="num">近 30 天重置 3 次 · 平均 9.8 天</span>
+              <span class="radar-link" data-card-hint="antigravity">筛选记录 ↓</span>
+            </div>
+          </button>
+
+          <button type="button" class="radar-card" data-filter-log="claude">
+            <div class="radar-top">
+              <div class="plat-ident">
+                <span class="plat-badge claude">CLD</span>
+                <div>
+                  <div class="plat-name">Claude / Claude Code</div>
+                  <div class="plat-handle">信源 Anthropic Status · X</div>
+                </div>
+              </div>
+              <span class="status-chip" data-status-chip="claude"></span>
+            </div>
+            <div class="elapsed-block">
+              <span class="elapsed-label">距上次全局重置已过</span>
+              <span class="elapsed-clock mono" data-live-since="claude">11天 06时 48分 05秒</span>
+            </div>
+            <p class="radar-quote">「上次为 Opus 新版发布同步发放的周限额全额重置；目前 Pro / Max 维持常规 5 小时滚动窗口。」</p>
+            <div class="radar-foot">
+              <span class="num">近 30 天重置 2 次 · 1 张补偿卡待领</span>
+              <span class="radar-link" data-card-hint="claude">筛选记录 ↓</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Signature Move: 30-Day Synchronized 3-Track Reset Timeline -->
+        <div class="section-block">
+          <div class="section-head">
+            <h2 class="section-title">近 30 天三轨同步重置时间轴</h2>
+            <div class="timeline-legend">
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-gpt)"></span>ChatGPT 全局</span>
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-ag)"></span>反重力全局</span>
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-claude)"></span>Claude 全局</span>
+              <span class="legend-item"><span class="legend-swatch banked"></span>重置卡 / 补偿</span>
+            </div>
+          </div>
+          <div class="surface timeline-card">
+            <div class="timeline-scroll">
+              <div class="timeline-matrix" id="timelineMatrix">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+            <div class="timeline-inspector" id="timelineInspector">
+              <div class="inspector-main">
+                <span class="status-chip ok" id="inspBadge">ChatGPT / Codex · 全局重置</span>
+                <strong id="inspTitle">Codex 额度全局刷新 + 发放 1 张 Banked Reset</strong>
+              </div>
+              <span class="inspector-time" id="inspTime">2026-11-27 11:16 (UTC+8)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unified Reset History Log (Replaces the 3 separate platform pages) -->
+        <div class="section-block" id="unifiedHistorySection">
+          <div class="section-head">
+            <h2 class="section-title">御三家历史重置与策略记录</h2>
+            <span class="section-sub" id="unifiedHistoryCount">共 13 条记录</span>
+          </div>
+
+          <div class="toolbar-row">
+            <div class="filter-pills" id="logPlatFilters">
+              <button type="button" class="pill-btn active" data-lplat="all">全部平台</button>
+              <button type="button" class="pill-btn" data-lplat="chatgpt">ChatGPT / Codex</button>
+              <button type="button" class="pill-btn" data-lplat="antigravity">反重力 Antigravity</button>
+              <button type="button" class="pill-btn" data-lplat="claude">Claude</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="filter-pills" id="logTypeFilters">
+                <button type="button" class="pill-btn active" data-ltype="all">全部类型</button>
+                <button type="button" class="pill-btn" data-ltype="global">全局重置</button>
+                <button type="button" class="pill-btn" data-ltype="banked">重置卡 / 补偿</button>
+                <button type="button" class="pill-btn" data-ltype="policy">政策调整</button>
+              </div>
+              <div class="search-wrap">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input type="search" class="search-input" id="unifiedLogSearch" placeholder="搜索公告内容、适用套餐…" />
+              </div>
+            </div>
+          </div>
+
+          <!-- PC Unified History Table -->
+          <div class="surface-padded desktop-table-only" style="overflow-x:auto">
+            <table class="compact-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>平台</th>
+                  <th>类型</th>
+                  <th>覆盖范围</th>
+                  <th>事件摘要</th>
+                  <th>间隔</th>
+                  <th>信源</th>
+                </tr>
+              </thead>
+              <tbody id="unifiedHistoryTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Unified History Cards -->
+          <div class="mobile-history-list" id="unifiedHistoryMobile"></div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: SUBSCRIPTION BENCHMARK ==================== -->
+      <section class="tab-panel" id="panel-benchmark" role="tabpanel">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">御三家订阅额度实测与 API 等值换算</h1>
+            <p class="page-desc">按主力模型对比 ChatGPT、反重力与 Claude 各档位在五小时、每周及平均月（周额度 ×52÷12）下的 Token 容量、API 等值美元与每 $1 产出；同套餐多模型共享池不叠加。</p>
+          </div>
+          <div class="head-meta">
+            <span class="status-chip neutral">口径快照：2026-11-25 · 参考 ModelDial 公开实测</span>
+          </div>
+        </div>
+
+        <p class="notice"><strong>数据来源：</strong>订阅额度数据整理自 <a href="https://modeldial.com/subscriptions" target="_blank" rel="noopener nofollow">ModelDial 订阅额度实测</a>（快照 2026-11-25），本站为独立整理，与 ModelDial 及各厂商无关联；套餐与额度随时可能调整，请以官方为准。</p>
+
+        <!-- Interactive Budget / Usage Recommender -->
+        <div class="surface calc-banner">
+          <div>
+            <div style="font-weight:700;font-size:14.5px;margin-bottom:4px">按月预算档位快速对比</div>
+            <div class="calc-controls" id="intensityGroup">
+              <button type="button" class="pill-btn" data-intensity="light">$20 入门主力档</button>
+              <button type="button" class="pill-btn active" data-intensity="medium">$100 进阶编码档</button>
+              <button type="button" class="pill-btn" data-intensity="heavy">$200–$500 重度并发档</button>
+            </div>
+          </div>
+          <div class="calc-result" id="calcResultBox">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Filter, Period & Sort Controls -->
+        <div class="toolbar-row">
+          <div class="filter-pills" id="benchPlatformFilters">
+            <button type="button" class="pill-btn active" data-bplat="all">全部套餐 (10)</button>
+            <button type="button" class="pill-btn" data-bplat="claude">Claude (3)</button>
+            <button type="button" class="pill-btn" data-bplat="antigravity">反重力 Antigravity (3)</button>
+            <button type="button" class="pill-btn" data-bplat="chatgpt">ChatGPT / Codex (4)</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="tz-switch" id="benchPeriodBtns" role="group" aria-label="用量周期">
+              <button type="button" data-bperiod="month" class="active">平均月</button>
+              <button type="button" data-bperiod="week">每周</button>
+              <button type="button" data-bperiod="win5h">五小时</button>
+            </div>
+            <div class="filter-pills" id="benchSortBtns">
+              <button type="button" class="pill-btn active" data-bsort="ratio">按倍率</button>
+              <button type="button" class="pill-btn" data-bsort="apiMonth">按 API 等值</button>
+              <button type="button" class="pill-btn" data-bsort="perDollar">按每 $1 Token</button>
+              <button type="button" class="pill-btn" data-bsort="price">按月费</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PC Sortable Expandable Table -->
+        <div class="surface-padded bench-table-wrap desktop-table-only">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>订阅套餐 · 主力模型</th>
+                <th>月费</th>
+                <th id="thPeriodTokens">平均月 Token</th>
+                <th id="thPeriodApi">平均月 API 等值</th>
+                <th>月费倍率</th>
+                <th>每 $1 Token（月均）</th>
+                <th>限窗机制</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="benchTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Card Deck for Benchmark -->
+        <div class="mobile-bench-list" id="mobileBenchList"></div>
+
+        <div style="margin-top:14px;font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <span>说明：单模型满跑口径（OpenAI 默认 97% 缓存命中，Claude 基于高缓存 Agent 负载）；API 等值不直接等同于任务数。</span>
+          <span>参考对照：<a href="https://modeldial.com/subscriptions" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">modeldial.com/subscriptions ↗</a></span>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>AI额度监控 QuotaReset · 独立社区项目，与 OpenAI、Google、Anthropic 无官方关联。</span>
+        <span><a href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener">联系我们</a> · <a href="https://xiaban.xyz" target="_blank" rel="noopener">小伴产品门户</a> · 订阅额度参考 <a href="https://modeldial.com/subscriptions" target="_blank" rel="noopener nofollow">ModelDial</a></span>
+      </div>
+    </footer>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+   Sample Data (Explicitly Demo Data for Prototype Validation)
+   ========================================================================== */
+const NOW = Date.now();
+const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
+
+const PLATFORMS = {
+  chatgpt: {
+    id: 'chatgpt',
+    name: 'ChatGPT / Codex',
+    short: 'GPT',
+    dotClass: 'gpt',
+    sourceHandle: '@thsottiaux · OpenAI Status',
+    statusText: '18 小时前全局重置',
+    statusType: 'ok',
+    lastResetTs: Date.parse('2026-11-27T11:16:00+08:00'),
+    avgInterval: '7.2 天',
+    count30d: '4 次',
+    bankedCard: '1 张待激活（29 天后过期）',
+    windowRule: '5h 滚动 + 周限额',
+    latestZh: '已为所有 Plus 与 Pro 活跃订阅执行一次 Codex 全局额度重置，并额外向账户下发 1 张 Banked Reset 卡（可在 Settings → Usage 中 30 天内手动使用）。',
+    latestEn: 'We just triggered a global Codex usage reset for Plus & Pro subscribers, plus 1 banked reset card redeemable manually within 30 days in Settings → Usage.',
+    apiEndpoint: '/api/v1/resets?platform=chatgpt',
+    history: [
+      { id: 'gpt-1', date: '2026-11-27 11:16', type: 'global', typeLabel: '全局重置', scope: 'Plus / Pro / Team', title: 'Codex 负载扩容完成，全局清零已用额度并赠 1 张重置卡', source: 'X @thsottiaux', interval: '6.8 天' },
+      { id: 'gpt-2', date: '2026-11-20 16:05', type: 'banked', typeLabel: '重置卡', scope: 'Plus / Pro', title: '周末编码峰值补偿：所有受限流账号发放 1 张免费重置卡', source: 'OpenAI Help', interval: '7.4 天' },
+      { id: 'gpt-3', date: '2026-11-13 06:40', type: 'global', typeLabel: '全局重置', scope: '全量订阅', title: 'GPT-5 Codex 新推理档位上线，同步触发全局额度刷新', source: 'X @thsottiaux', interval: '8.1 天' },
+      { id: 'gpt-4', date: '2026-11-05 03:20', type: 'policy', typeLabel: '政策调整', scope: 'Pro ($200)', title: '调整长上下文缓存折扣计费口径，同等任务消耗下降约 18%', source: 'Changelog', interval: '6.5 天' },
+      { id: 'gpt-5', date: '2026-10-29 14:50', type: 'global', typeLabel: '全局重置', scope: 'Plus / Pro', title: '月底集中算力释放，重置当前周限额计数', source: 'X @thsottiaux', interval: '—' }
+    ]
+  },
+  antigravity: {
+    id: 'antigravity',
+    name: '反重力 Antigravity',
+    short: 'AGY',
+    dotClass: 'ag',
+    sourceHandle: '@varunmohan · Google AI',
+    statusText: '4 天前全池重置',
+    statusType: 'warn',
+    lastResetTs: Date.parse('2026-11-24T02:30:00+08:00'),
+    avgInterval: '9.8 天',
+    count30d: '3 次',
+    bankedCard: '应急点数已开启（本月剩 2 次）',
+    windowRule: 'Gemini 池 / Claude 共享池双轨',
+    latestZh: '针对近期高峰期 429 限流问题完成集群扩容，已对 Google AI Pro 与 Ultra 用户的 Gemini 池及 Claude/GPT 共享池统一清零冷却计数。',
+    latestEn: 'Capacity expansion complete after recent 429 spikes. Global quota cooldowns for both the Gemini pool and the shared Claude/GPT pool have been reset for Pro & Ultra users.',
+    apiEndpoint: '/api/v1/resets?platform=antigravity',
+    history: [
+      { id: 'ag-1', date: '2026-11-24 02:30', type: 'global', typeLabel: '全局重置', scope: 'Pro / Ultra 双池', title: '集群扩容完成，清空 Gemini 池与 Claude 共享池周限冷却', source: 'X @varunmohan', interval: '9.5 天' },
+      { id: 'ag-2', date: '2026-11-14 14:10', type: 'policy', typeLabel: '池化调整', scope: 'Google AI Pro', title: 'Gemini 4 Neon 纳入 5 小时高频池，降低非峰值消耗倍率', source: 'Google Blog', interval: '10.2 天' },
+      { id: 'ag-3', date: '2026-11-04 09:00', type: 'global', typeLabel: '全局重置', scope: '全量 Antigravity', title: 'IDE 重大版本推送后触发全量额度刷新', source: 'Release Notes', interval: '9.6 天' },
+      { id: 'ag-4', date: '2026-10-25 19:20', type: 'banked', typeLabel: '应急点数', scope: 'Ultra 订阅', title: '因跨区认证短暂异常，额外赠送 200 AI Credits 应急额度', source: 'Status Page', interval: '—' }
+    ]
+  },
+  claude: {
+    id: 'claude',
+    name: 'Claude / Claude Code',
+    short: 'CLD',
+    dotClass: 'claude',
+    sourceHandle: 'Anthropic Status · 社区核验',
+    statusText: '11 天未全局重置',
+    statusType: 'alert',
+    lastResetTs: Date.parse('2026-11-17T04:50:00+08:00'),
+    avgInterval: '14.5 天',
+    count30d: '2 次',
+    bankedCard: '1 张故障补偿卡（6 天后失效）',
+    windowRule: '5h 滚动 + 固定周限额',
+    latestZh: '上次全局重置为 Opus 新模型发布窗口同步发放；近期无新增全局重置，但 11 月 19 日 API 抖动受影响账号可在 Usage 设置页手动点击一次免费重置。',
+    latestEn: 'Last global reset shipped alongside the new Opus release window. No new global reset since; accounts impacted by the Nov 19 latency incident still have 1 manual "Reset for free" voucher.',
+    apiEndpoint: '/api/v1/resets?platform=claude',
+    history: [
+      { id: 'cl-1', date: '2026-11-19 22:15', type: 'banked', typeLabel: '补偿重置', scope: '受影响 Pro / Max', title: '推理节点短暂超时，向受影响账户发放 1 次手动免费重置按钮', source: 'Anthropic Status', interval: '2.7 天' },
+      { id: 'cl-2', date: '2026-11-17 04:50', type: 'global', typeLabel: '全局重置', scope: 'Pro / Max 5x / 20x', title: '新版本 Opus 开放体验，全量清零当前 5 小时与周限额', source: 'X @AnthropicAI', interval: '14.8 天' },
+      { id: 'cl-3', date: '2026-11-02 09:30', type: 'policy', typeLabel: '限额说明', scope: 'Claude Code', title: '明确 Extended Thinking 计入周限额权重，建议常规任务用默认档', source: 'Docs Update', interval: '14.2 天' },
+      { id: 'cl-4', date: '2026-10-19 05:15', type: 'global', typeLabel: '全局重置', scope: 'Max 订阅', title: '计费口径迁移完成，一次性重置所有 Max 档位周额度', source: 'Email Notice', interval: '—' }
+    ]
+  }
+};
+
+// 30-day Synchronized Timeline Events (dayIndex: 0 = 29 days ago, 29 = today)
+const TIMELINE_EVENTS = [
+  { track: 'chatgpt', day: 1, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: '月底算力释放，重置周限额', time: '2026-10-29 14:50 (UTC+8)' },
+  { track: 'chatgpt', day: 14, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: 'GPT-5 Codex 新推理档位上线全量重置', time: '2026-11-13 06:40 (UTC+8)' },
+  { track: 'chatgpt', day: 21, kind: 'banked', label: 'ChatGPT / Codex · 重置卡', title: '周末峰值补偿发放 1 张 Banked Reset', time: '2026-11-20 16:05 (UTC+8)' },
+  { track: 'chatgpt', day: 28, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: 'Codex 额度全局刷新 + 发放 1 张 Banked Reset', time: '2026-11-27 11:16 (UTC+8)' },
+
+  { track: 'antigravity', day: 6, kind: 'global', label: '反重力 Antigravity · 全局重置', title: 'IDE 重大版本推送后触发全量额度刷新', time: '2026-11-04 09:00 (UTC+8)' },
+  { track: 'antigravity', day: 16, kind: 'banked', label: '反重力 Antigravity · 政策/池化', title: 'Gemini 4 Neon 纳入 5h 高频池，降低消耗倍率', time: '2026-11-14 14:10 (UTC+8)' },
+  { track: 'antigravity', day: 25, kind: 'global', label: '反重力 Antigravity · 全局重置', title: '集群扩容完成，清空 Gemini / Claude 双池周限冷却', time: '2026-11-24 02:30 (UTC+8)' },
+
+  { track: 'claude', day: 18, kind: 'global', label: 'Claude · 全局重置', title: '新版 Opus 开放体验，全量清零 5h 与周限额', time: '2026-11-17 04:50 (UTC+8)' },
+  { track: 'claude', day: 20, kind: 'banked', label: 'Claude · 补偿重置卡', title: '节点超时补偿：发放 1 次手动免费重置券', time: '2026-11-19 22:15 (UTC+8)' }
+];
+
+// Subscription Benchmark Data (Aligned with 2026-11-25 ModelDial /subscriptions scale)
+const BENCHMARKS = [
+  {
+    id: 'claude-pro',
+    platform: 'claude',
+    platLabel: 'Claude',
+    dot: 'claude',
+    name: 'Claude Pro',
+    mainModel: 'Opus 5.5',
+    price: 20,
+    monthTokens: 29,
+    monthApi: 1178,
+    weekTokens: 6.69,
+    weekApi: 271.85,
+    win5hTokens: 0.87,
+    win5hApi: 35.34,
+    win5hNote: null,
+    perDollarWan: 14500,
+    ratio: 59,
+    windowLabel: '5h + 周限额',
+    budget: ['light'],
+    detail: {
+      otherModels: 'Sonnet 5.5：月 42 亿 / $1,241（每 $1 ≈ 21,000 万）',
+      fableInfo: 'Fable 5.2：暂无样本；Fable 5.1：不包含',
+      windowRule: '5h 滚动（Opus 5.5 ≈ 0.87 亿 / $35.34）+ 周池',
+      methodology: 'SemiAnalysis Agent 高缓存负载；月均 = 周 ×52÷12'
+    }
+  },
+  {
+    id: 'claude-ultra',
+    platform: 'claude',
+    platLabel: 'Claude',
+    dot: 'claude',
+    name: 'Claude Ultra（原 Max 20×）',
+    mainModel: 'Opus 5.5',
+    price: 200,
+    monthTokens: 286,
+    monthApi: 11726,
+    weekTokens: 66,
+    weekApi: 2706,
+    win5hTokens: null,
+    win5hApi: null,
+    win5hNote: '认证账号无 5h 限制',
+    perDollarWan: 14300,
+    ratio: 59,
+    windowLabel: '无 5h 硬锁（周池）',
+    budget: ['heavy'],
+    detail: {
+      otherModels: 'Sonnet 5.5：月 423 亿 / $12,529（每 $1 ≈ 21,150 万）',
+      fableInfo: 'Fable 5.2：月 39 亿 / $3,054.57（最多占总周池 50%）',
+      windowRule: '原 Max 20× 自动迁移；已验证账号取消 5h 硬锁',
+      methodology: '含 Fable 5.2 实测 30 天样本与 Opus/Sonnet 基准'
+    }
+  },
+  {
+    id: 'claude-max',
+    platform: 'claude',
+    platLabel: 'Claude',
+    dot: 'claude',
+    name: 'Claude Max',
+    mainModel: 'Opus 5.5',
+    price: 100,
+    monthTokens: 140,
+    monthApi: 5725,
+    weekTokens: 32.31,
+    weekApi: 1321.15,
+    win5hTokens: 4.2,
+    win5hApi: 171.75,
+    win5hNote: null,
+    perDollarWan: 14000,
+    ratio: 57,
+    windowLabel: '5h + 周限额',
+    budget: ['medium'],
+    detail: {
+      otherModels: 'Sonnet 5.5：月 200 亿 / $5,919（每 $1 ≈ 20,000 万）',
+      fableInfo: 'Fable 5.2：月 19.93 亿 / $1,564.77（5h 约 0.54 亿 / $37.19）',
+      windowRule: '5h 滚动（Opus 5.5 ≈ 4.2 亿 / $171.75）+ 周限额',
+      methodology: 'Fable 模型最多占用总周额度 50%；模型共享总池'
+    }
+  },
+  {
+    id: 'ag-ultra-20x',
+    platform: 'antigravity',
+    platLabel: '反重力',
+    dot: 'ag',
+    name: 'Google AI Ultra 20×',
+    mainModel: 'Gemini 4 Neon',
+    price: 199.99,
+    monthTokens: 190.67,
+    monthApi: 10412.79,
+    weekTokens: 44,
+    weekApi: 2402.95,
+    win5hTokens: 11,
+    win5hApi: 600.74,
+    win5hNote: null,
+    perDollarWan: 9534,
+    ratio: 52,
+    windowLabel: '5h + 周共享池',
+    budget: ['heavy'],
+    detail: {
+      otherModels: 'Gemini 3.8 Flash：月 612.85 亿 / $10,400；Hydrogen：381.33 亿',
+      fableInfo: 'Argon：月 95.33 亿 / $3,479；站内 Claude Opus 5.5：月 3.6 亿',
+      windowRule: 'Ultra 20× 使用共享池，5h 刷新（Neon ≈ 11 亿 / $600.74）',
+      methodology: '超额可衔接 AI Credits（$0.01/credit）；月均 = 周 ×52÷12'
+    }
+  },
+  {
+    id: 'gpt-pro-100',
+    platform: 'chatgpt',
+    platLabel: 'ChatGPT',
+    dot: 'gpt',
+    name: 'ChatGPT Pro 100',
+    mainModel: 'GPT-6.2 Sol',
+    price: 100,
+    monthTokens: 147.06,
+    monthApi: 2897,
+    weekTokens: 33.94,
+    weekApi: 668.54,
+    win5hTokens: null,
+    win5hApi: null,
+    win5hNote: '共享周池（无独立 5h 锁）',
+    perDollarWan: 14706,
+    ratio: 29,
+    windowLabel: '共享周池',
+    budget: ['medium'],
+    detail: {
+      otherModels: 'GPT-6.1 Terra：月 204 亿 / $2,084；GPT-6.2 Astra：月 36.76 亿 / $2,897',
+      fableInfo: 'GPT-6.1 Sol：月 102 亿 / $2,084；GPT-5.6 Sol：月 77.79 亿 / $4,073',
+      windowRule: 'Pro 档仅按周池限额，取消独立 5h 硬锁；按 0.5× Pro 200 校准',
+      methodology: '97% 缓存输入 / 2.5% 常规输入 / 0.5% 输出；叠加高频全局重置'
+    }
+  },
+  {
+    id: 'gpt-pro-200',
+    platform: 'chatgpt',
+    platLabel: 'ChatGPT',
+    dot: 'gpt',
+    name: 'ChatGPT Pro 200',
+    mainModel: 'GPT-6.2 Sol',
+    price: 200,
+    monthTokens: 294.11,
+    monthApi: 5794,
+    weekTokens: 67.87,
+    weekApi: 1337.08,
+    win5hTokens: null,
+    win5hApi: null,
+    win5hNote: '共享周池（无独立 5h 锁）',
+    perDollarWan: 14706,
+    ratio: 29,
+    windowLabel: '共享周池',
+    budget: ['heavy'],
+    detail: {
+      otherModels: 'GPT-6.1 Terra：月 408 亿 / $4,168；GPT-6.2 Astra：月 73.53 亿 / $5,794',
+      fableInfo: 'GPT-6.1 Sol：月 204 亿 / $4,168；GPT-6 Astra：月 38 亿 / $5,794',
+      windowRule: '无独立 5h 锁，大周池覆盖连续 Codex 多任务',
+      methodology: '97% 缓存命中口径；多模型共享同一周池不叠加'
+    }
+  },
+  {
+    id: 'gpt-pro-500',
+    platform: 'chatgpt',
+    platLabel: 'ChatGPT',
+    dot: 'gpt',
+    name: 'ChatGPT Pro 500',
+    mainModel: 'GPT-6.2 Sol',
+    price: 500,
+    monthTokens: 706.09,
+    monthApi: 13910,
+    weekTokens: 162.94,
+    weekApi: 3210,
+    win5hTokens: null,
+    win5hApi: null,
+    win5hNote: '共享周池（无独立 5h 锁）',
+    perDollarWan: 14122,
+    ratio: 28,
+    windowLabel: '共享周池',
+    budget: ['heavy'],
+    detail: {
+      otherModels: 'GPT-6.1 Terra：月 1,052 亿 / $10,772；GPT-6.2 Astra：月 176.52 亿 / $13,910',
+      fableInfo: 'GPT-6 Sol：月 583.1 亿 / $14,845；GPT-5.6 Sol：月 401.15 亿 / $21,004',
+      windowRule: '最高并发共享周池，支持 Ultrafast 极速档位',
+      methodology: '按 Pro 500 / Pro 200 容量比校准；97% 缓存命中'
+    }
+  },
+  {
+    id: 'ag-ultra-5x',
+    platform: 'antigravity',
+    platLabel: '反重力',
+    dot: 'ag',
+    name: 'Google AI Ultra 5×',
+    mainModel: 'Gemini 4 Neon',
+    price: 99.99,
+    monthTokens: 47.67,
+    monthApi: 2603.2,
+    weekTokens: 11,
+    weekApi: 600.74,
+    win5hTokens: 2.75,
+    win5hApi: 150.18,
+    win5hNote: null,
+    perDollarWan: 4767,
+    ratio: 26,
+    windowLabel: '5h + 周共享池',
+    budget: ['medium'],
+    detail: {
+      otherModels: 'Gemini 3.8 Flash：月 153.21 亿 / $2,600；Hydrogen：95.33 亿',
+      fableInfo: 'Argon：月 23.83 亿 / $869.81；站内 Claude Sonnet 5.5：4.12 亿 / Opus：2.3 亿',
+      windowRule: '5h 滚动（Neon ≈ 2.75 亿 / $150.18）+ 周共享池',
+      methodology: '适合重度 Gemini 4 Neon / Carbon 开发，站内 Claude 额度远少于直订'
+    }
+  },
+  {
+    id: 'ag-pro',
+    platform: 'antigravity',
+    platLabel: '反重力',
+    dot: 'ag',
+    name: 'Google AI Pro · Antigravity',
+    mainModel: 'Gemini 4 Neon',
+    price: 19.99,
+    monthTokens: 8.34,
+    monthApi: 455.56,
+    weekTokens: 1.93,
+    weekApi: 105.13,
+    win5hTokens: 0.55,
+    win5hApi: 30.04,
+    win5hNote: null,
+    perDollarWan: 4173,
+    ratio: 23,
+    windowLabel: '5h + 周限额',
+    budget: ['light'],
+    detail: {
+      otherModels: 'Gemini 3.8 Flash：月 26.81 亿 / $455；Hydrogen：16.68 亿',
+      fableInfo: 'Argon（独立周额）：月 0.13 亿 / $65；站内 Claude Opus 5.5 仅 0.34 亿',
+      windowRule: '5h 滚动（Neon ≈ 0.55 亿 / $30.04）+ 周上限；Argon 走独立周额',
+      methodology: '月均 = 周 ×52÷12；$20 档内性价比优于 Plus，但站内 Claude 池很小'
+    }
+  },
+  {
+    id: 'gpt-plus',
+    platform: 'chatgpt',
+    platLabel: 'ChatGPT',
+    dot: 'gpt',
+    name: 'ChatGPT Plus（含 Codex）',
+    mainModel: 'GPT-6.2 Sol',
+    price: 20,
+    monthTokens: 14.52,
+    monthApi: 286,
+    weekTokens: 3.35,
+    weekApi: 66,
+    win5hTokens: 0.56,
+    win5hApi: 11,
+    win5hNote: null,
+    perDollarWan: 7259,
+    ratio: 14,
+    windowLabel: '5h + 周限额',
+    budget: ['light'],
+    detail: {
+      otherModels: 'GPT-6.1 Terra：月 20.59 亿 / $202.8；GPT-6.2 Astra：月 3.63 亿 / $286',
+      fableInfo: 'GPT-6.1 Sol：月 10.29 亿 / $202.8（5h 实测 $7.8，周按 6×5h 推算）',
+      windowRule: '5h 滚动（6.2 Sol ≈ 0.56 亿 / $11）+ 周限额',
+      methodology: '97% 缓存命中口径；不含官方不定期全局重置与 Banked Reset 额外增量'
+    }
+  }
+];
+
+/* ==========================================================================
+   State
+   ========================================================================== */
+const state = {
+  activeTab: 'overview',
+  tz: 'UTC+8',
+  theme: 'light',
+  benchPlat: 'all',
+  benchPeriod: 'month',
+  benchSort: 'ratio',
+  intensity: 'medium',
+  expandedBenchId: 'claude-pro',
+  logPlat: 'all',
+  logType: 'all',
+  logSearch: '',
+  selectedEventIdx: 3
+};
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+function formatElapsed(ts) {
+  const diff = Math.max(0, Date.now() - ts);
+  const d = Math.floor(diff / DAY);
+  const h = Math.floor((diff % DAY) / HOUR);
+  const m = Math.floor((diff % HOUR) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d)}天 ${pad(h)}时 ${pad(m)}分 ${pad(s)}秒`;
+}
+
+function formatDateByTz(str) {
+  if (state.tz === 'UTC+8') return `${str} (UTC+8)`;
+  // Shift -8h for illustrative UTC conversion
+  const [datePart, timePart] = str.split(' ');
+  if (!timePart) return str;
+  const dt = new Date(`${datePart}T${timePart}:00+08:00`);
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())} ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} (UTC)`;
+}
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ==========================================================================
+   Render: 30-Day Synchronized 3-Track Timeline
+   ========================================================================== */
+function renderTimeline() {
+  const matrix = document.getElementById('timelineMatrix');
+  const tracks = [
+    { id: 'chatgpt', name: 'ChatGPT', dot: 'gpt' },
+    { id: 'antigravity', name: '反重力', dot: 'ag' },
+    { id: 'claude', name: 'Claude', dot: 'claude' }
+  ];
+
+  let html = '';
+  tracks.forEach(tr => {
+    html += `<div class="track-label"><span class="tab-dot ${tr.dot}"></span>${tr.name}</div>`;
+    html += `<div class="track-cells">`;
+    for (let d = 0; d < 30; d++) {
+      const evIdx = TIMELINE_EVENTS.findIndex(e => e.track === tr.id && e.day === d);
+      if (evIdx >= 0) {
+        const ev = TIMELINE_EVENTS[evIdx];
+        const cls = ev.kind === 'banked' ? 'ev-banked' : `ev-${tr.dot}`;
+        const sel = evIdx === state.selectedEventIdx ? 'is-selected' : '';
+        html += `<button type="button" class="day-cell has-event ${cls} ${sel}" data-ev-idx="${evIdx}" title="${ev.title}" aria-label="${ev.label}: ${ev.title}"></button>`;
+      } else {
+        html += `<div class="day-cell" aria-hidden="true"></div>`;
+      }
+    }
+    html += `</div>`;
+  });
+
+  html += `<div class="timeline-axis"><span>30 天前 (10/29)</span><span>15 天前 (11/13)</span><span>今天 (11/28)</span></div>`;
+  matrix.innerHTML = html;
+
+  const ev = TIMELINE_EVENTS[state.selectedEventIdx] || TIMELINE_EVENTS[0];
+  document.getElementById('inspBadge').textContent = ev.label;
+  document.getElementById('inspBadge').className = `status-chip ${ev.kind === 'banked' ? 'warn' : 'ok'}`;
+  document.getElementById('inspTitle').textContent = ev.title;
+  document.getElementById('inspTime').textContent = state.tz === 'UTC+8' ? ev.time : ev.time.replace('(UTC+8)', '(UTC 换算)');
+}
+
+/* ==========================================================================
+   Render: Unified Reset History
+   ========================================================================== */
+function renderUnifiedHistory() {
+  // Sync radar card active visual & filter pills
+  document.querySelectorAll('.radar-card[data-filter-log]').forEach(card => {
+    const pid = card.dataset.filterLog;
+    const active = state.logPlat === pid;
+    card.classList.toggle('is-active', active);
+    const hint = card.querySelector('[data-card-hint]');
+    if (hint) hint.textContent = active ? '已筛选 · 点此还原' : '筛选记录 ↓';
+  });
+  document.querySelectorAll('[data-lplat]').forEach(b => b.classList.toggle('active', b.dataset.lplat === state.logPlat));
+  document.querySelectorAll('[data-ltype]').forEach(b => b.classList.toggle('active', b.dataset.ltype === state.logType));
+
+  const q = state.logSearch.trim().toLowerCase();
+  const allRows = Object.values(PLATFORMS).flatMap(p =>
+    p.history.map(r => ({ ...r, platId: p.id, platName: p.name, platDot: p.dotClass }))
+  ).sort((a, b) => b.date.localeCompare(a.date));
+
+  const rows = allRows.filter(r => {
+    const matchPlat = state.logPlat === 'all' || r.platId === state.logPlat;
+    const matchType = state.logType === 'all' || r.type === state.logType;
+    const matchQ = !q || r.title.toLowerCase().includes(q) || r.scope.toLowerCase().includes(q) || r.source.toLowerCase().includes(q) || r.platName.toLowerCase().includes(q);
+    return matchPlat && matchType && matchQ;
+  });
+
+  document.getElementById('unifiedHistoryCount').textContent = `共 ${rows.length} 条匹配记录`;
+
+  document.getElementById('unifiedHistoryTableBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td class="mono" style="white-space:nowrap">${formatDateByTz(r.date)}</td>
+      <td style="white-space:nowrap">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600">
+          <span class="tab-dot ${r.platDot}"></span>${r.platName}
+        </span>
+      </td>
+      <td><span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${r.typeLabel}</span></td>
+      <td style="white-space:nowrap">${r.scope}</td>
+      <td style="font-weight:500">${r.title}</td>
+      <td class="mono" style="white-space:nowrap;color:var(--text-muted)">${r.interval}</td>
+      <td class="mono" style="font-size:12px;color:var(--text-muted);white-space:nowrap">${r.source}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:28px">没有符合当前筛选条件的重置记录，试试切换到「全部平台」。</td></tr>`;
+
+  document.getElementById('unifiedHistoryMobile').innerHTML = rows.length ? rows.map(r => `
+    <div class="m-hist-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px">
+          <span class="tab-dot ${r.platDot}"></span>${r.platName}
+          <span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${r.typeLabel}</span>
+        </span>
+        <span class="mono" style="font-size:11.5px;color:var(--text-muted)">${formatDateByTz(r.date)}</span>
+      </div>
+      <div style="font-weight:600;font-size:13.5px">${r.title}</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">
+        <span>范围：${r.scope}</span>
+        <span class="mono">间隔 ${r.interval} · ${r.source}</span>
+      </div>
+    </div>
+  `).join('') : `<div class="m-hist-card" style="text-align:center;color:var(--text-muted)">暂无匹配记录</div>`;
+}
+
+/* ==========================================================================
+   Render: Subscription Benchmark Tab (PC Table + Mobile Cards)
+   ========================================================================== */
+function fmtTokens(val, note) {
+  if (val == null) return note || '—';
+  return `${val.toLocaleString()} 亿`;
+}
+
+function fmtUsd(val, note) {
+  if (val == null) return note ? '—' : '—';
+  return `$${val >= 1000 ? Math.round(val).toLocaleString() : val}`;
+}
+
+function renderBenchmark() {
+  const periodMeta = {
+    month: { tkHead: '平均月 Token', apiHead: '平均月 API 等值', tkKey: 'monthTokens', apiKey: 'monthApi', label: '平均月' },
+    week: { tkHead: '每周 Token', apiHead: '每周 API 等值', tkKey: 'weekTokens', apiKey: 'weekApi', label: '每周' },
+    win5h: { tkHead: '五小时 Token', apiHead: '五小时 API 等值', tkKey: 'win5hTokens', apiKey: 'win5hApi', label: '五小时' }
+  }[state.benchPeriod];
+
+  document.getElementById('thPeriodTokens').textContent = periodMeta.tkHead;
+  document.getElementById('thPeriodApi').textContent = periodMeta.apiHead;
+
+  // Budget Recommender box
+  const recMap = {
+    light: { title: '$20 档结论：Claude Pro ($1,178 / 59×) > Google AI Pro ($456 / 23×) > ChatGPT Plus ($286 / 14×)', desc: 'Claude Pro 单凭 Opus 5.5 / Sonnet 5.5 就能跑出 29–42 亿 Token；偏爱 Codex 且看重高频重置选 Plus。' },
+    medium: { title: '$100 档结论：Claude Max ($5,725 / 57×) · ChatGPT Pro 100 ($2,897 / 29×) · Ultra 5× ($2,603 / 26×)', desc: 'Pro 100 取消 5h 硬锁且每 $1 约 14,706 万 Token，与 Claude Max (14,000 万/$1) 并列主力档第一梯队。' },
+    heavy: { title: '$200+ 档结论：Claude Ultra ($11,726 / 59×) · Ultra 20× ($10,413 / 52×) · Pro 200 ($5,794 / 29×)', desc: 'Claude Ultra 认证号与 ChatGPT Pro 200/500 均无独立 5h 硬锁；超重度 OpenAI 并发可选 Pro 500 ($13,910/月)。' }
+  };
+  const rec = recMap[state.intensity];
+  document.getElementById('calcResultBox').innerHTML = `
+    <div>
+      <div style="font-weight:700;color:var(--accent)">${rec.title}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${rec.desc}</div>
+    </div>
+  `;
+
+  let list = BENCHMARKS.filter(b => state.benchPlat === 'all' || b.platform === state.benchPlat);
+  list.sort((a, b) => {
+    if (state.benchSort === 'price') return a.price - b.price;
+    if (state.benchSort === 'apiMonth') return b.monthApi - a.monthApi;
+    if (state.benchSort === 'perDollar') return b.perDollarWan - a.perDollarWan;
+    return b.ratio - a.ratio;
+  });
+
+  // PC Table
+  document.getElementById('benchTableBody').innerHTML = list.map(b => {
+    const isRec = b.budget.includes(state.intensity);
+    const isOpen = state.expandedBenchId === b.id;
+    const tkVal = b[periodMeta.tkKey];
+    const apiVal = b[periodMeta.apiKey];
+    return `
+      <tr class="bench-row ${isRec ? 'is-recommended' : ''}" data-toggle-bench="${b.id}">
+        <td>
+          <div style="display:flex;align-items:center;gap:9px">
+            <span class="tab-dot ${b.dot}"></span>
+            <div>
+              <div style="font-weight:600">${b.name}</div>
+              <div style="font-size:11.5px;color:var(--text-muted)">主力：${b.mainModel}${isRec ? ' · <span style="color:var(--accent);font-weight:600">当前预算档</span>' : ''}</div>
+            </div>
+          </div>
+        </td>
+        <td class="mono" style="font-weight:600">$${b.price}</td>
+        <td class="mono" style="font-weight:600">${fmtTokens(tkVal, b.win5hNote)}</td>
+        <td class="mono" style="font-weight:700">${fmtUsd(apiVal, b.win5hNote)}</td>
+        <td><span class="ratio-pill">${b.ratio}×</span></td>
+        <td class="mono">${b.perDollarWan.toLocaleString()} 万</td>
+        <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">${b.windowLabel}</td>
+        <td style="text-align:right;color:var(--text-muted);font-size:12px">${isOpen ? '收起 ▲' : '多模型 ▼'}</td>
+      </tr>
+      <tr class="bench-detail-row ${isOpen ? 'open' : ''}">
+        <td colspan="8">
+          <div class="detail-grid">
+            <div class="detail-kv"><div class="detail-kv-label">同套餐其他主力模型</div><div class="detail-kv-val">${b.detail.otherModels}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">旗舰 / 共享模型池</div><div class="detail-kv-val">${b.detail.fableInfo}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">限窗与刷新规则</div><div class="detail-kv-val">${b.detail.windowRule}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">实测口径说明</div><div class="detail-kv-val">${b.detail.methodology}</div></div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Mobile Card Deck
+  document.getElementById('mobileBenchList').innerHTML = list.map(b => {
+    const isRec = b.budget.includes(state.intensity);
+    const isOpen = state.expandedBenchId === b.id;
+    const tkVal = b[periodMeta.tkKey];
+    const apiVal = b[periodMeta.apiKey];
+    return `
+      <div class="m-bench-card ${isRec ? 'is-recommended' : ''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="tab-dot ${b.dot}"></span>
+            <div>
+              <div style="font-weight:700;font-size:14.5px">${b.name}</div>
+              <div class="mono" style="font-size:12px;color:var(--text-muted)">$${b.price}/月 · ${b.mainModel} · ${b.windowLabel}</div>
+            </div>
+          </div>
+          <span class="ratio-pill">${b.ratio}×</span>
+        </div>
+
+        <div class="m-bench-metrics">
+          <div class="m-metric-box">
+            <div style="font-size:11px;color:var(--text-muted)">${periodMeta.label} Token / API 等值</div>
+            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${fmtTokens(tkVal, b.win5hNote)} · ${fmtUsd(apiVal, b.win5hNote)}</div>
+          </div>
+          <div class="m-metric-box">
+            <div style="font-size:11px;color:var(--text-muted)">每 $1 Token（月均）</div>
+            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${b.perDollarWan.toLocaleString()} 万</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-sm" style="width:100%" data-toggle-bench="${b.id}">
+          ${isOpen ? '收起同套餐多模型拆解 ▲' : '查看同套餐多模型与口径拆解 ▼'}
+        </button>
+
+        ${isOpen ? `
+          <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid var(--border-default);font-size:12.5px;color:var(--text-secondary)">
+            <div><strong>其他模型：</strong>${b.detail.otherModels}</div>
+            <div><strong>高阶/共享池：</strong>${b.detail.fableInfo}</div>
+            <div><strong>限窗规则：</strong>${b.detail.windowRule}</div>
+            <div style="color:var(--text-muted)">${b.detail.methodology}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+/* ==========================================================================
+   Tab Switching & Event Delegation
+   ========================================================================== */
+const TAB_PATHS = { overview: '/', benchmark: '/benchmark/' };
+const TAB_META = {
+  overview: { title: 'AI额度监控 QuotaReset — ChatGPT Codex、反重力 Antigravity、Claude 额度重置雷达' },
+  benchmark: { title: 'AI订阅额度实测对比 — ChatGPT Pro、Claude Max、Google AI Ultra 月 API 等值 | AI额度监控 QuotaReset' }
+};
+
+function tabFromPath() {
+  return location.pathname.indexOf('/benchmark') === 0 ? 'benchmark' : 'overview';
+}
+
+function switchTab(tabId) {
+  if (!TAB_PATHS[tabId]) tabId = 'overview';
+  state.activeTab = tabId;
+
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    btn.setAttribute('aria-selected', btn.dataset.tab === tabId ? 'true' : 'false');
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + tabId);
+  });
+
+  if (tabId === 'benchmark') {
+    renderBenchmark();
+  }
+
+  document.title = TAB_META[tabId].title;
+
+  // Keep mobile tab scrolled into view
+  const activeMobileTab = document.querySelector('.mobile-tab-bar .nav-tab[data-tab="' + tabId + '"]');
+  if (activeMobileTab) activeMobileTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function goTab(tabId) {
+  switchTab(tabId);
+  try { history.pushState({ tab: tabId }, '', TAB_PATHS[tabId]); } catch (_) {}
+}
+
+window.addEventListener('popstate', () => switchTab(tabFromPath()));
+
+function agoText(ts) {
+  const d = Date.now() - ts;
+  const days = Math.floor(d / DAY);
+  if (days < 1) return Math.max(1, Math.floor(d / HOUR)) + ' 小时前';
+  return days + ' 天前';
+}
+
+function updateStatusChips() {
+  document.querySelectorAll('[data-status-chip]').forEach(el => {
+    const p = PLATFORMS[el.dataset.statusChip];
+    if (!p) return;
+    const days = (Date.now() - p.lastResetTs) / DAY;
+    const tone = days < 2 ? 'ok' : days < 7 ? 'warn' : 'alert';
+    el.className = 'status-chip ' + tone;
+    el.textContent = tone === 'alert' ? Math.floor(days) + ' 天未全局重置' : agoText(p.lastResetTs) + '全局重置';
+  });
+}
+
+function updateLiveClocks() {
+  document.querySelectorAll('[data-live-since]').forEach(el => {
+    const id = el.dataset.liveSince;
+    if (PLATFORMS[id]) el.textContent = formatElapsed(PLATFORMS[id].lastResetTs);
+  });
+  updateStatusChips();
+}
+
+/* Global Clicks */
+document.addEventListener('click', e => {
+  // Top / Mobile Tabs (real links, enhanced with History API)
+  const tabBtn = e.target.closest('.nav-tab[data-tab]');
+  if (tabBtn) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    goTab(tabBtn.dataset.tab);
+    return;
+  }
+
+  // Brand / go-tab links
+  const goBtn = e.target.closest('[data-go-tab]');
+  if (goBtn) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    goTab(goBtn.dataset.goTab);
+    return;
+  }
+
+  // Radar card click -> toggle unified history filter by platform
+  const filterCard = e.target.closest('[data-filter-log]');
+  if (filterCard) {
+    const pid = filterCard.dataset.filterLog;
+    state.logPlat = state.logPlat === pid ? 'all' : pid;
+    renderUnifiedHistory();
+    if (state.logPlat !== 'all') {
+      document.getElementById('unifiedHistorySection')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    return;
+  }
+
+  // Unified history platform / type filters
+  const lpBtn = e.target.closest('[data-lplat]');
+  if (lpBtn) {
+    state.logPlat = lpBtn.dataset.lplat;
+    renderUnifiedHistory();
+    return;
+  }
+
+  const ltBtn = e.target.closest('[data-ltype]');
+  if (ltBtn) {
+    state.logType = ltBtn.dataset.ltype;
+    renderUnifiedHistory();
+    return;
+  }
+
+  // Timezone switcher
+  const tzBtn = e.target.closest('[data-tz]');
+  if (tzBtn) {
+    state.tz = tzBtn.dataset.tz;
+    document.querySelectorAll('[data-tz]').forEach(b => b.classList.toggle('active', b.dataset.tz === state.tz));
+    renderTimeline();
+    renderUnifiedHistory();
+    showToast(`已切换为 ${state.tz === 'UTC+8' ? '北京时间 (UTC+8)' : 'UTC 标准时间'}`);
+    return;
+  }
+
+  // Timeline event click
+  const evCell = e.target.closest('[data-ev-idx]');
+  if (evCell) {
+    state.selectedEventIdx = Number(evCell.dataset.evIdx);
+    renderTimeline();
+    return;
+  }
+
+  // Copy button
+  const copyBtn = e.target.closest('[data-copy]');
+  if (copyBtn) {
+    navigator.clipboard?.writeText(copyBtn.dataset.copy).catch(() => {});
+    showToast('已复制链接到剪贴板');
+    return;
+  }
+
+  // Benchmark intensity
+  const intBtn = e.target.closest('[data-intensity]');
+  if (intBtn) {
+    state.intensity = intBtn.dataset.intensity;
+    document.querySelectorAll('[data-intensity]').forEach(b => b.classList.toggle('active', b.dataset.intensity === state.intensity));
+    renderBenchmark();
+    return;
+  }
+
+  // Benchmark platform filter
+  const bpBtn = e.target.closest('[data-bplat]');
+  if (bpBtn) {
+    state.benchPlat = bpBtn.dataset.bplat;
+    document.querySelectorAll('[data-bplat]').forEach(b => b.classList.toggle('active', b.dataset.bplat === state.benchPlat));
+    renderBenchmark();
+    return;
+  }
+
+  // Benchmark period switch (平均月 / 每周 / 五小时)
+  const bperBtn = e.target.closest('[data-bperiod]');
+  if (bperBtn) {
+    state.benchPeriod = bperBtn.dataset.bperiod;
+    document.querySelectorAll('[data-bperiod]').forEach(b => b.classList.toggle('active', b.dataset.bperiod === state.benchPeriod));
+    renderBenchmark();
+    return;
+  }
+
+  // Benchmark sort
+  const bsBtn = e.target.closest('[data-bsort]');
+  if (bsBtn) {
+    state.benchSort = bsBtn.dataset.bsort;
+    document.querySelectorAll('[data-bsort]').forEach(b => b.classList.toggle('active', b.dataset.bsort === state.benchSort));
+    renderBenchmark();
+    return;
+  }
+
+  // Benchmark row expand
+  const tbBtn = e.target.closest('[data-toggle-bench]');
+  if (tbBtn) {
+    const bid = tbBtn.dataset.toggleBench;
+    state.expandedBenchId = state.expandedBenchId === bid ? null : bid;
+    renderBenchmark();
+    return;
+  }
+
+  // Close modal buttons or backdrop click
+  const closeBtn = e.target.closest('[data-close-modal]');
+  if (closeBtn) {
+    document.getElementById(closeBtn.dataset.closeModal).classList.remove('open');
+    return;
+  }
+  if (e.target.classList.contains('overlay-backdrop')) {
+    e.target.classList.remove('open');
+  }
+});
+
+/* Search Input in Unified History */
+document.getElementById('unifiedLogSearch').addEventListener('input', e => {
+  state.logSearch = e.target.value;
+  renderUnifiedHistory();
+});
+
+/* Header Utility Controls */
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme;
+  document.getElementById('themeIconSun').style.display = state.theme === 'dark' ? 'block' : 'none';
+  document.getElementById('themeIconMoon').style.display = state.theme === 'light' ? 'block' : 'none';
+});
+
+/* Keyboard shortcuts 1-2 for Tabs & Escape for modals */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay-backdrop.open').forEach(m => m.classList.remove('open'));
+  }
+  if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const map = { '1': 'overview', '2': 'benchmark' };
+  if (map[e.key]) goTab(map[e.key]);
+});
+
+/* Boot */
+renderTimeline();
+renderUnifiedHistory();
+renderBenchmark();
+updateLiveClocks();
+switchTab((location.protocol.indexOf('http') === 0 ? tabFromPath() : document.body.dataset.initialTab) || 'overview');
+setInterval(updateLiveClocks, 1000);
+</script>
+</body>
+</html>

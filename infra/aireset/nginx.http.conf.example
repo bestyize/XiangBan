@@ -1,0 +1,25 @@
+# 香港云服务器宿主机 Nginx 静态站点配置（阶段一：HTTP，证书签发前）：aireset.xiangban.xyz
+# 放进 /etc/nginx/conf.d/aireset.xiangban.xyz.conf
+# DNS 生效并签发证书后，改用同目录 nginx.conf.example。
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name aireset.xiangban.xyz;
+
+    root /var/www/aireset.xiangban.xyz;
+    index index.html;
+    error_page 404 /404.html;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location ~* \.html$ {
+        add_header Cache-Control "no-cache";
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

@@ -15,6 +15,7 @@
 | 小伴官网 / 壁纸网站 | 提供小伴桌面介绍、下载、版本公告和壁纸图片/视频的网站。 | [services/server-xiaoban](services/server-xiaoban/README.md)，现有域名 `wallpaper.xiangban.xyz`。网站包含壁纸功能，并不意味着桌面应用仍叫“小伴壁纸”。 |
 | 小伴市场 | 专家、技能、连接器的自建目录、下载与更新服务。 | [services/server-xiaoban-market](services/server-xiaoban-market/README.md)。桌面“AI 插件”是客户端入口，市场是内容来源；两者不是同一个项目。 |
 | 超级小伴论坛 / 社区 | 用户交流、帖子和社区内容的网站及相关功能。 | [services/server-forum](services/server-forum/README.md)，现有域名 `chat.xiangban.xyz`。论坛与超级小伴悬浮助手是不同对象。 |
+| AI额度监控 / QuotaReset | 追踪 ChatGPT/Codex、反重力、Claude 额度重置并对比订阅额度的独立静态站，域名 `aireset.xiangban.xyz`。 | [client/aireset-web](client/aireset-web/README.md)；与小伴 AI 的额度系统（server-ai）无关，不要混淆。 |
 | 统一账号中心 | 注册、登录、身份验证和账号令牌服务，供各产品使用。 | [services/server-account](services/server-account/README.md)；不等同于 AI 额度系统。 |
 | AI 网关 | 管理模型调用、产品额度、兑换码及上游服务的服务端。 | [services/server-ai](services/server-ai/README.md)；身份来自账号中心。 |
 | 手机桌面互联 / 中转服务 | 同账号手机和桌面设备发现与消息转发。 | [services/server-link](services/server-link/README.md)；不等同于账号中心或 AI 网关。 |
