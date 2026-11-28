@@ -5,34 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <title>万磁搜</title>
-  <link rel="icon" href="icon.webp" type="image/webp">
+  <link rel="icon" href="icon.webp">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="app">
-    <header class="masthead"><h1>万磁搜</h1></header>
-    <form class="search" id="search-form" autocomplete="off">
-      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.3 4.3"/></svg>
-      <input id="query" type="search" aria-label="搜索关键词" placeholder="搜索关键词" maxlength="128" required>
-      <button id="submit" type="submit">搜索</button>
-    </form>
-    <div class="source-row"><label class="source-select"><select id="source" aria-label="搜索来源"><option value="all">全部来源</option></select></label></div>
-    <main id="results" aria-live="polite">
-      <section class="search-intro" aria-labelledby="search-intro-title">
-        <svg class="search-intro-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.3 4.3"/></svg>
-        <h2 id="search-intro-title">跨站搜索公开资源</h2>
-        <p>电影、美剧、音乐、软件随心搜！</p>
-      </section>
-    </main>
+  <div class="app" id="app">
+    <div class="ambient-field" aria-hidden="true">
+      <svg class="ambient-arcs" viewBox="0 0 220 190" fill="none">
+        <circle cx="170" cy="24" r="56" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="170" cy="24" r="90" stroke="currentColor" stroke-width="1.1"/>
+        <circle cx="170" cy="24" r="126" stroke="currentColor" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="app-shell" id="app-shell">
+      <header class="masthead">
+        <span class="brand-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7 6.5v6a5 5 0 0 0 10 0v-6" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/><path d="M5.6 6.5h2.8M15.6 6.5h2.8" stroke="#FFF2E0" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </span>
+        <h1>万磁搜</h1>
+        <span class="masthead-tag">11 站聚合</span>
+      </header>
+      <div class="search-dock">
+        <form class="search-pill" id="search-form" autocomplete="off" role="search">
+          <svg class="icon search-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.2 4.2"/></svg>
+          <input id="query" type="search" aria-label="搜索关键词" placeholder="搜索电影、剧集、软件…" maxlength="128" enterkeyhint="search" required>
+          <button id="clear-query" class="clear-btn" type="button" aria-label="清空关键词" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          <button id="submit" class="search-submit" type="submit">搜索</button>
+        </form>
+        <div class="toolbar">
+          <button id="source" class="source-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-overlay" aria-label="选择搜索来源，当前为全部来源">
+            <span id="source-dot" class="source-dot" aria-hidden="true" hidden></span>
+            <span id="source-label" class="source-label">全部来源</span>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="sort-seg" role="tablist" aria-label="排序方式">
+            <button class="sort-tab" type="button" role="tab" aria-selected="true" data-sort="relevance">相关</button>
+            <button class="sort-tab" type="button" role="tab" aria-selected="false" data-sort="size" tabindex="-1">体积</button>
+            <button class="sort-tab" type="button" role="tab" aria-selected="false" data-sort="seeds" tabindex="-1">做种</button>
+            <button class="sort-tab" type="button" role="tab" aria-selected="false" data-sort="date" tabindex="-1">日期</button>
+          </div>
+        </div>
+      </div>
+      <main id="results" class="scroll-area" aria-label="搜索内容" aria-live="polite" aria-busy="false"></main>
+    </div>
+    <div id="sheet-overlay" class="sheet-overlay" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
-  <div class="modal" id="modal" hidden>
-    <div class="backdrop" data-close></div>
-    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-      <header class="dialog-head"><div><h2 id="modal-title">磁力链接</h2><p id="modal-subtitle"></p></div><button class="close" type="button" data-close aria-label="关闭">×</button></header>
-      <div id="modal-body"></div>
-    </section>
-  </div>
-  <div id="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>

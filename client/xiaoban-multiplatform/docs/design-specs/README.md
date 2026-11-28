@@ -34,7 +34,7 @@
 | [轻启](prototypes/quick-launch.html) | 已合入 | Android 桌面快捷方式设计稿，256×256 WebP 图标网格、搜索筛选与添加到桌面演示，已合入内置 `quick-launch` 包。[本机预览](http://127.0.0.1:1421/prototypes/quick-launch.html) |
 | [遥控器](prototypes/universal-remote.html) | 已合入 | 协议 2 电视与空调红外工具：按市场份额排序的 19 电视 / 21 空调品牌试码、四点方向盘、大字温控与无圆底竖三点宿主菜单，已合入内置 `remote-control` 包。[本机预览](http://127.0.0.1:1421/prototypes/universal-remote.html) |
 | [动态壁纸 · 雨窗天光与画廊重设计](prototypes/live-wallpapers-redesign.html) | 设计评审中 | 协议 2 动态壁纸小程序重设计（6 画板总览 + 单机试玩 + 全屏壁纸 + 390/360px + 深浅色 + 6 套主题色）：画廊首页与「雨窗天光」WebGL 实时雨滴折射/触控拭雾壁纸，含暮雨/晴岚/梅雨/霓虹夜/微雪 5 套天光氛围、桌面/锁屏模拟预览与双槽位切换。[本机预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/live-wallpapers-redesign.html) |
-| [万磁搜](prototypes/torrent-search.html) | 待合入（V2 定稿） | V2「赤磁引力」重设计定稿：暖中性纸面与顶部赤磁柔光弧线、深绯墨 Hero 卡与 4 格场景入口、可点击 11 站点矩阵、两色语义结果卡、绯红浅底一键直复制、双段式 BTIH 磁力与带定位副标来源 BottomSheet、新版 16:9 封面预览（线上现役 `wancisou` v1.0.2）。[本机预览](http://127.0.0.1:1421/prototypes/torrent-search.html) |
+| [万磁搜](prototypes/torrent-search.html) | 已合入（V2，`wancisou` v2.0.0） | V2「赤磁引力」已完整合入独立应用包：暖中性纸面与顶部赤磁柔光弧线、深绯墨 Hero 卡与 4 格场景入口、可点击 11 站点矩阵、两色语义结果卡、绯红浅底一键直复制、双段式 BTIH 磁力与带定位副标来源 BottomSheet、新版 16:9 封面预览（独立应用包 `assets/app-packs/wancisou/` v2.0.0）。[本机预览](http://127.0.0.1:1421/prototypes/torrent-search.html) · [线上应用](https://res.xiangban.xyz/builtin-games/wancisou/index.html) |
 | [收盘别问](prototypes/shoupan-biewen.html) | 概念试玩 | 390×800 竖屏 H5 单页，100 个真实创业板交易日、可横滑真实日 K、提前收手结算与带二维码 PNG 海报（尚未合入内置应用包）。[本机预览](http://127.0.0.1:1421/prototypes/shoupan-biewen.html) |
 
 单独预览本目录：在仓库根运行 `python3 -m http.server 1421 --bind 127.0.0.1 --directory client/xiaoban-multiplatform/docs/design-specs`，或直接通过总导航 `python3 docs/design-preview/serve.py --open` 访问。

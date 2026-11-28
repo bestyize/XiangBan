@@ -1,23 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="万磁搜 16:9 封面">
   <defs>
-    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#FFF1EE"/><stop offset="1" stop-color="#F5F5F7"/></linearGradient>
-    <filter id="shadow" x="-20%" y="-40%" width="140%" height="200%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#183042" flood-opacity=".09"/></filter>
+    <radialGradient id="cGlow" cx="86%" cy="8%" r="65%">
+      <stop offset="0%" stop-color="#E3203C" stop-opacity="0.16"/>
+      <stop offset="48%" stop-color="#FF6B78" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#F4F3F1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cBrand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E3203C"/>
+      <stop offset="100%" stop-color="#F44353"/>
+    </linearGradient>
+    <filter id="cShadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feOffset in="blur" dy="4" result="offset"/>
+      <feFlood flood-color="#18141A" flood-opacity="0.06" result="color"/>
+      <feComposite in="color" in2="offset" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="640" height="360" rx="28" fill="url(#bg)"/>
-  <text x="42" y="74" fill="#183042" font-family="Arial, sans-serif" font-size="35" font-weight="700">万磁搜</text>
-  <rect x="42" y="94" width="556" height="50" rx="15" fill="#fff" stroke="#E7E7EA"/>
-  <circle cx="65" cy="119" r="8" fill="none" stroke="#FD7979" stroke-width="2"/><path d="m71 125 7 7" stroke="#FD7979" stroke-width="2"/>
-  <text x="89" y="126" fill="#6E6872" font-family="Arial, sans-serif" font-size="16">搜索公开资源</text>
-  <rect x="517" y="101" width="72" height="36" rx="11" fill="#FD7979"/><text x="553" y="125" fill="#fff" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700">搜索</text>
-  <g filter="url(#shadow)">
-    <rect x="42" y="178" width="556" height="138" rx="22" fill="#fff"/>
-    <text x="62" y="211" fill="#183042" font-family="Arial, sans-serif" font-size="19" font-weight="700">Ubuntu 24.04 LTS Desktop</text>
-    <rect x="551" y="192" width="30" height="21" rx="11" fill="#FCE5EC"/><text x="566" y="207" fill="#E66A8D" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="700">#1</text>
-    <rect x="62" y="230" width="61" height="25" rx="13" fill="#E4F4FD"/><text x="92" y="247" fill="#2D9CDB" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">BtSow</text>
-    <rect x="130" y="230" width="63" height="25" rx="13" fill="#FCE5EC"/><text x="161" y="247" fill="#E66A8D" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">5.7 GB</text>
-    <rect x="200" y="230" width="105" height="25" rx="13" fill="#F0EAFF"/><text x="252" y="247" fill="#8E6CE8" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">2026-07-11</text>
-    <rect x="62" y="266" width="73" height="25" rx="13" fill="#FFF0E2"/><text x="99" y="283" fill="#F2994A" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">下载 77</text>
-    <rect x="142" y="266" width="70" height="25" rx="13" fill="#E5F8EE"/><text x="177" y="283" fill="#27AE60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">做种 50</text>
-    <rect x="486" y="261" width="95" height="33" rx="17" fill="#FFF1EE"/><text x="533" y="283" fill="#F26060" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700">复制磁力</text>
+  <rect width="640" height="360" fill="#F4F3F1"/>
+  <rect width="640" height="220" fill="url(#cGlow)"/>
+  <g fill="none" stroke="#E3203C" stroke-opacity="0.12" stroke-width="1.2">
+    <circle cx="566" cy="36" r="54"/>
+    <circle cx="566" cy="36" r="88"/>
+    <circle cx="566" cy="36" r="122"/>
   </g>
+
+  <!-- Brand Header -->
+  <g transform="translate(42, 34)">
+    <rect width="32" height="32" rx="10" fill="url(#cBrand)"/>
+    <path d="M10 9v7.4a6 6 0 0 0 12 0V9" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M8.5 9h3M20.5 9h3" stroke="#FFF2E0" stroke-width="2.6" stroke-linecap="round"/>
+    <text x="44" y="23" fill="#1C1B1F" font-family="PingFang SC, -apple-system, sans-serif" font-size="23" font-weight="700" letter-spacing="-0.4">万磁搜</text>
+    <rect x="122" y="4" width="70" height="24" rx="12" fill="#FFF0F2"/>
+    <text x="157" y="20" fill="#D11B36" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="600">11 站聚合</text>
+  </g>
+
+  <!-- Elevated Search Capsule -->
+  <g filter="url(#cShadow)">
+    <rect x="42" y="84" width="556" height="50" rx="25" fill="#FFFFFF"/>
+  </g>
+  <g transform="translate(61, 100)" fill="none" stroke="#D11B36" stroke-width="1.9" stroke-linecap="round">
+    <circle cx="8" cy="8" r="5.5"/>
+    <path d="m12.2 12.2 3.5 3.5"/>
+  </g>
+  <text x="89" y="115" fill="#1C1B1F" font-family="PingFang SC, -apple-system, sans-serif" font-size="15" font-weight="500">Ubuntu 24.04 LTS Desktop</text>
+  <rect x="514" y="90" width="78" height="38" rx="19" fill="url(#cBrand)"/>
+  <text x="553" y="114" fill="#FFFFFF" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="13.5" font-weight="600">搜索</text>
+
+  <!-- Compact Toolbar -->
+  <rect x="42" y="146" width="88" height="28" rx="14" fill="#FFFFFF"/>
+  <text x="86" y="164" fill="#55535B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="500">全部来源</text>
+  <rect x="400" y="146" width="198" height="28" rx="14" fill="#EFEFF2"/>
+  <rect x="403" y="149" width="46" height="22" rx="11" fill="#FFFFFF"/>
+  <text x="426" y="164" fill="#1C1B1F" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="600">相关</text>
+  <text x="474" y="164" fill="#55535B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12">体积</text>
+  <text x="522" y="164" fill="#55535B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12">做种</text>
+  <text x="570" y="164" fill="#55535B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12">日期</text>
+
+  <!-- Result Card (Two-color semantic focus) -->
+  <g filter="url(#cShadow)">
+    <rect x="42" y="188" width="556" height="136" rx="16" fill="#FFFFFF"/>
+  </g>
+  <text x="62" y="220" fill="#1C1B1F" font-family="PingFang SC, -apple-system, sans-serif" font-size="16" font-weight="600">Ubuntu 24.04.1 LTS Desktop amd64 官方原版镜像</text>
+  <rect x="530" y="203" width="48" height="22" rx="11" fill="#FFF0F2"/>
+  <text x="554" y="218" fill="#D11B36" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="600">热种</text>
+
+  <rect x="62" y="236" width="60" height="22" rx="6" fill="#EFEFF3"/>
+  <text x="92" y="251" fill="#18181D" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="700">5.8 GB</text>
+
+  <rect x="130" y="236" width="76" height="22" rx="6" fill="#E8F7EF"/>
+  <circle cx="141" cy="247" r="3" fill="#22A867"/>
+  <text x="172" y="251" fill="#157A4B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="600">做种 52</text>
+
+  <text x="216" y="251" fill="#6E6C75" font-family="PingFang SC, -apple-system, sans-serif" font-size="12">下载 184   2026-08-30</text>
+
+  <line x1="62" y1="270" x2="578" y2="270" stroke="#18141A" stroke-opacity="0.08" stroke-width="0.7"/>
+
+  <rect x="62" y="280" width="68" height="26" rx="13" fill="#EFEFF2"/>
+  <circle cx="74" cy="293" r="3" fill="#0D9488"/>
+  <text x="100" y="297" fill="#55535B" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="500">BtSow</text>
+
+  <rect x="484" y="278" width="94" height="32" rx="16" fill="#FFF0F2" stroke="#FFD1D9" stroke-width="1"/>
+  <text x="531" y="298" fill="#D11B36" text-anchor="middle" font-family="PingFang SC, -apple-system, sans-serif" font-size="12" font-weight="600">复制磁力</text>
 </svg>

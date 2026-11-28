@@ -55,7 +55,7 @@ for (const id of ['remote-control', 'quick-launch']) {
 const wancisou = path.join(destination, 'wancisou')
 await mkdir(wancisou)
 const wancisouSource = path.join(root, 'assets/app-packs/wancisou')
-for (const file of ['app.js', 'styles.css', 'icon.webp']) {
+for (const file of ['app.js', 'styles.css', 'icon.webp', 'cover.svg']) {
   await cp(path.join(wancisouSource, file), path.join(wancisou, file))
 }
 const { version: wancisouVersion } = JSON.parse(await readFile(path.join(wancisouSource, 'manifest.json'), 'utf8'))
