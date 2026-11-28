@@ -249,6 +249,13 @@ async function share() {
     toast('复制失败，请手动复制')
   }
 }
+
+const isMobileDevice = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+const companionAppHref = isMobileDevice ? 'https://xiaban.xyz/app' : 'https://xiaban.xyz/desktop'
+const companionAppText = computed(() => {
+  if (isMobileDevice) return '用小伴手机版设为壁纸'
+  return item.value?.video ? '用小伴桌面一键设为动态壁纸' : '用小伴桌面一键设为壁纸'
+})
 </script>
 
 <template>
@@ -384,6 +391,11 @@ async function share() {
           </button>
         </div>
 
+        <a class="app-tip" :href="companionAppHref" target="_blank" rel="noopener noreferrer">
+          <span>{{ companionAppText }}</span>
+          <Icon name="external" :size="14" />
+        </a>
+
         <p class="fine">
           {{ item.license }}
           <a :href="item.source_page_url" target="_blank" rel="noopener noreferrer">
@@ -406,6 +418,26 @@ async function share() {
   background: #08080a;
   color: var(--text);
   overflow: hidden;
+}
+
+.app-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-2);
+  font-size: 12.5px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.app-tip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text);
 }
 
 .backdrop {

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小伴 · xiaban.xyz 产品矩阵（设计稿 v2.0）</title>
+<style>
+  :root {
+    --canvas: #faf8f5;
+    --canvas-soft: #f2eee8;
+    --surface: #ffffff;
+    --ink: #18171a;
+    --ink-2: #545058;
+    --ink-3: #8a848e;
+
+    --coral: #ee4f6d;
+    --coral-2: #f9744b;
+    --coral-grad: linear-gradient(135deg, #ff5b7d 0%, #f9744b 100%);
+    --coral-soft: #fff1f3;
+
+    --line: rgba(24, 23, 26, 0.08);
+    --line-strong: rgba(24, 23, 26, 0.16);
+    --shadow-sm: 0 2px 10px rgba(24, 20, 24, 0.04);
+    --shadow-md: 0 14px 32px rgba(24, 20, 24, 0.09);
+    --shadow-lg: 0 28px 64px rgba(24, 20, 24, 0.18);
+
+    --font: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    background: var(--canvas); color: var(--ink);
+    font-family: var(--font); -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+  body { min-height: 100vh; background: var(--canvas); color: var(--ink); font-size: 14px; line-height: 1.5; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  img { display: block; max-width: 100%; }
+
+  /* ==================== Review Bar ==================== */
+  .review-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 42px; padding: 0 14px;
+    background: rgba(22, 19, 23, 0.92); backdrop-filter: blur(14px);
+    color: #f3f0f4; border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 12px; transition: transform 0.22s var(--ease);
+  }
+  .review-bar.collapsed { transform: translateY(-100%); }
+  .review-restore {
+    position: fixed; top: 8px; right: 12px; z-index: 210;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    background: rgba(22, 19, 23, 0.88); color: #fff; font-size: 11.5px;
+    display: none; align-items: center; box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  }
+  .review-bar.collapsed + .review-restore { display: inline-flex; }
+  .rb-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .rb-title { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; background: rgba(255,101,132,0.22); color: #ffb5c3; font-weight: 700; flex-shrink: 0; }
+  .rb-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgba(255,255,255,0.09); gap: 2px; }
+  .rb-seg button { height: 24px; padding: 0 9px; border-radius: 6px; color: rgba(255,255,255,0.72); font-size: 11.5px; white-space: nowrap; }
+  .rb-seg button.active { background: #fff; color: #18171a; font-weight: 650; }
+  .rb-hide { height: 24px; padding: 0 8px; border-radius: 6px; color: rgba(255,255,255,0.72); font-size: 11.5px; white-space: nowrap; }
+  .rb-hide:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  /* ==================== Stage & Mobile Shell ==================== */
+  .stage { padding-top: 42px; min-height: 100vh; transition: padding-top 0.22s var(--ease); }
+  .stage.bar-hidden { padding-top: 0; }
+  .stage.mode-mobile {
+    background: radial-gradient(circle at 20% 10%, rgba(255,112,136,0.12), transparent 44%), #e8e2da;
+    padding: 60px 14px 48px; display: flex; justify-content: center;
+  }
+  .stage.mode-mobile.bar-hidden { padding-top: 20px; }
+
+  .device-shell { width: 100%; background: var(--canvas); min-height: calc(100vh - 42px); position: relative; }
+  .stage.mode-mobile .device-shell {
+    width: 390px; max-width: 100%; height: 810px; min-height: 0;
+    border-radius: 42px; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 28px 80px rgba(24,18,22,0.24), 0 0 0 9px #18171a, 0 0 0 11px rgba(255,255,255,0.5);
+  }
+  .m-status { display: none; }
+  .stage.mode-mobile .m-status {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 42px; padding: 8px 22px 0; background: rgba(250,248,245,0.94);
+    font-size: 12px; font-weight: 650; flex-shrink: 0; position: relative; z-index: 40;
+  }
+  .m-notch { width: 92px; height: 22px; border-radius: 999px; background: #141216; position: absolute; left: 50%; top: 8px; transform: translateX(-50%); }
+  .device-scroll { width: 100%; position: relative; }
+  .stage.mode-mobile .device-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+
+  /* ==================== Topbar ==================== */
+  .topbar {
+    position: sticky; top: 42px; z-index: 60;
+    background: rgba(250, 248, 245, 0.86);
+    backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border-bottom: 1px solid var(--line);
+    transition: top 0.22s var(--ease);
+  }
+  .stage.bar-hidden .topbar, .stage.mode-mobile .topbar { top: 0; }
+  .topbar-in {
+    max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 16.5px; font-weight: 740; letter-spacing: -0.02em; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; box-shadow: 0 3px 10px rgba(242,92,114,0.24); }
+  .brand-domain {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--ink-3); background: rgba(24,23,26,0.05);
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .top-link {
+    height: 32px; padding: 0 12px; border-radius: 999px;
+    font-size: 13px; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 4px; transition: 0.16s;
+  }
+  .top-link:hover { color: var(--ink); background: rgba(24,23,26,0.05); }
+  .top-btn {
+    height: 32px; padding: 0 14px; border-radius: 999px;
+    background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 620;
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: background 0.16s, transform 0.16s;
+  }
+  .top-btn:hover { background: #2e2b33; transform: translateY(-1px); }
+
+  /* ==================== Main Container ==================== */
+  .wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+
+  /* ==================== Compact Editorial Header ==================== */
+  .hero {
+    padding: 32px 0 22px;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+    flex-wrap: wrap;
+  }
+  .hero-left { max-width: 560px; }
+  .hero-kicker {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 620; color: var(--ink-3);
+    margin-bottom: 8px;
+  }
+  .hero-kicker i { width: 7px; height: 7px; border-radius: 50%; background: var(--coral-grad); display: block; }
+  .hero h1 {
+    font-size: clamp(24px, 3vw, 34px);
+    line-height: 1.2; letter-spacing: -0.035em; font-weight: 760;
+    margin-bottom: 6px;
+  }
+  .hero p { font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+
+  .filter-bar {
+    display: inline-flex; padding: 3px; border-radius: 999px;
+    background: var(--canvas-soft); border: 1px solid var(--line); gap: 2px;
+  }
+  .filter-pill {
+    height: 30px; padding: 0 12px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 550; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 5px; transition: 0.18s var(--ease);
+    white-space: nowrap;
+  }
+  .filter-pill:hover { color: var(--ink); }
+  .filter-pill.active {
+    background: var(--surface); color: var(--ink); font-weight: 650;
+    box-shadow: 0 2px 6px rgba(24,20,24,0.08);
+  }
+  .filter-pill span { font-size: 11px; font-family: var(--mono); color: var(--ink-3); }
+  .filter-pill.active span { color: var(--coral); }
+
+  /* ==================== Compact 3x2 Product Grid ==================== */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding-bottom: 28px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease), border-color 0.2s, opacity 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--line-strong);
+  }
+  .card.is-hidden { display: none; }
+
+  /* Visual Frame (16:10 real screenshot) */
+  .shot-wrap {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--canvas-soft);
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .shot-link { display: block; width: 100%; height: 100%; }
+
+  /* Full-bleed desktop / game / wallpaper screenshot */
+  .shot-full {
+    width: 100%; height: 100%; object-fit: cover; object-position: top center;
+    transition: transform 0.4s var(--ease);
+  }
+  .card:hover .shot-full { transform: scale(1.03); }
+
+  /* Studio stage for portrait mobile screenshots */
+  .shot-studio {
+    width: 100%; height: 100%;
+    padding: 12px 14px 0;
+    display: flex; align-items: flex-end; justify-content: center; gap: 10px;
+    background:
+      radial-gradient(65% 80% at 50% 0%, rgba(255, 118, 134, 0.12), transparent 72%),
+      #f1ece5;
+  }
+  .shot-studio.cool {
+    background:
+      radial-gradient(65% 80% at 50% 0%, rgba(92, 156, 255, 0.13), transparent 72%),
+      #eef1f6;
+  }
+  .shot-studio.pop {
+    background:
+      radial-gradient(70% 80% at 50% 0%, rgba(228, 248, 87, 0.30), transparent 70%),
+      #f3efe6;
+  }
+
+  .phone-shot {
+    width: 46%; height: 95%;
+    border-radius: 14px 14px 0 0;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(24, 20, 28, 0.18);
+    border: 2.5px solid #1d1b20; border-bottom: 0;
+    background: #fff;
+    transition: transform 0.35s var(--ease);
+    flex-shrink: 0;
+  }
+  .phone-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+  .phone-shot.secondary {
+    width: 40%; height: 84%;
+    opacity: 0.96;
+    transform: translateY(4px);
+  }
+  .card:hover .phone-shot.primary { transform: translateY(-3px); }
+  .card:hover .phone-shot.secondary { transform: translateY(0px); }
+
+  /* Game card showcase: real mobile homepage + real in-game preview */
+  .shot-game-split {
+    width: 100%; height: 100%;
+    padding: 12px 14px 0;
+    display: flex; align-items: flex-end; justify-content: center; gap: 10px;
+    background:
+      radial-gradient(65% 80% at 75% 10%, rgba(251, 146, 60, 0.16), transparent 70%),
+      #f4efe8;
+  }
+  .game-side-preview {
+    width: 44%; align-self: center;
+    display: flex; flex-direction: column; gap: 7px;
+    padding-bottom: 10px;
+  }
+  .game-mini-shot {
+    width: 100%; aspect-ratio: 16 / 10;
+    border-radius: 9px; overflow: hidden;
+    border: 1.5px solid rgba(255,255,255,0.9);
+    box-shadow: 0 6px 16px rgba(24, 20, 24, 0.14);
+    transition: transform 0.3s var(--ease);
+  }
+  .game-mini-shot img { width: 100%; height: 100%; object-fit: cover; }
+  .card:hover .game-mini-shot:first-child { transform: translateY(-2px); }
+  .card:hover .game-mini-shot:last-child { transform: translateY(2px); }
+
+  /* Corner Badges & Zoom Button */
+  .shot-badge {
+    position: absolute; top: 10px; left: 10px; z-index: 4;
+    padding: 3px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 620;
+    color: #fff; background: rgba(20, 19, 24, 0.62);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    letter-spacing: 0.01em;
+  }
+  .shot-zoom {
+    position: absolute; top: 9px; right: 9px; z-index: 5;
+    height: 26px; padding: 0 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    color: #fff; background: rgba(20, 19, 24, 0.56);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    opacity: 0; transform: translateY(-2px);
+    transition: opacity 0.18s, transform 0.18s, background 0.16s;
+  }
+  .card:hover .shot-zoom, .shot-zoom:focus-visible { opacity: 1; transform: translateY(0); }
+  .shot-zoom:hover { background: rgba(20, 19, 24, 0.85); }
+
+  /* Compact Card Body */
+  .card-body {
+    padding: 13px 15px 15px;
+    display: flex; flex-direction: column; gap: 5px;
+    flex: 1;
+  }
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .card-title {
+    display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
+  }
+  .card-title h2 {
+    font-size: 15.5px; font-weight: 720; letter-spacing: -0.02em; white-space: nowrap;
+  }
+  .card-title span {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card-arrow {
+    font-size: 14px; color: var(--ink-3); flex-shrink: 0;
+    transition: transform 0.2s var(--ease), color 0.2s;
+  }
+  .card:hover .card-arrow { color: var(--coral); transform: translate(2px, -2px); }
+  .card-desc {
+    font-size: 12.8px; line-height: 1.55; color: var(--ink-2);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* ==================== Slim Ecosystem Strip & Footer ==================== */
+  .eco-strip {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    margin-bottom: 24px;
+    font-size: 12.5px; color: var(--ink-2);
+  }
+  .eco-points { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .eco-points span { display: inline-flex; align-items: center; gap: 6px; }
+  .eco-points i { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); display: block; }
+  .eco-strip a { font-weight: 620; color: var(--ink); white-space: nowrap; }
+  .eco-strip a:hover { color: var(--coral); }
+
+  .footer {
+    border-top: 1px solid var(--line);
+    padding: 18px 0 34px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    flex-wrap: wrap; font-size: 12.5px; color: var(--ink-3);
+  }
+  .footer-links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .footer-links a:hover { color: var(--ink); }
+
+  /* ==================== Lightbox & Download Modal ==================== */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(18, 16, 22, 0.56); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    width: min(440px, 100%); background: var(--surface);
+    border-radius: 22px; padding: 22px; box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+  }
+  .modal.lightbox { width: min(820px, 100%); padding: 18px; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .modal-head h3 { font-size: 16px; font-weight: 720; }
+  .modal-close {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--canvas-soft);
+    display: grid; place-items: center; font-size: 13px; color: var(--ink-2);
+  }
+  .modal-close:hover { color: var(--ink); background: #e7e1d8; }
+  .lb-stage {
+    background: var(--canvas-soft); border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    max-height: 62vh;
+  }
+  .lb-stage img { max-height: 62vh; width: auto; max-width: 100%; object-fit: contain; }
+  .lb-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 12px; flex-wrap: wrap;
+  }
+  .lb-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lb-tab {
+    height: 28px; padding: 0 11px; border-radius: 999px; font-size: 12px;
+    background: var(--canvas-soft); color: var(--ink-2); font-weight: 550;
+  }
+  .lb-tab.active { background: var(--ink); color: #fff; }
+  .lb-open {
+    height: 32px; padding: 0 14px; border-radius: 999px;
+    background: var(--coral-grad); color: #fff; font-size: 12.5px; font-weight: 650;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  .dl-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .dl-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 14px; border-radius: 14px; background: var(--canvas); border: 1px solid var(--line);
+    transition: 0.16s;
+  }
+  .dl-row:hover { background: var(--coral-soft); border-color: rgba(238,79,109,0.25); }
+  .dl-row strong { display: block; font-size: 14px; }
+  .dl-row span { font-size: 12px; color: var(--ink-3); }
+  .dl-go { font-size: 12px; font-weight: 650; background: #fff; border: 1px solid var(--line-strong); padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+  .modal-note { font-size: 12px; color: var(--ink-3); text-align: center; }
+
+  /* ==================== Responsive & Mobile Mode ==================== */
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .wrap { width: min(1120px, calc(100% - 32px)); }
+    .topbar-in { padding: 0 16px; }
+  }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; gap: 12px; }
+    .brand-domain, .top-link { display: none; }
+    .hero { padding: 22px 0 16px; }
+    .shot-zoom { opacity: 1; transform: none; }
+  }
+
+  .is-mobile .topbar-in { padding: 0 14px; height: 50px; }
+  .is-mobile .brand-domain, .is-mobile .top-link { display: none; }
+  .is-mobile .wrap { width: calc(100% - 28px); }
+  .is-mobile .hero { padding: 20px 0 14px; gap: 12px; }
+  .is-mobile .hero h1 { font-size: 22px; }
+  .is-mobile .hero p { font-size: 13px; }
+  .is-mobile .grid { grid-template-columns: 1fr; gap: 12px; padding-bottom: 18px; }
+  .is-mobile .shot-wrap { aspect-ratio: 16 / 9; }
+  .is-mobile .shot-zoom { opacity: 1; transform: none; }
+  .is-mobile .eco-strip { padding: 12px 14px; font-size: 12px; }
+  .is-mobile .eco-points { gap: 8px 14px; }
+  .is-mobile .footer { padding: 14px 0 28px; }
+</style>
+</head>
+<body>
+
+  <!-- 评审顶栏 -->
+  <div class="review-bar" id="reviewBar">
+    <div class="rb-group">
+      <span class="rb-title">xiaban.xyz · 小伴产品矩阵</span>
+      <span class="rb-badge">v2.0 实图紧凑版</span>
+    </div>
+    <div class="rb-group">
+      <div class="rb-seg">
+        <button type="button" class="active" data-device="desktop" onclick="setDevice('desktop')">PC / 自适应</button>
+        <button type="button" data-device="mobile" onclick="setDevice('mobile')">手机 390px</button>
+      </div>
+      <button type="button" class="rb-hide" onclick="toggleReviewBar(true)">隐藏</button>
+    </div>
+  </div>
+  <button type="button" class="review-restore" onclick="toggleReviewBar(false)">评审栏</button>
+
+  <div class="stage" id="stage">
+    <div class="device-shell">
+      <div class="m-status" aria-hidden="true">
+        <span>9:41</span><div class="m-notch"></div><span>5G · 96%</span>
+      </div>
+
+      <div class="device-scroll">
+        <!-- 极简顶栏 -->
+        <header class="topbar">
+          <div class="topbar-in">
+            <a href="#top" class="brand">
+              <img src="./assets/app-icon-new.webp" alt="小伴图标" />
+              <span>小伴</span>
+              <span class="brand-domain">xiaban.xyz</span>
+            </a>
+            <div class="top-actions">
+              <a class="top-link" href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">社区</a>
+              <a class="top-link" href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer">交流群</a>
+              <button type="button" class="top-btn" onclick="openDownloadModal()">下载客户端</button>
+            </div>
+          </div>
+        </header>
+
+        <main class="wrap" id="top">
+          <!-- 紧凑型 Hero + 筛选 -->
+          <section class="hero">
+            <div class="hero-left">
+              <div class="hero-kicker"><i></i> 小伴产品矩阵 · 6 款独立产品</div>
+              <h1>你的 AI 伙伴，与随手可玩的小世界</h1>
+              <p>从桌面与手机里的个人 Agent，到免安装即玩的小游戏、趣味测评、社区与 4K 壁纸库。</p>
+            </div>
+            <div class="filter-bar" role="tablist" aria-label="产品分类">
+              <button type="button" class="filter-pill active" data-filter="all" onclick="setFilter('all')">全部 <span>6</span></button>
+              <button type="button" class="filter-pill" data-filter="client" onclick="setFilter('client')">客户端 <span>2</span></button>
+              <button type="button" class="filter-pill" data-filter="web" onclick="setFilter('web')">社区/壁纸 <span>2</span></button>
+              <button type="button" class="filter-pill" data-filter="h5" onclick="setFilter('h5')">轻玩 H5 <span>2</span></button>
+            </div>
+          </section>
+
+          <!-- 3×2 紧凑实图卡片网格 -->
+          <section class="grid" aria-label="小伴产品列表">
+
+            <!-- 1. 小伴（手机 App） -->
+            <article class="card" data-cat="client">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://wallpaper.xiangban.xyz/mobile" target="_blank" rel="noopener noreferrer" aria-label="小伴手机 App">
+                  <div class="shot-studio">
+                    <div class="phone-shot primary">
+                      <img src="./assets/mobile-ai-home.webp" alt="小伴手机 App 主页实拍" />
+                    </div>
+                    <div class="phone-shot secondary">
+                      <img src="./assets/mobile-voice-call.webp" alt="小伴手机 App 实时语音通话" />
+                    </div>
+                  </div>
+                </a>
+                <span class="shot-badge">Android · iOS 开发中</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('mobile')">看实图</button>
+              </div>
+              <a class="card-body" href="https://wallpaper.xiangban.xyz/mobile" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>小伴（手机 App）</h2>
+                    <span>wallpaper.xiangban.xyz/mobile</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">随身小伴 AI、端侧实时语音、一句话创作小游戏与小程序，还能随时遥控电脑。</p>
+              </a>
+            </article>
+
+            <!-- 2. 小伴桌面 -->
+            <article class="card" data-cat="client">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://wallpaper.xiangban.xyz/desktop" target="_blank" rel="noopener noreferrer" aria-label="小伴桌面">
+                  <img class="shot-full" src="./assets/desktop-dragon.webp" alt="小伴桌面 v3.1.8 实机界面" />
+                </a>
+                <span class="shot-badge">Win · macOS</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('desktop')">看实图</button>
+              </div>
+              <a class="card-body" href="https://wallpaper.xiangban.xyz/desktop" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>小伴桌面</h2>
+                    <span>wallpaper.xiangban.xyz/desktop</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">桌宠、动态壁纸、14 种特效、超级小伴悬浮助手与本地通用 Agent 创作。</p>
+              </a>
+            </article>
+
+            <!-- 3. 小伴社区 -->
+            <article class="card" data-cat="web">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer" aria-label="小伴社区">
+                  <img class="shot-full" src="./assets/site-community.webp" alt="小伴社区网页版实拍（chat.xiangban.xyz）" />
+                </a>
+                <span class="shot-badge">Web · 移动网页版</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('community')">看实图</button>
+              </div>
+              <a class="card-body" href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>小伴社区</h2>
+                    <span>chat.xiangban.xyz</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">创意作品与微观展厅、小伴前沿、AI 日报、开源精选、模型榜与网页版小伴 AI。</p>
+              </a>
+            </article>
+
+            <!-- 4. 小伴游戏厅 -->
+            <article class="card" data-cat="h5">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://game.xiaban.xyz/" target="_blank" rel="noopener noreferrer" aria-label="小伴游戏厅">
+                  <div class="shot-game-split">
+                    <div class="phone-shot primary" style="width:45%;">
+                      <img src="./assets/site-game.webp" alt="小伴游戏厅首页实拍（game.xiaban.xyz）" />
+                    </div>
+                    <div class="game-side-preview">
+                      <div class="game-mini-shot">
+                        <img src="./assets/work-ink-blade.webp" alt="《水墨剑客》实机画面" />
+                      </div>
+                      <div class="game-mini-shot">
+                        <img src="./assets/work-dusk-glider.webp" alt="《暮色滑翔》实机画面" />
+                      </div>
+                    </div>
+                  </div>
+                </a>
+                <span class="shot-badge">PWA · 8 款零广告</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('game')">看实图</button>
+              </div>
+              <a class="card-body" href="https://game.xiaban.xyz/" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>小伴游戏厅</h2>
+                    <span>game.xiaban.xyz</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">免登录即玩的 8 款官方精品小游戏（水墨剑客、倒杯快乐、暮色滑翔等），支持离线。</p>
+              </a>
+            </article>
+
+            <!-- 5. 人格贩卖机 -->
+            <article class="card" data-cat="h5">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://people.xiaban.xyz/" target="_blank" rel="noopener noreferrer" aria-label="人格贩卖机">
+                  <img class="shot-full" style="object-position:center;" src="./assets/site-people.webp" alt="人格贩卖机线上实拍（people.xiaban.xyz）" />
+                </a>
+                <span class="shot-badge">H5 · 12 套免费</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('people')">看实图</button>
+              </div>
+              <a class="card-body" href="https://people.xiaban.xyz/" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>人格贩卖机</h2>
+                    <span>people.xiaban.xyz</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">12 套潮玩盲盒风趣味与人格测评，高清海报无水印导出，零门槛 URL 双人合盘。</p>
+              </a>
+            </article>
+
+            <!-- 6. 小伴壁纸站 -->
+            <article class="card" data-cat="web">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://wallpaper.xiangban.xyz/images" target="_blank" rel="noopener noreferrer" aria-label="小伴壁纸站">
+                  <img class="shot-full" src="./assets/site-wallpaper.webp" alt="小伴壁纸站网页实拍（wallpaper.xiangban.xyz/images）" />
+                </a>
+                <span class="shot-badge">Web · 4K 图库与视频</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('wallpaper')">看实图</button>
+              </div>
+              <a class="card-body" href="https://wallpaper.xiangban.xyz/images" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>小伴壁纸站</h2>
+                    <span>wallpaper.xiangban.xyz/images</span>
+                  </div>
+                  <span class="card-arrow">↗</span>
+                </div>
+                <p class="card-desc">深色画廊级 4K 静态壁纸与循环动态视频网站，免装即逛，登录账号跨端同步收藏。</p>
+              </a>
+            </article>
+
+          </section>
+
+          <!-- 一行式生态说明条 -->
+          <div class="eco-strip">
+            <div class="eco-points">
+              <span><i></i>统一相伴账号</span>
+              <span><i></i>桌面 / 手机 / 网页共享小伴点</span>
+              <span><i></i>H5 免安装零广告</span>
+            </div>
+            <a href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer">加入用户交流群 ↗</a>
+          </div>
+
+          <!-- 极简页脚 -->
+          <footer class="footer">
+            <span>© 小伴 · xiaban.xyz</span>
+            <div class="footer-links">
+              <a href="https://wallpaper.xiangban.xyz/mobile" target="_blank" rel="noopener noreferrer">小伴 App</a>
+              <a href="https://wallpaper.xiangban.xyz/desktop" target="_blank" rel="noopener noreferrer">小伴桌面</a>
+              <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer">小伴社区</a>
+              <a href="https://game.xiaban.xyz/" target="_blank" rel="noopener noreferrer">小伴游戏厅</a>
+              <a href="https://people.xiaban.xyz/" target="_blank" rel="noopener noreferrer">人格贩卖机</a>
+              <a href="https://wallpaper.xiangban.xyz/images" target="_blank" rel="noopener noreferrer">小伴壁纸站</a>
+            </div>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- 实机图放大灯箱 -->
+  <div class="modal-bg" id="lightboxModal" role="dialog" aria-modal="true" onclick="if(event.target===this) closeLightbox()">
+    <div class="modal lightbox">
+      <div class="modal-head">
+        <h3 id="lbTitle">实机预览</h3>
+        <button type="button" class="modal-close" aria-label="关闭" onclick="closeLightbox()">✕</button>
+      </div>
+      <div class="lb-stage">
+        <img id="lbImg" src="" alt="" />
+      </div>
+      <div class="lb-foot">
+        <div class="lb-tabs" id="lbTabs"></div>
+        <a id="lbLink" class="lb-open" href="#" target="_blank" rel="noopener noreferrer">打开产品 ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快捷下载弹窗 -->
+  <div class="modal-bg" id="downloadModal" role="dialog" aria-modal="true" onclick="if(event.target===this) closeDownloadModal()">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>下载小伴客户端</h3>
+        <button type="button" class="modal-close" aria-label="关闭" onclick="closeDownloadModal()">✕</button>
+      </div>
+      <div class="dl-list">
+        <a class="dl-row" href="https://wallpaper.xiangban.xyz/download" target="_blank" rel="noopener noreferrer">
+          <div><strong>小伴桌面 · Windows</strong><span>Windows 10 / 11 (64 位)</span></div>
+          <span class="dl-go">下载 ↗</span>
+        </a>
+        <a class="dl-row" href="https://wallpaper.xiangban.xyz/download" target="_blank" rel="noopener noreferrer">
+          <div><strong>小伴桌面 · macOS</strong><span>macOS 12+ (Apple 芯片)</span></div>
+          <span class="dl-go">下载 ↗</span>
+        </a>
+        <a class="dl-row" href="https://wallpaper.xiangban.xyz/mobile" target="_blank" rel="noopener noreferrer">
+          <div><strong>小伴手机 App · Android</strong><span>AI 对话、语音、创作、社区与互联</span></div>
+          <span class="dl-go">下载 ↗</span>
+        </a>
+      </div>
+      <p class="modal-note">iOS 开发中，手机浏览器可先体验 <a href="https://chat.xiangban.xyz/" target="_blank" rel="noopener noreferrer" style="color:var(--ink);text-decoration:underline;">小伴社区网页版</a></p>
+    </div>
+  </div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const reviewBar = document.getElementById('reviewBar');
+  const downloadModal = document.getElementById('downloadModal');
+  const lightboxModal = document.getElementById('lightboxModal');
+  const lbTitle = document.getElementById('lbTitle');
+  const lbImg = document.getElementById('lbImg');
+  const lbTabs = document.getElementById('lbTabs');
+  const lbLink = document.getElementById('lbLink');
+
+  const GALLERIES = {
+    mobile: {
+      title: '小伴（手机 App）实机界面',
+      url: 'https://wallpaper.xiangban.xyz/mobile',
+      shots: [
+        { label: '小伴 AI 首页', src: './assets/mobile-ai-home.webp' },
+        { label: '实时语音通话', src: './assets/mobile-voice-call.webp' },
+        { label: '手机创作小游戏', src: './assets/mobile-chat-build.webp' }
+      ]
+    },
+    desktop: {
+      title: '小伴桌面 v3.1.8 实机界面',
+      url: 'https://wallpaper.xiangban.xyz/desktop',
+      shots: [
+        { label: '3D 龙鱼 & 特效', src: './assets/desktop-dragon.webp' },
+        { label: '小伴 AI 新建任务', src: './assets/desktop-home.webp' },
+        { label: 'AI 插件与专家', src: './assets/desktop-plugins-v318.webp' }
+      ]
+    },
+    community: {
+      title: '小伴社区实拍（chat.xiangban.xyz）',
+      url: 'https://chat.xiangban.xyz/',
+      shots: [
+        { label: 'PC 网页版首页', src: './assets/site-community.webp' },
+        { label: '移动端视图', src: './assets/mobile-community-new.webp' }
+      ]
+    },
+    game: {
+      title: '小伴游戏厅实拍（game.xiaban.xyz）',
+      url: 'https://game.xiaban.xyz/',
+      shots: [
+        { label: '游戏厅首页', src: './assets/site-game.webp' },
+        { label: '水墨剑客', src: './assets/work-ink-blade.webp' },
+        { label: '暮色滑翔', src: './assets/work-dusk-glider.webp' }
+      ]
+    },
+    people: {
+      title: '人格贩卖机实拍（people.xiaban.xyz）',
+      url: 'https://people.xiaban.xyz/',
+      shots: [
+        { label: 'VEND·ME 首页', src: './assets/site-people.webp' }
+      ]
+    },
+    wallpaper: {
+      title: '小伴壁纸站实拍（wallpaper.xiangban.xyz/images）',
+      url: 'https://wallpaper.xiangban.xyz/images',
+      shots: [
+        { label: '4K 壁纸网站', src: './assets/site-wallpaper.webp' }
+      ]
+    }
+  };
+
+  function setDevice(mode) {
+    const mobile = mode === 'mobile';
+    stage.classList.toggle('mode-mobile', mobile);
+    document.body.classList.toggle('is-mobile', mobile);
+    document.querySelectorAll('[data-device]').forEach(b => b.classList.toggle('active', b.dataset.device === mode));
+  }
+
+  function toggleReviewBar(hide) {
+    reviewBar.classList.toggle('collapsed', hide);
+    stage.classList.toggle('bar-hidden', hide);
+  }
+
+  function setFilter(cat) {
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.toggle('active', b.dataset.filter === cat));
+    document.querySelectorAll('.card[data-cat]').forEach(c => {
+      c.classList.toggle('is-hidden', cat !== 'all' && c.dataset.cat !== cat);
+    });
+  }
+
+  function openLightbox(key) {
+    const g = GALLERIES[key];
+    if (!g) return;
+    lbTitle.textContent = g.title;
+    lbLink.href = g.url;
+    lbTabs.innerHTML = '';
+    g.shots.forEach((s, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lb-tab' + (idx === 0 ? ' active' : '');
+      btn.textContent = s.label;
+      btn.onclick = () => {
+        lbImg.src = s.src;
+        lbImg.alt = s.label;
+        lbTabs.querySelectorAll('.lb-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+      };
+      lbTabs.appendChild(btn);
+    });
+    lbImg.src = g.shots[0].src;
+    lbImg.alt = g.shots[0].label;
+    lightboxModal.classList.add('open');
+  }
+
+  function closeLightbox() { lightboxModal.classList.remove('open'); }
+  function openDownloadModal() { downloadModal.classList.add('open'); }
+  function closeDownloadModal() { downloadModal.classList.remove('open'); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeLightbox(); closeDownloadModal(); }
+  });
+
+  if (new URLSearchParams(location.search).get('device') === 'mobile') setDevice('mobile');
+</script>
+</body>
+</html>

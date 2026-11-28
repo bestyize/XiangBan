@@ -7,11 +7,10 @@ const route = useRoute()
 const tab = computed(() => route.meta.tab as string)
 
 const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
-  { to: '/', tab: 'desktop', label: '小伴桌面', icon: 'device' },
-  { to: '/guide', tab: 'guide', label: '玩法指南', icon: 'sparkles' },
-  { to: '/plugins', tab: 'plugins', label: 'AI 插件', icon: 'grid' },
-  { to: '/images', tab: 'home', label: '图片', icon: 'image' },
+  { to: '/', tab: 'home', label: '图片', icon: 'image' },
   { to: '/videos', tab: 'videos', label: '视频', icon: 'play' },
+  { to: '/categories', tab: 'categories', label: '分类', icon: 'grid' },
+  { to: '/me', tab: 'me', label: '我的', icon: 'user' },
 ]
 </script>
 
@@ -24,19 +23,13 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
       :class="{ active: tab === t.tab }"
       :aria-current="tab === t.tab ? 'page' : undefined"
     >
-      <span class="glyph"><img v-if="t.tab === 'desktop'" src="/app-icon.png" alt="" class="home-mark"><Icon v-else :name="t.icon" :size="24" /></span>
+      <span class="glyph"><Icon :name="t.icon" :size="24" /></span>
       <span class="label">{{ t.label }}</span>
     </RouterLink>
-    <a href="https://chat.xiangban.xyz/c/xiaoban-wallpaper" target="_blank" rel="noopener noreferrer">
-      <span class="glyph"><Icon name="network" :size="24" /></span>
-      <span class="label">论坛</span>
-    </a>
   </nav>
 </template>
 
 <style scoped>
-.home-mark { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
-
 .tabs {
   display: none;
 }
@@ -88,4 +81,3 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
   }
 }
 </style>
-

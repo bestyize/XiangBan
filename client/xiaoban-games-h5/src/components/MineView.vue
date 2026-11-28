@@ -242,7 +242,7 @@ function confirmClearAction() {
           <UiIcon name="chevron" :size="15" />
         </span>
       </a>
-      <a class="mine-row" href="https://wallpaper.xiangban.xyz/mobile" target="_blank" rel="noopener">
+      <a class="mine-row" href="https://xiaban.xyz/app" target="_blank" rel="noopener">
         <span class="mine-row-left">
           <span class="mine-row-ico"><UiIcon name="gamepad" :size="19" /></span>
           <span class="mine-row-label">下载小伴 App</span>

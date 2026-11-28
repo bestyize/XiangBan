@@ -100,7 +100,7 @@ const categoryName = computed(() => categories.value.find((c) => c.slug === q.va
           小伴市场
         </RouterLink>
         <span class="grow" />
-        <a class="site-link" href="https://wallpaper.xiangban.xyz" target="_blank" rel="noopener noreferrer">下载小伴桌面</a>
+        <a class="site-link" href="https://xiaban.xyz/desktop" target="_blank" rel="noopener noreferrer">下载小伴桌面</a>
       </div>
     </div>
 

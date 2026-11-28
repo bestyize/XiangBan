@@ -15,9 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'app-icon.png', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: '小伴桌面',
-        short_name: '小伴桌面',
-        description: '小伴桌面：桌宠陪伴、图片与动态壁纸',
+        name: '小伴壁纸',
+        short_name: '小伴壁纸',
+        description: '小伴壁纸：4K 高清静态与动态视频壁纸独立站',
         lang: 'zh-CN',
         start_url: '/',
         scope: '/',
@@ -35,9 +35,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
-        // The admin console needs the server anyway, so it is never answered from the cached app shell.
-        // Otherwise an out-of-date shell would send /admin to the home page instead of showing the real error.
-        navigateFallbackDenylist: [/^\/api\//, /^\/health/, /^\/admin/],
+        // Keep API, health, admin, and external redirect paths out of the cached SPA shell.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/health/,
+          /^\/admin/,
+          /^\/(desktop|pc|app|mobile|download|features|desktop-experience|plugins)(\/|$)/,
+        ],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname === '/api/v1/categories' || url.pathname === '/api/v1/providers',

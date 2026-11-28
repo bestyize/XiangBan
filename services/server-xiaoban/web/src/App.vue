@@ -14,22 +14,17 @@ const route = useRoute()
 const catalog = useCatalog()
 const account = useAccount()
 
-// The admin console has its own layout; the public site's navigation and viewer stay out of it.
-watch(() => route.meta.tab, tab => {
-  document.documentElement.dataset.siteTheme = tab === 'desktop' || tab === 'product' || tab === 'plugins' ? 'light' : 'dark'
-}, { immediate: true })
+document.documentElement.dataset.siteTheme = 'dark'
 
 const isAdmin = computed(() => route.meta.admin === true)
-const isStandalone = computed(() => route.meta.standalone === true)
-const hidePublicChrome = computed(() => isAdmin.value || isStandalone.value)
 
 const glow = computed(() => ({ '--ambient': ambientColor.value ?? '#2b2b33' }))
 
 let publicDataLoaded = false
 watch(
-  [() => route.matched.length, hidePublicChrome],
-  ([matched, hidden]) => {
-    if (!matched || hidden || publicDataLoaded) return
+  [() => route.matched.length, isAdmin],
+  ([matched, admin]) => {
+    if (!matched || admin || publicDataLoaded) return
     publicDataLoaded = true
     catalog.load()
     account.restore()
@@ -39,7 +34,7 @@ watch(
 </script>
 
 <template>
-  <RouterView v-if="hidePublicChrome" />
+  <RouterView v-if="isAdmin" />
   <template v-else>
     <div class="ambient" :style="glow" aria-hidden="true" />
     <TopBar />
@@ -67,4 +62,3 @@ watch(
   transition: --ambient 1.4s ease;
 }
 </style>
-

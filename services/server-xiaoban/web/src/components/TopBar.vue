@@ -8,33 +8,31 @@ const route = useRoute()
 const account = useAccount()
 const tab = computed(() => route.meta.tab as string)
 
-const FORUM_URL = 'https://chat.xiangban.xyz/c/xiaoban-wallpaper'
 const links = [
-  { to: '/features', tab: 'product', label: '功能' },
-  { to: '/download', tab: 'download', label: '下载' },
-  { to: '/images', tab: 'home', label: '壁纸' },
-  { to: '/videos', tab: 'videos', label: '视频' },
-  { to: '/guide', tab: 'guide', label: '玩法指南' },
-  { to: '/plugins', tab: 'plugins', label: 'AI 插件' },
+  { to: '/', tab: 'home', label: '精选图片' },
+  { to: '/videos', tab: 'videos', label: '动态视频' },
+  { to: '/categories', tab: 'categories', label: '分类' },
 ]
 </script>
 
 <template>
   <header class="topbar">
     <div class="inner">
-      <RouterLink to="/" class="brand" aria-label="小伴桌面首页" :aria-current="tab === 'desktop' ? 'page' : undefined"><img src="/app-icon.png" alt=""><span>小伴桌面</span></RouterLink>
+      <RouterLink to="/" class="brand" aria-label="小伴壁纸首页" :aria-current="tab === 'home' ? 'page' : undefined">
+        <img src="/app-icon.png" alt="">
+        <span>小伴壁纸</span>
+      </RouterLink>
 
       <nav class="links" aria-label="主导航">
         <RouterLink
           v-for="l in links"
           :key="l.to"
           :to="l.to"
-          :class="{ active: (l.to === '/features' ? route.path === '/features' || route.path === '/desktop-experience' : l.to === '/download' ? route.path === '/download' : tab === l.tab) }"
-          :aria-current="(l.to === '/features' ? route.path === '/features' || route.path === '/desktop-experience' : l.to === '/download' ? route.path === '/download' : tab === l.tab) ? 'page' : undefined"
+          :class="{ active: tab === l.tab }"
+          :aria-current="tab === l.tab ? 'page' : undefined"
         >
           {{ l.label }}
         </RouterLink>
-        <a :href="FORUM_URL" target="_blank" rel="noopener noreferrer">超级小伴论坛<Icon name="external" :size="14" /></a>
       </nav>
 
       <div class="actions">
@@ -42,6 +40,10 @@ const links = [
           <Icon name="search" :size="18" />
           <span>搜索壁纸</span>
         </RouterLink>
+        <a href="https://xiaban.xyz/" target="_blank" rel="noopener noreferrer" class="portal-link" title="小伴全端产品">
+          <span>小伴客户端</span>
+          <Icon name="external" :size="13" />
+        </a>
         <RouterLink
           v-if="account.user"
           to="/me"
@@ -77,7 +79,7 @@ const links = [
 .inner {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
   height: var(--header-h);
   max-width: 1760px;
   margin: 0 auto;
@@ -89,12 +91,18 @@ const links = [
   align-items: center;
   gap: 9px;
   flex-shrink: 0;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 650;
   line-height: 1;
 }
 
-.brand img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; box-shadow: 0 2px 8px rgba(249, 116, 75, 0.22); }
+.brand img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(249, 116, 75, 0.22);
+}
 
 .links {
   display: flex;
@@ -109,7 +117,7 @@ const links = [
   padding: 8px 14px;
   border-radius: 999px;
   color: var(--text-2);
-  transition: color 0.2s;
+  transition: color 0.2s, background 0.2s;
 }
 
 .links a:hover,
@@ -132,7 +140,7 @@ const links = [
   align-items: center;
   gap: 10px;
   height: 38px;
-  min-width: 220px;
+  min-width: 210px;
   padding: 0 16px;
   border-radius: 999px;
   background: var(--surface);
@@ -143,6 +151,26 @@ const links = [
 
 .search:hover {
   border-color: var(--line-strong);
+}
+
+.portal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.portal-link:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--surface);
 }
 
 .account {
@@ -176,6 +204,12 @@ const links = [
   object-fit: cover;
 }
 
+@media (max-width: 960px) {
+  .portal-link {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   /* Scrolls away with the page so the category rail can take the sticky slot at the top. */
   .topbar {
@@ -192,7 +226,7 @@ const links = [
 
   .brand {
     margin-right: auto;
-    font-size: 21px;
+    font-size: 20px;
   }
 
   .links {
@@ -226,4 +260,3 @@ const links = [
   }
 }
 </style>
-

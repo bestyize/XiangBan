@@ -1,6 +1,6 @@
 use axum::{
-    http::{header, StatusCode, Uri},
-    response::{IntoResponse, Response},
+    http::{header, HeaderMap, StatusCode, Uri},
+    response::{IntoResponse, Redirect, Response},
 };
 use rust_embed::RustEmbed;
 
@@ -17,8 +17,49 @@ fn cache_control(path: &str) -> &'static str {
     }
 }
 
-pub async fn static_handler(uri: Uri) -> Response {
-    let mut path = uri.path().trim_start_matches('/').to_string();
+fn is_mobile_ua(headers: &HeaderMap) -> bool {
+    let ua = headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let lower = ua.to_ascii_lowercase();
+    lower.contains("android")
+        || lower.contains("iphone")
+        || lower.contains("ipad")
+        || lower.contains("ipod")
+        || lower.contains("mobile")
+}
+
+fn legacy_redirect(path: &str, query: Option<&str>, headers: &HeaderMap) -> Option<Response> {
+    let normalized = path.trim_end_matches('/').to_ascii_lowercase();
+    let suffix = query.filter(|q| !q.is_empty()).map(|q| format!("?{q}")).unwrap_or_default();
+    match normalized.as_str() {
+        "desktop" | "pc" | "features" | "desktop-experience" => {
+            Some(Redirect::permanent(&format!("https://xiaban.xyz/desktop{suffix}")).into_response())
+        }
+        "app" | "mobile" => {
+            Some(Redirect::permanent(&format!("https://xiaban.xyz/app{suffix}")).into_response())
+        }
+        "download" => {
+            let target = if is_mobile_ua(headers) {
+                format!("https://xiaban.xyz/app{suffix}")
+            } else {
+                format!("https://xiaban.xyz/desktop{suffix}")
+            };
+            Some(Redirect::temporary(&target).into_response())
+        }
+        "plugins" => Some(Redirect::temporary("https://market.xiangban.xyz/").into_response()),
+        _ => None,
+    }
+}
+
+pub async fn static_handler(uri: Uri, headers: HeaderMap) -> Response {
+    let raw_path = uri.path().trim_start_matches('/');
+    if let Some(resp) = legacy_redirect(raw_path, uri.query(), &headers) {
+        return resp;
+    }
+
+    let mut path = raw_path.to_string();
     if path.is_empty() {
         path = "index.html".to_string();
     }

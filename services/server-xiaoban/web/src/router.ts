@@ -2,20 +2,24 @@ import { nextTick } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAdmin } from './stores/admin'
 
+function isMobileUa(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+}
+
+function redirectExternal(url: string) {
+  if (typeof window !== 'undefined') {
+    window.location.replace(url)
+  }
+  return false
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   // Scroll is restored per page in the guards below, because pages are kept alive between tabs.
   scrollBehavior: () => false,
   routes: [
-    { path: '/desktop', alias: '/pc', name: 'desktop-app', component: () => import('./views/DesktopAppDownload.vue'), meta: { tab: 'product', standalone: true } },
-    { path: '/', name: 'desktop', component: () => import('./views/ProductHome.vue'), meta: { tab: 'desktop' } },
-    { path: '/features', name: 'features', component: () => import('./views/ProductFeatures.vue'), meta: { tab: 'product' } },
-    { path: '/download', name: 'download', component: () => import('./views/ProductDownload.vue'), meta: { tab: 'product' } },
-    { path: '/app', alias: '/mobile', name: 'mobile-app', component: () => import('./views/MobileAppDownload.vue'), meta: { tab: 'product', standalone: true } },
-    { path: '/desktop-experience', name: 'desktop-experience', component: () => import('./views/DesktopView.vue'), meta: { tab: 'product' } },
-    { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
-    { path: '/plugins', name: 'plugins', component: () => import('./views/PluginsView.vue'), meta: { tab: 'plugins' } },
-    { path: '/images', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
+    { path: '/', alias: '/images', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/images/c/:id', alias: '/c/:id', name: 'category', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/videos', name: 'videos', component: () => import('./views/BrowseView.vue'), meta: { tab: 'videos' } },
     {
@@ -26,8 +30,16 @@ export const router = createRouter({
     },
     { path: '/search', name: 'search', component: () => import('./views/BrowseView.vue'), meta: { tab: 'search' } },
     { path: '/categories', name: 'categories', component: () => import('./views/CategoriesView.vue'), meta: { tab: 'categories' } },
-    { path: '/favorites', redirect: '/images' },
+    { path: '/favorites', redirect: '/' },
     { path: '/me', name: 'me', component: () => import('./views/SettingsView.vue'), meta: { tab: 'me' } },
+    { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
+
+    // Legacy product & download paths now live under xiaban.xyz / market.xiangban.xyz
+    { path: '/desktop', alias: ['/pc', '/features', '/desktop-experience'], beforeEnter: () => redirectExternal('https://xiaban.xyz/desktop'), component: () => import('./views/BrowseView.vue') },
+    { path: '/app', alias: '/mobile', beforeEnter: () => redirectExternal('https://xiaban.xyz/app'), component: () => import('./views/BrowseView.vue') },
+    { path: '/download', beforeEnter: () => redirectExternal(isMobileUa() ? 'https://xiaban.xyz/app' : 'https://xiaban.xyz/desktop'), component: () => import('./views/BrowseView.vue') },
+    { path: '/plugins', beforeEnter: () => redirectExternal('https://market.xiangban.xyz/'), component: () => import('./views/BrowseView.vue') },
+
     {
       path: '/admin/login',
       name: 'admin-login',
@@ -55,6 +67,13 @@ export const router = createRouter({
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
+})
+
+// Legacy anchor /#desktop-downloads from older notices redirects to xiaban.xyz/desktop.
+router.beforeEach((to) => {
+  if ((to.path === '/' || to.path === '/images') && to.hash === '#desktop-downloads') {
+    return redirectExternal(isMobileUa() ? 'https://xiaban.xyz/app' : 'https://xiaban.xyz/desktop')
+  }
 })
 
 // Everything under /admin except the login page needs a signed-in administrator.
@@ -86,4 +105,3 @@ router.afterEach(async (to, from) => {
   }
   if (to.path !== from.path) window.scrollTo({ top: scrollByPath.get(to.path) ?? 0, behavior: 'instant' })
 })
-

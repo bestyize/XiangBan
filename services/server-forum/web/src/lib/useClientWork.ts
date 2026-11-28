@@ -7,7 +7,7 @@ export function useClientWork(target: () => ClientWork | undefined) {
   const mobile = platform === 'android'
   const label = mobile ? '在小伴手机版打开' : '在小伴桌面打开'
   const icon = mobile ? 'client-phone' : 'client-monitor'
-  const download = 'https://wallpaper.xiangban.xyz/download#desktop-downloads'
+  const download = mobile ? 'https://xiaban.xyz/app' : 'https://xiaban.xyz/desktop'
   const href = computed(() => platform ? clientWorkLink(target()) : undefined)
   const help = ref(false)
   let trigger: HTMLElement | null = null

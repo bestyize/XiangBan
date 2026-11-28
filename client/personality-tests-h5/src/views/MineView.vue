@@ -238,7 +238,7 @@ async function submitChangePassword() {
 
         <a
           class="mine-app-dl"
-          href="https://wallpaper.xiangban.xyz/download"
+          href="https://xiaban.xyz/app"
           target="_blank"
           rel="noopener noreferrer"
         >

@@ -1,0 +1,70 @@
+# 香港云服务器宿主机 Nginx 静态站点配置：xiaban.xyz
+# 放进 /etc/nginx/conf.d/xiaban.xyz.conf
+# 首次申请 HTTPS 证书前，请先确认 xiaban.xyz 的 A 记录指向香港机 IP，
+# 并使用 80 端口临时配置运行：
+#   sudo certbot certonly --webroot -w /var/www/certbot -d xiaban.xyz
+# 证书签发后替换为本完整 HTTPS 配置并重载 Nginx。
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name xiaban.xyz www.xiaban.xyz;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://xiaban.xyz$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name xiaban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/xiaban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xiaban.xyz/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    root /var/www/xiaban.xyz;
+    index index.html;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # 反代小伴三端发布清单与下载接口，供 /desktop 与 /app 独立下载页实时拉取最新版本
+    location /api/v1/desktop/ {
+        proxy_pass https://wallpaper.xiangban.xyz/api/v1/desktop/;
+        proxy_set_header Host wallpaper.xiangban.xyz;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+        proxy_buffering off;
+    }
+
+    location /assets/ {
+        expires 365d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
