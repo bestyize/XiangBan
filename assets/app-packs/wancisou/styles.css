@@ -243,18 +243,6 @@ h1, h2, h3, p { margin: 0; }
       letter-spacing: -0.02em;
       color: var(--ink);
     }
-    .masthead-tag {
-      height: 22px;
-      padding: 0 8px;
-      border-radius: var(--r-pill);
-      background: var(--brand-soft);
-      color: var(--brand-ink);
-      font-size: 12px;
-      line-height: 22px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
 
     /* Fixed Search & Toolbar Dock */
     .search-dock {
