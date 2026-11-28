@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
     <main id="top" class="wrap">
       <section class="hero">
         <div class="hero-left">
-          <div class="hero-kicker"><i aria-hidden="true"></i> 小伴产品矩阵 · 6 款独立产品</div>
+          <div class="hero-kicker"><i aria-hidden="true"></i> 小伴产品矩阵 · {{ PRODUCTS.length }} 款独立产品</div>
           <h1>你的 AI 伙伴，与随手可玩的小世界</h1>
           <p>从桌面与手机里的个人 Agent，到免安装即玩的小游戏、趣味测评、社区与 4K 壁纸库。</p>
         </div>
@@ -184,7 +184,7 @@ onBeforeUnmount(() => {
             </a>
 
             <span class="shot-badge">{{ item.badge }}</span>
-            <button type="button" class="shot-zoom" @click.stop="openLightbox(item)">看实图</button>
+            <button type="button" class="shot-zoom" @click.stop="openLightbox(item)">{{ item.lightboxButtonLabel ?? '看实图' }}</button>
           </div>
 
           <a

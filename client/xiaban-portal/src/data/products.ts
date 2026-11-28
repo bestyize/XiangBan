@@ -23,6 +23,7 @@ export interface ProductItem {
     tertiaryAlt?: string;
   };
   lightboxTitle: string;
+  lightboxButtonLabel?: string;
   shots: ProductShot[];
 }
 
@@ -54,11 +55,12 @@ export const WALLPAPER_URL = 'https://wallpaper.xiangban.xyz/';
 export const DOWNLOAD_URL = 'https://xiaban.xyz/download';
 export const MOBILE_URL = 'https://xiaban.xyz/app';
 export const DESKTOP_URL = 'https://xiaban.xyz/desktop';
+const AI_SUBSCRIPTIONS_URL = 'https://aireset.xiaban.xyz/';
 
 export const FILTERS: Array<{ key: ProductCategory; label: string; count: number }> = [
-  { key: 'all', label: '全部', count: 6 },
+  { key: 'all', label: '全部', count: 7 },
   { key: 'client', label: '客户端', count: 2 },
-  { key: 'web', label: '社区/壁纸', count: 2 },
+  { key: 'web', label: '网站', count: 3 },
   { key: 'h5', label: '轻玩 H5', count: 2 },
 ];
 
@@ -184,6 +186,25 @@ export const PRODUCTS: ProductItem[] = [
       { label: '4K 壁纸网站', src: assetUrl('site-wallpaper.webp') },
     ],
   },
+  {
+    id: 'ai-subscriptions',
+    name: 'AI 订阅测评',
+    domainLabel: 'aireset.xiaban.xyz',
+    badge: 'Web · 额度实测',
+    category: 'web',
+    description: '对比主流 AI 订阅的额度与 API 等值，查看额度重置记录。',
+    url: AI_SUBSCRIPTIONS_URL,
+    previewKind: 'full',
+    previewImages: {
+      primary: assetUrl('site-ai-subscriptions.webp'),
+      primaryAlt: 'AI 订阅额度对比界面设计预览',
+    },
+    lightboxTitle: 'AI 订阅测评界面预览',
+    lightboxButtonLabel: '看预览',
+    shots: [
+      { label: '订阅额度实测', src: assetUrl('site-ai-subscriptions.webp') },
+    ],
+  },
 ];
 
 export const DOWNLOAD_OPTIONS: DownloadOption[] = [
@@ -211,4 +232,5 @@ export const FOOTER_LINKS: Array<{ label: string; url: string }> = [
   { label: '小伴游戏厅', url: 'https://game.xiaban.xyz/' },
   { label: '人格贩卖机', url: 'https://people.xiaban.xyz/' },
   { label: '小伴壁纸站', url: WALLPAPER_URL },
+  { label: 'AI 订阅测评', url: AI_SUBSCRIPTIONS_URL },
 ];

@@ -2,6 +2,10 @@
 
 状态：设计参考（功能页/下载页已合入 `ProductFeatures.vue` 与 `ProductDownload.vue`，管理后台已合入 `services/server-xiaoban/web/src/views/admin/`），静态文件不参与生产构建。全端统一入口见[小伴设计稿总导航](../../../../docs/design-preview/index.html)。
 
+## 小伴产品门户（xiaban.xyz）
+
+v2.1 已合入产品门户。产品列表和页脚末尾新增「AI 订阅测评」，归入「网站」筛选，卡片打开 `https://aireset.xiaban.xyz/`。设计稿支持切换 PC 与手机预览。[设计稿](prototypes/xiaban-matrix-portal.html) · [封面来源](../../../../docs/design-preview/prototypes/ai-quota-monitor.html) · [本地预览](http://127.0.0.1:1455/services/server-xiaoban/docs/design-specs/prototypes/xiaban-matrix-portal.html)
+
 ## 功能页 & 下载页 UI 重设计稿（v2.3 · PC + 移动 H5）
 
 [功能页 & 下载页 UI 重设计稿](prototypes/features-download-redesign.html) 采用极简暖白 · 墨黑与「双星相伴 · 日落珊瑚」品牌点缀，覆盖 `/features` 与 `/download` 完整 PC 与移动 H5 体验：

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>小伴 · xiaban.xyz 产品矩阵（设计稿 v2.0）</title>
+<title>小伴 · xiaban.xyz 产品矩阵（设计稿 v2.1）</title>
 <style>
   :root {
     --canvas: #faf8f5;
@@ -437,7 +437,7 @@
   <div class="review-bar" id="reviewBar">
     <div class="rb-group">
       <span class="rb-title">xiaban.xyz · 小伴产品矩阵</span>
-      <span class="rb-badge">v2.0 实图紧凑版</span>
+      <span class="rb-badge">v2.1</span>
     </div>
     <div class="rb-group">
       <div class="rb-seg">
@@ -476,19 +476,19 @@
           <!-- 紧凑型 Hero + 筛选 -->
           <section class="hero">
             <div class="hero-left">
-              <div class="hero-kicker"><i></i> 小伴产品矩阵 · 6 款独立产品</div>
+              <div class="hero-kicker"><i></i> 小伴产品矩阵 · 7 款独立产品</div>
               <h1>你的 AI 伙伴，与随手可玩的小世界</h1>
               <p>从桌面与手机里的个人 Agent，到免安装即玩的小游戏、趣味测评、社区与 4K 壁纸库。</p>
             </div>
             <div class="filter-bar" role="tablist" aria-label="产品分类">
-              <button type="button" class="filter-pill active" data-filter="all" onclick="setFilter('all')">全部 <span>6</span></button>
+              <button type="button" class="filter-pill active" data-filter="all" onclick="setFilter('all')">全部 <span>7</span></button>
               <button type="button" class="filter-pill" data-filter="client" onclick="setFilter('client')">客户端 <span>2</span></button>
-              <button type="button" class="filter-pill" data-filter="web" onclick="setFilter('web')">社区/壁纸 <span>2</span></button>
+              <button type="button" class="filter-pill" data-filter="web" onclick="setFilter('web')">网站 <span>3</span></button>
               <button type="button" class="filter-pill" data-filter="h5" onclick="setFilter('h5')">轻玩 H5 <span>2</span></button>
             </div>
           </section>
 
-          <!-- 3×2 紧凑实图卡片网格 -->
+          <!-- 产品卡片网格 -->
           <section class="grid" aria-label="小伴产品列表">
 
             <!-- 1. 小伴（手机 App） -->
@@ -636,6 +636,27 @@
               </a>
             </article>
 
+            <!-- 7. AI 订阅测评 -->
+            <article class="card" data-cat="web">
+              <div class="shot-wrap">
+                <a class="shot-link" href="https://aireset.xiaban.xyz/" target="_blank" rel="noopener noreferrer" aria-label="AI 订阅测评">
+                  <img class="shot-full" src="./assets/site-ai-subscriptions.webp" alt="AI 订阅额度对比界面设计预览" width="1008" height="630" loading="lazy" />
+                </a>
+                <span class="shot-badge">Web · 额度实测</span>
+                <button type="button" class="shot-zoom" onclick="openLightbox('ai-subscriptions')">看预览</button>
+              </div>
+              <a class="card-body" href="https://aireset.xiaban.xyz/" target="_blank" rel="noopener noreferrer">
+                <div class="card-head">
+                  <div class="card-title">
+                    <h2>AI 订阅测评</h2>
+                    <span>aireset.xiaban.xyz</span>
+                  </div>
+                  <span class="card-arrow" aria-hidden="true">↗</span>
+                </div>
+                <p class="card-desc">对比主流 AI 订阅的额度与 API 等值，查看额度重置记录。</p>
+              </a>
+            </article>
+
           </section>
 
           <!-- 一行式生态说明条 -->
@@ -658,6 +679,7 @@
               <a href="https://game.xiaban.xyz/" target="_blank" rel="noopener noreferrer">小伴游戏厅</a>
               <a href="https://people.xiaban.xyz/" target="_blank" rel="noopener noreferrer">人格贩卖机</a>
               <a href="https://wallpaper.xiangban.xyz/images" target="_blank" rel="noopener noreferrer">小伴壁纸站</a>
+              <a href="https://aireset.xiaban.xyz/" target="_blank" rel="noopener noreferrer">AI 订阅测评</a>
             </div>
           </footer>
         </main>
@@ -765,6 +787,13 @@
       url: 'https://wallpaper.xiangban.xyz/images',
       shots: [
         { label: '4K 壁纸网站', src: './assets/site-wallpaper.webp' }
+      ]
+    },
+    'ai-subscriptions': {
+      title: 'AI 订阅测评界面预览',
+      url: 'https://aireset.xiaban.xyz/',
+      shots: [
+        { label: '订阅额度实测', src: './assets/site-ai-subscriptions.webp' }
       ]
     }
   };

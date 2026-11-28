@@ -34,6 +34,7 @@ PORTAL_IMAGES=(
   mobile-chat-build.webp
   mobile-community-new.webp
   mobile-my-works.webp
+  site-ai-subscriptions.webp
   site-community.webp
   site-game.webp
   site-people.webp
