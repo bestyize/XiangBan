@@ -15,24 +15,24 @@ interface ShowcaseScene {
 
 const SCENES: ShowcaseScene[] = [
   {
-    tab: '造 3D 游戏',
+    tab: '创造工具/游戏',
     imgs: ['/desktop/mobile-chat-build.webp', '/desktop/mobile-my-works.webp'],
-    caption: '一句话本地造 3D 游戏，当场试玩并导出 ZIP',
+    caption: '一句话本地创造工具/游戏，当场运行并分享',
   },
   {
-    tab: '实时语音',
-    imgs: ['/desktop/mobile-voice-call.webp', '/desktop/mobile-ai-home.webp'],
-    caption: '端侧离线实时语音，回答中随时开口打断',
+    tab: 'AI 对话',
+    imgs: ['/desktop/mobile-ai-home.webp', '/desktop/mobile-ai-chat.webp'],
+    caption: '跨话题连续主线对话，生图与并行任务一站搞定',
   },
   {
-    tab: '遥控电脑',
-    imgs: ['/desktop/mobile-chat-remote.webp', '/desktop/mobile-chat-approve.webp'],
-    caption: '远程看电脑进度，高危操作手机一键批复',
+    tab: '原生社区',
+    imgs: ['/desktop/mobile-community-new.webp', '/desktop/mobile-my-works.webp'],
+    caption: '逛原生超级小伴社区，发现创意作品、日报与热榜',
   },
   {
-    tab: '社区多模型',
-    imgs: ['/desktop/mobile-community-new.webp', '/desktop/mobile-model-deepseek.webp'],
-    caption: '逛原生超级小伴社区，免登录接自有模型',
+    tab: '我的作品',
+    imgs: ['/desktop/mobile-my-works.webp', '/desktop/mobile-chat-build.webp'],
+    caption: '草稿随时续作，一键导出与分享作品海报',
   },
 ]
 
@@ -47,7 +47,7 @@ const GAMES = [
 
 const TOOLS = [
   { name: '万能遥控器', icon: '/desktop/plaza/remote-control.webp', desc: '内置电视空调离线红外码库' },
-  { name: '轻启 104', icon: '/desktop/plaza/quick-launch.webp', desc: '常用应用桌面闪电快捷入口' },
+  { name: '轻启', icon: '/desktop/plaza/quick-launch.webp', desc: '桌面闪电直达，跳过应用开屏广告' },
   { name: '动态壁纸', icon: '/desktop/plaza/live-wallpapers.webp', desc: '水下花园与银河，锁屏可分设' },
   { name: 'MBTI 向内看', icon: '/desktop/plaza/mbti.webp', desc: '48 题六章报告与分享海报' },
 ]
@@ -58,8 +58,8 @@ const FAQS = [
     a: '正常。官网直装 APK 采用固定证书签名，可核对 SHA-256，后续可在 App 内直接升级。',
   },
   {
-    q: '不登录或没电脑也能用吗？',
-    a: '可以。小游戏和实用工具离线即用，填自有模型 Key 免登录也能聊天与造游戏。',
+    q: '不登录账号也能体验吗？',
+    a: '可以。内置小游戏、红外遥控器、动态壁纸、轻启与 MBTI 均可离线直接使用。',
   },
   {
     q: 'iPhone 什么时候支持？',
@@ -157,9 +157,9 @@ function noteLines(notes?: string): string[] {
   const raw = (notes || '').trim()
   if (!raw) {
     return [
-      '手机本地造 3D 游戏，支持试玩与导出 ZIP',
-      '端侧离线实时语音通话，开口随时打断',
-      '内置万能遥控器、轻启 104、动态壁纸与倒杯快乐',
+      '手机本地创造工具/游戏，支持当场运行与分享',
+      '跨话题连续主线对话，支持生图与多任务并行',
+      '内置万能遥控器、轻启（跳过开屏广告）、动态壁纸与倒杯快乐',
     ]
   }
   return raw
@@ -330,7 +330,7 @@ onUnmounted(() => {
           </div>
 
           <h1>把 AI 伙伴与游乐场<br><span class="grad-text">一起装进口袋</span></h1>
-          <p class="pc-sub">AI 造游戏 · 离线语音 · 遥控电脑 · 实用小工具</p>
+          <p class="pc-sub">创造工具/游戏 · 官方游乐场 · 实用百宝箱 · 原生社区</p>
 
           <div class="qr-panel">
             <div class="qr-box" aria-label="手机扫码下载二维码">
@@ -376,7 +376,7 @@ onUnmounted(() => {
             <img src="/desktop/mobile-chat-build.webp" alt="手机造游戏">
           </div>
           <div class="shot-frame lift">
-            <img src="/desktop/mobile-voice-call.webp" alt="实时语音">
+            <img src="/desktop/mobile-community-new.webp" alt="原生社区">
           </div>
         </div>
       </section>
@@ -391,7 +391,7 @@ onUnmounted(() => {
         </div>
 
         <h1>把 AI 伙伴与游乐场<br><span class="grad-text">一起装进口袋</span></h1>
-        <p class="hero-sub">AI 造游戏 · 离线语音 · 遥控电脑 · 实用小工具</p>
+        <p class="hero-sub">创造工具/游戏 · 官方游乐场 · 实用百宝箱 · 原生社区</p>
 
         <!-- iOS 访客承接卡 -->
         <div v-if="env === 'ios'" class="ios-status-card">
@@ -508,11 +508,11 @@ onUnmounted(() => {
                   <span class="fc-ico coral">
                     <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z" /></svg>
                   </span>
-                  <h3>手机造 3D 小游戏</h3>
-                  <p>一句话写代码、当场试玩，支持导出 ZIP 或发到社区。</p>
+                  <h3>手机创造工具/游戏</h3>
+                  <p>一句话写代码、当场运行，支持导出或发到社区。</p>
                 </div>
                 <div class="fc-thumb">
-                  <img src="/desktop/mobile-chat-build.webp" alt="手机造 3D 小游戏" loading="lazy">
+                  <img src="/desktop/mobile-chat-build.webp" alt="手机创造工具与游戏" loading="lazy">
                 </div>
               </div>
             </article>
@@ -521,75 +521,46 @@ onUnmounted(() => {
               <div class="fc-split">
                 <div>
                   <span class="fc-ico green">
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                   </span>
-                  <h3>离线实时语音通话</h3>
-                  <p>本地识别人声与字幕，回答中开口随时打断。</p>
+                  <h3>连续对话与 AI 生图</h3>
+                  <p>跨话题主线聊天、多任务并行，支持一键生成静态图与 GIF。</p>
                 </div>
                 <div class="fc-thumb">
-                  <img src="/desktop/mobile-voice-call.webp" alt="离线实时语音通话" loading="lazy">
+                  <img src="/desktop/mobile-ai-chat.webp" alt="连续对话与 AI 生图" loading="lazy">
                 </div>
               </div>
             </article>
           </div>
         </section>
 
-        <!-- 02 手机遥控电脑 -->
+        <!-- 02 官方游乐场 -->
         <section class="sec">
           <div class="sec-head">
-            <h2>手机遥控电脑</h2>
+            <h2>官方游乐场</h2>
           </div>
           <div class="relay-card">
             <div class="relay-glow" aria-hidden="true" />
-            <div class="relay-diagram">
-              <div class="relay-node">
-                <span class="relay-node-ico">
-                  <svg width="15" height="15" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>
-                </span>
-                <span>小伴手机</span>
-              </div>
-              <div class="relay-line"><span>同账号直连</span></div>
-              <div class="relay-node">
-                <span class="relay-node-ico">
-                  <svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
-                </span>
-                <span>小伴桌面</span>
-              </div>
+            <div class="arcade-head">
+              <h3>内置精选小游戏，离线断点续玩</h3>
+              <span class="arcade-pill">零广告</span>
             </div>
-            <h3>远程看进度，高危操作手机一键批复</h3>
-            <div class="relay-shots">
-              <figure class="relay-shot">
-                <img src="/desktop/mobile-chat-remote.webp" alt="遥控对话" loading="lazy">
-                <figcaption>遥控对话</figcaption>
-              </figure>
-              <figure class="relay-shot">
-                <img src="/desktop/mobile-chat-approve.webp" alt="权限审批" loading="lazy">
-                <figcaption>权限审批</figcaption>
-              </figure>
-            </div>
-          </div>
-        </section>
-
-        <!-- 03 内置游戏与小工具 -->
-        <section class="sec">
-          <div class="sec-head">
-            <h2>内置游戏与小工具</h2>
-          </div>
-
-          <div class="feature-card">
-            <div class="plaza-strip-head">
-              <strong>官方小游戏</strong>
-              <span>零广告 · 离线可玩</span>
-            </div>
-            <div class="game-rail">
-              <div v-for="g in GAMES" :key="g.name" class="game-tile">
+            <div class="arcade-grid">
+              <div v-for="g in GAMES" :key="g.name" class="arcade-tile">
                 <div class="game-icon"><img :src="g.icon" :alt="g.name" loading="lazy"></div>
                 <strong>{{ g.name }}</strong>
               </div>
             </div>
           </div>
+        </section>
 
-          <div class="tool-grid">
+        <!-- 03 实用百宝箱 -->
+        <section class="sec">
+          <div class="sec-head">
+            <h2>实用百宝箱</h2>
+          </div>
+
+          <div class="tool-grid" style="margin-top: 0">
             <article v-for="t in TOOLS" :key="t.name" class="tool-card">
               <div class="tool-head">
                 <div class="tool-icon"><img :src="t.icon" :alt="t.name" loading="lazy"></div>
@@ -600,10 +571,10 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <!-- 04 社区与自有模型 -->
+        <!-- 04 社区与作品 -->
         <section class="sec">
           <div class="sec-head">
-            <h2>社区与自有模型</h2>
+            <h2>社区与作品</h2>
           </div>
           <div class="dual-grid">
             <article class="mini-showcase">
@@ -612,16 +583,16 @@ onUnmounted(() => {
               </div>
               <div class="ms-body">
                 <strong>超级小伴社区</strong>
-                <p>作品即点即玩、前沿日报与榜单</p>
+                <p>创意作品即点即玩、前沿日报与热榜</p>
               </div>
             </article>
             <article class="mini-showcase">
               <div class="ms-shot">
-                <img src="/desktop/mobile-model-deepseek.webp" alt="免登录自由模型" loading="lazy">
+                <img src="/desktop/mobile-my-works.webp" alt="我的作品空间" loading="lazy">
               </div>
               <div class="ms-body">
-                <strong>免登录自由模型</strong>
-                <p>接入 OpenAI / DeepSeek，密钥存本地</p>
+                <strong>我的作品空间</strong>
+                <p>草稿随时续作，一键分享海报与作品</p>
               </div>
             </article>
           </div>
@@ -1501,6 +1472,53 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .relay-card h3 { font-size: 16px; font-weight: 740; position: relative; z-index: 1; }
+.arcade-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+.arcade-pill {
+  font-size: 11px;
+  font-weight: 650;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(245, 244, 248, 0.85);
+  flex: none;
+}
+.arcade-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 10px;
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+@media (min-width: 800px) {
+  .arcade-grid { grid-template-columns: repeat(6, 1fr); gap: 14px; }
+}
+.arcade-tile { text-align: center; }
+.arcade-tile .game-icon {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 7px;
+  border-radius: 16px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+}
+.arcade-tile strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  color: #f5f4f8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .relay-shots {
   display: grid;
   grid-template-columns: 1fr 1fr;

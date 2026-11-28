@@ -28,7 +28,7 @@ npm --prefix client/xiaoban-desktop run dev
 
 | 设计稿 | 模块 | 状态 | 内容 |
 | --- | --- | --- | --- |
-| [小伴手机版 · 独立移动端下载落地页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-download-h5.html) | 分发与拉新 | 已合入 | 面向扫码/社交分享/H5 引流的独立移动端下载落地页 6 画板交互原型，已合入官网 `/app`（别名 `/mobile`、`MobileAppDownload.vue`）：首屏 3 秒转化与 4 场景实机切换、端侧 Agent 造 3D 游戏与实时语音、手机电脑互联审批、游乐场与 4 大工具实装图标矩阵、原生社区与免登录多模型、下载后安装指引抽屉、微信拦截遮罩、iOS 网页生态导流及 PC 真实二维码扫码直下（[本地预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-download-h5.html)） |
+| [小伴手机版 · 独立移动端下载落地页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-download-h5.html) | 分发与拉新 | 已合入 | 面向扫码/社交分享/H5 引流的独立移动端下载落地页 6 画板交互原型，已合入官网 `/app`（别名 `/mobile`、`MobileAppDownload.vue`）：首屏 3 秒转化与 4 场景实机切换、端侧创造工具/游戏与连续对话生图、墨黑官方游乐场、实用百宝箱 2×2 实装图标矩阵、原生社区与我的作品空间、下载后安装指引抽屉、微信拦截遮罩、iOS 网页生态导流及 PC 真实二维码扫码直下（[本地预览](http://127.0.0.1:1455/client/xiaoban-multiplatform/docs/design-specs/prototypes/mobile-download-h5.html)） |
 | [应用广场视觉重设计](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/app-plaza-redesign.html) | 应用与广场 | 已合入 | 零额外封面三方案对比（定稿方案 A · 精装榜单流，已合入手机与网页）：1:1 图标三行横滑游戏卡 × 2×2 工具矩阵 × 净化 3:2 社区双列卡 |
 | [实时语音通话页](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/voice-call-redesign.html) | 核心 AI 与对话 | 已合入 | 同步「双星相伴 · 日落珊瑚」AppIcon，88dp 同心呼吸光球（回答态上收至 64dp 释放 224dp 渐隐歌词区），思考/聆听/回答三态与六套主题色 |
 | [小伴 AI 聊天窗口与全卡片体系](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/ai-chat-ui.html) | 核心 AI 与对话 | 已合入 | 通栏流式排版、无底星标、思考/完成/过程三合一摘要卡，统一 16px 白底细框卡片语法覆盖交付/提醒/生图/代码块/文件变更与贴底审批/提问/方案确认卡 |

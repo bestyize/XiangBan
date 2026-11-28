@@ -56,9 +56,9 @@ const TARGET_METAS: Record<DesktopTargetId, TargetMeta> = {
 
 const HERO_SCENES = [
   {
-    tab: '控电脑 & 模型',
+    tab: '控电脑 & 控手机',
     img: '/desktop/desktop-config-ai.webp',
-    caption: '原生控屏与 ADB 控手机，官方与自有模型自由切换',
+    caption: '原生看屏操作电脑与连接手机，自动完成多步工作流',
   },
   {
     tab: '外部协作',
@@ -95,7 +95,7 @@ const FAQS = [
   },
   {
     q: '不登录账号也能用吗？后续如何更新？',
-    a: '可以。壁纸、特效、组件、桌宠与自有第三方模型均支持免登录使用；新版在「设置 → 关于」内直接升级。',
+    a: '可以。壁纸、特效、组件与桌宠均可直接体验；新版在「设置 → 关于」内直接升级。',
   },
 ]
 
@@ -329,7 +329,7 @@ onUnmounted(() => {
           </div>
 
           <h1>你的 AI 工作台<br>与<span class="grad-text">活桌面</span></h1>
-          <p class="hero-sub">控电脑与手机 · 无限画布 · 3D 特效与组件 · 多模型自由</p>
+          <p class="hero-sub">控电脑与手机 · 无限画布 · 3D 特效与组件 · 桌宠壁纸</p>
 
           <!-- OS 切换器 -->
           <div class="os-seg" role="tablist" aria-label="选择电脑系统">
@@ -383,8 +383,6 @@ onUnmounted(() => {
             <span class="trust-item"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>官方签名</span>
             <span>·</span>
             <span class="trust-item"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>零广告</span>
-            <span>·</span>
-            <span class="trust-item"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>免登录可用</span>
             <button
               v-if="activeDownload?.sha256"
               type="button"
@@ -446,7 +444,7 @@ onUnmounted(() => {
                 </span>
                 <h3>控电脑与 ADB 控手机</h3>
               </div>
-              <p>原生看屏点击与自动化操作，免登录自由接入 DeepSeek、OpenAI、Claude 等自有模型。</p>
+              <p>原生看屏点击、输入与多步自动化操作，复杂重复任务交给 AI 自主推进。</p>
             </div>
           </article>
 
@@ -498,10 +496,10 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- ==================== 03 双端接力与创作空间 ==================== -->
+      <!-- ==================== 03 创作空间与超级小伴 ==================== -->
       <section class="sec">
         <div class="sec-head">
-          <h2>双端接力与创作空间</h2>
+          <h2>创作空间与超级小伴</h2>
         </div>
         <div class="bento-2">
           <article class="feature-card">
@@ -516,11 +514,11 @@ onUnmounted(() => {
 
           <article class="feature-card">
             <div class="fc-shot">
-              <img src="/desktop/desktop-config-agent.webp" alt="手机远程遥控与语音" loading="lazy">
+              <img src="/desktop/assistant.webp" alt="超级小伴悬浮助手" loading="lazy">
             </div>
             <div class="fc-body">
-              <h3>手机遥控与超级小伴</h3>
-              <p>离开工位用手机看任务进度与审批权限；电脑端按快捷键随时悬浮截图标注与语音对话。</p>
+              <h3>超级小伴悬浮助手</h3>
+              <p>全局快捷键随时呼出小球与胶囊，支持区域截图标注、语音快问与多轮对话。</p>
             </div>
           </article>
         </div>
