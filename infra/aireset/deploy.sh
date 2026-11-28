@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# AI额度监控（aireset.xiaban.xyz）本地构建 + 静态产物同步脚本
+# AI订阅测评（aireset.xiaban.xyz）本地构建 + 静态产物同步脚本
 # 遵守云服务器部署规范：100% 本地构建与自检，严禁在远端服务器执行 npm / 浏览器预渲染。
 #
 # 用法示例：

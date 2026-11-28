@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | [client/xiaoban-desktop](client/xiaoban-desktop/README.md) | 3.1.8 | 小伴桌面：Windows/macOS 桌宠、动态壁纸、十四个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | Android/iOS 使用 KMP + Compose；包含社区、小伴 AI 与手机桌面互联，桌面壳使用 Rust + Tauri |
-| [client/aireset-web](client/aireset-web/README.md) | 首版静态站 | AI额度监控 QuotaReset（aireset.xiaban.xyz）：ChatGPT/Codex、反重力、Claude 额度重置雷达与订阅额度实测；零依赖静态站，构建期预渲染，香港机 Nginx 托管，部署见 [infra/aireset](infra/aireset/README.md)；重置记录目前为演示数据 |
+| [client/aireset-web](client/aireset-web/README.md) | 首版静态站 | AI订阅测评 QuotaReset（aireset.xiaban.xyz，中英双语 `/` + `/en/`）：ChatGPT/Codex、反重力、Claude 额度重置雷达与订阅额度实测；零依赖静态站，构建期预渲染，香港机 Nginx 托管，部署见 [infra/aireset](infra/aireset/README.md)；重置记录目前为演示数据 |
 | [services/server-xiaoban](services/server-xiaoban/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-market](services/server-xiaoban-market/README.md) | 已实现 | 小伴市场：专家、技能、连接器的自建目录服务，公开网页、下载 / 更新检测 API，以及 SkillHub、魔搭社区的采集工作台；Rust Axum + PostgreSQL + Vue 3 + Vite |
 | [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴社区（chat.xiangban.xyz）：发现、讨论与资源，包含学习、创作、休闲和站方资讯；Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |

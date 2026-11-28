@@ -1,15 +1,17 @@
-# AI额度监控 QuotaReset（aireset-web）
+# AI订阅测评 QuotaReset（aireset-web）
 
-状态：已实现首版（静态站），域名 `aireset.xiaban.xyz`，部署到香港云服务器，见 [infra/aireset/README.md](../../infra/aireset/README.md)。
+状态：已实现首版（中英双语静态站），域名 `aireset.xiaban.xyz`，部署到香港云服务器，见 [infra/aireset/README.md](../../infra/aireset/README.md)。
 
-御三家（ChatGPT/Codex、反重力 Antigravity、Claude）额度重置雷达与订阅额度实测对比站。视觉与交互按设计稿 [ai-quota-monitor.html](../../docs/design-preview/prototypes/ai-quota-monitor.html) 落地，PC 与移动端共用同一份响应式页面（容器查询）。
+御三家（ChatGPT/Codex、反重力 Antigravity、Claude）额度重置雷达与订阅额度实测对比站。视觉与交互按设计稿 [ai-quota-monitor.html](../../docs/design-preview/prototypes/ai-quota-monitor.html) 落地，PC 与移动端共用同一份响应式页面（容器查询），支持简体中文与英文切换。
 
 ## 页面
 
 | 路径 | 内容 |
 | --- | --- |
-| `/` | 重置雷达：三平台距上次全局重置计时与状态、30 天三轨时间轴、统一历史重置记录（点平台卡片可筛选） |
-| `/benchmark/` | 订阅额度实测：10 档订阅的平均月 / 每周 / 五小时 Token 与 API 等值、月费倍率、每 $1 Token，同套餐多模型拆解 |
+| `/` | 中文重置雷达：三平台距上次全局重置计时与状态、30 天三轨时间轴、统一历史重置记录（点平台卡片可筛选） |
+| `/benchmark/` | 中文订阅额度实测：10 档订阅的平均月 / 每周 / 五小时 Token（亿）与 API 等值、月费倍率、每 $1 Token（万），同套餐多模型拆解 |
+| `/en/` | 英文重置雷达（QuotaReset）：完整英文界面与 hreflang 互链 |
+| `/en/benchmark/` | 英文订阅额度实测（Plan Benchmarks）：Token 单位自动切换为 `B`/`M` |
 
 顶部「交流群」跳转小伴社区联系我们页（`chat.xiangban.xyz/contact`），「小伴产品门户」跳转 `xiaban.xyz`。
 

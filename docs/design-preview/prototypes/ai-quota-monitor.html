@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>AI额度监控 QuotaReset — ChatGPT Codex、反重力 Antigravity、Claude 额度重置雷达与订阅额度实测</title>
-<meta name="description" content="AI额度监控（QuotaReset）实时追踪 ChatGPT/Codex、反重力 Antigravity 与 Claude 的官方全局重置与重置卡动态，并提供各档 AI 订阅套餐的 Token 容量与官方 API 等值实测对比。" />
-<meta property="og:title" content="AI额度监控 QuotaReset — 御三家额度重置雷达与订阅实测" />
+<title>AI订阅测评 QuotaReset — ChatGPT Codex、反重力 Antigravity、Claude 额度重置雷达与订阅实测</title>
+<meta name="description" content="AI订阅测评（QuotaReset）实时追踪 ChatGPT/Codex、反重力 Antigravity 与 Claude 的官方全局重置与重置卡动态，并对比各档 AI 订阅套餐的 Token 容量与官方 API 等值。" />
+<meta property="og:title" content="AI订阅测评 QuotaReset — 御三家额度重置雷达与订阅实测" />
 <meta property="og:description" content="一站追踪 ChatGPT/Codex、反重力 Antigravity、Claude 额度重置动态与主流 AI 订阅套餐实测性价比。" />
 <style>
 /* ==========================================================================
@@ -480,6 +480,12 @@ button { cursor: pointer; }
 .btn-icon {
   width: 34px;
   padding: 0;
+}
+
+.lang-btn {
+  min-width: 40px;
+  padding: 0 9px;
+  font-weight: 600;
 }
 
 .btn-sm {
@@ -1472,23 +1478,23 @@ button { cursor: pointer; }
 }
 </style>
 </head>
-<body>
+<body data-initial-tab="overview" data-initial-lang="zh">
 
 <!-- ========================================================================
      Design Review Bar (Switch Responsive / PC 1280 / Mobile 390)
      ======================================================================== -->
 <div class="spec-toolbar" id="specToolbar">
   <div class="spec-toolbar-left">
-    <span class="spec-badge">设计稿预览</span>
-    <span class="spec-note">AI额度监控 QuotaReset · 顶部双 Tab 分离 · 全响应 PC + 移动端原型</span>
+    <span class="spec-badge" data-i18n="specBadge">设计稿预览</span>
+    <span class="spec-note" data-i18n="specNote">AI订阅测评 QuotaReset · 中英文双语 · 顶部双 Tab 分离 · 全响应 PC + 移动端原型</span>
   </div>
   <div class="spec-controls">
     <div class="spec-seg" role="group" aria-label="视口切换">
-      <button type="button" data-vp="fluid" class="active">自适应</button>
+      <button type="button" data-vp="fluid" class="active" data-i18n="vpFluid">自适应</button>
       <button type="button" data-vp="desktop">PC 1280px</button>
-      <button type="button" data-vp="mobile">手机 390px</button>
+      <button type="button" data-vp="mobile" data-i18n="vpMobile">手机 390px</button>
     </div>
-    <button type="button" class="spec-dismiss" id="hideSpecBar">隐藏顶条</button>
+    <button type="button" class="spec-dismiss" id="hideSpecBar" data-i18n="specHide">隐藏顶条</button>
   </div>
 </div>
 
@@ -1508,35 +1514,31 @@ button { cursor: pointer; }
                 <polyline points="22 12 18 12 15 20 9 4 6 12 2 12"></polyline>
               </svg>
             </span>
-            <span class="brand-name">AI额度监控 <span class="brand-sub">QuotaReset</span></span>
+            <span class="brand-name"><span data-i18n="brandTitle">AI订阅测评</span> <span class="brand-sub" data-i18n="brandSub">QuotaReset</span></span>
           </button>
 
           <!-- PC Top Multi-Tabs -->
-          <nav class="nav-tabs" role="tablist" aria-label="主导航">
-            <button type="button" class="nav-tab" role="tab" data-tab="overview" aria-selected="true">
-              重置雷达
-              <span class="tab-tag">刚重置</span>
-            </button>
-            <button type="button" class="nav-tab" role="tab" data-tab="benchmark" aria-selected="false">
-              订阅额度实测
-            </button>
+          <nav class="nav-tabs" role="tablist" aria-label="主导航" data-i18n-aria="ariaMainNav">
+            <button type="button" class="nav-tab" role="tab" data-tab="overview" aria-selected="true" data-i18n="tabOverview">重置雷达</button>
+            <button type="button" class="nav-tab" role="tab" data-tab="benchmark" aria-selected="false" data-i18n="tabBenchmark">订阅额度实测</button>
           </nav>
 
           <!-- Right Actions -->
           <div class="header-actions">
-            <a class="btn" id="openGroupBtn" href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer" title="前往小伴社区联系我们（加入交流群）" aria-label="交流群">
+            <a class="btn" id="openGroupBtn" href="https://chat.xiangban.xyz/contact" target="_blank" rel="noopener noreferrer" title="前往小伴社区联系我们（加入交流群）" aria-label="交流群" data-i18n-title="groupTitle" data-i18n-aria="groupLabel">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="10" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
-              <span class="btn-label-hide-sm">交流群</span>
+              <span class="btn-label-hide-sm" data-i18n="groupLabel">交流群</span>
             </a>
-            <a class="btn btn-primary" id="openPortalBtn" href="https://xiaban.xyz" target="_blank" rel="noopener noreferrer" title="前往小伴产品门户（xiaban.xyz）" aria-label="小伴产品门户">
+            <a class="btn btn-primary" id="openPortalBtn" href="https://xiaban.xyz" target="_blank" rel="noopener noreferrer" title="前往小伴产品门户（xiaban.xyz）" aria-label="小伴产品门户" data-i18n-title="portalTitle" data-i18n-aria="portalLabel">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
               </svg>
-              <span class="btn-label-hide-sm">小伴产品门户</span>
+              <span class="btn-label-hide-sm" data-i18n="portalLabel">小伴产品门户</span>
             </a>
-            <button type="button" class="btn btn-icon" id="themeToggleBtn" aria-label="切换深浅色">
+            <button type="button" class="btn lang-btn" id="langToggleBtn" aria-label="Switch language / 切换语言">EN</button>
+            <button type="button" class="btn btn-icon" id="themeToggleBtn" aria-label="切换深浅色" data-i18n-aria="ariaTheme">
               <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none">
                 <circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
               </svg>
@@ -1549,10 +1551,10 @@ button { cursor: pointer; }
       </div>
 
       <!-- Mobile Scrollable Top Multi-Tab Bar -->
-      <div class="mobile-tab-bar" role="tablist" aria-label="移动端主导航">
+      <div class="mobile-tab-bar" role="tablist" aria-label="移动端主导航" data-i18n-aria="ariaMobileNav">
         <div class="mobile-tab-list">
-          <button type="button" class="nav-tab" role="tab" data-tab="overview" aria-selected="true">重置雷达</button>
-          <button type="button" class="nav-tab" role="tab" data-tab="benchmark" aria-selected="false">订阅额度实测</button>
+          <button type="button" class="nav-tab" role="tab" data-tab="overview" aria-selected="true" data-i18n="tabOverview">重置雷达</button>
+          <button type="button" class="nav-tab" role="tab" data-tab="benchmark" aria-selected="false" data-i18n="tabBenchmark">订阅额度实测</button>
         </div>
       </div>
     </header>
@@ -1566,96 +1568,30 @@ button { cursor: pointer; }
       <section class="tab-panel active" id="panel-overview" role="tabpanel">
         <div class="page-head">
           <div>
-            <h1 class="page-title">御三家重置雷达与实测速览</h1>
-            <p class="page-desc">实时追踪 ChatGPT / Codex、反重力（Antigravity）与 Claude 的官方额度重置、重置卡动态及各档订阅等效 API 实测。</p>
+            <h1 class="page-title" data-i18n="overviewTitle">御三家重置雷达与实测速览</h1>
+            <p class="page-desc" data-i18n="overviewDesc">实时追踪 ChatGPT / Codex、反重力（Antigravity）与 Claude 的官方额度重置、重置卡动态及各档订阅等效 API 实测。</p>
           </div>
           <div class="head-meta">
-            <span class="live-pill"><span class="live-dot"></span>自动轮询正常 · 60s</span>
-            <div class="tz-switch" role="group" aria-label="时区切换">
-              <button type="button" data-tz="UTC+8" class="active">北京时间</button>
+            <span class="live-pill"><span class="live-dot"></span><span data-i18n="livePolling">自动轮询正常 · 60s</span></span>
+            <div class="tz-switch" role="group" aria-label="时区切换" data-i18n-aria="ariaTz">
+              <button type="button" data-tz="UTC+8" class="active" data-i18n="tzBeijing">北京时间</button>
               <button type="button" data-tz="UTC">UTC</button>
             </div>
           </div>
         </div>
 
         <!-- 3-Platform Live Reset Summary Cards -->
-        <div class="radar-grid">
-          <button type="button" class="radar-card" data-filter-log="chatgpt">
-            <div class="radar-top">
-              <div class="plat-ident">
-                <span class="plat-badge gpt">GPT</span>
-                <div>
-                  <div class="plat-name">ChatGPT / Codex</div>
-                  <div class="plat-handle">信源 @thsottiaux · OpenAI</div>
-                </div>
-              </div>
-              <span class="status-chip ok">18 小时前全局重置</span>
-            </div>
-            <div class="elapsed-block">
-              <span class="elapsed-label">距上次全局重置已过</span>
-              <span class="elapsed-clock mono" data-live-since="chatgpt">00天 18时 24分 11秒</span>
-            </div>
-            <p class="radar-quote">「已为 Plus / Pro 订阅触发一次全局 Codex 用量重置，外加 1 张 30 天内可手动激活的重置卡。」</p>
-            <div class="radar-foot">
-              <span class="num">近 30 天重置 4 次 · 平均 7.2 天</span>
-              <span class="radar-link" data-card-hint="chatgpt">筛选记录 ↓</span>
-            </div>
-          </button>
-
-          <button type="button" class="radar-card" data-filter-log="antigravity">
-            <div class="radar-top">
-              <div class="plat-ident">
-                <span class="plat-badge ag">AGY</span>
-                <div>
-                  <div class="plat-name">反重力 Antigravity</div>
-                  <div class="plat-handle">信源 @varunmohan · Google</div>
-                </div>
-              </div>
-              <span class="status-chip warn">4 天前全池重置</span>
-            </div>
-            <div class="elapsed-block">
-              <span class="elapsed-label">距上次全局重置已过</span>
-              <span class="elapsed-clock mono" data-live-since="antigravity">04天 09时 12分 44秒</span>
-            </div>
-            <p class="radar-quote">「针对 Gemini 池与 Claude 共享池的 429 抖动完成扩容，已清空受影响账号的周限冷却。」</p>
-            <div class="radar-foot">
-              <span class="num">近 30 天重置 3 次 · 平均 9.8 天</span>
-              <span class="radar-link" data-card-hint="antigravity">筛选记录 ↓</span>
-            </div>
-          </button>
-
-          <button type="button" class="radar-card" data-filter-log="claude">
-            <div class="radar-top">
-              <div class="plat-ident">
-                <span class="plat-badge claude">CLD</span>
-                <div>
-                  <div class="plat-name">Claude / Claude Code</div>
-                  <div class="plat-handle">信源 Anthropic Status · X</div>
-                </div>
-              </div>
-              <span class="status-chip alert">11 天未全局重置</span>
-            </div>
-            <div class="elapsed-block">
-              <span class="elapsed-label">距上次全局重置已过</span>
-              <span class="elapsed-clock mono" data-live-since="claude">11天 06时 48分 05秒</span>
-            </div>
-            <p class="radar-quote">「上次为 Opus 新版发布同步发放的周限额全额重置；目前 Pro / Max 维持常规 5 小时滚动窗口。」</p>
-            <div class="radar-foot">
-              <span class="num">近 30 天重置 2 次 · 1 张补偿卡待领</span>
-              <span class="radar-link" data-card-hint="claude">筛选记录 ↓</span>
-            </div>
-          </button>
-        </div>
+        <div class="radar-grid" id="radarGrid"></div>
 
         <!-- Signature Move: 30-Day Synchronized 3-Track Reset Timeline -->
         <div class="section-block">
           <div class="section-head">
-            <h2 class="section-title">近 30 天三轨同步重置时间轴</h2>
+            <h2 class="section-title" data-i18n="timelineTitle">近 30 天三轨同步重置时间轴</h2>
             <div class="timeline-legend">
-              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-gpt)"></span>ChatGPT 全局</span>
-              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-ag)"></span>反重力全局</span>
-              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-claude)"></span>Claude 全局</span>
-              <span class="legend-item"><span class="legend-swatch banked"></span>重置卡 / 补偿</span>
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-gpt)"></span><span data-i18n="legGpt">ChatGPT 全局</span></span>
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-ag)"></span><span data-i18n="legAg">反重力全局</span></span>
+              <span class="legend-item"><span class="legend-swatch" style="background:var(--brand-claude)"></span><span data-i18n="legClaude">Claude 全局</span></span>
+              <span class="legend-item"><span class="legend-swatch banked"></span><span data-i18n="legBanked">重置卡 / 补偿</span></span>
             </div>
           </div>
           <div class="surface timeline-card">
@@ -1677,27 +1613,27 @@ button { cursor: pointer; }
         <!-- Unified Reset History Log (Replaces the 3 separate platform pages) -->
         <div class="section-block" id="unifiedHistorySection">
           <div class="section-head">
-            <h2 class="section-title">御三家历史重置与策略记录</h2>
+            <h2 class="section-title" data-i18n="historyTitle">御三家历史重置与策略记录</h2>
             <span class="section-sub" id="unifiedHistoryCount">共 13 条记录</span>
           </div>
 
           <div class="toolbar-row">
             <div class="filter-pills" id="logPlatFilters">
-              <button type="button" class="pill-btn active" data-lplat="all">全部平台</button>
+              <button type="button" class="pill-btn active" data-lplat="all" data-i18n="fltAllPlat">全部平台</button>
               <button type="button" class="pill-btn" data-lplat="chatgpt">ChatGPT / Codex</button>
-              <button type="button" class="pill-btn" data-lplat="antigravity">反重力 Antigravity</button>
+              <button type="button" class="pill-btn" data-lplat="antigravity" data-i18n="platAgShort">反重力 Antigravity</button>
               <button type="button" class="pill-btn" data-lplat="claude">Claude</button>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <div class="filter-pills" id="logTypeFilters">
-                <button type="button" class="pill-btn active" data-ltype="all">全部类型</button>
-                <button type="button" class="pill-btn" data-ltype="global">全局重置</button>
-                <button type="button" class="pill-btn" data-ltype="banked">重置卡 / 补偿</button>
-                <button type="button" class="pill-btn" data-ltype="policy">政策调整</button>
+                <button type="button" class="pill-btn active" data-ltype="all" data-i18n="fltAllType">全部类型</button>
+                <button type="button" class="pill-btn" data-ltype="global" data-i18n="fltGlobal">全局重置</button>
+                <button type="button" class="pill-btn" data-ltype="banked" data-i18n="fltBanked">重置卡 / 补偿</button>
+                <button type="button" class="pill-btn" data-ltype="policy" data-i18n="fltPolicy">政策调整</button>
               </div>
               <div class="search-wrap">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-                <input type="search" class="search-input" id="unifiedLogSearch" placeholder="搜索公告内容、适用套餐…" />
+                <input type="search" class="search-input" id="unifiedLogSearch" placeholder="搜索公告内容、适用套餐…" data-i18n-placeholder="searchPlaceholder" />
               </div>
             </div>
           </div>
@@ -1707,13 +1643,13 @@ button { cursor: pointer; }
             <table class="compact-table">
               <thead>
                 <tr>
-                  <th>时间</th>
-                  <th>平台</th>
-                  <th>类型</th>
-                  <th>覆盖范围</th>
-                  <th>事件摘要</th>
-                  <th>间隔</th>
-                  <th>信源</th>
+                  <th data-i18n="colTime">时间</th>
+                  <th data-i18n="colPlatform">平台</th>
+                  <th data-i18n="colType">类型</th>
+                  <th data-i18n="colScope">覆盖范围</th>
+                  <th data-i18n="colSummary">事件摘要</th>
+                  <th data-i18n="colInterval">间隔</th>
+                  <th data-i18n="colSource">信源</th>
                 </tr>
               </thead>
               <tbody id="unifiedHistoryTableBody"></tbody>
@@ -1729,22 +1665,22 @@ button { cursor: pointer; }
       <section class="tab-panel" id="panel-benchmark" role="tabpanel">
         <div class="page-head">
           <div>
-            <h1 class="page-title">御三家订阅额度实测与 API 等值换算</h1>
-            <p class="page-desc">按主力模型对比 ChatGPT、反重力与 Claude 各档位在五小时、每周及平均月（周额度 ×52÷12）下的 Token 容量、API 等值美元与每 $1 产出；同套餐多模型共享池不叠加。</p>
+            <h1 class="page-title" data-i18n="benchTitle">御三家订阅额度实测与 API 等值换算</h1>
+            <p class="page-desc" data-i18n="benchDesc">按主力模型对比 ChatGPT、反重力与 Claude 各档位在五小时、每周及平均月（周额度 ×52÷12）下的 Token 容量、API 等值美元与每 $1 产出；同套餐多模型共享池不叠加。</p>
           </div>
           <div class="head-meta">
-            <span class="status-chip neutral">口径快照：2026-11-25 · 参考 ModelDial 公开实测</span>
+            <span class="status-chip neutral" data-i18n="benchSnapshot">口径快照：2026-11-25 · 参考 ModelDial 公开实测</span>
           </div>
         </div>
 
         <!-- Interactive Budget / Usage Recommender -->
         <div class="surface calc-banner">
           <div>
-            <div style="font-weight:700;font-size:14.5px;margin-bottom:4px">按月预算档位快速对比</div>
+            <div style="font-weight:700;font-size:14.5px;margin-bottom:4px" data-i18n="budgetPrompt">按月预算档位快速对比</div>
             <div class="calc-controls" id="intensityGroup">
-              <button type="button" class="pill-btn" data-intensity="light">$20 入门主力档</button>
-              <button type="button" class="pill-btn active" data-intensity="medium">$100 进阶编码档</button>
-              <button type="button" class="pill-btn" data-intensity="heavy">$200–$500 重度并发档</button>
+              <button type="button" class="pill-btn" data-intensity="light" data-i18n="budgetLight">$20 入门主力档</button>
+              <button type="button" class="pill-btn active" data-intensity="medium" data-i18n="budgetMedium">$100 进阶编码档</button>
+              <button type="button" class="pill-btn" data-intensity="heavy" data-i18n="budgetHeavy">$200–$500 重度并发档</button>
             </div>
           </div>
           <div class="calc-result" id="calcResultBox">
@@ -1755,22 +1691,22 @@ button { cursor: pointer; }
         <!-- Filter, Period & Sort Controls -->
         <div class="toolbar-row">
           <div class="filter-pills" id="benchPlatformFilters">
-            <button type="button" class="pill-btn active" data-bplat="all">全部套餐 (10)</button>
+            <button type="button" class="pill-btn active" data-bplat="all" data-i18n="bAll">全部套餐 (10)</button>
             <button type="button" class="pill-btn" data-bplat="claude">Claude (3)</button>
-            <button type="button" class="pill-btn" data-bplat="antigravity">反重力 Antigravity (3)</button>
+            <button type="button" class="pill-btn" data-bplat="antigravity" data-i18n="bAg">反重力 Antigravity (3)</button>
             <button type="button" class="pill-btn" data-bplat="chatgpt">ChatGPT / Codex (4)</button>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <div class="tz-switch" id="benchPeriodBtns" role="group" aria-label="用量周期">
-              <button type="button" data-bperiod="month" class="active">平均月</button>
-              <button type="button" data-bperiod="week">每周</button>
-              <button type="button" data-bperiod="win5h">五小时</button>
+            <div class="tz-switch" id="benchPeriodBtns" role="group" aria-label="用量周期" data-i18n-aria="ariaPeriod">
+              <button type="button" data-bperiod="month" class="active" data-i18n="perMonth">平均月</button>
+              <button type="button" data-bperiod="week" data-i18n="perWeek">每周</button>
+              <button type="button" data-bperiod="win5h" data-i18n="per5h">五小时</button>
             </div>
             <div class="filter-pills" id="benchSortBtns">
-              <button type="button" class="pill-btn active" data-bsort="ratio">按倍率</button>
-              <button type="button" class="pill-btn" data-bsort="apiMonth">按 API 等值</button>
-              <button type="button" class="pill-btn" data-bsort="perDollar">按每 $1 Token</button>
-              <button type="button" class="pill-btn" data-bsort="price">按月费</button>
+              <button type="button" class="pill-btn active" data-bsort="ratio" data-i18n="srtRatio">按倍率</button>
+              <button type="button" class="pill-btn" data-bsort="apiMonth" data-i18n="srtApi">按 API 等值</button>
+              <button type="button" class="pill-btn" data-bsort="perDollar" data-i18n="srtPerDollar">按每 $1 Token</button>
+              <button type="button" class="pill-btn" data-bsort="price" data-i18n="srtPrice">按月费</button>
             </div>
           </div>
         </div>
@@ -1780,13 +1716,13 @@ button { cursor: pointer; }
           <table class="bench-table">
             <thead>
               <tr>
-                <th>订阅套餐 · 主力模型</th>
-                <th>月费</th>
+                <th data-i18n="bColPlan">订阅套餐 · 主力模型</th>
+                <th data-i18n="bColPrice">月费</th>
                 <th id="thPeriodTokens">平均月 Token</th>
                 <th id="thPeriodApi">平均月 API 等值</th>
-                <th>月费倍率</th>
-                <th>每 $1 Token（月均）</th>
-                <th>限窗机制</th>
+                <th data-i18n="bColRatio">月费倍率</th>
+                <th data-i18n="bColPerDollar">每 $1 Token（月均）</th>
+                <th data-i18n="bColWindow">限窗机制</th>
                 <th></th>
               </tr>
             </thead>
@@ -1798,8 +1734,8 @@ button { cursor: pointer; }
         <div class="mobile-bench-list" id="mobileBenchList"></div>
 
         <div style="margin-top:14px;font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <span>说明：单模型满跑口径（OpenAI 默认 97% 缓存命中，Claude 基于高缓存 Agent 负载）；API 等值不直接等同于任务数。</span>
-          <span>参考对照：<a href="https://modeldial.com/subscriptions" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">modeldial.com/subscriptions ↗</a></span>
+          <span data-i18n="benchFootnote">说明：单模型满跑口径（OpenAI 默认 97% 缓存命中，Claude 基于高缓存 Agent 负载）；API 等值不直接等同于任务数。</span>
+          <span><span data-i18n="benchRefLabel">参考对照：</span><a href="https://modeldial.com/subscriptions" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">modeldial.com/subscriptions ↗</a></span>
         </div>
       </section>
 
@@ -1808,8 +1744,8 @@ button { cursor: pointer; }
     <!-- Footer -->
     <footer class="site-footer">
       <div class="footer-inner">
-        <span>AI额度监控 QuotaReset · 独立社区监控原型，与 OpenAI、Google、Anthropic 无官方关联。</span>
-        <span>注：重置记录为设计稿演示数据；订阅额度按 2026-11-25 公开实测参考口径展示。</span>
+        <span data-i18n="footerLeft">AI订阅测评 QuotaReset · 独立社区监控原型，与 OpenAI、Google、Anthropic 无官方关联。</span>
+        <span data-i18n="footerRight">注：重置记录为设计稿演示数据；订阅额度按 2026-11-25 公开实测参考口径展示。</span>
       </div>
     </footer>
 
@@ -1821,98 +1757,292 @@ button { cursor: pointer; }
 
 <script>
 /* ==========================================================================
+   I18N Dictionary (zh / en)
+   ========================================================================== */
+const I18N = {
+  zh: {
+    specBadge: '设计稿预览',
+    specNote: 'AI订阅测评 QuotaReset · 中英文双语 · 顶部双 Tab 分离 · 全响应 PC + 移动端原型',
+    vpFluid: '自适应',
+    vpMobile: '手机 390px',
+    specHide: '隐藏顶条',
+    brandTitle: 'AI订阅测评',
+    brandSub: 'QuotaReset',
+    ariaMainNav: '主导航',
+    ariaMobileNav: '移动端主导航',
+    ariaTheme: '切换深浅色',
+    ariaTz: '时区切换',
+    ariaPeriod: '用量周期',
+    tabOverview: '重置雷达',
+    tabBenchmark: '订阅额度实测',
+    groupLabel: '交流群',
+    groupTitle: '前往小伴社区联系我们（加入交流群）',
+    portalLabel: '小伴产品门户',
+    portalTitle: '前往小伴产品门户（xiaban.xyz）',
+    langSwitchLabel: 'EN',
+    overviewTitle: '御三家重置雷达与实测速览',
+    overviewDesc: '实时追踪 ChatGPT / Codex、反重力（Antigravity）与 Claude 的官方额度重置、重置卡动态及各档订阅等效 API 实测。',
+    livePolling: '自动轮询正常 · 60s',
+    tzBeijing: '北京时间',
+    elapsedLabel: '距上次全局重置已过',
+    filterHint: '筛选记录 ↓',
+    filteredHint: '已筛选 · 点此还原',
+    timelineTitle: '近 30 天三轨同步重置时间轴',
+    legGpt: 'ChatGPT 全局',
+    legAg: '反重力全局',
+    legClaude: 'Claude 全局',
+    legBanked: '重置卡 / 补偿',
+    axis30: '30 天前 (10/29)',
+    axis15: '15 天前 (11/13)',
+    axisToday: '今天 (11/28)',
+    historyTitle: '御三家历史重置与策略记录',
+    fltAllPlat: '全部平台',
+    platAgShort: '反重力 Antigravity',
+    fltAllType: '全部类型',
+    fltGlobal: '全局重置',
+    fltBanked: '重置卡 / 补偿',
+    fltPolicy: '政策调整',
+    searchPlaceholder: '搜索公告内容、适用套餐…',
+    colTime: '时间',
+    colPlatform: '平台',
+    colType: '类型',
+    colScope: '覆盖范围',
+    colSummary: '事件摘要',
+    colInterval: '间隔',
+    colSource: '信源',
+    emptyDesktop: '没有符合当前筛选条件的重置记录，试试切换到「全部平台」。',
+    emptyMobile: '暂无匹配记录',
+    scopePrefix: '范围：',
+    gapPrefix: '间隔 ',
+    benchTitle: '御三家订阅额度实测与 API 等值换算',
+    benchDesc: '按主力模型对比 ChatGPT、反重力与 Claude 各档位在五小时、每周及平均月（周额度 ×52÷12）下的 Token 容量、API 等值美元与每 $1 产出；同套餐多模型共享池不叠加。',
+    benchSnapshot: '口径快照：2026-11-25 · 参考 ModelDial 公开实测',
+    budgetPrompt: '按月预算档位快速对比',
+    budgetLight: '$20 入门主力档',
+    budgetMedium: '$100 进阶编码档',
+    budgetHeavy: '$200–$500 重度并发档',
+    bAll: '全部套餐 (10)',
+    bAg: '反重力 Antigravity (3)',
+    perMonth: '平均月',
+    perWeek: '每周',
+    per5h: '五小时',
+    srtRatio: '按倍率',
+    srtApi: '按 API 等值',
+    srtPerDollar: '按每 $1 Token',
+    srtPrice: '按月费',
+    bColPlan: '订阅套餐 · 主力模型',
+    bColPrice: '月费',
+    bColRatio: '月费倍率',
+    bColPerDollar: '每 $1 Token（月均）',
+    bColWindow: '限窗机制',
+    benchFootnote: '说明：单模型满跑口径（OpenAI 默认 97% 缓存命中，Claude 基于高缓存 Agent 负载）；API 等值不直接等同于任务数。',
+    benchRefLabel: '参考对照：',
+    footerLeft: 'AI订阅测评 QuotaReset · 独立社区监控原型，与 OpenAI、Google、Anthropic 无官方关联。',
+    footerRight: '注：重置记录为设计稿演示数据；订阅额度按 2026-11-25 公开实测参考口径展示。',
+    mainPrefix: '主力：',
+    curBudgetTag: '当前预算档',
+    collapse: '收起 ▲',
+    expandModels: '多模型 ▼',
+    kvOther: '同套餐其他主力模型',
+    kvFable: '旗舰 / 共享模型池',
+    kvRule: '限窗与刷新规则',
+    kvMethod: '实测口径说明',
+    mCollapse: '收起同套餐多模型拆解 ▲',
+    mExpand: '查看同套餐多模型与口径拆解 ▼',
+    mLblOther: '其他模型：',
+    mLblFable: '高阶/共享池：',
+    mLblRule: '限窗规则：',
+    moSuffix: '/月',
+    perDollarUnit: '每 $1 Token（月均）',
+    toastCopied: '已复制链接到剪贴板',
+    toastTzZh: '已切换为北京时间 (UTC+8)',
+    toastTzUtc: '已切换为 UTC 标准时间',
+    toastLang: '已切换为简体中文'
+  },
+  en: {
+    specBadge: 'Design Preview',
+    specNote: 'QuotaReset · AI Plan Review · Bilingual zh/en · Dual Top Tabs · PC + Mobile Prototype',
+    vpFluid: 'Responsive',
+    vpMobile: 'Mobile 390px',
+    specHide: 'Hide Bar',
+    brandTitle: 'QuotaReset',
+    brandSub: 'AI Plan Review',
+    ariaMainNav: 'Primary navigation',
+    ariaMobileNav: 'Mobile navigation',
+    ariaTheme: 'Toggle color theme',
+    ariaTz: 'Timezone switch',
+    ariaPeriod: 'Usage period',
+    tabOverview: 'Reset Radar',
+    tabBenchmark: 'Plan Benchmarks',
+    groupLabel: 'Community',
+    groupTitle: 'Visit Xiaoban Community Contact Page',
+    portalLabel: 'Xiaoban Portal',
+    portalTitle: 'Open Xiaoban Product Portal (xiaban.xyz)',
+    langSwitchLabel: '中文',
+    overviewTitle: 'Big-Three Reset Radar & Snapshot',
+    overviewDesc: 'Live tracking of global quota resets, banked reset cards, and API-equivalent subscription benchmarks across ChatGPT / Codex, Google Antigravity, and Claude.',
+    livePolling: 'Live polling · 60s',
+    tzBeijing: 'UTC+8',
+    elapsedLabel: 'Time since last global reset',
+    filterHint: 'Filter logs ↓',
+    filteredHint: 'Filtered · Reset',
+    timelineTitle: '30-Day Synchronized 3-Track Reset Timeline',
+    legGpt: 'ChatGPT Global',
+    legAg: 'Antigravity Global',
+    legClaude: 'Claude Global',
+    legBanked: 'Reset Card / Voucher',
+    axis30: '30d ago (Oct 29)',
+    axis15: '15d ago (Nov 13)',
+    axisToday: 'Today (Nov 28)',
+    historyTitle: 'Reset History & Policy Changelog',
+    fltAllPlat: 'All Platforms',
+    platAgShort: 'Google Antigravity',
+    fltAllType: 'All Types',
+    fltGlobal: 'Global Reset',
+    fltBanked: 'Voucher / Credits',
+    fltPolicy: 'Policy Update',
+    searchPlaceholder: 'Search notices, plans, sources…',
+    colTime: 'Time',
+    colPlatform: 'Platform',
+    colType: 'Type',
+    colScope: 'Scope',
+    colSummary: 'Summary',
+    colInterval: 'Gap',
+    colSource: 'Source',
+    emptyDesktop: 'No reset records match your filter. Try switching back to All Platforms.',
+    emptyMobile: 'No matching records',
+    scopePrefix: 'Scope: ',
+    gapPrefix: 'Gap ',
+    benchTitle: 'AI Subscription Quota & API Equivalent Review',
+    benchDesc: 'Compare flagship-model token capacity, API-equivalent USD value, fee leverage, and tokens per $1 across 5-hour, weekly, and average monthly (weekly × 52 ÷ 12) windows. Models within a plan share one pool.',
+    benchSnapshot: 'Snapshot: 2026-11-25 · Ref: ModelDial',
+    budgetPrompt: 'Compare by Monthly Budget Tier',
+    budgetLight: '$20 Entry Tier',
+    budgetMedium: '$100 Pro Coding Tier',
+    budgetHeavy: '$200–$500 Heavy Parallel Tier',
+    bAll: 'All Plans (10)',
+    bAg: 'Antigravity (3)',
+    perMonth: 'Avg. Month',
+    perWeek: 'Weekly',
+    per5h: '5 Hours',
+    srtRatio: 'Leverage',
+    srtApi: 'API Value',
+    srtPerDollar: 'Tokens / $1',
+    srtPrice: 'Price',
+    bColPlan: 'Plan · Flagship Model',
+    bColPrice: 'Fee',
+    bColRatio: 'Leverage',
+    bColPerDollar: 'Tokens / $1 (Mo)',
+    bColWindow: 'Rate Window',
+    benchFootnote: 'Note: Single-model full consumption (OpenAI assumes 97% cached input; Claude uses high-cache agent load). API value ≠ task count.',
+    benchRefLabel: 'Reference:',
+    footerLeft: 'QuotaReset · AI Plan Review — Independent community prototype, not affiliated with OpenAI, Google, or Anthropic.',
+    footerRight: 'Note: Reset logs are prototype demo data; plan quotas reflect 2026-11-25 public benchmark estimates.',
+    mainPrefix: 'Model: ',
+    curBudgetTag: 'Selected tier',
+    collapse: 'Hide ▲',
+    expandModels: 'Models ▼',
+    kvOther: 'Other Flagship Models',
+    kvFable: 'Top / Shared Model Pool',
+    kvRule: 'Window & Reset Rules',
+    kvMethod: 'Methodology',
+    mCollapse: 'Hide multi-model breakdown ▲',
+    mExpand: 'View multi-model breakdown ▼',
+    mLblOther: 'Other models: ',
+    mLblFable: 'Top/Shared pool: ',
+    mLblRule: 'Window rule: ',
+    moSuffix: '/mo',
+    perDollarUnit: 'Tokens / $1 (Mo)',
+    toastCopied: 'Copied link to clipboard',
+    toastTzZh: 'Switched to Beijing Time (UTC+8)',
+    toastTzUtc: 'Switched to UTC',
+    toastLang: 'Switched to English'
+  }
+};
+
+/* ==========================================================================
    Sample Data (Explicitly Demo Data for Prototype Validation)
    ========================================================================== */
-const NOW = Date.now();
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
 
 const PLATFORMS = {
   chatgpt: {
     id: 'chatgpt',
-    name: 'ChatGPT / Codex',
+    name: { zh: 'ChatGPT / Codex', en: 'ChatGPT / Codex' },
+    trackName: { zh: 'ChatGPT', en: 'ChatGPT' },
     short: 'GPT',
     dotClass: 'gpt',
-    sourceHandle: '@thsottiaux · OpenAI Status',
-    statusText: '18 小时前全局重置',
-    statusType: 'ok',
-    lastResetTs: NOW - (18 * HOUR + 24 * 60 * 1000),
-    avgInterval: '7.2 天',
-    count30d: '4 次',
-    bankedCard: '1 张待激活（29 天后过期）',
-    windowRule: '5h 滚动 + 周限额',
-    latestZh: '已为所有 Plus 与 Pro 活跃订阅执行一次 Codex 全局额度重置，并额外向账户下发 1 张 Banked Reset 卡（可在 Settings → Usage 中 30 天内手动使用）。',
-    latestEn: 'We just triggered a global Codex usage reset for Plus & Pro subscribers, plus 1 banked reset card redeemable manually within 30 days in Settings → Usage.',
-    apiEndpoint: '/api/v1/resets?platform=chatgpt',
+    sourceHandle: { zh: '信源 @thsottiaux · OpenAI Status', en: 'Source @thsottiaux · OpenAI Status' },
+    lastResetTs: Date.parse('2026-11-27T11:16:00+08:00'),
+    footStats: { zh: '近 30 天重置 4 次 · 平均 7.2 天', en: '4 resets in 30d · Avg 7.2d' },
+    quote: {
+      zh: '「已为 Plus / Pro 订阅触发一次全局 Codex 用量重置，外加 1 张 30 天内可手动激活的重置卡。」',
+      en: '"Triggered a global Codex usage reset for Plus & Pro plans, plus 1 banked reset card valid for 30 days."'
+    },
     history: [
-      { id: 'gpt-1', date: '2026-11-27 11:16', type: 'global', typeLabel: '全局重置', scope: 'Plus / Pro / Team', title: 'Codex 负载扩容完成，全局清零已用额度并赠 1 张重置卡', source: 'X @thsottiaux', interval: '6.8 天' },
-      { id: 'gpt-2', date: '2026-11-20 16:05', type: 'banked', typeLabel: '重置卡', scope: 'Plus / Pro', title: '周末编码峰值补偿：所有受限流账号发放 1 张免费重置卡', source: 'OpenAI Help', interval: '7.4 天' },
-      { id: 'gpt-3', date: '2026-11-13 06:40', type: 'global', typeLabel: '全局重置', scope: '全量订阅', title: 'GPT-5 Codex 新推理档位上线，同步触发全局额度刷新', source: 'X @thsottiaux', interval: '8.1 天' },
-      { id: 'gpt-4', date: '2026-11-05 03:20', type: 'policy', typeLabel: '政策调整', scope: 'Pro ($200)', title: '调整长上下文缓存折扣计费口径，同等任务消耗下降约 18%', source: 'Changelog', interval: '6.5 天' },
-      { id: 'gpt-5', date: '2026-10-29 14:50', type: 'global', typeLabel: '全局重置', scope: 'Plus / Pro', title: '月底集中算力释放，重置当前周限额计数', source: 'X @thsottiaux', interval: '—' }
+      { id: 'gpt-1', date: '2026-11-27 11:16', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: 'Plus / Pro / Team', en: 'Plus / Pro / Team' }, title: { zh: 'Codex 负载扩容完成，全局清零已用额度并赠 1 张重置卡', en: 'Codex capacity expanded: global quota cleared + 1 banked reset card issued' }, source: 'X @thsottiaux', interval: { zh: '6.8 天', en: '6.8d' } },
+      { id: 'gpt-2', date: '2026-11-20 16:05', type: 'banked', typeLabel: { zh: '重置卡', en: 'Reset Card' }, scope: { zh: 'Plus / Pro', en: 'Plus / Pro' }, title: { zh: '周末编码峰值补偿：所有受限流账号发放 1 张免费重置卡', en: 'Weekend peak compensation: 1 free reset card granted to rate-limited accounts' }, source: 'OpenAI Help', interval: { zh: '7.4 天', en: '7.4d' } },
+      { id: 'gpt-3', date: '2026-11-13 06:40', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: '全量订阅', en: 'All Paid Tiers' }, title: { zh: 'GPT-5 Codex 新推理档位上线，同步触发全局额度刷新', en: 'New Codex reasoning tier launched alongside a full global quota refresh' }, source: 'X @thsottiaux', interval: { zh: '8.1 天', en: '8.1d' } },
+      { id: 'gpt-4', date: '2026-11-05 03:20', type: 'policy', typeLabel: { zh: '政策调整', en: 'Policy' }, scope: { zh: 'Pro ($200)', en: 'Pro ($200)' }, title: { zh: '调整长上下文缓存折扣计费口径，同等任务消耗下降约 18%', en: 'Updated long-context cache discount metering; equivalent task burn dropped ~18%' }, source: 'Changelog', interval: { zh: '6.5 天', en: '6.5d' } },
+      { id: 'gpt-5', date: '2026-10-29 14:50', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: 'Plus / Pro', en: 'Plus / Pro' }, title: { zh: '月底集中算力释放，重置当前周限额计数', en: 'Month-end compute release: active weekly quota counters reset' }, source: 'X @thsottiaux', interval: { zh: '—', en: '—' } }
     ]
   },
   antigravity: {
     id: 'antigravity',
-    name: '反重力 Antigravity',
+    name: { zh: '反重力 Antigravity', en: 'Google Antigravity' },
+    trackName: { zh: '反重力', en: 'Antigravity' },
     short: 'AGY',
     dotClass: 'ag',
-    sourceHandle: '@varunmohan · Google AI',
-    statusText: '4 天前全池重置',
-    statusType: 'warn',
-    lastResetTs: NOW - (4 * DAY + 9 * HOUR + 12 * 60 * 1000),
-    avgInterval: '9.8 天',
-    count30d: '3 次',
-    bankedCard: '应急点数已开启（本月剩 2 次）',
-    windowRule: 'Gemini 池 / Claude 共享池双轨',
-    latestZh: '针对近期高峰期 429 限流问题完成集群扩容，已对 Google AI Pro 与 Ultra 用户的 Gemini 池及 Claude/GPT 共享池统一清零冷却计数。',
-    latestEn: 'Capacity expansion complete after recent 429 spikes. Global quota cooldowns for both the Gemini pool and the shared Claude/GPT pool have been reset for Pro & Ultra users.',
-    apiEndpoint: '/api/v1/resets?platform=antigravity',
+    sourceHandle: { zh: '信源 @varunmohan · Google AI', en: 'Source @varunmohan · Google AI' },
+    lastResetTs: Date.parse('2026-11-24T02:30:00+08:00'),
+    footStats: { zh: '近 30 天重置 3 次 · 平均 9.8 天', en: '3 resets in 30d · Avg 9.8d' },
+    quote: {
+      zh: '「针对 Gemini 池与 Claude 共享池的 429 抖动完成扩容，已清空受影响账号的周限冷却。」',
+      en: '"Scaled capacity after 429 spikes; weekly cooldowns cleared across both Gemini and shared Claude pools."'
+    },
     history: [
-      { id: 'ag-1', date: '2026-11-24 02:30', type: 'global', typeLabel: '全局重置', scope: 'Pro / Ultra 双池', title: '集群扩容完成，清空 Gemini 池与 Claude 共享池周限冷却', source: 'X @varunmohan', interval: '9.5 天' },
-      { id: 'ag-2', date: '2026-11-14 14:10', type: 'policy', typeLabel: '池化调整', scope: 'Google AI Pro', title: 'Gemini 4 Neon 纳入 5 小时高频池，降低非峰值消耗倍率', source: 'Google Blog', interval: '10.2 天' },
-      { id: 'ag-3', date: '2026-11-04 09:00', type: 'global', typeLabel: '全局重置', scope: '全量 Antigravity', title: 'IDE 重大版本推送后触发全量额度刷新', source: 'Release Notes', interval: '9.6 天' },
-      { id: 'ag-4', date: '2026-10-25 19:20', type: 'banked', typeLabel: '应急点数', scope: 'Ultra 订阅', title: '因跨区认证短暂异常，额外赠送 200 AI Credits 应急额度', source: 'Status Page', interval: '—' }
+      { id: 'ag-1', date: '2026-11-24 02:30', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: 'Pro / Ultra 双池', en: 'Pro / Ultra Pools' }, title: { zh: '集群扩容完成，清空 Gemini 池与 Claude 共享池周限冷却', en: 'Cluster scaling complete: cleared weekly cooldowns for Gemini & shared Claude pools' }, source: 'X @varunmohan', interval: { zh: '9.5 天', en: '9.5d' } },
+      { id: 'ag-2', date: '2026-11-14 14:10', type: 'policy', typeLabel: { zh: '池化调整', en: 'Pool Rule' }, scope: { zh: 'Google AI Pro', en: 'Google AI Pro' }, title: { zh: 'Gemini 4 Neon 纳入 5 小时高频池，降低非峰值消耗倍率', en: 'Gemini 4 Neon added to 5h rolling pool with lower off-peak burn multiplier' }, source: 'Google Blog', interval: { zh: '10.2 天', en: '10.2d' } },
+      { id: 'ag-3', date: '2026-11-04 09:00', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: '全量 Antigravity', en: 'All Antigravity' }, title: { zh: 'IDE 重大版本推送后触发全量额度刷新', en: 'Major IDE release triggered a platform-wide quota refresh' }, source: 'Release Notes', interval: { zh: '9.6 天', en: '9.6d' } },
+      { id: 'ag-4', date: '2026-10-25 19:20', type: 'banked', typeLabel: { zh: '应急点数', en: 'Bonus Credits' }, scope: { zh: 'Ultra 订阅', en: 'Ultra Tier' }, title: { zh: '因跨区认证短暂异常，额外赠送 200 AI Credits 应急额度', en: 'Granted 200 bonus AI Credits following brief cross-region auth disruption' }, source: 'Status Page', interval: { zh: '—', en: '—' } }
     ]
   },
   claude: {
     id: 'claude',
-    name: 'Claude / Claude Code',
+    name: { zh: 'Claude / Claude Code', en: 'Claude / Claude Code' },
+    trackName: { zh: 'Claude', en: 'Claude' },
     short: 'CLD',
     dotClass: 'claude',
-    sourceHandle: 'Anthropic Status · 社区核验',
-    statusText: '11 天未全局重置',
-    statusType: 'alert',
-    lastResetTs: NOW - (11 * DAY + 6 * HOUR + 48 * 60 * 1000),
-    avgInterval: '14.5 天',
-    count30d: '2 次',
-    bankedCard: '1 张故障补偿卡（6 天后失效）',
-    windowRule: '5h 滚动 + 固定周限额',
-    latestZh: '上次全局重置为 Opus 新模型发布窗口同步发放；近期无新增全局重置，但 11 月 19 日 API 抖动受影响账号可在 Usage 设置页手动点击一次免费重置。',
-    latestEn: 'Last global reset shipped alongside the new Opus release window. No new global reset since; accounts impacted by the Nov 19 latency incident still have 1 manual "Reset for free" voucher.',
-    apiEndpoint: '/api/v1/resets?platform=claude',
+    sourceHandle: { zh: '信源 Anthropic Status · 社区核验', en: 'Source Anthropic Status · Verified' },
+    lastResetTs: Date.parse('2026-11-17T04:50:00+08:00'),
+    footStats: { zh: '近 30 天重置 2 次 · 1 张补偿卡待领', en: '2 resets in 30d · 1 voucher active' },
+    quote: {
+      zh: '「上次为 Opus 新版发布同步发放的周限额全额重置；目前 Pro / Max 维持常规 5 小时滚动窗口。」',
+      en: '"Last global weekly reset shipped with the Opus update; Pro & Max currently run on standard 5h rolling windows."'
+    },
     history: [
-      { id: 'cl-1', date: '2026-11-19 22:15', type: 'banked', typeLabel: '补偿重置', scope: '受影响 Pro / Max', title: '推理节点短暂超时，向受影响账户发放 1 次手动免费重置按钮', source: 'Anthropic Status', interval: '2.7 天' },
-      { id: 'cl-2', date: '2026-11-17 04:50', type: 'global', typeLabel: '全局重置', scope: 'Pro / Max 5x / 20x', title: '新版本 Opus 开放体验，全量清零当前 5 小时与周限额', source: 'X @AnthropicAI', interval: '14.8 天' },
-      { id: 'cl-3', date: '2026-11-02 09:30', type: 'policy', typeLabel: '限额说明', scope: 'Claude Code', title: '明确 Extended Thinking 计入周限额权重，建议常规任务用默认档', source: 'Docs Update', interval: '14.2 天' },
-      { id: 'cl-4', date: '2026-10-19 05:15', type: 'global', typeLabel: '全局重置', scope: 'Max 订阅', title: '计费口径迁移完成，一次性重置所有 Max 档位周额度', source: 'Email Notice', interval: '—' }
+      { id: 'cl-1', date: '2026-11-19 22:15', type: 'banked', typeLabel: { zh: '补偿重置', en: 'Voucher' }, scope: { zh: '受影响 Pro / Max', en: 'Impacted Pro / Max' }, title: { zh: '推理节点短暂超时，向受影响账户发放 1 次手动免费重置按钮', en: 'Brief inference timeout: granted 1 manual "Reset for free" voucher in Usage settings' }, source: 'Anthropic Status', interval: { zh: '2.7 天', en: '2.7d' } },
+      { id: 'cl-2', date: '2026-11-17 04:50', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: 'Pro / Max / Ultra', en: 'Pro / Max / Ultra' }, title: { zh: '新版本 Opus 开放体验，全量清零当前 5 小时与周限额', en: 'New Opus release rollout: cleared active 5-hour and weekly usage caps' }, source: 'X @AnthropicAI', interval: { zh: '14.8 天', en: '14.8d' } },
+      { id: 'cl-3', date: '2026-11-02 09:30', type: 'policy', typeLabel: { zh: '限额说明', en: 'Policy' }, scope: { zh: 'Claude Code', en: 'Claude Code' }, title: { zh: '明确 Extended Thinking 计入周限额权重，建议常规任务用默认档', en: 'Clarified Extended Thinking weighting against weekly cap; default effort advised for routine work' }, source: 'Docs Update', interval: { zh: '14.2 天', en: '14.2d' } },
+      { id: 'cl-4', date: '2026-10-19 05:15', type: 'global', typeLabel: { zh: '全局重置', en: 'Global Reset' }, scope: { zh: 'Max / Ultra 订阅', en: 'Max / Ultra' }, title: { zh: '计费口径迁移完成，一次性重置所有 Max 档位周额度', en: 'Billing migration complete: one-time weekly quota reset across Max & Ultra tiers' }, source: 'Email Notice', interval: { zh: '—', en: '—' } }
     ]
   }
 };
 
 // 30-day Synchronized Timeline Events (dayIndex: 0 = 29 days ago, 29 = today)
 const TIMELINE_EVENTS = [
-  { track: 'chatgpt', day: 1, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: '月底算力释放，重置周限额', time: '2026-10-29 14:50 (UTC+8)' },
-  { track: 'chatgpt', day: 14, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: 'GPT-5 Codex 新推理档位上线全量重置', time: '2026-11-13 06:40 (UTC+8)' },
-  { track: 'chatgpt', day: 21, kind: 'banked', label: 'ChatGPT / Codex · 重置卡', title: '周末峰值补偿发放 1 张 Banked Reset', time: '2026-11-20 16:05 (UTC+8)' },
-  { track: 'chatgpt', day: 28, kind: 'global', label: 'ChatGPT / Codex · 全局重置', title: 'Codex 额度全局刷新 + 发放 1 张 Banked Reset', time: '2026-11-27 11:16 (UTC+8)' },
+  { track: 'chatgpt', day: 1, kind: 'global', label: { zh: 'ChatGPT / Codex · 全局重置', en: 'ChatGPT / Codex · Global Reset' }, title: { zh: '月底算力释放，重置周限额', en: 'Month-end compute release: weekly limits reset' }, time: '2026-10-29 14:50' },
+  { track: 'chatgpt', day: 14, kind: 'global', label: { zh: 'ChatGPT / Codex · 全局重置', en: 'ChatGPT / Codex · Global Reset' }, title: { zh: 'GPT-5 Codex 新推理档位上线全量重置', en: 'New Codex reasoning tier global quota refresh' }, time: '2026-11-13 06:40' },
+  { track: 'chatgpt', day: 21, kind: 'banked', label: { zh: 'ChatGPT / Codex · 重置卡', en: 'ChatGPT / Codex · Reset Card' }, title: { zh: '周末峰值补偿发放 1 张 Banked Reset', en: 'Weekend peak compensation: 1 banked reset card issued' }, time: '2026-11-20 16:05' },
+  { track: 'chatgpt', day: 28, kind: 'global', label: { zh: 'ChatGPT / Codex · 全局重置', en: 'ChatGPT / Codex · Global Reset' }, title: { zh: 'Codex 额度全局刷新 + 发放 1 张 Banked Reset', en: 'Global Codex quota refresh + 1 banked reset card' }, time: '2026-11-27 11:16' },
 
-  { track: 'antigravity', day: 6, kind: 'global', label: '反重力 Antigravity · 全局重置', title: 'IDE 重大版本推送后触发全量额度刷新', time: '2026-11-04 09:00 (UTC+8)' },
-  { track: 'antigravity', day: 16, kind: 'banked', label: '反重力 Antigravity · 政策/池化', title: 'Gemini 4 Neon 纳入 5h 高频池，降低消耗倍率', time: '2026-11-14 14:10 (UTC+8)' },
-  { track: 'antigravity', day: 25, kind: 'global', label: '反重力 Antigravity · 全局重置', title: '集群扩容完成，清空 Gemini / Claude 双池周限冷却', time: '2026-11-24 02:30 (UTC+8)' },
+  { track: 'antigravity', day: 6, kind: 'global', label: { zh: '反重力 Antigravity · 全局重置', en: 'Google Antigravity · Global Reset' }, title: { zh: 'IDE 重大版本推送后触发全量额度刷新', en: 'Platform-wide quota refresh after major IDE update' }, time: '2026-11-04 09:00' },
+  { track: 'antigravity', day: 16, kind: 'banked', label: { zh: '反重力 Antigravity · 政策/池化', en: 'Google Antigravity · Pool Rule' }, title: { zh: 'Gemini 4 Neon 纳入 5h 高频池，降低消耗倍率', en: 'Gemini 4 Neon added to 5h rolling pool with lower burn' }, time: '2026-11-14 14:10' },
+  { track: 'antigravity', day: 25, kind: 'global', label: { zh: '反重力 Antigravity · 全局重置', en: 'Google Antigravity · Global Reset' }, title: { zh: '集群扩容完成，清空 Gemini / Claude 双池周限冷却', en: 'Cluster scaling complete: Gemini & Claude pool cooldowns cleared' }, time: '2026-11-24 02:30' },
 
-  { track: 'claude', day: 18, kind: 'global', label: 'Claude · 全局重置', title: '新版 Opus 开放体验，全量清零 5h 与周限额', time: '2026-11-17 04:50 (UTC+8)' },
-  { track: 'claude', day: 20, kind: 'banked', label: 'Claude · 补偿重置卡', title: '节点超时补偿：发放 1 次手动免费重置券', time: '2026-11-19 22:15 (UTC+8)' }
+  { track: 'claude', day: 18, kind: 'global', label: { zh: 'Claude · 全局重置', en: 'Claude · Global Reset' }, title: { zh: '新版 Opus 开放体验，全量清零 5h 与周限额', en: 'Opus release rollout: 5h and weekly limits cleared' }, time: '2026-11-17 04:50' },
+  { track: 'claude', day: 20, kind: 'banked', label: { zh: 'Claude · 补偿重置卡', en: 'Claude · Voucher' }, title: { zh: '节点超时补偿：发放 1 次手动免费重置券', en: 'Latency incident compensation: 1 manual free reset voucher' }, time: '2026-11-19 22:15' }
 ];
 
 // Subscription Benchmark Data (Aligned with 2026-11-25 ModelDial /subscriptions scale)
@@ -1922,7 +2052,7 @@ const BENCHMARKS = [
     platform: 'claude',
     platLabel: 'Claude',
     dot: 'claude',
-    name: 'Claude Pro',
+    name: { zh: 'Claude Pro', en: 'Claude Pro' },
     mainModel: 'Opus 5.5',
     price: 20,
     monthTokens: 29,
@@ -1934,13 +2064,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 14500,
     ratio: 59,
-    windowLabel: '5h + 周限额',
+    windowLabel: { zh: '5h + 周限额', en: '5h + Weekly' },
     budget: ['light'],
     detail: {
-      otherModels: 'Sonnet 5.5：月 42 亿 / $1,241（每 $1 ≈ 21,000 万）',
-      fableInfo: 'Fable 5.2：暂无样本；Fable 5.1：不包含',
-      windowRule: '5h 滚动（Opus 5.5 ≈ 0.87 亿 / $35.34）+ 周池',
-      methodology: 'SemiAnalysis Agent 高缓存负载；月均 = 周 ×52÷12'
+      otherModels: { zh: 'Sonnet 5.5：月 42 亿 / $1,241（每 $1 ≈ 21,000 万）', en: 'Sonnet 5.5: 4.2B/mo / $1,241 (210M / $1)' },
+      fableInfo: { zh: 'Fable 5.2：暂无样本；Fable 5.1：不包含', en: 'Fable 5.2: No sample; Fable 5.1: Not included' },
+      windowRule: { zh: '5h 滚动（Opus 5.5 ≈ 0.87 亿 / $35.34）+ 周池', en: '5h rolling (Opus 5.5 ≈ 87M / $35.34) + weekly pool' },
+      methodology: { zh: 'SemiAnalysis Agent 高缓存负载；月均 = 周 ×52÷12', en: 'SemiAnalysis Agent high-cache load; Monthly = Weekly × 52 ÷ 12' }
     }
   },
   {
@@ -1948,7 +2078,7 @@ const BENCHMARKS = [
     platform: 'claude',
     platLabel: 'Claude',
     dot: 'claude',
-    name: 'Claude Ultra（原 Max 20×）',
+    name: { zh: 'Claude Ultra（原 Max 20×）', en: 'Claude Ultra (ex-Max 20×)' },
     mainModel: 'Opus 5.5',
     price: 200,
     monthTokens: 286,
@@ -1957,16 +2087,16 @@ const BENCHMARKS = [
     weekApi: 2706,
     win5hTokens: null,
     win5hApi: null,
-    win5hNote: '认证账号无 5h 限制',
+    win5hNote: { zh: '认证账号无 5h 限制', en: 'No 5h limit (verified)' },
     perDollarWan: 14300,
     ratio: 59,
-    windowLabel: '无 5h 硬锁（周池）',
+    windowLabel: { zh: '无 5h 硬锁（周池）', en: 'Weekly pool (no 5h lock)' },
     budget: ['heavy'],
     detail: {
-      otherModels: 'Sonnet 5.5：月 423 亿 / $12,529（每 $1 ≈ 21,150 万）',
-      fableInfo: 'Fable 5.2：月 39 亿 / $3,054.57（最多占总周池 50%）',
-      windowRule: '原 Max 20× 自动迁移；已验证账号取消 5h 硬锁',
-      methodology: '含 Fable 5.2 实测 30 天样本与 Opus/Sonnet 基准'
+      otherModels: { zh: 'Sonnet 5.5：月 423 亿 / $12,529（每 $1 ≈ 21,150 万）', en: 'Sonnet 5.5: 42.3B/mo / $12,529 (211.5M / $1)' },
+      fableInfo: { zh: 'Fable 5.2：月 39 亿 / $3,054.57（最多占总周池 50%）', en: 'Fable 5.2: 3.9B/mo / $3,054.57 (max 50% of weekly pool)' },
+      windowRule: { zh: '原 Max 20× 自动迁移；已验证账号取消 5h 硬锁', en: 'Former Max 20× auto-migrated; no 5h lock for verified accounts' },
+      methodology: { zh: '含 Fable 5.2 实测 30 天样本与 Opus/Sonnet 基准', en: 'Includes 30-day Fable 5.2 sample & Opus/Sonnet baselines' }
     }
   },
   {
@@ -1974,7 +2104,7 @@ const BENCHMARKS = [
     platform: 'claude',
     platLabel: 'Claude',
     dot: 'claude',
-    name: 'Claude Max',
+    name: { zh: 'Claude Max', en: 'Claude Max' },
     mainModel: 'Opus 5.5',
     price: 100,
     monthTokens: 140,
@@ -1986,13 +2116,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 14000,
     ratio: 57,
-    windowLabel: '5h + 周限额',
+    windowLabel: { zh: '5h + 周限额', en: '5h + Weekly' },
     budget: ['medium'],
     detail: {
-      otherModels: 'Sonnet 5.5：月 200 亿 / $5,919（每 $1 ≈ 20,000 万）',
-      fableInfo: 'Fable 5.2：月 19.93 亿 / $1,564.77（5h 约 0.54 亿 / $37.19）',
-      windowRule: '5h 滚动（Opus 5.5 ≈ 4.2 亿 / $171.75）+ 周限额',
-      methodology: 'Fable 模型最多占用总周额度 50%；模型共享总池'
+      otherModels: { zh: 'Sonnet 5.5：月 200 亿 / $5,919（每 $1 ≈ 20,000 万）', en: 'Sonnet 5.5: 20B/mo / $5,919 (200M / $1)' },
+      fableInfo: { zh: 'Fable 5.2：月 19.93 亿 / $1,564.77（5h 约 0.54 亿 / $37.19）', en: 'Fable 5.2: 1.99B/mo / $1,564.77 (5h ≈ 54M / $37.19)' },
+      windowRule: { zh: '5h 滚动（Opus 5.5 ≈ 4.2 亿 / $171.75）+ 周限额', en: '5h rolling (Opus 5.5 ≈ 420M / $171.75) + weekly cap' },
+      methodology: { zh: 'Fable 模型最多占用总周额度 50%；模型共享总池', en: 'Fable capped at 50% of weekly pool; models share one quota' }
     }
   },
   {
@@ -2000,7 +2130,7 @@ const BENCHMARKS = [
     platform: 'antigravity',
     platLabel: '反重力',
     dot: 'ag',
-    name: 'Google AI Ultra 20×',
+    name: { zh: 'Google AI Ultra 20×', en: 'Google AI Ultra 20×' },
     mainModel: 'Gemini 4 Neon',
     price: 199.99,
     monthTokens: 190.67,
@@ -2012,13 +2142,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 9534,
     ratio: 52,
-    windowLabel: '5h + 周共享池',
+    windowLabel: { zh: '5h + 周共享池', en: '5h + Shared Weekly' },
     budget: ['heavy'],
     detail: {
-      otherModels: 'Gemini 3.8 Flash：月 612.85 亿 / $10,400；Hydrogen：381.33 亿',
-      fableInfo: 'Argon：月 95.33 亿 / $3,479；站内 Claude Opus 5.5：月 3.6 亿',
-      windowRule: 'Ultra 20× 使用共享池，5h 刷新（Neon ≈ 11 亿 / $600.74）',
-      methodology: '超额可衔接 AI Credits（$0.01/credit）；月均 = 周 ×52÷12'
+      otherModels: { zh: 'Gemini 3.8 Flash：月 612.85 亿 / $10,400；Hydrogen：381.33 亿', en: 'Gemini 3.8 Flash: 61.29B/mo / $10,400; Hydrogen: 38.13B' },
+      fableInfo: { zh: 'Argon：月 95.33 亿 / $3,479；站内 Claude Opus 5.5：月 3.6 亿', en: 'Argon: 9.53B/mo / $3,479; In-app Claude Opus 5.5: 360M/mo' },
+      windowRule: { zh: 'Ultra 20× 使用共享池，5h 刷新（Neon ≈ 11 亿 / $600.74）', en: 'Shared pool with 5h rolling refresh (Neon ≈ 1.1B / $600.74)' },
+      methodology: { zh: '超额可衔接 AI Credits（$0.01/credit）；月均 = 周 ×52÷12', en: 'Overage via AI Credits ($0.01/credit); Monthly = Weekly × 52 ÷ 12' }
     }
   },
   {
@@ -2026,7 +2156,7 @@ const BENCHMARKS = [
     platform: 'chatgpt',
     platLabel: 'ChatGPT',
     dot: 'gpt',
-    name: 'ChatGPT Pro 100',
+    name: { zh: 'ChatGPT Pro 100', en: 'ChatGPT Pro 100' },
     mainModel: 'GPT-6.2 Sol',
     price: 100,
     monthTokens: 147.06,
@@ -2035,16 +2165,16 @@ const BENCHMARKS = [
     weekApi: 668.54,
     win5hTokens: null,
     win5hApi: null,
-    win5hNote: '共享周池（无独立 5h 锁）',
+    win5hNote: { zh: '共享周池（无独立 5h 锁）', en: 'Shared weekly pool' },
     perDollarWan: 14706,
     ratio: 29,
-    windowLabel: '共享周池',
+    windowLabel: { zh: '共享周池', en: 'Shared Weekly' },
     budget: ['medium'],
     detail: {
-      otherModels: 'GPT-6.1 Terra：月 204 亿 / $2,084；GPT-6.2 Astra：月 36.76 亿 / $2,897',
-      fableInfo: 'GPT-6.1 Sol：月 102 亿 / $2,084；GPT-5.6 Sol：月 77.79 亿 / $4,073',
-      windowRule: 'Pro 档仅按周池限额，取消独立 5h 硬锁；按 0.5× Pro 200 校准',
-      methodology: '97% 缓存输入 / 2.5% 常规输入 / 0.5% 输出；叠加高频全局重置'
+      otherModels: { zh: 'GPT-6.1 Terra：月 204 亿 / $2,084；GPT-6.2 Astra：月 36.76 亿 / $2,897', en: 'GPT-6.1 Terra: 20.4B/mo / $2,084; GPT-6.2 Astra: 3.68B / $2,897' },
+      fableInfo: { zh: 'GPT-6.1 Sol：月 102 亿 / $2,084；GPT-5.6 Sol：月 77.79 亿 / $4,073', en: 'GPT-6.1 Sol: 10.2B/mo / $2,084; GPT-5.6 Sol: 7.78B / $4,073' },
+      windowRule: { zh: 'Pro 档仅按周池限额，取消独立 5h 硬锁；按 0.5× Pro 200 校准', en: 'Weekly pool only (no 5h lock); calibrated at 0.5× Pro 200' },
+      methodology: { zh: '97% 缓存输入 / 2.5% 常规输入 / 0.5% 输出；叠加高频全局重置', en: '97% cached / 2.5% normal input / 0.5% output; plus global resets' }
     }
   },
   {
@@ -2052,7 +2182,7 @@ const BENCHMARKS = [
     platform: 'chatgpt',
     platLabel: 'ChatGPT',
     dot: 'gpt',
-    name: 'ChatGPT Pro 200',
+    name: { zh: 'ChatGPT Pro 200', en: 'ChatGPT Pro 200' },
     mainModel: 'GPT-6.2 Sol',
     price: 200,
     monthTokens: 294.11,
@@ -2061,16 +2191,16 @@ const BENCHMARKS = [
     weekApi: 1337.08,
     win5hTokens: null,
     win5hApi: null,
-    win5hNote: '共享周池（无独立 5h 锁）',
+    win5hNote: { zh: '共享周池（无独立 5h 锁）', en: 'Shared weekly pool' },
     perDollarWan: 14706,
     ratio: 29,
-    windowLabel: '共享周池',
+    windowLabel: { zh: '共享周池', en: 'Shared Weekly' },
     budget: ['heavy'],
     detail: {
-      otherModels: 'GPT-6.1 Terra：月 408 亿 / $4,168；GPT-6.2 Astra：月 73.53 亿 / $5,794',
-      fableInfo: 'GPT-6.1 Sol：月 204 亿 / $4,168；GPT-6 Astra：月 38 亿 / $5,794',
-      windowRule: '无独立 5h 锁，大周池覆盖连续 Codex 多任务',
-      methodology: '97% 缓存命中口径；多模型共享同一周池不叠加'
+      otherModels: { zh: 'GPT-6.1 Terra：月 408 亿 / $4,168；GPT-6.2 Astra：月 73.53 亿 / $5,794', en: 'GPT-6.1 Terra: 40.8B/mo / $4,168; GPT-6.2 Astra: 7.35B / $5,794' },
+      fableInfo: { zh: 'GPT-6.1 Sol：月 204 亿 / $4,168；GPT-6 Astra：月 38 亿 / $5,794', en: 'GPT-6.1 Sol: 20.4B/mo / $4,168; GPT-6 Astra: 3.8B / $5,794' },
+      windowRule: { zh: '无独立 5h 锁，大周池覆盖连续 Codex 多任务', en: 'No independent 5h limit; large weekly pool for continuous Codex runs' },
+      methodology: { zh: '97% 缓存命中口径；多模型共享同一周池不叠加', en: '97% cache hit ratio; models share one weekly pool (non-additive)' }
     }
   },
   {
@@ -2078,7 +2208,7 @@ const BENCHMARKS = [
     platform: 'chatgpt',
     platLabel: 'ChatGPT',
     dot: 'gpt',
-    name: 'ChatGPT Pro 500',
+    name: { zh: 'ChatGPT Pro 500', en: 'ChatGPT Pro 500' },
     mainModel: 'GPT-6.2 Sol',
     price: 500,
     monthTokens: 706.09,
@@ -2087,16 +2217,16 @@ const BENCHMARKS = [
     weekApi: 3210,
     win5hTokens: null,
     win5hApi: null,
-    win5hNote: '共享周池（无独立 5h 锁）',
+    win5hNote: { zh: '共享周池（无独立 5h 锁）', en: 'Shared weekly pool' },
     perDollarWan: 14122,
     ratio: 28,
-    windowLabel: '共享周池',
+    windowLabel: { zh: '共享周池', en: 'Shared Weekly' },
     budget: ['heavy'],
     detail: {
-      otherModels: 'GPT-6.1 Terra：月 1,052 亿 / $10,772；GPT-6.2 Astra：月 176.52 亿 / $13,910',
-      fableInfo: 'GPT-6 Sol：月 583.1 亿 / $14,845；GPT-5.6 Sol：月 401.15 亿 / $21,004',
-      windowRule: '最高并发共享周池，支持 Ultrafast 极速档位',
-      methodology: '按 Pro 500 / Pro 200 容量比校准；97% 缓存命中'
+      otherModels: { zh: 'GPT-6.1 Terra：月 1,052 亿 / $10,772；GPT-6.2 Astra：月 176.52 亿 / $13,910', en: 'GPT-6.1 Terra: 105.2B/mo / $10,772; GPT-6.2 Astra: 17.65B / $13,910' },
+      fableInfo: { zh: 'GPT-6 Sol：月 583.1 亿 / $14,845；GPT-5.6 Sol：月 401.15 亿 / $21,004', en: 'GPT-6 Sol: 58.31B/mo / $14,845; GPT-5.6 Sol: 40.12B / $21,004' },
+      windowRule: { zh: '最高并发共享周池，支持 Ultrafast 极速档位', en: 'Highest-concurrency shared weekly pool with Ultrafast tier access' },
+      methodology: { zh: '按 Pro 500 / Pro 200 容量比校准；97% 缓存命中', en: 'Scaled by Pro 500 / Pro 200 capacity ratio; 97% cache hit rate' }
     }
   },
   {
@@ -2104,7 +2234,7 @@ const BENCHMARKS = [
     platform: 'antigravity',
     platLabel: '反重力',
     dot: 'ag',
-    name: 'Google AI Ultra 5×',
+    name: { zh: 'Google AI Ultra 5×', en: 'Google AI Ultra 5×' },
     mainModel: 'Gemini 4 Neon',
     price: 99.99,
     monthTokens: 47.67,
@@ -2116,13 +2246,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 4767,
     ratio: 26,
-    windowLabel: '5h + 周共享池',
+    windowLabel: { zh: '5h + 周共享池', en: '5h + Shared Weekly' },
     budget: ['medium'],
     detail: {
-      otherModels: 'Gemini 3.8 Flash：月 153.21 亿 / $2,600；Hydrogen：95.33 亿',
-      fableInfo: 'Argon：月 23.83 亿 / $869.81；站内 Claude Sonnet 5.5：4.12 亿 / Opus：2.3 亿',
-      windowRule: '5h 滚动（Neon ≈ 2.75 亿 / $150.18）+ 周共享池',
-      methodology: '适合重度 Gemini 4 Neon / Carbon 开发，站内 Claude 额度远少于直订'
+      otherModels: { zh: 'Gemini 3.8 Flash：月 153.21 亿 / $2,600；Hydrogen：95.33 亿', en: 'Gemini 3.8 Flash: 15.32B/mo / $2,600; Hydrogen: 9.53B' },
+      fableInfo: { zh: 'Argon：月 23.83 亿 / $869.81；站内 Claude Sonnet 5.5：4.12 亿 / Opus：2.3 亿', en: 'Argon: 2.38B/mo / $869.81; In-app Sonnet 5.5: 412M / Opus: 230M' },
+      windowRule: { zh: '5h 滚动（Neon ≈ 2.75 亿 / $150.18）+ 周共享池', en: '5h rolling (Neon ≈ 275M / $150.18) + shared weekly pool' },
+      methodology: { zh: '适合重度 Gemini 4 Neon / Carbon 开发，站内 Claude 额度远少于直订', en: 'Built for heavy Gemini 4 Neon/Carbon coding; lower in-app Claude pool' }
     }
   },
   {
@@ -2130,7 +2260,7 @@ const BENCHMARKS = [
     platform: 'antigravity',
     platLabel: '反重力',
     dot: 'ag',
-    name: 'Google AI Pro · Antigravity',
+    name: { zh: 'Google AI Pro · Antigravity', en: 'Google AI Pro · Antigravity' },
     mainModel: 'Gemini 4 Neon',
     price: 19.99,
     monthTokens: 8.34,
@@ -2142,13 +2272,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 4173,
     ratio: 23,
-    windowLabel: '5h + 周限额',
+    windowLabel: { zh: '5h + 周限额', en: '5h + Weekly' },
     budget: ['light'],
     detail: {
-      otherModels: 'Gemini 3.8 Flash：月 26.81 亿 / $455；Hydrogen：16.68 亿',
-      fableInfo: 'Argon（独立周额）：月 0.13 亿 / $65；站内 Claude Opus 5.5 仅 0.34 亿',
-      windowRule: '5h 滚动（Neon ≈ 0.55 亿 / $30.04）+ 周上限；Argon 走独立周额',
-      methodology: '月均 = 周 ×52÷12；$20 档内性价比优于 Plus，但站内 Claude 池很小'
+      otherModels: { zh: 'Gemini 3.8 Flash：月 26.81 亿 / $455；Hydrogen：16.68 亿', en: 'Gemini 3.8 Flash: 2.68B/mo / $455; Hydrogen: 1.67B' },
+      fableInfo: { zh: 'Argon（独立周额）：月 0.13 亿 / $65；站内 Claude Opus 5.5 仅 0.34 亿', en: 'Argon (separate weekly): 13M/mo / $65; In-app Opus 5.5: 34M' },
+      windowRule: { zh: '5h 滚动（Neon ≈ 0.55 亿 / $30.04）+ 周上限；Argon 走独立周额', en: '5h rolling (Neon ≈ 55M / $30.04) + weekly cap; Argon separate' },
+      methodology: { zh: '月均 = 周 ×52÷12；$20 档内性价比优于 Plus，但站内 Claude 池很小', en: 'Monthly = Weekly × 52 ÷ 12; beats Plus on Gemini value, small Claude cap' }
     }
   },
   {
@@ -2156,7 +2286,7 @@ const BENCHMARKS = [
     platform: 'chatgpt',
     platLabel: 'ChatGPT',
     dot: 'gpt',
-    name: 'ChatGPT Plus（含 Codex）',
+    name: { zh: 'ChatGPT Plus（含 Codex）', en: 'ChatGPT Plus (incl. Codex)' },
     mainModel: 'GPT-6.2 Sol',
     price: 20,
     monthTokens: 14.52,
@@ -2168,13 +2298,13 @@ const BENCHMARKS = [
     win5hNote: null,
     perDollarWan: 7259,
     ratio: 14,
-    windowLabel: '5h + 周限额',
+    windowLabel: { zh: '5h + 周限额', en: '5h + Weekly' },
     budget: ['light'],
     detail: {
-      otherModels: 'GPT-6.1 Terra：月 20.59 亿 / $202.8；GPT-6.2 Astra：月 3.63 亿 / $286',
-      fableInfo: 'GPT-6.1 Sol：月 10.29 亿 / $202.8（5h 实测 $7.8，周按 6×5h 推算）',
-      windowRule: '5h 滚动（6.2 Sol ≈ 0.56 亿 / $11）+ 周限额',
-      methodology: '97% 缓存命中口径；不含官方不定期全局重置与 Banked Reset 额外增量'
+      otherModels: { zh: 'GPT-6.1 Terra：月 20.59 亿 / $202.8；GPT-6.2 Astra：月 3.63 亿 / $286', en: 'GPT-6.1 Terra: 2.06B/mo / $202.8; GPT-6.2 Astra: 363M / $286' },
+      fableInfo: { zh: 'GPT-6.1 Sol：月 10.29 亿 / $202.8（5h 实测 $7.8，周按 6×5h 推算）', en: 'GPT-6.1 Sol: 1.03B/mo / $202.8 (5h ≈ $7.8, weekly est. 6×5h)' },
+      windowRule: { zh: '5h 滚动（6.2 Sol ≈ 0.56 亿 / $11）+ 周限额', en: '5h rolling (6.2 Sol ≈ 56M / $11) + weekly cap' },
+      methodology: { zh: '97% 缓存命中口径；不含官方不定期全局重置与 Banked Reset 额外增量', en: '97% cache hit ratio; excludes ad-hoc global resets & banked cards' }
     }
   }
 ];
@@ -2184,6 +2314,7 @@ const BENCHMARKS = [
    ========================================================================== */
 const state = {
   activeTab: 'overview',
+  lang: 'zh',
   tz: 'UTC+8',
   theme: 'light',
   benchPlat: 'all',
@@ -2198,8 +2329,18 @@ const state = {
 };
 
 /* ==========================================================================
-   Utilities
+   Utilities & I18N Helpers
    ========================================================================== */
+function t(key) {
+  return (I18N[state.lang] && I18N[state.lang][key]) || I18N.zh[key] || key;
+}
+
+function L(val) {
+  if (val == null) return '';
+  if (typeof val === 'string') return val;
+  return val[state.lang] || val.zh || '';
+}
+
 function formatElapsed(ts) {
   const diff = Math.max(0, Date.now() - ts);
   const d = Math.floor(diff / DAY);
@@ -2207,17 +2348,42 @@ function formatElapsed(ts) {
   const m = Math.floor((diff % HOUR) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   const pad = n => String(n).padStart(2, '0');
+  if (state.lang === 'en') {
+    return `${pad(d)}d ${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+  }
   return `${pad(d)}天 ${pad(h)}时 ${pad(m)}分 ${pad(s)}秒`;
 }
 
 function formatDateByTz(str) {
   if (state.tz === 'UTC+8') return `${str} (UTC+8)`;
-  // Shift -8h for illustrative UTC conversion
   const [datePart, timePart] = str.split(' ');
   if (!timePart) return str;
   const dt = new Date(`${datePart}T${timePart}:00+08:00`);
   const pad = n => String(n).padStart(2, '0');
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())} ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} (UTC)`;
+}
+
+function agoText(ts) {
+  const d = Date.now() - ts;
+  const days = Math.floor(d / DAY);
+  if (state.lang === 'en') {
+    if (days < 1) return Math.max(1, Math.floor(d / HOUR)) + 'h ago';
+    return days + 'd ago';
+  }
+  if (days < 1) return Math.max(1, Math.floor(d / HOUR)) + ' 小时前';
+  return days + ' 天前';
+}
+
+function statusChipInfo(ts) {
+  const days = (Date.now() - ts) / DAY;
+  const tone = days < 2 ? 'ok' : days < 7 ? 'warn' : 'alert';
+  let text;
+  if (state.lang === 'en') {
+    text = tone === 'alert' ? `No reset for ${Math.floor(days)}d` : `Reset ${agoText(ts)}`;
+  } else {
+    text = tone === 'alert' ? `${Math.floor(days)} 天未全局重置` : `${agoText(ts)}全局重置`;
+  }
+  return { tone, text };
 }
 
 let toastTimer;
@@ -2229,16 +2395,72 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+function applyI18n() {
+  document.documentElement.lang = state.lang === 'en' ? 'en' : 'zh-CN';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18nHtml);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  });
+  const langBtn = document.getElementById('langToggleBtn');
+  if (langBtn) langBtn.textContent = t('langSwitchLabel');
+}
+
+/* ==========================================================================
+   Render: 3-Platform Live Reset Summary Cards
+   ========================================================================== */
+function renderRadarCards() {
+  const order = ['chatgpt', 'antigravity', 'claude'];
+  document.getElementById('radarGrid').innerHTML = order.map(id => {
+    const p = PLATFORMS[id];
+    const chip = statusChipInfo(p.lastResetTs);
+    const active = state.logPlat === id;
+    return `
+      <button type="button" class="radar-card ${active ? 'is-active' : ''}" data-filter-log="${id}">
+        <div class="radar-top">
+          <div class="plat-ident">
+            <span class="plat-badge ${p.dotClass}">${p.short}</span>
+            <div>
+              <div class="plat-name">${L(p.name)}</div>
+              <div class="plat-handle">${L(p.sourceHandle)}</div>
+            </div>
+          </div>
+          <span class="status-chip ${chip.tone}" data-status-chip="${id}">${chip.text}</span>
+        </div>
+        <div class="elapsed-block">
+          <span class="elapsed-label">${t('elapsedLabel')}</span>
+          <span class="elapsed-clock mono" data-live-since="${id}">${formatElapsed(p.lastResetTs)}</span>
+        </div>
+        <p class="radar-quote">${L(p.quote)}</p>
+        <div class="radar-foot">
+          <span class="num">${L(p.footStats)}</span>
+          <span class="radar-link" data-card-hint="${id}">${active ? t('filteredHint') : t('filterHint')}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
 /* ==========================================================================
    Render: 30-Day Synchronized 3-Track Timeline
    ========================================================================== */
 function renderTimeline() {
   const matrix = document.getElementById('timelineMatrix');
-  const tracks = [
-    { id: 'chatgpt', name: 'ChatGPT', dot: 'gpt' },
-    { id: 'antigravity', name: '反重力', dot: 'ag' },
-    { id: 'claude', name: 'Claude', dot: 'claude' }
-  ];
+  const tracks = ['chatgpt', 'antigravity', 'claude'].map(id => ({
+    id,
+    name: L(PLATFORMS[id].trackName),
+    dot: PLATFORMS[id].dotClass
+  }));
 
   let html = '';
   tracks.forEach(tr => {
@@ -2250,7 +2472,7 @@ function renderTimeline() {
         const ev = TIMELINE_EVENTS[evIdx];
         const cls = ev.kind === 'banked' ? 'ev-banked' : `ev-${tr.dot}`;
         const sel = evIdx === state.selectedEventIdx ? 'is-selected' : '';
-        html += `<button type="button" class="day-cell has-event ${cls} ${sel}" data-ev-idx="${evIdx}" title="${ev.title}" aria-label="${ev.label}: ${ev.title}"></button>`;
+        html += `<button type="button" class="day-cell has-event ${cls} ${sel}" data-ev-idx="${evIdx}" title="${L(ev.title)}" aria-label="${L(ev.label)}: ${L(ev.title)}"></button>`;
       } else {
         html += `<div class="day-cell" aria-hidden="true"></div>`;
       }
@@ -2258,44 +2480,45 @@ function renderTimeline() {
     html += `</div>`;
   });
 
-  html += `<div class="timeline-axis"><span>30 天前 (10/29)</span><span>15 天前 (11/13)</span><span>今天 (11/28)</span></div>`;
+  html += `<div class="timeline-axis"><span>${t('axis30')}</span><span>${t('axis15')}</span><span>${t('axisToday')}</span></div>`;
   matrix.innerHTML = html;
 
   const ev = TIMELINE_EVENTS[state.selectedEventIdx] || TIMELINE_EVENTS[0];
-  document.getElementById('inspBadge').textContent = ev.label;
+  document.getElementById('inspBadge').textContent = L(ev.label);
   document.getElementById('inspBadge').className = `status-chip ${ev.kind === 'banked' ? 'warn' : 'ok'}`;
-  document.getElementById('inspTitle').textContent = ev.title;
-  document.getElementById('inspTime').textContent = state.tz === 'UTC+8' ? ev.time : ev.time.replace('(UTC+8)', '(UTC 换算)');
+  document.getElementById('inspTitle').textContent = L(ev.title);
+  document.getElementById('inspTime').textContent = formatDateByTz(ev.time);
 }
 
 /* ==========================================================================
    Render: Unified Reset History
    ========================================================================== */
 function renderUnifiedHistory() {
-  // Sync radar card active visual & filter pills
   document.querySelectorAll('.radar-card[data-filter-log]').forEach(card => {
     const pid = card.dataset.filterLog;
     const active = state.logPlat === pid;
     card.classList.toggle('is-active', active);
     const hint = card.querySelector('[data-card-hint]');
-    if (hint) hint.textContent = active ? '已筛选 · 点此还原' : '筛选记录 ↓';
+    if (hint) hint.textContent = active ? t('filteredHint') : t('filterHint');
   });
   document.querySelectorAll('[data-lplat]').forEach(b => b.classList.toggle('active', b.dataset.lplat === state.logPlat));
   document.querySelectorAll('[data-ltype]').forEach(b => b.classList.toggle('active', b.dataset.ltype === state.logType));
 
   const q = state.logSearch.trim().toLowerCase();
   const allRows = Object.values(PLATFORMS).flatMap(p =>
-    p.history.map(r => ({ ...r, platId: p.id, platName: p.name, platDot: p.dotClass }))
+    p.history.map(r => ({ ...r, platId: p.id, platName: L(p.name), platDot: p.dotClass }))
   ).sort((a, b) => b.date.localeCompare(a.date));
 
   const rows = allRows.filter(r => {
     const matchPlat = state.logPlat === 'all' || r.platId === state.logPlat;
     const matchType = state.logType === 'all' || r.type === state.logType;
-    const matchQ = !q || r.title.toLowerCase().includes(q) || r.scope.toLowerCase().includes(q) || r.source.toLowerCase().includes(q) || r.platName.toLowerCase().includes(q);
+    const hay = `${L(r.title)} ${L(r.scope)} ${r.source} ${r.platName}`.toLowerCase();
+    const matchQ = !q || hay.includes(q);
     return matchPlat && matchType && matchQ;
   });
 
-  document.getElementById('unifiedHistoryCount').textContent = `共 ${rows.length} 条匹配记录`;
+  document.getElementById('unifiedHistoryCount').textContent =
+    state.lang === 'en' ? `${rows.length} matching records` : `共 ${rows.length} 条匹配记录`;
 
   document.getElementById('unifiedHistoryTableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -2305,62 +2528,91 @@ function renderUnifiedHistory() {
           <span class="tab-dot ${r.platDot}"></span>${r.platName}
         </span>
       </td>
-      <td><span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${r.typeLabel}</span></td>
-      <td style="white-space:nowrap">${r.scope}</td>
-      <td style="font-weight:500">${r.title}</td>
-      <td class="mono" style="white-space:nowrap;color:var(--text-muted)">${r.interval}</td>
+      <td><span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${L(r.typeLabel)}</span></td>
+      <td style="white-space:nowrap">${L(r.scope)}</td>
+      <td style="font-weight:500">${L(r.title)}</td>
+      <td class="mono" style="white-space:nowrap;color:var(--text-muted)">${L(r.interval)}</td>
       <td class="mono" style="font-size:12px;color:var(--text-muted);white-space:nowrap">${r.source}</td>
     </tr>
-  `).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:28px">没有符合当前筛选条件的重置记录，试试切换到「全部平台」。</td></tr>`;
+  `).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:28px">${t('emptyDesktop')}</td></tr>`;
 
   document.getElementById('unifiedHistoryMobile').innerHTML = rows.length ? rows.map(r => `
     <div class="m-hist-card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px">
           <span class="tab-dot ${r.platDot}"></span>${r.platName}
-          <span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${r.typeLabel}</span>
+          <span class="status-chip ${r.type === 'global' ? 'ok' : r.type === 'banked' ? 'warn' : 'neutral'}">${L(r.typeLabel)}</span>
         </span>
         <span class="mono" style="font-size:11.5px;color:var(--text-muted)">${formatDateByTz(r.date)}</span>
       </div>
-      <div style="font-weight:600;font-size:13.5px">${r.title}</div>
+      <div style="font-weight:600;font-size:13.5px">${L(r.title)}</div>
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">
-        <span>范围：${r.scope}</span>
-        <span class="mono">间隔 ${r.interval} · ${r.source}</span>
+        <span>${t('scopePrefix')}${L(r.scope)}</span>
+        <span class="mono">${t('gapPrefix')}${L(r.interval)} · ${r.source}</span>
       </div>
     </div>
-  `).join('') : `<div class="m-hist-card" style="text-align:center;color:var(--text-muted)">暂无匹配记录</div>`;
+  `).join('') : `<div class="m-hist-card" style="text-align:center;color:var(--text-muted)">${t('emptyMobile')}</div>`;
 }
 
 /* ==========================================================================
    Render: Subscription Benchmark Tab (PC Table + Mobile Cards)
    ========================================================================== */
 function fmtTokens(val, note) {
-  if (val == null) return note || '—';
+  if (val == null) return L(note) || '—';
+  if (state.lang === 'en') {
+    if (val >= 10) {
+      const b = (val / 10).toFixed(val % 10 === 0 ? 0 : 2).replace(/\.?0+$/, '');
+      return `${b}B`;
+    }
+    return `${Math.round(val * 100)}M`;
+  }
   return `${val.toLocaleString()} 亿`;
 }
 
-function fmtUsd(val, note) {
-  if (val == null) return note ? '—' : '—';
+function fmtPerDollar(wan) {
+  if (state.lang === 'en') {
+    const m = (wan / 100).toFixed(wan % 100 === 0 ? 0 : 1).replace(/\.0$/, '');
+    return `${m}M`;
+  }
+  return `${wan.toLocaleString()} 万`;
+}
+
+function fmtUsd(val) {
+  if (val == null) return '—';
   return `$${val >= 1000 ? Math.round(val).toLocaleString() : val}`;
 }
 
 function renderBenchmark() {
-  const periodMeta = {
-    month: { tkHead: '平均月 Token', apiHead: '平均月 API 等值', tkKey: 'monthTokens', apiKey: 'monthApi', label: '平均月' },
-    week: { tkHead: '每周 Token', apiHead: '每周 API 等值', tkKey: 'weekTokens', apiKey: 'weekApi', label: '每周' },
-    win5h: { tkHead: '五小时 Token', apiHead: '五小时 API 等值', tkKey: 'win5hTokens', apiKey: 'win5hApi', label: '五小时' }
-  }[state.benchPeriod];
+  const periodMap = {
+    zh: {
+      month: { tkHead: '平均月 Token', apiHead: '平均月 API 等值', tkKey: 'monthTokens', apiKey: 'monthApi', label: '平均月' },
+      week: { tkHead: '每周 Token', apiHead: '每周 API 等值', tkKey: 'weekTokens', apiKey: 'weekApi', label: '每周' },
+      win5h: { tkHead: '五小时 Token', apiHead: '五小时 API 等值', tkKey: 'win5hTokens', apiKey: 'win5hApi', label: '五小时' }
+    },
+    en: {
+      month: { tkHead: 'Avg. Monthly Tokens', apiHead: 'Avg. Monthly API', tkKey: 'monthTokens', apiKey: 'monthApi', label: 'Monthly' },
+      week: { tkHead: 'Weekly Tokens', apiHead: 'Weekly API', tkKey: 'weekTokens', apiKey: 'weekApi', label: 'Weekly' },
+      win5h: { tkHead: '5-Hour Tokens', apiHead: '5-Hour API', tkKey: 'win5hTokens', apiKey: 'win5hApi', label: '5-Hour' }
+    }
+  };
+  const periodMeta = periodMap[state.lang][state.benchPeriod];
 
   document.getElementById('thPeriodTokens').textContent = periodMeta.tkHead;
   document.getElementById('thPeriodApi').textContent = periodMeta.apiHead;
 
-  // Budget Recommender box
   const recMap = {
-    light: { title: '$20 档结论：Claude Pro ($1,178 / 59×) > Google AI Pro ($456 / 23×) > ChatGPT Plus ($286 / 14×)', desc: 'Claude Pro 单凭 Opus 5.5 / Sonnet 5.5 就能跑出 29–42 亿 Token；偏爱 Codex 且看重高频重置选 Plus。' },
-    medium: { title: '$100 档结论：Claude Max ($5,725 / 57×) · ChatGPT Pro 100 ($2,897 / 29×) · Ultra 5× ($2,603 / 26×)', desc: 'Pro 100 取消 5h 硬锁且每 $1 约 14,706 万 Token，与 Claude Max (14,000 万/$1) 并列主力档第一梯队。' },
-    heavy: { title: '$200+ 档结论：Claude Ultra ($11,726 / 59×) · Ultra 20× ($10,413 / 52×) · Pro 200 ($5,794 / 29×)', desc: 'Claude Ultra 认证号与 ChatGPT Pro 200/500 均无独立 5h 硬锁；超重度 OpenAI 并发可选 Pro 500 ($13,910/月)。' }
+    zh: {
+      light: { title: '$20 档结论：Claude Pro ($1,178 / 59×) > Google AI Pro ($456 / 23×) > ChatGPT Plus ($286 / 14×)', desc: 'Claude Pro 单凭 Opus 5.5 / Sonnet 5.5 就能跑出 29–42 亿 Token；偏爱 Codex 且看重高频重置选 Plus。' },
+      medium: { title: '$100 档结论：Claude Max ($5,725 / 57×) · ChatGPT Pro 100 ($2,897 / 29×) · Ultra 5× ($2,603 / 26×)', desc: 'Pro 100 取消 5h 硬锁且每 $1 约 14,706 万 Token，与 Claude Max (14,000 万/$1) 并列主力档第一梯队。' },
+      heavy: { title: '$200+ 档结论：Claude Ultra ($11,726 / 59×) · Ultra 20× ($10,413 / 52×) · Pro 200 ($5,794 / 29×)', desc: 'Claude Ultra 认证号与 ChatGPT Pro 200/500 均无独立 5h 硬锁；超重度 OpenAI 并发可选 Pro 500 ($13,910/月)。' }
+    },
+    en: {
+      light: { title: '$20 Tier: Claude Pro ($1,178 / 59×) > Google AI Pro ($456 / 23×) > ChatGPT Plus ($286 / 14×)', desc: 'Claude Pro delivers 2.9B–4.2B tokens/mo on Opus/Sonnet 5.5; choose Plus if you prefer Codex & frequent global resets.' },
+      medium: { title: '$100 Tier: Claude Max ($5,725 / 57×) · ChatGPT Pro 100 ($2,897 / 29×) · Ultra 5× ($2,603 / 26×)', desc: 'Pro 100 drops the 5h hard lock at 147.1M/$1, matching Claude Max (140M/$1) at the top of the $100 tier.' },
+      heavy: { title: '$200+ Tier: Claude Ultra ($11,726 / 59×) · Ultra 20× ($10,413 / 52×) · Pro 200 ($5,794 / 29×)', desc: 'Verified Claude Ultra and ChatGPT Pro 200/500 remove 5h lockouts; Pro 500 leads raw throughput ($13,910/mo equiv.).' }
+    }
   };
-  const rec = recMap[state.intensity];
+  const rec = recMap[state.lang][state.intensity];
   document.getElementById('calcResultBox').innerHTML = `
     <div>
       <div style="font-weight:700;color:var(--accent)">${rec.title}</div>
@@ -2388,26 +2640,26 @@ function renderBenchmark() {
           <div style="display:flex;align-items:center;gap:9px">
             <span class="tab-dot ${b.dot}"></span>
             <div>
-              <div style="font-weight:600">${b.name}</div>
-              <div style="font-size:11.5px;color:var(--text-muted)">主力：${b.mainModel}${isRec ? ' · <span style="color:var(--accent);font-weight:600">当前预算档</span>' : ''}</div>
+              <div style="font-weight:600">${L(b.name)}</div>
+              <div style="font-size:11.5px;color:var(--text-muted)">${t('mainPrefix')}${b.mainModel}${isRec ? ` · <span style="color:var(--accent);font-weight:600">${t('curBudgetTag')}</span>` : ''}</div>
             </div>
           </div>
         </td>
         <td class="mono" style="font-weight:600">$${b.price}</td>
         <td class="mono" style="font-weight:600">${fmtTokens(tkVal, b.win5hNote)}</td>
-        <td class="mono" style="font-weight:700">${fmtUsd(apiVal, b.win5hNote)}</td>
+        <td class="mono" style="font-weight:700">${fmtUsd(apiVal)}</td>
         <td><span class="ratio-pill">${b.ratio}×</span></td>
-        <td class="mono">${b.perDollarWan.toLocaleString()} 万</td>
-        <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">${b.windowLabel}</td>
-        <td style="text-align:right;color:var(--text-muted);font-size:12px">${isOpen ? '收起 ▲' : '多模型 ▼'}</td>
+        <td class="mono">${fmtPerDollar(b.perDollarWan)}</td>
+        <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">${L(b.windowLabel)}</td>
+        <td style="text-align:right;color:var(--text-muted);font-size:12px">${isOpen ? t('collapse') : t('expandModels')}</td>
       </tr>
       <tr class="bench-detail-row ${isOpen ? 'open' : ''}">
         <td colspan="8">
           <div class="detail-grid">
-            <div class="detail-kv"><div class="detail-kv-label">同套餐其他主力模型</div><div class="detail-kv-val">${b.detail.otherModels}</div></div>
-            <div class="detail-kv"><div class="detail-kv-label">旗舰 / 共享模型池</div><div class="detail-kv-val">${b.detail.fableInfo}</div></div>
-            <div class="detail-kv"><div class="detail-kv-label">限窗与刷新规则</div><div class="detail-kv-val">${b.detail.windowRule}</div></div>
-            <div class="detail-kv"><div class="detail-kv-label">实测口径说明</div><div class="detail-kv-val">${b.detail.methodology}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">${t('kvOther')}</div><div class="detail-kv-val">${L(b.detail.otherModels)}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">${t('kvFable')}</div><div class="detail-kv-val">${L(b.detail.fableInfo)}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">${t('kvRule')}</div><div class="detail-kv-val">${L(b.detail.windowRule)}</div></div>
+            <div class="detail-kv"><div class="detail-kv-label">${t('kvMethod')}</div><div class="detail-kv-val">${L(b.detail.methodology)}</div></div>
           </div>
         </td>
       </tr>
@@ -2426,8 +2678,8 @@ function renderBenchmark() {
           <div style="display:flex;align-items:center;gap:8px">
             <span class="tab-dot ${b.dot}"></span>
             <div>
-              <div style="font-weight:700;font-size:14.5px">${b.name}</div>
-              <div class="mono" style="font-size:12px;color:var(--text-muted)">$${b.price}/月 · ${b.mainModel} · ${b.windowLabel}</div>
+              <div style="font-weight:700;font-size:14.5px">${L(b.name)}</div>
+              <div class="mono" style="font-size:12px;color:var(--text-muted)">$${b.price}${t('moSuffix')} · ${b.mainModel} · ${L(b.windowLabel)}</div>
             </div>
           </div>
           <span class="ratio-pill">${b.ratio}×</span>
@@ -2435,25 +2687,25 @@ function renderBenchmark() {
 
         <div class="m-bench-metrics">
           <div class="m-metric-box">
-            <div style="font-size:11px;color:var(--text-muted)">${periodMeta.label} Token / API 等值</div>
-            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${fmtTokens(tkVal, b.win5hNote)} · ${fmtUsd(apiVal, b.win5hNote)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${periodMeta.label} Tokens / API</div>
+            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${fmtTokens(tkVal, b.win5hNote)} · ${fmtUsd(apiVal)}</div>
           </div>
           <div class="m-metric-box">
-            <div style="font-size:11px;color:var(--text-muted)">每 $1 Token（月均）</div>
-            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${b.perDollarWan.toLocaleString()} 万</div>
+            <div style="font-size:11px;color:var(--text-muted)">${t('perDollarUnit')}</div>
+            <div class="mono" style="font-weight:700;font-size:13.5px;margin-top:2px">${fmtPerDollar(b.perDollarWan)}</div>
           </div>
         </div>
 
         <button type="button" class="btn btn-sm" style="width:100%" data-toggle-bench="${b.id}">
-          ${isOpen ? '收起同套餐多模型拆解 ▲' : '查看同套餐多模型与口径拆解 ▼'}
+          ${isOpen ? t('mCollapse') : t('mExpand')}
         </button>
 
         ${isOpen ? `
           <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid var(--border-default);font-size:12.5px;color:var(--text-secondary)">
-            <div><strong>其他模型：</strong>${b.detail.otherModels}</div>
-            <div><strong>高阶/共享池：</strong>${b.detail.fableInfo}</div>
-            <div><strong>限窗规则：</strong>${b.detail.windowRule}</div>
-            <div style="color:var(--text-muted)">${b.detail.methodology}</div>
+            <div><strong>${t('mLblOther')}</strong>${L(b.detail.otherModels)}</div>
+            <div><strong>${t('mLblFable')}</strong>${L(b.detail.fableInfo)}</div>
+            <div><strong>${t('mLblRule')}</strong>${L(b.detail.windowRule)}</div>
+            <div style="color:var(--text-muted)">${L(b.detail.methodology)}</div>
           </div>
         ` : ''}
       </div>
@@ -2479,7 +2731,6 @@ function switchTab(tabId) {
     renderBenchmark();
   }
 
-  // Keep mobile tab scrolled into view
   const activeMobileTab = document.querySelector(`.mobile-tab-bar .nav-tab[data-tab="${tabId}"]`);
   if (activeMobileTab) activeMobileTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
@@ -2493,18 +2744,23 @@ function updateLiveClocks() {
     const id = el.dataset.liveSince;
     if (PLATFORMS[id]) el.textContent = formatElapsed(PLATFORMS[id].lastResetTs);
   });
+  document.querySelectorAll('[data-status-chip]').forEach(el => {
+    const p = PLATFORMS[el.dataset.statusChip];
+    if (!p) return;
+    const chip = statusChipInfo(p.lastResetTs);
+    el.className = `status-chip ${chip.tone}`;
+    el.textContent = chip.text;
+  });
 }
 
 /* Global Clicks */
 document.addEventListener('click', e => {
-  // Top / Mobile Tabs
   const tabBtn = e.target.closest('.nav-tab[data-tab]');
   if (tabBtn) {
     switchTab(tabBtn.dataset.tab);
     return;
   }
 
-  // Go-tab cards / links
   const goBtn = e.target.closest('[data-go-tab]');
   if (goBtn) {
     if (goBtn.dataset.focusBench) state.expandedBenchId = goBtn.dataset.focusBench;
@@ -2512,7 +2768,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Preview viewport switcher
   const vpBtn = e.target.closest('[data-vp]');
   if (vpBtn) {
     document.querySelectorAll('[data-vp]').forEach(b => b.classList.remove('active'));
@@ -2521,7 +2776,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Radar card click -> toggle unified history filter by platform
   const filterCard = e.target.closest('[data-filter-log]');
   if (filterCard) {
     const pid = filterCard.dataset.filterLog;
@@ -2533,7 +2787,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Unified history platform / type filters
   const lpBtn = e.target.closest('[data-lplat]');
   if (lpBtn) {
     state.logPlat = lpBtn.dataset.lplat;
@@ -2548,18 +2801,16 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Timezone switcher
   const tzBtn = e.target.closest('[data-tz]');
   if (tzBtn) {
     state.tz = tzBtn.dataset.tz;
     document.querySelectorAll('[data-tz]').forEach(b => b.classList.toggle('active', b.dataset.tz === state.tz));
     renderTimeline();
     renderUnifiedHistory();
-    showToast(`已切换为 ${state.tz === 'UTC+8' ? '北京时间 (UTC+8)' : 'UTC 标准时间'}`);
+    showToast(state.tz === 'UTC+8' ? t('toastTzZh') : t('toastTzUtc'));
     return;
   }
 
-  // Timeline event click
   const evCell = e.target.closest('[data-ev-idx]');
   if (evCell) {
     state.selectedEventIdx = Number(evCell.dataset.evIdx);
@@ -2567,15 +2818,13 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Copy button
   const copyBtn = e.target.closest('[data-copy]');
   if (copyBtn) {
     navigator.clipboard?.writeText(copyBtn.dataset.copy).catch(() => {});
-    showToast('已复制链接到剪贴板');
+    showToast(t('toastCopied'));
     return;
   }
 
-  // Benchmark intensity
   const intBtn = e.target.closest('[data-intensity]');
   if (intBtn) {
     state.intensity = intBtn.dataset.intensity;
@@ -2584,7 +2833,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Benchmark platform filter
   const bpBtn = e.target.closest('[data-bplat]');
   if (bpBtn) {
     state.benchPlat = bpBtn.dataset.bplat;
@@ -2593,7 +2841,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Benchmark period switch (平均月 / 每周 / 五小时)
   const bperBtn = e.target.closest('[data-bperiod]');
   if (bperBtn) {
     state.benchPeriod = bperBtn.dataset.bperiod;
@@ -2602,7 +2849,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Benchmark sort
   const bsBtn = e.target.closest('[data-bsort]');
   if (bsBtn) {
     state.benchSort = bsBtn.dataset.bsort;
@@ -2611,7 +2857,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Benchmark row expand
   const tbBtn = e.target.closest('[data-toggle-bench]');
   if (tbBtn) {
     const bid = tbBtn.dataset.toggleBench;
@@ -2620,7 +2865,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Close modal buttons or backdrop click
   const closeBtn = e.target.closest('[data-close-modal]');
   if (closeBtn) {
     document.getElementById(closeBtn.dataset.closeModal).classList.remove('open');
@@ -2631,13 +2875,22 @@ document.addEventListener('click', e => {
   }
 });
 
-/* Search Input in Unified History */
 document.getElementById('unifiedLogSearch').addEventListener('input', e => {
   state.logSearch = e.target.value;
   renderUnifiedHistory();
 });
 
-/* Header Utility Controls */
+document.getElementById('langToggleBtn').addEventListener('click', () => {
+  state.lang = state.lang === 'zh' ? 'en' : 'zh';
+  applyI18n();
+  renderRadarCards();
+  renderTimeline();
+  renderUnifiedHistory();
+  renderBenchmark();
+  updateLiveClocks();
+  showToast(t('toastLang'));
+});
+
 document.getElementById('themeToggleBtn').addEventListener('click', () => {
   state.theme = state.theme === 'light' ? 'dark' : 'light';
   document.documentElement.dataset.theme = state.theme;
@@ -2651,7 +2904,6 @@ document.getElementById('hideSpecBar').addEventListener('click', () => {
   document.getElementById('viewportStage').dataset.viewport = 'fluid';
 });
 
-/* Keyboard shortcuts 1-2 for Tabs & Escape for modals */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.overlay-backdrop.open').forEach(m => m.classList.remove('open'));
@@ -2662,6 +2914,9 @@ document.addEventListener('keydown', e => {
 });
 
 /* Boot */
+state.lang = document.body.dataset.initialLang || 'zh';
+applyI18n();
+renderRadarCards();
 renderTimeline();
 renderUnifiedHistory();
 renderBenchmark();

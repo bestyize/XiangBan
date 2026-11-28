@@ -2,7 +2,7 @@
   "name": "aireset-web",
   "version": "0.1.0",
   "private": true,
-  "description": "AI额度监控 QuotaReset：御三家（ChatGPT/Codex、反重力、Claude）额度重置雷达与订阅额度实测静态站",
+  "description": "AI订阅测评 QuotaReset：御三家（ChatGPT/Codex、反重力、Claude）额度重置雷达与订阅额度实测中英双语静态站",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

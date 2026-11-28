@@ -1,6 +1,6 @@
-# AI额度监控 QuotaReset（`aireset.xiaban.xyz`）香港机静态部署说明
+# AI订阅测评 QuotaReset（`aireset.xiaban.xyz`）香港机静态部署说明
 
-`client/aireset-web` 是纯静态站点（零依赖，两个入口页 `/` 与 `/benchmark/`，无后端、无数据库、无 Docker 容器），由香港云服务器宿主机 Nginx 直接托管并终结 HTTPS。
+`client/aireset-web` 是纯静态站点（零依赖，四个中英双语入口页 `/`、`/benchmark/`、`/en/`、`/en/benchmark/`，无后端、无数据库、无 Docker 容器），由香港云服务器宿主机 Nginx 直接托管并终结 HTTPS。
 
 > 严格遵守云服务器部署规范：**一律在本地完成构建与自检**，只把 `dist/` 静态产物同步到服务器，服务器上不装 Node、不跑浏览器。
 
