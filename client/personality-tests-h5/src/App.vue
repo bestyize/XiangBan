@@ -45,6 +45,7 @@ function navigate(next: RouteView) {
   if (window.location.hash !== targetHash) {
     window.location.hash = targetHash;
   }
+  window.scrollTo({ top: 0 });
   if (scrollEl.value) {
     scrollEl.value.scrollTo({ top: 0 });
   }
@@ -170,7 +171,7 @@ async function handleResultSystemShare(imageDataUrl?: string, filename?: string)
 <template>
   <div class="app-stage">
     <div class="app-shell">
-      <main ref="scrollEl" class="main-scroll">
+      <main ref="scrollEl" class="main-scroll" :class="{ 'has-tabbar': showBottomTabs }">
         <HomeView
           v-if="route.name === 'home'"
           :results="results"

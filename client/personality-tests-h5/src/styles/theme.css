@@ -61,6 +61,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "SF Pro Display", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   line-height: 1.42;
+  overflow-x: clip;
 }
 
 button,
@@ -101,7 +102,7 @@ p {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* ========== 移动端 100dvh 壳层 + PC 居中 430px 手机展台 ========== */
+/* ========== 移动端原生全页滚动 + PC 居中 430px 手机展台 ========== */
 .app-stage {
   width: 100%;
   min-height: 100dvh;
@@ -122,6 +123,17 @@ p {
   position: relative;
 }
 
+/* 移动端默认交由 window/document 原生滚动，杜绝微信/iOS 嵌套 overflow + overscroll 锁死 */
+.main-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+
+.main-scroll.has-tabbar {
+  padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+}
+
 @media (min-width: 560px) {
   .app-stage {
     padding: 20px 16px;
@@ -139,20 +151,18 @@ p {
     border-color: #3a3747;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65);
   }
-}
-
-.main-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  scrollbar-width: none;
-}
-
-.main-scroll::-webkit-scrollbar {
-  display: none;
+  .main-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+  }
+  .main-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .main-scroll.has-tabbar {
+    padding-bottom: 0;
+  }
 }
 
 /* ========== 顶部导航与安全区 ========== */
@@ -271,8 +281,14 @@ p {
   white-space: nowrap;
 }
 
-/* ========== 底部三栏通栏导航 ========== */
+/* ========== 底部三栏通栏导航（移动端 fixed 吸底，PC 端跟随手机框） ========== */
 .tabbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  bottom: 0;
   padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1.8px solid var(--border);
@@ -280,7 +296,16 @@ p {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   flex-shrink: 0;
-  z-index: 15;
+  z-index: 25;
+}
+
+@media (min-width: 560px) {
+  .tabbar {
+    position: static;
+    left: auto;
+    transform: none;
+    max-width: none;
+  }
 }
 
 .tab-item {

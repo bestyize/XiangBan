@@ -119,17 +119,19 @@ function handleSystemShare() {
 
 <style scoped>
 .sheet-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(24, 24, 27, 0.54);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
+  justify-content: center;
   z-index: 40;
 }
 .bottom-sheet {
   width: 100%;
-  max-height: 92%;
+  max-width: 430px;
+  max-height: 92dvh;
   background: var(--bg);
   border-radius: 24px 24px 0 0;
   border-top: 2.2px solid var(--border);
@@ -137,6 +139,15 @@ function handleSystemShare() {
   flex-direction: column;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (min-width: 560px) {
+  .sheet-backdrop {
+    position: absolute;
+  }
+  .bottom-sheet {
+    max-width: none;
+    max-height: 92%;
+  }
 }
 .bs-handle {
   width: 40px;

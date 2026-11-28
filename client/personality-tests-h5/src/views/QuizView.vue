@@ -471,17 +471,22 @@ function finishTest() {
 }
 
 .analyzing-layer {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: var(--pop-lime);
   color: #18181b;
-  z-index: 30;
+  z-index: 35;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 28px;
   text-align: center;
+}
+@media (min-width: 560px) {
+  .analyzing-layer {
+    position: absolute;
+  }
 }
 .star-spin {
   width: 78px;
