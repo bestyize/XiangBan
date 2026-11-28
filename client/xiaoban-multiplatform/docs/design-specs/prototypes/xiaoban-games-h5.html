@@ -1,0 +1,2672 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>小伴游戏厅 · game.xiaban.xyz 移动端游戏站 UI 设计稿</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{
+  margin:0;
+  background:#eff0f2;
+  color:#1c1c1e;
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  transition:background .22s ease,color .22s ease;
+}
+body.studio-dark{background:#0c0c0e;color:#ececef}
+button,input{border:0;background:none;font:inherit;color:inherit;padding:0}
+button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--accent,#e3203c);outline-offset:2px}
+h1,h2,h3,h4,p,ul,li{margin:0;padding:0}
+ul,li{list-style:none}
+svg{stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg:not([fill]){fill:none;stroke:currentColor}
+img{display:block}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+[hidden]{display:none!important}
+
+/* ========== 工作台顶栏 ========== */
+.studio{max-width:1540px;margin:0 auto;padding:20px 22px 64px}
+.studio-bar{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 18px;
+  padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.88);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(0,0,0,.07);box-shadow:0 4px 20px rgba(0,0,0,.04);
+  margin-bottom:18px;position:sticky;top:12px;z-index:50;
+}
+body.studio-dark .studio-bar{background:rgba(24,24,28,.88);border-color:rgba(255,255,255,.08);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.studio-brand{display:flex;align-items:center;gap:11px}
+.studio-logo{
+  width:34px;height:34px;border-radius:10px;flex:none;
+  background:linear-gradient(135deg,#ff5b7d 0%,#f9744b 100%);
+  display:grid;place-items:center;box-shadow:0 4px 12px rgba(238,79,109,.28);
+}
+.studio-brand h1{font-size:15.5px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.domain-pill{
+  font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+  background:rgba(0,0,0,.055);color:#555860;
+}
+body.studio-dark .domain-pill{background:rgba(255,255,255,.09);color:#b8bac4}
+.studio-brand p{font-size:12px;color:#6c6f77;margin-top:2px}
+body.studio-dark .studio-brand p{color:#9698a2}
+
+.studio-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.seg{display:inline-flex;align-items:center;padding:3px;border-radius:10px;background:rgba(0,0,0,.055);gap:2px}
+body.studio-dark .seg{background:rgba(255,255,255,.08)}
+.seg button{height:28px;padding:0 11px;border-radius:7px;font-size:12px;color:#5a5d66;white-space:nowrap;transition:background .15s,color .15s}
+body.studio-dark .seg button{color:#a5a8b2}
+.seg button.active{background:#fff;color:#18191c;font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+body.studio-dark .seg button.active{background:#2c2d33;color:#f4f4f7}
+
+.swatches{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.055)}
+body.studio-dark .swatches{background:rgba(255,255,255,.08)}
+.swatch{width:14px;height:14px;border-radius:50%;position:relative;transition:transform .14s}
+.swatch:hover{transform:scale(1.16)}
+.swatch.active::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:1.5px solid currentColor}
+
+/* ========== 多画板画廊 ========== */
+.boards{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;
+  gap:28px 26px;
+}
+body.mode-live .boards .board:not(.board-live){display:none}
+.board{width:390px;flex:none;transition:width .2s ease}
+body.compact .board:not(.board-wide){width:360px}
+.board-wide{width:760px;max-width:calc(100vw - 40px)}
+body.mode-live .board-live{width:390px}
+body.mode-live.compact .board-live{width:360px}
+
+.board-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin:0 4px 10px;min-height:26px;flex-wrap:wrap;
+}
+.board-title{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:650}
+.board-num{
+  font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;
+  background:rgba(0,0,0,.07);color:#4f525a;
+}
+body.studio-dark .board-num{background:rgba(255,255,255,.1);color:#c2c4ce}
+.board-tag{
+  font-size:11px;font-weight:550;padding:2px 8px;border-radius:999px;
+  background:rgba(0,0,0,.055);color:#5e616a;
+}
+body.studio-dark .board-tag{background:rgba(255,255,255,.09);color:#a7aab4}
+.board-caption{margin:10px 6px 0;font-size:12px;line-height:1.6;color:#666972}
+body.studio-dark .board-caption{color:#9699a4}
+
+/* ========== 手机壳层与官方 Token ========== */
+.phone{
+  --paper:#fafafa;
+  --surface:#ffffff;
+  --surface-2:#f4f4f6;
+  --ink:#1c1c1e;
+  --ink2:#666666;
+  --ink3:#9a9a9a;
+  --hairline:#ededed;
+  --fill:#f2f2f2;
+  --fill-hover:#e8e8ec;
+  --accent:#e3203c;
+  --accent-ink:#ffffff;
+  --accent-soft:#fff3f4;
+  --accent-soft-ink:#e3203c;
+  --ok:#2fa36b;
+  --sheet-shadow:0 -8px 30px rgba(0,0,0,.14);
+  --bar-glass:rgba(250,250,250,.88);
+
+  position:relative;
+  height:812px;
+  border-radius:40px;
+  background:var(--paper);
+  color:var(--ink);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  border:6px solid #ffffff;
+  box-shadow:0 24px 60px rgba(15,18,25,.12),0 0 0 1px rgba(0,0,0,.06);
+}
+.phone.dark{
+  --paper:#111111;
+  --surface:#1c1c1e;
+  --surface-2:#252528;
+  --ink:#f4f4f6;
+  --ink2:#a1a1aa;
+  --ink3:#71717a;
+  --hairline:rgba(255,255,255,.09);
+  --fill:#2c2c2e;
+  --fill-hover:#38383c;
+  --accent-soft:rgba(227,32,60,.18);
+  --accent-soft-ink:#ff6b7a;
+  --sheet-shadow:0 -10px 36px rgba(0,0,0,.55);
+  --bar-glass:rgba(17,17,17,.88);
+
+  border-color:#26262a;
+  box-shadow:0 28px 64px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.08);
+}
+.phone.landscape-phone{
+  height:390px;
+  border-radius:36px;
+}
+
+/* 状态栏 */
+.status-bar{
+  height:42px;padding:12px 22px 0;flex:none;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12.5px;font-weight:650;position:relative;z-index:8;
+}
+.status-bar.overlay{
+  position:absolute;top:0;left:0;right:0;color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none;
+}
+.status-icons{display:flex;align-items:center;gap:5px}
+.dynamic-island{
+  position:absolute;left:50%;top:10px;transform:translateX(-50%);
+  width:92px;height:24px;border-radius:999px;background:#09090b;
+}
+.phone.dark .dynamic-island{background:#000}
+
+/* 顶部品牌栏 */
+.app-topbar{
+  height:48px;padding:0 16px;flex:none;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--bar-glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  position:relative;z-index:6;
+}
+.app-brand{display:flex;align-items:center;gap:9px;min-width:0}
+.xb-mark{
+  width:28px;height:28px;border-radius:8px;flex:none;
+  background:linear-gradient(135deg,#ff5b7d 0%,#f9744b 100%);
+  display:grid;place-items:center;box-shadow:0 3px 10px rgba(238,79,109,.25);
+}
+.app-brand-text{display:flex;align-items:baseline;gap:6px;min-width:0}
+.app-brand-name{font-size:17px;font-weight:750;letter-spacing:-.02em}
+.app-brand-host{
+  font-size:10.5px;font-weight:600;color:var(--ink3);
+  padding:1px 6px;border-radius:999px;background:var(--fill);
+}
+.top-actions{display:flex;align-items:center;gap:4px}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;
+  display:grid;place-items:center;color:var(--ink2);
+  transition:background .14s,color .14s,transform .12s;
+}
+.icon-btn svg{width:19px;height:19px}
+.icon-btn:hover{background:var(--fill);color:var(--ink)}
+.icon-btn:active{transform:scale(.94)}
+.icon-btn.accent-dot{position:relative}
+.icon-btn.accent-dot::after{
+  content:"";position:absolute;top:7px;right:7px;width:6px;height:6px;
+  border-radius:50%;background:var(--accent);
+}
+
+/* 滚动主体 */
+.screen-scroll{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  overscroll-behavior-y:auto;
+  padding:6px 16px 20px;scrollbar-width:none;
+}
+.screen-scroll::-webkit-scrollbar{display:none}
+
+/* 继续上次浮条 */
+.resume-strip{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 11px;border-radius:14px;
+  background:var(--surface);border:1px solid var(--hairline);
+  margin-bottom:12px;touch-action:pan-y;
+  transition:border-color .15s,transform .12s;
+}
+.resume-strip:active{transform:scale(.99)}
+.resume-icon{
+  width:38px;height:38px;border-radius:10px;overflow:hidden;flex:none;
+  border:1px solid var(--hairline);background:var(--fill);
+}
+.resume-icon img{width:100%;height:100%;object-fit:cover}
+.resume-meta{flex:1;min-width:0}
+.resume-top{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:650}
+.resume-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+.resume-sub{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.resume-btn{
+  height:30px;padding:0 12px;border-radius:999px;flex:none;
+  background:var(--accent);color:var(--accent-ink);
+  font-size:12px;font-weight:650;display:inline-flex;align-items:center;gap:4px;
+}
+
+/* 今日主打沉浸大片卡 */
+.hero-card{
+  position:relative;border-radius:20px;overflow:hidden;
+  aspect-ratio:16/9.6;background:#18181b;
+  margin-bottom:14px;isolation:isolate;
+  border:1px solid var(--hairline);
+}
+.hero-bg{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  transition:transform .4s cubic-bezier(.22,1,.36,1);
+}
+.hero-card:hover .hero-bg{transform:scale(1.03)}
+.hero-scrim{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(12,12,16,.12) 0%,rgba(12,12,16,.28) 42%,rgba(12,12,16,.86) 100%);
+}
+.hero-top-row{
+  position:absolute;top:11px;left:12px;right:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;z-index:2;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 9px;border-radius:999px;
+  background:rgba(16,16,20,.56);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:#fff;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.14);
+}
+.hero-dots{display:flex;align-items:center;gap:5px}
+.hero-dots button{
+  width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.42);
+  transition:width .2s,background .2s;
+}
+.hero-dots button.active{width:18px;background:#fff}
+.hero-bottom{
+  position:absolute;left:14px;right:14px;bottom:13px;z-index:2;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px;
+}
+.hero-copy{min-width:0;color:#fff}
+.hero-title{font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.2}
+.hero-desc{font-size:12px;color:rgba(255,255,255,.82);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-play{
+  height:36px;padding:0 14px;border-radius:999px;flex:none;
+  background:#ffffff;color:#18181b;font-size:12.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:5px;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+}
+.hero-play:active{transform:scale(.95)}
+
+/* 筛选胶囊行 */
+.filter-row{
+  display:flex;align-items:center;gap:7px;margin-bottom:12px;
+}
+.filter-rail{
+  flex:1;min-width:0;display:flex;align-items:center;gap:6px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x;
+  scrollbar-width:none;padding:1px 0;
+}
+.filter-rail::-webkit-scrollbar{display:none}
+.chip{
+  height:30px;padding:0 11px;border-radius:999px;flex:none;
+  font-size:12px;font-weight:550;color:var(--ink2);
+  background:var(--fill);display:inline-flex;align-items:center;gap:4px;
+  transition:background .15s,color .15s;
+}
+.chip.active{background:var(--accent);color:var(--accent-ink);font-weight:650}
+.chip .mini-count{font-size:10.5px;opacity:.75}
+.dice-btn{
+  height:30px;padding:0 10px;border-radius:999px;flex:none;
+  background:var(--surface);border:1px solid var(--hairline);
+  font-size:12px;font-weight:600;color:var(--ink);
+  display:inline-flex;align-items:center;gap:4px;
+}
+.dice-btn:active{transform:scale(.95)}
+
+/* 分区标题 */
+.sec-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:9px;
+}
+.sec-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px}
+.sec-count{font-size:12px;color:var(--ink3);font-weight:500}
+.layout-toggle{
+  display:inline-flex;padding:2px;border-radius:8px;background:var(--fill);gap:2px;
+}
+.layout-toggle button{
+  width:26px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--ink3);
+}
+.layout-toggle button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.07)}
+
+/* 双列卡带网格 */
+.game-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+.cart-card{
+  background:var(--surface);border:1px solid var(--hairline);
+  border-radius:16px;overflow:hidden;display:flex;flex-direction:column;
+  transition:transform .14s ease,border-color .15s;
+  text-align:left;touch-action:pan-y;
+}
+.cart-card:active{transform:scale(.98)}
+.cart-card.highlight-roll{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.cart-cover{
+  position:relative;aspect-ratio:16/10;background:var(--fill);overflow:hidden;
+}
+.cart-cover img{width:100%;height:100%;object-fit:cover}
+.orient-pill{
+  position:absolute;top:7px;right:7px;
+  padding:2px 6px;border-radius:6px;
+  background:rgba(16,16,20,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:#fff;font-size:10px;font-weight:600;
+  display:inline-flex;align-items:center;gap:3px;
+}
+.record-pill{
+  position:absolute;left:7px;bottom:7px;
+  padding:2px 6px;border-radius:6px;
+  background:rgba(16,16,20,.68);color:#fff;font-size:10px;font-weight:600;
+}
+.cart-body{padding:9px 10px 10px;display:flex;align-items:center;gap:8px}
+.cart-icon{
+  width:32px;height:32px;border-radius:8px;overflow:hidden;flex:none;
+  border:1px solid var(--hairline);background:var(--fill);
+}
+.cart-icon img{width:100%;height:100%;object-fit:cover}
+.cart-text{flex:1;min-width:0}
+.cart-name{font-size:13.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cart-sub{font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+
+/* 精装列表视图 */
+.game-list{
+  background:var(--surface);border:1px solid var(--hairline);
+  border-radius:16px;overflow:hidden;
+}
+.list-row{
+  display:flex;align-items:center;gap:11px;padding:11px 12px;width:100%;text-align:left;
+  position:relative;
+}
+.list-row+.list-row::before{
+  content:"";position:absolute;top:0;left:73px;right:12px;height:.5px;background:var(--hairline);
+}
+.list-icon{
+  width:50px;height:50px;border-radius:13px;overflow:hidden;flex:none;
+  border:1px solid var(--hairline);background:var(--fill);
+}
+.list-icon img{width:100%;height:100%;object-fit:cover}
+.list-info{flex:1;min-width:0}
+.list-title-row{display:flex;align-items:center;gap:6px}
+.list-name{font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-tag{
+  font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;
+  background:var(--fill);color:var(--ink2);flex:none;
+}
+.list-desc{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.list-play{
+  height:30px;padding:0 13px;border-radius:999px;flex:none;
+  background:var(--fill);color:var(--ink);font-size:12px;font-weight:650;
+}
+.list-row:hover .list-play{background:var(--accent);color:var(--accent-ink)}
+
+/* 底部三项导航（规范 4.2：墨黑选中、不用红色） */
+.bottom-nav{
+  height:56px;padding:0 8px 4px;flex:none;
+  background:var(--surface);border-top:.5px solid var(--hairline);
+  display:grid;grid-template-columns:repeat(3,1fr);align-items:center;
+  position:relative;z-index:6;
+}
+.nav-item{
+  height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  color:var(--ink3);font-size:10px;font-weight:500;
+}
+.nav-item.active{color:var(--ink);font-weight:700}
+.nav-item svg{width:21px;height:21px}
+
+/* 底部手势条 */
+.home-indicator{
+  position:absolute;left:50%;bottom:7px;transform:translateX(-50%);
+  width:118px;height:4px;border-radius:999px;background:var(--ink);opacity:.2;
+  pointer-events:none;z-index:30;
+}
+.home-indicator.light-bar{background:#fff;opacity:.45}
+
+/* ========== BottomSheet 卡带预览抽屉 ========== */
+.scrim{
+  position:absolute;inset:0;background:rgba(18,18,23,.42);z-index:18;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  animation:fadeIn .18s ease;
+}
+.phone.dark .scrim{background:rgba(0,0,0,.62)}
+.sheet{
+  background:var(--surface);border-radius:20px 20px 0 0;
+  box-shadow:var(--sheet-shadow);padding:8px 18px 22px;
+  max-height:84%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  scrollbar-width:none;
+  animation:slideUp .24s cubic-bezier(.22,1,.36,1);
+}
+.sheet::-webkit-scrollbar{display:none}
+.sheet-handle{width:36px;height:4px;border-radius:999px;background:var(--ink3);opacity:.35;margin:0 auto 12px}
+.sheet-cover{
+  position:relative;border-radius:14px;overflow:hidden;aspect-ratio:16/9;
+  background:#18181b;margin-bottom:14px;border:1px solid var(--hairline);
+}
+.sheet-cover img{width:100%;height:100%;object-fit:cover}
+.sheet-cover-meta{
+  position:absolute;right:9px;bottom:9px;
+  padding:3px 8px;border-radius:999px;background:rgba(16,16,20,.72);
+  color:#fff;font-size:10.5px;font-weight:600;
+}
+.sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.sheet-icon{
+  width:52px;height:52px;border-radius:13px;overflow:hidden;flex:none;
+  border:1px solid var(--hairline);background:var(--fill);
+}
+.sheet-icon img{width:100%;height:100%;object-fit:cover}
+.sheet-title{font-size:18px;font-weight:750;letter-spacing:-.01em}
+.sheet-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.sheet-tag{
+  font-size:11px;font-weight:550;padding:2px 8px;border-radius:999px;
+  background:var(--fill);color:var(--ink2);display:inline-flex;align-items:center;gap:4px;
+}
+.sheet-tag .dot{width:5.5px;height:5.5px;border-radius:50%}
+.sheet-desc{font-size:13.5px;line-height:1.6;color:var(--ink2);margin-bottom:12px}
+.sheet-stat{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 12px;border-radius:12px;background:var(--fill);
+  font-size:12px;color:var(--ink2);margin-bottom:14px;
+}
+.sheet-stat strong{color:var(--ink);font-weight:650}
+.sheet-actions{display:flex;align-items:center;gap:9px}
+.btn-share{
+  height:46px;padding:0 16px;border-radius:999px;flex:none;
+  background:var(--fill);color:var(--ink);font-size:13.5px;font-weight:650;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-primary{
+  height:46px;padding:0 18px;border-radius:999px;flex:1;
+  background:var(--accent);color:var(--accent-ink);font-size:14.5px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-primary:active,.btn-share:active{transform:scale(.97)}
+
+/* ========== 运行页（竖屏 & 横屏 + 宿主竖三点） ========== */
+.game-canvas{
+  position:relative;flex:1;min-height:0;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+/* 协议 2 右上角无圆底透明阴影竖三点（规范 4.3） */
+.host-more-btn{
+  position:absolute;top:44px;right:8px;z-index:15;
+  width:44px;height:44px;display:grid;place-items:center;
+  color:#fff;filter:drop-shadow(0 1px 4px rgba(0,0,0,.55));
+}
+.landscape-phone .host-more-btn{top:10px;right:10px}
+.host-more-btn:active{transform:scale(.9)}
+
+/* 模拟方块爆破竖屏画面 */
+.bp-stage{
+  flex:1;background:linear-gradient(180deg,#1b2434 0%,#121826 100%);
+  color:#fff;padding:54px 18px 26px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.bp-hud{display:flex;align-items:center;justify-content:space-between;padding-right:34px}
+.bp-score-box small{display:block;font-size:10.5px;color:rgba(255,255,255,.55);letter-spacing:.04em}
+.bp-score-box strong{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.bp-best{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;
+  background:rgba(255,255,255,.1);font-size:11.5px;font-weight:650;color:#fcd34d;
+}
+.bp-board{
+  width:100%;aspect-ratio:1;background:rgba(255,255,255,.05);
+  border-radius:16px;padding:8px;border:1px solid rgba(255,255,255,.08);
+  display:grid;grid-template-columns:repeat(8,1fr);gap:4px;
+}
+.bp-cell{border-radius:5px;background:rgba(255,255,255,.06)}
+.bp-cell.c1{background:linear-gradient(135deg,#fb7185,#e11d48);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.bp-cell.c2{background:linear-gradient(135deg,#38bdf8,#0284c7);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.bp-cell.c3{background:linear-gradient(135deg,#fbbf24,#d97706);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.bp-cell.c4{background:linear-gradient(135deg,#34d399,#059669);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.bp-cell.c5{background:linear-gradient(135deg,#a78bfa,#7c3aed);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.bp-tray{display:flex;align-items:center;justify-content:space-around;padding:8px 0 4px}
+.bp-piece{display:grid;gap:3px}
+.bp-piece i{display:block;width:18px;height:18px;border-radius:4px}
+
+/* 宿主菜单 BottomSheet */
+.host-sheet-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:.5px solid var(--hairline)}
+.host-sheet-head img{width:40px;height:40px;border-radius:10px;border:1px solid var(--hairline)}
+.host-sheet-head b{font-size:15px;display:block}
+.host-sheet-head span{font-size:11.5px;color:var(--ink2)}
+.host-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px 0;
+}
+.host-act{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)}
+.host-act-ico{
+  width:46px;height:46px;border-radius:14px;background:var(--fill);
+  display:grid;place-items:center;color:var(--ink);
+}
+.host-exit-btn{
+  width:100%;height:46px;border-top:.5px solid var(--hairline);
+  font-size:15px;font-weight:650;color:var(--ink);
+}
+
+/* 横屏引导蒙层 */
+.rotate-stage{
+  flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px 26px;text-align:center;color:#fff;overflow:hidden;background:#141418;
+}
+.rotate-bg{
+  position:absolute;inset:-18px;width:calc(100% + 36px);height:calc(100% + 36px);
+  object-fit:cover;filter:blur(22px) brightness(.42);transform:scale(1.06);
+}
+.rotate-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;width:100%}
+.rotate-phone-glyph{
+  width:72px;height:72px;border-radius:20px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);
+  backdrop-filter:blur(12px);display:grid;place-items:center;margin-bottom:18px;
+}
+.rotate-svg{animation:tiltPhone 2.4s ease-in-out infinite}
+@keyframes tiltPhone{
+  0%,18%{transform:rotate(0deg)}
+  48%,70%{transform:rotate(-90deg)}
+  100%{transform:rotate(0deg)}
+}
+.rotate-game-chip{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 6px;
+  border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);
+  font-size:12px;font-weight:600;margin-bottom:12px;
+}
+.rotate-game-chip img{width:22px;height:22px;border-radius:6px}
+.rotate-content h3{font-size:20px;font-weight:750;margin-bottom:6px}
+.rotate-content p{font-size:13px;color:rgba(255,255,255,.76);line-height:1.55;max-width:260px;margin-bottom:22px}
+.rotate-primary{
+  width:100%;max-width:248px;height:44px;border-radius:999px;
+  background:#fff;color:#18181b;font-size:14px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;
+}
+.rotate-links{display:flex;align-items:center;gap:16px;margin-top:4px}
+.rotate-links button{font-size:12.5px;color:rgba(255,255,255,.72);padding:6px 4px}
+
+/* 横屏真机战斗示意（水墨剑客） */
+.ink-stage{
+  flex:1;position:relative;overflow:hidden;
+  background:radial-gradient(circle at 72% 28%,#f7efe2 0%,#e5d8c3 46%,#c7b79e 100%);
+  color:#1d1917;padding:16px 22px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.ink-mountains{
+  position:absolute;inset:0;pointer-events:none;opacity:.88;
+}
+.ink-hud{
+  position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding-right:42px;
+}
+.ink-title-pill{
+  display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
+  background:rgba(24,20,18,.78);color:#f7f1e3;font-size:12px;font-weight:600;
+}
+.ink-hp{display:flex;align-items:center;gap:6px}
+.ink-heart{width:10px;height:10px;border-radius:50%;background:#c82834;box-shadow:0 0 0 2px rgba(200,40,52,.22)}
+.ink-heart.lost{background:rgba(24,20,18,.2);box-shadow:none}
+.ink-arena{
+  position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:space-around;padding:0 36px;
+}
+.ink-flash{
+  width:72px;height:72px;border-radius:50%;
+  background:radial-gradient(circle,rgba(227,32,60,.85) 0%,rgba(227,32,60,.15) 56%,transparent 72%);
+  display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:.08em;
+}
+.ink-controls{
+  position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+}
+.ink-touch-btn{
+  height:42px;padding:0 22px;border-radius:999px;
+  background:rgba(24,20,18,.76);color:#f7f1e3;font-size:13px;font-weight:650;
+  border:1px solid rgba(255,255,255,.16);
+}
+.ink-touch-btn.parry{background:#c82834;border-color:rgba(255,255,255,.25)}
+
+/* 横屏右侧窄宿主抽屉 */
+.side-drawer-scrim{
+  position:absolute;inset:0;background:rgba(16,16,20,.45);z-index:20;
+  display:flex;justify-content:flex-end;
+}
+.side-drawer{
+  width:248px;height:100%;background:var(--surface);padding:16px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  box-shadow:-10px 0 32px rgba(0,0,0,.22);
+}
+
+/* ========== 战绩与本机档案页 ========== */
+.profile-hero{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:18px;
+  padding:15px;margin-bottom:12px;
+}
+.profile-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.profile-badge{display:flex;align-items:center;gap:10px}
+.profile-avatar{
+  width:42px;height:42px;border-radius:13px;
+  background:var(--fill);display:grid;place-items:center;color:var(--ink);
+}
+.profile-title{font-size:15.5px;font-weight:750}
+.profile-sub{font-size:11.5px;color:var(--ink2);margin-top:1px}
+.local-pill{
+  font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;
+  background:var(--fill);color:var(--ink2);display:inline-flex;align-items:center;gap:5px;
+}
+.local-pill i{width:6px;height:6px;border-radius:50%;background:var(--ok);display:block}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat-box{background:var(--fill);border-radius:12px;padding:10px 10px 9px}
+.stat-val{font-size:19px;font-weight:800;letter-spacing:-.02em}
+.stat-lbl{font-size:11px;color:var(--ink2);margin-top:2px}
+
+.record-card{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:16px;
+  overflow:hidden;margin-bottom:12px;
+}
+.rec-row{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;position:relative;
+}
+.rec-row+.rec-row::before{
+  content:"";position:absolute;top:0;left:60px;right:12px;height:.5px;background:var(--hairline);
+}
+.rec-row img{width:38px;height:38px;border-radius:10px;border:1px solid var(--hairline);flex:none}
+.rec-info{flex:1;min-width:0}
+.rec-name{font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:6px}
+.rec-meta{font-size:11.5px;color:var(--ink2);margin-top:1px}
+.rec-go{
+  height:28px;padding:0 11px;border-radius:999px;background:var(--fill);
+  color:var(--ink);font-size:11.5px;font-weight:650;flex:none;
+}
+
+.sister-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:12px}
+.sister-card{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:15px;
+  padding:12px;text-align:left;display:flex;flex-direction:column;gap:6px;
+}
+.sister-top{display:flex;align-items:center;justify-content:space-between}
+.sister-ico{
+  width:30px;height:30px;border-radius:9px;background:var(--fill);
+  display:grid;place-items:center;color:var(--ink);
+}
+.sister-card b{font-size:13px;font-weight:700}
+.sister-card small{font-size:11px;color:var(--ink2);line-height:1.4}
+
+.danger-link{
+  width:100%;height:42px;border-radius:12px;
+  background:var(--surface);border:1px solid var(--hairline);
+  font-size:12.5px;font-weight:600;color:var(--ink2);
+}
+
+/* ========== 「我的」页（通栏精修，对齐手机端设计规范） ========== */
+.mine-scroll{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior-y:auto;
+  padding:0 0 22px;scrollbar-width:none;
+}
+.mine-scroll::-webkit-scrollbar{display:none}
+body.mode-fullscreen #livePhone .mine-scroll{overscroll-behavior-y:contain}
+.mine-slab{background:var(--surface)}
+.mine-profile{
+  padding:8px 16px 18px;display:flex;align-items:center;gap:13px;
+}
+.mine-avatar{
+  width:60px;height:60px;border-radius:50%;flex:none;
+  display:grid;place-items:center;font-size:21px;font-weight:750;
+  background:var(--fill);color:var(--ink2);
+  box-shadow:0 0 0 1px var(--hairline);
+}
+.mine-avatar svg{width:26px;height:26px}
+.mine-avatar.logged{
+  background:linear-gradient(135deg,#ff5b7d 0%,#f9744b 100%);
+  color:#fff;box-shadow:0 4px 14px rgba(238,79,109,.24);
+}
+.mine-info{flex:1;min-width:0}
+.mine-name-row{display:flex;align-items:center;gap:6px;min-width:0}
+.mine-name{font-size:20px;line-height:26px;font-weight:700;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mine-pill-tag{
+  font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;flex:none;
+  background:var(--fill);color:var(--ink2);display:inline-flex;align-items:center;gap:4px;
+}
+.mine-pill-tag i{width:5.5px;height:5.5px;border-radius:50%;background:var(--ok);display:block}
+.mine-sub{font-size:12.5px;color:var(--ink2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mine-auth-btn{
+  height:32px;padding:0 12px;border-radius:999px;flex:none;
+  background:var(--fill);color:var(--ink);font-size:12px;font-weight:650;
+}
+.mine-auth-btn.primary{background:var(--accent);color:var(--accent-ink)}
+.mine-divider{height:.5px;margin:0 16px;background:var(--hairline)}
+.mine-quick{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  padding:13px 10px 15px;
+}
+.mine-quick-btn{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:6px 4px;border-radius:12px;touch-action:pan-y;
+}
+.mine-quick-btn:active{background:var(--fill)}
+.mine-quick-val{font-size:17px;font-weight:750;line-height:22px;color:var(--ink)}
+.mine-quick-lbl{font-size:11.5px;color:var(--ink2);display:inline-flex;align-items:center;gap:4px}
+.mine-quick-lbl svg{width:13px;height:13px;color:var(--ink3)}
+
+.mine-gap{height:8px;background:var(--paper)}
+.mine-group{background:var(--surface)}
+.mine-row{
+  width:100%;min-height:50px;padding:0 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  text-align:left;position:relative;touch-action:pan-y;
+}
+.mine-row+.mine-row::before{
+  content:"";position:absolute;top:0;left:48px;right:16px;height:.5px;background:var(--hairline);
+}
+.mine-row:active{background:var(--fill)}
+.mine-row-left{display:flex;align-items:center;gap:12px;min-width:0}
+.mine-row-ico{width:20px;height:20px;color:var(--ink2);display:grid;place-items:center;flex:none}
+.mine-row-ico svg{width:19px;height:19px}
+.mine-row-label{font-size:15px;font-weight:500;color:var(--ink);white-space:nowrap}
+.mine-row-label.danger{color:#e3203c}
+.phone.dark .mine-row-label.danger{color:#ff6369}
+.mine-row-right{display:flex;align-items:center;gap:6px;color:var(--ink3);font-size:13px;min-width:0}
+.mine-row-right span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mine-row-right svg{width:15px;height:15px;opacity:.65}
+.accent-dot-preview{width:12px;height:12px;border-radius:50%;background:var(--accent);flex:none}
+
+/* 原生质感 Switch 开关 */
+.xb-switch{
+  width:42px;height:24px;border-radius:999px;background:var(--fill-hover);
+  position:relative;transition:background .16s ease;flex:none;
+}
+.xb-switch::after{
+  content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+  border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.22);
+  transition:transform .16s cubic-bezier(.22,1,.36,1);
+}
+.xb-switch.on{background:var(--accent)}
+.xb-switch.on::after{transform:translateX(18px)}
+
+/* 24px 居中确认弹窗（规范 4.1.1） */
+.dialog-scrim{
+  position:absolute;inset:0;background:rgba(18,18,23,.42);z-index:26;
+  display:grid;place-items:center;padding:24px;animation:fadeIn .16s ease;
+}
+.phone.dark .dialog-scrim{background:rgba(0,0,0,.64)}
+.dialog-card{
+  width:min(326px,100%);background:var(--surface);border-radius:24px;
+  padding:22px 20px 18px;box-shadow:0 16px 42px rgba(0,0,0,.22);
+}
+.dialog-card h4{font-size:17px;font-weight:750;margin-bottom:8px}
+.dialog-card p{font-size:13.5px;line-height:1.6;color:var(--ink2);margin-bottom:18px}
+.dialog-actions{display:flex;flex-direction:column;gap:8px}
+.dialog-danger{
+  width:100%;height:46px;border-radius:999px;background:#e3203c;color:#fff;
+  font-size:14.5px;font-weight:700;
+}
+.dialog-cancel{width:100%;height:42px;border-radius:999px;color:var(--ink2);font-size:14px;font-weight:600}
+
+.fav-pill-btn{
+  width:46px;height:46px;border-radius:999px;flex:none;
+  background:var(--fill);color:var(--ink2);display:grid;place-items:center;
+}
+.fav-pill-btn.active{color:#d97706}
+.fav-pill-btn svg{width:19px;height:19px}
+
+/* ========== 登录 / 注册弹窗（对齐统一账号中心与 20px BottomSheet 规范） ========== */
+.auth-sheet{
+  background:var(--surface);border-radius:20px 20px 0 0;
+  box-shadow:var(--sheet-shadow);padding:8px 20px 22px;
+  max-height:90%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  scrollbar-width:none;animation:slideUp .24s cubic-bezier(.22,1,.36,1);
+}
+.auth-sheet::-webkit-scrollbar{display:none}
+.auth-top{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  margin-bottom:14px;
+}
+.auth-brand{display:flex;align-items:center;gap:10px;min-width:0}
+.auth-close{
+  width:32px;height:32px;border-radius:50%;flex:none;
+  background:var(--fill);color:var(--ink2);display:grid;place-items:center;
+}
+.auth-close svg{width:16px;height:16px}
+.auth-heading{font-size:18px;font-weight:750;letter-spacing:-.015em;line-height:1.25}
+.auth-sub{font-size:12px;color:var(--ink2);margin-top:3px}
+.auth-back-link{
+  display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:600;
+  color:var(--ink2);margin-bottom:10px;padding:2px 0;
+}
+.auth-back-link svg{width:15px;height:15px}
+
+.auth-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;
+  border-radius:12px;background:var(--fill);margin-bottom:14px;
+}
+.auth-tabs button{
+  height:34px;border-radius:9px;font-size:13px;font-weight:550;color:var(--ink2);
+  transition:background .15s,color .15s;
+}
+.auth-tabs button.active{
+  background:var(--surface);color:var(--ink);font-weight:700;
+  box-shadow:0 1px 4px rgba(0,0,0,.08);
+}
+
+.auth-verified-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 12px;border-radius:12px;background:var(--fill);
+  margin-bottom:12px;font-size:12.5px;
+}
+.auth-verified-left{display:flex;align-items:center;gap:6px;min-width:0}
+.auth-verified-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+.auth-verified-left span{color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.auth-verified-change{font-size:12px;color:var(--ink2);font-weight:600;flex:none}
+
+.auth-field{margin-bottom:10px}
+.auth-input-wrap{
+  height:46px;border-radius:12px;background:var(--fill);
+  display:flex;align-items:center;gap:8px;padding:0 12px 0 14px;
+  border:1.5px solid transparent;transition:border-color .15s,background .15s;
+}
+.auth-input-wrap:focus-within{
+  border-color:var(--accent);background:var(--surface);
+}
+.auth-input{
+  flex:1;min-width:0;height:100%;font-size:15px;color:var(--ink);outline:none;background:transparent;
+}
+.auth-input::placeholder{color:var(--ink3)}
+.auth-code-btn{
+  height:30px;padding:0 10px;border-radius:8px;flex:none;
+  font-size:12.5px;font-weight:650;color:var(--accent);
+  background:var(--surface);border:1px solid var(--hairline);
+}
+.auth-code-btn:disabled{color:var(--ink3);cursor:default;opacity:.8}
+.auth-eye-btn{
+  width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--ink3);flex:none;
+}
+.auth-eye-btn svg{width:17px;height:17px}
+.auth-field-hint{
+  font-size:11.5px;color:var(--ink3);margin:5px 2px 0;line-height:1.45;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.auth-field-hint.ok{color:var(--ok)}
+.auth-field-hint button{font-size:12px;font-weight:600;color:var(--ink2)}
+
+.auth-agree{
+  display:flex;align-items:flex-start;gap:8px;margin:12px 2px 14px;
+  font-size:12px;line-height:1.45;color:var(--ink2);text-align:left;width:100%;
+}
+.auth-check{
+  width:16px;height:16px;border-radius:5px;flex:none;margin-top:1px;
+  border:1.5px solid var(--ink3);display:grid;place-items:center;
+  transition:background .14s,border-color .14s;
+}
+.auth-check.checked{background:var(--accent);border-color:var(--accent);color:#fff}
+.auth-check svg{width:11px;height:11px;stroke-width:2.6}
+.auth-agree b{color:var(--ink);font-weight:600}
+
+.auth-submit{
+  width:100%;height:48px;border-radius:999px;
+  background:var(--accent);color:var(--accent-ink);
+  font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+.auth-submit:active{transform:scale(.98)}
+.auth-foot{
+  margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:12px;color:var(--ink3);
+}
+.auth-foot button{color:var(--ink2);font-weight:550;padding:4px 0}
+.auth-sync-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 10px;border-radius:10px;background:var(--fill);
+  font-size:11.5px;color:var(--ink2);margin-bottom:12px;width:100%;
+}
+.auth-sync-badge i{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+@keyframes shakeX{
+  0%,100%{transform:translateX(0)}
+  20%,60%{transform:translateX(-4px)}
+  40%,80%{transform:translateX(4px)}
+}
+.shake{animation:shakeX .28s ease}
+
+/* ========== 分享直达落地页 & PC 桌面适配示意 ========== */
+.deeplink-stage{
+  flex:1;display:flex;flex-direction:column;padding:12px 18px 24px;
+  justify-content:space-between;
+}
+.deeplink-back{
+  display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 12px 0 8px;
+  border-radius:999px;background:var(--fill);color:var(--ink);font-size:12.5px;font-weight:600;
+  align-self:flex-start;
+}
+.deeplink-card{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:22px;
+  overflow:hidden;margin:auto 0;
+}
+.deeplink-cover{position:relative;aspect-ratio:16/9.5;background:#18181b}
+.deeplink-cover img{width:100%;height:100%;object-fit:cover}
+.deeplink-body{padding:16px}
+.deeplink-from{
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+  color:var(--ink2);margin-bottom:8px;
+}
+.deeplink-from .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.deeplink-title{font-size:20px;font-weight:750;margin-bottom:4px}
+.deeplink-desc{font-size:13px;color:var(--ink2);line-height:1.55;margin-bottom:14px}
+.load-bar{height:4px;border-radius:999px;background:var(--fill);overflow:hidden;margin-bottom:14px}
+.load-bar i{display:block;width:78%;height:100%;border-radius:999px;background:var(--accent)}
+.deeplink-foot{text-align:center;font-size:11.5px;color:var(--ink3)}
+
+/* 轻提示 Toast */
+.phone-toast{
+  position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:35;
+  padding:8px 14px;border-radius:999px;white-space:nowrap;
+  background:var(--surface);color:var(--ink);font-size:12px;font-weight:600;
+  border:1px solid var(--hairline);box-shadow:0 8px 24px rgba(0,0,0,.16);
+  animation:fadeIn .16s ease;
+}
+
+/* 架构说明卡 */
+.spec-card{
+  margin:34px auto 0;max-width:1240px;
+  background:#fff;border-radius:18px;border:1px solid rgba(0,0,0,.06);
+  padding:20px 22px;
+}
+body.studio-dark .spec-card{background:#16171a;border-color:rgba(255,255,255,.07)}
+.spec-card h3{font-size:14.5px;font-weight:700;margin-bottom:12px}
+.spec-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.spec-item{padding:13px 14px;border-radius:13px;background:#f7f7f9}
+body.studio-dark .spec-item{background:#1f2025}
+.spec-item b{font-size:13px;display:block;margin-bottom:5px}
+.spec-item p{font-size:12px;line-height:1.6;color:#63666f}
+body.studio-dark .spec-item p{color:#9a9da8}
+@media(max-width:980px){.spec-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+  .spec-grid{grid-template-columns:1fr}
+  .studio{padding:12px 10px 56px}
+  .studio-bar{position:static;padding:11px 12px;margin-bottom:14px}
+  .board,.board-wide,body.compact .board:not(.board-wide),body.mode-live .board-live,body.mode-live.compact .board-live{
+    width:100%;max-width:390px;
+  }
+  .phone{height:720px;max-height:80dvh;border-radius:30px;border-width:4px}
+  .phone.landscape-phone{height:240px;max-height:46dvh}
+}
+
+/* ========== 真机全屏模式（手机打开默认启用，流畅原生滚动） ========== */
+body.mode-fullscreen{overflow:hidden;background:#fafafa}
+body.mode-fullscreen.studio-dark{background:#111111}
+body.mode-fullscreen .studio{padding:0;max-width:none}
+body.mode-fullscreen .studio-bar,
+body.mode-fullscreen .spec-card,
+body.mode-fullscreen .board:not(.board-live),
+body.mode-fullscreen .board-live .board-head,
+body.mode-fullscreen .board-live .board-caption{display:none!important}
+body.mode-fullscreen .boards{display:block}
+body.mode-fullscreen .board-live{width:100%!important;max-width:none!important}
+body.mode-fullscreen #livePhone{
+  position:fixed;inset:0;width:100%;height:100dvh;max-height:none;
+  border:0;border-radius:0;box-shadow:none;
+}
+body.mode-fullscreen #livePhone .status-bar,
+body.mode-fullscreen #livePhone .home-indicator{display:none}
+body.mode-fullscreen #livePhone .app-topbar{
+  padding-top:env(safe-area-inset-top,0px);
+  height:calc(52px + env(safe-area-inset-top,0px));
+}
+body.mode-fullscreen #livePhone .bottom-nav{
+  padding-bottom:calc(4px + env(safe-area-inset-bottom,0px));
+  height:calc(56px + env(safe-area-inset-bottom,0px));
+}
+body.mode-fullscreen #livePhone .host-more-btn{
+  top:calc(10px + env(safe-area-inset-top,0px));
+}
+body.mode-fullscreen #livePhone .bp-stage{
+  padding-top:calc(18px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));
+}
+body.mode-fullscreen #livePhone .screen-scroll{overscroll-behavior-y:contain}
+.fs-exit-pill{
+  position:fixed;right:12px;bottom:calc(68px + env(safe-area-inset-bottom,0px));z-index:60;
+  height:32px;padding:0 11px;border-radius:999px;
+  background:rgba(24,24,27,.76);color:#fff;font-size:11.5px;font-weight:600;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.16);box-shadow:0 4px 14px rgba(0,0,0,.18);
+  display:none;align-items:center;gap:5px;
+}
+body.mode-fullscreen .fs-exit-pill{display:inline-flex}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(28px);opacity:.6}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="studio">
+  <!-- 顶部评审工作台 -->
+  <header class="studio-bar">
+    <div class="studio-brand">
+      <div class="studio-logo" aria-hidden="true">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff" stroke="none">
+          <path d="M12 2.5L14.2 9.2L21 11.4L14.2 13.6L12 20.5L9.8 13.6L3 11.4L9.8 9.2Z"/>
+          <circle cx="18.6" cy="5.4" r="2.1"/>
+        </svg>
+      </div>
+      <div>
+        <h1>小伴游戏厅 · 移动端游戏站 UI 设计稿 <span class="domain-pill mono">game.xiaban.xyz</span></h1>
+        <p>香港纯静态部署 · 覆盖小伴现役 8+1 款官方游戏 · 精装掌机展厅风（01 画板支持完整交互试玩）</p>
+      </div>
+    </div>
+    <div class="studio-controls">
+      <div class="seg" role="group" aria-label="浏览模式">
+        <button type="button" class="active" data-mode="all">全部画板</button>
+        <button type="button" data-mode="live">单机试玩</button>
+        <button type="button" data-mode="fullscreen">真机全屏</button>
+      </div>
+      <div class="seg" role="group" aria-label="机宽基准">
+        <button type="button" class="active" data-width="390">390px</button>
+        <button type="button" data-width="360">360px</button>
+      </div>
+      <div class="seg" role="group" aria-label="日夜模式">
+        <button type="button" class="active" data-theme="light">暖瓷浅色</button>
+        <button type="button" data-theme="dark">掌机深色</button>
+      </div>
+      <div class="swatches" role="group" aria-label="6 套官方主题色">
+        <button type="button" class="swatch active" data-accent="#e3203c" data-soft="#fff3f4" style="background:#e3203c;color:#e3203c" title="小伴红"></button>
+        <button type="button" class="swatch" data-accent="#2e8b5e" data-soft="#eef8f2" style="background:#2e8b5e;color:#2e8b5e" title="薄荷绿"></button>
+        <button type="button" class="swatch" data-accent="#2563eb" data-soft="#eff6ff" style="background:#2563eb;color:#2563eb" title="海湾蓝"></button>
+        <button type="button" class="swatch" data-accent="#7c3aed" data-soft="#f5f3ff" style="background:#7c3aed;color:#7c3aed" title="暮紫"></button>
+        <button type="button" class="swatch" data-accent="#d97706" data-soft="#fffbeb" style="background:#d97706;color:#d97706" title="琥珀"></button>
+        <button type="button" class="swatch" data-accent="#3f3f46" data-soft="#f4f4f5" style="background:#3f3f46;color:#3f3f46" title="石墨"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 6 画板舞台 -->
+  <main class="boards" id="boards">
+
+    <!-- ==================== 画板 01：首页 · 可完整交互试玩 ==================== -->
+    <section class="board board-live">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">01</span> 首页 · 游戏厅（可交互试玩）</div>
+        <span class="board-tag">双列卡带 / 列表切换</span>
+      </div>
+      <div class="phone" id="livePhone"></div>
+      <p class="board-caption">首屏由「继续上次」断点续玩条 + 「今日主打」沉浸大片轮播 + 「单手竖屏 / 分类 / 🎲 随便玩」筛选 + 8+1 款游戏卡带画廊组成。点击任意卡片可预览并真实进入运行态。</p>
+    </section>
+
+    <!-- ==================== 画板 02：卡带预览 BottomSheet ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">02</span> 卡带预览抽屉</div>
+        <span class="board-tag">20px 顶圆角 BottomSheet</span>
+      </div>
+      <div class="phone" id="sheetPhone"></div>
+      <p class="board-caption">点击卡片信息区弹出 20px 顶圆角抽屉：展示 16:9 封面、包体大小、方向与操控方式、本机存档与最高分，底部提供「复制直达链接」与「立即开玩」。</p>
+    </section>
+
+    <!-- ==================== 画板 03：竖屏全屏运行 + 协议 2 宿主菜单 ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">03</span> 竖屏运行态 &amp; 宿主菜单</div>
+        <div class="seg" id="b3Seg">
+          <button type="button" class="active" data-b3="play">沉浸对局</button>
+          <button type="button" data-b3="menu">三点菜单</button>
+        </div>
+      </div>
+      <div class="phone" id="portraitRunPhone"></div>
+      <p class="board-caption">竖屏游戏（方块爆破 / 2048 / 倒杯快乐）全屏铺满 100dvh，右上角仅留无圆底透明阴影竖三点（规范 4.3），不设厚重浏览器顶栏；点击展开重新开始、静音、分享与退出。</p>
+    </section>
+
+    <!-- ==================== 画板 04：横屏引导 & 横置沉浸运行态 ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">04</span> 横屏引导蒙层（iOS / 微信兜底）</div>
+        <span class="board-tag">6 款横屏游戏关键体验</span>
+      </div>
+      <div class="phone" id="rotateGuidePhone"></div>
+      <p class="board-caption">小伴 6 款横屏作品在 iOS Safari / 微信中无法强制锁横屏时，先呈现优雅的高斯模糊旋转引导层，提供「全屏横屏」触发与「暂不旋转」降级出口。</p>
+    </section>
+
+    <!-- ==================== 画板 05：战绩与本机存档 + 姐妹站联动 ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">05</span> 战绩档案 &amp; 生态联动</div>
+        <span class="board-tag">免登录 · localStorage</span>
+      </div>
+      <div class="phone" id="recordsPhone"></div>
+      <p class="board-caption">零账号体系下靠本机战绩与存档留存：汇总已玩款数、存档数与各游戏最佳纪录（一键续玩），底部轻联动姐妹站 people.xiaban.xyz 与小伴 App。</p>
+    </section>
+
+    <!-- ==================== 画板 06：分享直达落地页 ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">06</span> 好友分享直达落地页</div>
+        <span class="board-tag mono">/#/play/ink-blade</span>
+      </div>
+      <div class="phone" id="deeplinkPhone"></div>
+      <p class="board-caption">微信 / 朋友圈点开单游戏直达链接时跳过大厅，直接渲染高颜值卡带启动卡并后台预加载游戏包（132 KB–1.0 MB 秒开），左上角保留返回游戏厅入口。</p>
+    </section>
+
+    <!-- ==================== 画板 07：我的页（通栏精修 · 访客 / 已登录双态） ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">07</span> 我的页（通栏精修）</div>
+        <div class="seg" id="b7Seg">
+          <button type="button" class="active" data-b7="guest">访客态</button>
+          <button type="button" data-b7="logged">已登录</button>
+        </div>
+      </div>
+      <div class="phone" id="minePhone"></div>
+      <p class="board-caption">对齐小伴手机 App「方案 1 通栏精修」：白底通栏资料卡 + 收藏/存档/成就三宫格 + 游玩偏好（深浅色/主题色/默认音效/横屏引导）+ 存档码导出备份与 24px 清理确认弹窗 + 生态联动。</p>
+    </section>
+
+    <!-- ==================== 画板 08：登录注册弹窗（统一相伴账号四态） ==================== -->
+    <section class="board">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">08</span> 登录注册弹窗（统一账号）</div>
+        <div class="seg" id="b8Seg">
+          <button type="button" class="active" data-b8="code">验证码</button>
+          <button type="button" data-b8="pwd">密码</button>
+          <button type="button" data-b8="register">完善注册</button>
+          <button type="button" data-b8="reset">找回</button>
+        </div>
+      </div>
+      <div class="phone" id="authPhone"></div>
+      <p class="board-caption">严格对齐统一账号中心（server-account）：20px 顶圆角 BottomSheet 贴底适配软键盘，默认邮箱/手机验证码二合一（已有账号直登、新标识滑入第 2 步设唯一不可改用户名与密码），另含密码登录、找回密码及「暂不登录继续免登录玩」出口。</p>
+    </section>
+
+    <!-- ==================== 附加横屏真机展板：横置运行态 ==================== -->
+    <section class="board board-wide">
+      <div class="board-head">
+        <div class="board-title"><span class="board-num">04B</span> 横屏真机沉浸态 &amp; 右侧窄宿主抽屉（《水墨剑客》）</div>
+        <div class="seg" id="b4bSeg">
+          <button type="button" class="active" data-b4b="play">全屏战斗</button>
+          <button type="button" data-b4b="drawer">右侧菜单</button>
+        </div>
+      </div>
+      <div class="phone landscape-phone" id="landscapeRunPhone"></div>
+      <p class="board-caption">手机横置后引导层自动消退，全幅呈现水墨剑客等横屏游戏；右上角竖三点在横屏态呼出右侧 248px 窄抽屉，不遮挡宽屏主画面，PC 桌面访问亦复用此宽屏画幅。</p>
+    </section>
+
+  </main>
+
+  <!-- 底部设计要点总结矩阵 -->
+  <section class="spec-card">
+    <h3>game.xiaban.xyz 移动端设计决策速览</h3>
+    <div class="spec-grid">
+      <div class="spec-item">
+        <b>1. 少而精的「卡带展厅」定位</b>
+        <p>小伴现役 8+1 款均为高完成度原创作品，拒绝传统小游戏站杂乱广告位。纯中性画布（浅 #FAFAFA / 深 #111111）把视觉焦点留给每款游戏的真实图标与 16:9 封面。</p>
+      </div>
+      <div class="spec-item">
+        <b>2. 「单手竖屏」与「横屏沉浸」显式分流</b>
+        <p>筛选栏特设「单手竖屏」满足通勤单手即玩（倒杯快乐、方块爆破、2048）；6 款横屏游戏配备旋转动效引导层 + 横屏右侧窄宿主抽屉，彻底解决 iOS/微信锁横屏限制。</p>
+      </div>
+      <div class="spec-item">
+        <b>3. 零登录秒开 + 本机续玩留存</b>
+        <p>香港 Nginx 纯静态托管，全部 8+1 款游戏合计仅 ~4 MB。通过前端 Web xb.storage 桥接 localStorage，首屏顶部浮现「继续上次」，无须登录即可沉淀进度与最高分。</p>
+      </div>
+      <div class="spec-item">
+        <b>4. 与 people.xiaban.xyz 形成轻矩阵</b>
+        <p>单游戏直达路由 /#/play/:id 支持微信强传播；战绩页底部温和互导姐妹站「人格贩卖机」与小伴客户端下载，同属 xiaban.xyz 轻量静态阵营。</p>
+      </div>
+    </div>
+  </section>
+</div>
+<button type="button" class="fs-exit-pill" id="fsExitBtn" aria-label="切换至 6 画板总览">6 画板总览</button>
+
+<script>
+(() => {
+  const ASSET = 'app-plaza-assets/plaza/';
+  const WHALE = '../../../../xiaoban-desktop/public/game-packs/featured-whale-girl/';
+
+  const GAMES = [
+    {
+      id: 'ink-blade',
+      name: '水墨剑客',
+      genre: '动作',
+      category: 'action',
+      orient: 'landscape',
+      orientLabel: '横屏',
+      size: '1.0 MB',
+      version: '1.9.0',
+      tagline: '看准朱光弹反 · 七卷四十二幅',
+      desc: '横屏水墨动作：竹林、雪江、烽火、怒涛、灯市、悬山、归墨七卷各六幅。看准朱光出剑弹反，逐幅解锁、集三印、求逸品。',
+      icon: ASSET + 'ink-blade.png',
+      cover: ASSET + 'ink-blade-cover.svg',
+      featured: true,
+      heroBadge: '动作主打 · 横屏沉浸',
+      record: '雪江卷 · 第 4 幅',
+      bestScore: '逸品 14 印',
+      hasSave: true,
+      lastPlayed: '今天 21:14',
+      controls: '双手触控 · 弹反出剑'
+    },
+    {
+      id: 'water-sort',
+      name: '倒杯快乐',
+      genre: '解压',
+      category: 'casual',
+      orient: 'any',
+      orientLabel: '竖横皆可',
+      size: '228 KB',
+      version: '2.1.0',
+      tagline: '45 关调饮解谜 · 每日特调',
+      desc: '3 个入门练习、45 关调饮解谜和每日特调。空杯中转、解封签、接订单，单手即可随时续玩。',
+      icon: ASSET + 'water-sort.webp',
+      cover: ASSET + 'water-sort-cover.svg',
+      featured: true,
+      heroBadge: '单手解压 · 随时续玩',
+      record: '第 12 关 · 存档就绪',
+      bestScore: '12 / 45 关',
+      hasSave: true,
+      lastPlayed: '10 分钟前',
+      controls: '单手点按 · 随时存档'
+    },
+    {
+      id: 'dusk-glider',
+      name: '暮色滑翔',
+      genre: '解压',
+      category: 'casual',
+      orient: 'landscape',
+      orientLabel: '横屏',
+      size: '808 KB',
+      version: '1.0.0',
+      tagline: '3D 日落群岛 · 按住俯冲起飞',
+      desc: '横屏 3D 滑翔：按住俯冲蓄力，松开乘风起飞，在日落之前飞过一座座微光群岛。',
+      icon: ASSET + 'dusk-glider.png',
+      cover: ASSET + 'dusk-glider-cover.svg',
+      featured: true,
+      heroBadge: '3D 治愈 · 日落滑翔',
+      record: '最远 2,840 m',
+      bestScore: '2,840 m',
+      hasSave: false,
+      lastPlayed: '昨天',
+      controls: '单指长按 · 俯冲爬升'
+    },
+    {
+      id: 'block-puzzle',
+      name: '方块爆破',
+      genre: '益智',
+      category: 'puzzle',
+      orient: 'portrait',
+      orientLabel: '竖屏',
+      size: '656 KB',
+      version: '2.1.2',
+      tagline: '经典 8×8 消除 · 连消爆分',
+      desc: '经典 8×8 消除：拖放三块填满横行或竖列，连消拿高分。支持残局自动存档与音效反馈。',
+      icon: ASSET + 'block-puzzle.webp',
+      cover: ASSET + 'block-puzzle-cover.svg',
+      featured: false,
+      record: '最高 14,820',
+      bestScore: '14,820 分',
+      hasSave: true,
+      lastPlayed: '昨天',
+      controls: '单手拖放 · 残局续玩'
+    },
+    {
+      id: 'merge-2048',
+      name: '2048',
+      genre: '益智',
+      category: 'puzzle',
+      orient: 'portrait',
+      orientLabel: '竖屏',
+      size: '140 KB',
+      version: '1.1.0',
+      tagline: '黑曜石琥珀光 · 顺滑合成',
+      desc: '黑曜石与琥珀光视觉，四向顺滑滑动合并数字，在方寸之间一步步合出 2048。',
+      icon: ASSET + 'merge-2048.png',
+      cover: ASSET + 'merge-2048-cover.svg',
+      featured: false,
+      record: '最高 1024',
+      bestScore: '10,480 分',
+      hasSave: true,
+      lastPlayed: '3 天前',
+      controls: '单手滑动 · 即开即合'
+    },
+    {
+      id: 'snake-arena',
+      name: '小伴贪吃蛇',
+      genre: '动作',
+      category: 'action',
+      orient: 'landscape',
+      orientLabel: '横屏',
+      size: '132 KB',
+      version: '1.0.5',
+      tagline: '无尽成长 / 三分钟冲分',
+      desc: '无尽成长或三分钟限时冲分，吃糖果长成大蛇，灵巧走位反杀 AI、赚取糖果币。',
+      icon: ASSET + 'snake-arena.png',
+      cover: ASSET + 'snake-arena-cover.svg',
+      featured: false,
+      record: '长度 312',
+      bestScore: '312 节',
+      hasSave: false,
+      lastPlayed: '3 天前',
+      controls: '左手摇杆 · 右手加速'
+    },
+    {
+      id: 'pro-cube',
+      name: '3D全阶魔方',
+      genre: '益智',
+      category: 'puzzle',
+      orient: 'landscape',
+      orientLabel: '横屏',
+      size: '696 KB',
+      version: '1.0.0',
+      tagline: '3~9 阶磁力手感 · 智能还原',
+      desc: '3 至 9 阶全系真实质感磁力魔方：支持手势划动切层、自由视角、计时与智能分步还原。',
+      icon: ASSET + 'pro-cube.png',
+      cover: ASSET + 'pro-cube-cover.svg',
+      featured: false,
+      record: '',
+      bestScore: '',
+      hasSave: false,
+      lastPlayed: '',
+      controls: '触控切层 · 3D 视角'
+    },
+    {
+      id: 'jade-gomoku',
+      name: '雅韵五子棋',
+      genre: '棋牌',
+      category: 'board',
+      orient: 'landscape',
+      orientLabel: '横屏',
+      size: '184 KB',
+      version: '1.0.0',
+      tagline: '水墨玉石质感 · 人机/双人',
+      desc: '水墨玉石质感五子棋，支持智能人机对弈与双人同屏对局，沉浸式金石落子音效与连珠特效。',
+      icon: ASSET + 'jade-gomoku.png',
+      cover: ASSET + 'jade-gomoku-cover.svg',
+      featured: false,
+      record: '',
+      bestScore: '',
+      hasSave: false,
+      lastPlayed: '',
+      controls: '点击落子 · 同屏双人'
+    },
+    {
+      id: 'featured-whale-girl',
+      name: '潮汐书房 · 鲸鱼娘',
+      genre: '解压',
+      category: 'casual',
+      orient: 'landscape',
+      orientLabel: '横屏 · 番外',
+      size: '132 KB',
+      version: '1.1.0',
+      tagline: '月湾听潮翻书 · 点亮贝壳灯',
+      desc: '治愈系互动番外：在月湾书房陪溟月听潮、翻书，点亮窗前贝壳灯给海面末班船打招呼。',
+      icon: WHALE + 'icon.webp',
+      cover: WHALE + 'cover.webp',
+      featured: false,
+      record: '',
+      bestScore: '',
+      hasSave: false,
+      lastPlayed: '',
+      controls: '轻触互动 · 治愈陪伴'
+    }
+  ];
+
+  const FILTERS = [
+    { key: 'all', label: '全部' },
+    { key: 'portrait', label: '单手竖屏' },
+    { key: 'puzzle', label: '益智' },
+    { key: 'action', label: '动作' },
+    { key: 'casual', label: '解压' },
+    { key: 'board', label: '棋牌' }
+  ];
+
+  const ICONS = {
+    gamepad: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="19" height="11" rx="5.5"/><path d="M8 10v4M6 12h4"/><circle cx="15.5" cy="11" r=".7" fill="currentColor"/><circle cx="17.5" cy="13" r=".7" fill="currentColor"/></svg>',
+    trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5a1.5 1.5 0 0 0-1.5 1.5v1A3.5 3.5 0 0 0 6.5 12H7M17 6h2.5A1.5 1.5 0 0 1 21 7.5v1a3.5 3.5 0 0 1-3.5 3.5H17"/></svg>',
+    moon: '<svg viewBox="0 0 24 24"><path d="M20.4 14.5A8.5 8.5 0 1 1 9.5 3.6a6.7 6.7 0 0 0 10.9 10.9Z"/></svg>',
+    sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>',
+    dice: '<svg width="14" height="14" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor"/></svg>',
+    play: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 7 5.2Z"/></svg>',
+    grid: '<svg width="14" height="14" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>',
+    list: '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+    moreV: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5.5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="18.5" r="1.8"/></svg>',
+    share: '<svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4M12 2v13"/></svg>',
+    refresh: '<svg width="18" height="18" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg>',
+    volume: '<svg width="18" height="18" viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 5.8a9 9 0 0 1 0 12.4"/></svg>',
+    rotate: '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="6.5" y="3.5" width="11" height="17" rx="2.2"/><path d="M11 17.5h2"/></svg>',
+    back: '<svg width="16" height="16" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+    spark: '<svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z"/></svg>',
+    arrowUpRight: '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+    phoneMini: '<svg width="10" height="10" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/></svg>',
+    landMini: '<svg width="11" height="11" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/></svg>',
+    user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 19.5a7.2 7.2 0 0 1 14.4 0"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9L12 3.5Z"/></svg>',
+    starFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.2l2.8 5.7 6.3.9-4.5 4.4 1.1 6.2L12 17.5l-5.7 2.9 1.1-6.2-4.5-4.4 6.3-.9L12 3.2Z"/></svg>',
+    save: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4Z"/><path d="M8 4v5h7V4M8 21v-6h8v6"/></svg>',
+    palette: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="13" cy="8.5" r="1" fill="currentColor"/><circle cx="15.5" cy="12" r="1" fill="currentColor"/></svg>',
+    download: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5L12 15l4.5-4.5M4 19.5h16"/></svg>',
+    trash: '<svg viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 4h5M7 7l.8 12.2a1.5 1.5 0 0 0 1.5 1.3h5.4a1.5 1.5 0 0 0 1.5-1.3L17 7"/></svg>',
+    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    eye: '<svg viewBox="0 0 24 24"><path d="M2.5 12s3.6-6.5 9.5-6.5S21.5 12 21.5 12s-3.6 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2.5 2.5 0 0 0 2.8 2.8M6.5 6.8C4.1 8.5 2.5 12 2.5 12s3.6 6.5 9.5 6.5c1.8 0 3.4-.5 4.8-1.3M9.8 5.7c.7-.1 1.4-.2 2.2-.2 5.9 0 9.5 6.5 9.5 6.5a16.8 16.8 0 0 1-2.6 3.5"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    chat: '<svg viewBox="0 0 24 24"><path d="M5 18.5l-1.5 2.5 3.6-.8A8.8 8.8 0 1 0 5 18.5Z"/><path d="M8.5 11.5h7M8.5 14.5h4.5"/></svg>'
+  };
+
+  const ACCENTS = [
+    { name: '小伴红', color: '#e3203c', soft: '#fff3f4' },
+    { name: '薄荷绿', color: '#2e8b5e', soft: '#eef8f2' },
+    { name: '海湾蓝', color: '#2563eb', soft: '#eff6ff' },
+    { name: '暮紫', color: '#7c3aed', soft: '#f5f3ff' },
+    { name: '琥珀', color: '#d97706', soft: '#fffbeb' },
+    { name: '石墨', color: '#3f3f46', soft: '#f4f4f5' }
+  ];
+
+  const state = {
+    dark: false,
+    accent: '#e3203c',
+    accentSoft: '#fff3f4',
+    tab: 'home',         // 'home' | 'records' | 'mine'
+    filter: 'all',
+    layout: 'grid',      // 'grid' | 'list'
+    heroIdx: 0,
+    lastGameId: 'water-sort',
+    previewId: null,     // bottomsheet game id
+    runningId: null,     // in-live-phone running game id
+    runningStep: 'play', // 'rotate' | 'play'
+    hostMenuOpen: false,
+    muted: false,
+    rotateGuideOn: true,
+    loggedIn: false,
+    userName: '林小满',
+    authOpen: false,
+    authMode: 'code',    // 'code' | 'pwd' | 'register' | 'reset'
+    authShowPwd: false,
+    authAgree: true,
+    authShake: false,
+    authCooldown: 0,
+    authForm: {
+      identifier: 'linxiaoman@qq.com',
+      code: '',
+      password: '',
+      username: '林小满'
+    },
+    favorites: ['ink-blade', 'water-sort', 'dusk-glider'],
+    mineSheet: null,     // null | 'favorites' | 'saves'
+    confirmClear: false,
+    rollingId: null,
+    toast: '',
+    b3Mode: 'play',
+    b4bMode: 'play',
+    b7Mode: 'guest',
+    b8Mode: 'code'
+  };
+
+  let toastTimer = null;
+  function showToast(msg) {
+    state.toast = msg;
+    renderLive();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { state.toast = ''; renderLive(); }, 2200);
+  }
+
+  function statusBarHtml(overlay = false) {
+    return `
+      <div class="status-bar ${overlay ? 'overlay' : ''}">
+        <span class="num">21:24</span>
+        <div class="dynamic-island" aria-hidden="true"></div>
+        <div class="status-icons" aria-hidden="true">
+          <svg width="15" height="11" viewBox="0 0 18 12" fill="currentColor" stroke="none">
+            <rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/>
+            <rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/>
+          </svg>
+          <svg width="22" height="11" viewBox="0 0 25 12">
+            <rect x="1" y="1.5" width="19" height="9" rx="2.5" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="3" y="3.5" width="14" height="5" rx="1" fill="currentColor" stroke="none"/>
+            <path d="M22 4.5v3" stroke="currentColor" stroke-width="1.6"/>
+          </svg>
+        </div>
+      </div>`;
+  }
+
+  function filteredGames(filterKey) {
+    if (filterKey === 'all') return GAMES;
+    if (filterKey === 'portrait') return GAMES.filter(g => g.orient === 'portrait' || g.orient === 'any');
+    return GAMES.filter(g => g.category === filterKey);
+  }
+
+  function filterCount(key) {
+    return filteredGames(key).length;
+  }
+
+  function heroGames() {
+    return GAMES.filter(g => g.featured);
+  }
+
+  function homeContentHtml(opts = {}) {
+    const { interactive = false } = opts;
+    const heroes = heroGames();
+    const hero = heroes[state.heroIdx % heroes.length];
+    const lastGame = GAMES.find(g => g.id === state.lastGameId) || GAMES[1];
+    const list = filteredGames(interactive ? state.filter : 'all');
+    const layout = interactive ? state.layout : 'grid';
+
+    return `
+      ${statusBarHtml(false)}
+      <header class="app-topbar">
+        <div class="app-brand">
+          <div class="xb-mark" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" stroke="none">
+              <path d="M12 2.5L14.2 9.2L21 11.4L14.2 13.6L12 20.5L9.8 13.6L3 11.4L9.8 9.2Z"/>
+              <circle cx="18.6" cy="5.4" r="2.1"/>
+            </svg>
+          </div>
+          <div class="app-brand-text">
+            <span class="app-brand-name">小伴游戏厅</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="icon-btn" ${interactive ? 'data-act="toggleTheme"' : ''} title="切换深浅色" aria-label="切换深浅色">
+            ${state.dark ? ICONS.sun : ICONS.moon}
+          </button>
+          <button type="button" class="icon-btn accent-dot" ${interactive ? 'data-act="goRecords"' : ''} title="本机战绩与存档" aria-label="本机战绩">
+            ${ICONS.trophy}
+          </button>
+        </div>
+      </header>
+
+      <div class="screen-scroll">
+        <!-- 继续上次浮条 -->
+        <button type="button" class="resume-strip" style="width:100%;text-align:left" ${interactive ? `data-launch="${lastGame.id}"` : ''}>
+          <span class="resume-icon"><img src="${lastGame.icon}" alt=""></span>
+          <span class="resume-meta">
+            <span class="resume-top"><i class="resume-dot"></i> 继续上次 · ${lastGame.name}</span>
+            <span class="resume-sub">${lastGame.record || '本机进度已自动保存'}</span>
+          </span>
+          <span class="resume-btn">${ICONS.play} 续玩</span>
+        </button>
+
+        <!-- 今日主打沉浸大片卡 -->
+        <div class="hero-card">
+          <img class="hero-bg" src="${hero.cover}" alt="">
+          <div class="hero-scrim"></div>
+          <div class="hero-top-row">
+            <span class="hero-badge">${hero.heroBadge}</span>
+            <div class="hero-dots">
+              ${heroes.map((h, i) => `<button type="button" class="${i === state.heroIdx ? 'active' : ''}" ${interactive ? `data-hero="${i}"` : ''} aria-label="${h.name}"></button>`).join('')}
+            </div>
+          </div>
+          <div class="hero-bottom">
+            <div class="hero-copy">
+              <div class="hero-title">${hero.name}</div>
+              <div class="hero-desc">${hero.tagline}</div>
+            </div>
+            <button type="button" class="hero-play" ${interactive ? `data-launch="${hero.id}"` : ''}>${ICONS.play} 开玩</button>
+          </div>
+        </div>
+
+        <!-- 筛选胶囊 + 随便玩 -->
+        <div class="filter-row">
+          <div class="filter-rail">
+            ${FILTERS.map(f => `
+              <button type="button" class="chip ${(interactive ? state.filter : 'all') === f.key ? 'active' : ''}" ${interactive ? `data-filter="${f.key}"` : ''}>
+                ${f.label}<span class="mini-count num">${filterCount(f.key)}</span>
+              </button>
+            `).join('')}
+          </div>
+          <button type="button" class="dice-btn" ${interactive ? 'data-act="roll"' : ''}>${ICONS.dice} 随便玩</button>
+        </div>
+
+        <!-- 全部游戏画廊 -->
+        <div class="sec-head">
+          <h2 class="sec-title">精选游戏 <span class="sec-count num">${list.length} 款 · 免登录直玩</span></h2>
+          <div class="layout-toggle" aria-label="切换卡片样式">
+            <button type="button" class="${layout === 'grid' ? 'active' : ''}" ${interactive ? 'data-layout="grid"' : ''} title="卡带双列">${ICONS.grid}</button>
+            <button type="button" class="${layout === 'list' ? 'active' : ''}" ${interactive ? 'data-layout="list"' : ''} title="精装列表">${ICONS.list}</button>
+          </div>
+        </div>
+
+        ${layout === 'grid' ? `
+          <div class="game-grid">
+            ${list.map(g => `
+              <button type="button" class="cart-card ${interactive && state.rollingId === g.id ? 'highlight-roll' : ''}" ${interactive ? `data-preview="${g.id}"` : ''}>
+                <div class="cart-cover">
+                  <img src="${g.cover}" alt="" loading="lazy">
+                  <span class="orient-pill">${g.orient === 'landscape' ? ICONS.landMini : ICONS.phoneMini} ${g.orientLabel}</span>
+                  ${g.record ? `<span class="record-pill num">${g.bestScore}</span>` : ''}
+                </div>
+                <div class="cart-body">
+                  <span class="cart-icon"><img src="${g.icon}" alt=""></span>
+                  <span class="cart-text">
+                    <span class="cart-name">${g.name}</span>
+                    <span class="cart-sub">${g.genre} · ${g.tagline.split('·')[0].trim()}</span>
+                  </span>
+                </div>
+              </button>
+            `).join('')}
+          </div>
+        ` : `
+          <div class="game-list">
+            ${list.map(g => `
+              <div class="list-row" role="button" tabindex="0" ${interactive ? `data-preview="${g.id}"` : ''}>
+                <span class="list-icon"><img src="${g.icon}" alt=""></span>
+                <span class="list-info">
+                  <span class="list-title-row">
+                    <span class="list-name">${g.name}</span>
+                    <span class="mini-tag">${g.orientLabel}</span>
+                  </span>
+                  <span class="list-desc">${g.tagline}</span>
+                </span>
+                <button type="button" class="list-play" ${interactive ? `data-launch="${g.id}"` : ''}>开玩</button>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      ${bottomNavHtml(interactive ? state.tab : 'home', interactive)}
+      <div class="home-indicator"></div>
+    `;
+  }
+
+  function bottomNavHtml(activeTab, interactive) {
+    return `
+      <nav class="bottom-nav" aria-label="主导航">
+        <button type="button" class="nav-item ${activeTab === 'home' ? 'active' : ''}" ${interactive ? 'data-tab="home"' : ''}>
+          ${ICONS.gamepad}
+          <span>大厅</span>
+        </button>
+        <button type="button" class="nav-item ${activeTab === 'records' ? 'active' : ''}" ${interactive ? 'data-tab="records"' : ''}>
+          ${ICONS.trophy}
+          <span>战绩</span>
+        </button>
+        <button type="button" class="nav-item ${activeTab === 'mine' ? 'active' : ''}" ${interactive ? 'data-tab="mine"' : ''}>
+          ${ICONS.user}
+          <span>我的</span>
+        </button>
+      </nav>
+    `;
+  }
+
+  function sheetOverlayHtml(game, interactive) {
+    const isFav = state.favorites.includes(game.id);
+    return `
+      <div class="scrim" ${interactive ? 'data-act="closeSheet"' : ''}>
+        <div class="sheet" onclick="event.stopPropagation()">
+          <div class="sheet-handle"></div>
+          <div class="sheet-cover">
+            <img src="${game.cover}" alt="">
+            <span class="sheet-cover-meta num">v${game.version} · ${game.size} · 免登录</span>
+          </div>
+          <div class="sheet-head">
+            <div class="sheet-icon"><img src="${game.icon}" alt=""></div>
+            <div>
+              <div class="sheet-title">${game.name}</div>
+              <div class="sheet-tags">
+                <span class="sheet-tag">${game.genre}</span>
+                <span class="sheet-tag"><i class="dot" style="background:${game.orient === 'landscape' ? '#d97706' : '#2fa36b'}"></i>${game.orient === 'landscape' ? '推荐横屏游玩' : '支持单手竖屏'}</span>
+                <span class="sheet-tag">${game.controls}</span>
+              </div>
+            </div>
+          </div>
+          <p class="sheet-desc">${game.desc}</p>
+          <div class="sheet-stat">
+            <span>${game.hasSave ? '本机存档已就绪' : '即开即玩 · 零广告'}</span>
+            <strong class="num">${game.bestScore || '尚未挑战'}</strong>
+          </div>
+          <div class="sheet-actions">
+            <button type="button" class="fav-pill-btn ${isFav ? 'active' : ''}" ${interactive ? `data-fav="${game.id}"` : ''} title="${isFav ? '取消收藏' : '加入收藏'}" aria-label="收藏游戏">${isFav ? ICONS.starFill : ICONS.star}</button>
+            <button type="button" class="btn-share" ${interactive ? `data-share="${game.id}"` : ''}>${ICONS.share} 分享</button>
+            <button type="button" class="btn-primary" ${interactive ? `data-launch="${game.id}"` : ''}>${ICONS.play} ${game.orient === 'landscape' ? '横屏开玩' : '立即开玩'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function portraitRunHtml(game, menuOpen, interactive) {
+    // 8x8 棋盘静态演示图案
+    const filled = {
+      10:'c2',11:'c2',12:'c2',18:'c2',
+      27:'c1',28:'c1',35:'c1',36:'c1',
+      20:'c3',21:'c3',29:'c3',
+      41:'c4',42:'c4',43:'c4',44:'c4',
+      50:'c5',51:'c5',58:'c5'
+    };
+    let cells = '';
+    for (let i = 0; i < 64; i++) cells += `<div class="bp-cell ${filled[i] || ''}"></div>`;
+
+    return `
+      ${statusBarHtml(true)}
+      <div class="game-canvas">
+        <button type="button" class="host-more-btn" ${interactive ? 'data-act="openHostMenu"' : ''} aria-label="游戏菜单">${ICONS.moreV}</button>
+        <div class="bp-stage">
+          <div class="bp-hud">
+            <div class="bp-score-box">
+              <small>${game.name} · 残局已自动存档</small>
+              <strong class="num">12,640</strong>
+            </div>
+            <span class="bp-best num">★ 最高 14,820</span>
+          </div>
+          <div class="bp-board" aria-hidden="true">${cells}</div>
+          <div class="bp-tray" aria-hidden="true">
+            <div class="bp-piece" style="grid-template-columns:repeat(3,18px)">
+              <i style="background:#38bdf8"></i><i style="background:#38bdf8"></i><i style="background:#38bdf8"></i>
+            </div>
+            <div class="bp-piece" style="grid-template-columns:repeat(2,18px)">
+              <i style="background:#fbbf24"></i><i style="background:#fbbf24"></i>
+              <i style="background:#fbbf24"></i><i style="opacity:0"></i>
+            </div>
+            <div class="bp-piece" style="grid-template-columns:repeat(2,18px)">
+              <i style="background:#34d399"></i><i style="background:#34d399"></i>
+              <i style="background:#34d399"></i><i style="background:#34d399"></i>
+            </div>
+          </div>
+        </div>
+        ${menuOpen ? `
+          <div class="scrim" ${interactive ? 'data-act="closeHostMenu"' : ''}>
+            <div class="sheet" style="padding-bottom:14px" onclick="event.stopPropagation()">
+              <div class="sheet-handle"></div>
+              <div class="host-sheet-head">
+                <img src="${game.icon}" alt="">
+                <div>
+                  <b>${game.name}</b>
+                  <span>本机进度已自动保存 · game.xiaban.xyz</span>
+                </div>
+              </div>
+              <div class="host-grid">
+                <button type="button" class="host-act" ${interactive ? 'data-act="restartGame"' : ''}>
+                  <span class="host-act-ico">${ICONS.refresh}</span><span>重新开始</span>
+                </button>
+                <button type="button" class="host-act" ${interactive ? 'data-act="toggleMute"' : ''}>
+                  <span class="host-act-ico">${ICONS.volume}</span><span>${state.muted ? '已静音' : '音效开启'}</span>
+                </button>
+                <button type="button" class="host-act" ${interactive ? `data-share="${game.id}"` : ''}>
+                  <span class="host-act-ico">${ICONS.share}</span><span>发给好友</span>
+                </button>
+                <button type="button" class="host-act" ${interactive ? 'data-act="closeHostMenu"' : ''}>
+                  <span class="host-act-ico">${ICONS.play}</span><span>继续玩</span>
+                </button>
+              </div>
+              <button type="button" class="host-exit-btn" ${interactive ? 'data-act="exitGame"' : ''}>退出回到游戏厅</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <div class="home-indicator light-bar"></div>
+    `;
+  }
+
+  function rotateGuideHtml(game, interactive) {
+    return `
+      ${statusBarHtml(true)}
+      <div class="rotate-stage">
+        <img class="rotate-bg" src="${game.cover}" alt="">
+        <div class="rotate-content">
+          <div class="rotate-game-chip">
+            <img src="${game.icon}" alt="">
+            <span>${game.name} · 横屏作品</span>
+          </div>
+          <div class="rotate-phone-glyph" aria-hidden="true">
+            <svg class="rotate-svg" width="32" height="32" viewBox="0 0 24 24" stroke="#fff" stroke-width="1.7">
+              <rect x="6.5" y="3" width="11" height="18" rx="2.5"/>
+              <path d="M10.5 17.5h3"/>
+            </svg>
+          </div>
+          <h3>横过手机，沉浸开玩</h3>
+          <p>《${game.name}》专为横屏宽视野设计，旋转设备后自动进入全屏，双手操作更顺手。</p>
+          <button type="button" class="rotate-primary" ${interactive ? 'data-act="enterLandscapePlay"' : ''}>开启全屏横屏</button>
+          <div class="rotate-links">
+            <button type="button" ${interactive ? 'data-act="enterLandscapePlay"' : ''}>暂不旋转，继续查看</button>
+            <span style="opacity:.35">·</span>
+            <button type="button" ${interactive ? 'data-act="exitGame"' : ''}>返回大厅</button>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator light-bar"></div>
+    `;
+  }
+
+  function landscapeRunHtml(game, drawerOpen) {
+    return `
+      <div class="game-canvas">
+        <button type="button" class="host-more-btn" style="color:#1d1917;filter:drop-shadow(0 1px 2px rgba(255,255,255,.7))" aria-label="宿主菜单">${ICONS.moreV}</button>
+        <div class="ink-stage">
+          <svg class="ink-mountains" viewBox="0 0 760 390" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 290 Q120 205 240 250 T510 220 T760 255 L760 390 L0 390 Z" fill="rgba(45,40,36,.16)" stroke="none"/>
+            <path d="M0 325 Q180 255 370 298 T760 280 L760 390 L0 390 Z" fill="rgba(26,22,20,.28)" stroke="none"/>
+            <circle cx="590" cy="96" r="46" fill="rgba(200,40,52,.82)" stroke="none"/>
+          </svg>
+          <div class="ink-hud">
+            <span class="ink-title-pill">卷二 · 雪江第四幅 · 逸品挑战</span>
+            <div class="ink-hp" aria-label="心神">
+              <span class="ink-heart"></span><span class="ink-heart"></span><span class="ink-heart"></span><span class="ink-heart lost"></span>
+            </div>
+          </div>
+          <div class="ink-arena">
+            <svg width="78" height="106" viewBox="0 0 80 110" stroke="none">
+              <circle cx="38" cy="24" r="10" fill="#1d1917"/>
+              <path d="M22 42 Q38 34 52 46 L46 84 L26 84 Z" fill="#1d1917"/>
+              <path d="M46 52 L78 34" stroke="#1d1917" stroke-width="3.5"/>
+              <path d="M16 20 L58 20 L38 11 Z" fill="#2d2622"/>
+            </svg>
+            <div class="ink-flash">朱光 · 斩</div>
+            <svg width="82" height="108" viewBox="0 0 84 110" stroke="none">
+              <circle cx="46" cy="24" r="10" fill="#2f2926"/>
+              <path d="M30 44 Q48 34 62 46 L58 84 L36 84 Z" fill="#2f2926"/>
+              <path d="M34 52 L4 38" stroke="#c82834" stroke-width="3.5"/>
+            </svg>
+          </div>
+          <div class="ink-controls">
+            <button type="button" class="ink-touch-btn">闪身退步</button>
+            <button type="button" class="ink-touch-btn parry">朱光弹反</button>
+          </div>
+        </div>
+        ${drawerOpen ? `
+          <div class="side-drawer-scrim">
+            <div class="side-drawer">
+              <div>
+                <div class="host-sheet-head" style="padding-bottom:12px">
+                  <img src="${game.icon}" alt="">
+                  <div>
+                    <b>${game.name}</b>
+                    <span>已暂停 · 自动存档</span>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+                  <button type="button" class="host-act"><span class="host-act-ico">${ICONS.play}</span><span>继续战斗</span></button>
+                  <button type="button" class="host-act"><span class="host-act-ico">${ICONS.refresh}</span><span>重打本幅</span></button>
+                  <button type="button" class="host-act"><span class="host-act-ico">${ICONS.volume}</span><span>音效开启</span></button>
+                  <button type="button" class="host-act"><span class="host-act-ico">${ICONS.share}</span><span>发给好友</span></button>
+                </div>
+              </div>
+              <button type="button" class="host-exit-btn" style="height:40px">退出回到游戏厅</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function recordsContentHtml(interactive) {
+    const played = GAMES.filter(g => g.record);
+    return `
+      ${statusBarHtml(false)}
+      <header class="app-topbar">
+        <div class="app-brand">
+          <span class="app-brand-name">战绩与存档</span>
+        </div>
+        <span class="local-pill"><i></i> 本机保存</span>
+      </header>
+      <div class="screen-scroll">
+        <div class="profile-hero">
+          <div class="profile-top">
+            <div class="profile-badge">
+              <div class="profile-avatar">${ICONS.gamepad}</div>
+              <div>
+                <div class="profile-title">掌机访客</div>
+                <div class="profile-sub">免登录 · 进度存在当前浏览器</div>
+              </div>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-box"><div class="stat-val num">${played.length}/${GAMES.length}</div><div class="stat-lbl">已玩游戏</div></div>
+            <div class="stat-box"><div class="stat-val num">${played.filter(g => g.hasSave).length}</div><div class="stat-lbl">本机存档</div></div>
+            <div class="stat-box"><div class="stat-val num">42m</div><div class="stat-lbl">累计游玩</div></div>
+          </div>
+        </div>
+
+        <div class="sec-head">
+          <h2 class="sec-title">游玩印记</h2>
+          <span class="sec-count">按最近游玩</span>
+        </div>
+        <div class="record-card">
+          ${played.map(g => `
+            <div class="rec-row">
+              <img src="${g.icon}" alt="">
+              <div class="rec-info">
+                <div class="rec-name">${g.name} ${g.hasSave ? '<span class="mini-tag">有存档</span>' : ''}</div>
+                <div class="rec-meta num">${g.bestScore} · ${g.lastPlayed}</div>
+              </div>
+              <button type="button" class="rec-go" ${interactive ? `data-launch="${g.id}"` : ''}>续玩</button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="sec-head">
+          <h2 class="sec-title">相伴小站</h2>
+          <span class="sec-count mono">xiaban.xyz</span>
+        </div>
+        <div class="sister-grid">
+          <button type="button" class="sister-card" ${interactive ? 'data-toast="跳转姐妹站：https://people.xiaban.xyz"' : ''}>
+            <div class="sister-top">
+              <span class="sister-ico">${ICONS.spark}</span>
+              ${ICONS.arrowUpRight}
+            </div>
+            <b>人格贩卖机</b>
+            <small>2 分钟趣味盲盒测评与双人合盘</small>
+          </button>
+          <button type="button" class="sister-card" ${interactive ? 'data-toast="前往小伴官网下载桌面 / 手机客户端"' : ''}>
+            <div class="sister-top">
+              <span class="sister-ico">${ICONS.gamepad}</span>
+              ${ICONS.arrowUpRight}
+            </div>
+            <b>小伴 App</b>
+            <small>离线畅玩 + 用 AI 自己做小游戏</small>
+          </button>
+        </div>
+
+        <button type="button" class="danger-link" ${interactive ? 'data-toast="正式版弹出 24px 居中确认卡：仅清理当前浏览器存档"' : ''}>清理本机游戏存档与缓存</button>
+      </div>
+      ${bottomNavHtml('records', interactive)}
+      <div class="home-indicator"></div>
+    `;
+  }
+
+  function deeplinkHtml(game) {
+    return `
+      ${statusBarHtml(false)}
+      <div class="deeplink-stage">
+        <button type="button" class="deeplink-back">${ICONS.back} 全部游戏 (9)</button>
+        <div class="deeplink-card">
+          <div class="deeplink-cover">
+            <img src="${game.cover}" alt="">
+            <span class="sheet-cover-meta num">${game.orientLabel} · ${game.size}</span>
+          </div>
+          <div class="deeplink-body">
+            <div class="deeplink-from"><i class="dot"></i> 好友分享 · 直达作品</div>
+            <div class="deeplink-title">${game.name}</div>
+            <p class="deeplink-desc">${game.desc}</p>
+            <div class="load-bar" aria-label="预加载中"><i></i></div>
+            <button type="button" class="btn-primary" style="width:100%">${ICONS.play} 立即进入游戏</button>
+          </div>
+        </div>
+        <div class="deeplink-foot">小伴游戏厅 · <span class="mono">game.xiaban.xyz</span> · 零广告 · 免登录</div>
+      </div>
+      <div class="home-indicator"></div>
+    `;
+  }
+
+  function mineContentHtml(opts = {}) {
+    const { interactive = false, loggedIn = false } = opts;
+    const played = GAMES.filter(g => g.record);
+    const saved = GAMES.filter(g => g.hasSave);
+    const accentName = (ACCENTS.find(a => a.color === state.accent) || ACCENTS[0]).name;
+
+    return `
+      ${statusBarHtml(false)}
+      <header class="app-topbar" style="background:var(--surface)">
+        <div class="app-brand">
+          <span class="app-brand-name">我的</span>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="icon-btn" ${interactive ? 'data-act="toggleTheme"' : ''} title="切换深浅色" aria-label="切换深浅色">
+            ${state.dark ? ICONS.sun : ICONS.moon}
+          </button>
+        </div>
+      </header>
+
+      <div class="mine-scroll">
+        <!-- 顶部通栏资料与三宫格快捷入口 -->
+        <section class="mine-slab">
+          <div class="mine-profile">
+            <div class="mine-avatar ${loggedIn ? 'logged' : ''}">
+              ${loggedIn ? '满' : ICONS.user}
+            </div>
+            <div class="mine-info">
+              <div class="mine-name-row">
+                <span class="mine-name">${loggedIn ? state.userName : '掌机访客'}</span>
+                <span class="mine-pill-tag"><i></i>${loggedIn ? '已云同步' : '免登录'}</span>
+              </div>
+              <div class="mine-sub num">${loggedIn ? 'ID: 13586 · 进度跨设备同步' : `本机游玩 · ${saved.length} 份存档已保存`}</div>
+            </div>
+            <button type="button" class="mine-auth-btn ${loggedIn ? '' : 'primary'}" ${interactive ? `data-act="${loggedIn ? 'logout' : 'openAuth'}"` : ''}>
+              ${loggedIn ? '退出' : '登录同步'}
+            </button>
+          </div>
+          <div class="mine-divider"></div>
+          <div class="mine-quick">
+            <button type="button" class="mine-quick-btn" ${interactive ? 'data-act="openFavs"' : ''}>
+              <span class="mine-quick-val num">${state.favorites.length}</span>
+              <span class="mine-quick-lbl">${ICONS.star} 收藏</span>
+            </button>
+            <button type="button" class="mine-quick-btn" ${interactive ? 'data-act="openSaves"' : ''}>
+              <span class="mine-quick-val num">${saved.length}</span>
+              <span class="mine-quick-lbl">${ICONS.save} 存档</span>
+            </button>
+            <button type="button" class="mine-quick-btn" ${interactive ? 'data-tab="records"' : ''}>
+              <span class="mine-quick-val num">${played.length}/${GAMES.length}</span>
+              <span class="mine-quick-lbl">${ICONS.trophy} 印记</span>
+            </button>
+          </div>
+        </section>
+
+        <div class="mine-gap"></div>
+
+        <!-- 通栏组 1：游玩偏好 -->
+        <section class="mine-group" aria-label="游玩偏好">
+          <button type="button" class="mine-row" ${interactive ? 'data-act="toggleTheme"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${state.dark ? ICONS.sun : ICONS.moon}</span><span class="mine-row-label">外观模式</span></span>
+            <span class="mine-row-right"><span>${state.dark ? '掌机深色' : '暖瓷浅色'}</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-act="cycleAccent"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.palette}</span><span class="mine-row-label">主题强调色</span></span>
+            <span class="mine-row-right"><i class="accent-dot-preview"></i><span>${accentName}</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-act="toggleMute"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.volume}</span><span class="mine-row-label">游戏默认音效</span></span>
+            <span class="mine-row-right"><span class="xb-switch ${!state.muted ? 'on' : ''}" aria-hidden="true"></span></span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-act="toggleRotateGuide"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.rotate}</span><span class="mine-row-label">横屏游戏旋转提示</span></span>
+            <span class="mine-row-right"><span class="xb-switch ${state.rotateGuideOn ? 'on' : ''}" aria-hidden="true"></span></span>
+          </button>
+        </section>
+
+        <div class="mine-gap"></div>
+
+        <!-- 通栏组 2：本机存档与数据 -->
+        <section class="mine-group" aria-label="存档与数据">
+          <button type="button" class="mine-row" ${interactive ? 'data-toast="已复制本机存档备份码（JSON），换机可一键导入"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.download}</span><span class="mine-row-label">导出 / 恢复存档码</span></span>
+            <span class="mine-row-right"><span class="num">${saved.length} 份</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-act="askClearSaves"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico" style="color:#e3203c">${ICONS.trash}</span><span class="mine-row-label danger">清理本机存档与缓存</span></span>
+            <span class="mine-row-right"><span class="num">1.2 MB</span>${ICONS.chevron}</span>
+          </button>
+        </section>
+
+        <div class="mine-gap"></div>
+
+        <!-- 通栏组 3：相伴生态与关于 -->
+        <section class="mine-group" aria-label="相伴生态与关于">
+          <button type="button" class="mine-row" ${interactive ? 'data-toast="跳转小伴社区：https://chat.xiangban.xyz"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.chat}</span><span class="mine-row-label">小伴社区</span></span>
+            <span class="mine-row-right"><span class="mono" style="font-size:11.5px">chat.xiangban.xyz</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-toast="跳转姐妹站：https://people.xiaban.xyz"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.spark}</span><span class="mine-row-label">人格贩卖机</span></span>
+            <span class="mine-row-right"><span class="mono" style="font-size:11.5px">people.xiaban.xyz</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-toast="前往小伴官网下载桌面 / Android 客户端"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.gamepad}</span><span class="mine-row-label">下载小伴 App</span></span>
+            <span class="mine-row-right"><span>离线畅玩 · AI 创作</span>${ICONS.chevron}</span>
+          </button>
+          <button type="button" class="mine-row" ${interactive ? 'data-toast="小伴游戏厅 v1.0 · 纯静态免登录 · game.xiaban.xyz"' : ''}>
+            <span class="mine-row-left"><span class="mine-row-ico">${ICONS.info}</span><span class="mine-row-label">关于小伴游戏厅</span></span>
+            <span class="mine-row-right"><span class="mono" style="font-size:11.5px">game.xiaban.xyz</span>${ICONS.chevron}</span>
+          </button>
+        </section>
+      </div>
+
+      ${bottomNavHtml('mine', interactive)}
+      <div class="home-indicator"></div>
+    `;
+  }
+
+  function mineSubSheetHtml(kind) {
+    const isFav = kind === 'favorites';
+    const items = isFav ? GAMES.filter(g => state.favorites.includes(g.id)) : GAMES.filter(g => g.hasSave);
+    return `
+      <div class="scrim" data-act="closeMineSheet">
+        <div class="sheet" style="padding-bottom:18px" onclick="event.stopPropagation()">
+          <div class="sheet-handle"></div>
+          <div class="sec-head" style="margin-bottom:12px">
+            <h3 class="sec-title">${isFav ? '我的收藏' : '本机存档管理'} <span class="sec-count num">${items.length} 款</span></h3>
+          </div>
+          ${items.length ? `
+            <div class="record-card" style="margin-bottom:0">
+              ${items.map(g => `
+                <div class="rec-row">
+                  <img src="${g.icon}" alt="">
+                  <div class="rec-info">
+                    <div class="rec-name">${g.name} <span class="mini-tag">${g.orientLabel}</span></div>
+                    <div class="rec-meta">${isFav ? g.tagline : (g.record || '本机存档已保存')}</div>
+                  </div>
+                  <button type="button" class="rec-go" data-launch="${g.id}">${isFav ? '开玩' : '续玩'}</button>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p style="text-align:center;color:var(--ink3);padding:26px 0;font-size:13px">暂无内容，在游戏详情抽屉点星标即可收藏</p>'}
+        </div>
+      </div>
+    `;
+  }
+
+  function clearConfirmDialogHtml() {
+    return `
+      <div class="dialog-scrim" data-act="cancelClearSaves">
+        <div class="dialog-card" onclick="event.stopPropagation()">
+          <h4>清理本机存档与缓存？</h4>
+          <p>将清除当前浏览器中保存的 4 份游戏进度与最高分纪录；如想保留进度，可先使用「导出存档码」备份。</p>
+          <div class="dialog-actions">
+            <button type="button" class="dialog-danger" data-act="confirmClearSaves">确认清理</button>
+            <button type="button" class="dialog-cancel" data-act="cancelClearSaves">取消</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function authSheetHtml(opts = {}) {
+    const {
+      mode = 'code',
+      interactive = false,
+      cooldown = 0,
+      showPwd = false,
+      agree = true,
+      shake = false
+    } = opts;
+    const savedCount = GAMES.filter(g => g.hasSave).length;
+    const f = interactive ? state.authForm : {
+      identifier: mode === 'pwd' ? 'linxiaoman' : 'linxiaoman@qq.com',
+      code: mode === 'reset' ? '684219' : '',
+      password: mode === 'pwd' ? '••••••••' : '',
+      username: '林小满'
+    };
+
+    const isSubFlow = mode === 'register' || mode === 'reset';
+    const heading = mode === 'register'
+      ? '设置用户名与密码'
+      : mode === 'reset'
+        ? '重置账号密码'
+        : '登录相伴账号';
+    const sub = mode === 'register'
+      ? '新邮箱已验证 · 完成后即刻建号并同步存档'
+      : mode === 'reset'
+        ? '验证绑定邮箱或手机号后设置新密码'
+        : '全端通用 · 登录后自动同步本机游戏存档';
+
+    const brandLogo = `
+      <div class="xb-mark" style="width:34px;height:34px;border-radius:10px" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none">
+          <path d="M12 2.5L14.2 9.2L21 11.4L14.2 13.6L12 20.5L9.8 13.6L3 11.4L9.8 9.2Z"/>
+          <circle cx="18.6" cy="5.4" r="2.1"/>
+        </svg>
+      </div>`;
+
+    let bodyHtml = '';
+
+    if (mode === 'code') {
+      bodyHtml = `
+        <div class="auth-sync-badge"><i></i><span>将自动合并当前浏览器的 <b>${savedCount} 份本机存档</b>，不丢进度</span></div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="text" placeholder="输入邮箱或手机号" value="${f.identifier}" ${interactive ? 'data-auth-field="identifier"' : 'readonly'}>
+          </div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input num" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" value="${f.code}" ${interactive ? 'data-auth-field="code"' : 'readonly'}>
+            <button type="button" class="auth-code-btn num" ${interactive ? 'data-act="sendCode"' : ''} ${cooldown > 0 ? 'disabled' : ''}>
+              ${cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码'}
+            </button>
+          </div>
+          <div class="auth-field-hint">
+            <span>未注册邮箱验证后将进入完善注册</span>
+            ${interactive ? '<button type="button" data-auth-mode="register">模拟新用户 →</button>' : ''}
+          </div>
+        </div>
+      `;
+    } else if (mode === 'pwd') {
+      bodyHtml = `
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="text" placeholder="用户名 / 邮箱 / 手机号" value="${f.identifier}" ${interactive ? 'data-auth-field="identifier"' : 'readonly'}>
+          </div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="${showPwd ? 'text' : 'password'}" placeholder="输入密码" value="${f.password}" ${interactive ? 'data-auth-field="password"' : 'readonly'}>
+            <button type="button" class="auth-eye-btn" ${interactive ? 'data-act="toggleAuthPwd"' : ''} aria-label="显示或隐藏密码">${showPwd ? ICONS.eye : ICONS.eyeOff}</button>
+          </div>
+          <div class="auth-field-hint">
+            <span>支持与小伴桌面 / App 同一账号密码</span>
+            <button type="button" ${interactive ? 'data-auth-mode="reset"' : ''}>忘记密码？</button>
+          </div>
+        </div>
+      `;
+    } else if (mode === 'register') {
+      bodyHtml = `
+        <div class="auth-verified-bar">
+          <span class="auth-verified-left"><i class="auth-verified-dot"></i><span>${f.identifier || 'lin***@qq.com'} · 已验证</span></span>
+          <button type="button" class="auth-verified-change" ${interactive ? 'data-auth-mode="code"' : ''}>换个邮箱</button>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="text" maxlength="20" placeholder="设置用户名（将作为全站昵称）" value="${f.username}" ${interactive ? 'data-auth-field="username"' : 'readonly'}>
+          </div>
+          <div class="auth-field-hint ok">
+            <span>✓ 用户名可用 · 注册后不可修改</span>
+          </div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="${showPwd ? 'text' : 'password'}" placeholder="设置登录密码（8–32 位）" value="${f.password}" ${interactive ? 'data-auth-field="password"' : 'readonly'}>
+            <button type="button" class="auth-eye-btn" ${interactive ? 'data-act="toggleAuthPwd"' : ''} aria-label="显示或隐藏密码">${showPwd ? ICONS.eye : ICONS.eyeOff}</button>
+          </div>
+          <div class="auth-field-hint"><span>凭证 15 分钟内有效，后续可直接用用户名 + 密码登录</span></div>
+        </div>
+      `;
+    } else {
+      bodyHtml = `
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="text" placeholder="已绑定的邮箱或手机号" value="${f.identifier}" ${interactive ? 'data-auth-field="identifier"' : 'readonly'}>
+          </div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input num" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" value="${f.code}" ${interactive ? 'data-auth-field="code"' : 'readonly'}>
+            <button type="button" class="auth-code-btn num" ${interactive ? 'data-act="sendCode"' : ''} ${cooldown > 0 ? 'disabled' : ''}>
+              ${cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码'}
+            </button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-input-wrap">
+            <input class="auth-input" type="${showPwd ? 'text' : 'password'}" placeholder="设置新密码（8–32 位）" value="${f.password}" ${interactive ? 'data-auth-field="password"' : 'readonly'}>
+            <button type="button" class="auth-eye-btn" ${interactive ? 'data-act="toggleAuthPwd"' : ''} aria-label="显示或隐藏密码">${showPwd ? ICONS.eye : ICONS.eyeOff}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    const submitLabel = mode === 'code'
+      ? '登录 / 注册'
+      : mode === 'pwd'
+        ? '立即登录'
+        : mode === 'register'
+          ? '完成注册并同步存档'
+          : '重置密码并登录';
+
+    return `
+      <div class="scrim" ${interactive ? 'data-act="closeAuth"' : ''}>
+        <div class="auth-sheet" onclick="event.stopPropagation()">
+          <div class="sheet-handle"></div>
+          ${isSubFlow ? `<button type="button" class="auth-back-link" ${interactive ? `data-auth-mode="${mode === 'reset' ? 'pwd' : 'code'}"` : ''}>${ICONS.back} 返回${mode === 'reset' ? '密码登录' : '验证码登录'}</button>` : ''}
+          <div class="auth-top">
+            <div class="auth-brand">
+              ${brandLogo}
+              <div>
+                <div class="auth-heading">${heading}</div>
+                <div class="auth-sub">${sub}</div>
+              </div>
+            </div>
+            <button type="button" class="auth-close" ${interactive ? 'data-act="closeAuth"' : ''} aria-label="关闭">${ICONS.close}</button>
+          </div>
+
+          ${!isSubFlow ? `
+            <div class="auth-tabs" role="tablist">
+              <button type="button" role="tab" class="${mode === 'code' ? 'active' : ''}" ${interactive ? 'data-auth-mode="code"' : ''}>验证码登录</button>
+              <button type="button" role="tab" class="${mode === 'pwd' ? 'active' : ''}" ${interactive ? 'data-auth-mode="pwd"' : ''}>密码登录</button>
+            </div>
+          ` : ''}
+
+          ${bodyHtml}
+
+          ${mode !== 'reset' ? `
+            <button type="button" class="auth-agree ${shake ? 'shake' : ''}" ${interactive ? 'data-act="toggleAuthAgree"' : ''}>
+              <span class="auth-check ${agree ? 'checked' : ''}">${agree ? ICONS.check : ''}</span>
+              <span>已阅读并同意 <b>《用户协议》</b> 与 <b>《隐私政策》</b></span>
+            </button>
+          ` : '<div style="height:10px"></div>'}
+
+          <button type="button" class="auth-submit" ${interactive ? 'data-act="submitAuth"' : ''}>${submitLabel}</button>
+
+          <div class="auth-foot">
+            <span>相伴统一账号 · account.xiangban.xyz</span>
+            <button type="button" ${interactive ? 'data-act="closeAuth"' : ''}>暂不登录</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function applyTokens(phoneEl) {
+    phoneEl.classList.toggle('dark', state.dark);
+    phoneEl.style.setProperty('--accent', state.accent);
+    phoneEl.style.setProperty('--accent-soft', state.dark ? 'rgba(255,255,255,.12)' : state.accentSoft);
+  }
+
+  function renderLive(opts = {}) {
+    const el = document.getElementById('livePhone');
+    const prevScroll = opts.resetScroll ? 0 : (el.querySelector('.screen-scroll,.mine-scroll')?.scrollTop || 0);
+    const prevRail = opts.resetScroll ? 0 : (el.querySelector('.filter-rail')?.scrollLeft || 0);
+    applyTokens(el);
+
+    if (state.runningId) {
+      const game = GAMES.find(g => g.id === state.runningId);
+      if (state.runningStep === 'rotate') {
+        el.innerHTML = rotateGuideHtml(game, true) + (state.toast ? `<div class="phone-toast">${state.toast}</div>` : '');
+      } else {
+        el.innerHTML = portraitRunHtml(game, state.hostMenuOpen, true) + (state.toast ? `<div class="phone-toast">${state.toast}</div>` : '');
+      }
+      return;
+    }
+
+    let html = state.tab === 'home'
+      ? homeContentHtml({ interactive: true })
+      : state.tab === 'records'
+        ? recordsContentHtml(true)
+        : mineContentHtml({ interactive: true, loggedIn: state.loggedIn });
+    if (state.previewId) {
+      const g = GAMES.find(item => item.id === state.previewId);
+      if (g) html += sheetOverlayHtml(g, true);
+    }
+    if (state.mineSheet) html += mineSubSheetHtml(state.mineSheet);
+    if (state.authOpen) {
+      html += authSheetHtml({
+        mode: state.authMode,
+        interactive: true,
+        cooldown: state.authCooldown,
+        showPwd: state.authShowPwd,
+        agree: state.authAgree,
+        shake: state.authShake
+      });
+    }
+    if (state.confirmClear) html += clearConfirmDialogHtml();
+    if (state.toast) html += `<div class="phone-toast">${state.toast}</div>`;
+    el.innerHTML = html;
+
+    const sc = el.querySelector('.screen-scroll,.mine-scroll');
+    if (sc && prevScroll) sc.scrollTop = prevScroll;
+    const rail = el.querySelector('.filter-rail');
+    if (rail && prevRail) rail.scrollLeft = prevRail;
+  }
+
+  function renderStaticBoards() {
+    // 02 卡带预览抽屉（以水墨剑客为例）
+    const p2 = document.getElementById('sheetPhone');
+    applyTokens(p2);
+    p2.innerHTML = homeContentHtml({ interactive: false }) + sheetOverlayHtml(GAMES[0], false);
+
+    // 03 竖屏运行态（方块爆破）
+    const p3 = document.getElementById('portraitRunPhone');
+    applyTokens(p3);
+    p3.innerHTML = portraitRunHtml(GAMES[3], state.b3Mode === 'menu', false);
+
+    // 04 横屏引导蒙层（水墨剑客）
+    const p4 = document.getElementById('rotateGuidePhone');
+    applyTokens(p4);
+    p4.innerHTML = rotateGuideHtml(GAMES[0], false);
+
+    // 05 战绩档案
+    const p5 = document.getElementById('recordsPhone');
+    applyTokens(p5);
+    p5.innerHTML = recordsContentHtml(false);
+
+    // 06 分享直达落地页（暮色滑翔）
+    const p6 = document.getElementById('deeplinkPhone');
+    applyTokens(p6);
+    p6.innerHTML = deeplinkHtml(GAMES[2]);
+
+    // 07 我的页（通栏精修）
+    const p7 = document.getElementById('minePhone');
+    applyTokens(p7);
+    p7.innerHTML = mineContentHtml({ interactive: false, loggedIn: state.b7Mode === 'logged' });
+
+    // 08 登录注册弹窗（四态）
+    const p8 = document.getElementById('authPhone');
+    applyTokens(p8);
+    p8.innerHTML = mineContentHtml({ interactive: false, loggedIn: false }) + authSheetHtml({
+      mode: state.b8Mode,
+      interactive: false,
+      cooldown: state.b8Mode === 'reset' ? 48 : 0,
+      showPwd: false,
+      agree: true
+    });
+
+    // 04B 横屏真机运行态
+    const p4b = document.getElementById('landscapeRunPhone');
+    applyTokens(p4b);
+    p4b.innerHTML = landscapeRunHtml(GAMES[0], state.b4bMode === 'drawer');
+  }
+
+  function renderAll() {
+    renderLive();
+    renderStaticBoards();
+  }
+
+  let authTimer = null;
+  function startAuthCooldown() {
+    state.authCooldown = 60;
+    state.authForm.code = '684219';
+    renderLive();
+    showToast('演示验证码已发送：684219');
+    clearInterval(authTimer);
+    authTimer = setInterval(() => {
+      state.authCooldown = Math.max(0, state.authCooldown - 1);
+      if (state.authCooldown === 0) clearInterval(authTimer);
+      if (state.authOpen) renderLive();
+    }, 1000);
+  }
+
+  // 01 号可交互手机输入同步（不触发重绘以保持输入焦点）
+  document.getElementById('livePhone').addEventListener('input', (e) => {
+    const k = e.target.dataset?.authField;
+    if (k) state.authForm[k] = e.target.value;
+  });
+
+  // 01 号可交互手机事件委托
+  document.getElementById('livePhone').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-tab],[data-filter],[data-layout],[data-hero],[data-preview],[data-launch],[data-share],[data-fav],[data-auth-mode],[data-act],[data-toast]');
+    if (!t) return;
+
+    if (t.dataset.authMode) {
+      state.authMode = t.dataset.authMode;
+      state.authShowPwd = false;
+      renderLive();
+      return;
+    }
+
+    if (t.dataset.launch) {
+      e.stopPropagation();
+      const id = t.dataset.launch;
+      const g = GAMES.find(x => x.id === id);
+      if (!g) return;
+      state.lastGameId = id;
+      state.previewId = null;
+      state.mineSheet = null;
+      state.runningId = id;
+      state.hostMenuOpen = false;
+      state.runningStep = (g.orient === 'landscape' && state.rotateGuideOn) ? 'rotate' : 'play';
+      renderLive();
+      return;
+    }
+    if (t.dataset.fav) {
+      e.stopPropagation();
+      const id = t.dataset.fav;
+      const idx = state.favorites.indexOf(id);
+      if (idx >= 0) { state.favorites.splice(idx, 1); showToast('已从我的收藏移除'); }
+      else { state.favorites.push(id); showToast('已加入「我的 → 收藏」'); }
+      renderStaticBoards();
+      return;
+    }
+    if (t.dataset.preview) {
+      state.previewId = t.dataset.preview;
+      renderLive();
+      return;
+    }
+    if (t.dataset.share) {
+      e.stopPropagation();
+      showToast(`已复制直达链接：game.xiaban.xyz/#/play/${t.dataset.share}`);
+      return;
+    }
+    if (t.dataset.tab) {
+      state.tab = t.dataset.tab;
+      renderLive({ resetScroll: true });
+      return;
+    }
+    if (t.dataset.filter) {
+      state.filter = t.dataset.filter;
+      renderLive();
+      return;
+    }
+    if (t.dataset.layout) {
+      state.layout = t.dataset.layout;
+      renderLive();
+      return;
+    }
+    if (t.dataset.hero !== undefined) {
+      state.heroIdx = Number(t.dataset.hero);
+      renderLive();
+      return;
+    }
+    if (t.dataset.toast) {
+      showToast(t.dataset.toast);
+      return;
+    }
+
+    const act = t.dataset.act;
+    if (act === 'closeSheet') { state.previewId = null; renderLive(); }
+    else if (act === 'openHostMenu') { state.hostMenuOpen = true; renderLive(); }
+    else if (act === 'closeHostMenu') { state.hostMenuOpen = false; renderLive(); }
+    else if (act === 'enterLandscapePlay') { state.runningStep = 'play'; renderLive(); }
+    else if (act === 'exitGame') { state.runningId = null; state.hostMenuOpen = false; renderLive(); showToast('进度已保存在本机'); }
+    else if (act === 'restartGame') { state.hostMenuOpen = false; renderLive(); showToast('已重新开始本局'); }
+    else if (act === 'toggleMute') { state.muted = !state.muted; renderLive(); renderStaticBoards(); }
+    else if (act === 'toggleRotateGuide') { state.rotateGuideOn = !state.rotateGuideOn; renderLive(); renderStaticBoards(); }
+    else if (act === 'openAuth') {
+      state.authOpen = true;
+      state.authMode = 'code';
+      state.authShowPwd = false;
+      renderLive();
+    }
+    else if (act === 'closeAuth') { state.authOpen = false; renderLive(); }
+    else if (act === 'logout') {
+      state.loggedIn = false;
+      showToast('已退出登录，本机 4 份存档仍保留');
+    }
+    else if (act === 'sendCode') { startAuthCooldown(); }
+    else if (act === 'toggleAuthPwd') { state.authShowPwd = !state.authShowPwd; renderLive(); }
+    else if (act === 'toggleAuthAgree') { state.authAgree = !state.authAgree; state.authShake = false; renderLive(); }
+    else if (act === 'submitAuth') {
+      if (state.authMode !== 'reset' && !state.authAgree) {
+        state.authShake = true;
+        renderLive();
+        showToast('请先阅读并勾选用户协议与隐私政策');
+        setTimeout(() => { state.authShake = false; }, 320);
+        return;
+      }
+      if (state.authMode === 'register' && state.authForm.username.trim()) {
+        state.userName = state.authForm.username.trim();
+      }
+      state.loggedIn = true;
+      state.authOpen = false;
+      renderStaticBoards();
+      showToast(
+        state.authMode === 'register'
+          ? `欢迎你，${state.userName}！已同步 4 份本机存档`
+          : state.authMode === 'reset'
+            ? '密码已重置并登录成功'
+            : `已登录相伴账号（${state.userName}），本机存档已同步`
+      );
+    }
+    else if (act === 'cycleAccent') {
+      const idx = (ACCENTS.findIndex(a => a.color === state.accent) + 1) % ACCENTS.length;
+      const next = ACCENTS[idx];
+      state.accent = next.color;
+      state.accentSoft = next.soft;
+      document.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b.dataset.accent === next.color));
+      renderAll();
+      showToast(`主题强调色已切换为「${next.name}」`);
+    }
+    else if (act === 'openFavs') { state.mineSheet = 'favorites'; renderLive(); }
+    else if (act === 'openSaves') { state.mineSheet = 'saves'; renderLive(); }
+    else if (act === 'closeMineSheet') { state.mineSheet = null; renderLive(); }
+    else if (act === 'askClearSaves') { state.confirmClear = true; renderLive(); }
+    else if (act === 'cancelClearSaves') { state.confirmClear = false; renderLive(); }
+    else if (act === 'confirmClearSaves') { state.confirmClear = false; showToast('演示提示：正式版将清空当前浏览器游戏存档'); }
+    else if (act === 'goRecords') { state.tab = 'records'; renderLive({ resetScroll: true }); }
+    else if (act === 'toggleTheme') { setTheme(!state.dark); }
+    else if (act === 'roll') {
+      const pool = filteredGames(state.filter);
+      if (!pool.length) return;
+      let steps = 6;
+      const tick = () => {
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        state.rollingId = pick.id;
+        renderLive();
+        if (--steps > 0) setTimeout(tick, 85);
+        else setTimeout(() => { state.rollingId = null; state.previewId = pick.id; renderLive(); }, 180);
+      };
+      tick();
+    }
+  });
+
+  // 今日主打横滑手势支持（手机左右滑动切轮播）
+  let heroTouchX = 0, heroTouchY = 0;
+  const liveEl = document.getElementById('livePhone');
+  liveEl.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.hero-card') || !e.touches[0]) return;
+    heroTouchX = e.touches[0].clientX;
+    heroTouchY = e.touches[0].clientY;
+  }, { passive: true });
+  liveEl.addEventListener('touchend', (e) => {
+    if (!heroTouchX || !e.changedTouches[0]) return;
+    const dx = e.changedTouches[0].clientX - heroTouchX;
+    const dy = e.changedTouches[0].clientY - heroTouchY;
+    heroTouchX = 0; heroTouchY = 0;
+    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      const len = heroGames().length;
+      state.heroIdx = (state.heroIdx + (dx < 0 ? 1 : -1) + len) % len;
+      renderLive();
+    }
+  }, { passive: true });
+
+  // 顶部工作台控制
+  function setMode(mode) {
+    document.body.classList.toggle('mode-live', mode === 'live');
+    document.body.classList.toggle('mode-fullscreen', mode === 'fullscreen');
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  }
+
+  function setTheme(isDark) {
+    state.dark = isDark;
+    document.body.classList.toggle('studio-dark', isDark);
+    document.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('active', (b.dataset.theme === 'dark') === isDark));
+    renderAll();
+  }
+
+  document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => {
+    setMode(btn.dataset.mode);
+  }));
+
+  document.getElementById('fsExitBtn').addEventListener('click', () => {
+    setMode('all');
+    window.scrollTo(0, 0);
+  });
+
+  document.querySelectorAll('[data-width]').forEach(btn => btn.addEventListener('click', () => {
+    document.body.classList.toggle('compact', btn.dataset.width === '360');
+    document.querySelectorAll('[data-width]').forEach(b => b.classList.toggle('active', b === btn));
+  }));
+
+  document.querySelectorAll('[data-theme]').forEach(btn => btn.addEventListener('click', () => {
+    setTheme(btn.dataset.theme === 'dark');
+  }));
+
+  document.querySelectorAll('.swatch').forEach(btn => btn.addEventListener('click', () => {
+    state.accent = btn.dataset.accent;
+    state.accentSoft = btn.dataset.soft;
+    document.querySelectorAll('.swatch').forEach(b => b.classList.toggle('active', b === btn));
+    renderAll();
+  }));
+
+  document.getElementById('b3Seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-b3]');
+    if (!b) return;
+    state.b3Mode = b.dataset.b3;
+    document.querySelectorAll('#b3Seg button').forEach(x => x.classList.toggle('active', x === b));
+    renderStaticBoards();
+  });
+
+  document.getElementById('b4bSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-b4b]');
+    if (!b) return;
+    state.b4bMode = b.dataset.b4b;
+    document.querySelectorAll('#b4bSeg button').forEach(x => x.classList.toggle('active', x === b));
+    renderStaticBoards();
+  });
+
+  document.getElementById('b7Seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-b7]');
+    if (!b) return;
+    state.b7Mode = b.dataset.b7;
+    document.querySelectorAll('#b7Seg button').forEach(x => x.classList.toggle('active', x === b));
+    renderStaticBoards();
+  });
+
+  document.getElementById('b8Seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-b8]');
+    if (!b) return;
+    state.b8Mode = b.dataset.b8;
+    document.querySelectorAll('#b8Seg button').forEach(x => x.classList.toggle('active', x === b));
+    renderStaticBoards();
+  });
+
+  // 真实手机访问（视口 <= 540px）自动进入「真机全屏」免去手机套手机卡滑，仍可一键切回 6 画板总览
+  if (window.matchMedia('(max-width: 540px)').matches) {
+    setMode('fullscreen');
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
