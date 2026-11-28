@@ -91,3 +91,7 @@ tools/**/target/
 tools/compose-typecheck/build-src/
 tools/compose-typecheck/.gradle/
 client/xiaoban-multiplatform/androidApp/src/main/jniLibs/
+
+# 小伴游戏厅构建前自动同步的官方游戏副本
+client/xiaoban-games-h5/public/game-packs/
+client/xiaoban-games-h5/public/game-icons/

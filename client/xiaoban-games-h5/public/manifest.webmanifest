@@ -1,0 +1,19 @@
+{
+  "name": "小伴游戏厅",
+  "short_name": "小伴游戏厅",
+  "description": "零广告、免登录、打开即玩的精品移动端小游戏合集",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#e3203c",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

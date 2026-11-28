@@ -1,0 +1,95 @@
+# 香港云服务器宿主机 Nginx 静态站点配置：game.xiaban.xyz
+# 放进 /etc/nginx/conf.d/game.xiaban.xyz.conf
+# 首次申请 HTTPS 证书前，请先按 README.md 放置最小 80 配置并运行：
+#   sudo certbot certonly --webroot -w /var/www/certbot -d game.xiaban.xyz
+# 证书签发后替换为本配置并执行 sudo nginx -t && sudo systemctl reload nginx。
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name game.xiaban.xyz;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name game.xiaban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/game.xiaban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/game.xiaban.xyz/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    root /var/www/game.xiaban.xyz;
+    index index.html;
+
+    # Gzip 压缩（覆盖游戏 JS/CSS/SVG/JSON）
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml application/wasm;
+
+    # 基础安全头（允许同源 iframe 挂载游戏包）
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # 带内容哈希的 Vite 构建产物强缓存一年
+    location /assets/ {
+        expires 365d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # 官方游戏静态资源与图标（7 天缓存，兼顾更新与秒开）
+    location /game-packs/ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+        try_files $uri =404;
+    }
+    location /game-icons/ {
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
+        try_files $uri =404;
+    }
+
+    # 入口 HTML 与 PWA Service Worker 禁止强缓存，确保发版后立即生效
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    location = /sw.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    location = /manifest.webmanifest {
+        add_header Cache-Control "no-cache";
+    }
+
+    # 相伴统一账号中心同源代理（避免跨子域 CORS 拦截）
+    location ^~ /account-api/ {
+        proxy_pass https://account.xiangban.xyz/api/;
+        proxy_ssl_server_name on;
+        proxy_set_header Host account.xiangban.xyz;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass_header Retry-After;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 20s;
+    }
+
+    # SPA 回退
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
