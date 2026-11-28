@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -23,16 +24,25 @@ const GAME_IDS = [
   'jade-gomoku'
 ];
 
-const ICON_FILES = [
-  'ink-blade.png', 'ink-blade-cover.svg',
-  'water-sort.webp', 'water-sort-cover.svg',
-  'dusk-glider.png', 'dusk-glider-cover.svg',
-  'block-puzzle.webp', 'block-puzzle-cover.svg',
-  'merge-2048.png', 'merge-2048-cover.svg',
-  'snake-arena.png', 'snake-arena-cover.svg',
-  'pro-cube.png', 'pro-cube-cover.svg',
-  'jade-gomoku.png', 'jade-gomoku-cover.svg'
-];
+const ICON_SOURCES = {
+  'ink-blade': 'ink-blade.png',
+  'water-sort': 'water-sort.png',
+  'dusk-glider': 'dusk-glider.png',
+  'block-puzzle': 'block-puzzle.webp',
+  'merge-2048': 'merge-2048.png',
+  'snake-arena': 'snake-arena.png',
+  'pro-cube': 'pro-cube.png',
+  'jade-gomoku': 'jade-gomoku.png'
+};
+
+function hasCwebp() {
+  try {
+    execFileSync('cwebp', ['-version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const BRIDGE_TAG = '<script src="../../xb-bridge.js"></script>';
 
@@ -55,6 +65,8 @@ async function main() {
   await mkdir(outPacksDir, { recursive: true });
   await mkdir(outIconsDir, { recursive: true });
 
+  const canEncodeWebp = hasCwebp();
+
   for (const id of GAME_IDS) {
     const src = join(sourcePacksDir, id);
     const dst = join(outPacksDir, id);
@@ -68,16 +80,26 @@ async function main() {
       const raw = await readFile(entryPath, 'utf8');
       await writeFile(entryPath, injectBridge(raw, id), 'utf8');
     }
-  }
 
-  for (const file of ICON_FILES) {
-    const src = join(plazaIconsDir, file);
-    if (existsSync(src)) {
-      await cp(src, join(outIconsDir, file));
+    // 同步 16:9 矢量封面
+    const coverSrc = join(plazaIconsDir, `${id}-cover.svg`);
+    if (existsSync(coverSrc)) {
+      await cp(coverSrc, join(outIconsDir, `${id}-cover.svg`));
+    }
+
+    // 同步并压缩 1:1 图标为 160x160 高清 WebP
+    const iconSrc = join(plazaIconsDir, ICON_SOURCES[id]);
+    const iconDst = join(outIconsDir, `${id}.webp`);
+    if (existsSync(iconSrc)) {
+      if (canEncodeWebp) {
+        execFileSync('cwebp', ['-quiet', '-q', '82', '-m', '6', '-resize', '160', '160', iconSrc, '-o', iconDst]);
+      } else {
+        await cp(iconSrc, iconDst);
+      }
     }
   }
 
-  console.log(`[sync-games] 已同步 ${GAME_IDS.length} 款小伴官方游戏包与高清图标至 public/`);
+  console.log(`[sync-games] 已同步 ${GAME_IDS.length} 款官方游戏包与${canEncodeWebp ? '压缩 WebP ' : ''}图标至 public/`);
 }
 
 main().catch((err) => {

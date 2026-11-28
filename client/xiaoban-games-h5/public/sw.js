@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xiaoban-games-h5-v1';
+const CACHE_NAME = 'xiaoban-games-h5-v2';
 const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './xb-bridge.js'];
 
 self.addEventListener('install', (event) => {
